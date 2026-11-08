@@ -30,7 +30,8 @@ fn receipt() ! {
 	serial := os.read_file(work + '/serial.log')!
 	for marker in ['javascript DOM mutation: passed', 'javascript click event: passed',
 		'native wheel routing and scrolling: passed', 'ordinary element wheel listeners: passed',
-		'Ladybird V smoke check passed', 'VOX GUEST: self-test exit=0', 'VOX GUEST: native tests exit=0'] {
+		'Ladybird V smoke check passed', 'Vinix document baselines and native HTML controls: passed',
+		'VOX GUEST: self-test exit=0', 'VOX GUEST: native tests exit=0'] {
 		if !serial.contains(marker) { return error('missing guest check: ' + marker) }
 	}
 	if !serial.contains('VOX-MEMORY-SAMPLE RAM: ') || serial.count('VOX-PROCESS-STATM ') < 5 {
@@ -76,6 +77,9 @@ fn receipt() ! {
 	os.cp(work + '/browser-source/browserapp/browser_chrome_portable.v', work + '/browser-chrome-portable.v')!
 	os.cp(work + '/browser-source/main.v', work + '/browser-main.v')!
 	os.cp(work + '/browser-source/native/replay_scratch.v', work + '/browser-replay-scratch.v')!
+	for name in ['paint_transport.v', 'chromium_native_text_controls.v', 'vinix_native_controls.v'] {
+		os.cp(work + '/browser-source/layout/' + name, work + '/browser-' + name)!
+	}
 	os.cp(work + '/modules/ui2/ui/vox_native_font_metrics.v', work + '/native-font-metrics.v')!
 	os.cp(work + '/modules/processmetrics/vinix_memory.v', work + '/resident-memory.v')!
 	os.cp(work + '/modules/processmetrics/memory_default.v', work + '/memory-default.v')!
@@ -105,7 +109,8 @@ fn receipt() ! {
 		work + '/browser-main.v', work + '/browser-replay-scratch.v', work + '/include/native-tabs.h',
 		work + '/include/EGL/eglext_angle.h', work + '/native-font-metrics.v',
 		work + '/desktop-frame-tests.log', work + '/desktop-frame-build.log',
-		work + '/resident-memory.v', work + '/memory-default.v'] {
+		work + '/resident-memory.v', work + '/memory-default.v', work + '/browser-paint_transport.v',
+		work + '/browser-chromium_native_text_controls.v', work + '/browser-vinix_native_controls.v'] {
 		lines << fingerprint(path)! + '\t' + path
 	}
 	mut files := os.walk_ext(work + '/guest', '')
@@ -127,7 +132,8 @@ fn receipt() ! {
 		'ui2-source.patch', 'arena-tests-final.log', 'arena-runtime-receipt.tsv', 'initramfs.tar',
 		'boot.img', 'vars.fd', 'browser-chrome-portable.v', 'browser-main.v', 'browser-replay-scratch.v',
 		'vox.o.flags', 'native-font-metrics.v', 'desktop-frame-tests.log', 'desktop-frame-build.log',
-		'resident-memory.v', 'memory-default.v'])!
+		'resident-memory.v', 'memory-default.v', 'browser-paint_transport.v',
+		'browser-chromium_native_text_controls.v', 'browser-vinix_native_controls.v'])!
 	os.write_file(archive + '.sha256', fingerprint(archive)! + '\t' + archive + '\n')!
 	println('Guest checks passed; receipt: ' + work + '/receipt.tsv')
 	println(os.read_file(archive + '.sha256')!)

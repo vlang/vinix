@@ -6,15 +6,24 @@ JavaScript, browser tabs and UI2 chrome. The module overlay in
 UI2's native desktop embedding API. Frames use Vinix's shared surface protocol;
 keyboard and pointer events return through the desktop IPC connection.
 
-Browser controls use Vinix UI2 buttons and builtin navigation symbols; window
-management uses the desktop's outer title bar. Tab and bookmark favicons are
-published from Vox's decoded image cache as small shared surfaces, preserving
+Browser controls use Vinix UI2 buttons and Vox's PNG navigation icons. Vox's
+client title bar owns the window controls; the outer desktop frame is hidden.
+Tab and bookmark favicons are published from Vox's decoded image cache as
+small shared surfaces, preserving
 their alpha against the control background. The desktop never opens arbitrary
 PNG paths from the browser's cache.
 
 Page text is sent as clipped UI2 labels to the same Roboto coverage renderer as
 other Vinix apps. Line-box metrics are generated from `desktop/font_data.v`,
-including its nearest-size and weight selection. The private fontconfig setup
+including its nearest-size and weight selection. Text is placed at the layout
+baseline minus the selected desktop face's ascent, keeping link underlines
+aligned with the glyphs. Default HTML button bezels are sent as clipped native
+UI2 buttons while layout, captions and DOM input stay with Vox. Authored
+backgrounds, borders, radii, images and `appearance:none` keep their web paint.
+The browser's existing smoke entrypoint checks default/disabled buttons,
+hover/focus transitions, DOM mutation and these CSS overrides under both font
+rendering policies. Focused adapter tests check baseline selection, clipping
+and reuse of native button storage. The private fontconfig setup
 uses the same bundled Roboto and Roboto Mono files for document layout.
 
 The runtime dependency closure rejects X11, XCB, Wayland and GTK libraries.

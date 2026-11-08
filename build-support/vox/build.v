@@ -240,7 +240,7 @@ fn build() ! {
 		'-enable-globals', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-prealloc', '-w',
 		'-n', '-nocache', '-prod', '-d', 'ui2_headless', '-d', 'no_backtrace', '-d',
 		'no_segfault_handler', '-d', 'use_openssl', '-exclude', '@vlib/time/zoneinfo.native.v',
-		'-path', vox + '|' + modules + '|@vlib|@vmodules', '-o', work + '/vox.c', entry])!)
+		'-path', entry + '|' + vox + '|' + modules + '|@vlib|@vmodules', '-o', work + '/vox.c', entry])!)
 	finish_browser_source(vox, entry, work)!
 }
 
@@ -256,6 +256,9 @@ fn finish_browser_source(vox string, entry string, work string) ! {
 		return error('cross-generated browser is missing its arena allocator')
 	}
 	mut result := generated
+	if !generated.contains('layout__vinix_native_button(') || !generated.contains('gg__Context__draw_native_button(') {
+		return error('cross-generated browser is missing native document controls')
+	}
 	for base in [vox, entry] {
 		result = result.replace('#include "' + base + '/native_browser_tab_process_linux.h"',
 			'#include "' + work + '/include/native-tabs.h"')
@@ -271,10 +274,34 @@ fn stage_browser_source(vox string, work string) !string {
 	if os.exists(entry) { os.rmdir_all(entry)! }
 	os.mkdir_all(entry + '/browserapp')!
 	for name in os.ls(vox)! {
-		if name in ['browserapp', 'native', 'processmetrics', 'main.v', '.git'] { continue }
+		if name in ['browserapp', 'native', 'layout', 'processmetrics', 'main.v', '.git'] { continue }
 		os.symlink(vox + '/' + name, entry + '/' + name)!
 	}
 	os.symlink(work + '/modules/processmetrics', entry + '/processmetrics')!
+	os.mkdir_all(entry + '/layout')!
+	for name in os.ls(vox + '/layout')! {
+		if name != 'paint_transport.v' {
+			os.symlink(vox + '/layout/' + name, entry + '/layout/' + name)!
+		}
+	}
+	transport := os.read_file(vox + '/layout/paint_transport.v')!
+	native_control := '\t\t\tchromium_native_text_control(box)'
+	unselected := "\t\t\tkind: 'draw_text'\n\t\t\tx: run_left\n\t\t\ty: first.y"
+	selected := "\t\tkind: 'draw_text'\n\t\tx: fragment.x\n\t\ty: fragment.y"
+	for marker in [native_control, unselected, selected] {
+		if transport.count(marker) != 1 { return error('unsupported native document paint transport: ' + marker) }
+	}
+	os.write_file(entry + '/layout/paint_transport.v', transport
+		.replace(native_control, "\t\t\tif native := vinix_native_button(box) { native } else { chromium_native_text_control(box) }")
+		.replace(unselected, unselected + '\n\t\t\tglyph_translation_y: text_fragment_paint_top(first) + first.baseline')
+		.replace(selected, selected + '\n\t\tglyph_translation_y: text_fragment_paint_top(fragment) + fragment.baseline'))!
+	os.cp(os.dir(@FILE) + '/layout/native_controls.v', entry + '/layout/vinix_native_controls.v')!
+	controls := os.read_file(vox + '/layout/chromium_native_text_controls.v')!
+	control_marker := '\tsnapped := pixel_snapped_layout_rect(rect)\n\tinset := scale / 2'
+	if controls.count(control_marker) != 1 { return error('unsupported native control painting') }
+	os.rm(entry + '/layout/chromium_native_text_controls.v')!
+	os.write_file(entry + '/layout/chromium_native_text_controls.v', controls.replace(control_marker,
+		"\tif kind.starts_with('vinix_button') {\n\t\tcommands << PaintCommand{kind: kind, x: rect.x, y: rect.y, width: rect.width, height: rect.height, opacity: opacity}\n\t\treturn\n\t}\n" + control_marker))!
 	os.mkdir_all(entry + '/native')!
 	for name in os.ls(vox + '/native')! {
 		if name != 'replay_scratch.v' {
@@ -290,16 +317,27 @@ fn stage_browser_source(vox string, work string) !string {
 		.replace('&& app.ctx.native_rendering', '&& (app.ctx.native_rendering || ui2.native_chrome_ready())')
 		.replace('import platform', 'import platform\nimport ui2'))!
 	main_source := os.read_file(vox + '/main.v')!
+	if main_source.count('import gg\n') != 1 || main_source.count("\t\tprintln('Ladybird V smoke check passed')") != 1 {
+		return error('unsupported browser native checks entrypoint')
+	}
 	shadow_start := '\tindex := app.portable_shadow_image_index\n'
 	shadow_end := '\tapp.ctx.update_pixel_data(slot.image_id, bitmap.pixels.data)'
 	shadow_trim := '\t\t\tapp.portable_shadow_images = app.portable_shadow_images[..app.portable_shadow_image_index].clone()'
 	text_raster := '\t\t\t\t$if linux {\n\t\t\t\t\tif command.glyph_run != none {'
+	text_top := '\t\t\t\ttext_y := $if macos { native_text_draw_y(y, h) } $else { y }'
+	if main_source.count(text_top) != 2 || main_source.count("\t\t'draw_text' {\n\t\t\t{") != 1 {
+		return error('unsupported native text baseline replay')
+	}
 	if main_source.count(shadow_start) != 1 || main_source.count(shadow_end) != 1 || main_source.count(shadow_trim) != 1 {
 		return error('unsupported portable shadow cache')
 	}
 	if main_source.count(text_raster) != 1 { return error('unsupported portable text replay') }
 	// Native labels are painted by the compositor's Roboto coverage atlas.
 	os.write_file(entry + '/main.v', main_source
+		.replace('import gg\n', 'import gg\nimport ui2\n')
+		.replace("\t\tprintln('Ladybird V smoke check passed')", "\t\tvinix_document_checks()\n\t\tprintln('Ladybird V smoke check passed')")
+		.replace("\t\t'draw_text' {\n\t\t\t{", "\t\t'vinix_button', 'vinix_button_disabled' {\n\t\t\tapp.ctx.draw_native_button(x, y, w, h, command.kind == 'vinix_button')\n\t\t}\n\t\t'draw_text' {\n\t\t\t{")
+		.replace(text_top, text_top.replace('text_y :=', 'mut text_y :=') + '\n\t\t\t\t$if ui2_headless ? {\n\t\t\t\t\t_, baseline_y := paint_screen_point(*command, command.glyph_translation_x, command.glyph_translation_y, page_x, page_y, scroll_y)\n\t\t\t\t\ttext_y = baseline_y - f32(ui2.native_text_ascent(font_size, command.bold, command.mono))\n\t\t\t\t}')
 		.replace(text_raster, text_raster.replace('$if linux {', '$if linux && !ui2_headless ? {'))
 		.replace(shadow_start, '\tpersistent := platform.enter_persistent()\n' + shadow_start)
 		.replace(shadow_end, '\tplatform.leave_persistent(persistent)\n' + shadow_end)
@@ -309,6 +347,7 @@ fn stage_browser_source(vox string, work string) !string {
 		os.symlink(vox + '/browserapp/' + name, entry + '/browserapp/' + name)!
 	}
 	source := os.read_file(vox + '/browserapp/browser_chrome_portable.v')!
+	os.cp(os.dir(@FILE) + '/../../tests/vox/document_checks.v', entry + '/browserapp/vinix_document_checks.v')!
 	marker := '\t\t\tapp.browser_chrome = chrome'
 	if source.count(marker) != 1 { return error('unsupported portable browser chrome') }
 	patched := source.replace(marker,
@@ -513,12 +552,14 @@ fn stage_font_metrics(repo string, output string) ! {
 			if parts.len == 2 { fields[parts[0]] = parts[1].trim_space() }
 		}
 		if fields['raster_scale'] != '1' { continue }
-		entries << 'NativeFontMetrics{size: ${fields['size']}, bold: ${fields['bold']}, mono: ${fields['mono']}, height: ${fields['ascent'].int() + fields['descent'].int()}}'
+		entries << 'NativeFontMetrics{size: ${fields['size']}, bold: ${fields['bold']}, mono: ${fields['mono']}, ascent: ${fields['ascent']}, height: ${fields['ascent'].int() + fields['descent'].int()}}'
 	}
 	if entries.len == 0 { return error('desktop font metrics are missing') }
-	os.write_file(output, 'module ui2\nstruct NativeFontMetrics { size int\n bold bool\n mono bool\n height int }\n' +
+	os.write_file(output, 'module ui2\nstruct NativeFontMetrics { size int\n bold bool\n mono bool\n ascent int\n height int }\n' +
 		'const native_font_metrics = [\n' + entries.join(',\n') + '\n]\n' +
-		'fn native_text_line_height(size int, bold bool, mono bool) int {\nmut height := 0\nmut best := 1 << 30\nfor face in native_font_metrics {\nmut score := if face.size > size { face.size - size } else { size - face.size }\nif face.mono != mono { score += 100000 }\nif face.bold != bold { score += 1000 }\nif score < best { best = score\nheight = face.height }\n}\nreturn height\n}\n')!
+		'fn native_text_metrics(size int, bold bool, mono bool) NativeFontMetrics {\nmut selected := NativeFontMetrics{}\nmut best := 1 << 30\nfor face in native_font_metrics {\nmut score := if face.size > size { face.size - size } else { size - face.size }\nif face.mono != mono { score += 100000 }\nif face.bold != bold { score += 1000 }\nif score < best { best = score\nselected = face }\n}\nreturn selected\n}\n' +
+		'fn native_text_line_height(size int, bold bool, mono bool) int { return native_text_metrics(size, bold, mono).height }\n' +
+		'pub fn native_text_ascent(size int, bold bool, mono bool) int { return native_text_metrics(size, bold, mono).ascent }\n')!
 }
 
 struct RegexFile {

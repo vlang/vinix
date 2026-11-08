@@ -394,6 +394,59 @@ fn test_native_document_text_uses_desktop_fonts_and_preserves_clip_and_monospace
 	assert label.frame.height == 18
 }
 
+fn test_document_text_baselines_use_the_selected_desktop_face() {
+	ui2.native_release_resources()
+	defer { ui2.native_release_resources() }
+	mut context := gg.new_context(width: 200, height: 100)
+	context.scissor_rect(5, 6, 180, 80)
+	for size in [11, 13, 18, 28] {
+		for bold in [false, true] {
+			for mono in [false, true] {
+				ascent := ui2.native_text_ascent(size, bold, mono)
+				assert ascent > 0
+				context.draw_text(10, 40 - ascent, 'Link gyp', gg.TextCfg{size: size, bold: bold, mono: mono})
+				label := ui2.native_embedded_elements()[0].children[0]
+				assert int(label.frame.y) + 6 + ascent == 40
+				assert label.frame.height >= ascent
+			}
+		}
+	}
+	assert ui2.native_text_ascent(13, false, false) == 13
+	assert ui2.native_text_ascent(13, false, true) == 14
+}
+
+fn test_document_buttons_use_native_bezels_and_leave_input_to_the_dom() {
+	ui2.native_release_resources()
+	defer { ui2.native_release_resources() }
+	mut context := gg.new_context(width: 200, height: 100)
+	context.scissor_rect(5, 6, 180, 80)
+	mut storage := voidptr(unsafe { nil })
+	for index in 0 .. 64 {
+		enabled := index % 2 == 0
+		context.draw_native_button(2, 3, 100, 24, enabled)
+		tree := ui2.native_embedded_elements()
+		assert tree.len == 1 && tree[0].frame == ui2.rect(5, 6, 180, 80)
+		control := tree[0].children[0]
+		assert control.kind == .button && control.native_style
+		assert control.enabled == enabled && control.box.radius == 4
+		assert control.frame == ui2.rect(-3, -3, 100, 24)
+		assert control.id == '' && control.action_id == '' && !control.clickable
+		if index == 0 { storage = tree[0].children.data }
+		assert storage == tree[0].children.data
+	}
+	for _ in 0 .. 2 {
+		context.draw_native_button(2, 3, 100, 24, true)
+		context.draw_text(10, 7, 'Caption', gg.TextCfg{})
+		context.draw_native_button(2, 35, 100, 24, false)
+		context.draw_text(10, 39, 'Disabled', gg.TextCfg{})
+		tree := ui2.native_embedded_elements()
+		assert tree.len == 4
+		assert tree[0].children[0].kind == .button && tree[1].children[0].kind == .label
+		assert tree[2].children[0].kind == .button && tree[3].children[0].kind == .label
+		assert tree[1].children[0].text == 'Caption' && tree[3].children[0].text == 'Disabled'
+	}
+}
+
 fn test_vector_surface_has_the_compositors_real_buffer_layout() {
 	path := os.temp_dir() + '/vox-native-test-${os.getpid()}.surface'
 	defer { os.rm(path) or {} }

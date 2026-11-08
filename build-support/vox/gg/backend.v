@@ -717,6 +717,13 @@ pub fn (ctx &Context) draw_text(x int, y int, text string, cfg TextCfg) {
 	ui2.native_add_text(x, y, text, cfg.size, u32(cfg.color.r) << 16 | u32(cfg.color.g) << 8 | u32(cfg.color.b), cfg.bold, cfg.italic, cfg.mono, ctx.clip)
 }
 
+pub fn (ctx &Context) draw_native_button(x f32, y f32, width f32, height f32, enabled bool) {
+	mut owner := unsafe { &Context(ctx) }
+	previous := owner.native_cache_enter()
+	defer { owner.native_cache_leave(previous) }
+	ui2.native_add_document_button(x, y, width, height, enabled, ctx.clip)
+}
+
 @[export: 'gg__gg_event_fn']
 fn native_event(pointer voidptr, owner voidptr) {
 	event := unsafe { &Event(pointer) }

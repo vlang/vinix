@@ -11,6 +11,9 @@ __global vox_native_elements = []Element{}
 __global vox_native_action = EventFn(unsafe { nil })
 __global vox_native_text = []Element{}
 __global vox_native_text_cache = []Element{}
+__global vox_native_text_count = 0
+__global vox_native_button_cache = []Element{}
+__global vox_native_button_count = 0
 __global vox_native_wheel = fn (_ f64, _ f64, _ f64, _ f64) bool { return false }
 __global vox_native_vector_cache = map[string]string{}
 __global vox_native_vector_paths = map[string]string{}
@@ -20,6 +23,8 @@ pub fn native_embedded_elements() []Element {
 	mut elements := vox_native_text.clone()
 	elements << vox_native_elements
 	vox_native_text.clear()
+	vox_native_text_count = 0
+	vox_native_button_count = 0
 	return elements
 }
 
@@ -47,7 +52,7 @@ pub fn draw_embedded_elements(_ &gg.Context, elements []Element, images map[stri
 }
 
 pub fn native_add_text(x int, y int, text string, size int, color u32, bold bool, italic bool, mono bool, clip gg.Rect) {
-	index := vox_native_text.len
+	index := vox_native_text_count
 	if index >= vox_native_text_cache.len {
 		vox_native_text_cache << view('native-text-clip-${index}', rect(0, 0, 0, 0), BoxStyle{ transparent: true }, [
 			label('native-text-${index}', text.clone(), rect(0, 0, 0, 0), TextStyle{}),
@@ -75,6 +80,29 @@ pub fn native_add_text(x int, y int, text string, size int, color u32, bold bool
 	}
 	vox_native_text_cache[index] = Element{ ...vox_native_text_cache[index], frame: rect(clip.x, clip.y, clip.width, clip.height) }
 	vox_native_text << vox_native_text_cache[index]
+	vox_native_text_count++
+}
+
+pub fn native_add_document_button(x f32, y f32, width f32, height f32, enabled bool, clip gg.Rect) {
+	// An empty action/id keeps this visual control out of UI2's input targets.
+	// The browser continues receiving raw pointer events and dispatches DOM
+	// click/focus/keyboard behavior against its original layout box.
+	index := vox_native_button_count
+	if index >= vox_native_button_cache.len {
+		vox_native_button_cache << view('', rect(0, 0, 0, 0), BoxStyle{ transparent: true }, [
+			Element{ ...button('', '', rect(0, 0, 0, 0), BoxStyle{}, TextStyle{}), native_style: true },
+		])
+	}
+	mut children := unsafe { vox_native_button_cache[index].children }
+	children[0] = Element{
+		...children[0]
+		frame: rect(x - clip.x, y - clip.y, width, height)
+		box: BoxStyle{ bg: if enabled { u32(0xe4e9f1) } else { u32(0xf3f5f9) }, radius: 4 }
+		enabled: enabled
+	}
+	vox_native_button_cache[index] = Element{ ...vox_native_button_cache[index], frame: rect(clip.x, clip.y, clip.width, clip.height) }
+	vox_native_text << vox_native_button_cache[index]
+	vox_native_button_count++
 }
 
 pub fn install_embedded_wheel(handler fn (f64, f64, f64, f64) bool) { vox_native_wheel = handler }
@@ -111,6 +139,9 @@ pub fn native_release_resources() {
 	vox_native_action = EventFn(unsafe { nil })
 	vox_native_text = []Element{}
 	vox_native_text_cache = []Element{}
+	vox_native_text_count = 0
+	vox_native_button_cache = []Element{}
+	vox_native_button_count = 0
 	for _, path in vox_native_vector_paths { os.rm(path) or {} }
 	for _, path in vox_native_icon_paths { os.rm(path) or {} }
 	vox_native_vector_paths.clear()
