@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<title>Vox on Vinix</title>
+<style>
+body { margin: 0; color: #23344d; background: #f4f7fb; font-family: sans-serif; }
+header { padding: 20px 32px; background: #e7effc; border-bottom: 1px solid #c8d8f1; }
+h1 { font-size: 36px; margin: 4px 0 8px; color: #2455a2; }
+header p { font-size: 16px; margin: 0; }
+main { padding: 12px 32px; }
+h2 { font-size: 21px; margin: 4px 0 8px; }
+p { font-size: 15px; line-height: 1.3; margin: 6px 0; }
+.card { padding: 10px 20px; background: white; border: 1px solid #dce4ef; border-radius: 10px; margin-bottom: 12px; }
+a { color: #2455a2; }
+small { color: #68788f; }
+</style>
+<header><p>VOX WEB BROWSER</p><h1>Hello, Vinix.</h1><p>A native window. A V browser engine. UI2.</p></header>
+<main>
+<div class="card"><h2>The web, on your desktop</h2><p>This page is parsed and laid out by Vox's HTML and CSS engine.<br>UI2 sends the page and browser controls to the Vinix compositor.</p></div>
+<div class="card"><h2>Take a look around</h2><p><a href="vox-welcome.html">Reload this welcome page</a> &nbsp; · &nbsp; <a href="https://example.com">Visit example.com</a></p><p>Enter an address above, follow a link, or open another tab.</p><p id="script-status">Starting JavaScript...</p><button id="script-button">Test JavaScript</button></div>
+<p><small>Vox · V + UI2 · Vinix</small></p>
+</main>
+<script>
+document.getElementById('script-status').textContent = 'JavaScript is running.';
+document.getElementById('script-button').addEventListener('click', function () {
+  document.getElementById('script-status').textContent = 'JavaScript click received on Vinix.';
+});
+</script>
+</html>

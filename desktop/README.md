@@ -458,6 +458,13 @@ The direct launcher writes Firefox's upstream graphics and GTK diagnostics to
 enable glamor/DRI3 and Firefox WebRender over X11 EGL. The embedded window uses
 Xvfb's software surface so the native compositor can copy it into the desktop.
 
+Vox has a native UI2 Start-menu entry. Its CPU renderer publishes shared
+surfaces directly to the Vinix compositor, with browser input over native IPC.
+The browser uses its existing DOM, layout, JavaScript and tab implementation;
+its private runtime needs no X11 libraries or display server. See
+[the Vox workflow](../tests/vox/README.md) for cross-building, staging and
+capturing it on the desktop.
+
 Zed is also a hosted X11 application, with its own Start-menu entry, official
 icon, input and clipboard forwarding. Its native AArch64 Alpine APK runs with a
 private musl/Vulkan dependency tree under `/usr/libexec/vinix-zed/root`; Mesa's
