@@ -670,11 +670,20 @@ fn native(repo string, vox string, work string, sysroot string) ! {
 	println('Compiling Vox for native Vinix')
 	stamp := work + '/vox.o.sha256'
 	fingerprint := sha256.sum(os.read_bytes(work + '/vox.c')!).hex()
+	mut browser_flags := common.clone()
+	// This compiler retains vlib's Brotli helper but emits its V name despite
+	// the export attribute. Bind the C spelling to that exact retained helper.
+	// MSan's __msan_unpoison selection remains owned by vlib's preprocessor.
+	generated := os.read_file(work + '/vox.c')!
+	if generated.contains('void compress__brotli__unpoison_noop(')
+		&& !generated.contains('void v_brotli_unpoison_noop(') {
+		browser_flags << '-Dv_brotli_unpoison_noop=compress__brotli__unpoison_noop'
+	}
 	flags_stamp := work + '/vox.o.flags'
-	if !os.is_file(work + '/vox.o') || (os.read_file(stamp) or { '' }) != fingerprint || (os.read_file(flags_stamp) or { '' }) != common.join('\n') {
-		run([llvm + '/clang', ...common, '-O0', '-c', work + '/vox.c', '-o', work + '/vox.o'])!
+	if !os.is_file(work + '/vox.o') || (os.read_file(stamp) or { '' }) != fingerprint || (os.read_file(flags_stamp) or { '' }) != browser_flags.join('\n') {
+		run([llvm + '/clang', ...browser_flags, '-O0', '-c', work + '/vox.c', '-o', work + '/vox.o'])!
 		os.write_file(stamp, fingerprint)!
-		os.write_file(flags_stamp, common.join('\n'))!
+		os.write_file(flags_stamp, browser_flags.join('\n'))!
 	}
 	run([llvm + '/clang', ...common, '-O1', '-c', work + '/desktop/execinfo.c', '-o',
 		work + '/execinfo.o'])!
