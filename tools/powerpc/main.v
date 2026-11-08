@@ -128,6 +128,9 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool, runtime_p
 	}
 	if !test {
 		if !graphics { args << '-nographic' }
+		$if macos {
+			if graphics { args << ['-display', 'cocoa,zoom-to-fit=on,zoom-interpolation=off'] }
+		}
 		args << ['-serial', 'mon:stdio']
 		record_qemu(output, qemu, args)!
 		mut argv := [qemu]
