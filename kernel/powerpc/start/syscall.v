@@ -19,6 +19,7 @@ mut:
 
 __global descriptors [16]Descriptor
 __global io_buffer [4096]u8
+__global syscall_trace_count u32
 
 fn copy_to_user(address u32, source &u8, size u32) bool {
 	if !user_space.accessible(address, size, true) { return false }
@@ -88,7 +89,10 @@ fn user_path(address u32) int {
 	return -36
 }
 
-fn sys_open(path u32, flags u32) int {
+fn sys_open(path u32, requested_flags u32) int {
+	// The read-only archive has no symlinks, controlling terminals or 32-bit
+	// file-size limit. CLOEXEC becomes relevant when exec is implemented.
+	flags := requested_flags & ~u32(0x9c100)
 	length := user_path(path)
 	if length < 0 { return length }
 	if length == 0 || io_buffer[0] != `/` { return -2 }
@@ -112,6 +116,7 @@ fn sys_open(path u32, flags u32) int {
 	if flags != 0 && !(pointer_device && flags == 0x800) && !((packet_device || framebuffer_device) && flags == 2) && !(audio_device && (flags == 1 || flags == 2)) { return -30 }
 	node := if pointer_device { -6 } else if framebuffer_device { -5 } else if audio_device { -4 } else if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
 	if node == -1 { return -2 }
+	if requested_flags & 0x4000 != 0 && node != -2 && (node < 0 || !rootfs.files[node].directory) { return -20 }
 	for fd in 3 .. 16 {
 		if !descriptors[fd].used {
 			descriptors[fd] = Descriptor{ used: true, writable: flags == 1 || flags == 2, file: node }
@@ -313,6 +318,7 @@ fn syscall(mut frame exception.Frame) {
 			}
 		}
 		20 { result = 1 }
+		24, 47, 49, 50 { result = 0 } // the initial process has real/effective UID/GID 0
 		45 { result = sys_brk(frame.gpr[3]) }
 		54 { result = sys_ioctl(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		91 {
@@ -323,16 +329,34 @@ fn syscall(mut frame exception.Frame) {
 		122 { result = sys_uname(frame.gpr[3]) }
 		141 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		146 { result = sys_writev(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		182 {
+			result = if frame.gpr[4] < 2 { -34 }
+				else if copy_to_user(frame.gpr[3], unsafe { &u8(c'/') }, 2) { 2 } else { -14 }
+		}
 		192 {
 			result = if frame.gpr[6] & 0x20 != 0 { anonymous_map(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[6], frame.gpr[8]) }
 				else { framebuffer_map(frame.gpr[3], frame.gpr[4], frame.gpr[5], frame.gpr[6], frame.gpr[7], frame.gpr[8]) }
 		}
 		232 { result = if frame.gpr[3] == 0 || user_space.accessible(frame.gpr[3], 4, true) { 1 } else { -14 } }
+		223 {
+			buffer_word(0, 1)
+			result = if frame.gpr[3] != 0 && frame.gpr[3] != 1 { -3 }
+				else if frame.gpr[4] < 4 { -22 }
+				else if copy_to_user(frame.gpr[5], unsafe { &io_buffer[0] }, 4) { 4 } else { -14 }
+		}
 		403 { result = sys_clock64(frame.gpr[3], frame.gpr[4]) }
 		else {}
 	}
 	frame.cr &= ~u32(0x10000000)
 	if result < 0 {
+		$if ppc_trace_syscalls ? {
+			if result != -11 && syscall_trace_count < 128 {
+				syscall_trace_count++
+				serial.text(c'syscall '); serial.hex(frame.gpr[0])
+				serial.text(c' errno '); serial.hex(u32(-result))
+				serial.text(c' pc '); serial.hex(frame.pc); serial.text(c'\n')
+			}
+		}
 		frame.cr |= 0x10000000
 		frame.gpr[3] = u32(-result)
 	} else {

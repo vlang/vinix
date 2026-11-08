@@ -70,9 +70,12 @@ fn build(root string, output string, runtime_probe bool) ! {
 }
 
 fn cross_build(root string, output string, v string, zig string, headers string, source string, generated string, binary string, entry string) ! {
-	command([v, '-shared', '-no-builtin', '-no-closures', '-enable-globals', '-os', 'vinix', '-arch',
+	mut generate := [v, '-shared', '-no-builtin', '-no-closures', '-enable-globals', '-os', 'vinix', '-arch',
 		'ppc', '-target-libc-headers', '-nofloat', '-gc', 'none', '-manualfree', '-o',
-		output + '/${generated}.c', '-path', '@vlib|' + root + '/kernel', root + '/' + source])!
+		output + '/${generated}.c', '-path', '@vlib|' + root + '/kernel']
+	if os.getenv('VINIX_PPC_TRACE') == '1' { generate << ['-d', 'ppc_trace_syscalls'] }
+	generate << root + '/' + source
+	command(generate)!
 	// Use musl's type declarations, but the V freestanding runtime owns
 	// memcpy/memset. V's exported voidptr lacks C's const qualifier.
 	command([zig, 'cc', '-target', 'powerpc-linux-musl', '-mcpu=7450-hard_float', '-O2', '-D_STRING_H', '-isystem',
@@ -168,7 +171,7 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool, runtime_p
 		child.close()
 	}
 	mut log := ''
-	deadline := time.now().add(20 * time.second)
+	deadline := time.now().add(60 * time.second)
 	for time.now() < deadline && child.is_alive() {
 		log = os.read_file(log_path)!
 		if log.contains(marker) || log.contains('VINIX-PPC: FAIL') || log.contains('VINIX-PPC: PANIC') {

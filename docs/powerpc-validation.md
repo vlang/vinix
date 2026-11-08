@@ -309,3 +309,17 @@ source overlays:
   `4bdb5879c7403354a0aaafbf0b16895aa28ac1b518a5fbd82cf3856e7efedfcc`.
 - `/tmp/vinix-ppc-large-regression`, `SHA256SUMS`:
   `daeea1f3821f178ac84abf1e39786c327f48c581ad68e876636374f51ec21e20`.
+
+## Desktop process identity and startup calls (2026-11-08)
+
+The initial process now reports root UID/GID, `/` as its working directory,
+and CPU 0 as its affinity. Read-only opens accept the libc metadata flags
+while enforcing `O_DIRECTORY`. The real musl probe checks all four identity
+calls, cwd and affinity buffer errors, nonexistent PIDs, 200 open/read/close
+cycles, directory rejection and write rejection. All checks and the existing
+heap/FPU runtime checks pass in a 128 MiB guest.
+
+`VINIX_PPC_TRACE=1` enables bounded failed-syscall diagnostics. The boot deadline
+is 60 seconds to accommodate larger native applications. Bundle, based on
+`9a7253674` with preserved sources: `/tmp/vinix-ppc-startup-runtime`;
+`SHA256SUMS`: `4d6a6bdfd15fcf08b77735a8063570808927096fce98c8fd82de65c68bd7a60e`.

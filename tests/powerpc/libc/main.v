@@ -12,6 +12,8 @@ module main
 #include <sys/sysinfo.h>
 #include <time.h>
 #include <math.h>
+#include <fcntl.h>
+#include <sched.h>
 
 struct C.timespec { tv_sec i64 tv_nsec i64 }
 struct C.sysinfo { freeram u32 }
@@ -29,6 +31,39 @@ fn C.mmap(voidptr, usize, i32, i32, i32, i64) voidptr
 fn C.munmap(voidptr, usize) i32
 fn C.clock_gettime(i32, &C.timespec) i32
 fn C.sin(f64) f64
+fn C.getuid() u32
+fn C.getgid() u32
+fn C.geteuid() u32
+fn C.getegid() u32
+fn C.getcwd(&char, usize) &char
+fn C.open(&char, i32, ...voidptr) i32
+fn C.read(i32, voidptr, usize) i32
+fn C.sched_getaffinity(i32, usize, voidptr) i32
+
+fn startup_services() bool {
+	unsafe {
+		if C.getuid() != 0 || C.geteuid() != 0 || C.getgid() != 0 || C.getegid() != 0 { return false }
+		mut cwd := [8]char{}
+		if C.getcwd(&cwd[0], 8) != &cwd[0] || C.strcmp(&cwd[0], c'/') != 0 { return false }
+		if C.getcwd(&cwd[0], 1) != nil || *C.__errno_location() != 34 { return false }
+		if C.getcwd(&char(1), 8) != nil || *C.__errno_location() != 14 { return false }
+		mut cpus := [4]u32{init: 0xffffffff}
+		if C.sched_getaffinity(0, 16, voidptr(&cpus[0])) != 0 || cpus[0] != 1
+			|| cpus[1] != 0 || cpus[2] != 0 || cpus[3] != 0 { return false }
+		if C.sched_getaffinity(2, 16, voidptr(&cpus[0])) != -1 || *C.__errno_location() != 3 { return false }
+		if C.sched_getaffinity(1, 3, voidptr(&cpus[0])) != -1 || *C.__errno_location() != 22 { return false }
+		if C.sched_getaffinity(1, 16, voidptr(1)) != -1 || *C.__errno_location() != 14 { return false }
+		for _ in 0 .. 200 {
+			fd := C.open(c'/etc/motd', C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW | C.O_NOCTTY)
+			if fd < 3 || C.read(fd, &cwd[0], 8) != 8 || C.close(fd) != 0 { return false }
+		}
+		fd := C.open(c'/', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
+		if fd < 3 || C.close(fd) != 0 { return false }
+		if C.open(c'/etc/motd', C.O_RDONLY | C.O_DIRECTORY) != -1 || *C.__errno_location() != 20 { return false }
+		if C.open(c'/etc/motd', C.O_WRONLY | C.O_CLOEXEC) != -1 || *C.__errno_location() != 30 { return false }
+		return true
+	}
+}
 
 fn fail(stage &char) i32 {
 	C.printf(c'VINIX-PPC: FAIL libc %s\n', stage)
@@ -43,6 +78,8 @@ fn entry(argc i32, argv &&char) i32 {
 		if path == nil || C.strcmp(path, c'/bin:/usr/bin') != 0 { return fail(c'environment') }
 		if C.getauxval(6) != 4096 || C.getauxval(3) == 0 || C.getauxval(5) == 0 { return fail(c'auxiliary vector') }
 		if C.getpid() != 1 || C.close(-1) != -1 || *C.__errno_location() != 9 { return fail(c'TLS errno') }
+		if !startup_services() { return fail(c'identity cwd affinity open flags') }
+		C.printf(c'VINIX-PPC: PASS libc identity cwd affinity open flags\n')
 		mut start := C.timespec{}
 		if C.clock_gettime(1, &start) != 0 { return fail(c'monotonic clock') }
 		mut stable_free := u32(0)
