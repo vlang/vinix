@@ -73,6 +73,12 @@ v -o /tmp/ppc-check-setup run tests/powerpc/check-setup.v /tmp/vinix-ppc-desktop
 Set `VINIX_PPC_TEST_STABILITY=1` on the capture command for 20 additional
 frames checked by the same verifier. Images and logs stay outside Git.
 
+On macOS, add `-display cocoa,zoom-to-fit=on,zoom-interpolation=off` to enlarge
+the guest display as you resize the window, with sharp pixel scaling. The
+existing window offers **View → Zoom To Fit**. An 800x600 guest displayed in
+a 1600x1200 area is 2x; 3200x2400 is 4x if the host screen is large enough.
+This scales the display without changing the guest's framebuffer resolution.
+
 ```
 v run tools/powerpc test /tmp/vinix-ppc-state
 v run tools/powerpc test-media /tmp/vinix-ppc-cd-state
