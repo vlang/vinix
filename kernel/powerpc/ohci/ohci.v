@@ -29,6 +29,7 @@ mut:
 	dma u32
 	ports u32
 	count u32
+	next_address u32
 	endpoints [8]Endpoint
 }
 
@@ -133,18 +134,37 @@ fn enumerate(mut host Controller, port u32, mut pool pages.Pool) {
 	flags := mmio.read32(status)
 	if flags & 3 != 3 { return }
 	low := flags & 0x200 != 0
+	if !enumerate_device(mut host, port, low, 0, mut pool) {
+		mmio.write32(status, 1) // isolate a device which may still answer at address zero
+	}
+}
+
+fn enumerate_device(mut host Controller, port u32, low bool, depth u32, mut pool pages.Pool) bool {
+	if host.next_address > 32 { return false }
 	buffer := unsafe { &u8(host.dma + 1024) }
-	if transfer(mut host, 0, low, 8, 0x0680, 0x0100, 0, 8) < 8 { return }
+	if transfer(mut host, 0, low, 8, 0x0680, 0x0100, 0, 8) < 8 { return false }
+	class := unsafe { u32(buffer[4]) }
 	packet := unsafe { u32(buffer[7]) }
-	if packet != 8 && packet != 16 && packet != 32 && packet != 64 { return }
-	address := port + 1
-	if transfer(mut host, 0, low, packet, 0x0500, address, 0, 0) < 0 { return }
+	if (packet != 8 && packet != 16 && packet != 32 && packet != 64) || (low && packet != 8) { return false }
+	address := host.next_address
+	if transfer(mut host, 0, low, packet, 0x0500, address, 0, 0) < 0 { return false }
+	host.next_address++
 	delay(2)
+	configure_device(mut host, address, packet, class, port, low, depth, mut pool)
+	return true
+}
+
+fn configure_device(mut host Controller, address u32, packet u32, class u32, port u32, low bool, depth u32, mut pool pages.Pool) {
+	buffer := unsafe { &u8(host.dma + 1024) }
 	if transfer(mut host, address, low, packet, 0x0680, 0x0200, 0, 9) < 9 { return }
 	length := unsafe { u32(buffer[2]) | u32(buffer[3]) << 8 }
 	if length < 9 || length > 1024 || transfer(mut host, address, low, packet, 0x0680, 0x0200, 0, length) != int(length) { return }
-	if !low && discover_audio(mut host, address, packet, port, length, mut pool) { return }
 	configuration := unsafe { u32(buffer[5]) }
+	if !low && class == 9 {
+		enumerate_hub(mut host, address, packet, configuration, port, depth, mut pool)
+		return
+	}
+	if !low && discover_audio(mut host, address, packet, port, length, mut pool) { return }
 	mut kind := u32(0)
 	mut interface_number := u32(0)
 	mut endpoint := u32(0)
@@ -188,6 +208,7 @@ pub fn init(info &boot.Info, mut pool pages.Pool) {
 		if device.class != 0x0c0310 || device.size < 0x60 || controller_count == 4 || !pci.enable(unsafe { &device }) { continue }
 		mut host := unsafe { &controllers[controller_count] }
 		host.base = device.base
+		host.next_address = 1
 		if mmio.read32(host.base) & 255 != 0x10 { continue }
 		mmio.write32(host.base + 0x14, 0xffffffff)
 		mmio.write32(host.base + 4, 0)

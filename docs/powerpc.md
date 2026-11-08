@@ -85,9 +85,17 @@ The same variable on `test-shell` verifies framebuffer RGB colors and text,
 types a command through QEMU's USB keyboard, and checks mouse movement and
 button press/release against screenshot pixels. OHCI uses little-endian
 descriptors, explicit G4 DMA cache ownership and bounded polling. This first
-driver supports directly attached boot-protocol HID devices present at boot;
-USB hubs, reconnection, key repeat, storage and EHCI remain pending. It does
+driver supports boot-protocol HID devices present at boot, directly attached
+or behind full-speed hubs (up to eight ports, four tiers and 32 addresses).
+It powers and resets downstream ports before assigning unique addresses;
+failed address assignments disable the port to isolate address zero.
+Reconnection, key repeat, storage and EHCI remain pending. It does
 not call firmware for keyboard, mouse or console output after takeover.
+
+Set `VINIX_PPC_USB_HUB=1` to exercise two nested hubs: the keyboard is behind
+the first, and the mouse and speaker behind the second. The second hub has
+switchable port power. Combine it with `VINIX_PPC_MEMORY=128` and
+`VINIX_PPC_GRAPHICS=1` on `test-shell` to verify all three drivers together.
 
 The GEM Ethernet driver enables Apple UniNorth GMAC MMIO and bus mastering,
 finds its MII PHY, negotiates 10/100 duplex, and uses separate 32-entry RX/TX
@@ -218,7 +226,7 @@ Shared Vinix scheduler, filesystem and desktop integration remain pending.
    that does not establish a memory budget for the eventual desktop.
 6. **Working in QEMU:** inherited 32-bit framebuffer console and OHCI USB
    keyboard/mouse, GEM Ethernet DMA, DHCP/ARP/ICMP and USB PCM output. Pending:
-   full desktop, USB hubs/hotplug/EHCI, TCP/IP sockets, built-in iMac audio,
+   full desktop, USB hotplug/EHCI, TCP/IP sockets, built-in iMac audio,
    real-machine ATA/DBDMA, PMU and
    hardware boot tests. Identify the
    exact iMac revision before selecting its built-in audio codec.

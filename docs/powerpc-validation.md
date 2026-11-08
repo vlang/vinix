@@ -175,3 +175,16 @@ Bundle: `/tmp/vinix-ppc-audio-final`, base `984ff5b92` plus preserved sources.
 This verifies the fixed-format USB output in QEMU. Native iMac speakers,
 other USB audio profiles, input capture and asynchronous mixing are untested
 or unimplemented, as detailed in the port document.
+
+## Nested USB hubs
+
+The complete graphics/input/audio/network shell suite passes with 128 MiB
+RAM and two external hub tiers. The keyboard is on the first hub; the mouse
+and speaker are on the second, which requires per-port power switching.
+There are no directly attached HID devices in this topology. The same
+screenshot, PCM waveform and packet-capture checks pass, including keyboard
+events during audio playback and stable free pages. Enumeration supports
+bounded USB 1.1 hub traversal; reconnection remains separate work.
+
+Bundle: `/tmp/vinix-ppc-hubs-final`, base `6fa5980cd` plus preserved sources.
+`SHA256SUMS`: `81ffb33dd9d52f5af5eb53daedb301e719e92d095f3800208b854353bb40b1aa`.

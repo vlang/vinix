@@ -77,14 +77,20 @@ fn cross_build(root string, output string, v string, zig string, headers string,
 fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	qemu := tool('VINIX_PPC_QEMU', 'qemu-system-ppc')!
 	graphics := os.getenv('VINIX_PPC_GRAPHICS') == '1'
+	hubs := os.getenv('VINIX_PPC_USB_HUB') == '1'
 	memory := strconv.parse_uint(os.getenv_opt('VINIX_PPC_MEMORY') or { '512' }, 10, 32)!
 	if memory < 128 || memory > 2048 { return error('VINIX_PPC_MEMORY must be 128..2048 MiB') }
-	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
+	mut args := ['-M', if hubs { 'mac99,via=pmu,usb=off' } else { 'mac99,via=pmu' }, '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
 		'-nic', 'user,model=sungem,id=net0', '-no-reboot']
+	if hubs {
+		args << ['-device', 'pci-ohci,id=ohci', '-device', 'usb-hub,id=hub,bus=ohci.0,port=1',
+			'-device', 'usb-kbd,bus=ohci.0,port=1.1', '-device', 'usb-hub,id=nested,bus=ohci.0,port=1.2,ports=4,port-power=on',
+			'-device', 'usb-mouse,bus=ohci.0,port=1.2.1']
+	}
 	if graphics { args << ['-prom-env', 'output-device=scca'] }
 	if shell {
 		args << ['-audiodev', if test { 'wav,id=sound,path=' + (output + '/audio.wav').replace(',', ',,') + ',out.frequency=48000,out.channels=2,out.format=s16' } else { (os.getenv_opt('VINIX_PPC_AUDIO') or { 'coreaudio' }) + ',id=sound' },
-			'-device', 'usb-audio,id=usb_sound,audiodev=sound,port=3']
+			'-device', 'usb-audio,id=usb_sound,audiodev=sound,' + if hubs { 'bus=ohci.0,port=1.2.2' } else { 'port=3' }]
 	}
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
@@ -162,6 +168,9 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		return error('PPC boot did not reach the requested milestone; see ${log_path}')
 	}
 	if shell {
+		if hubs && (!log.contains('USB hub ready, depth 0x00000001') || !log.contains('USB hub ready, depth 0x00000002')) {
+			return error('Both USB hub tiers must enumerate before input and audio tests')
+		}
 		exercise_usb(mut child, output, log_path, graphics)!
 		exercise_shell(mut child, output, log_path)!
 		validate_packets(os.read_bytes(output + '/network.pcap')!)!
