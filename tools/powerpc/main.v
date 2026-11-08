@@ -47,7 +47,7 @@ fn build(root string, output string) ! {
 	headers := zig_headers(zig)!
 	command([v, '-shared', '-no-builtin', '-no-closures', '-enable-globals', '-os', 'vinix', '-arch',
 		'ppc', '-target-libc-headers', '-nofloat', '-gc', 'none', '-manualfree', '-o',
-		output + '/loader.c', root + '/powerpc-boot'])!
+		output + '/loader.c', '-path', '@vlib|' + root + '/kernel', root + '/powerpc-boot'])!
 	// Use musl's type declarations, but the V freestanding runtime owns
 	// memcpy/memset. V's exported voidptr lacks C's const qualifier.
 	command([zig, 'cc', '-target', 'powerpc-linux-musl', '-mcpu=7450', '-O2', '-D_STRING_H', '-isystem',
@@ -95,7 +95,8 @@ fn boot(output string, test bool) ! {
 		time.sleep(10 * time.millisecond)
 	}
 	print(log)
-	if !log.contains('VINIX-PPC: PASS firmware discovery') || log.contains('VINIX-PPC: FAIL') {
+	if !log.contains('VINIX-PPC: PASS firmware discovery')
+		|| !log.contains('VINIX-PPC: PASS cpu clock atomics cache') || log.contains('VINIX-PPC: FAIL') {
 		return error('PPC boot did not reach the firmware milestone; see ${output}/boot.log')
 	}
 	for line in log.split_into_lines() {

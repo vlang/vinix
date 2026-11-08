@@ -35,8 +35,9 @@ fn get_property(node u32, name &char, buffer voidptr, size u32) int {
 
 fn puts(text &char) {
 	mut size := u32(0)
-	unsafe { for text[size] != 0 { size++ }
-	 }
+	unsafe {
+		for text[size] != 0 { size++ }
+	}
 	mut done := u32(0)
 	for done < size {
 		mut call := Call{ service: c'write', nargs: 3, nret: 1 }
@@ -69,5 +70,9 @@ fn entry(_ u32, _ u32, client Client) {
 		return
 	}
 	puts(c'VINIX-PPC: PASS ppc32 big-endian firmware\r\n')
+	if !check_cpu() {
+		puts(c'VINIX-PPC: FAIL cpu primitives\r\n')
+		return
+	}
 	if !discover() { puts(c'VINIX-PPC: FAIL firmware discovery\r\n') }
 }

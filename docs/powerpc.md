@@ -11,6 +11,10 @@ and `qemu-system-ppc`. Apple Clang does not include that backend. All maintained
 build and test tooling is V. Zig compiles V's generated C; no Zig application
 source, hosted libc, or Python is used.
 
+The CPU backend requires V commit `b7b4dd46ee` (raw PPC assembly support), or
+a later compiler containing that change. It is installed in the sibling `../v`
+checkout. An alternate compiler can be selected with `VINIX_V_COMPILER`.
+
 ```
 v run tools/powerpc test /tmp/vinix-ppc-state
 v run tools/powerpc run /tmp/vinix-ppc-state
@@ -53,8 +57,11 @@ Add `-S -s` to stop at reset and attach a PowerPC-capable GDB on port 1234.
 2. **Working in QEMU:** available-memory map with loader exclusions, copied
    device tree, optional framebuffer metadata. Pending: kernel/initramfs loading,
    bootable Open Firmware media, physical-address translation on real firmware.
-3. Pending: CPU exceptions, cache/TLB operations, Book III-S 32-bit MMU,
-   interrupt controller, timer, atomics and scheduler integration.
+3. **Working in QEMU:** kernel `powerpc.cpu` primitives for PVR/MSR, coherent
+   64-bit timebase reads, 32-bit CAS and G4 instruction-cache publication.
+   The guest checks successful/failed CAS, clock progress, and executing code
+   after cache synchronization. Pending: exceptions, TLB/MMU, interrupt
+   controller, timer interrupt, 64-bit atomic policy and scheduler integration.
 4. Pending: common kernel pointer-width/endian audit, ELF32 execution and
    PPC32 Linux syscall ABI, signals, TLS and floating-point/vector state.
 5. Pending: PPC32 libc, init, shell and desktop userland; small-memory profile.
