@@ -368,11 +368,12 @@ Base `3289116b1`, with complete source snapshots:
 - `/tmp/vinix-ppc-wait-regression`, `SHA256SUMS`:
   `1a865a14b2e33da3f4d015855e1674fa6028c8d69f49bd2b05da35655a43f0bc`.
 
-The desktop again renders its form and accepts typing and mouse focus. One
-capture contained only the backdrop after a click; a repeat run's clicked
-and later settled frames both show the complete form and masked input. Keep
-both runs: the transient blank capture is not yet explained, so this is not
-a claim of flicker-free presentation.
+The desktop again renders its form and accepts typing and mouse focus. An
+initial image preview appeared blank; checking the saved pixels and viewing
+the original resolution showed the complete form. The clicked PNG from this
+run is byte-identical to the repeat run's good image (SHA-256
+`dd2fbcb3b99c442a2be16acbd21fe0ee98c03fc8598fc77c4a28aa0ad7bf2b26`).
+The preview was not evidence of a guest rendering fault.
 
 - `/tmp/vinix-ppc-desktop-ready`, boot `SHA256SUMS`:
   `0c1e0596d47e160098368eb6067b675f9154172d9b273bc672c7fff3436b2b0a`;
@@ -380,3 +381,18 @@ a claim of flicker-free presentation.
   `882dcc8f6f6b56fa2e139fe62d382965eb497b12b8e29f2761c5c13d4980c989`.
 - `/tmp/vinix-ppc-desktop-waits-recheck`, `PROGRAM-SHA256SUMS`:
   `574af8e4fff8430717c3948c4b84b5833db2230edf30d6649222cea0e4e14f6f`.
+
+## Independent desktop capture checks (2026-11-08)
+
+`tests/powerpc/check-setup.v` checks the actual QEMU PPM dimensions, backdrop,
+card edges and heading ink, plus name/password field changes from USB input
+and unchanged settled fields. A 20-frame follow-up sequence passes; an older
+console-only capture is rejected. This checks observable application output
+independently of serial startup markers. It does not claim account creation,
+session startup or physical iMac validation.
+
+Bundle `/tmp/vinix-ppc-desktop-stability` uses the native image above, base
+`1b0610e82` plus preserved capture/checker sources. `PROGRAM-SHA256SUMS`:
+`f8a06f42c118aa0368b5a25c6bb95c85265f5e1b1cd23c50093d8e100300713b`.
+`CHECKER-SHA256SUMS` covers the checker and positive/negative reports:
+`c0a39ae871665d819f0f6e8ffa5b88a617eb7c548773601a29a967434323e136`.

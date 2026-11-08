@@ -87,19 +87,31 @@ fn boot(output string, marker string) ! {
 		time.sleep(2 * time.second)
 		child.stdin_write('info registers\n')
 		capture_screen(mut child, capture, 'program-settled')!
+		if os.getenv('VINIX_PPC_TEST_STABILITY') == '1' {
+			for i in 0 .. 20 {
+				capture_screen(mut child, capture, 'stability-${i:02}')!
+			}
+		}
 	}
 	log = os.read_file(logfile)!
 	print(log)
 	os.cp(@FILE, capture + '/boot-program.v')!
 	mut sums := ''
-	for name in ['program.log', 'program.ppm', 'program-typed.ppm', 'program-clicked.ppm', 'program-settled.ppm',
-		'boot-program.v', 'program-qemu.txt', 'init-ppc.elf', 'vinix-ppc.elf', 'vinix-ppc-boot.iso'] {
+	for name in ['program.log', 'program.ppm', 'program-typed.ppm', 'program-clicked.ppm',
+		'program-settled.ppm', 'boot-program.v', 'program-qemu.txt', 'init-ppc.elf', 'vinix-ppc.elf',
+		'vinix-ppc-boot.iso'] {
 		path := if name.starts_with('program') || name == 'boot-program.v' {
 			capture + '/' + name
 		} else {
 			output + '/' + name
 		}
 		if os.is_file(path) {
+			sums += sha256.hexhash(os.read_bytes(path)!.bytestr()) + '  ' + path + '\n'
+		}
+	}
+	for name in os.ls(capture)! {
+		if name.starts_with('stability-') && name.ends_with('.ppm') {
+			path := capture + '/' + name
 			sums += sha256.hexhash(os.read_bytes(path)!.bytestr()) + '  ' + path + '\n'
 		}
 	}

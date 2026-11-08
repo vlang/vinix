@@ -63,7 +63,15 @@ VINIX_PPC_TEST_SETUP=1 v -o /tmp/ppc-boot-program run tests/powerpc/boot-program
 
 `VINIX_PPC_CAPTURE_DIR` optionally separates captures from the image directory.
 The runner waits for the startup marker and allows the first frame to finish;
-its marker result alone is not a visual assertion. Inspect the saved PPMs.
+its marker result alone is not a visual assertion. Validate the captured form,
+rendered heading, USB field changes and settled input with:
+
+```
+v -o /tmp/ppc-check-setup run tests/powerpc/check-setup.v /tmp/vinix-ppc-desktop-boot
+```
+
+Set `VINIX_PPC_TEST_STABILITY=1` on the capture command for 20 additional
+frames checked by the same verifier. Images and logs stay outside Git.
 
 ```
 v run tools/powerpc test /tmp/vinix-ppc-state
