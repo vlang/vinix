@@ -158,7 +158,7 @@ fn sampler(work string, arch string, sanitizer bool) ! {
 	run([...flags, '-DVINIX_KALLOC_HOST_TEST', '-I', root + '/kernel/c', '-c', generated, '-o',
 		work + '/sampler.o'], 120)!
 	imports := run(['nm', '-u', work + '/sampler.o'], 30)!.stdout
-	assert !hosttest.allocation_symbols(imports), imports
+	if hosttest.allocation_symbols(imports) { return error('sampler allocator imports: ' + imports) }
 	run([...flags, '-Wno-unused-function', '-Wno-unused-parameter', '-I',
 		root + '/tests/alloc-bench/samplerfixture', '-c', fixture, '-o', work + '/fixture.o'], 120)!
 	run([...flags, '-c', root + '/tests/alloc-bench/samplerfixture/varargs-' + arch + '.S', '-o',
@@ -166,8 +166,8 @@ fn sampler(work string, arch string, sanitizer bool) ! {
 	run([...flags, work + '/sampler.o', work + '/fixture.o', work + '/varargs.o', '-o',
 		work + '/sampler-test'], 120)!
 	result := run([work + '/sampler-test'], 180)!
-	assert result.stdout == 'Shared kernel allocator sampler: success, three-phase OOM/zeroing rollback, TSC failure and kext ABI passed\n', result.str()
-	assert result.stderr == '', result.str()
+	if result.stdout != 'Shared kernel allocator sampler: success, three-phase OOM/zeroing rollback, TSC failure and kext ABI passed\n'
+		|| result.stderr != '' { return error('sampler fixture result differs: ' + result.str()) }
 	os.write_file(work + '/sampler.stdout', result.stdout)!
 	println('SAMPLER / OOM / zeroing / clock / callback ABI / allocator imports: PASS ' + arch)
 }
@@ -233,6 +233,24 @@ fn main() {
 		} else {
 			generators.cli(args[2..], args[1])
 		})
+	}
+	if args.len > 0 && args[0] == '--sampler-only' {
+		if args.len != 4 || args[2] !in ['arm64', 'amd64'] || args[3] !in ['plain', 'san'] {
+			eprintln('usage: test-generators --sampler-only NEW_STATE arm64|amd64 plain|san')
+			exit(2)
+		}
+		os.mkdir(args[1]) or {
+			eprintln(err)
+			exit(1)
+		}
+		guard := cachecli.own_commands()
+		defer { guard.close() }
+		sampler(args[1], args[2], args[3] == 'san') or {
+			eprintln(err)
+			exit(1)
+		}
+		println('NATIVE GENERATORS SAMPLER: PASS')
+		return
 	}
 	if args.len != 4 || args[2] !in ['arm64', 'amd64'] || args[3] !in ['plain', 'san'] {
 		eprintln('usage: test-generators NEW_STATE ORIGINAL_METADATA arm64|amd64 plain|san')

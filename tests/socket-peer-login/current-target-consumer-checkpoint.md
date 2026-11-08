@@ -23,8 +23,9 @@ environments, original audits, generated C and the exact-count/inverse proof.
 six-case runs, strict compiler outputs and complete SRC/header/HOST pre/post
 audits. All four native manifests per build use canonical SDK26.5. Builds and
 fixture runs use GNU timeout and endpoint accounting; they make no nativeguard
-typed cleanup claim. No TARGET consumer, native sampler, rename, kernel or VM
-has started. Section 14 remains open.
+typed cleanup claim. The later source03 consumer-driver invocation is recorded
+below. TARGET compilation, native sampler, rename, kernel and VM checks have
+not started. Section 14 remains open.
 
 | Artifact under T | SHA256 |
 | --- | --- |
@@ -36,10 +37,67 @@ has started. Section 14 remains open.
 Review found that source02 omits the original checker used by a relative
 embed, although its declared 73-entry filesystem capture passed. The pinned
 compiler may compile a missing embed without its payload, so source02 is not
-a complete embedded-input closure. A fresh source03 capture must include that
-template; source02 must remain unchanged. The full consumer route still needs
-that correction and its own execution evidence. The revised plan keeps the
+a complete embedded-input closure. Source03 now includes that template;
+source02 remains unchanged. The revised plan keeps the
 80 MiB working subtotal, full 16 MiB tail and 96/512 MiB caps unchanged.
+
+The source03 correction captures all 65 producers and nine helpers, pins the
+10,200-byte original comparer, and verifies the exact complete 74-entry set.
+`bootstrap-07-closure-fix` passed the strict main build, nine source postchecks,
+complete HOST/header checks and SDK/C-ABI review. `stage-03` returned 0; a
+repeated stage returned 1 with the exact freshness refusal, leaving sources and
+receipts unchanged. `bootstrap-08-captured` and `bootstrap-09-comparer` then
+passed strict production builds from source03. Independent review found all
+14 embed occurrences have payloads and every native manifest uses SDK26.5.
+Complete source03, source02, HOST and resource-header postchecks passed.
+
+The fixed consumer driver returned 1 at `00-tools-before`, before invoking
+TARGET. Four direct children ran: the original complete TARGET check and
+postcheck returned 0, while both selected-tool comparers returned 1 with
+ENOENT. All four have observed private groups, natural reap, empty groups,
+final wait/ECHILD and zero cleanup kills. The top status is FAIL. The pinned
+historical loader map names three absent paths: main's
+`build/package-https-runtime-work`, its `toolchain`, and `toolchain/v`.
+The checker and baseline are unchanged; no substitute files were created.
+The consumed action/status namespace remains preserved. This does not qualify
+relocated TARGET compilation, sampler execution or guest behavior.
+
+T measured 37,152 KiB allocated / 33,932 KiB apparent after the consumer's
+external postchecks. Space admission recovered to about 373 GiB; disk space
+is no longer the blocker. Future execution needs a fresh complete forecast
+and namespace plus restoration/audit of the original missing inputs or a
+separately qualified current-input route. The pending rename helper and
+sampler-only CLI are retained source drafts; neither was executed. The
+rename README records the older source02 proposal, superseded by the current
+plan's source03 closure. Before eventual success, also enforce a final exact
+81-action count alongside the current upper bound.
+
+| Further artifact under T | SHA256 |
+| --- | --- |
+| source-03-stage.json | `0fb54dd365d19ae74aa636d32232ad74e6c403f839b7a277c756ddba793cd7c7` |
+| stage-03/actual-status.json | `4283d090894bf05e2c5b5e219fae4cc00e6059b3f6eda790a40e2aa747f1e2d1` |
+| stage-03/repeat-status.json | `c56cebbf797689babdbd14c6fc837ca77bf539a608a2ab992dd22e6d808b8d9f` |
+| bootstrap-09-comparer/actual-status.json | `c3f32a5d4ad7b12877b1e0d7ad147dfc793014b6d96b20153bbacb8b0f71b2e5` |
+| qualify-launch/actual-status.json | `7bb660b18cbe62b45ea42652ca57d71da7ca3caf478fc37a2deacc60dc73bccc` |
+| status.json | `8d110c7d51c4cd4cd48fd0c702409297b91f0045b7f4d8c7a1755d06a0ced8c8` |
+
+Qualified captured artifacts: qualifier C/executable
+`09d46f52593b32c474b8844fe15d76686ce67a87fb5b6cb85246e4a82ef839f6` /
+`a8c9f500ec4d153c4bdc426ef39c5f10335266085d3ac830a8eacc53c0981dbe`;
+comparer C/executable
+`3702e1bea38d143d9e4f420c88cf07a89e534f73e299b052b335112d125adece` /
+`e4de38b76849da610d1b80020954f6e4d5fed926dd05fc8e2611a8208e4192f0`.
+
+The complete retained T bundle is sealed at
+R/target-consumer-retained-20261108-01/inventory.json, SHA256
+`8176439fe7d49b6ea9f61c4e89f177cf84eee5edfa1426bcebd94198b8e643c8`.
+The unchanged original auditor's separate check passed. The missing-input
+diagnosis and direct stat refusal are retained in T/qualify-launch. The local
+`vinix-waitpid-width-20261026-01` candidate is partial: its original copy hit
+the namespace cap and omitted library subtrees. The complete `-02` HOST copy
+is patched. Neither is a verified restoration of the historical original.
+Sources resumed from `a8e4f7d68`; callback API qualification is committed in
+`b1a2e5e92`. This checkpoint adds the capture fix and pending consumer sources.
 
 ## Earlier checkpoint
 
