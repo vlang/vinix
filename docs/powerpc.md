@@ -9,12 +9,36 @@ QEMU. It does not yet run the shared Vinix kernel or desktop.
 
 The host needs V with `-arch ppc` support, Zig with its PowerPC LLVM backend,
 and `qemu-system-ppc`. Apple Clang does not include that backend. All maintained
-build and test tooling is V. Zig compiles V's generated C; no Zig application
-source, hosted libc, or Python is used.
+build and test tooling is V. Zig compiles V's generated C; the firmware and
+kernel remain freestanding. The desktop uses static musl.
 
 The CPU backend requires V commit `b7b4dd46ee` (raw PPC assembly support), or
 a later compiler containing that change. It is installed in the sibling `../v`
 checkout. An alternate compiler can be selected with `VINIX_V_COMPILER`.
+
+### Desktop cross-build
+
+The actual `desktop/` compositor now cross-links as a big-endian PPC32 static
+executable, including the ui2 calculator, software renderer and musl runtime.
+Building it does not yet make the PPC development image a desktop system:
+the kernel still lacks the process, writable-filesystem and Unix-socket services
+used by the session and its applications.
+
+The tested desktop toolchain is deliberately separate from the kernel compiler:
+V `1f4d705322714d6ab35a712db9d1b93db9fbcc03`, with the one-line `math.round`
+type fix from upstream `8e4573656196e71851153400b4df608fbde951d6`, and ui2
+`8b2179604a37056dd5a2b9afc3f4666e38bf4749`. Current V removed `$vml`; this
+desktop still uses it. The isolated compatible V checkout on this host is
+`/tmp/vinix-ppc-v-desktop` (local backport commit `dc06c1a39f`).
+
+```
+VINIX_UI2_SOURCE=/tmp/vinix-ppc-ui2 VINIX_PPC_DESKTOP_V=/tmp/vinix-ppc-v-desktop/v v run tools/powerpc-desktop /tmp/vinix-ppc-desktop
+```
+
+The runner stages sources with V, builds the freestanding presenter/execinfo
+modules, and links with Zig's `powerpc-linux-musleabihf` libc and unwinder.
+It preserves build logs, source archives, revision/overlay records and checksums
+outside Git. It does not modify the compiler or ui2 source checkouts.
 
 ```
 v run tools/powerpc test /tmp/vinix-ppc-state
