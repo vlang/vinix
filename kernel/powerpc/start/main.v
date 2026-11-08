@@ -59,7 +59,9 @@ fn start(info &boot.Info) {
 		asm volatile ppc raw { "nop" ; ; ; memory }
 	}
 	serial.text(c'VINIX-PPC: PASS kernel decrementer interrupts\n')
-	for {}
+	msr &= ~u32(0x8000)
+	asm volatile ppc raw { "mtmsr %[msr]\nisync" ; ; [msr] "r" (msr) ; memory }
+	check_userspace(info.stack.base + info.stack.size - 32)
 }
 
 @[export: 'vinix_ppc_dispatch']
@@ -70,7 +72,33 @@ fn dispatch(mut frame exception.Frame) {
 		return
 	}
 	if frame.vector == 0xc00 {
+		if frame.msr & 0x4000 != 0 {
+			if frame.gpr[0] == 20 {
+				frame.gpr[3] = 1
+				return
+			}
+			if frame.gpr[0] == 0x7f00 && user_faults == 4 {
+				frame.pc = u32(voidptr(C.vinix_user_check_done))
+				frame.msr = 0
+				frame.gpr[1] = resume_stack
+				return
+			}
+			halt(c'user syscall probe')
+		}
 		traps++
+		return
+	}
+	if frame.msr & 0x4000 != 0 && ((frame.vector == 0x300 && user_faults == 0 && frame.dar == 0x02000000 && frame.pc == 0x40000014)
+		|| (frame.vector == 0x700 && user_faults == 1 && frame.pc == 0x40000018)
+		|| (frame.vector == 0x300 && user_faults == 2 && frame.dar == 0x40000000 && frame.pc == 0x40000020)) {
+		user_faults++
+		frame.pc += 4
+		return
+	}
+	if frame.msr & 0x4000 != 0 && frame.vector == 0x400 && user_faults == 3
+		&& frame.pc == 0x5000fff0 && frame.lr == 0x4000002c {
+		user_faults++
+		frame.pc = frame.lr
 		return
 	}
 	serial.text(c'exception ')

@@ -98,7 +98,7 @@ fn boot(output string, test bool, media bool, kernel bool) ! {
 		'/boot.log'
 	}
 	marker := if kernel {
-		'VINIX-PPC: PASS kernel decrementer interrupts'
+		'VINIX-PPC: PASS userspace MMU syscall and protection'
 	} else if media {
 		'VINIX-PPC: PASS ELF32 handoff probe'
 	} else {

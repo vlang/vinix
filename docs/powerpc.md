@@ -97,8 +97,15 @@ The independent PPC kernel entry in `kernel/powerpc/start` now takes control
 without returning to firmware. `test-kernel` boots `KERNEL.ELF` and verifies
 its own polled SCC console, physical-page allocator, low exception vectors,
 complete integer register frame save/restore and decrementer interrupts.
-It currently runs in supervisor real mode. User mappings and the shared
-Vinix scheduler, filesystem and userland integration remain pending.
+The supervisor runs in real mode; userspace runs with relocation and the
+problem-state bit set. A 64 KiB hashed page table maps read-only executable
+text in segment 4 and non-executable writable data/stack in segment 5.
+Inherited firmware BATs are disabled. The boot check executes `sc` from user
+mode and verifies faults for kernel reads, privileged instructions, text
+writes and stack execution before returning to the kernel. Real G4 TLB
+invalidation uses 64 `tlbie` operations, not QEMU's accepted-but-unsupported
+`tlbia` ([MPC7450 reference manual](https://www.nxp.com/docs/en/reference-manual/MPC7450UM.pdf), section 2.4.6).
+Shared Vinix scheduler, filesystem and userland integration remain pending.
 
 ## Milestones
 
@@ -113,7 +120,7 @@ Vinix scheduler, filesystem and userland integration remain pending.
    64-bit timebase reads, 32-bit CAS and G4 instruction-cache publication.
    The guest checks successful/failed CAS, clock progress, and executing code
    after cache synchronization. Kernel exception entry and decrementer
-   interrupts now pass. Pending: TLB/MMU, interrupt controller,
+   interrupts and initial hashed user mappings now pass. Pending: interrupt controller,
    64-bit atomic policy and scheduler integration.
 4. Pending: common kernel pointer-width/endian audit, userspace ELF32 execution and
    PPC32 Linux syscall ABI, signals, TLS and floating-point/vector state.

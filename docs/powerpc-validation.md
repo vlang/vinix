@@ -54,3 +54,17 @@ Bundle: `/tmp/vinix-ppc-kernel-stage`, base revision `9992871cd` plus the
 exact source snapshot in the bundle. `SHA256SUMS` digest:
 `66a3272b5d147821668db970d7050f000660dd41019572749bdfcf8459a943fa`.
 This stage has no userspace or interactive shell yet.
+
+## Protected userspace
+
+The subsequent kernel check enters problem state with instruction/data
+relocation enabled, completes a getpid-style syscall, and recovers only at
+the expected PCs from four deliberate faults: kernel-memory read,
+privileged `mfmsr`, text write, and execution on a non-executable stack.
+It then returns to supervisor mode. QEMU passes all checks using the
+G4-compatible 64-index TLB invalidation sequence.
+
+Bundle: `/tmp/vinix-ppc-mmu-verified`, base revision `d60df15c9` plus the
+preserved source snapshot. `SHA256SUMS` digest:
+`4f196992a9599bf97d453655b98bbf81de30b7c450a6f1890a0cf124b2037a12`.
+This is still a protection fixture; it is not an interactive shell.
