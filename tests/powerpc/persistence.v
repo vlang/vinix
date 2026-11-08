@@ -40,6 +40,8 @@ fn check(mode string, output string) ! {
 		if !os.is_file(os.getenv('VINIX_PPC_INIT')) { return error('Set VINIX_PPC_INIT to the traced native desktop executable') }
 		run([v, '-enable-globals', '-path', '@vlib|' + root + '/kernel', '-o', output + '/accountcheck',
 			'tests/powerpc/accountcheck'], output + '/accountcheck-build.log')!
+		os.cp('tests/powerpc/check-desktop.v', output + '/check-desktop.v')!
+		run([v, '-o', output + '/check-desktop', 'tests/powerpc/check-desktop.v'], output + '/check-desktop-build.log')!
 	}
 	run([v, '-o', output + '/builder', 'tools/powerpc'], output + '/builder.log')!
 	run([output + '/builder', 'build', output + '/image'], output + '/build.log')!
@@ -47,11 +49,15 @@ fn check(mode string, output string) ! {
 	for round in 1 .. 3 {
 		os.setenv('VINIX_PPC_CAPTURE_DIR', output + '/boot-${round}', true)
 		os.setenv('VINIX_PPC_TEST_ACCOUNT', if mode == 'desktop' && round == 1 { '1' } else { '0' }, true)
+		os.setenv('VINIX_PPC_TEST_DISPLAY_STABILITY', if mode == 'desktop' && round == 2 { '1' } else { '0' }, true)
 		marker := if mode == 'abi' { 'VINIX-PPC: PASS storage ABI round ${round}' }
 			else if round == 1 { 'vinix-desktop: GPU init: checking user profile' }
 			else { 'vinix-desktop: GPU init: first canvas presented' }
 		run([output + '/boot', output + '/image', marker], output + '/boot-${round}.log')!
 		if mode == 'desktop' { run([output + '/accountcheck', output + '/disk.raw'], output + '/account-${round}.log')! }
+		if mode == 'desktop' && round == 2 {
+			run([output + '/check-desktop', output + '/boot-2'], output + '/desktop-check.log')!
+		}
 		run([fsck, '-fn', output + '/disk.raw'], output + '/fsck-${round}.log')!
 		// Each snapshot binds what was actually durable at that boot boundary.
 		os.cp(output + '/disk.raw', output + '/disk-${round}.raw')!

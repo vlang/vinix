@@ -83,9 +83,12 @@ VINIX_PPC_INIT=/path/to/traced/vinix-desktop v run tests/powerpc/persistence.v d
 ```
 
 The desktop test enters disposable `vinix` / `test123` credentials through USB,
-checks the saved hash and permissions, restarts QEMU, and requires a presented
-desktop frame. Never use its disk as your personal installation. See
-[storage validation](powerpc-storage-validation.md) for preserved evidence.
+checks the saved hash and permissions, and restarts QEMU. After restart it
+captures 56 frames across repeated display checks, holds a window drag across
+those checks, and opens and closes the Start menu through USB. It rejects
+framebuffer remapping or the kernel console replacing the desktop. Never use
+its disk as your personal installation. See [storage validation](powerpc-storage-validation.md)
+and [display validation](powerpc-display-validation.md) for preserved evidence.
 
 Set `VINIX_PPC_TRACE=1` on both build commands for startup diagnostics. Capture
 the real framebuffer and exercise setup typing/focus without submitting it:

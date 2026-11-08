@@ -114,6 +114,41 @@ fn boot(output string, marker string) ! {
 			}
 		}
 	}
+	if log.contains(marker) && os.getenv('VINIX_PPC_TEST_DISPLAY_STABILITY') == '1' {
+		// Use the persisted GUI fixture with its initial System window. Cross
+		// many two-second output-discovery polls, including a held mouse drag.
+		for i in 0 .. 20 { capture_screen(mut child, capture, 'display-idle-${i:02}')! }
+		monitor(mut child, 'mouse_move -2000 -2000')
+		time.sleep(300 * time.millisecond)
+		monitor(mut child, 'mouse_move 480 70')
+		time.sleep(300 * time.millisecond)
+		capture_screen(mut child, capture, 'display-before-drag')!
+		monitor(mut child, 'mouse_button 1')
+		time.sleep(300 * time.millisecond)
+		for i in 0 .. 6 {
+			monitor(mut child, 'mouse_move -20 8')
+			capture_screen(mut child, capture, 'display-drag-${i:02}')!
+		}
+		// A spurious output reset cancels the held drag; the final movement
+		// then moves only the pointer. Check the final window position too.
+		for i in 0 .. 6 { capture_screen(mut child, capture, 'display-held-${i:02}')! }
+		monitor(mut child, 'mouse_move -100 30')
+		time.sleep(300 * time.millisecond)
+		monitor(mut child, 'mouse_button 0')
+		capture_screen(mut child, capture, 'display-after-drag')!
+		monitor(mut child, 'mouse_move -2000 -2000')
+		time.sleep(300 * time.millisecond)
+		monitor(mut child, 'mouse_move 20 584')
+		time.sleep(300 * time.millisecond)
+		for action in ['open', 'close'] {
+			monitor(mut child, 'mouse_button 1')
+			time.sleep(150 * time.millisecond)
+			monitor(mut child, 'mouse_button 0')
+			time.sleep(time.second)
+			capture_screen(mut child, capture, 'display-menu-' + action)!
+		}
+		for i in 0 .. 20 { capture_screen(mut child, capture, 'display-settled-${i:02}')! }
+	}
 	log = os.read_file(logfile)!
 	print(log)
 	os.cp(@FILE, capture + '/boot-program.v')!
@@ -131,7 +166,7 @@ fn boot(output string, marker string) ! {
 		}
 	}
 	for name in os.ls(capture)! {
-		if name.starts_with('stability-') && name.ends_with('.ppm') {
+		if (name.starts_with('stability-') || name.starts_with('display-')) && name.ends_with('.ppm') {
 			path := capture + '/' + name
 			sums += sha256.hexhash(os.read_bytes(path)!.bytestr()) + '  ' + path + '\n'
 		}
