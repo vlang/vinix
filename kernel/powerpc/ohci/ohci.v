@@ -312,7 +312,10 @@ pub fn poll() {
 			if head & 0xfffffff0 != ed + 128 { continue }
 			mmio.acquire(ed + 64, 32)
 			mmio.acquire(ed + 192, 64)
-			if mmio.read32(ed + 64) >> 28 == 0 {
+			// Rounding permits short USB transfers to complete without halting
+			// the endpoint. Only a full boot report may consume the DMA bytes;
+			// otherwise stale bytes could look like new keys or mouse motion.
+			if mmio.read32(ed + 64) >> 28 == 0 && mmio.read32(ed + 68) == 0 {
 				data := unsafe { &u8(ed + 192) }
 				unsafe {
 					if ep.kind == 1 {

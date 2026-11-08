@@ -241,3 +241,14 @@ The full framebuffer, nested-hub, audio, network and stable-memory suite
 passes with 128 MiB RAM. Bundle: `/tmp/vinix-ppc-pointer-final`, base
 `3e96b4ec9` plus preserved sources. `SHA256SUMS`:
 `7eafa5d74475df4e4a2f82eeca150cc80af6b09810580c4e95b6e184d1736d4d`.
+
+## Serial-mode regression and HID length guard
+
+The final serial-mode suite passes after adding a completion-length guard
+to HID reports. Short successful transfers are rearmed without interpreting
+old bytes in the DMA buffer. The normal QEMU keyboard/audio/network paths
+pass; malformed USB report injection is not part of this emulator run.
+
+Bundle: `/tmp/vinix-ppc-hid-serial-final`, base `695cb08f4` plus preserved
+sources. `SHA256SUMS`:
+`f9440c4ed340613fdd4ff4ba8e47af7324427482b8fbf55e46a16f461d85b155`.
