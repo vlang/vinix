@@ -24,9 +24,15 @@ The test cross-compiles a freestanding V firmware client, links an ELF32 MSB
 PowerPC executable, and boots its flat image through OpenBIOS. The client
 uses the firmware-provided stack and r5 client-interface pointer. It validates
 pointer width, firmware-call layout and byte order inside the guest, then
-prints `VINIX-PPC: PASS ppc32 big-endian firmware`. The runner has a 20-second
-deadline, kills/reaps its own emulator, and saves `boot.log` and binary SHA-256
-files in the output directory.
+prints `VINIX-PPC: PASS ppc32 big-endian firmware`. It then copies the firmware
+tree into a bounded FDT v17 buffer, discovers framebuffer metadata if present,
+and snapshots available memory after its claims, explicitly excluding its own
+image. Firmware reservations remain excluded. The runner requires the later
+`VINIX-PPC: PASS firmware discovery` marker, dumps the copied FDT through the
+QEMU monitor, and independently validates its structure and node count.
+It has a 20-second boot deadline, kills/reaps its own emulator, and saves
+`boot.log`, `firmware.dtb`, and binary/FDT SHA-256 files in the output directory.
+Host corruption tests run with `v test tools/powerpc/validate_test.v`.
 
 Direct QEMU command after building:
 
@@ -44,8 +50,9 @@ Add `-S -s` to stop at reset and attach a PowerPC-capable GDB on port 1234.
 
 1. **Working:** V cross-build, ELF32 MSB link, Open Firmware entry and automated
    QEMU boot check. No dependency on the amd64/arm64 kernel build products.
-2. Pending: memory reservations, copied device tree, framebuffer and kernel /
-   initramfs loading; bootable Open Firmware media.
+2. **Working in QEMU:** available-memory map with loader exclusions, copied
+   device tree, optional framebuffer metadata. Pending: kernel/initramfs loading,
+   bootable Open Firmware media, physical-address translation on real firmware.
 3. Pending: CPU exceptions, cache/TLB operations, Book III-S 32-bit MMU,
    interrupt controller, timer, atomics and scheduler integration.
 4. Pending: common kernel pointer-width/endian audit, ELF32 execution and

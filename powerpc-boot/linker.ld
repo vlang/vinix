@@ -8,5 +8,7 @@ SECTIONS
     .rodata : { *(.rodata .rodata.*) }
     .data : { *(.data .data.*) *(.sdata .sdata.*) }
     .bss : { *(.bss .bss.*) *(.sbss .sbss.*) *(COMMON) }
+    . = ALIGN(4096);
+    vinix_image_end = .;
     /DISCARD/ : { *(.eh_frame*) *(.comment) *(.note*) *(.init_array*) *(.fini_array*) }
 }

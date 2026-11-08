@@ -3,6 +3,7 @@ module main
 
 import crypto.sha256
 import os
+import strconv
 import time
 
 fn command(args []string) ! {
@@ -49,14 +50,13 @@ fn build(root string, output string) ! {
 		output + '/loader.c', root + '/powerpc-boot'])!
 	// Use musl's type declarations, but the V freestanding runtime owns
 	// memcpy/memset. V's exported voidptr lacks C's const qualifier.
-	command([zig, 'cc', '-target', 'powerpc-linux-musl', '-mcpu=7450', '-O2',
-		'-D_STRING_H', '-isystem', headers + '/powerpc-linux-musl', '-isystem', headers + '/generic-musl',
-		'-isystem', headers + '/powerpc-linux-any', '-isystem', headers + '/any-linux-any',
-		'-ffreestanding', '-fno-builtin', '-fno-stack-protector', '-fno-pic', '-fno-pie',
-		'-ffunction-sections', '-fdata-sections', '-mno-altivec', '-nostdlib', '-static',
-		'-Wl,--gc-sections', '-Wl,--build-id=none', '-Wl,-e,vinix_of_entry',
-		'-Wl,-T,' + root + '/powerpc-boot/linker.ld', output + '/loader.c', '-o',
-		output + '/vinix-of.elf'])!
+	command([zig, 'cc', '-target', 'powerpc-linux-musl', '-mcpu=7450', '-O2', '-D_STRING_H', '-isystem',
+		headers + '/powerpc-linux-musl', '-isystem', headers + '/generic-musl', '-isystem',
+		headers + '/powerpc-linux-any', '-isystem', headers + '/any-linux-any', '-ffreestanding',
+		'-fno-builtin', '-fno-stack-protector', '-fno-pic', '-fno-pie', '-ffunction-sections',
+		'-fdata-sections', '-mno-altivec', '-nostdlib', '-static', '-Wl,--gc-sections',
+		'-Wl,--build-id=none', '-Wl,-e,vinix_of_entry', '-Wl,-T,' + root + '/powerpc-boot/linker.ld',
+		output + '/loader.c', '-o', output + '/vinix-of.elf'])!
 	command([zig, 'objcopy', '-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin'])!
 	for name in ['vinix-of.elf', 'vinix-of.bin'] {
 		data := os.read_bytes(output + '/' + name)!
@@ -75,7 +75,9 @@ fn boot(output string, test bool) ! {
 		command(argv)!
 		return
 	}
-	args << ['-nographic', '-monitor', 'none']
+	log_path := output + '/boot.log'
+	os.write_file(log_path, '')!
+	args << ['-nographic', '-serial', 'file:' + log_path, '-monitor', 'stdio']
 	mut child := os.new_process(qemu)
 	child.set_args(args)
 	child.set_redirect_stdio_merged()
@@ -88,18 +90,39 @@ fn boot(output string, test bool) ! {
 	mut log := ''
 	deadline := time.now().add(20 * time.second)
 	for time.now() < deadline && child.is_alive() {
-		if child.is_pending(.stdout) {
-			chunk := child.stdout_read()
-			log += chunk
-			print(chunk)
-		}
-		if log.contains('VINIX-PPC: PASS ppc32 big-endian firmware') { break }
+		log = os.read_file(log_path)!
+		if log.contains('VINIX-PPC: PASS firmware discovery') { break }
 		time.sleep(10 * time.millisecond)
 	}
-	os.write_file(output + '/boot.log', log)!
-	if !log.contains('VINIX-PPC: PASS ppc32 big-endian firmware') {
+	print(log)
+	if !log.contains('VINIX-PPC: PASS firmware discovery') || log.contains('VINIX-PPC: FAIL') {
 		return error('PPC boot did not reach the firmware milestone; see ${output}/boot.log')
 	}
+	for line in log.split_into_lines() {
+		if !line.starts_with('VINIX-PPC: FDT ') { continue }
+		fields := line.trim_space().split(' ')
+		if fields.len != 7 { return error('Invalid FDT report') }
+		address := strconv.parse_uint(fields[2], 0, 32)!
+		length := strconv.parse_uint(fields[4], 0, 32)!
+		nodes := strconv.parse_uint(fields[6], 0, 32)!
+		if length < 88 || length > 512 * 1024 || address + length > 512 * 1024 * 1024 {
+			return error('Invalid FDT guest address')
+		}
+		path := output + '/firmware.dtb'
+		if os.exists(path) { os.rm(path)! }
+		quoted := path.replace('\\', '\\\\').replace('"', '\\"')
+		child.stdin_write('pmemsave ${address} ${length} "${quoted}"\n')
+		dump_deadline := time.now().add(3 * time.second)
+		for time.now() < dump_deadline && (!os.exists(path) || os.file_size(path) != length) {
+			time.sleep(10 * time.millisecond)
+		}
+		data := os.read_bytes(path)!
+		if u64(validate_tree(data)!) != nodes { return error('FDT node count mismatch') }
+		os.write_file(path + '.sha256', sha256.hexhash(data.bytestr()) + '  firmware.dtb\n')!
+		println('Validated copied FDT (${nodes} nodes)')
+		return
+	}
+	return error('Missing FDT report')
 }
 
 fn main() {
@@ -115,6 +138,10 @@ fn main() {
 		exit(2)
 	}
 	if args.len == 2 { output = os.abs_path(args[1]) }
+	if output.contains('\n') || output.contains('\r') {
+		eprintln('Invalid output path')
+		exit(2)
+	}
 	build(root, output) or {
 		eprintln(err)
 		exit(1)

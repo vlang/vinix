@@ -69,4 +69,5 @@ fn entry(_ u32, _ u32, client Client) {
 		return
 	}
 	puts(c'VINIX-PPC: PASS ppc32 big-endian firmware\r\n')
+	if !discover() { puts(c'VINIX-PPC: FAIL firmware discovery\r\n') }
 }
