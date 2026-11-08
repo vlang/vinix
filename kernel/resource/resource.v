@@ -86,6 +86,13 @@ pub fn poll_status(mut res Resource) int {
 		unsafe { scratch.backend = PollableResource(res) }
 		return scratch.backend.poll_status()
 	}
+	// Ordinary files and directories have no asynchronous readiness source.
+	// Like Linux's DEFAULT_POLLMASK, report normal reads and writes ready even
+	// at EOF or on a read-only description. Access checks belong to I/O.
+	// Keep explicit callbacks first: virtual files may supply real wait state.
+	if stat.isreg(res.stat.mode) || stat.isdir(res.stat.mode) {
+		return 0x001 | 0x004 | 0x040 | 0x100 // IN, OUT, RDNORM, WRNORM
+	}
 	return res.status
 }
 
