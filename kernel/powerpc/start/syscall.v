@@ -59,11 +59,14 @@ fn sys_open(path u32, flags u32) int {
 	mut framebuffer_device := end == 8
 	fb_name := c'/dev/fb0'
 	unsafe { for i := 0; framebuffer_device && i < end; i++ { if io_buffer[i] != u8(fb_name[i]) { framebuffer_device = false } } }
+	mut pointer_device := end == 12
+	pointer_name := c'/dev/pointer'
+	unsafe { for i := 0; pointer_device && i < end; i++ { if io_buffer[i] != u8(pointer_name[i]) { pointer_device = false } } }
 	if packet_device && !gem.present() { return -19 }
 	if audio_device && !ohci.sound_present() { return -19 }
 	if framebuffer_device && video.info().base == 0 { return -19 }
-	if flags != 0 && !((packet_device || framebuffer_device) && flags == 2) && !(audio_device && (flags == 1 || flags == 2)) { return -30 }
-	node := if framebuffer_device { -5 } else if audio_device { -4 } else if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
+	if flags != 0 && !(pointer_device && flags == 0x800) && !((packet_device || framebuffer_device) && flags == 2) && !(audio_device && (flags == 1 || flags == 2)) { return -30 }
+	node := if pointer_device { -6 } else if framebuffer_device { -5 } else if audio_device { -4 } else if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
 	if node == -1 { return -2 }
 	for fd in 3 .. 16 {
 		if !descriptors[fd].used {
@@ -88,6 +91,17 @@ fn sys_read(fd u32, address u32, requested u32) int {
 		return 1
 	}
 	node := descriptors[fd].file
+	if node == -6 {
+		if count < 32 { return -22 }
+		packet := ohci.pointer_snapshot()
+		buffer_word(0, u32(packet.x)); buffer_word(4, u32(packet.y))
+		buffer_word(8, u32(packet.max_x)); buffer_word(12, u32(packet.max_y))
+		buffer_word(16, packet.buttons); buffer_word(20, packet.pressed); buffer_word(24, packet.released)
+		buffer_word(28, u32(packet.scroll)); buffer_word(32, u32(packet.scroll_x))
+		actual := if count >= 36 { u32(36) } else { u32(32) }
+		if !copy_to_user(address, unsafe { &io_buffer[0] }, actual) { return -14 }
+		return int(actual)
+	}
 	if node == -5 { return -22 } // fbdev currently exposes ioctl and mmap only
 	if node == -4 { return -9 }
 	if node == -3 {

@@ -227,3 +227,17 @@ Bundles, based on `9b822d048` plus preserved sources:
   `fe359b84a93951d39ef603a8cf25812c77c239c759d20f63513eb05792c60013`.
 - `/tmp/vinix-ppc-fbdev-32-final`: RGB32, direct USB, 512 MiB; `SHA256SUMS`
   `89e9b8b28fd0637eb2e17e15d89601dc50cfba27d5f8049abcb552b4f9fd83d4`.
+
+## Userspace pointer input
+
+The shared `/dev/pointer` packet layout now reaches protected PPC userspace.
+QEMU injects a 7,-4 movement and a complete left click between two reads.
+The returned packet has the expected coordinates, released button level and
+both click edges. Rejected short/invalid-pointer reads leave the edges intact;
+the next valid read consumes them. Both 32-byte and 36-byte reads pass. Host
+tests additionally exercise signed-delta extremes and coordinate clamping.
+
+The full framebuffer, nested-hub, audio, network and stable-memory suite
+passes with 128 MiB RAM. Bundle: `/tmp/vinix-ppc-pointer-final`, base
+`3e96b4ec9` plus preserved sources. `SHA256SUMS`:
+`7eafa5d74475df4e4a2f82eeca150cc80af6b09810580c4e95b6e184d1736d4d`.

@@ -190,7 +190,7 @@ fn start() {
 			}
 			arg := &char(&input[argument])
 			if same(input, c'help') {
-				print_text(c'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  tone  fbtest  echo text  exit\n')
+				print_text(c'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  tone  fbtest  pointertest  echo text  exit\n')
 			} else if same(input, c'ls') {
 				ls(if argument < used { arg } else { c'/' })
 			} else if same(input, c'cat') {
@@ -231,6 +231,8 @@ fn start() {
 				tone()
 			} else if same(input, c'fbtest') {
 				framebuffer_test()
+			} else if same(input, c'pointertest') {
+				pointer_test()
 			} else if same(input, c'exit') {
 				C.vinix_user_syscall(1, 0, 0, 0)
 			} else if used != 0 {

@@ -118,6 +118,16 @@ the first, and the mouse and speaker behind the second. The second hub has
 switchable port power. Combine it with `VINIX_PPC_MEMORY=128` and
 `VINIX_PPC_GRAPHICS=1` on `test-shell` to verify all three drivers together.
 
+`/dev/pointer` returns the shared Vinix fixed-width pointer snapshot ABI:
+big-endian 32-bit x/y, coordinate maxima, button level, pressed/released
+edges, and scroll axes. Reads accept the original 32-byte prefix or the
+36-byte extended packet. Edges accumulate until a successful read, including
+a complete click between reads; invalid buffers do not consume them.
+The boot-protocol mouse currently reports three buttons and no wheel data.
+`pointertest` lets you move/click, then press Enter to inspect the snapshot.
+It supports read-only/nonblocking opens; poll/epoll readiness and hotplug
+are not yet connected to the shared kernel.
+
 The GEM Ethernet driver enables Apple UniNorth GMAC MMIO and bus mastering,
 finds its MII PHY, negotiates 10/100 duplex, and uses separate 32-entry RX/TX
 DMA rings. RX descriptors are recycled in groups of four to preserve cache

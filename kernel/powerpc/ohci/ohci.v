@@ -7,6 +7,7 @@ import powerpc.cpu
 import powerpc.mmio
 import powerpc.pages
 import powerpc.pci
+import powerpc.pointer
 import powerpc.runtime
 import powerpc.serial
 import powerpc.video
@@ -40,6 +41,12 @@ __global keys [128]u8
 __global key_read u32
 __global key_write u32
 __global caps_lock bool
+__global pointer_state pointer.State
+
+pub fn pointer_snapshot() pointer.Packet {
+	poll()
+	return pointer_state.take()
+}
 
 fn delay(ms u32) {
 	end := cpu.timebase() + u64(frequency / 1000) * ms
@@ -198,6 +205,10 @@ fn configure_device(mut host Controller, address u32, packet u32, class u32, por
 	mmio.write32(ed + 12, if index == 0 { u32(0) } else { ed - 256 })
 	arm(mut host, index)
 	host.count++
+	if kind == 2 {
+		screen := video.info()
+		pointer_state.attach(screen.width, screen.height)
+	}
 	serial.text(if kind == 1 { c'VINIX-PPC: USB keyboard ready\n' } else { c'VINIX-PPC: USB mouse ready\n' })
 }
 
@@ -315,6 +326,7 @@ pub fn poll() {
 						}
 						for j := u32(0); j < 6; j++ { ep.previous[j] = data[j + 2] }
 					} else {
+						pointer_state.move(i32(i8(data[1])), i32(i8(data[2])), data[0])
 						video.pointer(int(i8(data[1])), int(i8(data[2])), data[0])
 					}
 				}
