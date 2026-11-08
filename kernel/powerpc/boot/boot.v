@@ -2,7 +2,20 @@
 module boot
 
 pub const magic = u32(0x564f4631)
-pub const version = u32(4)
+pub const version = u32(5)
+
+pub struct PciDevice {
+pub mut:
+	base u32
+	size u32
+	config u32
+	bdf u32
+	root_bus u32
+	vendor u32
+	device u32
+	class u32
+	mac [6]u8
+}
 
 pub struct MemoryRange {
 pub mut:
@@ -33,4 +46,6 @@ pub mut:
 	serial_data     u32
 	timebase_hz     u32
 	initramfs       MemoryRange
+	pci_count       u32
+	pci             [8]PciDevice
 }

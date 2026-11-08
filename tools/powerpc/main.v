@@ -154,24 +154,13 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 		|| !log.contains(marker) || log.contains('VINIX-PPC: FAIL') || log.contains('VINIX-PPC: PANIC') {
 		return error('PPC boot did not reach the requested milestone; see ${log_path}')
 	}
-	if shell { exercise_shell(output, log_path)! }
+	if shell {
+		exercise_usb(mut child, output, log_path, graphics)!
+		exercise_shell(output, log_path)!
+	}
 	if graphics {
 		if !log.contains('VINIX-PPC: PASS framebuffer console') { return error('Framebuffer console missing') }
-		path := output + '/screen.ppm'
-		if os.exists(path) { os.rm(path)! }
-		child.stdin_write('screendump "${path}"\n')
-		deadline_image := time.now().add(3 * time.second)
-		mut valid_image := false
-		for time.now() < deadline_image {
-			if os.exists(path) {
-				data := os.read_bytes(path)!
-				validate_screen(data) or { time.sleep(10 * time.millisecond); continue }
-				valid_image = true
-				break
-			}
-			time.sleep(10 * time.millisecond)
-		}
-		if !valid_image { return error('Screenshot failed framebuffer validation') }
+		screenshot(mut child, output + '/screen.ppm')!
 		println('PASS framebuffer RGB byte order and rendered console')
 	}
 	for line in log.split_into_lines() {

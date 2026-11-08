@@ -117,3 +117,18 @@ Bundle: `/tmp/vinix-ppc-video`, base `775898128` plus preserved sources.
 `SHA256SUMS`: `86863aef30576e3ebf766c1657517695422986e8499a39a24bfabe9d2a7a6737`.
 This verifies the graphical console, not accelerated GPU rendering or the
 shared Vinix desktop; keyboard input in this stage is still serial.
+
+## OHCI USB input
+
+The kernel discovers UniNorth PCI OHCI, enables MMIO and bus mastering,
+resets its root ports and enumerates the directly attached keyboard/mouse.
+The test types `echo usb-aZ` using HMP key events, including Shift and
+Backspace, and checks the command's result in the independent serial log.
+Mouse events move the pointer by 50,30 pixels; screenshots verify every
+arrow pixel before, during and after the left-button press. The complete
+shell/protection/memory-stability suite also passes with these devices active.
+
+Bundle: `/tmp/vinix-ppc-usb-final`, base `3d2b574dc` plus preserved sources.
+`SHA256SUMS`: `7750175edf3ed39e3edbf09811d24c3e14c19e86b0966863dc83070cd2da6c45`.
+This covers QEMU boot-time HID devices. Hubs, reconnection, other USB classes
+and native iMac validation are separate work.

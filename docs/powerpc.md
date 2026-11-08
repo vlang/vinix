@@ -72,11 +72,22 @@ qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -c
 This command boots the PPC kernel and initial userspace shell. This ISO
 has no partition map, so OpenBIOS takes the filename immediately after the
 colon; adding a comma prevents lookup. Keep the ISO file version `;1`.
-Input/output uses the emulated SCC serial port. Graphical console and USB
-keyboard work is tracked below. Set `VINIX_PPC_GRAPHICS=1` to enable the
-inherited 32-bit framebuffer and a scrolling graphical console. The same
-variable on `test-shell` captures and checks the framebuffer's RGB colors
-and text. Input currently still uses serial until the USB driver is enabled.
+Input/output uses the emulated SCC serial port. Set `VINIX_PPC_GRAPHICS=1`
+to enable the inherited 32-bit framebuffer, scrolling console and USB mouse
+pointer. USB boot-protocol keyboard input works alongside serial input.
+For a window with keyboard and mouse, use:
+
+```
+VINIX_PPC_GRAPHICS=1 v run tools/powerpc run /tmp/vinix-ppc-state
+```
+
+The same variable on `test-shell` verifies framebuffer RGB colors and text,
+types a command through QEMU's USB keyboard, and checks mouse movement and
+button press/release against screenshot pixels. OHCI uses little-endian
+descriptors, explicit G4 DMA cache ownership and bounded polling. This first
+driver supports directly attached boot-protocol HID devices present at boot;
+USB hubs, reconnection, key repeat, storage and EHCI remain pending. It does
+not call firmware for keyboard, mouse or console output after takeover.
 
 The separate direct test uses `-kernel vinix-of.bin`. QEMU's
 `-kernel` ELF loader relocates PowerMac load addresses by 16 MiB, so this path
@@ -104,8 +115,9 @@ The initial handoff ABI is PPC32 SysV: `r3` points to `powerpc.boot.Info`,
 `r4` is the firmware client pointer, and `r1` uses a claimed 64 KiB stack
 aligned to 16 bytes. Firmware is still active. The available-memory snapshot
 is refreshed after claims and excludes the loader, copied FDT, source image,
-kernel, initramfs and stack. Boot-info version 4 includes the retained
-initramfs physical range. The `Info` map is authoritative; the copied firmware tree's
+kernel, initramfs and stack. Boot-info version 5 includes the retained
+initramfs range and a bounded inventory of UniNorth PCI devices. The `Info`
+map is authoritative; the copied firmware tree's
 earlier `available` property is not an allocator input. Kernels must retain
 firmware reservations until they can replace firmware mappings and services.
 The loader checks identity translations for every page of the executable,
@@ -166,8 +178,10 @@ Shared Vinix scheduler, filesystem and desktop integration remain pending.
    commands. Pending: PPC32 libc and ordinary applications, shared Vinix
    userland and desktop. The initial shell also boots with 128 MiB guest RAM;
    that does not establish a memory budget for the eventual desktop.
-6. Pending: real-machine ATA/DBDMA, USB OHCI/EHCI, GEM Ethernet, framebuffer,
-   PMU and hardware boot tests. Identify the exact iMac revision first.
+6. **Working in QEMU:** inherited 32-bit framebuffer console and OHCI USB
+   keyboard/mouse. Pending: full desktop, USB hubs/hotplug/EHCI, GEM Ethernet,
+   audio, real-machine ATA/DBDMA, PMU and hardware boot tests. Identify the
+   exact iMac revision before selecting its built-in audio codec.
 
 The existing ARM64 iBoot adapter is unrelated to PowerPC Open Firmware.
 Neither current Vinix ISO nor Alpine ppc64le packages run on a G4. A real

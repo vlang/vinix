@@ -30,6 +30,12 @@ pub fn write_be32(address u32, value u32) {
 	}
 }
 
+pub fn read_be32(address u32) u32 {
+	mut value := u32(0)
+	asm volatile ppc raw { "lwz %[value],0(%[address])\neieio" ; [value] "=r" (value) ; [address] "b" (address) ; memory }
+	return value
+}
+
 // DMA descriptors/buffers are cache-line aligned and exclusively owned when
 // published. Invalidate only after the device has relinquished ownership.
 pub fn publish(address u32, size u32) {

@@ -4,6 +4,7 @@ module main
 import powerpc.exception
 import powerpc.runtime
 import powerpc.serial
+import powerpc.ohci
 
 struct Descriptor {
 mut:
@@ -63,7 +64,8 @@ fn sys_read(fd u32, address u32, requested u32) int {
 	if !user_space.accessible(address, count, true) { return -14 }
 	if count == 0 { return 0 }
 	if fd == 0 {
-		byte := serial.get()
+		mut byte := serial.get()
+		if byte < 0 { byte = ohci.get() }
 		if byte < 0 { return -11 }
 		io_buffer[0] = u8(byte)
 		if !copy_to_user(address, unsafe { &io_buffer[0] }, 1) { return -14 }

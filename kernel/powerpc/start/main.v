@@ -8,6 +8,7 @@ import powerpc.exception
 import powerpc.pages
 import powerpc.serial
 import powerpc.video
+import powerpc.ohci
 import powerpc.runtime as _
 
 __global physical_pages pages.Pool
@@ -48,6 +49,7 @@ fn start(info &boot.Info) {
 		if !physical_pages.add(range.base, range.size) { halt(c'physical memory map') }
 	}
 	managed_pages = physical_pages.count
+	ohci.init(info, mut physical_pages)
 	stack := physical_pages.take(16, 1)
 	if stack == 0 || !exception.install(stack + 65536) { halt(c'exception stack') }
 	interval = info.timebase_hz / 100

@@ -14,6 +14,12 @@ __global row u32
 __global columns u32
 __global rows u32
 __global cells [16384]u8
+__global mouse_x int
+__global mouse_y int
+__global mouse_buttons u8
+__global mouse_visible bool
+__global mouse_enabled bool
+__global mouse_saved [384]u32
 
 const background = u32(0x15212e)
 const foreground = u32(0xdce9f2)
@@ -72,6 +78,8 @@ fn draw_cell(x u32, y u32) {
 
 pub fn put(byte u8) {
 	if surface == 0 { return }
+	hide_pointer()
+	defer { show_pointer() }
 	if byte == `\r` { column = 0; return }
 	if byte == 8 {
 		if column > 0 { column-- }
@@ -95,4 +103,41 @@ pub fn put(byte u8) {
 		}
 		row--
 	}
+}
+
+fn hide_pointer() {
+	if !mouse_visible { return }
+	for y in 0 .. 24 {
+		for x in 0 .. 16 { pixel(u32(mouse_x + x), u32(mouse_y + y), mouse_saved[y * 16 + x]) }
+	}
+	mouse_visible = false
+}
+
+fn show_pointer() {
+	if !mouse_enabled || mouse_visible || surface == 0 { return }
+	for y in 0 .. 24 {
+		for x in 0 .. 16 {
+			address := surface + u32(mouse_y + y) * stride + u32(mouse_x + x) * 4
+			mouse_saved[y * 16 + x] = mmio.read_be32(address)
+			if y < 20 && x <= y / 2 {
+				color := if x == 0 || x == y / 2 || y == 19 { u32(0x000000) } else if mouse_buttons & 1 != 0 { u32(0xffb454) } else { u32(0xffffff) }
+				pixel(u32(mouse_x + x), u32(mouse_y + y), color)
+			}
+		}
+	}
+	mouse_visible = true
+}
+
+pub fn pointer(dx int, dy int, buttons u8) {
+	if surface == 0 { return }
+	hide_pointer()
+	if !mouse_enabled { mouse_x = int(width / 2); mouse_y = int(height / 2); mouse_enabled = true }
+	mouse_x += dx
+	mouse_y += dy
+	if mouse_x < 0 { mouse_x = 0 }
+	if mouse_y < 0 { mouse_y = 0 }
+	if mouse_x > int(width) - 16 { mouse_x = int(width) - 16 }
+	if mouse_y > int(height) - 24 { mouse_y = int(height) - 24 }
+	mouse_buttons = buttons
+	show_pointer()
 }
