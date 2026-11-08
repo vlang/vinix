@@ -4,6 +4,7 @@ module main
 
 import crypto.sha256
 import os
+import json2
 import time
 
 fn main() {
@@ -19,7 +20,7 @@ fn main() {
 
 fn capture_screen(mut child os.Process, capture string, name string) ! {
 	path := capture + '/' + name + '.ppm'
-	child.stdin_write('screendump "' + path.replace('\\', '\\\\').replace('"', '\\"') + '"\n')
+	monitor(mut child, 'screendump "' + path.replace('\\', '\\\\').replace('"', '\\"') + '"\n')
 	time.sleep(500 * time.millisecond)
 	if !os.is_file(path) { return error('QEMU did not capture ' + path) }
 }
@@ -30,17 +31,22 @@ fn boot(output string, marker string) ! {
 	os.mkdir_all(capture)!
 	qemu := os.find_abs_path_of_executable(os.getenv_opt('VINIX_PPC_QEMU') or { 'qemu-system-ppc' })!
 	logfile := capture + '/program.log'
-	args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', '512', '-smp', '1',
+	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', '512', '-smp', '1',
 		'-nic', 'user,model=sungem', '-g', '800x600x32', '-display', 'none', '-no-reboot', '-cdrom',
 		output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env', 'boot-device=cd:\\BOOT.ELF;1',
 		'-prom-env', 'boot-file=cd:\\KERNEL.ELF;1 cd:\\RAMFS.TAR;1', '-prom-env', 'output-device=scca',
-		'-serial', 'file:' + logfile, '-monitor', 'stdio']
+		'-serial', 'file:' + logfile, '-monitor', 'none', '-qmp', 'stdio']
+	if disk := os.getenv_opt('VINIX_PPC_DISK') {
+		if !os.is_file(disk) { return error('VINIX_PPC_DISK must exist') }
+		args << ['-drive', 'file=' + os.real_path(disk).replace(',', ',,') + ',format=raw,if=ide,index=0,cache=writeback']
+	}
 	os.write_file(capture + '/program-qemu.txt', args.join('\n') + '\n')!
 	os.write_file(logfile, '')!
 	mut child := os.new_process(qemu)
 	child.set_args(args)
 	child.set_redirect_stdio_merged()
 	child.run()
+	child.stdin_write('{"execute":"qmp_capabilities"}\n')
 	defer {
 		if child.is_alive() { child.signal_kill() }
 		child.wait()
@@ -61,31 +67,46 @@ fn boot(output string, marker string) ! {
 	time.sleep(5 * time.second)
 	log = os.read_file(logfile)!
 	// Preserve even failed screens; a captured screen alone is not a pass.
-	child.stdin_write('info registers\n')
+	monitor(mut child, 'info registers\n')
 	capture_screen(mut child, capture, 'program')!
+	if log.contains(marker) && os.getenv('VINIX_PPC_TEST_ACCOUNT') == '1' {
+		// Disposable fixture credentials, entered through the real USB keyboard.
+		// Tab changes fields; Return submits the real registration form.
+		for key in ['v', 'i', 'n', 'i', 'x', 'tab', 't', 'e', 's', 't', '1', '2', '3',
+			'tab', 't', 'e', 's', 't', '1', '2', '3', 'ret'] {
+			monitor(mut child, 'sendkey ' + key + ' 30\n')
+			time.sleep(150 * time.millisecond)
+		}
+		for _ in 0 .. 60 {
+			time.sleep(time.second)
+			if os.read_file(logfile)!.contains('first canvas presented') { break }
+		}
+		time.sleep(2 * time.second)
+		capture_screen(mut child, capture, 'program-registered')!
+	}
 	if log.contains(marker) && os.getenv('VINIX_PPC_TEST_SETUP') == '1' {
 		// The real 800x600 first-run form starts with the name focused. Type
 		// through USB, then click the password field and type there. Never
 		// submit credentials or bypass registration in this capture test.
 		for key in ['v', 'i', 'n', 'i', 'x'] {
-			child.stdin_write('sendkey ' + key + ' 30\n')
+			monitor(mut child, 'sendkey ' + key + ' 30\n')
 			time.sleep(150 * time.millisecond)
 		}
 		time.sleep(2 * time.second)
 		capture_screen(mut child, capture, 'program-typed')!
-		child.stdin_write('mouse_move 0 6\n')
+		monitor(mut child, 'mouse_move 0 6\n')
 		time.sleep(150 * time.millisecond)
-		child.stdin_write('mouse_button 1\n')
+		monitor(mut child, 'mouse_button 1\n')
 		time.sleep(150 * time.millisecond)
-		child.stdin_write('mouse_button 0\n')
+		monitor(mut child, 'mouse_button 0\n')
 		for key in ['x', 'y', 'z'] {
-			child.stdin_write('sendkey ' + key + ' 30\n')
+			monitor(mut child, 'sendkey ' + key + ' 30\n')
 			time.sleep(150 * time.millisecond)
 		}
 		time.sleep(2 * time.second)
 		capture_screen(mut child, capture, 'program-clicked')!
 		time.sleep(2 * time.second)
-		child.stdin_write('info registers\n')
+		monitor(mut child, 'info registers\n')
 		capture_screen(mut child, capture, 'program-settled')!
 		if os.getenv('VINIX_PPC_TEST_STABILITY') == '1' {
 			for i in 0 .. 20 {
@@ -98,7 +119,7 @@ fn boot(output string, marker string) ! {
 	os.cp(@FILE, capture + '/boot-program.v')!
 	mut sums := ''
 	for name in ['program.log', 'program.ppm', 'program-typed.ppm', 'program-clicked.ppm',
-		'program-settled.ppm', 'boot-program.v', 'program-qemu.txt', 'init-ppc.elf', 'vinix-ppc.elf',
+		'program-settled.ppm', 'program-registered.ppm', 'boot-program.v', 'program-qemu.txt', 'init-ppc.elf', 'vinix-ppc.elf',
 		'vinix-ppc-boot.iso'] {
 		path := if name.starts_with('program') || name == 'boot-program.v' {
 			capture + '/' + name
@@ -116,7 +137,19 @@ fn boot(output string, marker string) ! {
 		}
 	}
 	os.write_file(capture + '/PROGRAM-SHA256SUMS', sums)!
+	if os.getenv('VINIX_PPC_TEST_ACCOUNT') == '1' && !log.contains('user profile ready') {
+		return error('Real GUI registration did not save the account')
+	}
 	if !log.contains(marker) || log.contains('VINIX-PPC: PANIC') || log.contains('init exited') {
 		return error('Application did not reach ' + marker)
 	}
+}
+
+struct MonitorCommand {
+ execute string = "human-monitor-command"
+ arguments map[string]string
+}
+
+fn monitor(mut child os.Process, command string) {
+ child.stdin_write(json2.encode(MonitorCommand{arguments: {"command-line": command.trim_space()}}) + "\n")
 }
