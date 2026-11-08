@@ -141,7 +141,7 @@ pub fn console_mode(graphics i32) {
 
 @[export: 'vinix_gpu_present_startup_stage']
 pub fn startup_stage(stage &char) {
-    $if gpu_presenter_enabled ? {
+    $if gpu_presenter_enabled ? || desktop_startup_trace ? {
         C.fprintf(C.stderr, c'vinix-desktop: GPU init: %s\n', stage)
         C.fflush(C.stderr)
     } $else { _ = stage }

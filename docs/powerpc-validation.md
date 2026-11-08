@@ -323,3 +323,27 @@ heap/FPU runtime checks pass in a 128 MiB guest.
 is 60 seconds to accommodate larger native applications. Bundle, based on
 `9a7253674` with preserved sources: `/tmp/vinix-ppc-startup-runtime`;
 `SHA256SUMS`: `4d6a6bdfd15fcf08b77735a8063570808927096fce98c8fd82de65c68bd7a60e`.
+
+## Native desktop first frame and USB input (2026-11-08)
+
+The real desktop now links into the kernel's text/data ranges and boots as
+`/bin/init`, with static musl and software rendering. QEMU's 800x600 scanout
+shows the existing "Create your user" form. USB typing enters `vinix` in the
+name field; a mouse click focuses the password field and subsequent typing
+appears as three masked characters. Both captures were visually inspected.
+The initial console-only capture was taken before the first render completed;
+the V capture runner now waits five seconds after the startup marker.
+
+This proves native application rendering and input, not account persistence
+or a working multi-process desktop session. Registration is not bypassed.
+The kernel still lacks writable filesystems, process creation and Unix sockets;
+poll/nanosleep are also not yet implemented at this milestone.
+
+Preserve these bundles together (base `d4591db06`/`9a7253674` and source overlays):
+
+- `/tmp/vinix-ppc-desktop-native`, application build/source archives,
+  `SHA256SUMS`: `adf460c95e160645e8e0e64bec5e8da76fa18bc2429b3dc10c8866874aa8ef21`.
+- `/tmp/vinix-ppc-desktop-boot2`, native kernel/image/source inputs,
+  `SHA256SUMS`: `f1e137690f0db5d8c1332b2c4389b8a3fcb23ffbdcd51a37e07d988acac302fb`.
+- `/tmp/vinix-ppc-desktop-input`, capture runner, logs and three PPMs,
+  `PROGRAM-SHA256SUMS`: `1fc6bd3a5c959583761335b446b2e03832f93c90e1cf0fbeb236b99dad5f8cf0`.

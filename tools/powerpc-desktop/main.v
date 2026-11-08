@@ -55,10 +55,11 @@ fn build(output string) ! {
 		['gpucore', 'gpu-present-soft.c', app + '/gpu_present.h']] {
 		// stage_app may have linked the checked-in declaration header.
 		if os.is_link(item[2]) { os.rm(item[2])! }
-		run([host, '-o', output + '/generate-module', 'run',
+		mut generate := [host, '-o', output + '/generate-module', 'run',
 			root + '/tests/linuxkpi/generate_module.v', root + '/desktop/' + item[0],
-			output + '/' + item[1], '--arch', 'ppc', '--header', item[2]],
-			output, 'generate-' + item[0])!
+			output + '/' + item[1], '--arch', 'ppc', '--header', item[2]]
+		if os.getenv('VINIX_PPC_TRACE') == '1' { generate << ['-d', 'desktop_startup_trace'] }
+		run(generate, output, 'generate-' + item[0])!
 	}
 	run([v, '-gc', 'none', '-o', output + '/stage-runtime', 'run',
 		root + '/build-support/stage-v-runtime.v', output + '/v-runtime'], output, 'stage-runtime')!
@@ -67,7 +68,8 @@ fn build(output string) ! {
 		'@vlib|' + output + '/vmodules|@vmodules|' + root + '|' + root + '/third_party|' + root + '/tools/accounts',
 		'-o', output + '/desktop.c', app], output, 'generate-desktop')!
 	run([zig, 'cc', '-target', 'powerpc-linux-musleabihf', '-mcpu=7450', '-static', '-O2',
-		'-mno-altivec', '-fno-stack-protector', '-w', '-D_GNU_SOURCE', '-I', app, '-I',
+		'-mno-altivec', '-fno-pic', '-fno-pie', '-fno-stack-protector', '-w', '-D_GNU_SOURCE',
+		'-Wl,-T,' + root + '/tests/powerpc/libc/linker.ld', '-Wl,--build-id=none', '-Wl,--strip-debug', '-I', app, '-I',
 		root + '/build-support/aarch64-cc-shim', '-I', root + '/desktop/gpucore', '-I',
 		vroot + '/thirdparty/fontstash', '-I', vroot + '/thirdparty/stb_image', output + '/desktop.c',
 		output + '/execinfo.c', output + '/gpu-present-soft.c',
@@ -84,7 +86,7 @@ fn build(output string) ! {
 		mut archive := ['git', '-C', item[0], 'archive', '--format=tar', '-o',
 			output + '/' + item[1] + '-sources.tar', 'HEAD']
 		if item[1] == 'vinix' {
-			archive << ['desktop', 'tools/accounts', 'tools/packages', 'tests/linuxkpi', 'build-support',
+			archive << ['desktop', 'tools/accounts', 'tools/packages', 'tests/linuxkpi', 'tests/powerpc', 'build-support',
 				'tools/powerpc-desktop']
 		}
 		run(archive, output, item[1] + '-sources')!

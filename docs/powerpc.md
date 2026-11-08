@@ -2,8 +2,11 @@
 
 Target: 32-bit big-endian PowerPC, initially the 7450 CPU and Open Firmware
 on a NewWorld Macintosh. QEMU `mac99,via=pmu` is the development machine.
-The port boots a small native kernel and a protected userspace shell in
-QEMU. It does not yet run the shared Vinix kernel or desktop.
+The port boots a small native kernel and protected userspace in QEMU. The
+actual Vinix desktop now renders its first-run registration screen, with USB
+keyboard and mouse input. Completing registration and running the full session
+still require writable storage and process/IPC services. This is not yet a
+complete end-user system or the shared Vinix kernel.
 
 ## Build and test
 
@@ -18,11 +21,11 @@ checkout. An alternate compiler can be selected with `VINIX_V_COMPILER`.
 
 ### Desktop cross-build
 
-The actual `desktop/` compositor now cross-links as a big-endian PPC32 static
+The actual `desktop/` compositor cross-links as a big-endian PPC32 static
 executable, including the ui2 calculator, software renderer and musl runtime.
-Building it does not yet make the PPC development image a desktop system:
-the kernel still lacks the process, writable-filesystem and Unix-socket services
-used by the session and its applications.
+Its linker script places text at `0x40000000` and data at `0x50000000`, within
+the native kernel's protected address ranges. Debug sections are omitted so
+the application fits the bounded boot archive.
 
 The tested desktop toolchain is deliberately separate from the kernel compiler:
 V `1f4d705322714d6ab35a712db9d1b93db9fbcc03`, with the one-line `math.round`
@@ -39,6 +42,28 @@ The runner stages sources with V, builds the freestanding presenter/execinfo
 modules, and links with Zig's `powerpc-linux-musleabihf` libc and unwinder.
 It preserves build logs, source archives, revision/overlay records and checksums
 outside Git. It does not modify the compiler or ui2 source checkouts.
+
+To build an image with that desktop as `/bin/init`, then open its setup screen:
+
+```
+VINIX_PPC_INIT=/tmp/vinix-ppc-desktop/vinix-desktop v run tools/powerpc build /tmp/vinix-ppc-desktop-boot
+qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic user,model=sungem -g 800x600x32 -cdrom /tmp/vinix-ppc-desktop-boot/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -prom-env 'boot-file=cd:\KERNEL.ELF;1 cd:\RAMFS.TAR;1' -prom-env 'output-device=scca' -serial mon:stdio
+```
+
+The setup form is the existing desktop application's first screen. It is not
+yet possible to save an account to the read-only archive. The normal shell
+image remains useful for the USB audio and Ethernet regression commands.
+
+Set `VINIX_PPC_TRACE=1` on both build commands for startup diagnostics. Capture
+the real framebuffer and exercise setup typing/focus without submitting it:
+
+```
+VINIX_PPC_TEST_SETUP=1 v -o /tmp/ppc-boot-program run tests/powerpc/boot-program.v /tmp/vinix-ppc-desktop-boot 'vinix-desktop: GPU init: checking user profile'
+```
+
+`VINIX_PPC_CAPTURE_DIR` optionally separates captures from the image directory.
+The runner waits for the startup marker and allows the first frame to finish;
+its marker result alone is not a visual assertion. Inspect the saved PPMs.
 
 ```
 v run tools/powerpc test /tmp/vinix-ppc-state
@@ -81,7 +106,7 @@ and snapshots available memory after its claims, explicitly excluding its own
 image. Firmware reservations remain excluded. The runner requires the later
 `VINIX-PPC: PASS firmware discovery` marker, dumps the copied FDT through the
 QEMU monitor, and independently validates its structure and node count.
-It has a 20-second boot deadline, kills/reaps its own emulator, and saves
+It has a 60-second boot deadline, kills/reaps its own emulator, and saves
 `boot.log`, `firmware.dtb`, and binary/FDT SHA-256 files in the output directory.
 `test-media` instead loads the ELF from the generated ISO through OpenBIOS,
 then reads and executes a separate ELF32 handoff probe. It records
@@ -136,7 +161,7 @@ Run `fbtest` in the shell to draw directly from protected userspace. It
 checks geometry layouts, access restrictions, mapping reuse and pixel
 readback, then displays a color pattern until Enter. Graphical shell tests
 check every captured pixel and the restored console. This is the display
-interface needed by future applications, not the shared Vinix desktop.
+interface used by the native desktop's software renderer.
 
 The same variable on `test-shell` verifies framebuffer RGB colors and text,
 types a command through QEMU's USB keyboard, and checks mouse movement and
