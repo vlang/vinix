@@ -2,7 +2,7 @@
 module boot
 
 pub const magic = u32(0x564f4631)
-pub const version = u32(5)
+pub const version = u32(6)
 
 pub struct PciDevice {
 pub mut:
@@ -48,4 +48,6 @@ pub mut:
 	initramfs       MemoryRange
 	pci_count       u32
 	pci             [8]PciDevice
+	ata_count       u32
+	ata             [4]u32
 }

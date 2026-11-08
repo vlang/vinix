@@ -1,6 +1,26 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module mmio
 
+pub fn read8(address u32) u8 {
+	mut value := u32(0)
+	asm volatile ppc raw { "lbz %[value],0(%[address])\neieio" ; [value] "=r" (value) ; [address] "b" (address) ; memory }
+	return u8(value)
+}
+
+pub fn write8(address u32, value u8) {
+	asm volatile ppc raw { "stb %[value],0(%[address])\neieio" ; ; [address] "b" (address) [value] "r" (value) ; memory }
+}
+
+pub fn read16(address u32) u16 {
+	mut value := u32(0)
+	asm volatile ppc raw { "lhbrx %[value],0,%[address]\neieio" ; [value] "=r" (value) ; [address] "b" (address) ; memory }
+	return u16(value)
+}
+
+pub fn write16(address u32, value u16) {
+	asm volatile ppc raw { "sthbrx %[value],0,%[address]\neieio" ; ; [address] "b" (address) [value] "r" (value) ; memory }
+}
+
 pub fn read32(address u32) u32 {
 	mut value := u32(0)
 	asm volatile ppc raw {

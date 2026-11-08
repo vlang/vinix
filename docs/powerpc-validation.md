@@ -396,3 +396,23 @@ Bundle `/tmp/vinix-ppc-desktop-stability` uses the native image above, base
 `f8a06f42c118aa0368b5a25c6bb95c85265f5e1b1cd23c50093d8e100300713b`.
 `CHECKER-SHA256SUMS` covers the checker and positive/negative reports:
 `c0a39ae871665d819f0f6e8ffa5b88a617eb7c548773601a29a967434323e136`.
+
+## Native ATA persistence (2026-11-08)
+
+The loader discovers KeyLargo/Heathrow ATA taskfiles from Open Firmware. A
+native polled LBA28 driver identifies disks, transfers 512-byte sectors with
+explicit little-endian data words, bounds requests, and issues FLUSH CACHE.
+ATAPI boot media are skipped. No firmware disk calls occur after takeover.
+
+The destructive test is compiled only with `VINIX_PPC_TEST_ATA=1` and requires
+an exact 4 MiB disk with its fixture label. Two QEMU boots update the final
+sector; an independent host comparison checks every byte, including unchanged
+neighbours. Out-of-bounds requests fail. This is QEMU validation; hardware
+controller reset/timing setup and LBA48 remain future work.
+
+Reproduce: `v -o /tmp/ppc-ata-test run tests/powerpc/ata-disk.v FRESH_DIRECTORY`.
+`VINIX_PPC_DISK` attaches an existing raw disk to normal launcher runs.
+Bundle `/tmp/vinix-ppc-ata-persist3`, base `5f33f0d56` plus saved sources:
+top-level `SHA256SUMS` `c7efad4397caf07bb198ac8b1caefbbf24c63cb998aa9f03ca9d50d1c50b105f`;
+`boot-1/SHA256SUMS` `6e7920dda0de1631cb5a18d6118d97118953e8645324171a78d731e251488c64`;
+`boot-2/SHA256SUMS` `3281ca5803f68c84d6e30c55139469b16603bdaa94ca0b1be8c65c32902634dc`.

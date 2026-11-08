@@ -74,6 +74,7 @@ fn cross_build(root string, output string, v string, zig string, headers string,
 		'ppc', '-target-libc-headers', '-nofloat', '-gc', 'none', '-manualfree', '-o',
 		output + '/${generated}.c', '-path', '@vlib|' + root + '/kernel']
 	if os.getenv('VINIX_PPC_TRACE') == '1' { generate << ['-d', 'ppc_trace_syscalls'] }
+	if os.getenv('VINIX_PPC_TEST_ATA') == '1' { generate << ['-d', 'ppc_test_ata'] }
 	generate << root + '/' + source
 	command(generate)!
 	// Use musl's type declarations, but the V freestanding runtime owns
@@ -98,6 +99,10 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool, runtime_p
 	mut args := ['-M', if hubs { 'mac99,via=pmu,usb=off' } else { 'mac99,via=pmu' }, '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
 		'-nic', 'user,model=sungem,id=net0', '-no-reboot']
 	args << ['-g', '800x600x' + depth]
+	if disk := os.getenv_opt('VINIX_PPC_DISK') {
+		if !os.is_file(disk) { return error('VINIX_PPC_DISK must name an existing image') }
+		args << ['-drive', 'file=' + os.real_path(disk).replace(',', ',,') + ',format=raw,if=ide,index=0,cache=writeback']
+	}
 	if hubs {
 		args << ['-device', 'pci-ohci,id=ohci', '-device', 'usb-hub,id=hub,bus=ohci.0,port=1',
 			'-device', 'usb-kbd,bus=ohci.0,port=1.1', '-device', 'usb-hub,id=nested,bus=ohci.0,port=1.2,ports=4,port-power=on',

@@ -31,6 +31,7 @@ fn copy_node(node u32, depth u32) bool {
 	if depth >= 64 || tree_nodes >= 4096 { return false }
 	tree_nodes++
 	discover_pci(node)
+	discover_ata(node)
 	mut path := [512]u8{}
 	mut call := Call{ service: c'package-to-path', nargs: 3, nret: 1 }
 	call.cells[0] = node
