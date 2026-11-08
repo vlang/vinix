@@ -271,9 +271,10 @@ fn stage_browser_source(vox string, work string) !string {
 	if os.exists(entry) { os.rmdir_all(entry)! }
 	os.mkdir_all(entry + '/browserapp')!
 	for name in os.ls(vox)! {
-		if name in ['browserapp', 'native', 'main.v', '.git'] { continue }
+		if name in ['browserapp', 'native', 'processmetrics', 'main.v', '.git'] { continue }
 		os.symlink(vox + '/' + name, entry + '/' + name)!
 	}
+	os.symlink(work + '/modules/processmetrics', entry + '/processmetrics')!
 	os.mkdir_all(entry + '/native')!
 	for name in os.ls(vox + '/native')! {
 		if name != 'replay_scratch.v' {
@@ -441,6 +442,17 @@ fn build_glvnd(repo string, work string) ! {
 
 fn stage_native_host(repo string, vox string, work string, v string) ! {
 	modules := work + '/modules'
+	metrics := modules + '/processmetrics'
+	if os.exists(metrics) { os.rmdir_all(metrics)! }
+	os.mkdir_all(metrics)!
+	for name in os.ls(vox + '/processmetrics')! {
+		if name.ends_with('_test.v') || name == 'memory_default.v' { continue }
+		os.symlink(vox + '/processmetrics/' + name, metrics + '/' + name)!
+	}
+	fallback := os.read_file(vox + '/processmetrics/memory_default.v')!
+	if fallback.count('$if !darwin {') != 1 { return error('unsupported memory sampler fallback') }
+	os.write_file(metrics + '/memory_default.v', fallback.replace('$if !darwin {', '$if !darwin && !linux {'))!
+	os.cp(repo + '/build-support/vox/processmetrics/memory.v', metrics + '/vinix_memory.v')!
 	vroot := os.dir(os.real_path(v))
 	for name in ['gg', 'sokol/sapp', 'sokol/gfx'] { os.mkdir_all(modules + '/' + name)! }
 	for name in ['gg.v', 'enums.v', 'color.v', 'image.v'] {

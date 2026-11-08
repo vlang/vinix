@@ -133,43 +133,42 @@ fn native_element(source Element, inherited u32, images map[string]int) Element 
 	// Vox owns its frame. Keep its controls and let Vinix perform the scoped
 	// window actions instead of routing them to platform-specific host code.
 	if source.id in ['window-close', 'window-minimize', 'window-zoom'] {
-		action, glyph := match source.id {
-			'window-close' { window_action_close, 'builtin:close' }
-			'window-minimize' { window_action_minimize, 'builtin:minimize' }
-			else { window_action_maximize, 'builtin:maximize' }
+		action := match source.id {
+			'window-close' { window_action_close }
+			'window-minimize' { window_action_minimize }
+			else { window_action_maximize }
 		}
 		return Element{
 			...source
 			action_id: action
-			native_style: true
-			vector: VectorPath{}
-			box: BoxStyle{ bg: 0xe4e9f1, radius: 3 }
-			children: [image(source.id + '-glyph', glyph, rect(0, 0, source.frame.width, source.frame.height))]
+			native_style: false
 		}
 	}
-	background := if source.vector.fill_enabled && source.vector.points.len > 0 {
-		source.vector.fill
-	} else if source.box.transparent {
+	background := if source.box.transparent {
 		inherited
 	} else {
 		source.box.bg
 	}
-	mut children := source.children.map(native_element(it, background, images))
+	content_background := if source.vector.fill_enabled && source.vector.points.len > 0 { source.vector.fill } else { background }
+	mut children := source.children.map(native_element(it, content_background, images))
 	if source.kind == .image {
 		return Element{ ...source, image_path: native_icon_path(source.image_path, int(source.frame.width), int(source.frame.height), background, images), children: children }
 	}
 	if source.id == 'address-info' {
 		return Element{ ...source, text: 'i', text_style: TextStyle{ ...source.text_style, bold: true, align: .center } }
 	}
-	if source.id.starts_with('tab-') && source.accessibility_role == 'tab' {
-		return Element{ ...source, vector: VectorPath{}, box: BoxStyle{ bg: background, radius: 4 }, children: children }
+	if source.id.starts_with('tab-close:') {
+		// Keep the classic unboxed close mark, using the compositor glyph so
+		// it remains legible with the desktop's available font coverage.
+		children << Element{ ...image(source.id + '-icon', 'builtin:close', rect(0, 0, source.frame.width, source.frame.height)), text_style: source.text_style }
+		return Element{ ...source, text: '', native_style: false, children: children }
 	}
-	if source.kind == .button && (source.text != '' || source.image_path != '' || source.id == 'tab-new') {
+	if source.kind == .button && (source.text != '' || source.image_path != '') && !source.id.starts_with('tab-close:') {
 		return native_button(source, children, images)
 	}
 	if source.id == 'tab-strip' {
 		return Element{ ...source, action_id: window_action_move, draggable: true,
-			box: BoxStyle{ bg: 0xf3f5f9, border_bottom: 1, border_color: 0xe8ebf0 }, children: children }
+			children: children }
 	}
 	if source.vector.points.len < 2 { return Element{ ...source, children: children } }
 	key := '${source.frame.width}:${source.frame.height}:${background}:${source.vector}'

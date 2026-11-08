@@ -122,11 +122,19 @@ and log, copy its complete output to `$VINIX_VOX_STATE/vox.c`, then run
 `builder finish-source` before `builder native`. That step applies the same
 allocator, completeness and ABI-header checks as `full`.
 The guest logs system memory and browser process status every 15 seconds for
-interaction and idle measurements.
+interaction and idle measurements, including each browser's raw `statm` counters
+and page size. The footer samples current process resident memory from
+`/proc/self/statm` once per second, converting pages with the runtime page size.
+Invalid or overflowing counters stay unavailable. The staged processmetrics
+overlay leaves the shared Vox checkout unchanged; the receipt requires the
+sampler's native test and five live process-counter samples.
 
 Vox calls the Vinix UI2 setting `set_window_decorated(false)` before opening its
 window. Its own tab strip supplies native window buttons and the drag target;
 the compositor adds invisible resize targets. Other clients retain decorations.
+The strip preserves Vox's classic curved tab outlines, gray background and
+red/yellow/green window buttons, with window actions handled by Vinix. Toolbar
+and bookmark buttons still use the native Vinix controls and font renderer.
 The backward-compatible hello extension leaves protocol header sizes unchanged.
 Run the frame/geometry regressions with the same guarded desktop builder command
 above, appending `--host-tests`. This checks negotiation, all four themes,

@@ -33,6 +33,9 @@ fn receipt() ! {
 		'Ladybird V smoke check passed', 'VOX GUEST: self-test exit=0', 'VOX GUEST: native tests exit=0'] {
 		if !serial.contains(marker) { return error('missing guest check: ' + marker) }
 	}
+	if !serial.contains('VOX-MEMORY-SAMPLE RAM: ') || serial.count('VOX-PROCESS-STATM ') < 5 {
+		return error('resident-memory sampling was not exercised in the guest')
+	}
 	for failure in ['stopped with SIG', 'transport failed:', 'V panic:', 'memory allocation failure',
 		'VOX-FAULT'] {
 		if serial.contains(failure) { return error('guest failure: ' + failure) }
@@ -59,6 +62,9 @@ fn receipt() ! {
 	if !generated.contains('#define CUSTOM_DEFINE_prealloc') || !generated.contains('prealloc_realloc_copy_size') || !generated.contains('closure_metadata_enter') {
 		return error('browser was built without scoped arenas')
 	}
+	if !generated.contains('processmetrics__memory_from_statm') || !generated.contains('/proc/self/statm') {
+		return error('browser is missing the resident-memory sampler')
+	}
 	runtime := os.read_file(work + '/runtime-path.txt') or {
 		candidates := (os.ls(work)!).filter(it.starts_with('prealloc-') && os.is_file(work + '/' + it + '/receipt.tsv'))
 		if candidates.len != 1 {
@@ -71,6 +77,8 @@ fn receipt() ! {
 	os.cp(work + '/browser-source/main.v', work + '/browser-main.v')!
 	os.cp(work + '/browser-source/native/replay_scratch.v', work + '/browser-replay-scratch.v')!
 	os.cp(work + '/modules/ui2/ui/vox_native_font_metrics.v', work + '/native-font-metrics.v')!
+	os.cp(work + '/modules/processmetrics/vinix_memory.v', work + '/resident-memory.v')!
+	os.cp(work + '/modules/processmetrics/memory_default.v', work + '/memory-default.v')!
 	command(['mcopy', '-o', '-i', work + '/boot.img', '::/boot/vinix', work + '/kernel'])!
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	command(['tar', '--format=ustar', '-cf', work + '/port-source.tar', '-C', root, 'desktop/app.v',
@@ -96,7 +104,8 @@ fn receipt() ! {
 		work + '/browser-chrome-portable.v', work + '/vox.o.flags', work + '/include/worker_process.h',
 		work + '/browser-main.v', work + '/browser-replay-scratch.v', work + '/include/native-tabs.h',
 		work + '/include/EGL/eglext_angle.h', work + '/native-font-metrics.v',
-		work + '/desktop-frame-tests.log', work + '/desktop-frame-build.log'] {
+		work + '/desktop-frame-tests.log', work + '/desktop-frame-build.log',
+		work + '/resident-memory.v', work + '/memory-default.v'] {
 		lines << fingerprint(path)! + '\t' + path
 	}
 	mut files := os.walk_ext(work + '/guest', '')
@@ -117,7 +126,8 @@ fn receipt() ! {
 		'glvnd-build-final.log', 'port-source.tar', 'include', 'vinix-source.patch', 'vox2-source.patch',
 		'ui2-source.patch', 'arena-tests-final.log', 'arena-runtime-receipt.tsv', 'initramfs.tar',
 		'boot.img', 'vars.fd', 'browser-chrome-portable.v', 'browser-main.v', 'browser-replay-scratch.v',
-		'vox.o.flags', 'native-font-metrics.v', 'desktop-frame-tests.log', 'desktop-frame-build.log'])!
+		'vox.o.flags', 'native-font-metrics.v', 'desktop-frame-tests.log', 'desktop-frame-build.log',
+		'resident-memory.v', 'memory-default.v'])!
 	os.write_file(archive + '.sha256', fingerprint(archive)! + '\t' + archive + '\n')!
 	println('Guest checks passed; receipt: ' + work + '/receipt.tsv')
 	println(os.read_file(archive + '.sha256')!)

@@ -57,6 +57,8 @@ fn main() {
 				command := os.read_file('/proc/' + pid + '/cmdline') or { continue }
 				if command.contains('/usr/libexec/vinix-vox/root/usr/bin/vox') {
 					println('VOX-PROCESS-MEMORY pid=' + pid + ' ' + (os.read_file('/proc/' + pid + '/status') or { '' }).replace('\n', ' '))
+					println('VOX-PROCESS-STATM pid=' + pid + ' page-size=' + os.page_size().str() + ' ' +
+						(os.read_file('/proc/' + pid + '/statm') or { '' }).trim_space())
 				}
 			}
 		}

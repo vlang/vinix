@@ -5,6 +5,7 @@ import gg
 import ui2
 import encoding.base64
 import os
+import processmetrics
 import sync.stdatomic as _
 
 #include <sys/mman.h>
@@ -40,6 +41,25 @@ fn testsuite_begin() {
 		if C.fcntl(fd, C.F_GETFD) != -1 || C.fcntl(4, C.F_GETFD) < 0 { exit(1) }
 		exit(0)
 	}
+}
+
+fn test_resident_memory_uses_statm_pages_and_rejects_invalid_counters() {
+	reading := processmetrics.memory_from_statm('100000 12345 0 0 0 0 0\n', 4096)
+	assert reading.available && reading.bytes == 50_565_120
+	assert reading.ram_label() == 'RAM: 50.6 MB'
+	assert processmetrics.memory_from_statm('10\t2\n', 16384).bytes == 32768
+	for invalid in ['', '100', '100 -1', '100 nope', '100 2k', '100 18446744073709551616',
+		'100 18446744073709551615'] {
+		assert !processmetrics.memory_from_statm(invalid, 4096).available
+	}
+	assert !processmetrics.memory_from_statm('100 2', 0).available
+}
+
+fn test_resident_memory_samples_the_running_process() {
+	reading := processmetrics.memory_snapshot()
+	assert reading.available && reading.bytes > 0
+	assert !reading.ram_label().contains('unavailable')
+	println('VOX-MEMORY-SAMPLE ' + reading.ram_label())
 }
 
 fn test_ui2_window_decoration_setting_is_sent_in_the_initial_handshake() {
@@ -288,7 +308,7 @@ fn test_native_chrome_keeps_favicon_pixels_and_uses_native_buttons() {
 		ui2.image('tab-icon-0', path, ui2.rect(0, 0, 16, 16)),
 		ui2.button_with_image('bookmark-open:0', 'Example', path, ui2.rect(0, 20, 120, 24), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{}),
 		ui2.button('back', '‹', ui2.rect(0, 50, 22, 22), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{}),
-		ui2.button('window-close', '', ui2.rect(0, 0, 12, 12), ui2.BoxStyle{}, ui2.TextStyle{}),
+		ui2.button('window-close', '', ui2.rect(0, 0, 12, 12), ui2.BoxStyle{ bg: 0xff5f57, radius: 6 }, ui2.TextStyle{}),
 	]
 	for _ in 0 .. 2 {
 		ui2.draw_embedded_elements(context, elements, {
@@ -308,10 +328,54 @@ fn test_native_chrome_keeps_favicon_pixels_and_uses_native_buttons() {
 		assert tree[2].native_style && tree[2].text == ''
 		assert tree[2].children[0].image_path == 'builtin:arrow_left'
 		assert tree[2].children[0].frame == ui2.rect(0, 0, 22, 22)
-		assert !tree[3].hidden && tree[3].enabled && tree[3].native_style
+		assert !tree[3].hidden && tree[3].enabled && !tree[3].native_style
 		assert tree[3].action_id == ui2.window_action_close
-		assert tree[3].children[0].image_path == 'builtin:close'
+		assert tree[3].box.bg == 0xff5f57 && tree[3].box.radius == 6
 	}
+}
+
+fn test_classic_tabs_keep_shaped_shoulders_gray_strip_and_client_controls() {
+	ui2.native_release_resources()
+	defer { ui2.native_release_resources() }
+	mut context := gg.new_context(width: 180, height: 40)
+	outline := ui2.VectorPath{
+		points: [ui2.VectorPoint{ x: 0, y: 20 }, ui2.VectorPoint{ x: 10, y: 0 },
+			ui2.VectorPoint{ x: 90, y: 0 }, ui2.VectorPoint{ x: 100, y: 20 }]
+		fill: 0xf7f7f7
+		stroke: 0xadadad
+		stroke_width: 1
+	}
+	tab := ui2.Element{
+		...ui2.view('tab-0', ui2.rect(62, 5, 100, 24), ui2.BoxStyle{ transparent: true }, [
+			ui2.button('tab-close:0', '×', ui2.rect(74, 3, 16, 16), ui2.BoxStyle{ transparent: true }, ui2.TextStyle{}),
+		])
+		vector: outline
+		action_id: 'tabdrag-0'
+		accessibility_role: 'tab'
+	}
+	strip := ui2.view('tab-strip', ui2.rect(0, 0, 180, 29), ui2.BoxStyle{ bg: 0xdbdbdb }, [tab,
+		ui2.button('window-minimize', '', ui2.rect(26, 8, 12, 12), ui2.BoxStyle{ bg: 0xffbd2e, radius: 6 }, ui2.TextStyle{}),
+		ui2.button('window-zoom', '', ui2.rect(42, 8, 12, 12), ui2.BoxStyle{ bg: 0x28c840, radius: 6 }, ui2.TextStyle{}),
+	])
+	ui2.draw_embedded_elements(context, [strip], map[string]int{}, fn (_ string) {})
+	tree := ui2.native_embedded_elements()[0]
+	assert tree.box.bg == 0xdbdbdb && tree.action_id == ui2.window_action_move
+	assert tree.draggable
+	assert tree.children[1].action_id == ui2.window_action_minimize
+	assert tree.children[1].box.bg == 0xffbd2e && tree.children[1].box.radius == 6
+	assert tree.children[2].action_id == ui2.window_action_maximize
+	assert tree.children[2].box.bg == 0x28c840 && tree.children[2].box.radius == 6
+	rendered := tree.children[0]
+	assert rendered.box.transparent && rendered.action_id == 'tabdrag-0'
+	assert rendered.vector.points == outline.points
+	assert rendered.children[1].box.transparent && !rendered.children[1].native_style
+	assert rendered.children[1].text == ''
+	assert rendered.children[1].children[0].image_path == 'builtin:close'
+	bytes := os.read_bytes(rendered.children[0].image_path.all_after('vinix-surface:')) or { panic(err) }
+	offset := 48 + int(bytes[28]) * 100 * 24 * 4
+	assert bytes[offset..offset + 4] == [u8(0xdb), 0xdb, 0xdb, 255]
+	center := offset + (10 * 100 + 50) * 4
+	assert bytes[center..center + 4] == [u8(0xf7), 0xf7, 0xf7, 255]
 }
 
 fn test_native_document_text_uses_desktop_fonts_and_preserves_clip_and_monospace() {
