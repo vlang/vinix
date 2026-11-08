@@ -39,8 +39,8 @@ fn directory_record(mut image []u8, at int, extent u32, size u32, flags u8, name
 // Write an ordinary ISO9660 volume. Open Firmware loads the ELF by its path;
 // PC El Torito boot records and UEFI executables have no role here.
 fn make_iso(output string) ! {
-	names := ['vinix-of.elf', 'handoff-probe.elf', 'vinix-ppc.elf']
-	iso_names := ['BOOT.ELF;1', 'PROBE.ELF;1', 'KERNEL.ELF;1']
+	names := ['vinix-of.elf', 'handoff-probe.elf', 'vinix-ppc.elf', 'ramfs.tar']
+	iso_names := ['BOOT.ELF;1', 'PROBE.ELF;1', 'KERNEL.ELF;1', 'RAMFS.TAR;1']
 	mut files := [][]u8{}
 	mut extents := []int{}
 	mut blocks := 21

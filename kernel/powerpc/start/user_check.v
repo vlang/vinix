@@ -10,12 +10,14 @@ import powerpc.serial
 __global user_space mmu.Space
 __global user_faults u32
 __global resume_stack u32
+__global user_check_active bool
 
 fn C.vinix_user_check()
 fn C.vinix_user_check_end()
 fn C.vinix_user_check_done()
 
 fn check_userspace(stack u32) {
+	user_check_active = true
 	resume_stack = stack
 	table := physical_pages.take(16, 16)
 	code := physical_pages.take(1, 1)
@@ -44,7 +46,17 @@ fn check_userspace(stack u32) {
 @[export: 'vinix_user_check_done']
 fn user_check_done() {
 	serial.text(c'VINIX-PPC: PASS userspace MMU syscall and protection\n')
-	for {}
+	user_check_active = false
+	// The CPU is back in real mode with interrupts disabled. Revoke the old
+	// mappings before reusing the probe's frames, then flush on activation.
+	old_count := user_space.count
+	if !user_space.init(user_space.table) { halt(c'user address space reset') }
+	for i := u32(0); i < old_count; i++ {
+		if !physical_pages.give(user_space.mappings[i].physical, 1) {
+			halt(c'probe frame ownership')
+		}
+	}
+	launch_init()
 }
 
 // Position-independent fixture executes exclusively through the user mapping.

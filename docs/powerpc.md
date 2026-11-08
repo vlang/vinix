@@ -2,7 +2,8 @@
 
 Target: 32-bit big-endian PowerPC, initially the 7450 CPU and Open Firmware
 on a NewWorld Macintosh. QEMU `mac99,via=pmu` is the development machine.
-This is an architecture bring-up, not yet a bootable Vinix desktop.
+The port boots a small native kernel and a protected userspace shell in
+QEMU. It does not yet run the shared Vinix kernel or desktop.
 
 ## Build and test
 
@@ -19,6 +20,7 @@ checkout. An alternate compiler can be selected with `VINIX_V_COMPILER`.
 v run tools/powerpc test /tmp/vinix-ppc-state
 v run tools/powerpc test-media /tmp/vinix-ppc-cd-state
 v run tools/powerpc test-kernel /tmp/vinix-ppc-kernel-state
+v run tools/powerpc test-shell /tmp/vinix-ppc-shell-state
 v run tools/powerpc run /tmp/vinix-ppc-state
 ```
 
@@ -40,23 +42,31 @@ It has a 20-second boot deadline, kills/reaps its own emulator, and saves
 `boot.log`, `firmware.dtb`, and binary/FDT SHA-256 files in the output directory.
 `test-media` instead loads the ELF from the generated ISO through OpenBIOS,
 then reads and executes a separate ELF32 handoff probe. It records
-`media-boot.log`. `run` opens this CD boot in a QEMU window.
+`media-boot.log`. `test-shell` boots the kernel and initramfs, exercises
+commands through the serial port, checks errors and repeated file access,
+and records `kernel-boot.log` and `shell-commands.log`.
+`run` starts the interactive shell in the host terminal. Type at `vinix$`;
+exit QEMU with Ctrl-A then X. The shell's `exit` command stops init.
+It no longer selects the returning handoff probe that showed `0 >`.
 The V image builder writes ISO9660 directly, without external image utilities.
 Each build saves its base Git revision, tool versions, exact source inputs,
 and SHA-256 manifests (`sources.sha256` and `SHA256SUMS`) outside Git.
 Host corruption tests run with `v test tools/powerpc/validate_test.v`.
 ELF validation tests run with `v test kernel/powerpc/elf32`.
+Archive validation tests run with `v test kernel/powerpc/ramfs`.
 
 Direct QEMU command after building:
 
 ```
-qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -cdrom /tmp/vinix-ppc-state/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -prom-env 'boot-file=cd:\PROBE.ELF;1' -serial stdio
+qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -cdrom /tmp/vinix-ppc-state/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -prom-env 'boot-file=cd:\KERNEL.ELF;1 cd:\RAMFS.TAR;1' -nographic -serial mon:stdio
 ```
 
-This command boots the firmware bring-up program, not the whole OS. This ISO
+This command boots the PPC kernel and initial userspace shell. This ISO
 has no partition map, so OpenBIOS takes the filename immediately after the
 colon; adding a comma prevents lookup. Keep the ISO file version `;1`.
-For a headless boot add `-nographic -monitor none`.
+Input/output uses the emulated SCC serial port. Graphical console and USB
+keyboard support remain pending; typing in an old Open Firmware window will
+not control this shell.
 
 The separate direct test uses `-kernel vinix-of.bin`. QEMU's
 `-kernel` ELF loader relocates PowerMac load addresses by 16 MiB, so this path
@@ -107,7 +117,21 @@ mode and verifies faults for kernel reads, privileged instructions, text
 writes and stack execution before returning to the kernel. Real G4 TLB
 invalidation uses 64 `tlbie` operations, not QEMU's accepted-but-unsupported
 `tlbia` ([MPC7450 reference manual](https://www.nxp.com/docs/en/reference-manual/MPC7450UM.pdf), section 2.4.6).
-Shared Vinix scheduler, filesystem and userland integration remain pending.
+After the protection check, the kernel revokes the fixture mappings and
+releases its frames. With an initramfs, it validates the read-only USTAR
+archive, maps `/bin/init` as a separate ELF32 process, and enters it in user
+mode. The shell implements `help`, `ls`, `cat`, `pwd`, `ps`, `uname`, `mem`,
+`echo` and `exit`. File contents and directory entries come from the archive;
+memory accounting comes from the physical allocator.
+
+The syscall subset uses PPC32 Linux numbers, argument registers and CR0.SO
+error signalling. User buffers are checked page by page before access.
+Console reads currently return EAGAIN when empty, and the shell polls; this
+is not a complete Linux ABI. Boot checks exercise invalid pointers, writes
+to text, unknown syscalls, descriptor exhaustion/reuse and page-spanning
+file reads. There is one process, no `fork`/`exec`, scheduler, writable
+filesystem, pipes, signals, TLS, libc or floating-point/vector context.
+Shared Vinix scheduler, filesystem and desktop integration remain pending.
 
 ## Milestones
 
@@ -115,7 +139,7 @@ Shared Vinix scheduler, filesystem and userland integration remain pending.
    QEMU boot check. No dependency on the amd64/arm64 kernel build products.
 2. **Working in QEMU:** available-memory map with loader exclusions, copied
    device tree, optional framebuffer metadata, checked ELF32 loading and
-   stack/boot-info handoff. Pending: initramfs loading and support for
+   stack/boot-info handoff and initramfs loading. Pending: support for
    nonidentity firmware mappings. The ISO-to-ELF firmware
    boot path works in QEMU; Apple's firmware and physical CD boot are untested.
 3. **Working in QEMU:** kernel `powerpc.cpu` primitives for PVR/MSR, coherent
@@ -124,9 +148,13 @@ Shared Vinix scheduler, filesystem and userland integration remain pending.
    after cache synchronization. Kernel exception entry and decrementer
    interrupts and initial hashed user mappings now pass. Pending: interrupt controller,
    64-bit atomic policy and scheduler integration.
-4. Pending: common kernel pointer-width/endian audit, userspace ELF32 execution and
-   PPC32 Linux syscall ABI, signals, TLS and floating-point/vector state.
-5. Pending: PPC32 libc, init, shell and desktop userland; small-memory profile.
+4. **Working in QEMU:** static userspace ELF32 execution, initial PPC32 syscall
+   subset and read-only boot filesystem. Pending: common kernel pointer-width/
+   endian audit, process scheduling and full syscall ABI, signals, TLS and
+   floating-point/vector state.
+5. **Working in QEMU:** freestanding V init/shell with serial input and file
+   commands. Pending: PPC32 libc and ordinary applications, shared Vinix
+   userland, desktop and small-memory profile.
 6. Pending: real-machine ATA/DBDMA, USB OHCI/EHCI, GEM Ethernet, framebuffer,
    PMU and hardware boot tests. Identify the exact iMac revision first.
 

@@ -13,6 +13,8 @@ __global physical_pages pages.Pool
 __global ticks u32
 __global interval u32
 __global traps u32
+__global startup_info &boot.Info
+__global managed_pages u32
 
 fn C.vinix_ppc_kernel_start(info &boot.Info)
 
@@ -32,6 +34,7 @@ fn halt(message &char) {
 
 @[export: 'vinix_ppc_kernel_start']
 fn start(info &boot.Info) {
+	startup_info = info
 	serial.init(info.serial_control, info.serial_data)
 	serial.text(c'\nVinix PowerPC kernel: firmware takeover\n')
 	if info.magic != boot.magic || info.version != boot.version || info.bytes != sizeof(boot.Info)
@@ -42,6 +45,7 @@ fn start(info &boot.Info) {
 		range := info.available[i]
 		if !physical_pages.add(range.base, range.size) { halt(c'physical memory map') }
 	}
+	managed_pages = physical_pages.count
 	stack := physical_pages.take(16, 1)
 	if stack == 0 || !exception.install(stack + 65536) { halt(c'exception stack') }
 	interval = info.timebase_hz / 100
@@ -73,6 +77,10 @@ fn dispatch(mut frame exception.Frame) {
 	}
 	if frame.vector == 0xc00 {
 		if frame.msr & 0x4000 != 0 {
+			if !user_check_active {
+				syscall(mut frame)
+				return
+			}
 			if frame.gpr[0] == 20 {
 				frame.gpr[3] = 1
 				return
@@ -88,14 +96,14 @@ fn dispatch(mut frame exception.Frame) {
 		traps++
 		return
 	}
-	if frame.msr & 0x4000 != 0 && ((frame.vector == 0x300 && user_faults == 0 && frame.dar == 0x02000000 && frame.pc == 0x40000014)
+	if user_check_active && frame.msr & 0x4000 != 0 && ((frame.vector == 0x300 && user_faults == 0 && frame.dar == 0x02000000 && frame.pc == 0x40000014)
 		|| (frame.vector == 0x700 && user_faults == 1 && frame.pc == 0x40000018)
 		|| (frame.vector == 0x300 && user_faults == 2 && frame.dar == 0x40000000 && frame.pc == 0x40000020)) {
 		user_faults++
 		frame.pc += 4
 		return
 	}
-	if frame.msr & 0x4000 != 0 && frame.vector == 0x400 && user_faults == 3
+	if user_check_active && frame.msr & 0x4000 != 0 && frame.vector == 0x400 && user_faults == 3
 		&& frame.pc == 0x5000fff0 && frame.lr == 0x4000002c {
 		user_faults++
 		frame.pc = frame.lr

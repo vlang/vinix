@@ -92,10 +92,12 @@ launch commands, and the current limits.
 
 ### PowerPC G4 bring-up
 
-The experimental [PowerPC G4 port](docs/powerpc.md) has a V Open Firmware
-loader, G4 CPU primitives, and an ISO-to-ELF32 handoff test under QEMU `mac99`.
-Build and run it with `v run tools/powerpc run`. The full kernel, userspace,
-desktop and physical iMac G4 boot are not supported yet.
+The experimental [PowerPC G4 port](docs/powerpc.md) boots a native PPC32 kernel
+and a protected V userspace shell under QEMU `mac99`. Build and enter the
+serial shell with `v run tools/powerpc run`; exit QEMU with Ctrl-A then X.
+`v run tools/powerpc test-shell` checks commands and the syscall boundary.
+The shared Vinix kernel, desktop and physical iMac G4 boot remain unported
+or unverified; this is an initial development system.
 
 ## Roadmap
 

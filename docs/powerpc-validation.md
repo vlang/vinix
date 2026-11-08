@@ -68,3 +68,26 @@ Bundle: `/tmp/vinix-ppc-mmu-verified`, base revision `d60df15c9` plus the
 preserved source snapshot. `SHA256SUMS` digest:
 `4f196992a9599bf97d453655b98bbf81de30b7c450a6f1890a0cf124b2037a12`.
 This is still a protection fixture; it is not an interactive shell.
+
+## Interactive userspace shell
+
+`test-shell` passes from ISO boot through kernel takeover to a separately
+loaded `/bin/init` ELF32 process. It exercises `help`, root and nested `ls`,
+`cat`, `pwd`, `ps`, `uname`, `mem`, `echo`, backspace, missing files, invalid
+commands and exit. Thirty-two repeated open/read/close cycles preserve the
+free-page count. In-guest syscall checks reject kernel pointers, writes to
+text, a buffer crossing into unmapped memory and unknown/test-only syscalls;
+they also exercise descriptor exhaustion/reuse and a valid page-spanning
+file read. USTAR corruption/truncation, capacity, duplicate-name and
+unsupported-entry host tests pass. The diagnostic media handoff still passes.
+
+Shell bundle: `/tmp/vinix-ppc-shell-final`, base revision `73f5b1470` plus
+the exact source snapshot and `sources.sha256`. `SHA256SUMS` digest:
+`e82365c6eab3e4496b282ccf4915cc46046dbf63a57d70bcc9f62e88c5b2bec0`.
+Media regression bundle: `/tmp/vinix-ppc-initramfs-media`, base revision
+`209da615e` plus its source snapshot. `SHA256SUMS` digest:
+`6e02cedcf0a4b1d29f359adf405fb06ff51f0ea1b9ecf6c408689c4a53f64e91`.
+
+This validates the initial PPC kernel and freestanding V shell under QEMU,
+not the shared Vinix kernel, ordinary Linux programs, desktop, or physical
+iMac G4. The default runner now selects the shell and terminal serial I/O.
