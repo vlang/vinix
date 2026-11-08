@@ -61,3 +61,6 @@ probe ELF and a supplied Linux kernel; `--self-test` exercises its parser.
 This qualifies the described native musl poll paths. Select, epoll, concurrent
 close/reuse, malformed argument precedence, NULL timeouts, GNU libc and
 foreign/32-bit paths remain separate. Section 15's broader gates stay open.
+
+The [epoll follow-up](linux-o_path-epoll.md) separately qualifies path-only
+descriptor refusals in control and wait operations.

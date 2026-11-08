@@ -213,6 +213,16 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 	defer {
 		epoll_fd.unref()
 	}
+	if epoll_fd.handle.flags & resource.o_path != 0 {
+		return errno.err, errno.ebadf
+	}
+	mut watched_fd := fd_from_fdnum(unsafe { nil }, fd) or {
+		return errno.err, errno.ebadf
+	}
+	if watched_fd.handle.flags & resource.o_path != 0 {
+		watched_fd.unref()
+		return errno.err, errno.ebadf
+	}
 
 	// Reach the concrete resource through V's own type test. Reading the
 	// interface's first word by hand, as this used to, assumed a layout this
@@ -224,13 +234,12 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u6
 	if mut res is EpollResource {
 		epoll_res = res
 	} else {
+		watched_fd.unref()
 		return errno.err, errno.einval
 	}
 	if epfd == fd {
+		watched_fd.unref()
 		return errno.err, errno.einval
-	}
-	mut watched_fd := fd_from_fdnum(unsafe { nil }, fd) or {
-		return errno.err, errno.ebadf
 	}
 	// Synchronous filesystem descriptions use poll's default readiness mask,
 	// but cannot be registered with epoll. Refuse them before retaining a
@@ -397,6 +406,9 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 	}
 	defer {
 		epoll_fd.unref()
+	}
+	if epoll_fd.handle.flags & resource.o_path != 0 {
+		return errno.err, errno.ebadf
 	}
 
 	mut res := epoll_fd.handle.resource
