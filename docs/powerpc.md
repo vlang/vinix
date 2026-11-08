@@ -17,6 +17,7 @@ checkout. An alternate compiler can be selected with `VINIX_V_COMPILER`.
 
 ```
 v run tools/powerpc test /tmp/vinix-ppc-state
+v run tools/powerpc test-media /tmp/vinix-ppc-cd-state
 v run tools/powerpc run /tmp/vinix-ppc-state
 ```
 
@@ -36,15 +37,25 @@ image. Firmware reservations remain excluded. The runner requires the later
 QEMU monitor, and independently validates its structure and node count.
 It has a 20-second boot deadline, kills/reaps its own emulator, and saves
 `boot.log`, `firmware.dtb`, and binary/FDT SHA-256 files in the output directory.
+`test-media` instead loads the ELF from the generated ISO through OpenBIOS,
+and records `media-boot.log`. `run` opens this CD boot in a QEMU window.
+The V image builder writes ISO9660 directly, without external image utilities.
+Each build saves its base Git revision, tool versions, exact source inputs,
+and SHA-256 manifests (`sources.sha256` and `SHA256SUMS`) outside Git.
 Host corruption tests run with `v test tools/powerpc/validate_test.v`.
 
 Direct QEMU command after building:
 
 ```
-qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -kernel /tmp/vinix-ppc-state/vinix-of.bin -serial stdio
+qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -cdrom /tmp/vinix-ppc-state/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -serial stdio
 ```
 
-This command boots the firmware bring-up program, not the whole OS. QEMU's
+This command boots the firmware bring-up program, not the whole OS. This ISO
+has no partition map, so OpenBIOS takes the filename immediately after the
+colon; adding a comma prevents lookup. Keep the ISO file version `;1`.
+For a headless boot add `-nographic -monitor none`.
+
+The separate direct test uses `-kernel vinix-of.bin`. QEMU's
 `-kernel` ELF loader relocates PowerMac load addresses by 16 MiB, so this path
 deliberately uses a flat binary linked at 0x01000000. The separate ELF output
 has its ordinary physical/virtual addresses for loading from real firmware.
@@ -56,7 +67,8 @@ Add `-S -s` to stop at reset and attach a PowerPC-capable GDB on port 1234.
    QEMU boot check. No dependency on the amd64/arm64 kernel build products.
 2. **Working in QEMU:** available-memory map with loader exclusions, copied
    device tree, optional framebuffer metadata. Pending: kernel/initramfs loading,
-   bootable Open Firmware media, physical-address translation on real firmware.
+   physical-address translation on real firmware. The ISO-to-ELF firmware
+   boot path works in QEMU; Apple's firmware and physical CD boot are untested.
 3. **Working in QEMU:** kernel `powerpc.cpu` primitives for PVR/MSR, coherent
    64-bit timebase reads, 32-bit CAS and G4 instruction-cache publication.
    The guest checks successful/failed CAS, clock progress, and executing code

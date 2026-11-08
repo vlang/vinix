@@ -45,6 +45,7 @@ fn build(root string, output string) ! {
 	v := tool('VINIX_V_COMPILER', 'v')!
 	zig := tool('VINIX_PPC_ZIG', 'zig')!
 	headers := zig_headers(zig)!
+	preserve_sources(root, output, v, zig)!
 	command([v, '-shared', '-no-builtin', '-no-closures', '-enable-globals', '-os', 'vinix', '-arch',
 		'ppc', '-target-libc-headers', '-nofloat', '-gc', 'none', '-manualfree', '-o',
 		output + '/loader.c', '-path', '@vlib|' + root + '/kernel', root + '/powerpc-boot'])!
@@ -58,16 +59,23 @@ fn build(root string, output string) ! {
 		'-Wl,--build-id=none', '-Wl,-e,vinix_of_entry', '-Wl,-T,' + root + '/powerpc-boot/linker.ld',
 		output + '/loader.c', '-o', output + '/vinix-of.elf'])!
 	command([zig, 'objcopy', '-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin'])!
-	for name in ['vinix-of.elf', 'vinix-of.bin'] {
+	make_iso(output)!
+	for name in ['vinix-of.elf', 'vinix-of.bin', 'vinix-ppc-boot.iso'] {
 		data := os.read_bytes(output + '/' + name)!
 		os.write_file(output + '/' + name + '.sha256', sha256.hexhash(data.bytestr()) + '  ' + name + '\n')!
 	}
 }
 
-fn boot(output string, test bool) ! {
+fn boot(output string, test bool, media bool) ! {
 	qemu := tool('VINIX_PPC_QEMU', 'qemu-system-ppc')!
 	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', '512', '-smp', '1',
-		'-nic', 'none', '-kernel', output + '/vinix-of.bin', '-no-reboot']
+		'-nic', 'none', '-no-reboot']
+	if media {
+		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
+			'boot-device=cd:\\BOOT.ELF;1']
+	} else {
+		args << ['-kernel', output + '/vinix-of.bin']
+	}
 	if !test {
 		args << ['-serial', 'stdio']
 		mut argv := [qemu]
@@ -75,7 +83,7 @@ fn boot(output string, test bool) ! {
 		command(argv)!
 		return
 	}
-	log_path := output + '/boot.log'
+	log_path := output + if media { '/media-boot.log' } else { '/boot.log' }
 	os.write_file(log_path, '')!
 	args << ['-nographic', '-serial', 'file:' + log_path, '-monitor', 'stdio']
 	mut child := os.new_process(qemu)
@@ -97,7 +105,7 @@ fn boot(output string, test bool) ! {
 	print(log)
 	if !log.contains('VINIX-PPC: PASS firmware discovery')
 		|| !log.contains('VINIX-PPC: PASS cpu clock atomics cache') || log.contains('VINIX-PPC: FAIL') {
-		return error('PPC boot did not reach the firmware milestone; see ${output}/boot.log')
+		return error('PPC boot did not reach the firmware milestone; see ${log_path}')
 	}
 	for line in log.split_into_lines() {
 		if !line.starts_with('VINIX-PPC: FDT ') { continue }
@@ -130,8 +138,8 @@ fn main() {
 	root := os.real_path(@VMODROOT + '/../..')
 	mut output := os.join_path(os.temp_dir(), 'vinix-powerpc-' + sha256.hexhash(root)[..12])
 	args := os.args[1..]
-	if args.len == 0 || args[0] !in ['build', 'run', 'test'] {
-		eprintln('Usage: v run tools/powerpc {build|run|test} [OUTPUT_DIRECTORY]')
+	if args.len == 0 || args[0] !in ['build', 'run', 'test', 'test-media'] {
+		eprintln('Usage: v run tools/powerpc {build|run|test|test-media} [OUTPUT_DIRECTORY]')
 		exit(2)
 	}
 	if args.len > 2 {
@@ -149,9 +157,13 @@ fn main() {
 	}
 	println('PowerPC build: ${output}')
 	if args[0] != 'build' {
-		boot(output, args[0] == 'test') or {
+		boot(output, args[0] != 'run', args[0] != 'test') or {
 			eprintln(err)
 			exit(1)
 		}
+	}
+	seal_results(output) or {
+		eprintln(err)
+		exit(1)
 	}
 }
