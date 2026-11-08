@@ -16,10 +16,29 @@ fn main() {
 	workflowbuild.run('git', ['archive', 'HEAD', 'desktop', 'tools/accounts', 'tools/packages',
 		'-o', work + '/desktop-source.tar'])!
 	workflowbuild.run('tar', ['-xf', work + '/desktop-source.tar', '-C', work + '/desktop-source'])!
-	os.cp(root + '/desktop/app.v', work + '/desktop-source/desktop/app.v')!
-	workflowbuild.stage(work + '/desktop-source', root + '/../ui2', work + '/desktop', true)!
+	for name in ['app.v', 'app_process.v', 'client_frame.v', 'window.v', 'settings.v',
+		'wm.v', 'render.v', 'framebuffer_server.v', 'window_actions.v'] {
+		os.cp(root + '/desktop/' + name, work + '/desktop-source/desktop/' + name)!
+	}
+	host_tests := '--host-tests' in os.args
+	workflowbuild.stage(work + '/desktop-source', root + '/../ui2', work + '/desktop', !host_tests)!
 	app := work + '/desktop'
 	v := os.getenv('VINIX_DESKTOP_V')
+	if host_tests {
+		controls := app + '/modules/ui2/ui/control_state.c.v'
+		os.write_file(controls, os.read_file(controls)!.replace('$else $if macos {',
+			'$else $if macos && !ui2_headless ? {'))!
+		os.rm(app + '/main.v')!
+		for name in ['client_frame', 'window_edges', 'window_actions', 'titlebar_click'] {
+			os.cp(root + '/desktop/tools/tests/' + name + '_test.v', app + '/' + name + '_test.v')!
+			workflowbuild.test(v, ['-new-compiler', '-nocache', '-gc', 'none', '-manualfree',
+				'-enable-globals', '-d', 'ui2_headless', '-d', 'no_segfault_handler', '-path', '@vlib|' + app + '/modules|@vmodules|' +
+				work + '/desktop-source|' + root + '|' + root + '/third_party|' + root + '/tools/accounts',
+				app + '/' + name + '_test.v'], app, name)!
+			os.rm(app + '/' + name + '_test.v')!
+		}
+		return
+	}
 	workflowbuild.run(v, ['-new-compiler', '-memory-limit', '10G', '-os', 'linux', '-arch', 'arm64',
 		'-gc', 'none', '-manualfree', '-enable-globals', '-prod', '-d', 'glibc', '-d',
 		'no_segfault_handler', '-d', 'ui2_headless', '-path',

@@ -252,6 +252,7 @@ pub fn (mut ctx Context) run() {
 	vinix_gg_context = ctx
 	if ctx.config.init_fn != unsafe { nil } { ctx.config.init_fn(ctx.user_data) }
 	ctx.has_started = true
+	ui2.set_window_decorated(false)
 	ui2.run_window(ctx.config.window_title, ctx.width, ctx.height, native_build, native_action)
 	if ctx.config.cleanup_fn != unsafe { nil } { ctx.config.cleanup_fn(ctx.user_data) }
 	ui2.native_release_resources()

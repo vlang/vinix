@@ -46,6 +46,8 @@ mut:
 	y      int
 	width  int
 	height int
+	// The client draws its own frame, title bar and window controls.
+	client_frame bool
 	hide_body_cursor bool
 	// The glyph that stands for the window in the switcher. An application
 	// lends its own; a built-in page has none of its own to lend.

@@ -400,5 +400,5 @@ fn (d &Desktop) theme() Theme {
 // bottom. A maximized window has none: Windows pushes that part of the frame
 // off the screen.
 fn (d &Desktop) window_border(window &Window) int {
-	return if window.maximized { 0 } else { d.theme().frame_border }
+	return if window.maximized || window.has_client_frame() { 0 } else { d.theme().frame_border }
 }

@@ -465,6 +465,15 @@ its private runtime needs no X11 libraries or display server. See
 [the Vox workflow](../tests/vox/README.md) for cross-building, staging and
 capturing it on the desktop.
 
+The Vinix UI2 backend supports `ui2.set_window_decorated(false)` before
+`run_window` for applications that draw their own frame. Vox selects this
+option, so its tab strip is the window's top edge. The scoped UI2 actions
+`window_action_close`, `window_action_minimize`, `window_action_maximize` and
+`window_action_move` control the client's own window. A draggable view can use
+the move action as its `action_id`. Edge resizing and taskbar controls remain
+available. Decorations stay enabled by default; a failed client receives the
+standard recovery frame.
+
 Zed is also a hosted X11 application, with its own Start-menu entry, official
 icon, input and clipboard forwarding. Its native AArch64 Alpine APK runs with a
 private musl/Vulkan dependency tree under `/usr/libexec/vinix-zed/root`; Mesa's

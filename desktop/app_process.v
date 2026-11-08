@@ -59,7 +59,8 @@ const app_features = app_feature_toolbar | app_feature_close_guard | app_feature
 // taken to have none.
 const app_extended_luna = u32(1) // the Windows XP theme
 const app_extended_taskbar_visibility = u32(2)
-const app_extended = app_extended_luna | app_extended_taskbar_visibility
+const app_extended_client_frame = u32(4)
+const app_extended = app_extended_luna | app_extended_taskbar_visibility | app_extended_client_frame
 const app_extended_option = '--app-extended='
 const app_extended_mark = [u8(`V`), `E`, `X`, `T`]!
 
@@ -1370,6 +1371,7 @@ mut:
 	peer_features    u8
 	// Its app_extended, from its first response.
 	peer_extended u32
+	client_frame bool
 	desktop_services bool
 	clipboard_copy bool
 	color_sample     ColorMeterReport
@@ -1470,6 +1472,7 @@ fn start_remote_app_at_with_timeout(path string, factory AppFactory, mut desktop
 	}
 	remote.peer_features = reply.features
 	remote.peer_extended = app_hello_extended(reply.payload)
+	remote.client_frame = app_hello_client_frame(reply.payload)
 	if reply.payload.cap > 0 {
 		unsafe { reply.payload.free() }
 	}

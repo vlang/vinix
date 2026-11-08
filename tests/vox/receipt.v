@@ -74,6 +74,9 @@ fn receipt() ! {
 	command(['mcopy', '-o', '-i', work + '/boot.img', '::/boot/vinix', work + '/kernel'])!
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	command(['tar', '--format=ustar', '-cf', work + '/port-source.tar', '-C', root, 'desktop/app.v',
+		'desktop/app_process.v', 'desktop/client_frame.v', 'desktop/window.v', 'desktop/settings.v',
+		'desktop/wm.v', 'desktop/render.v', 'desktop/framebuffer_server.v', 'desktop/window_actions.v',
+		'desktop/tools/ui2_vinix_backend.v', 'desktop/tools/tests/client_frame_test.v',
 		'desktop/README.md', 'build-support/vox', 'tests/vox'])!
 	mut lines := ['time\t' + time.now().format_ss(),
 		'vinix\t' + command(['git', 'rev-parse', 'HEAD'])!.trim_space(),
@@ -92,7 +95,8 @@ fn receipt() ! {
 		work + '/arena-tests-final.log', work + '/arena-runtime-receipt.tsv',
 		work + '/browser-chrome-portable.v', work + '/vox.o.flags', work + '/include/worker_process.h',
 		work + '/browser-main.v', work + '/browser-replay-scratch.v', work + '/include/native-tabs.h',
-		work + '/include/EGL/eglext_angle.h', work + '/native-font-metrics.v'] {
+		work + '/include/EGL/eglext_angle.h', work + '/native-font-metrics.v',
+		work + '/desktop-frame-tests.log', work + '/desktop-frame-build.log'] {
 		lines << fingerprint(path)! + '\t' + path
 	}
 	mut files := os.walk_ext(work + '/guest', '')
@@ -113,7 +117,7 @@ fn receipt() ! {
 		'glvnd-build-final.log', 'port-source.tar', 'include', 'vinix-source.patch', 'vox2-source.patch',
 		'ui2-source.patch', 'arena-tests-final.log', 'arena-runtime-receipt.tsv', 'initramfs.tar',
 		'boot.img', 'vars.fd', 'browser-chrome-portable.v', 'browser-main.v', 'browser-replay-scratch.v',
-		'vox.o.flags', 'native-font-metrics.v'])!
+		'vox.o.flags', 'native-font-metrics.v', 'desktop-frame-tests.log', 'desktop-frame-build.log'])!
 	os.write_file(archive + '.sha256', fingerprint(archive)! + '\t' + archive + '\n')!
 	println('Guest checks passed; receipt: ' + work + '/receipt.tsv')
 	println(os.read_file(archive + '.sha256')!)

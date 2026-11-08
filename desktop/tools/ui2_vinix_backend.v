@@ -16,6 +16,26 @@ const vinix_response_header_size = 144
 const vinix_state_size = 132
 const vinix_max_payload = 16 * 1024 * 1024
 
+// Client-side decorations are opt-in. Set this before run_window; use the
+// scoped actions below for controls and a draggable_view for the title area.
+pub const window_action_close = 'ui2.window.close'
+pub const window_action_minimize = 'ui2.window.minimize'
+pub const window_action_maximize = 'ui2.window.maximize'
+pub const window_action_move = 'ui2.window.move'
+
+__global vinix_window_decorated = true
+
+pub fn set_window_decorated(decorated bool) {
+	vinix_window_decorated = decorated
+}
+
+fn vinix_window_hello() []u8 {
+	mut hello := [u8(`V`), `E`, `X`, `T`]
+	vinix_put_u32(mut hello, 4) // client-frame extension
+	vinix_put_u32(mut hello, if vinix_window_decorated { u32(0) } else { u32(1) })
+	return hello
+}
+
 enum VinixCommand as u8 {
 	build = 1
 	handle
@@ -833,7 +853,7 @@ fn vinix_handle_key(input string) {
 
 fn vinix_serve(request_fd int, response_fd int) {
 	mut state := vinix_default_state()
-	vinix_send_response(response_fd, true, state, []u8{})
+	vinix_send_response(response_fd, true, state, vinix_window_hello())
 	vinix_running = true
 	for vinix_running {
 		header := vinix_read_exact(request_fd, vinix_request_header_size) or { break }

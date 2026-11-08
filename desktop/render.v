@@ -2161,7 +2161,7 @@ fn (mut d Desktop) draw_cursor() {
 			continue
 		}
 		border := d.window_border(&window)
-		if window.hide_body_cursor && d.pointer_y >= window.y + d.theme().title_height
+		if window.hide_body_cursor && d.pointer_y >= window.y + d.window_title_height(&window)
 			&& d.pointer_y < window.y + window.height - border && d.pointer_x >= window.x + border
 			&& d.pointer_x < window.x + window.width - border && !d.window_overlay_active() {
 			return

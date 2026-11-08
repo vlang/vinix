@@ -551,6 +551,9 @@ const app_toolbar_id = 'app.toolbar'
 
 fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	window := &d.windows[window_index]
+	if window.has_client_frame() {
+		return d.client_frame_element(window_index)
+	}
 	theme := d.theme()
 	active := window.id == d.focus
 	// A glass frame also runs down both sides of the body and under it.
@@ -954,6 +957,9 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 	d.windows[index].status_path = status_path
 	d.windows[index].icon = factory.icon
 	d.windows[index].hide_body_cursor = factory.hide_body_cursor
+	if app is RemoteApp {
+		d.windows[index].client_frame = app.client_frame
+	}
 	d.clamp_to_screen(index)
 }
 
@@ -1305,7 +1311,7 @@ fn (mut d Desktop) forward_pointer_to_window(x int, y int, phase AppPointerPhase
 		for i := d.windows.len - 1; i >= 0; i-- {
 			window := &d.windows[i]
 			border := d.window_border(window)
-			body_top := window.y + d.theme().title_height
+			body_top := window.y + d.window_title_height(window)
 			if window.workspace == d.current_workspace && !window.minimized
 				&& window.app_index >= 0 && x >= window.x + border
 				&& x < window.x + window.width - border && y >= body_top
@@ -1333,9 +1339,9 @@ fn (mut d Desktop) forward_pointer_to_window(x int, y int, phase AppPointerPhase
 		window_id := window.id
 		border := d.window_border(window)
 		body_width := window.width - 2 * border
-		body_height := window.height - d.theme().title_height - border
+		body_height := window.height - d.window_title_height(window) - border
 		mut local_x := x - window.x - border
-		mut local_y := y - window.y - d.theme().title_height
+		mut local_y := y - window.y - d.window_title_height(window)
 		if local_x < 0 {
 			local_x = 0
 		}
@@ -2314,7 +2320,7 @@ fn (mut d Desktop) on_pointer_move(x int, y int) {
 			d.restore_window(d.drag.window_id)
 			new_index := d.window_index(d.drag.window_id) or { return }
 			d.drag.offset_x = int(ratio * f64(d.windows[new_index].width))
-			d.drag.offset_y = d.theme().title_height / 2
+			d.drag.offset_y = if d.windows[new_index].has_client_frame() { d.drag.offset_y } else { d.theme().title_height / 2 }
 		}
 		moved := d.window_index(d.drag.window_id) or { return }
 		old_x := d.windows[moved].x
@@ -2390,7 +2396,7 @@ fn (mut d Desktop) resize_window_to_pointer(x int, y int) {
 	} else {
 		d.drag.start_height + dy
 	}
-	min_height := d.theme().title_height + window_min_body_height + d.theme().frame_border
+	min_height := d.window_title_height(&d.windows[index]) + window_min_body_height + d.window_border(&d.windows[index])
 	if d.drag.resize_horizontal && width < window_min_width {
 		width = window_min_width
 	}
@@ -2607,6 +2613,9 @@ fn (mut d Desktop) on_pointer_down(x int, y int) {
 	}
 
 	resizing_window := world == .desktop && window_resize_action(action)
+	if world == .application && d.handle_client_window_action(action, x, y) {
+		return
+	}
 	if !resizing_window && d.forward_pointer_to_app(x, y, .down, .left, 0) && action == '' {
 		// Raw-surface clicks were already delivered and focused above. Falling
 		// through would interpret their deliberately action-less content as an

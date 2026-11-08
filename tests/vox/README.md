@@ -123,6 +123,17 @@ and log, copy its complete output to `$VINIX_VOX_STATE/vox.c`, then run
 allocator, completeness and ABI-header checks as `full`.
 The guest logs system memory and browser process status every 15 seconds for
 interaction and idle measurements.
+
+Vox calls the Vinix UI2 setting `set_window_decorated(false)` before opening its
+window. Its own tab strip supplies native window buttons and the drag target;
+the compositor adds invisible resize targets. Other clients retain decorations.
+The backward-compatible hello extension leaves protocol header sizes unchanged.
+Run the frame/geometry regressions with the same guarded desktop builder command
+above, appending `--host-tests`. This checks negotiation, all four themes,
+recovery, raw-pointer coordinates, scoped controls and existing edge, window
+action and title-bar behavior. Rebuild the compositor as well as Vox to exercise
+this option in a fresh guest.
+
 The portable chrome uses its existing state comparison to reuse unchanged
 controls. Only the native UI tree has a recycled request lifetime; browser
 callbacks retain their own state. CPU pixel buffers remain valid across those

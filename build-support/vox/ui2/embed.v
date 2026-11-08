@@ -130,10 +130,22 @@ fn native_icon_path(source string, width int, height int, background u32, images
 }
 
 fn native_element(source Element, inherited u32, images map[string]int) Element {
-	// Vinix already owns window management. Do not draw an inert second set
-	// of platform-specific traffic lights inside the browser's client area.
+	// Vox owns its frame. Keep its controls and let Vinix perform the scoped
+	// window actions instead of routing them to platform-specific host code.
 	if source.id in ['window-close', 'window-minimize', 'window-zoom'] {
-		return Element{ ...source, hidden: true, enabled: false }
+		action, glyph := match source.id {
+			'window-close' { window_action_close, 'builtin:close' }
+			'window-minimize' { window_action_minimize, 'builtin:minimize' }
+			else { window_action_maximize, 'builtin:maximize' }
+		}
+		return Element{
+			...source
+			action_id: action
+			native_style: true
+			vector: VectorPath{}
+			box: BoxStyle{ bg: 0xe4e9f1, radius: 3 }
+			children: [image(source.id + '-glyph', glyph, rect(0, 0, source.frame.width, source.frame.height))]
+		}
 	}
 	background := if source.vector.fill_enabled && source.vector.points.len > 0 {
 		source.vector.fill
@@ -156,8 +168,8 @@ fn native_element(source Element, inherited u32, images map[string]int) Element 
 		return native_button(source, children, images)
 	}
 	if source.id == 'tab-strip' {
-		children << image('vox-native-brand', 'builtin:browser', rect(12, 5, 22, 22))
-		return Element{ ...source, box: BoxStyle{ bg: 0xf3f5f9, border_bottom: 1, border_color: 0xe8ebf0 }, children: children }
+		return Element{ ...source, action_id: window_action_move, draggable: true,
+			box: BoxStyle{ bg: 0xf3f5f9, border_bottom: 1, border_color: 0xe8ebf0 }, children: children }
 	}
 	if source.vector.points.len < 2 { return Element{ ...source, children: children } }
 	key := '${source.frame.width}:${source.frame.height}:${background}:${source.vector}'

@@ -270,7 +270,7 @@ fn (mut app FramebufferApp) emit(kind windowfb.Kind, x int, y int, value int, te
 fn (mut app FramebufferApp) sync_window(w Window, d &Desktop, mut s FramebufferServer) {
 	border := d.window_border(unsafe { &w })
 	width := w.width - 2 * border
-	height := w.height - d.theme().title_height - border
+	height := w.height - d.window_title_height(&w) - border
 	changed := width != app.content_width || height != app.content_height
 	if app.features & windowfb.resize_buffers != 0 && app.offer_path.len == 0 && (width != app.surface.width || height != app.surface.height) {
 		s.serial++

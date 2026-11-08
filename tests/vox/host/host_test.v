@@ -42,6 +42,45 @@ fn testsuite_begin() {
 	}
 }
 
+fn test_ui2_window_decoration_setting_is_sent_in_the_initial_handshake() {
+	old_request := os.getenv('VINIX_REQUEST_FD')
+	old_response := os.getenv('VINIX_RESPONSE_FD')
+	defer {
+		os.setenv('VINIX_REQUEST_FD', old_request, true)
+		os.setenv('VINIX_RESPONSE_FD', old_response, true)
+		ui2.set_window_decorated(true)
+	}
+	for decorated in [true, false] {
+		mut request := os.pipe() or { panic(err) }
+		mut response := os.pipe() or { panic(err) }
+		defer { request.close(); response.close() }
+		os.setenv('VINIX_REQUEST_FD', request.read_fd.str(), true)
+		os.setenv('VINIX_RESPONSE_FD', response.write_fd.str(), true)
+		ui2.set_window_decorated(decorated)
+		// Queue a close request so run_window can return after its hello.
+		mut header := []u8{len: 152}
+		header[0] = 0x50
+		header[1] = 0x50
+		header[2] = 0x41
+		header[3] = 0x56
+		header[4] = 11
+		header[5] = 6
+		assert request.write(header) or { panic(err) } == header.len
+		ui2.run_window('Test', 20, 20, fn () ui2.Element {
+			return ui2.view('test', ui2.rect(0, 0, 20, 20), ui2.BoxStyle{}, [])
+		}, fn (_ string) {})
+		// The server owns and closes these pipe ends.
+		request.read_fd = -1
+		response.write_fd = -1
+		mut bytes := []u8{len: 300} // 144 + 12-byte hello + 144 close reply
+		assert response.read(mut bytes) or { panic(err) } == bytes.len
+		assert bytes[140..144] == [u8(12), 0, 0, 0]
+		assert bytes[144..148] == 'VEXT'.bytes()
+		assert bytes[148..152] == [u8(4), 0, 0, 0]
+		assert bytes[152..156] == [u8(if decorated { 0 } else { 1 }), 0, 0, 0]
+	}
+}
+
 fn test_worker_spawn_closes_extra_descriptors_and_preserves_reserved_channels() {
 	mut original := C.rlimit{}
 	assert C.getrlimit(C.RLIMIT_NOFILE, &original) == 0
@@ -269,7 +308,9 @@ fn test_native_chrome_keeps_favicon_pixels_and_uses_native_buttons() {
 		assert tree[2].native_style && tree[2].text == ''
 		assert tree[2].children[0].image_path == 'builtin:arrow_left'
 		assert tree[2].children[0].frame == ui2.rect(0, 0, 22, 22)
-		assert tree[3].hidden && !tree[3].enabled
+		assert !tree[3].hidden && tree[3].enabled && tree[3].native_style
+		assert tree[3].action_id == ui2.window_action_close
+		assert tree[3].children[0].image_path == 'builtin:close'
 	}
 }
 
