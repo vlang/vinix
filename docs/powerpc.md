@@ -66,7 +66,8 @@ Add `-S -s` to stop at reset and attach a PowerPC-capable GDB on port 1234.
 
 ## Kernel loader boundary
 
-`/chosen/bootargs` supplies one absolute Open Firmware path. An empty value
+`/chosen/bootargs` supplies an absolute Open Firmware kernel path and an
+optional second path for the initramfs, separated by a space. An empty value
 runs only firmware discovery. The CD test passes `cd:\PROBE.ELF;1` through
 the firmware's `boot-file` option. This is a diagnostic ELF, not Vinix's
 main kernel. It is built from `tests/powerpc/handoff/`.
@@ -83,7 +84,8 @@ The initial handoff ABI is PPC32 SysV: `r3` points to `powerpc.boot.Info`,
 `r4` is the firmware client pointer, and `r1` uses a claimed 64 KiB stack
 aligned to 16 bytes. Firmware is still active. The available-memory snapshot
 is refreshed after claims and excludes the loader, copied FDT, source image,
-kernel and stack. The `Info` map is authoritative; the copied firmware tree's
+kernel, initramfs and stack. Boot-info version 4 includes the retained
+initramfs physical range. The `Info` map is authoritative; the copied firmware tree's
 earlier `available` property is not an allocator input. Kernels must retain
 firmware reservations until they can replace firmware mappings and services.
 The loader checks identity translations for every page of the executable,

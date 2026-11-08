@@ -6,6 +6,7 @@ import powerpc.cpu
 import powerpc.elf32
 
 const image_limit = u32(16 * 1024 * 1024)
+__global boot_path [512]u8
 
 fn release(address u32, size u32) {
 	mut call := Call{ service: c'release', nargs: 2 }
@@ -68,35 +69,66 @@ fn claim_exact(address u32, size u32) bool {
 	return true
 }
 
-// Load the single absolute OF file path supplied in /chosen/bootargs.
-// An empty path leaves the firmware-only bring-up mode available.
-fn load_image() bool {
-	mut path := [512]u8{}
-	length := get_property(find_device(c'/chosen'), c'bootargs', unsafe { &path[0] }, sizeof(path))
-	if length <= 0 || path[0] == 0 { return true }
-	if length >= int(sizeof(path)) { return false }
-	path[length] = 0
+fn read_file(path &u8) boot.MemoryRange {
 	mut open := Call{ service: c'open', nargs: 1, nret: 1 }
-	open.cells[0] = u32(unsafe { &path[0] })
-	if firmware(unsafe { &open }) != 0 || open.cells[1] == 0 { return false }
+	open.cells[0] = u32(path)
+	if firmware(unsafe { &open }) != 0 || open.cells[1] == 0 { return boot.MemoryRange{} }
 	handle := open.cells[1]
 	defer { close_file(handle) }
 	source := claim(image_limit)
-	if source == 0xffffffff || source == 0 { return false }
-	defer { release(source, image_limit) }
+	if source == 0xffffffff || source == 0 { return boot.MemoryRange{} }
+	mut success := false
+	defer { if !success { release(source, image_limit) } }
+	if source > 0xffffffff - image_limit { return boot.MemoryRange{} }
 	mut size := u32(0)
 	for {
-		if size == image_limit { return false }
+		if size == image_limit { return boot.MemoryRange{} }
 		mut read := Call{ service: c'read', nargs: 3, nret: 1 }
 		read.cells[0] = handle
 		read.cells[1] = source + size
 		read.cells[2] = image_limit - size
-		if firmware(unsafe { &read }) != 0 { return false }
+		if firmware(unsafe { &read }) != 0 { return boot.MemoryRange{} }
 		actual := read.cells[3]
 		if actual == 0 { break }
-		if actual > image_limit - size { return false }
+		if actual > image_limit - size { return boot.MemoryRange{} }
 		size += actual
 	}
+	success = true
+	return boot.MemoryRange{source, size}
+}
+
+// Absolute OF kernel path, optionally followed by one initramfs path.
+fn load_image() bool {
+	fill_bytes(unsafe { &boot_path[0] }, 0, 512)
+	length := get_property(find_device(c'/chosen'), c'bootargs', unsafe { &boot_path[0] }, 512)
+	if length <= 0 || boot_path[0] == 0 { return true }
+	if length >= 512 { return false }
+	boot_path[length] = 0
+	mut second := 0
+	for i in 0 .. length {
+		if boot_path[i] == 0 { break }
+		if boot_path[i] == ` ` {
+			boot_path[i] = 0
+			second = i + 1
+			break
+		}
+	}
+	if second != 0 {
+		for second < length && boot_path[second] == ` ` { second++ }
+		if second == length || boot_path[second] == 0 { return false }
+		for i in second .. length { if boot_path[i] == ` ` { return false } }
+		boot_info.initramfs = read_file(unsafe { &boot_path[second] })
+		if boot_info.initramfs.base == 0 { return false }
+	}
+	defer { if boot_info.initramfs.base != 0 { release(boot_info.initramfs.base, image_limit) } }
+	if second != 0 && !identity_mapping(boot_info.initramfs.base, boot_info.initramfs.size) {
+		return false
+	}
+	file := read_file(unsafe { &boot_path[0] })
+	if file.base == 0 { return false }
+	source := file.base
+	size := file.size
+	defer { release(source, image_limit) }
 	mut image := elf32.Image{}
 	if !elf32.parse(unsafe { &u8(source) }, size, mut image) { return false }
 	// Refresh after the source claim so destination claims cannot alias it.
