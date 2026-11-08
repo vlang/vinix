@@ -61,4 +61,5 @@ The recorded inventory was checked against the retained copy successfully.
 
 These checks cover a fixed 800x600 QEMU display and sustained USB interaction.
 They do not qualify physical iMac graphics hardware, real display hotplug,
-or the separate application processes still missing from this port.
+or the separate application processes missing at that revision. See
+[app validation](powerpc-app-validation.md) for the later process work.

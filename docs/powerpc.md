@@ -5,7 +5,9 @@ on a NewWorld Macintosh. QEMU `mac99,via=pmu` is the development machine.
 The port boots a small native kernel and protected userspace in QEMU. The
 actual Vinix desktop now saves first-run accounts to an ext2 disk and reaches
 the compositor, icons, taskbar and System window after a restart. USB keyboard
-and mouse work. Separate applications still require process/IPC services. This is not yet a
+and mouse work. Files, Settings, Text Editor, Calculator and Terminal now launch
+as separate processes; typing and calculation work through their real app protocol.
+This is not yet a
 complete end-user system or the shared Vinix kernel.
 
 ## Build and test
@@ -52,6 +54,12 @@ v run tools/powerpc-disk "$HOME/vinix-powerpc.raw"
 qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic user,model=sungem -g 800x600x32 -display cocoa,zoom-to-fit=on,zoom-interpolation=off -drive "file=$HOME/vinix-powerpc.raw,format=raw,if=ide,index=0,cache=writeback" -cdrom /tmp/vinix-ppc-desktop-boot/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -prom-env 'boot-file=cd:\KERNEL.ELF;1 cd:\RAMFS.TAR;1' -prom-env 'output-device=scca' -serial mon:stdio
 ```
 
+The builder recognizes an init executable named `vinix-desktop` and installs
+its native app entry points under `/usr/bin`, plus the native shell at `/bin/sh`.
+Set `VINIX_PPC_DESKTOP_APPS=1` if the desktop executable has a different name.
+Archive hardlinks share the executable bytes; each launch has private memory.
+Standalone third-party executables still need separate PowerPC ports.
+
 The formatter refuses existing images. Reuse the same disk on subsequent boots
 to keep the account and home folders. Keep the disk outside temporary build
 directories. On other hosts, omit the Cocoa display option and select their
@@ -64,7 +72,7 @@ or the capture runner. Add `VINIX_PPC_GRAPHICS=1` for a graphical window; the
 macOS launcher enables zoom-to-fit automatically. Boot files remain in the
 read-only archive; disk paths such as `/root`, `/home`, `/tmp` and `/run` are
 writable. Directory moves, files above 4,243,456 bytes, a merged root directory
-listing, and general `*at`/process/IPC compatibility remain pending.
+listing, and general `*at`/socket compatibility remain pending.
 
 The private disk seed comes from the host CSPRNG and is rotated and flushed
 before `/dev/urandom` or `getrandom` serves bytes. Keep images private and create
@@ -89,6 +97,19 @@ those checks, and opens and closes the Start menu through USB. It rejects
 framebuffer remapping or the kernel console replacing the desktop. Never use
 its disk as your personal installation. See [storage validation](powerpc-storage-validation.md)
 and [display validation](powerpc-display-validation.md) for preserved evidence.
+
+App launch and interaction regression (use a disposable persisted GUI test disk):
+
+```sh
+VINIX_PPC_DISK=/external/test-disk.raw VINIX_PPC_CAPTURE_DIR=/external/app-captures VINIX_PPC_TEST_APPS=1 v -o /tmp/ppc-boot-program run tests/powerpc/boot-program.v /external/desktop-image 'vinix-desktop: GPU init: first canvas presented'
+v -o /tmp/ppc-check-apps run tests/powerpc/check-apps.v /external/app-captures
+```
+
+The runner clicks five application shortcuts, types into three apps and reopens
+Calculator eight times. The checker verifies process launches, changes inside
+the app content, window removal and uninterrupted framebuffer ownership. Inspect
+the screenshots to verify the actual text and results. See
+[app validation](powerpc-app-validation.md) for the tested build and limitations.
 
 Set `VINIX_PPC_TRACE=1` on both build commands for startup diagnostics. Capture
 the real framebuffer and exercise setup typing/focus without submitting it:
@@ -136,14 +157,17 @@ VINIX_PPC_MEMORY=128 v run tools/powerpc test-shell /tmp/vinix-ppc-128
 It verifies the initial argument/environment/auxiliary stack, ELF TLS, errno,
 200 malloc/free and anonymous mmap/munmap cycles, zero filling, failed-map
 rollback, monotonic time and floating-point values surviving system calls.
-The single-process kernel now supports a bounded `brk` heap and private RW
+The kernel supports a bounded `brk` heap and private RW
 anonymous mappings. Executable/shared/fixed anonymous mappings remain rejected.
-Its integer-only kernel build disables the LLVM hard-float feature; the one
-user process owns the FPU until scheduling and per-thread FPU contexts exist.
+Its integer-only kernel build disables the LLVM hard-float feature; process
+switches save and restore all 32 FPRs and FPSCR.
 The runtime probe also checks identity/cwd/affinity and libc open flags, then
 times `nanosleep` and `poll` and wakes blocked polls through injected USB input.
-The single-process wait loops service polled devices; they do not yet idle
-the CPU or support signal interruption.
+Blocking reads, writes, waits and timers yield to the other processes. The
+scheduler does not yet idle the CPU or deliver user signal handlers.
+The runtime probe additionally exercises fork/exec, shared descriptor offsets,
+large pipe transfers, wait/reaping, fault isolation, page reclamation, PTY
+hangup/newlines and the irreversible pipe-only app sandbox.
 `VINIX_PPC_INIT` can select an alternate static executable for the boot archive;
 its ELF segments must respect the existing PPC text/data address ranges.
 
@@ -343,10 +367,17 @@ error signalling. User buffers are checked page by page before access.
 Console reads currently return EAGAIN when empty, and the shell polls; this
 is not a complete Linux ABI. Boot checks exercise invalid pointers, writes
 to text, unknown syscalls, descriptor exhaustion/reuse and page-spanning
-file reads. There is one process, with static musl, initial TLS and FPU state,
-bounded writable ext2 and framebuffer mappings. `fork`/`exec`, scheduling,
-pipes, signals, Unix/TCP sockets and per-thread floating-point/vector state
-remain pending. Desktop icons do not imply those separate applications run.
+file reads. The bounded scheduler supports eight processes, 64 descriptors per
+process, 16 pipes and four PTY pairs. Fork copies private pages, exec loads static
+ELF files from the boot archive, and every process receives an 8 MiB stack.
+Framebuffer ownership survives child exec and exit. SIGKILL and SIGTERM terminate
+children; general signal handlers, process groups, threads, Unix/TCP sockets and
+vector state remain pending. PTYs implement raw input and optional CRLF output;
+the native shell supplies editing and echo, without Unix job control. Its commands
+are builtins, not a port of Zsh. Unsupported terminal processing is rejected.
+Calculator uses an enforced syscall whitelist with only its protocol pipes and
+stdio retained. This is a bootstrap capability boundary, not a general user or
+credential implementation.
 
 ## Milestones
 
@@ -362,15 +393,16 @@ remain pending. Desktop icons do not imply those separate applications run.
    The guest checks successful/failed CAS, clock progress, and executing code
    after cache synchronization. Kernel exception entry and decrementer
    interrupts and initial hashed user mappings now pass. Pending: interrupt controller,
-   64-bit atomic policy and scheduler integration.
+   64-bit atomic policy and interrupt-driven device waits.
 4. **Working in QEMU:** static userspace ELF32 execution, initial PPC32 syscall
    subset, read-only boot filesystem and writable ext2. Static musl, initial
-   TLS, heap/mmap and single-process FPU operation pass. Pending: common kernel
-   pointer-width/endian audit, scheduling, full syscall ABI, signals and
-   per-thread floating-point/vector state.
+   TLS, heap/mmap, process scheduling and per-process FPU state pass. Pending:
+   common kernel pointer-width/endian audit, full syscall ABI, signal handlers,
+   threads and vector state.
 5. **Working in QEMU:** freestanding V init/shell with serial input and file
-   commands, real desktop registration, account persistence and compositor.
-   Pending: separate application processes and shared Vinix userland services.
+   commands, real desktop registration, account persistence, compositor and
+   separate native application processes. Pending: shared Vinix userland services
+   and third-party runtime ports.
    The initial shell also boots with 128 MiB guest RAM;
    that does not establish a memory budget for the eventual desktop.
 6. **Working in QEMU:** inherited 15/32-bit framebuffer console and OHCI USB
