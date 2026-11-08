@@ -42,3 +42,15 @@ Base revision: `86ca85518e2161512ab64a61ab5623670bf60ccb`; exact inputs are
 preserved in the bundle's source snapshot and manifest. `SHA256SUMS` digest:
 `79830df8a4334c22292869630d5062ad998a8dbe818eb3e575cc4d9ee5f69d0f`.
 The loaded ELF is a test fixture; this is not a full-kernel boot.
+
+## Initial kernel takeover
+
+`test-kernel` passes its native SCC console, system-call exception return,
+and repeated decrementer interrupt checks. The kernel stops using firmware
+and does not return to its prompt. Physical-frame ownership and hash-table
+policy host tests also pass, including exhaustion and invalid free cases.
+
+Bundle: `/tmp/vinix-ppc-kernel-stage`, base revision `9992871cd` plus the
+exact source snapshot in the bundle. `SHA256SUMS` digest:
+`66a3272b5d147821668db970d7050f000660dd41019572749bdfcf8459a943fa`.
+This stage has no userspace or interactive shell yet.

@@ -48,6 +48,7 @@ fn build(root string, output string) ! {
 	preserve_sources(root, output, v, zig)!
 	cross_build(root, output, v, zig, headers, 'powerpc-boot', 'loader', 'vinix-of', 'vinix_of_entry')!
 	cross_build(root, output, v, zig, headers, 'tests/powerpc/handoff', 'probe', 'handoff-probe', 'vinix_handoff_probe')!
+	cross_build(root, output, v, zig, headers, 'kernel/powerpc/start', 'kernel', 'vinix-ppc', 'vinix_ppc_entry')!
 	command([zig, 'objcopy', '-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin'])!
 	make_iso(output)!
 	for name in ['vinix-of.elf', 'vinix-of.bin', 'handoff-probe.elf', 'vinix-ppc-boot.iso'] {
@@ -71,13 +72,14 @@ fn cross_build(root string, output string, v string, zig string, headers string,
 		output + '/${generated}.c', '-o', output + '/${binary}.elf'])!
 }
 
-fn boot(output string, test bool, media bool) ! {
+fn boot(output string, test bool, media bool, kernel bool) ! {
 	qemu := tool('VINIX_PPC_QEMU', 'qemu-system-ppc')!
 	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', '512', '-smp', '1',
 		'-nic', 'none', '-no-reboot']
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
-			'boot-device=cd:\\BOOT.ELF;1', '-prom-env', 'boot-file=cd:\\PROBE.ELF;1']
+			'boot-device=cd:\\BOOT.ELF;1', '-prom-env',
+			if kernel { 'boot-file=cd:\\KERNEL.ELF;1' } else { 'boot-file=cd:\\PROBE.ELF;1' }]
 	} else {
 		args << ['-kernel', output + '/vinix-of.bin']
 	}
@@ -88,7 +90,20 @@ fn boot(output string, test bool, media bool) ! {
 		command(argv)!
 		return
 	}
-	log_path := output + if media { '/media-boot.log' } else { '/boot.log' }
+	log_path := output + if kernel {
+		'/kernel-boot.log'
+	} else if media {
+		'/media-boot.log'
+	} else {
+		'/boot.log'
+	}
+	marker := if kernel {
+		'VINIX-PPC: PASS kernel decrementer interrupts'
+	} else if media {
+		'VINIX-PPC: PASS ELF32 handoff probe'
+	} else {
+		'VINIX-PPC: PASS firmware discovery'
+	}
 	os.write_file(log_path, '')!
 	args << ['-nographic', '-serial', 'file:' + log_path, '-monitor', 'stdio']
 	mut child := os.new_process(qemu)
@@ -104,11 +119,7 @@ fn boot(output string, test bool, media bool) ! {
 	deadline := time.now().add(20 * time.second)
 	for time.now() < deadline && child.is_alive() {
 		log = os.read_file(log_path)!
-		if log.contains(if media {
-			'VINIX-PPC: PASS ELF32 handoff probe'
-		} else {
-			'VINIX-PPC: PASS firmware discovery'
-		}) || log.contains('VINIX-PPC: FAIL') {
+		if log.contains(marker) || log.contains('VINIX-PPC: FAIL') || log.contains('VINIX-PPC: PANIC') {
 			break
 		}
 		time.sleep(10 * time.millisecond)
@@ -116,7 +127,7 @@ fn boot(output string, test bool, media bool) ! {
 	print(log)
 	if !log.contains('VINIX-PPC: PASS firmware discovery')
 		|| !log.contains('VINIX-PPC: PASS cpu clock atomics cache')
-		|| (media && !log.contains('VINIX-PPC: PASS ELF32 handoff probe')) || log.contains('VINIX-PPC: FAIL') {
+		|| !log.contains(marker) || log.contains('VINIX-PPC: FAIL') || log.contains('VINIX-PPC: PANIC') {
 		return error('PPC boot did not reach the firmware milestone; see ${log_path}')
 	}
 	for line in log.split_into_lines() {
@@ -150,8 +161,8 @@ fn main() {
 	root := os.real_path(@VMODROOT + '/../..')
 	mut output := os.join_path(os.temp_dir(), 'vinix-powerpc-' + sha256.hexhash(root)[..12])
 	args := os.args[1..]
-	if args.len == 0 || args[0] !in ['build', 'run', 'test', 'test-media'] {
-		eprintln('Usage: v run tools/powerpc {build|run|test|test-media} [OUTPUT_DIRECTORY]')
+	if args.len == 0 || args[0] !in ['build', 'run', 'test', 'test-media', 'test-kernel'] {
+		eprintln('Usage: v run tools/powerpc {build|run|test|test-media|test-kernel} [OUTPUT_DIRECTORY]')
 		exit(2)
 	}
 	if args.len > 2 {
@@ -169,7 +180,7 @@ fn main() {
 	}
 	println('PowerPC build: ${output}')
 	if args[0] != 'build' {
-		boot(output, args[0] != 'run', args[0] != 'test') or {
+		boot(output, args[0] != 'run', args[0] != 'test', args[0] == 'test-kernel') or {
 			eprintln(err)
 			exit(1)
 		}

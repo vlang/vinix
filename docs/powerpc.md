@@ -18,6 +18,7 @@ checkout. An alternate compiler can be selected with `VINIX_V_COMPILER`.
 ```
 v run tools/powerpc test /tmp/vinix-ppc-state
 v run tools/powerpc test-media /tmp/vinix-ppc-cd-state
+v run tools/powerpc test-kernel /tmp/vinix-ppc-kernel-state
 v run tools/powerpc run /tmp/vinix-ppc-state
 ```
 
@@ -90,9 +91,14 @@ stack, copied tree and loader; nonidentity mappings currently fail safely.
 
 The probe checks initialized data, zeroed/writable BSS, stack alignment/range,
 boot-info version/size, FDT magic and kernel/stack exclusion from free memory.
-It returns to the loader for an explicit PASS marker. The full kernel must
-eventually establish exception vectors, MMU mappings, interrupts and its own
-console, then stop using firmware. That takeover is not implemented yet.
+It returns to the loader for an explicit PASS marker.
+
+The independent PPC kernel entry in `kernel/powerpc/start` now takes control
+without returning to firmware. `test-kernel` boots `KERNEL.ELF` and verifies
+its own polled SCC console, physical-page allocator, low exception vectors,
+complete integer register frame save/restore and decrementer interrupts.
+It currently runs in supervisor real mode. User mappings and the shared
+Vinix scheduler, filesystem and userland integration remain pending.
 
 ## Milestones
 
@@ -106,8 +112,9 @@ console, then stop using firmware. That takeover is not implemented yet.
 3. **Working in QEMU:** kernel `powerpc.cpu` primitives for PVR/MSR, coherent
    64-bit timebase reads, 32-bit CAS and G4 instruction-cache publication.
    The guest checks successful/failed CAS, clock progress, and executing code
-   after cache synchronization. Pending: exceptions, TLB/MMU, interrupt
-   controller, timer interrupt, 64-bit atomic policy and scheduler integration.
+   after cache synchronization. Kernel exception entry and decrementer
+   interrupts now pass. Pending: TLB/MMU, interrupt controller,
+   64-bit atomic policy and scheduler integration.
 4. Pending: common kernel pointer-width/endian audit, userspace ELF32 execution and
    PPC32 Linux syscall ABI, signals, TLS and floating-point/vector state.
 5. Pending: PPC32 libc, init, shell and desktop userland; small-memory profile.

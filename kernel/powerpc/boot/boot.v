@@ -2,7 +2,7 @@
 module boot
 
 pub const magic = u32(0x564f4631)
-pub const version = u32(2)
+pub const version = u32(3)
 
 pub struct MemoryRange {
 pub mut:
@@ -29,4 +29,7 @@ pub mut:
 	depth           u32
 	kernel          MemoryRange
 	stack           MemoryRange
+	serial_control  u32
+	serial_data     u32
+	timebase_hz     u32
 }

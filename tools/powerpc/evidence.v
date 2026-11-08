@@ -41,9 +41,9 @@ fn preserve_sources(root string, output string, compiler string, zig string) ! {
 
 fn seal_results(output string) ! {
 	mut checksums := ''
-	for file in ['build.txt', 'sources.sha256', 'loader.c', 'probe.c', 'handoff-probe.elf',
-		'vinix-of.elf', 'vinix-of.bin', 'vinix-ppc-boot.iso', 'firmware.dtb', 'boot.log',
-		'media-boot.log'] {
+	for file in ['build.txt', 'sources.sha256', 'loader.c', 'probe.c', 'handoff-probe.elf', 'kernel.c',
+		'vinix-ppc.elf', 'kernel-boot.log', 'vinix-of.elf', 'vinix-of.bin', 'vinix-ppc-boot.iso',
+		'firmware.dtb', 'boot.log', 'media-boot.log'] {
 		if !os.is_file(output + '/' + file) { continue }
 		data := os.read_bytes(output + '/' + file)!
 		checksums += sha256.hexhash(data.bytestr()) + '  ' + file + '\n'

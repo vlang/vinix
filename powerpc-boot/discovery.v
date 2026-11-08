@@ -117,9 +117,40 @@ fn discover() bool {
 	boot_info = boot.Info{ magic: boot.magic, version: boot.version, bytes: sizeof(boot.Info) }
 	if !copy_device_tree() { return false }
 	discover_framebuffer()
+	discover_machine()
 	// Read available after claims: firmware-owned and loader-owned pages must
 	// never become free pages in the kernel allocator.
 	if !discover_memory() { return false }
 	puts(c'VINIX-PPC: PASS firmware discovery\r\n')
 	return true
+}
+
+fn discover_machine() {
+	serial := find_device(c'scca')
+	if serial != 0xffffffff {
+		mut reg := [4]u32{}
+		mut assigned := [20]u32{}
+		controller := relation(c'parent', serial)
+		macio := relation(c'parent', controller)
+		if get_property(serial, c'reg', unsafe { &reg[0] }, sizeof(reg)) >= 8 {
+			length := get_property(macio, c'assigned-addresses', unsafe { &assigned[0] }, sizeof(assigned))
+			if length >= 20 && length <= int(sizeof(assigned)) {
+				for i := 0; i + 4 < length / 4; i += 5 {
+					if assigned[i] & 0x03000000 == 0x02000000 && assigned[i + 1] == 0
+						&& reg[0] < assigned[i + 4] && assigned[i + 2] <= 0xffffffef - reg[0] {
+						boot_info.serial_control = assigned[i + 2] + reg[0]
+						boot_info.serial_data = boot_info.serial_control + 16
+						break
+					}
+				}
+			}
+		}
+	}
+	processor := relation(c'child', find_device(c'/cpus'))
+	boot_info.timebase_hz = property_u32(processor, c'timebase-frequency', 0)
+	puts(c'VINIX-PPC: serial ')
+	hex(boot_info.serial_control)
+	puts(c' timebase ')
+	hex(boot_info.timebase_hz)
+	puts(c'\r\n')
 }
