@@ -80,7 +80,7 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	memory := strconv.parse_uint(os.getenv_opt('VINIX_PPC_MEMORY') or { '512' }, 10, 32)!
 	if memory < 128 || memory > 2048 { return error('VINIX_PPC_MEMORY must be 128..2048 MiB') }
 	mut args := ['-M', 'mac99,via=pmu', '-cpu', '7450', '-accel', 'tcg', '-m', memory.str(), '-smp', '1',
-		'-nic', 'none', '-no-reboot']
+		'-nic', 'user,model=sungem,id=net0', '-no-reboot']
 	if graphics { args << ['-prom-env', 'output-device=scca'] }
 	if media {
 		args << ['-cdrom', output + '/vinix-ppc-boot.iso', '-boot', 'd', '-prom-env',
@@ -126,6 +126,7 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	if shell {
 		args << ['-chardev', 'socket,id=console,path=' + (output + '/serial.sock').replace(',', ',,') +
 			',server=on,wait=off,logfile=' + log_path.replace(',', ',,'), '-serial', 'chardev:console']
+		args << ['-object', 'filter-dump,id=packets,netdev=net0,file=' + (output + '/network.pcap').replace(',', ',,')]
 	} else {
 		args << ['-serial', 'file:' + log_path]
 	}
@@ -156,7 +157,8 @@ fn boot(output string, test bool, media bool, kernel bool, shell bool) ! {
 	}
 	if shell {
 		exercise_usb(mut child, output, log_path, graphics)!
-		exercise_shell(output, log_path)!
+		exercise_shell(mut child, output, log_path)!
+		validate_packets(os.read_bytes(output + '/network.pcap')!)!
 	}
 	if graphics {
 		if !log.contains('VINIX-PPC: PASS framebuffer console') { return error('Framebuffer console missing') }

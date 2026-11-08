@@ -66,7 +66,7 @@ Archive validation tests run with `v test kernel/powerpc/ramfs`.
 Direct QEMU command after building:
 
 ```
-qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic none -cdrom /tmp/vinix-ppc-state/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -prom-env 'boot-file=cd:\KERNEL.ELF;1 cd:\RAMFS.TAR;1' -nographic -serial mon:stdio
+qemu-system-ppc -M mac99,via=pmu -cpu 7450 -accel tcg -m 512 -smp 1 -nic user,model=sungem,id=net0 -cdrom /tmp/vinix-ppc-state/vinix-ppc-boot.iso -boot d -prom-env 'boot-device=cd:\BOOT.ELF;1' -prom-env 'boot-file=cd:\KERNEL.ELF;1 cd:\RAMFS.TAR;1' -nographic -serial mon:stdio
 ```
 
 This command boots the PPC kernel and initial userspace shell. This ISO
@@ -88,6 +88,24 @@ descriptors, explicit G4 DMA cache ownership and bounded polling. This first
 driver supports directly attached boot-protocol HID devices present at boot;
 USB hubs, reconnection, key repeat, storage and EHCI remain pending. It does
 not call firmware for keyboard, mouse or console output after takeover.
+
+The GEM Ethernet driver enables Apple UniNorth GMAC MMIO and bus mastering,
+finds its MII PHY, negotiates 10/100 duplex, and uses separate 32-entry RX/TX
+DMA rings. RX descriptors are recycled in groups of four to preserve cache
+ownership on a G4. `net` obtains a DHCP lease; `ping [IPv4]` resolves a next
+hop with ARP and sends four checked ICMP echo requests (the default target
+is the DHCP gateway). QEMU's user network normally assigns `10.0.2.15`.
+
+The development `/dev/net0` interface reads/writes one Ethernet frame per
+call, without FCS. Open with flag 2 for writes; frame size is 14..1514 bytes.
+Reads return EAGAIN when empty, or EMSGSIZE and discard an oversized frame.
+Ioctl `0x564e0001` returns 16 bytes: MAC[6], reserved[2], big-endian 32-bit
+link state and MTU. User pointers, frame lengths and descriptor types are
+checked. DHCP/ARP/ICMP live in the freestanding shell; this is not yet the
+shared kernel's TCP/IP socket stack. DNS, TCP, IPv6, background lease renewal,
+gigabit PHY tuning and iMac clock/reset GPIO support remain pending.
+The same driver passes QEMU link loss/recovery and ring-wrap traffic tests;
+native hardware has not yet been validated.
 
 The separate direct test uses `-kernel vinix-of.bin`. QEMU's
 `-kernel` ELF loader relocates PowerMac load addresses by 16 MiB, so this path
@@ -143,7 +161,7 @@ After the protection check, the kernel revokes the fixture mappings and
 releases its frames. With an initramfs, it validates the read-only USTAR
 archive, maps `/bin/init` as a separate ELF32 process, and enters it in user
 mode. The shell implements `help`, `ls`, `cat`, `pwd`, `ps`, `uname`, `mem`,
-`echo` and `exit`. File contents and directory entries come from the archive;
+`echo`, `net`, `ping` and `exit`. File contents and directory entries come from the archive;
 memory accounting comes from the physical allocator.
 
 The syscall subset uses PPC32 Linux numbers, argument registers and CR0.SO
@@ -179,8 +197,9 @@ Shared Vinix scheduler, filesystem and desktop integration remain pending.
    userland and desktop. The initial shell also boots with 128 MiB guest RAM;
    that does not establish a memory budget for the eventual desktop.
 6. **Working in QEMU:** inherited 32-bit framebuffer console and OHCI USB
-   keyboard/mouse. Pending: full desktop, USB hubs/hotplug/EHCI, GEM Ethernet,
-   audio, real-machine ATA/DBDMA, PMU and hardware boot tests. Identify the
+   keyboard/mouse, GEM Ethernet DMA and DHCP/ARP/ICMP. Pending: full desktop,
+   USB hubs/hotplug/EHCI, TCP/IP sockets, audio, real-machine ATA/DBDMA, PMU and
+   hardware boot tests. Identify the
    exact iMac revision before selecting its built-in audio codec.
 
 The existing ARM64 iBoot adapter is unrelated to PowerPC Open Firmware.

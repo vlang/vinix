@@ -132,3 +132,25 @@ Bundle: `/tmp/vinix-ppc-usb-final`, base `3d2b574dc` plus preserved sources.
 `SHA256SUMS`: `7750175edf3ed39e3edbf09811d24c3e14c19e86b0966863dc83070cd2da6c45`.
 This covers QEMU boot-time HID devices. Hubs, reconnection, other USB classes
 and native iMac validation are separate work.
+
+## GEM Ethernet
+
+QEMU boots with Apple UniNorth GMAC. The userspace `net` command completes
+DHCP DISCOVER/OFFER/REQUEST/ACK; `ping` resolves the gateway through ARP and
+checks ICMP checksums, source/destination, sequence and payload. Sixty-four
+echo exchanges wrap both 32-entry DMA rings repeatedly. The harness drops
+and restores the emulated link, verifies its reported state, and receives
+four further replies. An independent pcap checker requires all 68 matching
+request/reply pairs plus DHCP and ARP traffic. Free physical pages stay
+constant across networking and repeated file operations.
+
+Host parser tests reject every truncated DHCP prefix, malformed lengths,
+wrong transaction/MAC, bad IPv4/UDP checksums, fragments, duplicate options
+and unsupported option overloading. In-guest tests reject invalid user
+pointers, oversized TX frames, unknown ioctls and directory operations on
+the packet device. The USB input and framebuffer checks pass in the same run.
+
+Bundle: `/tmp/vinix-ppc-network`, base `224d57e15` plus preserved sources.
+`SHA256SUMS`: `4ced056c490690650b908ca7442f079ea65f029ef873db205ae0986c14e2299f`.
+This validates GEM DMA and the small userspace network utility in QEMU,
+not shared-kernel sockets, TCP, gigabit PHYs or physical iMac Ethernet.

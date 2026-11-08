@@ -189,7 +189,7 @@ fn start() {
 			}
 			arg := &char(&input[argument])
 			if same(input, c'help') {
-				print_text(c'help  ls [path]  cat path  pwd  ps  uname  mem  echo text  exit\n')
+				print_text(c'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  echo text  exit\n')
 			} else if same(input, c'ls') {
 				ls(if argument < used { arg } else { c'/' })
 			} else if same(input, c'cat') {
@@ -222,6 +222,10 @@ fn start() {
 					number(word(0))
 					print_text(c'\n')
 				}
+			} else if same(input, c'net') {
+				network_command(arg, false)
+			} else if same(input, c'ping') {
+				network_command(arg, true)
 			} else if same(input, c'exit') {
 				C.vinix_user_syscall(1, 0, 0, 0)
 			} else if used != 0 {

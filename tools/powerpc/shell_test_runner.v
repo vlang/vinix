@@ -8,7 +8,7 @@ import time
 fn shell_command(mut console unix.StreamConn, log_path string, command string) !string {
 	before := os.read_file(log_path)!
 	console.write_string(command + '\n')!
-	deadline := time.now().add(3 * time.second)
+	deadline := time.now().add(20 * time.second)
 	for time.now() < deadline {
 		log := os.read_file(log_path)!
 		if log.len < before.len { return error('Console log was truncated') }
@@ -22,12 +22,12 @@ fn shell_command(mut console unix.StreamConn, log_path string, command string) !
 	return error('Shell command timed out: ${command}')
 }
 
-fn exercise_shell(output string, log_path string) ! {
+fn exercise_shell(mut child os.Process, output string, log_path string) ! {
 	mut console := unix.connect_stream(output + '/serial.sock')!
 	defer { console.close() or {} }
 	mut transcript := ''
 	checks := {
-		'help':          'help  ls [path]  cat path  pwd  ps  uname  mem  echo text  exit\n'
+		'help':          'help  ls [path]  cat path  pwd  ps  uname  mem  net  ping [IPv4]  echo text  exit\n'
 		'ls':            'bin/\netc/\nREADME\n'
 		'ls /bin':       '\ninit\n'
 		'ls /etc/':      '\nmotd\n'
@@ -49,6 +49,24 @@ fn exercise_shell(output string, log_path string) ! {
 	}
 	before := shell_command(mut console, log_path, 'mem')!
 	transcript += before
+	network := shell_command(mut console, log_path, 'net')!
+	transcript += network
+	if !network.contains('DHCP: 10.0.2.15 gateway 10.0.2.2') { return error('GEM DHCP failed: ${network}') }
+	for _ in 0 .. 16 {
+		ping := shell_command(mut console, log_path, 'ping 10.0.2.2')!
+		transcript += ping
+		if !ping.contains('ping: 4/4 replies from 10.0.2.2') { return error('GEM ping failed: ${ping}') }
+	}
+	child.stdin_write('set_link net0 off\n')
+	time.sleep(100 * time.millisecond)
+	down := shell_command(mut console, log_path, 'net')!
+	transcript += down
+	if !down.contains('net: link down') { return error('GEM failed to report link loss: ${down}') }
+	child.stdin_write('set_link net0 on\n')
+	time.sleep(100 * time.millisecond)
+	recovered := shell_command(mut console, log_path, 'ping')!
+	transcript += recovered
+	if !recovered.contains('ping: 4/4 replies from 10.0.2.2') { return error('GEM failed link recovery: ${recovered}') }
 	for _ in 0 .. 32 {
 		result := shell_command(mut console, log_path, 'cat /etc/motd')!
 		transcript += result
@@ -74,5 +92,5 @@ fn exercise_shell(output string, log_path string) ! {
 		time.sleep(10 * time.millisecond)
 	}
 	if !exited { return error('Shell did not exit successfully') }
-	println('PASS interactive userspace shell: commands, errors, editing, repeated open/read/close, stable free pages')
+	println('PASS interactive userspace shell: commands, errors, editing, DHCP, 64 ICMP replies across DMA ring wraps, stable free pages')
 }

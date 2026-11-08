@@ -5,10 +5,12 @@ import powerpc.exception
 import powerpc.runtime
 import powerpc.serial
 import powerpc.ohci
+import powerpc.gem
 
 struct Descriptor {
 mut:
 	used   bool
+	writable bool
 	file   int
 	offset u32
 }
@@ -41,17 +43,21 @@ fn user_path(address u32) int {
 }
 
 fn sys_open(path u32, flags u32) int {
-	if flags != 0 { return -30 }
 	length := user_path(path)
 	if length < 0 { return length }
 	if length == 0 || io_buffer[0] != `/` { return -2 }
 	mut end := length
 	for end > 1 && io_buffer[end - 1] == `/` { end-- }
-	node := if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
+	mut packet_device := end == 9
+	name := c'/dev/net0'
+	unsafe { for i := 0; packet_device && i < end; i++ { if io_buffer[i] != u8(name[i]) { packet_device = false } } }
+	if packet_device && !gem.present() { return -19 }
+	if flags != 0 && !(packet_device && flags == 2) { return -30 }
+	node := if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
 	if node == -1 { return -2 }
 	for fd in 3 .. 16 {
 		if !descriptors[fd].used {
-			descriptors[fd] = Descriptor{ used: true, file: node }
+			descriptors[fd] = Descriptor{ used: true, writable: flags == 2, file: node }
 			return fd
 		}
 	}
@@ -72,6 +78,12 @@ fn sys_read(fd u32, address u32, requested u32) int {
 		return 1
 	}
 	node := descriptors[fd].file
+	if node == -3 {
+		actual := gem.receive(unsafe { &io_buffer[0] }, count)
+		if actual <= 0 { return actual }
+		if !copy_to_user(address, unsafe { &io_buffer[0] }, u32(actual)) { return -14 }
+		return actual
+	}
 	if node == -2 || rootfs.files[node].directory { return -21 }
 	file := rootfs.files[node]
 	offset := descriptors[fd].offset
@@ -83,6 +95,13 @@ fn sys_read(fd u32, address u32, requested u32) int {
 }
 
 fn sys_write(fd u32, address u32, requested u32) int {
+	if fd >= 3 && fd < 16 && descriptors[fd].used && descriptors[fd].file == -3 {
+		if !descriptors[fd].writable { return -9 }
+		if requested < 14 || requested > 1514 { return -90 }
+		if !user_space.accessible(address, requested, false) { return -14 }
+		for i := u32(0); i < requested; i++ { io_buffer[i] = unsafe { *(&u8(user_space.translate(address + i, false))) } }
+		return gem.send(unsafe { &io_buffer[0] }, requested)
+	}
 	if fd != 1 && fd != 2 { return -9 }
 	count := if requested > 4096 { u32(4096) } else { requested }
 	if !user_space.accessible(address, count, false) { return -14 }
@@ -101,6 +120,7 @@ fn buffer_word(at u32, value u32) {
 fn sys_getdents(fd u32, address u32, requested u32) int {
 	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
 	parent := descriptors[fd].file
+	if parent == -3 { return -20 }
 	if parent >= 0 && !rootfs.files[parent].directory { return -20 }
 	capacity := if requested > 4096 { u32(4096) } else { requested }
 	if !user_space.accessible(address, capacity, true) { return -14 }
@@ -172,6 +192,19 @@ fn sys_info(address u32) int {
 	return 0
 }
 
+// Development packet device ABI: MAC[6], reserved[2], BE link and MTU words.
+// It is deliberately not advertised as a POSIX socket interface.
+fn sys_ioctl(fd u32, request u32, address u32) int {
+	if fd < 3 || fd >= 16 || !descriptors[fd].used { return -9 }
+	if descriptors[fd].file != -3 || request != 0x564e0001 { return -25 }
+	runtime.fill(unsafe { &io_buffer[0] }, 0, 16)
+	gem.mac(unsafe { &io_buffer[0] })
+	buffer_word(8, if gem.link() { u32(1) } else { u32(0) })
+	buffer_word(12, 1500)
+	if !copy_to_user(address, unsafe { &io_buffer[0] }, 16) { return -14 }
+	return 0
+}
+
 fn syscall(mut frame exception.Frame) {
 	mut result := -38
 	match frame.gpr[0] {
@@ -193,6 +226,7 @@ fn syscall(mut frame exception.Frame) {
 			}
 		}
 		20 { result = 1 }
+		54 { result = sys_ioctl(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		116 { result = sys_info(frame.gpr[3]) }
 		122 { result = sys_uname(frame.gpr[3]) }
 		141 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
