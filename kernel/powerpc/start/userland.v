@@ -26,7 +26,7 @@ fn launch_init() {
 	for i := u32(0); i < image.count; i++ {
 		segment := image.segments[i]
 		end := segment.address + segment.memory_size
-		if segment.address < 0x40000000 || end > 0x5ffe0000
+		if segment.address < 0x40000000 || end > 0x5fe00000
 			|| (segment.flags & 1 != 0 && end > 0x50000000)
 			|| (segment.flags & 2 != 0 && segment.address < 0x50000000) {
 			halt(c'init segment permissions')
@@ -48,11 +48,11 @@ fn launch_init() {
 			copied += count
 		}
 	}
-	for i := u32(0); i < 16; i++ {
+	for i := u32(0); i < 512; i++ {
 		physical := physical_pages.take(1, 1)
 		if physical == 0 { halt(c'user stack allocation') }
 		runtime.fill(voidptr(physical), 0, 4096)
-		if !user_space.map(0x5fff0000 + i * 4096, physical, true) { halt(c'user stack mapping') }
+		if !user_space.map(0x5fe00000 + i * 4096, physical, true) { halt(c'user stack mapping') }
 	}
 	for i := u32(0); i < user_space.count; i++ {
 		mapping := user_space.mappings[i]

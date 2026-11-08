@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module hash32
 
-pub const bytes = u32(65536)
+pub const entries = 65536
+pub const bytes = u32(entries * 8)
+pub const group_mask = u32(entries / 8 - 1)
 
 pub struct Pte {
 pub mut:
@@ -10,7 +12,7 @@ pub mut:
 }
 
 pub fn primary(vsid u32, address u32) u32 {
-	return (vsid ^ ((address >> 12) & 0xffff)) & 1023
+	return (vsid ^ ((address >> 12) & 0xffff)) & group_mask
 }
 
 pub fn tag(vsid u32, address u32, secondary bool) u32 {
@@ -23,7 +25,7 @@ pub fn slot(table &Pte, vsid u32, address u32) int {
 	group := primary(vsid, address)
 	mut empty := -1
 	for secondary in 0 .. 2 {
-		first := (if secondary == 0 { group } else { group ^ 1023 }) * 8
+		first := (if secondary == 0 { group } else { group ^ group_mask }) * 8
 		wanted := tag(vsid, address, secondary != 0)
 		for i := first; i < first + 8; i++ {
 			entry := unsafe { table[i].tag }
@@ -37,7 +39,7 @@ pub fn slot(table &Pte, vsid u32, address u32) int {
 pub fn find(table &Pte, vsid u32, address u32) int {
 	group := primary(vsid, address)
 	for secondary in 0 .. 2 {
-		first := (if secondary == 0 { group } else { group ^ 1023 }) * 8
+		first := (if secondary == 0 { group } else { group ^ group_mask }) * 8
 		wanted := tag(vsid, address, secondary != 0)
 		for i := first; i < first + 8; i++ {
 			if unsafe { table[i].tag } == wanted { return int(i) }

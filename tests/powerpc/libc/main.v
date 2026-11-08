@@ -66,9 +66,20 @@ fn entry(argc i32, argv &&char) i32 {
 		// Failures must neither replace text nor consume physical pages.
 		if usize(C.mmap(nil, 4096, 7, 0x22, -1, 0)) != usize(0xffffffff)
 			|| C.munmap(voidptr(0x40000000), 4096) != -1 { return fail(c'mapping permissions') }
-		if usize(C.mmap(nil, 32 * 1024 * 1024, 3, 0x22, -1, 0)) != usize(0xffffffff) {
-			return fail(c'mapping capacity')
+		large := C.mmap(nil, 32 * 1024 * 1024, 3, 0x22, -1, 0)
+		if usize(large) == usize(0xffffffff) { return fail(c'large mapping') }
+		(&u8(large))[32 * 1024 * 1024 - 1] = 0xa5
+		if C.munmap(large, 32 * 1024 * 1024) != 0 { return fail(c'large unmap') }
+		mut blocks := [32]voidptr{}
+		mut count := 0
+		for count < blocks.len {
+			block := C.mmap(nil, 4 * 1024 * 1024, 3, 0x22, -1, 0)
+			if usize(block) == usize(0xffffffff) { break }
+			blocks[count] = block
+			count++
 		}
+		if count == 0 || count == blocks.len { return fail(c'mapping exhaustion') }
+		for i in 0 .. count { if C.munmap(blocks[i], 4 * 1024 * 1024) != 0 { return fail(c'exhaustion cleanup') } }
 		mut after_failure := C.sysinfo{}
 		if C.sysinfo(&after_failure) != 0 || after_failure.freeram != stable_free { return fail(c'failed mapping rollback') }
 		// Force an actual libm operation with a runtime argument, and keep its

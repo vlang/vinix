@@ -16,11 +16,11 @@ pub struct Space {
 pub mut:
 	table    u32
 	count    u32
-	mappings [4096]Mapping
+	mappings [32768]Mapping
 }
 
 pub fn (mut space Space) init(table u32) bool {
-	if table == 0 || table & 65535 != 0 { return false }
+	if table == 0 || table & (hash32.bytes - 1) != 0 { return false }
 	space.table = table
 	space.count = 0
 	runtime.fill(voidptr(table), 0, hash32.bytes)
@@ -37,7 +37,7 @@ pub fn (mut space Space) map_device(address u32, physical u32, writable bool) bo
 
 fn (mut space Space) map_page(address u32, physical u32, writable bool, device bool) bool {
 	if space.table == 0 || address < 0x40000000 || address >= 0x60000000
-		|| (address | physical) & 4095 != 0 || physical == 0 || space.count >= 4096
+		|| (address | physical) & 4095 != 0 || physical == 0 || space.count >= 32768
 		|| (writable && address < 0x50000000) {
 		return false
 	}
@@ -78,15 +78,13 @@ pub fn (mut space Space) unmap(address u32) bool {
 }
 
 pub fn (space &Space) translate(address u32, write bool) u32 {
-	page := address & ~u32(4095)
-	for i := u32(0); i < space.count; i++ {
-		mapping := space.mappings[i]
-		if mapping.virtual == page {
-			if write && !mapping.writable { return 0 }
-			return mapping.physical + (address & 4095)
-		}
-	}
-	return 0
+	if space.table == 0 || address < 0x40000000 || address >= 0x60000000 { return 0 }
+	table := unsafe { &hash32.Pte(space.table) }
+	index := hash32.find(table, address >> 28, address)
+	if index < 0 { return 0 }
+	page := unsafe { table[index].page }
+	if write && page & 3 != 2 { return 0 }
+	return (page & ~u32(4095)) + (address & 4095)
 }
 
 pub fn (space &Space) accessible(address u32, size u32, write bool) bool {
@@ -100,6 +98,7 @@ pub fn (space &Space) accessible(address u32, size u32, write bool) bool {
 }
 
 pub fn (space &Space) activate() {
+	sdr1 := space.table | ((hash32.bytes >> 16) - 1)
 	// The kernel runs real-mode; revoke every inherited firmware BAT before
 	// enabling relocation in userspace. Hardware hash walking, no high BATs
 	// or extended physical addressing. This backend targets the 745x family.
@@ -108,7 +107,7 @@ pub fn (space &Space) activate() {
 		"mtspr 536,0\nmtspr 538,0\nmtspr 540,0\nmtspr 542,0\n"
 		"mfspr 4,1008\nlis 5,0x0182\nandc 4,4,5\nmtspr 1008,4\n"
 		"mtsdr1 %[table]\nsync\nisync"
-		; ; [table] "r" (space.table)
+		; ; [table] "r" (sdr1)
 		; r0
 		  r4
 		  r5

@@ -46,7 +46,7 @@ fn make_iso(output string) ! {
 	mut blocks := 21
 	for name in names {
 		data := os.read_bytes(output + '/' + name)!
-		if data.len == 0 || data.len > 16 * 1024 * 1024 { return error('Invalid ISO input size') }
+		if data.len == 0 || data.len >= 32 * 1024 * 1024 { return error('Invalid ISO input size') }
 		extents << blocks
 		blocks += (data.len + sector_size - 1) / sector_size
 		files << data

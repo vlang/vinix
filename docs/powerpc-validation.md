@@ -290,3 +290,22 @@ USB hub tiers. Both bundles preserve the `77947bc7b` source overlays:
   `336ef43120c3033ab94fa0a501580d4f73291fb4ce7a8b1c376f4334e2d9d6a4`.
 - `/tmp/vinix-ppc-libc-regression`: full device regression. `SHA256SUMS`:
   `38de388be8066bcc69f064555e4b9b94b61beae76a96ceef17cca517f7b2dc48`.
+
+## Desktop-sized address space (2026-11-08)
+
+The 512 KiB hashed page table and 32,768 mapping records accommodate the real
+desktop's image and heap. User-buffer translation now searches the hardware
+hash groups rather than scanning every mapping. The user stack is 2 MiB, and
+the boot archive limit is 32 MiB; the kernel read buffer stays at 16 MiB so it
+does not occupy the kernel's required load address on the 128 MiB guest.
+
+The host collision/exhaustion hash tests passed. At 128 MiB the libc probe
+successfully maps 32 MiB, then allocates until exhaustion, releases every block
+and verifies the original free-page count. The full graphics, nested-hub USB,
+audio and Ethernet regression also passes. Base `d4591db06` plus preserved
+source overlays:
+
+- `/tmp/vinix-ppc-large-runtime`, `SHA256SUMS`:
+  `4bdb5879c7403354a0aaafbf0b16895aa28ac1b518a5fbd82cf3856e7efedfcc`.
+- `/tmp/vinix-ppc-large-regression`, `SHA256SUMS`:
+  `daeea1f3821f178ac84abf1e39786c327f48c581ad68e876636374f51ec21e20`.

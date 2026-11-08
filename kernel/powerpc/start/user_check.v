@@ -4,6 +4,7 @@ module main
 import powerpc.cpu
 import powerpc.exception
 import powerpc.mmu
+import powerpc.hash32
 import powerpc.runtime
 import powerpc.serial
 
@@ -20,7 +21,7 @@ fn C.vinix_user_check_done()
 fn check_userspace(stack u32) {
 	user_check_active = true
 	resume_stack = stack
-	table := physical_pages.take(16, 16)
+	table := physical_pages.take(hash32.bytes / 4096, hash32.bytes / 4096)
 	code := physical_pages.take(1, 1)
 	user_stack := physical_pages.take(16, 1)
 	if table == 0 || code == 0 || user_stack == 0 || !user_space.init(table) {
