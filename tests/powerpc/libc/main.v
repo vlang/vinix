@@ -15,6 +15,7 @@ module main
 #include <fcntl.h>
 #include <sched.h>
 #include <poll.h>
+#include <sys/stat.h>
 
 struct C.timespec { tv_sec i64 tv_nsec i64 }
 struct C.sysinfo { freeram u32 }
@@ -49,6 +50,41 @@ mut:
 }
 fn C.poll(&C.pollfd, usize, i32) i32
 fn C.nanosleep(&C.timespec, &C.timespec) i32
+fn C.access(&char, i32) i32
+struct C.stat { st_mode u32 st_ino u64 st_dev u64 }
+fn C.stat(&char, &C.stat) i32
+fn C.fstat(i32, &C.stat) i32
+
+fn device_discovery() bool {
+	unsafe {
+		for path in [c'/dev/fb0', c'/dev/pointer']! {
+			mut by_path := C.stat{}
+			mut by_fd := C.stat{}
+			fd := C.open(path, C.O_RDONLY)
+			if fd < 0 {
+				// A serial-only firmware boot may provide no framebuffer.
+				// Its missing device must also be absent from discovery.
+				if C.strcmp(path, c'/dev/fb0') != 0 || *C.__errno_location() != 19
+					|| C.access(path, C.F_OK) != -1 || *C.__errno_location() != 2
+					|| C.stat(path, &by_path) != -1 || *C.__errno_location() != 2 { return false }
+				continue
+			}
+			if C.access(path, C.F_OK) != 0 || C.access(path, C.R_OK) != 0
+				|| C.access(path, C.X_OK) != -1 || *C.__errno_location() != 13
+				|| C.stat(path, &by_path) != 0 || by_path.st_mode & 0xf000 != 0x2000 { return false }
+			if fd < 0 || C.fstat(fd, &by_fd) != 0 || C.close(fd) != 0
+				|| by_path.st_ino != by_fd.st_ino || by_path.st_dev != by_fd.st_dev { return false }
+			if C.strcmp(path, c'/dev/fb0') == 0 && C.access(path, C.R_OK | C.W_OK) != 0 { return false }
+		}
+		mut missing := C.stat{}
+		for path in [c'/dev/fb1', c'/dev/fb7']! {
+			if C.access(path, C.F_OK) != -1 || *C.__errno_location() != 2
+				|| C.stat(path, &missing) != -1 || *C.__errno_location() != 2
+				|| C.open(path, C.O_RDONLY) != -1 || *C.__errno_location() != 2 { return false }
+		}
+		return true
+	}
+}
 
 fn monotonic_ns() i64 {
 	mut stamp := C.timespec{}
@@ -144,6 +180,8 @@ fn entry(argc i32, argv &&char) i32 {
 		if C.getauxval(6) != 4096 || C.getauxval(3) == 0 || C.getauxval(5) == 0 { return fail(c'auxiliary vector') }
 		if C.getpid() != 1 || C.close(-1) != -1 || *C.__errno_location() != 9 { return fail(c'TLS errno') }
 		if !startup_services() { return fail(c'identity cwd affinity open flags') }
+		if !device_discovery() { return fail(c'consistent device discovery') }
+		C.printf(c'VINIX-PPC: PASS libc consistent device discovery\n')
 		C.printf(c'VINIX-PPC: PASS libc identity cwd affinity open flags\n')
 		if !wait_services() { return fail(c'poll nanosleep input readiness') }
 		C.printf(c'VINIX-PPC: PASS libc poll nanosleep input readiness\n')

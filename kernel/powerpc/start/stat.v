@@ -8,6 +8,11 @@ fn sys_access(path u32, mode u32) int {
 	if mode & ~u32(7) != 0 { return -22 }
 	length := user_path(path)
 	if length <= 0 { return if length < 0 { length } else { -2 } }
+	device := device_node(length)
+	if device != -1 {
+		if !device_present(device) { return -2 }
+		return if mode & 1 != 0 || (device == -7 && mode & 2 != 0) { -13 } else { 0 }
+	}
 	if persistent_volume.mounted {
 		id := persistent_volume.walk(unsafe { &io_buffer[0] }, u32(length), true)
 		if id > 0 {
@@ -19,9 +24,6 @@ fn sys_access(path u32, mode u32) int {
 			return 0
 		}
 		if id != -2 { return id }
-	}
-	if path_equal(c'/dev/urandom', length) || path_equal(c'/dev/random', length) {
-		return if !persistent_random.ready { -19 } else if mode & 3 != 0 { -13 } else { 0 }
 	}
 	if length == 1 && io_buffer[0] == `/` { return if mode & 2 != 0 { -30 } else { 0 } }
 	if io_buffer[0] != `/` { return -2 }
@@ -47,16 +49,18 @@ fn sys_statx(dirfd u32, path u32, flags u32, address u32) int {
 	} else {
 		if length == 0 { return -2 }
 		if io_buffer[0] != `/` && i32(dirfd) != -100 { return -95 }
-		if persistent_volume.mounted {
+		device := device_node(length)
+		if device != -1 {
+			if !device_present(device) { return -2 }
+			archive = device
+			mode = 0x2180
+		} else if persistent_volume.mounted {
 			found := persistent_volume.walk(unsafe { &io_buffer[0] }, u32(length), flags & 0x100 == 0)
 			if found > 0 { id = u32(found) } else if found != -2 { return found }
 		}
-		if id == 0 {
+		if id == 0 && mode == 0 {
 			if length == 1 && io_buffer[0] == `/` { archive = -2 }
 			else if path_equal(c'/dev', length) { mode = 0x41ed }
-			else if path_equal(c'/dev/urandom', length) || path_equal(c'/dev/random', length)
-				|| path_equal(c'/dev/fb0', length) || path_equal(c'/dev/pointer', length)
-				|| path_equal(c'/dev/audio', length) || path_equal(c'/dev/net0', length) { mode = 0x2180 }
 			else if io_buffer[0] == `/` { archive = rootfs.find(unsafe { &io_buffer[1] }, u32(length - 1)) }
 			if archive == -1 && mode == 0 { return -2 }
 		}

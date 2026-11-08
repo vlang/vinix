@@ -7,7 +7,6 @@ import powerpc.serial
 import powerpc.ohci
 import powerpc.gem
 import powerpc.cpu
-import powerpc.video
 
 struct Descriptor {
 mut:
@@ -119,8 +118,9 @@ fn sys_open(path u32, requested_flags u32, mode u32) int {
 	length := user_path(path)
 	if length < 0 { return length }
 	if length == 0 || io_buffer[0] != `/` { return -2 }
-	if path_equal(c'/dev/urandom', length) || path_equal(c'/dev/random', length) {
-		if !persistent_random.ready { return -19 }
+	device := device_node(length)
+	if device != -1 && !device_present(device) { return -19 }
+	if device == -7 {
 		if requested_flags & 3 != 0 { return -13 }
 		for fd in 3 .. 16 {
 			if !descriptors[fd].used {
@@ -136,21 +136,10 @@ fn sys_open(path u32, requested_flags u32, mode u32) int {
 	}
 	mut end := length
 	for end > 1 && io_buffer[end - 1] == `/` { end-- }
-	mut packet_device := end == 9
-	name := c'/dev/net0'
-	unsafe { for i := 0; packet_device && i < end; i++ { if io_buffer[i] != u8(name[i]) { packet_device = false } } }
-	mut audio_device := end == 10
-	audio_name := c'/dev/audio'
-	unsafe { for i := 0; audio_device && i < end; i++ { if io_buffer[i] != u8(audio_name[i]) { audio_device = false } } }
-	mut framebuffer_device := end == 8
-	fb_name := c'/dev/fb0'
-	unsafe { for i := 0; framebuffer_device && i < end; i++ { if io_buffer[i] != u8(fb_name[i]) { framebuffer_device = false } } }
-	mut pointer_device := end == 12
-	pointer_name := c'/dev/pointer'
-	unsafe { for i := 0; pointer_device && i < end; i++ { if io_buffer[i] != u8(pointer_name[i]) { pointer_device = false } } }
-	if packet_device && !gem.present() { return -19 }
-	if audio_device && !ohci.sound_present() { return -19 }
-	if framebuffer_device && video.info().base == 0 { return -19 }
+	packet_device := device == -3
+	audio_device := device == -4
+	framebuffer_device := device == -5
+	pointer_device := device == -6
 	if flags != 0 && !(pointer_device && flags == 0x800) && !((packet_device || framebuffer_device) && flags == 2) && !(audio_device && (flags == 1 || flags == 2)) { return -30 }
 	node := if pointer_device { -6 } else if framebuffer_device { -5 } else if audio_device { -4 } else if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
 	if node == -1 { return -2 }
