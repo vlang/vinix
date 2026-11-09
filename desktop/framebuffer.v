@@ -9,71 +9,10 @@
 module main
 
 import desktop.sessioncore
+import desktop.fbdevabi
 
 const fbioget_vscreeninfo = u64(0x4600)
 const fbioget_fscreeninfo = u64(0x4602)
-
-// Field order and widths follow linux/fb.h, which is what the Vinix fbdev
-// driver copies out. The whole structure has to be present even though only a
-// few fields are read: the driver copies its own sizeof into this buffer.
-struct FBBitfield {
-mut:
-	offset    u32
-	length    u32
-	msb_right u32
-}
-
-struct FBVarScreenInfo {
-mut:
-	xres           u32
-	yres           u32
-	xres_virtual   u32
-	yres_virtual   u32
-	xoffset        u32
-	yoffset        u32
-	bits_per_pixel u32
-	grayscale      u32
-	red            FBBitfield
-	green          FBBitfield
-	blue           FBBitfield
-	transp         FBBitfield
-	nonstd         u32
-	activate       u32
-	height         u32
-	width          u32
-	accel_flags    u32
-	pixclock       u32
-	left_margin    u32
-	right_margin   u32
-	upper_margin   u32
-	lower_margin   u32
-	hsync_len      u32
-	vsync_len      u32
-	sync           u32
-	vmode          u32
-	rotate         u32
-	colorspace     u32
-	reserved       [4]u32
-}
-
-struct FBFixScreenInfo {
-mut:
-	id           [16]u8
-	smem_start   u64
-	smem_len     u32
-	typ          u32
-	type_aux     u32
-	visual       u32
-	xpanstep     u16
-	ypanstep     u16
-	ywrapstep    u16
-	line_length  u32
-	mmio_start   u64
-	mmio_len     u32
-	accel        u32
-	capabilities u16
-	reserved     [2]u16
-}
 
 // Framebuffer owns the mapping. `stride` is in pixels, not bytes, because
 // every consumer indexes the mapping as u32.
@@ -108,7 +47,7 @@ fn open_framebuffer(path string) !Framebuffer {
 	}
 	gpu_present_startup_stage(c'framebuffer device node opened')
 
-	mut var := FBVarScreenInfo{}
+	mut var := fbdevabi.Variable{}
 	gpu_present_startup_stage(c'querying framebuffer variable geometry')
 	if desktop_ioctl(fd, fbioget_vscreeninfo, &var) < 0 {
 		desktop_close(fd)
@@ -116,7 +55,7 @@ fn open_framebuffer(path string) !Framebuffer {
 	}
 	gpu_present_startup_stage(c'framebuffer variable geometry received')
 
-	mut fix := FBFixScreenInfo{}
+	mut fix := fbdevabi.Fixed{}
 	gpu_present_startup_stage(c'querying framebuffer fixed geometry')
 	if desktop_ioctl(fd, fbioget_fscreeninfo, &fix) < 0 {
 		desktop_close(fd)

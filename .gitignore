@@ -85,3 +85,5 @@ kernel/tmp.v
 # short Markdown reports can remain tracked; new reports belong in docs/.
 /tests/**/results/
 /artifacts/
+/tools/powerpc/powerpc
+/tools/powerpc-desktop/powerpc-desktop

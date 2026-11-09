@@ -74,7 +74,7 @@ pub fn open_surface(path string, width int, height int) !Surface {
 	if fd < 0 { return error('cannot open framebuffer') }
 	defer { C.close(fd) }
 	mut info := C.stat{}
-	if C.fstat(fd, unsafe { &info }) != 0 || info.st_size != size {
+	if C.fstat(fd, unsafe { &info }) != 0 || info.st_size != u64(size) {
 		return error('invalid framebuffer file size')
 	}
 	return map_fd(fd, width, height)
