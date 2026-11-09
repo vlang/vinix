@@ -11,7 +11,7 @@ module main
 #include <dirent.h>
 
 struct C.stat { st_mode u32 st_size i64 st_uid u32 }
-struct C.dirent { d_name [256]char }
+struct C.dirent { d_ino u64 d_off i64 d_reclen u16 d_type u8 d_name [256]char }
 fn C.printf(&char, ...voidptr) i32
 fn C.fflush(voidptr) i32
 fn C.open(&char, i32, ...voidptr) i32
@@ -50,6 +50,9 @@ fn fail(stage &char) {
 @[export: 'main']
 fn entry() i32 {
 	unsafe {
+		check_path_mutations()
+		check_dangling_creation()
+		check_archive_directories()
 		mut counter := u8(0)
 		old := C.open(c'/root/storage-round', C.O_RDONLY)
 		if old >= 0 {

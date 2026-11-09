@@ -61,7 +61,10 @@ fn build(root string, output string, runtime_probe bool) ! {
 		os.setenv('VINIX_PPC_INIT', output + '/libc.elf', true)
 	}
 	make_ramfs(output)!
-	command([zig, 'objcopy', '-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin'])!
+	mut objcopy := [zig, 'objcopy']
+	if os.getenv('VINIX_PPC_OBJCOPY') != '' { objcopy = [tool('VINIX_PPC_OBJCOPY', 'llvm-objcopy')!] }
+	objcopy << ['-O', 'binary', output + '/vinix-of.elf', output + '/vinix-of.bin']
+	command(objcopy)!
 	make_iso(output)!
 	for name in ['vinix-of.elf', 'vinix-of.bin', 'handoff-probe.elf', 'vinix-ppc-boot.iso'] {
 		data := os.read_bytes(output + '/' + name)!

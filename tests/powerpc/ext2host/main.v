@@ -30,6 +30,7 @@ fn main() {
 	assert read_sector(2, &super_before[0])
 	root := volume.walk(c'/root', 5, true)
 	assert root > 0
+	check_paths(mut volume, u32(root))
 	mut dir := ext2.Node{}
 	assert volume.inode(u32(root), mut dir) && dir.mode() == 0x41c0
 	newdir := volume.create(u32(root), c'persist', 7, 0x41c0)
@@ -87,4 +88,41 @@ fn main() {
 	assert read_sector(2, &super_after[0])
 	assert super_before[12..20] == super_after[12..20] // every block and inode reclaimed
 	println('PASS ext2 host: creation, modes, indirect IO, rename, symlink, unlink-open, allocation reuse, remount')
+}
+
+fn check_paths(mut volume ext2.Volume, root u32) {
+	mut component := ext2.Path{}
+	assert volume.parent(c'/root/new///', 12, mut component) == int(root)
+	assert component.directory_required && component.length == 3
+	file := volume.create(root, c'file', 4, 0x8180)
+	assert file > 0
+	assert volume.parent(c'/root/file/', 11, mut component) == -20
+	assert volume.walk(c'/root/file/', 11, true) == -20
+	assert volume.lookup(root, c'file', 4) == file
+	dir := volume.create(root, c'dir', 3, 0x41c0)
+	assert dir > 0
+	assert volume.parent(c'/root/dir///', 12, mut component) == int(root)
+	assert component.directory_required
+	assert volume.symlink(root, c'link', 4, c'dir/missing', 11) == 0
+	assert volume.resolve(c'/root/link', 10, true, mut component) == -2
+	assert component.parent == u32(dir) && component.length == 7 && !component.directory_required
+	target := volume.create(component.parent, &component.name[0], component.length, 0x8180)
+	assert target > 0
+	assert volume.walk(c'/root/link', 10, true) == target
+	assert volume.walk(c'/root/dir/missing', 17, true) == target
+	assert volume.walk(c'/root/link', 10, false) > 0
+	assert volume.walk(c'/root/link', 10, false) != target
+	assert volume.symlink(root, c'absolute', 8, c'/root/link', 10) == 0
+	assert volume.unlink(u32(dir), c'missing', 7, false, false) == 0
+	assert volume.resolve(c'/root/absolute', 14, true, mut component) == -2
+	assert component.parent == u32(dir) && component.length == 7
+	assert volume.resolve(c'/root/link/', 11, true, mut component) == -2
+	assert component.parent == u32(dir) && component.directory_required
+	assert volume.resolve(c'/root/link/child', 15, true, mut component) == -2
+	assert component.parent == 0 // a missing intermediate is never creatable
+	assert volume.parent(c'/root/link/', 11, mut component) == -20
+	assert volume.unlink(root, c'link', 4, false, false) == 0
+	assert volume.unlink(root, c'absolute', 8, false, false) == 0
+	assert volume.unlink(root, c'file', 4, false, false) == 0
+	assert volume.unlink(root, c'dir', 3, true, false) == 0
 }

@@ -17,6 +17,9 @@ and `qemu-system-ppc`. Apple Clang does not include that backend. All maintained
 build and test tooling is V. Zig compiles V's generated C; the firmware and
 kernel remain freestanding. The desktop uses static musl.
 
+If Zig's host `objcopy` cannot link, set `VINIX_PPC_OBJCOPY` to an installed
+`llvm-objcopy` executable. The default remains `zig objcopy`.
+
 The CPU backend requires V commit `b7b4dd46ee` (raw PPC assembly support), or
 a later compiler containing that change. It is installed in the sibling `../v`
 checkout. An alternate compiler can be selected with `VINIX_V_COMPILER`.

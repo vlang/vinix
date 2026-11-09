@@ -33,7 +33,7 @@ fn check(mode string, output string) ! {
 			'-gc', 'none', '-manualfree', '-o', output + '/probe.c', 'tests/powerpc/storageabi'], output + '/probe-v.log')!
 		run([zig, 'cc', '-target', 'powerpc-linux-musleabihf', '-mcpu=7450', '-mno-altivec', '-O2', '-fno-pic',
 			'-fno-pie', '-fno-stack-protector', '-static', '-D_GNU_SOURCE', '-ffunction-sections', '-fdata-sections',
-			'-Wl,--gc-sections', '-Wl,--build-id=none', '-Wl,-T,tests/powerpc/libc/linker.ld', output + '/probe.c',
+			'-Wl,--gc-sections', '-Wl,--build-id=none', '-Wl,-T,tests/powerpc/storageabi/linker.ld', output + '/probe.c',
 			'-lc', '-o', output + '/probe.elf'], output + '/probe-link.log')!
 		os.setenv('VINIX_PPC_INIT', output + '/probe.elf', true)
 	} else {

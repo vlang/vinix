@@ -10,6 +10,17 @@ pub mut:
 	next u32
 }
 
+// A final component keeps its directory requirement even when its trailing
+// separators are removed. A missing lookup fills parent only after resolving
+// every preceding component and symlink.
+pub struct Path {
+pub mut:
+	parent u32
+	length u32
+	name [256]u8
+	directory_required bool
+}
+
 pub fn (mut v Volume) next(number u32, offset u32, mut e Entry) int {
 	mut n := Node{}
 	if !v.inode(number, mut n) { return -5 }
@@ -58,6 +69,12 @@ pub fn (mut v Volume) lookup(parent u32, name &u8, length u32) int {
 // Resolve links without recursion or allocated strings. All paths here are
 // volume-relative; the syscall layer chooses the mount and working directory.
 pub fn (mut v Volume) walk(path &u8, length u32, follow bool) int {
+	mut missing := Path{}
+	return v.resolve(path, length, follow, mut missing)
+}
+
+pub fn (mut v Volume) resolve(path &u8, length u32, follow bool, mut missing Path) int {
+	missing = Path{}
 	if length == 0 { return -2 }
 	if length > 511 { return -36 }
 	mut pending := [512]u8{}
@@ -73,7 +90,17 @@ pub fn (mut v Volume) walk(path &u8, length u32, follow bool) int {
 		for at < size && pending[at] != `/` { at++ }
 		if at - first > 255 { return -36 }
 		id := v.lookup(current, unsafe { &pending[first] }, at - first)
-		if id < 0 { return id }
+		if id < 0 {
+			mut end := at
+			for end < size && pending[end] == `/` { end++ }
+			if id == -2 && end == size && valid_name(unsafe { &pending[first] }, at - first) {
+				missing.parent = current
+				missing.length = at - first
+				missing.directory_required = at < size
+				copy_bytes(unsafe { &missing.name[0] }, unsafe { &pending[first] }, missing.length)
+			}
+			return id
+		}
 		mut n := Node{}
 		if !v.inode(u32(id), mut n) { return -5 }
 		if n.mode() & 0xf000 == 0xa000 && (follow || at < size) {
@@ -96,17 +123,31 @@ pub fn (mut v Volume) walk(path &u8, length u32, follow bool) int {
 	return int(current)
 }
 
-pub fn (mut v Volume) parent(path &u8, length u32, mut component Entry) int {
+pub fn (mut v Volume) parent(path &u8, length u32, mut component Path) int {
+	component = Path{}
 	if length == 0 || length > 511 { return -36 }
 	mut end := length
 	for end > 0 && unsafe { path[end - 1] == `/` } { end-- }
+	component.directory_required = end < length
 	mut at := end
 	for at > 0 && unsafe { path[at - 1] != `/` } { at-- }
 	component.length = end - at
 	if component.length == 0 || component.length > 255 { return -22 }
 	copy_bytes(unsafe { &component.name[0] }, unsafe { &path[at] }, component.length)
 	if !valid_name(unsafe { &component.name[0] }, component.length) { return -22 }
-	return if at == 0 { 2 } else { v.walk(path, at, true) }
+	parent := if at == 0 { 2 } else { v.walk(path, at, true) }
+	if parent < 0 { return parent }
+	component.parent = u32(parent)
+	if component.directory_required {
+		id := v.lookup(u32(parent), unsafe { &component.name[0] }, component.length)
+		if id < 0 && id != -2 { return id }
+		if id > 0 {
+			mut n := Node{}
+			if !v.inode(u32(id), mut n) { return -5 }
+			if n.mode() & 0xf000 != 0x4000 { return -20 }
+		}
+	}
+	return parent
 }
 
 fn valid_name(name &u8, length u32) bool {
