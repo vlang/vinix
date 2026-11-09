@@ -207,7 +207,8 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, eve
 	op := int(i32(op_word))
 	fd := int(i32(fd_word))
 	mut requested := EpollEvent{}
-	if op == epoll_ctl_add || op == epoll_ctl_mod {
+	// Linux imports event for every operation except DEL, including unknown ops.
+	if op != epoll_ctl_del {
 		requested = read_epoll_event(event_ptr) or { return errno.err, errno.efault }
 	}
 
