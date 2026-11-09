@@ -163,10 +163,12 @@ fn dynamic_textrel(mut res resource.Resource, phdr ProgramHdr) !bool {
 		return true
 	}
 	mut offset := u64(0)
+	// Reuse one stack record. Taking a local's address for read_exact can
+	// otherwise make V allocate a wrapper on every iteration.
+	mut dynamic := unsafe { &DynamicEntry(C.vinix_stack_alloc(sizeof(DynamicEntry))) }
 	for offset + sizeof(DynamicEntry) <= phdr.p_filesz {
-		mut dynamic := DynamicEntry{}
-		read_exact(mut res, unsafe { &dynamic }, phdr.p_offset + offset, sizeof(DynamicEntry))!
-		if requires_text_relocation(dynamic) {
+		read_exact(mut res, dynamic, phdr.p_offset + offset, sizeof(DynamicEntry))!
+		if requires_text_relocation(*dynamic) {
 			return true
 		}
 		if dynamic.d_tag == dt_null {
@@ -185,9 +187,9 @@ struct LoadedRange {
 // How far past its load base an image's LOAD segments reach.
 fn load_extent(mut res resource.Resource, header Header) !u64 {
 	mut extent := u64(0)
+	mut phdr := unsafe { &ProgramHdr(C.vinix_stack_alloc(sizeof(ProgramHdr))) }
 	for i := u64(0); i < header.ph_num; i++ {
-		mut phdr := ProgramHdr{}
-		read_exact(mut res, unsafe { &phdr }, header.phoff + (sizeof(ProgramHdr) * i),
+		read_exact(mut res, phdr, header.phoff + (sizeof(ProgramHdr) * i),
 			sizeof(ProgramHdr))!
 		if phdr.p_type != pt_load {
 			continue
@@ -256,6 +258,16 @@ fn exec_trace(enabled bool, image string, stage string) {
 	if enabled {
 		C.kprintf(c'exec[gpu]/elf %.*s: %.*s\n', i32(image.len), image.str, i32(stage.len),
 			stage.str)
+	}
+}
+
+// The loader owns the buffer, while the string header remains on the stack.
+// An implicit mutable receiver can otherwise box the caller's header.
+fn release_loader_string(value string) {
+	mut owned := unsafe { &string(C.vinix_stack_alloc(sizeof(string))) }
+	unsafe {
+		*owned = value
+		owned.free()
 	}
 }
 
@@ -342,20 +354,20 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 				mmap.munmap(mut pagemap, voidptr(range.base), range.length) or {}
 			}
 			if ld_path != '' {
-				unsafe { ld_path.free() }
+				release_loader_string(ld_path)
 			}
 		}
 		unsafe { loaded_ranges.free() }
 	}
 
+	mut phdr := unsafe { &ProgramHdr(C.vinix_stack_alloc(sizeof(ProgramHdr))) }
 	for i := u64(0); i < header.ph_num; i++ {
-		mut phdr := ProgramHdr{}
 
 		if trace {
 			C.kprintf(c'exec[gpu]/elf %.*s: reading program header %llu/%llu\n', i32(image.len),
 				image.str, u64(i + 1), u64(header.ph_num))
 		}
-		read_exact(mut res, unsafe { &phdr }, header.phoff + (sizeof(ProgramHdr) * i),
+		read_exact(mut res, phdr, header.phoff + (sizeof(ProgramHdr) * i),
 			sizeof(ProgramHdr))!
 		if trace {
 			C.kprintf(c'exec[gpu]/elf %.*s: program header %llu type=%llu flags=0x%llx\n',
@@ -364,7 +376,7 @@ fn load_impl(_pagemap &memory.Pagemap, _res &resource.Resource, _base u64, trace
 
 		match phdr.p_type {
 			pt_dynamic {
-				if dynamic_textrel(mut res, phdr)! {
+				if dynamic_textrel(mut res, *phdr)! {
 					textrel = true
 				}
 			}

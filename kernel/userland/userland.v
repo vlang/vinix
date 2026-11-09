@@ -313,9 +313,10 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	}
 
 	// Check for shebang before proceeding as if it was an ELF.
-	mut shebang := [2]char{}
-	prog.read(0, &shebang[0], 0, 2)?
-	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
+	mut shebang := unsafe { &char(C.vinix_stack_alloc(2)) }
+	unsafe { shebang[0] = 0; shebang[1] = 0 }
+	prog.read(0, shebang, 0, 2)?
+	if unsafe { shebang[0] } == char(`#`) && unsafe { shebang[1] } == char(`!`) {
 		relative_name := !description && loading_thread.exec_depth == 1
 			&& loading_thread.exec_descriptor != unsafe { nil }
 		name_budget := if relative_name { u64(path.len) * 2 + 64 } else { u64(0) }
@@ -323,31 +324,31 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
   real_path, arg := parse_shebang(mut prog)?
 		if loading_thread.exec_depth == 1 && exec_descriptor_cloexec() {
 			// A valid script cannot outlive the descriptor naming it.
-			unsafe { real_path.free(); arg.free() }
+			free_exec_text(real_path)
+			free_exec_text(arg)
 			errno.set(errno.enoent)
 			return none
 		}
-		// Room for the interpreter, its argument and the script. `<<` copies
-		// a string, so the list owns all of its strings.
+		// Room for the interpreter, its argument and the script. Clone each
+		// borrowed string because this list outlives the original arguments.
 		mut final_argv := []string{cap: argv.len + 2} @[freed]
-		final_argv << real_path
+		final_argv.flags |= .noslices
+		final_argv << real_path.clone()
 		if arg != '' {
-			final_argv << arg
+			final_argv << arg.clone()
 		}
 		if relative_name {
 			script_path := exec_relative_script_name(path) @[freed]
-			final_argv << script_path
-			unsafe { script_path.free() }
+			final_argv << script_path.clone()
+			free_exec_text(script_path)
 		} else {
-			final_argv << path
+			final_argv << path.clone()
 		}
 		for i := 1; i < argv.len; i++ {
-			final_argv << argv[i]
+			final_argv << argv[i].clone()
 		}
-		unsafe {
-			real_path.free()
-			arg.free()
-		}
+		free_exec_text(real_path)
+		free_exec_text(arg)
 
 		if execve {
 			// The interpreter's exec frees final_argv and envp; the rest of
@@ -358,7 +359,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			path_in_argv := argv.any(it.str == path.str)
 			unsafe {
 				if !path_in_argv {
-					path.free()
+					free_exec_text(path)
 				}
 				argv.free()
 			}
@@ -384,6 +385,16 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		return none
 	}
 
+	return load_native_program_image(execve, prog_node, prog_mount, path, argv, envp,
+		stdin_path, stdout_path, stderr_path, allow_wx)
+}
+
+// Interpreter recursion must not retain the native loader's large frame.
+@[noinline]
+fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib.MountContext,
+	path string, argv []string, envp []string, stdin_path string, stdout_path string,
+	stderr_path string, allow_wx bool) ?&proc.Process {
+	mut prog := prog_node.resource
 	// Made after the shebang check: a script never used it, and lost it.
 	mut new_pagemap := memory.new_user_pagemap(proc.kernel_owner())?
  mut map_transferred := false
@@ -395,8 +406,11 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
   }
  }
 
-	mut auxval, ld_path := elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
- defer { unsafe { ld_path.free() } }
+	loaded_auxval, loaded_path := elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
+	mut auxval := unsafe { &elf.Auxval(C.vinix_stack_alloc(sizeof(elf.Auxval))) }
+	unsafe { *auxval = loaded_auxval }
+	mut ld_path := loaded_path
+ defer { free_exec_text(ld_path) }
 
 	mut entry_point := unsafe { nil }
 
@@ -431,7 +445,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		}
 
 		if interp != '' {
-			unsafe { interp.free() }
+			free_exec_text(interp)
 		}
 
 		entry_point = voidptr(ld_auxval.at_entry)
@@ -442,7 +456,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 
 	// Successful exec never returns through its defers. The interpreter
 	// pathname is no longer needed once both images have loaded.
-	unsafe { ld_path.free() }
+	free_exec_text(ld_path)
 	ld_path = ''
 
 	if execve == false {

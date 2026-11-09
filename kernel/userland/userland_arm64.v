@@ -873,10 +873,11 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	}
 
 	// Check for shebang before proceeding as if it was an ELF.
-	mut shebang := [2]char{}
-	prog.read(0, &shebang[0], 0, 2)?
+	mut shebang := unsafe { &char(C.vinix_stack_alloc(2)) }
+	unsafe { shebang[0] = 0; shebang[1] = 0 }
+	prog.read(0, shebang, 0, 2)?
 	gpu_exec_trace(trace_gpu, 'read executable signature')
-	if shebang[0] == char(`#`) && shebang[1] == char(`!`) {
+	if unsafe { shebang[0] } == char(`#`) && unsafe { shebang[1] } == char(`!`) {
 		relative_name := !description && loading_thread.exec_depth == 1
 			&& loading_thread.exec_descriptor != unsafe { nil }
 		name_budget := if relative_name { u64(path.len) * 2 + 64 } else { u64(0) }
@@ -884,31 +885,31 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
   real_path, arg := parse_shebang(mut prog)?
 		if loading_thread.exec_depth == 1 && exec_descriptor_cloexec() {
 			// A valid script cannot outlive the descriptor naming it.
-			unsafe { real_path.free(); arg.free() }
+			free_exec_text(real_path)
+			free_exec_text(arg)
 			errno.set(errno.enoent)
 			return none
 		}
-		// Room for the interpreter, its argument and the script. `<<` copies
-		// a string, so the list owns all of its strings.
+		// Room for the interpreter, its argument and the script. Clone each
+		// borrowed string because this list outlives the original arguments.
 		mut final_argv := []string{cap: argv.len + 2} @[freed]
-		final_argv << real_path
+		final_argv.flags |= .noslices
+		final_argv << real_path.clone()
 		if arg != '' {
-			final_argv << arg
+			final_argv << arg.clone()
 		}
 		if relative_name {
 			script_path := exec_relative_script_name(path) @[freed]
-			final_argv << script_path
-			unsafe { script_path.free() }
+			final_argv << script_path.clone()
+			free_exec_text(script_path)
 		} else {
-			final_argv << path
+			final_argv << path.clone()
 		}
 		for i := 1; i < argv.len; i++ {
-			final_argv << argv[i]
+			final_argv << argv[i].clone()
 		}
-		unsafe {
-			real_path.free()
-			arg.free()
-		}
+		free_exec_text(real_path)
+		free_exec_text(arg)
 
 		if execve {
 			// The interpreter's exec frees final_argv and envp; the rest of
@@ -919,7 +920,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			path_in_argv := argv.any(it.str == path.str)
 			unsafe {
 				if !path_in_argv {
-					path.free()
+					free_exec_text(path)
 				}
 				argv.free()
 			}
@@ -982,9 +983,9 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		multiarch_root := own_root && envp.contains('VINIX_X86_MULTIARCH=1')
 		guest_preload := if architecture == elf.arch_i386 { i386_preload } else { x86_64_preload }
 
-		// Room for every option below, then the program's arguments. `<<`
-		// copies a string, and the rest are literals or made here, so both
-		// lists own all of their strings.
+		// Room for every option below, then the program's arguments. Clone
+		// borrowed arguments and environment views; transfer newly built
+		// strings to the lists. Each list owns everything its deep free releases.
 		if !grow_exec_scratch((exec_strings_size(argv) + exec_strings_size(envp)) * 8 + u64(argv.len + envp.len) * 256 + 16384) { return none }
   mut translated_argv := []string{cap: argv.len + 24} @[freed]
  translated_argv.flags |= .noslices
@@ -994,7 +995,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			translated_argv << '0x100000000'
 		}
 		translated_argv << '-L'
-		translated_argv << guest_root
+		translated_argv << guest_root.clone()
 		if multiarch_root {
 			// QEMU's -E edits the emulated process's environment without
 			// making the native AArch64 translator load x86 libraries. A
@@ -1021,7 +1022,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			translated_argv << '-E'
 			library_text_result := lib.finish_text(*library_text)
  translated_argv << library_text_result
- unsafe { library_text_result.free() }
 			// Mesa opens DRI drivers itself rather than through the ELF loader.
 			// Give the guest the driver directory of its own word size, or an
 			// inherited native path can make it dlopen an AArch64 driver.
@@ -1035,7 +1035,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			translated_argv << '-E'
 			drivers_text_result := lib.finish_text(*drivers_text)
  translated_argv << drivers_text_result
- unsafe { drivers_text_result.free() }
 			if guest_preload != '' {
 				// Each guest preload must match its word size and must never
 				// reach the native translator.
@@ -1046,18 +1045,17 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 				translated_argv << '-E'
 				preload_text_result := lib.finish_text(*preload_text)
  translated_argv << preload_text_result
- unsafe { preload_text_result.free() }
 			}
 		}
 		// argv[0] is the caller's to choose, as it is for a native program:
 		// a multicall binary or a script's `env bash` picks its behaviour by it.
 		if argv.len > 0 && argv[0] != path {
 			translated_argv << '-0'
-			translated_argv << argv[0]
+			translated_argv << argv[0].clone()
 		}
-		translated_argv << path
+		translated_argv << path.clone()
 		for i := 1; i < argv.len; i++ {
-			translated_argv << argv[i]
+			translated_argv << argv[i].clone()
 		}
 
 		mut translated_envp := []string{cap: envp.len + 1} @[freed]
@@ -1066,7 +1064,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 				|| (guest_preload != '' && environment_entry.starts_with('LD_PRELOAD='))) {
 				continue
 			}
-			translated_envp << environment_entry
+			translated_envp << environment_entry.clone()
 		}
 		if !own_root && !has_library_path {
 			mut library_text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
@@ -1078,7 +1076,6 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 			library_text.add('/usr/lib')
 			library_text_result := lib.finish_text(*library_text)
  translated_envp << library_text_result
- unsafe { library_text_result.free() }
 		}
 
 		if execve {
@@ -1106,6 +1103,18 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		}
 		return process
 	}
+	return load_native_program_image(execve, prog_node, prog_mount, path, argv, envp,
+		stdin_path, stdout_path, stderr_path, allow_wx)
+}
+
+// Interpreter recursion must not retain the native loader's large frame.
+@[noinline]
+fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib.MountContext,
+	path string, argv []string, envp []string, stdin_path string, stdout_path string,
+	stderr_path string, allow_wx bool) ?&proc.Process {
+	trace_gpu := execve && path == gpu_desktop_executable
+	root := fs.process_root(proc.current_thread().process)
+	mut prog := prog_node.resource
 	// QEMU's -E preload belongs to the emulated x86 process. Its children may
 	// exec a native helper (for example Steam's /bin/sh uname wrapper), passing
 	// that LD_PRELOAD along. Do not make the AArch64 loader open an x86 library.
@@ -1130,11 +1139,12 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 	}
 	if omit_foreign_preload {
   if !grow_exec_scratch(exec_strings_size(envp) * 4 + u64(envp.len) * 128 + 4096) { return none }
-		// `<<` copies the strings; this frees them with the list.
+		// The filtered list owns clones; the original environment is freed
+		// separately whether loading succeeds or fails.
 		program_envp = []string{cap: envp.len} @[freed]
 		for entry in envp {
 			if !entry.starts_with('LD_PRELOAD=') {
-				program_envp << entry
+				program_envp << entry.clone()
 			}
 		}
 	}
@@ -1156,16 +1166,18 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
  }
 	gpu_exec_trace(trace_gpu, 'allocated replacement page map')
 	gpu_exec_trace(trace_gpu, 'loading program ELF segments')
-	mut auxval := elf.Auxval{}
+	mut loaded_auxval := elf.Auxval{}
 	mut ld_path := ''
- defer { unsafe { ld_path.free() } }
+ defer { free_exec_text(ld_path) }
 	if trace_gpu {
-		auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program') or {
+		loaded_auxval, ld_path = elf.load_traced(new_pagemap, prog, 0, 'program') or {
 			return exec_format_error(err)
 		}
 	} else {
-		auxval, ld_path = elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
+		loaded_auxval, ld_path = elf.load(new_pagemap, prog, 0) or { return exec_format_error(err) }
 	}
+	mut auxval := unsafe { &elf.Auxval(C.vinix_stack_alloc(sizeof(elf.Auxval))) }
+	unsafe { *auxval = loaded_auxval }
 	gpu_exec_trace(trace_gpu, 'program ELF segments loaded')
 
 	mut entry_point := unsafe { nil }
@@ -1214,7 +1226,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 		gpu_exec_trace(trace_gpu, 'ELF interpreter segments loaded')
 
 		if interp != '' {
-			unsafe { interp.free() }
+			free_exec_text(interp)
 		}
 
 		entry_point = voidptr(ld_auxval.at_entry)
@@ -1230,7 +1242,7 @@ fn load_program_image(execve bool, dir &fs.VFSNode, prog_node &fs.VFSNode, prog_
 
 	// Successful exec never returns through its defers. The interpreter
 	// pathname is no longer needed once both images have loaded.
-	unsafe { ld_path.free() }
+	free_exec_text(ld_path)
 	ld_path = ''
 
 	if execve == false {

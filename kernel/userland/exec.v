@@ -9,6 +9,14 @@ import kbudget
 import proc
 import resource
 
+// Free an owned string through a synchronous stack header. Taking an
+// implicit mutable receiver can move the caller's header to the heap under
+// -manualfree even though free() does not retain it.
+fn free_exec_text(text string) {
+	mut owned := unsafe { &string(C.vinix_stack_alloc(sizeof(string))) }
+	unsafe { *owned = text; owned.free() }
+}
+
 // Frees what an exec was handed, once it has failed or is about to leave for
 // good. `path` can be one of the arguments too: a script's interpreter and the
 // x86 translator are put into argv as well.
@@ -16,7 +24,7 @@ fn free_exec_arguments(path string, argv []string, envp []string) {
 	path_in_argv := argv.any(it.str == path.str)
 	unsafe {
 		if !path_in_argv {
-			path.free()
+			free_exec_text(path)
 		}
 		argv.free()
 		envp.free()
@@ -32,6 +40,10 @@ fn exec_format_error(err IError) ?&proc.Process {
 	if !err.msg().starts_with('elf: unable to map') {
 		errno.set(errno.enoexec)
 	}
+	// ELF error messages are borrowed literals; the returned interface box
+	// belongs to this final consumer.
+	owned := unsafe { &IError(C.vinix_stack_alloc(sizeof(IError))) }
+	unsafe { *owned = err; owned.free() }
 	return none
 }
 

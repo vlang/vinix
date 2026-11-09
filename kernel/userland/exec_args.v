@@ -72,8 +72,9 @@ fn exec_strings_from_user(vector u64, budget u64) ?[]string {
 			free_exec_strings(mut strings)
 			return none
 		}
-		// Appending clones a string; the array owns that copy, not this buffer.
-		strings << text
+		// The import buffer can have excess capacity. Store a compact owned
+		// clone matching the persistent charge before releasing that buffer.
+		strings << text.clone()
 		unsafe { text.free() }
 		shrink_exec_scratch(transient)
 	}
