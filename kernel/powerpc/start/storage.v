@@ -78,13 +78,14 @@ fn storage_open(length int, flags u32, mode u32) int {
 	for fd in 3 .. 64 { if !descriptors[fd].used { available = fd; break } }
 	if available < 0 { return -24 }
 	if flags & ~u32(0x1ddfc3) != 0 || flags & 3 == 3 { return -22 }
-	mut id := persistent_volume.walk(unsafe { &io_buffer[0] }, u32(length), flags & 0x8000 == 0 && flags & 0xc0 != 0xc0)
+	mut name := ext2.Path{}
+	mut id := persistent_volume.resolve(unsafe { &io_buffer[0] }, u32(length), flags & 0x8000 == 0 && flags & 0xc0 != 0xc0, mut name)
 	if id > 0 && flags & 0xc0 == 0xc0 { return -17 }
 	if id == -2 && flags & 0x40 != 0 {
-		mut name := ext2.Entry{}
-		parent := persistent_volume.parent(unsafe { &io_buffer[0] }, u32(length), mut name)
-		if parent < 0 { return parent }
-		id = persistent_volume.create(u32(parent), unsafe { &name.name[0] }, name.length, 0x8000 | (mode & 0xfff & ~process_umask))
+		if name.parent == 0 { return -2 }
+		if name.directory_required { return -21 }
+		if flags & 0x4000 != 0 { return -20 }
+		id = persistent_volume.create(name.parent, unsafe { &name.name[0] }, name.length, 0x8000 | (mode & 0xfff & ~process_umask))
 	}
 	if id < 0 { return id }
 	mut n := ext2.Node{}
@@ -180,7 +181,7 @@ fn sys_path_change(path u32, arg u32, operation u32) int {
 		id := persistent_volume.walk(unsafe { &io_buffer[0] }, u32(length), true)
 		return if id < 0 { id } else { persistent_volume.chmod(u32(id), arg) }
 	}
-	mut name := ext2.Entry{}
+	mut name := ext2.Path{}
 	parent := persistent_volume.parent(unsafe { &io_buffer[0] }, u32(length), mut name)
 	if parent < 0 { return parent }
 	if operation == 39 {
@@ -196,14 +197,17 @@ fn sys_rename(old_path u32, new_path u32) int {
 	length := user_path(old_path)
 	if length < 0 { return length }
 	if !persistent_volume.mounted { return -30 }
-	mut old_name := ext2.Entry{}
+	mut old_name := ext2.Path{}
 	old_parent := persistent_volume.parent(unsafe { &io_buffer[0] }, u32(length), mut old_name)
 	if old_parent < 0 { return old_parent }
 	new_length := user_path(new_path)
 	if new_length < 0 { return new_length }
-	mut new_name := ext2.Entry{}
+	mut new_name := ext2.Path{}
 	new_parent := persistent_volume.parent(unsafe { &io_buffer[0] }, u32(new_length), mut new_name)
 	if new_parent < 0 { return new_parent }
+	// Directory moves remain unsupported; a file cannot acquire a directory
+	// requirement by naming an absent destination with a trailing separator.
+	if new_name.directory_required { return -20 }
 	replaced := persistent_volume.lookup(u32(new_parent), unsafe { &new_name.name[0] }, new_name.length)
 	return persistent_volume.rename(u32(old_parent), unsafe { &old_name.name[0] }, old_name.length,
 		u32(new_parent), unsafe { &new_name.name[0] }, new_name.length, replaced > 0 && inode_open(u32(replaced)))
@@ -218,9 +222,13 @@ fn sys_symlink(target u32, path u32) int {
 	size := user_path(path)
 	if size < 0 { return size }
 	if !persistent_volume.mounted { return -30 }
-	mut name := ext2.Entry{}
+	mut name := ext2.Path{}
 	parent := persistent_volume.parent(unsafe { &io_buffer[0] }, u32(size), mut name)
 	if parent < 0 { return parent }
+	if name.directory_required {
+		id := persistent_volume.lookup(u32(parent), unsafe { &name.name[0] }, name.length)
+		return if id > 0 { -17 } else { id }
+	}
 	return persistent_volume.symlink(u32(parent), unsafe { &name.name[0] }, name.length, unsafe { &saved[0] }, u32(length))
 }
 

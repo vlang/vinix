@@ -144,9 +144,9 @@ fn sys_open(path u32, requested_flags u32, mode u32) int {
 	audio_device := device == -4
 	framebuffer_device := device == -5
 	pointer_device := device == -6
-	if flags != 0 && !(pointer_device && flags == 0x800) && !((packet_device || framebuffer_device) && flags == 2) && !(audio_device && (flags == 1 || flags == 2)) { return -30 }
 	node := if pointer_device { -6 } else if framebuffer_device { -5 } else if audio_device { -4 } else if packet_device { -3 } else if end == 1 { -2 } else { rootfs.find(unsafe { &io_buffer[1] }, u32(end - 1)) }
 	if node == -1 { return -2 }
+	if flags != 0 && !(pointer_device && flags == 0x800) && !((packet_device || framebuffer_device) && flags == 2) && !(audio_device && (flags == 1 || flags == 2)) { return -30 }
 	if requested_flags & 0x4000 != 0 && node != -2 && (node < 0 || !rootfs.files[node].directory) { return -20 }
 	for fd in 3 .. 64 {
 		if !descriptors[fd].used {
@@ -247,9 +247,9 @@ fn buffer_word(at u32, value u32) {
 	for i := u32(0); i < 4; i++ { io_buffer[at + i] = u8(value >> (24 - i * 8)) }
 }
 
-fn sys_getdents(fd u32, address u32, requested u32) int {
+fn sys_getdents(fd u32, address u32, requested u32, wide bool) int {
 	if fd >= 64 || !descriptors[fd].used { return -9 }
-	if disk_fd(fd) { return storage_getdents(fd, address, requested, false) }
+	if disk_fd(fd) { return storage_getdents(fd, address, requested, wide) }
 	parent := descriptors[fd].file
 	if parent < -2 { return -20 }
 	if parent >= 0 && !rootfs.files[parent].directory { return -20 }
@@ -277,18 +277,22 @@ fn sys_getdents(fd u32, address u32, requested u32) int {
 			continue
 		}
 		namesize := file.name_size - name_start
-		record := (10 + namesize + 2 + 3) & ~u32(3)
+		head := if wide { u32(19) } else { u32(10) }
+		record := if wide { (head + namesize + 1 + 7) & ~u32(7) } else { (head + namesize + 2 + 3) & ~u32(3) }
 		if record > capacity - used {
 			if used == 0 { return -22 }
 			break
 		}
 		runtime.fill(unsafe { &io_buffer[used] }, 0, record)
-		buffer_word(used, index + 1)
-		buffer_word(used + 4, index + 1)
-		io_buffer[used + 8] = u8(record >> 8)
-		io_buffer[used + 9] = u8(record)
-		for i := u32(0); i < namesize; i++ { io_buffer[used + 10 + i] = file.name[name_start + i] }
-		io_buffer[used + record - 1] = if file.directory { u8(4) } else { u8(8) }
+		dtype := if file.directory { u8(4) } else { u8(8) }
+		if wide {
+			buffer_word(used + 4, index + 1); buffer_word(used + 12, index + 1)
+			io_buffer[used + 16] = u8(record >> 8); io_buffer[used + 17] = u8(record); io_buffer[used + 18] = dtype
+		} else {
+			buffer_word(used, index + 1); buffer_word(used + 4, index + 1)
+			io_buffer[used + 8] = u8(record >> 8); io_buffer[used + 9] = u8(record); io_buffer[used + record - 1] = dtype
+		}
+		for i := u32(0); i < namesize; i++ { io_buffer[used + head + i] = file.name[name_start + i] }
 		used += record
 		descriptors[fd].offset++
 	}
@@ -401,9 +405,9 @@ fn syscall(mut frame exception.Frame) {
 		116 { result = sys_info(frame.gpr[3]) }
 		118, 148 { result = sys_fsync(frame.gpr[3]) }
 		122 { result = sys_uname(frame.gpr[3]) }
-		141 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
+		141 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5], false) }
 		140 { result = if frame.gpr[6] == 0 { -14 } else { sys_seek(frame.gpr[3], i64(u64(frame.gpr[4]) << 32 | frame.gpr[5]), frame.gpr[7], frame.gpr[6]) } }
-		202 { result = storage_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5], true) }
+		202 { result = sys_getdents(frame.gpr[3], frame.gpr[4], frame.gpr[5], true) }
 		146 { result = sys_writev(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		145 { result = sys_readv(frame.gpr[3], frame.gpr[4], frame.gpr[5]) }
 		162 { result = sys_nanosleep(frame.gpr[3], frame.pc) }
