@@ -172,7 +172,8 @@ fn (mut this EpollResource) mmap(_handle voidptr, _page u64, _flags int) voidptr
 	return unsafe { nil }
 }
 
-pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
+pub fn syscall_epoll_create1(_ voidptr, flags_word int) (u64, u64) {
+	flags := int(i32(flags_word))
 	if flags & ~epoll_cloexec != 0 {
 		return errno.err, errno.einval
 	}
@@ -200,7 +201,11 @@ pub fn syscall_epoll_create1(_ voidptr, flags int) (u64, u64) {
 	return u64(fdnum), 0
 }
 
-pub fn syscall_epoll_ctl(_ voidptr, epfd int, op int, fd int, event_ptr u64) (u64, u64) {
+pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, event_ptr u64) (u64, u64) {
+	// Linux decodes every C int from the signed low word of its register.
+	epfd := int(i32(epfd_word))
+	op := int(i32(op_word))
+	fd := int(i32(fd_word))
 	mut requested := EpollEvent{}
 	if op == epoll_ctl_add || op == epoll_ctl_mod {
 		requested = read_epoll_event(event_ptr) or { return errno.err, errno.efault }

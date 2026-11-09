@@ -237,7 +237,8 @@ fn syscall_linux_getpgrp(gpr_state voidptr) (u64, u64) {
 
 // epoll_create(size): epoll_create1(0), once size has been checked. The size
 // has been a hint only since Linux 2.6.8, but it still has to be positive.
-fn syscall_linux_epoll_create(gpr_state voidptr, size int) (u64, u64) {
+fn syscall_linux_epoll_create(gpr_state voidptr, size_word int) (u64, u64) {
+	size := int(i32(size_word))
 	if size <= 0 {
 		return errno.err, errno.einval
 	}
