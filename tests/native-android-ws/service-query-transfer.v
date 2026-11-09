@@ -241,6 +241,11 @@ const global_settings_string_api_runner = '/Users/alex/.local/state/vinix/androi
 const global_settings_string_api_runner_pin = '7dedaf0f25f4eb3daa9a6af9f94b6d65329dded9d90645fa2d1f37c195010ae7'
 const global_settings_string_apk = '/Users/alex/.local/state/vinix/android/global-settings-string-fixture-2026-11-05-r1/probe.apk'
 const global_settings_string_apk_pin = 'faee136b4cdb500ff165b7b7aceb6649f8af27054593a5905a64f217553c806a'
+// Draft only: qualify the final static ARM runner after SDK/native pins settle.
+const default_network_active_api_runner = '/Users/alex/.local/state/vinix/android/default-network-active-api-run-2026-11-05-r1/run'
+const default_network_active_api_runner_pin = ''
+const default_network_active_apk = '/Users/alex/.local/state/vinix/android/default-network-active-fixture-2026-11-05-r2/probe.apk'
+const default_network_active_apk_pin = 'be0b524b85218bd0f570fe72a0154c97c06bc15c32271e140c3c39eb76090dd2'
 const file_limit = 32 * 1024 * 1024
 const request_limit = 12
 const seconds_limit = 600
@@ -699,6 +704,52 @@ fn global_settings_string_api_assets() []Asset {
 		Asset{url: '/global-settings-string.apk', path: global_settings_string_apk, sha256: global_settings_string_apk_pin}]
 }
 
+fn default_network_active_api_assets() []Asset {
+	return [Asset{url: '/default-network-active-api-run', path: default_network_active_api_runner, sha256: default_network_active_api_runner_pin},
+		Asset{url: '/default-network-active.apk', path: default_network_active_apk, sha256: default_network_active_apk_pin}]
+}
+
+fn default_network_active_distinct(asset Asset, old Asset) ! {
+	if asset.url == old.url || asset.path == old.path || asset.sha256 == old.sha256 {
+		return error('default network activity route or artifact collision')
+	}
+}
+
+// This selector retains historical routing and the existing bounded protocol.
+fn serve_default_network_active(root string, port string) ! {
+	$if !net_nonblocking_sockets ? { return error('build with -d net_nonblocking_sockets for socket deadlines') }
+	external(root)!
+	if port == '' || port.len > 5 || !port.bytes().all(it >= `0` && it <= `9`)
+		|| port.u64() > 65535 || port != port.u64().str() { return error('canonical port 0..65535 required') }
+	if default_network_active_api_runner == '' || default_network_active_apk == ''
+		|| !valid_digest(default_network_active_api_runner_pin) || !valid_digest(default_network_active_apk_pin) {
+		return error('qualified default network activity artifact paths and pins required')
+	}
+	if unsafe { C.mkdir(root.str, 0o700) } != 0 { return error('fresh private output directory required') }
+	inputs := default_network_active_api_assets()
+	mut assets := []Asset{}
+	for asset in inputs { assets << snapshot(asset, root + asset.url)! }
+	mut listener := net.listen_tcp(.ip, '127.0.0.1:' + port)!
+	defer { listener.close() or {} }
+	address := listener.addr()!.str()
+	deadline := time.now().add(seconds_limit * time.second)
+	write_json(root + '/ready.json', json2.encode({
+		'kind': json2.Any('vinix-default-network-active-api-http-v1')
+		'scope': json2.Any(scope)
+		'address': json2.Any(address)
+		'deadline_utc': json2.Any(deadline.str())
+		'request_limit': json2.Any(request_limit)
+		'inputs': json2.decode[json2.Any](json2.encode(inputs))!
+		'snapshots': json2.decode[json2.Any](json2.encode(assets))!
+	}, prettify: true))!
+	println('SERVICE-QUERY-HTTP READY ' + address)
+	flush_stdout()
+	result := serve_loop(mut listener, assets, request_limit, deadline)
+	write_json(root + '/result.json', json2.encode(result, prettify: true))!
+	if !result.success { return error(result.reason) }
+	println('SERVICE-QUERY-HTTP PASS two pinned files transferred')
+}
+
 fn global_settings_string_distinct(asset Asset, old Asset) ! {
 	if asset.url == old.url || asset.path == old.path || asset.sha256 == old.sha256 {
 		return error('Global settings String route or artifact collision')
@@ -908,6 +959,14 @@ fn main() {
 			exit(2)
 		}
 		serve_global_settings_string(os.args[3], os.args[4]) or { eprintln(err); exit(1) }
+		return
+	}
+	if os.args.len > 2 && os.args[1] == 'serve' && os.args[2] == '--default-network-active-api' {
+		if os.args.len != 5 {
+			eprintln('usage: transfer serve --default-network-active-api FRESH_EXTERNAL_DIR PORT')
+			exit(2)
+		}
+		serve_default_network_active(os.args[3], os.args[4]) or { eprintln(err); exit(1) }
 		return
 	}
 	if os.args.len > 2 && os.args[1] == 'serve' && os.args[2] == '--process-packages-api' {
@@ -1155,6 +1214,44 @@ fn global_settings_string_self_test(root string) ! {
 	println('GLOBAL-SETTINGS-STRING-HTTP SELF-TEST PASS exact-selector routes pins distinct-artifacts collision-controls6')
 }
 
+fn default_network_active_self_test(root string) ! {
+	for bad in [['serve', '--default-network-active-api'],
+		['serve', '--default-network-active-api', root + '/must-not-exist'],
+		['serve', '--default-network-active-api-other', root + '/must-not-exist', '0'],
+		['serve', '--default-network-active-api', root + '/must-not-exist', '0', 'extra'],
+		['serve', '--default-network-active-api', '--global-settings-string-api', root + '/must-not-exist', '0'],
+		['serve', '--global-settings-string-api', '--default-network-active-api', root + '/must-not-exist', '0']] {
+		mut argv := [os.executable()]
+		argv << bad
+		result := os.exec(argv)
+		assert result.exit_code != 0, 'malformed default network activity transfer CLI accepted'
+		assert !os.exists(root + '/must-not-exist')
+	}
+	for port in ['', '-1', '65536', '00', '01', '+1', '1x', ' 1'] {
+		result := os.exec([os.executable(), 'serve', '--default-network-active-api', root + '/must-not-exist', port])
+		assert result.exit_code == 1 && result.output.contains('canonical port 0..65535 required'),
+			'noncanonical default network activity port accepted'
+		assert !os.exists(root + '/must-not-exist')
+	}
+	current := default_network_active_api_assets()
+	assert current.len == 2
+	assert current.map(it.url) == ['/default-network-active-api-run', '/default-network-active.apk']
+	default_network_active_distinct(current[0], current[1])!
+	for asset in current {
+		assert valid_digest(asset.sha256)
+		assert os.is_abs_path(asset.path) && os.abs_path(asset.path) == asset.path
+		for older in [pinned_assets(), direct_boot_assets(), credential_storage_assets(), broadcast_result_assets(), onboarding_api_assets(), application_restrictions_assets(), auth_exception_api_assets(), auth_worker_api_assets(), binder_identity_api_assets(), service_lifecycle_api_assets(), platform_fragments_api_assets(), image_bounds_api_assets(), window_system_ui_api_assets(), seed_account_options_api_assets(), persistent_data_block_api_assets(), bitmap_tiles_api_assets(), connectivity_truth_api_assets(), window_animations_api_assets(), layout_alignment_api_assets(), user_restrictions_api_assets(), bundle_cross_profile_api_assets(), resources_float_api_assets(), paint_drawable_api_assets(), dialog_theme_api_assets(), intent_extras_api_assets(), resource_locks_api_assets(), pending_intent_api_assets(), stable_display_api_assets(), asset_locales_api_assets(), unmanaged_queries_api_assets(), stats_unavailable_api_assets(), subscription_service_api_assets(), autofill_service_api_assets(), keyguard_policy_api_assets(), broadcast_permission_api_assets(), broadcast_permission_v2_api_assets(), secure_settings_api_assets(), usage_inactive_api_assets(), messenger_binder_api_assets(), messenger_binder_v2_api_assets(), event_log_api_assets(), build_abis_api_assets(), webview_package_api_assets(), bootclasspath_api_assets(), bootclasspath_jni_api_assets(), traffic_stats_uid_api_assets(), process_packages_api_assets(), global_settings_string_api_assets()] {
+			for old in older { default_network_active_distinct(asset, old)! }
+		}
+		for old in user_restrictions_bundle_api_assets() { default_network_active_distinct(asset, old)! }
+		old := global_settings_string_api_assets()[0]
+		for changed in [Asset{...asset, url: old.url}, Asset{...asset, path: old.path}, Asset{...asset, sha256: old.sha256}] {
+			if _ := default_network_active_distinct(changed, old) { return error('default network activity collision accepted') }
+		}
+	}
+	println('DEFAULT-NETWORK-ACTIVE-HTTP SELF-TEST PASS exact-selector routes pins distinct-artifacts collision-controls6')
+}
+
 fn self_test(root string) ! {
 	$if !net_nonblocking_sockets ? { return error('self-test requires nonblocking sockets') }
 	external(root)!
@@ -1163,6 +1260,7 @@ fn self_test(root string) ! {
 	traffic_stats_uid_self_test(root)!
 	process_packages_self_test(root)!
 	global_settings_string_self_test(root)!
+	default_network_active_self_test(root)!
 	for bad in [['serve', '--binder-identity-apis'],
 		['serve', '--binder-identity-apis', root + '/must-not-exist'],
 		['serve', '--binder-identity-apis-other', root + '/must-not-exist', '0'],

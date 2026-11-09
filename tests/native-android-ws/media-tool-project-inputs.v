@@ -73,7 +73,7 @@ fn fresh_write(path string, text string) ! {
 }
 
 fn run(tools string, repo string, profile string) ! {
-	if profile != 'global-settings-string' { return error('literal Global String profile required') }
+	if profile !in ['global-settings-string', 'default-network-active'] { return error('literal media input profile required') }
 	for root in [tools, repo] {
 		canonical(root)!
 		if os.lstat(root)!.get_filetype() != .directory { return error('existing directory required: ' + root) }
@@ -93,9 +93,19 @@ fn run(tools string, repo string, profile string) ! {
 		linked_archives(project, mut archives)!
 	}
 	mut extra := map[string]bool{}
-	for relative in ['maps-global-settings-string-stage.v', 'maps-global-settings-string-ancestry.v',
-		'mapsaccountstage/batches.v', 'mapsaccountstage/batches_test.v', 'media-stage-inputs.v',
-		'global-settings-string-native-readback.v'] {
+	relatives := match profile {
+		'global-settings-string' {
+			['maps-global-settings-string-stage.v', 'maps-global-settings-string-ancestry.v',
+				'mapsaccountstage/batches.v', 'mapsaccountstage/batches_test.v', 'media-stage-inputs.v',
+				'global-settings-string-native-readback.v']
+		}
+		else {
+			['maps-default-network-active-stage.v', 'maps-default-network-active-ancestry.v',
+				'mapsaccountstage/batches.v', 'mapsaccountstage/batches_test.v', 'media-stage-inputs.v',
+				'default-network-active-native-readback.v']
+		}
+	}
+	for relative in relatives {
 		for root in [repo, tools + '/sources'] {
 			add(root + '/tests/native-android-ws/' + relative, mut extra)!
 		}
@@ -115,7 +125,7 @@ fn run(tools string, repo string, profile string) ! {
 
 fn main() {
 	if os.args.len != 4 {
-		eprintln('usage: media-tool-project-inputs TOOLS_ROOT REPO_ROOT global-settings-string')
+		eprintln('usage: media-tool-project-inputs TOOLS_ROOT REPO_ROOT global-settings-string|default-network-active')
 		exit(2)
 	}
 	run(os.args[1], os.args[2], os.args[3]) or { eprintln(err); exit(1) }

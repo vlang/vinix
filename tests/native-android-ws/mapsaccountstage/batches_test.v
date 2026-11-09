@@ -218,12 +218,12 @@ fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
 		audit_one_hundred_forty_two_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
-	for count in [64, 66, 69, 71, 95, 97, 99, 101, 102, 104, 105, 107, 109, 111, 113, 115, 117, 118, 120, 122, 124, 126, 128, 130, 132, 133, 135, 136, 138, 139, 141, 143] {
+	for count in [64, 66, 69, 71, 95, 97, 99, 101, 102, 104, 105, 107, 109, 111, 113, 115, 117, 118, 120, 122, 124, 126, 128, 130, 132, 133, 135, 136, 138, 139, 141, 143, 144, 146, 148] {
 		mut refused := false
 		inventory_batch_plan(batch_selectors(count), count) or { refused = true }
 		assert refused
 	}
-	for count in [70, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 134, 137, 140, 142, 145] {
+	for count in [70, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 134, 137, 140, 142, 145, 147] {
 		last := '/inventory/' + batch_index(count - 1)
 		for invalid_root in ['relative', '/inventory/../alias', '/inventory/trailing/', '/inventory/line\nfeed', '/inventory/back\\slash'] {
 			mut pins := batch_selectors(count)
@@ -244,7 +244,7 @@ fn test_inventory_batch_plan_exact_boundaries_and_selectors() ! {
 }
 
 fn test_inventory_batch_plans_129_131_134_137_140_and_142_cross_second_boundary_without_exceeding_helper_bound() ! {
-	for count in [129, 131, 134, 137, 140, 142, 145] {
+	for count in [129, 131, 134, 137, 140, 142, 145, 147] {
 		pins := batch_selectors(count)
 		before := pins.clone()
 		batches := inventory_batch_plan(pins, count)!
@@ -267,7 +267,7 @@ fn test_inventory_batch_plans_129_131_134_137_140_and_142_cross_second_boundary_
 }
 
 fn test_inventory_129_131_134_137_140_and_142_batches_start_only_after_each_predecessor_completes() {
-	for count in [129, 131, 134, 137, 140, 142, 145] {
+	for count in [129, 131, 134, 137, 140, 142, 145, 147] {
 		probe := &BatchProbe{}
 		started := chan int{cap: 3}
 		release := chan bool{cap: 3}
@@ -300,7 +300,7 @@ fn test_inventory_129_131_134_137_140_and_142_batches_start_only_after_each_pred
 }
 
 fn test_inventory_129_131_134_137_140_and_142_batches_stop_at_first_second_or_third_failure() {
-	for count in [129, 131, 134, 137, 140, 142, 145] {
+	for count in [129, 131, 134, 137, 140, 142, 145, 147] {
 		tail := count - 128
 		for failing in [u64(1), u64(2), u64(3)] {
 			probe := &BatchProbe{}
@@ -425,7 +425,7 @@ fn test_inventory_second_batch_joins_both_workers_before_error() {
 }
 
 fn test_inventory_131_134_137_140_and_142_third_batch_joins_both_workers_before_error_without_starting_tail() {
-	for count in [131, 134, 137, 140, 142, 145] {
+	for count in [131, 134, 137, 140, 142, 145, 147] {
 		inventory_third_batch_joins_both_workers_before_error_without_starting_tail(count)
 	}
 }
@@ -515,9 +515,17 @@ fn batch_fixture_payload(index int) string {
 }
 
 fn test_inventory_145_public_contract_refuses_other_cardinalities() {
-	for count in [0, 64, 65, 70, 127, 128, 129, 131, 134, 137, 140, 142, 143, 144, 146] {
+	for count in [0, 64, 65, 70, 127, 128, 129, 131, 134, 137, 140, 142, 143, 144, 146, 147, 148] {
 		mut refused := false
 		audit_one_hundred_forty_five_inventories(batch_selectors(count)) or { refused = true }
+		assert refused
+	}
+}
+
+fn test_inventory_147_public_contract_refuses_other_cardinalities() {
+	for count in [0, 64, 65, 70, 127, 128, 129, 131, 134, 137, 140, 142, 143, 144, 145, 146, 148] {
+		mut refused := false
+		audit_one_hundred_forty_seven_inventories(batch_selectors(count)) or { refused = true }
 		assert refused
 	}
 }
@@ -533,14 +541,15 @@ fn batch_fixture_selector(root string, payload string) !string {
 }
 
 fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_106_108_110_112_114_116_119_121_123_125_127_129_131_134_137_140_and_142_inputs_repeat_all_bytes() ! {
-	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 134, 137, 140, 142, 145] {
+	for count in [65, 70, 73, 76, 79, 82, 84, 86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 134, 137, 140, 142, 145, 147] {
 		root := batch_fixture_root('real-' + count.str())!
 		mut pins := map[string]string{}
 		for index := count - 1; index >= 0; index-- {
 			selected := root + '/node-' + batch_index(index)
 			pins[selected] = batch_fixture_selector(selected, batch_fixture_payload(index))!
 		}
-		if count == 145 { audit_one_hundred_forty_five_inventories(pins)! }
+		if count == 147 { audit_one_hundred_forty_seven_inventories(pins)! }
+		else if count == 145 { audit_one_hundred_forty_five_inventories(pins)! }
 		else if count == 142 { audit_one_hundred_forty_two_inventories(pins)! }
 		else if count == 140 { audit_one_hundred_forty_inventories(pins)! }
 		else if count == 137 { audit_one_hundred_thirty_seven_inventories(pins)! }
@@ -588,8 +597,8 @@ fn test_inventory_batches_real_65_70_73_76_79_82_84_86_89_91_94_96_98_100_103_10
 		assert second_failure.starts_with('inventory dependency ' + root + '/node-064: ')
 		assert second_failure.contains('nested/payload')
 		os.write_file(root + '/node-064/nested/payload', batch_fixture_payload(64))!
-		if count in [86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 134, 137, 140, 142, 145] {
-			// Include every overflow tail, through the third batch's node-144 at 145 roots.
+		if count in [86, 89, 91, 94, 96, 98, 100, 103, 106, 108, 110, 112, 114, 116, 119, 121, 123, 125, 127, 129, 131, 134, 137, 140, 142, 145, 147] {
+			// Include every overflow tail, through the third batch's node-146 at 147 roots.
 			last := '/node-' + batch_index(count - 1)
 			os.write_file(root + last + '/nested/payload', 'changed final overflow root')!
 			mut tail_failure := ''
