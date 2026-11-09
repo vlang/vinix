@@ -402,6 +402,11 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 	if sigmask != 0 && sigsetsize != sizeof(u64) {
 		return errno.err, errno.einval
 	}
+	// access_ok checks the declared address span before looking up epfd.
+	// Null is a canonical address; an actual event copy may still fault there.
+	if events_buf != 0 && !usercopy.user_range(events_buf, u64(maxevents) * epoll_event_size) {
+		return errno.err, errno.efault
+	}
 
 	// Get the epoll fd
 	mut epoll_fd := fd_from_fdnum(unsafe { nil }, epfd) or {
