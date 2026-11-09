@@ -393,7 +393,8 @@ fn epoll_ready_events(mut entry EpollEntry, status int, generation u64) u32 {
 pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, timeout int, sigmask u64, sigsetsize u64) (u64, u64) {
 	mut t := proc.current_thread()
 
-	if maxevents <= 0 || timeout < -1 {
+	// Every negative millisecond timeout means an indefinite wait on Linux.
+	if maxevents <= 0 {
 		return errno.err, errno.einval
 	}
 	if sigmask != 0 && sigsetsize != sizeof(u64) {
