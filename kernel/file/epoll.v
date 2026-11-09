@@ -390,7 +390,12 @@ fn epoll_ready_events(mut entry EpollEntry, status int, generation u64) u32 {
 	return deliverable
 }
 
-pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, timeout int, sigmask u64, sigsetsize u64) (u64, u64) {
+pub fn syscall_epoll_pwait(_ voidptr, epfd_word int, events_buf u64, maxevents_word int, timeout_word int, sigmask u64, sigsetsize u64) (u64, u64) {
+	// Linux's C int arguments use the signed low 32 bits of each register.
+	// pwait2 and the x86 epoll_wait adapter also enter through this function.
+	epfd := int(i32(epfd_word))
+	maxevents := int(i32(maxevents_word))
+	timeout := int(i32(timeout_word))
 	mut t := proc.current_thread()
 
 	// Every negative millisecond timeout means an indefinite wait on Linux.

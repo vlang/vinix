@@ -1,0 +1,89 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import crypto.sha256
+import epollwordscheck
+import guesthost
+import hosttest
+import json2
+import os
+
+fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
+
+fn run() ! {
+	options := guesthost.parse(os.args[1..], [
+		hosttest.Option{ name: '--arch', value: true, choices: ['aarch64', 'x86_64'] },
+		hosttest.Option{ name: '--kernel-dir', value: true },
+		hosttest.Option{ name: '--init', value: true },
+		hosttest.Option{ name: '--state-dir', value: true },
+	], [], 'Usage: run-epollwords.v --arch aarch64|x86_64 --kernel-dir DIR [--init PROBE-ELF] --state-dir FRESH-DIR')!
+	for key in ['--arch', '--kernel-dir', '--state-dir'] {
+		if !options.has(key) { return error('Missing ' + key) }
+	}
+	arch := options.value('--arch', '')
+	state := options.value('--state-dir', '')
+	if os.exists(state) { return error('State directory must be fresh') }
+	kernel := os.read_bytes(options.value('--kernel-dir', '') + '/bin/vinix')!
+	if kernel.len < 20 || kernel[..6] != [u8(127), `E`, `L`, `F`, 2, 1]
+		|| int(kernel[18]) + (int(kernel[19]) << 8) != if arch == 'aarch64' { 183 } else { 62 } {
+		return error('Kernel must be a matching little-endian ELF64')
+	}
+	os.mkdir_all(state + '/kernel/bin')!
+	os.mkdir_all(state + '/source/epollwordsfixture')!
+	os.write_file_array(state + '/kernel/bin/vinix', kernel)!
+	source := os.read_bytes(os.dir(@FILE) + '/epollwordsfixture/core.v')!
+	os.write_file_array(state + '/source/epollwordsfixture/core.v', source)!
+	os.write_file(state + '/inputs.json', json2.encode({
+		'kernel': sha256.sum(kernel).hex()
+		'source': sha256.sum(source).hex()
+	}, prettify: true) + '\n')!
+	init := if options.has('--init') {
+		bytes := os.read_bytes(options.value('--init', ''))!
+		if bytes.len < 20 || bytes[..6] != [u8(127), `E`, `L`, `F`, 2, 1]
+			|| int(bytes[18]) + (int(bytes[19]) << 8) != if arch == 'aarch64' { 183 } else { 62 } {
+			return error('Probe must be a matching little-endian ELF64')
+		}
+		os.write_file_array(state + '/init', bytes)!
+		state + '/init'
+	} else {
+		guesthost.compile_init(state + '/source/epollwordsfixture/core.v', state, arch, false)!
+	}
+	archive := guesthost.image(init, state)!
+	launch := guesthost.launch(init, archive, state, state + '/kernel', arch, true)!
+	os.write_file(state + '/command.json', json2.encode(launch.command, prettify: true) + '\n')!
+	result := guesthost.boot_session(launch.command, launch.env, state, guesthost.SessionPolicy{
+		pass:     'LINUX EPOLLWORDS: PASS'
+		failures: ['LINUX EPOLLWORDS FAIL', 'LINUX EPOLLWORDS: FAIL', 'LINUX EPOLLWORDS MISMATCH',
+			'KERNEL PANIC', 'FATAL EXCEPTION']
+		settle:   1
+		log:      state + '/live.log'
+	}, 600, true)!
+	mut reason := ''
+	epollwordscheck.verify(result.text, arch, false, false) or { reason = err.msg() }
+	passed := reason == '' && result.finished && result.passed && result.status == 0
+	os.write_file(state + '/receipt.json', json2.encode({
+		'architecture': json2.Any(arch)
+		'passed':       passed
+		'finished':     result.finished
+		'status':       result.status
+		'probe_mode':   if options.has('--init') {
+			'supplied ELF; source recorded separately'
+		} else {
+			'compiled recorded source'
+		}
+		'reason':       reason
+		'kernel':       sha256.sum(kernel).hex()
+		'source':       sha256.sum(source).hex()
+		'probe':        digest(init)!
+		'serial':       digest(state + '/serial.log')!
+	}, prettify: true) + '\n')!
+	if !passed { return error(if reason != '' { reason } else { 'Guest failed' }) }
+	println('Linux epoll wait integer words: PASS ' + arch)
+}
+
+fn main() {
+	run() or {
+		eprintln(err.msg())
+		exit(1)
+	}
+}
