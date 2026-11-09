@@ -2049,6 +2049,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   JIT slab double-free reproduced on both original kernels. See
   [the empty-wait qualification](docs/linux-empty-select-waits.md).
 
+- [x] Count native select/pselect6 ready bits across all returned sets. Qualify
+  5,040 AArch64 and 6,720 x86-64 UNIX socket checks against identical Linux
+  ELFs, with flat repeated cleanup. Retain the separate regular-file readiness
+  failure in the complete probes and keep broad compatibility gates open.
+  See [the ready-bit qualification](docs/linux-select-ready-counts.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

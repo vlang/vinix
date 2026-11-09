@@ -24,6 +24,12 @@ that observes sleep before and after an ignored signal. It verifies handled
 EINTR, masks, bitmap guards, timeout controls and flat repeated cleanup as
 root and UID1000. See [qualification and evidence](../../docs/linux-empty-select-waits.md).
 
+`--cases selectready` compares ready bits across read/write/exception sets for
+regular files and UNIX stream/datagram/seqpacket sockets, including high-word
+aliases, multiple descriptors, raw/musl APIs, guards and repeated cleanup.
+The socket count fix is qualified separately; the retained regular-file
+readiness failure remains a failing result. See [results and limits](../../docs/linux-select-ready-counts.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

@@ -195,27 +195,24 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 	mut got_except := [fd_set_words]u64{}
 	mut count := u64(0)
 
+	// Linux counts ready bits across all three sets, including when one
+	// descriptor appears in more than one returned set.
 	for i := 0; i < polls.len; i++ {
 		revents := polls[i].revents
 		fd := indexes[i]
-		mut hit := false
 
 		// An error or a hangup makes a descriptor readable as far as select is
 		// concerned, so that the caller goes and finds out what happened.
 		if revents & i16(pollin | pollhup | pollerr) != 0 && is_set(want_read, fd) {
 			set_bit(mut got_read, fd)
-			hit = true
+			count++
 		}
 		if revents & i16(pollout | pollerr) != 0 && is_set(want_write, fd) {
 			set_bit(mut got_write, fd)
-			hit = true
+			count++
 		}
 		if revents & i16(pollpri) != 0 && is_set(want_except, fd) {
 			set_bit(mut got_except, fd)
-			hit = true
-		}
-
-		if hit {
 			count++
 		}
 	}
