@@ -394,7 +394,9 @@ pub fn syscall_epoll_pwait(_ voidptr, epfd int, events_buf u64, maxevents int, t
 	mut t := proc.current_thread()
 
 	// Every negative millisecond timeout means an indefinite wait on Linux.
-	if maxevents <= 0 {
+	// Linux bounds the entire event array to INT_MAX bytes, using the
+	// architecture's userspace event layout (12 bytes on x86, 16 on ARM).
+	if maxevents <= 0 || u64(maxevents) > u64(0x7fffffff) / epoll_event_size {
 		return errno.err, errno.einval
 	}
 	if sigmask != 0 && sigsetsize != sizeof(u64) {
