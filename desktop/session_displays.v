@@ -2,6 +2,7 @@
 module main
 
 import desktop.sessioncore
+import desktop.fbdevabi
 
 fn open_desktop_outputs(primary_path string) !Framebuffer {
 	mut fb := open_framebuffer(primary_path) or {
@@ -66,7 +67,7 @@ fn (fb &Framebuffer) virtual_height() int {
 
 fn (fb &Framebuffer) output_geometry_changed() bool {
 	if fb.fd < 0 { return true }
-	mut geometry := FBVarScreenInfo{}
+	mut geometry := fbdevabi.Variable{}
 	if desktop_ioctl(fb.fd, fbioget_vscreeninfo, &geometry) < 0 || int(geometry.xres) != fb.width || int(geometry.yres) != fb.height {
 		return true
 	}

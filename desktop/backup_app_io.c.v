@@ -112,7 +112,7 @@ fn backup_read_marker(directory int) bool {
 	defer { desktop_close(fd) }
 	mut info := C.stat{}
 	if unsafe { C.fstat(fd, &info) } != 0 || u32(info.st_mode) & u32(C.S_IFMT) != u32(C.S_IFREG)
-		|| info.st_size != backup_marker.len { return false }
+		|| info.st_size != u64(backup_marker.len) { return false }
 	mut buffer := [32]u8{}
 	n := desktop_read(fd, unsafe { &buffer[0] }, u64(backup_marker.len))
 	return n == backup_marker.len && unsafe { tos(&buffer[0], backup_marker.len) } == backup_marker

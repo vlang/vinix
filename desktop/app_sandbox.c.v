@@ -29,6 +29,14 @@ fn native_app_apply_sandbox(options AppProcessOptions) ! {
 		|| options.request_fd == options.response_fd {
 		return error('invalid application sandbox pipe descriptors')
 	}
+	$if ppc {
+		// PPC32's bootstrap kernel exposes an atomic, enforced stdio-only
+		// boundary, rather than the amd64/aarch64 credential/pledge ABI below.
+		if unsafe { C.syscall(0x7f10, options.request_fd, options.response_fd) } != 0 {
+			return error('could not restrict PowerPC application to its protocol pipes')
+		}
+		return
+	}
 	$if linux || vinix {
 		unsafe {
 			mut prctl_nr := i32(167)

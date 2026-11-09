@@ -929,6 +929,15 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 			unsafe { status_path.free() }
 		}
 		eprintln('vinix-desktop: cannot start ${factory.title}: ${err}')
+		d.external_error_app = factory.title
+		d.external_error_result = .spawn_failed
+		d.external_error_missing = false
+		d.compose_external_error()
+		id := d.spawn(factory.title, .external_error, 180, 120, 560, 220)
+		if index := d.window_index(id) {
+			d.windows[index].icon = factory.icon
+			d.clamp_to_screen(index)
+		}
 		return
 	}
 	d.pending_status_path = ''
@@ -955,6 +964,7 @@ fn (mut d Desktop) launch_with_timeout(factory AppFactory, timeout_ms int) {
 	d.windows[index].icon = factory.icon
 	d.windows[index].hide_body_cursor = factory.hide_body_cursor
 	d.clamp_to_screen(index)
+	eprintln('vinix-desktop: opened ${factory.title}')
 }
 
 // external_finished restores the native desktop after an exclusive program.

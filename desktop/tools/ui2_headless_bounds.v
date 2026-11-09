@@ -9,6 +9,12 @@
 module ui2
 
 $if (linux || vinix) && ui2_headless ? {
+	// ui2's platform helpers refer to these even with the native window
+	// backend disabled. Vinix owns input and schedules its own repaint loop.
+	__global g_key_modifiers = KeyModifiers{}
+
+	pub fn request_refresh() {}
+
 	pub fn bounds() Rect {
 		return Rect{
 			width: 800
