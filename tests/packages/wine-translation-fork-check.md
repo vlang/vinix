@@ -71,3 +71,46 @@ The output directory must be new. The retained failing output is
 `build/package-wine-translation-fork-qualified-1`; host controls are under the
 calculator worktree's `build/wine-fork-host-*`, and controller refusal controls
 are under `build/wine-fork-controller-guards` in the main checkout.
+
+## Cause, 2026-11-11
+
+The failure comes from forcing split RW/RX in user mode, not from the account
+or the kernel. QEMU's memfd split buffer maps one `tcg-jit` memfd twice, both
+`MAP_SHARED` (`alloc_code_gen_buffer_splitwx_memfd` in `tcg/region.c`). After a
+non-exec `fork()`, parent and child share those pages but each keeps its own
+copy of the region allocator. Each process writes new translations and jump
+patches over the other's code. Upstream enables split-wx only for system
+emulation (`tcg_accel_instance_init`), so the binary patch in
+`tools/packages/wineadapter/patch.v` turns on a mode QEMU never supports here.
+
+The [A/B check](wine-fork-splitwx/check.v) boots one AArch64 guest and runs the
+same retained probe three times:
+
+| Variant | Result (run 1 / run 2) |
+| --- | --- |
+| Stock translator, root, `VINIX_ALLOW_WX=1` | 32 children reaped, status 0 / same |
+| Split RW/RX translator, root | internal SIGSEGV after the first fork / same |
+| Split RW/RX translator, uid 1000 | internal SIGSEGV / hang, killed at 60 s |
+
+The fault addresses (`0xf900427472a0045c`, `0x529a68d4f9001274`) are AArch64
+instruction words loaded as pointers, which fits overwritten generated code.
+The runs used kernel `build/pty-kernels/aarch64/vinix` (SHA256 `246ce2e5…4771`),
+the retained probe (`ea340091…1ae7`), the stock translator (`9025933d…1671`) and
+the retained split translator (`93f1e83f…5475`). Their serial logs are under
+`~/.cache/vinix-forkwx/` (`run-1/serial.log` `f5452883…985f`,
+`run-2/boot/serial.log` `c82886c6…e96de2`).
+
+Possible fixes, none applied yet:
+
+- A translator built from source. In `fork_start`, while every vCPU is
+  stopped, it would copy the used JIT bytes into a fresh memfd. The child
+  would map that memfd over both views at the same addresses. QEMU's build
+  runs Python (configure, Meson, code generators), so it cannot be built
+  under this repository's V-only rule without an exception.
+- The same logic as a binary patch to the stripped static-PIE Alpine
+  translator: a hook around musl's fork `svc` and recovered addresses for
+  `region`, `tcg_splitwx_diff` and the TLS `tcg_ctx`. This is possible but
+  fragile.
+- An OpenBSD-style `wxallowed` mount for the signed translator runtime,
+  running the stock translator with W+X. This reverses this package path's
+  "no W+X exception" decision.
