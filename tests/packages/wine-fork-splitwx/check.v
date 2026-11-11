@@ -10,7 +10,9 @@ import os
 const clang = '/opt/homebrew/opt/llvm/bin/clang'
 
 fn run() ! {
-	if os.args.len != 3 { return error('usage: check OUTPUT KERNEL (V=<compiler>)') }
+	if os.args.len !in [3, 4] {
+		return error('usage: check OUTPUT KERNEL [REBUILT_TRANSLATOR] (V=<compiler>)')
+	}
 	root := os.real_path(os.dir(@FILE) + '/../../..')
 	work := os.abs_path(os.args[1])
 	kernel := os.real_path(os.args[2])
@@ -25,6 +27,11 @@ fn run() ! {
 		work + '/extras/qemu-stock')!
 	for name in ['qemu-x86_64', 'fork-probe', 'qemu-stock'] {
 		os.chmod(work + '/extras/' + name, 0o755)!
+	}
+	// A source-built translator (build-support/dota2/qemu, splitwx-fork.patch).
+	if os.args.len == 4 {
+		os.cp(os.real_path(os.args[3]), work + '/extras/qemu-rebuilt')!
+		os.chmod(work + '/extras/qemu-rebuilt', 0o755)!
 	}
 	cfile := work + '/guest.c'
 	hwhost.run_tool([v, '-prod', '-backend', 'c', '-os', 'linux', '-arch', 'arm64', '-gc',

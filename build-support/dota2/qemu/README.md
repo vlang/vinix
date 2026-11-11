@@ -67,3 +67,16 @@ gain the guest base (Vinix starts x86-64 programs with `-B 0x100000000`);
 null pointers stay null. As for `FUTEX_WAKE_OP`, output buffers are made
 writable first, in case translated code protects their 16 KiB native page,
 but the memory lock is not held across calls that wait for fences.
+
+`splitwx-fork.patch` lets the translator run where W+X memory is refused,
+without forcing anything on hosts that allow it. When one anonymous RWX page
+cannot be mapped, the JIT buffer uses QEMU's split views instead: one memfd
+mapped read-write and read-execute. Upstream allows split views only for
+system emulation, because both views are `MAP_SHARED`. After a guest `fork()`
+without an exec, parent and child would write translations into the same
+pages, and the child crashed straight away
+([translated fork regression](../../../tests/packages/wine-translation-fork-check.md)).
+With every vCPU stopped, `fork_start` copies the used part of the buffer into
+a new memfd. In the child, `fork_end` maps that copy over both views at their
+old addresses, restores the guard page and flushes the instruction cache. A
+child without a private copy exits rather than share the parent's code.

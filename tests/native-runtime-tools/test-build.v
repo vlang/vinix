@@ -209,7 +209,7 @@ fn qemu_cases(work string) ! {
 	}
 	write(root + '/build-aarch64-userland/staging/usr/lib/gcc/aarch64-alpine-linux-musl/12.2/libgcc.a', 'gcc')!
 	write(root + '/build-aarch64-userland/staging/usr/lib/libatomic.a', 'atomic')!
-	for name in ['noreplace.patch', 'wake-op.patch', 'internal-fault.patch', 'drm-passthrough.patch'] {
+	for name in ['noreplace.patch', 'wake-op.patch', 'internal-fault.patch', 'drm-passthrough.patch', 'splitwx-fork.patch'] {
 		write(support + '/' + name, name)!
 	}
 	write(bin + '/upstream-interpreter', 'external interpreter identity')!

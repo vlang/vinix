@@ -335,7 +335,8 @@ pub fn build(options Options) ! {
 			return failed('the inherited Alpine patch has an unexpected hash: ' + path)
 		}
 	}
-	for name in ['noreplace.patch', 'wake-op.patch', 'internal-fault.patch', 'drm-passthrough.patch'] {
+	for name in ['noreplace.patch', 'wake-op.patch', 'internal-fault.patch', 'drm-passthrough.patch',
+		'splitwx-fork.patch'] {
 		patches << join(options.support, name)
 	}
 	mut static_inputs := map[string]bool{}

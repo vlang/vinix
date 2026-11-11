@@ -25,18 +25,18 @@
       "repository": "main"
     },
     {
-      "filename": "pcre2-dev-10.43-r0.apk",
-      "sha256": "268f84df49bee9bc4ff7d8dda2f49f27c5a1b994abb35101bb9c80356eeead21",
+      "filename": "pcre2-dev-10.43-r1.apk",
+      "sha256": "1a93033cc1e62fb1581e4a670cbf89e7c0499ec78eb0410527ceb780ec01d2f7",
       "repository": "main"
     },
     {
-      "filename": "zlib-dev-1.3.2-r0.apk",
-      "sha256": "02ed78555e37fbdaabc7bc013203eec84f3c91a386e56d08baeae6aaf09512a5",
+      "filename": "zlib-dev-1.4-r0.apk",
+      "sha256": "7be6590c2dd559e17166d2a236c63301f24d2cb92efb0447867d97726321552b",
       "repository": "main"
     },
     {
-      "filename": "zlib-static-1.3.2-r0.apk",
-      "sha256": "f80029f641098e356c072fe6e83547b1b79369c27dcf7303aa349e3a8e5fd3b2",
+      "filename": "zlib-static-1.4-r0.apk",
+      "sha256": "2f1ed2d5e0c18aee14205b1249a972b0209c72399d86a3087e73211ad5efc463",
       "repository": "main"
     }
   ],
@@ -94,12 +94,15 @@
   ],
   "patched_source_sha256": {
     "hw/9pfs/9p.c": "d8e0a1ae7d26e70537876cd753c2310e29483cf86460d5acb8d732059228dc51",
+    "include/tcg/startup.h": "c9c50514406ccab6e1cb98d503f39fbd14b1396fd68d7c07da5827619b3b1c72",
+    "linux-user/main.c": "2a3af1624564f682ad4a92e96dfef8c4985cea7f226a4113c7e47d2218d03dd6",
     "linux-user/mmap.c": "baa573936b0d59f4911254e6505ab3ca030db1de64f4f25b2b3aba3aac3ba457",
     "linux-user/signal.c": "de949e53cacdea76fe7d7c671e406fa800a03387526f3e84accf1edc4f6e2f61",
     "linux-user/syscall.c": "01cb3a074c03b0d7e215ba906a8d3b040e9307771923759aa222182c4b497b53",
     "meson.build": "b9398bbc3a290421973d1cbf489643edcedae1e699927bf3c17d3c33a4376965",
     "qga/commands-posix.c": "240fcbae6e927c255b2434312fea986817042179e6be035f5f0da953cb8d83ef",
     "target/riscv/kvm/kvm-cpu.c": "de55b91a130a0f650ca39bce8f116d43a144303f75603ddefaccdf881e01fa9b",
+    "tcg/region.c": "c76b2f4e8b53d6af47f3da87caba3f4dbf6d1c9b88870089b1efedca1b574882",
     "util/cpuinfo-riscv.c": "41c2af06be8edf5cfbe68a1955500e4172b61d549394aff9be667d25727b3ee8",
     "util/mmap-alloc.c": "198367baacb3eef72873a9a4e39399318c5931b3ff997796dce1dbff1aab397d"
   }

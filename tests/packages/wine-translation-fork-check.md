@@ -100,17 +100,33 @@ the retained split translator (`93f1e83f…5475`). Their serial logs are under
 `~/.cache/vinix-forkwx/` (`run-1/serial.log` `f5452883…985f`,
 `run-2/boot/serial.log` `c82886c6…e96de2`).
 
-Possible fixes, none applied yet:
+## Fix, 2026-11-11
 
-- A translator built from source. In `fork_start`, while every vCPU is
-  stopped, it would copy the used JIT bytes into a fresh memfd. The child
-  would map that memfd over both views at the same addresses. QEMU's build
-  runs Python (configure, Meson, code generators), so it cannot be built
-  under this repository's V-only rule without an exception.
-- The same logic as a binary patch to the stripped static-PIE Alpine
-  translator: a hook around musl's fork `svc` and recovered addresses for
-  `region`, `tcg_splitwx_diff` and the TLS `tcg_ctx`. This is possible but
-  fragile.
-- An OpenBSD-style `wxallowed` mount for the signed translator runtime,
-  running the stock translator with W+X. This reverses this package path's
-  "no W+X exception" decision.
+The approved fix is a translator built from source. The Dota translator builder
+(`build-support/dota2/qemu-stage`) now applies
+[`splitwx-fork.patch`](../../build-support/dota2/qemu/README.md) on top of QEMU
+9.1.2. When the host refuses an RWX page, the translator chooses split RW/RX
+itself. `fork_start` copies the used JIT bytes into a fresh memfd while every
+vCPU is stopped, and the child maps that copy over both views. Hosts that allow
+W+X keep the single RWX buffer. QEMU's configure needs Python with `tomli`. The
+user approved Python for this third-party build on 2026-11-11. The interpreter
+was a private venv made from `/usr/bin/python3` with the `tomli==2.0.1` that the
+builder already pins, passed as `VINIX_DOTA2_QEMU_PYTHON`. Alpine 3.21 had
+replaced three pinned development packages (`pcre2-dev` 10.43-r1, `zlib-dev`
+and `zlib-static` 1.4-r0), so their pins were updated.
+
+With that translator (`21bbd59f…ca83`) supplied as the check's third argument,
+the same boot adds three variants:
+
+| Variant | Result |
+| --- | --- |
+| Rebuilt translator, uid 1000, no W+X exception | 32 children reaped, status 0 |
+| Rebuilt translator, root, no W+X exception | 32 children reaped, status 0 |
+| Rebuilt translator, root, `VINIX_ALLOW_WX=1` | 32 children reaped, status 0 |
+
+None of these variants logged an internal SIGSEGV, while the Alpine split
+translator still failed in the same boot. The serial log is
+`~/.cache/vinix-forkwx/run-3/boot/serial.log` (`12f69ae4…a96`). A repeat boot
+(`run-4`) gave the same six results. The packaged Wine
+runtime still stages the binary-patched Alpine translator. Moving it to the
+rebuilt one, and requalifying Wine itself, is the next step.

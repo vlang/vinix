@@ -17,6 +17,7 @@ fn C.setresuid(u32, u32, u32) i32
 fn C.usleep(u32) i32
 fn C.kill(i32, i32) i32
 fn C.setpgid(i32, i32) i32
+fn C.access(&char, i32) i32
 
 fn emit(text string) {
 	mut offset := 0
@@ -70,6 +71,14 @@ fn main() {
 	variant('root-splitwx', '/qemu-x86_64', false, false)
 	// The original failing configuration: ordinary account, split RW/RX.
 	variant('user-splitwx', '/qemu-x86_64', true, false)
+	// A translator built from source with splitwx-fork.patch, when supplied: it
+	// selects split rw/rx itself because W+X is refused, and keeps it private.
+	if C.access(c'/qemu-rebuilt', 1) == 0 {
+		variant('user-rebuilt', '/qemu-rebuilt', true, false)
+		variant('root-rebuilt', '/qemu-rebuilt', false, false)
+		// With W+X allowed it keeps the ordinary single RWX buffer.
+		variant('root-rebuilt-allowwx', '/qemu-rebuilt', false, true)
+	}
 	emit('FORKWX DONE\n')
 	for { C.usleep(1000000) }
 }

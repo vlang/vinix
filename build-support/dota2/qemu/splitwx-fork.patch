@@ -1,0 +1,193 @@
+--- a/include/tcg/startup.h
++++ b/include/tcg/startup.h
+@@ -55,4 +55,18 @@
+  */
+ void tcg_prologue_init(void);
+ 
++/**
++ * tcg_region_fork_start, tcg_region_fork_end: Keep a split JIT private
++ *
++ * A split rw/rx JIT buffer is one shared memory object mapped twice.  A
++ * process created by fork() would keep sharing it with its parent, and
++ * each would overwrite the other's translations.  With every vCPU stopped,
++ * tcg_region_fork_start() copies the used part of the buffer into a new
++ * object; in the child, tcg_region_fork_end() maps that copy over both
++ * views at their existing addresses.  Both do nothing for a buffer that
++ * is not split.
++ */
++void tcg_region_fork_start(void);
++void tcg_region_fork_end(bool child);
++
+ #endif
+--- a/linux-user/main.c
++++ b/linux-user/main.c
+@@ -147,12 +147,14 @@
+     cpu_list_lock();
+     qemu_plugin_user_prefork_lock();
+     gdbserver_fork_start();
++    tcg_region_fork_start();
+ }
+ 
+ void fork_end(pid_t pid)
+ {
+     bool child = pid == 0;
+ 
++    tcg_region_fork_end(child);
+     qemu_plugin_user_postfork(child);
+     mmap_fork_end(child);
+     if (child) {
+--- a/tcg/region.c
++++ b/tcg/region.c
+@@ -34,6 +34,9 @@
+ #include "exec/translation-block.h"
+ #include "tcg-internal.h"
+ #include "host/cpuinfo.h"
++#include "tcg/startup.h"
++#include "qemu/cacheflush.h"
++#include "qemu/error-report.h"
+ 
+ 
+ /*
+@@ -572,6 +575,14 @@
+ #ifdef CONFIG_POSIX
+ #include "qemu/memfd.h"
+ 
++#if defined(CONFIG_USER_ONLY) && !defined(CONFIG_DARWIN)
++#define TCG_SPLITWX_FORK
++/* The size of both views, and the private copy prepared for a fork. */
++static size_t splitwx_map_size;
++static size_t splitwx_fork_used;
++static int splitwx_fork_fd = -1;
++#endif
++
+ static int alloc_code_gen_buffer_splitwx_memfd(size_t size, Error **errp)
+ {
+     void *buf_rw = NULL, *buf_rx = MAP_FAILED;
+@@ -593,6 +604,9 @@
+     region.start_aligned = buf_rw;
+     region.total_size = size;
+     tcg_splitwx_diff = buf_rx - buf_rw;
++#ifdef TCG_SPLITWX_FORK
++    splitwx_map_size = size;
++#endif
+ 
+     return PROT_READ | PROT_WRITE;
+ 
+@@ -687,6 +701,25 @@
+     ERRP_GUARD();
+     int prot, flags;
+ 
++#if defined(TCG_SPLITWX_FORK) && defined(CONFIG_LINUX)
++    /*
++     * A host that enforces W^X (Vinix, OpenBSD-style) refuses the RWX
++     * buffer set up below, and would end this process at the first
++     * mprotect.  Ask for one RWX page; if the host refuses it, use the
++     * split rw/rx views, which fork keeps private (tcg_region_fork_start).
++     */
++    if (!splitwx) {
++        size_t page = qemu_real_host_page_size();
++        void *probe = mmap(NULL, page, PROT_READ | PROT_WRITE | PROT_EXEC,
++                           MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
++
++        if (probe == MAP_FAILED) {
++            return alloc_code_gen_buffer_splitwx(size, errp);
++        }
++        munmap(probe, page);
++    }
++#endif
++
+     if (splitwx) {
+         prot = alloc_code_gen_buffer_splitwx(size, errp);
+         if (prot >= 0) {
+@@ -720,6 +753,91 @@
+     return alloc_code_gen_buffer_anon(size, prot, flags, errp);
+ }
+ #endif /* USE_STATIC_CODE_GEN_BUFFER, WIN32, POSIX */
++
++#ifdef TCG_SPLITWX_FORK
++/*
++ * Called by fork_start() with every vCPU stopped, so no translation or
++ * jump patching runs while the used part of the buffer is copied.
++ */
++void tcg_region_fork_start(void)
++{
++    const size_t page_size = qemu_real_host_page_size();
++    uint8_t *start = region.start_aligned;
++    Error *err = NULL;
++    size_t used = 0;
++    void *copy;
++    int fd;
++
++    if (tcg_splitwx_diff == 0 || splitwx_map_size == 0) {
++        return;
++    }
++    for (unsigned int i = 0; i < qatomic_read(&tcg_cur_ctxs); i++) {
++        const TCGContext *s = qatomic_read(&tcg_ctxs[i]);
++        size_t end = (uint8_t *)qatomic_read(&s->code_gen_ptr) - start;
++
++        used = MAX(used, end);
++    }
++    used = MIN(ROUND_UP(used, page_size), splitwx_map_size);
++
++    copy = qemu_memfd_alloc("tcg-jit", splitwx_map_size, 0, &fd, &err);
++    if (copy == NULL) {
++        /* The child refuses to run on the shared buffer; see fork_end. */
++        error_report_err(err);
++        return;
++    }
++    memcpy(copy, start, used);
++    munmap(copy, splitwx_map_size);
++    splitwx_fork_fd = fd;
++    splitwx_fork_used = used;
++}
++
++void tcg_region_fork_end(bool child)
++{
++    const size_t page_size = qemu_real_host_page_size();
++    uint8_t *rw = region.start_aligned;
++    uint8_t *rx = rw + tcg_splitwx_diff;
++    int fd = splitwx_fork_fd;
++
++    if (tcg_splitwx_diff == 0 || splitwx_map_size == 0) {
++        return;
++    }
++    splitwx_fork_fd = -1;
++    if (child) {
++        if (fd < 0) {
++            error_report("jit split-wx: no private code buffer after fork");
++            _exit(EXIT_FAILURE);
++        }
++        /* The child is single-threaded: nothing runs translated code here. */
++        if (mmap(rw, splitwx_map_size, PROT_READ | PROT_WRITE,
++                 MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED ||
++            mmap(rx, splitwx_map_size, host_prot_read_exec(),
++                 MAP_SHARED | MAP_FIXED, fd, 0) == MAP_FAILED) {
++            error_report("jit split-wx: cannot map the private code buffer "
++                         "after fork: %s", strerror(errno));
++            _exit(EXIT_FAILURE);
++        }
++        /* Restore the guard pages tcg_region_init() set in the rw view. */
++        for (size_t i = 0; i < region.n; i++) {
++            void *start, *end;
++
++            tcg_region_bounds(i, &start, &end);
++            (void)qemu_mprotect_none(end, page_size);
++        }
++        flush_idcache_range((uintptr_t)rx, (uintptr_t)rw, splitwx_fork_used);
++    }
++    if (fd >= 0) {
++        close(fd);
++    }
++}
++#else
++void tcg_region_fork_start(void)
++{
++}
++
++void tcg_region_fork_end(bool child)
++{
++}
++#endif
+ 
+ /*
+  * Initializes region partitioning.
