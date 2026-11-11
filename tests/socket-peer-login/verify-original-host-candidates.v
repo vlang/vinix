@@ -12,6 +12,8 @@ import time
 #include <fcntl.h>
 #include <unistd.h>
 
+fn C.fsync(fd i32) i32
+
 const baseline = '/Users/alex/Library/Caches/vinix-codex/section14/current-peer-frame-integration-20261105-01/host-bootstrap-01/inputs-before.json'
 const baseline_sha = 'e6582519df2c91330848552ba6f1bcd9582ea27a5757c667e12b6ad8bf5f61f5'
 const old_root = '/Users/alex/code/vinix/build/package-https-runtime-work/toolchain'
@@ -183,12 +185,12 @@ fn write_receipt(path string, body string) ! {
 	if fd < 0 { return os.error_posix() }
 	mut closed := false
 	defer { if !closed { C.close(fd) } }
-	mut offset := usize(0)
-	for offset < usize(body.len) {
-		n := C.write(fd, unsafe { body.str + offset }, usize(body.len) - offset)
+	mut offset := u64(0)
+	for offset < u64(body.len) {
+		n := C.write(fd, unsafe { body.str + offset }, u64(body.len) - offset)
 		if n < 0 { if C.errno == C.EINTR { continue }; return os.error_posix() }
 		need(n > 0, 'candidate receipt write made no progress')!
-		offset += usize(n)
+		offset += u64(n)
 	}
 	if C.fsync(fd) != 0 { return os.error_posix() }
 	status := C.close(fd)

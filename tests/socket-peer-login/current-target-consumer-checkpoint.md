@@ -1,5 +1,19 @@
 # Compiler-consumer checkpoint
 
+## Original compiler recovery, 2026-11-11
+
+`verify-original-host-candidates.v` (with its missing `fsync` declaration and
+deprecated `usize` casts fixed, built `-prod`) compared both retained
+`vinix-waitpid-width-20261026` toolchain copies against the 4,636-entry
+historical loader map. It returned 1: three original files are in neither
+copy (`vlib/v/diagserver/diagserver_linux.c.v`,
+`vlib/v/driver/instance_check_nix.c.v`, `vlib/v/gen/fastc/unit_compile_nix.c.v`)
+and strict metadata is incomplete. The receipt is
+R/original-host-recovery-01/coverage-receipt-01.json, SHA256
+`3ccd2654deb54147dc61750a7d28fe15ebf57f56fdeba675564fa818b2401f78`.
+Nothing was restored. The historical compiler controls cannot resume from
+retained copies; only a separately qualified current-input route remains.
+
 ## Continuation, 2026-11-08
 
 Work resumed at `a8e4f7d68` with about 375 GiB available. The strict stager
