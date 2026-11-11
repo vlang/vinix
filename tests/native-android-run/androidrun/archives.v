@@ -12,7 +12,6 @@ import tarstream
 #include <sys/stat.h>
 
 fn C.mkdir(&char, u32) int
-fn C.mkfifo(&char, u32) int
 fn C.mknod(&char, u32, u64) int
 fn C.major(u64) u32
 fn C.minor(u64) u32
@@ -114,7 +113,8 @@ fn extract_archive(mut archive Archive, root string) ! {
 				if C.link(source.str, target.str) != 0 { return os.error_posix() }
 			}
 		} else if member.kind == `6` {
-			if C.mkfifo(target.str, u32(member.mode)) != 0 { return os.error_posix() }
+			mode := $if macos { u16(member.mode) } $else { u32(member.mode) }
+			if C.mkfifo(target.str, mode) != 0 { return os.error_posix() }
 		} else if member.kind in [u8(`3`), `4`] {
 			kind := if member.kind == `3` { C.S_IFCHR } else { C.S_IFBLK }
 			if C.mknod(target.str, u32(member.mode) | u32(kind), C.makedev(u32(member.major), u32(member.minor))) != 0 {
