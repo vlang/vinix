@@ -2084,3 +2084,18 @@ compiler's split helper in service_identifier. The source now materializes
 those segments, preserving all identifier validation. Neither failed build was
 deployed. Original build limits remain unchanged. ARM execution and the actual
 Google account-flow retry remain pending.
+
+Fresh r63 stages both protocol artifacts from r3 together with the qualified
+keygen SDK r4, native r5, mandatory core/TLS boot jars and signed fixture r55.
+Staging passed0/0, complete cleanup,10001ms, RSS36634624, shared growth
+158474240 bytes. Both deployed protocol file hashes match the build outputs;
+volume identity, read-only e2fsck and the initial image hash passed before boot.
+The complete signed SDK/API regression repeated successfully on ARM as
+UID/GID10160, ready/pass once, drained EOF and exit0. Snapshot
+`account-protocol-api-uart-20261112-r1` full SHA256 is
+`1705778c63990584fba44f9c846612147130b6a368a8ea4f1c72fb44fd5f0e35`;
+matching plan/readback use zero removals and archive SHA256
+`2e047bd0fb3bbfb5e85468bab2e95992fb42f4b7c274e0e57f3f060aaa714c35`.
+The bind was released before broker preparation. This API pass does not itself
+exercise the paired protocol's real account interaction; that retry remains
+pending.
