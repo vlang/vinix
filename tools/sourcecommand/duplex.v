@@ -127,7 +127,7 @@ fn drain_duplex(descriptor i32, mut data []u8) !i32 {
 	if descriptor < 0 { return descriptor }
 	mut bytes := [65536]u8{}
 	for {
-		read := C.read(descriptor, &bytes[0], usize(bytes.len))
+		read := C.read(descriptor, &bytes[0], uint(bytes.len))
 		if read > 0 {
 			if data.len + int(read) > 32 * 1024 * 1024 {
 				return error('duplex diagnostics exceed 32 MiB')
@@ -167,7 +167,7 @@ pub fn (mut child DuplexChild) read_exact(count int, cancel fn () bool) ![]u8 {
 	for offset < count {
 		if cancel != unsafe { nil } && cancel() { return error('duplex operation interrupted') }
 		child.drain()!
-		read := unsafe { C.read(child.response, &u8(bytes.data) + offset, usize(count - offset)) }
+		read := unsafe { C.read(child.response, &u8(bytes.data) + offset, uint(count - offset)) }
 		if read > 0 {
 			offset += int(read)
 			deadline = time.sys_mono_now() + i64(10 * time.second)
@@ -189,7 +189,7 @@ pub fn (mut child DuplexChild) write_all(bytes []u8, cancel fn () bool) ! {
 	for offset < bytes.len {
 		if cancel != unsafe { nil } && cancel() { return error('duplex operation interrupted') }
 		child.drain()!
-		written := unsafe { C.write(child.request, &u8(bytes.data) + offset, usize(bytes.len - offset)) }
+		written := unsafe { C.write(child.request, &u8(bytes.data) + offset, uint(bytes.len - offset)) }
 		if written > 0 {
 			offset += int(written)
 			deadline = time.sys_mono_now() + i64(10 * time.second)

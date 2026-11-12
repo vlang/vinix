@@ -117,7 +117,7 @@ pub fn (child &PtyChild) read(mut buffer []u8, milliseconds int) !int {
 		result := C.poll(&descriptor, 1, milliseconds)
 		if result < 0 { if C.errno == C.EINTR { continue }; return os.error_posix() }
 		if result == 0 { return -1 }
-		count := unsafe { C.read(child.master, buffer.data, usize(buffer.len)) }
+		count := unsafe { C.read(child.master, buffer.data, uint(buffer.len)) }
 		if count < 0 {
 			if C.errno == C.EIO { return 0 }
 			if C.errno in [C.EINTR, C.EAGAIN, C.EWOULDBLOCK] { return -1 }
@@ -132,7 +132,7 @@ pub fn (child &PtyChild) write(bytes []u8) ! {
 	if child.retired { return error('PTY child is retired') }
 	mut offset := 0
 	for offset < bytes.len {
-		count := unsafe { C.write(child.master, &u8(bytes.data) + offset, usize(bytes.len - offset)) }
+		count := unsafe { C.write(child.master, &u8(bytes.data) + offset, uint(bytes.len - offset)) }
 		if count < 0 {
 			if C.errno == C.EINTR { continue }
 			if C.errno in [C.EAGAIN, C.EWOULDBLOCK] { time.sleep(time.millisecond); continue }

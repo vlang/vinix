@@ -63,6 +63,9 @@ fn build_guest(argv []string) ! {
 	})
 	v := args.value('--v', @VEXE)
 	vroot := os.dir(os.real_path(v))
+	mut runtime_sources := []string{}
+	process_runtime := vroot + '/vlib/os/execute_capture_nix.c'
+	if os.is_file(process_runtime) { runtime_sources << process_runtime }
 	static_link := '--static' in args.options
 	guest_source := os.abs_path(args.value('--source', root + '/tests/native-validation-tools/guest.v'))
 	defines := args.options['--define']
@@ -117,7 +120,7 @@ fn build_guest(argv []string) ! {
 			flags << '-Wl,--dynamic-linker=/lib/ld-musl-' + arch + '.so.1'
 		}
 		flags << [sysroot + '/usr/lib/crt1.o', sysroot + '/usr/lib/crti.o',
-			gcc + if static_link { '/crtbeginT.o' } else { '/crtbegin.o' }, source,
+			gcc + if static_link { '/crtbeginT.o' } else { '/crtbegin.o' }, source, ...runtime_sources,
 			'-L' + sysroot + '/usr/lib', '-L' + gcc, '-lgcc_eh', '-lc', '-lgcc', '-lm',
 			gcc + '/crtend.o', sysroot + '/usr/lib/crtn.o', '-fuse-ld=lld', '-o', binary]
 		checked_command(flags, root)!

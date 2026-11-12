@@ -34,7 +34,7 @@ pub fn publish(path string, text string) ! {
 	}
 	mut written := 0
 	for written < text.len {
-		count := unsafe { C.write(fd, text.str + written, usize(text.len - written)) }
+		count := unsafe { C.write(fd, text.str + written, uint(text.len - written)) }
 		if count < 0 {
 			if C.errno == C.EINTR { continue }
 			return os.error_posix()

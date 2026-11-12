@@ -34,7 +34,7 @@ fn C.posix_spawnattr_destroy(voidptr) i32
 fn C.posix_spawnattr_setpgroup(voidptr, i32) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
 fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
-fn C.posix_spawnattr_setbinpref_np(voidptr, usize, &i32, &usize) i32
+fn C.posix_spawnattr_setbinpref_np(voidptr, uint, &i32, &uint) i32
 $if macos || ios || freebsd || openbsd || dragonfly || android || termux {
 	fn C.poll(&C.pollfd, u32, i32) i32
 } $else {
@@ -263,7 +263,7 @@ fn capture_stream_input_arch(argv []string, env map[string]string, timeout f64, 
 		}
 		if cpu != 0 {
 			preferences := [cpu, i32(C.CPU_TYPE_ANY)]!
-			mut selected := usize(0)
+			mut selected := uint(0)
 			status := C.posix_spawnattr_setbinpref_np(&attributes, 2, &preferences[0], &selected)
 			if status != 0 { return error_with_code('cannot configure host architecture preference', int(status)) }
 			if selected != 2 { return error('incomplete host architecture preference') }
