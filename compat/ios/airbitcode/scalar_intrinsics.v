@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if id in [.fma, .fmuladd, .fshl, .fshr]! { return 3 }
-	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax]! { 2 } else { 1 }
+	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
@@ -58,7 +58,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	for i in 0 .. arity {
 		argument := ir.references[signature.refs_start + i + 1]
 		if argument < 0 || argument >= p.types.len || p.operands[op.operands_start + i + 1].type_index != argument { return error('AIR intrinsic: argument type identity') }
-		if i == 1 && (id == .is_fpclass || scalar_integer_zero_count(id)) {
+		if i == 1 && (id == .is_fpclass || scalar_integer_poison_flag(id)) {
 			immediate_bits := if id == .is_fpclass { u32(32) } else { u32(1) }
 			maximum := if id == .is_fpclass { u64(1023) } else { u64(1) }
 			if p.integer_bits(argument)! != immediate_bits { return error('AIR intrinsic: immediate type') }
@@ -75,11 +75,11 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
 	key := if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
-	return key, ir_values(stream, raw)[6], id == .is_fpclass || scalar_integer_zero_count(id)
+	return key, ir_values(stream, raw)[6], id == .is_fpclass || scalar_integer_poison_flag(id)
 }
 // Accept only harmless function-level properties inherent in these intrinsics.
 // Return/parameter, string, type, strictfp and other attributes reject, except
-// parameter two's exact immarg on is.fpclass/ctlz/cttz. Scans share a profile-work
+// parameter two's exact immarg on is.fpclass/ctlz/cttz/abs. Scans share a profile-work
 // limit and run once per admitted declaration.
 fn scalar_intrinsic_attributes(stream Stream, set u64, limit int) !int {
 	return scalar_intrinsic_attributes_profile(stream, set, limit, false)!
@@ -129,6 +129,7 @@ fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second
 	return work
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
+	if id == .iabs { return error('AIR intrinsic: integer abs requires poison-aware evaluation') }
 	if scalar_integer_extremum(id) { return scalar_integer_extremum_value(id, bits, a, b)! }
 	if scalar_integer_funnel(id) { return error('AIR intrinsic: three funnel-shift arguments required') }
 	if scalar_integer_zero_count(id) { return error('AIR intrinsic: zero counts require poison-aware evaluation') }

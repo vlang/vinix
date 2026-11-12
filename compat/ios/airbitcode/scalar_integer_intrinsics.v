@@ -2,8 +2,9 @@
 module airbitcode
 
 fn scalar_integer_intrinsic(id ScalarIntrinsic) bool {
-	return id in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax]!
+	return id in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs]!
 }
+fn scalar_integer_poison_flag(id ScalarIntrinsic) bool { return scalar_integer_zero_count(id) || id == .iabs }
 fn scalar_integer_extremum(id ScalarIntrinsic) bool { return id in [.smin, .smax, .umin, .umax]! }
 fn scalar_integer_funnel(id ScalarIntrinsic) bool { return id in [.fshl, .fshr]! }
 fn scalar_integer_zero_count(id ScalarIntrinsic) bool { return id in [.ctlz, .cttz]! }
@@ -19,6 +20,7 @@ fn scalar_integer_intrinsic_name(name string) !ScalarIntrinsic {
 		else if name.starts_with('llvm.smax.i') { ScalarIntrinsic.smax }
 		else if name.starts_with('llvm.umin.i') { ScalarIntrinsic.umin }
 		else if name.starts_with('llvm.umax.i') { ScalarIntrinsic.umax }
+		else if name.starts_with('llvm.abs.i') { ScalarIntrinsic.iabs }
 		else { return error('AIR intrinsic: unsupported callee') }
 	scalar_integer_intrinsic_width(name, id)!
 	return id
@@ -26,7 +28,7 @@ fn scalar_integer_intrinsic_name(name string) !ScalarIntrinsic {
 // Inspect bytes directly: no substring allocation and no permissive numeric
 // parser that might admit signs, leading zeroes, suffixes or other overloads.
 fn scalar_integer_intrinsic_width(name string, id ScalarIntrinsic) !u32 {
-	start := match id { .ctpop { 'llvm.ctpop.i'.len } .bitreverse { 'llvm.bitreverse.i'.len } .bswap { 'llvm.bswap.i'.len } .ctlz { 'llvm.ctlz.i'.len } .cttz { 'llvm.cttz.i'.len } .fshl { 'llvm.fshl.i'.len } .fshr { 'llvm.fshr.i'.len } .smin { 'llvm.smin.i'.len } .smax { 'llvm.smax.i'.len } .umin { 'llvm.umin.i'.len } .umax { 'llvm.umax.i'.len } else { return error('AIR intrinsic: integer family') } }
+	start := match id { .ctpop { 'llvm.ctpop.i'.len } .bitreverse { 'llvm.bitreverse.i'.len } .bswap { 'llvm.bswap.i'.len } .ctlz { 'llvm.ctlz.i'.len } .cttz { 'llvm.cttz.i'.len } .fshl { 'llvm.fshl.i'.len } .fshr { 'llvm.fshr.i'.len } .smin { 'llvm.smin.i'.len } .smax { 'llvm.smax.i'.len } .umin { 'llvm.umin.i'.len } .umax { 'llvm.umax.i'.len } .iabs { 'llvm.abs.i'.len } else { return error('AIR intrinsic: integer family') } }
 	if name.len <= start || name.len > start + 2 || name[start] == `0` { return error('AIR intrinsic: integer overload spelling') }
 	mut width := u32(0)
 	for i in start .. name.len {
@@ -37,7 +39,7 @@ fn scalar_integer_intrinsic_width(name string, id ScalarIntrinsic) !u32 {
 	return width
 }
 fn scalar_integer_intrinsic_value(id ScalarIntrinsic, bits u32, value u64) !u64 {
-	if !scalar_integer_intrinsic(id) || scalar_integer_zero_count(id) || scalar_integer_funnel(id) || scalar_integer_extremum(id) || bits < 1 || bits > 64 || (id == .bswap && bits % 16 != 0) { return error('AIR intrinsic: unary integer operation/width') }
+	if !scalar_integer_intrinsic(id) || scalar_integer_poison_flag(id) || scalar_integer_funnel(id) || scalar_integer_extremum(id) || bits < 1 || bits > 64 || (id == .bswap && bits % 16 != 0) { return error('AIR intrinsic: unary integer operation/width') }
 	mut input := value & constant_mask(bits); mut result := u64(0)
 	if id == .bswap {
 		for _ in 0 .. bits / 8 { result = (result << 8) | (input & 0xff); input >>= 8 }
@@ -81,4 +83,13 @@ fn scalar_integer_extremum_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u6
 	less := (x ^ key_flip) < (y ^ key_flip)
 	minimum := id in [.smin, .umin]!
 	return if less == minimum { x } else { y }
+}
+
+fn scalar_integer_abs_value(bits u32, value u64, minimum_poison u64) !IntegerValue {
+	if bits < 1 || bits > 64 || minimum_poison > 1 { return error('AIR intrinsic: integer abs width/flag') }
+	mask := constant_mask(bits); input := value & mask; sign := u64(1) << (bits - 1)
+	if input == sign && minimum_poison == 1 { return IntegerValue{poison: true} }
+	// Unsigned modular negation preserves INT_MIN when poison is disabled,
+	// without ever negating a host signed minimum (including i1 and i64).
+	return IntegerValue{value: if input & sign == 0 { input } else { (u64(0) - input) & mask }}
 }

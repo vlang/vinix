@@ -55,10 +55,11 @@ are not aliases for these LLVM names.
 Declaration attributes admit only function-level `nounwind`, `readnone`,
 `readonly`, `speculatable`, `willreturn`, `nofree`, `nosync`, `nocallback`,
 `nocreateundeforpoison` and `memory(none)` (bitcode memory versions 0/1/2).
-Except classification/zero-count parameter two's `immarg`, return/parameter, string/type,
+Except parameter two's `immarg` on classification, zero counts and integer abs,
+return/parameter, string/type,
 `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A 744-entry fixed stack cache validates each admitted
+validation budget. An 808-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -73,8 +74,9 @@ maintained checker compares 1,980,544 results across both precisions, including
 [Power-of-two scaling](SCALAR-LDEXP.md) admits the exact `.f16.i32` and `.f32.i32`
 names, with a floating first argument/result and a signed i32 second argument.
 [Floating classification](SCALAR-FPCLASS.md) returns i1 from a half/float input
-and an immediate i32 mask. This intrinsic and integer zero counts admit the exact parameter-two
-`immarg` declaration attribute; the mask is independently checked at every call.
+and an immediate i32 mask. This intrinsic, integer zero counts and integer abs
+admit the exact parameter-two `immarg` declaration attribute; each immediate is
+independently checked at every call.
 [Integer bit operations](SCALAR-INTEGER-INTRINSICS.md) add unary `ctpop` and
 `bitreverse` at i1..i64 and `bswap` at i16/i32/i48/i64, also through the mixed
 scalar entry point. Their cache keys reserve three independent 64-width ranges
@@ -85,6 +87,8 @@ with a constant i1 zero-poison flag, using two more independent 64-width ranges.
 including dynamic shift amounts and rotations, in another two width ranges.
 [Integer extrema](SCALAR-INTEGER-EXTREMA.md) add signed `smin`/`smax` and unsigned
 `umin`/`umax` at i1..i64, in four more independent width ranges.
+[Integer absolute value](SCALAR-INTEGER-ABS.md) adds `abs` at i1..i64, with a
+constant i1 minimum-poison flag and its own width range.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting

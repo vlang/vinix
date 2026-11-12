@@ -21,12 +21,13 @@ policy. The second operand must resolve to a nonsplat integer/zero constant of
 type i1, with raw value 0 or 1. Arguments, SSA results, declarations, opaque/
 poison/undef constants and malformed types/values reject. Every call is checked,
 including in dead blocks and after another call cached its declaration attributes.
-Only `is.fpclass`, `ctlz` and `cttz` admit parameter two's exact enum `immarg`
+Only `is.fpclass`, `ctlz`, `cttz` and integer `abs` admit parameter two's exact
+enum `immarg`
 attribute; other parameter/return/string/type attributes still reject. Valid
 LLVM IR and matching immutable indexes remain preconditions.
 
-The 744-entry fixed stack cache reserves forty floating-overload slots and
-eleven separate 64-width integer ranges. `ctlz` and `cttz` use separate ranges;
+The 808-entry fixed stack cache reserves forty floating-overload slots and
+twelve separate 64-width integer ranges. `ctlz` and `cttz` use separate ranges;
 their two flag values share a declaration identity, not a cached immediate.
 The shared 1,000,000 attribute-work budget and fixed two-ID group storage remain.
 The existing three owned execution arrays and cleanup are unchanged. Retained
