@@ -216,6 +216,8 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_guest_user(smali)!
  framework_service_create_failure(smali)!
  framework_result_receiver(smali)!
+ framework_bluetooth_unavailable(smali)!
+ framework_contacts_directory(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!

@@ -42,6 +42,10 @@ handshake timeout. Its actual Maps retry is still pending.
 That retry exited after Skip on a Play Store secondary-service DI class cast.
 Guest r45 passes scoped service-creation failure and ResultReceiver callback
 regressions; its actual Maps retry is pending.
+Guest r45 rendered Explore/Local vibe and stayed alive past the contained
+Play Store creation failure. During a Louvre search attempt, uncaught GMS
+Bluetooth/Contacts-directory linkage failures ended the process. Search,
+tiles, routing and login remain unqualified.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -1386,3 +1390,54 @@ delivering asynchronously to the main Handler. Snapshot
 `f762b96df595d5a031ba01446e35229d3bf215948724d4fdd3a2f46f41f951c9`.
 The fixture bind was released before broker preparation. Maps functionality
 remains unqualified.
+
+With source `f1d1528e2`, r45 reached Explore/Local vibe after Skip. The full
+private log retained the Play Store class cast under the new scoped creation
+failure message, without a primary-looper failure. The previous ResultReceiver
+Parcelable cast did not recur. The app exited during a Louvre search attempt;
+the complete log identifies uncaught GMS background failures, not a proven
+search-handler fault: BluetoothAdapter.getBondedDevices in cjui.l source12,
+and ContactsContract.Directory resolution in enfw.e source12. Exact caller
+readback is `gms-bond-directory-caller-20261112-r1`: cjui is in classes.dex,
+enfw in classes2.dex, and the synthetic outline in classes12.dex reads
+Directory.ENTERPRISE_CONTENT_URI.
+
+Complete r45 log `maps-current-20261112-r45/maps.retained.log` has SHA256
+`33ba3f1ae520f5b1c15d01aa17396e4dc0bff0d4b9e27b50fbd08eb010620d37`.
+The synced, stopped data image has SHA256
+`59c03f7e0464f9faea35e3643bad1671cc5112b8f5f9e3805815fc9e698e0719`.
+Snapshot `maps-bond-directory-final-uart-20261112-r1` has SHA256
+`0d50c33ba68fb931c64a36506f6a246c2af100ae1c802c046ad42ff6dc52a660`.
+Only verified owned QEMU PID64396 was stopped. Minimum observed disk was
+7245332480 bytes and MemFree177504KiB; no600-second stability claim is made.
+
+`framework_bluetooth_unavailable.v` makes manager lookup delegate to the
+existing null default-adapter lookup, removing the inconsistent fabricated
+adapter. Legacy directly constructed objects expose off-state queries, absent
+name/address and fresh empty bonded-device snapshots. It adds no radio backend.
+The [BluetoothAdapter contract](https://developer.android.com/reference/android/bluetooth/BluetoothAdapter)
+requires empty bonds outside STATE_ON. `framework_contacts_directory.v`
+supplies URI/MIME and directory-ID metadata, including the observed enterprise
+URI. [AOSP's directory definitions](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/provider/ContactsContract.java)
+define these values and numeric classifications. They do not create a provider
+or managed profile; ContentResolver retains its absent-provider null result,
+which the exact enfw caller handles.
+
+SDK `framework-availability-20261112-r1` passed guarded full assembly/readback:
+0/0, complete cleanup,2273ms, RSS471416832, shared growth29290496 bytes.
+Signed fixture r44 passed build/link/sign/verification:0/0, complete cleanup,
+941ms, RSS90750976, shared growth24702976 bytes. Guest r46 staging passed0/0,
+complete cleanup,9048ms, RSS36864000, shared growth138141696 bytes. UUID,
+read-only e2fsck and initial-image hash verification passed before boot.
+ARM qualification is pending for the new availability checks.
+
+The complete signed r44 fixture passed on ARM in r46 as UID/GID10160,
+readiness/pass once, drained EOF and exit0. It checks both manager lookup
+forms against the null default adapter, direct legacy off-state queries,
+bonded-set mutation isolation, directory URI values and ID boundaries, and
+the exact caller's enterprise-directory projection with an absent provider.
+Snapshot `availability-api-uart-20261112-r1`, plan
+`availability-api-plan-20261112-r1.json` and strict readback
+`availability-api-readback-20261112-r1` retain archive SHA256
+`7a6ec270977263a5f2a1c3729400c8594d25aaf4600365973affa60e5ef6b2da`.
+The fixture bind was released before broker preparation and the Maps retry.

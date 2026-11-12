@@ -42,6 +42,8 @@ fn main() {
 	androidtools.framework_guest_user(root + '/smali')!
 	androidtools.framework_service_create_failure(root + '/smali')!
 	androidtools.framework_result_receiver(root + '/smali')!
+	androidtools.framework_bluetooth_unavailable(root + '/smali')!
+	androidtools.framework_contacts_directory(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -85,6 +87,9 @@ fn main() {
 	types << 'android/os/VinixResultReceiverBinder'
 	types << 'android/os/VinixResultReceiverDelivery'
 	types << 'android/os/VinixResultReceiverCreator'
+	types << 'android/bluetooth/BluetoothAdapter'
+	types << 'android/bluetooth/BluetoothManager'
+	types << r'android/provider/ContactsContract$Directory'
 	types << r'android/app/job/JobInfo$Builder'
 	types << 'android/content/pm/PackageParser'
 	types << 'android/content/pm/IPackageDeleteObserver'
