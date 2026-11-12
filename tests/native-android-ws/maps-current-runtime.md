@@ -5,8 +5,10 @@ tiles, search, routing and login have not passed. Guest r21 validates the
 current read APIs and the caller-scoped account-query adapter. Maps rendered
 onboarding in that guest but exited after Skip; native account ownership
 checks remain enforced. Guest r22 passed user/broadcast checks, then Maps
-exited on the missing platform-module query. Guest r23 tests that addition
-and observes startup storage without changing the guest memory budget.
+exited on the missing platform-module query. Guest r23 passed that addition
+and rendered onboarding, then exited after Skip on missing sandbox metadata.
+Guest r25 passed the sandbox metadata regression; the next Maps retry follows.
+Startup storage remains tight under the unchanged guest memory budget.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -643,3 +645,51 @@ at14046ms available2964226048 bytes, minimum2941861888 and MemFree3091264KiB).
 This verifies the observer can run on this kernel, not a completed startup
 measurement. The next desktop Maps launch is in progress. This successor
 uses `3c5e891f7` plus this commit's source changes.
+
+Guest r23 passed the platform-module query and rendered onboarding. After
+Skip, it exited on ApplicationInfo.targetSandboxVersion in Play Store aqxh.l
+(FinskyEventLog). The full log delimiters are `MODULE-CATALOG-MAPS-LOG-BEGIN`
+/ `END`; snapshot `maps-module-catalog-uart-20261112-r1` has full-log SHA256
+`08b0ca81452f6c09d43a4f7f75078e06e437799f52b8ea28b2361f90a5a4984e`.
+No ENOSPC occurred in this attempt's exported Maps log. The observer sampled
+available storage down to142770176 bytes (MemFree336000KiB), followed by a
+recovery after Maps exited. A250ms sampler cannot exclude shorter troughs.
+
+`framework_sandbox_metadata.v` adds the public integer field with its normal
+zero object default and preserves it in ApplicationInfo copies. PackageParser
+reads the existing AndroidManifest TypedArray before recycle, using its
+targetSandboxVersion attribute and default1, following Android's
+[metadata field/copy](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-10.0.0_r1/core/java/android/content/pm/ApplicationInfo.java)
+and [manifest parser](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-10.0.0_r1/core/java/android/content/pm/PackageParser.java).
+This exposes requested metadata; it does not add Android sandbox-version
+enforcement, installation policy or parcel transport.
+
+SDK `framework-sandbox-metadata-20261112-r1` passed full assembly/readback in
+4730ms, RSS485081088 and shared growth156983296 bytes, guard/child0/0 with
+complete cleanup. The fixture checks object default0, copies of value2 and
+copy isolation, installed omitted-manifest default1, and parsing literal2
+and a resource-backed2 from distinct metadata-only APK assets. Those archives
+have hasCode=false and are parsed without installation or application startup.
+An initial fixture link using -R rejected the new resource as an overlay;
+the producer now supplies its compiled resource archive as a normal link input.
+Fixture r19 is a retained failed build, not ARM evidence. r20 uses a shared
+cache filename; the final successor uses distinct paths for independent reads.
+Guest r24 was staged with r20 but was not booted or used for qualification.
+
+The r23 storage observer completed at600203ms, retaining the same minimum
+142770176 bytes / MemFree336000KiB. Full snapshot
+`maps-storage-complete-uart-20261112-r1` has SHA256
+`0f6c0bbacf43b403adaf07919e54978b66984862eb0a57ebe89852bef6deefe5`.
+Only the verified r23 QEMU was stopped. Guest r25 stages fixture r21, whose
+two metadata assets are copied to distinct cache paths; its ARM checks follow.
+
+Signed fixture r21 passed on ARM in r25, including both metadata-only archive
+parses and all earlier checks, runner readiness/pass, EOF drain and exit0.
+Snapshot `sandbox-metadata-api-uart-20261112-r1`, plan
+`sandbox-metadata-api-plan-20261112-r1.json` and independent readback
+`sandbox-metadata-api-readback-20261112-r1` retain the two-entry export, archive
+SHA256 `66e6384ddf5793c31253d136ecf6ef2b3d19b94f5e15588aa3b22bdad674fc2e`.
+Caller inspection `vending-sandbox-metadata-caller-20261112-r1` confirms
+aqxh.l reads that field directly after its platform-version gate. The test
+bind mount was released before broker preparation and the next Maps attempt.
+This successor uses `d5adecec5` plus this commit's source changes.

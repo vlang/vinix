@@ -5,6 +5,85 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static sandboxMetadata(Landroid/content/Context;)V
+.locals 4
+new-instance v0, Landroid/content/pm/ApplicationInfo;
+invoke-direct {v0}, Landroid/content/pm/ApplicationInfo;-><init>()V
+iget v1, v0, Landroid/content/pm/ApplicationInfo;->targetSandboxVersion:I
+const/4 v2, 0
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const/4 v2, 2
+iput v2, v0, Landroid/content/pm/ApplicationInfo;->targetSandboxVersion:I
+new-instance v1, Landroid/content/pm/ApplicationInfo;
+invoke-direct {v1, v0}, Landroid/content/pm/ApplicationInfo;-><init>(Landroid/content/pm/ApplicationInfo;)V
+iget v3, v1, Landroid/content/pm/ApplicationInfo;->targetSandboxVersion:I
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const/4 v3, 1
+iput v3, v1, Landroid/content/pm/ApplicationInfo;->targetSandboxVersion:I
+iget v1, v0, Landroid/content/pm/ApplicationInfo;->targetSandboxVersion:I
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {p0}, Landroid/content/Context;->getApplicationInfo()Landroid/content/pm/ApplicationInfo;
+move-result-object v0
+iget v1, v0, Landroid/content/pm/ApplicationInfo;->targetSandboxVersion:I
+invoke-static {v1, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v0, "sandbox/literal.apk"
+invoke-static {p0, v0, v2}, Lorg/vinix/bootstrap/Main;->sandboxArchive(Landroid/content/Context;Ljava/lang/String;I)V
+const-string v0, "sandbox/resource.apk"
+invoke-static {p0, v0, v2}, Lorg/vinix/bootstrap/Main;->sandboxArchive(Landroid/content/Context;Ljava/lang/String;I)V
+return-void
+.end method
+.method public static sandboxArchive(Landroid/content/Context;Ljava/lang/String;I)V
+.locals 8
+invoke-virtual {p0}, Landroid/content/Context;->getAssets()Landroid/content/res/AssetManager;
+move-result-object v0
+invoke-virtual {v0, p1}, Landroid/content/res/AssetManager;->open(Ljava/lang/String;)Ljava/io/InputStream;
+move-result-object v0
+invoke-virtual {p0}, Landroid/content/Context;->getCacheDir()Ljava/io/File;
+move-result-object v1
+new-instance v2, Ljava/io/File;
+const/16 v3, 0x2f
+const/16 v4, 0x5f
+invoke-virtual {p1, v3, v4}, Ljava/lang/String;->replace(CC)Ljava/lang/String;
+move-result-object v3
+invoke-direct {v2, v1, v3}, Ljava/io/File;-><init>(Ljava/io/File;Ljava/lang/String;)V
+new-instance v1, Ljava/io/FileOutputStream;
+invoke-direct {v1, v2}, Ljava/io/FileOutputStream;-><init>(Ljava/io/File;)V
+const/16 v4, 0x1000
+new-array v4, v4, [B
+:copy_start
+:copy_loop
+invoke-virtual {v0, v4}, Ljava/io/InputStream;->read([B)I
+move-result v5
+if-ltz v5, :copy_done
+const/4 v6, 0
+invoke-virtual {v1, v4, v6, v5}, Ljava/io/FileOutputStream;->write([BII)V
+goto :copy_loop
+:copy_done
+:copy_end
+invoke-virtual {v1}, Ljava/io/FileOutputStream;->close()V
+invoke-virtual {v0}, Ljava/io/InputStream;->close()V
+invoke-virtual {v2}, Ljava/io/File;->getPath()Ljava/lang/String;
+move-result-object v3
+new-instance v0, Landroid/content/pm/PackageParser;
+invoke-direct {v0, v3}, Landroid/content/pm/PackageParser;-><init>(Ljava/lang/String;)V
+new-instance v4, Landroid/util/DisplayMetrics;
+invoke-direct {v4}, Landroid/util/DisplayMetrics;-><init>()V
+invoke-virtual {v4}, Landroid/util/DisplayMetrics;->setToDefaults()V
+const/4 v5, 0
+invoke-virtual {v0, v2, v3, v4, v5}, Landroid/content/pm/PackageParser;->parsePackage(Ljava/io/File;Ljava/lang/String;Landroid/util/DisplayMetrics;I)Landroid/content/pm/PackageParser$Package;
+move-result-object v0
+iget-object v0, v0, Landroid/content/pm/PackageParser$Package;->applicationInfo:Landroid/content/pm/ApplicationInfo;
+iget v0, v0, Landroid/content/pm/ApplicationInfo;->targetSandboxVersion:I
+invoke-static {v0, p2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v2}, Ljava/io/File;->delete()Z
+return-void
+:copy_failed
+move-exception v7
+invoke-virtual {v1}, Ljava/io/FileOutputStream;->close()V
+invoke-virtual {v0}, Ljava/io/InputStream;->close()V
+throw v7
+.catchall {:copy_start .. :copy_end} :copy_failed
+.end method
 .method public static moduleCatalog(Landroid/content/Context;)V
 .locals 4
 invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
@@ -810,6 +889,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->runtimeQueries(Landroid/content/
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->accountPackages(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->userBroadcasts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->moduleCatalog(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sandboxMetadata(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1129,6 +1209,7 @@ return-object v0
 .end method
 ')!
 	os.cp(base + '/unsigned.apk', root + '/unsigned.apk')!
+	sandbox_assets(root)!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	tools := '/Users/alex/code/vinix/build/android-framework/tools'
 	signer := '/Users/alex/code/vinix/build/android-native-ws/android-15/lib/apksigner.jar'
@@ -1139,4 +1220,30 @@ return-object v0
 		if os.system_args(args) != 0 { panic('fixture build failed') }
 	}
 	println('CURRENT-API-FIXTURE ' + root + '/probe.apk')
+}
+
+// Parse metadata-only archives without installing them or starting their code.
+fn sandbox_assets(root string) ! {
+	aapt := os.abs_path('build/android-native-ws/aapt2')
+	resources := os.abs_path('build/android-framework/opensudoku/overlay/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/framework-res.apk')
+	os.mkdir_all(root + '/assets/sandbox')!
+	os.mkdir_all(root + '/metadata-res/values')!
+	os.write_file(root + '/metadata-res/values/integers.xml', '<resources><integer name="sandbox_level">2</integer></resources>')!
+	if os.system_args([aapt, 'compile', '--dir', root + '/metadata-res', '-o', root + '/metadata-res.zip']) != 0 {
+		return error('metadata resource compilation failed')
+	}
+	for name, value in {'literal': '2', 'resource': '@integer/sandbox_level'} {
+		manifest := root + '/metadata-' + name + '.xml'
+		os.write_file(manifest, '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.sandboxmetadata" android:targetSandboxVersion="' + value + '"><uses-sdk android:minSdkVersion="28"/><application android:hasCode="false"/></manifest>')!
+		if os.system_args([aapt, 'link', '-I', resources, '--manifest', manifest, root + '/metadata-res.zip', '-o', root + '/assets/sandbox/' + name + '.apk']) != 0 {
+			return error('metadata archive link failed')
+		}
+	}
+	// zip must retain the assets/ prefix, unlike the classes.dex insertion.
+	mut zip := os.new_process('/usr/bin/zip')
+	zip.set_work_folder(root)
+	zip.set_args(['-q', '-r', root + '/unsigned.apk', 'assets'])
+	zip.run()
+	zip.wait()
+	if zip.code != 0 { return error('metadata assets insertion failed') }
 }
