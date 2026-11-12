@@ -27,6 +27,9 @@ not produce a result before that exit.
 Guest r36 repeated the same SDK and reached onboarding without the r35
 app-host transport failure, then lost its main looper on the missing optional
 StorageStatsManager type. No map/search/route/login result is qualified.
+Guest r38 passed that repair's complete API regression, then Maps exited on
+missing Build.getSerial in GMS check-in; an SSLSessionCache context constructor
+was also missing in an asynchronous Play Store initialization path.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -1091,3 +1094,47 @@ forms returned null and the caller's optional pattern completed. Snapshot
 `storage-stats-api-readback-20261112-r1` retain its two-entry export, archive
 SHA256 `6eb8fe4ee4308327e34a5c0c8c25b11870341d6988177d6024a29385f398c13e`.
 The fixture bind was released before broker preparation and the Maps retry.
+
+Guest r38 rendered onboarding and exited10 after Skip on missing
+Build.getSerial in GMS `bjaa.a` source17. That caller explicitly catches
+SecurityException and falls back to an absent serial; it does not catch a
+linkage error. Readback is `gms-build-serial-caller-20261112-r1/classes.dex/bjaa.smali`.
+It also logged an asynchronous missing SSLSessionCache(Context) constructor
+in Play Store `bosv.<init>` source88, retained at
+`vending-ssl-cache-caller-20261112-r1/classes.dex/bosv.smali`. The previous
+StorageStatsManager failure is absent from the complete log.
+
+Snapshot `maps-storage-stats-final-uart-20261112-r1` has SHA256
+`a30eec2d07363c9f1910b3e8f016288894e940d895136a5b88fa35a3c2d4c5b8`;
+log markers are STORAGE-STATS-MAPS-LOG-BEGIN/END. Minimum disk was7947096064
+bytes and MemFree34000KiB before verified shutdown at about482 seconds.
+No600-second or functional map/search result is claimed.
+The synced, stopped r38 image has SHA256
+`621ab22013d9ec4839706473c4b99824c94276cfb3d78d8e03c848d2956c52c6`.
+
+`framework_serial_tls_cache.v` adds getSerial with explicit SecurityException:
+this deployment has no authorized hardware-serial service. No host identifier
+or fabricated serial is returned. The caller's denial handling follows the
+[Build API contract](https://developer.android.com/reference/android/os/Build#getSerial()).
+The SSLSessionCache context overload requests getDir("sslcache", MODE_PRIVATE)
+and delegates to the existing File overload, following the directory selection
+in [AOSP](https://android.googlesource.com/platform/frameworks/base/+/27f592d/core/java/android/net/SSLSessionCache.java).
+That existing overload has no persistence backend. This change supplies the
+constructor and directory selection, not session resumption or caching; socket
+factories, trust stores, hostname and certificate verification are unchanged.
+
+SDK `framework-serial-cache-20261112-r1` passed guarded full assembly and DEX
+readback, guard/child0/0, complete cleanup,9636ms, RSS482000896 and shared
+growth180051968 bytes. Signed fixture r31 checks direct serial denial,
+getDir name/mode/count through a recording ContextWrapper, the actual private
+directory and null-context rejection. Build/link/sign/verify passed0/0,
+complete cleanup,2355ms, RSS130007040 and growth62132224 bytes. Guest r39
+stages that pair with unchanged native/core, volume probe and VM resources.
+
+The complete signed r31 fixture passed on ARM in r39 as UID/GID10160 with
+disk-backed data, readiness/pass once, drained EOF and exit0. Snapshot
+`serial-cache-api-uart-20261112-r1`, plan `serial-cache-api-plan-20261112-r1.json`
+and strict independent readback `serial-cache-api-readback-20261112-r1` retain
+its two-entry export, archive SHA256
+`5a57c75a4dc800e8de01e3dc18fb1a0417ec1adf6171e1f0651e91d635ba1715`.
+The fixture bind was released before broker preparation.

@@ -36,6 +36,7 @@ fn main() {
 	androidtools.framework_job_parameters(root + '/smali')!
 	androidtools.framework_modem_identifiers(root + '/smali')!
 	androidtools.framework_storage_stats_type(root + '/smali')!
+	androidtools.framework_serial_tls_cache(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -66,6 +67,8 @@ fn main() {
 	types << 'android/app/job/JobInfo'
 	types << 'android/app/job/JobParameters'
 	types << 'android/app/usage/StorageStatsManager'
+	types << 'android/os/Build'
+	types << 'android/net/SSLSessionCache'
 	types << r'android/app/job/JobInfo$Builder'
 	types << 'android/content/pm/PackageParser'
 	types << 'android/content/pm/IPackageDeleteObserver'

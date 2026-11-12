@@ -5,6 +5,48 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static serialTlsCache(Landroid/content/Context;)V
+.locals 5
+:serial_start
+invoke-static {}, Landroid/os/Build;->getSerial()Ljava/lang/String;
+:serial_end
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+:serial_denied
+move-exception v0
+new-instance v0, Lorg/vinix/bootstrap/TestSslContext;
+invoke-direct {v0, p0}, Lorg/vinix/bootstrap/TestSslContext;-><init>(Landroid/content/Context;)V
+new-instance v1, Landroid/net/SSLSessionCache;
+invoke-direct {v1, v0}, Landroid/net/SSLSessionCache;-><init>(Landroid/content/Context;)V
+iget v1, v0, Lorg/vinix/bootstrap/TestSslContext;->calls:I
+const/4 v2, 1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget-object v1, v0, Lorg/vinix/bootstrap/TestSslContext;->directory:Ljava/io/File;
+invoke-virtual {v1}, Ljava/io/File;->isDirectory()Z
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v3, "sslcache"
+const/4 v4, 0
+invoke-virtual {p0, v3, v4}, Landroid/content/Context;->getDir(Ljava/lang/String;I)Ljava/io/File;
+move-result-object v3
+invoke-virtual {v1, v3}, Ljava/io/File;->equals(Ljava/lang/Object;)Z
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:null_cache_start
+new-instance v1, Landroid/net/SSLSessionCache;
+const/4 v0, 0
+invoke-direct {v1, v0}, Landroid/net/SSLSessionCache;-><init>(Landroid/content/Context;)V
+:null_cache_end
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+:null_cache
+move-exception v0
+return-void
+.catch Ljava/lang/SecurityException; {:serial_start .. :serial_end} :serial_denied
+.catch Ljava/lang/NullPointerException; {:null_cache_start .. :null_cache_end} :null_cache
+.end method
 .method public static optionalStorageStats(Landroid/content/Context;)V
 .locals 4
 const-class v0, Landroid/app/usage/StorageStatsManager;
@@ -1260,6 +1302,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->jobInstallQueries(Landroid/conte
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->scheduleProbeJob(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->modemIdentifiers(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->optionalStorageStats(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->serialTlsCache(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1500,6 +1543,33 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
+	os.write_file(root + '/smali/TestSslContext.smali', r'.class public Lorg/vinix/bootstrap/TestSslContext;
+.super Landroid/content/ContextWrapper;
+.field public calls:I
+.field public directory:Ljava/io/File;
+.method public constructor <init>(Landroid/content/Context;)V
+.locals 0
+invoke-direct {p0, p1}, Landroid/content/ContextWrapper;-><init>(Landroid/content/Context;)V
+return-void
+.end method
+.method public getDir(Ljava/lang/String;I)Ljava/io/File;
+.locals 3
+const-string v0, "sslcache"
+invoke-virtual {v0, p1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+const/4 v1, 1
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const/4 v0, 0
+invoke-static {p2, v0}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v0, p0, Lorg/vinix/bootstrap/TestSslContext;->calls:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestSslContext;->calls:I
+invoke-super {p0, p1, p2}, Landroid/content/ContextWrapper;->getDir(Ljava/lang/String;I)Ljava/io/File;
+move-result-object v0
+iput-object v0, p0, Lorg/vinix/bootstrap/TestSslContext;->directory:Ljava/io/File;
+return-object v0
+.end method
+')!
 	os.write_file(root + '/smali/TestJobService.smali', r'.class public Lorg/vinix/bootstrap/TestJobService;
 .super Landroid/app/job/JobService;
 .field public static calls:I
