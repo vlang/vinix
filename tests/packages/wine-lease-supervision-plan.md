@@ -219,6 +219,83 @@ This qualifies these two forced publication orderings and their controls, not
 all process/namespace races, init death, kernel leak freedom, complete C
 toolchain contents, real Wine supervision or roadmap section 14 completion.
 
+## Standalone holder primitive, 2026-11-13
+
+Following `4a1457330`, `tools/packages/launchhold` adds a standalone synchronous
+holder for the qualified Linux AMD64/AArch64 static toolchains. It is not wired
+to package or Wine launch paths. The caller supplies an already verified shared
+generation lease with CLOEXEC above standard streams, keeps its arguments and
+lease valid, and must not unlock/reuse the lease or let another waiter collect
+the holder. Default waitable SIGCHLD policy is required throughout the call;
+ignored/custom handlers and SA_NOCLDWAIT refuse before workload creation.
+
+The parent prepares argv/status storage, blocks the calling thread's full
+kernel signal mask before `_Fork`, then immediately restores its own mask.
+The private non-execing holder enables/read-checks subreaping, closes unrelated
+descriptors using close_range, starts the client and retains the borrowed
+lease copy until the original client and adopted descendants retire. Only the
+holder collects arbitrary children; its caller waits for its exact holder PID.
+The client closes the lease, resets caught signal dispositions before unmasking,
+preserves ignored dispositions and restores the caller's mask before chdir/exec.
+Raw kernel signal/wait/write/close/poll operations avoid inherited libc
+cancellation state, and `_Fork` bypasses user pthread_atfork callbacks.
+Generated C and independent read-only lifetime review confirm stack-only
+post-fork records without V allocation/formatting or environment reconstruction.
+
+The normal result preserves the initial client status, separately from cwd/exec
+failure records. Unexpected waits retain the lease and retry with one diagnostic
+attempt to stderr. This is a fail-closed primitive, not a complete recovery UI.
+The caller's lease descriptor remains open and its subreaper state is unchanged.
+SIGKILL of the holder remains outside the guarantee: no kernel-owned workload
+reference is added. Wine prefix serialization, authenticated foreground server
+ownership, descriptor handoff, caller wait ownership and production recovery
+still need integration/qualification before enabling this for signed Wine.
+
+`tests/packages/lease-holder-check.v` compiles/admit-checks actual parsed guest
+sources, records literal commands and selected tools/kernels, and verifies
+generated artifacts and source hashes before/after boot. It runs with:
+
+```text
+CHECK FRESH_OUTPUT ARCH KERNEL SYSROOT GCC_INSTALL CLANG V standard
+CHECK FRESH_OUTPUT ARCH KERNEL SYSROOT GCC_INSTALL CLANG V fault
+CHECK FRESH_OUTPUT ARCH KERNEL SYSROOT GCC_INSTALL CLANG V signal
+CHECK FRESH_OUTPUT ARCH KERNEL SYSROOT GCC_INSTALL CLANG V signal-refused
+```
+
+Both architectures pass final `*-standard-05`: statuses 37/126/127/143,
+double-fork/setsid adoption, retained lease after caller death, catchable holder
+cancellation, lease-free workload descriptors, unrelated-lease retirement and
+both low/high descriptor orderings. Registered at-fork callbacks demonstrably
+run for a calibration child and are skipped by the holder; that unrelated child
+remains the caller's to reap. Ignored SIGUSR2 survives exec. Caller mask/reaper
+state and its borrowed lease remain intact. Ten refusal cases cover missing
+cwd/executable, invalid/inheritable leases, process/FD exhaustion and unwaitable
+SIGCHLD policies, including mask restoration after fork failure.
+
+Both `*-fault-05` runs force persistent EIO after initial-client collection,
+kill the caller, and require the lease to remain busy after worker retirement.
+Exactly one diagnostic is retained; the fixture explicitly kills/reaps the
+control holder and adopts its unreaped worker for cleanup. Both `*-signal-05`
+runs inject a caught signal immediately after the first fork and before child
+unmask/exec; the holder stays protected and the client returns the default
+signal status. `*-signal-refused-05` preserves caught handlers deliberately and
+must refuse at exactly `inherited handler ran before exec`. Injection branches
+require `lease_holder_fixture` plus their mode flags. A macOS compile/unit run
+also passes the unsupported-host refusal. The saved production kernels from
+the preceding publication-race gate are unchanged; no kernel rebuild was needed.
+
+Initial review found the inherited-handler window; it was fixed and re-reviewed
+before final qualification. Earlier standard-02/fault-02 successes predate that
+fix and are superseded. Failed compile logs, preliminary runs, review notes,
+final source copies, all generated C/binaries/commands and the eight final runs
+remain at `/Users/alex/.cache/vlh-20261113-01`. The complete in-place inventory
+is `/Users/alex/Library/Caches/vinix-codex/section14/lease-holder-20261113-01.inventory.json`,
+SHA-256 `334faa96655a4735d9c5a35f91bb5520d8c665d3ee8f777b9e81d78457c31c89`.
+Recording and separate complete verification pass; adjacent logs retain results.
+Keep the original workspace and input namespaces. This is local primitive
+qualification, not a complete C toolchain inventory, hermetic build, leak
+measurement, package sandbox acceptance or real Wine supervision qualification.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

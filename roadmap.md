@@ -1184,6 +1184,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     refuse at their intended wait-ownership gates. Default kernels exclude the
     hooks and pass ordinary subreaper regressions. Production Wine lease
     supervision remains open.
+    A [standalone lease holder](tests/packages/wine-lease-supervision-plan.md#standalone-holder-primitive-2026-11-13)
+    now passes native ARM/x86 lifecycle, caller-death, resource-refusal and
+    signal-window controls. It remains disconnected from package launches;
+    foreground Wine server ownership and production integration remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
