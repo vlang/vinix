@@ -305,6 +305,42 @@ fn test_software_metal_compiled_library_metadata() {
 	println('IOS-SOFTWARE-METAL-LIBRARY: raw/wrapped and independent/shared module containers, leaf/rope dispatch ABI, owned bytes, names/types/UTF-8, function lifetimes, empty/missing functions, truncations/hash/range/type errors, optional NSError, bounded 512 MiB rope rejection, eight workers and two drained runtimes PASS')
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
+type SMNoCopy = fn (u64, &char, u64, u64, u64, u64) u64
+fn sm_test_no_copy(d u64, bytes u64, length u64, options u64, deallocator u64) u64 { return unsafe { SMNoCopy(voidptr(C.ios_objc_msgsend))(d, c'newBufferWithBytesNoCopy:length:options:deallocator:', bytes, length, options, deallocator) } }
+fn test_software_metal_no_copy_buffers() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		page := u64(C.getpagesize()); memory := C.mmap(unsafe { nil }, usize(2 * page), 3, 0x1002, -1, 0); assert u64(memory) != ~u64(0)
+		base := u64(memory); C.memset(memory, 0x11, usize(2 * page))
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
+		b := sm_test_no_copy(d, base, 2 * page, 0, 0); alias := sm_test_no_copy(d, base, 2 * page, 0, 0)
+		assert b != 0 && alias != b && sm_send(b, c'contents') == base && sm_send(b, c'length') == 2 * page && sm_send(b, c'device') == d
+		for mode in 0 .. 8 { assert sm_test_no_copy(d, if mode == 0 { u64(0) } else if mode == 1 { base + 1 } else if mode == 2 { ~u64(0) - page + 1 } else { base }, if mode == 3 { u64(0) } else if mode == 4 { page - 1 } else if mode == 5 { software_metal_max_buffer + page } else { page }, if mode == 6 { u64(1) } else { 0 }, if mode == 7 { u64(1) } else { 0 }) == 0 }
+		owned := sm_test_buffer(d, 64, 0); texture := sm_test_buffer_texture_view(b, sm_test_descriptor(80, 2, 2, 0), 256, 256); assert texture != 0
+		mut pixel := [u8(7), 13, 29, 53]!
+		sm_test_put(texture, SoftwareMetalRegion{width: 1, height: 1, depth: 1}, 0, u64(unsafe { &pixel[0] }), 0)
+		for i in 0 .. 4 { assert unsafe { *(&u8(base + 256 + u64(i))) } == pixel[i] }
+		child := C.fork(); assert child >= 0
+		if child == 0 { C.close(1); C.close(2); cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder'); sm_test_copy(enc, b, 0, alias, 1, 8); C._exit(0) }
+		mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder')
+		sm_test_copy(enc, b, 0, owned, 0, 16); sm_test_fill(enc, alias, SoftwareMetalRange{location: 4, length: 4}, 0x44)
+		sm_test_copy(enc, owned, 0, b, page, 16) // Disjoint pages of aliased storage.
+		sm_test_copy(enc, b, 0, alias, page + 32, 16)
+		sm_test_buffer_texture(enc, alias, page + 64, 8, 0, SoftwareMetalSize{width: 2, height: 2, depth: 1}, texture, 0, 0, SoftwareMetalOrigin{}, true)
+		sm_test_buffer_texture(enc, alias, page + 96, 8, 0, SoftwareMetalSize{width: 2, height: 2, depth: 1}, texture, 0, 0, SoftwareMetalOrigin{}, false)
+		unsafe { *(&u8(base)) = 0x22 }
+		objc_release(b); objc_release(alias); objc_release(texture); objc_release(q); objc_release(d)
+		sm_call(enc, c'endEncoding'); sm_call(cmd, c'commit'); assert unsafe { *(&u8(sm_send(owned, c'contents'))) } == 0x22
+		assert unsafe { *(&u8(base + page)) } == 0x22 && unsafe { *(&u8(base + page + 32)) } == 0x22
+		for i in 4 .. 8 { assert unsafe { *(&u8(base + u64(i))) } == 0x44 }
+		for i in 0 .. 16 { assert unsafe { *(&u8(base + page + 96 + u64(i))) } == 0x11 }
+		objc_release(owned); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+		// The runtime must neither free nor unmap caller pages on buffer disposal.
+		unsafe { *(&u8(base)) = 0x7e }; assert unsafe { *(&u8(base)) } == 0x7e; assert C.munmap(memory, usize(2 * page)) == 0
+	}
+	println('IOS-SOFTWARE-METAL-NO-COPY: borrowed page-aligned memory, exact contents/length ABI, eight rejected inputs, alias overlap rejection, ordered copies/fills and buffer-texture transfers, live CPU bytes, retained owners, caller pages survive disposal and two drained runtimes PASS')
+}
 fn sm_texture_descriptor_profile(api SMSamplerAPI) {
 	d := unsafe { SMDescriptor(api.send)(api.cls, api.sel(c'texture2DDescriptorWithPixelFormat:width:height:mipmapped:'), 80, 7, 3, 0) }; assert d != 0
 	assert api.get(d, c'width') == 7 && api.get(d, c'height') == 3 && api.get(d, c'pixelFormat') == 80

@@ -47,7 +47,7 @@ fn sm_buffer_texture_copy(encoder u64, buffer u64, offset u64, row u64, image u6
 	if offset % pixel != 0 || row % pixel != 0 || row < width || row > 16384 * pixel { panic('iOS: Metal transfer offset/row alignment or size') }
 	// Dimensions and row pitch are bounded before this multiplication.
 	span := (size.height - 1) * row + width
-	if !sm_range(u64(b.data.len), offset, span) { panic('iOS: Metal transfer span exceeds buffer') }
+	if !sm_range(sm_buffer_length(b), offset, span) { panic('iOS: Metal transfer span exceeds buffer') }
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	texture_offset := origin.y * sm_texture_stride(t) + origin.x * pixel
 	if sm_spans_overlap(sm_storage_base(b) + offset, span, sm_storage_base(t) + texture_offset, (size.height - 1) * sm_texture_stride(t) + width) { panic('iOS: overlapping Metal buffer/texture storage spans') }

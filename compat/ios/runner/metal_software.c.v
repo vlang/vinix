@@ -15,6 +15,17 @@ mut:
 	finished bool
 }
 const software_metal_max_buffer = u64(64 * 1024 * 1024)
+fn sm_buffer_length(h &ObjHeader) u64 { return if h.external_data != 0 { h.external_size } else { u64(h.data.len) } }
+fn sm_buffer_no_copy(device u64, selector &char, bytes u64, length u64, options u64, deallocator u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	sm_check(device, 'VinixSoftwareMTLDevice')
+	page := u64(C.getpagesize())
+	if bytes == 0 || length == 0 || length > software_metal_max_buffer || bytes > ~u64(0) - length || bytes % page != 0 || length % page != 0 || options != 0 || deallocator != 0 { return 0 }
+	buffer := sm_new('VinixSoftwareMTLBuffer', device)
+	mut h := obj_header(buffer); h.external_data = bytes; h.external_size = length
+	return buffer // Caller owns the pages; no destructor ever frees this address.
+}
 fn sm_new(name string, owner u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -93,8 +104,8 @@ fn sm_copy(encoder u64, selector &char, source u64, source_offset u64, destinati
 	src := sm_check(source, 'VinixSoftwareMTLBuffer'); dst := sm_check(destination, 'VinixSoftwareMTLBuffer')
 	device := obj_header(obj_header(h.fields[0]).fields[0]).fields[0]
 	if src.fields[0] != device || dst.fields[0] != device { panic('iOS: Metal blit resources belong to another device') }
-	if !sm_range(u64(src.data.len), source_offset, size) || !sm_range(u64(dst.data.len), destination_offset, size) { panic('iOS: Metal blit range exceeds buffer') }
-	if source == destination && size > 0 && source_offset < destination_offset + size && destination_offset < source_offset + size { panic('iOS: overlapping Metal blit ranges') }
+	if !sm_range(sm_buffer_length(src), source_offset, size) || !sm_range(sm_buffer_length(dst), destination_offset, size) { panic('iOS: Metal blit range exceeds buffer') }
+	if size > 0 && sm_spans_overlap(sm_storage_base(src) + source_offset, size, sm_storage_base(dst) + destination_offset, size) { panic('iOS: overlapping Metal blit ranges') }
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	state.ops << SoftwareMetalCopy{source: objc_retain(source), destination: objc_retain(destination), source_offset: source_offset, destination_offset: destination_offset, size: size}
 }
@@ -127,7 +138,7 @@ fn sm_commit(command u64, selector &char) {
 		if op.size == 0 { continue }
 		if op.fill {
 			dst := obj_header(op.destination)
-			unsafe { C.memset(voidptr(u64(dst.data.data) + op.destination_offset), int(op.fill_value), usize(op.size)) }
+			unsafe { C.memset(voidptr(sm_storage_base(dst) + op.destination_offset), int(op.fill_value), usize(op.size)) }
 			continue
 		}
 		src := obj_header(op.source); dst := obj_header(op.destination)
@@ -182,8 +193,8 @@ fn sm_get(object u64, selector &char) u64 {
 	defer { C.ios_objc_initialize_unlock() }
 	h := obj_header(object)
 	return match ctext(u64(selector)) {
-		'length' { u64(h.data.len) }
-		'contents' { u64(h.data.data) }
+		'length' { sm_buffer_length(h) }
+		'contents' { sm_storage_base(h) }
 		'storageMode', 'cpuCacheMode' { u64(0) }
 		'device' { if h.cls == ios_runtime.names['VinixSoftwareMTLBuffer'] || h.cls == ios_runtime.names['VinixSoftwareMTLCommandQueue'] { h.fields[0] } else { obj_header(h.fields[0]).fields[0] } }
 		'commandQueue' { h.fields[0] }
@@ -204,6 +215,7 @@ fn software_metal_start() {
 	device := ios_runtime.names['VinixSoftwareMTLDevice']; buffer := ios_runtime.names['VinixSoftwareMTLBuffer']; queue := ios_runtime.names['VinixSoftwareMTLCommandQueue']; command := ios_runtime.names['VinixSoftwareMTLCommandBuffer']; encoder := ios_runtime.names['VinixSoftwareMTLBlitCommandEncoder']
 	sm_method(device, c'newBufferWithLength:options:', u64(unsafe { voidptr(sm_new_buffer) }), c'@32@0:8Q16Q24')
 	sm_method(device, c'newBufferWithBytes:length:options:', u64(unsafe { voidptr(sm_buffer_bytes) }), c'@40@0:8r^v16Q24Q32')
+	sm_method(device, c'newBufferWithBytesNoCopy:length:options:deallocator:', u64(unsafe { voidptr(sm_buffer_no_copy) }), c'@48@0:8^v16Q24Q32@?40')
 	sm_method(device, c'newCommandQueue', u64(unsafe { voidptr(sm_new_queue) }), c'@16@0:8')
 	sm_method(device, c'maxBufferLength', u64(unsafe { voidptr(sm_get) }), c'Q16@0:8')
 	for cls in [buffer, queue, command]! { sm_method(cls, c'device', u64(unsafe { voidptr(sm_get) }), c'@16@0:8') }
@@ -237,7 +249,7 @@ fn sm_fill(encoder u64, selector &char, buffer u64, range SoftwareMetalRange, va
 	b := sm_check(buffer, 'VinixSoftwareMTLBuffer')
 	device := obj_header(obj_header(h.fields[0]).fields[0]).fields[0]
 	if b.fields[0] != device { panic('iOS: Metal fill buffer belongs to another device') }
-	if !sm_range(u64(b.data.len), range.location, range.length) { panic('iOS: Metal fill range exceeds buffer') }
+	if !sm_range(sm_buffer_length(b), range.location, range.length) { panic('iOS: Metal fill range exceeds buffer') }
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	state.ops << SoftwareMetalCopy{destination: objc_retain(buffer), destination_offset: range.location, size: range.length, fill: true, fill_value: value}
 }

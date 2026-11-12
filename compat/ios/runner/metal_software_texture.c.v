@@ -31,7 +31,7 @@ fn sm_buffer_texture(buffer u64, selector &char, descriptor u64, offset u64, row
 	alignment := sm_linear_alignment(a.format)
 	if offset % alignment != 0 || row % alignment != 0 || row < a.width * pixel || row > software_metal_max_buffer { return 0 }
 	span := (a.height - 1) * row + a.width * pixel
-	if !sm_range(u64(b.data.len), offset, span) { return 0 }
+	if !sm_range(sm_buffer_length(b), offset, span) { return 0 }
 	mut state := unsafe { &CVMetalState(C.malloc(sizeof(CVMetalState))) }
 	if state == unsafe { nil } { return 0 }; unsafe { *state = *a }
 	texture := sm_new('VinixSoftwareMTLTexture', b.fields[0]); mut target := obj_header(texture)

@@ -9,6 +9,7 @@ textures, present drawables or use a GPU. It cannot yet render Fortnite.
 Implemented Objective-C API:
 
 - Device: `newBufferWithLength:options:`, `newBufferWithBytes:length:options:`,
+  `newBufferWithBytesNoCopy:length:options:deallocator:`,
   `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`,
   `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`,
   `newLibraryWithFile:error:`, `newDefaultLibrary`,
@@ -129,6 +130,18 @@ device, command buffers retain their queue, and encoders retain their command
 buffer. Encoded copies retain source and destination until command-buffer
 destruction. Autorelease ownership applies to command buffers and encoders;
 device, queue and buffer creation transfer a reference to the caller.
+
+The no-copy constructor instead borrows caller-owned pages. Pointer and length
+must be aligned to the host page size, length must be positive and at most
+64 MiB, and pointer-plus-length must not overflow. Options and deallocator
+must both be zero; nonnil deallocator blocks are currently unsupported and
+rejected without copying or invoking them. The caller must keep the entire
+region mapped and writable until all buffers, textures, views and encoded
+commands using it have been released. The runtime never frees/unmaps these
+pages. Contents, fills, blits and buffer-backed textures all use the borrowed
+bytes directly. Separately wrapped overlapping memory participates in alias
+checks; nonempty overlapping buffer copies reject, while disjoint copies and
+empty copies are valid. Access through contents still requires synchronization.
 
 Copies execute in encoding order when committed, under the runtime's recursive
 lock. Commit completes synchronously and transitions status from 0 to 2 to 3 to 4.
