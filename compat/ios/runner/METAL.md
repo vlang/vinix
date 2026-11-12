@@ -11,7 +11,8 @@ Implemented Objective-C API:
 - Device: `newBufferWithLength:options:`, `newBufferWithBytes:length:options:`,
   `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`,
   `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`,
-  `newLibraryWithFile:error:`.
+  `newLibraryWithFile:error:`, `newDefaultLibrary`,
+  `newDefaultLibraryWithBundle:error:`.
 - Library: `device`, `functionNames`, `newFunctionWithName:`.
 - Function: `device`, `name`, `functionType` (metadata handles only).
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
@@ -109,8 +110,8 @@ Success leaves the error slot untouched.
 
 These handles expose container metadata. AIR instruction verification,
 specialization, pipeline creation and shader execution remain pending; even
-a valid container does not establish executable LLVM IR. Source compilation,
-URL loading and default libraries remain unsupported. See
+a valid container does not establish executable LLVM IR. Source compilation
+and URL loading remain unsupported. See
 [Apple's dispatch-data library API](https://developer.apple.com/documentation/metal/mtldevice/makelibrary%28data%3A%29).
 
 Filename loading uses the same validation and ownership path without requiring
@@ -121,6 +122,16 @@ reject early EOF and check for growth beyond the stat size. Open failures
 return library error 6, stat failures 2, invalid paths/file types/size 1 and
 incomplete or malformed content 3. Files may be replaced or deleted after
 loading; the library keeps its own bytes. Source compilation remains absent.
+
+Default-library loading reads `default.metallib` directly from the configured
+iOS main bundle resource root, using the same bounded file loader. It requires
+a nonempty root of at most 1,006 bytes without NULs. `newDefaultLibrary` returns
+nil on failure; the explicit bundle form reports the existing library errors
+and accepts only the runtime-owned main NSBundle. Other bundles return
+unsupported (1). An unset resource root returns unsupported; a missing file
+returns file-not-found (6). Success transfers an owned library and leaves the
+error slot untouched. No library is cached, so subsequent calls reread the
+file. Neither entry point requires dispatch initialization.
 
 Texture-to-texture blits copy positive 2D regions between textures with the
 same pixel format and device. Only slice/level zero, origin z zero and depth

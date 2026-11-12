@@ -19,6 +19,42 @@ type SMDescriptor = fn (u64, &char, u64, u64, u64, u8) u64
 type SMTexture = fn (u64, &char, u64) u64
 type SMSet = fn (u64, &char, u64)
 type SMLibrary = fn (u64, &char, u64, &u64) u64
+fn sm_test_default_library(d u64, bundle u64, output &u64) u64 { return unsafe { SMLibrary(voidptr(C.ios_objc_msgsend))(d, c'newDefaultLibraryWithBundle:error:', bundle, output) } }
+fn test_software_metal_default_libraries() {
+	$if !ios_metal_software ? { return }
+	for iteration in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device(); bundle := ns_main_bundle()
+		assert dispatch_runtime == unsafe { nil }
+		mut failure := u64(0)
+		assert sm_send(d, c'newDefaultLibrary') == 0 && sm_test_default_library(d, bundle, &failure) == 0; sm_library_check_error(failure, 1)
+		root := os.join_path(os.temp_dir(), 'metal-default-π-' + C.getpid().str() + '-' + iteration.str()); os.mkdir(root)!
+		ios_runtime.bundle = root
+		assert sm_send(d, c'newDefaultLibrary') == 0
+		assert sm_test_default_library(d, bundle, &failure) == 0; sm_library_check_error(failure, 6)
+		path := os.join_path(root, 'default.metallib')
+		bytes := sm_library_fixture(['v_main', 'f_main', 'k_π'], true, true); os.write_file_array(path, bytes)!; unsafe { bytes.free() }
+		for explicit in [false, true]! {
+			failure = 0xfeed
+			library := if explicit { sm_test_default_library(d, bundle, &failure) } else { sm_send(d, c'newDefaultLibrary') }
+			assert library != 0 && failure == 0xfeed && sm_send(library, c'device') == d
+			names := sm_send(library, c'functionNames'); assert sm_send(names, c'count') == 3
+			function := unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(library, c'newFunctionWithName:', obj_header(names).items[2]) }
+			objc_release(library); assert string_text(sm_send(function, c'name')) == 'k_π' && sm_send(function, c'functionType') == 3; objc_release(function)
+		}
+		foreign := objc_allocate(ios_runtime.names['NSBundle'])
+		for invalid in [u64(0), d, foreign]! { assert sm_test_default_library(d, invalid, &failure) == 0; sm_library_check_error(failure, 1) }
+		objc_release(foreign)
+		os.write_file(path, 'bad')!
+		assert sm_send(d, c'newDefaultLibrary') == 0 && sm_test_default_library(d, bundle, &failure) == 0; sm_library_check_error(failure, 3)
+		ios_runtime.bundle = 'x'.repeat(1024)
+		assert sm_test_default_library(d, bundle, &failure) == 0; sm_library_check_error(failure, 1)
+		unsafe { ios_runtime.bundle.free() }; ios_runtime.bundle = root
+		objc_release(d); objc_pool_pop(pool)
+		assert ios_runtime.live == 1 && ios_runtime.objects.len == 1 // Runtime-owned main bundle only.
+		objc_stop(); unsafe { path.free(); root.free() }
+	}
+	println('IOS-SOFTWARE-METAL-DEFAULT-LIBRARY: main-bundle lookup, implicit/explicit selectors, Unicode resource path, owned function lifetimes, unset/missing/corrupt/oversized paths, foreign/nil bundles, optional error slot and two drained runtimes without dispatch PASS')
+}
 fn C.mkfifo(&char, u32) int
 fn sm_test_library_file(d u64, name u64, output &u64) u64 { return unsafe { SMLibrary(voidptr(C.ios_objc_msgsend))(d, c'newLibraryWithFile:error:', name, output) } }
 fn test_software_metal_library_files() {

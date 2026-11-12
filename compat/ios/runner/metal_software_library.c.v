@@ -2,6 +2,7 @@
 module main
 
 import metallib
+import os
 
 // The index borrows the library object's immutable data. Function handles retain
 // that object. Container validation does not verify or execute the LLVM IR.
@@ -123,6 +124,33 @@ fn sm_library_get(object u64, selector &char) u64 {
 	for function in h.metal_library.index.functions { result.items << owned_string(function.name) }
 	return objc_autorelease(array)
 }
+fn sm_default_library_bundle(device u64, selector &char, bundle u64, output &u64) u64 {
+	C.ios_objc_initialize_lock()
+	sm_check(device, 'VinixSoftwareMTLDevice')
+	if bundle == 0 || bundle != ios_runtime.bundle_object || !objc_is_kind(bundle, ios_runtime.names['NSBundle']) {
+		C.ios_objc_initialize_unlock()
+		return sm_library_error(output, 1, 'Software Metal supports the main bundle only')
+	}
+	C.ios_objc_initialize_unlock()
+	return sm_default_library_load(device, output)
+}
+fn sm_default_library(device u64, selector &char) u64 { return sm_default_library_load(device, unsafe { nil }) }
+fn sm_default_library_load(device u64, output &u64) u64 {
+	C.ios_objc_initialize_lock()
+	sm_check(device, 'VinixSoftwareMTLDevice')
+	// The runner exposes the iOS bundle root as resourcePath. Do not search cwd
+	// or host app bundles when no guest bundle has been configured.
+	root := ios_runtime.bundle
+	if root.len == 0 || root.len > 1006 || root.contains('\x00') {
+		C.ios_objc_initialize_unlock()
+		return sm_library_error(output, 1, 'Software Metal requires a configured bundle resource path')
+	}
+	path := os.join_path(root, 'default.metallib')
+	name := owned_string(path)
+	C.ios_objc_initialize_unlock()
+	defer { objc_release(name); unsafe { path.free() } }
+	return sm_library_file(device, c'newLibraryWithFile:error:', name, output)
+}
 fn sm_library_function(library u64, selector &char, name u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -157,6 +185,8 @@ fn sm_library_start(device u64) {
 	library := ios_runtime.names['VinixSoftwareMTLLibrary']; function := ios_runtime.names['VinixSoftwareMTLFunction']
 	sm_method(device, c'newLibraryWithData:error:', u64(unsafe { voidptr(sm_library_data) }), c'@32@0:8@16^@24')
 	sm_method(device, c'newLibraryWithFile:error:', u64(unsafe { voidptr(sm_library_file) }), c'@32@0:8@16^@24')
+	sm_method(device, c'newDefaultLibrary', u64(unsafe { voidptr(sm_default_library) }), c'@16@0:8')
+	sm_method(device, c'newDefaultLibraryWithBundle:error:', u64(unsafe { voidptr(sm_default_library_bundle) }), c'@32@0:8@16^@24')
 	for selector in [c'device', c'functionNames']! { sm_method(library, selector, u64(unsafe { voidptr(sm_library_get) }), c'@16@0:8') }
 	sm_method(library, c'newFunctionWithName:', u64(unsafe { voidptr(sm_library_function) }), c'@24@0:8@16')
 	for selector in [c'device', c'name']! { sm_method(function, selector, u64(unsafe { voidptr(sm_function_get) }), c'@16@0:8') }
