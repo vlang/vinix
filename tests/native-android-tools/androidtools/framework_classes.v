@@ -86,6 +86,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_alarm(smali)!
  framework_intent(smali)!
  framework_intent_uri(smali)!
+ framework_intent_to_uri(smali)!
  framework_clipdata(smali)!
  framework_pending_intent(smali)!
  framework_strict_mode(smali)!

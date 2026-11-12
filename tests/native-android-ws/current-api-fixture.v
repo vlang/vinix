@@ -4,6 +4,123 @@ import os
 import json2
 import crypto.sha256
 
+const intent_source = r'
+.method public static intent()V
+.locals 10
+new-instance v0, Landroid/content/Intent;
+const-string v1, "android.intent.action.MAIN"
+invoke-direct {v0, v1}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
+new-instance v1, Landroid/content/ComponentName;
+const-string v2, "com.example"
+const-string v3, "com.example.Main"
+invoke-direct {v1, v2, v3}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+invoke-virtual {v0, v1}, Landroid/content/Intent;->setComponent(Landroid/content/ComponentName;)Landroid/content/Intent;
+invoke-virtual {v0, v2}, Landroid/content/Intent;->setPackage(Ljava/lang/String;)Landroid/content/Intent;
+const-string v1, "android.intent.category.LAUNCHER"
+invoke-virtual {v0, v1}, Landroid/content/Intent;->addCategory(Ljava/lang/String;)Landroid/content/Intent;
+const/4 v1, 1
+invoke-virtual {v0, v1}, Landroid/content/Intent;->toUri(I)Ljava/lang/String;
+move-result-object v2
+const-string v3, "intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=com.example;component=com.example/.Main;end"
+invoke-virtual {v2, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v5
+const/4 v6, 1
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const/4 v1, 2
+invoke-virtual {v0, v1}, Landroid/content/Intent;->toUri(I)Ljava/lang/String;
+move-result-object v2
+const-string v3, "android-app://com.example#Intent;category=android.intent.category.LAUNCHER;component=com.example/.Main;end"
+invoke-virtual {v2, v3}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v5
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v1, "demo+map://host/a%20b?x=1#fragment"
+invoke-static {v1}, Landroid/net/Uri;->parse(Ljava/lang/String;)Landroid/net/Uri;
+move-result-object v1
+const-string v2, "text/plain"
+invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->setDataAndType(Landroid/net/Uri;Ljava/lang/String;)Landroid/content/Intent;
+const-string v1, "s;雪"
+const-string v2, "value;=☃"
+invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->putExtra(Ljava/lang/String;Ljava/lang/String;)Landroid/content/Intent;
+const-string v1, "count"
+const/16 v2, -7
+invoke-virtual {v0, v1, v2}, Landroid/content/Intent;->putExtra(Ljava/lang/String;I)Landroid/content/Intent;
+const-string v1, "yes"
+invoke-virtual {v0, v1, v6}, Landroid/content/Intent;->putExtra(Ljava/lang/String;Z)Landroid/content/Intent;
+const-string v1, "wide"
+const-wide v8, 0x1020304050607080L
+invoke-virtual {v0, v1, v8, v9}, Landroid/content/Intent;->putExtra(Ljava/lang/String;J)Landroid/content/Intent;
+const/4 v1, 1
+invoke-virtual {v0, v1}, Landroid/content/Intent;->toUri(I)Ljava/lang/String;
+move-result-object v2
+invoke-static {v2, v1}, Landroid/content/Intent;->parseUri(Ljava/lang/String;I)Landroid/content/Intent;
+move-result-object v3
+invoke-static {v0, v3}, Lorg/vinix/bootstrap/Main;->sameIntent(Landroid/content/Intent;Landroid/content/Intent;)V
+const/4 v1, 2
+invoke-virtual {v0, v1}, Landroid/content/Intent;->toUri(I)Ljava/lang/String;
+move-result-object v2
+invoke-static {v2, v1}, Landroid/content/Intent;->parseUri(Ljava/lang/String;I)Landroid/content/Intent;
+move-result-object v3
+invoke-static {v0, v3}, Lorg/vinix/bootstrap/Main;->sameIntent(Landroid/content/Intent;Landroid/content/Intent;)V
+new-instance v0, Landroid/content/Intent;
+invoke-direct {v0}, Landroid/content/Intent;-><init>()V
+:package_start
+invoke-virtual {v0, v1}, Landroid/content/Intent;->toUri(I)Ljava/lang/String;
+:package_end
+new-instance v2, Ljava/lang/AssertionError;
+invoke-direct {v2}, Ljava/lang/AssertionError;-><init>()V
+throw v2
+.catch Ljava/lang/IllegalArgumentException; {:package_start .. :package_end} :package_expected
+:package_expected
+move-exception v2
+return-void
+.end method
+.method public static sameIntent(Landroid/content/Intent;Landroid/content/Intent;)V
+.locals 6
+invoke-virtual {p0}, Landroid/content/Intent;->getDataString()Ljava/lang/String;
+move-result-object v0
+invoke-virtual {p1}, Landroid/content/Intent;->getDataString()Ljava/lang/String;
+move-result-object v1
+invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+const/4 v2, 1
+invoke-static {v0, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {p0}, Landroid/content/Intent;->getComponent()Landroid/content/ComponentName;
+move-result-object v0
+invoke-virtual {p1}, Landroid/content/Intent;->getComponent()Landroid/content/ComponentName;
+move-result-object v1
+invoke-virtual {v0, v1}, Landroid/content/ComponentName;->equals(Ljava/lang/Object;)Z
+move-result v0
+invoke-static {v0, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v0, "s;雪"
+invoke-virtual {p1, v0}, Landroid/content/Intent;->getStringExtra(Ljava/lang/String;)Ljava/lang/String;
+move-result-object v0
+const-string v1, "value;=☃"
+invoke-virtual {v1, v0}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+invoke-static {v0, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v0, "count"
+const/4 v1, 0
+invoke-virtual {p1, v0, v1}, Landroid/content/Intent;->getIntExtra(Ljava/lang/String;I)I
+move-result v0
+const/16 v1, -7
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v0, "yes"
+const/4 v1, 0
+invoke-virtual {p1, v0, v1}, Landroid/content/Intent;->getBooleanExtra(Ljava/lang/String;Z)Z
+move-result v0
+invoke-static {v0, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v0, "wide"
+const-wide/16 v4, 0
+invoke-virtual {p1, v0, v4, v5}, Landroid/content/Intent;->getLongExtra(Ljava/lang/String;J)J
+move-result-wide v4
+const-wide v0, 0x1020304050607080L
+cmp-long v0, v0, v4
+const/4 v1, 0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+.end method
+'
+
 const main_source = r'.class public Lorg/vinix/bootstrap/Main;
 .super Landroid/app/Activity;
 .method public constructor <init>()V
@@ -17,6 +134,7 @@ invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->mime()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->parcel()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 new-instance v0, Landroid/telephony/TelephonyManager;
 invoke-direct {v0}, Landroid/telephony/TelephonyManager;-><init>()V
 invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->isVoiceCapable()Z
@@ -244,7 +362,7 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
-	os.write_file(root + '/smali/Main.smali', main_source)!
+	os.write_file(root + '/smali/Main.smali', main_source + intent_source)!
 	os.write_file(root + '/smali/TestAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestAccounts;
 .super Landroid/accounts/AccountManager;
 .field public snapshot:[Landroid/accounts/Account;

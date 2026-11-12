@@ -135,3 +135,26 @@ used for an explicit MAIN intent with package, component and launcher category.
 The retained caller at `maps-intent-serialize-caller-20261112-r1` shows both
 URI_INTENT_SCHEME (1) and URI_ANDROID_APP_SCHEME (2) paths. Guest r8's complete
 log is retained between `CONTACTS-FULL-LOG-BEGIN` and `CONTACTS-FULL-LOG-END`.
+
+`framework_intent_to_uri.v` adds API-28 serialization and the deprecated
+`toURI()` alias, adapted from AOSP Intent.java. It emits ordinary, intent and
+android-app forms with action, categories, MIME type, flags, package,
+component, bounds, selector metadata and supported primitive/String extras.
+The complete SDK is `framework-intent-serialize-20261112-r1`; its guarded
+assembly/readback passed in5,220 ms with RSS477,757,440, growth29,696,000,
+guard/child0/0 and complete cleanup.
+
+`current-api-fixture-20261112-r3` adds exact expected URI strings for GMS's
+MAIN/component/package/category shape with flags1 and2. It also tests both
+URI forms roundtripping encoded path/query/fragment data, component and
+Unicode/delimiter String, integer, boolean and wide-long extras through the
+existing parser, plus the missing-package exception for android-app URIs.
+It passed on ARM in guest `maps-current-20261112-r9`, including every earlier
+regression. The runner closed stdin after pass/readiness, drained to EOF and
+required exit0. Snapshot `current-api-uart-20261112-r2`, plan
+`current-api-plan-20261112-r2.json` and independent readback
+`current-api-readback-20261112-r2` retain the result without byte removals.
+The two-entry archive checksum is
+`2ece7a6da7ce7692064f541f282961312f015ccfbef4da117808035df32efab2`.
+Broader selector/source-bounds and all primitive-extra combinations have not
+yet been separately exercised. GMS/Maps validation of this successor is ongoing.
