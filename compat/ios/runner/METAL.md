@@ -1,10 +1,12 @@
 # Software Metal backend
 
 Build the iOS runner with `-d ios_metal_software` to enable a CPU backend for
-shared buffers, shared 2D textures and buffer blits. `MTLCreateSystemDefaultDevice` then returns
+shared buffers, shared 2D textures, buffer blits and bounded scalar compute.
+`MTLCreateSystemDefaultDevice` then returns
 an owned device implemented by Vinix. Without that build flag it returns nil.
-This backend does real deferred buffer work; it does not run shaders, render
-textures, present drawables or use a GPU. It cannot yet render Fortnite.
+This backend executes deferred buffer operations and a narrow AIR compute
+profile on the CPU. Rendering, presentation and GPU execution remain absent.
+It cannot yet render Fortnite.
 
 Implemented Objective-C API:
 
@@ -14,17 +16,23 @@ Implemented Objective-C API:
   `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`,
   `newLibraryWithFile:error:`, `newDefaultLibrary`,
   `newDefaultLibraryWithBundle:error:`, `newSamplerStateWithDescriptor:`,
+  `newComputePipelineStateWithFunction:error:`,
   `minimumLinearTextureAlignmentForPixelFormat:`.
 - Sampler descriptor: `init`, `copy`, `copyWithZone:`, min/mag/mip filters,
   max anisotropy, S/T/R address modes, border color, compare function,
   normalized coordinates, LOD clamps/averaging, argument-buffer flag and label.
 - Sampler state: `device`, `label` (immutable configuration snapshots).
 - Library: `device`, `functionNames`, `newFunctionWithName:`.
-- Function: `device`, `name`, `functionType` (metadata handles only).
+- Function: `device`, `name`, `functionType`.
+- Compute pipeline: `device`, `maxTotalThreadsPerThreadgroup`,
+  `threadExecutionWidth`, `staticThreadgroupMemoryLength`.
+- Compute encoder: `setComputePipelineState:`, `setBuffer:offset:atIndex:`,
+  `dispatchThreads:threadsPerThreadgroup:`,
+  `dispatchThreadgroups:threadsPerThreadgroup:`, `endEncoding`.
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`,
   `newTextureWithDescriptor:offset:bytesPerRow:`.
 - Queue: `commandBuffer`, `device`.
-- Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
+- Command buffer: `blitCommandEncoder`, `computeCommandEncoder`, `commandQueue`, `device`, `commit`,
   `waitUntilCompleted`, `addCompletedHandler:`, `waitUntilScheduled`,
   `addScheduledHandler:`, `status`, `error`.
 - Blit encoder: `copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:`,
@@ -158,7 +166,8 @@ checks; nonempty overlapping buffer copies reject, while disjoint copies and
 empty copies are valid. Access through contents still requires synchronization.
 
 Copies execute in encoding order when committed, under the runtime's recursive
-lock. Commit completes synchronously and transitions status from 0 to 2 to 3 to 4.
+lock. Commit completes synchronously and transitions status from 0 to 2 to 3
+to 4 on success, or 5 when compute execution fails.
 Buffer fills participate in the same command order: each records a retained
 destination, byte range and 8-bit value, and writes only when committed.
 Ranges are byte granular; an empty range at the end of a buffer is valid.
@@ -168,7 +177,7 @@ its shared limit; they retain no source object. See
 [Apple's fill API](https://developer.apple.com/documentation/metal/mtlblitcommandencoder/fillbuffer%3Arange%3Avalue%3A).
 Completion means destination bytes are visible to the CPU. Commit invokes
 completed handlers synchronously, in registration order, outside the runtime
-lock. Handlers receive the command buffer at status 4. Registration copies the
+lock. Handlers receive the command buffer at status 4 or 5. Registration copies the
 block (including captures) and is allowed only before commit, with at most
 4,096 handlers. Each copied block is released after invocation; abandoning an
 uncommitted buffer releases handlers without invoking them. Commit retains
@@ -188,9 +197,9 @@ Encoding cannot overlap on one command buffer; every encoder
 must end before commit. Resources must belong to the queue's device. Bounds
 checks use subtraction to avoid overflow; overlapping ranges in the same
 buffer reject. Zero-length copies at the end of a buffer are valid. Each
-command buffer is limited to 65,536 copies. Invalid encoding/state/ranges fail
+command buffer is limited to 65,536 operations. Invalid encoding/state/ranges fail
 explicitly. Client accesses through `contents` still require synchronization
-with command submission. Shader/render methods and presentation remain absent.
+with command submission. Render methods and presentation remain absent.
 
 Compiled-library loading accepts live dispatch data containing the existing
 [MTLB v2 reader's profile](../metallib/README.md). Inputs are capped at 256 MiB
@@ -206,9 +215,10 @@ returns nil and, when requested, an autoreleased NSError in
 or malformed container (3). The domain global is available from Metal.framework.
 Success leaves the error slot untouched.
 
-These handles expose container metadata. AIR instruction verification,
-specialization, pipeline creation and shader execution remain pending; even
-a valid container does not establish executable LLVM IR. Source compilation
+These handles expose container metadata; compute pipeline creation performs
+additional AIR profile checks. General LLVM verification, specialization and
+shader execution remain pending; a valid container alone does not establish
+executable LLVM IR. Source compilation
 and URL loading remain unsupported. See
 [Apple's dispatch-data library API](https://developer.apple.com/documentation/metal/mtldevice/makelibrary%28data%3A%29).
 
@@ -230,6 +240,46 @@ unsupported (1). An unset resource root returns unsupported; a missing file
 returns file-not-found (6). Success transfers an owned library and leaves the
 error slot untouched. No library is cached, so subsequent calls reread the
 file. Neither entry point requires dispatch initialization.
+
+Compute pipeline creation parses the selected module and requires a matching
+classic `air.kernel` entry. It accepts only the ordinary void, one-block
+[scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
+flag-free binary arithmetic, direct pointer arguments, explicit access alignment
+and final ret void. Calling convention and LLVM function attributes must be
+zero. This is a bounded interpreter profile, not a general LLVM verifier.
+Valid LLVM IR remains a precondition. No source compilation is provided.
+
+Every argument requires explicit `air.buffer` metadata, a unique location
+in slots 0..30 with count one, address space 1 or 2, and read/write/read_write
+access matching the body. Space 2 is readonly. Conditional/unused arguments,
+unknown attribute tails, structures and builtins reject. Declared and actual
+minimum buffer extents are combined; alignment must not exceed the virtual
+buffer base alignment of 256 bytes. Pipeline creation returns an owned state
+retaining its function/library/device, leaves a success error slot untouched,
+and uses the library NSError path for unsupported/invalid input.
+
+Both compute dispatch selectors require grid and threadgroup dimensions
+exactly `(1, 1, 1)`. The reported thread execution width and maximum group size
+are one; static threadgroup memory is zero. There are no thread IDs, loops,
+GEP, vectors, texture access, barriers or threadgroup memory in this profile.
+Setting a buffer accepts nil to clear a slot; dispatch requires every argument
+to have an in-bounds, aligned binding from the queue's device. Encoding checks
+state and resource requirements before recording work.
+
+Each dispatch snapshots and retains its pipeline, buffer handles and offsets.
+Later rebindings do not affect it; buffer contents are read at commit. Compute,
+copies and fills share one ordered command array and limit. Aliased compute
+buffers observe ordinary instruction order. Execution borrows buffer bytes
+under the runtime lock, without copying or owning their storage. Dynamic
+interpreter failure sets command status 5 and an owned NSError in
+`MTLCommandBufferErrorDomain` (code 1); earlier writes remain visible and later
+commands are skipped. The domain global is exported from Metal.framework.
+Scheduled/completed notifications and waits still finish.
+Clients must synchronize direct buffer access against submission.
+
+The compute tests assemble synthetic LLVM modules with AIR metadata and check
+Objective-C dispatch ABI and byte results. They do not establish compatibility
+with an Apple compiler-produced compute library or native Metal execution.
 
 Texture-to-texture blits copy positive 2D regions between textures with the
 same pixel format and device. Only slice/level zero, origin z zero and depth
@@ -262,6 +312,7 @@ v -path '@vlib|compat/ios|tests/ios|@vmodules' run tests/ios/metal-software-chec
 The harness uses the captured runner compiler and headers from
 `build/ios/fortnite/ns-calendar-checks/toolchain`, creates an isolated compiler
 executable/resource root, and references its captured library/dependencies.
+Compute fixtures additionally require `/opt/homebrew/opt/llvm/bin/llvm-as`.
 The captured development compiler reloads some headers through absolute paths
 with stale lengths. The harness preserves the original generated C and replaces
 only its integer-128 and libc preambles with the complete captured headers;

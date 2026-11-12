@@ -14,6 +14,7 @@ fn run(out string, label string, args []string, deterministic bool) {
 	env['VEXE'] = env['V_RESOURCE_PATH'] + '/v'
 	env['ASAN_OPTIONS'] = 'detect_leaks=0:halt_on_error=1'; env['UBSAN_OPTIONS'] = 'halt_on_error=1'
 	env['VINIX_IOS_CHECK_NAME'] = 'notification-center-checks'
+	env['VINIX_METAL_COMPUTE_CHECK_DIR'] = out + '/compute'
 	if deterministic { env['SWIFT_DETERMINISTIC_HASHING'] = '1' } else { env.delete('SWIFT_DETERMINISTIC_HASHING') }
 	p.set_environment(env); p.run(); output := p.stdout_slurp(); p.wait(); code := p.code; p.close()
 	os.write_file(out + '/' + label + '.log', 'COMMAND: ' + args.map(os.quoted_path(it)).join(' ') + '\n' + output) or { panic(err) }
@@ -71,6 +72,7 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	expected := if fixture == 'metal_software_test.v' { 'IOS-SOFTWARE-METAL: Objective-C buffer/queue/command/blit ABI' } else { 'IOS-METAL-DEVICE: scoped no-argument import, nil without a Metal backend' }
 	for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains(expected), 'missing Metal test execution marker' }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-FLOAT-TEXTURES:'), 'missing float texture marker' } }
+	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-COMPUTE:'), 'missing compute marker' } }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-RGBA8:'), 'missing RGBA8 marker' } }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-DEALLOCATOR:'), 'missing buffer deallocator marker' } }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-NO-COPY:'), 'missing no-copy buffer marker' } }

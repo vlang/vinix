@@ -9,6 +9,13 @@ Flags (including fast-math), GEP, alloca, pointer casts, branches, atomics,
 volatile accesses, calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
+`memory_function_profile` validates the supported signature and complete body
+without accessing buffer data. Its owned `arguments` array describes required
+address spaces, minimum extents, alignment and read/write usage; release it
+with `profile.free()`. The executor uses the same validation, then checks
+actual bindings and budget before execution. A store through address space 2
+is rejected when building the profile.
+
 Each pointer argument binds to an IRMemoryBinding with borrowed mutable data,
 a byte offset, declared virtual base alignment and write permission. At most
 64 bindings of at most 64 MiB each are accepted. Address spaces 0 and 1 are
@@ -37,5 +44,5 @@ Execution scratch arrays are freed on success and failure; binding data is not.
 against independent byte expectations, guards and constant stores. Execution is
 also checked against native LLVM by `tests/ios/air-memory-arithmetic.v` for
 load/compute/store bodies, including poison consumption and budget guards.
-This is interpreter groundwork: Metal buffer binding, pipelines and dispatch
-remain pending.
+The opt-in software Metal runner uses this profile for its bounded single-thread
+compute pipeline. General shader execution and GPU dispatch remain pending.

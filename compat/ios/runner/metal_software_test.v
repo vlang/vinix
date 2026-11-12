@@ -4,6 +4,7 @@ module main
 import crypto.sha256
 import math
 import os
+import strings
 
 #include <sys/wait.h>
 fn C.waitpid(int, &int, int) int
@@ -199,9 +200,12 @@ fn sm_library_append(mut data []u8, count int, value u64) { start := data.len; f
 fn sm_library_tag(mut data []u8, name string, payload []u8) { data << name.bytes(); sm_library_append(mut data, 2, u64(payload.len)); data << payload }
 // Synthetic container/index fixtures, deliberately not executable LLVM IR.
 fn sm_library_fixture(names []string, wrapped bool, aliased bool) []u8 {
+	return sm_library_code_fixture(names, [u8(0x42), 0x43, 0xc0, 0xde, 0, 0, 0, 0], wrapped, aliased, false)
+}
+fn sm_library_code_fixture(names []string, raw []u8, wrapped bool, aliased bool, kernels bool) []u8 {
 	mut code := []u8{}; code.flags |= .noslices
-	if wrapped { for value in [u64(0x0b17c0de), 0, 20, 8, 0xffffffff]! { sm_library_append(mut code, 4, value) } }
-	code << [u8(0x42), 0x43, 0xc0, 0xde, 0, 0, 0, 0]
+	if wrapped { for value in [u64(0x0b17c0de), 0, 20, u64(raw.len), 0xffffffff]! { sm_library_append(mut code, 4, value) } }
+	code << raw
 	digest := sha256.sum(code)
 	defer { unsafe { code.free(); digest.free() } }
 	mut data := []u8{len: 88}; data.flags |= .noslices
@@ -210,7 +214,7 @@ fn sm_library_fixture(names []string, wrapped bool, aliased bool) []u8 {
 	for i, name in names {
 		start := data.len; sm_library_append(mut data, 4, 0)
 		mut text := name.bytes(); text << u8(0); sm_library_tag(mut data, 'NAME', text); unsafe { text.free() }
-		sm_library_tag(mut data, 'TYPE', [u8(i % 3)])
+		sm_library_tag(mut data, 'TYPE', [if kernels { u8(2) } else { u8(i % 3) }])
 		sm_library_tag(mut data, 'HASH', digest)
 		mut offsets := []u8{len: 24}
 		sm_library_number(mut offsets, 0, 8, u64(i * 8)); sm_library_number(mut offsets, 8, 8, u64(i * 8)); sm_library_number(mut offsets, 16, 8, if aliased { u64(0) } else { u64(i * code.len) })
@@ -1105,6 +1109,159 @@ fn test_software_metal_texture_storage_region_abi_and_lifetimes() {
 	println('IOS-SOFTWARE-METAL-TEXTURES: four formats, 48-byte region ABI, padded subregion uploads/readback, guards, descriptor snapshots, device lifetimes and two drained runtimes PASS')
 }
 fn sm_send(object u64, selector &char) u64 { return unsafe { SMGet(voidptr(C.ios_objc_msgsend))(object, selector) } }
+type SMComputeBuffer = fn (u64, &char, u64, u64, u64)
+type SMComputeDispatch = fn (u64, &char, SoftwareMetalSize, SoftwareMetalSize)
+fn sm_test_compute_buffer(encoder u64, buffer u64, offset u64, slot u64) { unsafe { SMComputeBuffer(voidptr(C.ios_objc_msgsend))(encoder, c'setBuffer:offset:atIndex:', buffer, offset, slot) } }
+fn sm_test_compute_dispatch(encoder u64, selector &char, width u64) { unsafe { SMComputeDispatch(voidptr(C.ios_objc_msgsend))(encoder, selector, SoftwareMetalSize{width, 1, 1}, SoftwareMetalSize{1, 1, 1}) } }
+fn sm_test_compute_pipeline(device u64, library u64, name string, output &u64) u64 {
+	text := owned_string(name)
+	function := unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(library, c'newFunctionWithName:', text) }
+	objc_release(text)
+	result := unsafe { SMLibrary(voidptr(C.ios_objc_msgsend))(device, c'newComputePipelineStateWithFunction:error:', function, output) }
+	objc_release(function)
+	return result
+}
+// Portable LLVM fixtures with classic AIR metadata. They exercise our explicit
+// interpreter profile and are not compiler-produced/native Metal libraries.
+fn sm_test_compute_library() ![]u8 {
+	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR')
+	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
+	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic' } else { '/normal' }
+	assert !os.exists(out); os.mkdir_all(out)!
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'no_metadata']
+	mut source := strings.new_builder(8192)
+	defer { unsafe { source.free() } }
+	for name in names {
+		if name == 'empty' { source.write_string('define void @empty() { ret void }\n'); continue }
+		typ := if name == 'float_sum' { 'float' } else { 'i32' }
+		op := if name == 'float_sum' { 'fadd' } else if name == 'divide' { 'udiv' } else if name == 'bad_flags' { 'add nuw' } else { 'add' }
+		prior := if name == 'divide' { 'store i32 17, ptr addrspace(1) %out, align 4\n' } else { '' }
+		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n %x = load ${typ}, ptr addrspace(2) %a, align 4\n %y = load ${typ}, ptr addrspace(2) %b, align 4\n ${prior}%v = ${op} ${typ} %x, %y\n store ${typ} %v, ptr addrspace(1) %out, align 4\n ret void\n}\n')
+	}
+	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70}\n')
+	for i, name in names[..8] {
+		n := i * 10
+		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n!${n + 1} = !{}\n')
+		if name == 'empty' { source.write_string('!${n + 2} = !{}\n'); continue }
+		source.write_string('!${n + 2} = !{!${n + 5}, !${n + 3}, !${n + 4}}\n')
+		semantic := if name == 'bad_builtin' { 'air.thread_position_in_grid' } else { 'air.buffer' }
+		source.write_string('!${n + 3} = !{i32 0, !"${semantic}", !"air.location_index", i32 0, i32 1, !"air.address_space", i32 2, !"air.read", !"air.arg_type_align_size", i32 4, !"air.buffer_size", i32 4}\n')
+		slot := if name == 'bad_slot' { 0 } else { 3 }
+		source.write_string('!${n + 4} = !{i32 1, !"air.buffer", !"air.location_index", i32 ${slot}, i32 1, !"air.address_space", i32 2, !"air.read"}\n')
+		access := if name == 'bad_access' { 'air.read' } else { 'air.write' }
+		source.write_string('!${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"${access}"}\n')
+	}
+	os.write_file(out + '/input.ll', source.str())!
+	mut proc := os.new_process('/opt/homebrew/opt/llvm/bin/llvm-as')
+	proc.set_args([out + '/input.ll', '-o', out + '/input.bc']); proc.set_redirect_stdio_merged(); proc.run()
+	log := proc.stdout_slurp(); proc.wait(); code := proc.code; proc.close()
+	os.write_file(out + '/assemble.log', log)!; assert code == 0, log
+	bits := os.read_bytes(out + '/input.bc')!
+	defer { unsafe { bits.free() } }
+	return sm_library_code_fixture(names, bits, true, true, true)
+}
+fn test_software_metal_compute() {
+	$if !ios_metal_software ? { return }
+	bytes := sm_test_compute_library()!
+	defer { unsafe { bytes.free() } }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
+		library := sm_library_bytes(d, bytes.clone(), unsafe { nil })
+		assert library != 0
+		mut error_slot := u64(0x1234)
+		pipeline := sm_test_compute_pipeline(d, library, 'sum', &error_slot)
+		assert pipeline != 0 && error_slot == 0x1234
+		assert sm_send(pipeline, c'device') == d && sm_send(pipeline, c'threadExecutionWidth') == 1 && sm_send(pipeline, c'maxTotalThreadsPerThreadgroup') == 1 && sm_send(pipeline, c'staticThreadgroupMemoryLength') == 0
+		for name in ['bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'no_metadata', 'missing'] {
+			error_slot = 0
+			assert sm_test_compute_pipeline(d, library, name, &error_slot) == 0
+			sm_library_check_error(error_slot, if name == 'missing' { i64(1) } else { i64(3) })
+			assert sm_test_compute_pipeline(d, library, name, unsafe { nil }) == 0
+		}
+		queue := sm_send(d, c'newCommandQueue')
+		empty_pipeline := sm_test_compute_pipeline(d, library, 'empty', unsafe { nil }); assert empty_pipeline != 0
+		empty_command := sm_send(queue, c'commandBuffer'); empty_encoder := sm_send(empty_command, c'computeCommandEncoder')
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(empty_encoder, c'setComputePipelineState:', empty_pipeline) }
+		sm_test_compute_dispatch(empty_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+		sm_call(empty_encoder, c'endEncoding'); objc_release(empty_pipeline); sm_call(empty_command, c'commit')
+		assert sm_send(empty_command, c'status') == 4 && sm_send(empty_command, c'error') == 0
+		a := sm_test_buffer(d, 32, 0); b := sm_test_buffer(d, 32, 0); output := sm_test_buffer(d, 32, 0); copy := sm_test_buffer(d, 32, 0)
+		ap := sm_send(a, c'contents'); bp := sm_send(b, c'contents'); outp := sm_send(output, c'contents'); cp := sm_send(copy, c'contents')
+		unsafe { C.memset(voidptr(outp), 0xcc, 32) }
+		command_pool := objc_pool_push()
+		command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+		objc_retain(command)
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+		sm_test_compute_buffer(encoder, a, 4, 0); sm_test_compute_buffer(encoder, b, 8, 3); sm_test_compute_buffer(encoder, output, 12, 7)
+		for mode in 0 .. 11 {
+			child := C.fork(); assert child >= 0
+			if child == 0 {
+				C.close(1); C.close(2)
+				match mode {
+					0 { sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 2) }
+					1 { sm_test_compute_buffer(encoder, 0, 0, 0); sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1) }
+					2 { sm_test_compute_buffer(encoder, a, 32, 0); sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1) }
+					3 { sm_test_compute_buffer(encoder, a, 1, 0); sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1) }
+					4 { sm_test_compute_buffer(encoder, a, 0, 31) }
+					5 { sm_call(encoder, c'endEncoding'); sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1) }
+					6 { sm_send(command, c'blitCommandEncoder') }
+					7 { sm_call(command, c'commit') }
+					8 { other := metal_create_system_default_device(); foreign := sm_test_buffer(other, 32, 0); sm_test_compute_buffer(encoder, foreign, 0, 0) }
+					9 { fresh := sm_send(queue, c'commandBuffer'); unbound := sm_send(fresh, c'computeCommandEncoder'); sm_test_compute_dispatch(unbound, c'dispatchThreads:threadsPerThreadgroup:', 1) }
+					else { unsafe { SMComputeDispatch(voidptr(C.ios_objc_msgsend))(encoder, c'dispatchThreads:threadsPerThreadgroup:', SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{2, 1, 1}) } }
+				}
+				C._exit(0)
+			}
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		}
+		sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+		// Rebinding and changing pipeline cannot alter the recorded dispatch.
+		float_pipeline := sm_test_compute_pipeline(d, library, 'float_sum', unsafe { nil }); assert float_pipeline != 0
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', float_pipeline) }
+		sm_test_compute_buffer(encoder, copy, 0, 7); sm_call(encoder, c'endEncoding')
+		blit := sm_send(command, c'blitCommandEncoder'); sm_test_copy(blit, output, 12, copy, 16, 4); sm_call(blit, c'endEncoding')
+		unsafe { *(&u32(ap + 4)) = 19; *(&u32(bp + 8)) = 23 }
+		assert unsafe { *(&u32(outp + 12)) } == u32(0xcccccccc)
+		objc_release(pipeline); objc_release(float_pipeline)
+		objc_pool_pop(command_pool) // Recorded work owns its pipeline after encoder destruction.
+		sm_call(command, c'commit'); sm_call(command, c'waitUntilCompleted')
+		assert sm_send(command, c'status') == 4 && sm_send(command, c'error') == 0
+		assert unsafe { *(&u32(outp + 12)) } == 42 && unsafe { *(&u32(cp + 16)) } == 42 && unsafe { *(&u32(cp)) } == 0
+		for i in 0 .. 32 { if i < 12 || i >= 16 { assert unsafe { *(&u8(outp + u64(i))) } == 0xcc } }
+		objc_release(command)
+		// A second dispatch aliases output to an input; resources remain live
+		// after caller releases its handles, through the recorded snapshot.
+		alias := sm_send(queue, c'commandBuffer'); e := sm_send(alias, c'computeCommandEncoder')
+		p := sm_test_compute_pipeline(d, library, 'float_sum', unsafe { nil }); assert p != 0
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(e, c'setComputePipelineState:', p) }
+		sm_test_compute_buffer(e, a, 4, 0); sm_test_compute_buffer(e, b, 8, 3); sm_test_compute_buffer(e, a, 4, 7)
+		sm_test_compute_dispatch(e, c'dispatchThreadgroups:threadsPerThreadgroup:', 1); sm_call(e, c'endEncoding')
+		unsafe { *(&u32(ap + 4)) = 0x3fc00000; *(&u32(bp + 8)) = 0x40100000 }
+		objc_release(p); sm_call(alias, c'commit'); assert unsafe { *(&u32(ap + 4)) } == u32(0x40700000)
+		// Dynamic interpreter errors report failed completion, retain earlier
+		// stores, and stop subsequent commands in the same command buffer.
+		failed := sm_send(queue, c'commandBuffer'); fe := sm_send(failed, c'computeCommandEncoder')
+		fp := sm_test_compute_pipeline(d, library, 'divide', unsafe { nil }); assert fp != 0
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(fe, c'setComputePipelineState:', fp) }
+		sm_test_compute_buffer(fe, a, 0, 0); sm_test_compute_buffer(fe, b, 0, 3); sm_test_compute_buffer(fe, output, 0, 7)
+		sm_test_compute_dispatch(fe, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(fe, c'endEncoding'); objc_release(fp)
+		fb := sm_send(failed, c'blitCommandEncoder'); sm_test_copy(fb, output, 0, copy, 0, 4); sm_call(fb, c'endEncoding')
+		objc_release(a); objc_release(b); objc_release(output); objc_release(copy); objc_release(library); objc_release(d); objc_release(queue)
+		sm_call(failed, c'commit'); sm_call(failed, c'waitUntilCompleted'); sm_call(failed, c'waitUntilScheduled')
+		assert sm_send(failed, c'status') == 5 && unsafe { *(&u32(outp)) } == 17 && unsafe { *(&u32(cp)) } == 0
+		error := sm_send(failed, c'error'); assert error != 0 && string_text(sm_send(error, c'domain')) == 'MTLCommandBufferErrorDomain' && sm_send(error, c'code') == 1
+		assert string_text(sm_send(error, c'localizedDescription')).len > 0
+		objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		// Framework globals intentionally live until runtime shutdown. Check
+		// their scoped cells after verifying all command resources have drained.
+		domain_cell := runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_MTLCommandBufferErrorDomain') or { panic(err) }
+		assert string_text(read64(domain_cell)) == 'MTLCommandBufferErrorDomain'
+		assert runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_MTLCommandBufferErrorDomain') or { panic(err) } == domain_cell
+		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty kernel, single-thread dispatch selectors, deferred integer/float execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, failed completion and two drained runtimes PASS')
+}
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 fn sm_test_buffer(device u64, length u64, options u64) u64 { return unsafe { SMBuffer(voidptr(C.ios_objc_msgsend))(device, c'newBufferWithLength:options:', length, options) } }
 fn sm_test_copy(encoder u64, src u64, a u64, dst u64, b u64, size u64) { unsafe { SMCopy(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', src, a, dst, b, size) } }

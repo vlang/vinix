@@ -3,7 +3,7 @@ module main
 
 // Deliberately opt-in until shader execution and presentation are implemented.
 // All API state is serialized by the runtime's recursive Objective-C lock.
-struct SoftwareMetalCopy { source u64 destination u64 source_offset u64 destination_offset u64 size u64 rows u64 = 1 source_stride u64 destination_stride u64 fill bool fill_value u8 }
+struct SoftwareMetalCopy { source u64 destination u64 source_offset u64 destination_offset u64 size u64 rows u64 = 1 source_stride u64 destination_stride u64 fill bool fill_value u8 compute &SoftwareMetalComputeBindings = unsafe { nil } }
 struct SoftwareMetalCommands {
 mut:
 	ops []SoftwareMetalCopy
@@ -57,7 +57,7 @@ fn sm_check(object u64, name string) &ObjHeader {
 fn software_metal_dispose(mut header ObjHeader) {
 	if header.software_metal == unsafe { nil } { return }
 	mut state := header.software_metal
-	for op in state.ops { objc_release(op.source); objc_release(op.destination) }
+	for op in state.ops { objc_release(op.source); objc_release(op.destination); if op.compute != unsafe { nil } { sm_compute_bindings_free(op.compute) } }
 	for block in state.completed { block_release(block) }
 	for block in state.scheduled { block_release(block) }
 	unsafe { state.ops.free(); state.completed.free(); state.scheduled.free() }
@@ -127,7 +127,8 @@ fn sm_copy(encoder u64, selector &char, source u64, source_offset u64, destinati
 fn sm_end(encoder u64, selector &char) {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
-	mut h := sm_check(encoder, 'VinixSoftwareMTLBlitCommandEncoder')
+	mut h := obj_header(encoder)
+	if h.cls != ios_runtime.names['VinixSoftwareMTLBlitCommandEncoder'] && h.cls != ios_runtime.names['VinixSoftwareMTLComputeCommandEncoder'] { panic('iOS: incompatible software Metal encoder') }
 	mut state := obj_header(h.fields[0]).software_metal
 	if !h.valid || !state.active || state.status != 0 { panic('iOS: Metal encoder already ended') }
 	h.valid = false; state.active = false
@@ -150,6 +151,18 @@ fn sm_commit(command u64, selector &char) {
 	C.ios_objc_initialize_lock()
 	state.scheduled_finished = true
 	for op in state.ops {
+		if op.compute != unsafe { nil } {
+			sm_compute_execute(op.compute) or {
+				domain := owned_string('MTLCommandBufferErrorDomain'); info := objc_allocate(ios_runtime.names['NSDictionary'])
+				key := owned_string('NSLocalizedDescription'); detail := owned_string(err.msg())
+				dictionary_insert_copy(info, detail, key)
+				obj_header(command).fields[1] = ns_error_create(domain, 1, info)
+				objc_release(domain); objc_release(info); objc_release(key); objc_release(detail)
+				state.status = 5
+				break
+			}
+			continue
+		}
 		if op.size == 0 { continue }
 		if op.fill {
 			dst := obj_header(op.destination)
@@ -161,7 +174,7 @@ fn sm_commit(command u64, selector &char) {
 			unsafe { C.memcpy(voidptr(sm_storage_base(dst) + op.destination_offset + row * op.destination_stride), voidptr(sm_storage_base(src) + op.source_offset + row * op.source_stride), usize(op.size)) }
 		}
 	}
-	state.status = 4 // Completion is synchronous; bytes are visible before return.
+	if state.status != 5 { state.status = 4 } // Synchronous; bytes are visible before return.
 	C.ios_objc_initialize_unlock()
 	for i in 0 .. state.completed.len {
 		block := state.completed[i]
@@ -214,7 +227,7 @@ fn sm_get(object u64, selector &char) u64 {
 		'device' { if h.cls == ios_runtime.names['VinixSoftwareMTLBuffer'] || h.cls == ios_runtime.names['VinixSoftwareMTLCommandQueue'] { h.fields[0] } else { obj_header(h.fields[0]).fields[0] } }
 		'commandQueue' { h.fields[0] }
 		'status' { h.software_metal.status }
-		'error' { u64(0) }
+		'error' { h.fields[1] }
 		'maxBufferLength' { software_metal_max_buffer }
 		else { panic('iOS: unsupported software Metal property') }
 	}
@@ -250,6 +263,7 @@ fn software_metal_start() {
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 	sm_texture_start(device)
 	sm_library_start(device)
+	sm_compute_start(device, command)
 	sm_sampler_start(device)
 	sm_texture_blit_start(encoder)
 	sm_method(encoder, c'fillBuffer:range:value:', u64(unsafe { voidptr(sm_fill) }), c'v48@0:8@16{_NSRange=QQ}24C40')

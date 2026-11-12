@@ -114,6 +114,8 @@ mut:
 	cv_metal &CVMetalState = unsafe { nil }
 	software_metal &SoftwareMetalCommands = unsafe { nil }
 	metal_library &SoftwareMetalLibrary = unsafe { nil }
+	metal_kernel &SoftwareMetalKernel = unsafe { nil }
+	metal_compute &SoftwareMetalComputeBindings = unsafe { nil }
 	cm_format &CMFormatState = unsafe { nil }
 	cm_block &CMBlockState = unsafe { nil }
 	cm_sample &CMSampleState = unsafe { nil }
