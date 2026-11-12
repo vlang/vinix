@@ -49,4 +49,27 @@ receipt 79ec427fa310e942216c47c92416a97d79246a00a0219b69397daa4b919d3456.
 Plan/readback r1 reconstruct the unchanged export with zero removals,
 archive 2ac8fef6e3f61f27eed59d4f968b33985c19564bf9445b334e6717a1ec614bf1.
 This is byte-export evidence, not a claim that the historical strict importer
-passed. Real account-flow retry and map geometry remain pending.
+passed. diagnostic-uart-child-20261113-r1 also extracted the unchanged child log
+and confirmed the unbound-string/thread-isolation and decor pass markers.
+Child SHA256: 50d9edd88a0181f9d758a4db67a8307e0f71aba943a6acf94a87ecb0de88b9f8.
+
+The real account retry reached Add account but GMS then terminated on an uncaught
+NoClassDefFoundError for android.net.ConnectivityManager.OnNetworkActiveListener,
+loaded by Find My Device's management service. GMS explicitly called killProcess
+and System.exit(0); the controller correctly records failed broker input
+disconnection. This was not a native SIGSEGV or OOM kill. The missing nested
+interface and registration API are the next concrete SDK gap. There was no login
+page or authentication success, and map geometry was not exercised in this retry.
+
+The 600127 ms memory/storage watch completed with minimum MemFree 4820576 KiB
+and app-data space 7241555968 bytes. Broad process snapshots were omitted.
+After sync returned, owned QEMU PID 72426 was verified, stopped, and confirmed
+absent before offline extraction. The failed r69 attempt is retained intact:
+
+| Artifact | SHA256 |
+|---|---|
+| maps.retained.log | 8e6cbeb8f37e13cd2a266e244280ac855a99e1435c42ffe39ed549865b473df5 |
+| broker.retained.log | 3bd79f1977d9e6e61a959876e43192a8b16b53e6936c9108879ca39f82a055ca |
+| receipt.retained.json | a193adc4ab9d67add376f1762bf67678efc88e02303b20858f51c4728608265a |
+| serial.log | 4997d9733b97244b3929a662887518d79a5d5b5939b7d26b88dd4cd70921100c |
+| app-data.ext2 final | 30bdbe295a3ac271b7e49f468b346d5e4456d5ce9126d8f43f089ffd78cf50bc |
