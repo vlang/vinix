@@ -11,12 +11,15 @@ fn main() {
 	androidtools.framework_bluetooth_values(root + '/smali')!
 	androidtools.framework_parcel_uuid(root + '/smali')!
 	androidtools.framework_peripheral_types(root + '/smali')!
+	androidtools.framework_account_features(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
 	mut types := ['android/os/ParcelUuid', 'android/bluetooth/BluetoothDevice', 'android/bluetooth/BluetoothClass',
 		'android/nfc/Tag', 'android/nfc/NdefMessage', 'android/hardware/usb/UsbDevice', 'android/hardware/usb/UsbAccessory']
 	for name in types.clone() { types << name + r'$VinixCreator' }
+	types << 'android/accounts/AccountManager'
+	types << 'android/atl/VinixAccountFuture'
 	for args in [[java, '-Xmx256m', '-cp', cp, 'org.jf.smali.Main', 'assemble', '--api', '28', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'],
 		['/usr/bin/zip', '-q', '-j', root + '/api-impl.jar', root + '/classes.dex'],
 		[java, '-Xmx256m', '-cp', cp, 'org.jf.baksmali.Main', 'disassemble', '--classes', types.map('L' + it + ';').join(','), '--jobs', '2', root + '/classes.dex', '-o', root + '/roundtrip']] {

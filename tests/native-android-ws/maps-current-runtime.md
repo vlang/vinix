@@ -59,3 +59,30 @@ after a compiler failure, and does not qualify peripheral type generation.
 The compilation failure was conflicting `C.poll` nfds declarations after
 shared host tooling changes. The platform ABI correction passed the host
 PTY suite (one file, 15,053 ms runtime) and is committed as `701ba90b5`.
+
+Guest r5 advanced past the intent registry and then exited10 in Safe Browsing:
+`AccountManager.getAccountsByTypeAndFeatures` was missing, called by `cxly.v`
+source19 and `SafeBrowsingChromeSyncIntentOperation`. Its complete log is in
+the serial interval `INTENT-FULL-LOG-BEGIN` through `INTENT-FULL-LOG-END`.
+`framework_account_features.v` adds the query using the existing visible typed
+account snapshot and future callback/Handler implementation. Null account
+types throw; null/empty feature sets return that snapshot; zero candidates
+complete with an empty array for any feature set. Nonempty candidates with
+requested features complete with the existing unsupported-authenticator error
+rather than inventing matches. The future gains a Java-only array completion
+method; native registrations are unchanged.
+`framework-account-features-20261112-r1` passed full SDK assembly and selected
+DEX readback in5,489 ms, sampled RSS486,227,968, growth50,057,216, guard/child
+0/0 and complete cleanup. Guest r6 uses this SDK. Dedicated nonempty-account
+and callback regression execution remains pending.
+
+Maps launch must come from the desktop app host, which owns the compositor
+input pipe and fresh surface. Invoking `--launch` from a shell does not supply
+that app-host identity and does not qualify Maps startup.
+
+Guest r6 advanced past the account query and then recorded missing
+`TelephonyManager.isVoiceCapable()Z` and `IntentFilter.addDataType(String)V`.
+The former appears in `bizf.a` source41, the latter in `cizh.i` source10 on
+service creation. Its full broker log is retained between
+`FEATURES-FULL-LOG-BEGIN` and `FEATURES-FULL-LOG-END` in the serial log.
+Maps has not reached a usable window or a functional pass.

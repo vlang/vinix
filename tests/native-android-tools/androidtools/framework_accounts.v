@@ -135,6 +135,7 @@ fn framework_account_listeners(smali string) ! {
  text = framework_account_store(text)!
  text = framework_account_token(text)!
  os.write_file(path, text)!
+ framework_account_features(smali)!
  os.write_file(smali + '/android/atl/VinixAccountUpdate.smali',
   '.class public final Landroid/atl/VinixAccountUpdate;\n.super Ljava/lang/Object;\n.implements Ljava/lang/Runnable;\n' +
   '.field public listener:Landroid/accounts/OnAccountsUpdateListener;\n' +
