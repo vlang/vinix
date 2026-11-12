@@ -40,6 +40,9 @@ and rechecks the full original inventory and archive checksum afterward. It
 retains originals and avoids another expanded copy. This does not authorize
 retiring expanded evidence or substitute for launch auditors or restoration
 requirements before deletion.
+An optional trailing `--fast` selects gzip level 1 for large workspaces; the
+literal compression command is retained. This trades compressed size for CPU
+time and preserves the same complete logical-content and metadata checks.
 
 If compression completed but verification failed, preserve the failed audit.
 `wine-workspace-archive verify-existing SOURCE ARCHIVE.tar.gz SHA256 CHECKER`

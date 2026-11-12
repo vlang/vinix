@@ -60,6 +60,9 @@ fn selftest(root string, checker string) ! {
 	sparse.seek(1048576, .start)!; sparse.write_string('end')!; sparse.close()
 	fresh := root + '/fresh.tar.gz'
 	invoke([os.executable(), root + '/input', fresh, checker], root + '/fresh.log')!
+	fast := root + '/fast.tar.gz'
+	invoke([os.executable(), root + '/input', fast, checker, '--fast'], root + '/fast.log')!
+	if os.read_file(fresh + '.inventory.txt')! != os.read_file(fast + '.inventory.txt')! { return error('normal and fast archive inventories disagree') }
 	for name in ['existing', 'wrong-pin', 'changed-byte', 'changed-link'] {
 		os.cp(fresh, root + '/' + name + '.tar.gz')!
 	}
@@ -81,7 +84,7 @@ fn selftest(root string, checker string) ! {
 		if name == 'changed-byte' { os.write_file(root + '/input/nested/payload', 'payload')! }
 		if name == 'changed-link' { os.rm(root + '/input/link')!; os.symlink('nested/payload', root + '/input/link')! }
 	}
-	println('Workspace archive: fresh/existing sparse baseline and ' + refused.str() + ' refusal controls PASS')
+	println('Workspace archive: fresh/fast/existing sparse baseline and ' + refused.str() + ' refusal controls PASS')
 }
 
 fn run() ! {
@@ -93,7 +96,8 @@ fn run() ! {
 		selftest(root, os.real_path(os.args[3]))!; return
 	}
 	existing := os.args.len == 6 && os.args[1] == 'verify-existing'
-	if !existing && os.args.len != 4 { return error('usage: wine-workspace-archive SOURCE NEW_ARCHIVE.tar.gz ARCHIVE_CHECKER | verify-existing SOURCE ARCHIVE.tar.gz SHA256 ARCHIVE_CHECKER') }
+	fast := os.args.len == 5 && os.args[4] == '--fast'
+	if !existing && !fast && os.args.len != 4 { return error('usage: wine-workspace-archive SOURCE NEW_ARCHIVE.tar.gz ARCHIVE_CHECKER [--fast] | verify-existing SOURCE ARCHIVE.tar.gz SHA256 ARCHIVE_CHECKER') }
 	if digest(@FILE)! != sha256.hexhash($embed_file('wine-workspace-archive.v').to_string()) { return error('compiled workspace archive source differs') }
 	source := os.abs_path(os.args[if existing { 2 } else { 1 }])
 	archive := os.abs_path(os.args[if existing { 3 } else { 2 }])
@@ -119,7 +123,9 @@ fn run() ! {
 	if existing {
 		os.write_file(audit + '/existing-archive-sha256.txt', os.args[4] + '\n')!
 	} else {
-		invoke(['/usr/bin/tar', '-czpf', archive, '-C', os.dir(source), '--', top], audit + '/archive.log')!
+		mut command := ['/usr/bin/tar', '-czpf', archive, '-C', os.dir(source), '--', top]
+		if fast { command.insert(1, '--options=gzip:compression-level=1') }
+		invoke(command, audit + '/archive.log')!
 	}
 	archive_hash := digest(archive)!
 	if existing && archive_hash != os.args[4] { return error('existing archive changed before verification') }
