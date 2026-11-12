@@ -26,11 +26,11 @@ fn test_scalar_pair_flow_profile_shapes_and_types() {
 fn test_scalar_pair_flow_runtime_tags_and_availability() {
 	mut p := IRTypedProgram{types: [IRType{kind: .integer_t, bits: 32}, IRType{kind: .integer_t, bits: 1}, IRType{kind: .struct_t, refs_count: 2}], references: [0, 1], operands: [IRTypedOperand{number: 5, type_index: 2}, IRTypedOperand{number: 6, type_index: 2}, IRTypedOperand{number: 7, type_index: 0}, IRTypedOperand{number: 5, type_index: 0}]}
 	defer { p.free() }
-	mut m := IntegerMachine{p: p, binary32: true, bodies: IRFunctionBodies{scopes: [IRBodyScope{base_id: 5}]}, values: [IntegerValue{value: 0xffffffff, overflow: true, aggregate: true}, IntegerValue{poison: true, aggregate: true}, IntegerValue{value: 99}], known: [true, true, true]}
+	mut m := IntegerMachine{p: p, binary32: true, bodies: IRFunctionBodies{scopes: [IRBodyScope{base_id: 5}]}, values: [IntegerValue{value: 0xffffffff, overflow: true, aggregate: true}, IntegerValue{poison: true, aggregate: true, flag_poison: true}, IntegerValue{value: 99}], known: [true, true, true]}
 	defer { unsafe { m.values.free(); m.known.free(); m.bodies.scopes.free() } }
 	pair := m.read_flow(0)!; poisoned := m.read_flow(1)!; scalar := m.read_flow(2)!
 	assert sizeof(IntegerValue) == 16 && pair.aggregate && pair.value == 0xffffffff && pair.overflow && !pair.poison
-	assert poisoned.aggregate && poisoned.poison && !scalar.aggregate && scalar.value == 99 && !scalar.poison
+	assert poisoned.aggregate && poisoned.poison && poisoned.flag_poison && !scalar.aggregate && scalar.value == 99 && !scalar.poison
 	if _ := m.read(3) { assert false, 'pair slot used as scalar' }
 	if _ := m.read_overflow(2) { assert false, 'scalar slot used as pair' }
 	m.known[0] = false

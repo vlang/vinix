@@ -5,13 +5,15 @@ The mixed scalar API carries existing instruction-produced literal unpacked
 Incoming pair types must match the result type exactly. Select requires
 a scalar i1 condition. PHIs retain the usual grouping, incoming-target and
 function-local block checks. Every block is preflighted, including unvisited
-ones. Aggregate arguments, returns, constants, freeze, insertvalue and other
+ones. Pairs support [field insertion](SCALAR-PAIR-INSERT.md).
+Aggregate arguments, returns, constants, freeze and other
 layouts remain unsupported. The integer-only API keeps its no-call profile.
 
 Select reads only the chosen pair after evaluating the condition. A poison
 condition produces a poison pair, so both extracted fields remain poison;
 undef conditions error under the existing bounded profile. A selected poison
-pair retains its tag, while an unselected poison pair has no effect. PHIs
+pair retains both field-poison states, while an unselected poison pair has no
+effect. PHIs
 read only the executed predecessor, and all incoming pair/scalar values are
 collected before any result slot changes. This preserves simultaneous swaps
 across loop backedges, including the arithmetic bits, overflow flag and poison.

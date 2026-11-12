@@ -23,7 +23,8 @@ PHIs can carry either kind. All instructions, including unvisited blocks, must
 belong to the supported profile. Floating-point fast-math flags reject.
 [Integer overflow intrinsics](SCALAR-OVERFLOW.md) additionally produce checked
 `{iN, i1}` pairs for field extraction and [select/PHI flow](SCALAR-PAIR-FLOW.md);
-general aggregate execution is unsupported.
+[field insertion](SCALAR-PAIR-INSERT.md) preserves independent field-poison
+states. General aggregate execution is unsupported.
 Selected [scalar LLVM intrinsic calls](SCALAR-INTRINSICS.md) support absolute
 value, sign copying, integral rounding, NaN-propagating minimum/maximum and square root
 for half and float.

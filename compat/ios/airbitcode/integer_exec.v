@@ -9,7 +9,7 @@ pub:
 	poison bool
 	steps int // Visited instructions plus switch case comparisons.
 }
-struct IntegerValue { value u64 poison bool overflow bool aggregate bool }
+struct IntegerValue { value u64 poison bool overflow bool aggregate bool flag_poison bool }
 struct IntegerProfile {
 	scope int
 	return_bits u32
@@ -125,11 +125,11 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			if op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start || op.targets_start < 0 || op.targets_count < 0 || op.targets_start > p.targets.len || op.targets_count > p.targets.len - op.targets_start { return error('AIR integer: operand/target range') }
 			code := stream.records[inst.record].code
 			mut first_operand := op.operands_start
-			mut overflow_result := false
+			mut pair_result := false
 			if code == 34 {
 				if !binary32 || !inst.has_result { return error('AIR intrinsic: mixed scalar result required') }
 				key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
-				overflow_result = scalar_integer_overflow(scalar_intrinsic_name(ir.functions[op.callee_function].name)!)
+				pair_result = scalar_integer_overflow(scalar_intrinsic_name(ir.functions[op.callee_function].name)!)
 				if intrinsic_declarations[key] != 0 && intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR intrinsic: duplicate reserved declaration') }
 				if intrinsic_declarations[key] == 0 {
 					intrinsic_work += if second_immarg { scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, true)! } else { scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)! }
@@ -138,7 +138,11 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				first_operand++ // The validated callee is a declaration, not a scalar value.
 			}
 			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
-			if pair_flow {
+			if code == 27 {
+				if !binary32 || !inst.has_result { return error('AIR overflow: mixed pair insertion required') }
+				p.scalar_pair_insert(op, s.base_id)!
+				pair_result = true
+			} else if pair_flow {
 				if !binary32 { return error('AIR overflow: mixed pair control flow required') }
 				p.scalar_pair_flow(op, s.base_id, code != 16)!
 			} else if code == 26 {
@@ -152,13 +156,13 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				for operand in p.operands[first_operand..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
 			}
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
-			if inst.has_result { if !overflow_result && !pair_flow { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
+			if inst.has_result { if !pair_result && !pair_flow { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			floating_result := inst.has_result && p.types[op.result_type].kind in [.float_t, .half_t]!
 			allowed_flags := if code == 34 { u64(32768) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
 				34 {} // Checked direct intrinsic, including its attributes, above.
-				26 {} // Only a field of a checked overflow result, validated above.
+				26, 27 {} // Checked overflow pair extraction/insertion, validated above.
 				2, 9, 28 {
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
 					fp := p.types[p.operands[op.operands_start].type_index].kind in [.float_t, .half_t]!
@@ -316,11 +320,16 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 					b := if arity >= 2 { m.read(start + 2)! } else { IntegerValue{} }
 					c := if arity == 3 { m.read(start + 3)! } else { IntegerValue{} }
 					bits := p.execution_bits(if id == .is_fpclass || scalar_integer_overflow(id) { p.operands[start + 1].type_index } else { op.result_type }, binary32)!
-					result = if a.poison || b.poison || c.poison { IntegerValue{poison: true, aggregate: scalar_integer_overflow(id)} } else if scalar_integer_overflow(id) { scalar_integer_overflow_value(id, bits, a.value, b.value)! } else if scalar_integer_saturating_shift(id) { scalar_integer_saturating_shift_value(id, bits, a.value, b.value)! } else if id == .iabs { scalar_integer_abs_value(bits, a.value, b.value)! } else if scalar_integer_zero_count(id) { scalar_integer_zero_count_value(id, bits, a.value, b.value)! } else { IntegerValue{value: if id in [.fma, .fmuladd]! { scalar_fma(bits, a.value, b.value, c.value)! } else if scalar_integer_funnel(id) { scalar_integer_funnel_value(id, bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
+					result = if a.poison || b.poison || c.poison { IntegerValue{poison: true, aggregate: scalar_integer_overflow(id), flag_poison: scalar_integer_overflow(id)} } else if scalar_integer_overflow(id) { scalar_integer_overflow_value(id, bits, a.value, b.value)! } else if scalar_integer_saturating_shift(id) { scalar_integer_saturating_shift_value(id, bits, a.value, b.value)! } else if id == .iabs { scalar_integer_abs_value(bits, a.value, b.value)! } else if scalar_integer_zero_count(id) { scalar_integer_zero_count_value(id, bits, a.value, b.value)! } else { IntegerValue{value: if id in [.fma, .fmuladd]! { scalar_fma(bits, a.value, b.value, c.value)! } else if scalar_integer_funnel(id) { scalar_integer_funnel_value(id, bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
 				}
 				26 {
 					pair := m.read_overflow(start)!
-					result = IntegerValue{value: if p.indices[op.indices_start] == 0 { pair.value } else { u64(pair.overflow) }, poison: pair.poison}
+					result = IntegerValue{value: if p.indices[op.indices_start] == 0 { pair.value } else { u64(pair.overflow) }, poison: if p.indices[op.indices_start] == 0 { pair.poison } else { pair.flag_poison }}
+				}
+				27 {
+					pair := m.read_overflow(start)!; inserted := m.read(start + 1)!
+					bits := p.integer_bits(p.scalar_overflow_element(op.result_type)!)!
+					result = scalar_pair_insert_value(pair, inserted, p.indices[op.indices_start], bits)!
 				}
 				2 {
 					a := m.read(start)!; b := m.read(start + 1)!
@@ -351,7 +360,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 						result = IntegerValue{value: value & constant_mask(dest_bits)}
 					}
 				}
-				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true, aggregate: p.types[op.result_type].kind == .struct_t} } else { m.read_flow(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
+				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true, aggregate: p.types[op.result_type].kind == .struct_t, flag_poison: p.types[op.result_type].kind == .struct_t} } else { m.read_flow(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
 				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
 				58 { result = m.read_frozen(start)! }
 				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }

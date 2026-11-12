@@ -17,7 +17,8 @@ flag without poisoning either field. No valid data bit is reserved for a tag,
 including at i64. CALL, extraction and every other visited instruction each
 consume a step under the existing budget.
 
-Aggregate arguments, returns, constants, freeze and insertvalue
+Pairs also support [field insertion](SCALAR-PAIR-INSERT.md).
+Aggregate arguments, returns, constants and freeze
 remain outside this profile. The integer-only API continues rejecting calls
 and aggregate extraction. All blocks are preflighted, including unvisited
 ones. Direct-call identity, canonical name/width, signature, flags, calling
@@ -29,9 +30,9 @@ second calls cannot bypass validation through caching.
 Production reuses the unsigned bit-pattern ALU for wrapping arithmetic and
 its NUW/NSW checks for overflow. The latter's poison flag becomes the pair's
 overflow bit, while a separate wrapped evaluation retains the arithmetic
-value. The runtime value adds overflow and aggregate booleans, preserving
-the existing 16-byte value layout. A dedicated reader requires a known pair
-slot; ordinary scalar reads reject pair tags. Extraction clears that aggregate
+value. The runtime value stores overflow, an aggregate tag and independent
+field-poison booleans within its existing 16-byte layout. A dedicated reader
+requires a known pair slot; ordinary scalar reads reject pair tags. Extraction clears that aggregate
 tag and preserves poison. There is no new valid-path allocation, LLVM runtime
 dependency or host signed arithmetic. The three existing owned arrays and
 cleanup remain; no retained-allocation measurement is implied.

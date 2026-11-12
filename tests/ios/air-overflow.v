@@ -62,7 +62,7 @@ fn fixture(mut source strings.Builder) []OverflowCase {
 		source.write_string(branch); wrapper(mut source, branch_name, width, width); unsafe { branch_name.free(); branch.free() }
 	} }
 	// These remain outside the deliberately bounded overflow-result profile.
-	source.write_string('define i32 @constant_pair() {\n  %r = extractvalue {i32, i1} zeroinitializer, 0\n  ret i32 %r\n}\ndefine i1 @poison_pair() {\n  %r = extractvalue {i32, i1} poison, 1\n  ret i1 %r\n}\ndefine i32 @argument_pair({i32, i1} %a) {\n  %r = extractvalue {i32, i1} %a, 0\n  ret i32 %r\n}\ndefine {i32, i1} @return_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  ret {i32, i1} %p\n}\ndefine i32 @freeze_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  %f = freeze {i32, i1} %p\n  %r = extractvalue {i32, i1} %f, 0\n  ret i32 %r\n}\ndefine i32 @select_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  %s = select i1 true, {i32, i1} %p, {i32, i1} poison\n  %r = extractvalue {i32, i1} %s, 0\n  ret i32 %r\n}\ndefine i32 @insert_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  %s = insertvalue {i32, i1} %p, i1 true, 1\n  %r = extractvalue {i32, i1} %s, 0\n  ret i32 %r\n}\n')
+	source.write_string('define i32 @constant_pair() {\n  %r = extractvalue {i32, i1} zeroinitializer, 0\n  ret i32 %r\n}\ndefine i1 @poison_pair() {\n  %r = extractvalue {i32, i1} poison, 1\n  ret i1 %r\n}\ndefine i32 @argument_pair({i32, i1} %a) {\n  %r = extractvalue {i32, i1} %a, 0\n  ret i32 %r\n}\ndefine {i32, i1} @return_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  ret {i32, i1} %p\n}\ndefine i32 @freeze_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  %f = freeze {i32, i1} %p\n  %r = extractvalue {i32, i1} %f, 0\n  ret i32 %r\n}\ndefine i32 @select_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  %s = select i1 true, {i32, i1} %p, {i32, i1} poison\n  %r = extractvalue {i32, i1} %s, 0\n  ret i32 %r\n}\ndefine i32 @insert_pair(i32 %a, i32 %b) {\n  %p = call {i32, i1} @llvm.sadd.with.overflow.i32(i32 %a, i32 %b)\n  %s = insertvalue {i32, i1} poison, i1 true, 1\n  %r = extractvalue {i32, i1} %s, 0\n  ret i32 %r\n}\n')
 	return cases
 }
 fn function_index(ir airbitcode.IRModule, name string) !int { for i, f in ir.functions { if f.name == name { return i } }; return error('missing overflow fixture') }
@@ -141,7 +141,7 @@ fn main() {
 	mut profile_controls := 0
 	for name in ['constant_pair', 'poison_pair', 'argument_pair', 'return_pair', 'freeze_pair', 'select_pair', 'insert_pair'] {
 		inputs := if name in ['constant_pair', 'poison_pair']! { []u64{} } else if name == 'argument_pair' { [u64(0)] } else { [u64(0), 0] }; defer { unsafe { inputs.free() } }
-		if _ := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, inputs, 32) { panic('general aggregate execution accepted') } else { profile_controls++ }
+		if _ := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, inputs, 32) { panic('unsupported aggregate constant/argument/return/freeze accepted') } else { profile_controls++ }
 	}
 	index := function_index(ir, 'sadd_32_0')!; slot := bodies.scopes[index + 1].instructions_start; call := p.instructions[slot]; extract := p.instructions[slot + 1]
 	args := [u64(0x7fffffff), 1]; defer { unsafe { args.free() } }
