@@ -305,6 +305,50 @@ fn test_software_metal_compiled_library_metadata() {
 	println('IOS-SOFTWARE-METAL-LIBRARY: raw/wrapped and independent/shared module containers, leaf/rope dispatch ABI, owned bytes, names/types/UTF-8, function lifetimes, empty/missing functions, truncations/hash/range/type errors, optional NSError, bounded 512 MiB rope rejection, eight workers and two drained runtimes PASS')
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
+fn sm_test_view(texture u64, format u64) u64 { return unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(texture, c'newTextureViewWithPixelFormat:', format) } }
+fn test_software_metal_texture_views() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start()
+		for format in [u64(10), 30, 80, 81]! { for imported in [false, true]! {
+			pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
+			desc := sm_test_descriptor(format, 3, 2, 0); sm_test_set(desc, c'setUsage:', 17)
+			mut image := u64(0); mut surface := u64(0); plane := if format == 30 { u64(1) } else { u64(0) }
+			if imported {
+				attrs := objc_allocate(ios_runtime.names['NSDictionary']); empty := objc_allocate(ios_runtime.names['NSDictionary']); key := owned_string('IOSurfaceProperties')
+				dictionary_insert_copy(attrs, empty, key); objc_release(empty); objc_release(key)
+				assert cv_pixel_create(0, 7, 3, if format < 80 { u32(0x34323076) } else { u32(0x42475241) }, attrs, &image) == 0; objc_release(attrs)
+				surface = cv_pixel_surface(image); C.memset(unsafe { voidptr(cv_surface_plane_base(surface, plane)) }, 0xcc, usize(cv_surface_plane_row(surface, plane) * cv_surface_plane_height(surface, plane)))
+			}
+			root := if imported { sm_test_surface(d, desc, surface, plane) } else { sm_test_texture(d, desc) }; assert root != 0 && sm_send(root, c'parentTexture') == 0
+			for bad in [u64(0), 99, if format == 10 { u64(30) } else { u64(10) }]! { assert sm_test_view(root, bad) == 0 }
+			view_format := if format == 80 { u64(81) } else if format == 81 { u64(80) } else { format }
+			view := sm_test_view(root, view_format); nested := sm_test_view(view, format); assert view != 0 && nested != 0 && view != root && nested != view
+			assert sm_send(view, c'parentTexture') == root && sm_send(nested, c'parentTexture') == view && sm_send(view, c'pixelFormat') == view_format && sm_send(nested, c'device') == d
+			assert sm_send(view, c'width') == 3 && sm_send(view, c'height') == 2 && sm_send(view, c'usage') == 17 && sm_send(view, c'parentRelativeLevel') == 0 && sm_send(view, c'parentRelativeSlice') == 0
+			assert sm_send(nested, c'iosurface') == surface && sm_send(nested, c'iosurfacePlane') == if imported { plane } else { u64(0) }
+			pixel := sm_pixel_size(format); mut input := [128]u8{}; mut output := [128]u8{}
+			for i in 0 .. int(6 * pixel) { input[i] = u8(i + 1) }
+			region := SoftwareMetalRegion{width: 3, height: 2, depth: 1}
+			sm_test_put(view, region, 0, u64(unsafe { &input[0] }), 3 * pixel); sm_test_read(root, region, 0, u64(unsafe { &output[0] }), 3 * pixel)
+			for i in 0 .. int(6 * pixel) { assert output[i] == input[i] }
+			cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder')
+			child := C.fork(); assert child >= 0
+			if child == 0 { C.close(1); C.close(2); sm_test_texture_copy(enc, root, 0, 0, SoftwareMetalOrigin{}, SoftwareMetalSize{width: 1, height: 1, depth: 1}, nested, 0, 0, SoftwareMetalOrigin{}); C._exit(0) }
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+			sm_test_texture_copy(enc, root, 0, 0, SoftwareMetalOrigin{}, SoftwareMetalSize{width: 1, height: 1, depth: 1}, nested, 0, 0, SoftwareMetalOrigin{x: 2, y: 1})
+			objc_release(root); objc_release(view); objc_release(image); objc_release(d); objc_release(q)
+			sm_call(enc, c'endEncoding'); sm_call(cmd, c'commit'); sm_test_read(nested, region, 0, u64(unsafe { &output[0] }), 3 * pixel)
+			for i in 0 .. int(pixel) { assert output[int(5 * pixel) + i] == input[i] }
+			if imported { assert unsafe { *(&u8(cv_surface_plane_base(surface, plane) + 3 * pixel)) } == 0xcc }
+			objc_release(nested); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		} }
+		// Conservative cross-format profile requires PixelFormatView usage.
+		pool := objc_pool_push(); d := metal_create_system_default_device(); t := sm_test_texture(d, sm_test_descriptor(80, 1, 1, 0)); assert sm_test_view(t, 81) == 0
+		same := sm_test_view(t, 80); assert same != 0; objc_release(same); objc_release(t); objc_release(d); objc_pool_pop(pool); objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-VIEWS: four formats, owned/IOSurface storage, nested aliases, CPU coherence, BGRA reinterpretation, retained parent/device/plane, padded rows, deferred disjoint blits, overlap and format rejection, two drained runtimes PASS')
+}
 fn sm_test_surface(d u64, descriptor u64, surface u64, plane u64) u64 { return unsafe { SMSurface(voidptr(C.ios_objc_msgsend))(d, c'newTextureWithDescriptor:iosurface:plane:', descriptor, surface, plane) } }
 fn test_software_metal_iosurface_imports() {
 	$if !ios_metal_software ? { return }

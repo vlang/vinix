@@ -33,6 +33,8 @@ Implemented Objective-C API:
 - Texture descriptor: `texture2DDescriptorWithPixelFormat:width:height:mipmapped:`
   plus width, height, pixel-format, usage and storage-mode setters.
 - Texture: dimension/format/usage/device/storage queries, `iosurface`, `iosurfacePlane`,
+  `newTextureViewWithPixelFormat:`, `parentTexture`, `parentRelativeLevel`,
+  `parentRelativeSlice`,
   `replaceRegion:mipmapLevel:withBytes:bytesPerRow:` and
   `getBytes:bytesPerRow:fromRegion:mipmapLevel:`.
 
@@ -51,6 +53,15 @@ normal object cleanup. The descriptor class and metaclass imports are scoped
 to Metal.framework and available only with the software flag. This provides
 configuration objects; shader binding, texture sampling and GPU resource IDs
 remain absent. Newer reduction-mode and LOD-bias properties are unsupported.
+
+Texture views alias the full single-level 2D storage and retain their immediate
+parent, including for nested views and IOSurface planes. Same-format views
+are supported for all four formats; BGRA 80/81 reinterpretation requires usage
+PixelFormatView (16) in this conservative profile. Other format changes return
+nil. Views preserve dimensions, usage, device, plane and padded stride; CPU
+transfers/blits share bytes without conversion. Parent-relative level/slice
+are zero. Existing alias-overlap checks apply. Subranges, swizzles and texture
+type changes remain unsupported.
 
 Textures support R8Unorm (10), RG8Unorm (30), BGRA8Unorm (80) and
 BGRA8Unorm_sRGB (81). Upload/readback preserves raw bytes without color

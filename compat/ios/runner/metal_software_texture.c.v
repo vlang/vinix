@@ -86,12 +86,33 @@ fn sm_texture_get(object u64, selector &char) u64 {
 	return match ctext(u64(selector)) {
 		'width' { state.width } 'height' { state.height } 'pixelFormat' { state.format }
 		'usage' { state.usage } 'device' { h.fields[0] }
+		'parentTexture' { h.fields[2] }
+		'parentRelativeLevel', 'parentRelativeSlice' { u64(0) }
 		'iosurface' { h.fields[1] } 'iosurfacePlane' { h.mutation }
 		'textureType' { u64(2) }
 		'depth', 'arrayLength', 'mipmapLevelCount', 'sampleCount' { u64(1) }
 		'storageMode', 'cpuCacheMode', 'resourceOptions', 'hazardTrackingMode' { u64(0) }
 		else { panic('iOS: unsupported software Metal texture property') }
 	}
+}
+// Full single-level 2D views borrow the parent's bytes and retain that parent.
+// fields[1]/mutation preserve IOSurface plane identity and padded row stride.
+fn sm_texture_view(texture u64, selector &char, format u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	h := sm_check(texture, 'VinixSoftwareMTLTexture')
+	input := h.cv_metal
+	if format != input.format && (!(format in [u64(80), 81]! && input.format in [u64(80), 81]!) || input.usage & 16 == 0) { return 0 }
+	mut state := unsafe { &CVMetalState(C.malloc(sizeof(CVMetalState))) }
+	if state == unsafe { nil } { return 0 }
+	unsafe { *state = *input }; state.format = format
+	view := sm_new('VinixSoftwareMTLTexture', h.fields[0])
+	mut target := obj_header(view)
+	target.cv_metal = state
+	target.external_data = sm_storage_base(h)
+	target.fields[1] = objc_retain(h.fields[1]); target.mutation = h.mutation
+	target.fields[2] = objc_retain(texture)
+	return view
 }
 fn sm_texture_transfer(object u64, region SoftwareMetalRegion, level u64, bytes u64, row u64, write bool) {
 	C.ios_objc_initialize_lock()
@@ -115,6 +136,9 @@ fn sm_texture_read(object u64, selector &char, bytes u64, row u64, region Softwa
 fn sm_texture_start(device u64) {
 	texture := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSoftwareMTLTexture', 0)
 	objc_register_class(texture)
+	sm_method(texture, c'newTextureViewWithPixelFormat:', u64(unsafe { voidptr(sm_texture_view) }), c'@24@0:8Q16')
+	sm_method(texture, c'parentTexture', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')
+	for selector in [c'parentRelativeLevel', c'parentRelativeSlice']! { sm_method(texture, selector, u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8') }
 	sm_method(device, c'newTextureWithDescriptor:', u64(unsafe { voidptr(sm_new_texture) }), c'@24@0:8@16')
 	sm_method(device, c'newTextureWithDescriptor:iosurface:plane:', u64(unsafe { voidptr(sm_surface_texture) }), c'@40@0:8@16^{__IOSurface=}24Q32')
 	sm_method(texture, c'iosurface', u64(unsafe { voidptr(sm_texture_get) }), c'^{__IOSurface=}16@0:8')
