@@ -246,7 +246,7 @@ file. Neither entry point requires dispatch initialization.
 Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, one-block
 [scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
-flag-free binary arithmetic/comparisons/select/casts/fneg/freeze, pointer arguments with
+scalar binary arithmetic/comparisons/select/casts/fneg/freeze, pointer arguments with
 supported constant GEPs,
 explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
@@ -303,6 +303,12 @@ signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and
 chooses a fixed zero for poison/undef. Both cost one step and require no flags.
 Freeze does not skip earlier dynamic errors. Synthetic deferred kernels check
 raw signaling-NaN negation and freezing an invalid conversion result.
+
+Integer add/sub/mul/shl also accept `nuw`/`nsw`, and udiv/sdiv/lshr/ashr accept
+`exact`, using the scalar interpreter's poison rules. Flags do not change step
+cost. Unknown/wrong-family flags and floating fast-math flags reject during
+pipeline creation. Synthetic deferred kernels check defined flagged sums,
+freezing overflow poison, and failed command completion when poison is stored.
 
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not

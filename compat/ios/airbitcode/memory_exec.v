@@ -66,7 +66,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	return IRMemoryAccess{argument: base.argument, offset: offset}
 }
 // Narrow execution profile: an ordinary void function, pointer arguments, one
-// block, scalar loads/stores, forward literal GEPs, flag-free binary operations,
+// block, scalar loads/stores, forward literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
@@ -106,7 +106,8 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		if inst.scope != scope || inst.block != s.blocks_start || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded || op.is_volatile || op.targets_count != 0 || op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start { return error('AIR memory execution: decoded access required') }
 		code := stream.records[inst.record].code
 		gep := code in [u64(4), 30, 43]!
-		if op.flags != 0 && (!gep || op.flags & ~u64(7) != 0) { return error('AIR memory execution: unsupported flags') }
+		allowed_flags := if gep { u64(7) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+		if op.flags & ~allowed_flags != 0 { return error('AIR memory execution: unsupported flags') }
 		if index == block.first + block.count - 1 { if code != 10 || inst.has_result || op.operands_count != 0 { return error('AIR memory execution: ret void required') }; continue }
 		if gep {
 			if !inst.has_result || op.operands_count < 1 || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: GEP result/arity') }

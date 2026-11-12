@@ -1,15 +1,23 @@
 # Bounded scalar memory execution
 
 `run_memory_function` executes a defined ordinary void function with pointer
-arguments, one basic block, scalar loads/stores, flag-free binary operations,
+arguments, one basic block, scalar loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, forward constant GEPs
 and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
-Arithmetic flags (including fast-math), alloca, pointer casts, branches, atomics,
+Fast-math flags, alloca, pointer casts, branches, atomics,
 volatile accesses, calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
+
+Integer add/sub/mul/shl accept `nuw`, `nsw` or both. Integer udiv/sdiv/lshr/ashr
+accept `exact`. Their existing scalar evaluator propagates poison for violated
+wrap/exact promises and overshifts. Unknown and wrong-family flag bits reject
+during preflight. Floating arithmetic still requires zero flags. Division by
+zero, signed division overflow and poison division inputs retain their dynamic
+error behavior. Storing poison rejects; select may discard it and freeze can
+make a defined choice. Flags add no execution steps.
 
 Integer comparisons support all ten signed/unsigned/equality predicates;
 half/float comparisons support all sixteen ordered/unordered predicates.
@@ -103,5 +111,7 @@ including narrow padding, layouts, GEP flags, chains and preflight failures.
 native LLVM conversions, with separate poison and unsupported-input controls.
 `tests/ios/air-memory-unary.v` checks fneg/freeze against native LLVM and exact
 raw-bit expectations, all half encodings, and separate indeterminate choices.
+`tests/ios/air-memory-flags.v` checks integer flags across all widths against a
+defined widened LLVM value/poison-tag reference without executing native poison.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
