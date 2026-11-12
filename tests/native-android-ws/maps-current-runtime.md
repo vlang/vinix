@@ -33,3 +33,29 @@ at `djsz.<clinit>` source430. Its serial log retains both crash traces and
 controller result exports. Parcel method behavior has not yet been executed
 by a dedicated regression APK. These results establish class resolution,
 not full Maps functionality, search, rendering or account login.
+
+The next SDK, `framework-parcel-uuid-20261112-r1`, adds ParcelUuid and its
+creator through `framework_parcel_uuid.v`. It delegates string parsing,
+equality and hashing to `java.util.UUID`, and writes/reads the most-significant
+and least-significant long halves in order. The full SDK assemble and selected
+DEX readback passed with guard/child 0/0 and complete cleanup in 3,948 ms,
+sampled RSS471,220,224 and shared growth41,746,432 bytes. The unchanged native
+library is reused because no consumed JNI class or native method changes.
+Guest `maps-current-20261112-r4` reached broker ready with this SDK.
+It advanced to `NoClassDefFoundError: android.nfc.Tag` in the same registry;
+the complete broker log was exported to its serial log between
+`UUID-FULL-LOG-BEGIN` and `UUID-FULL-LOG-END`.
+
+`framework_peripheral_types.v` makes Tag, NdefMessage, UsbDevice and
+UsbAccessory resolvable as Parcelable types for that registry. The services
+still expose no hardware objects. Unsupported peripheral parcel creation and
+serialization throw explicitly; these are type definitions, not NFC/USB data
+or device implementations. The focused builder now checks all fourteen
+added type/creator files in the actual assembled DEX readback.
+Final combined SDK is `framework-intent-types-20261112-r2`. Its guard/child
+passed 0/0 with complete cleanup in8,381 ms, sampled RSS456,736,768 and
+growth66,068,480 bytes. The earlier r1 invocation used the previous executable
+after a compiler failure, and does not qualify peripheral type generation.
+The compilation failure was conflicting `C.poll` nfds declarations after
+shared host tooling changes. The platform ABI correction passed the host
+PTY suite (one file, 15,053 ms runtime) and is committed as `701ba90b5`.

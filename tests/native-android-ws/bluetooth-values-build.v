@@ -9,13 +9,19 @@ fn main() {
 	os.mkdir_all(root)!
 	os.cp_all(base + '/smali', root + '/smali', false)!
 	androidtools.framework_bluetooth_values(root + '/smali')!
+	androidtools.framework_parcel_uuid(root + '/smali')!
+	androidtools.framework_peripheral_types(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
+	mut types := ['android/os/ParcelUuid', 'android/bluetooth/BluetoothDevice', 'android/bluetooth/BluetoothClass',
+		'android/nfc/Tag', 'android/nfc/NdefMessage', 'android/hardware/usb/UsbDevice', 'android/hardware/usb/UsbAccessory']
+	for name in types.clone() { types << name + r'$VinixCreator' }
 	for args in [[java, '-Xmx256m', '-cp', cp, 'org.jf.smali.Main', 'assemble', '--api', '28', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'],
 		['/usr/bin/zip', '-q', '-j', root + '/api-impl.jar', root + '/classes.dex'],
-		[java, '-Xmx256m', '-cp', cp, 'org.jf.baksmali.Main', 'disassemble', '--classes', r'Landroid/bluetooth/BluetoothDevice;,Landroid/bluetooth/BluetoothClass;,Landroid/bluetooth/BluetoothDevice$VinixCreator;,Landroid/bluetooth/BluetoothClass$VinixCreator;', '--jobs', '2', root + '/classes.dex', '-o', root + '/roundtrip']] {
+		[java, '-Xmx256m', '-cp', cp, 'org.jf.baksmali.Main', 'disassemble', '--classes', types.map('L' + it + ';').join(','), '--jobs', '2', root + '/classes.dex', '-o', root + '/roundtrip']] {
 		if os.system_args(args) != 0 { panic('assembly/readback failed') }
 	}
+	for name in types { if !os.is_file(root + '/roundtrip/' + name + '.smali') { panic('missing DEX type: ' + name) } }
 	println('BLUETOOTH-VALUES-BUILD-PASS ' + root)
 }
