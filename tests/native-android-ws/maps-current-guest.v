@@ -35,6 +35,13 @@ fn stage(parent string, framework string, native string, root string) ! {
 		inputs['/' + relative] = json2.Any(sha256.sum(os.read_bytes(root + '/payload/' + relative)!).hex())
 	}
 	deployment['inputs_sha256'] = json2.Any(inputs)
+	if boot := os.getenv_opt('VINIX_CURRENT_CORE_LIBART') {
+		relative := '/opt/vinix-android-aarch64/usr/lib/java/dex/art/core-libart-hostdex.jar'
+		os.mkdir_all(os.dir(root + '/payload' + relative))!
+		os.cp(boot, root + '/payload' + relative)!
+		inputs[relative] = json2.Any(sha256.sum(os.read_bytes(boot)!).hex())
+		deployment['inputs_sha256'] = json2.Any(inputs)
+	}
 	os.mkdir_all(root + '/payload/opt/vinix-maps-account')!
 	os.write_file(root + '/payload/opt/vinix-maps-account/build.json', json2.encode(deployment))!
 	if fixture := os.getenv_opt('VINIX_CURRENT_API_FIXTURE') {
@@ -43,6 +50,10 @@ fn stage(parent string, framework string, native string, root string) ! {
 		os.cp(fixture, root + '/payload/opt/current-api/probe.apk')!
 		os.cp(runner, root + '/payload/opt/current-api/run')!
 		os.chmod(root + '/payload/opt/current-api/run', 0o755)!
+	}
+	if fixture := os.getenv_opt('VINIX_CURRENT_LOADER_FIXTURE') {
+		os.mkdir_all(root + '/payload/opt/current-api')!
+		os.cp(fixture, root + '/payload/opt/current-api/loader.apk')!
 	}
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	command(['/usr/bin/tar', '-cf', root + '/maps-current.tar', '-C', root + '/payload', 'opt'])!

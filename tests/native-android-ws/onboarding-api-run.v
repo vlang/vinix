@@ -1474,6 +1474,10 @@ fn run() ! {
 	framework := config.runtime + '/usr/lib/java/dex/android_translation_layer/api-impl.jar'
 	require(input_pin(framework)! == config.profile.framework_sha, 'corrected framework JAR pin')!
 	mut inputs := map[string]string{}
+	if current_api {
+		boot := config.runtime + '/usr/lib/java/dex/art/core-libart-hostdex.jar'
+		inputs[boot] = input_pin(boot)!
+	}
 	for path in [config.apk, framework, config.runtime + '/usr/bin/run-android',
 		config.runtime + '/usr/bin/vinix-android-native', os.executable()] {
 		inputs[path] = input_pin(path)!
