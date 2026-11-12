@@ -342,7 +342,7 @@ qemu_amd64() {
         return
     fi
     if "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/tests/default-qemu/run.v" \
-        --desktop "$iso" "$OUT/qemu-amd64-default" "$QMP_TOOL"; then
+        --desktop --state-parent "$iso" "$OUT/qemu-amd64-default" "$QMP_TOOL"; then
         PASSED+=("qemu-amd64-default")
     else
         FAILED+=("qemu-amd64-default (see $OUT/qemu-amd64-default)")

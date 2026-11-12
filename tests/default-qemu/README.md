@@ -34,8 +34,17 @@ V=/path/to/v v run tests/default-qemu/build.v vinix-amd64.iso kernel/bin/vinix /
 v run tests/default-qemu/run.v /tmp/vinix-input-build/input-amd64.iso /tmp/vinix-input-check /tmp/vinix-qmp
 ```
 
-Every state directory must be new. Extra arguments are passed directly to
-QEMU, for example `-machine pc,hpet=off`, `-machine q35 -smp 4`, or
+Every state directory must be new unless `--state-parent` is supplied after
+`--desktop`. With that option, the runner creates a fresh `run-XXXXXX` child
+under the given directory and prints its path before starting QEMU. The release
+gate uses this mode under `$OUT/qemu-amd64-default`, so multiple amd64 images
+and repeated invocations with the same `--out` retain separate evidence.
+Run `v run tests/default-qemu/check-state.v` to check these cases with a V
+stand-in for QEMU, including preservation of earlier evidence and refusal to
+reuse an explicit state directory.
+
+Extra arguments are passed directly to QEMU, for example
+`-machine pc,hpet=off`, `-machine q35 -smp 4`, or
 `-accel kvm -cpu host`. For UEFI, append
 `-machine q35 -drive if=pflash,unit=0,format=raw,readonly=on,file=/path/to/OVMF_CODE.fd`.
 `VINIX_QEMU_X86_64` selects another QEMU executable.

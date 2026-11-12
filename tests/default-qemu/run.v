@@ -6,6 +6,10 @@ import time
 import json2
 import screenshotcore
 
+#include <stdlib.h>
+
+fn C.mkdtemp(&char) &char
+
 struct Test {
 	qmp_tool string
 	socket   string
@@ -170,14 +174,26 @@ fn run() ! {
 	mut options := os.args[1..].clone()
 	desktop := options.len > 0 && options[0] == '--desktop'
 	if desktop { options = options[1..] }
+	state_parent := options.len > 0 && options[0] == '--state-parent'
+	if state_parent { options = options[1..] }
 	if options.len < 3 {
-		eprintln('Usage: v run tests/default-qemu/run.v [--desktop] ISO NEW-STATE-DIR QMP-CLIENT [QEMU options...]')
+		eprintln('Usage: v run tests/default-qemu/run.v [--desktop] [--state-parent] ISO STATE-DIR QMP-CLIENT [QEMU options...]')
 		exit(2)
 	}
 	iso := os.abs_path(options[0])
-	state := os.abs_path(options[1])
-	if os.exists(state) { panic('state directory must be new: ${state}') }
-	os.mkdir_all(state) or { panic(err) }
+	mut state := os.abs_path(options[1])
+	if state_parent {
+		os.mkdir_all(state)!
+		mut template := (state + '/run-XXXXXX\x00').bytes()
+		if isnil(C.mkdtemp(&char(template.data))) {
+			return error('cannot create state directory under ${state}: ${os.get_error_msg(int(C.errno))}')
+		}
+		state = template[..template.len - 1].bytestr()
+	} else {
+		if os.exists(state) { return error('state directory must be new: ${state}') }
+		os.mkdir_all(state)!
+	}
+	println('Default QEMU evidence: ${state}')
 	mut t := Test{
 		qmp_tool: os.abs_path(options[2])
 		socket:   state + '/qmp.sock'
