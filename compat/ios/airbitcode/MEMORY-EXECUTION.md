@@ -2,13 +2,24 @@
 
 `run_memory_function` executes a defined ordinary void function with pointer
 arguments, one basic block, scalar loads/stores, flag-free binary operations,
-forward constant GEPs and a final ret void. It accepts i1..i64, half and float
-memory values.
+comparisons, scalar select, forward constant GEPs and a final ret void. It accepts
+i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
 Arithmetic flags (including fast-math), alloca, pointer casts, branches, atomics,
 volatile accesses, calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
+
+Integer comparisons support all ten signed/unsigned/equality predicates;
+half/float comparisons support all sixteen ordered/unordered predicates.
+Results are scalar i1. Select requires an i1 condition and matching scalar
+value/result types. Comparison and selection reuse the scalar interpreter's
+helpers, including constant true/false FP predicates and poison propagation.
+Select reads its condition and only the chosen value. Unselected poison/undef
+constants do not reject; selected undef errors, and poison conditions/chosen
+values propagate to a rejected poison store. Selection does not skip earlier
+instructions. Pointer, vector and aggregate comparisons/selects and all
+comparison/select flags remain unsupported.
 
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
@@ -57,8 +68,9 @@ Stores write only the scalar's ceil(bits/8) bytes, zeroing unused high bits.
 Loads/stores preserve floating raw bits. Buffer bytes are treated as defined values;
 uninitialized-memory/poison shadow tracking is not implemented. Poison stores
 and selected undef reject. Dynamic value errors can leave earlier stores
-visible; errors do not roll back memory. Every load/store/binary/return costs
-one step (also for GEP), with the existing maximum step limit. Preflight rejects
+visible; errors do not roll back memory. Every load, store, binary operation,
+comparison, select, GEP and return costs one step, with the existing maximum
+step limit. Preflight rejects
 an insufficient budget.
 Execution scratch arrays are freed on success and failure; binding data is not.
 

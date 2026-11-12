@@ -262,6 +262,19 @@ fn (m &IntegerMachine) binary_value(op IRTypedInstruction) !IntegerValue {
 	if m.p.types[op.result_type].kind == .half_t { return if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary16_binary(op.opcode, u16(a.value), u16(b.value))!} } }
 	return integer_binary_flags(op.opcode, op.flags, m.p.integer_bits(op.result_type)!, a, b)!
 }
+fn (m &IntegerMachine) compare_value(op IRTypedInstruction) !IntegerValue {
+	start := op.operands_start
+	fp := m.p.types[m.p.operands[start].type_index].kind in [.float_t, .half_t]!
+	if fp && op.opcode in [u32(0), 15]! { return IntegerValue{value: u64(op.opcode == 15)} }
+	a := m.read(start)!; b := m.read(start + 1)!
+	if m.p.types[m.p.operands[start].type_index].kind == .half_t { return if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary16_compare(op.opcode, u16(a.value), u16(b.value))!)} } }
+	if fp { return if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary32_compare(op.opcode, u32(a.value), u32(b.value))!)} } }
+	return integer_compare(op.opcode, m.p.integer_bits(m.p.operands[start].type_index)!, a, b)!
+}
+fn (m &IntegerMachine) select_value(op IRTypedInstruction) !IntegerValue {
+	condition := m.read(op.operands_start + 2)!
+	return if condition.poison { IntegerValue{poison: true, aggregate: m.p.types[op.result_type].kind == .struct_t, flag_poison: m.p.types[op.result_type].kind == .struct_t} } else { m.read_flow(op.operands_start + if condition.value & 1 != 0 { 0 } else { 1 })! }
+}
 
 fn (m &IntegerMachine) read_frozen(operand_index int) !IntegerValue {
 	operand := m.p.operands[operand_index]
@@ -347,16 +360,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 					result = scalar_pair_insert_value(pair, inserted, p.indices[op.indices_start], bits)!
 				}
 				2 { result = m.binary_value(op)! }
-				9, 28 {
-					fp := p.types[p.operands[start].type_index].kind in [.float_t, .half_t]!
-					if fp && op.opcode in [u32(0), 15]! { result = IntegerValue{value: u64(op.opcode == 15)} }
-					else {
-						a := m.read(start)!; b := m.read(start + 1)!
-						if p.types[p.operands[start].type_index].kind == .half_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary16_compare(op.opcode, u16(a.value), u16(b.value))!)} } }
-						else if fp { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary32_compare(op.opcode, u32(a.value), u32(b.value))!)} } }
-						else { result = integer_compare(op.opcode, p.integer_bits(p.operands[start].type_index)!, a, b)! }
-					}
-				}
+				9, 28 { result = m.compare_value(op)! }
 				3 {
 					input := m.read(start)!; source_bits := p.execution_bits(p.operands[start].type_index, binary32)!; dest_bits := p.execution_bits(op.result_type, binary32)!
 					if input.poison { result = IntegerValue{poison: true} }
@@ -370,7 +374,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 						result = IntegerValue{value: value & constant_mask(dest_bits)}
 					}
 				}
-				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true, aggregate: p.types[op.result_type].kind == .struct_t, flag_poison: p.types[op.result_type].kind == .struct_t} } else { m.read_flow(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
+				5, 29 { result = m.select_value(op)! }
 				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
 				58 { result = if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
 				10 {

@@ -66,8 +66,8 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	return IRMemoryAccess{argument: base.argument, offset: offset}
 }
 // Narrow execution profile: an ordinary void function, pointer arguments, one
-// block, scalar loads/stores, forward literal GEPs, flag-free binary operations
-// and final ret void.
+// block, scalar loads/stores, forward literal GEPs, flag-free binary operations,
+// comparisons, scalar select and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -128,6 +128,20 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if (floating && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!floating && op.opcode > 12) { return error('AIR memory execution: binary opcode') }
 			continue
 		}
+		if code in [u64(9), 28, 5, 29]! {
+			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: comparison/select result') }
+			p.execution_bits(op.result_type, true)!
+			for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, true)! }
+			start := op.operands_start
+			if code in [u64(9), 28]! {
+				if op.operands_count != 2 || p.integer_bits(op.result_type)! != 1 || p.operands[start].type_index != p.operands[start + 1].type_index { return error('AIR memory execution: comparison types/arity') }
+				fp := p.types[p.operands[start].type_index].kind in [.float_t, .half_t]!
+				if (fp && op.opcode > 15) || (!fp && (op.opcode < 32 || op.opcode > 41)) { return error('AIR memory execution: comparison predicate') }
+			} else {
+				if op.operands_count != 3 || op.opcode != 0 || p.operands[start].type_index != op.result_type || p.operands[start + 1].type_index != op.result_type || p.integer_bits(p.operands[start + 2].type_index)! != 1 { return error('AIR memory execution: scalar select types/arity') }
+			}
+			continue
+		}
 		if code !in [u64(20), 24, 44]! || op.operands_count != (if code == 20 { 1 } else { 2 }) || inst.has_result != (code == 20) { return error('AIR memory execution: scalar load/store required') }
 		access := p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
 		accesses[index - block.first] = access
@@ -160,6 +174,8 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
 		if code == 10 { return IRVoidRun{steps: m.steps} }
 		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
+		if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
+		if code in [u64(5), 29]! { value := m.select_value(op)!; m.put(inst, value); continue }
 		if code in [u64(4), 30, 43]! { continue }
 		access := profile.accesses[index - block.first]; binding := access.argument
 		bits := p.execution_bits(op.source_type, true)!; bytes := int((bits + 7) / 8); offset := int(bindings[binding].offset + access.offset)

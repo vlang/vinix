@@ -246,7 +246,8 @@ file. Neither entry point requires dispatch initialization.
 Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, one-block
 [scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
-flag-free binary arithmetic, pointer arguments with supported constant GEPs,
+flag-free binary arithmetic/comparisons/select, pointer arguments with supported
+constant GEPs,
 explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
 Valid LLVM IR remains a precondition. No source compilation is provided.
@@ -279,6 +280,15 @@ interpreter failure sets command status 5 and an owned NSError in
 commands are skipped. The domain global is exported from Metal.framework.
 Scheduled/completed notifications and waits still finish.
 Clients must synchronize direct buffer access against submission.
+
+Scalar comparison/select kernels support all ten integer predicates and all
+sixteen half/float predicates. Comparisons produce i1; select chooses between
+matching i1..i64, half or float values using a scalar i1 condition. Unselected
+poison/undef constants are not read. Selected undef rejects and poison flows
+to the existing failed-command path if stored. Comparisons and selects each
+cost one step, retain zero-flags requirements, and do not add branches or
+skip earlier instructions. Synthetic integer and ordered-float max kernels
+exercise this path through pipeline creation and deferred dispatch.
 
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not

@@ -1133,22 +1133,24 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
 	for name in names {
 		if name == 'empty' { source.write_string('define void @empty() { ret void }\n'); continue }
-		typ := if name == 'float_sum' { 'float' } else { 'i32' }
+		typ := if name in ['float_sum', 'float_max'] { 'float' } else { 'i32' }
 		op := if name == 'float_sum' { 'fadd' } else if name == 'divide' { 'udiv' } else if name == 'bad_flags' { 'add nuw' } else { 'add' }
 		prior := if name == 'divide' { 'store i32 17, ptr addrspace(1) %out, align 4\n' } else { '' }
 		indexed := name == 'indexed_sum'
 		gep := if indexed { '%ai = getelementptr inbounds i32, ptr addrspace(2) %a, i64 2\n %bi = getelementptr inbounds i32, ptr addrspace(2) %b, i64 1\n %di = getelementptr inbounds i32, ptr addrspace(1) %out, i64 3\n' } else { '' }
 		a := if indexed { '%ai' } else { '%a' }; b := if indexed { '%bi' } else { '%b' }; dst := if indexed { '%di' } else { '%out' }
-		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n ${gep}%x = load ${typ}, ptr addrspace(2) ${a}, align 4\n %y = load ${typ}, ptr addrspace(2) ${b}, align 4\n ${prior}%v = ${op} ${typ} %x, %y\n store ${typ} %v, ptr addrspace(1) ${dst}, align 4\n ret void\n}\n')
+		cmp := if name == 'max' { 'icmp sgt' } else { 'fcmp ogt' }
+		compute := if name in ['max', 'float_max'] { '%c = ${cmp} ${typ} %x, %y\n %v = select i1 %c, ${typ} %x, ${typ} %y\n' } else { '%v = ${op} ${typ} %x, %y\n' }
+		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n ${gep}%x = load ${typ}, ptr addrspace(2) ${a}, align 4\n %y = load ${typ}, ptr addrspace(2) ${b}, align 4\n ${prior}${compute}store ${typ} %v, ptr addrspace(1) ${dst}, align 4\n ret void\n}\n')
 	}
-	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80}\n')
-	for i, name in names[..9] {
+	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100}\n')
+	for i, name in names[..11] {
 		n := i * 10
 		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n!${n + 1} = !{}\n')
 		if name == 'empty' { source.write_string('!${n + 2} = !{}\n'); continue }
@@ -1255,6 +1257,20 @@ fn test_software_metal_compute() {
 		unsafe { *(&u32(ap + 12)) = 101; *(&u32(bp + 12)) = 203 }
 		sm_call(indexed_command, c'commit'); assert sm_send(indexed_command, c'status') == 4
 		assert unsafe { *(&u32(outp + 16)) } == 304 && unsafe { *(&u32(outp + 12)) } == 42
+		maximum := sm_send(queue, c'commandBuffer'); me := sm_send(maximum, c'computeCommandEncoder')
+		for i, name in ['max', 'float_max'] {
+			mp := sm_test_compute_pipeline(d, library, name, unsafe { nil }); assert mp != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(me, c'setComputePipelineState:', mp) }
+			sm_test_compute_buffer(me, a, if i == 0 { u64(0) } else { 4 }, 0)
+			sm_test_compute_buffer(me, b, if i == 0 { u64(0) } else { 8 }, 3)
+			sm_test_compute_buffer(me, output, u64(20 + i * 4), 7)
+			sm_test_compute_dispatch(me, c'dispatchThreads:threadsPerThreadgroup:', 1); objc_release(mp)
+		}
+		sm_call(me, c'endEncoding')
+		unsafe { *(&u32(ap)) = 0xfffffffb; *(&u32(bp)) = 3; *(&u32(ap + 4)) = 0x3fc00000; *(&u32(bp + 8)) = 0x40100000 }
+		sm_call(maximum, c'commit'); assert sm_send(maximum, c'status') == 4
+		assert unsafe { *(&u32(outp + 20)) } == 3 && unsafe { *(&u32(outp + 24)) } == u32(0x40100000)
+		unsafe { *(&u32(bp)) = 0 } // Preserve the later division-by-zero fixture.
 		// A second dispatch aliases output to an input; resources remain live
 		// after caller releases its handles, through the recorded snapshot.
 		alias := sm_send(queue, c'commandBuffer'); e := sm_send(alias, c'computeCommandEncoder')
@@ -1286,7 +1302,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty and indexed kernels, derived bounds, single-thread dispatch selectors, deferred integer/float execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed and integer/float max kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {
