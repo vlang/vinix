@@ -1,5 +1,18 @@
 # Current Maps runtime work — 2026-11-12
 
+Latest continuation, 2026-11-13: real search, Louvre details and photos were
+observed in [r66](maps-current-memory-runtime-20261112.md); tiles and route
+geometry remain blank, and no account has authenticated. The
+[decor fix](maps-window-decor-runtime-20261112.md) passed on ARM; its account
+retry reached a check-in timeout page. The [unbound GL query guard](maps-unbound-gl-runtime-20261113.md)
+also passed the full signed ARM regression. r69 then exited on the missing
+ConnectivityManager.OnNetworkActiveListener type. The
+[listener repair](maps-network-active-listener-runtime-20261113.md) passed the
+full signed ARM regression in r70; the real Maps retry is pending.
+[Generator compatibility](maps-generator-current-v-20261113.md)
+keeps these builds on the available latest V. The following records earlier
+attempts; API passes alone do not establish complete Maps functionality.
+
 Full Maps qualification is pending. Onboarding rendered in guest r12; map
 tiles, search, routing and login have not passed. Guest r21 validates the
 current read APIs and the caller-scoped account-query adapter. Maps rendered
