@@ -49,7 +49,7 @@ fn run() ! {
 	for path, expected in inputs { if winesource.file_digest(path)! != expected { return error('input changed before boot') } }
 	boot_host := if arch == 'x86_64' { hwhost.Host{ ...host, root: plainiso.prepare(root, work)! } } else { host }
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-server-endpoint', arches: [arch], ending: .running,
-		required: ['WINE SERVER ENDPOINT PASS pinned socket; parent binding; replacement refusal; live transport; 1000 cycles', 'HWTEST PASS wine-server-endpoint fixture'],
+		required: ['WINE SERVER ENDPOINT PASS pinned socket; parent binding; replacement refusal; live transport; retired listener; 1000 cycles', 'HWTEST PASS wine-server-endpoint fixture'],
 		forbidden: ['HWTEST FAIL', 'Kernel panic']},
 		hwhost.Run{kernel: os.args[3], guest: work + '/probe', state: work + '/boot', timeout: 90, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!

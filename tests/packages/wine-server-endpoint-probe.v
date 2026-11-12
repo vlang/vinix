@@ -336,6 +336,8 @@ fn suite() ! {
 	endpoint.close(); endpoint.close()
 	need(changed(&endpoint, &directory, &guard, data), 'closed endpoint accepted')!
 	endpoint = directory.capture_endpoint(&guard, data)!
+	mut survivor := directory.capture_endpoint(&guard, data)!
+	defer { survivor.close() }
 	directory.close()
 	need(changed(&endpoint, &directory, &guard, data), 'closed server directory accepted')!
 	endpoint.close()
@@ -346,9 +348,18 @@ fn suite() ! {
 	guard.close()
 	byte_write(server.command, `X`)!
 	wait_exit(server.pid, 0)!
+	// Keep the O_PATH capture alive while the real listener's final owner
+	// retires. Metadata references must not keep its transport accepting.
+	retired := C.identity_fixture_socket(C.AF_UNIX, C.SOCK_STREAM | C.SOCK_CLOEXEC | C.SOCK_NONBLOCK, 0)
+	need(retired >= 3, 'retired listener probe socket failed')!
+	retired_address := address(socket_path)!
+	need(C.identity_fixture_connect(retired, unsafe { &retired_address }, u32(2 + socket_path.len + 1)) == -1
+		&& C.errno == C.ECONNREFUSED, 'metadata kept retired listener accepting')!
+	C.identity_fixture_close(retired)
+	survivor.close(); survivor.close()
 	server.close()
 	need(descriptor_count()! == initial, 'closed endpoint fixture retained descriptors')!
-	println('WINE SERVER ENDPOINT PASS pinned socket; parent binding; replacement refusal; live transport; 1000 cycles')
+	println('WINE SERVER ENDPOINT PASS pinned socket; parent binding; replacement refusal; live transport; retired listener; 1000 cycles')
 }
 fn main() {
 	if C.getpid() != 1 { eprintln('requires fixture PID 1'); exit(2) }
