@@ -37,16 +37,16 @@ fn test_pair_insert_profile_shape_origin_and_field_types() {
 	mut p := IRTypedProgram{types: [IRType{kind: .integer_t, bits: 32}, IRType{kind: .integer_t, bits: 1}, IRType{kind: .struct_t, refs_count: 2}], references: [0, 1], operands: [IRTypedOperand{number: 5, type_index: 2}, IRTypedOperand{number: 0, type_index: 0}], indices: [u32(0)]}
 	defer { p.free() }
 	op := IRTypedInstruction{result_type: 2, source_type: 2, operands_count: 2, indices_count: 1}
-	p.scalar_pair_insert(op, 5)!
+	p.scalar_pair_insert(op, 5, IRConstantPools{}, 0)!
 	for changed in [IRTypedInstruction{...op, result_type: 0}, IRTypedInstruction{...op, source_type: -1}, IRTypedInstruction{...op, opcode: 1}, IRTypedInstruction{...op, operands_count: 1}, IRTypedInstruction{...op, targets_count: 1}, IRTypedInstruction{...op, indices_count: 0}, IRTypedInstruction{...op, indices_start: -1}] {
-		if _ := p.scalar_pair_insert(changed, 5) { assert false, 'insert profile shape' }
+		if _ := p.scalar_pair_insert(changed, 5, IRConstantPools{}, 0) { assert false, 'insert profile shape' }
 	}
 	p.indices[0] = 1
-	if _ := p.scalar_pair_insert(op, 5) { assert false, 'i32 replacement in i1 field' }
-	p.operands[1] = IRTypedOperand{number: 0, type_index: 1}; p.scalar_pair_insert(op, 5)!
+	if _ := p.scalar_pair_insert(op, 5, IRConstantPools{}, 0) { assert false, 'i32 replacement in i1 field' }
+	p.operands[1] = IRTypedOperand{number: 0, type_index: 1}; p.scalar_pair_insert(op, 5, IRConstantPools{}, 0)!
 	p.indices[0] = 2
-	if _ := p.scalar_pair_insert(op, 5) { assert false, 'out-of-range insert' }
+	if _ := p.scalar_pair_insert(op, 5, IRConstantPools{}, 0) { assert false, 'out-of-range insert' }
 	p.indices[0] = 1; p.operands[0] = IRTypedOperand{number: 4, type_index: 2}
-	if _ := p.scalar_pair_insert(op, 5) { assert false, 'non-instruction pair base' }
-	println('AIR-PAIR-INSERT-PROFILE: both scalar field types, literal index, source/result identity, shape and instruction-origin guards PASS')
+	if _ := p.scalar_pair_insert(op, 5, IRConstantPools{}, 0) { assert false, 'unavailable pair constant' }
+	println('AIR-PAIR-INSERT-PROFILE: both scalar field types, literal index, source/result identity, shape and source scope guards PASS')
 }

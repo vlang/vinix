@@ -5,22 +5,22 @@ fn test_scalar_pair_flow_profile_shapes_and_types() {
 	mut p := IRTypedProgram{types: [IRType{kind: .integer_t, bits: 32}, IRType{kind: .integer_t, bits: 1}, IRType{kind: .struct_t, refs_count: 2}], references: [0, 1], operands: [IRTypedOperand{number: 5, type_index: 2}, IRTypedOperand{number: 6, type_index: 2}, IRTypedOperand{number: 0, type_index: 1}]}
 	defer { p.free() }
 	op := IRTypedInstruction{result_type: 2, operands_count: 3}
-	p.scalar_pair_flow(op, 5, true)!
-	p.scalar_pair_flow(IRTypedInstruction{...op, operands_count: 2}, 5, false)!
+	p.scalar_pair_flow(op, 5, true, IRConstantPools{}, 0)!
+	p.scalar_pair_flow(IRTypedInstruction{...op, operands_count: 2}, 5, false, IRConstantPools{}, 0)!
 	for changed in [IRTypedInstruction{...op, operands_count: 2}, IRTypedInstruction{...op, operands_count: 0}, IRTypedInstruction{...op, opcode: 1}, IRTypedInstruction{...op, targets_count: 1}, IRTypedInstruction{...op, result_type: 0}] {
-		if _ := p.scalar_pair_flow(changed, 5, true) { assert false, 'pair select shape' }
+		if _ := p.scalar_pair_flow(changed, 5, true, IRConstantPools{}, 0) { assert false, 'pair select shape' }
 	}
 	for slot in 0 .. 2 {
 		saved := p.operands[slot]
 		for changed in [IRTypedOperand{...saved, number: 4}, IRTypedOperand{...saved, type_index: 0}] {
 			p.operands[slot] = changed
-			if _ := p.scalar_pair_flow(op, 5, true) { assert false, 'select pair operand' }
-			if _ := p.scalar_pair_flow(IRTypedInstruction{...op, operands_count: 2}, 5, false) { assert false, 'PHI pair operand' }
+			if _ := p.scalar_pair_flow(op, 5, true, IRConstantPools{}, 0) { assert false, 'select pair operand' }
+			if _ := p.scalar_pair_flow(IRTypedInstruction{...op, operands_count: 2}, 5, false, IRConstantPools{}, 0) { assert false, 'PHI pair operand' }
 		}; p.operands[slot] = saved
 	}
 	saved := p.operands[2]; p.operands[2] = IRTypedOperand{...saved, type_index: 0}
-	if _ := p.scalar_pair_flow(op, 5, true) { assert false, 'pair select condition not i1' }
-	println('AIR-PAIR-FLOW-PROFILE: matching literal pairs, select/PHI arities, opcode, targets, scalar condition and instruction-result guards PASS')
+	if _ := p.scalar_pair_flow(op, 5, true, IRConstantPools{}, 0) { assert false, 'pair select condition not i1' }
+	println('AIR-PAIR-FLOW-PROFILE: matching literal pairs, select/PHI arities, opcode, targets, scalar condition and source type/scope guards PASS')
 }
 
 fn test_scalar_pair_flow_runtime_tags_and_availability() {

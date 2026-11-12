@@ -140,17 +140,18 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
 			if code == 27 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: mixed pair insertion required') }
-				p.scalar_pair_insert(op, s.base_id)!
+				p.scalar_pair_insert(op, s.base_id, pools, scope)!
 				pair_result = true
 			} else if pair_flow {
 				if !binary32 { return error('AIR overflow: mixed pair control flow required') }
-				p.scalar_pair_flow(op, s.base_id, code != 16)!
+				p.scalar_pair_flow(op, s.base_id, code != 16, pools, scope)!
 			} else if code == 26 {
 				if !binary32 || !inst.has_result || op.operands_count != 1 || op.opcode != 0 || op.targets_count != 0 || op.indices_count != 1 || op.indices_start < 0 || op.indices_start >= p.indices.len { return error('AIR overflow: extract shape/index') }
 				operand := p.operands[first_operand]
 				element := p.scalar_overflow_element(operand.type_index)!
 				field := p.indices[op.indices_start]
-				if op.source_type != operand.type_index || operand.number < s.base_id || field > 1 || op.result_type != p.references[p.types[operand.type_index].refs_start + int(field)] { return error('AIR overflow: extract source/field/type') }
+				if op.source_type != operand.type_index || field > 1 || op.result_type != p.references[p.types[operand.type_index].refs_start + int(field)] { return error('AIR overflow: extract source/field/type') }
+				p.scalar_pair_source(pools, scope, s.base_id, operand, op.source_type)!
 				p.integer_bits(element)!
 			} else {
 				for operand in p.operands[first_operand..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
@@ -263,7 +264,7 @@ fn (m &IntegerMachine) read_frozen(operand_index int) !IntegerValue {
 fn (m &IntegerMachine) read_overflow(operand_index int) !IntegerValue {
 	operand := m.p.operands[operand_index]
 	s := m.bodies.scopes[m.scope]
-	if operand.number < s.base_id { return error('AIR overflow: pair must be an instruction result') }
+	if operand.number < s.base_id { return m.p.scalar_pair_constant(m.pools, m.scope, operand)! }
 	slot := u64(operand.number) - s.base_id
 	if slot >= u64(m.values.len) || !m.known[int(slot)] { return error('AIR overflow: pair unavailable on executed path') }
 	value := m.values[int(slot)]

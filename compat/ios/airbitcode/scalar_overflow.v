@@ -16,15 +16,14 @@ fn (p IRTypedProgram) scalar_overflow_element(index int) !int {
 	return element
 }
 
-// Pair control flow borrows only typed instruction-result slots. Constants,
-// aggregate arguments and all other aggregate layouts remain unsupported.
-fn (p IRTypedProgram) scalar_pair_flow(op IRTypedInstruction, base_id u32, select_value bool) ! {
+// Pair control flow borrows typed result slots or zero/poison constants.
+fn (p IRTypedProgram) scalar_pair_flow(op IRTypedInstruction, base_id u32, select_value bool, pools IRConstantPools, scope int) ! {
 	p.scalar_overflow_element(op.result_type)!
 	if op.opcode != 0 || op.operands_count < 1 || (select_value && (op.operands_count != 3 || op.targets_count != 0)) { return error('AIR overflow: pair flow shape') }
 	count := if select_value { 2 } else { op.operands_count }
 	for i in 0 .. count {
 		operand := p.operands[op.operands_start + i]
-		if operand.type_index != op.result_type || operand.number < base_id { return error('AIR overflow: pair flow requires matching instruction results') }
+		p.scalar_pair_source(pools, scope, base_id, operand, op.result_type)!
 	}
 	if select_value && p.integer_bits(p.operands[op.operands_start + 2].type_index)! != 1 { return error('AIR overflow: scalar i1 select condition required') }
 }

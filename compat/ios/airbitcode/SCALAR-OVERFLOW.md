@@ -18,7 +18,8 @@ including at i64. CALL, extraction and every other visited instruction each
 consume a step under the existing budget.
 
 Pairs also support [field insertion](SCALAR-PAIR-INSERT.md).
-Aggregate arguments, returns, constants and freeze
+[Zero/poison pair constants](SCALAR-PAIR-CONSTANTS.md) are supported.
+Aggregate arguments, returns, other constants and freeze
 remain outside this profile. The integer-only API continues rejecting calls
 and aggregate extraction. All blocks are preflighted, including unvisited
 ones. Direct-call identity, canonical name/width, signature, flags, calling

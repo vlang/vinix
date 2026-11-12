@@ -144,7 +144,7 @@ fn main() {
 		if _ := p.run_scalar_function(ir, stream, pools, bodies, index, args, 100) { panic('insert operand type accepted') } else { metadata_controls++ }; p.operands[operand_slot] = operand
 	}
 	base_slot := saved.operands_start; original_base := p.operands[base_slot]; p.operands[base_slot] = airbitcode.IRTypedOperand{...original_base, number: 0}
-	if _ := p.run_scalar_function(ir, stream, pools, bodies, index, args, 100) { panic('constant pair insertion accepted') } else { metadata_controls++ }; p.operands[base_slot] = original_base
+	if _ := p.run_scalar_function(ir, stream, pools, bodies, index, args, 100) { panic('declaration used as pair source') } else { metadata_controls++ }; p.operands[base_slot] = original_base
 	baseline := p.run_scalar_function(ir, stream, pools, bodies, index, args, 4)!; mut result_controls := 0
 	for changed in [airbitcode.IRScalarRun{...baseline, value: baseline.value ^ 1}, airbitcode.IRScalarRun{...baseline, kind: .binary32}, airbitcode.IRScalarRun{...baseline, bits: 1}, airbitcode.IRScalarRun{...baseline, poison: true}, airbitcode.IRScalarRun{...baseline, steps: 3}] { compare(changed, baseline.value, 32, 4) or { result_controls++; continue }; panic('insert result corruption accepted') }
 	bad := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'poison_32_1_1')!, args, 4)!

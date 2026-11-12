@@ -1,12 +1,13 @@
 # Overflow pairs through select and PHIs
 
-The mixed scalar API carries existing instruction-produced literal unpacked
-`{iN, i1}` overflow pairs through unflagged select and PHIs, for every i1..i64.
+The mixed scalar API carries literal unpacked `{iN, i1}` pairs from instructions
+or [zero/poison constants](SCALAR-PAIR-CONSTANTS.md) through unflagged select
+and PHIs, for every i1..i64.
 Incoming pair types must match the result type exactly. Select requires
 a scalar i1 condition. PHIs retain the usual grouping, incoming-target and
 function-local block checks. Every block is preflighted, including unvisited
 ones. Pairs support [field insertion](SCALAR-PAIR-INSERT.md).
-Aggregate arguments, returns, constants, freeze and other
+Aggregate arguments, returns, other constants, freeze and other
 layouts remain unsupported. The integer-only API keeps its no-call profile.
 
 Select reads only the chosen pair after evaluating the condition. A poison

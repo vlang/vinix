@@ -1,11 +1,12 @@
 # Field insertion in bounded overflow pairs
 
-The mixed scalar API supports unflagged `insertvalue` in instruction-produced
-literal unpacked `{iN, i1}` pairs, for every i1..i64. Exactly one literal index
+The mixed scalar API supports unflagged `insertvalue` in literal unpacked
+`{iN, i1}` pairs from instructions or [zero/poison constants](SCALAR-PAIR-CONSTANTS.md),
+for every i1..i64. Exactly one literal index
 selects the arithmetic field (zero) or flag field (one). The inserted scalar
 must have that field's exact type, and source/result pair types must match.
 Preflight checks shape, index, types and source origin in every block.
-Aggregate arguments, returns, constants, freeze, other layouts and nested
+Aggregate arguments, returns, other constants, freeze, other layouts and nested
 field paths remain unsupported. The integer-only API keeps its no-call profile.
 
 Insertion replaces only the chosen field and its poison state. Inserting a
