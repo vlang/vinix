@@ -6,6 +6,27 @@ import crypto.sha256
 import os
 import strconv
 
+#flag -larchive
+#flag darwin -I/opt/homebrew/opt/libarchive/include
+#include <archive.h>
+#include <archive_entry.h>
+struct C.archive {}
+struct C.archive_entry {}
+fn C.archive_read_new() &C.archive
+fn C.archive_read_support_filter_all(&C.archive) i32
+fn C.archive_read_support_format_tar(&C.archive) i32
+fn C.archive_read_open_filename(&C.archive, &char, uint) i32
+fn C.archive_read_next_header(&C.archive, &&C.archive_entry) i32
+fn C.archive_read_data(&C.archive, voidptr, uint) i64
+fn C.archive_read_data_skip(&C.archive) i32
+fn C.archive_read_free(&C.archive) i32
+fn C.archive_entry_pathname(&C.archive_entry) &char
+fn C.archive_entry_filetype(&C.archive_entry) u32
+fn C.archive_entry_perm(&C.archive_entry) u32
+fn C.archive_entry_size(&C.archive_entry) i64
+fn C.archive_entry_symlink(&C.archive_entry) &char
+fn C.archive_entry_hardlink(&C.archive_entry) &char
+
 fn digest(path string) !string {
 	mut file := os.open(path)!
 	defer { file.close() }
@@ -87,14 +108,109 @@ fn check_archive(archive string, expected_sha string, restored string) ! {
 fn check_archive_root(archive string, expected_sha string, root string) ! {
 	if expected_sha.len != 64 || digest(archive)! != expected_sha { return error('archive checksum mismatch') }
 	if os.is_link(archive) || !os.is_file(archive) || os.is_link(root) || !os.is_dir(root) { return error('requires regular archive and ordinary complete root') }
-	mut expected, top := archive_inventory(archive)!
+	mut expected, top := archive_logical_inventory(archive)!
 	if top == '' || os.base(root) != top { return error('archive named root differs') }
 	mut actual := inventory(os.dir(root), top)!
 	actual << 'directory\t' + (int(os.lstat(root)!.mode) & 0o7777).str() + '\t' + top
 	expected.sort(); actual.sort()
-	if expected != actual { return error('archive/named-root typed inventories differ') }
+	if expected != actual {
+		eprintln('Archive/root entries: ' + expected.len.str() + '/' + actual.len.str())
+		mut root_rows := map[string]string{}
+		for row in actual { root_rows[row.split('\t').last()] = row }
+		mut differences := 0
+		for row in expected {
+			path := row.split('\t').last()
+			if root_rows[path] != row {
+				eprintln('Archive difference: ' + row)
+				eprintln('Root difference: ' + root_rows[path])
+				differences++
+				if differences == 8 { break }
+			}
+			root_rows.delete(path)
+		}
+		if differences < 8 {
+			for _, row in root_rows {
+				eprintln('Root-only difference: ' + row)
+				differences++
+				if differences == 8 { break }
+			}
+		}
+		return error('archive/named-root typed inventories differ')
+	}
 	if digest(archive)! != expected_sha { return error('archive changed during verification') }
 	println('Pinned archive and complete named root bytes, paths, types, modes and link targets: PASS; originals retained')
+}
+
+// archive_read_data expands sparse holes into logical zero bytes. Converting
+// tar to mtree on this libarchive hashes only stored extents for sparse files,
+// which cannot be compared with a normal file digest. Keep legacy conversion
+// modes unchanged and use complete decoded bytes for named-root sealing.
+fn archive_logical_inventory(archive string) !([]string, string) {
+	reader := C.archive_read_new()
+	if reader == unsafe { nil } { return error('cannot allocate archive reader') }
+	defer { C.archive_read_free(reader) }
+	if C.archive_read_support_filter_all(reader) != 0 || C.archive_read_support_format_tar(reader) != 0
+		|| C.archive_read_open_filename(reader, archive.str, 1048576) != 0 { return error('cannot open logical archive stream') }
+	mut entries := []string{}
+	mut seen := map[string]bool{}
+	mut top := ''
+	mut root_directory := false
+	mut buffer := []u8{len: 1048576}
+	defer { unsafe { buffer.free() } }
+	for {
+		mut entry := &C.archive_entry(unsafe { nil })
+		answer := C.archive_read_next_header(reader, &entry)
+		if answer == 1 { break } // ARCHIVE_EOF
+		if answer != 0 || entry == unsafe { nil } { return error('archive header decode failed') }
+		raw := C.archive_entry_pathname(entry)
+		if raw == unsafe { nil } { return error('archive entry has no path') }
+		kind := C.archive_entry_filetype(entry)
+		mut path := unsafe { cstring_to_vstring(raw) }.clone()
+		if path.starts_with('./') { path = path[2..] }
+		if kind == 0o040000 && path.ends_with('/') { path = path[..path.len - 1] }
+		if path == '' || path.contains_any('\\\t\r\n') { return error('unsupported archive path') }
+		for component in path.split('/') { if component in ['', '.', '..'] { return error('unsafe archive path') } }
+		if path in seen { return error('duplicate archive entry') }; seen[path] = true
+		root := path.split('/')[0]
+		if top == '' { top = root.clone() }
+		if root != top { return error('multiple archive roots') }
+		if C.archive_entry_hardlink(entry) != unsafe { nil } { return error('unsupported archive hard link') }
+		mode := C.archive_entry_perm(entry)
+		if mode > 0o7777 { return error('unsupported archive mode') }
+		if path == top {
+			if kind != 0o040000 { return error('archive root is not a directory') }
+			root_directory = true
+		}
+		if kind == 0o040000 {
+			entries << 'directory\t' + mode.str() + '\t' + path
+			if C.archive_read_data_skip(reader) != 0 { return error('archive directory decode failed') }
+		} else if kind == 0o120000 {
+			target := C.archive_entry_symlink(entry)
+			if target == unsafe { nil } { return error('archive link target is absent') }
+			text := unsafe { cstring_to_vstring(target) }
+			entries << 'link\t' + mode.str() + '\t' + text.bytes().hex() + '\t' + path
+			if C.archive_read_data_skip(reader) != 0 { return error('archive symlink decode failed') }
+		} else if kind == 0o100000 {
+			size := C.archive_entry_size(entry)
+			if size < 0 { return error('negative archive file size') }
+			mut hash := sha256.new()
+			mut sum := []u8{len: sha256.size}
+			defer { unsafe { hash.free(); free(hash); sum.free() } }
+			mut count := i64(0)
+			for {
+				n := C.archive_read_data(reader, buffer.data, uint(buffer.len))
+				if n < 0 || n > size - count { return error('archive file decode exceeds declared size') }
+				if n == 0 { break }
+				hash.write(buffer[..int(n)])!
+				count += n
+			}
+			if count != size { return error('incomplete logical archive file') }
+			hash.checksum_into(mut sum)
+			entries << 'file\t' + mode.str() + '\t' + size.str() + '\t' + sum.hex() + '\t' + path
+		} else { return error('unsupported archive entry type') }
+	}
+	if top == '' || !root_directory { return error('missing archive root') }
+	return entries, top
 }
 
 fn archive_inventory(archive string) !([]string, string) {
@@ -271,6 +387,24 @@ fn selftest(root string) ! {
 	println('Staging archive checker: six corruption controls PASS')
 	println('Direct archive checker: seven corruption controls PASS')
 	println('Named root archive checker: eight corruption controls PASS')
+	// Sparse storage and allocated zeroes represent the same logical bytes.
+	sparse_root := root + '/sparse/input'
+	os.mkdir_all(sparse_root)!
+	sparse_path := sparse_root + '/image'
+	mut sparse := os.create(sparse_path)!
+	sparse.seek(1048576, .start)!
+	sparse.write_string('end')!; sparse.close()
+	sparse_archive := root + '/sparse.tar.gz'
+	run(['/usr/bin/tar', '-czpf', sparse_archive, '-C', os.dir(sparse_root), 'input'])!
+	sparse_sha := digest(sparse_archive)!
+	check_archive_root(sparse_archive, sparse_sha, sparse_root)!
+	mut changed := os.open_file(sparse_path, 'r+')!
+	changed.seek(512, .start)!; changed.write([u8(1)])!; changed.close()
+	if _ := check_archive_root(sparse_archive, sparse_sha, sparse_root) { return error('accepted changed sparse-hole byte') }
+	mut restored_zero := os.open_file(sparse_path, 'r+')!
+	restored_zero.seek(512, .start)!; restored_zero.write([u8(0)])!; restored_zero.close()
+	check_archive_root(sparse_archive, sparse_sha, sparse_root)!
+	println('Logical sparse archive checker: sparse baseline, changed-hole refusal and allocated-zero retry PASS')
 }
 
 fn main() {

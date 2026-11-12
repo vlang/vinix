@@ -27,6 +27,12 @@ For a large immutable workspace retained in place,
 decodes every archived payload and compares the complete named root's paths,
 types, modes, links, sizes and hashes, including the root mode. Its parent may
 contain unrelated workspaces; all members inside the named root must match.
+This mode reads logical file contents through libarchive, including sparse
+holes. Converting a sparse tar member to mtree can hash only stored extents
+on macOS and is insufficient for this comparison. Building the checker needs
+libarchive headers (`brew install libarchive` on Apple Silicon macOS); it
+links the system libarchive there. Its selftest covers sparse holes, changed
+logical bytes and equivalent allocated zero bytes.
 The existing restoration and coverage modes keep their original contracts.
 `tests/packages/wine-workspace-archive.v SOURCE NEW_ARCHIVE.tar.gz CHECKER`
 records the original typed inventory before compression, invokes that check,
@@ -34,6 +40,16 @@ and rechecks the full original inventory and archive checksum afterward. It
 retains originals and avoids another expanded copy. This does not authorize
 retiring expanded evidence or substitute for launch auditors or restoration
 requirements before deletion.
+
+If compression completed but verification failed, preserve the failed audit.
+`wine-workspace-archive verify-existing SOURCE ARCHIVE.tar.gz SHA256 CHECKER`
+requires an explicit matching archive checksum and fresh qualification
+receipts. It records a separate `.verified-audit`, compares every logical
+archive member with the complete source, and rechecks the source inventory,
+archive and tool identities afterward. It never overwrites an earlier audit
+or existing qualification receipts. `selftest FRESH_EXTERNAL_DIR CHECKER`
+checks fresh and existing sparse archives, wrong pins, changed source bytes,
+changed links and refusal to overwrite receipts.
 
 For a complete diagnostic bundle whose outcome falls outside a historical
 auditor's contract, preserve that auditor and its rejection. The V tool
