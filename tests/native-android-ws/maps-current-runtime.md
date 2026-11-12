@@ -1006,3 +1006,27 @@ and strict independent readback `modem-job-api-readback-20261112-r1` retain
 the two-entry export, archive SHA256
 `81ff2036558ae93b3dae7966ad3c65a7a519c9981660fd87e3f4c6bb6693ceee`.
 The fixture bind was released before broker startup.
+
+Guest r35's actual retry ended before onboarding when the native app host's
+response pipe closed. Desktop logged a failed poll after49ms and app-host
+status0, then the account controller detected changed ancestry and cleaned up
+its owned processes. The final receipt reports failed status and2 cleanup
+survivors, so no complete controller cleanup is claimed. The complete Maps
+log has no new uncaught Java failure before that shutdown. This does not
+establish the cause of the app-host exit or qualify the map screen.
+
+Immutable full snapshot `maps-modem-host-final-uart-20261112-r1` has SHA256
+`067193544b6b3c142cd4e45ef6d9c46578a00d2fbec98bdae2fe763feb8c9bf7`.
+Its full app log is between MODEM-JOB-MAPS-LOG-BEGIN/END, followed by the
+literal final controller receipt between MODEM-HOST-RECEIPT-BEGIN/END.
+The earlier append-proof snapshot `maps-modem-host-uart-20261112-r1` retains
+the complete controller export too. The existing no-removal planner rejected
+noncanonical frame fields; no reconstructed controller archive is claimed and
+no checker was weakened. Its minimum observed disk was7953838080 bytes and
+MemFree37088KiB. Guest r36 repeats the same SDK/native/core/fixture binaries
+with a fresh data image; the already-passed API regression need not be rerun.
+The synced, stopped r35 image has final SHA256
+`18c8bb612590219639ba07a337dab0bb6c3f6f63bfe436cb37a35fc47b2965c1`.
+Guest r36 staging passed guard/child0/0 with complete cleanup,8818ms,
+RSS36814848 and shared growth137330688 bytes; read-only filesystem/UUID
+inspection and ARM volume write/readback passed before broker preparation.
