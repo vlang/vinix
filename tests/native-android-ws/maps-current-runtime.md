@@ -4,7 +4,9 @@ Full Maps qualification is pending. Onboarding rendered in guest r12; map
 tiles, search, routing and login have not passed. Guest r21 validates the
 current read APIs and the caller-scoped account-query adapter. Maps rendered
 onboarding in that guest but exited after Skip; native account ownership
-checks remain enforced. Guest r22 tests the next user/broadcast additions.
+checks remain enforced. Guest r22 passed user/broadcast checks, then Maps
+exited on the missing platform-module query. Guest r23 tests that addition
+and observes startup storage without changing the guest memory budget.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -594,3 +596,50 @@ pass, EOF drain and exit0 were observed. Snapshot
 SHA256 `87b35fa72b11adf9d330e3fa38d0d83157f953f010c0ac839332d97de149f32a`.
 The fixture bind mount was released before broker preparation. This successor
 uses `6746c6efa` plus this commit's source changes.
+
+Guest r22's Maps attempt exited with an uncaught
+PackageManager.getInstalledModules(int) linkage error in Play Store's
+FinskyEventLog. Its complete final log delimiters are
+`USER-BROADCAST-FINAL-MAPS-LOG-BEGIN` / `END`; immutable snapshot
+`maps-user-broadcast-uart-20261112-r1` has full-log SHA256
+`e8a5a0d75d77c7100a8336af0a08df063439652304e5bf3b46e2ccaf54e78be0`.
+`vending-module-catalog-caller-20261112-r1` shows ammm calling the API with
+MATCH_ALL (0x20000) and collecting a stream of its entries.
+
+`framework_module_catalog.v` returns a fresh empty list for the configured
+deployment, which has no Android platform module installer or module metadata
+catalog. Installed apps, Chimera APKs and host libraries are not advertised as
+system modules. This follows the documented
+[empty module catalog result](https://developer.android.com/reference/android/content/pm/PackageManager#getInstalledModules(int));
+it does not implement APEX installation or nonempty ModuleInfo transport.
+SDK `framework-module-catalog-20261112-r1` passed guarded full assembly/readback
+in10,454ms, RSS484,065,280 and shared growth77,758,464 bytes, guard/child0/0
+with complete cleanup. Fixture r18 checks empty results for0/MATCH_ALL and
+isolation from mutations of a previous returned list.
+
+The same r22 log records ENOSPC writing GMS preferences during startup.
+After Maps exited, df reported8.3GiB total/6.0GiB used/2.3GiB available and
+MemFree2587200KiB. That later observation cannot establish the startup peak.
+`maps-storage-watch.v` reads real meminfo and filesystem availability every
+250ms for at most ten minutes, reporting minima every5s or64MiB drop. It does
+not write guest data, grant storage or change resource limits. Current-V
+host parser selftest passed; the static ARM executable is
+`maps-storage-watch-arm-20261112` (SHA256
+`c19b5a8956434d2b302eb1baab126eccbc4601450c08f6fccc022a269aaaa03e`).
+Both probe builds use -gc none -autofree. The guest staging tool optionally
+includes it through VINIX_CURRENT_STORAGE_WATCH. Guest r23 retains the same
+12GiB/4CPU configuration.
+
+Fixture r18 passed on ARM in r23, with all earlier cases, runner readiness,
+pass, EOF drain and exit0. Snapshot `module-catalog-api-uart-20261112-r1`, plan
+`module-catalog-api-plan-20261112-r1.json` and independent readback
+`module-catalog-api-readback-20261112-r1` preserve the two-entry export, archive
+SHA256 `a9171fe7623d142d4fd7b9296458f5b2b39fc869ae836364a486f6566e701359`.
+The ARM storage parser selftest also passed. The first observer invocation
+failed because it preceded broker provisioning of /var/lib/vinix/apps; it
+was restarted after that directory and broker readiness were observed.
+Its real samples report filesystem availability and MemFree (for example,
+at14046ms available2964226048 bytes, minimum2941861888 and MemFree3091264KiB).
+This verifies the observer can run on this kernel, not a completed startup
+measurement. The next desktop Maps launch is in progress. This successor
+uses `3c5e891f7` plus this commit's source changes.

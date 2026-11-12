@@ -55,6 +55,11 @@ fn stage(parent string, framework string, native string, root string) ! {
 		os.mkdir_all(root + '/payload/opt/current-api')!
 		os.cp(fixture, root + '/payload/opt/current-api/loader.apk')!
 	}
+	if probe := os.getenv_opt('VINIX_CURRENT_STORAGE_WATCH') {
+		os.mkdir_all(root + '/payload/opt/current-api')!
+		os.cp(probe, root + '/payload/opt/current-api/storage-watch')!
+		os.chmod(root + '/payload/opt/current-api/storage-watch', 0o755)!
+	}
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	command(['/usr/bin/tar', '-cf', root + '/maps-current.tar', '-C', root + '/payload', 'opt'])!
 	config := os.read_file(parent + '/limine-after.conf')! + '    module_path: boot():/boot/maps-current.tar\n'

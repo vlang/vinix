@@ -5,6 +5,31 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static moduleCatalog(Landroid/content/Context;)V
+.locals 4
+invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+const/4 v1, 0
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->getInstalledModules(I)Ljava/util/List;
+move-result-object v2
+invoke-interface {v2}, Ljava/util/List;->size()I
+move-result v3
+invoke-static {v3, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v3, "fixture caller mutation"
+invoke-interface {v2, v3}, Ljava/util/List;->add(Ljava/lang/Object;)Z
+const/high16 v3, 0x20000
+invoke-virtual {v0, v3}, Landroid/content/pm/PackageManager;->getInstalledModules(I)Ljava/util/List;
+move-result-object v2
+invoke-interface {v2}, Ljava/util/List;->size()I
+move-result v3
+invoke-static {v3, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->getInstalledModules(I)Ljava/util/List;
+move-result-object v2
+invoke-interface {v2}, Ljava/util/List;->size()I
+move-result v3
+invoke-static {v3, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+.end method
 .method public static userBroadcasts(Landroid/content/Context;)V
 .locals 7
 new-instance v0, Landroid/os/UserManager;
@@ -784,6 +809,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->stableDensity()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->runtimeQueries(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->accountPackages(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->userBroadcasts(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->moduleCatalog(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
