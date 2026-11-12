@@ -7,6 +7,7 @@ import certificateprobe
 import servicefailureprobe
 import resultreceiverprobe
 import availabilityprobe
+import vmpolicyprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1376,6 +1377,7 @@ invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
 invoke-static {p0}, Lorg/vinix/bootstrap/ServiceFailureProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/ResultReceiverProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/AvailabilityProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/VmPolicyProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1621,6 +1623,7 @@ fn main() {
 	servicefailureprobe.install(root)!
 	resultreceiverprobe.install(root)!
 	availabilityprobe.install(root)!
+	vmpolicyprobe.install(root)!
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;
 .super Landroid/widget/TableLayout;

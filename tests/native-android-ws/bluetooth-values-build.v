@@ -44,6 +44,7 @@ fn main() {
 	androidtools.framework_result_receiver(root + '/smali')!
 	androidtools.framework_bluetooth_unavailable(root + '/smali')!
 	androidtools.framework_contacts_directory(root + '/smali')!
+	androidtools.framework_vm_policy(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -90,6 +91,10 @@ fn main() {
 	types << 'android/bluetooth/BluetoothAdapter'
 	types << 'android/bluetooth/BluetoothManager'
 	types << r'android/provider/ContactsContract$Directory'
+	types << 'android/os/StrictMode'
+	types << r'android/os/StrictMode$VmPolicy'
+	types << r'android/os/StrictMode$VmPolicy$Builder'
+	types << r'android/os/StrictMode$OnVmViolationListener'
 	types << r'android/app/job/JobInfo$Builder'
 	types << 'android/content/pm/PackageParser'
 	types << 'android/content/pm/IPackageDeleteObserver'

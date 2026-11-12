@@ -1441,3 +1441,46 @@ Snapshot `availability-api-uart-20261112-r1`, plan
 `availability-api-readback-20261112-r1` retain archive SHA256
 `7a6ec270977263a5f2a1c3729400c8594d25aaf4600365973affa60e5ef6b2da`.
 The fixture bind was released before broker preparation and the Maps retry.
+
+With source `e40e2bb7e`, r46 exited before onboarding when GMS application
+startup sampled its StrictMode VM-policy interceptor path. The primary looper
+reports the missing `VmPolicy.Builder(VmPolicy)` constructor at
+GmsApplication.onCreate source206. The fresh exact caller readback is
+`gms-vmpolicy-caller-20261112-r1`; `gms-vmpolicy-outline-20261112-r1` retains
+the synthetic outlines for the subsequent policy detection/listener calls.
+Complete private log `maps-current-20261112-r46/maps.retained.log` has SHA256
+`254fe31465cb743be418a0fe6a1c570e0b445b5006f4685449dc0a813a7415b9`.
+Only verified owned QEMU PID6553 was synced and stopped. Its data image has
+SHA256 `84f3a38ef154a6851202843a5529660aa162d60cb06dac2eb9bcdcdbd467135e`.
+Snapshot `maps-vmpolicy-final-uart-20261112-r1` has full SHA256
+`6fe6df4ea80c48ccd6c93cf413328bfababb612e67e2f646c15a1b9e58bb4ea8`.
+Minimum observed disk was7260200960 bytes and MemFree1069584KiB; this is
+not a full600-second stability result.
+
+`framework_vm_policy.v` supplies copyable VM-policy configuration: detection
+and penalty flags, independent class-limit snapshots, retained listener and
+executor references, null rejection, and synchronized process-wide get/set.
+It follows [AOSP's builder/copy contract](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/os/StrictMode.java).
+This replaces the prior stateless VM-policy facade. It does not add missing
+runtime leak instrumentation or claim VM violation detection/callback coverage.
+Existing BlockGuard-backed ThreadPolicy behavior is preserved.
+
+SDK `framework-vmpolicy-20261112-r1` passed guarded full assembly/readback:
+0/0, complete cleanup,3500ms, RSS489947136, shared growth140025856 bytes.
+Signed fixture r45 passed build/link/sign/verification:0/0, complete cleanup,
+1240ms, RSS170344448, shared growth442368 bytes. Guest r47 staging passed0/0,
+complete cleanup,13159ms, RSS36978688, shared growth198488064 bytes. UUID,
+read-only e2fsck and initial-image hash verification passed before boot.
+ARM qualification and the actual Maps retry remain pending.
+
+The complete signed r45 fixture passed on ARM in r47 as UID/GID10160,
+ready/pass once, drained EOF and exit0. It checks builder chaining, copied
+detection flags, independent class-limit snapshots after both builder mutations,
+listener/executor preservation, get/set identity, null rejection without
+clobbering the installed policy, and restoration of the original policy.
+Snapshot `vmpolicy-api-uart-20261112-r1`, plan
+`vmpolicy-api-plan-20261112-r1.json` and strict readback
+`vmpolicy-api-readback-20261112-r1` retain archive SHA256
+`2b16fa7c67e353c30f79d28b511023a9dccfd523d91694776e4ccaf5d8f9a99a`.
+The fixture bind was released before broker preparation. Actual Maps
+functionality remains unqualified.
