@@ -243,6 +243,7 @@ fn objc_destroy_contents(object u64, mut header ObjHeader, destructors bool) {
 	accessibility_dispose(object)
 	cv_pixel_dispose(mut header)
 	cv_metal_dispose(mut header)
+	software_metal_dispose(mut header)
 	cm_format_dispose(mut header)
 	cm_block_dispose(mut header)
 	cm_sample_dispose(mut header)

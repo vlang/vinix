@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// Metal permits nil when no device is available. The GLES renderer cannot
-// execute Metal command buffers or AIR shaders, so it is not a Metal device.
-// Keep this result nil until a working Metal backend can supply the device.
+// The software backend currently executes shared-buffer blits only. Keep it
+// opt-in; the ordinary runner cannot yet execute an application's Metal shaders.
 fn metal_create_system_default_device() u64 {
+	$if ios_metal_software ? {
+		return sm_new('VinixSoftwareMTLDevice', 0)
+	}
 	return 0
 }
 

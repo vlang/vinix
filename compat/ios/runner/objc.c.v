@@ -112,6 +112,7 @@ mut:
 	swift_data_owner u64 // NSData bridge owns one Swift snapshot storage reference.
 	cv_pixel &CVPixelState = unsafe { nil }
 	cv_metal &CVMetalState = unsafe { nil }
+	software_metal &SoftwareMetalCommands = unsafe { nil }
 	cm_format &CMFormatState = unsafe { nil }
 	cm_block &CMBlockState = unsafe { nil }
 	cm_sample &CMSampleState = unsafe { nil }
@@ -890,6 +891,7 @@ fn objc_start() {
 	mut http_response := ios_runtime.classes[ios_runtime.names['NSHTTPURLResponse']] or { panic('iOS: missing HTTP response class') }
 	http_response.ivars['_httpInternal'] = &ObjIvar{name:'_httpInternal'.clone(), types:'@"NSHTTPURLResponseInternal"'.clone(), offset:24, size:8}
 	cv_metal_start()
+	$if ios_metal_software ? { software_metal_start() }
 }
 
 fn read64(address u64) u64 { return unsafe { *(&u64(address)) } }
