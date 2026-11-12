@@ -1192,6 +1192,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now passes ARM/x86 contention, close-on-exec, replacement and descriptor
     checks, plus host heap/sanitizer controls. Managed Wine server admission
     and generation lease integration remain open.
+    [Server identity checks](tests/packages/wine-lease-supervision-plan.md#server-identity-prerequisite-2026-11-13)
+    now verify the owned unreaped child, POSIX lock owner and connected Unix
+    peer in both native guests, preserving protocol bytes and child status.
+    Foreground startup, namespace capture and production integration remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

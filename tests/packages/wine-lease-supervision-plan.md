@@ -339,6 +339,51 @@ primitive qualification; complete toolchain inventory, sandbox acceptance,
 authenticated foreground server startup/socket handoff, production Wine lease
 coverage and retention across holder death remain open.
 
+## Server identity prerequisite, 2026-11-13
+
+Source `2662d54e0` adds the observational
+`wineadapter.verify_server_identity(socket_fd, lock_fd, child)` primitive for
+Linux AMD64/AArch64. The caller borrows both CLOEXEC descriptors and exclusively
+owns the direct, unreaped child with default waitable SIGCHLD throughout the
+call. Nonblocking `waitid` with WNOWAIT checks that child before and after
+inspection without consuming its status. F_GETLK must identify that child as
+the first-byte POSIX write-lock owner; the connected Unix stream's SO_PEERCRED
+must identify the same PID and effective UID/GID. Terminal poll states refuse.
+The first-byte lock matches the inspected
+[Wine 9.17 server](https://github.com/wine-mirror/wine/blob/wine-9.17/server/request.c).
+No socket protocol bytes are consumed, locks changed, descriptors closed or
+processes signalled. The caller must prevent other waiters or descriptor reuse;
+numeric PIDs alone do not establish this ownership contract.
+
+Final `arm-03` and `x86-03` native runs pass under uid/gid 1000. Two child-owned
+listeners and locks prove acceptance and distinct live peer/lock-owner mismatch
+refusals. Queued protocol data survives 1,000 successful checks with zero
+retained V allocations and flat complete current-limit descriptor counts.
+Named refusals also cover invalid/equal descriptors, invalid/self/nonchild PIDs,
+regular-file/datagram/unconnected peers, missing CLOEXEC, unsafe lock mode,
+ignored SIGCHLD/SA_NOCLDWAIT, unlocked/read-locked files and disconnected peers.
+Exited-child refusal leaves status 23 collectible; reaped children refuse too.
+The ordinary macOS host check passes the unsupported-platform refusal only.
+
+`tests/packages/wine-server-identity-check.v` uses the preceding gate's unchanged
+production kernels. It admits actual parsed guest V sources, explicitly hashes
+the repository heap-tracker header, and checks selected executable, firmware,
+kernel and generated artifact hashes before/after boot. Raw commands, generated
+C, logs, earlier failed compiles, final sources and ownership self-review remain
+at `/Users/alex/.cache/vwi-20261113-01`. Complete typed inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-server-identity-20261113-01.inventory.json`,
+SHA-256 `ba409af8c195f1b4d398bd920e2dc2f72bafe7e0dce27ec83f4206801b5c4a25`.
+Recording and separate verification pass with adjacent logs. Preserve originals
+and historical input namespaces. The raw validation note's standard-descriptor
+category is broader than the fixture: descriptors 0–2 are not separately tested.
+Foreign UID/GID variants, AF_INET peers, injected kernel failures, mid-check
+exit interleavings and kernel heap retention are also outside this gate.
+
+This qualifies a V fixture, not a real Wine launch. Signed foreground startup,
+captured/rechecked prefix/server-directory/lock/endpoint identities, refusal of
+pre-existing servers, bounded connect, retained socket handoff and generation
+lease integration remain open. It changes neither `wine-runner` nor the holder.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
