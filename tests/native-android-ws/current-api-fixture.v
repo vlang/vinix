@@ -11,6 +11,7 @@ import vmpolicyprobe
 import tlslifetimeprobe
 import displaysmsprobe
 import updatepolicyprobe
+import graphictextprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1383,6 +1384,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/AvailabilityProbe;->check(Landroid/cont
 invoke-static {}, Lorg/vinix/bootstrap/VmPolicyProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/DisplaySmsProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/UpdatePolicyProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/GraphicTextProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1632,6 +1634,7 @@ fn main() {
 	vmpolicyprobe.install(root)!
 	displaysmsprobe.install(root)!
 	updatepolicyprobe.install(root)!
+	graphictextprobe.install(root)!
 	if tls_lifetime { tlslifetimeprobe.install(root)! }
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;

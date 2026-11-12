@@ -1683,3 +1683,49 @@ Fresh r52 staging passed0/0, complete cleanup,32756ms, RSS37601280, shared
 growth218722304 bytes. Its UUID, read-only e2fsck and initial-image hash checks
 passed before boot. SDK, JNI, core and wolfJSSE inputs are unchanged from the
 successful r51 API run. Broker preparation has begun; no Maps result is claimed.
+
+The unchanged-artifact r52 retry reached broker readiness, so the r51 attach
+timeout did not recur. Maps rendered onboarding and then Explore, including
+Restaurants/Hotels/Coffee/Shopping chips and Local vibe. The map remained
+blank. Clicking search and waiting, without typing a query, preceded process
+exit. The complete log identifies an uncaught GMS location worker calling
+missing TextUtils.isGraphic(CharSequence) at gfyp.p source17. Fresh exact
+caller readback is `gms-graphic-caller-20261112-r1`. This run does not qualify
+tiles, search, routes or login.
+
+Complete r52 log SHA256 is
+`f234baada8add1a69adca4077f8f10510c55aea19e34294c1b00d584c78e5a45`.
+Only verified owned QEMU PID77652 was synced and stopped. Data-image SHA256 is
+`8761f5b6cae680c421ea9e59a2b317e5f53cb809f67910693652f1f394c4c53f`.
+Snapshot `maps-graphic-final-uart-20261112-r1` has full SHA256
+`4e6424388f610414425f53515d91cd93af8351c6eca2c99241de89805e2a56e2`.
+The observed watcher interval was shorter than600 seconds; no full-duration
+stability pass is claimed.
+
+`framework_graphic_text.v` adds both TextUtils.isGraphic overloads using
+Character Unicode categories. The CharSequence overload iterates code points,
+including supplementary characters; the char overload classifies one UTF-16
+unit. Unassigned, separator, control, format and surrogate categories are
+excluded. Empty input is false and null CharSequence throws NullPointerException,
+matching [the Android implementation](https://github.com/aosp-mirror/platform_frameworks_base/blob/master/core/java/android/text/TextUtils.java).
+
+Available V `0.5.2 8415951` compiled the builder and fixture generator without
+a compiler-revision prerequisite. SDK `framework-graphic-text-20261112-r1`
+passed guarded full assembly and selected DEX readback:0/0, complete cleanup,
+2623ms, RSS475136000, shared growth30842880 bytes. Signed fixture r50 passed
+build/link/sign/verification:0/0, complete cleanup,918ms, RSS170180608, shared
+growth2015232 bytes. Guest r53 staging passed0/0, complete cleanup,8533ms,
+RSS37535744, shared growth237395968 bytes. UUID, read-only e2fsck and initial
+image hash checks passed before boot. ARM qualification remains pending.
+
+The complete signed r50 fixture passed on ARM in r53 as UID/GID10160,
+ready/pass once, drained EOF and exit0. New cases cover empty input, Unicode
+separators/controls/format/unassigned characters, combining marks/private use,
+supplementary emoji and format code points, isolated surrogates, StringBuilder
+input, both overloads and null rejection. Snapshot
+`graphic-text-api-uart-20261112-r1`, plan
+`graphic-text-api-plan-20261112-r1.json` and strict readback
+`graphic-text-api-readback-20261112-r1` retain archive SHA256
+`a1273fe6ad7144a6ddb635c5c5dbb57b0e09a7f04e87a0f3216894f8faae7c0b`.
+The fixture bind was released before broker preparation. The actual Maps
+retry remains pending; this API pass does not qualify Maps functionality.
