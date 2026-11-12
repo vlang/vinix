@@ -5,6 +5,34 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static optionalStorageStats(Landroid/content/Context;)V
+.locals 4
+const-class v0, Landroid/app/usage/StorageStatsManager;
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
+move-result-object v1
+check-cast v1, Landroid/app/usage/StorageStatsManager;
+invoke-static {v1}, Ljava/util/Optional;->ofNullable(Ljava/lang/Object;)Ljava/util/Optional;
+move-result-object v1
+invoke-virtual {v1}, Ljava/util/Optional;->isPresent()Z
+move-result v1
+const/4 v2, 0
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget-object v0, Landroid/content/Context;->STORAGE_STATS_SERVICE:Ljava/lang/String;
+const-string v1, "storagestats"
+invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+const/4 v3, 1
+invoke-static {v1, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/app/usage/StorageStatsManager;
+if-nez v0, :stats_failed
+return-void
+:stats_failed
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.end method
 .method public static modemIdentifiers(Landroid/content/Context;)V
 .locals 5
 const-string v0, "phone"
@@ -1231,6 +1259,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sharedLibraryCatalog(Landroid/co
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->jobInstallQueries(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->scheduleProbeJob(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->modemIdentifiers(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->optionalStorageStats(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V

@@ -24,6 +24,9 @@ were not rendered before that failure.
 Guest r34 passed the scheduled callback regression and loaded Explore content,
 then exited on missing TelephonyManager.getImei in GMS check-in. Search did
 not produce a result before that exit.
+Guest r36 repeated the same SDK and reached onboarding without the r35
+app-host transport failure, then lost its main looper on the missing optional
+StorageStatsManager type. No map/search/route/login result is qualified.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -1030,3 +1033,61 @@ The synced, stopped r35 image has final SHA256
 Guest r36 staging passed guard/child0/0 with complete cleanup,8818ms,
 RSS36814848 and shared growth137330688 bytes; read-only filesystem/UUID
 inspection and ARM volume write/readback passed before broker preparation.
+
+Guest r36 repeated the same SDK/native/core/fixture set with fresh disk-backed
+data. It passed onboarding rendering and exited after Skip on a main-looper
+NoClassDefFoundError for android.app.usage.StorageStatsManager, used as a
+class literal by Play Store `amne.<init>` source74. That constructor calls
+typed getSystemService, casts its possibly null result and wraps it with
+Optional.ofNullable; an unavailable service is explicitly supported. Caller
+readback is `vending-storage-stats-caller-20261112-r1/classes.dex/amne.smali`.
+The r35 native app-host pipe failure did not reproduce; this does not establish
+its cause or repair. The previous IMEI and job-deadline linkage failures are
+absent from this complete Maps log.
+
+Snapshot `maps-modem-repeat-final-uart-20261112-r1` has SHA256
+`58154b8cfc46a8231c054c9dc69cd3d3e4fd8a8f13fadbc97be67bc78af3f273`;
+log markers are MODEM-REPEAT-MAPS-LOG-BEGIN/END. The observer sampled minimum
+disk7952162816 bytes and MemFree34480KiB before verified shutdown at about344
+seconds. No600-second stability observation is claimed.
+The stopped r36 image SHA256 is
+`6b48beba6e30a39df1378ceb92491da2de9aea1c0a6debf3c15732b24d0d7282`.
+
+`framework_storage_stats_type.v` makes the public API class resolvable and
+adds Context.STORAGE_STATS_SERVICE with its
+[documented name](https://developer.android.com/reference/android/content/Context#STORAGE_STATS_SERVICE).
+This is type availability for the caller's optional path, not a storage
+accounting implementation. The runtime registers no instance or statistics
+backend, exposes no per-package data and invents no byte counts. The signed
+fixture checks the class literal, cast of null, Optional.empty result,
+service-name constant and both typed/string lookup absence.
+
+SDK `framework-storage-stats-20261112-r1` passed guarded full assembly and
+DEX readback: guard/child0/0, complete cleanup,3188ms, RSS480919552 and shared
+growth36077568 bytes. Signed fixture r30 build/link/sign/verify passed0/0,
+complete cleanup,1053ms, RSS126418944 and growth26378240 bytes. Guest r37
+stages that pair with unchanged native/core, volume probe and VM resources.
+
+The r37 API regression correctly failed: the generic typed-service fallback
+tries the first public constructor of unknown classes. StorageStatsManager
+has no public SDK constructor, so lookup threw ArrayIndexOutOfBoundsException
+instead of returning absent. Snapshot `storage-stats-api-failure-uart-20261112-r1`
+has SHA256 `7044a5eddfcc91076c07ef444ebb6c63ff9e3fa3b2ac6f4d3c5c985aa50fe42c`.
+No broker or Maps retry used this unqualified intermediate SDK.
+
+The final adapter explicitly returns null for just this type/name before the
+generic fallback, preserving other services. SDK
+`framework-storage-stats-20261112-r2` passed guarded full assembly/readback,
+guard/child0/0, complete cleanup,3732ms, RSS474398720 and shared growth47915008
+bytes. Guest r38 retains the same signed fixture r30 to qualify the repair.
+The stopped intermediate r37 image has SHA256
+`43ba94021354af0ef553ac92f8b4a58f1768ec3bc42b06743a3261008d2b4215`.
+
+The complete signed r30 fixture passed on ARM in r38 as UID/GID10160 with
+disk-backed data, ready/pass once, drained EOF and exit0. Both service lookup
+forms returned null and the caller's optional pattern completed. Snapshot
+`storage-stats-api-uart-20261112-r1`, plan
+`storage-stats-api-plan-20261112-r1.json` and strict independent readback
+`storage-stats-api-readback-20261112-r1` retain its two-entry export, archive
+SHA256 `6eb8fe4ee4308327e34a5c0c8c25b11870341d6988177d6024a29385f398c13e`.
+The fixture bind was released before broker preparation and the Maps retry.
