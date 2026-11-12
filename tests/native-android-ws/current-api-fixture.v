@@ -5,6 +5,48 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static secureLongs(Landroid/content/ContentResolver;)V
+.locals 6
+const-string v0, "vinix_absent_long"
+:secure_strict_start
+invoke-static {p0, v0}, Landroid/provider/Settings$Secure;->getLong(Landroid/content/ContentResolver;Ljava/lang/String;)J
+:secure_strict_end
+new-instance v1, Ljava/lang/AssertionError;
+invoke-direct {v1}, Ljava/lang/AssertionError;-><init>()V
+throw v1
+:secure_missing
+move-exception v1
+invoke-virtual {v1}, Ljava/lang/Throwable;->getMessage()Ljava/lang/String;
+move-result-object v1
+invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+const/4 v2, 1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-wide v1, 0x1020304050607080L
+invoke-static {p0, v0, v1, v2}, Landroid/provider/Settings$Secure;->getLong(Landroid/content/ContentResolver;Ljava/lang/String;J)J
+move-result-wide v3
+cmp-long v5, v1, v3
+const/4 v0, 0
+invoke-static {v5, v0}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v0, "advertising_id"
+const-wide v1, -0x8000000000000000L
+invoke-static {p0, v0, v1, v2}, Landroid/provider/Settings$Secure;->getLong(Landroid/content/ContentResolver;Ljava/lang/String;J)J
+move-result-wide v3
+cmp-long v5, v1, v3
+const/4 v0, 0
+invoke-static {v5, v0}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:secure_null_start
+invoke-static {p0, v0, v1, v2}, Landroid/provider/Settings$Secure;->getLong(Landroid/content/ContentResolver;Ljava/lang/String;J)J
+:secure_null_end
+new-instance v1, Ljava/lang/AssertionError;
+invoke-direct {v1}, Ljava/lang/AssertionError;-><init>()V
+throw v1
+:secure_null
+move-exception v1
+return-void
+.catch Landroid/provider/Settings$SettingNotFoundException; {:secure_strict_start .. :secure_strict_end} :secure_missing
+.catch Ljava/lang/NullPointerException; {:secure_null_start .. :secure_null_end} :secure_null
+.end method
 .method public static stableDensity()V
 .locals 5
 sget v0, Landroid/util/DisplayMetrics;->DENSITY_DEVICE:I
@@ -500,6 +542,9 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->properties()V
+invoke-virtual {p0}, Landroid/content/Context;->getContentResolver()Landroid/content/ContentResolver;
+move-result-object v0
+invoke-static {v0}, Lorg/vinix/bootstrap/Main;->secureLongs(Landroid/content/ContentResolver;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->stableDensity()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V

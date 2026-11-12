@@ -188,6 +188,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_keyguard_policy(smali)!
  framework_broadcast_permission(smali)!
  framework_settings_secure(smali)!
+ framework_secure_longs(smali)!
  framework_quick_settings(smali)!
  framework_usage_inactive(smali)!
  framework_messenger(smali)!

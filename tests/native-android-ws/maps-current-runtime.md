@@ -441,3 +441,36 @@ archive checksum
 `3388790193da65a6561f289ebaf12c5cf7ec6abb4833442f87fe00f548a50fd9`.
 The test mount was released before the next broker/Maps attempt. This
 successor uses `f6d35f515` plus this commit's source changes.
+
+Guest r18 advanced past density initialization and exited later in Play Store
+ContentFiltersService startup on missing `Settings.Secure.getLong` at
+`alyh.g` source18. Full log delimiters are `DENSITY-MAPS-LOG-BEGIN` /
+`DENSITY-MAPS-LOG-END`; snapshot `maps-density-uart-20261112-r1` has SHA256
+`ecb61c05a3f56e4e55c43fb35b7b7fd59b580cdaa1a6ee852c1abc9893b6b623`.
+Inspection `vending-secure-long-caller-20261112-r1` shows queries for mobile
+download-size limits. Its strict-call branch catches SettingNotFoundException
+and returns -1; another flag selects the default-value overload with -1.
+These are optional settings rather than a request to generate an identifier.
+
+`framework_secure_longs.v` supplies both public static overloads over the
+existing String getter. Long conversion failure becomes the
+[documented checked absence](https://developer.android.com/reference/android/provider/Settings.Secure#getLong(android.content.ContentResolver,java.lang.String))
+or the caller's complete 64-bit default. Other getter exceptions propagate.
+It does not change legacy String fallbacks, create settings values, provide a
+settings store or qualify successful provider-backed numeric reads.
+SDK `framework-secure-longs-20261112-r1` passed guarded assembly/readback in
+3,819 ms, RSS 452,739,072, growth 29,515,776, guard/child 0/0 with complete
+cleanup.
+
+Signed fixture `current-api-fixture-20261112-r14` passed on ARM in guest r19:
+the strict checked exception and key message for unavailable/nonnumeric data,
+an unchanged positive wide default, Long.MIN_VALUE default for an empty value,
+propagation of the existing getter's null-key NPE, and all earlier API checks.
+Valid numeric strings cannot currently be supplied through this legacy getter
+and are not claimed as an executed provider-backed case. Runner readiness/pass,
+EOF drain and exit0 were observed. Snapshot `secure-long-api-uart-20261112-r1`,
+plan `secure-long-api-plan-20261112-r1.json` and readback
+`secure-long-api-readback-20261112-r1` preserve its two-entry export, checksum
+`ab490eec7ffa2783245851647d1ce935edac6130cd050e6f72f60b7d1c75304e`.
+The test mount was released before the next broker/Maps attempt. This
+successor uses `c58ba2f59` plus this commit's source changes.
