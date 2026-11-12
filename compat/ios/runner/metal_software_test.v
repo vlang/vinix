@@ -305,6 +305,44 @@ fn test_software_metal_compiled_library_metadata() {
 	println('IOS-SOFTWARE-METAL-LIBRARY: raw/wrapped and independent/shared module containers, leaf/rope dispatch ABI, owned bytes, names/types/UTF-8, function lifetimes, empty/missing functions, truncations/hash/range/type errors, optional NSError, bounded 512 MiB rope rejection, eight workers and two drained runtimes PASS')
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
+type SMBufferTexture = fn (u64, &char, u64, u64, u64) u64
+fn sm_test_buffer_texture_view(buffer u64, descriptor u64, offset u64, row u64) u64 { return unsafe { SMBufferTexture(voidptr(C.ios_objc_msgsend))(buffer, c'newTextureWithDescriptor:offset:bytesPerRow:', descriptor, offset, row) } }
+fn test_software_metal_buffer_backed_textures() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
+		for format in [u64(10), 30, 80, 81]! {
+			b := sm_test_buffer(d, 4096, 0); base := sm_send(b, c'contents'); C.memset(unsafe { voidptr(base) }, 0xcc, 4096)
+			desc := sm_test_descriptor(format, 3, 2, 0); sm_test_set(desc, c'setUsage:', 17)
+			t := sm_test_buffer_texture_view(b, desc, 256, 256); assert t != 0
+			assert sm_send(t, c'buffer') == b && sm_send(t, c'bufferOffset') == 256 && sm_send(t, c'bufferBytesPerRow') == 256 && sm_send(t, c'parentTexture') == 0 && sm_send(t, c'iosurface') == 0
+			view := sm_test_view(t, format); assert sm_send(view, c'buffer') == b && sm_send(view, c'bufferOffset') == 256 && sm_send(view, c'bufferBytesPerRow') == 256
+			pixel := sm_pixel_size(format); mut input := [32]u8{}; mut output := [32]u8{}; for i in 0 .. 32 { input[i] = u8(i + 1) }
+			region := SoftwareMetalRegion{width: 3, height: 2, depth: 1}; sm_test_put(view, region, 0, u64(unsafe { &input[0] }), 3 * pixel)
+			for y in 0 .. 2 { for x in 0 .. int(3 * pixel) { assert unsafe { *(&u8(base + 256 + u64(y * 256 + x))) } == input[y * int(3 * pixel) + x] }; assert unsafe { *(&u8(base + 256 + u64(y * 256) + 3 * pixel)) } == 0xcc }
+			for mode in 0 .. 12 {
+				bad := sm_test_descriptor(format, 3, 2, 0)
+				match mode { 6 { sm_test_set(bad, c'setWidth:', 0) } 7 { sm_test_set(bad, c'setHeight:', 16385) } 8 { sm_test_set(bad, c'setStorageMode:', 2) } 9 { sm_test_set(bad, c'setPixelFormat:', 99) } 10 { sm_test_set(bad, c'setUsage:', 32) } else {} }
+				assert sm_test_buffer_texture_view(b, if mode == 11 { d } else { bad }, if mode == 0 { 1 } else if mode == 1 { ~u64(0) - 255 } else if mode == 2 { 4096 } else { 256 }, if mode == 3 { 0 } else if mode == 4 { 257 } else if mode == 5 { ~u64(0) - 255 } else { 256 }) == 0
+			}
+			other := sm_test_buffer_texture_view(b, desc, 512, 256)
+			for mode in 0 .. 3 {
+				child := C.fork(); assert child >= 0
+				if child == 0 { C.close(1); C.close(2); cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder'); if mode == 0 { sm_test_texture_copy(enc, t, 0, 0, SoftwareMetalOrigin{}, SoftwareMetalSize{width: 3, height: 2, depth: 1}, other, 0, 0, SoftwareMetalOrigin{}) } else { sm_test_buffer_texture(enc, b, 256, 256, 0, SoftwareMetalSize{width: 3, height: 2, depth: 1}, t, 0, 0, SoftwareMetalOrigin{}, mode == 1) }; C._exit(0) }
+				mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+			}; objc_release(other)
+			separate := sm_test_buffer_texture_view(b, desc, 1024, 256); cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder')
+			sm_test_fill(enc, b, SoftwareMetalRange{location: 256, length: 3 * pixel}, 0x6b)
+			sm_test_texture_copy(enc, t, 0, 0, SoftwareMetalOrigin{}, SoftwareMetalSize{width: 3, height: 2, depth: 1}, separate, 0, 0, SoftwareMetalOrigin{})
+			objc_release(b); objc_release(t); sm_call(enc, c'endEncoding'); sm_call(cmd, c'commit')
+			sm_test_read(separate, region, 0, u64(unsafe { &output[0] }), 3 * pixel); for i in 0 .. int(3 * pixel) { assert output[i] == 0x6b && output[int(3 * pixel) + i] == input[int(3 * pixel) + i] }
+			sm_test_read(view, region, 0, u64(unsafe { &output[0] }), 3 * pixel); assert output[0] == 0x6b
+			objc_release(view); objc_release(separate)
+		}
+		objc_release(q); objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-BUFFER-STORAGE: four formats, 256-byte layouts, CPU aliases/padding, nested view buffer metadata, twelve invalid allocations, three overlapping alias blits rejected, deferred fill/disjoint texture copy, retained storage and two drained runtimes PASS')
+}
 fn sm_test_view(texture u64, format u64) u64 { return unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(texture, c'newTextureViewWithPixelFormat:', format) } }
 type SMViewRanges = fn (u64, &char, u64, u64, SoftwareMetalRange, SoftwareMetalRange) u64
 fn sm_test_view_ranges(texture u64, format u64, kind u64, levels SoftwareMetalRange, slices SoftwareMetalRange) u64 { return unsafe { SMViewRanges(voidptr(C.ios_objc_msgsend))(texture, c'newTextureViewWithPixelFormat:textureType:levels:slices:', format, kind, levels, slices) } }

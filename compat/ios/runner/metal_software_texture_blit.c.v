@@ -3,6 +3,7 @@ module main
 
 struct SoftwareMetalOrigin { x u64 y u64 z u64 }
 struct SoftwareMetalSize { width u64 height u64 depth u64 }
+fn sm_spans_overlap(a u64, an u64, b u64, bn u64) bool { return if a <= b { b - a < an } else { a - b < bn } }
 fn sm_copy_texture(encoder u64, selector &char, source u64, source_slice u64, source_level u64, origin SoftwareMetalOrigin, size SoftwareMetalSize, destination u64, destination_slice u64, destination_level u64, target SoftwareMetalOrigin) {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -16,6 +17,10 @@ fn sm_copy_texture(encoder u64, selector &char, source u64, source_slice u64, so
 	if source_slice != 0 || destination_slice != 0 || source_level != 0 || destination_level != 0 || origin.z != 0 || target.z != 0 || size.depth != 1 || size.width == 0 || size.height == 0 || a.format != b.format { panic('iOS: unsupported Metal texture blit layout/format') }
 	if !sm_range(a.width, origin.x, size.width) || !sm_range(a.height, origin.y, size.height) || !sm_range(b.width, target.x, size.width) || !sm_range(b.height, target.y, size.height) { panic('iOS: Metal texture blit region exceeds texture') }
 	if sm_storage_base(src) == sm_storage_base(dst) && origin.x < target.x + size.width && target.x < origin.x + size.width && origin.y < target.y + size.height && target.y < origin.y + size.height { panic('iOS: overlapping Metal texture blit regions') }
+	if sm_storage_base(src) != sm_storage_base(dst) || sm_texture_stride(src) != sm_texture_stride(dst) {
+		pixel := sm_pixel_size(a.format)
+		if sm_spans_overlap(sm_storage_base(src) + origin.y * sm_texture_stride(src) + origin.x * pixel, (size.height - 1) * sm_texture_stride(src) + size.width * pixel, sm_storage_base(dst) + target.y * sm_texture_stride(dst) + target.x * pixel, (size.height - 1) * sm_texture_stride(dst) + size.width * pixel) { panic('iOS: overlapping Metal texture storage spans') }
+	}
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	pixel := sm_pixel_size(a.format)
 	// Owned allocations and imported spans are both bounded to 64 MiB.
@@ -45,6 +50,7 @@ fn sm_buffer_texture_copy(encoder u64, buffer u64, offset u64, row u64, image u6
 	if !sm_range(u64(b.data.len), offset, span) { panic('iOS: Metal transfer span exceeds buffer') }
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	texture_offset := origin.y * sm_texture_stride(t) + origin.x * pixel
+	if sm_spans_overlap(sm_storage_base(b) + offset, span, sm_storage_base(t) + texture_offset, (size.height - 1) * sm_texture_stride(t) + width) { panic('iOS: overlapping Metal buffer/texture storage spans') }
 	state.ops << SoftwareMetalCopy{source: objc_retain(if upload { buffer } else { texture }), destination: objc_retain(if upload { texture } else { buffer }), source_offset: if upload { offset } else { texture_offset }, destination_offset: if upload { texture_offset } else { offset }, size: width, rows: size.height, source_stride: if upload { row } else { sm_texture_stride(t) }, destination_stride: if upload { sm_texture_stride(t) } else { row }}
 }
 fn sm_buffer_to_texture(encoder u64, selector &char, source u64, offset u64, row u64, image u64, size SoftwareMetalSize, destination u64, slice u64, level u64, origin SoftwareMetalOrigin) { sm_buffer_texture_copy(encoder, source, offset, row, image, size, destination, slice, level, origin, true) }

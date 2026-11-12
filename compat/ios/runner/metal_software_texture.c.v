@@ -8,7 +8,27 @@ fn sm_pixel_size(format u64) u64 {
 // Imported textures borrow a plane address and retain its IOSurface in fields[1].
 // mutation stores the immutable plane index; ordinary textures own data instead.
 fn sm_storage_base(h &ObjHeader) u64 { return if h.external_data != 0 { h.external_data } else { u64(h.data.data) } }
-fn sm_texture_stride(h &ObjHeader) u64 { return if h.fields[1] != 0 { cv_surface_plane_row(h.fields[1], h.mutation) } else { h.cv_metal.width * sm_pixel_size(h.cv_metal.format) } }
+fn sm_texture_stride(h &ObjHeader) u64 { return if h.fields[3] != 0 { u64(h.deadline) } else if h.fields[1] != 0 { cv_surface_plane_row(h.fields[1], h.mutation) } else { h.cv_metal.width * sm_pixel_size(h.cv_metal.format) } }
+fn sm_buffer_texture(buffer u64, selector &char, descriptor u64, offset u64, row u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	b := sm_check(buffer, 'VinixSoftwareMTLBuffer')
+	h := ios_runtime.objects[descriptor] or { return 0 }
+	if h.cls != ios_runtime.names['VinixMetalTextureDescriptor'] || h.cv_metal == unsafe { nil } { return 0 }
+	a := h.cv_metal; pixel := sm_pixel_size(a.format)
+	if pixel == 0 || a.storage != 0 || a.usage & ~u64(31) != 0 || a.width == 0 || a.height == 0 || a.width > 16384 || a.height > 16384 { return 0 }
+	// A conservative 256-byte layout works for every current format. Bound row
+	// before span arithmetic, and use subtraction for the buffer extent check.
+	if offset % 256 != 0 || row % 256 != 0 || row < a.width * pixel || row > software_metal_max_buffer { return 0 }
+	span := (a.height - 1) * row + a.width * pixel
+	if !sm_range(u64(b.data.len), offset, span) { return 0 }
+	mut state := unsafe { &CVMetalState(C.malloc(sizeof(CVMetalState))) }
+	if state == unsafe { nil } { return 0 }; unsafe { *state = *a }
+	texture := sm_new('VinixSoftwareMTLTexture', b.fields[0]); mut target := obj_header(texture)
+	target.cv_metal = state; target.external_data = sm_storage_base(b) + offset
+	target.fields[3] = objc_retain(buffer); target.number = i64(offset); target.deadline = i64(row)
+	return texture
+}
 fn sm_surface_texture(device u64, selector &char, descriptor u64, surface u64, plane u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -87,6 +107,7 @@ fn sm_texture_get(object u64, selector &char) u64 {
 		'width' { state.width } 'height' { state.height } 'pixelFormat' { state.format }
 		'usage' { state.usage } 'device' { h.fields[0] }
 		'parentTexture' { h.fields[2] }
+		'buffer' { h.fields[3] } 'bufferOffset' { u64(h.number) } 'bufferBytesPerRow' { if h.fields[3] != 0 { u64(h.deadline) } else { u64(0) } }
 		'parentRelativeLevel', 'parentRelativeSlice' { u64(0) }
 		'iosurface' { h.fields[1] } 'iosurfacePlane' { h.mutation }
 		'textureType' { u64(2) }
@@ -112,6 +133,7 @@ fn sm_texture_view(texture u64, selector &char, format u64) u64 {
 	target.external_data = sm_storage_base(h)
 	target.fields[1] = objc_retain(h.fields[1]); target.mutation = h.mutation
 	target.fields[2] = objc_retain(texture)
+	target.fields[3] = objc_retain(h.fields[3]); target.number = h.number; target.deadline = h.deadline
 	return view
 }
 fn sm_texture_view_ranges(texture u64, selector &char, format u64, kind u64, levels SoftwareMetalRange, slices SoftwareMetalRange) u64 {
@@ -153,6 +175,9 @@ fn sm_texture_read_slice(object u64, selector &char, bytes u64, row u64, image u
 fn sm_texture_start(device u64) {
 	texture := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSoftwareMTLTexture', 0)
 	objc_register_class(texture)
+	sm_method(ios_runtime.names['VinixSoftwareMTLBuffer'], c'newTextureWithDescriptor:offset:bytesPerRow:', u64(unsafe { voidptr(sm_buffer_texture) }), c'@40@0:8@16Q24Q32')
+	sm_method(texture, c'buffer', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')
+	for selector in [c'bufferOffset', c'bufferBytesPerRow']! { sm_method(texture, selector, u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8') }
 	sm_method(texture, c'newTextureViewWithPixelFormat:', u64(unsafe { voidptr(sm_texture_view) }), c'@24@0:8Q16')
 	sm_method(texture, c'newTextureViewWithPixelFormat:textureType:levels:slices:', u64(unsafe { voidptr(sm_texture_view_ranges) }), c'@64@0:8Q16Q24{_NSRange=QQ}32{_NSRange=QQ}48')
 	sm_method(texture, c'parentTexture', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')

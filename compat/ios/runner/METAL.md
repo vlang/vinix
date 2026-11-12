@@ -19,7 +19,8 @@ Implemented Objective-C API:
 - Sampler state: `device`, `label` (immutable configuration snapshots).
 - Library: `device`, `functionNames`, `newFunctionWithName:`.
 - Function: `device`, `name`, `functionType` (metadata handles only).
-- Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
+- Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`,
+  `newTextureWithDescriptor:offset:bytesPerRow:`.
 - Queue: `commandBuffer`, `device`.
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
   `waitUntilCompleted`, `addCompletedHandler:`, `waitUntilScheduled`,
@@ -33,6 +34,7 @@ Implemented Objective-C API:
 - Texture descriptor: `texture2DDescriptorWithPixelFormat:width:height:mipmapped:`
   plus width, height, pixel-format, usage and storage-mode setters.
 - Texture: dimension/format/usage/device/storage queries, `iosurface`, `iosurfacePlane`,
+  `buffer`, `bufferOffset`, `bufferBytesPerRow`,
   `newTextureViewWithPixelFormat:`, `parentTexture`, `parentRelativeLevel`,
   `newTextureViewWithPixelFormat:textureType:levels:slices:`,
   `parentRelativeSlice`,
@@ -94,6 +96,17 @@ arithmetic before copying rows; caller memory must cover the requested span.
 Pitch must be a multiple of the pixel size; zero pitch is accepted for a
 single row, following [Apple's transfer contract](https://developer.apple.com/documentation/metal/mtltexture/replace%28region%3Amipmaplevel%3Awithbytes%3Abytesperrow%3A%29).
 Only requested pixel bytes are touched, preserving client row padding.
+Buffer-backed textures alias a retained shared buffer with a snapshot of the
+2D descriptor. Offset and row pitch must be multiples of 256 bytes; pitch must
+cover a row and be at most 64 MiB. The full addressed span must fit the buffer.
+Invalid layouts/descriptors return nil. Views preserve the buffer metadata and
+stride, and CPU transfers and deferred fills/blits share the same bytes.
+Buffers remain alive until all texture, view and encoded-command owners release
+them. Textures without buffer storage report nil/zero buffer properties.
+Blits reject overlapping buffer/texture address spans. Texture aliases with
+different bases or strides also reject overlapping bounding spans, including
+row padding; this is a conservative restriction. Existing identical-layout
+texture aliases retain their rectangle overlap checks.
 The full CPU transfer selectors use the same checks and storage path, requiring
 slice zero and bytes-per-image zero for this 2D profile. Invalid values reject
 before accessing client bytes. They also work on views and IOSurface planes;
