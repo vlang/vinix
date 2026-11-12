@@ -2035,3 +2035,52 @@ passed with the pending cancellation-race changes:0/0, complete cleanup,
 34293/40332ms, RSS378896384/486998016, shared growth107245568/110616576 bytes.
 ASan checks address lifetimes, with leak detection disabled for the existing
 manual-allocation fixtures. Paired ARM protocol deployment remains pending.
+
+### Account cancellation crossings
+
+Real stream regressions reproduce the broker's fatal unknown-session outcome
+when a selected service reply arrives after the requesting client disconnects.
+They also exercise the reverse crossing: a cancellation arriving after the
+service has sent its terminal reply. This is a candidate explanation for r62;
+that run did not retain per-session correlation data, so the host reproduction
+does not prove the exact runtime interleaving.
+
+The broker now closes the cancelled client's output/UI immediately and retains
+only its existing capability/deadline in a draining entry. A matching in-flight
+reply is discarded. A cancellation acknowledgement releases the entry; it
+otherwise expires at the original deadline plus ten seconds of transport grace.
+These entries count against the existing32-session admission bound and cannot
+deliver results or redeem interactions. The original request/authority deadline
+is unchanged. The service acknowledges a live cancellation and retains a fixed
+32-entry completion window solely to consume a crossing cancellation once.
+No completed session can create another response. Unknown IDs, wrong
+capabilities, unsupported reply kinds and consumed/replayed authority still
+fail closed. Public diagnostic schemas remain unchanged.
+
+Broker and service-side library must be deployed together. Current staging's
+single `VINIX_CURRENT_ACCOUNT_PROTOCOL` directory selects both and records the
+actual deployed bytes. The maintained current-V producer retains source inputs,
+commands, output hashes and symbol readback. It rebuilds static PIC zlib from
+the available repository source; no historical compiler or dependency receipt
+is required. Source/input capture is not an exhaustive native dependency audit.
+
+Full31-file suites in `account-protocol-plain-20261112-r3` and
+`account-protocol-asan-20261112-r2` passed0/0, complete cleanup,62152/68640ms,
+RSS379273216/481525760, shared growth128536576/129454080 bytes. They include
+both wire crossings, continued unrelated clients, cancellation ACKs, queued
+client failure preservation, replay/forgery rejection, admission bounds/expiry
+and existing broker/client/manifest/native-auth checks. ASan leak detection is
+disabled for existing manual-allocation test fixtures; address checks remain on.
+
+Paired AArch64 build `account-protocol-build-20261112-r3` passed0/0, complete
+cleanup,19016ms, RSS389595136, shared growth180232192 bytes. The broker is a
+static ELF executable; the shared library has75 defined account ABI exports
+and needs only the existing SQLite and libc DSOs. Broker SHA256 is
+`e6a925818761b2e4e8c775160381b0e199220969b5a7d5d16ab54cca52264ab7`;
+library SHA256 is
+`abe1747ea9616526f0d94253665eaf455a7a3678428f1d35241ed85152093879`.
+Earlier r1 lacked target zlib headers/archive; r2 then exposed the current
+compiler's split helper in service_identifier. The source now materializes
+those segments, preserving all identifier validation. Neither failed build was
+deployed. Original build limits remain unchanged. ARM execution and the actual
+Google account-flow retry remain pending.

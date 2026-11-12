@@ -18,6 +18,11 @@ mut:
 	ui_accepted bool
 }
 
+struct CompletedAuthSession {
+	id u64
+	capability [32]u8
+}
+
 @[heap]
 struct Authenticator {
 mut:
@@ -28,6 +33,8 @@ mut:
 	closed bool
 	refs int = 1
 	released bool
+	completed [32]CompletedAuthSession
+	completed_next int
 }
 
 @[heap]
@@ -68,6 +75,30 @@ fn same_capability(a []u8, b []u8) bool {
 	return difference == 0
 }
 
+// Root's ordered command stream can carry a cancellation that crossed a
+// terminal reply. Keep the last admission-window of completed capabilities,
+// exclusively to discard that cancellation; they cannot create responses.
+fn (mut a Authenticator) remember_completed(id u64, capability []u8) {
+	if capability.len != 32 { return }
+	mut bytes := [32]u8{}
+	for i in 0 .. 32 { bytes[i] = capability[i] }
+	a.completed[a.completed_next] = CompletedAuthSession{id, bytes}
+	a.completed_next = (a.completed_next + 1) % a.completed.len
+}
+
+fn (mut a Authenticator) consume_completed_cancel(id u64, capability []u8) bool {
+	if capability.len != 32 { return false }
+	for index, entry in a.completed {
+		if entry.id != id || id == 0 { continue }
+		mut difference := u8(0)
+		for i in 0 .. 32 { difference |= entry.capability[i] ^ capability[i] }
+		if difference != 0 { return false }
+		a.completed[index] = CompletedAuthSession{}
+		return true
+	}
+	return false
+}
+
 // A successful open consumes the dedicated root command fd. Failure does not.
 @[export: 'vinix_android_authenticator_open']
 pub fn auth_open(fd i32) voidptr {
@@ -84,6 +115,7 @@ fn (mut a Authenticator) disconnect() {
 	a.clear_current()
 	for _, s in a.sessions { auth_session_free(s) }
 	a.sessions.clear()
+	a.completed = [32]CompletedAuthSession{}
 }
 
 @[export: 'vinix_android_authenticator_read']
@@ -121,8 +153,18 @@ pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 	if packet.header.kind == .cancel {
 		event := accountipc.decode_event(packet.header, packet.body, true) or { a.disconnect(); return -1 }
 		defer { accountipc.dispose_event(event) }
-		value := a.sessions[event.id] or { a.disconnect(); return -1 }
+		value := a.sessions[event.id] or {
+			if a.consume_completed_cancel(event.id, event.capability) { return 0 }
+			a.disconnect(); return -1
+		}
 		if !same_capability(event.capability, value.command.capability) { a.disconnect(); return -1 }
+		ack := accountipc.failure(event.id, 4, 'Account request cancelled')
+		defer { unsafe { ack.options.free() } }
+		wire := accountipc.encode_event(accountipc.Event{...ack, capability: event.capability}, true) or {
+			a.disconnect(); return -1
+		}
+		defer { unsafe { wire.free() } }
+		a.stream.enqueue(wire) or { a.disconnect(); return -1 }
 		a.retire(event.id)
 		unsafe { *session = event.id }
 		return 2
@@ -419,7 +461,10 @@ pub fn auth_response_send(handle voidptr) i32 {
 	if b.kind == .interaction {
 		s.interaction = accountipc.Interaction{b.interaction.handle.clone(),b.interaction.target_package.clone(),b.interaction.target_class.clone()}
 	}
-	if accountipc.terminal(b.kind) { a.retire(b.session) }
+	if accountipc.terminal(b.kind) {
+		a.remember_completed(b.session, b.capability)
+		a.retire(b.session)
+	}
 	return 0
 }
 

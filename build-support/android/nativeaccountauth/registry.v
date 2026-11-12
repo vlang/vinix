@@ -87,7 +87,8 @@ fn hash_valid(value string) bool {
 
 fn service_identifier(value string, class_name bool) bool {
 	if value.len == 0 || value.len > 255 || !value.contains('.') { return false }
-	for part in value.split('.') {
+	parts := value.split('.')
+	for part in parts {
 		if part.len == 0 || !(part[0].is_letter() || part[0] == `_`)
 			|| !part.bytes().all(it.is_alnum() || it == `_` || (class_name && it == `$`)) { return false }
 	}

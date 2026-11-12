@@ -629,6 +629,11 @@ retains its V input hashes, source copies, commands and host self-test output.
 `maps-current-guest.v` accepts `VINIX_CURRENT_ACCOUNT_CONTROLLER` to deploy
 the same controller bytes at both protected launch paths and update their
 deployment hashes.
+For account cancellation crossings, `build-current-account-protocol.v` checks
+the real broker/client/manifest/native-auth modules normally and with ASan,
+and builds the AArch64 broker plus service-side transport with current V.
+Deploy both through `VINIX_CURRENT_ACCOUNT_PROTOCOL=BUILD_DIRECTORY` when
+staging a fresh VM. Cancellation acknowledgements require this paired update.
 
 Single-pointer WS input enters `dispatchTouchEvent` at the window root.
 ViewGroups retain the consuming child for the gesture, translate local

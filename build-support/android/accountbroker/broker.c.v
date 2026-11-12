@@ -38,6 +38,8 @@ struct Session {
 mut:
 	terminal  bool
 	cancelled bool
+	draining  bool
+	cancel_acknowledged bool
 }
 
 @[heap]
@@ -218,7 +220,7 @@ fn (mut b Broker) redeem(id u64, authorized nativeaccountauth.AuthorizedRequest)
 		b.fail(id, 7, 'Account request has ended')!
 		return
 	}
-	if session.terminal || session.output.peer_gone() || time.sys_mono_now() >= session.deadline
+	if session.draining || session.terminal || session.output.peer_gone() || time.sys_mono_now() >= session.deadline
 		|| !same_capability(session.capability, launch.response_capability) {
 		b.revoke(launch.session)
 		b.fail(id, 7, 'Account request has ended')!
@@ -261,7 +263,7 @@ fn same_capability(a []u8, b []u8) bool {
 
 fn (mut b Broker) finish(id u64, event accountipc.Event) ! {
 	mut session := b.sessions[id] or { return error('unknown account session') }
-	if session.terminal { return error('account session already completed') }
+	if session.terminal || session.draining { return error('account session already completed') }
 	client_event := accountipc.Event{
 		kind:        event.kind
 		id:          session.request
@@ -286,9 +288,28 @@ fn (mut b Broker) callback(packet accountipc.Packet) ! {
 	event := accountipc.decode_event(packet.header, packet.body, true)!
 	defer { accountipc.dispose_event(event) }
 	session := b.sessions[event.id] or { return error('authenticator returned an unknown session') }
-	if session.terminal || !same_capability(session.capability, event.capability) {
+	if !same_capability(session.capability, event.capability) {
 		return error('authenticator response capability is invalid or consumed')
 	}
+	// Cancellation and a service reply travel on separate stream directions.
+	// Discard a matching in-flight reply after revocation without restoring
+	// client/UI authority. Unknown IDs and wrong capabilities still fail closed.
+	if session.cancelled {
+		if session.cancel_acknowledged { return error('authenticator cancellation capability is consumed') }
+		if event.kind !in [.result, .failure, .continued, .accounts, .interaction]
+			|| (event.kind == .accounts && session.operation != .get_accounts)
+			|| (event.kind == .result && session.operation == .get_accounts)
+			|| (event.kind == .interaction && session.operation !in [.add_account, .get_auth_token]) {
+			return error('unsupported cancelled authenticator callback')
+		}
+		if accountipc.terminal(event.kind) {
+			if session.draining { b.release_session(event.id) } else {
+				b.sessions[event.id] = Session{...session, cancel_acknowledged: true}
+			}
+		}
+		return
+	}
+	if session.terminal { return error('authenticator response capability is invalid or consumed') }
 	if event.kind == .interaction {
 		if session.operation !in [.add_account, .get_auth_token] { return error('account query cannot start an interaction') }
 		handoff_stage(.interaction_received, session.operation)
@@ -345,11 +366,27 @@ fn (mut b Broker) revoke(id u64) {
 	if b.interactions != unsafe { nil } { b.interactions.revoke(id) }
 	b.cancel_service(id)
 	session := b.sessions[id] or { return }
-	session.output.close()
-	unsafe {
-		free(session.output)
-		session.capability.free()
+	if !b.closed && session.cancelled && !session.cancel_acknowledged
+		&& time.sys_mono_now() < session.deadline + 10 * time.second {
+		if !session.draining {
+			session.output.close()
+			unsafe { free(session.output) }
+			b.sessions[id] = Session{...session, output: unsafe { nil }, draining: true}
+		}
+		return
 	}
+	b.release_session(id)
+}
+
+// Draining entries retain only their existing capability and deadline, within
+// the same 32-session admission limit. They own no output descriptor or UI.
+fn (mut b Broker) release_session(id u64) {
+	session := b.sessions[id] or { return }
+	if session.output != unsafe { nil } {
+		session.output.close()
+		unsafe { free(session.output) }
+	}
+	unsafe { session.capability.free() }
 	b.sessions.delete(id)
 }
 
@@ -382,7 +419,7 @@ fn (mut b Broker) pump_ui() ! {
 			b.fail_ui(b.ui_session, 'Account request has ended')
 			return
 		}
-		if current.terminal || current.output.peer_gone() || time.sys_mono_now() >= current.deadline {
+		if current.draining || current.terminal || current.output.peer_gone() || time.sys_mono_now() >= current.deadline {
 			handoff_stage(.ui_request_ended, current.operation)
 			b.fail_ui(b.ui_session, 'Account request has ended')
 			return
@@ -452,6 +489,10 @@ pub fn (mut b Broker) pump(timeout int) ! {
 	b.pump_ui()!
 	now := time.sys_mono_now()
 	for id, session in b.sessions {
+		if session.draining {
+			if now >= session.deadline + 10 * time.second { b.release_session(id) }
+			continue
+		}
 		if session.output.peer_gone() {
 			b.revoke(id)
 			continue
@@ -472,7 +513,11 @@ pub fn (mut b Broker) pump(timeout int) ! {
 	}
 }
 
-pub fn (b &Broker) active() int { return b.pending + b.sessions.len }
+pub fn (b &Broker) active() int {
+	mut count := b.pending
+	for _, session in b.sessions { if !session.draining { count++ } }
+	return count
+}
 
 pub fn (mut b Broker) close() {
 	if b.closed { return }

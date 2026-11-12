@@ -75,6 +75,12 @@ fn test_authenticator_cancellation_expiration_and_builder_survives_close() {
 	peer.enqueue(wire) or { panic(err) }; peer.flush() or { panic(err) }
 	unsafe { wire.free() }
 	assert auth_read(owner,&id,0) == 2 && id == 9
+	assert auth_read(owner,&id,0) == 0 // flush the cancellation acknowledgement
+	ack_packet := peer.read(0) or { panic(err) }
+	ack := accountipc.decode_event(ack_packet.header, ack_packet.body, true) or { panic(err) }
+	assert ack.kind == .failure && ack.id == 9 && ack.capability == []u8{len:32,init:9}
+	accountipc.dispose_event(ack)
+	unsafe { ack_packet.body.free() }
 	assert auth_response_send(late) == -1
 	auth_response_free(late)
 	auth_dispatch(mut peer,10)
@@ -90,6 +96,39 @@ fn test_authenticator_cancellation_expiration_and_builder_survives_close() {
 	auth_close(owner)
 	assert auth_response_send(last) == -1
 	auth_response_free(last)
+}
+
+fn test_completed_response_and_cancel_cross_without_reopening_authority() {
+	for forged in [false, true] {
+		mut owner, mut peer := auth_pair()
+		defer { auth_close(owner); peer.close(); unsafe { free(peer) } }
+		auth_dispatch(mut peer, 7)
+		mut id := u64(0)
+		assert auth_read(owner, &id, 0) == 1
+		response := auth_response(owner, 7, 1)
+		assert auth_response_send(response) == 0
+		auth_response_free(response)
+		assert auth_response(owner, 7, 1) == unsafe { nil }
+		assert auth_read(owner, &id, 0) == 0
+		packet := peer.read(0) or { panic(err) }
+		assert packet.available && packet.header.kind == .result
+		unsafe { packet.body.free() }
+		wire := accountipc.encode_event(accountipc.Event{kind: .cancel, id: 7,
+			capability: []u8{len: 32, init: if forged { u8(8) } else { u8(7) }}}, true) or { panic(err) }
+		defer { unsafe { wire.free() } }
+		peer.enqueue(wire) or { panic(err) }
+		peer.flush() or { panic(err) }
+		assert auth_read(owner, &id, 0) == if forged { -1 } else { 0 }
+		assert owner.closed == forged
+		if !forged {
+			assert auth_response(owner, 7, 1) == unsafe { nil }
+			// The one crossing cancellation consumes its record. A replay is
+			// still a protocol failure, with no response or UI authority.
+			peer.enqueue(wire) or { panic(err) }
+			peer.flush() or { panic(err) }
+			assert auth_read(owner, &id, 0) == -1 && owner.closed
+		}
+	}
 }
 
 fn test_authenticator_rejects_forged_cancel_duplicate_and_nonroot_open() {

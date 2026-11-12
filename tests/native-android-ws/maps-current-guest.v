@@ -73,6 +73,20 @@ fn stage(parent string, framework string, native string, root string) ! {
 		inputs['/' + relative] = json2.Any(sha256.sum(os.read_bytes(root + '/payload/' + relative)!).hex())
 	}
 	deployment['inputs_sha256'] = json2.Any(inputs)
+	if protocol := os.getenv_opt('VINIX_CURRENT_ACCOUNT_PROTOCOL') {
+		// Cancellation acknowledgements require the broker and service-side
+		// transport together. One build directory selects both, never one half.
+		for relative, name in {
+			'/opt/vinix-android-aarch64/usr/bin/native-account-broker': 'native-account-broker'
+			'/opt/vinix-android-aarch64/usr/lib/libvinix-android-account.so': 'libvinix-android-account.so'
+		} {
+			os.mkdir_all(os.dir(root + '/payload' + relative))!
+			os.cp(protocol + '/' + name, root + '/payload' + relative)!
+			os.chmod(root + '/payload' + relative, 0o755)!
+			inputs[relative] = json2.Any(media.hash(root + '/payload' + relative)!)
+		}
+		deployment['inputs_sha256'] = json2.Any(inputs)
+	}
 	if controller := os.getenv_opt('VINIX_CURRENT_ACCOUNT_CONTROLLER') {
 		for relative in ['/opt/vinix-maps-account/bin/maps-account-guest', '/usr/bin/run-android-calculator'] {
 			os.mkdir_all(os.dir(root + '/payload' + relative))!
