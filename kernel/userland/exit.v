@@ -16,6 +16,7 @@ import katomic
 import memory.mmap
 import posixtimer
 import proc
+import parentfixture
 import sched
 import term
 import time
@@ -261,9 +262,19 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 
 	// claim_teardown uses this same lock. Keep selection and publication
 	// together: a pin alone does not prevent the adopter detaching its list.
+	$if parent_publication_fixture ? {
+		$if parent_adopt_old ? {} $else { parentfixture.pause(2, current_process.pid) }
+	}
 	proc.lock_table()
 	mut adopter := find_reaper_locked(current_process)
 	if adopter != unsafe { nil } { proc.pin_process(adopter) }
+	$if parent_publication_fixture ? {
+		$if parent_adopt_old ? {
+			proc.unlock_table()
+			parentfixture.pause(2, current_process.pid)
+			proc.lock_table()
+		}
+	}
 	if adopter != unsafe { nil } && voidptr(adopter) != voidptr(current_process) {
 		mut adopted_zombie := false
 		// Parent identity belongs to the process-table snapshot contract. Publish

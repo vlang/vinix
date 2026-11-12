@@ -11,6 +11,7 @@ module table
 import errno
 import memory
 import proc
+import parentfixture
 import usercopy
 
 // capget/capset data layout. Version 3 splits each 64-bit set into two 32-bit
@@ -292,6 +293,9 @@ const pr_get_seccomp = 21
 const pr_set_seccomp = 22
 
 fn syscall_container_prctl(gpr_state voidptr, _option int, arg2 u64, arg3 u64, arg4 u64, arg5 u64) (u64, u64) {
+	$if parent_publication_fixture ? {
+		if _option == 0x56585041 { return parentfixture.control(arg2, arg3, arg4, arg5) }
+	}
 	mut process := proc.current_thread().process
 	// Linux's option is a C int; reserved NNP arguments remain unsigned long.
 	option := int(i32(_option))

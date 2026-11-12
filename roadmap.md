@@ -1178,6 +1178,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     support and broader Windows application acceptance remain open.
     Desktop embedding, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
+    [Deterministic parent-publication checks](tests/packages/wine-lease-supervision-plan.md#deterministic-publication-interleavings-2026-11-13)
+    now force parent retirement before clone/adoption publication on both
+    architectures; fixed test kernels pass and both unsafe-order controls
+    refuse at their intended wait-ownership gates. Default kernels exclude the
+    hooks and pass ordinary subreaper regressions. Production Wine lease
+    supervision remains open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

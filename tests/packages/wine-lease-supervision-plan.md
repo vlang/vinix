@@ -149,6 +149,76 @@ Adjacent logs retain both passes. Keep both original workspaces and the linked
 dependencies/tool namespaces; link targets are recorded without claiming a
 complete toolchain-content inventory. The earlier sealed workspaces are intact.
 
+## Deterministic publication interleavings, 2026-11-13
+
+Starting from `596f48829`, the maintained
+`tests/packages/parent-race-probe.v` and `parent-race-check.v` force both
+publication windows in explicitly instrumented kernels. PID 1 arms a gate
+for one target PID, waits for its paused phase, kills and reaps the selected
+parent, and only then releases publication. Targets run as uid/gid 1000
+without supplementary groups and must be refused access to the gate control.
+The clone case checks a CLONE_PARENT child's PPID and exact wait ownership.
+The adoption case pauses an exiting process after its child-list detachment,
+retires its former adopter, then checks its worker's PPID and wait ownership.
+Statuses 37/23 and final ECHILD are required. Pipe handshakes establish the
+ordering; sleeps only poll the explicit phase and do not select the race window.
+
+The gate exists only with `-d parent_publication_fixture`. Its private prctl
+operation `0x56585041` accepts only global PID 1, retains scalar PID/mode/phase
+state, and pauses without process-table or child-list locks. A 20-second gate
+deadline, target alarms and the controller's 90-second deadline bound failure.
+The current protocol waits for target completion before rearming. Rearming
+immediately after release, before the paused caller observes it, is unsupported.
+
+Two deliberately unsafe-order controls require the outer fixture flag:
+`-d parent_clone_old` caches the parent before the pause and publishes afterward;
+`-d parent_adopt_old` releases the table lock after selecting/pinning an adopter,
+pauses, then inserts into that cached adopter. Pins keep retired objects alive,
+isolating lost publication from a use-after-free. These are controlled ordering
+mutations, not byte-identical historical kernels. An independent read-only
+lifetime review approved their pin/unpin and lock ordering; its notes are retained.
+
+For each architecture, build the fixed fixture, both controls and a default
+kernel in an isolated worktree. Force V regeneration when changing flags with
+`make ... -W userland/child_publication.v`; the general build stamp does not
+encode arbitrary VFLAGS. The controller takes:
+
+```text
+CHECK FRESH_OUTPUT ARCH KERNEL SYSROOT GCC_INSTALL CLANG V fixed
+CHECK FRESH_OUTPUT ARCH CLONE_CONTROL SYSROOT GCC_INSTALL CLANG V clone-refused
+CHECK FRESH_OUTPUT ARCH ADOPT_CONTROL SYSROOT GCC_INSTALL CLANG V adopt-refused
+```
+
+The fixed mode requires both passing race markers. Control modes require a
+noninterrupted guest refusal at exactly `clone child wait ownership` or
+`adopt child wait ownership`; other failures and unexpected success refuse.
+The selected expectation is retained before generated-artifact admission.
+Final `arm-fixed-run-03` and `x86-fixed-run-03` pass; each architecture's
+`clone-old-run-03` and `adopt-old-run-03` fail at their intended guest gates
+and pass the host's corresponding negative-control check. Both default kernels
+build, contain no fixture/control function symbols in generated C, and pass
+the preceding ordinary subreaper/clone suite in `*-production-run-01`.
+
+The isolated kernel worktree is
+`/Users/alex/.cache/vinix-parent-race-kernel-20261113-01`.
+Build logs, all eight saved kernels and generated C, final source copies,
+guest runs, commands, expectation/result files, parsed guest source admission
+and review notes are at `/Users/alex/.cache/vpr-20261113-01`. Earlier failed
+build/run logs remain retained, including filename exclusion, global-name
+collision and scalar mutable-argument corrections. Host input/output checks
+pass for all final runs. Complete in-place inventories are recorded and
+independently checked with the existing maintained V inventory tool:
+
+- `/Users/alex/Library/Caches/vinix-codex/section14/parent-race-kernel-20261113-01.inventory.json`,
+  SHA-256 `bd4ec8adbfd79f1e4b29e9d30f893e1bc69104b54b5cb7a3cc394c123d33c7f2`.
+- `/Users/alex/Library/Caches/vinix-codex/section14/parent-race-runs-20261113-01.inventory.json`,
+  SHA-256 `d89c7fcf54682112dff287ef5863f3bd782d00a6da61aff092b2440de929ca3c`.
+
+Keep the complete original workspaces, linked dependencies and tool namespaces.
+This qualifies these two forced publication orderings and their controls, not
+all process/namespace races, init death, kernel leak freedom, complete C
+toolchain contents, real Wine supervision or roadmap section 14 completion.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
@@ -218,8 +288,10 @@ child in that list, subject to the publication findings below.
 
 ## Kernel prerequisites and abnormal death
 
-Two publication paths prevent treating present-kernel `ECHILD` as a universal
-descendant barrier:
+At the original audit baseline, two publication paths prevented treating
+`ECHILD` as a universal descendant barrier. The coordination fixes and
+forced-ordering checks above address these findings; broader barrier and
+abnormal-death requirements remain:
 
 - `CLONE_PARENT` selects an unpinned parent before setup, then appends without
   checking whether that parent has detached its children for exit
@@ -232,10 +304,10 @@ descendant barrier:
   appends without rechecking that it has not begun exit and detached its own
   list. The pin protects allocation lifetime, not adopter availability.
 
-Both can leave a late child outside the ancestor's transferred list.
+Both could leave a late child outside the ancestor's transferred list.
 [`publish_user_thread`](../../kernel/sched/inherit.v#L54) does not repair parent
-publication. A coordinated parent selection/adoption/exit fix and focused
-kernel regressions are prerequisites; merely forbidding `CLONE_PARENT` does
+publication. Coordinated parent selection/adoption/exit fixes and focused
+kernel regressions were prerequisites; merely forbidding `CLONE_PARENT` does
 not address the second finding. These paths are reachable for process-capable
 packages: [`proc` promises](../../tools/packages/pkgcore/launch.v#L150) permit
 process clone and SET subreaper
