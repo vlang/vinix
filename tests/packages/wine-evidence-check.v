@@ -193,7 +193,7 @@ fn checks() ! {
 		if name.starts_with('producer-') || name in ['forksafe-manifest-binding',
 			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
 			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
-			'wine-client-resealed-patch', 'wine-server-proc-nls'] {
+			'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image'] {
 			selected_prepared = directory + '/prepared'
 			prepared_copy(directory, prepared, selected_prepared)!
 		}
@@ -230,8 +230,8 @@ fn checks() ! {
 				expected = 'missing ARM boot input declaration:'
 			}
 			replace(directory + '/declaration.json', json2.encode(declaration))!
-		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls'] {
-			part := if name != 'wine-client-resealed-patch' {
+		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image'] {
+			part := if name !in ['wine-client-resealed-patch', 'wine-client-rwx-image'] {
 				'/usr/libexec/vinix-wine/wineserver'
 			} else {
 				'/usr/lib/wine/x86_64-unix/ntdll.so'
@@ -244,6 +244,9 @@ fn checks() ! {
 				// keeping the private-prefix patch and resealing all hashes.
 				instruction := '\x48\x8d\x3d\x40\xf9\x00\x00'
 				unsafe { vmemcpy(changed.str + 0x5efe4, instruction.str, instruction.len) }
+			} else if name == 'wine-client-rwx-image' {
+				// Restore RWX in one initial-image path, then reseal all hashes.
+				unsafe { changed.str[0x5a25f] = 0x2d }
 			} else {
 				unsafe { changed.str[0] ^= 1 }
 			}
@@ -271,7 +274,7 @@ fn checks() ! {
 			replace(directory + '/result.json', json2.encode(outcome))!
 			expected = 'requires uninterrupted passing native Wine outcome'
 		} else if name in ['missing-ready', 'duplicate-ready', 'missing-pass', 'marker-order',
-			'forbidden', 'missing-smoke-marker'] {
+			'forbidden', 'missing-smoke-marker', 'missing-image-marker', 'missing-wx-marker'] {
 			serial := os.read_file(directory + '/boot/serial.log')!
 			ready := 'VINIX SIGNED REAL WIN64 READY'
 			pass := 'HWTEST PASS packaged-Wine'
@@ -282,6 +285,10 @@ fn checks() ! {
 				changed = serial + '\n' + ready + '\n'
 			} else if name == 'missing-pass' {
 				changed = serial.replace(pass, 'removed PASS')
+			} else if name == 'missing-image-marker' {
+				changed = serial.replace('VINIX SIGNED WIN64 IMAGE PROTECTION PASS', 'removed IMAGE')
+			} else if name == 'missing-wx-marker' {
+				changed = serial.replace('VINIX SIGNED WIN64 WX PASS', 'removed WX')
 			} else if name == 'missing-smoke-marker' {
 				changed = serial.replace('HWTEST INFO Wine translated BusyBox true ordinary split-WX control PASS', 'removed smoke')
 			} else if name == 'marker-order' {

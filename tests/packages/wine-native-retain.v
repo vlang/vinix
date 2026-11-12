@@ -411,6 +411,8 @@ fn retain() ! {
 	if arch == 'aarch64' {
 		markers << 'HWTEST INFO Wine translated BusyBox true ordinary split-WX control PASS'
 	}
+	markers << 'VINIX SIGNED WIN64 IMAGE PROTECTION PASS'
+	if arch == 'x86_64' { markers << 'VINIX SIGNED WIN64 WX PASS' }
 	markers << ['VINIX SIGNED REAL WIN64 READY', 'VINIX SIGNED REAL WIN64 PASS',
 		'HWTEST INFO Wine signed-real-Win64 ordinary-private-prefix socket lease Windows-API outside-write-refused natural-exit PASS',
 		'HWTEST PASS packaged-Wine']

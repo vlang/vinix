@@ -17,13 +17,14 @@ pub fn names(architecture string, forksafe bool) ![]string {
 		'producer-cc-argv', 'producer-missing-locale', 'producer-missing-intl',
 		'producer-changed-locale', 'producer-changed-intl', 'producer-missing-inf',
 		'producer-changed-inf', 'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
-		'wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls']
+		'wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls',
+		'wine-client-rwx-image', 'missing-image-marker']
 	if architecture == 'aarch64' {
 		result << ['translator-declaration', 'translator-resealed-patch', 'translator-resealed-smoke',
 			'missing-smoke-marker', 'missing-arm-loader-input', 'missing-firmware-vars-input',
 			'missing-arm-loader-declaration', 'missing-firmware-vars-declaration']
 	} else {
-		result << ['missing-iso-input', 'changed-iso-argv', 'x86-firmware-vars']
+		result << ['missing-iso-input', 'changed-iso-argv', 'x86-firmware-vars', 'missing-wx-marker']
 	}
 	if forksafe {
 		result << ['forksafe-implicit', 'forksafe-missing-translator',

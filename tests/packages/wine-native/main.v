@@ -547,7 +547,9 @@ fn run() ! {
 	text := unsafe { tos(bytes.data, bytes.len) }
 	println('HWTEST INFO Wine signed execution status=' + child.code.str() + ' observed=' + observed.str())
 	println(text)
-	if child.code != 0 || !observed || text.count('VINIX SIGNED REAL WIN64 READY\n') != 1
+	if child.code != 0 || !observed || text.count('VINIX SIGNED WIN64 IMAGE PROTECTION PASS\n') != 1
+		|| ($if amd64 { text.count('VINIX SIGNED WIN64 WX PASS\n') != 1 } $else { false })
+		|| text.count('VINIX SIGNED REAL WIN64 READY\n') != 1
 		|| text.count('VINIX SIGNED REAL WIN64 PASS\n') != 1 {
 		$if amd64 {
 			failure_diagnostics(state, generation) or {

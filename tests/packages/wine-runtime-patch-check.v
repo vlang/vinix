@@ -24,8 +24,24 @@ fn run() ! {
 		defer { unsafe { path.free(); input.free(); original.free(); private.free(); patched.free() } }
 		if input != original || patched.len != private.len { return error('input or output size changed') }
 		instruction := '\x48\x8b\x3d\x35\x4d\x03\x00'
+		client_sites := {
+			0x98: '\xb9'
+			0xa0: '\xb9'
+			0x5a25f: '\x29'
+			0x5a294: '\x29'
+			0x5a312: '\x29'
+			0x5a6c1: '\x03'
+			0x5a368: '\xe9\x33\x78\x00\x00\x90\x90\x90\x90\x90\x90\x90\x90\x90\x90'
+			0x61ba0: '\x8b\x84\x24\xac\x00\x00\x00\x4c\x8b\xbc\x24\xb8\x00\x00\x00\x41\x80\x4f\x30\x04\xe9\xbe\x87\xff\xff'
+			0x829b0: '\x2c'
+		}
 		for i in 0 .. patched.len {
-			wanted := if !client && i >= 0x5efe4 && i < 0x5efeb { instruction[i - 0x5efe4] } else { private[i] }
+			mut wanted := if !client && i >= 0x5efe4 && i < 0x5efeb { instruction[i - 0x5efe4] } else { private[i] }
+			if client {
+				for offset, text in client_sites {
+					if i >= offset && i < offset + text.len { wanted = text[i - offset] }
+				}
+			}
 			if patched[i] != wanted { return error('unexpected runtime byte change at ' + i.str()) }
 		}
 		// Reapplication, using the other binary, truncation and corruption of
@@ -39,8 +55,16 @@ fn run() ! {
 			unsafe { changed.str[offset] ^= 1 }
 			refused(changed, client)!
 		}
+		if client {
+			for offset, _ in client_sites {
+				changed := input.clone()
+				unsafe { changed.str[offset] ^= 1 }
+				refused(changed, client)!
+				unsafe { changed.free() }
+			}
+		}
 	}
-	println('WINE RUNTIME PATCH PASS exact server/client composition, immutable inputs and 16 refusals')
+	println('WINE RUNTIME PATCH PASS exact server/client composition, immutable inputs and 25 refusals')
 }
 
 fn main() {

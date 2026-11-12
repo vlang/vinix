@@ -1128,8 +1128,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     changes and omitted hidden compiler inputs. The original historical
     attempts remain refused. [Private NLS discovery](tests/packages/wine-nls-check.md)
     now uses the bridge's admitted absolute identity and passes fresh ARM signed
-    execution. Fresh x86 Wine gets past NLS loading and refuses PE mappings
-    requesting writable/executable memory; x86 execution remains unqualified.
+    execution. The subsequent [PE loading under W^X](tests/packages/wine-pe-wx-check.md)
+    fixes initial writable/executable image requests: fresh signed Win64 console
+    execution and independent retention pass on both architectures. Native x86
+    also passes RW-to-RX execution, W+X refusal and all 49 evidence controls.
     Graphical execution, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
