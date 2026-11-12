@@ -2,7 +2,7 @@
 module airbitcode
 
 fn scalar_integer_intrinsic(id ScalarIntrinsic) bool {
-	return id in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]!
+	return scalar_integer_overflow(id) || id in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]!
 }
 fn scalar_integer_bit_permutation(id ScalarIntrinsic) bool { return id in [.pext, .pdep]! }
 fn scalar_integer_saturating_shift(id ScalarIntrinsic) bool { return id in [.sshl_sat, .ushl_sat]! }
@@ -33,6 +33,12 @@ fn scalar_integer_intrinsic_name(name string) !ScalarIntrinsic {
 		else if name.starts_with('llvm.pext.i') { ScalarIntrinsic.pext }
 		else if name.starts_with('llvm.pdep.i') { ScalarIntrinsic.pdep }
 		else if name.starts_with('llvm.clmul.i') { ScalarIntrinsic.clmul }
+		else if name.starts_with('llvm.sadd.with.overflow.i') { ScalarIntrinsic.sadd_overflow }
+		else if name.starts_with('llvm.uadd.with.overflow.i') { ScalarIntrinsic.uadd_overflow }
+		else if name.starts_with('llvm.ssub.with.overflow.i') { ScalarIntrinsic.ssub_overflow }
+		else if name.starts_with('llvm.usub.with.overflow.i') { ScalarIntrinsic.usub_overflow }
+		else if name.starts_with('llvm.smul.with.overflow.i') { ScalarIntrinsic.smul_overflow }
+		else if name.starts_with('llvm.umul.with.overflow.i') { ScalarIntrinsic.umul_overflow }
 		else { return error('AIR intrinsic: unsupported callee') }
 	scalar_integer_intrinsic_width(name, id)!
 	return id
@@ -40,7 +46,7 @@ fn scalar_integer_intrinsic_name(name string) !ScalarIntrinsic {
 // Inspect bytes directly: no substring allocation and no permissive numeric
 // parser that might admit signs, leading zeroes, suffixes or other overloads.
 fn scalar_integer_intrinsic_width(name string, id ScalarIntrinsic) !u32 {
-	start := match id { .ctpop { 'llvm.ctpop.i'.len } .bitreverse { 'llvm.bitreverse.i'.len } .bswap { 'llvm.bswap.i'.len } .ctlz { 'llvm.ctlz.i'.len } .cttz { 'llvm.cttz.i'.len } .fshl { 'llvm.fshl.i'.len } .fshr { 'llvm.fshr.i'.len } .smin { 'llvm.smin.i'.len } .smax { 'llvm.smax.i'.len } .umin { 'llvm.umin.i'.len } .umax { 'llvm.umax.i'.len } .iabs { 'llvm.abs.i'.len } .sadd_sat { 'llvm.sadd.sat.i'.len } .uadd_sat { 'llvm.uadd.sat.i'.len } .ssub_sat { 'llvm.ssub.sat.i'.len } .usub_sat { 'llvm.usub.sat.i'.len } .sshl_sat { 'llvm.sshl.sat.i'.len } .ushl_sat { 'llvm.ushl.sat.i'.len } .pext { 'llvm.pext.i'.len } .pdep { 'llvm.pdep.i'.len } .clmul { 'llvm.clmul.i'.len } else { return error('AIR intrinsic: integer family') } }
+	start := match id { .ctpop { 'llvm.ctpop.i'.len } .bitreverse { 'llvm.bitreverse.i'.len } .bswap { 'llvm.bswap.i'.len } .ctlz { 'llvm.ctlz.i'.len } .cttz { 'llvm.cttz.i'.len } .fshl { 'llvm.fshl.i'.len } .fshr { 'llvm.fshr.i'.len } .smin { 'llvm.smin.i'.len } .smax { 'llvm.smax.i'.len } .umin { 'llvm.umin.i'.len } .umax { 'llvm.umax.i'.len } .iabs { 'llvm.abs.i'.len } .sadd_sat { 'llvm.sadd.sat.i'.len } .uadd_sat { 'llvm.uadd.sat.i'.len } .ssub_sat { 'llvm.ssub.sat.i'.len } .usub_sat { 'llvm.usub.sat.i'.len } .sshl_sat { 'llvm.sshl.sat.i'.len } .ushl_sat { 'llvm.ushl.sat.i'.len } .pext { 'llvm.pext.i'.len } .pdep { 'llvm.pdep.i'.len } .clmul { 'llvm.clmul.i'.len } .sadd_overflow { 'llvm.sadd.with.overflow.i'.len } .uadd_overflow { 'llvm.uadd.with.overflow.i'.len } .ssub_overflow { 'llvm.ssub.with.overflow.i'.len } .usub_overflow { 'llvm.usub.with.overflow.i'.len } .smul_overflow { 'llvm.smul.with.overflow.i'.len } .umul_overflow { 'llvm.umul.with.overflow.i'.len } else { return error('AIR intrinsic: integer family') } }
 	if name.len <= start || name.len > start + 2 || name[start] == `0` { return error('AIR intrinsic: integer overload spelling') }
 	mut width := u32(0)
 	for i in start .. name.len {
@@ -51,7 +57,7 @@ fn scalar_integer_intrinsic_width(name string, id ScalarIntrinsic) !u32 {
 	return width
 }
 fn scalar_integer_intrinsic_value(id ScalarIntrinsic, bits u32, value u64) !u64 {
-	if !scalar_integer_intrinsic(id) || scalar_integer_poison_flag(id) || scalar_integer_funnel(id) || scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) || scalar_integer_bit_permutation(id) || id == .clmul || bits < 1 || bits > 64 || (id == .bswap && bits % 16 != 0) { return error('AIR intrinsic: unary integer operation/width') }
+	if !scalar_integer_intrinsic(id) || scalar_integer_poison_flag(id) || scalar_integer_funnel(id) || scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) || scalar_integer_bit_permutation(id) || scalar_integer_overflow(id) || id == .clmul || bits < 1 || bits > 64 || (id == .bswap && bits % 16 != 0) { return error('AIR intrinsic: unary integer operation/width') }
 	mut input := value & constant_mask(bits); mut result := u64(0)
 	if id == .bswap {
 		for _ in 0 .. bits / 8 { result = (result << 8) | (input & 0xff); input >>= 8 }

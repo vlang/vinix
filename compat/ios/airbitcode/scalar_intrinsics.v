@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
+	if scalar_integer_overflow(id) { return 2 }
 	if id in [.fma, .fmuladd, .fshl, .fshr]! { return 3 }
 	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { 2 } else { 1 }
 }
@@ -47,7 +48,8 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 { return error('AIR intrinsic: fixed signature/arity') }
 	result := ir.references[signature.refs_start]
 	if result != op.result_type { return error('AIR intrinsic: return type') }
-	input := if id == .is_fpclass { ir.references[signature.refs_start + 1] } else { result }
+	input := if id == .is_fpclass || scalar_integer_overflow(id) { ir.references[signature.refs_start + 1] } else { result }
+	if scalar_integer_overflow(id) && p.scalar_overflow_element(result)! != input { return error('AIR intrinsic: overflow result element type') }
 	bits := p.execution_bits(input, true)!
 	half := f.name.ends_with('.f16') || (id == .ldexp && f.name.ends_with('.f16.i32'))
 	integer := scalar_integer_intrinsic(id)
@@ -70,7 +72,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 			if argument != input { return error('AIR intrinsic: classification input type') }
 		} else if id == .ldexp && i == 1 {
 			if p.types[argument].kind != .integer_t || p.types[argument].bits != 32 { return error('AIR intrinsic: signed i32 exponent required') }
-		} else if argument != result { return error('AIR intrinsic: matching scalar arguments required') }
+		} else if argument != input { return error('AIR intrinsic: matching scalar arguments required') }
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
@@ -129,6 +131,7 @@ fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second
 	return work
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
+	if scalar_integer_overflow(id) { return error('AIR intrinsic: overflow pair evaluator required') }
 	if id == .clmul { return scalar_integer_clmul(bits, a, b)! }
 	if scalar_integer_bit_permutation(id) { return scalar_integer_bit_permutation_value(id, bits, a, b)! }
 	if scalar_integer_saturating_shift(id) { return error('AIR intrinsic: saturating shift requires poison-aware evaluation') }
