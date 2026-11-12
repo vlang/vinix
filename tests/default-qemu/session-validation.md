@@ -45,3 +45,14 @@ uses `-gc none -manualfree`, followed by static Clang `-O2`; V `-prod` is
 omitted because existing `usize` deprecations otherwise prevent translation.
 The exact staged inputs are retained for audit. No compiler changes are
 proposed as part of the crash fix.
+
+The final application smoke also found a separate credential mismatch:
+Calculator could not start because it inherited supplementary groups from
+the graphical login and could not clear them after losing root. The session
+manager now applies its existing isolated identity transition to a new
+desktop session before exec. The account's UID, primary GID, login attribution
+and display seat are preserved; console sessions still retain account group
+memberships. Graphical programs needing administrative access use the broker.
+The account guest regression now checks zero supplementary groups for both
+standard and administrator desktops. Its V translation was checked; the full
+account scenario suite was not rerun for this focused change.
