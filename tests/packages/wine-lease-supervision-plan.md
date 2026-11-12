@@ -384,6 +384,56 @@ captured/rechecked prefix/server-directory/lock/endpoint identities, refusal of
 pre-existing servers, bounded connect, retained socket handoff and generation
 lease integration remain open. It changes neither `wine-runner` nor the holder.
 
+## Server directory capture, 2026-11-13
+
+Source `00215ed4e` adds `LaunchGuard.prepare_server_directory(data)` and the
+owned `ServerDirectory` capture. It derives Wine's private UID/device/inode
+namespace from the held prefix descriptor, opens directories without following
+links, requires account-owned mode 0700 directories and retains an empty,
+single-link account-owned mode 0600 lock file with CLOEXEC. Real/effective UID
+and GID must match. Preparation and rechecks keep the existing launch guard
+live; closing the Prefix alone does not invalidate them. Close frees owned
+strings/descriptors and retains Wine's files and directories.
+
+`recheck` compares the held base/server directory and lock identities against
+fresh descriptor-relative opens, with upstream guard checks. `require_idle`
+also requires an unlocked first byte and an absent `socket` entry before a
+future startup. Any existing entry, including a dangling link or real Unix
+socket, refuses without being removed or rewritten. Lock inspection errors
+refuse too. Callers must hold no POSIX record locks on that file: F_GETLK
+ignores their own locks, and closing another descriptor could release them.
+Namespace-only rechecks intentionally permit a running server's lock/socket.
+This does not reserve the namespace against noncooperating same-account code;
+rechecks and idle checks are observations at their respective boundaries.
+
+The shared maintained fixture passes final `arm-02`/`x86-02` under uid/gid 1000,
+plus ordinary macOS normal/production heap controls and address/undefined
+sanitizers. Each heap-enabled run retains zero V bytes over 1,000 successful
+capture/recheck/close cycles and 1,000 refused endpoint captures. Descriptor
+counts stay flat after success/refusal paths and return to their initial count
+after all captures close. A pipe-gated foreign child holds the real POSIX lock;
+preflight/capture refuse without releasing it, then accept after status 23 is
+collected. Other refusals cover malformed lock types/content/modes/hardlinks,
+directory symlinks, permission/special-bit changes, base/directory/lock
+replacement, closed captures and closed guards. Restoring original identities
+permits retry. The generated C keeps temporary records on the stack; the account
+check returns no scalar result to avoid the qualified compiler's observed
+escape-analysis boxing. Earlier failed heap controls remain preserved.
+
+The controller admits actual parsed guest V sources, explicitly hashes the
+repository heap tracker, and verifies selected tools/kernel/firmware and
+generated artifacts before/after boot. Complete attempts, final sources and
+ownership self-review remain at `/Users/alex/.cache/vwd-20261113-01`. Typed
+inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-server-directory-20261113-01.inventory.json`,
+SHA-256 `f79c4c8f8e86970716ba1e7e84e4a8156037495a450449517415b4f7bc897d6a`.
+Recording and independent complete verification pass with adjacent logs.
+Preserve original bundles and historical input namespaces. Full C toolchain
+inventory, kernel heap retention, sandbox acceptance and concurrent mutation
+interleavings are outside this gate. Signed foreground startup, endpoint
+identity capture/authenticated socket handoff, generation lease integration and
+holder-death recovery remain open; runner and holder behavior is unchanged.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
