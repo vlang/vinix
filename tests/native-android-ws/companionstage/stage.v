@@ -197,9 +197,9 @@ fn prune_removed(mut work Work) {
 	mut retained := []Owned{cap: 1024}
 	retained.flags |= .noslices
 	for item in work.objects {
-		// Appending derives an independent copy of Owned.path. Release every
-		// old path after that copy, including paths retained as active entries.
-		if item.active { retained << item }
+		// Struct copies share string storage. Each surviving entry must own
+		// its path before the previous ledger's strings are released.
+		if item.active { retained << Owned{path: item.path.clone(), object: item.object, active: true} }
 		unsafe { item.path.free() }
 	}
 	unsafe { work.objects.free() }

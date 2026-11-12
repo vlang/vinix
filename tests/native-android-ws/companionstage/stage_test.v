@@ -502,6 +502,34 @@ fn test_companion_pair_exact_shared_catalog_and_independent_packages() ! {
 	companion_assert_primary_cache(gms)!
 }
 
+fn test_pruned_ledger_preserves_catalog_identity_and_path_ownership() ! {
+	root := os.join_path(os.temp_dir(), 'vinix-companion-ledger-' + os.getpid().str())
+	assert !os.exists(root)
+	os.mkdir(root, mode: 0o700)!
+	defer { os.rmdir_all(root) or {} }
+	catalog := root + '/_installed_apks_'
+	os.mkdir(catalog, mode: 0o700)!
+	os.chown(catalog, os.getuid(), os.getgid())!
+	mut work := Work{objects: []Owned{cap: 1024}}
+	remember(mut work, catalog)!
+	remember(mut work, root)!
+	work.objects[1].active = false
+	old_storage := unsafe { usize(work.objects[0].path.str) }
+	prune_removed(mut work)
+	defer {
+		for item in work.objects { unsafe { item.path.free() } }
+		unsafe { work.objects.free() }
+	}
+	assert work.objects.len == 1
+	// Compare addresses only: dereferencing the old string would itself be
+	// a use-after-free. Independent storage must precede its release.
+	assert unsafe { usize(work.objects[0].path.str) } != old_storage
+	assert work.objects[0].path == catalog
+	ensure_owned_catalog(mut work, catalog, u32(os.getuid()), u32(os.getgid()))!
+	assert rollback(mut work, catalog)
+	assert !os.exists(catalog)
+}
+
 fn test_companion_pair_second_pin_is_checked_before_first_mutation() ! {
 	gms, vending := companion_pair_fixture('pair-second-pin-preflight', 'valid')!
 	root := os.dir(gms.data)

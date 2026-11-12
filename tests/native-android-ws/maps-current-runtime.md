@@ -1901,3 +1901,30 @@ JNI, mandatory delegate-last core and TLS lifetime boot jars, plus the new
 controller. r57 failed before staging because the requested stage executable
 was absent; it supplied no VM or runtime evidence. The surface diagnostic and
 actual Maps retry on r58 remain pending.
+
+r58 reached companion installation and failed closed with `companion shared
+catalog is not owned by this batch`, before GMS readiness or Maps launch.
+The new compiler exposes a ledger lifetime bug: prune_removed copied an Owned
+struct containing a string, then freed that same path storage. Surviving
+entries now explicitly clone their paths before releasing the old ledger.
+Inode, owner, mode and admission checks remain enforced. All11 companion-stage
+tests pass with current V and GC disabled, including paired publication,
+rollback and a new storage-ownership/catalog-identity regression. Results are
+`companion-lifetime-results-20261112-r2`; the old shallow-copy mutation in
+`companion-ledger-negative-20261112-r1` aborts with exit134. The first new-test
+attempt rejected inherited macOS /tmp group metadata; the fixture now sets
+its intended group explicitly before exercising the ledger.
+
+Only verified r58 QEMU PID9549 was synced and stopped. Offline receipt SHA256
+is `130808adefa1afebcd4aebe59fcf430654216b0ab8cd41e9317fbf7044344801`,
+serial SHA256 `d31e49d767eb4a46b1fa0b3933bc2ad967958ac4d76d14eac3de95a384384bb8`,
+and image SHA256
+`eeca07404d1d6629ad44f30720001460c8fad976d0a7192995a7d72ff59cd59a`.
+
+Controller r7(-O2) and r8(-O1) exceeded aggregate RSS and were not deployed.
+The builder retains its qualified serial default compilation; no cap changed.
+Controller r9 with the ledger fix passed0/0, complete cleanup,11759ms,
+RSS603062272, shared growth30302208 bytes, with host self-tests. Fresh r59
+staging passed0/0, complete cleanup,9487ms, RSS37683200, shared growth
+137273344 bytes; volume identity and read-only e2fsck passed. Actual broker
+and Maps qualification of the ledger fix remains pending.
