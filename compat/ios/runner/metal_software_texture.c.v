@@ -114,6 +114,15 @@ fn sm_texture_view(texture u64, selector &char, format u64) u64 {
 	target.fields[2] = objc_retain(texture)
 	return view
 }
+fn sm_texture_view_ranges(texture u64, selector &char, format u64, kind u64, levels SoftwareMetalRange, slices SoftwareMetalRange) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	sm_check(texture, 'VinixSoftwareMTLTexture')
+	// Current storage has exactly one 2D mip and one slice. Test fields directly
+	// instead of adding range endpoints, including for hostile NSUInteger values.
+	if kind != 2 || levels.location != 0 || levels.length != 1 || slices.location != 0 || slices.length != 1 { return 0 }
+	return sm_texture_view(texture, selector, format)
+}
 fn sm_texture_transfer(object u64, region SoftwareMetalRegion, level u64, bytes u64, row u64, write bool) {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -137,6 +146,7 @@ fn sm_texture_start(device u64) {
 	texture := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSoftwareMTLTexture', 0)
 	objc_register_class(texture)
 	sm_method(texture, c'newTextureViewWithPixelFormat:', u64(unsafe { voidptr(sm_texture_view) }), c'@24@0:8Q16')
+	sm_method(texture, c'newTextureViewWithPixelFormat:textureType:levels:slices:', u64(unsafe { voidptr(sm_texture_view_ranges) }), c'@64@0:8Q16Q24{_NSRange=QQ}32{_NSRange=QQ}48')
 	sm_method(texture, c'parentTexture', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')
 	for selector in [c'parentRelativeLevel', c'parentRelativeSlice']! { sm_method(texture, selector, u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8') }
 	sm_method(device, c'newTextureWithDescriptor:', u64(unsafe { voidptr(sm_new_texture) }), c'@24@0:8@16')

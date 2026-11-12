@@ -306,6 +306,34 @@ fn test_software_metal_compiled_library_metadata() {
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
 fn sm_test_view(texture u64, format u64) u64 { return unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(texture, c'newTextureViewWithPixelFormat:', format) } }
+type SMViewRanges = fn (u64, &char, u64, u64, SoftwareMetalRange, SoftwareMetalRange) u64
+fn sm_test_view_ranges(texture u64, format u64, kind u64, levels SoftwareMetalRange, slices SoftwareMetalRange) u64 { return unsafe { SMViewRanges(voidptr(C.ios_objc_msgsend))(texture, c'newTextureViewWithPixelFormat:textureType:levels:slices:', format, kind, levels, slices) } }
+fn test_software_metal_texture_view_ranges() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
+		for format in [u64(10), 30, 80, 81]! {
+			descriptor := sm_test_descriptor(format, 2, 1, 0); sm_test_set(descriptor, c'setUsage:', 17)
+			root := sm_test_texture(d, descriptor); full := SoftwareMetalRange{length: 1}
+			view := sm_test_view_ranges(root, format, 2, full, full); assert view != 0 && sm_send(view, c'parentTexture') == root
+			view_format := if format == 80 { u64(81) } else if format == 81 { u64(80) } else { format }
+			nested := sm_test_view_ranges(view, view_format, 2, full, full); assert nested != 0 && sm_send(nested, c'parentTexture') == view && sm_send(nested, c'pixelFormat') == view_format
+			assert sm_send(nested, c'parentRelativeLevel') == 0 && sm_send(nested, c'parentRelativeSlice') == 0 && sm_send(nested, c'device') == d
+			for kind in [u64(0), 1, 3, 4, 5, 6, 7, 8, 9, ~u64(0)]! { assert sm_test_view_ranges(root, format, kind, full, full) == 0 }
+			for bad in [SoftwareMetalRange{}, SoftwareMetalRange{length: 2}, SoftwareMetalRange{location: 1, length: 1}, SoftwareMetalRange{location: ~u64(0), length: 2}, SoftwareMetalRange{length: ~u64(0)}]! {
+				assert sm_test_view_ranges(root, format, 2, bad, full) == 0 && sm_test_view_ranges(root, format, 2, full, bad) == 0
+			}
+			assert sm_test_view_ranges(root, 99, 2, full, full) == 0
+			mut input := [u8(13), 29, 37, 41, 53, 61, 73, 89]!; mut output := [8]u8{}
+			pixel := sm_pixel_size(format); region := SoftwareMetalRegion{width: 2, height: 1, depth: 1}
+			sm_test_put(root, region, 0, u64(unsafe { &input[0] }), 2 * pixel); objc_release(root); objc_release(view)
+			sm_test_read(nested, region, 0, u64(unsafe { &output[0] }), 2 * pixel)
+			for i in 0 .. int(2 * pixel) { assert output[i] == input[i] }; objc_release(nested)
+		}
+		objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-VIEW-RANGES: two inline NSRange ABI arguments, four formats, nested shared bytes and parent lifetimes, BGRA reinterpretation, ten unsupported types, empty/out-of-bounds/overflow ranges on both axes, bad formats and two drained runtimes PASS')
+}
 fn test_software_metal_texture_views() {
 	$if !ios_metal_software ? { return }
 	for _ in 0 .. 2 {
@@ -323,7 +351,7 @@ fn test_software_metal_texture_views() {
 			root := if imported { sm_test_surface(d, desc, surface, plane) } else { sm_test_texture(d, desc) }; assert root != 0 && sm_send(root, c'parentTexture') == 0
 			for bad in [u64(0), 99, if format == 10 { u64(30) } else { u64(10) }]! { assert sm_test_view(root, bad) == 0 }
 			view_format := if format == 80 { u64(81) } else if format == 81 { u64(80) } else { format }
-			view := sm_test_view(root, view_format); nested := sm_test_view(view, format); assert view != 0 && nested != 0 && view != root && nested != view
+			view := sm_test_view(root, view_format); nested := sm_test_view_ranges(view, format, 2, SoftwareMetalRange{length: 1}, SoftwareMetalRange{length: 1}); assert view != 0 && nested != 0 && view != root && nested != view
 			assert sm_send(view, c'parentTexture') == root && sm_send(nested, c'parentTexture') == view && sm_send(view, c'pixelFormat') == view_format && sm_send(nested, c'device') == d
 			assert sm_send(view, c'width') == 3 && sm_send(view, c'height') == 2 && sm_send(view, c'usage') == 17 && sm_send(view, c'parentRelativeLevel') == 0 && sm_send(view, c'parentRelativeSlice') == 0
 			assert sm_send(nested, c'iosurface') == surface && sm_send(nested, c'iosurfacePlane') == if imported { plane } else { u64(0) }

@@ -34,6 +34,7 @@ Implemented Objective-C API:
   plus width, height, pixel-format, usage and storage-mode setters.
 - Texture: dimension/format/usage/device/storage queries, `iosurface`, `iosurfacePlane`,
   `newTextureViewWithPixelFormat:`, `parentTexture`, `parentRelativeLevel`,
+  `newTextureViewWithPixelFormat:textureType:levels:slices:`,
   `parentRelativeSlice`,
   `replaceRegion:mipmapLevel:withBytes:bytesPerRow:` and
   `getBytes:bytesPerRow:fromRegion:mipmapLevel:`.
@@ -60,8 +61,12 @@ are supported for all four formats; BGRA 80/81 reinterpretation requires usage
 PixelFormatView (16) in this conservative profile. Other format changes return
 nil. Views preserve dimensions, usage, device, plane and padded stride; CPU
 transfers/blits share bytes without conversion. Parent-relative level/slice
-are zero. Existing alias-overlap checks apply. Subranges, swizzles and texture
-type changes remain unsupported.
+are zero. The type/ranges constructor accepts texture type 2 and exactly
+`{location: 0, length: 1}` for both levels and slices. Empty, oversized,
+nonzero-base and overflowing ranges, or other types, return nil before
+allocating a view. Both constructors share format validation and ownership.
+Existing alias-overlap checks apply. Swizzles and texture-type changes remain
+unsupported.
 
 Textures support R8Unorm (10), RG8Unorm (30), BGRA8Unorm (80) and
 BGRA8Unorm_sRGB (81). Upload/readback preserves raw bytes without color
