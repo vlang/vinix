@@ -5,6 +5,62 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static forceLayoutProbe(Landroid/content/Context;)V
+.locals 6
+new-instance v0, Lorg/vinix/bootstrap/TestLayoutTable;
+invoke-direct {v0, p0}, Lorg/vinix/bootstrap/TestLayoutTable;-><init>(Landroid/content/Context;)V
+new-instance v1, Lorg/vinix/bootstrap/TestLayoutView;
+invoke-direct {v1, p0}, Lorg/vinix/bootstrap/TestLayoutView;-><init>(Landroid/content/Context;)V
+invoke-virtual {v0, v1}, Landroid/widget/TableLayout;->addView(Landroid/view/View;)V
+const v2, 0x40000040
+invoke-virtual {v1, v2, v2}, Landroid/view/View;->measure(II)V
+const/4 v3, 0
+iput v3, v0, Lorg/vinix/bootstrap/TestLayoutTable;->requests:I
+iput v3, v1, Lorg/vinix/bootstrap/TestLayoutView;->requests:I
+invoke-virtual {v1}, Landroid/view/View;->isLayoutRequested()Z
+move-result v4
+invoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1}, Landroid/view/View;->forceLayout()V
+invoke-virtual {v1}, Landroid/view/View;->isLayoutRequested()Z
+move-result v4
+const/4 v5, 1
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v4, v1, Lorg/vinix/bootstrap/TestLayoutView;->requests:I
+invoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v4, v0, Lorg/vinix/bootstrap/TestLayoutTable;->requests:I
+invoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1, v2, v2}, Landroid/view/View;->measure(II)V
+iget v4, v1, Lorg/vinix/bootstrap/TestLayoutView;->measures:I
+const/4 v5, 2
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1, v2, v2}, Landroid/view/View;->measure(II)V
+iget v4, v1, Lorg/vinix/bootstrap/TestLayoutView;->measures:I
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v4, Lorg/vinix/bootstrap/TestForceLayoutWorker;
+invoke-direct {v4, v1}, Lorg/vinix/bootstrap/TestForceLayoutWorker;-><init>(Landroid/view/View;)V
+new-instance v5, Ljava/lang/Thread;
+invoke-direct {v5, v4}, Ljava/lang/Thread;-><init>(Ljava/lang/Runnable;)V
+invoke-virtual {v5}, Ljava/lang/Thread;->start()V
+invoke-virtual {v5}, Ljava/lang/Thread;->join()V
+invoke-virtual {v1}, Landroid/view/View;->isLayoutRequested()Z
+move-result v4
+const/4 v5, 1
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v4, v1, Lorg/vinix/bootstrap/TestLayoutView;->requests:I
+invoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v4, v0, Lorg/vinix/bootstrap/TestLayoutTable;->requests:I
+invoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1, v2, v2}, Landroid/view/View;->measure(II)V
+invoke-virtual {v0}, Landroid/widget/TableLayout;->requestLayout()V
+iget v4, v0, Lorg/vinix/bootstrap/TestLayoutTable;->requests:I
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v4, v1, Lorg/vinix/bootstrap/TestLayoutView;->requests:I
+invoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1}, Landroid/view/View;->isLayoutRequested()Z
+move-result v4
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+.end method
 .method public static serialTlsCache(Landroid/content/Context;)V
 .locals 5
 :serial_start
@@ -1303,6 +1359,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->scheduleProbeJob(Landroid/conten
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->modemIdentifiers(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->optionalStorageStats(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->serialTlsCache(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->forceLayoutProbe(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1543,6 +1600,66 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
+	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;
+.super Landroid/widget/TableLayout;
+.field public requests:I
+.method public constructor <init>(Landroid/content/Context;)V
+.locals 0
+invoke-direct {p0, p1}, Landroid/widget/TableLayout;-><init>(Landroid/content/Context;)V
+return-void
+.end method
+.method public requestLayout()V
+.locals 1
+iget v0, p0, Lorg/vinix/bootstrap/TestLayoutTable;->requests:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestLayoutTable;->requests:I
+invoke-super {p0}, Landroid/widget/TableLayout;->requestLayout()V
+return-void
+.end method
+')!
+	os.write_file(root + '/smali/TestLayoutView.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutView;
+.super Landroid/view/View;
+.field public requests:I
+.field public measures:I
+.method public constructor <init>(Landroid/content/Context;)V
+.locals 0
+invoke-direct {p0, p1}, Landroid/view/View;-><init>(Landroid/content/Context;)V
+return-void
+.end method
+.method public requestLayout()V
+.locals 1
+iget v0, p0, Lorg/vinix/bootstrap/TestLayoutView;->requests:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestLayoutView;->requests:I
+invoke-super {p0}, Landroid/view/View;->requestLayout()V
+return-void
+.end method
+.method protected onMeasure(II)V
+.locals 1
+iget v0, p0, Lorg/vinix/bootstrap/TestLayoutView;->measures:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestLayoutView;->measures:I
+invoke-super {p0, p1, p2}, Landroid/view/View;->onMeasure(II)V
+return-void
+.end method
+')!
+	os.write_file(root + '/smali/TestForceLayoutWorker.smali', r'.class public Lorg/vinix/bootstrap/TestForceLayoutWorker;
+.super Ljava/lang/Object;
+.implements Ljava/lang/Runnable;
+.field private view:Landroid/view/View;
+.method public constructor <init>(Landroid/view/View;)V
+.locals 0
+invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+iput-object p1, p0, Lorg/vinix/bootstrap/TestForceLayoutWorker;->view:Landroid/view/View;
+return-void
+.end method
+.method public run()V
+.locals 1
+iget-object v0, p0, Lorg/vinix/bootstrap/TestForceLayoutWorker;->view:Landroid/view/View;
+invoke-virtual {v0}, Landroid/view/View;->forceLayout()V
+return-void
+.end method
+')!
 	os.write_file(root + '/smali/TestSslContext.smali', r'.class public Lorg/vinix/bootstrap/TestSslContext;
 .super Landroid/content/ContextWrapper;
 .field public calls:I

@@ -211,6 +211,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_modem_identifiers(smali)!
  framework_storage_stats_type(smali)!
  framework_serial_tls_cache(smali)!
+ framework_force_layout(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!

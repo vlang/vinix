@@ -30,6 +30,11 @@ StorageStatsManager type. No map/search/route/login result is qualified.
 Guest r38 passed that repair's complete API regression, then Maps exited on
 missing Build.getSerial in GMS check-in; an SSLSessionCache context constructor
 was also missing in an asynchronous Play Store initialization path.
+Guest r39 passed those regressions but was stopped for host disk pressure.
+Guest r40 rendered Explore after Skip, then hit a View.forceLayout/TableLayout
+requestLayout recursion and StackOverflowError on the main looper. Its
+disk-retained private log also records the missing secure Android socket
+factory overload; neither tiles nor search/routes/login are qualified.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -1138,3 +1143,67 @@ and strict independent readback `serial-cache-api-readback-20261112-r1` retain
 its two-entry export, archive SHA256
 `5a57c75a4dc800e8de01e3dc18fb1a0417ec1adf6171e1f0651e91d635ba1715`.
 The fixture bind was released before broker preparation.
+
+Guest r39 passed the full signed API fixture and rendered onboarding in the
+actual Maps retry (`maps-onboarding.png`). Before Skip could be qualified,
+host free space fell to2.1GiB amid ongoing shared filesystem writes. Only the
+verified owned QEMU was stopped. No subsequent map/search/routing/login or
+clean Maps exit is claimed. Its private RAM-backed Maps log was not exported
+before shutdown, so this attempt cannot identify another runtime failure.
+Immutable snapshot `maps-serial-cache-blocked-uart-20261112-r1` has SHA256
+`302d8d2cecd4f80ffea15788bb9c5bd92ca959dae80038c016e37dfa0ceb142b`;
+the stopped raw data image has SHA256
+`d8fcf0a64f112330d841f5eb1847ac5519ec09bf40cc9847fcc04e982dcddf28`.
+Read-only inspection retained a native-crashloop marker but no stack trace;
+the marker alone does not establish a native crash or its cause.
+
+Host-space samples `host-space-after-r39-stop-1.log` through `-6.log` retain
+the subsequent recovery. The last three were21556308,22781740 and25040008KiB
+free, above20GiB and increasing. Guest r40 therefore repeats the same already
+qualified SDK/native/core/fixture set with a fresh disk. Its diagnostic bundle
+will be placed on that disk before broker preparation, preserving private
+logs if another host-pressure stop is needed. No identity check is relaxed.
+
+Guest r40 staging passed guard/child 0/0 with complete cleanup: 14587ms,
+RSS 37224448 bytes and shared growth 13930496 bytes. Broker preparation
+accepted the disk-backed diagnostic bundle and printed ACCOUNT-READY.
+After onboarding and Skip, Explore/search controls rendered, then the main
+looper failed with StackOverflowError. View.forceLayout called virtual
+requestLayout, which forwarded to TableLayout.requestLayout, which forces
+each child again. Snapshot `maps-force-layout-final-uart-20261112-r1` has
+SHA256 `a1a8ddda91d88911469d014531b1173003e0d809bdc872aff367479c34f59bf3`.
+
+After syncing and stopping only verified owned QEMU PID44587, read-only
+debugfs exported `maps-current-20261112-r40/maps.retained.log` from
+`/.maps-account/results/maps.log`, SHA256
+`d5642ed5343c6b639118c7f7b17264efa9a2a9dccd2a35f41d8d3ebc6a624fdf`.
+The stopped image has SHA256
+`ec1aa8e47aebb01f5313a46efd6533899c904ffff4fa5923a83b285fa91b2ab0`.
+This complete log also retains the asynchronous missing
+SSLCertificateSocketFactory.getDefault(int, SSLSessionCache) call in Play
+Store bosr.a. No TLS security behavior was changed to bypass that failure.
+
+`framework_force_layout.v` marks the view's existing measurement request
+flag directly, without scheduling traversal or calling virtual requestLayout
+on either the view or parent. This follows the
+[Android contract](https://developer.android.com/reference/android/view/View#forceLayout()).
+The signed fixture adds a counting TableLayout child, unchanged-spec
+remeasurement checks and a joined worker-thread forceLayout check. It
+requires zero child/parent request callbacks for forceLayout and checks
+that a subsequent table request forces its child without recursion.
+
+SDK `framework-force-layout-20261112-r1` passed full assembly/selected DEX
+readback under the original caps: guard/child 0/0, complete cleanup, 3527ms,
+RSS 469680128 and shared growth 350302208 bytes. Signed fixture r32 passed
+build/link/sign/verification: 0/0, complete cleanup, 1255ms, RSS 137052160 and
+shared growth 24563712 bytes. Guest r41 stages these for ARM validation.
+
+The complete signed r32 fixture passed on ARM in r41 as UID/GID10160,
+readiness/pass once, drained EOF and exit0. The table regression completed
+with no recursion, both forceLayout callers avoided request callbacks, and
+unchanged-spec measurement ran again only when forced. Snapshot
+`force-layout-api-uart-20261112-r1`, plan
+`force-layout-api-plan-20261112-r1.json` and independent strict readback
+`force-layout-api-readback-20261112-r1` retain its two-entry export, archive
+SHA256 `a77d51aa3934e06ef5d6802556c2597fa96bbcca9079fa88215dc7271c7ecbac`.
+The fixture bind was released before broker preparation and the Maps retry.
