@@ -108,8 +108,8 @@ define half @guard_frem_fmf(half %x, half %y, i64 %c) { %r = frem fast half %x, 
 define half @guard_precision(half %x, half %y, i64 %c) { %d = fpext half %x to double
   %r = fptrunc double %d to half
   ret half %r }
-define half @guard_to_integer(half %x, half %y, i64 %c) { %i = fptosi half %x to i16
-  %r = sitofp i16 %i to half
+define half @guard_cast_flags(half %x, half %y, i64 %c) { %i = fptosi half %x to i16
+  %r = sitofp nnan i16 %i to half
   ret half %r }
 define half @guard_undef(half %x, half %y, i64 %c) { ret half undef }
 define half @guard_freeze(half %x, half %y, i64 %c) { %r = freeze half poison
@@ -208,7 +208,7 @@ fn main() {
 	}
 	args := [u64(0x3c00), 0x4000, 0]; defer { unsafe { args.free() } }
 	mut guards := 0
-	for name in ['guard_fmf', 'guard_frem_fmf', 'guard_precision', 'guard_to_integer', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary16 fixture') }
+	for name in ['guard_fmf', 'guard_frem_fmf', 'guard_precision', 'guard_cast_flags', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary16 fixture') }
 	for name in ['poison_add', 'poison_divide', 'poison_remainder_left', 'poison_remainder_right', 'poison_compare'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('binary16 poison lost') } }
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != args[0] { panic('binary16 select was not lazy') }
 	for i, name in ['lazy_false', 'lazy_true'] { result := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!; if result.poison || result.value != u64(i) { panic('constant half predicate read poison/undef') } }

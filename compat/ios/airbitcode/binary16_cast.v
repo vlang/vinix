@@ -23,3 +23,21 @@ fn binary16_to_binary32(value u16) u32 {
 	for fraction < u32(1) << 10 { fraction <<= 1; exponent-- }
 	return sign | (u32(exponent + 127) << 23) | ((fraction & 0x3ff) << 13)
 }
+fn binary16_from_integer(bits u32, signed bool, value u64) !u16 {
+	if bits == 0 || bits > 64 { return error('AIR binary16: integer conversion width') }
+	mask := constant_mask(bits); word := value & mask
+	negative := signed && word & (u64(1) << (bits - 1)) != 0
+	magnitude := if negative { (u64(0) - word) & mask } else { word }
+	if magnitude == 0 { return 0 }
+	mut scan := magnitude; mut exponent := 0
+	for scan > 1 { scan >>= 1; exponent++ }
+	// Eleven retained significand bits plus guard/round/sticky. Round once,
+	// directly to half, including signed infinity when the result overflows.
+	significand := if exponent <= 13 { magnitude << (13 - exponent) } else { binary32_jam(magnitude, exponent - 13) }
+	return binary16_pack(if negative { u16(0x8000) } else { u16(0) }, exponent, significand)
+}
+fn binary16_to_integer(bits u32, signed bool, value u16) !IntegerValue {
+	// Widening is exact for every finite half value. The existing integer-only
+	// truncation/range checker also rejects infinities and all converted NaNs.
+	return binary32_to_integer(bits, signed, binary16_to_binary32(value))!
+}

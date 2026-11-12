@@ -55,9 +55,8 @@ charges and three owned temporary arrays. It borrows its inputs and frees those
 arrays on success/error. Input validity, dominance and full CFG/PHI correctness
 remain caller preconditions; this is not a general LLVM verifier.
 
-Outside this profile: half/integer numeric conversions, bfloat16/double,
-vectors, precision conversions beyond half/float,
-fast/constrained operations,
+Outside this profile: bfloat16/double, vectors, precision conversions beyond
+half/float, fast/constrained operations,
 function attributes, calls/intrinsics, pointers, memory and Metal commands.
 These are explicit unsupported cases, not approximated operations.
 

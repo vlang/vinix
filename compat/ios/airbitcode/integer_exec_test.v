@@ -352,3 +352,32 @@ fn test_scalar_binary16_conversions_and_profile_guards() {
 	if _ := f.scalar([u64(0), 0], 2) { assert false, 'precision fast math flags' }
 	println('AIR-SCALAR-BINARY16: decoded precision conversions, arithmetic/comparison, kind/width/step/masking, poison/undef/constants, exact fneg and flag/profile/budget guards PASS')
 }
+fn test_scalar_binary16_numeric_integer_conversion_instructions() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.types.flags |= .noslices; f.types[0] = IRType{kind: .half_t}; f.types << IRType{kind: .integer_t, bits: 64}
+	f.refs[0] = 3; f.constants[0] = IRConstant{...f.constants[0], kind: .floating, bits: 16}
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 3, 4]); f.add(10, [u64(1)])
+	integer := f.scalar([u64(0x1be00), 0], 2)!
+	assert integer.kind == .integer && integer.bits == 64 && integer.value == ~u64(0) && !integer.poison && integer.steps == 2
+	assert f.scalar([u64(0x7c00), 0], 2)!.poison
+	f.types[3] = IRType{kind: .integer_t, bits: 8}
+	assert f.scalar([u64(0xd804), 0], 2)!.value == 128
+	f.values[f.records[2].values_start + 2] = 3
+	unsigned := f.scalar([u64(0xbbff), 0], 2)!
+	assert !unsigned.poison && unsigned.value == 0
+	f.refs[0] = 0; f.refs[1] = 3; f.arguments[0] = 3; f.types[3] = IRType{kind: .integer_t, bits: 64}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 0, 6]); f.add(10, [u64(1)])
+	half := f.scalar([u64(0) - 65520, 0], 2)!
+	assert half.kind == .binary16 && half.bits == 16 && half.value == 0xfc00 && !half.poison && half.steps == 2
+	if _ := f.scalar([u64(1), 0], 1) { assert false, 'numeric half conversion budget' }
+	if _ := f.run([u64(1), 0], 2) { assert false, 'integer entry accepted half conversion' }
+	f.constants[0] = IRConstant{...f.constants[0], kind: .poison, type_index: 3, bits: 64}
+	f.values[f.records[2].values_start] = 1
+	assert f.scalar([u64(0), 0], 2)!.poison
+	f.constants[0] = IRConstant{...f.constants[0], kind: .undef}
+	if _ := f.scalar([u64(0), 0], 2) { assert false, 'numeric half conversion undef' }
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 0, 5, 1]); f.add(10, [u64(1)])
+	if _ := f.scalar([u64(1), 0], 2) { assert false, 'numeric half conversion flags' }
+	println('AIR-SCALAR-BINARY16-INTEGER: decoded signed/unsigned conversions, masking, kinds/widths/steps, overflow infinity, fractional limits, poison/undef and flag/profile/budget guards PASS')
+}

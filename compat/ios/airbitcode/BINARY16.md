@@ -12,6 +12,7 @@ The half profile supports:
 - `fpext half ... to float`, exact for every finite half value.
 - Bitcasts between half and i16, arguments, constants, return, select and PHIs.
 - `fneg half`, which changes only the sign bit, including for signaling NaNs.
+- [Signed/unsigned numeric conversions between half and i1..i64](BINARY16-INTEGER.md).
 
 `binary16_cast.v` uses integer significands, exponent shifts and guard/round/
 sticky bits. Narrowing preserves signed zero and gradual underflow; rounding
@@ -43,8 +44,8 @@ shifts for float input and ten shifts for half input. The existing execution
 arrays, their ownership and instruction/loop budgets are unchanged. Matching
 immutable indexes and valid LLVM IR remain preconditions.
 
-Half/integer numeric conversions, bfloat16, double, vectors, memory and
-intrinsics reject, including in unvisited blocks. The integer-only entry point
+`bfloat16`, `double`, vectors, memory and intrinsics reject, including in
+unvisited blocks. The integer-only entry point
 still rejects all floating-point types.
 
 `binary16_cast_test.v` checks 14 exact widening patterns, 32 exact narrowing
@@ -94,8 +95,8 @@ each changed host mode; remainder retains an exact extreme-quotient result.
 Native reference calls run only in the default environment. LLVM/JIT native
 code is not sanitizer-instrumented. The tool runs only its generated fixture
 and preserves every comparison, original IR/bitcode and target/fenv identity
-outside Git. The precision checker's retired arithmetic/comparison guards now
-check still-unsupported dead precision operations and comparison flags.
+outside Git. Retired unsupported-operation guards now check still-unsupported
+dead precision operations and conversion/comparison flags.
 
 These are scalar shader prerequisites. They do not create a Metal device,
 execute an AIR shader, submit GPU work or qualify an iOS application launch.

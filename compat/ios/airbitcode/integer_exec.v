@@ -141,11 +141,11 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 					source := p.operands[op.operands_start].type_index
 					if op.opcode <= 2 { p.integer_bits(source)!; p.integer_bits(op.result_type)! }
 					else if binary32 && op.opcode in [u32(3), 4]! {
-						if p.types[source].kind != .float_t { return error('AIR scalar: binary32 conversion source required') }
+						if p.types[source].kind !in [.float_t, .half_t]! { return error('AIR scalar: floating conversion source required') }
 						p.integer_bits(op.result_type)!
 					} else if binary32 && op.opcode in [u32(5), 6]! {
 						p.integer_bits(source)!
-						if p.types[op.result_type].kind != .float_t { return error('AIR scalar: binary32 conversion result required') }
+						if !floating_result { return error('AIR scalar: floating conversion result required') }
 					}
 					else if binary32 && op.opcode == 7 {
 						if p.types[source].kind != .float_t || p.types[op.result_type].kind != .half_t { return error('AIR scalar: only binary32 to binary16 truncation supported') }
@@ -267,8 +267,8 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				3 {
 					input := m.read(start)!; source_bits := p.execution_bits(p.operands[start].type_index, binary32)!; dest_bits := p.execution_bits(op.result_type, binary32)!
 					if input.poison { result = IntegerValue{poison: true} }
-					else if op.opcode in [u32(3), 4]! { result = binary32_to_integer(dest_bits, op.opcode == 4, u32(input.value))! }
-					else if op.opcode in [u32(5), 6]! { result = IntegerValue{value: binary32_from_integer(source_bits, op.opcode == 6, input.value)!} }
+					else if op.opcode in [u32(3), 4]! { result = if source_bits == 16 { binary16_to_integer(dest_bits, op.opcode == 4, u16(input.value))! } else { binary32_to_integer(dest_bits, op.opcode == 4, u32(input.value))! } }
+					else if op.opcode in [u32(5), 6]! { result = IntegerValue{value: if dest_bits == 16 { u64(binary16_from_integer(source_bits, op.opcode == 6, input.value)!) } else { u64(binary32_from_integer(source_bits, op.opcode == 6, input.value)!) }} }
 					else if op.opcode == 7 { result = IntegerValue{value: binary16_from_binary32(u32(input.value))} }
 					else if op.opcode == 8 { result = IntegerValue{value: binary16_to_binary32(u16(input.value))} }
 					else {
