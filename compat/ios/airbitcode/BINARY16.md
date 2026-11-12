@@ -40,7 +40,9 @@ results. Invalid arithmetic, including zero divided by zero, an infinite
 dividend in `frem`, or a zero remainder divisor, returns the preferred quiet
 NaN `0x7e00`. Other arithmetic and comparisons propagate operand poison.
 
-Poison propagates, selected undef errors and fast-math flags reject. No host
+Poison propagates, selected undef errors and fast-math flags reject. The
+[scalar freeze](SCALAR-FREEZE.md) instruction preserves defined half bits and
+chooses zero for poison or a direct undef constant. No host
 FP instruction, environment, numeric cast, allocation or LLVM dependency
 participates in production conversion. Normalization requires at most 23
 shifts for float input and ten shifts for half input. The existing execution

@@ -17,13 +17,13 @@ Result bits must not be consumed when `poison` is true.
 
 The interpreter supports integer add/sub/mul, unsigned/signed division
 and remainder, shifts, and/or/xor, all ten integer comparisons, trunc/zext/sext,
-scalar select, direct branches/switches, PHIs and return. It rejects opaque/deferred
+scalar select, freeze, direct branches/switches, PHIs and return. It rejects opaque/deferred
 instructions and other instruction families, even in unvisited blocks. It checks
 `nuw`/`nsw` on add/sub/mul/shl and `exact` on udiv/sdiv/lshr/ashr. Flags use
 their serialized, family-specific bit positions. Unknown bits, wrong-family
 flags, disjoint/samesign and cast flags reject; they are not silently ignored.
 Function attributes are rejected rather than assuming their boundary semantics.
-Floating point, vectors, pointers, memory operations, calls and freeze are
+Floating point, vectors, pointers, memory operations and calls are
 outside this profile.
 The separate [mixed scalar entry point](BINARY32.md) adds software binary32
 execution while preserving this integer-only API.
@@ -44,7 +44,10 @@ retain poison, while a poison branch condition errors. Division/remainder by
 zero and signed minimum divided/remaindered by -1 error rather than invoke host
 undefined behavior. Poison division/remainder operands are explicitly outside
 this profile and error. Reading undef or an unsupported constant expression
-errors; unchosen select/PHI values are not read. No freeze choice is invented.
+errors; unchosen select/PHI values are not read. [Scalar freeze](SCALAR-FREEZE.md)
+is the exception: direct undef constants and poison become a fixed zero choice;
+defined inputs retain their exact bits. It does not admit undef computations
+before the freeze or rescue preceding undefined behavior.
 
 On entry to a block, all selected PHI values are read before any PHI result is
 written. This preserves simultaneous swaps across loop backedges. PHIs select

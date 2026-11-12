@@ -112,8 +112,9 @@ define half @guard_cast_flags(half %x, half %y, i64 %c) { %i = fptosi half %x to
   %r = sitofp nnan i16 %i to half
   ret half %r }
 define half @guard_undef(half %x, half %y, i64 %c) { ret half undef }
-define half @guard_freeze(half %x, half %y, i64 %c) { %r = freeze half poison
-  ret half %r }
+define half @guard_freeze(half %x, half %y, i64 %c) { %r = freeze double poison
+  %narrow = fptrunc double %r to half
+  ret half %narrow }
 define noundef half @guard_attributes(half %x, half %y, i64 %c) { ret half %x }
 define half @poison_add(half %x, half %y, i64 %c) { %r = fadd half %x, poison
   ret half %r }

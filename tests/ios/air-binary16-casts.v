@@ -118,8 +118,9 @@ define half @guard_dead_precision(half %x, half %y, i64 %c) {
 entry: ret half %x
 dead: %r = fpext half %x to double
   ret half %y }
-define half @guard_freeze(half %x, half %y, i64 %c) { %r = freeze half poison
-  ret half %r }
+define half @guard_freeze(half %x, half %y, i64 %c) { %r = freeze <2 x half> poison
+  %element = extractelement <2 x half> %r, i32 0
+  ret half %element }
 define float @guard_double(half %x, half %y, i64 %c) { %d = fpext half %x to double
   %r = fptrunc double %d to float
   ret float %r }

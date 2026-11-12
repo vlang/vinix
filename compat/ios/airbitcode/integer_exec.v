@@ -174,6 +174,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
 				56 { if !binary32 || !floating_result || op.operands_count != 1 { return error('AIR scalar: floating fneg required') } }
+				58 { if !inst.has_result || op.operands_count != 1 || op.opcode != 0 || p.operands[op.operands_start].type_index != op.result_type { return error('AIR scalar: freeze result/arity/type') } }
 				else { return error('AIR integer: instruction outside execution profile') }
 			}
 		}
@@ -223,6 +224,18 @@ fn (m &IntegerMachine) read(operand_index int) !IntegerValue {
 fn (mut m IntegerMachine) put(inst IRInstruction, value IntegerValue) {
 	slot := int(inst.next_value - m.bodies.scopes[m.scope].base_id)
 	m.values[slot] = value; m.known[slot] = true
+}
+
+fn (m &IntegerMachine) read_frozen(operand_index int) !IntegerValue {
+	operand := m.p.operands[operand_index]
+	if operand.number < m.bodies.scopes[m.scope].base_id {
+		value := m.pools.lookup(m.scope, operand.number)!
+		if value.kind == .constant && m.pools.constants[value.constant_index].kind == .undef { return IntegerValue{} }
+	}
+	input := m.read(operand_index)!
+	// Zero is a permitted fixed choice for scalar undef/poison. The normal
+	// result slot keeps every use of this dynamic freeze evaluation consistent.
+	return if input.poison { IntegerValue{} } else { input }
 }
 
 // Execute valid LLVM IR within the checked scalar profile. No host pointers,
@@ -302,6 +315,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				}
 				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true} } else { m.read(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
 				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
+				58 { result = m.read_frozen(start)! }
 				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }
 				11 {
 					mut target := 0

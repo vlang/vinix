@@ -54,8 +54,9 @@ PHIs and bitcasts preserve every NaN bit; `fneg` changes only the sign bit,
 including for signaling NaNs. Comparisons classify quiet/signaling NaNs as
 unordered. The constant `fcmp false`/`true` predicates return their constants
 without reading operands. Other comparisons and arithmetic propagate poison;
-selected undef and unsupported constant expressions still error. No undef or
-freeze bit pattern is invented.
+selected undef and unsupported constant expressions still error, except that
+[scalar freeze](SCALAR-FREEZE.md) chooses zero for a direct undef constant or
+poison. Defined freeze inputs keep their exact bits, including signaling NaNs.
 
 The mixed entry point shares the integer execution budget, switch comparison
 charges and three owned temporary arrays. It borrows its inputs and frees those

@@ -164,8 +164,9 @@ define i64 @guard_flags(i64 %a, i64 %b, i64 %c) { %v = or disjoint i64 %a, %b
 define noundef i64 @guard_attributes(i64 %a, i64 %b, i64 %c) { ret i64 %a }
 define i64 @guard_undef(i64 %a, i64 %b, i64 %c) { ret i64 undef }
 define i64 @guard_unreachable(i64 %a, i64 %b, i64 %c) { unreachable }
-define i64 @guard_freeze(i64 %a, i64 %b, i64 %c) { %v = freeze i64 poison
-  ret i64 %v }
+define i64 @guard_freeze(i64 %a, i64 %b, i64 %c) { %v = freeze i128 poison
+ %narrow = trunc i128 %v to i64
+ ret i64 %narrow }
 define i64 @guard_loop(i64 %a, i64 %b, i64 %c) {
 entry: br label %loop
 loop: br label %loop }

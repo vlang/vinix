@@ -101,8 +101,9 @@ define float @guard_bfloat(float %x, float %y, i64 %c) { %h = fptrunc float %x t
   %r = fpext bfloat %h to float
   ret float %r }
 define float @guard_undef(float %x, float %y, i64 %c) { ret float undef }
-define float @guard_freeze(float %x, float %y, i64 %c) { %r = freeze float poison
-  ret float %r }
+define float @guard_freeze(float %x, float %y, i64 %c) { %r = freeze double poison
+  %narrow = fptrunc double %r to float
+  ret float %narrow }
 define noundef float @guard_attributes(float %x, float %y, i64 %c) { ret float %x }
 define float @poison_add(float %x, float %y, i64 %c) { %r = fadd float %x, poison
   ret float %r }

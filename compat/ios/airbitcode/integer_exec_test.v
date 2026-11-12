@@ -111,6 +111,70 @@ fn test_integer_narrow_argument_and_return_masks() {
 	assert a.bits == 8 && a.value == 3 && b.bits == 8 && b.value == 1
 	println('AIR-INTEGER-NARROW: incoming argument masking, narrow result slots/wrap and returned bit width PASS')
 }
+
+fn test_scalar_freeze_defined_and_indeterminate_values() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	for width in u32(1) .. 65 {
+		f.types[0] = IRType{kind: .integer_t, bits: width}
+		f.constants[0] = IRConstant{...f.constants[0], kind: .integer, bits: width}
+		f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)])
+		f.add(58, [u64(3)]); f.add(10, [u64(1)])
+		for raw in [u64(0), 1, u64(1) << (width - 1), ~u64(0)]! {
+			actual := f.run([raw, 0], 2)!
+			assert actual.value == raw & constant_mask(width) && !actual.poison && actual.bits == width && actual.steps == 2
+		}
+		f.values[f.records[2].values_start] = 1 // Freeze the constant, not the argument.
+		for kind in [IRConstantKind.undef, .poison]! {
+			f.constants[0] = IRConstant{...f.constants[0], kind: kind}
+			actual := f.run([u64(99), 0], 2)!
+			assert actual.value == 0 && !actual.poison && actual.steps == 2
+		}
+	}
+	for kind in [IRKind.half_t, .float_t]! {
+		width := if kind == .half_t { u32(16) } else { u32(32) }
+		f.types[0] = IRType{kind: kind}
+		f.constants[0] = IRConstant{...f.constants[0], kind: .floating, bits: width}
+		f.values[f.records[2].values_start] = 3
+		for raw in [u64(0), 0x8000, 0x7c01, 0xfc00, 0x80000000, 0x7f800001, 0xff800000, ~u64(0)]! {
+			actual := f.scalar([raw, 0], 2)!
+			assert actual.value == raw & constant_mask(width) && !actual.poison && actual.bits == width && actual.steps == 2
+		}
+		if _ := f.run([u64(0), 0], 2) { assert false, 'floating freeze in integer profile' }
+		f.values[f.records[2].values_start] = 1
+		for state in [IRConstantKind.undef, .poison]! {
+			f.constants[0] = IRConstant{...f.constants[0], kind: state}
+			actual := f.scalar([u64(99), 0], 2)!
+			assert actual.value == 0 && !actual.poison
+		}
+	}
+	println('AIR-SCALAR-FREEZE: i1..i64, half/float bit preservation, poison/undef fixed choices and integer profile isolation PASS')
+}
+
+fn test_integer_freeze_computed_poison_and_stable_result_slots() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.types[0] = IRType{kind: .integer_t, bits: 8}; f.constants[0] = IRConstant{...f.constants[0], bits: 8}
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)])
+	f.add(2, [u64(3), 2, 7]); f.add(58, [u64(1)]); f.add(10, [u64(1)])
+	for amount in [u64(0), 1, 7, 8, 255]! {
+		actual := f.run([u64(3), amount], 3)!
+		assert !actual.poison && actual.steps == 3 && actual.value == if amount < 8 { (u64(3) << amount) & 255 } else { u64(0) }
+	}
+	f.constants[0] = IRConstant{...f.constants[0], kind: .undef}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)])
+	f.add(58, [u64(1)]); f.add(2, [u64(1), 1, 12]); f.add(10, [u64(1)])
+	actual := f.run([u64(99), 0], 3)!
+	assert actual.value == 0 && !actual.poison && actual.steps == 3
+	if _ := f.run([u64(99), 0], 2) { assert false, 'freeze budget' }
+	// A freeze does not rescue an unsupported undef computation or immediate UB.
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)])
+	f.add(2, [u64(3), 1, 0]); f.add(58, [u64(1)]); f.add(10, [u64(1)])
+	if _ := f.run([u64(99), 0], 3) { assert false, 'undef arithmetic admitted before freeze' }
+	f.values[f.records[2].values_start + 1] = 2; f.values[f.records[2].values_start + 2] = 3
+	if _ := f.run([u64(99), 0], 3) { assert false, 'division by zero rescued by freeze' }
+	println('AIR-INTEGER-FREEZE: computed overshift poison, repeated uses, budgets and preceding undef/UB guards PASS')
+}
 fn test_integer_flags_against_widened_narrow_arithmetic() {
 	mut comparisons := 0
 	for bits in u32(1) .. 9 {
