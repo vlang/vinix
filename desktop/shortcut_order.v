@@ -193,7 +193,7 @@ fn (mut d Desktop) begin_shortcut_press(action string, x int, y int) bool {
 		return false
 	}
 	app_index := action[action_shortcut_prefix.len..].int()
-	if app_index < 0 || app_index >= available_apps.len {
+	if app_index < 0 || app_index >= available_apps.len || !available_apps[app_index].shortcut_available() {
 		return false
 	}
 	d.ensure_shortcut_order()
@@ -218,9 +218,10 @@ fn (mut d Desktop) update_shortcut_drag(x int, y int) {
 		}
 		d.shortcut_press.dragging = true
 	}
-	target := shortcut_slot_at(x, y, d.canvas.height, d.taskbar_height()) or { return }
+	visible_target := shortcut_slot_at(x, y, d.canvas.height, d.taskbar_height()) or { return }
+	target := d.shortcut_order_slot_for_visible_slot(visible_target)
 	from := d.shortcut_slot_for_app(d.shortcut_press.app_index)
-	if from < 0 || target == from {
+	if from < 0 || target < 0 || target == from {
 		return
 	}
 	d.ensure_shortcut_order()

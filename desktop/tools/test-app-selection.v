@@ -25,7 +25,8 @@ fn main() {
 	setup_run('tar', ['-xf', '${work}/source.tar', '-C', '${work}/source'])!
 	for name in ['main.v', 'app_selection.v', 'app_selection_release.v', 'app_selection_migration.v', 'app_selection_catalogue.v', 'app_selection_runtime.v', 'app_selection_download.v', 'session_hub.v',
 		'software_app.v', 'software_release.v',
-		'app_icon.v', 'font_data.v', 'app.v', 'wine_app.v', 'zed_app.v', 'session_paste.v'] {
+		'app_icon.v', 'font_data.v', 'app.v', 'wine_app.v', 'zed_app.v', 'session_paste.v',
+		'shortcut_availability.v', 'shortcut_order.v', 'wm.v'] {
 		os.cp('${root}/desktop/${name}', '${work}/source/desktop/${name}')!
 	}
 	os.cp(root + '/desktop/packagecore/release.c.v', work + '/source/desktop/packagecore/release.c.v')!

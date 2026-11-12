@@ -67,8 +67,9 @@ What it does:
   and recently used programs, their recent items, Recent Items, All Programs,
   type-to-search, readable paged program/search rows, system links and the
   session buttons: Shut down, Restart and, where the kernel can, Sleep
-- **shortcuts down the left edge of the wallpaper**, and matching Start-menu
-  entries, for every application the desktop can open
+- **shortcuts down the left edge of the wallpaper** for installed applications;
+  optional apps appear once installed, without leaving gaps or losing the saved
+  shortcut order. The Start menu also includes the optional application catalog
 - a **file browser** over the real filesystem: directories first, sizes, and a
   way back up
 - an **activity monitor** with searchable process lists, owner/application/

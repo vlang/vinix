@@ -2042,7 +2042,7 @@ fn test_shortcut_click_commits_only_on_release_over_same_icon() {
 	launched := desktop.finish_shortcut_press_in(os.temp_dir(), app_shortcut_actions[0], 10,
 		10) or { -1 }
 	assert launched == 0
-	assert desktop.begin_shortcut_press(app_shortcut_actions[1], 10, 10)
+	assert desktop.begin_shortcut_press(app_shortcut_actions[2], 10, 10)
 	if unexpected := desktop.finish_shortcut_press_in(os.temp_dir(), app_shortcut_actions[0],
 		10, 10) {
 		assert unexpected == -1
@@ -2073,11 +2073,12 @@ fn test_shortcut_release_processes_coalesced_final_drag_position() {
 	// stale original-icon hit action as a click.
 	drop_x := shortcut_left + 2
 	drop_y := shortcut_top + 3 * (shortcut_height + shortcut_gap) + 2
+	target := desktop.shortcut_order_slot_for_visible_slot(3)
 	if unexpected := desktop.finish_shortcut_press_in(root, app_shortcut_actions[app_index],
 		drop_x, drop_y) {
 		panic('coalesced shortcut release unexpectedly launched app ${unexpected}')
 	}
-	assert desktop.shortcut_slot_for_app(app_index) == 3
+	assert desktop.shortcut_slot_for_app(app_index) == target
 	assert desktop.shortcut_press.app_index == -1
 
 	loaded := load_shortcut_order(root)
@@ -2104,9 +2105,10 @@ fn test_shortcut_release_outside_an_icon_restores_preview_without_persisting() {
 	app_index := desktop.shortcut_order[0]
 	assert desktop.begin_shortcut_press(app_shortcut_actions[app_index], shortcut_left + 2,
 		shortcut_top + 2)
+	target := desktop.shortcut_order_slot_for_visible_slot(3)
 	desktop.update_shortcut_drag(shortcut_left + 2,
 		shortcut_top + 3 * (shortcut_height + shortcut_gap) + 2)
-	assert desktop.shortcut_slot_for_app(app_index) == 3
+	assert desktop.shortcut_slot_for_app(app_index) == target
 
 	if unexpected := desktop.finish_shortcut_press_in(root, '', 600, 500) {
 		panic('invalid shortcut drop unexpectedly launched app ${unexpected}')

@@ -1402,18 +1402,23 @@ fn (d &Desktop) app_pointer_changed(window_index int) bool {
 fn (d &Desktop) shortcut_elements() []ui2.Element {
 	mut out := frame_elements(available_apps.len)
 	rows := shortcut_rows_for_height(d.canvas.height, d.taskbar_height())
+	mut visible_slot := 0
 	for slot in 0 .. available_apps.len {
 		app_index := d.shortcut_app_at_slot(slot)
 		if app_index < 0 {
 			continue
 		}
 		factory := &available_apps[app_index]
+		if !factory.shortcut_available() {
+			continue
+		}
 		id := app_shortcut_actions[app_index]
 		theme := d.theme()
 		hovered := d.hover == id
 		dragging := d.shortcut_press.dragging && d.shortcut_press.app_index == app_index
-		column := slot / rows
-		row := slot % rows
+		column := visible_slot / rows
+		row := visible_slot % rows
+		visible_slot++
 		x := shortcut_left + column * (shortcut_width + shortcut_gap)
 		y := shortcut_top + row * (shortcut_height + shortcut_gap)
 		icon_x := (shortcut_width - shortcut_icon) / 2
