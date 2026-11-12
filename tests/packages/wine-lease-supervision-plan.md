@@ -434,6 +434,56 @@ interleavings are outside this gate. Signed foreground startup, endpoint
 identity capture/authenticated socket handoff, generation lease integration and
 holder-death recovery remain open; runner and holder behavior is unchanged.
 
+## Endpoint metadata capture, 2026-11-13
+
+Source `09e5ed998` adds `ServerDirectory.capture_endpoint(guard, data)` and the
+owned `ServerEndpoint` for Linux. It holds an O_PATH/CLOEXEC reference to the
+`socket` inode plus an independently duplicated parent directory descriptor.
+It requires an account-owned single-link socket with mode 0600; O_PATH with
+O_NOFOLLOW captures a symlink itself so the type check refuses it. Rechecks
+validate the enclosing namespace, captured parent and current socket inode.
+An inode moved into a different captured prefix refuses at the parent-identity
+gate. Close releases only the two owned metadata references and is idempotent.
+
+Final fixture source `663e0f7e6` passes `arm-01` and `x86-01` in the second
+series, outside PID 1 as uid/gid 1000. A child owns the real Unix listener and
+first-byte record lock. Both 1,000 successful capture/recheck/close cycles and
+1,000 unsafe-mode refusals retain zero V bytes; descriptor counts stay flat and
+return to the initial count after all objects close. Original queued protocol
+bytes survive. Fresh connections with matching child/lock/peer identities
+still succeed after repeated metadata closes and after the ServerDirectory
+closes while independent metadata remains. The reverse lifetime control keeps
+a metadata capture open while the actual listener child exits with status 0;
+a new connect must then fail with ECONNREFUSED before the metadata closes.
+
+Refusals cover missing nodes, wrong mode, hardlinks, symlinks/dangling links,
+ordinary files, FIFO/directory entries, a different well-formed socket inode,
+removed endpoints, replacement directories, closed captures and closed parents.
+Restoring original identities permits recheck. A fresh capture of a correctly
+formed non-listening replacement deliberately succeeds: metadata capture alone
+does not authenticate an owned/live server or connect the client. This remains
+an observational namespace prerequisite, separate from startup and peer checks.
+The macOS host check qualifies unsupported-platform capture refusal only.
+
+The controller admits actual parsed guest V sources, explicitly hashes the
+repository heap tracker and verifies selected tools/kernel/firmware and generated
+artifacts before/after boot. Production kernels from the preceding gate remain
+unchanged. First-series sources/results and host check remain at
+`/Users/alex/.cache/vwe-20261113-01`, with complete typed inventory
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-server-endpoint-20261113-01.inventory.json`,
+SHA-256 `1cfc4154251cf034d95991ad7116bd2e4c63f039b92495a42d246ba812694ac0`.
+Final sources, generated-C ownership self-review and both complete final runs
+are at `/Users/alex/.cache/vwe-20261113-02`; inventory
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-server-endpoint-20261113-02.inventory.json`,
+SHA-256 `ae498805500895f409d38bcef5463a225296c7a3a3d24dd2fb4ea194817a9e27`.
+Both recording and separate complete verification pass with adjacent logs.
+Keep both workspaces and historical input bundles. Full C toolchain inventory,
+kernel heap retention, credential-change/fault injection, concurrent namespace
+interleavings, sandbox acceptance and real signed Wine startup are outside this
+gate. Signed foreground startup, bounded authenticated connect and retained
+socket handoff, generation lease integration and holder-death recovery remain
+open. Neither the runner nor holder is enabled or changed by this prerequisite.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

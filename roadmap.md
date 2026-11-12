@@ -1198,7 +1198,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Server directory capture](tests/packages/wine-lease-supervision-plan.md#server-directory-capture-2026-11-13)
     now passes ARM/x86 and host checks for private directory/lock identity,
     busy-lock and existing-endpoint refusal, replacement and allocation cleanup.
-    Foreground startup, endpoint capture and production integration remain open.
+    [Endpoint metadata capture](tests/packages/wine-lease-supervision-plan.md#endpoint-metadata-capture-2026-11-13)
+    now retains socket/parent identities in both native guests, rejects
+    replacements and leaves live/retired listener behavior intact across
+    metadata closure/retention. Foreground startup, authenticated socket handoff
+    and production lease integration remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
