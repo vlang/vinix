@@ -1,7 +1,6 @@
 # Offline Wine prefix bootstrap, 2026-11-12
 
-Source baseline: `4cbebfb07`, plus the bootstrap patch, producer/admission
-bindings and checks in this checkpoint.
+Implementation checkpoint: `b2f1239ce` (source baseline `4cbebfb07`).
 
 This continues the [signed x86 GUI checkpoint](wine-gui-check.md) and the
 [ARM shared-page diagnostic](wine-shared-pages-check.md). The retained ARM
@@ -78,3 +77,19 @@ complete [pinned dependency bundle](wine-forksafe-retention-check.md) remain
 required. Compiler/source/input receipts describe selected local qualification
 inputs and do not establish a hermetic build. Earlier failed GUI runs and
 their historical auditors remain unchanged.
+
+The complete original workspace, including all failed attempts and control
+copies, is sealed at
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-bootstrap-20261112-01.tar.gz`:
+
+- Archive SHA-256: `0d3558242e7e1105c99e36c9bf717772ea472d5c1a8abf70acba14f427b26e5d`.
+- Adjacent `.inventory.txt` SHA-256: `fff1447937a72e66688873d0c229eaa7927addbf31bcc55cda8f7595af5f0c3a`.
+
+The producer at `bccedaa5f` records gzip level 1 explicitly; the logical sparse
+decoder is `32460200e`. The adjacent `.audit` preserves both sources and
+binaries and confirms complete logical archive/original byte and metadata
+agreement, unchanged before/after original inventories, and unchanged selected
+tool/archive hashes. The archived source snapshot is `b2f1239ce`; this final
+checksum report follows compression to avoid recursively including its own
+archive checksum. Originals remain retained. Integrity sealing adds no launch
+qualification and authorizes no removal of expanded evidence.
