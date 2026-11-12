@@ -3,6 +3,35 @@ module androidtools
 
 import os
 
+pub fn framework_egl_error_names(smali string) ! {
+ path := smali + '/android/opengl/GLUtils.smali'
+ mut text := os.read_file(path)!
+ if text.contains(' getEGLErrorString(') { return error('EGL error formatter already installed') }
+ names := ['EGL_SUCCESS', 'EGL_NOT_INITIALIZED', 'EGL_BAD_ACCESS', 'EGL_BAD_ALLOC',
+  'EGL_BAD_ATTRIBUTE', 'EGL_BAD_CONFIG', 'EGL_BAD_CONTEXT', 'EGL_BAD_CURRENT_SURFACE',
+  'EGL_BAD_DISPLAY', 'EGL_BAD_MATCH', 'EGL_BAD_NATIVE_PIXMAP', 'EGL_BAD_NATIVE_WINDOW',
+  'EGL_BAD_PARAMETER', 'EGL_BAD_SURFACE', 'EGL_CONTEXT_LOST']
+ mut method := r'
+.method public static getEGLErrorString(I)Ljava/lang/String;
+.locals 2
+packed-switch p0, :codes
+invoke-static {p0}, Ljava/lang/Integer;->toHexString(I)Ljava/lang/String;
+move-result-object v0
+const-string v1, "0x"
+invoke-virtual {v1, v0}, Ljava/lang/String;->concat(Ljava/lang/String;)Ljava/lang/String;
+move-result-object v0
+return-object v0
+'
+ for index, name in names {
+  method += ':e${index}\nconst-string v0, "${name}"\nreturn-object v0\n'
+ }
+ method += ':codes\n.packed-switch 0x3000\n'
+ for index in 0 .. names.len { method += ':e${index}\n' }
+ method += '.end packed-switch\n.end method\n'
+ text += method
+ os.write_file(path, text)!
+}
+
 fn framework_glutils(smali string) ! {
  path := smali + '/android/opengl/GLUtils.smali'
  mut text := os.read_file(path)!

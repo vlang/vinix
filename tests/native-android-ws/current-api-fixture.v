@@ -16,6 +16,7 @@ import startupfixture
 import deviceconfigprobe
 import statslogprobe
 import keygenprobe
+import eglerrorprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1393,6 +1394,7 @@ invoke-static {}, Lorg/vinix/bootstrap/EglProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/DeviceConfigProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/StatsLogProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/KeyGenProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/EglErrorProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1647,6 +1649,7 @@ fn main() {
 	deviceconfigprobe.install(root)!
 	statslogprobe.install(root)!
 	keygenprobe.install(root)!
+	eglerrorprobe.install(root)!
 	if tls_lifetime { tlslifetimeprobe.install(root)! }
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;

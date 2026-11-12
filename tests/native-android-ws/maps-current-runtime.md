@@ -2099,3 +2099,54 @@ matching plan/readback use zero removals and archive SHA256
 The bind was released before broker preparation. This API pass does not itself
 exercise the paired protocol's real account interaction; that retry remains
 pending.
+
+### EGL error formatter and r63 account retry
+
+The actual r63 Sign in / Add account retry reached the GMS activity handoff
+and redemption acknowledgement. Its complete broker log did not repeat the
+unknown-session failure. A background GMS MlBenchmark installer then threw
+NoSuchMethodError for GLUtils.getEGLErrorString(int); GMS exited10 and the
+broker reported account input disconnected. This is neither authentication
+success nor proof that the cancellation race can never recur. No credentials
+were entered. The watch ended before600 seconds (minimum app-data space
+7255179264 bytes, MemFree32832KiB), so it supplies no stability pass.
+
+Verified owned QEMU91502 was synced and stopped before offline extraction.
+Under `maps-current-20261112-r63`, complete Maps log SHA256 is
+`e77b722cf29b0c04e55e3a8251e38cf72b4ad4545f80891d0cdf3fdc194708ef`,
+broker `c312c0fce19617730701eb12460524e3a328d2626af9699c0b4edf32b27ebccc`,
+receipt `f9e841f8996dd71184ba2fd8a6e9837d7e40215015e2fdf72abdab5f8d06aab8`,
+serial `980292208a8c6d1b0d02397e6f169bb51536f5b33106cfd95f9fa96dc840a416`,
+and data image
+`0f9c580b94c172fcf36da13d3cdb29c318645ea1257eb3b2fc7c55068c26fba6`.
+
+The SDK now implements the Android GLUtils error formatter: the15 standard
+EGL names and an unsigned hexadecimal fallback. It only formats the supplied
+integer; it does not call EGL, consume an error, or advertise GPU capability.
+The ordinary SDK producer and full signed regression both include it.
+Source contract: Android framework GLUtils.java at
+https://android.googlesource.com/platform/frameworks/base/+/06c01a2f962a/opengl/java/android/opengl/GLUtils.java.
+
+Using current V0.5.2 6422d39, SDK `framework-egl-error-names-20261112-r1`
+passed the unchanged build guard:0/0, complete cleanup,2391ms,
+RSS476774400 and shared growth28848128 bytes. The fixture tool initially
+failed on the compiler cache's unresolved split helper; compiling with
+`-nocache` succeeded without changing the fixture source. Signed fixture r57
+passed0/0, complete cleanup,819ms, RSS197279744, growth786432 bytes.
+
+Fresh VM r64 passed staging0/0, complete cleanup,7670ms, RSS36700160,
+growth150298624 bytes, then volume identity, read-only e2fsck and initial hash
+checks. It uses the new SDK/fixture with the same paired protocol r3,
+optimized controller r10, native r5 and mandatory core/TLS boot jars. The full
+signed regression passed on ARM as UID/GID10160, including15 standard codes,
+seven unknown/signed boundary values and a real EGL_BAD_DISPLAY error that
+remains available after formatting and is consumed exactly once. Ready/pass
+occur once, child output drains to EOF and exit0.
+
+Snapshot `egl-error-api-uart-20261112-r1` has full SHA256
+`84697bc49e765f024390ecbe033236562d2baf1f9b79554cb9747ace0f497693`.
+Matching plan/readback r1 reconstruct the unchanged export with zero removals,
+archive SHA256
+`c8f7c8f981be854cea567c993773d9ab375dc2e1a58383c4f79ba36f98a2d895`.
+This API pass does not establish Maps tile rendering or account completion;
+the real Maps retry follows after releasing the API bind.
