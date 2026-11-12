@@ -173,6 +173,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_network_requests(smali)!
  framework_connectivity(smali)!
  framework_default_network_active(smali)!
+ framework_bluetooth_values(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
  framework_text_hints(smali)!
