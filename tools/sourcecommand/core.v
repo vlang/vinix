@@ -35,7 +35,11 @@ fn C.posix_spawnattr_setpgroup(voidptr, i32) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
 fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
 fn C.posix_spawnattr_setbinpref_np(voidptr, usize, &i32, &usize) i32
-fn C.poll(&C.pollfd, usize, i32) i32
+$if macos || ios || freebsd || openbsd || dragonfly || android || termux {
+	fn C.poll(&C.pollfd, u32, i32) i32
+} $else {
+	fn C.poll(&C.pollfd, uint, i32) i32
+}
 fn C.waitid(i32, u32, &C.vinix_source_child_info, i32) i32
 fn C.waitpid(i32, &i32, i32) i32
 fn C.WEXITSTATUS(i32) i32
