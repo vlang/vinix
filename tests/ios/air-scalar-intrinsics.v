@@ -43,12 +43,19 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 	mut cases := []IntrinsicCase{}; cases.flags |= .noslices
 	for bits in [u32(16), 32]! {
 		typ := if bits == 16 { 'half' } else { 'float' }
-		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum'] {
+		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum', 'sqrt'] {
 			name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, op !in ['fabs', 'copysign'], 2}; unsafe { cases.push_many(&entry, 1) }
 			binary := op in ['copysign', 'minimum', 'maximum']
 			args := if binary { '${typ} %x, ${typ} %y' } else { '${typ} %x' }
 			params := if binary { '${typ}, ${typ}' } else { typ }
 			text := 'declare ${typ} @llvm.${op}.f${bits}(${params})\ndefine ${typ} @${name}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.${op}.f${bits}(${args})\n  ret ${typ} %r\n}\n'; source.write_string(text); unsafe { args.free(); if binary { params.free() }; text.free() }
+		}
+		for op in ['sqrt_abs', 'sqrt_loop'] {
+			name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, true, if op == 'sqrt_abs' { 3 } else { 0 }}; unsafe { cases.push_many(&entry, 1) }
+		}
+		sqrt_flow := 'define ${typ} @sqrt_abs_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.fabs.f${bits}(${typ} %x)\n  %r = call ${typ} @llvm.sqrt.f${bits}(${typ} %a)\n  ret ${typ} %r\n}\ndefine ${typ} @sqrt_loop_${bits}(${typ} %x, ${typ} %y, i64 %c) {\nentry: %n = and i64 %c, 7\n  br label %loop\nloop: %a = phi ${typ} [ %x, %entry ], [ %r, %loop ]\n  %i = phi i64 [ 0, %entry ], [ %inc, %loop ]\n  %r = call ${typ} @llvm.sqrt.f${bits}(${typ} %a)\n  %inc = add i64 %i, 1\n  %again = icmp ult i64 %inc, %n\n  br i1 %again, label %loop, label %exit\nexit: ret ${typ} %r\n}\n'; source.write_string(sqrt_flow); unsafe { sqrt_flow.free() }
+		for state in ['poison', 'undef'] {
+			control := 'define ${typ} @sqrt_${state}_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.sqrt.f${bits}(${typ} ${state})\n  ret ${typ} %r\n}\n'; source.write_string(control); unsafe { control.free() }
 		}
 		chain_entry := IntrinsicCase{'extrema_chain_${bits}', bits, true, 3}; unsafe { cases.push_many(&chain_entry, 1) }
 		chain := 'define ${typ} @extrema_chain_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.minimum.f${bits}(${typ} %x, ${typ} %y)\n  %r = call ${typ} @llvm.maximum.f${bits}(${typ} %a, ${typ} %x)\n  ret ${typ} %r\n}\n'; source.write_string(chain); unsafe { chain.free() }
@@ -63,11 +70,11 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 		for op in ['chain', 'loop'] { name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, true, if op == 'chain' { 4 } else { 0 }}; unsafe { cases.push_many(&entry, 1) } }
 		flow := 'define ${typ} @chain_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.fabs.f${bits}(${typ} %x)\n  %b = call ${typ} @llvm.copysign.f${bits}(${typ} %a, ${typ} %y)\n  %r = call ${typ} @llvm.roundeven.f${bits}(${typ} %b)\n  ret ${typ} %r\n}\ndefine ${typ} @loop_${bits}(${typ} %x, ${typ} %y, i64 %c) {\nentry: %n = and i64 %c, 7\n  br label %loop\nloop: %a = phi ${typ} [ %x, %entry ], [ %sum, %loop ]\n  %i = phi i64 [ 0, %entry ], [ %inc, %loop ]\n  %r = call ${typ} @llvm.floor.f${bits}(${typ} %a)\n  %sum = fadd ${typ} %r, %y\n  %inc = add i64 %i, 1\n  %again = icmp ult i64 %inc, %n\n  br i1 %again, label %loop, label %exit\nexit: ret ${typ} %sum\n}\n'; source.write_string(flow); unsafe { flow.free() }
 	}
-	source.write_string('declare float @llvm.sqrt.f32(float)
+	source.write_string('declare float @llvm.sin.f32(float)
 define float @helper(float %x) { ret float %x }
 define float @guard_defined(float %x, float %y, i64 %c) { %r = call float @helper(float %x)
   ret float %r }
-define float @guard_unknown(float %x, float %y, i64 %c) { %r = call float @llvm.sqrt.f32(float %x)
+define float @guard_unknown(float %x, float %y, i64 %c) { %r = call float @llvm.sin.f32(float %x)
   ret float %r }
 define float @guard_tail(float %x, float %y, i64 %c) { %r = tail call float @llvm.fabs.f32(float %x)
   ret float %r }
@@ -81,7 +88,7 @@ define float @guard_undef(float %x, float %y, i64 %c) { %r = call float @llvm.fl
   ret float %r }
 define float @guard_dead(float %x, float %y, i64 %c) {
 entry: ret float %x
-dead: %r = call float @llvm.sqrt.f32(float %y)
+dead: %r = call float @llvm.sin.f32(float %y)
   ret float %r }
 define float @guard_indirect(float %x, float %y, i64 %c) {
   %test = trunc i64 %c to i1
@@ -209,6 +216,26 @@ fn main() {
 			comparisons++; extrema_pairs++; if nan_class { nan_cases++ }
 		}
 	}
+	// Square the exact midpoint between adjacent float roots in u64, then
+	// test the float immediately below that boundary and its two neighbors.
+	// Vary even input exponents across the full normal range. This generator
+	// uses integer products/shifts, independent of production root/pack code.
+	sqrt_case := IntrinsicCase{'sqrt_32', 32, true, 2}; sqrt_index := function_index(ir, sqrt_case.name)!
+	sqrt_address := C.LLVMGetFunctionAddress(engine, c'reference_sqrt_32'); if sqrt_address == 0 { panic('missing sqrt reference') }; sqrt_reference := unsafe { NativeBits(voidptr(sqrt_address)) }
+	mut sqrt_boundaries := 0
+	for sample in 0 .. 65536 {
+		midpoint := (u64(1) << 24) | (u64(pattern(sample, 0x6a09e667f3bcc909) & 0x7fffff) << 1) | 1
+		square := midpoint * midpoint; wide := int(square >= u64(1) << 49)
+		encoded_exponent := 127 + 2 * (sample % 127 - 63) + wide
+		floor_bits := (u32(encoded_exponent) << 23) | (u32(square >> (25 + wide)) & 0x7fffff)
+		for delta in [-1, 0, 1]! {
+			a := u64(i64(floor_bits) + delta); args := [a, u64(0), 0]; defer { unsafe { args.free() } }
+			actual := p.run_scalar_function(ir, stream, pools, bodies, sqrt_index, args, 256)!; expected := sqrt_reference(a, 0, 0)
+			nan_class := compare(actual, expected, sqrt_case) or { row := 'FAIL sqrt boundary a=${a} got=${actual.value} expected=${expected}'; results.writeln(row)!; panic(row) }
+			if nan_class { panic('positive finite square root produced native NaN') }
+			row := 'sqrt_boundary_32\t${a}\t0\t0\t${actual.value}\t${expected}\tfalse\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }; comparisons++; sqrt_boundaries++
+		}
+	}
 	args := [u64(0xbf000000), 0, 0]; defer { unsafe { args.free() } }; mut guards := 0
 	for name in ['guard_defined', 'guard_unknown', 'guard_tail', 'guard_fmf', 'guard_return_attr', 'guard_parameter_attr', 'guard_undef', 'guard_dead', 'guard_indirect'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported intrinsic fixture') }
 	for name in ['poison_unary', 'poison_left', 'poison_right'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('intrinsic poison lost') } }
@@ -222,6 +249,12 @@ fn main() {
 				p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, undef_name)!, args, 64) or { extrema_controls++; continue }; panic('accepted extrema undef')
 			}
 		}
+	}
+	mut sqrt_controls := 0
+	for bits in [16, 32]! {
+		poison_name := 'sqrt_poison_${bits}'; undef_name := 'sqrt_undef_${bits}'; defer { unsafe { poison_name.free(); undef_name.free() } }
+		if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, poison_name)!, args, 64)!.poison { panic('sqrt poison lost') }; sqrt_controls++
+		p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, undef_name)!, args, 64) or { sqrt_controls++; continue }; panic('accepted sqrt undef')
 	}
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != 0x3f000000 { panic('intrinsic select not lazy') }
 	index := function_index(ir, 'fabs_32')!; slot := bodies.scopes[index + 1].instructions_start; original := p.instructions[slot]
@@ -261,6 +294,14 @@ fn main() {
 			expected := if mode == C.FE_UPWARD { u64(0) } else { u64(0x40000000) }
 			if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, rounding_args, 64)!.value != expected { panic('intrinsic used host rounding mode') }
 		}
+		for bits in [16, 32]! {
+			name := 'sqrt_${bits}'; defer { unsafe { name.free() } }
+			// sqrt(2) rounds down in nearest mode; sqrt(5) rounds up.
+			input := if mode == C.FE_UPWARD { if bits == 16 { u64(0x4000) } else { u64(0x40000000) } } else { if bits == 16 { u64(0x4500) } else { u64(0x40a00000) } }
+			rounding_args := [input, u64(0), 0]; defer { unsafe { rounding_args.free() } }
+			expected := if mode == C.FE_UPWARD { if bits == 16 { u64(0x3da8) } else { u64(0x3fb504f3) } } else { if bits == 16 { u64(0x4079) } else { u64(0x400f1bbd) } }
+			if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, rounding_args, 64)!.value != expected { panic('sqrt used host rounding mode') }
+		}
 	}
-	println('LLVM-SCALAR-INTRINSICS: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} arithmetic NaN-class cases), including ${extrema_pairs} boundary pairs; ${guards} guards, three poison results, ${extrema_controls} extrema poison/undef controls, lazy select, budget/integer isolation, ${metadata_controls} metadata/${attribute_controls} declaration/${controls} result corruptions and six host-rounding controls PASS; no AIR shader or iOS app executed')
+	println('LLVM-SCALAR-INTRINSICS: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} arithmetic NaN-class cases), including ${extrema_pairs} extrema boundary pairs and ${sqrt_boundaries} squared-midpoint neighbors; ${guards} guards, three poison results, ${extrema_controls} extrema/${sqrt_controls} sqrt poison/undef controls, lazy select, budget/integer isolation, ${metadata_controls} metadata/${attribute_controls} declaration/${controls} result corruptions and ten host-rounding controls PASS; no AIR shader or iOS app executed')
 }

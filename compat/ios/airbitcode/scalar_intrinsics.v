@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	return if id in [.copysign, .minimum, .maximum]! { 2 } else { 1 }
 }
@@ -18,6 +18,7 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.nearbyint.f16', 'llvm.nearbyint.f32' { ScalarIntrinsic.nearbyint }
 		'llvm.minimum.f16', 'llvm.minimum.f32' { ScalarIntrinsic.minimum }
 		'llvm.maximum.f16', 'llvm.maximum.f32' { ScalarIntrinsic.maximum }
+		'llvm.sqrt.f16', 'llvm.sqrt.f32' { ScalarIntrinsic.sqrt }
 		else { return error('AIR intrinsic: unsupported callee') }
 	}
 }
@@ -85,6 +86,7 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	abs := a & (sign_mask - 1)
 	if id == .fabs { return abs }
 	if id == .copysign { return abs | (b & sign_mask) }
+	if id == .sqrt { return scalar_intrinsic_sqrt(bits, a) }
 	if id in [.minimum, .maximum]! {
 		infinity := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
 		other := b & (sign_mask - 1)
@@ -120,4 +122,37 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	}
 	if increment { rounded += unit }
 	return sign | rounded
+}
+
+// Restoring integer square root for the at-most-54-bit scaled significands
+// below. Exactly 27 steps; return floor(sqrt(n)) and n - root*root. All sums
+// fit in u64. No host FP operation or allocation participates.
+fn scalar_sqrt_root(radicand u64) (u64, u64) {
+	mut remainder := radicand; mut root := u64(0); mut place := u64(1) << 52
+	for _ in 0 .. 27 {
+		trial := root + place
+		if remainder >= trial { remainder -= trial; root = (root >> 1) + place }
+		else { root >>= 1 }
+		place >>= 2
+	}
+	return root, remainder
+}
+fn scalar_intrinsic_sqrt(bits u32, value u64) u64 {
+	sign := u64(1) << (bits - 1); abs := value & (sign - 1)
+	inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
+	if abs == 0 { return value } // Preserve negative zero before sign checks.
+	if abs > inf || value & sign != 0 { return if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) } }
+	if abs == inf { return value }
+	mut significand := u64(0); mut exponent := 0
+	fraction_bits := if bits == 16 { 10 } else { 23 }
+	if bits == 16 { finite := binary16_finite(u16(value)); significand = finite.significand; exponent = finite.exponent }
+	else { finite := binary32_finite(u32(value)); significand = finite.significand; exponent = finite.exponent }
+	odd := exponent % 2 != 0
+	// Normalize to an even exponent. The radical has p+3 fraction bits;
+	// its nonzero integer remainder supplies the sticky bit for one final
+	// rounding in pack(). Radicands use at most 2*p+8 bits (54 for float).
+	root, remainder := scalar_sqrt_root(significand << (fraction_bits + 6 + int(odd)))
+	extended := root | u64(remainder != 0)
+	result_exponent := exponent / 2 - int(exponent < 0 && odd)
+	return if bits == 16 { u64(binary16_pack(0, result_exponent, extended)) } else { u64(binary32_pack(0, result_exponent, extended)) }
 }

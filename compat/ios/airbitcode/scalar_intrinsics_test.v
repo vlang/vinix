@@ -21,8 +21,38 @@ fn test_scalar_intrinsic_bits_and_rounding() {
 	defer { unsafe { for row in cases { row.free() }; cases.free() } }
 	for row in cases { assert scalar_intrinsic_value(unsafe { ScalarIntrinsic(row[0]) }, u32(row[1]), row[2], row[3])! == row[4], '${row}' }
 	if _ := scalar_intrinsic_value(.fabs, 64, 0, 0) { assert false, 'unsupported precision' }
-	for name in ['air.fabs.f32', 'llvm.fabs.f64', 'llvm.fabs.v2f32', 'llvm.sqrt.f32', 'llvm.fabs.f32.spoof'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported name' } }
+	for name in ['air.fabs.f32', 'llvm.fabs.f64', 'llvm.fabs.v2f32', 'llvm.sin.f32', 'llvm.fabs.f32.spoof'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported name' } }
 	println('AIR-SCALAR-INTRINSIC-VALUES: ${cases.len} exact sign/payload/rounding/zero/subnormal/infinity/NaN patterns and unsupported name/width guards PASS')
+}
+
+fn test_scalar_intrinsic_square_root() {
+	cases := [[u64(16), 0, 0], [u64(16), 0x8000, 0x8000], [u64(16), 0x3c00, 0x3c00],
+		[u64(16), 0x4400, 0x4000], [u64(16), 0x4880, 0x4200], [u64(16), 0x4000, 0x3da8],
+		[u64(16), 0x4500, 0x4079],
+		[u64(16), 1, 0x0c00], [u64(16), 0x0400, 0x2000], [u64(16), 0x7bff, 0x5bff],
+		[u64(16), 0xbc00, 0x7e00], [u64(16), 0x8001, 0x7e00], [u64(16), 0x7c00, 0x7c00],
+		[u64(16), 0xfc00, 0x7e00], [u64(16), 0xfc01, 0x7e00], [u64(16), 0x7e55, 0x7e00],
+		[u64(32), 0, 0], [u64(32), 0x80000000, 0x80000000], [u64(32), 0x3f800000, 0x3f800000],
+		[u64(32), 0x40800000, 0x40000000], [u64(32), 0x41100000, 0x40400000], [u64(32), 0x40000000, 0x3fb504f3],
+		[u64(32), 0x40a00000, 0x400f1bbd],
+		[u64(32), 1, 0x1a3504f3], [u64(32), 0x00800000, 0x20000000], [u64(32), 0x7f7fffff, 0x5f7fffff],
+		[u64(32), 0xbf800000, 0x7fc00000], [u64(32), 0x80000001, 0x7fc00000], [u64(32), 0x7f800000, 0x7f800000],
+		[u64(32), 0xff800000, 0x7fc00000], [u64(32), 0xff800001, 0x7fc00000], [u64(32), 0x7fc12345, 0x7fc00000]]
+	defer { unsafe { for row in cases { row.free() }; cases.free() } }
+	for row in cases { assert scalar_intrinsic_value(.sqrt, u32(row[0]), row[1], 0)! == row[2], '${row}' }
+	for name in ['llvm.sqrt.f16', 'llvm.sqrt.f32'] { assert scalar_intrinsic_arity(scalar_intrinsic_name(name)!) == 1 }
+	for name in ['llvm.sqrt.f64', 'llvm.sqrt.v2f32', 'air.sqrt.f32', 'llvm.sqrt.f32.spoof'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported square root name' } }
+	// Independent multiplication inequalities verify the integer primitive,
+	// including exact squares and their neighbors at the 54-bit bound.
+	for sample in 0 .. 65536 {
+		candidate := (u64(sample) * 0x1f123bb5) & 0x7ffffff
+		for radicand in [u64(sample), candidate * candidate, candidate * candidate + 1, if candidate == 0 { u64(0) } else { candidate * candidate - 1 }, (u64(1) << 54) - 1 - u64(sample)]! {
+			root, remainder := scalar_sqrt_root(radicand)
+			assert root * root <= radicand && (root + 1) * (root + 1) > radicand
+			assert remainder == radicand - root * root
+		}
+	}
+	println('AIR-SCALAR-SQRT: ${cases.len} exact results, unary name/width guards and 327680 integer root/remainder inequalities PASS')
 }
 fn test_scalar_intrinsic_attribute_encodings_and_budget() {
 	blocks := [Block{parent: -1}, Block{id: 9, parent: 0}, Block{id: 10, parent: 0}]
