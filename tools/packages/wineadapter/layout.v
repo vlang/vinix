@@ -1,6 +1,73 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module wineadapter
 
+import os
+
+pub struct GraphicsLibrary {
+pub:
+	source string
+	name string
+}
+
+pub fn graphics_libraries() [2]GraphicsLibrary {
+	return [GraphicsLibrary{'libfreetype.so.6.20.2', 'libfreetype.so.6'},
+		GraphicsLibrary{'libfontconfig.so.1.12.1', 'libfontconfig.so.1'}]!
+}
+
+// Graphical startup also consumes libraries loaded by name and font data.
+// Require each original ordinary file and the complete copied font set;
+// hashes on the prepared payload cannot replace distribution provenance.
+pub fn admit_graphics_layout(runtime string, inputs map[string]string) ! {
+	mut distribution := ''
+	defer { unsafe { distribution.free() } }
+	for library in graphics_libraries() {
+		suffix := '/usr/lib/' + library.source
+		destination := runtime + '/root/usr/lib/' + library.name
+		defer { unsafe { suffix.free(); destination.free() } }
+		original := layout_input(inputs, suffix)!
+		defer { unsafe { original.free() } }
+		parent := unsafe { tos(original.str, original.len - suffix.len) }
+		if distribution == '' { distribution = parent.clone() }
+		else if parent != distribution { return error('Wine graphics libraries use different distributions') }
+		bytes := layout_bytes(destination)!
+		digest := patch_digest(bytes)
+		defer { unsafe { bytes.free(); digest.free() } }
+		if digest != inputs[original] { return error('Wine graphics library differs: ' + library.name) }
+	}
+	font_root := distribution + '/usr/share/fonts'
+	copied_root := runtime + '/root/usr/share/fonts'
+	defer { unsafe { font_root.free(); copied_root.free() } }
+	font_paths := os.walk_ext(font_root, '', hidden: true)
+	copy_paths := os.walk_ext(copied_root, '', hidden: true)
+	defer {
+		for path in font_paths { unsafe { path.free() } }
+		for path in copy_paths { unsafe { path.free() } }
+		unsafe { (&array(&font_paths)).free(); (&array(&copy_paths)).free() }
+	}
+	mut count := 0
+	mut truetype := false
+	for path in font_paths {
+		if !os.is_file(path) { continue }
+		if count >= 1024 || path !in inputs { return error('missing Wine graphics font input: ' + path) }
+		original := layout_bytes(path)!
+		defer { unsafe { original.free() } }
+		relative := unsafe { tos(path.str + font_root.len, path.len - font_root.len) }
+		destination := copied_root + relative
+		defer { unsafe { destination.free() } }
+		copied := layout_bytes(destination)!
+		digest := patch_digest(original)
+		defer { unsafe { copied.free(); digest.free() } }
+		if digest != inputs[path] || copied != original { return error('Wine graphics font differs: ' + path) }
+		truetype = truetype || path.ends_with('.ttf')
+		count++
+	}
+	mut copies := 0
+	for path in copy_paths { if os.is_file(path) { copies++ } }
+	if !truetype || count == 0 || copies != count {
+		return error('Wine graphics font inventory differs')
+	}
+}
+
 fn layout_bytes(path string) !string {
 	fd := C.open(path.str, C.O_RDONLY | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC)
 	if fd < 0 { return error('Wine layout file is unavailable or linked: ' + path) }

@@ -104,6 +104,7 @@ fn dependencies(seeds []string, root string, destination string, work string, mu
 		file := pending.pop()
 		if file in seen { continue }
 		seen[file] = true
+		inputs[file] = digest(file)!
 		output := invoke(['/opt/homebrew/opt/llvm/bin/llvm-readelf', '-d', file], work + '/elf-' + seen.len.str() + '.log')!
 		for line in output.split_into_lines() {
 			if !line.contains('(NEEDED)') { continue }
@@ -211,13 +212,20 @@ fn build() ! {
 	// discovers its native child bridges and ../share/wine resources.
 	copy_input(root + '/lib/ld-musl-x86_64.so.1', runtime + '/root/usr/bin/vinix-wine-musl', mut inputs)!
 	for directory in ['/usr/lib/wine/x86_64-windows', '/usr/lib/wine/x86_64-unix', '/usr/share/wine',
-		'/etc/fonts']! {
-		for path in os.walk_ext(root + directory, '') {
+		'/etc/fonts', '/usr/share/fonts']! {
+		for path in os.walk_ext(root + directory, '', hidden: true) {
 			if os.is_dir(path) { continue }
 			if !os.is_file(path) { return error('Wine data node is not an ordinary file: ' + path) }
 			copy_input(path, runtime + '/root' + path[root.len..], mut inputs)!
 			if directory.ends_with('-unix') { seeds << path }
 		}
+	}
+	// Wine opens these graphics libraries with dlopen, so DT_NEEDED traversal
+	// alone cannot discover them. Keep ordinary pinned distribution inputs.
+	for library in wineadapter.graphics_libraries() {
+		source := root + '/usr/lib/' + library.source
+		copy_input(source, runtime + '/root/usr/lib/' + library.name, mut inputs)!
+		seeds << source
 	}
 	dependencies(seeds, root, runtime + '/root', output + '/logs', mut inputs)!
 	// Wine derives ../share/wine from its usr/bin entrypoint. These files
@@ -320,6 +328,7 @@ fn build() ! {
 		os.cp(runtime + '/bin/wine-runner', runtime + '/root/usr/bin/' + name)!
 	}
 	wineadapter.admit_private_layout(runtime, inputs)!
+	wineadapter.admit_graphics_layout(runtime, inputs)!
 	for role in ['application', 'runtime']! {
 		payload := prepared + '/' + role
 		mut entries := []Entry{}
@@ -328,8 +337,12 @@ fn build() ! {
 				return error('Wine prepared payload must use ordinary files')
 			}
 			relative := path[payload.len + 1..]
+			if role == 'runtime' && relative.starts_with('root/usr/share/fonts/') { continue }
 			entries << Entry{ source: role + '/' + relative, path: relative }
 		}
+		// The font tree is one directory selector; its expanded files still
+		// retain the normal payload bounds, hashes and ordinary-file checks.
+		if role == 'runtime' { entries << Entry{source: 'runtime/root/usr/share/fonts', path: 'root/usr/share/fonts'} }
 		manifest := if role == 'runtime' {
 			Manifest{
 				id:           'org.vinix.wine-runtime'

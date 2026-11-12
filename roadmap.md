@@ -1142,6 +1142,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     handler ordering and removal on both architectures, with independent
     receipt admission and all 55 x86/64 ARM evidence refusals. Stack-based SEH
     and broader signal coverage remain open.
+    [Graphics dependency construction](tests/packages/wine-graphics-check.md)
+    now includes pinned dlopen-only FreeType/Fontconfig and complete font
+    provenance. Fresh signed console runs pass on both architectures with
+    59 x86/68 ARM evidence refusals. The calculator's graphical run still
+    fails during window display; painting/input/close remain unqualified.
     Graphical execution, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)

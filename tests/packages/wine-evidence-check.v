@@ -39,11 +39,13 @@ fn replace(path string, text string) ! {
 }
 
 fn private_executable(path string) bool {
+	if path.contains('/runtime/root/usr/share/fonts/') { return true }
 	for suffix in ['/runtime/bin/wine-runner', '/runtime/bin/wine64', '/runtime/bin/wineserver',
 		'/runtime/root/usr/bin/wine', '/runtime/root/usr/bin/wine64', '/runtime/root/usr/bin/wineserver',
 		'/runtime/root/usr/bin/vinix-wine-musl', '/runtime/root/lib/ld-musl-x86_64.so.1',
 		'/runtime/root/usr/libexec/vinix-wine/wine', '/runtime/root/usr/libexec/vinix-wine/wineserver',
-		'/runtime/root/usr/lib/wine/x86_64-unix/ntdll.so']! {
+		'/runtime/root/usr/lib/wine/x86_64-unix/ntdll.so',
+		'/runtime/root/usr/lib/libfreetype.so.6', '/runtime/root/usr/lib/libfontconfig.so.1']! {
 		if path.ends_with(suffix) { return true }
 	}
 	return false
@@ -51,7 +53,7 @@ fn private_executable(path string) bool {
 
 fn clone_tree(source string, destination string) ! {
 	os.mkdir_all(destination)!
-	for path in os.walk_ext(source, '') {
+	for path in os.walk_ext(source, '', hidden: true) {
 		if !os.is_file(path) { continue }
 		target := destination + path[source.len..]
 		os.mkdir_all(os.dir(target))!
@@ -194,7 +196,7 @@ fn checks() ! {
 			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
 			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
 			'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
-			'wine-client-unwind-index', 'wine-client-unwind-cfa'] {
+			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font'] {
 			selected_prepared = directory + '/prepared'
 			prepared_copy(directory, prepared, selected_prepared)!
 		}
@@ -231,10 +233,31 @@ fn checks() ! {
 				expected = 'missing ARM boot input declaration:'
 			}
 			replace(directory + '/declaration.json', json2.encode(declaration))!
+		} else if name in ['producer-missing-graphics-library-input', 'producer-missing-graphics-font-input'] {
+			captured := read_map(selected_prepared + '/inputs-verified.json')!
+			mut candidates := captured.keys().filter(if name.ends_with('library-input') {
+				it.ends_with('/usr/libexec/vinix-x86_64/root/usr/lib/libfreetype.so.6.20.2')
+			} else { it.contains('/usr/libexec/vinix-x86_64/root/usr/share/fonts/') && it.ends_with('.ttf') })
+			candidates.sort()
+			if candidates.len == 0 { return error('graphics control input missing') }
+			for receipt in ['inputs-before-build.json', 'inputs-verified.json']! {
+				mut changed := read_map(selected_prepared + '/' + receipt)!
+				changed.delete(candidates[0])
+				replace(selected_prepared + '/' + receipt, json2.encode(changed))!
+				reseal_producer(directory, selected_prepared, receipt)!
+			}
+			expected = if name.ends_with('library-input') { 'missing Wine layout input:' } else { 'missing Wine graphics font input:' }
 		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
-			'wine-client-unwind-index', 'wine-client-unwind-cfa'] {
+			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font'] {
 			part := if name in ['wine-server-resealed-patch', 'wine-server-proc-nls'] {
 				'/usr/libexec/vinix-wine/wineserver'
+			} else if name == 'wine-graphics-resealed-library' {
+				'/usr/lib/libfreetype.so.6'
+			} else if name == 'wine-graphics-resealed-font' {
+				mut fonts := os.walk_ext(selected_prepared + '/prepared/' + architecture + '/runtime/root/usr/share/fonts', '.ttf', hidden: true)
+				fonts.sort()
+				if fonts.len == 0 { return error('graphics control font missing') }
+				'/usr/share/fonts/' + fonts[0].all_after('/usr/share/fonts/')
 			} else {
 				'/usr/lib/wine/x86_64-unix/ntdll.so'
 			}
@@ -258,7 +281,9 @@ fn checks() ! {
 			}
 			replace(selected_prepared + '/' + file, changed)!
 			reseal_producer(directory, selected_prepared, file)!
-			expected = 'Wine binary differs from the exact private-runtime patch: '
+			expected = if name == 'wine-graphics-resealed-library' { 'Wine graphics library differs:' }
+			else if name == 'wine-graphics-resealed-font' { 'Wine graphics font differs:' }
+			else { 'Wine binary differs from the exact private-runtime patch: ' }
 		} else if name == 'missing-iso-input' {
 			declaration := read_map(directory + '/declaration.json')!
 			input_update(directory, declaration['iso_bootx64'], '', '')!

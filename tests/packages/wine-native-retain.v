@@ -277,6 +277,7 @@ fn retain() ! {
 		}
 	}
 	wineadapter.admit_private_layout(prepared + '/prepared/' + arch + '/runtime', producer_inputs)!
+	wineadapter.admit_graphics_layout(prepared + '/prepared/' + arch + '/runtime', producer_inputs)!
 	mut offer := wineadapter.admit_local_source_offer(prepared + '/publisher-notices', 'org.vinix.wine-runtime', '9.17-r1', arch)!
 	offer.close()
 	if arch == 'aarch64' {
