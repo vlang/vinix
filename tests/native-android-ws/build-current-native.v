@@ -791,6 +791,25 @@ fn replace_frozen_builder(argv []string, executable_pin string) ! {
 }
 
 fn main() {
+	// Normal builds follow the current V checkout. Historical frozen invocations
+	// remain available only for reading/replaying their original evidence.
+	if os.args.len == 3 {
+		latest := library_origin + '/v'
+		tool := os.abs_path(os.args[2]) + '-latest-builder'
+		if os.exists(tool) { eprintln('builder output already exists: ' + tool); exit(1) }
+		mut compile := os.new_process(latest)
+		compile.set_args(['-w', '-path', '@vlib|' + repo + '/tests/native-android-tools', '-o', tool, repo + '/tests/native-android-ws/build-current-native-latest.v'])
+		compile.run()
+		compile.wait()
+		code := compile.code
+		compile.close()
+		if code != 0 { exit(code) }
+		os.execvp(tool, [os.args[1], os.args[2]]) or {
+			eprintln(err)
+			exit(1)
+		}
+		return
+	}
 	if os.args.len == 4 && os.args[1] == '--hash-file' {
 		hash_file_probe(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
 		return
