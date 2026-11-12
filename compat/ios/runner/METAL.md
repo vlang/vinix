@@ -12,7 +12,8 @@ Implemented Objective-C API:
   `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`,
   `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`,
   `newLibraryWithFile:error:`, `newDefaultLibrary`,
-  `newDefaultLibraryWithBundle:error:`, `newSamplerStateWithDescriptor:`.
+  `newDefaultLibraryWithBundle:error:`, `newSamplerStateWithDescriptor:`,
+  `minimumLinearTextureAlignmentForPixelFormat:`.
 - Sampler descriptor: `init`, `copy`, `copyWithZone:`, min/mag/mip filters,
   max anisotropy, S/T/R address modes, border color, compare function,
   normalized coordinates, LOD clamps/averaging, argument-buffer flag and label.
@@ -97,7 +98,11 @@ Pitch must be a multiple of the pixel size; zero pitch is accepted for a
 single row, following [Apple's transfer contract](https://developer.apple.com/documentation/metal/mtltexture/replace%28region%3Amipmaplevel%3Awithbytes%3Abytesperrow%3A%29).
 Only requested pixel bytes are touched, preserving client row padding.
 Buffer-backed textures alias a retained shared buffer with a snapshot of the
-2D descriptor. Offset and row pitch must be multiples of 256 bytes; pitch must
+2D descriptor. The device's `minimumLinearTextureAlignmentForPixelFormat:`
+returns 256 for R8Unorm, RG8Unorm and BGRA8Unorm/_sRGB. Queries for other
+formats fail explicitly. The allocator and query share one alignment policy;
+applications can round row sizes up and align offsets using the query.
+Offset and row pitch must be multiples of 256 bytes; pitch must
 cover a row and be at most 64 MiB. The full addressed span must fit the buffer.
 Invalid layouts/descriptors return nil. Views preserve the buffer metadata and
 stride, and CPU transfers and deferred fills/blits share the same bytes.

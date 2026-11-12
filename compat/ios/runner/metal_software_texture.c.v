@@ -5,6 +5,15 @@ struct SoftwareMetalRegion { x u64 y u64 z u64 width u64 height u64 depth u64 }
 fn sm_pixel_size(format u64) u64 {
 	return match format { 10 { u64(1) } 30 { u64(2) } 80, 81 { u64(4) } else { u64(0) } }
 }
+fn sm_linear_alignment(format u64) u64 { return if sm_pixel_size(format) == 0 { u64(0) } else { u64(256) } }
+fn sm_device_linear_alignment(device u64, selector &char, format u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	sm_check(device, 'VinixSoftwareMTLDevice')
+	alignment := sm_linear_alignment(format)
+	if alignment == 0 { panic('iOS: unsupported software Metal linear texture pixel format') }
+	return alignment
+}
 // Imported textures borrow a plane address and retain its IOSurface in fields[1].
 // mutation stores the immutable plane index; ordinary textures own data instead.
 fn sm_storage_base(h &ObjHeader) u64 { return if h.external_data != 0 { h.external_data } else { u64(h.data.data) } }
@@ -19,7 +28,8 @@ fn sm_buffer_texture(buffer u64, selector &char, descriptor u64, offset u64, row
 	if pixel == 0 || a.storage != 0 || a.usage & ~u64(31) != 0 || a.width == 0 || a.height == 0 || a.width > 16384 || a.height > 16384 { return 0 }
 	// A conservative 256-byte layout works for every current format. Bound row
 	// before span arithmetic, and use subtraction for the buffer extent check.
-	if offset % 256 != 0 || row % 256 != 0 || row < a.width * pixel || row > software_metal_max_buffer { return 0 }
+	alignment := sm_linear_alignment(a.format)
+	if offset % alignment != 0 || row % alignment != 0 || row < a.width * pixel || row > software_metal_max_buffer { return 0 }
 	span := (a.height - 1) * row + a.width * pixel
 	if !sm_range(u64(b.data.len), offset, span) { return 0 }
 	mut state := unsafe { &CVMetalState(C.malloc(sizeof(CVMetalState))) }
@@ -175,6 +185,7 @@ fn sm_texture_read_slice(object u64, selector &char, bytes u64, row u64, image u
 fn sm_texture_start(device u64) {
 	texture := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSoftwareMTLTexture', 0)
 	objc_register_class(texture)
+	sm_method(device, c'minimumLinearTextureAlignmentForPixelFormat:', u64(unsafe { voidptr(sm_device_linear_alignment) }), c'Q24@0:8Q16')
 	sm_method(ios_runtime.names['VinixSoftwareMTLBuffer'], c'newTextureWithDescriptor:offset:bytesPerRow:', u64(unsafe { voidptr(sm_buffer_texture) }), c'@40@0:8@16Q24Q32')
 	sm_method(texture, c'buffer', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')
 	for selector in [c'bufferOffset', c'bufferBytesPerRow']! { sm_method(texture, selector, u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8') }

@@ -306,6 +306,37 @@ fn test_software_metal_compiled_library_metadata() {
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
 type SMBufferTexture = fn (u64, &char, u64, u64, u64) u64
+fn sm_test_linear_alignment(device u64, format u64) u64 { return unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(device, c'minimumLinearTextureAlignmentForPixelFormat:', format) } }
+fn test_software_metal_linear_alignment() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); d := metal_create_system_default_device()
+		for format in [u64(10), 30, 80, 81]! {
+			alignment := sm_test_linear_alignment(d, format); assert alignment == 256 && alignment & (alignment - 1) == 0
+			pixel := sm_pixel_size(format)
+			for width in [u64(1), 63, 64, 65, 255, 256, 257, 16384]! {
+				pool := objc_pool_push(); row := (width * pixel + alignment - 1) & ~(alignment - 1)
+				length := alignment + row + width * pixel; b := sm_test_buffer(d, length, 0); desc := sm_test_descriptor(format, width, 2, 0)
+				t := sm_test_buffer_texture_view(b, desc, alignment, row); assert t != 0 && sm_send(t, c'bufferOffset') == alignment && sm_send(t, c'bufferBytesPerRow') == row
+				short := sm_test_buffer(d, length - 1, 0); assert sm_test_buffer_texture_view(short, desc, alignment, row) == 0; objc_release(short)
+				assert sm_test_buffer_texture_view(b, desc, alignment - 1, row) == 0 && sm_test_buffer_texture_view(b, desc, alignment, row - 1) == 0
+				mut input := [u8(11), 29, 53, 97]!; mut output := [4]u8{}
+				last := SoftwareMetalRegion{x: width - 1, y: 1, width: 1, height: 1, depth: 1}
+				sm_test_put(t, last, 0, u64(unsafe { &input[0] }), 0); sm_test_read(t, last, 0, u64(unsafe { &output[0] }), 0)
+				for i in 0 .. int(pixel) { assert input[i] == output[i] }
+				base := sm_send(b, c'contents'); for i in 0 .. int(pixel) { assert unsafe { *(&u8(base + length - pixel + u64(i))) } == input[i] }
+				objc_release(t); objc_release(b); objc_pool_pop(pool)
+			}
+		}
+		for format in [u64(0), 1, 70, 252, ~u64(0)]! {
+			child := C.fork(); assert child >= 0
+			if child == 0 { C.close(1); C.close(2); sm_test_linear_alignment(d, format); C._exit(0) }
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		}
+		objc_release(d); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-LINEAR-ALIGNMENT: NSUInteger query ABI, four formats, eight boundary widths each, calculated pitches, exact-fit backing spans, last-pixel CPU access, short/misaligned allocation rejection, five unsupported formats and two drained runtimes PASS')
+}
 fn sm_test_buffer_texture_view(buffer u64, descriptor u64, offset u64, row u64) u64 { return unsafe { SMBufferTexture(voidptr(C.ios_objc_msgsend))(buffer, c'newTextureWithDescriptor:offset:bytesPerRow:', descriptor, offset, row) } }
 fn test_software_metal_buffer_backed_textures() {
 	$if !ios_metal_software ? { return }
