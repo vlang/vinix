@@ -133,6 +133,7 @@ fn retain() ! {
 		'tools/packages/wineadapter/prefix.c.v':        $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
 		'tools/packages/wineadapter/patch.v':           $embed_file('../../tools/packages/wineadapter/patch.v').to_string()
 		'tools/packages/wineadapter/graphics_patch.v':  $embed_file('../../tools/packages/wineadapter/graphics_patch.v').to_string()
+		'tools/packages/wineadapter/bootstrap_patch.v': $embed_file('../../tools/packages/wineadapter/bootstrap_patch.v').to_string()
 		'tools/packages/wineadapter/unwind.v':          $embed_file('../../tools/packages/wineadapter/unwind.v').to_string()
 		'tools/packages/wineadapter/fork_translator.v': $embed_file('../../tools/packages/wineadapter/fork_translator.v').to_string()
 		'tools/packages/wineadapter/layout.v':          $embed_file('../../tools/packages/wineadapter/layout.v').to_string()

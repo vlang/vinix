@@ -97,6 +97,12 @@ startup, desktop embedding, broader applications/exception coverage, complete
 corresponding source and redistribution/catalog acceptance remain open.
 Section 14 remains unchecked.
 
+A subsequent [offline bootstrap fix](wine-bootstrap-check.md) removes a
+separate Wineboot socket abort from the ARM attempt. A fresh x86 graphical
+run still passes paint/input/close. The ARM retry remains refused with the
+shared-data mapping warning and services startup error `731`; the earlier
+warning alone did not establish why Explorer failed.
+
 During qualification, evidence jobs briefly paused when available storage
 dropped below 4 GiB, then resumed. The earlier exception archive and its typed
 inventory still match their published SHA-256 values. Its complete redundant

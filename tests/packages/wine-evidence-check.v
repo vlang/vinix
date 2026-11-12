@@ -46,7 +46,8 @@ fn private_executable(path string) bool {
 		'/runtime/root/usr/libexec/vinix-wine/wine', '/runtime/root/usr/libexec/vinix-wine/wineserver',
 		'/runtime/root/usr/lib/wine/x86_64-unix/ntdll.so',
 		'/runtime/root/usr/lib/libfreetype.so.6', '/runtime/root/usr/lib/libfontconfig.so.1',
-		'/runtime/root/usr/lib/wine/x86_64-unix/winex11.so']! {
+		'/runtime/root/usr/lib/wine/x86_64-unix/winex11.so',
+		'/runtime/root/usr/lib/wine/x86_64-windows/wineboot.exe']! {
 		if path.ends_with(suffix) { return true }
 	}
 	return false
@@ -197,7 +198,7 @@ fn checks() ! {
 			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
 			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
 			'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
-			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font', 'wine-graphics-shm-fallback'] {
+			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font', 'wine-graphics-shm-fallback', 'wine-bootstrap-canonical-name'] {
 			selected_prepared = directory + '/prepared'
 			prepared_copy(directory, prepared, selected_prepared)!
 		}
@@ -234,11 +235,12 @@ fn checks() ! {
 				expected = 'missing ARM boot input declaration:'
 			}
 			replace(directory + '/declaration.json', json2.encode(declaration))!
-		} else if name in ['producer-missing-graphics-library-input', 'producer-missing-graphics-font-input', 'producer-missing-graphics-driver-input'] {
+		} else if name in ['producer-missing-graphics-library-input', 'producer-missing-graphics-font-input', 'producer-missing-graphics-driver-input', 'producer-missing-bootstrap-input'] {
 			captured := read_map(selected_prepared + '/inputs-verified.json')!
 			mut candidates := captured.keys().filter(if name.ends_with('library-input') {
 				it.ends_with('/usr/libexec/vinix-x86_64/root/usr/lib/libfreetype.so.6.20.2')
 			} else if name.ends_with('driver-input') { it.ends_with('/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-unix/winex11.so') }
+			else if name == 'producer-missing-bootstrap-input' { it.ends_with('/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-windows/wineboot.exe') }
 			else { it.contains('/usr/libexec/vinix-x86_64/root/usr/share/fonts/') && it.ends_with('.ttf') })
 			candidates.sort()
 			if candidates.len == 0 { return error('graphics control input missing') }
@@ -250,7 +252,7 @@ fn checks() ! {
 			}
 			expected = if name.ends_with('font-input') { 'missing Wine graphics font input:' } else { 'missing Wine layout input:' }
 		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
-			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font', 'wine-graphics-shm-fallback'] {
+			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font', 'wine-graphics-shm-fallback', 'wine-bootstrap-canonical-name'] {
 			part := if name in ['wine-server-resealed-patch', 'wine-server-proc-nls'] {
 				'/usr/libexec/vinix-wine/wineserver'
 			} else if name == 'wine-graphics-resealed-library' {
@@ -262,6 +264,8 @@ fn checks() ! {
 				'/usr/share/fonts/' + fonts[0].all_after('/usr/share/fonts/')
 			} else if name == 'wine-graphics-shm-fallback' {
 				'/usr/lib/wine/x86_64-unix/winex11.so'
+			} else if name == 'wine-bootstrap-canonical-name' {
+				'/usr/lib/wine/x86_64-windows/wineboot.exe'
 			} else {
 				'/usr/lib/wine/x86_64-unix/ntdll.so'
 			}
@@ -283,6 +287,9 @@ fn checks() ! {
 			} else if name == 'wine-graphics-shm-fallback' {
 				instruction := '\xff\x15\x88\x51\x06\x00'
 				unsafe { vmemcpy(changed.str + 0x7e3a, instruction.str, instruction.len) }
+			} else if name == 'wine-bootstrap-canonical-name' {
+				instruction := '\xe8\x57\xd6\xff\xff'
+				unsafe { vmemcpy(changed.str + 0x6864, instruction.str, instruction.len) }
 			} else {
 				unsafe { changed.str[0] ^= 1 }
 			}

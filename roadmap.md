@@ -1158,6 +1158,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [ARM shared-page diagnostic](tests/packages/wine-shared-pages-check.md)
     passes twelve native/translated cases and measures unsupported 4 KiB
     shared views on its 16 KiB host; ARM graphical startup remains open.
+    [Offline prefix bootstrap](tests/packages/wine-bootstrap-check.md) now
+    selects Wineboot's literal-hostname fallback without requesting DNS or
+    widening package permissions. Fresh signed console runs pass on both
+    architectures, with all 63 x86/72 ARM evidence refusals, and x86 graphical
+    paint/input/close still passes with eleven GUI refusals. The ARM
+    retry removes the socket abort but retains shared-user-data mapping and
+    services startup failures; ARM graphical acceptance remains open.
     Desktop embedding, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
