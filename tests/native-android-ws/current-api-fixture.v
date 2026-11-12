@@ -20,6 +20,7 @@ import eglerrorprobe
 import lookupconstantsprobe
 import windowdecorprobe
 import networkactiveprobe
+import networkvalidationprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1401,6 +1402,7 @@ invoke-static {}, Lorg/vinix/bootstrap/EglErrorProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/LookupConstantsProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/WindowDecorProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/NetworkActiveProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/NetworkValidationProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1659,6 +1661,7 @@ fn main() {
 	lookupconstantsprobe.install(root)!
 	windowdecorprobe.install(root)!
 	networkactiveprobe.install(root)!
+	networkvalidationprobe.install(root)!
 	if tls_lifetime { tlslifetimeprobe.install(root)! }
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;
@@ -1899,6 +1902,11 @@ invoke-direct {p0}, Landroid/net/ConnectivityManager;-><init>()V
 return-void
 .end method
 .method protected nativeGetNetworkState()I
+.locals 1
+iget v0, p0, Lorg/vinix/bootstrap/TestNetwork;->state:I
+return v0
+.end method
+.method public vinixNetworkState()I
 .locals 1
 iget v0, p0, Lorg/vinix/bootstrap/TestNetwork;->state:I
 return v0

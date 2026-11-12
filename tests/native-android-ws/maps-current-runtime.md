@@ -16,6 +16,9 @@ pending. The [JIT experiment](maps-jit-runtime-20261113.md) passed the signed AP
 regression in r71/r72. r72 rendered onboarding and a Google account error page,
 then exited with an account-query timeout in its log. JIT remains disabled by
 default; these attempts qualify neither full Maps nor local expiry handling.
+The [measured network validator](maps-network-validation-runtime-20261113.md)
+passed the signed ARM API regression, including a real HTTPS 204 response and
+offline checks. Its actual Maps rendering retry is pending.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

@@ -77,7 +77,8 @@ return-object v0')
  // policy is independent of the conservative metered-link classification.
  text += connectivity_method('public getRestrictBackgroundStatus()I', 'const/4 v0, 1\nreturn v0')
  text += connectivity_method('public getDefaultProxy()Landroid/net/ProxyInfo;', 'const/4 v0, 0\nreturn-object v0')
- // Reports cannot promote an unvalidated link: validation is not implemented.
+ // An application's report is not reachability evidence. The optional HTTPS
+ // validator measures connectivity independently; reports cannot promote it.
  text += connectivity_method('public reportNetworkConnectivity(${network}Z)V', 'return-void')
  text += connectivity_method('private vinixRegister(${request}${cb}${handler})V', '
 invoke-static {p2}, Ljava/util/Objects;->requireNonNull(Ljava/lang/Object;)Ljava/lang/Object;

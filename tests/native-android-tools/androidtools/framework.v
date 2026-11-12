@@ -230,6 +230,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_lookup_constants(smali)!
  framework_window_decor(smali)!
  framework_network_active_listener(smali)!
+ framework_network_validation(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!

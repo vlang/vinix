@@ -12,7 +12,9 @@ pub fn install_connectivity_probe(dir string) ! {
  caps := 'Landroid/net/NetworkCapabilities;'
  handler := 'Landroid/os/Handler;'
  request := 'Landroid/net/NetworkRequest;'
- os.write_file(dir + '/TestConnectivity.smali', '.class public ${manager}\n.super ${cm}\n.field public state:I\n' + method('public constructor <init>()V', 'invoke-direct {p0}, ${cm}-><init>()V\nreturn-void') + method('protected nativeGetNetworkState()I', 'iget v0, p0, ${manager}->state:I\nreturn v0'))!
+ // Synthetic transitions test callback ordering without probing the host's
+ // unrelated real default route. The ordinary manager below tests kernel state.
+ os.write_file(dir + '/TestConnectivity.smali', '.class public ${manager}\n.super ${cm}\n.field public state:I\n' + method('public constructor <init>()V', 'invoke-direct {p0}, ${cm}-><init>()V\nreturn-void') + method('protected nativeGetNetworkState()I', 'iget v0, p0, ${manager}->state:I\nreturn v0') + method('public vinixNetworkState()I', 'iget v0, p0, ${manager}->state:I\nreturn v0'))!
  mut text := '.class public ${probe}\n.super ${cb}\n.implements Ljava/lang/Runnable;\n.field private manager:${manager}\n.field private handler:${handler}\n.field private internet:${probe}\n.field private wifi:${probe}\n.field private cancelled:${probe}\n'
  for field in ['stage', 'mode', 'available', 'capabilities', 'links', 'blocked', 'lost', 'order'] { text += '.field private ${field}:I\n' }
  failure := ':bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "connectivity callback state or ordering"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0'
@@ -203,10 +205,8 @@ const/16 v2, 12
 invoke-virtual {v1, v2}, ${caps}->hasCapability(I)Z
 move-result v2
 if-eqz v2, :bad
-const/16 v2, 16
-invoke-virtual {v1, v2}, ${caps}->hasCapability(I)Z
-move-result v2
-if-nez v2, :bad
+# This offline-capable suite checks the kernel route. Internet validation is
+# asynchronous; the separate signed NetworkValidationProbe requires real HTTPS.
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "BOOTSTRAP-CONNECTIVITY-PASS kernel-route offline snapshots ordering handler capability-change filtering loss unregister reentrant-cancel background-policy"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V

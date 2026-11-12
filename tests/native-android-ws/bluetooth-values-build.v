@@ -55,6 +55,7 @@ fn main() {
 	androidtools.framework_lookup_constants(root + '/smali')!
 	androidtools.framework_window_decor(root + '/smali')!
 	androidtools.framework_network_active_listener(root + '/smali')!
+	androidtools.framework_network_validation(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -67,6 +68,7 @@ fn main() {
 	types << 'android/opengl/GLUtils'
 	types << 'android/view/Window'
 	types << r'android/net/ConnectivityManager$OnNetworkActiveListener'
+	types << 'android/atl/VinixNetworkValidation'
 	types << 'android/content/Context'
 	types << r'android/provider/Settings$Global'
 	types << 'android/atl/VinixAccountFuture'
