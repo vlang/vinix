@@ -18,7 +18,10 @@ then exited with an account-query timeout in its log. JIT remains disabled by
 default; these attempts qualify neither full Maps nor local expiry handling.
 The [measured network validator](maps-network-validation-runtime-20261113.md)
 passed the signed ARM API regression, including a real HTTPS 204 response and
-offline checks. Its actual Maps rendering retry is pending.
+offline checks. r74's actual Maps validation succeeded; Explore remained blank
+and the main looper exited on missing JobParameters.getNetwork during search.
+The [job network/key authentication metadata repair](maps-job-network-keygen-runtime-20261113.md)
+passed the signed ARM regression in r75. Its actual Maps retry is pending.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

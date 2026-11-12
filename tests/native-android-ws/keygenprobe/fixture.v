@@ -160,6 +160,7 @@ invoke-virtual {v4}, Landroid/security/keystore/KeyGenParameterSpec;->getDigests
 move-result-object v5
 array-length v5, v5
 invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-static {}, Lorg/vinix/bootstrap/KeyGenProbe;->authValidity()V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "KEYGEN-PARAMETERS-PASS metadata snapshots defensive-arrays null empty unspecified no-key-generation"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
@@ -170,4 +171,16 @@ invoke-direct {v5}, Ljava/lang/AssertionError;-><init>()V
 throw v5
 .end method
 ')!
+	path := root + '/smali/KeyGenProbe.smali'
+	p := 'Landroid/security/keystore/KeyGenParameterSpec;'
+	b := r'Landroid/security/keystore/KeyGenParameterSpec$Builder;'
+	mut body := '\n.method private static authValidity()V\n.locals 8\nnew-instance v0, ' + b + '\nconst-string v1, "vinix-auth-validity-metadata"\nconst/4 v2, 1\ninvoke-direct {v0, v1, v2}, ' + b + '-><init>(Ljava/lang/String;I)V\ninvoke-virtual {v0}, ' + b + '->build()' + p + '\nmove-result-object v1\nconst/4 v6, -1\n'
+	for value in [-1, 0, 60, 2147483647] {
+		body += 'const v3, ${value}\ninvoke-virtual {v0, v3}, ${b}->setUserAuthenticationValidityDurationSeconds(I)${b}\nmove-result-object v4\nif-ne v4, v0, :auth_bad\ninvoke-virtual {v1}, ${p}->getUserAuthenticationValidityDurationSeconds()I\nmove-result v4\ninvoke-static {v4, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V\ninvoke-virtual {v0}, ${b}->build()${p}\nmove-result-object v1\ninvoke-virtual {v1}, ${p}->getUserAuthenticationValidityDurationSeconds()I\nmove-result v4\ninvoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V\ninvoke-virtual {v1}, ${p}->isUserAuthenticationRequired()Z\nmove-result v4\nif-nez v4, :auth_bad\nmove v6, v3\n'
+	}
+	for index, value in [-2, -2147483647 - 1] {
+		body += 'const v3, ${value}\n:auth_invalid_${index}\ninvoke-virtual {v0, v3}, ${b}->setUserAuthenticationValidityDurationSeconds(I)${b}\n:auth_invalid_end_${index}\ngoto :auth_bad\n.catch Ljava/lang/IllegalArgumentException; {:auth_invalid_${index} .. :auth_invalid_end_${index}} :auth_caught_${index}\n:auth_caught_${index}\nmove-exception v4\ninvoke-virtual {v0}, ${b}->build()${p}\nmove-result-object v2\ninvoke-virtual {v2}, ${p}->getUserAuthenticationValidityDurationSeconds()I\nmove-result v4\ninvoke-static {v4, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V\n'
+	}
+	body += 'sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;\nconst-string v1, "KEYGEN-AUTH-VALIDITY-PASS default per-operation zero positive max snapshots fluent invalid-preserves-state no-authentication-grant"\ninvoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V\nreturn-void\n:auth_bad\nnew-instance v0, Ljava/lang/AssertionError;\nconst-string v1, "keygen authentication validity metadata"\ninvoke-direct {v0, v1}, Ljava/lang/AssertionError;-><init>(Ljava/lang/Object;)V\nthrow v0\n.end method\n'
+	os.write_file(path, os.read_file(path)! + body)!
 }

@@ -1761,6 +1761,16 @@ return-void
 .end method
 .method public onStartJob(Landroid/app/job/JobParameters;)Z
 .locals 3
+invoke-virtual {p1}, Landroid/app/job/JobParameters;->getNetwork()Landroid/net/Network;
+move-result-object v0
+if-eqz v0, :job_no_assigned_network
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+:job_no_assigned_network
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "JOB-NETWORK-PASS scheduled-callback no-assigned-network"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 invoke-virtual {p1}, Landroid/app/job/JobParameters;->isOverrideDeadlineExpired()Z
 move-result v0
 const/4 v1, 0

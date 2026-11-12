@@ -14,8 +14,18 @@ pub fn framework_keygen_parameters(smali string) ! {
 	mut builder := os.read_file(bpath)!
 	if source.contains('vinixAlgorithmSpec') { return error('key generation parameters already installed') }
 	new_fields := {'vinixAlgorithmSpec': 'Ljava/security/spec/AlgorithmParameterSpec;',
-		'vinixDigests': '[Ljava/lang/String;', 'vinixAttestationChallenge': '[B', 'vinixUniqueIdIncluded': 'Z'}
+		'vinixDigests': '[Ljava/lang/String;', 'vinixAttestationChallenge': '[B', 'vinixUniqueIdIncluded': 'Z',
+		'vinixAuthValiditySeconds': 'I'}
 	for name, kind in new_fields { source += '\n.field ' + name + ':' + kind + '\n' }
+	window_animations_method(source, 'public constructor <init>()V',
+		'.registers 1\ninvoke-direct {p0}, Ljava/lang/Object;-><init>()V\nreturn-void')!
+	source = framework_replace_method(source, '<init>()V', signature_method('public constructor <init>()V',
+		'invoke-direct {p0}, Ljava/lang/Object;-><init>()V\nconst/4 v0, -1\niput v0, p0, ' + p + '->vinixAuthValiditySeconds:I\nreturn-void'))!
+	// This is request metadata only; it grants no key or authentication authority.
+	builder += signature_method('public setUserAuthenticationValidityDurationSeconds(I)' + b,
+		'const/4 v0, -1\nif-lt p1, v0, :bad\niget-object v0, p0, ' + b + '->spec:' + p + '\niput p1, v0, ' + p + '->vinixAuthValiditySeconds:I\nreturn-object p0\n:bad\nnew-instance v0, Ljava/lang/IllegalArgumentException;\nconst-string v1, "seconds must be -1 or larger"\ninvoke-direct {v0, v1}, Ljava/lang/IllegalArgumentException;-><init>(Ljava/lang/String;)V\nthrow v0')
+	source += signature_method('public getUserAuthenticationValidityDurationSeconds()I',
+		'iget v0, p0, ' + p + '->vinixAuthValiditySeconds:I\nreturn v0')
 	for kind, suffix in {'[Ljava/lang/String;': 'Strings', '[B': 'Bytes'} {
 		source += signature_method('static vinixClone' + suffix + '(' + kind + ')' + kind,
 			'if-eqz p0, :done\ninvoke-virtual {p0}, ' + kind + '->clone()Ljava/lang/Object;\nmove-result-object p0\ncheck-cast p0, ' + kind + '\n:done\nreturn-object p0')

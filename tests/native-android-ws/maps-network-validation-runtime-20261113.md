@@ -67,5 +67,21 @@ Readback reconstructs the unchanged two-entry export with zero removals:
 archive 86994281caccfc326e6808fb4af3438083b54a51205a07a1df239b7179191ea7;
 child 642eac0f1afc2c428897a471183ef59b06f7bccc9148d61ff0858688b59cdb05.
 
-The actual Maps rendering retry is in progress. This API pass does not qualify
-map tiles, route geometry or Google sign-in.
+r74's actual Maps log records an initial failed validation and repeated later
+HTTPS-204 successes. Explore rendered with a blank map. During a Louvre search
+attempt after confirmed focus, the main looper exited on the missing
+JobParameters.getNetwork API. No search result, tiles or route geometry passed;
+sign-in was not attempted in this run. The root broker remained ready.
+
+The complete 600238 ms watch retained at least 4593424 KiB free memory and
+7246233600 bytes free app storage. After sync returned a guest prompt, owned
+QEMU PID 62482 was stopped and verified absent before read-only extraction.
+maps-current-20261113-r74 retains screenshots, logs, receipt, complete UART,
+raw image and retained.sha256. Final image SHA256:
+c3af58cdf7422e4b2d82e849174ea9d55e76cdccd5612a2c424cc89b80118f1d;
+Maps log 81845c2b5787b5d3a8f0dd8cf99a33a7485cf2613f26f5cd4cafd45e9ddaf6e2;
+broker log 7f41f3ee3a1db6ad70b73b9d5079c2d37eb8f75bcd58162582244f811d68c088;
+receipt 489f3e6dd507606b85fa35a432f1a20fcdd471b003e39702f2a864cf56695f9b;
+UART bdf5734d90e166f5a833428323dfd6c9ba192d782221ccdbecd27237139f31d0.
+The next [job/key-parameter repair](maps-job-network-keygen-runtime-20261113.md)
+passes its signed ARM regression. Full Maps remains pending.

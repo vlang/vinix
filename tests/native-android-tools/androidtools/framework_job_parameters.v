@@ -25,5 +25,13 @@ return v0
 const/4 v0, 0
 return v0
 .end method')!
+	// This scheduler dispatches by latency and never assigns a network to a
+	// job. A default route is not a job-specific network assignment.
+	text = framework_replace_method(text, 'getNetwork()Landroid/net/Network;', r'
+.method public getNetwork()Landroid/net/Network;
+.locals 1
+const/4 v0, 0
+return-object v0
+.end method')!
 	os.write_file(path, text)!
 }

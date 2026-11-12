@@ -34,6 +34,10 @@ its retained log includes an uncaught UnsupportedOperationException from
 AccountManager.vinixAccounts (account query failed or timed out), followed by
 self-termination. The broker receipt reports failure after GMS exited. No
 authentication or successful Explore/search/tiles/routes result is qualified.
+Further inspection of the retained GMS log found an uncaught missing
+KeyGenParameterSpec.Builder.setUserAuthenticationValidityDurationSeconds in
+TapAndPay initialization before GMS exits. The corresponding
+[API repair](maps-job-network-keygen-runtime-20261113.md) is qualified separately.
 There are no recorded auth-pump failures; this retry does not qualify the
 five-minute local-expiry crossing or establish JIT as the cause of the exit.
 
