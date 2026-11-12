@@ -2306,3 +2306,6 @@ and builds alone do not establish the memory reduction or fix the native fault.
 r66's completed ARM/API check, preparation-memory reduction,600-second
 observation, working Louvre search and remaining account native fault are
 recorded in [the current memory runtime report](maps-current-memory-runtime-20261112.md).
+
+The subsequent native-lookup constant fix and r67 ARM/API regression are in
+[the lookup runtime report](maps-lookup-constants-runtime-20261112.md).
