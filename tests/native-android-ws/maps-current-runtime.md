@@ -14,6 +14,8 @@ Its ARM regression passed. Maps then rendered onboarding but killed itself
 after SQLiteFullException as RAM-backed storage reached zero. Guest r31
 passed disk write/readback and the unprivileged SQLite regression on a
 separate app-data disk under the unchanged guest memory budget.
+Maps rendered onboarding in r31, then exited after Skip on Play Store code
+passing the null system shared-library catalog into Arrays.asList.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -825,3 +827,44 @@ An older reconstructor correctly rejected the newer plan format; the current
 source accepted it without byte removals. The fixture bind was released
 before the next broker run. These checks establish disk and SQLite behavior,
 not Maps tiles, search, routes or login.
+
+Guest r31 rendered onboarding on the disk-backed data path. After Skip,
+Play Store code loaded inside Maps called getSystemSharedLibraryNames and
+immediately Arrays.asList on the result: `wtt.a` source514, via `anag.a`,
+`anam.b`, `anal` and background executor `tqv`. The null catalog caused an
+uncaught NPE and the GMS crash handler killed the process. The complete log
+is between DISK-DATA-MAPS-LOG-BEGIN/END in immutable snapshot
+`maps-disk-data-final-uart-20261112-r1`, SHA256
+`4180ee0f79eda3bc664220ffcedb3b36376ff3a63416b944b5635057c52f60ab`.
+Minimum observed disk availability was7953289216 bytes. Memory was tight
+(minimum MemFree35600KiB), but this exit has a specific Java exception;
+it is not evidence of an OOM kill. The observer was stopped with the owned
+VM before its600-second deadline. Caller readback is retained at
+`vending-package-state-caller-20261112-r1/classes3.dex/wtt.smali`.
+The synced, stopped r31 data image has final SHA256
+`0c691b38695dbbb35411308d3c2113bb6ecea864b04c58ef83c055637ceefa4f`.
+
+`framework_shared_library_catalog.v` deliberately normalizes the empty
+Android shared-library catalog to a fresh empty String array, allowing direct
+enumeration by this caller. It advertises no host ELF libraries, APK-private
+modules or nonexistent Android library. This is a Vinix compatibility choice:
+[Android's API permits null for an empty catalog](https://developer.android.google.cn/reference/android/test/mock/MockPackageManager#getSystemSharedLibraryNames()),
+and [AOSP returns null for an empty name/path map](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/services/core/java/com/android/server/pm/IPackageManagerBase.java).
+The normal SDK generator and current additive builder both install it.
+
+SDK `framework-shared-libraries-20261112-r1` passed full assembly and selected
+DEX readback under the original caps: guard/child0/0, complete cleanup,
+3661ms, RSS471629824 and shared growth45236224 bytes. Signed fixture r25
+checks the actual Arrays.asList call, zero size and fresh array identity,
+alongside all earlier regressions. Its build/sign/verify guard passed0/0
+with complete cleanup,974ms, RSS126861312 and growth364544 bytes. Guest r32
+stages this SDK and fixture with the unchanged native/core and disk probe r7.
+
+Guest r32 passed the complete signed fixture r25 as UID/GID10160, with its
+private directory on the selected disk: readiness/pass once, EOF and exit0.
+Snapshot `shared-library-api-uart-20261112-r1`, plan
+`shared-library-api-plan-20261112-r1.json` and independent strict readback
+`shared-library-api-readback-20261112-r1` retain the two-entry export, archive
+SHA256 `e4858cc2d9345d59859d469830712e80fabea3aafef026ca59963ff85c6a4a84`.
+The fixture bind was released before broker startup. Actual Maps qualification
+continues with this SDK; no map-rendering claim follows from the fixture.

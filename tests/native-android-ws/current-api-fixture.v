@@ -5,6 +5,33 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static sharedLibraryCatalog(Landroid/content/Context;)V
+.locals 4
+invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+invoke-virtual {v0}, Landroid/content/pm/PackageManager;->getSystemSharedLibraryNames()[Ljava/lang/String;
+move-result-object v1
+array-length v2, v1
+const/4 v3, 0
+invoke-static {v2, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-static {v1}, Ljava/util/Arrays;->asList([Ljava/lang/Object;)Ljava/util/List;
+move-result-object v1
+invoke-interface {v1}, Ljava/util/List;->size()I
+move-result v2
+invoke-static {v2, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/content/pm/PackageManager;->getSystemSharedLibraryNames()[Ljava/lang/String;
+move-result-object v1
+invoke-virtual {v0}, Landroid/content/pm/PackageManager;->getSystemSharedLibraryNames()[Ljava/lang/String;
+move-result-object v2
+if-eq v1, v2, :catalog_failed
+array-length v2, v2
+invoke-static {v2, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+:catalog_failed
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.end method
 .method public static storageDatabase(Landroid/content/Context;)V
 .locals 8
 const-string v0, "vinix-storage-probe.db"
@@ -1013,6 +1040,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->moduleCatalog(Landroid/content/C
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sandboxMetadata(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->buildAndObserver()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->storageDatabase(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sharedLibraryCatalog(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
