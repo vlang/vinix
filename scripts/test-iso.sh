@@ -13,7 +13,8 @@
 #
 # Each image is booted from a virtual CD with nothing but its own files:
 #
-#   amd64  QEMU, BIOS, i440fx, no HPET, one CPU (what VirtualBox gives a new VM)
+#   amd64  QEMU defaults, 2 GiB, no extra devices or CPU options
+#          QEMU, BIOS, i440fx, no HPET, one CPU (what VirtualBox gives a new VM)
 #          QEMU, UEFI, q35, two CPUs, a blank SATA disk
 #          the same again, from the system it installed on the disk
 #          VirtualBox, BIOS, a blank SATA disk       (x86 hosts)
@@ -339,6 +340,12 @@ qemu_amd64() {
     if ! command -v "$qemu_bin" >/dev/null 2>&1; then
         FAILED+=("qemu-amd64 ($qemu_bin not installed)")
         return
+    fi
+    if "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/tests/default-qemu/run.v" \
+        --desktop "$iso" "$OUT/qemu-amd64-default" "$QMP_TOOL"; then
+        PASSED+=("qemu-amd64-default")
+    else
+        FAILED+=("qemu-amd64-default (see $OUT/qemu-amd64-default)")
     fi
     if [ -w /dev/kvm ]; then
         accel=(-accel kvm -cpu host)

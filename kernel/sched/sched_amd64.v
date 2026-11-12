@@ -172,6 +172,13 @@ fn scheduler_isr(_ u32, gpr_state &cpulocal.GPRState) {
 		}
 	}
 
+	// The LAPIC is also armed for the earliest timer deadline. Expire that
+	// deadline here before choosing another one-shot: otherwise an overdue
+	// timer keeps rearming it for 1 us. On a fast single-vCPU KVM guest those
+	// scheduler IRQs starve the lower-priority PIT, which was the only path
+	// expiring timers, and neither sleeping tasks nor input handlers run.
+	time.timer_handler()
+
 	// Before the run queue is read, so a thread that the poll wakes -- one
 	// waiting on a socket -- can be picked straight away.
 	poll_devices()

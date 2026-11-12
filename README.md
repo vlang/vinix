@@ -39,7 +39,17 @@ The latest release has a bootable desktop image for each architecture:
 
 Older and nightly images are at https://github.com/vlang/vinix/releases.
 
-Give the VM at least 4 GiB of memory and an empty disk of 4 GiB or more
+For a quick amd64 desktop session, QEMU's default PC, keyboard and PS/2 mouse
+work with:
+
+```sh
+qemu-system-x86_64 -m 2048 -cdrom vinix-amd64.iso
+```
+
+Click inside the QEMU window to capture the mouse. No USB tablet or custom
+machine options are required. Without a disk, changes are lost on restart.
+
+For installing apps, give the VM at least 4 GiB of memory and an empty disk of 4 GiB or more
 (16 GiB leaves room for apps). The first boot installs Vinix onto the disk;
 from then on the machine starts from it and keeps everything, as a QEMU machine
 started by `scripts/run-desktop-aarch64.sh` does: users, files, installed apps. Keep
