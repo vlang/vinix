@@ -246,7 +246,7 @@ file. Neither entry point requires dispatch initialization.
 Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, one-block
 [scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
-flag-free binary arithmetic/comparisons/select/casts, pointer arguments with
+flag-free binary arithmetic/comparisons/select/casts/fneg/freeze, pointer arguments with
 supported constant GEPs,
 explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
@@ -297,6 +297,12 @@ vector, aggregate, double and bfloat conversions remain unsupported. Invalid
 float-to-integer inputs yield poison; storing it follows failed-command
 completion, while an unchosen select operand may discard it. Synthetic kernels
 combine signed conversion with floating addition in both directions.
+
+Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
+signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and
+chooses a fixed zero for poison/undef. Both cost one step and require no flags.
+Freeze does not skip earlier dynamic errors. Synthetic deferred kernels check
+raw signaling-NaN negation and freezing an invalid conversion result.
 
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not

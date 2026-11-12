@@ -186,8 +186,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
 				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
-				56 { if !binary32 || !floating_result || op.operands_count != 1 { return error('AIR scalar: floating fneg required') } }
-				58 { if !inst.has_result || op.operands_count != 1 || op.opcode != 0 || p.operands[op.operands_start].type_index != op.result_type { return error('AIR scalar: freeze result/arity/type') } }
+				56, 58 { if !inst.has_result { return error('AIR scalar: unary result required') }; p.scalar_unary_profile(op, code == 58, binary32)! }
 				else { return error('AIR integer: instruction outside execution profile') }
 			}
 		}
@@ -347,7 +346,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				9, 28 { result = m.compare_value(op)! }
 				3 { result = m.cast_value(op)! }
 				5, 29 { result = m.select_value(op)! }
-				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
+				56 { result = m.fneg_value(op)! }
 				58 { result = if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
 				10 {
 					if profile.return_bits == 0 { return IRIntegerRun{steps: m.steps} }

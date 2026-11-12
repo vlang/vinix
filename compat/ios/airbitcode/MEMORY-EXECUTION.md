@@ -2,7 +2,8 @@
 
 `run_memory_function` executes a defined ordinary void function with pointer
 arguments, one basic block, scalar loads/stores, flag-free binary operations,
-comparisons, scalar select/casts, forward constant GEPs and a final ret void.
+comparisons, scalar select/casts/freeze, floating negation, forward constant GEPs
+and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
@@ -31,6 +32,14 @@ Float-to-integer conversion truncates toward zero; NaN, infinity and values
 whose truncated result is outside the destination range produce poison.
 Poison inputs propagate. Selected undef still errors. Storing a poisoned cast
 rejects; a later select can discard its poison result. All casts cost one step.
+
+Floating `fneg` toggles only the sign bit of half/float, preserving zeros,
+subnormals, infinities and NaN payload/quiet bits. Poison propagates; undef
+rejects. Scalar `freeze` preserves defined i1..i64/half/float bits and makes a
+fixed zero choice for poison or undef. Every use of its SSA result sees that
+same choice. It does not prevent an earlier instruction from rejecting undef
+or another dynamic error. Both operations require zero flags and cost one
+step. Pointer/vector/aggregate freezes remain unsupported by this API.
 
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
@@ -80,7 +89,7 @@ Loads/stores preserve floating raw bits. Buffer bytes are treated as defined val
 uninitialized-memory/poison shadow tracking is not implemented. Poison stores
 and selected undef reject. Dynamic value errors can leave earlier stores
 visible; errors do not roll back memory. Every load, store, binary operation,
-comparison, select, cast, GEP and return costs one step, with the existing
+comparison, select, cast, fneg, freeze, GEP and return costs one step, with the existing
 maximum step limit. Preflight rejects an insufficient budget.
 Execution scratch arrays are freed on success and failure; binding data is not.
 
@@ -92,5 +101,7 @@ load/compute/store bodies, including poison consumption and budget guards.
 including narrow padding, layouts, GEP flags, chains and preflight failures.
 `tests/ios/air-memory-casts.v` checks load/cast/store bodies against defined
 native LLVM conversions, with separate poison and unsupported-input controls.
+`tests/ios/air-memory-unary.v` checks fneg/freeze against native LLVM and exact
+raw-bit expectations, all half encodings, and separate indeterminate choices.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
