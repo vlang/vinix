@@ -17,7 +17,8 @@ struct SourceCopy {
 
 fn run() ! {
 	$if prod {} $else { return error('compile source snapshot with -prod') }
-	if os.args.len != 3 { return error('usage: wine-source-snapshot NATIVE_RUN FRESH_OUTPUT') }
+	if os.args.len !in [3, 4] || (os.args.len == 4 && os.args[3] != '--guest-only') { return error('usage: wine-source-snapshot NATIVE_RUN FRESH_OUTPUT [--guest-only]') }
+	programs := if os.args.len == 4 { ['guest'] } else { ['guest', 'package'] }
 	for path, source in {
 		@FILE: $embed_file('wine-source-snapshot.v').to_string()
 		os.dir(@FILE) + '/winesource/closure.v': $embed_file('winesource/closure.v').to_string()
@@ -32,7 +33,7 @@ fn run() ! {
 	inputs := json2.decode[map[string]string](os.read_file(index)!)!
 	mut sources := map[string]string{}
 	mut lists := map[string]string{}
-	for program in ['guest', 'package']! {
+	for program in programs {
 		before := run + '/build-' + program + '/sources-before.txt'
 		built := run + '/build-' + program + '/sources-built.txt'
 		if os.read_file(before)! != os.read_file(built)! { return error('source discovery/build lists differ') }

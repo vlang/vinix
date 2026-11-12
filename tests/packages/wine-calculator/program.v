@@ -28,7 +28,7 @@ fn (calculator &Calculator) value() f64 {
 }
 
 fn (mut calculator Calculator) show(value f64) {
-	length := unsafe { int(C.snprintf(&char(&calculator.text[0]), usize(calculator.text.len), c'%.12g', value)) }
+	length := unsafe { int(C.snprintf(&char(&calculator.text[0]), uint(calculator.text.len), c'%.12g', value)) }
 	if length < 1 || length >= calculator.text.len {
 		calculator.text[0] = `0`
 		calculator.text[1] = 0
@@ -84,28 +84,28 @@ $if windows {
 	@[typedef]
 	struct C.WNDCLASSA {
 	mut:
-		lpfnWndProc fn (&C.HWND__, u32, usize, isize) isize
+		lpfnWndProc fn (&C.HWND__, u32, u64, i64) i64
 		hInstance voidptr
 		hCursor voidptr
 		hbrBackground voidptr
 		lpszClassName &char
 	}
 	@[typedef]
-	struct C.MSG { wParam usize }
+	struct C.MSG { wParam u64 }
 	fn C.GetModuleHandleA(&char) voidptr
 	fn C.LoadCursorA(voidptr, &char) voidptr
 	fn C.RegisterClassA(&C.WNDCLASSA) u16
 	fn C.UnregisterClassA(&char, voidptr) int
 	fn C.CreateWindowExA(u32, &char, &char, u32, int, int, int, int, voidptr, voidptr, voidptr, voidptr) voidptr
-	fn C.GetWindowLongPtrA(voidptr, int) isize
-	fn C.SetWindowLongPtrA(voidptr, int, isize) isize
+	fn C.GetWindowLongPtrA(voidptr, int) i64
+	fn C.SetWindowLongPtrA(voidptr, int, i64) i64
 	fn C.SetWindowTextA(voidptr, &char) int
 	fn C.ShowWindow(voidptr, int) int
 	fn C.UpdateWindow(voidptr) int
 	fn C.GetMessageA(&C.MSG, voidptr, u32, u32) int
 	fn C.TranslateMessage(&C.MSG) int
-	fn C.DispatchMessageA(&C.MSG) isize
-	fn C.DefWindowProcA(voidptr, u32, usize, isize) isize
+	fn C.DispatchMessageA(&C.MSG) i64
+	fn C.DefWindowProcA(voidptr, u32, u64, i64) i64
 	fn C.PostQuitMessage(int)
 	fn C.DestroyWindow(voidptr) int
 	fn C.GetStdHandle(u32) voidptr
@@ -123,7 +123,7 @@ $if windows {
 		C.WriteFile(C.GetStdHandle(u32(0xfffffff5)), text.str, u32(text.len), unsafe { voidptr(&written) }, unsafe { nil })
 	}
 
-	fn window_proc(window &C.HWND__, message u32, wparam usize, lparam isize) isize {
+	fn window_proc(window &C.HWND__, message u32, wparam u64, lparam i64) i64 {
 		if message == 0x0002 { // WM_DESTROY
 			pointer := C.GetWindowLongPtrA(window, -21)
 			if pointer != 0 {
@@ -155,23 +155,26 @@ $if windows {
 	}
 
 	fn run_window() ! {
+		output('VINIX WIN64 CALCULATOR START\n')
 		instance := C.GetModuleHandleA(unsafe { nil })
 		class := C.WNDCLASSA{
 			lpfnWndProc: window_proc
 			hInstance: instance
-			hCursor: C.LoadCursorA(unsafe { nil }, unsafe { &char(usize(32512)) })
-			hbrBackground: voidptr(usize(16)) // COLOR_BTNFACE + 1
+			hCursor: C.LoadCursorA(unsafe { nil }, unsafe { &char(u64(32512)) })
+			hbrBackground: voidptr(u64(16)) // COLOR_BTNFACE + 1
 			lpszClassName: c'VinixVWineCalculator'
 		}
 		if C.RegisterClassA(unsafe { &class }) == 0 { return error('calculator window class failed') }
+		output('VINIX WIN64 CALCULATOR CLASS\n')
 		defer { C.UnregisterClassA(c'VinixVWineCalculator', instance) }
 		window := C.CreateWindowExA(0, c'VinixVWineCalculator', c'Calculator', 0x00ca0000,
 			100, 100, 326, 430, unsafe { nil }, unsafe { nil }, instance, unsafe { nil })
 		if window == unsafe { nil } { return error('calculator window failed') }
+		output('VINIX WIN64 CALCULATOR WINDOW\n')
 		mut context := CalculatorWindow{calculator: new_calculator()}
 		// The callback borrows this stack object only while this message loop is
 		// active. Destroy/detach the window before returning from this function.
-		C.SetWindowLongPtrA(window, -21, isize(unsafe { &context }))
+		C.SetWindowLongPtrA(window, -21, i64(unsafe { &context }))
 		defer {
 			if !context.closed {
 				C.SetWindowLongPtrA(window, -21, 0)
@@ -181,15 +184,18 @@ $if windows {
 		// Standard controls use USER32's default font; this probe needs no GDI
 		// allocation or additional producer linker inputs.
 		context.display = C.CreateWindowExA(0x200, c'EDIT', c'0', 0x50000802,
-			16, 18, 278, 58, window, voidptr(usize(100)), instance, unsafe { nil })
+			16, 18, 278, 58, window, voidptr(u64(100)), instance, unsafe { nil })
 		if context.display == unsafe { nil } { return error('calculator display failed') }
+		output('VINIX WIN64 CALCULATOR EDIT\n')
 		for index, label in ['7', '8', '9', '/', '4', '5', '6', '*', '1', '2', '3', '-', 'C', '0', '=', '+']! {
 			button := C.CreateWindowExA(0, c'BUTTON', &char(label.str), 0x50000000,
 				16 + (index % 4) * 71, 92 + (index / 4) * 70, 65, 60, window,
-				voidptr(usize(label[0])), instance, unsafe { nil })
+				voidptr(u64(label[0])), instance, unsafe { nil })
 			if button == unsafe { nil } { return error('calculator button failed') }
 		}
+		output('VINIX WIN64 CALCULATOR CONTROLS\n')
 		C.ShowWindow(window, 1)
+		output('VINIX WIN64 CALCULATOR SHOW\n')
 		C.UpdateWindow(window)
 		output('VINIX WIN64 CALCULATOR READY\n')
 		mut message := C.MSG{}

@@ -1096,8 +1096,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     builds real USER32 controls through the pinned PE producer. Arithmetic,
     bounded input, formatting and 10,000 zero-retained V allocation cycles pass
     normal/production/sanitizer host checks; a production arithmetic mutation
-    refuses and the real PE receipt is admitted. Wine window painting, input
-    and close remain separate target qualification gates.
+    refuses and the real PE receipt is admitted. A subsequent
+    [signed x86 graphical qualification](tests/packages/wine-gui-check.md)
+    passes real painting, pointer arithmetic and natural close; ARM graphical
+    startup and desktop embedding remain open.
   - [x] [Wine adapter host boundaries](tests/packages/wine-prefix-check.md)
     qualify private per-account prefix/IPC preparation and exact pinned Wine
     and AArch64 translator patches with measured ownership and sanitizers.
@@ -1145,14 +1147,15 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Graphics dependency construction](tests/packages/wine-graphics-check.md)
     now includes pinned dlopen-only FreeType/Fontconfig and complete font
     provenance. Fresh signed console runs pass on both architectures with
-    59 x86/68 ARM evidence refusals. The calculator's graphical run still
-    fails during window display; painting/input/close remain unqualified.
+    59 x86/68 ARM evidence refusals.
     Its [private XImage fallback](tests/packages/wine-ximage-check.md) now
     avoids a forbidden SysV allocation without changing sandbox permissions.
     Fresh signed console runs and all 61 x86/70 ARM evidence refusals pass.
-    X86 paint, pointer arithmetic and close are observed, with final GUI
-    cleanup qualification and ARM graphical startup still open.
-    Graphical execution, detached-server lease coverage, complete source and
+    [Signed x86 graphical calculator qualification](tests/packages/wine-gui-check.md)
+    now passes authenticated paint, real pointer arithmetic, natural close,
+    fixture retirement and independent signature/pixel/runtime admission,
+    with eleven targeted evidence refusals. ARM graphical startup, desktop
+    embedding, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
