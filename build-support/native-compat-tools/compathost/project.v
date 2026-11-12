@@ -106,7 +106,12 @@ fn x11_core(tool string, destination string, arch string, no_main bool) ! {
 	if tool == 'winehost' { defines << 'x11_host_libc' }
 	project(root() + '/build-support/xorg-server/' + tool, tool, destination, arch, false, false,
 		defines)!
-	write(destination, '#define VINIX_XINPUT_V_RUNTIME 1\n' + scaffold_warnings + read(destination)!)!
+	// Native modules can expose string.str as char* while V's literal macro
+	// still casts to u8*. Match the actual field type without relaxing -Werror.
+	generated := read(destination)!.replace(
+		'#define _SL(id, s, n) static const string id = {(u8*)s, n, 1}',
+		'#define _SL(id, s, n) static const string id = {(__typeof__(((string*)0)->str))s, n, 1}')
+	write(destination, '#define VINIX_XINPUT_V_RUNTIME 1\n' + scaffold_warnings + generated)!
 }
 
 fn x11_compile(args []string) !int {
