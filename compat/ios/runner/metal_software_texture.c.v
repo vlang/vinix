@@ -3,7 +3,7 @@ module main
 
 struct SoftwareMetalRegion { x u64 y u64 z u64 width u64 height u64 depth u64 }
 fn sm_pixel_size(format u64) u64 {
-	return match format { 10 { u64(1) } 30 { u64(2) } 80, 81 { u64(4) } else { u64(0) } }
+	return match format { 10 { u64(1) } 30 { u64(2) } 70, 71, 80, 81 { u64(4) } else { u64(0) } }
 }
 fn sm_linear_alignment(format u64) u64 { return if sm_pixel_size(format) == 0 { u64(0) } else { u64(256) } }
 fn sm_device_linear_alignment(device u64, selector &char, format u64) u64 {
@@ -145,7 +145,8 @@ fn sm_texture_view(texture u64, selector &char, format u64) u64 {
 	defer { C.ios_objc_initialize_unlock() }
 	h := sm_check(texture, 'VinixSoftwareMTLTexture')
 	input := h.cv_metal
-	if format != input.format && (!(format in [u64(80), 81]! && input.format in [u64(80), 81]!) || input.usage & 16 == 0) { return 0 }
+	compatible := (format in [u64(70), 71]! && input.format in [u64(70), 71]!) || (format in [u64(80), 81]! && input.format in [u64(80), 81]!)
+	if format != input.format && (!compatible || input.usage & 16 == 0) { return 0 }
 	mut state := unsafe { &CVMetalState(C.malloc(sizeof(CVMetalState))) }
 	if state == unsafe { nil } { return 0 }
 	unsafe { *state = *input }; state.format = format

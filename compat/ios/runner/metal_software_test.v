@@ -305,6 +305,43 @@ fn test_software_metal_compiled_library_metadata() {
 	println('IOS-SOFTWARE-METAL-LIBRARY: raw/wrapped and independent/shared module containers, leaf/rope dispatch ABI, owned bytes, names/types/UTF-8, function lifetimes, empty/missing functions, truncations/hash/range/type errors, optional NSError, bounded 512 MiB rope rejection, eight workers and two drained runtimes PASS')
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
+fn test_software_metal_rgba8_textures() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
+		for format in [u64(70), 71]! {
+			assert sm_test_linear_alignment(d, format) == 256
+			desc := sm_test_descriptor(format, 2, 2, 0); sm_test_set(desc, c'setUsage:', 17)
+			t := sm_test_texture(d, desc); assert t != 0 && sm_send(t, c'pixelFormat') == format
+			view := sm_test_view(t, if format == 70 { u64(71) } else { u64(70) }); assert view != 0
+			nested := sm_test_view_ranges(view, format, 2, SoftwareMetalRange{length: 1}, SoftwareMetalRange{length: 1}); assert nested != 0
+			for bad in [u64(0), 10, 30, 80, 81, 112]! { assert sm_test_view(t, bad) == 0 }
+			mut input := [u8(3), 17, 91, 255, 9, 29, 83, 127, 11, 41, 73, 63, 19, 53, 67, 31]!
+			mut output := [32]u8{}; region := SoftwareMetalRegion{width: 2, height: 2, depth: 1}
+			sm_test_read(t, region, 0, u64(unsafe { &output[0] }), 8); for i in 0 .. 16 { assert output[i] == 0 }
+			sm_test_put(view, region, 0, u64(unsafe { &input[0] }), 8); sm_test_transfer_slice(nested, region, 0, 0, u64(unsafe { &output[0] }), 8, 0, false)
+			for i in 0 .. 16 { assert output[i] == input[i] } // Distinct R/B values detect accidental swizzling.
+			b := sm_test_buffer(d, 1024, 0); target := sm_test_buffer_texture_view(b, desc, 256, 256); assert target != 0
+			readback := sm_test_buffer(d, 64, 0); C.memset(unsafe { voidptr(sm_send(readback, c'contents')) }, 0xcc, 64)
+			cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder'); size := SoftwareMetalSize{width: 2, height: 2, depth: 1}
+			sm_test_texture_copy(enc, nested, 0, 0, SoftwareMetalOrigin{}, size, target, 0, 0, SoftwareMetalOrigin{})
+			sm_test_buffer_texture(enc, readback, 4, 16, 0, size, target, 0, 0, SoftwareMetalOrigin{}, false)
+			// Exact format matching still applies to blits across linear/sRGB handles.
+			child := C.fork(); assert child >= 0
+			if child == 0 { C.close(1); C.close(2); sm_test_texture_copy(enc, t, 0, 0, SoftwareMetalOrigin{}, size, view, 0, 0, SoftwareMetalOrigin{}); C._exit(0) }
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+			input[0] = 0x5d; sm_test_transfer_slice(view, region, 0, 0, u64(unsafe { &input[0] }), 8, 0, true)
+			objc_release(t); objc_release(view); objc_release(nested); objc_release(b); sm_call(enc, c'endEncoding'); sm_call(cmd, c'commit')
+			base := sm_send(readback, c'contents')
+			for i in 0 .. 64 { expected := if i >= 4 && i < 12 { input[i - 4] } else if i >= 20 && i < 28 { input[i - 12] } else { u8(0xcc) }; assert unsafe { *(&u8(base + u64(i))) } == expected }
+			objc_release(target); objc_release(readback)
+			// No PixelFormatView usage: same-format view succeeds, pair conversion rejects.
+			restricted := sm_test_texture(d, sm_test_descriptor(format, 1, 1, 0)); same := sm_test_view(restricted, format); assert same != 0 && sm_test_view(restricted, if format == 70 { u64(71) } else { u64(70) }) == 0; objc_release(same); objc_release(restricted)
+		}
+		objc_release(q); objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-RGBA8: linear/sRGB storage, zero initialization, raw channel order, short/full CPU transfers, nested compatible views, alignment/buffer storage, deferred live-byte texture/readback blits, client padding, format/usage rejection and two drained runtimes PASS')
+}
 type SMNoCopy = fn (u64, &char, u64, u64, u64, u64) u64
 struct SMDeallocatorProbe {
 	owner u64
@@ -447,7 +484,7 @@ fn test_software_metal_linear_alignment() {
 				objc_release(t); objc_release(b); objc_pool_pop(pool)
 			}
 		}
-		for format in [u64(0), 1, 70, 252, ~u64(0)]! {
+		for format in [u64(0), 1, 112, 252, ~u64(0)]! {
 			child := C.fork(); assert child >= 0
 			if child == 0 { C.close(1); C.close(2); sm_test_linear_alignment(d, format); C._exit(0) }
 			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
