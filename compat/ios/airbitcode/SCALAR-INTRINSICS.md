@@ -59,7 +59,7 @@ Except parameter two's `immarg` on classification, zero counts and integer abs,
 return/parameter, string/type,
 `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A 1320-entry fixed stack cache validates each admitted
+validation budget. A 1384-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -96,6 +96,8 @@ at i1..i64, with dynamic same-width shift amounts and poison for overshifts,
 in two more width ranges.
 [Bit extraction and deposition](SCALAR-BIT-PERMUTATION.md) add `pext`/`pdep`
 at i1..i64, using dynamic same-width masks and two more width ranges.
+[Carry-less multiplication](SCALAR-CLMUL.md) adds `clmul` at i1..i64, retaining
+the low N polynomial product bits, in another width range.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting

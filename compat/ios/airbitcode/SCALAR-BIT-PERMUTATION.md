@@ -26,8 +26,8 @@ Dynamic masks are supported. Vectors, wider integers, malformed suffixes and
 AIR aliases reject. All blocks are preflighted. Valid LLVM IR and matching
 immutable indexes remain preconditions.
 
-The fixed stack cache has 1320 entries: forty floating-overload slots and
-twenty independent 64-width integer ranges. Extraction and deposition have
+The fixed stack cache has 1384 entries: forty floating-overload slots and
+twenty-one independent 64-width integer ranges. Extraction and deposition have
 separate ranges. The shared 1,000,000-work attribute limit, fixed two-ID
 attribute storage and three existing owned execution arrays/cleanup remain.
 Retained allocation is not measured.

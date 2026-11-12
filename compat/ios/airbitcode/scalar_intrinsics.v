@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if id in [.fma, .fmuladd, .fshl, .fshr]! { return 3 }
-	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep]! { 2 } else { 1 }
+	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
@@ -129,6 +129,7 @@ fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second
 	return work
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
+	if id == .clmul { return scalar_integer_clmul(bits, a, b)! }
 	if scalar_integer_bit_permutation(id) { return scalar_integer_bit_permutation_value(id, bits, a, b)! }
 	if scalar_integer_saturating_shift(id) { return error('AIR intrinsic: saturating shift requires poison-aware evaluation') }
 	if scalar_integer_saturating(id) { return scalar_integer_saturating_value(id, bits, a, b)! }

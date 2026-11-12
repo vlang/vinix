@@ -43,7 +43,7 @@ the groups under the existing shared 1,000,000-work budget. Mask constancy is
 checked even when the declaration has no attribute list. Declaration cache
 keys use the floating input width, keeping both overloads distinct despite
 their shared i1 result. The cache reserves forty floating-overload slots within
-the 1320-entry fixed stack cache shared with integer intrinsics. No new owned
+the 1384-entry fixed stack cache shared with integer intrinsics. No new owned
 execution arrays are introduced; the existing three arrays and cleanup remain.
 A CALL costs one executed instruction; primitive CALL/return takes two.
 
