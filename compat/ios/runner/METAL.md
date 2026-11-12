@@ -1,7 +1,7 @@
 # Software Metal backend
 
 Build the iOS runner with `-d ios_metal_software` to enable a CPU backend for
-shared buffers and buffer blits. `MTLCreateSystemDefaultDevice` then returns
+shared buffers, shared 2D textures and buffer blits. `MTLCreateSystemDefaultDevice` then returns
 an owned device implemented by Vinix. Without that build flag it returns nil.
 This backend does real deferred buffer work; it does not run shaders, render
 textures, present drawables or use a GPU. It cannot yet render Fortnite.
@@ -9,13 +9,32 @@ textures, present drawables or use a GPU. It cannot yet render Fortnite.
 Implemented Objective-C API:
 
 - Device: `newBufferWithLength:options:`, `newBufferWithBytes:length:options:`,
-  `newCommandQueue`, `maxBufferLength`.
+  `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`.
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
 - Queue: `commandBuffer`, `device`.
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
   `waitUntilCompleted`, `status`, `error`.
 - Blit encoder: `copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:`,
   `endEncoding`.
+- Texture descriptor: `texture2DDescriptorWithPixelFormat:width:height:mipmapped:`
+  plus width, height, pixel-format, usage and storage-mode setters.
+- Texture: dimension/format/usage/device/storage queries,
+  `replaceRegion:mipmapLevel:withBytes:bytesPerRow:` and
+  `getBytes:bytesPerRow:fromRegion:mipmapLevel:`.
+
+Textures support R8Unorm (10), RG8Unorm (30), BGRA8Unorm (80) and
+BGRA8Unorm_sRGB (81). Upload/readback preserves raw bytes without color
+conversion. Only shared, single-level, single-sample 2D storage is supported,
+with dimensions 1..16,384 and at most 64 MiB per texture. Mipmapped descriptor
+creation and unsupported allocations return nil. Textures snapshot descriptor
+metadata, own zero-initialized storage and retain their device independently.
+Descriptor/texture state is freed through the existing CoreVideo metadata
+destructor; pixel storage and device references use normal object cleanup.
+Transfers validate positive 2D regions, level zero, row pitch and pointer
+arithmetic before copying rows; caller memory must cover the requested span.
+Pitch must be a multiple of the pixel size; zero pitch is accepted for a
+single row, following [Apple's transfer contract](https://developer.apple.com/documentation/metal/mtltexture/replace%28region%3Amipmaplevel%3Awithbytes%3Abytesperrow%3A%29).
+Only requested pixel bytes are touched, preserving client row padding.
 
 Only resource options zero (shared storage, default cache/hazards) are
 supported. Buffers must have a positive length at most 64 MiB; rejected
@@ -35,7 +54,8 @@ checks use subtraction to avoid overflow; overlapping ranges in the same
 buffer reject. Zero-length copies at the end of a buffer are valid. Each
 command buffer is limited to 65,536 copies. Invalid encoding/state/ranges fail
 explicitly. Client accesses through `contents` still require synchronization
-with command submission. Unsupported shader/render/texture methods are absent.
+with command submission. Texture blit commands, shader/render methods,
+IOSurface imports and presentation remain absent.
 
 Run the maintained V harness from the repository root:
 

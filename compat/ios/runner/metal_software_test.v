@@ -9,6 +9,76 @@ type SMBuffer = fn (u64, &char, u64, u64) u64
 type SMBytes = fn (u64, &char, u64, u64, u64) u64
 type SMCopy = fn (u64, &char, u64, u64, u64, u64, u64)
 type SMVoid = fn (u64, &char)
+type SMDescriptor = fn (u64, &char, u64, u64, u64, u8) u64
+type SMTexture = fn (u64, &char, u64) u64
+type SMSet = fn (u64, &char, u64)
+type SMPut = fn (u64, &char, SoftwareMetalRegion, u64, u64, u64)
+type SMRead = fn (u64, &char, u64, u64, SoftwareMetalRegion, u64)
+fn sm_test_descriptor(format u64, width u64, height u64, mipmapped u8) u64 { return unsafe { SMDescriptor(voidptr(C.ios_objc_msgsend))(ios_runtime.names['MTLTextureDescriptor'], c'texture2DDescriptorWithPixelFormat:width:height:mipmapped:', format, width, height, mipmapped) } }
+fn sm_test_texture(device u64, descriptor u64) u64 { return unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(device, c'newTextureWithDescriptor:', descriptor) } }
+fn sm_test_set(object u64, selector &char, value u64) { unsafe { SMSet(voidptr(C.ios_objc_msgsend))(object, selector, value) } }
+fn sm_test_put(texture u64, region SoftwareMetalRegion, level u64, bytes u64, row u64) { unsafe { SMPut(voidptr(C.ios_objc_msgsend))(texture, c'replaceRegion:mipmapLevel:withBytes:bytesPerRow:', region, level, bytes, row) } }
+fn sm_test_read(texture u64, region SoftwareMetalRegion, level u64, bytes u64, row u64) { unsafe { SMRead(voidptr(C.ios_objc_msgsend))(texture, c'getBytes:bytesPerRow:fromRegion:mipmapLevel:', bytes, row, region, level) } }
+
+fn test_software_metal_texture_storage_region_abi_and_lifetimes() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start()
+		for format in [u64(10), 30, 80, 81]! {
+			pool := objc_pool_push(); device := metal_create_system_default_device()
+			assert sm_test_descriptor(format, 7, 5, 1) == 0
+			descriptor := sm_test_descriptor(format, 7, 5, 0)
+			assert descriptor != 0 && sm_send(descriptor, c'width') == 7
+			texture := sm_test_texture(device, descriptor)
+			assert texture != 0 && sm_send(texture, c'width') == 7 && sm_send(texture, c'height') == 5 && sm_send(texture, c'pixelFormat') == format && sm_send(texture, c'device') == device
+			assert sm_send(texture, c'mipmapLevelCount') == 1 && sm_send(texture, c'textureType') == 2 && sm_send(texture, c'storageMode') == 0
+			for selector in [c'setWidth:', c'setStorageMode:', c'setPixelFormat:', c'setUsage:']! {
+				key := ctext(u64(selector))
+				original := sm_send(descriptor, if key == 'setWidth:' { c'width' } else if key == 'setStorageMode:' { c'storageMode' } else if key == 'setPixelFormat:' { c'pixelFormat' } else { c'usage' })
+				sm_test_set(descriptor, selector, if key == 'setWidth:' { u64(0) } else { ~u64(0) })
+				assert sm_test_texture(device, descriptor) == 0
+				sm_test_set(descriptor, selector, original)
+			}
+			sm_test_set(descriptor, c'setWidth:', 16385); assert sm_test_texture(device, descriptor) == 0
+			sm_test_set(descriptor, c'setWidth:', 16384); sm_test_set(descriptor, c'setHeight:', 16384); assert sm_test_texture(device, descriptor) == 0
+			assert sm_send(texture, c'width') == 7 && sm_send(texture, c'height') == 5
+			objc_release(device); objc_pool_pop(pool) // Texture owns its snapshot and device.
+			pixel := sm_pixel_size(format); row := 7 * pixel + 4
+			mut input := [64]u8{}; mut output := [256]u8{}
+			for i in 0 .. 64 { input[i] = u8(i * 7 + 3) }
+			for i in 0 .. 256 { output[i] = 0xcc }
+			full := SoftwareMetalRegion{width: 7, height: 5, depth: 1}
+			sm_test_read(texture, full, 0, u64(&output[4]), row)
+			for y in 0 .. 5 { for x in 0 .. int(row) { assert output[4 + y * int(row) + x] == if x < int(7 * pixel) { u8(0) } else { u8(0xcc) } } }
+			region := SoftwareMetalRegion{x: 2, y: 1, width: 3, height: 2, depth: 1}
+			sm_test_put(texture, region, 0, u64(&input[0]), 3 * pixel + 4)
+			sm_test_read(texture, full, 0, u64(&output[4]), row)
+			for y in 0 .. 5 { for x in 0 .. int(row) {
+				expected := if x >= int(7 * pixel) { u8(0xcc) } else if y >= 1 && y < 3 && x >= int(2 * pixel) && x < int(5 * pixel) { input[(y - 1) * int(3 * pixel + 4) + x - int(2 * pixel)] } else { u8(0) }
+				assert output[4 + y * int(row) + x] == expected
+			} }
+			for i in 0 .. 4 { assert output[i] == 0xcc && output[4 + int(row) * 5 + i] == 0xcc }
+			one := SoftwareMetalRegion{width: 1, height: 1, depth: 1}
+			sm_test_put(texture, one, 0, u64(&input[0]), 0)
+			sm_test_read(texture, one, 0, u64(&output[240]), 0)
+			for i in 0 .. int(pixel) { assert output[240 + i] == input[i] }
+			for mode in 0 .. 9 {
+				child := C.fork(); assert child >= 0
+				if child == 0 {
+					C.close(1); C.close(2)
+					bad := match mode { 0 { SoftwareMetalRegion{...region, x: 7} } 1 { SoftwareMetalRegion{...region, y: ~u64(0)} } 2 { SoftwareMetalRegion{...region, depth: 2} } else { region } }
+					sm_test_put(texture, bad, if mode == 3 { u64(1) } else { 0 }, if mode == 4 { u64(0) } else if mode == 6 { ~u64(0) } else { u64(unsafe { &input[0] }) }, if mode == 5 { ~u64(0) } else if mode == 7 { u64(1) } else if mode == 8 { if pixel == 1 { u64(0) } else { 3 * pixel + 1 } } else { 3 * pixel + 4 })
+					C._exit(0)
+				}
+				mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+			}
+			objc_release(texture)
+			assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		}
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-TEXTURES: four formats, 48-byte region ABI, padded subregion uploads/readback, guards, descriptor snapshots, device lifetimes and two drained runtimes PASS')
+}
 fn sm_send(object u64, selector &char) u64 { return unsafe { SMGet(voidptr(C.ios_objc_msgsend))(object, selector) } }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 fn sm_test_buffer(device u64, length u64, options u64) u64 { return unsafe { SMBuffer(voidptr(C.ios_objc_msgsend))(device, c'newBufferWithLength:options:', length, options) } }

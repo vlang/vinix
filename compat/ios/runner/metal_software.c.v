@@ -155,4 +155,5 @@ fn software_metal_start() {
 	sm_method(command, c'waitUntilCompleted', u64(unsafe { voidptr(sm_wait) }), c'v16@0:8')
 	sm_method(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', u64(unsafe { voidptr(sm_copy) }), c'v56@0:8@16Q24@32Q40Q48')
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
+	sm_texture_start(device)
 }

@@ -1,0 +1,94 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+struct SoftwareMetalRegion { x u64 y u64 z u64 width u64 height u64 depth u64 }
+fn sm_pixel_size(format u64) u64 {
+	return match format { 10 { u64(1) } 30 { u64(2) } 80, 81 { u64(4) } else { u64(0) } }
+}
+fn sm_descriptor(cls u64, selector &char, format u64, width u64, height u64, mipmapped u8) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	if mipmapped != 0 { return 0 }
+	mut state := unsafe { &CVMetalState(C.calloc(1, sizeof(CVMetalState))) }
+	if state == unsafe { nil } { return 0 }
+	state.width = width; state.height = height; state.format = format; state.usage = 1
+	descriptor := objc_allocate(ios_runtime.names['VinixMetalTextureDescriptor'])
+	obj_header(descriptor).cv_metal = state
+	return objc_autorelease(descriptor)
+}
+fn sm_descriptor_set(object u64, selector &char, value u64) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	mut state := cv_metal_state(object, ios_runtime.names['VinixMetalTextureDescriptor'])
+	match ctext(u64(selector)) {
+		'setWidth:' { state.width = value }
+		'setHeight:' { state.height = value }
+		'setPixelFormat:' { state.format = value }
+		'setUsage:' { state.usage = value }
+		'setStorageMode:' { state.storage = value }
+		else { panic('iOS: unsupported software Metal descriptor setter') }
+	}
+}
+fn sm_new_texture(device u64, selector &char, descriptor u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	sm_check(device, 'VinixSoftwareMTLDevice')
+	if descriptor == 0 { return 0 }
+	h := ios_runtime.objects[descriptor] or { return 0 }
+	if h.cls != ios_runtime.names['VinixMetalTextureDescriptor'] || h.cv_metal == unsafe { nil } { return 0 }
+	input := h.cv_metal; pixel := sm_pixel_size(input.format)
+	if pixel == 0 || input.storage != 0 || input.usage & ~u64(31) != 0 || input.width == 0 || input.height == 0 || input.width > 16384 || input.height > 16384 { return 0 }
+	length := input.width * input.height * pixel
+	if length > software_metal_max_buffer { return 0 }
+	mut state := unsafe { &CVMetalState(C.calloc(1, sizeof(CVMetalState))) }
+	if state == unsafe { nil } { return 0 }
+	unsafe { *state = *input } // Snapshot; subsequent descriptor changes are independent.
+	texture := sm_new('VinixSoftwareMTLTexture', device)
+	mut target := obj_header(texture)
+	target.cv_metal = state
+	target.data = []u8{len: int(length)}
+	return texture
+}
+fn sm_texture_get(object u64, selector &char) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	h := sm_check(object, 'VinixSoftwareMTLTexture'); state := h.cv_metal
+	return match ctext(u64(selector)) {
+		'width' { state.width } 'height' { state.height } 'pixelFormat' { state.format }
+		'usage' { state.usage } 'device' { h.fields[0] }
+		'textureType' { u64(2) }
+		'depth', 'arrayLength', 'mipmapLevelCount', 'sampleCount' { u64(1) }
+		'storageMode', 'cpuCacheMode', 'resourceOptions', 'hazardTrackingMode' { u64(0) }
+		else { panic('iOS: unsupported software Metal texture property') }
+	}
+}
+fn sm_texture_transfer(object u64, region SoftwareMetalRegion, level u64, bytes u64, row u64, write bool) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	h := sm_check(object, 'VinixSoftwareMTLTexture'); state := h.cv_metal
+	if level != 0 || region.z != 0 || region.depth != 1 || region.width == 0 || region.height == 0 || !sm_range(state.width, region.x, region.width) || !sm_range(state.height, region.y, region.height) { panic('iOS: software Metal texture region/level') }
+	pixel := sm_pixel_size(state.format); width := region.width * pixel
+	pitch := if row == 0 && region.height == 1 { width } else { row }
+	if bytes == 0 || pitch < width || pitch % pixel != 0 || (region.height > 1 && pitch > (~u64(0) - width) / (region.height - 1)) { panic('iOS: software Metal texture row/pointer') }
+	extent := pitch * (region.height - 1) + width
+	if bytes > ~u64(0) - extent { panic('iOS: software Metal texture pointer overflow') }
+	for y in u64(0) .. region.height {
+		texture := u64(h.data.data) + ((region.y + y) * state.width + region.x) * pixel
+		client := bytes + y * pitch
+		if write { C.memcpy(unsafe { voidptr(texture) }, unsafe { voidptr(client) }, usize(width)) }
+		else { C.memcpy(unsafe { voidptr(client) }, unsafe { voidptr(texture) }, usize(width)) }
+	}
+}
+fn sm_texture_put(object u64, selector &char, region SoftwareMetalRegion, level u64, bytes u64, row u64) { sm_texture_transfer(object, region, level, bytes, row, true) }
+fn sm_texture_read(object u64, selector &char, bytes u64, row u64, region SoftwareMetalRegion, level u64) { sm_texture_transfer(object, region, level, bytes, row, false) }
+fn sm_texture_start(device u64) {
+	texture := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSoftwareMTLTexture', 0)
+	objc_register_class(texture)
+	sm_method(device, c'newTextureWithDescriptor:', u64(unsafe { voidptr(sm_new_texture) }), c'@24@0:8@16')
+	sm_method(read64(ios_runtime.names['MTLTextureDescriptor']), c'texture2DDescriptorWithPixelFormat:width:height:mipmapped:', u64(unsafe { voidptr(sm_descriptor) }), c'@48@0:8Q16Q24Q32B40')
+	for selector in [c'setWidth:', c'setHeight:', c'setPixelFormat:', c'setUsage:', c'setStorageMode:']! { sm_method(ios_runtime.names['VinixMetalTextureDescriptor'], selector, u64(unsafe { voidptr(sm_descriptor_set) }), c'v24@0:8Q16') }
+	for selector in [c'width', c'height', c'pixelFormat', c'usage', c'textureType', c'depth', c'arrayLength', c'mipmapLevelCount', c'sampleCount', c'storageMode', c'cpuCacheMode', c'resourceOptions', c'hazardTrackingMode']! { sm_method(texture, selector, u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8') }
+	sm_method(texture, c'device', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')
+	sm_method(texture, c'replaceRegion:mipmapLevel:withBytes:bytesPerRow:', u64(unsafe { voidptr(sm_texture_put) }), c'v88@0:8{MTLRegion={MTLOrigin=QQQ}{MTLSize=QQQ}}16Q64r^v72Q80')
+	sm_method(texture, c'getBytes:bytesPerRow:fromRegion:mipmapLevel:', u64(unsafe { voidptr(sm_texture_read) }), c'v88@0:8^v16Q24{MTLRegion={MTLOrigin=QQQ}{MTLSize=QQQ}}32Q80')
+}
