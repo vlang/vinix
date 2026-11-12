@@ -8,6 +8,19 @@ This is a proposed V implementation and qualification plan. No supervisor,
 kernel fix, reproducer, target build or native run was added by this audit.
 The two kernel findings below are static findings, not reproduced failures.
 
+Follow-up: `tests/packages/wine-subreaper-probe.v` adds a native prerequisite
+probe for SET/GET subreaper, double-fork adoption across a new session, saved
+client status 37, adopted-worker status 23, a busy independent lease open
+after client exit and release after worker retirement. A pipe gates the worker
+without relying on a sleep to keep it alive; a 30-second alarm bounds blocking
+operations. Descendants explicitly close the holder's lease descriptor.
+Run the Linux executable with one fresh absolute external state directory.
+Both Linux architecture declarations pass V checking. Native compilation and
+execution remain pending; this is not race coverage or Wine lifetime acceptance.
+The current clone-parent publication and exit adoption paths still require
+the coordinated review and deterministic controls described below. No production
+lease handling is changed by this probe.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
