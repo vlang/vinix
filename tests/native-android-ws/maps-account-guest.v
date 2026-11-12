@@ -135,6 +135,7 @@ fn hash(path string) !string {
 	defer { f.close() }
 	mut digest := sha256.new()
 	mut bytes := []u8{len: 65536}
+	defer { unsafe { bytes.free(); digest.free(); free(digest) } }
 	for {
 		n := f.read(mut bytes) or {
 			if err is os.Eof { break }
@@ -143,7 +144,10 @@ fn hash(path string) !string {
 		if n == 0 { break }
 		digest.write(bytes[..n])!
 	}
-	return digest.sum([]u8{}).hex()
+	mut result := []u8{len: 32}
+	defer { unsafe { result.free() } }
+	digest.checksum_into(mut result)
+	return result.hex()
 }
 
 fn safe_relative(path string) bool {
@@ -473,7 +477,8 @@ fn desktop_identity() !DesktopIdentity {
 			account_identity(passwd, group, uid, gid)!
 			socket := window_path(uid)
 			mut overrides := map[string]string{}
-			for entry in os.read_file(base + '/environ')!.split('\x00') {
+			environment_entries := os.read_file(base + '/environ')!.split('\x00')
+			for entry in environment_entries {
 				for key in ['VINIX_WINDOW_SOCKET', 'VINIX_SESSION_RUNTIME'] {
 					if entry.starts_with(key + '=') {
 						if key in overrides { return error('duplicate desktop window override') }
@@ -934,7 +939,8 @@ fn sqlite_after(before []SqliteObject, after []SqliteObject) ! {
 fn sqlite_snapshot() ![]SqliteObject {
 	protected('/', 0, false, .directory)!
 	mut parent := ''
-	for part in os.dir(sqlite_path)[1..].split('/') {
+	parts := os.dir(sqlite_path)[1..].split('/')
+	for part in parts {
 		parent += '/' + part
 		protected(parent, 0, false, .directory)!
 	}

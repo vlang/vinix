@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module accountmanifest
 
-import compress.szip
 import encoding.utf8
 import os
 
@@ -346,34 +345,9 @@ fn verify_xml(data []u8, expected_package string, expected_class string) ! {
 // Only a bounded, unique root manifest entry is read; archive paths are never
 // extracted to disk. Package/APK/certificate authentication remains the caller's.
 pub fn verify_activity(apk string, expected_package string, expected_class string) ! {
-	if os.file_size(apk) > 1024 * 1024 * 1024 {
-		return error('APK exceeds manifest verification size limit')
-	}
-	mut archive := szip.open(apk, .no_compression, .read_only)!
-	defer { archive.close() }
-	count := archive.total()!
-	if count > 65536 { return error('APK has too many ZIP entries') }
-	mut manifest := []u8{}
-	mut seen := false
-	for i in 0 .. count {
-		archive.open_entry_by_index(i)!
-		if archive.name() != 'AndroidManifest.xml' {
-			archive.close_entry()
-			continue
-		}
-		if seen || archive.size() < 8 || archive.size() > u64(manifest_limit) {
-			archive.close_entry()
-			return error('APK manifest must be unique and bounded')
-		}
-		seen = true
-		manifest = []u8{len: int(archive.size())}
-		read := archive.read_entry_buf(manifest.data, manifest.len) or {
-			archive.close_entry()
-			return err
-		}
-		archive.close_entry()
-		if read != manifest.len { return error('truncated APK manifest ZIP entry') }
-	}
-	if !seen { return error('APK has no AndroidManifest.xml') }
+	mut file := os.open(apk)!
+	defer { file.close() }
+	manifest := read_authenticator_zip_entry(mut file, 'AndroidManifest.xml', u64(manifest_limit))!
+	defer { unsafe { manifest.free() } }
 	verify_xml(manifest, expected_package, expected_class)!
 }

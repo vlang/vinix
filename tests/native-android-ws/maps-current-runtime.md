@@ -2247,3 +2247,58 @@ receipt `25dcaec111655e71716475e58ca2cd650e35c15cfe376ddc3584994a5932d2ee`,
 serial `522e7633a1e19d982b59dac809c4c3fa451029cf271407dc1eb6166d42abead1`,
 and data image
 `0440b3388e3d003d336a1029e93391a1c83d3873db4ff607e010ac5c24937728`.
+
+### Release APK preparation storage with current V
+
+Current V's szip.open eagerly caches all decoded entry payloads, while read-only
+close does not free its storage. Native APK installation now uses the lazy
+reader, validates every payload one at a time (including unused assets and
+directory entries), then releases it. It streams file hashes and explicitly
+releases the archive's owned names, payloads, backing bytes and reader object;
+the borrowed path remains owned by the caller. Entry allocation is capped at
+512MiB before decoding. ZIP/member validation, native path/ABI checks, atomic
+publication and verification of an existing installation remain enforced.
+Corrupt unused payload and nonempty-directory regressions fail before publication.
+Generated C confirmed that typed ZipEntry-array free is shallow in this compiler;
+entry fields therefore need explicit release, unlike its string-array free.
+
+Activity verification reuses the existing bounded, unique-member streaming APK
+reader for AndroidManifest.xml and frees its result. It scans the complete
+central directory and checks the selected member's local metadata, compression,
+CRC and complete binary XML; it does not decompress unrelated resources. The
+caller still authenticates the whole APK. Controller hashing now releases its
+buffer and digest. Two controller split loops are materialized for the current
+compiler's unresolved split helper, without changing their validation.
+
+The current protocol producer also builds/captures the native launcher and
+checks its ARM ELF identity. Staging's VINIX_CURRENT_NATIVE_LAUNCHER selects
+those actual bytes and updates deployment hashes. The test suite now includes
+nativeapk and companionstage as well as the original31 files. Its first ASan
+attempt failed because companionstage's required external fixture root was not
+set; the producer now creates a fresh private root, preserving the test rule.
+
+All33 files then passed ASan in `apk-memory-asan-20261112-r2`:0/0, complete
+cleanup,64556ms, RSS475676672, shared growth82886656 bytes. Leak detection is
+disabled for existing manual-allocation fixtures; address checks remain on.
+After the final directory-entry validation case, focused nativeapk ASan tests
+passed again and the complete33-file plain suite passed in
+`apk-memory-plain-20261112-r1`:0/0, complete cleanup,58993ms, RSS370868224,
+growth105615360 bytes. No historical checker was relaxed.
+
+Using available V0.5.2 6422d39 under the unchanged guard, controller build
+`apk-memory-controller-build-20261112-r4` passed0/0, complete cleanup,19684ms,
+RSS514195456, growth42373120 bytes. Protocol/launcher build
+`apk-memory-protocol-build-20261112-r2` passed0/0, complete cleanup,24264ms,
+RSS369917952, growth50483200 bytes. Controller SHA256 is
+`935e9d8df10fd91371b50418090311a7a2c92de8c8f8f6f28763411b5937fb3e`,
+broker `375210203078ea52751e4b327eef0e4d4cf73f6ebc42c368adf65d3caf5c7799`,
+launcher `10be0d265dcc4322fb26723108b60f89761c0ab39a614ebdc2de69778e768cb4`,
+and account DSO
+`626a0ff645e0a058755c01866f1a67340a6e79cf6b7968b51c21f2b20e5aa69e`.
+
+Fresh r66 stages all these artifacts with the qualified EGL SDK r1/fixture r57,
+native r5 and mandatory core/TLS jars. Staging passed0/0, complete cleanup,
+4899ms, RSS36585472, growth182820864 bytes. Deployed launcher, broker and
+controller hashes match their build outputs; volume identity, read-only e2fsck
+and initial hash passed. ARM/API and memory comparison are pending; host tests
+and builds alone do not establish the memory reduction or fix the native fault.

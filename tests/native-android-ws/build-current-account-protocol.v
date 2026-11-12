@@ -64,11 +64,12 @@ fn execute(mode string, root string) ! {
 	cross := '/opt/homebrew/bin/aarch64-linux-musl-gcc'
 	os.setenv('VEXE', v, true)
 	os.chdir(repo)!
-	common := [v, '-new-compiler', '-no-parallel', '-nocache', '-gc', 'none', '-path', '@vlib|' + repo + '/build-support/android']
+	common := [v, '-new-compiler', '-no-parallel', '-nocache', '-gc', 'none', '-path', '@vlib|' + repo + '/build-support/android|' + repo + '/tests/native-android-ws']
 	broker := repo + '/build-support/android/native-account-broker.v'
 	client := repo + '/build-support/android/accountclient'
 	mut inputs := [v, os.real_path(@FILE)]
-	for source in [broker, client] {
+	sources := [broker, client, repo + '/build-support/android/native-run.v']
+	for source in sources {
 		mut command := common.clone()
 		if mode == 'build' { command << ['-os', 'linux', '-arch', 'arm64', '-cc', cross] }
 		if source == client {
@@ -83,17 +84,21 @@ fn execute(mode string, root string) ! {
 		}
 	}
 	mut tests := []string{}
-	for directory in ['accountbroker', 'accountclient', 'accountmanifest', 'nativeaccountauth'] {
+	for directory in ['accountbroker', 'accountclient', 'accountmanifest', 'nativeaccountauth', 'nativeapk'] {
 		for name in os.ls(repo + '/build-support/android/' + directory)! {
 			if name.ends_with('_test.v') { tests << repo + '/build-support/android/' + directory + '/' + name }
 		}
 	}
+	tests << repo + '/tests/native-android-ws/companionstage/stage_test.v'
+	inputs << repo + '/tests/native-android-ws/companionstage/stage.v'
 	tests.sort()
 	inputs << tests
 	run([v, 'version'], root + '/v-version.log')!
 	run(['git', 'rev-parse', 'HEAD'], root + '/source-revision.log')!
 	if mode != 'build' {
 		hashes := capture(root, inputs)!
+		os.mkdir(root + '/companion-fixtures', mode: 0o700)!
+		os.setenv('VINIX_COMPANION_STAGE_TEST_ROOT', root + '/companion-fixtures', true)
 		if mode == 'asan' { os.setenv('ASAN_OPTIONS', 'detect_leaks=0:halt_on_error=1', true) }
 		for index, source in tests {
 			name := index.str() + '-' + os.base(os.dir(source)) + '-' + os.base(source)
@@ -143,12 +148,16 @@ fn execute(mode string, root string) ! {
 	broker_command << ['-cflags', optimization + ' -static -no-pie -I' + root + '/zlib -L' + root + '/zlib',
 		'-o', root + '/native-account-broker', broker]
 	run(broker_command, root + '/broker-build.log')!
+	mut launcher_command := arm.clone()
+	launcher_command << ['-cflags', optimization + ' -static -no-pie -I' + root + '/zlib -L' + root + '/zlib',
+		'-o', root + '/run-android', repo + '/build-support/android/native-run.v']
+	run(launcher_command, root + '/launcher-build.log')!
 	mut client_command := arm.clone()
 	client_command << ['-shared', '-enable-globals', '-manualfree', '-d', 'no_backtrace', '-d', 'no_segfault_handler',
 		'-cflags', optimization + ' -fPIC -I' + root + '/native -L' + root + '/native -I' + root + '/zlib -L' + root + '/zlib',
 		'-ldflags', '-Wl,-z,defs -Wl,-z,max-page-size=65536', '-o', root + '/libvinix-android-account.so', client]
 	run(client_command, root + '/client-build.log')!
-	for name in ['native-account-broker', 'libvinix-android-account.so'] {
+	for name in ['native-account-broker', 'libvinix-android-account.so', 'run-android'] {
 		bytes := os.read_bytes(root + '/' + name)!
 		kind := if name.ends_with('.so') { u8(3) } else { u8(2) }
 		if bytes.len < 64 || bytes[..6] != [u8(0x7f), `E`, `L`, `F`, 2, 1]
