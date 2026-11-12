@@ -48,3 +48,33 @@ serial. amd64 production kernels print only to the framebuffer, so that check
 is skipped there. The amd64 Linux ABI has no `clone`, `rename`, `link`,
 `symlink` or `mount` yet; the cases that need them accept `ENOSYS` there, and
 the thread case runs on aarch64 only.
+
+`ioctl-check.v` builds a production V guest with 20 ordinary-user controls for
+file-query ioctls under pledge. It checks `rpath` admission, `error`-mode
+refusal, fatal violations, sign-extended request numbers and denied flag
+changes/neighboring requests on both architectures.
+
+`media-check.v` runs the unchanged C security fixture using the hardware
+harness's boot media (FAT on ARM). This is useful when the legacy ARM ISO
+stalls in firmware. It calls `tests/native-system-tools/security-verdict.v`
+in a separate process to apply the existing exact marker counts, forbidden
+markers, ARM violation report and packet-randomness checks. An empty packet
+capture still refuses. It stops QEMU after PASS; it does not test shutdown.
+
+Both controllers use the same arguments and require a fresh output directory:
+
+```sh
+"$V" -cc clang -prod -path '@vlib|tests/hardware-platform|@vmodules' \
+  -o /external/ioctl-check tests/openbsd-security/ioctl-check.v
+V="$V" /external/ioctl-check aarch64 /external/ioctl-arm \
+  /external/vinix-aarch64 /path/to/musl/sysroot /path/to/gcc/runtime clang
+
+"$V" -cc clang -prod -path '@vlib|tests/hardware-platform|@vmodules' \
+  -o /external/media-check tests/openbsd-security/media-check.v
+V="$V" /external/media-check aarch64 /external/security-arm \
+  /external/vinix-aarch64 /path/to/musl/sysroot /path/to/gcc/runtime clang
+```
+
+Use `x86_64` and its kernel/sysroot/GCC runtime for the other architecture.
+Bootloader, firmware and emulator selection follow `hwhost`. See the
+[Wine pledge continuation](../packages/wine-pledge-check.md) for retained results.

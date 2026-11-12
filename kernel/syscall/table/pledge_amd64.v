@@ -132,6 +132,7 @@ fn pledge_needs(nr u64, a [6]u64) u64 {
 // the call was refused with.
 fn pledge_entry(mut t proc.Thread, frame &cpulocal.GPRState, nr u64) u64 {
 	t.pledge_syscall = i64(nr)
+	t.pledge_argument = frame.rsi
 	code := pledge_verdict(pledge_needs(nr, [frame.rdi, frame.rsi, frame.rdx, frame.r10, frame.r8,
 		frame.r9]!))
 	if code == 0 {

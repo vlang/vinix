@@ -288,8 +288,8 @@ pub fn pledge_fail(needed u64) u64 {
 		// The first broken promise is the one worth reporting; a call that
 		// goes on to break more is dead already.
 		names := pledge_names_text(needed & ~pledge_set)
-		C.kprintf(c'%.*s: pledge "%.*s", syscall %lld\n', i32(process.name.len), process.name.str,
-			i32(names.len), names.str, i64(t.pledge_syscall))
+		C.kprintf(c'%.*s: pledge "%.*s", syscall %lld, argument 0x%llx\n', i32(process.name.len),
+			process.name.str, i32(names.len), names.str, i64(t.pledge_syscall), t.pledge_argument)
 		unsafe { names.free() }
 	}
 	t.pledge_violation = needed | pledge_set

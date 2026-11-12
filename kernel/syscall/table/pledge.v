@@ -51,6 +51,10 @@ const tcgets2 = u64(0x802c542a)
 const tiocgwinsz = u64(0x5413)
 const tiocspgrp = u64(0x5410)
 const tiocsti = u64(0x5412)
+const fs_ioc_getflags = u64(0x80086601)
+const fs_ioc32_getflags = u64(0x80046601)
+const vfat_ioctl_readdir_both = u64(0x82307201)
+const vfat_ioctl_readdir_short = u64(0x82307202)
 
 fn pledge_ioctl(request u64) u64 {
 	req := request & 0xffffffff
@@ -60,6 +64,12 @@ fn pledge_ioctl(request u64) u64 {
 		// uses fcntl(F_ISATTY) instead, so it never needed them.
 		fionread, fionbio, fioclex, fionclex, tcgets, tcgets2, tiocgwinsz {
 			return pledge_stdio
+		}
+		// Reads about a file the process already opened. Wine asks every
+		// directory for its case-folding flag and a FAT short-name listing;
+		// a filesystem without them answers ENOTTY.
+		fs_ioc_getflags, fs_ioc32_getflags, vfat_ioctl_readdir_both, vfat_ioctl_readdir_short {
+			return p_rpath
 		}
 		// Pushing input into a terminal is how a program escapes into its
 		// parent shell; OpenBSD removed it outright.

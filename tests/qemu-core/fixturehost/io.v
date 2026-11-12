@@ -41,7 +41,7 @@ fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
 fn C.posix_spawnattr_setpgroup(voidptr, i32) i32
 fn C.killpg(i32, i32) i32
-fn C.poll(&C.pollfd, usize, i32) i32
+// os declares poll with the platform's nfds_t (u32 on Darwin).
 
 struct C.pollfd {
 mut:

@@ -172,6 +172,8 @@ pub mut:
 	// number, for the report. See proc/pledge.v.
 	pledge_violation u64
 	pledge_syscall   i64
+	// Its second argument, which names the request for ioctl and fcntl.
+	pledge_argument  u64
 	// Set on the way out of a syscall that is being rewound to run again, for
 	// the signal dispatched next to take back if its handler wants EINTR.
 	restarting_syscall bool

@@ -201,6 +201,8 @@ pub mut:
 	// number, for the report. See proc/pledge.v.
 	pledge_violation u64
 	pledge_syscall   i64
+	// Its second argument, which names the request for ioctl and fcntl.
+	pledge_argument  u64
 	// Linux thread bookkeeping, as on arm64: the futex word set_tid_address()
 	// or CLONE_CHILD_CLEARTID names, and the set_robust_list() head, both
 	// handed back when the thread exits.

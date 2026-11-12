@@ -1114,13 +1114,18 @@ architectures; broader release/catalog/runtime acceptance remains open.
   - [ ] Qualified isolated Wine/translation and Apple runtime catalogs, including
     ordinary-user graphical execution and their required IPC/device services.
     The retained [translated fork regression](tests/packages/wine-translation-fork-check.md)
-    currently fails on ARM after the first fork with split RW/RX mappings. An
+    records an ARM failure after the first fork with split RW/RX mappings. An
     A/B boot traces this to the translator, not the kernel: QEMU shares its
     memfd JIT buffer between parent and child, while the stock translator with
     W+X passes all 32 forks. The source-built translator now carries
     `splitwx-fork.patch`, and with it all 32 forks pass as uid 1000 without W+X.
-    The packaged Wine runtime still stages the Alpine translator, so
-    Wine/translation qualification stays open.
+    Local runtime construction can now select the source-built translator.
+    The [Wine pledge continuation](tests/packages/wine-pledge-check.md) passes
+    the signed ARM Win64 console probe after admitting four file-query ioctls
+    under `rpath`; both architectures pass 20 focused controls and the full
+    security suite. Historical retention still refuses changed producer inputs.
+    Graphical execution, detached-server lease coverage, complete source and
+    redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
