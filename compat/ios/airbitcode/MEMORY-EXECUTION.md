@@ -64,7 +64,14 @@ the first input for fshl and the second for fshr. All operands are evaluated;
 poison propagates even in an otherwise unused half at zero shift, and undef
 rejects. These calls reuse scalar evaluation and cost one step each.
 
-Only ordinary direct calls to these seven families' exact declarations are admitted:
+Direct LLVM `smin`/`smax`/`umin`/`umax` support matching scalar i1..i64
+operands and results. Signed variants use two's-complement ordering, including
+i1 true as -1 and i64 minimum. Unsigned variants compare the raw masked words.
+Both operands are evaluated; poison propagates and undef rejects. Results
+preserve the chosen input bits. Each call costs one step and reuses the scalar
+intrinsic validator and evaluator.
+
+Only ordinary direct calls to these eleven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -142,5 +149,7 @@ defined widened LLVM value/poison-tag reference without executing native poison.
 defined native LLVM execution, with separate zero/poison/undef/call controls.
 `tests/ios/air-memory-funnel.v` checks three-input funnel buffer functions,
 rotation/amount boundaries and separate poison/undef/padding-choice controls.
+`tests/ios/air-memory-extrema.v` checks signed/unsigned min/max buffer functions
+against native LLVM, including boundary matrices and separate poison controls.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.

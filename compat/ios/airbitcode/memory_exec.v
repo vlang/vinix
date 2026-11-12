@@ -101,7 +101,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	defer { unsafe { pointers.free() } }
 	mut layouts := IRTypeLayouts{}
 	defer { layouts.free() }
-	mut intrinsic_declarations := [488]int{} // Forty FP slots + seven integer families.
+	mut intrinsic_declarations := [744]int{} // Forty FP slots + eleven integer families.
 	mut intrinsic_work := 0
 	for index in block.first .. block.first + block.count {
 		inst := bodies.instructions[index]; op := p.instructions[index]
@@ -115,7 +115,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: intrinsic result') }
 			key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
 			id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
-			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr]! { return error('AIR memory execution: unsupported intrinsic') }
+			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax]! { return error('AIR memory execution: unsupported intrinsic') }
 			if key < 0 || key >= intrinsic_declarations.len || (intrinsic_declarations[key] != 0 && intrinsic_declarations[key] != op.callee_function + 1) { return error('AIR memory execution: duplicate intrinsic declaration') }
 			if intrinsic_declarations[key] == 0 {
 				intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, second_immarg)!
