@@ -2,6 +2,7 @@
 module main
 
 import crypto.sha256
+import math
 import os
 
 #include <sys/wait.h>
@@ -19,6 +20,100 @@ type SMDescriptor = fn (u64, &char, u64, u64, u64, u8) u64
 type SMTexture = fn (u64, &char, u64) u64
 type SMSet = fn (u64, &char, u64)
 type SMLibrary = fn (u64, &char, u64, &u64) u64
+type SMSamplerFloatGet = fn (u64, &char) f32
+type SMSamplerFloatSet = fn (u64, &char, f32)
+type SMSamplerBoolGet = fn (u64, &char) u8
+type SMSamplerBoolSet = fn (u64, &char, u8)
+type SMSamplerName = fn (&char) u64
+struct SMSamplerAPI { send voidptr selector SMSamplerName cls u64 }
+fn (api SMSamplerAPI) sel(name &char) &char { return unsafe { &char(api.selector(name)) } }
+fn (api SMSamplerAPI) get(object u64, name &char) u64 { return unsafe { SMGet(api.send)(object, api.sel(name)) } }
+fn (api SMSamplerAPI) set(object u64, name &char, value u64) { unsafe { SMSet(api.send)(object, api.sel(name), value) } }
+fn (api SMSamplerAPI) float_get(object u64, name &char) f32 { return unsafe { SMSamplerFloatGet(api.send)(object, api.sel(name)) } }
+fn (api SMSamplerAPI) float_set(object u64, name &char, value f32) { unsafe { SMSamplerFloatSet(api.send)(object, api.sel(name), value) } }
+fn (api SMSamplerAPI) bool_get(object u64, name &char) u8 { return unsafe { SMSamplerBoolGet(api.send)(object, api.sel(name)) } }
+fn (api SMSamplerAPI) bool_set(object u64, name &char, value u8) { unsafe { SMSamplerBoolSet(api.send)(object, api.sel(name), value) } }
+fn sm_sampler_profile(api SMSamplerAPI) {
+	descriptor := api.get(api.cls, c'new'); assert descriptor != 0
+	for i, name in [c'minFilter', c'magFilter', c'mipFilter', c'maxAnisotropy', c'sAddressMode', c'tAddressMode', c'rAddressMode', c'borderColor', c'compareFunction']! { assert api.get(descriptor, name) == if i == 3 { u64(1) } else { u64(0) } }
+	assert api.bool_get(descriptor, c'normalizedCoordinates') == 1 && api.bool_get(descriptor, c'lodAverage') == 0 && api.bool_get(descriptor, c'supportArgumentBuffers') == 0
+	assert api.float_get(descriptor, c'lodMinClamp') == 0 && api.float_get(descriptor, c'lodMaxClamp') == f32(3.4028234663852886e38) && api.get(descriptor, c'label') == 0
+	for i, setter in [c'setMinFilter:', c'setMagFilter:', c'setMipFilter:', c'setMaxAnisotropy:', c'setSAddressMode:', c'setTAddressMode:', c'setRAddressMode:', c'setBorderColor:', c'setCompareFunction:']! { api.set(descriptor, setter, [u64(1), 1, 2, 16, 2, 3, 4, 2, 7]![i]) }
+	api.float_set(descriptor, c'setLodMinClamp:', 0.25); api.float_set(descriptor, c'setLodMaxClamp:', 7.75)
+	api.bool_set(descriptor, c'setNormalizedCoordinates:', 0); api.bool_set(descriptor, c'setLodAverage:', 1); api.bool_set(descriptor, c'setSupportArgumentBuffers:', 1)
+	copy := api.get(descriptor, c'copy'); assert copy != 0 && copy != descriptor
+	api.set(descriptor, c'setMinFilter:', 0); api.float_set(descriptor, c'setLodMinClamp:', 2); api.bool_set(descriptor, c'setLodAverage:', 0)
+	api.get(descriptor, c'release')
+	for i, getter in [c'minFilter', c'magFilter', c'mipFilter', c'maxAnisotropy', c'sAddressMode', c'tAddressMode', c'rAddressMode', c'borderColor', c'compareFunction']! { assert api.get(copy, getter) == [u64(1), 1, 2, 16, 2, 3, 4, 2, 7]![i] }
+	assert api.float_get(copy, c'lodMinClamp') == 0.25 && api.float_get(copy, c'lodMaxClamp') == 7.75
+	assert api.bool_get(copy, c'normalizedCoordinates') == 0 && api.bool_get(copy, c'lodAverage') == 1 && api.bool_get(copy, c'supportArgumentBuffers') == 1
+	api.get(copy, c'release')
+}
+fn sm_sampler_worker(api SMSamplerAPI, device u64, descriptor u64) {
+	for _ in 0 .. 64 {
+		state := unsafe { SMTexture(api.send)(device, api.sel(c'newSamplerStateWithDescriptor:'), descriptor) }
+		assert state != 0 && api.get(state, c'device') == device
+		api.get(state, c'release')
+	}
+}
+fn test_software_metal_samplers() {
+	$if !ios_metal_software ? { return }
+	$if macos {
+		metal := C.dlopen(c'/System/Library/Frameworks/Metal.framework/Metal', 2); objc := C.dlopen(c'/usr/lib/libobjc.A.dylib', 2)
+		assert metal != unsafe { nil } && objc != unsafe { nil }
+		get_class := C.dlsym(objc, c'objc_getClass'); send := C.dlsym(objc, c'objc_msgSend'); selector := C.dlsym(objc, c'sel_registerName')
+		assert get_class != unsafe { nil } && send != unsafe { nil } && selector != unsafe { nil }
+		cls := unsafe { SMSamplerName(get_class)(c'MTLSamplerDescriptor') }; assert cls != 0
+		sm_sampler_profile(SMSamplerAPI{send, unsafe { SMSamplerName(selector) }, cls})
+		assert C.dlclose(objc) == 0 && C.dlclose(metal) == 0
+	}
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
+		cls := runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_OBJC_CLASS_$_MTLSamplerDescriptor') or { panic(err) }
+		assert cls == ios_runtime.names['MTLSamplerDescriptor'] && (runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_OBJC_METACLASS_$_MTLSamplerDescriptor') or { panic(err) }) == read64(cls)
+		for library in ['/usr/lib/libobjc.A.dylib', '/usr/lib/libSystem.B.dylib', '/System/Library/Frameworks/Foundation.framework/Foundation', '/System/Library/Frameworks/UIKit.framework/UIKit']! { for symbol in ['_OBJC_CLASS_$_MTLSamplerDescriptor', '_OBJC_METACLASS_$_MTLSamplerDescriptor']! { if _ := runtime_symbol(library, symbol) { assert false } } }
+		api := SMSamplerAPI{unsafe { voidptr(C.ios_objc_msgsend) }, objc_selector, cls}
+		sm_sampler_profile(api)
+		// Creation is a +1 snapshot. Labels copy mutable strings before sharing.
+		descriptor := api.get(api.get(cls, c'alloc'), c'init')
+		label := api.get(ios_runtime.names['NSMutableString'], c'new'); text := owned_string('sampler π'); api.set(label, c'setString:', text); objc_release(text)
+		api.set(descriptor, c'setLabel:', label)
+		assert api.get(descriptor, c'label') != label
+		changed := owned_string('changed'); api.set(label, c'setString:', changed); objc_release(changed)
+		assert string_text(api.get(descriptor, c'label')) == 'sampler π'; objc_release(label)
+		state := unsafe { SMTexture(api.send)(d, api.sel(c'newSamplerStateWithDescriptor:'), descriptor) }; assert state != 0
+		api.set(descriptor, c'setLabel:', 0); api.set(descriptor, c'setMinFilter:', 1)
+		assert string_text(api.get(state, c'label')) == 'sampler π' && sm_sampler_data(obj_header(state)).min_filter == 0
+		zone_copy := unsafe { SMTexture(api.send)(descriptor, api.sel(c'copyWithZone:'), 0) }; assert zone_copy != descriptor && api.get(zone_copy, c'minFilter') == 1; objc_release(zone_copy)
+		for axis in [c'setSAddressMode:', c'setTAddressMode:', c'setRAddressMode:']! { for value in u64(0) .. 6 { api.set(descriptor, axis, value); result := unsafe { SMTexture(api.send)(d, api.sel(c'newSamplerStateWithDescriptor:'), descriptor) }; assert result != 0; objc_release(result) }; api.set(descriptor, axis, 0) }
+		for compare in u64(0) .. 8 { api.set(descriptor, c'setCompareFunction:', compare); result := unsafe { SMTexture(api.send)(d, api.sel(c'newSamplerStateWithDescriptor:'), descriptor) }; assert result != 0; objc_release(result) }
+		for value in u64(1) .. 17 { api.set(descriptor, c'setMaxAnisotropy:', value); result := unsafe { SMTexture(api.send)(d, api.sel(c'newSamplerStateWithDescriptor:'), descriptor) }; assert result != 0; objc_release(result) }; api.set(descriptor, c'setMaxAnisotropy:', 1)
+		api.bool_set(descriptor, c'setNormalizedCoordinates:', 0); result := unsafe { SMTexture(api.send)(d, api.sel(c'newSamplerStateWithDescriptor:'), descriptor) }; assert result != 0; objc_release(result)
+		// Each rejection gets a fresh default descriptor, isolating the bad field.
+		for mode in 0 .. 22 {
+			bad := api.get(cls, c'new')
+			match mode {
+				0 { api.set(bad, c'setMinFilter:', 2) } 1 { api.set(bad, c'setMagFilter:', ~u64(0)) } 2 { api.set(bad, c'setMipFilter:', 3) }
+				3 { api.set(bad, c'setMaxAnisotropy:', 0) } 4 { api.set(bad, c'setMaxAnisotropy:', 17) }
+				5 { api.set(bad, c'setSAddressMode:', 6) } 6 { api.set(bad, c'setTAddressMode:', 6) } 7 { api.set(bad, c'setRAddressMode:', 6) }
+				8 { api.set(bad, c'setBorderColor:', 3) } 9 { api.set(bad, c'setCompareFunction:', 8) }
+				10 { api.bool_set(bad, c'setSupportArgumentBuffers:', 1) }
+				11 { api.float_set(bad, c'setLodMinClamp:', -0.25) } 12 { api.float_set(bad, c'setLodMinClamp:', 2); api.float_set(bad, c'setLodMaxClamp:', 1) }
+				13 { api.float_set(bad, c'setLodMinClamp:', math.f32_from_bits(0x7fc00000)) } 14 { api.float_set(bad, c'setLodMaxClamp:', math.f32_from_bits(0x7fc00000)) }
+				15 { api.float_set(bad, c'setLodMinClamp:', math.f32_from_bits(0x7f800000)) } 16 { api.float_set(bad, c'setLodMaxClamp:', math.f32_from_bits(0x7f800000)) }
+				else { api.bool_set(bad, c'setNormalizedCoordinates:', 0); match mode { 17 { api.set(bad, c'setSAddressMode:', 2) } 18 { api.set(bad, c'setTAddressMode:', 2) } 19 { api.set(bad, c'setRAddressMode:', 2) } 20 { api.set(bad, c'setMipFilter:', 1) } else { api.set(bad, c'setMaxAnisotropy:', 2) } } }
+			}
+			assert unsafe { SMTexture(api.send)(d, api.sel(c'newSamplerStateWithDescriptor:'), bad) } == 0; objc_release(bad)
+		}
+		raw := api.get(cls, c'alloc')
+		for bad in [u64(0), d, raw]! { assert unsafe { SMTexture(api.send)(d, api.sel(c'newSamplerStateWithDescriptor:'), bad) } == 0 }; objc_release(raw)
+		mut workers := []thread{}; for _ in 0 .. 8 { workers << spawn sm_sampler_worker(api, d, descriptor) }; for worker in workers { worker.wait() }; unsafe { workers.free() }
+		objc_release(descriptor); objc_release(d)
+		assert api.get(state, c'device') == d && string_text(api.get(state, c'label')) == 'sampler π'
+		objc_release(state); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-SAMPLERS: native descriptor reference, integer/bool/float ABI, copies and immutable snapshots, copied Unicode labels, address/compare/anisotropy ranges, 25 rejected inputs, eight workers, retained device and two drained runtimes PASS')
+}
 fn sm_test_default_library(d u64, bundle u64, output &u64) u64 { return unsafe { SMLibrary(voidptr(C.ios_objc_msgsend))(d, c'newDefaultLibraryWithBundle:error:', bundle, output) } }
 fn test_software_metal_default_libraries() {
 	$if !ios_metal_software ? { return }

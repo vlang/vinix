@@ -60,7 +60,8 @@ fn test_metal_device() {
 			if _ := runtime_symbol(other, '_MTLCreateSystemDefaultDevice') { assert false }
 		}
 		for missing in ['_MTLCreateSystemDefaultDeviceUnknown', '_OBJC_CLASS_$_MTLDevice',
-			'_MTLCreateSystemDefaultDeviceWithOptions']! {
+			'_MTLCreateSystemDefaultDeviceWithOptions', '_OBJC_CLASS_$_MTLSamplerDescriptor',
+			'_OBJC_METACLASS_$_MTLSamplerDescriptor']! {
 			if _ := runtime_symbol(library, missing) { assert false }
 		}
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0

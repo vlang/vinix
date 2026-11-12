@@ -12,7 +12,11 @@ Implemented Objective-C API:
   `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`,
   `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`,
   `newLibraryWithFile:error:`, `newDefaultLibrary`,
-  `newDefaultLibraryWithBundle:error:`.
+  `newDefaultLibraryWithBundle:error:`, `newSamplerStateWithDescriptor:`.
+- Sampler descriptor: `init`, `copy`, `copyWithZone:`, min/mag/mip filters,
+  max anisotropy, S/T/R address modes, border color, compare function,
+  normalized coordinates, LOD clamps/averaging, argument-buffer flag and label.
+- Sampler state: `device`, `label` (immutable configuration snapshots).
 - Library: `device`, `functionNames`, `newFunctionWithName:`.
 - Function: `device`, `name`, `functionType` (metadata handles only).
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
@@ -30,6 +34,22 @@ Implemented Objective-C API:
 - Texture: dimension/format/usage/device/storage queries, `iosurface`, `iosurfacePlane`,
   `replaceRegion:mipmapLevel:withBytes:bytesPerRow:` and
   `getBytes:bytesPerRow:fromRegion:mipmapLevel:`.
+
+Sampler descriptors have the SDK defaults: nearest min/mag filters, no mip
+filter, anisotropy one, clamp-to-edge addressing, transparent-black border,
+comparison never, normalized coordinates, LOD range zero through FLT_MAX,
+and no LOD averaging or argument-buffer support. Copies have independent
+configuration; labels copy NSString contents, including mutable strings.
+`newSamplerStateWithDescriptor:` snapshots the descriptor and label and
+retains its device. It returns nil for invalid enum values, anisotropy outside
+1..16, nonfinite/negative/reversed LOD clamps, or argument-buffer support.
+Unnormalized coordinates require clamp-to-edge on all axes, no mip filtering
+and anisotropy one in this bounded profile. Nil, wrong-type and uninitialized
+descriptors also return nil. Sampler storage and label/device references use
+normal object cleanup. The descriptor class and metaclass imports are scoped
+to Metal.framework and available only with the software flag. This provides
+configuration objects; shader binding, texture sampling and GPU resource IDs
+remain absent. Newer reduction-mode and LOD-bias properties are unsupported.
 
 Textures support R8Unorm (10), RG8Unorm (30), BGRA8Unorm (80) and
 BGRA8Unorm_sRGB (81). Upload/readback preserves raw bytes without color

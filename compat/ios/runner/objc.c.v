@@ -1439,9 +1439,9 @@ fn runtime_symbol(library string, symbol string) !u64 {
 		&& library != '/System/Library/Frameworks/CoreTelephony.framework/CoreTelephony' {
 		return error('iOS: telephony import requires CoreTelephony.framework')
 	}
-	if symbol in ['_OBJC_CLASS_$_MTLTextureDescriptor', '_OBJC_METACLASS_$_MTLTextureDescriptor']!
+	if symbol in ['_OBJC_CLASS_$_MTLTextureDescriptor', '_OBJC_METACLASS_$_MTLTextureDescriptor', '_OBJC_CLASS_$_MTLSamplerDescriptor', '_OBJC_METACLASS_$_MTLSamplerDescriptor']!
 		&& library != '/System/Library/Frameworks/Metal.framework/Metal' {
-		return error('iOS: Metal texture descriptor import requires Metal.framework')
+		return error('iOS: Metal descriptor import requires Metal.framework')
 	}
 	if library == '/usr/lib/swift/libswiftDispatch.dylib' { return swift_dispatch_symbol(symbol) }
 	if library == '/usr/lib/swift/libswiftFoundation.dylib' { return swift_foundation_symbol(symbol) }

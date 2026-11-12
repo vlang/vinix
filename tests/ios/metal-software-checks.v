@@ -79,6 +79,7 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-LIBRARY:'), 'missing library test marker' } }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-LIBRARY-FILES:'), 'missing library file test marker' } }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-DEFAULT-LIBRARY:'), 'missing default library marker' } }
+	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-SAMPLERS:'), 'missing sampler marker' } }
 }
 
 fn main() {
