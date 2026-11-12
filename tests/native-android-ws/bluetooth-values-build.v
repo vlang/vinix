@@ -16,6 +16,7 @@ fn main() {
 	androidtools.framework_intent_mime(root + '/smali')!
 	androidtools.framework_contacts_authority(root + '/smali')!
 	androidtools.framework_intent_to_uri(root + '/smali')!
+	androidtools.framework_tethering(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -29,6 +30,7 @@ fn main() {
 	types << r'android/content/IntentFilter$MalformedMimeTypeException'
 	types << 'android/provider/ContactsContract'
 	types << 'android/content/Intent'
+	types << 'android/net/ConnectivityManager'
 	for args in [[java, '-Xmx256m', '-cp', cp, 'org.jf.smali.Main', 'assemble', '--api', '28', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'],
 		['/usr/bin/zip', '-q', '-j', root + '/api-impl.jar', root + '/classes.dex'],
 		[java, '-Xmx256m', '-cp', cp, 'org.jf.baksmali.Main', 'disassemble', '--classes', types.map('L' + it + ';').join(','), '--jobs', '2', root + '/classes.dex', '-o', root + '/roundtrip']] {

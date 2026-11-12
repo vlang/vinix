@@ -158,3 +158,20 @@ The two-entry archive checksum is
 `2ece7a6da7ce7692064f541f282961312f015ccfbef4da117808035df32efab2`.
 Broader selector/source-bounds and all primitive-extra combinations have not
 yet been separately exercised. GMS/Maps validation of this successor is ongoing.
+
+Guest r9 advanced to missing `ConnectivityManager.isTetheringSupported()Z`
+in `apra.b` source16. The complete broker log is retained between
+`URI-FULL-LOG-BEGIN` and `URI-MAPS-LOG-BEGIN`; the following Maps log probe
+confirmed no Maps log had yet been created.
+`framework_tethering.v` adds the capability query returning false without
+polling or claiming a tethering backend. SDK `framework-tethering-20261112-r1`
+passed guarded assembly/readback in3,878 ms with RSS474,546,176,
+growth28,536,832, guard/child0/0 and complete cleanup.
+Signed fixture `current-api-fixture-20261112-r4` adds a direct capability check
+and passed all earlier API tests in guest `maps-current-20261112-r10`, again
+with pass/readiness, complete EOF drain and exit0. Snapshot
+`current-api-uart-20261112-r3`, plan `current-api-plan-20261112-r3.json` and
+independent readback `current-api-readback-20261112-r3` retain its two-entry
+archive without removals, checksum
+`7ef3f391c725dee81ec3f34f28469ab86914601c5fecf43a06d3c25724dc174c`.
+The test bind mount was released before the subsequent broker attempt.

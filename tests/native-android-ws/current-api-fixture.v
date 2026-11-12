@@ -141,6 +141,11 @@ invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->isVoiceCapable()Z
 move-result v0
 const/4 v1, 0
 invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Landroid/net/ConnectivityManager;
+invoke-direct {v0}, Landroid/net/ConnectivityManager;-><init>()V
+invoke-virtual {v0}, Landroid/net/ConnectivityManager;->isTetheringSupported()Z
+move-result v0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "CURRENT-API-PASS"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
