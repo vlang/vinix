@@ -96,7 +96,7 @@ pub fn admit_private_layout(runtime string, inputs map[string]string) ! {
 		defer { unsafe { original.free() } }
 		bytes := layout_bytes(original)!
 		defer { unsafe { bytes.free() } }
-		patched := private_server_patch(bytes, part.ends_with('ntdll.so'))!
+		patched := private_runtime_patch(bytes, part.ends_with('ntdll.so'))!
 		defer { unsafe { patched.free() } }
 		path := runtime + '/root' + if part == '/usr/bin/wineserver' {
 			'/usr/libexec/vinix-wine/wineserver'
@@ -105,7 +105,7 @@ pub fn admit_private_layout(runtime string, inputs map[string]string) ! {
 		consumed := layout_bytes(path)!
 		defer { unsafe { consumed.free() } }
 		if patched != consumed {
-			return error('Wine binary differs from the exact private-server patch: ' + part)
+			return error('Wine binary differs from the exact private-runtime patch: ' + part)
 		}
 	}
 }

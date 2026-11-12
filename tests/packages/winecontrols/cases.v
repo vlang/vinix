@@ -17,7 +17,7 @@ pub fn names(architecture string, forksafe bool) ![]string {
 		'producer-cc-argv', 'producer-missing-locale', 'producer-missing-intl',
 		'producer-changed-locale', 'producer-changed-intl', 'producer-missing-inf',
 		'producer-changed-inf', 'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
-		'wine-server-resealed-patch', 'wine-client-resealed-patch']
+		'wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls']
 	if architecture == 'aarch64' {
 		result << ['translator-declaration', 'translator-resealed-patch', 'translator-resealed-smoke',
 			'missing-smoke-marker', 'missing-arm-loader-input', 'missing-firmware-vars-input',

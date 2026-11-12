@@ -193,7 +193,7 @@ fn checks() ! {
 		if name.starts_with('producer-') || name in ['forksafe-manifest-binding',
 			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
 			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
-			'wine-client-resealed-patch'] {
+			'wine-client-resealed-patch', 'wine-server-proc-nls'] {
 			selected_prepared = directory + '/prepared'
 			prepared_copy(directory, prepared, selected_prepared)!
 		}
@@ -230,8 +230,8 @@ fn checks() ! {
 				expected = 'missing ARM boot input declaration:'
 			}
 			replace(directory + '/declaration.json', json2.encode(declaration))!
-		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch'] {
-			part := if name == 'wine-server-resealed-patch' {
+		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls'] {
+			part := if name != 'wine-client-resealed-patch' {
 				'/usr/libexec/vinix-wine/wineserver'
 			} else {
 				'/usr/lib/wine/x86_64-unix/ntdll.so'
@@ -239,10 +239,17 @@ fn checks() ! {
 			file := 'prepared/' + architecture + '/runtime/root' + part
 			original := os.read_file(selected_prepared + '/' + file)!
 			changed := original.clone()
-			unsafe { changed.str[0] ^= 1 }
+			if name == 'wine-server-proc-nls' {
+				// Restore exactly the original procfs discovery instruction,
+				// keeping the private-prefix patch and resealing all hashes.
+				instruction := '\x48\x8d\x3d\x40\xf9\x00\x00'
+				unsafe { vmemcpy(changed.str + 0x5efe4, instruction.str, instruction.len) }
+			} else {
+				unsafe { changed.str[0] ^= 1 }
+			}
 			replace(selected_prepared + '/' + file, changed)!
 			reseal_producer(directory, selected_prepared, file)!
-			expected = 'Wine binary differs from the exact private-server patch: '
+			expected = 'Wine binary differs from the exact private-runtime patch: '
 		} else if name == 'missing-iso-input' {
 			declaration := read_map(directory + '/declaration.json')!
 			input_update(directory, declaration['iso_bootx64'], '', '')!

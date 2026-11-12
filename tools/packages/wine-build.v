@@ -231,7 +231,7 @@ fn build() ! {
 	}
 	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so']! {
 		text := os.read_file(root + part)!
-		patched := wineadapter.private_server_patch(text, part.ends_with('ntdll.so'))!
+		patched := wineadapter.private_runtime_patch(text, part.ends_with('ntdll.so'))!
 		destination := if part == '/usr/bin/wineserver' {
 			'/usr/libexec/vinix-wine/wineserver'
 		} else {
