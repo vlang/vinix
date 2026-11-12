@@ -26,7 +26,7 @@ including `immarg`, reject for these operations. Dynamic shift amounts are
 supported. Vectors, wider integers, malformed decimal suffixes and AIR aliases
 reject. Valid LLVM IR and matching immutable indexes remain preconditions.
 
-The fixed stack cache has 488 entries: forty floating-overload slots and seven
+The fixed stack cache has 744 entries: forty floating-overload slots and eleven
 independent 64-width integer ranges. Funnel-left and funnel-right use separate
 ranges; attribute validation runs once per admitted declaration under the
 existing shared 1,000,000-work limit. The three owned execution arrays and their

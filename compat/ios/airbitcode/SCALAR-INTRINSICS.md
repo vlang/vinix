@@ -58,7 +58,7 @@ Declaration attributes admit only function-level `nounwind`, `readnone`,
 Except classification/zero-count parameter two's `immarg`, return/parameter, string/type,
 `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A 488-entry fixed stack cache validates each admitted
+validation budget. A 744-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -83,6 +83,8 @@ after the forty floating-overload slots. Unsupported byte-swap widths reject.
 with a constant i1 zero-poison flag, using two more independent 64-width ranges.
 [Funnel shifts](SCALAR-FUNNEL.md) add homogeneous ternary `fshl`/`fshr` at i1..i64,
 including dynamic shift amounts and rotations, in another two width ranges.
+[Integer extrema](SCALAR-INTEGER-EXTREMA.md) add signed `smin`/`smax` and unsigned
+`umin`/`umax` at i1..i64, in four more independent width ranges.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting
