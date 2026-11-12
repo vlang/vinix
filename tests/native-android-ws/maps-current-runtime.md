@@ -2202,3 +2202,48 @@ on ARM, then its first real pre-broker snapshot retained all four files for
 six processes (354327 bytes), with stable start times. This kernel's status
 files do not yield VmRSS in the observer's Android/Linux format; the raw maps/
 smaps are retained for inspection. Maps runtime memory sampling follows.
+
+### Retained process mappings and r65 outcome
+
+r65 captures before preparation, during preparation (the directory named
+`ready` predates actual broker readiness), with GMS ready, during Maps startup,
+and after account cleanup remain under `maps-current-20261112-r65`.
+The raw data image is authoritative. Offline debugfs extraction retained file
+contents; changing ownership to the guest's root failed on the host, so the
+extracted directories do not reproduce guest ownership. Their content checksum
+list `memory-retained.sha256` has SHA256
+`28acef585ca8c1a3af288b6ee81a0e0338e7c63763797788a86412e44e01d2f7`.
+
+The new V `maps-memory-report.v` checks complete per-mapping Size/Rss fields
+and stable bracket identities, and reports unavailable captures explicitly.
+Malformed, duplicate, missing and inconsistent fields fail its selftests.
+Its derived GMS/Maps reports have SHA256
+`035581d69895e1d21306a479ac7b0a91d9c807f020ec5254646fe4aae590da7a` and
+`0210dd027d72da331e6e3d572f9faa4ce1278946b4a2f11d681b2bc52e062667`.
+These are non-atomic RSS samples, not physical-memory totals: shared pages may
+appear in multiple processes, and mappings can change between reads.
+
+The GMS-phase sample shows controller PID55854 at2094288KiB RSS,
+root broker48389 at655840KiB, service launcher46055 at1022288KiB and GMS38656
+at688816KiB. The later Maps launcher11867 has1083968KiB RSS. Many large
+anonymous regions match APK and decoded-entry sizes. Maps6835's smaps exceeded
+the2MiB per-file capture bound; its stat/maps/status remain retained, but no
+complete Maps smaps result is claimed. These measurements implicate substantial
+launch/preparation retention rather than establishing a Java-heap explanation.
+
+Direct onboarding Sign in / Add account reached GMS PreAddAccountActivity and
+check-in/FRP state processing. GMS then reported native SIGSEGV at address0x898,
+PC0x80111921b94 on thread51281, followed by account input disconnected. No OOM
+kill was logged in r65; low memory may be relevant but does not establish the
+native fault's cause. No login page or credentials were observed. The600-second
+watch was interrupted; minimum space7221202944 bytes at the retained late
+sample and minimum MemFree34480KiB supply no stability pass.
+
+Only verified owned QEMU93163 was synced and stopped before offline access.
+Maps log SHA256 is
+`b629c9da1b1f3149c50f858602b4bf29e291866122ff0470ccf82f6c42d43b08`,
+broker `6f4bb8b695d39ad175bc565c7bffdd4296e2a6469bdad314d42bbf39256301b3`,
+receipt `25dcaec111655e71716475e58ca2cd650e35c15cfe376ddc3584994a5932d2ee`,
+serial `522e7633a1e19d982b59dac809c4c3fa451029cf271407dc1eb6166d42abead1`,
+and data image
+`0440b3388e3d003d336a1029e93391a1c83d3873db4ff607e010ac5c24937728`.
