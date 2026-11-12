@@ -30,6 +30,54 @@ fn C.__atomic_store_n(&u8, u8, i32)
 
 fn failed(pointer voidptr) bool { return u64(pointer) == ~u64(0) }
 
+struct AliasView { reservation voidptr base voidptr }
+
+fn alias_view(fd i32, prot i32) !AliasView {
+	reservation := C.mmap(unsafe { nil }, 131072, C.PROT_NONE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0)
+	if failed(reservation) { return error('alias reservation failed') }
+	base := (u64(reservation) + 65535) & ~u64(65535)
+	mapped := C.mmap(voidptr(base), 16384, prot, C.MAP_FIXED | C.MAP_SHARED, fd, 0)
+	if failed(mapped) || mapped != voidptr(base) { C.munmap(reservation, 131072); return error('alias mapping failed') }
+	return AliasView{reservation, mapped}
+}
+
+fn aliases(mode string) ! {
+	path := '/tmp/shared-aliases-' + mode
+	fd := C.open(path.str, C.O_RDWR | C.O_CREAT | C.O_EXCL | C.O_CLOEXEC, 0o600)
+	if fd < 0 { return error('alias backing creation failed') }
+	defer { C.close(fd); C.unlink(path.str) }
+	if C.ftruncate(fd, 16384) != 0 { return error('alias backing resize failed') }
+	for page in 0 .. 4 {
+		mut value := u8(17 + page)
+		if C.pwrite(fd, &value, 1, i64(page * 4096)) != 1 { return error('alias seed failed') }
+	}
+	reader_fd := C.open(path.str, C.O_RDONLY | C.O_CLOEXEC)
+	other_fd := C.dup(fd)
+	if reader_fd < 0 || other_fd < 0 {
+		if reader_fd >= 0 { C.close(reader_fd) }; if other_fd >= 0 { C.close(other_fd) }
+		return error('alias descriptor creation failed')
+	}
+	defer { C.close(reader_fd); C.close(other_fd) }
+	writer := alias_view(fd, C.PROT_READ | C.PROT_WRITE)!
+	defer { C.munmap(writer.reservation, 131072) }
+	reader := alias_view(reader_fd, C.PROT_READ)!
+	defer { C.munmap(reader.reservation, 131072) }
+	other := alias_view(other_fd, C.PROT_READ | C.PROT_WRITE)!
+	defer { C.munmap(other.reservation, 131072) }
+	for changed in 0 .. 4 {
+		C.__atomic_store_n(unsafe { &u8(u64(writer.base) + u64(changed * 4096)) }, u8(80 + changed), 3)
+		for page in 0 .. 4 {
+			wanted := if page == changed { u8(80 + changed) } else { u8(17 + page) }
+			for base in [writer.base, reader.base, other.base]! {
+				if C.__atomic_load_n(unsafe { &u8(u64(base) + u64(page * 4096)) }, 2) != wanted { return error('alias contents or subpage isolation differs') }
+			}
+		}
+		C.__atomic_store_n(unsafe { &u8(u64(other.base) + u64(changed * 4096)) }, u8(17 + changed), 3)
+		if C.__atomic_load_n(unsafe { &u8(u64(reader.base) + u64(changed * 4096)) }, 2) != u8(17 + changed) { return error('reverse alias coherence differs') }
+	}
+	println('SHARED-PAGES ALIASES ' + mode + ' PASS three views four distinct subpages and separate/duplicated descriptors')
+}
+
 fn one(mode string, length int, is_shared bool, writable bool) ! {
 	path := '/tmp/shared-pages-' + mode + '-' + length.str() + '-' + is_shared.str() + '-' + writable.str()
 	fd := C.open(path.str, C.O_RDWR | C.O_CREAT | C.O_EXCL | C.O_CLOEXEC, 0o600)
@@ -95,6 +143,7 @@ fn probe(mode string) ! {
 		one(mode, length, true, true)!
 		one(mode, length, true, false)!
 	}
+	aliases(mode)!
 	println('SHARED-PAGES PASS ' + mode + ' pagesize=' + wanted.str() + ' six ordinary mapping controls; diagnostic only')
 }
 

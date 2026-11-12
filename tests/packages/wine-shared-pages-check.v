@@ -58,6 +58,8 @@ fn run() ! {
 	os.write_file(work + '/generated-before-boot.json', json2.encode(generated))!
 	outcome := hwhost.run_scenario(host, hwhost.Scenario{name: 'shared-page-diagnostic', arches: ['aarch64'], ending: .running,
 		required: ['SHARED-PAGES PASS native pagesize=16384 six ordinary mapping controls; diagnostic only',
+			'SHARED-PAGES ALIASES native PASS three views four distinct subpages and separate/duplicated descriptors',
+			'SHARED-PAGES ALIASES translated PASS three views four distinct subpages and separate/duplicated descriptors',
 			'SHARED-PAGES PASS translated pagesize=4096 six ordinary mapping controls; diagnostic only', 'HWTEST PASS shared-page-diagnostic'],
 		forbidden: ['HWTEST FAIL', 'SHARED-PAGES FAIL', 'Kernel panic']},
 		hwhost.Run{kernel: kernel, guest: extras + '/probe-native', extras: extras, state: work + '/boot', timeout: 120, keep: true})

@@ -78,3 +78,21 @@ retained. The earlier `-01` archive attempt remains failed and preserved:
 mtree conversion hashed sparse disk-image extents rather than logical holes.
 The corrected reader hashes every logical byte, including zero-filled holes;
 it does not exempt disk images or change historical launch qualification.
+
+## Three-view continuation
+
+The continuation based on `80c5311ad` adds two alias groups to the twelve
+original cases. Each uses one 16 KiB shared backing file, four distinct 4 KiB
+subpages and three views: a writable original descriptor, an independently
+opened read-only descriptor and a duplicated writable descriptor. Writes in
+both directions must remain visible through the aliases without changing the
+other subpages. Native ARM and translated x86 both pass these checks as uid
+1000 on the same retained kernel and fork-safe translator.
+
+The complete passing run remains at
+`/Users/alex/.cache/vinix-wine-shared-user-20261112/linux-alias-01`, with literal
+build commands, generated C, actual parsed-source lists, selected input hashes,
+before/after inventories, serial output and `result.json`. The original
+`wine-shared-pages-20261112` workspace and archive remain unchanged. This
+continuation measures coherent aliases at host-page boundaries; general
+translated 4 KiB shared mappings and ARM Wine graphical acceptance remain open.
