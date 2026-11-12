@@ -24,6 +24,7 @@ fn main() {
 	androidtools.framework_restrictions_service(root + '/smali')!
 	androidtools.framework_stable_density(root + '/smali')!
 	androidtools.framework_secure_longs(root + '/smali')!
+	androidtools.framework_runtime_queries(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -46,6 +47,8 @@ fn main() {
 	types << 'android/app/ContextImpl'
 	types << 'android/util/DisplayMetrics'
 	types << r'android/provider/Settings$Secure'
+	types << 'android/os/UserManager'
+	types << 'android/content/pm/ApplicationInfo'
 	types << 'android/telephony/VinixSubscriptionFailure'
 	types << r'android/telephony/SubscriptionManager$OnSubscriptionsChangedListener'
 	types << r'android/os/UserHandle$VinixCreator'

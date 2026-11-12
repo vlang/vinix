@@ -1,5 +1,10 @@
 # Current Maps runtime work — 2026-11-12
 
+Full Maps qualification is pending. Onboarding rendered in guest r12; map
+tiles, search, routing and login have not passed. Guest r20 validates the
+current read-API additions. The account target-query path is the next known
+startup blocker; native account ownership checks remain enforced.
+
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
 compiler at that path without requiring a historical revision. The new
@@ -474,3 +479,39 @@ plan `secure-long-api-plan-20261112-r1.json` and readback
 `ab490eec7ffa2783245851647d1ce935edac6130cd050e6f72f60b7d1c75304e`.
 The test mount was released before the next broker/Maps attempt. This
 successor uses `c58ba2f59` plus this commit's source changes.
+
+Guest r19 progressed further and exposed several independent failures:
+missing `UserManager.getUserCount`, `UserManager.getUserForSerialNumber`,
+`ConnectivityManager.getNetworkInfo(Network)` and `ApplicationInfo.isInstantApp`.
+It also recorded an account target-query SecurityException; that authorization
+path remains separate from these read APIs. Full log delimiters are
+`SECURE-LONG-MAPS-LOG-BEGIN` / `SECURE-LONG-MAPS-LOG-END`; snapshot
+`maps-secure-long-uart-20261112-r1` has SHA256
+`a5de5911a56d00be4c0ba8171581cd01008d450b844ee899ce2719ef06e2ee2f`.
+
+`framework_runtime_queries.v` adds the count and inverse serial lookup for
+the configured single Android-user catalog (not the per-app Unix accounts).
+The Network overload matches one native state observation to the requested
+interface and returns null for null, unknown, expired or absent handles.
+ApplicationInfo now has privateFlags; isInstantApp reads its 0x80 bit rather
+than public flags, and the metadata copy constructor preserves that field.
+This does not implement multiuser management, a disconnected-network catalog,
+instant installation or ApplicationInfo parcel transport.
+
+SDK `framework-runtime-queries-20261112-r1` passed guarded assembly/readback in
+3,895 ms, RSS 478,232,576, growth 29,769,728, guard/child 0/0 with complete
+cleanup. Signed fixture `current-api-fixture-20261112-r15` passed on ARM in
+guest r20, including all earlier checks: user count/profile agreement,
+current-user serial roundtrip, negative/unknown/above-32-bit serial rejection;
+instant flag defaults, unrelated public/private bits, copied flags and copy
+isolation, plus installed-fixture metadata; Network overload type/identity,
+null/unknown/expired handles and no-link states through an overridden native
+state boundary, plus a real backend query. That final observation does not
+assert Internet reachability. Runner readiness/pass, EOF drain and exit0
+were observed. Snapshot `runtime-query-api-uart-20261112-r1`, plan
+`runtime-query-api-plan-20261112-r1.json` and independent readback
+`runtime-query-api-readback-20261112-r1` preserve its two-entry export, checksum
+`1ac2167c62b1fbbbcc8a122e5fbc93a1b4ba6026da4779f38ee41cd55a4dc88e`.
+The test mount was released before broker preparation. A Maps retry awaits
+the separately investigated package-query path; its native ownership check
+has not been relaxed. This successor uses `bec488e01` plus this commit's sources.
