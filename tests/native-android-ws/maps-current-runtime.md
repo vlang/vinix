@@ -10,8 +10,10 @@ and rendered onboarding, then exited after Skip on missing sandbox metadata.
 Guest r25 passed the sandbox metadata regression, then Maps exited on an
 inaccessible package-delete observer placeholder; BASE_OS was also missing.
 Guest r27 tests the corresponding observer types and build-field fixes.
-Its ARM regression passed; another Maps desktop attempt follows.
-Startup storage remains tight under the unchanged guest memory budget.
+Its ARM regression passed. Maps then rendered onboarding but killed itself
+after SQLiteFullException as RAM-backed storage reached zero. Guest r31
+passed disk write/readback and the unprivileged SQLite regression on a
+separate app-data disk under the unchanged guest memory budget.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -750,3 +752,76 @@ pass, EOF drain and exit0. Snapshot `build-observers-api-uart-20261112-r1`, plan
 SHA256 `3e67d0ae409ed667bed78dd450e1f0f72b7a42617c5508fa000035da2dc72726`.
 The fixture bind was released before broker preparation and another desktop
 Maps launch. This successor uses `ac898f13c` plus this commit's source changes.
+
+Guest r27 rendered onboarding with the observer fixes. After Skip, its actual
+Maps database writes failed with SQLiteFullException; DeviceDoctor logged the
+error and the app called killProcess on itself (the bridge emitted VM-EXIT0).
+The observer completed at600033ms with minimum filesystem availability0 and
+MemFree81856KiB. The full Maps log has no prior linkage failures; delimiters
+are `BUILD-OBSERVERS-MAPS-LOG-BEGIN` / `END`. Immutable snapshot
+`maps-build-observers-uart-20261112-r1` has SHA256
+`c1c0dda440d682c3888e8b32c0b32155384016ad4f327bae237b3e1476c3a93f`.
+
+The guest stager now optionally creates an8GiB sparse ext2 app-data image,
+records its initial full checksum, UUID, formatter command and executable
+identities, and attaches it as a separate virtio block device. The file is
+0600; root ownership and the ext2 feature set follow the existing ARM desktop
+test formatter. Launch verifies the initial image checksum. Host hashing
+reuses the existing streaming CommonCrypto/portable implementation; there is
+no compiler revision requirement. VINIX_CURRENT_APP_DATA_DISK=1 selects this
+path and VINIX_CURRENT_DATA_VOLUME_PROBE supplies the current ARM probe.
+
+`maps-data-volume.v` selects the disk by UUID/size rather than enumeration
+order. Its root-only mount path refuses to hide an existing device/mount or
+nonempty app-data directory. It verifies ext2 and rw/nosuid/nodev/wxallowed,
+root-owned0755 directories and fresh capacity, then writes, flushes, syncs,
+renames, reads back and removes a1MiB probe. It mounts only
+/var/lib/vinix/apps, preserving the broker's paths and identity checks.
+`--inspect` supplies read-only host identity checking; the stager's `--hash`
+mode retains mutable-image audit checksums after shutdown.
+
+The first r28 staging attempt rejected a valid formatted image because the
+new helper incorrectly combined seek with read_bytes, which reads from the
+file beginning. Both host and ARM readers now use explicit-offset reads.
+r28 was not booted; its guard/child1/1 and complete cleanup are retained.
+Its empty data image checksum is
+`10e6c3e2fae596f0b0bae36b12524d7600721959dd00993323767c8da25a4f53`.
+Guest r29 rejected the probe's buffered raw-device read before mounting.
+Vinix requires sector-aligned block reads; the probe now uses direct pread
+of512 bytes at offset1024. Host inspection accepts the selected UUID and
+rejects another image. Guest r30 then mounted the selected disk and wrote,
+synced and renamed its1MiB file, but the helper failed during readback despite
+MemFree8421600KiB and7.9GiB disk availability. Guest wc and sha256sum read the
+complete file successfully. Snapshot `data-volume-readback-uart-20261112-r1`
+SHA256 `681cfd704f1783f342db68ed6908c96d8658682c21a08d06f162c5c4a6409a5c`
+retains the failure and independent reads. The leftover file is retained in
+r30's image, final SHA256
+`25ab38b3320c83afb47daf0e71a70b89e217559e59df824da4142afb864fce06`.
+
+Final volume probe r7 uses a bounded byte-for-byte pread loop and a literal
+disk_usage path: current V's os.disk_usage frees its path argument, so passing
+the decoded metadata string invalidates borrowed storage. This short-lived
+probe uses -gc none without autofree, closes its descriptors and explicitly
+frees the large buffers. Stager r5 and both host/ARM probes compiled with
+current V0.5.2 596e18d. No SDK/native/core change was required.
+
+Guest r31 staging passed the original guard limits: child/guard0/0, cleanup
+complete,10197ms, RSS36995072 and shared growth233627648 bytes. Read-only
+e2fsck and UUID inspection passed; the wrong-volume input was rejected.
+Its initial image SHA256 is
+`12285ce681d6100c9ba2bc7d43f7806af55886bb0162be8c59741db451adabca`.
+ARM mounting passed exact flags/ownership/capacity and write/flush/fsync/
+rename/readback/removal with8522207232 bytes available.
+
+Signed fixture r24 adds a native SQLite1MiB write, database close/reopen,
+length/file-size readback and cleanup. The complete regression passed as
+UID/GID10160 with private data at /var/lib/vinix/apps/current-api-r1 on the
+new disk, ready/pass once, drained EOF and exit0. Immutable snapshot
+`data-volume-api-uart-20261112-r1`, plan `data-volume-api-plan-20261112-r1.json`
+and current-source independent readback `data-volume-api-readback-20261112-r1`
+retain its two-entry export, archive SHA256
+`69353619f3c986d24390fbe0e6ff4e9df0d1abde9aa1c320ff3e9112de080bc3`.
+An older reconstructor correctly rejected the newer plan format; the current
+source accepted it without byte removals. The fixture bind was released
+before the next broker run. These checks establish disk and SQLite behavior,
+not Maps tiles, search, routes or login.

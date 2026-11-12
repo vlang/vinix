@@ -5,6 +5,53 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static storageDatabase(Landroid/content/Context;)V
+.locals 8
+const-string v0, "vinix-storage-probe.db"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getDatabasePath(Ljava/lang/String;)Ljava/io/File;
+move-result-object v0
+const/4 v3, 0
+invoke-static {v0, v3}, Landroid/database/sqlite/SQLiteDatabase;->openOrCreateDatabase(Ljava/io/File;Landroid/database/sqlite/SQLiteDatabase$CursorFactory;)Landroid/database/sqlite/SQLiteDatabase;
+move-result-object v1
+const-string v2, "PRAGMA synchronous=FULL"
+invoke-virtual {v1, v2}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+const-string v2, "CREATE TABLE probe(v BLOB NOT NULL)"
+invoke-virtual {v1, v2}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+const-string v2, "INSERT INTO probe VALUES (zeroblob(1048576))"
+invoke-virtual {v1, v2}, Landroid/database/sqlite/SQLiteDatabase;->execSQL(Ljava/lang/String;)V
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase;->close()V
+invoke-static {v0, v3}, Landroid/database/sqlite/SQLiteDatabase;->openOrCreateDatabase(Ljava/io/File;Landroid/database/sqlite/SQLiteDatabase$CursorFactory;)Landroid/database/sqlite/SQLiteDatabase;
+move-result-object v1
+const-string v2, "SELECT length(v) FROM probe"
+invoke-virtual {v1, v2, v3}, Landroid/database/sqlite/SQLiteDatabase;->rawQuery(Ljava/lang/String;[Ljava/lang/String;)Landroid/database/Cursor;
+move-result-object v4
+invoke-interface {v4}, Landroid/database/Cursor;->moveToFirst()Z
+move-result v5
+const/4 v6, 1
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-interface {v4, v3}, Landroid/database/Cursor;->getInt(I)I
+move-result v5
+const v7, 0x100000
+invoke-static {v5, v7}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-interface {v4}, Landroid/database/Cursor;->moveToNext()Z
+move-result v5
+invoke-static {v5, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-interface {v4}, Landroid/database/Cursor;->close()V
+invoke-virtual {v1}, Landroid/database/sqlite/SQLiteDatabase;->close()V
+invoke-virtual {v0}, Ljava/io/File;->length()J
+move-result-wide v1
+const-wide/32 v4, 0x100000
+cmp-long v7, v1, v4
+if-lez v7, :storage_failed
+invoke-static {v0}, Landroid/database/sqlite/SQLiteDatabase;->deleteDatabase(Ljava/io/File;)Z
+move-result v5
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+:storage_failed
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.end method
 .method public static buildAndObserver()V
 .locals 6
 const-string v0, "ro.build.version.base_os"
@@ -965,6 +1012,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->userBroadcasts(Landroid/content/
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->moduleCatalog(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sandboxMetadata(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->buildAndObserver()V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->storageDatabase(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
