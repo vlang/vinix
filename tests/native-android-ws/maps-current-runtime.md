@@ -2,8 +2,9 @@
 
 Full Maps qualification is pending. Onboarding rendered in guest r12; map
 tiles, search, routing and login have not passed. Guest r21 validates the
-current read APIs and the caller-scoped account-query adapter. A fresh Maps
-retry follows; native account ownership checks remain enforced.
+current read APIs and the caller-scoped account-query adapter. Maps rendered
+onboarding in that guest but exited after Skip; native account ownership
+checks remain enforced. Guest r22 tests the next user/broadcast additions.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -556,3 +557,40 @@ plan `account-package-api-plan-20261112-r1.json` and independent readback
 checksum `e8630702d04e880a31754ee5e7752b51ef629a0c24a7bd5e2db27cbc761c56a2`.
 The test mount was released before broker preparation and Maps retry. This
 successor uses `9b706a845` plus this commit's source changes.
+
+The r21 desktop launch rendered onboarding; selecting Skip exited the APK.
+Its complete log (delimiters `ACCOUNT-PACKAGE-FINAL-MAPS-LOG-BEGIN` / `END`)
+is retained in `maps-account-package-uart-20261112-r1`, full-log SHA256
+`e441e83df333ff2bbedf6f643d7cdf8a5ad2ea6ae189958f05bd38df268b9c85`.
+The next linkage failures were UserManager.isDemoUser and
+Context.sendBroadcastAsUser(Intent,UserHandle). Play Store caller inspection
+`vending-broadcast-user-caller-20261112-r1` shows bgel selecting serial0's
+system user and sending a SingleUserSettingsReceiver intent to that user.
+
+`framework_user_broadcast.v` reports the configured persistent user as not a
+[demo user](https://developer.android.com/reference/android/os/UserManager#isDemoUser()).
+The two-argument broadcast overload validates both arguments, requires the
+target's identifier to equal the real process Android user, then delegates
+to the existing broadcast transport. Foreign and all-user targets throw
+SecurityException. This adds no cross-user privilege, user management or
+cross-process broadcast transport; the native backend remains process-local.
+Native code and JNI method descriptors are unchanged.
+
+SDK `framework-user-broadcast-20261112-r1` passed full assembly/readback with
+guard/child0/0 and complete cleanup in38,274ms, RSS469,417,984 and
+shared growth195,080,192 bytes. Guest r22 stages this SDK and signed fixture
+`current-api-fixture-20261112-r17` using current V.
+
+The r22 ARM regression passed, including all earlier API cases. It registered
+a real native broadcast receiver and observed exactly one asynchronous
+own-user delivery with its action and integer payload intact. Foreign and
+all-user targets raised SecurityException; null intent/user raised NPE and
+caused no extra delivery. The callback count was checked at the existing
+main-Handler completion fence. isDemoUser returned false. Runner readiness,
+pass, EOF drain and exit0 were observed. Snapshot
+`user-broadcast-api-uart-20261112-r1`, plan
+`user-broadcast-api-plan-20261112-r1.json` and independent readback
+`user-broadcast-api-readback-20261112-r1` retain the two-entry export, archive
+SHA256 `87b35fa72b11adf9d330e3fa38d0d83157f953f010c0ac839332d97de149f32a`.
+The fixture bind mount was released before broker preparation. This successor
+uses `6746c6efa` plus this commit's source changes.

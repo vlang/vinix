@@ -5,6 +5,71 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static userBroadcasts(Landroid/content/Context;)V
+.locals 7
+new-instance v0, Landroid/os/UserManager;
+invoke-direct {v0}, Landroid/os/UserManager;-><init>()V
+invoke-virtual {v0}, Landroid/os/UserManager;->isDemoUser()Z
+move-result v0
+const/4 v1, 0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Lorg/vinix/bootstrap/TestUserBroadcast;
+invoke-direct {v0}, Lorg/vinix/bootstrap/TestUserBroadcast;-><init>()V
+new-instance v2, Landroid/content/IntentFilter;
+const-string v3, "org.vinix.fixture.USER_BROADCAST"
+invoke-direct {v2, v3}, Landroid/content/IntentFilter;-><init>(Ljava/lang/String;)V
+invoke-virtual {p0, v0, v2}, Landroid/content/Context;->registerReceiver(Landroid/content/BroadcastReceiver;Landroid/content/IntentFilter;)Landroid/content/Intent;
+new-instance v2, Landroid/content/Intent;
+invoke-direct {v2, v3}, Landroid/content/Intent;-><init>(Ljava/lang/String;)V
+const-string v3, "payload"
+const/16 v4, 0x59
+invoke-virtual {v2, v3, v4}, Landroid/content/Intent;->putExtra(Ljava/lang/String;I)Landroid/content/Intent;
+invoke-static {}, Landroid/os/Process;->myUserHandle()Landroid/os/UserHandle;
+move-result-object v3
+invoke-virtual {p0, v2, v3}, Landroid/content/Context;->sendBroadcastAsUser(Landroid/content/Intent;Landroid/os/UserHandle;)V
+new-instance v4, Landroid/os/UserHandle;
+invoke-virtual {v3}, Landroid/os/UserHandle;->getIdentifier()I
+move-result v5
+add-int/lit8 v5, v5, 1
+invoke-direct {v4, v5}, Landroid/os/UserHandle;-><init>(I)V
+:foreign_start
+invoke-virtual {p0, v2, v4}, Landroid/content/Context;->sendBroadcastAsUser(Landroid/content/Intent;Landroid/os/UserHandle;)V
+:foreign_end
+goto :broadcast_failed
+:foreign_denied
+move-exception v5
+new-instance v4, Landroid/os/UserHandle;
+const/4 v5, -1
+invoke-direct {v4, v5}, Landroid/os/UserHandle;-><init>(I)V
+:all_start
+invoke-virtual {p0, v2, v4}, Landroid/content/Context;->sendBroadcastAsUser(Landroid/content/Intent;Landroid/os/UserHandle;)V
+:all_end
+goto :broadcast_failed
+:all_denied
+move-exception v5
+:null_user_start
+invoke-virtual {p0, v2, v1}, Landroid/content/Context;->sendBroadcastAsUser(Landroid/content/Intent;Landroid/os/UserHandle;)V
+:null_user_end
+goto :broadcast_failed
+:null_user
+move-exception v5
+:null_intent_start
+invoke-virtual {p0, v1, v3}, Landroid/content/Context;->sendBroadcastAsUser(Landroid/content/Intent;Landroid/os/UserHandle;)V
+:null_intent_end
+goto :broadcast_failed
+:null_intent
+move-exception v5
+invoke-virtual {p0, v0}, Landroid/content/Context;->unregisterReceiver(Landroid/content/BroadcastReceiver;)V
+return-void
+:broadcast_failed
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.catch Ljava/lang/SecurityException; {:foreign_start .. :foreign_end} :foreign_denied
+.catch Ljava/lang/SecurityException; {:all_start .. :all_end} :all_denied
+.catch Ljava/lang/NullPointerException; {:null_user_start .. :null_user_end} :null_user
+.catch Ljava/lang/NullPointerException; {:null_intent_start .. :null_intent_end} :null_intent
+.end method
 .method public static accountPackages(Landroid/content/Context;)V
 .locals 8
 invoke-virtual {p0}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
@@ -433,6 +498,8 @@ invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
 iget v1, v0, Lorg/vinix/bootstrap/TestSubscriptions;->calls:I
 const/4 v2, 1
 invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget v1, Lorg/vinix/bootstrap/TestUserBroadcast;->calls:I
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "CURRENT-API-PASS"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
@@ -716,6 +783,7 @@ invoke-static {v0}, Lorg/vinix/bootstrap/Main;->secureLongs(Landroid/content/Con
 invoke-static {}, Lorg/vinix/bootstrap/Main;->stableDensity()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->runtimeQueries(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->accountPackages(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->userBroadcasts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -956,6 +1024,35 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
+	os.write_file(root + '/smali/TestUserBroadcast.smali', r'.class public Lorg/vinix/bootstrap/TestUserBroadcast;
+.super Landroid/content/BroadcastReceiver;
+.field public static calls:I
+.method public constructor <init>()V
+.locals 0
+invoke-direct {p0}, Landroid/content/BroadcastReceiver;-><init>()V
+return-void
+.end method
+.method public onReceive(Landroid/content/Context;Landroid/content/Intent;)V
+.locals 3
+const-string v0, "org.vinix.fixture.USER_BROADCAST"
+invoke-virtual {p2}, Landroid/content/Intent;->getAction()Ljava/lang/String;
+move-result-object v1
+invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+const/4 v1, 1
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v0, "payload"
+const/4 v1, 0
+invoke-virtual {p2, v0, v1}, Landroid/content/Intent;->getIntExtra(Ljava/lang/String;I)I
+move-result v0
+const/16 v1, 0x59
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget v0, Lorg/vinix/bootstrap/TestUserBroadcast;->calls:I
+add-int/lit8 v0, v0, 1
+sput v0, Lorg/vinix/bootstrap/TestUserBroadcast;->calls:I
+return-void
+.end method
+')!
 	os.write_file(root + '/smali/TestPackageAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestPackageAccounts;
 .super Landroid/accounts/AccountManager;
 .field public snapshot:[Landroid/accounts/Account;

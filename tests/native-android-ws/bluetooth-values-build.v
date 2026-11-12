@@ -26,6 +26,7 @@ fn main() {
 	androidtools.framework_secure_longs(root + '/smali')!
 	androidtools.framework_runtime_queries(root + '/smali')!
 	androidtools.framework_account_package_query(root + '/smali')!
+	androidtools.framework_user_broadcast(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -46,6 +47,7 @@ fn main() {
 	types << 'android/content/pm/ShortcutManager'
 	types << 'android/content/RestrictionsManager'
 	types << 'android/app/ContextImpl'
+	types << 'android/content/Context'
 	types << 'android/util/DisplayMetrics'
 	types << r'android/provider/Settings$Secure'
 	types << 'android/os/UserManager'
