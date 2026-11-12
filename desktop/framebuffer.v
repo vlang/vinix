@@ -131,13 +131,13 @@ fn (mut fb Framebuffer) present(canvas &Canvas, _ int) {
 	if fb.direct {
 		if canvas.stride == fb.stride {
 			unsafe {
-				vmemcpy(fb.base, canvas.pixels, usize(u64(fb.stride) * u64(fb.height) * 4))
+				vmemcpy(fb.base, canvas.pixels, fb.stride * fb.height * 4)
 			}
 			return
 		}
 		for y := 0; y < fb.height; y++ {
 			unsafe {
-				vmemcpy(&fb.base[y * fb.stride], &canvas.pixels[y * canvas.stride], usize(fb.width * 4))
+				vmemcpy(&fb.base[y * fb.stride], &canvas.pixels[y * canvas.stride], fb.width * 4)
 			}
 		}
 		return
@@ -208,7 +208,7 @@ fn (mut fb Framebuffer) copy_damage(canvas &Canvas, damage DamageRect) {
 		for y := area.y; y < area.y + area.h; y++ {
 			unsafe {
 				vmemcpy(&fb.base[(y - fb.origin_y) * fb.stride + area.x - fb.origin_x],
-					&canvas.pixels[y * canvas.stride + area.x], usize(area.w * 4))
+					&canvas.pixels[y * canvas.stride + area.x], area.w * 4)
 			}
 		}
 		return

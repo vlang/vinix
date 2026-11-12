@@ -14,8 +14,8 @@ $if !wallpaper_jpeg_custom ? {
 
 fn C.tjInitDecompress() voidptr
 fn C.tjDestroy(voidptr) i32
-fn C.tjDecompressHeader3(voidptr, &u8, usize, &i32, &i32, &i32, &i32) i32
-fn C.tjDecompress2(voidptr, &u8, usize, &u8, i32, i32, i32, i32, i32) i32
+fn C.tjDecompressHeader3(voidptr, &u8, uint, &i32, &i32, &i32, &i32) i32
+fn C.tjDecompress2(voidptr, &u8, uint, &u8, i32, i32, i32, i32, i32) i32
 fn C.tjGetErrorStr2(voidptr) &char
 fn C.sin(f64) f64
 
@@ -39,7 +39,7 @@ pub fn jpeg(path string) !Image {
 	mut height := i32(0)
 	mut sampling := i32(0)
 	mut colour := i32(0)
-	if C.tjDecompressHeader3(handle, bytes.data, usize(bytes.len), &width, &height, &sampling, &colour) != 0 {
+	if C.tjDecompressHeader3(handle, bytes.data, uint(bytes.len), &width, &height, &sampling, &colour) != 0 {
 		return jpeg_error(handle)
 	}
 	if width <= 0 || height <= 0 || u64(width) * u64(height) > u64(max_int) / 4 {
@@ -48,7 +48,7 @@ pub fn jpeg(path string) !Image {
 	components := if colour in [C.TJCS_CMYK, C.TJCS_YCCK] { 4 } else { 3 }
 	mut pixels := []u8{len: int(width) * int(height) * components}
 	format := if components == 4 { C.TJPF_CMYK } else { C.TJPF_RGB }
-	if C.tjDecompress2(handle, bytes.data, usize(bytes.len), pixels.data, width, 0, height, format, C.TJFLAG_ACCURATEDCT) != 0 {
+	if C.tjDecompress2(handle, bytes.data, uint(bytes.len), pixels.data, width, 0, height, format, C.TJFLAG_ACCURATEDCT) != 0 {
 		return jpeg_error(handle)
 	}
 	if components == 4 {

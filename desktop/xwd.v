@@ -165,7 +165,7 @@ fn open_xwd_surface_access(path string, writable bool) ?XwdSurface {
 			&& blue_mask == 0xff && pixel_offset % 4 == 0 && bytes_per_line % 4 == 0
 		mapping:        mapping
 		size:           info.size
-		pixels:         unsafe { &u8(usize(mapping) + usize(pixel_offset)) }
+		pixels:         unsafe { &u8(uint(mapping) + uint(pixel_offset)) }
 		width:          int(width)
 		height:         int(height)
 		bytes_per_line: int(bytes_per_line)
@@ -227,7 +227,7 @@ fn obs_capture_presented(canvas &Canvas) {
 		for y := 0; y < surface.height; y++ {
 			unsafe {
 				vmemcpy(&surface.pixels[y * surface.bytes_per_line],
-					&canvas.pixels[y * canvas.stride], usize(surface.width * 4))
+					&canvas.pixels[y * canvas.stride], surface.width * 4)
 			}
 		}
 		return

@@ -42,7 +42,7 @@ fn preview_png_inflate_bounded(source []u8, width int, height int) bool {
 		length := int(preview_be32(source, at))
 		kind := preview_be32(source, at + 4)
 		if kind == 0x49444154 {
-			unsafe { C.memcpy(&u8(compressed.data) + offset, &u8(source.data) + at + 8, usize(length)) }
+			unsafe { C.memcpy(&u8(compressed.data) + offset, &u8(source.data) + at + 8, uint(length)) }
 			offset += length
 		}
 		if kind == 0x49454e44 { break }

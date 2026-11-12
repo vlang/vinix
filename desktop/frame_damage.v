@@ -271,7 +271,7 @@ fn (mut d Desktop) copy_cursor_backing(box DamageRect, area DamageRect, to_backi
 	if x1 <= x0 {
 		return
 	}
-	bytes := usize((x1 - x0) * 4)
+	bytes := (x1 - x0) * 4
 	for y := area.y * scale; y < y1; y++ {
 		unsafe {
 			canvas_pixel := &d.canvas.pixels[y * d.canvas.stride + x0]

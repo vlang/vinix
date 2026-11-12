@@ -341,7 +341,7 @@ fn session_limit_service_log(home string, name string) {
 	if fd < 0 { return }
 	defer { sessionipc.desktop_close(fd) }
 	message := 'vinix-session: log exceeded 1 MiB; older output discarded\n'
-	C.write(fd, message.str, usize(message.len))
+	C.write(fd, message.str, uint(message.len))
 }
 
 fn session_random_token() !u64 {

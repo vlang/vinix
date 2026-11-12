@@ -65,7 +65,7 @@ fn archive_name_valid(name string) bool {
 
 fn archive_is_parent(parent string, child string) bool {
 	return child.len > parent.len && child[parent.len] == `/`
-		&& unsafe { C.memcmp(parent.str, child.str, usize(parent.len)) } == 0
+		&& unsafe { C.memcmp(parent.str, child.str, uint(parent.len)) } == 0
 }
 
 fn archive_entry_conflict(entries []ArchiveEntry, name string, directory bool) bool {

@@ -38,13 +38,13 @@ fn C.strcmp(&char, &char) i32
 fn C.strstr(&char, &char) &char
 fn C.open(&char, i32, ...voidptr) i32
 fn C.close(i32) i32
-fn C.ioctl(i32, usize, ...voidptr) i32
+fn C.ioctl(i32, uint, ...voidptr) i32
 fn C.stat(&char, &C.stat) i32
 fn C.fstat(i32, &C.stat) i32
-fn C.calloc(usize, usize) voidptr
-fn C.malloc(usize) voidptr
+fn C.calloc(uint, uint) voidptr
+fn C.malloc(uint) voidptr
 fn C.free(voidptr)
-fn C.memcpy(voidptr, voidptr, usize) voidptr
+fn C.memcpy(voidptr, voidptr, uint) voidptr
 fn C.eglGetProcAddress(&char) voidptr
 fn C.eglGetDisplay(i32) voidptr
 fn C.eglInitialize(voidptr, &i32, &i32) u32
@@ -116,7 +116,7 @@ pub fn console_mode(graphics i32) {
     mode := i32(if graphics != 0 { 1 } else { 0 })
     fd := C.open(c'/dev/console', C.O_RDWR | C.O_CLOEXEC)
     if fd >= 0 {
-        C.ioctl(fd, usize(0x4b3a), mode)
+        C.ioctl(fd, uint(0x4b3a), mode)
         C.close(fd)
         return
     }
@@ -134,7 +134,7 @@ pub fn console_mode(graphics i32) {
             || (u32(inherited.st_mode) & u32(C.S_IFMT)) != u32(C.S_IFCHR)
             || inherited.st_dev != console.st_dev || inherited.st_ino != console.st_ino
             || inherited.st_rdev != console.st_rdev { continue }
-        C.ioctl(stream, usize(0x4b3a), mode)
+        C.ioctl(stream, uint(0x4b3a), mode)
         return
     }
 }
@@ -321,7 +321,7 @@ pub fn frame(opaque voidptr, source &u32, source_width i32, source_height i32,
             if trace_first { startup_stage(c'first-frame context current') }
             if p.readback == nil {
                 if trace_first { startup_stage(c'allocating packed readback buffer') }
-                p.readback = &u32(C.malloc(usize(destination_width) * usize(destination_height) * sizeof(u32)))
+                p.readback = &u32(C.malloc(uint(destination_width) * uint(destination_height) * sizeof(u32)))
                 if p.readback == nil { return 0 }
             }
             output := p.readback
@@ -351,7 +351,7 @@ pub fn frame(opaque voidptr, source &u32, source_width i32, source_height i32,
             if trace_first { startup_stage(c'first frame ready; entering graphics mode') }
             console_mode(1)
             for row := i32(0); row < destination_height; row++ {
-                C.memcpy(destination + usize(row) * usize(destination_stride), output + usize(row) * usize(destination_width), usize(destination_width) * sizeof(u32))
+                C.memcpy(destination + uint(row) * uint(destination_stride), output + uint(row) * uint(destination_width), uint(destination_width) * sizeof(u32))
             }
             return 1
         }

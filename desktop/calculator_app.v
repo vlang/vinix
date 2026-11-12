@@ -98,10 +98,6 @@ fn open_native_calculator() NativeApp {
 	return new_calculator_app()
 }
 
-fn build_compiled_calculator(app &CalculatorApp) ui2.Element {
-	return $vml('calculator_vinix.vml')
-}
-
 // V3 currently deep-clones each local Element appended by `$vml`, stranding
 // the original nested arrays. Direct constructor results avoid those copies;
 // the cached keypad owns only the three child arrays released below.

@@ -630,7 +630,7 @@ fn test_preview_decodes_iphone_png_as_straight_rgba_and_exports_correct_colors()
 	}
 }
 
-fn preview_test_fail_crop_allocation(_ usize) &u8 { return unsafe { nil } }
+fn preview_test_fail_crop_allocation(_ uint) &u8 { return unsafe { nil } }
 
 fn preview_test_control(element ui2.Element, action string) ?ui2.Element {
 	if element.id == action { return element }

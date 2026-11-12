@@ -116,7 +116,7 @@ fn (mut d Desktop) start_quick_launch_query() {
 		if text.len > quick_launch_reply_limit { C._exit(1) }
 		mut at := 0
 		for at < text.len {
-			written := C.write(pipe[1], unsafe { text.str + at }, usize(text.len - at))
+			written := C.write(pipe[1], unsafe { text.str + at }, uint(text.len - at))
 			if written < 0 && C.errno == C.EINTR { continue }
 			if written <= 0 { C._exit(1) }
 			at += int(written)
@@ -179,7 +179,7 @@ fn (mut d Desktop) poll_quick_launch_query() {
 	if search.fd >= 0 {
 		mut buffer := [4096]u8{}
 		for _ in 0 .. 17 {
-			count := C.read(search.fd, &buffer[0], usize(buffer.len))
+			count := C.read(search.fd, &buffer[0], uint(buffer.len))
 			if count < 0 && C.errno == C.EINTR { continue }
 			if count < 0 && (C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) { break }
 			if count <= 0 { C.close(search.fd); search.fd = -1; break }
@@ -199,7 +199,7 @@ fn (mut d Desktop) poll_quick_launch_query() {
 	if search.fd >= 0 {
 		mut buffer := [4096]u8{}
 		for _ in 0 .. 17 {
-			count := C.read(search.fd, &buffer[0], usize(buffer.len))
+			count := C.read(search.fd, &buffer[0], uint(buffer.len))
 			if count < 0 && C.errno == C.EINTR { continue }
 			if count <= 0 { break }
 			if search.bytes.len + int(count) > quick_launch_reply_limit { search.cancelled = true; break }

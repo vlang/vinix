@@ -167,7 +167,7 @@ fn vinix_read_exact(fd int, count int) ?[]u8 {
 fn vinix_write_all(fd int, data []u8) {
 	mut done := 0
 	for done < data.len {
-		written := int(C.write(fd, unsafe { &data.data[done] }, usize(data.len - done)))
+		written := int(C.write(fd, unsafe { &data.data[done] }, uint(data.len - done)))
 		if written > 0 {
 			done += written
 			continue

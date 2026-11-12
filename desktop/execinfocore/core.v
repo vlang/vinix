@@ -29,15 +29,15 @@ struct C._Unwind_Context {}
 @[typedef]
 struct C._Unwind_Reason_Code {}
 fn C._Static_assert(bool, &char)
-fn C._Unwind_GetIP(&C._Unwind_Context) usize
+fn C._Unwind_GetIP(&C._Unwind_Context) uint
 fn C._Unwind_Backtrace(fn (&C._Unwind_Context, voidptr) C._Unwind_Reason_Code, voidptr) C._Unwind_Reason_Code
 fn C.dladdr(voidptr, &C.Dl_info) i32
-fn C.readlink(&char, &char, usize) isize
-fn C.snprintf(&char, usize, &char, ...voidptr) i32
-fn C.malloc(usize) voidptr
+fn C.readlink(&char, &char, uint) int
+fn C.snprintf(&char, uint, &char, ...voidptr) i32
+fn C.malloc(uint) voidptr
 fn C.free(voidptr)
-fn C.memset(voidptr, i32, usize) voidptr
-fn C.write(i32, voidptr, usize) isize
+fn C.memset(voidptr, i32, uint) voidptr
+fn C.write(i32, voidptr, uint) int
 fn C.__errno_location() &i32
 fn C.__error() &i32
 
@@ -83,7 +83,7 @@ pub fn capture(buffer &voidptr, size i32) i32 {
     }
 }
 
-fn format_frame(destination &char, capacity usize, address voidptr) i32 {
+fn format_frame(destination &char, capacity uint, address voidptr) i32 {
     $if execinfo_darwin ? {
         mut executable := [1024]char{}
         return unsafe { format_frame_with_buffer(destination, capacity, address, &executable[0], 1024) }
@@ -93,15 +93,15 @@ fn format_frame(destination &char, capacity usize, address voidptr) i32 {
     }
 }
 
-fn format_frame_with_buffer(destination &char, capacity usize, address voidptr, executable &char, executable_capacity usize) i32 {
+fn format_frame_with_buffer(destination &char, capacity uint, address voidptr, executable &char, executable_capacity uint) i32 {
     unsafe {
         mut information := C.Dl_info{}
         mut image := &char(c'/proc/self/exe')
         mut symbol := &char(nil)
-        instruction := usize(address)
+        instruction := uint(address)
         mut offset := instruction
         length := C.readlink(c'/proc/self/exe', executable, executable_capacity - 1)
-        if length > 0 && usize(length) < executable_capacity {
+        if length > 0 && uint(length) < executable_capacity {
             executable[length] = 0
             image = &char(executable)
         }
@@ -110,11 +110,11 @@ fn format_frame_with_buffer(destination &char, capacity usize, address voidptr, 
                 image = &char(information.dli_fname)
             }
             if information.dli_sname != nil && information.dli_saddr != nil &&
-                instruction >= usize(information.dli_saddr) {
+                instruction >= uint(information.dli_saddr) {
                 symbol = &char(information.dli_sname)
-                offset = instruction - usize(information.dli_saddr)
-            } else if information.dli_fbase != nil && instruction >= usize(information.dli_fbase) {
-                offset = instruction - usize(information.dli_fbase)
+                offset = instruction - uint(information.dli_saddr)
+            } else if information.dli_fbase != nil && instruction >= uint(information.dli_fbase) {
+                offset = instruction - uint(information.dli_fbase)
             }
         }
         if symbol != nil {
@@ -128,13 +128,13 @@ fn format_frame_with_buffer(destination &char, capacity usize, address voidptr, 
 pub fn symbols(buffer &voidptr, size i32) &&char {
     unsafe {
         if buffer == nil || size <= 0 { return nil }
-        pointer_bytes := usize(size) * sizeof(&char)
-        if pointer_bytes / sizeof(&char) != usize(size) { return nil }
+        pointer_bytes := uint(size) * sizeof(&char)
+        if pointer_bytes / sizeof(&char) != uint(size) { return nil }
         mut allocation_size := pointer_bytes
         for index := i32(0); index < size; index++ {
             length := format_frame(nil, 0, buffer[index])
-            if length < 0 || usize(length) >= ~usize(0) - allocation_size { return nil }
-            allocation_size += usize(length) + 1
+            if length < 0 || uint(length) >= ~uint(0) - allocation_size { return nil }
+            allocation_size += uint(length) + 1
         }
         result := &&char(C.malloc(allocation_size))
         if result == nil { return nil }
@@ -142,13 +142,13 @@ pub fn symbols(buffer &voidptr, size i32) &&char {
         mut remaining := allocation_size - pointer_bytes
         for index := i32(0); index < size; index++ {
             length := format_frame(text, remaining, buffer[index])
-            if length < 0 || usize(length) >= remaining {
+            if length < 0 || uint(length) >= remaining {
                 C.free(result)
                 return nil
             }
             result[index] = text
-            text += usize(length) + 1
-            remaining -= usize(length) + 1
+            text += uint(length) + 1
+            remaining -= uint(length) + 1
         }
         return result
     }
@@ -159,7 +159,7 @@ fn interrupted() bool {
     $else { return unsafe { *C.__errno_location() == C.EINTR } }
 }
 
-fn write_all(fd i32, text &char, length usize) {
+fn write_all(fd i32, text &char, length uint) {
     unsafe {
         mut cursor := &char(text)
         mut remaining := length
@@ -167,7 +167,7 @@ fn write_all(fd i32, text &char, length usize) {
             written := C.write(fd, cursor, remaining)
             if written > 0 {
                 cursor += written
-                remaining -= usize(written)
+                remaining -= uint(written)
             } else if written < 0 && interrupted() { continue }
             else { return }
         }
@@ -182,11 +182,11 @@ pub fn symbols_fd(buffer &voidptr, size i32, fd i32) {
             mut line := [1024]char{}
             mut length := format_frame(&line[0], 1024, buffer[index])
             if length < 0 { continue }
-            if usize(length) >= 1024 {
+            if uint(length) >= 1024 {
                 length = C.snprintf(&line[0], 1024, c'/proc/self/exe(+0x%zx) [0x%zx]',
-                    usize(buffer[index]), usize(buffer[index]))
+                    uint(buffer[index]), uint(buffer[index]))
             }
-            if length > 0 { write_all(fd, &line[0], usize(length)) }
+            if length > 0 { write_all(fd, &line[0], uint(length)) }
             write_all(fd, c'\n', 1)
         }
     }

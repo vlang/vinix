@@ -341,17 +341,17 @@ fn check_hosted_html_fallback(root string, v string) ! {
 	source := os.read_file('${root}/build-support/xorg-server/winehost/core.v')!
 	start := source.index('fn clipboard_html_text(') or { return error('HTML fallback missing') }
 	end := source.index('fn paste_clipboard_kind(') or { return error('clipboard paste missing') }
-	fixture := 'module main\n#include <string.h>\nfn C.memcmp(voidptr, voidptr, usize) i32\n' + source[start..end] + r'
+	fixture := 'module main\n#include <string.h>\nfn C.memcmp(voidptr, voidptr, uint) i32\n' + source[start..end] + r'
 fn test_hosted_html_fallback_preserves_unicode_and_bounds() {
     input := "<b>A &amp; B</b>&lt;&gt;&quot;&nbsp;&#39; Привет"
     mut output := [128]u8{}
-    used := clipboard_html_text(input.str, usize(input.len), unsafe { &output[0] })
+    used := clipboard_html_text(input.str, uint(input.len), unsafe { &output[0] })
     assert unsafe { tos(&output[0], int(used)) }.starts_with("A & B<>")
     assert output[7] == 34 && output[8] == 32 && output[9] == 39
     assert unsafe { tos(&output[10], int(used) - 10) } == " Привет"
     assert output[int(used)] == 0
     control := [u8(1), 27, 65, 10, 9, 66]!
-    count := clipboard_html_text(unsafe { &control[0] }, usize(control.len), unsafe { &output[0] })
+    count := clipboard_html_text(unsafe { &control[0] }, uint(control.len), unsafe { &output[0] })
     assert count == 4
     assert output[0] == 65 && output[1] == 10 && output[2] == 9 && output[3] == 66
 }

@@ -333,7 +333,7 @@ fn (mut c Canvas) copy_logical_patch(source []u32, x int, y int, w int, h int) {
 		first := physical_y * c.stride
 		if scale == 1 {
 			unsafe {
-				vmemcpy(&c.pixels[first + physical_x0], &source[(ly - y) * w + x0 - x], usize((physical_x1 - physical_x0) * 4))
+				vmemcpy(&c.pixels[first + physical_x0], &source[(ly - y) * w + x0 - x], (physical_x1 - physical_x0) * 4)
 			}
 			continue
 		}
@@ -345,7 +345,7 @@ fn (mut c Canvas) copy_logical_patch(source []u32, x int, y int, w int, h int) {
 		}
 		for offset := 1; offset < scale && physical_y + offset < c.physical_height; offset++ {
 			unsafe {
-				vmemcpy(&c.pixels[first + offset * c.stride + physical_x0], &c.pixels[first + physical_x0], usize((physical_x1 - physical_x0) * 4))
+				vmemcpy(&c.pixels[first + offset * c.stride + physical_x0], &c.pixels[first + physical_x0], (physical_x1 - physical_x0) * 4)
 			}
 		}
 	}

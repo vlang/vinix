@@ -69,8 +69,8 @@ fn open_vinix_surface(path string) ?VinixSurface {
 		desktop_munmap(mapping, info.size)
 		return none
 	}
-	active_ptr := unsafe { &u32(usize(mapping) + 28) }
-	reader_ptr := unsafe { &u32(usize(mapping) + 32) }
+	active_ptr := unsafe { &u32(uint(mapping) + 28) }
+	reader_ptr := unsafe { &u32(uint(mapping) + 32) }
 	active := C.vinix_surface_claim_reader(active_ptr, reader_ptr)
 	if active > 1 {
 		C.vinix_surface_release_reader(reader_ptr)
@@ -81,7 +81,7 @@ fn open_vinix_surface(path string) ?VinixSurface {
 	return VinixSurface{
 		mapping:       mapping
 		size:          info.size
-		pixels:        unsafe { &u8(usize(mapping) + usize(pixel_offset)) }
+		pixels:        unsafe { &u8(uint(mapping) + uint(pixel_offset)) }
 		reader_buffer: reader_ptr
 		width:         int(width)
 		height:        int(height)
@@ -217,7 +217,7 @@ fn (mut cache VinixPreviewCache) draw(mut canvas Canvas, path string, x int, y i
 		source := unsafe { &cache.pixels[(row - y) * width + x0 - x] }
 		if canvas.clip_is_plain(x0, row, x1 - x0, 1) {
 			if canvas.scale == 1 {
-				unsafe { C.memcpy(&canvas.pixels[row * canvas.stride + x0], source, usize((x1 - x0) * 4)) }
+				unsafe { C.memcpy(&canvas.pixels[row * canvas.stride + x0], source, uint((x1 - x0) * 4)) }
 				continue
 			}
 			if canvas.scale == 2 && x1 * 2 <= canvas.physical_width
@@ -230,7 +230,7 @@ fn (mut cache VinixPreviewCache) draw(mut canvas Canvas, path string, x int, y i
 						canvas.pixels[destination + column * 2 + 1] = color
 					}
 				}
-				unsafe { C.memcpy(&canvas.pixels[destination + canvas.stride], &canvas.pixels[destination], usize((x1 - x0) * 8)) }
+				unsafe { C.memcpy(&canvas.pixels[destination + canvas.stride], &canvas.pixels[destination], uint((x1 - x0) * 8)) }
 				continue
 			}
 		}

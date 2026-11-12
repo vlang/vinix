@@ -21,7 +21,7 @@ fn C.execv(&char, &&char) int
 fn C.getpeereid(int, &u32, &u32) int
 fn C.lstat(&char, &C.stat) int
 fn C.fcntl(int, int, ...voidptr) int
-fn C.poll(&C.pollfd, usize, int) int
+fn C.poll(&C.pollfd, uint, int) int
 fn C.unlink(&char) int
 fn C.setsid() int
 

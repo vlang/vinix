@@ -22,7 +22,7 @@ struct C.pollfd {
 	revents i16
 }
 
-fn C.poll(&C.pollfd, usize, int) int
+fn C.poll(&C.pollfd, uint, int) int
 
 // C structs declared by another module may have private fields in V. Use our
 // own fixed-width poll layout and cast only at the libc call boundary.
@@ -131,7 +131,7 @@ pub fn (c &Connection) wants_write() bool { return c.queued > c.sent }
 pub fn (mut c Connection) send(m &Message) ! {
 	if c.fd < 0 || m.length < 0 || m.length > max_payload { return error('invalid window output') }
 	if c.sent > 0 {
-		unsafe { C.memmove(&c.tx[0], &c.tx[c.sent], usize(c.queued - c.sent)) }
+		unsafe { C.memmove(&c.tx[0], &c.tx[c.sent], uint(c.queued - c.sent)) }
 		c.queued -= c.sent
 		c.sent = 0
 	}
@@ -143,7 +143,7 @@ pub fn (mut c Connection) send(m &Message) ! {
 	put_u32(p, 12, u32(m.y))
 	put_u32(p, 16, u32(m.value))
 	put_u32(p, 20, u32(m.length))
-	unsafe { C.memcpy(p + header_size, &m.payload[0], usize(m.length)) }
+	unsafe { C.memcpy(p + header_size, &m.payload[0], uint(m.length)) }
 	c.queued += header_size + m.length
 	c.flush()!
 }
@@ -151,7 +151,7 @@ pub fn (mut c Connection) send(m &Message) ! {
 pub fn (mut c Connection) flush() ! {
 	for c.sent < c.queued {
 		flags := $if macos { 0 } $else { C.MSG_NOSIGNAL }
-		n := unsafe { C.send(c.fd, &c.tx[c.sent], usize(c.queued - c.sent), flags) }
+		n := unsafe { C.send(c.fd, &c.tx[c.sent], uint(c.queued - c.sent), flags) }
 		if n < 0 && C.errno == C.EINTR { continue }
 		if n < 0 && C.errno in [C.EAGAIN, C.EWOULDBLOCK]! { return }
 		if n <= 0 { return error('window peer disconnected') }
@@ -166,7 +166,7 @@ pub fn (mut c Connection) receive(m &Message) !bool {
 	if c.fd < 0 { return error('window connection is closed') }
 	for {
 		if c.used < c.wanted {
-			n := unsafe { C.recv(c.fd, &c.rx[c.used], usize(c.wanted - c.used), 0) }
+			n := unsafe { C.recv(c.fd, &c.rx[c.used], uint(c.wanted - c.used), 0) }
 			if n < 0 && C.errno == C.EINTR { continue }
 			if n < 0 && C.errno in [C.EAGAIN, C.EWOULDBLOCK]! { return false }
 			if n <= 0 { return error('window peer disconnected') }
@@ -178,7 +178,7 @@ pub fn (mut c Connection) receive(m &Message) !bool {
 		if c.used < c.wanted { continue }
 		unsafe {
 			*m = header
-			C.memcpy(&m.payload[0], &c.rx[header_size], usize(m.length))
+			C.memcpy(&m.payload[0], &c.rx[header_size], uint(m.length))
 		}
 		c.used = 0
 		c.wanted = header_size

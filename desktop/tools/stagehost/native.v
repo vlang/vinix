@@ -48,7 +48,7 @@ fn native(operation string, row map[string]json2.Any) !json2.Any {
 			hosttest.module_decode_utf8(args[0])!
 			mut offset := 0
 			for offset < args[0].len {
-				count := unsafe { C.write(fd, args[0].str + offset, usize(args[0].len - offset)) }
+				count := unsafe { C.write(fd, args[0].str + offset, uint(args[0].len - offset)) }
 				if count < 0 { if C.errno == C.EINTR { continue }; return os.error_posix() }
 				if count == 0 { return error('cannot write staged source') }
 				offset += int(count)

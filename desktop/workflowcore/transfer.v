@@ -307,7 +307,7 @@ fn (mut job Transfer) step() ! {
 		if first_open { job.total_bytes += n.original.size }
 		if C.lseek(job.input, i64(job.offset), C.SEEK_SET) < 0 || C.lseek(job.output, i64(job.offset), C.SEEK_SET) < 0 { return error('cannot resume copy') }
 	}
-	count := C.read(job.input, job.buffer.data, usize(job.buffer.len))
+	count := C.read(job.input, job.buffer.data, uint(job.buffer.len))
 	if count < 0 && C.errno == C.EINTR { return }
 	if count < 0 { return error('copy read failed (${C.errno}); retry resumes the partial file') }
 	if count > 0 {

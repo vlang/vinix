@@ -95,7 +95,7 @@ pub fn session_send(fd int, data string) bool {
 			C.setsockopt(fd, C.SOL_SOCKET, C.SO_NOSIGPIPE, &signal_option, u32(sizeof(i32)))
 		}
 		flags := $if macos { 0 } $else { C.MSG_NOSIGNAL }
-		n := unsafe { C.send(fd, &data.str[offset], usize(data.len - offset), flags) }
+		n := unsafe { C.send(fd, &data.str[offset], uint(data.len - offset), flags) }
 		if n <= 0 { return false }
 		offset += n
 	}
@@ -126,7 +126,7 @@ pub fn session_read_exact(fd int, bytes &u8, length int, timeout int) ! {
 		if remaining <= 0 || C.poll(&readiness, 1, int(remaining)) <= 0 {
 			return error('session request timed out')
 		}
-		n := unsafe { C.recv(fd, &bytes[count], usize(length - count), 0) }
+		n := unsafe { C.recv(fd, &bytes[count], uint(length - count), 0) }
 		if n <= 0 { return error('session connection closed') }
 		count += n
 	}

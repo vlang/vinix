@@ -139,7 +139,7 @@ fn (mut a SoftwareApp) send_window_event(event appsdk.WindowEvent) bool {
 	defer { unsafe { text.free(); line.free() } }
 	// Smaller than PIPE_BUF, with a nonblocking writer: all or nothing.
 	// No package can block the compositor's event loop.
-	return C.write(a.worker.stdio_fd[0], line.str, usize(line.len)) == line.len
+	return C.write(a.worker.stdio_fd[0], line.str, uint(line.len)) == line.len
 }
 
 fn (mut a SoftwareApp) request_window_close() {

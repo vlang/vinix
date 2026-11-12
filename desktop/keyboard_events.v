@@ -180,8 +180,8 @@ fn (mut kbd Keyboard) poll_secret_text() string {
 
 fn wipe_login_input(text string) {
 	if text.len == 0 { return }
-	$if linux { unsafe { C.explicit_bzero(text.str, usize(text.len)) } }
-	$else { unsafe { C.memset_s(text.str, usize(text.len), 0, usize(text.len)) } }
+	$if linux { unsafe { C.explicit_bzero(text.str, uint(text.len)) } }
+	$else { unsafe { C.memset_s(text.str, uint(text.len), 0, uint(text.len)) } }
 }
 
 fn (mut kbd Keyboard) poll_setup_text(secret bool) string {

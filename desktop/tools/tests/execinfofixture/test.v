@@ -14,12 +14,12 @@ fn C.assert(bool)
 fn C.backtrace(&voidptr, i32) i32
 fn C.backtrace_symbols(&voidptr, i32) &&char
 fn C.backtrace_symbols_fd(&voidptr, i32, i32)
-fn C.snprintf(&char, usize, &char, ...voidptr) i32
+fn C.snprintf(&char, uint, &char, ...voidptr) i32
 fn C.strstr(&char, &char) &char
 fn C.free(voidptr)
 fn C.pipe(&i32) i32
 fn C.close(i32) i32
-fn C.read(i32, voidptr, usize) isize
+fn C.read(i32, voidptr, uint) int
 fn C.puts(&char) i32
 fn C.open(&char, i32, ...voidptr) i32
 fn C.dup2(i32, i32) i32
@@ -34,7 +34,7 @@ fn capture_and_check() {
         C.assert(symbols != nil)
         for index := i32(0); index < count; index++ {
             mut address := [64]char{}
-            C.snprintf(&address[0], 64, c'[0x%zx]', usize(frames[index]))
+            C.snprintf(&address[0], 64, c'[0x%zx]', uint(frames[index]))
             C.assert(symbols[index] != nil)
             C.assert(C.strstr(symbols[index], &address[0]) != nil)
         }
@@ -49,7 +49,7 @@ fn capture_and_check() {
         C.assert(length > 0)
         C.assert(C.close(descriptors[0]) == 0)
         mut newlines := i32(0)
-        for index := isize(0); index < length; index++ {
+        for index := int(0); index < length; index++ {
             if output[index] == 10 { newlines++ }
         }
         C.assert(newlines == count)

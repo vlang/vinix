@@ -43,7 +43,7 @@ fn calendar_ics_assert_explanation(tree ui2.Element, id string, text string, wid
 		assert child.text.len > 0 && calendar_ics_utf8(child.text)
 		// Actual rendered rows must borrow the original translation and consume
 		// every word in order, rather than only matching a wrapping helper.
-		assert usize(child.text.str) == usize(text.str) + usize(at)
+		assert uint(child.text.str) == uint(text.str) + uint(at)
 		assert at + child.text.len <= text.len
 		assert child.text == calendar_borrow(text, at, at + child.text.len)
 		mut characters := 0

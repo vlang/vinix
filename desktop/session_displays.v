@@ -92,7 +92,7 @@ fn (fb &Framebuffer) present_viewport(canvas &Canvas) {
 	for y in 0 .. fb.height {
 		if y + fb.origin_y >= canvas.physical_height { break }
 		if fb.direct {
-			unsafe { vmemcpy(&fb.base[y * fb.stride], &canvas.pixels[(y + fb.origin_y) * canvas.stride + fb.origin_x], usize(fb.width * 4)) }
+			unsafe { vmemcpy(&fb.base[y * fb.stride], &canvas.pixels[(y + fb.origin_y) * canvas.stride + fb.origin_x], fb.width * 4) }
 		} else {
 			for x in 0 .. fb.width {
 				unsafe { fb.base[y * fb.stride + x] = fb.pack_pixel(canvas.pixels[(y + fb.origin_y) * canvas.stride + fb.origin_x + x]) }

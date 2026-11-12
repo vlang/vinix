@@ -46,7 +46,7 @@ pub mut:
 pub struct Fixed {
 pub mut:
 	id           [16]u8
-	smem_start   usize
+	smem_start   uint
 	smem_len     u32
 	typ          u32
 	type_aux     u32
@@ -55,7 +55,7 @@ pub mut:
 	ypanstep     u16
 	ywrapstep    u16
 	line_length  u32
-	mmio_start   usize
+	mmio_start   uint
 	mmio_len     u32
 	accel        u32
 	capabilities u16

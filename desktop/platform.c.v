@@ -67,9 +67,9 @@ fn C.ptsname(fd int) &char
 
 fn C.setsid() int
 
-fn C.mmap(base voidptr, length usize, prot int, flags int, fd int, offset i64) voidptr
+fn C.mmap(base voidptr, length uint, prot int, flags int, fd int, offset i64) voidptr
 
-fn C.munmap(base voidptr, length usize) int
+fn C.munmap(base voidptr, length uint) int
 
 fn C.lseek(fd int, offset i64, whence int) i64
 
@@ -89,7 +89,7 @@ struct C.pollfd {
 	revents i16
 }
 
-fn C.poll(fds &C.pollfd, count usize, timeout int) int
+fn C.poll(fds &C.pollfd, count uint, timeout int) int
 
 // Match vlib/net's declaration if a native application also imports it.
 fn C.fcntl(fd int, cmd int, arg ...voidptr) int
@@ -142,7 +142,7 @@ fn desktop_read(fd int, buffer voidptr, count u64) i64 {
 	if count > 0x7fffffff {
 		return -1
 	}
-	return i64(C.read(fd, buffer, usize(count)))
+	return i64(C.read(fd, buffer, uint(count)))
 }
 
 fn desktop_ioctl(fd int, request u64, argument voidptr) int {
@@ -150,7 +150,7 @@ fn desktop_ioctl(fd int, request u64, argument voidptr) int {
 }
 
 fn desktop_mmap_shared(fd int, length u64) voidptr {
-	mapping := C.mmap(unsafe { nil }, usize(length), C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, 0)
+	mapping := C.mmap(unsafe { nil }, uint(length), C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, 0)
 	if mapping == voidptr(C.MAP_FAILED) {
 		return unsafe { nil }
 	}
@@ -158,7 +158,7 @@ fn desktop_mmap_shared(fd int, length u64) voidptr {
 }
 
 fn desktop_mmap_readonly(fd int, length u64) voidptr {
-	mapping := C.mmap(unsafe { nil }, usize(length), C.PROT_READ, C.MAP_SHARED, fd, 0)
+	mapping := C.mmap(unsafe { nil }, uint(length), C.PROT_READ, C.MAP_SHARED, fd, 0)
 	if mapping == voidptr(C.MAP_FAILED) {
 		return unsafe { nil }
 	}
@@ -166,7 +166,7 @@ fn desktop_mmap_readonly(fd int, length u64) voidptr {
 }
 
 fn desktop_munmap(base voidptr, length u64) int {
-	return C.munmap(base, usize(length))
+	return C.munmap(base, uint(length))
 }
 
 fn desktop_unlink(path string) int {
@@ -318,7 +318,7 @@ fn desktop_wait_for_input(pointer_fd int, keyboard_fd int, milliseconds i64) {
 		return
 	}
 	timeout := if milliseconds > 0x7fffffff { 0x7fffffff } else { int(milliseconds) }
-	C.poll(&fds[0], usize(count), timeout)
+	C.poll(&fds[0], uint(count), timeout)
 }
 
 // Read a whole file into a caller-supplied buffer, returning the byte count or
@@ -673,7 +673,7 @@ fn desktop_write(fd int, buffer voidptr, count u64) i64 {
 	if count > 0x7fffffff {
 		return -1
 	}
-	return i64(C.write(fd, buffer, usize(count)))
+	return i64(C.write(fd, buffer, uint(count)))
 }
 
 // Exact pipe I/O for compositor/application messages. Unlike device reads,
@@ -1556,7 +1556,7 @@ fn (mut io PosixDeviceIO) open(path string, writable bool) (int, DeviceError) {
 }
 
 fn (mut io PosixDeviceIO) read(fd int, mut buffer []u8) (int, DeviceError) {
-	count := C.read(fd, buffer.data, usize(buffer.len))
+	count := C.read(fd, buffer.data, uint(buffer.len))
 	if count < 0 {
 		return count, device_errno(C.errno)
 	}
@@ -1564,7 +1564,7 @@ fn (mut io PosixDeviceIO) read(fd int, mut buffer []u8) (int, DeviceError) {
 }
 
 fn (mut io PosixDeviceIO) write(fd int, buffer []u8) (int, DeviceError) {
-	count := C.write(fd, buffer.data, usize(buffer.len))
+	count := C.write(fd, buffer.data, uint(buffer.len))
 	if count < 0 {
 		return count, device_errno(C.errno)
 	}

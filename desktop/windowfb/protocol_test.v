@@ -104,7 +104,7 @@ fn test_shared_framebuffer_copy_and_retirement() {
 		client.back[0] = 0x123456
 		client.back[4095] = 0xabcdef
 	}
-	front := unsafe { &u32(usize(producer.mapping) + surface_header_size) }
+	front := unsafe { &u32(uint(producer.mapping) + surface_header_size) }
 	assert unsafe { front[0] } == 0
 	producer.copy_frame()
 	assert unsafe { front[0] } == 0x123456

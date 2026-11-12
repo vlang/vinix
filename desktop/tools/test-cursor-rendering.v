@@ -28,6 +28,13 @@ fn main() {
 	bounds := os.read_file(root + '/desktop/tools/ui2_headless_bounds.v')!.replace('(linux || vinix)', '(linux || vinix || macos)')
 	os.write_file(work + '/headless_bounds.v', bounds)!
 	run([root + '/desktop/tools/stage_ui2', work + '/modules/ui2', ui2, work + '/headless_bounds.v'])!
+	controls := work + '/modules/ui2/ui/control_state.c.v'
+	if os.is_file(controls) {
+		text := os.read_file(controls)!
+		if os.is_link(controls) { os.rm(controls)! }
+		os.write_file(controls, text.replace('$else $if macos {',
+			'$else $if macos && !ui2_headless ? {'))!
+	}
 	run([root + '/desktop/tools/stage_app', work + '/ui', root + '/desktop',
 		ui2 + '/examples/calculator'])!
 	for name in os.ls(work + '/ui')! {
@@ -53,7 +60,7 @@ fn main() {
 		println('==> ${suite}')
 		run([v, '-new-compiler', '-nocache', '-w', '-gc', 'none', '-manualfree', '-enable-globals',
 			'-d', 'ui2_headless', '-path',
-			'@vlib|' + work + '/modules|@vmodules|' + root + '|' + root + '/third_party',
+			'@vlib|' + work + '/modules|@vmodules|' + root + '|' + root + '/third_party|' + root + '/tools/accounts',
 			work + '/ui/' + name])!
 		os.rm(work + '/ui/' + name)!
 	}

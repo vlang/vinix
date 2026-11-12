@@ -15,8 +15,8 @@ struct C.stat {}
 fn C.printf(&char, ...voidptr) i32
 fn C.fprintf(voidptr, &char, ...voidptr) i32
 fn C.abort()
-fn C.malloc(usize) voidptr
-fn C.calloc(usize, usize) voidptr
+fn C.malloc(uint) voidptr
+fn C.calloc(uint, uint) voidptr
 fn C.free(voidptr)
 fn C.strcmp(&char, &char) i32
 @[c_extern] __global C.stderr voidptr
@@ -47,8 +47,8 @@ __global fixture_vertex_pointers [2]voidptr
 fn check(ok bool, message &char) {
  if !ok { C.fprintf(C.stderr, c'GPU FIXTURE FAIL: %s\n', message); C.abort() }
 }
-fn trace(name &char, a i64, b i64) { C.printf(c'%s %ld %ld\n', name, isize(a), isize(b)) }
-fn handle(value usize) voidptr { return unsafe { voidptr(value) } }
+fn trace(name &char, a i64, b i64) { C.printf(c'%s %ld %ld\n', name, int(a), int(b)) }
+fn handle(value uint) voidptr { return unsafe { voidptr(value) } }
 fn quiescent() {
  check(fixture_live_allocations == 0 && fixture_descriptors == 0, c'host allocation or descriptor retained')
  check(fixture_shader_mask == 0 && !fixture_program && !fixture_texture, c'GL resource retained')
@@ -75,13 +75,13 @@ fn remember(address voidptr) voidptr {
  check(false, c'fixture allocation table overflow'); return unsafe { nil }
 }
 @[export: 'gpf_malloc']
-pub fn allocate(size usize) voidptr {
+pub fn allocate(size uint) voidptr {
  fixture_mallocs++; trace(c'malloc', i64(size), fixture_mallocs)
  if fixture_failure == 26 && fixture_mallocs == 1 { return unsafe { nil } }
  return remember(C.malloc(size))
 }
 @[export: 'gpf_calloc']
-pub fn allocate_zero(count usize, size usize) voidptr {
+pub fn allocate_zero(count uint, size uint) voidptr {
  fixture_callocs++; trace(c'calloc', i64(count), i64(size))
  if fixture_failure == 2 { return unsafe { nil } }
  return remember(C.calloc(count, size))
@@ -133,17 +133,17 @@ pub fn inherited_stat(fd i32, state &C.stat) i32 {
  check(false, c'inherited console examined after failed stat')
  return -1
 }
-fn ioctl_model(fd i32, request usize, mode i32) i32 {
+fn ioctl_model(fd i32, request uint, mode i32) i32 {
  check(fd == 82 && request == 0x4b3a && mode == 1, c'graphics console handoff')
  trace(c'ioctl', i64(request), mode)
  return if fixture_failure == 29 { -1 } else { 0 }
 }
 $if fixture_darwin_arm64 ? {
  @[export: 'gpf_ioctl_body']
- pub fn ioctl(fd i32, request usize, mode i32) i32 { return ioctl_model(fd, request, mode) }
+ pub fn ioctl(fd i32, request uint, mode i32) i32 { return ioctl_model(fd, request, mode) }
 } $else {
  @[export: 'gpf_ioctl']
- pub fn ioctl(fd i32, request usize, mode i32) i32 { return ioctl_model(fd, request, mode) }
+ pub fn ioctl(fd i32, request uint, mode i32) i32 { return ioctl_model(fd, request, mode) }
 }
 @[export: 'eglGetProcAddress']
 pub fn proc_address(name &char) voidptr {

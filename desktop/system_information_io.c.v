@@ -7,8 +7,8 @@ module main
 // A distinct V name avoids os's private, partial C.statvfs declaration while
 // the C macro still selects the platform header's complete native structure.
 struct C.vinix_system_information_statvfs {
-	f_bsize usize
-	f_frsize usize
+	f_bsize uint
+	f_frsize uint
 	f_blocks u64
 	f_bfree u64
 	f_bavail u64

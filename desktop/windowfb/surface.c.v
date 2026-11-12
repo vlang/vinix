@@ -7,8 +7,8 @@ import os as _
 #include <fcntl.h>
 #include <unistd.h>
 
-fn C.mmap(voidptr, usize, int, int, int, i64) voidptr
-fn C.munmap(voidptr, usize) int
+fn C.mmap(voidptr, uint, int, int, int, i64) voidptr
+fn C.munmap(voidptr, uint) int
 fn C.fstat(int, &C.stat) int
 
 pub const surface_header_size = 48
@@ -39,7 +39,7 @@ mut:
 
 fn map_fd(fd int, width int, height int) !Surface {
 	size := surface_size(width, height)!
-	mapping := C.mmap(unsafe { nil }, usize(size), C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, 0)
+	mapping := C.mmap(unsafe { nil }, uint(size), C.PROT_READ | C.PROT_WRITE, C.MAP_SHARED, fd, 0)
 	if mapping == voidptr(-1) { return error('cannot map framebuffer') }
 	return Surface{
 		width:   width
@@ -47,7 +47,7 @@ fn map_fd(fd int, width int, height int) !Surface {
 		stride:  width * 4
 		mapping: mapping
 		size:    size
-		back:    unsafe { &u32(usize(mapping) + usize(surface_header_size + width * height * 4)) }
+		back:    unsafe { &u32(uint(mapping) + uint(surface_header_size + width * height * 4)) }
 	}
 }
 
@@ -99,12 +99,12 @@ fn (mut s Surface) initialize() {
 pub fn (mut s Surface) copy_frame() {
 	if s.mapping == unsafe { nil } { return }
 	s.initialize()
-	unsafe { C.memcpy(&u8(usize(s.mapping) + surface_header_size), s.back, usize(s.stride * s.height)) }
+	unsafe { C.memcpy(&u8(uint(s.mapping) + surface_header_size), s.back, uint(s.stride * s.height)) }
 }
 
 pub fn (mut s Surface) close() {
 	if s.mapping != unsafe { nil } {
-		C.munmap(s.mapping, usize(s.size))
+		C.munmap(s.mapping, uint(s.size))
 		s.mapping = unsafe { nil }
 	}
 }

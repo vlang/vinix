@@ -154,7 +154,7 @@ fn (inspector &ActivityInspector) read_link(entry string) string {
 	path := '/proc/${inspector.pid_text}/${entry}'
 	defer { unsafe { path.free() } }
 	mut buffer := [4096]u8{}
-	length := C.readlink(&char(path.str), &char(&buffer[0]), usize(buffer.len))
+	length := C.readlink(&char(path.str), &char(&buffer[0]), uint(buffer.len))
 	return if length > 0 { unsafe { tos(&buffer[0], int(length)).clone() } } else { '' }
 }
 

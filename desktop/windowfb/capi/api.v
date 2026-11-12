@@ -36,7 +36,7 @@ fn report(out &ApiError, text string) {
 	if out == unsafe { nil } { return }
 	length := if text.len < 255 { text.len } else { 255 }
 	unsafe {
-		C.memcpy(&out.message[0], text.str, usize(length))
+		C.memcpy(&out.message[0], text.str, uint(length))
 		out.message[length] = 0
 	}
 }
@@ -175,7 +175,7 @@ pub fn c_next_event(opaque voidptr, event &Event, out &ApiError) i32 {
 	if !ready { return 0 }
 	unsafe {
 		*event = Event{ kind: u32(message.kind), x: message.x, y: message.y, value: message.value, length: u32(message.length) }
-		C.memcpy(&event.payload[0], &message.payload[0], usize(message.length))
+		C.memcpy(&event.payload[0], &message.payload[0], uint(message.length))
 	}
 	return 1
 }

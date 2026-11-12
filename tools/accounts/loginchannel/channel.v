@@ -14,7 +14,7 @@ fn C.getsockname(int, voidptr, &u32) int
 fn C.getsockopt(int, int, int, voidptr, &u32) int
 fn C.setsockopt(int, int, int, voidptr, u32) int
 fn C.fcntl(fd int, cmd int, arg ...voidptr) int
-fn C.poll(fds &C.pollfd, count usize, timeout int) int
+fn C.poll(fds &C.pollfd, count uint, timeout int) int
 fn C.getenv(&char) &char
 fn C.strcmp(&char, &char) int
 

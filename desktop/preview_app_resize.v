@@ -128,7 +128,7 @@ fn (mut a PreviewApp) apply_resize() bool {
 	return a.apply_resize_using(preview_allocate_crop)
 }
 
-fn (mut a PreviewApp) apply_resize_using(allocate fn (usize) &u8) bool {
+fn (mut a PreviewApp) apply_resize_using(allocate fn (uint) &u8) bool {
 	width := a.resize_width.value()
 	height := a.resize_height.value()
 	input_width, input_height := a.oriented_dimensions()
@@ -143,7 +143,7 @@ fn (mut a PreviewApp) apply_resize_using(allocate fn (usize) &u8) bool {
 	}
 	// At most 32 MiB per buffer. Only one new allocation is needed; no scratch
 	// image or full rotated copy. Failure preserves active pixels and history.
-	pixels := allocate(usize(width * height * 4))
+	pixels := allocate(uint(width * height * 4))
 	if pixels == unsafe { nil } { a.status_key = 'preview.status.resize_failed'; return false }
 	for y in 0 .. height {
 		y0, y1, fy := preview_resize_coordinate(y, input_height, height)

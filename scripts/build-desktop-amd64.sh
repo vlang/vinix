@@ -187,6 +187,7 @@ echo "==> Compiling for x86_64-linux-musl..."
     "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
     "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
     "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
+    "$BUILD_DIR/v-runtime/execute_capture_nix.c" \
     -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
     "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
     -fuse-ld=lld -o "$BUILD_DIR/vinix-desktop"

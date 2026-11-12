@@ -56,7 +56,7 @@ pub fn save(path string, record string) ! {
 	}
 	mut offset := 0
 	for offset < record.len {
-		n := unsafe { C.write(fd, &record.str[offset], usize(record.len - offset)) }
+		n := unsafe { C.write(fd, &record.str[offset], uint(record.len - offset)) }
 		if n <= 0 { return error('short session write') }
 		offset += int(n)
 	}

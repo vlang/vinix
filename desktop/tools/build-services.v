@@ -127,6 +127,15 @@ fn main() {
 	}
 	// Cache only service source/modules and the selected compiler/runtime inputs.
 	mut inputs := [compiler, arch, sysroot, clang]
+	mut runtime_sources := []string{}
+	process_runtime := os.dir(compiler) + '/vlib/os/execute_capture_nix.c'
+	if os.is_file(process_runtime) {
+		runtime_sources << process_runtime
+		for path in [process_runtime, os.dir(process_runtime) + '/execute_capture_nix.h'] {
+			inputs << path
+			inputs << sha256.sum(os.read_bytes(path)!).hex()
+		}
+	}
 	for directory in ['services', 'sessiondaemon', 'sessionipc', 'serviceprocess', 'servicerunner',
 		'timesync', 'sessioncore', 'sessionruntime'] {
 		mut files := os.walk_ext(root + '/desktop/' + directory, '.v')
@@ -160,7 +169,7 @@ fn main() {
 				'-isystem', gcc + '/include', '-isystem', sysroot + '/usr/include', '-isystem',
 				root + '/build-support/aarch64-cc-shim', '-D_GNU_SOURCE', '-O2', '-fno-stack-protector',
 				'-w', sysroot + '/usr/lib/crt1.o', sysroot + '/usr/lib/crti.o', gcc + '/crtbeginT.o',
-				generated, '-L' + sysroot + '/usr/lib', '-L' + gcc, '-lgcc_eh', '-lc', '-lgcc',
+				generated, ...runtime_sources, '-L' + sysroot + '/usr/lib', '-L' + gcc, '-lgcc_eh', '-lc', '-lgcc',
 				'-lm', '-lpthread', gcc + '/crtend.o', sysroot + '/usr/lib/crtn.o', '-fuse-ld=lld',
 				'-o', binary + '.tmp'])!
 		}

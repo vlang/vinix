@@ -8,7 +8,7 @@ $if linux {
 	#include <sys/prctl.h>
 }
 
-fn C.prctl(int, usize, usize, usize, usize) int
+fn C.prctl(int, uint, uint, uint, uint) int
 fn C.execv(&char, &&char) int
 fn C.getpgrp() int
 
@@ -36,7 +36,7 @@ pub fn run(lease int, args []string) ! {
 	child := C.fork()
 	if child == 0 {
 		$if linux {
-			if C.prctl(1, usize(C.SIGKILL), 0, 0, 0) != 0 || C.getppid() != guardian {
+			if C.prctl(1, uint(C.SIGKILL), 0, 0, 0) != 0 || C.getppid() != guardian {
 				C._exit(127)
 			}
 		}

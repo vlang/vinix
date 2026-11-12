@@ -13,8 +13,8 @@ import os
 #flag -I @VMODROOT
 #include "app_icon_data.h"
 
-fn C.vinix_app_icon_data(&char, &usize) voidptr
-fn C.vinix_app_icon_size(&char) usize
+fn C.vinix_app_icon_data(&char, &uint) voidptr
+fn C.vinix_app_icon_size(&char) uint
 
 const app_icon_dir = '/usr/share/vinix/icons'
 

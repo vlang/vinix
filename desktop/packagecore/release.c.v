@@ -10,7 +10,7 @@ import tools.packages.pkgprotocol
 
 fn C.openat(int, &char, int, ...int) int
 fn C.fstat(int, &C.stat) int
-fn C.read(int, voidptr, usize) isize
+fn C.read(int, voidptr, uint) int
 fn C.close(int) int
 
 fn release_trusted(fd int, owner u32, directory bool) !C.stat {
@@ -68,7 +68,7 @@ fn release_route_at(root string, owner u32, architecture string, id string) !boo
 	defer { unsafe { bytes.free() } }
 	mut count := 0
 	for count < bytes.len {
-		n := C.read(fd, unsafe { &bytes[count] }, usize(bytes.len - count))
+		n := C.read(fd, unsafe { &bytes[count] }, uint(bytes.len - count))
 		if n <= 0 { return error('incomplete release declaration') }
 		count += int(n)
 	}

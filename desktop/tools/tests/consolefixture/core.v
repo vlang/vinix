@@ -98,7 +98,7 @@ pub fn inherited_stat(fd i32, state &C.stat) i32 {
 	return 0
 }
 
-fn ioctl_model(fd i32, request usize, mode i32) i32 {
+fn ioctl_model(fd i32, request uint, mode i32) i32 {
 	check(request == 0x4b3a && mode == mode_requested, c'KDSETMODE and normalized mode')
 	check(!rejected() && fd == if scenario <= 1 { 82 } else { matching_fd() }, c'only exact console receives ioctl')
 	ioctls++
@@ -109,10 +109,10 @@ fn ioctl_model(fd i32, request usize, mode i32) i32 {
 
 $if fixture_darwin_arm64 ? {
 	@[export: 'gpf_ioctl_body']
-	pub fn ioctl(fd i32, request usize, mode i32) i32 { return ioctl_model(fd, request, mode) }
+	pub fn ioctl(fd i32, request uint, mode i32) i32 { return ioctl_model(fd, request, mode) }
 } $else {
 	@[export: 'gpf_ioctl']
-	pub fn ioctl(fd i32, request usize, mode i32) i32 { return ioctl_model(fd, request, mode) }
+	pub fn ioctl(fd i32, request uint, mode i32) i32 { return ioctl_model(fd, request, mode) }
 }
 
 fn exercise(code i32) {

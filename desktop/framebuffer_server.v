@@ -411,5 +411,5 @@ fn (d &Desktop) wait_framebuffer_input(s &FramebufferServer, pointer_fd int, key
 		}
 	}
 	timeout := if milliseconds > 1000 { 1000 } else { int(milliseconds) }
-	C.poll(&fds[0], usize(count), timeout)
+	C.poll(&fds[0], uint(count), timeout)
 }

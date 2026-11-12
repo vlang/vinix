@@ -42,7 +42,7 @@ fn first_run_release_decided(home string) bool {
 	if C.fstat(fd, unsafe { &info }) != 0 || info.st_mode & 0o170000 != 0o100000
 		|| info.st_size < 5 || info.st_size > 7 { return false }
 	mut bytes := [8]u8{}
-	count := C.read(fd, &bytes[0], usize(bytes.len))
+	count := C.read(fd, &bytes[0], uint(bytes.len))
 	return (count == 5 && bytes[0] == `s` && bytes[1] == `k` && bytes[2] == `i`
 		&& bytes[3] == `p` && bytes[4] == `\n`)
 		|| (count == 7 && bytes[0] == `r` && bytes[1] == `e` && bytes[2] == `v`
@@ -70,7 +70,7 @@ fn first_run_release_save(home string, choice FirstRunReleaseChoice) bool {
 	// Persist the explicit choice before handing off. Software's normal release
 	// review remains available if a crash or failed window launch loses delivery.
 	data := if choice == .review { 'review\n' } else { 'skip\n' }
-	written := C.write(fd, data.str, usize(data.len))
+	written := C.write(fd, data.str, uint(data.len))
 	closed := C.close(fd)
 	if written != data.len || closed != 0 {
 		C.unlink(temporary.str)

@@ -52,7 +52,7 @@ fn (mut a SoftwareApp) submit_admin() {
 	for index in 0 .. a.admin_password_len { line[index] = a.admin_password[index] }
 	line[a.admin_password_len] = `\n`
 	unsafe { C.signal(C.SIGPIPE, C.SIG_IGN) }
-	if C.write(a.worker.stdio_fd[0], &line[0], usize(a.admin_password_len + 1)) != a.admin_password_len + 1 {
+	if C.write(a.worker.stdio_fd[0], &line[0], uint(a.admin_password_len + 1)) != a.admin_password_len + 1 {
 		a.set_status('Authentication input is busy or closed. The password was not sent.'); return
 	}
 	C.close(a.worker.stdio_fd[0]); a.worker.stdio_fd[0] = -1

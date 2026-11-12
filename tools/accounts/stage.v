@@ -119,6 +119,11 @@ fn stage() ! {
 	}
 	mut programs := ['authd', 'account', 'system', 'auth']
 	if include_session { programs << 'session' }
+	// V's Linux process pipes live in an external runtime object. Manual C
+	// links must include it, just as the compiler's normal linker does.
+	mut runtime_sources := []string{}
+	process_runtime := os.dir(v) + '/vlib/os/execute_capture_nix.c'
+	if os.is_file(process_runtime) { runtime_sources << process_runtime }
 	for program in programs {
 		installer.check()!
 		source := work + '/' + program + '.c'
@@ -128,7 +133,7 @@ fn stage() ! {
 			'-manualfree', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
 			if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', source,
 			repository + '/tools/accounts/' + program + '.v']
-		c_argv := [...cc[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source, '-o', binary,
+		c_argv := [...cc[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source, ...runtime_sources, '-o', binary,
 			'-lm', '-lpthread']
 		invoke(v, v_argv)!
 		invoke(compiler, c_argv)!

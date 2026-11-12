@@ -641,6 +641,7 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
         "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
         "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
         "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
+        "$BUILD_DIR/v-runtime/execute_capture_nix.c" \
         -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
         "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
         -fuse-ld=lld -B"$LLVM_BIN" \
@@ -678,6 +679,7 @@ if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
             -D_GNU_SOURCE -O2 -fno-pie -no-pie -fno-stack-protector -w \
             "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" \
             "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
+            "$BUILD_DIR/v-runtime/execute_capture_nix.c" \
             "$BUILD_DIR/gpu-present.c" \
             -L"$ASAHI_STAGING/usr/lib" \
             -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \

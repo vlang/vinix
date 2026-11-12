@@ -15,6 +15,10 @@ $if (linux || vinix) && ui2_headless ? {
 
 	pub fn request_refresh() {}
 
+	fn native_safe_insets() ?SafeInsets {
+		return none
+	}
+
 	pub fn bounds() Rect {
 		return Rect{
 			width: 800

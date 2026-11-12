@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-fn C.malloc(usize) voidptr
+fn C.malloc(uint) voidptr
 fn C.vheap_alloc(voidptr, u64)
 fn C.vheap_free(voidptr)
 
@@ -222,7 +222,7 @@ fn (mut a PreviewApp) update_selection(x int, y int, width int, height int) {
 	}
 }
 
-fn preview_allocate_crop(length usize) &u8 {
+fn preview_allocate_crop(length uint) &u8 {
 	pixels := &u8(C.malloc(length))
 	$if track_heap ? { C.vheap_alloc(pixels, u64(length)) }
 	return pixels
@@ -246,7 +246,7 @@ fn (mut a PreviewApp) apply_crop() bool {
 	return a.apply_crop_using(preview_allocate_crop)
 }
 
-fn (mut a PreviewApp) apply_crop_using(allocate fn (usize) &u8) bool {
+fn (mut a PreviewApp) apply_crop_using(allocate fn (uint) &u8) bool {
 	rect := a.crop_rect()
 	if !a.crop_rect_valid(rect) {
 		a.status_key = 'preview.status.selection_empty'
@@ -254,7 +254,7 @@ fn (mut a PreviewApp) apply_crop_using(allocate fn (usize) &u8) bool {
 	}
 	// The bounded dimensions guarantee at most 32 MiB and no multiplication
 	// overflow. A failed allocation preserves pixels, selection and source bytes.
-	length := usize(rect.width * rect.height * 4)
+	length := uint(rect.width * rect.height * 4)
 	pixels := allocate(length)
 	if pixels == unsafe { nil } {
 		a.status_key = 'preview.status.crop_failed'

@@ -98,7 +98,7 @@ fn (mut info FilesInfoPanel) read(path string, tz_offset_seconds i64) {
 	}
 	if info.mode & u32(C.S_IFMT) == u32(C.S_IFLNK) {
 		mut target := [4096]u8{}
-		length := C.readlink(&char(path.str), &char(&target[0]), usize(target.len))
+		length := C.readlink(&char(path.str), &char(&target[0]), uint(target.len))
 		info.link_target = if length >= 0 && length < target.len {
 			unsafe { tos(&target[0], int(length)) }.clone()
 		} else {

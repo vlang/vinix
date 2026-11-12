@@ -217,7 +217,7 @@ fn test_preview_path_growth_utf8_and_decode_errors_release_owned_memory() {
 	assert C.vinix_heap_end() == 0
 }
 
-fn preview_heap_fail_crop_allocation(_ usize) &u8 { return unsafe { nil } }
+fn preview_heap_fail_crop_allocation(_ uint) &u8 { return unsafe { nil } }
 
 fn test_preview_repeated_select_cancel_failed_allocate_crop_export_and_close_releases_pixels() {
 	root := os.join_path(os.temp_dir(), 'vinix-preview-crop-heap-${os.getpid()}')

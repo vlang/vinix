@@ -38,11 +38,11 @@ fn C.unlinkat(int, &char, int) int
 fn C.fsync(int) int
 fn C.flock(int, int) int
 fn C.lseek(int, i64, int) i64
-fn C.read(int, voidptr, usize) isize
-fn C.write(int, voidptr, usize) isize
+fn C.read(int, voidptr, uint) int
+fn C.write(int, voidptr, uint) int
 fn C.close(int) int
 fn C.access(&char, int) int
-fn C.readlinkat(int, &char, &char, usize) isize
+fn C.readlinkat(int, &char, &char, uint) int
 fn C.symlinkat(&char, int, &char) int
 fn C.futimens(int, &C.timespec) int
 
@@ -148,7 +148,7 @@ fn copy_metadata(fd int, id Identity) ! {
 fn write_all(fd int, bytes []u8) ! {
 	mut at := 0
 	for at < bytes.len {
-		count := C.write(fd, unsafe { &u8(bytes.data) + at }, usize(bytes.len - at))
+		count := C.write(fd, unsafe { &u8(bytes.data) + at }, uint(bytes.len - at))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count <= 0 { return error('write failed (${C.errno})') }
 		at += int(count)
@@ -166,7 +166,7 @@ pub fn read_regular(path string, limit int) ![]u8 {
 	mut bytes := []u8{len: int(before.size)}
 	mut at := 0
 	for at < bytes.len {
-		count := C.read(fd, unsafe { &u8(bytes.data) + at }, usize(bytes.len - at))
+		count := C.read(fd, unsafe { &u8(bytes.data) + at }, uint(bytes.len - at))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count <= 0 { unsafe { bytes.free() }; return error('read interrupted') }
 		at += int(count)
