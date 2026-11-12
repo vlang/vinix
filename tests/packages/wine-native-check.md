@@ -1,21 +1,23 @@
 # Signed Wine Win64 native qualification
 
-Current status: **runtime qualification is incomplete**. The retained
+Current status: **runtime qualification is incomplete**. A fresh local ARM
+signed Win64 producer, guest and independent fork-safe retainer pass, with all
+55 evidence refusal controls; see [the retained continuation](wine-forksafe-retention-check.md).
+The fresh x86 run reaches Wine but its server fails to load `l_intl.nls`; the
+retainer refuses that failed outcome. The retained
 [checkpoint](wine-native-checkpoint.md) records the previous failed guests.
 The [nested bridge qualification](wine-nested-bridge-check.md) adds private
 native child bridges and an adjacent ordinary musl copy so Wine can discover
 its loader, server and data through its own executable-directory rules. Both
 prepared architectures pass independent layout and source-binding controls;
-these host checks do not establish a passing signed Wine launch.
+these host checks alone do not establish a passing signed Wine launch.
 
-The current production retainer verifies the x86-9 input/output provenance and
-then refuses its failed outcome, leaving no retained success directory. The
-control runner also refuses that baseline before any mutations. Its full
-resealed refusal matrix remains unqualified until there is a real passing
-native baseline. AArch64 additionally fails in QEMU's translated fork path;
-the separate [translated-fork fixture](wine-translation-fork-check.md) records
-that boundary without claiming Wine qualification. No Calculator UI or
-ordinary graphical Wine execution has passed.
+The historical x86-9 outcome remains a failed checkpoint. The separate
+[translated-fork fixture](wine-translation-fork-check.md) records the original
+ARM split-WX failure and its source-built fix. The new explicit retainer mode
+below admits one pinned fork-safe build; the original Alpine patch contract
+remains separate. No Calculator UI or ordinary graphical Wine execution has
+passed.
 
 This fixture is designed to run an actual AMD64 PE32+ console program through Wine 9.17-r1
 under an ordinary Vinix account. The runtime and application are separate signed
@@ -83,10 +85,10 @@ retainer and evidence controls require `-prod` for embedded source binding.
 The tools' positional interfaces are:
 
 ```text
-wine-build ARCH TRANSLATION_STAGE NEW_PREPARED V MUSL_SYSROOT GCC_RUNTIME NOTICES PE_PRODUCER --local-qualification-only
+wine-build ARCH TRANSLATION_STAGE NEW_PREPARED V MUSL_SYSROOT GCC_RUNTIME NOTICES PE_PRODUCER --local-qualification-only [TRANSLATOR_STAGE]
 wine-native-check ARCH NEW_RUN PREPARED KERNEL ASSEMBLED_STAGE MUSL_SYSROOT GCC_RUNTIME SANDBOX
-wine-native-retain RUN PREPARED ARCH NEW_RETAINED
-wine-evidence-check RETAINER RUN PREPARED ARCH NEW_CONTROLS
+wine-native-retain RUN PREPARED ARCH NEW_RETAINED [--forksafe-translator]
+wine-evidence-check RETAINER RUN PREPARED ARCH NEW_CONTROLS [--forksafe-translator] [--shard=INDEX/COUNT]
 ```
 
 Keep the source tree and all captured producer inputs unchanged from producer
@@ -94,3 +96,49 @@ capture through native verification and retention. The receipts name local
 absolute artifacts; they are qualification evidence, not a hermetic or
 reproducible-build assertion. Local signing keys remain outside the guest and
 are never production trust inputs.
+
+## Pinned fork-safe translator
+
+AArch64 preparation now requires the source-built `TRANSLATOR_STAGE`. The
+shared `wineadapter.admit_forksafe_translator` checks exact pins for the tested
+QEMU binary, its build manifest and `splitwx-fork.patch`. Each must be an
+ordinary, non-linked file within the reader's size bound. A self-reported
+binary hash in a different manifest cannot admit a replacement translator.
+These pins describe one local build, not arbitrary QEMU builds or complete
+corresponding-source availability. x86_64 preparation refuses the extra stage.
+
+The independent retainer accepts `--forksafe-translator` after its four
+positional arguments for AArch64 only. It requires method
+`pinned-forksafe-v1`, exact declaration fields and scope, all three pinned
+inputs in both producer and native inventories, and the exact packaged
+translator bytes. Omitting this option retains the Alpine instruction-patch
+contract and refuses the source-built declaration. Both modes still require
+the full PE proof, runtime layout, signed native outcome and original evidence
+checks; neither accepts historical input substitutions.
+
+Compiler/source tree capture and comparison include hidden entries. In
+particular, the PE receipt's full compiler inventory includes `.vdocignore`
+and hidden test directories. The independent tree walk must count and require
+these files too. A fresh capture is required for runs that omitted them.
+
+`wine-forksafe-admission.v BINARY MANIFEST PATCH FRESH_OUTPUT` supplies ordinary
+host controls for changed, truncated, missing, linked and directory inputs,
+swapped roles and exact retries. Build it normally, with `-prod`, or with
+ASan/UBSan; it uses explicit errors in all modes. The evidence-control driver
+also accepts `--forksafe-translator` after its five positional arguments. Its
+matrix includes missing hidden compiler inputs on both sides, mode omission,
+missing translator inputs, resealed manifest declarations and resealed runtime
+tampering. Native qualification and retained results are recorded separately.
+
+The matrix can be partitioned into up to eight shards, numbered from zero.
+Each shard still requires its own original and copied passing baselines, and
+runs controls whose list index modulo the shard count equals its shard index.
+Use a fresh output directory for each process. Then run
+`wine-evidence-shards FRESH_COVERAGE_JSON SHARD_DIR ...` with every shard.
+It derives the complete expected control list from the same byte-bound
+`winecontrols/cases.v` contract, requires identical baseline inputs, checks
+each control's unique assignment and rehashes all baseline inputs and shard
+proofs before writing coverage. It refuses missing, duplicate or altered
+collections. `wine-evidence-shards-check.v` supplies synthetic baseline/retry
+and corruption controls for this collection step; it makes no Wine execution
+claim. A single shard's success is not a complete matrix result.

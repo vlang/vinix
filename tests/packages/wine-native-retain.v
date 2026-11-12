@@ -47,7 +47,7 @@ fn require_input(inputs map[string]string, path string) ! {
 
 fn tree(inputs map[string]string, directory string) ! {
 	mut count := 0
-	for path in os.walk_ext(directory, '') {
+	for path in os.walk_ext(directory, '', hidden: true) {
 		if os.is_file(path) {
 			require_input(inputs, path)!
 			count++
@@ -85,7 +85,8 @@ fn producer_argv(vargv string, ccargv string, compiler string, architecture stri
 	expected_v << ['-o', cfile, source]
 	if native {
 		expected_v.insert(1, ['-dump-files', os.dir(cfile) + '/sources-built.txt'])
-		mut expected_discovery := [compiler, '-print-watched-files', '-dump-files', os.dir(cfile) + '/sources-before.txt']
+		mut expected_discovery := [compiler, '-print-watched-files', '-dump-files',
+			os.dir(cfile) + '/sources-before.txt']
 		for argument in expected_v[3..] { expected_discovery << argument }
 		if argv(os.dir(vargv) + '/discover.log.argv.json')! != expected_discovery {
 			return error('V source discovery argv differs')
@@ -107,30 +108,35 @@ fn retain() ! {
 	} $else {
 		return error('compile Wine retention with -prod for embedded source admission')
 	}
-	if os.args.len != 5 {
-		return error('usage: wine-native-retain RUN PREPARED_BUILD ARCH NEW_OUTPUT')
+	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] != '--forksafe-translator') {
+		return error('usage: wine-native-retain RUN PREPARED_BUILD ARCH NEW_OUTPUT [--forksafe-translator]')
 	}
+	forksafe := os.args.len == 6
 	root := hwhost.find_root(@FILE)!
 	run := os.abs_path(os.args[1])
 	prepared := os.abs_path(os.args[2])
 	arch := os.args[3]
+	if forksafe && arch != 'aarch64' {
+		return error('fork-safe translator admission requires aarch64')
+	}
 	out := os.abs_path(os.args[4])
 	if arch !in ['aarch64', 'x86_64'] || os.exists(out) {
 		return error('unsupported architecture or existing retention output')
 	}
 	expected_sources := {
-		'tests/packages/wine-native-retain.v':     $embed_file('wine-native-retain.v').to_string()
-		'tests/packages/wine-native-check.v':      $embed_file('wine-native-check.v').to_string()
-		'tests/packages/wine-native/main.v':       $embed_file('wine-native/main.v').to_string()
-		'tests/packages/winesource/closure.v':     $embed_file('winesource/closure.v').to_string()
-		'tools/packages/wine-build.v':             $embed_file('../../tools/packages/wine-build.v').to_string()
-		'tools/packages/wine-runner.v':            $embed_file('../../tools/packages/wine-runner.v').to_string()
-		'tools/packages/wineadapter/prefix.c.v':   $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
-		'tools/packages/wineadapter/patch.v':      $embed_file('../../tools/packages/wineadapter/patch.v').to_string()
-		'tools/packages/wineadapter/layout.v':     $embed_file('../../tools/packages/wineadapter/layout.v').to_string()
-		'tools/packages/wineadapter/pe_proof.c.v': $embed_file('../../tools/packages/wineadapter/pe_proof.c.v').to_string()
-		'tools/packages/wineadapter/pe_reader.v':  $embed_file('../../tools/packages/wineadapter/pe_reader.v').to_string()
-		'tests/hardware-platform/plainiso/iso.v':  plainiso.source()
+		'tests/packages/wine-native-retain.v':          $embed_file('wine-native-retain.v').to_string()
+		'tests/packages/wine-native-check.v':           $embed_file('wine-native-check.v').to_string()
+		'tests/packages/wine-native/main.v':            $embed_file('wine-native/main.v').to_string()
+		'tests/packages/winesource/closure.v':          $embed_file('winesource/closure.v').to_string()
+		'tools/packages/wine-build.v':                  $embed_file('../../tools/packages/wine-build.v').to_string()
+		'tools/packages/wine-runner.v':                 $embed_file('../../tools/packages/wine-runner.v').to_string()
+		'tools/packages/wineadapter/prefix.c.v':        $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
+		'tools/packages/wineadapter/patch.v':           $embed_file('../../tools/packages/wineadapter/patch.v').to_string()
+		'tools/packages/wineadapter/fork_translator.v': $embed_file('../../tools/packages/wineadapter/fork_translator.v').to_string()
+		'tools/packages/wineadapter/layout.v':          $embed_file('../../tools/packages/wineadapter/layout.v').to_string()
+		'tools/packages/wineadapter/pe_proof.c.v':      $embed_file('../../tools/packages/wineadapter/pe_proof.c.v').to_string()
+		'tools/packages/wineadapter/pe_reader.v':       $embed_file('../../tools/packages/wineadapter/pe_reader.v').to_string()
+		'tests/hardware-platform/plainiso/iso.v':       plainiso.source()
 	}
 	for name, source in expected_sources {
 		if digest(root + '/' + name)! != sha256.hexhash(source) {
@@ -174,7 +180,8 @@ fn retain() ! {
 			require_input(inputs, declaration[name])!
 		}
 	}
-	for name in ['tests/packages/wine-native-check.v', 'tests/packages/wine-native/main.v', 'tests/packages/winesource/closure.v']! {
+	for name in ['tests/packages/wine-native-check.v', 'tests/packages/wine-native/main.v',
+		'tests/packages/winesource/closure.v']! {
 		require_input(inputs, root + '/' + name)!
 	}
 	for directory in [root + '/tools/packages', root + '/tools/accounts',
@@ -280,40 +287,76 @@ fn retain() ! {
 		}
 		patch := json2.decode[map[string]string](os.read_file(prepared + '/translator-patch.json')!)!
 		patched_file := prepared + '/prepared/' + arch + '/runtime/bin/qemu-x86_64'
-		if patch != {
-			'input':         original
-			'input_sha256':  wineadapter.qemu_splitwx_input
-			'output':        recorded_prepared + '/prepared/' + arch + '/runtime/bin/qemu-x86_64'
-			'output_sha256': digest(patched_file)!
-			'scope':         'local-qualification-only: exact AArch64 tcg_init_machine argument instruction forces splitwx=1; no RWX fallback'
-			'offset':        '0x85c64'
-			'before':        '612e40b9'
-			'after':         '21008052'
-		} {
-			return error('Wine translator patch declaration differs')
+		if forksafe {
+			for name, expected in {
+				'translator':          wineadapter.qemu_forksafe_input
+				'translator_manifest': wineadapter.qemu_forksafe_manifest
+				'fork_patch':          wineadapter.qemu_forksafe_patch
+			} {
+				if inputs[patch[name]] != expected || producer_inputs[patch[name]] != expected {
+					return error('Wine fork-safe translator input binding differs: ' + name)
+				}
+			}
+			if patch != {
+				'input':                      original
+				'input_sha256':               wineadapter.qemu_splitwx_input
+				'output':                     recorded_prepared + '/prepared/' + arch + '/runtime/bin/qemu-x86_64'
+				'output_sha256':              digest(patched_file)!
+				'translator':                 patch['translator']
+				'translator_sha256':          wineadapter.qemu_forksafe_input
+				'translator_manifest':        patch['translator_manifest']
+				'translator_manifest_sha256': wineadapter.qemu_forksafe_manifest
+				'fork_patch':                 root + '/build-support/dota2/qemu/splitwx-fork.patch'
+				'fork_patch_sha256':          wineadapter.qemu_forksafe_patch
+				'method':                     'pinned-forksafe-v1'
+				'scope':                      wineadapter.qemu_forksafe_scope
+			} {
+				return error('Wine translator patch declaration differs')
+			}
+			wineadapter.admit_forksafe_translator(patch['translator'], patch['translator_manifest'], patch['fork_patch'])!
+			if digest(patched_file)! != wineadapter.qemu_forksafe_input {
+				return error('Wine translator differs from the pinned fork-safe build')
+			}
+		} else {
+			if patch != {
+				'input':         original
+				'input_sha256':  wineadapter.qemu_splitwx_input
+				'output':        recorded_prepared + '/prepared/' + arch + '/runtime/bin/qemu-x86_64'
+				'output_sha256': digest(patched_file)!
+				'scope':         'local-qualification-only: exact AArch64 tcg_init_machine argument instruction forces splitwx=1; no RWX fallback'
+				'offset':        '0x85c64'
+				'before':        '612e40b9'
+				'after':         '21008052'
+			} {
+				return error('Wine translator patch declaration differs')
+			}
+			if 'translator-patch.json' !in outputs {
+				return error('missing required translator patch output')
+			}
+			original_text := os.read_file(original)!
+			patched := wineadapter.splitwx_patch(original_text)!
+			consumed := os.read_file(patched_file)!
+			defer {
+				unsafe {
+					original_text.free()
+					patched.free()
+					consumed.free()
+				}
+			}
+			if patched != consumed {
+				return error('Wine translator differs from the exact split-WX patch')
+			}
 		}
 		if 'translator-patch.json' !in outputs {
 			return error('missing required translator patch output')
-		}
-		original_text := os.read_file(original)!
-		patched := wineadapter.splitwx_patch(original_text)!
-		consumed := os.read_file(patched_file)!
-		defer {
-			unsafe {
-				original_text.free()
-				patched.free()
-				consumed.free()
-			}
-		}
-		if patched != consumed {
-			return error('Wine translator differs from the exact split-WX patch')
 		}
 	}
 	generated := hashes(run + '/generated-before-boot.json')!
 	mut required := []string{}
 	for program in ['guest', 'package']! {
 		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
-			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt', 'sources-built.txt'] {
+			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
+			'sources-built.txt'] {
 			required << 'build-' + program + '/' + name
 		}
 		winesource.admit(run + '/build-' + program + '/sources-before.txt',

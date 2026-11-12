@@ -5,6 +5,8 @@ module main
 import crypto.sha256
 import json2
 import os
+import strconv
+import tests.packages.winecontrols
 
 struct WineControls {
 	format          int = 1
@@ -13,6 +15,10 @@ struct WineControls {
 	copied_baseline bool
 	refused         []string
 	inputs          map[string]string
+	shard           int
+	shards          int = 1
+	expected        []string
+	forksafe        bool
 }
 
 fn digest(path string) !string {
@@ -96,10 +102,12 @@ fn reseal_producer(run string, prepared string, name string) ! {
 	input_update(run, '', prepared + '/outputs.json', digest(prepared + '/outputs.json')!)!
 }
 
-fn admit(retainer string, run string, prepared string, architecture string, output string, log string) !int {
+fn admit(retainer string, run string, prepared string, architecture string, output string, log string, forksafe bool) !int {
 	mut child := os.new_process(retainer)
 	defer { child.close() }
-	child.set_args([run, prepared, architecture, output])
+	mut args := [run, prepared, architecture, output]
+	if forksafe { args << '--forksafe-translator' }
+	child.set_args(args)
 	child.set_redirect_stdio_merged()
 	child.run()
 	C.close(child.stdio_fd[0])
@@ -116,13 +124,34 @@ fn checks() ! {
 	} $else {
 		return error('compile Wine evidence controls with -prod')
 	}
-	if os.args.len != 6 {
-		return error('usage: wine-evidence-check RETAINER RUN PREPARED ARCH NEW_OUTPUT')
+	if os.args.len < 6 || os.args.len > 8 {
+		return error('usage: wine-evidence-check RETAINER RUN PREPARED ARCH NEW_OUTPUT [--forksafe-translator] [--shard=INDEX/COUNT]')
+	}
+	mut forksafe := false
+	mut shard := 0
+	mut shards := 1
+	mut selected_shard := false
+	for option in os.args[6..] {
+		if option == '--forksafe-translator' && !forksafe {
+			forksafe = true
+		} else if option.starts_with('--shard=') && !selected_shard {
+			parts := option.all_after('=').split('/')
+			if parts.len != 2 { return error('shard must be INDEX/COUNT') }
+			shard = strconv.atoi(parts[0])!
+			shards = strconv.atoi(parts[1])!
+			if shards < 1 || shards > 8 || shard < 0 || shard >= shards {
+				return error('invalid shard bounds')
+			}
+			selected_shard = true
+		} else {
+			return error('unknown or duplicate Wine control option')
+		}
 	}
 	retainer := os.real_path(os.args[1])
 	run := os.real_path(os.args[2])
 	prepared := os.real_path(os.args[3])
 	architecture := os.args[4]
+	if forksafe && architecture != 'aarch64' { return error('fork-safe controls require aarch64') }
 	proof := os.abs_path(os.args[5])
 	if architecture !in ['aarch64', 'x86_64'] || os.exists(proof) {
 		return error('unsupported architecture or existing proof directory')
@@ -130,8 +159,13 @@ fn checks() ! {
 	if digest(@FILE)! != sha256.hexhash($embed_file('wine-evidence-check.v').to_string()) {
 		return error('Wine controls source changed')
 	}
+	cases := os.dir(@FILE) + '/winecontrols/cases.v'
+	if digest(cases)! != sha256.hexhash(winecontrols.source()) {
+		return error('Wine control cases changed')
+	}
 	os.mkdir_all(proof)!
 	inputs := {
+		cases:                      digest(cases)!
 		retainer:                   digest(retainer)!
 		@FILE:                      digest(@FILE)!
 		os.executable():            digest(os.executable())!
@@ -139,46 +173,43 @@ fn checks() ! {
 		run + '/inputs.json':       digest(run + '/inputs.json')!
 		prepared + '/outputs.json': digest(prepared + '/outputs.json')!
 	}
-	if admit(retainer, run, prepared, architecture, proof + '/baseline', proof + '/baseline.log')! != 0 {
+	if admit(retainer, run, prepared, architecture, proof + '/baseline', proof + '/baseline.log', forksafe)! != 0 {
 		return error('real Wine native evidence baseline was refused')
 	}
 	baseline_copy := proof + '/copied-baseline'
 	clone_tree(run, baseline_copy)!
 	prepared_copy(baseline_copy, prepared, baseline_copy + '/prepared')!
-	if admit(retainer, baseline_copy, baseline_copy + '/prepared', architecture, baseline_copy + '/retained', proof + '/copied-baseline.log')! != 0 {
+	if admit(retainer, baseline_copy, baseline_copy + '/prepared', architecture, baseline_copy + '/retained', proof + '/copied-baseline.log', forksafe)! != 0 {
 		return error('unchanged copied Wine evidence baseline was refused')
 	}
-	mut names := ['failed', 'interrupted', 'reason', 'missing-ready', 'duplicate-ready', 'missing-pass',
-		'marker-order', 'forbidden', 'input-mismatch', 'missing-fixture-input', 'missing-library-input',
-		'missing-generated-c', 'missing-generated-log', 'missing-generated-argv', 'changed-generated-c',
-		'missing-package-c', 'missing-package-log', 'missing-package-argv', 'changed-package',
-		'package-v-argv', 'package-cc-argv', 'changed-account', 'changed-sandbox',
-		'producer-c-output-only', 'producer-missing-c', 'producer-missing-log', 'producer-missing-argv',
-		'producer-v-argv', 'producer-cc-argv', 'producer-missing-locale', 'producer-missing-intl',
-		'producer-changed-locale', 'producer-changed-intl', 'producer-missing-inf',
-		'producer-changed-inf', 'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
-		'wine-server-resealed-patch', 'wine-client-resealed-patch']
-	if architecture == 'aarch64' {
-		names << ['translator-declaration', 'translator-resealed-patch', 'translator-resealed-smoke',
-			'missing-smoke-marker', 'missing-arm-loader-input', 'missing-firmware-vars-input',
-			'missing-arm-loader-declaration', 'missing-firmware-vars-declaration']
-	}
-	if architecture == 'x86_64' {
-		names << ['missing-iso-input', 'changed-iso-argv', 'x86-firmware-vars']
-	}
+	names := winecontrols.names(architecture, forksafe)!
 	mut refused := []string{}
-	for name in names {
+	for index, name in names {
+		if index % shards != shard { continue }
 		directory := proof + '/' + name
 		clone_tree(run, directory)!
 		mut selected_prepared := prepared
 		mut expected := ''
-		if name.starts_with('producer-') || name in ['pe-executable-binding', 'resealed-prepared-pe',
-			'source-offer-closure', 'translator-declaration', 'translator-resealed-patch',
-			'wine-server-resealed-patch', 'wine-client-resealed-patch'] {
+		if name.starts_with('producer-') || name in ['forksafe-manifest-binding',
+			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
+			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
+			'wine-client-resealed-patch'] {
 			selected_prepared = directory + '/prepared'
 			prepared_copy(directory, prepared, selected_prepared)!
 		}
-		if name in ['missing-arm-loader-input', 'missing-firmware-vars-input'] {
+		if name == 'forksafe-implicit' {
+			expected = 'Wine translator patch declaration differs'
+		} else if name.starts_with('forksafe-missing-') {
+			patch := read_map(prepared + '/translator-patch.json')!
+			input_update(directory, patch[name.all_after('forksafe-missing-')], '', '')!
+			expected = 'Wine fork-safe translator input binding differs'
+		} else if name == 'forksafe-manifest-binding' {
+			mut patch := read_map(selected_prepared + '/translator-patch.json')!
+			patch['translator_manifest_sha256'] = '0'.repeat(64)
+			replace(selected_prepared + '/translator-patch.json', json2.encode(patch))!
+			reseal_producer(directory, selected_prepared, 'translator-patch.json')!
+			expected = 'Wine translator patch declaration differs'
+		} else if name in ['missing-arm-loader-input', 'missing-firmware-vars-input'] {
 			declaration := read_map(directory + '/declaration.json')!
 			key := if name == 'missing-arm-loader-input' { 'arm_loader' } else { 'firmware_vars' }
 			input_update(directory, declaration[key], '', '')!
@@ -264,10 +295,23 @@ fn checks() ! {
 			inputs_map['/control'] = 'changed'
 			replace(directory + '/inputs-verified.json', json2.encode(inputs_map))!
 			expected = 'Wine input verification differs'
-		} else if name in ['missing-fixture-input', 'missing-library-input'] {
+		} else if name == 'producer-missing-hidden-library-input' {
+			declaration := read_map(directory + '/declaration.json')!
+			path := os.dir(declaration['compiler']) + '/vlib/.vdocignore'
+			for receipt in ['inputs-before-build.json', 'inputs-verified.json']! {
+				mut captured := read_map(selected_prepared + '/' + receipt)!
+				captured.delete(path)
+				replace(selected_prepared + '/' + receipt, json2.encode(captured))!
+				reseal_producer(directory, selected_prepared, receipt)!
+			}
+			expected = 'missing required input'
+		} else if name in ['missing-fixture-input', 'missing-library-input',
+			'missing-hidden-library-input'] {
 			declaration := read_map(directory + '/declaration.json')!
 			path := if name == 'missing-fixture-input' {
 				declaration['source_root'] + '/tests/packages/wine-native/main.v'
+			} else if name == 'missing-hidden-library-input' {
+				os.dir(declaration['compiler']) + '/vlib/.vdocignore'
 			} else {
 				os.dir(declaration['compiler']) + '/vlib/builtin/array.v'
 			}
@@ -437,13 +481,17 @@ fn checks() ! {
 			patch['output_sha256'] = digest(selected_prepared + '/' + file)!
 			replace(selected_prepared + '/translator-patch.json', json2.encode(patch))!
 			reseal_producer(directory, selected_prepared, 'translator-patch.json')!
-			expected = 'Wine translator differs from the exact split-WX patch'
+			expected = if forksafe {
+				'Wine translator differs from the pinned fork-safe build'
+			} else {
+				'Wine translator differs from the exact split-WX patch'
+			}
 		} else {
 			return error('unimplemented Wine control: ' + name)
 		}
 		out := directory + '/retained'
 		log := proof + '/' + name + '.log'
-		if admit(retainer, directory, selected_prepared, architecture, out, log)! == 0 || os.exists(out) {
+		if admit(retainer, directory, selected_prepared, architecture, out, log, forksafe && name != 'forksafe-implicit')! == 0 || os.exists(out) {
 			return error('corrupted Wine evidence accepted or created output: ' + name)
 		}
 		if !os.read_file(log)!.contains(expected) {
@@ -460,6 +508,10 @@ fn checks() ! {
 		copied_baseline: true
 		refused:         refused
 		inputs:          inputs
+		shard:           shard
+		shards:          shards
+		expected:        names
+		forksafe:        forksafe
 	}) + '\n')!
 	println('WINE EVIDENCE CONTROLS PASS ' + architecture + ': real and copied baselines plus ' + refused.len.str() + ' refusals')
 }

@@ -1123,7 +1123,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     The [Wine pledge continuation](tests/packages/wine-pledge-check.md) passes
     the signed ARM Win64 console probe after admitting four file-query ioctls
     under `rpath`; both architectures pass 20 focused controls and the full
-    security suite. Historical retention still refuses changed producer inputs.
+    security suite. A [fresh fork-safe producer and independent ARM retainer](tests/packages/wine-forksafe-retention-check.md)
+    now pass all 55 evidence refusal controls, including resealed translator
+    changes and omitted hidden compiler inputs. The original historical
+    attempts remain refused; fresh x86 Wine reaches a server NLS-loading failure.
     Graphical execution, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)

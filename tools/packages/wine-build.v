@@ -8,24 +8,38 @@ import json2
 import os
 import wineadapter
 
-struct Entry { source string; path string }
-struct Recipe { format int = 1; manifest Manifest; entries []Entry }
-struct Dependency { id string; minimum string; before string }
+struct Entry {
+	source string
+	path   string
+}
+
+struct Recipe {
+	format   int = 1
+	manifest Manifest
+	entries  []Entry
+}
+
+struct Dependency {
+	id      string
+	minimum string
+	before  string
+}
+
 struct Manifest {
-	id string
-	version string
+	id           string
+	version      string
 	architecture string
-	name string
-	description string
-	homepage string
-	license string
-	kind string
-	runtime string
-	entrypoint string
-	arguments []string
-	permissions []string
+	name         string
+	description  string
+	homepage     string
+	license      string
+	kind         string
+	runtime      string
+	entrypoint   string
+	arguments    []string
+	permissions  []string
 	dependencies []Dependency
-	sdk int = 1
+	sdk          int = 1
 }
 
 fn digest(path string) !string {
@@ -35,14 +49,20 @@ fn digest(path string) !string {
 }
 
 fn verify_sources() ! {
-	$if prod {} $else { return error('compile Wine producer with -prod for embedded source admission') }
+	$if prod {
+	} $else {
+		return error('compile Wine producer with -prod for embedded source admission')
+	}
 	for path, contents in {
-		@FILE: $embed_file('wine-build.v').to_string()
-		os.dir(@FILE) + '/wine-runner.v': $embed_file('wine-runner.v').to_string()
-		os.dir(@FILE) + '/wineadapter/layout.v': $embed_file('wineadapter/layout.v').to_string()
-		os.dir(@FILE) + '/wineadapter/patch.v': $embed_file('wineadapter/patch.v').to_string()
+		@FILE:                                            $embed_file('wine-build.v').to_string()
+		os.dir(@FILE) + '/wine-runner.v':                 $embed_file('wine-runner.v').to_string()
+		os.dir(@FILE) + '/wineadapter/layout.v':          $embed_file('wineadapter/layout.v').to_string()
+		os.dir(@FILE) + '/wineadapter/patch.v':           $embed_file('wineadapter/patch.v').to_string()
+		os.dir(@FILE) + '/wineadapter/fork_translator.v': $embed_file('wineadapter/fork_translator.v').to_string()
 	} {
-		if digest(path)! != sha256.hexhash(contents) { return error('compiled Wine producer source differs: ' + path) }
+		if digest(path)! != sha256.hexhash(contents) {
+			return error('compiled Wine producer source differs: ' + path)
+		}
 	}
 }
 
@@ -50,12 +70,18 @@ fn invoke(argv []string, log string) !string {
 	os.write_file(log + '.argv.json', json2.encode(argv) + '\n')!
 	mut child := os.new_process(argv[0])
 	defer { child.close() }
-	child.set_args(argv[1..]); child.set_redirect_stdio_merged(); child.run()
-	C.close(child.stdio_fd[0]); child.stdio_fd[0] = -1
+	child.set_args(argv[1..])
+	child.set_redirect_stdio_merged()
+	child.run()
+	C.close(child.stdio_fd[0])
+	child.stdio_fd[0] = -1
 	output := child.stdout_slurp()
 	child.wait()
 	os.write_file(log, output)!
-	if child.code != 0 { unsafe { output.free() }; return error('Wine producer command failed; see ' + log) }
+	if child.code != 0 {
+		unsafe { output.free() }
+		return error('Wine producer command failed; see ' + log)
+	}
 	return output
 }
 
@@ -65,7 +91,9 @@ fn copy_input(source string, destination string, mut inputs map[string]string) !
 	os.mkdir_all(os.dir(destination))!
 	os.cp(source, destination)!
 	os.chmod(destination, if os.stat(source)!.mode & 0o111 != 0 { 0o755 } else { 0o644 })!
-	if digest(destination)! != inputs[source] { return error('Wine copied input differs: ' + source) }
+	if digest(destination)! != inputs[source] {
+		return error('Wine copied input differs: ' + source)
+	}
 }
 
 fn dependencies(seeds []string, root string, destination string, work string, mut inputs map[string]string) ! {
@@ -83,10 +111,16 @@ fn dependencies(seeds []string, root string, destination string, work string, mu
 			mut source := ''
 			mut relative := ''
 			for directory in ['/lib/', '/usr/lib/', '/usr/lib/wine/x86_64-unix/', '/usr/lib/pulseaudio/']! {
-				if os.is_file(root + directory + name) { source = root + directory + name; relative = directory + name; break }
+				if os.is_file(root + directory + name) {
+					source = root + directory + name
+					relative = directory + name
+					break
+				}
 			}
 			if source == '' { return error('missing Wine ELF dependency: ' + name) }
-			if !os.exists(destination + relative) { copy_input(source, destination + relative, mut inputs)! }
+			if !os.exists(destination + relative) {
+				copy_input(source, destination + relative, mut inputs)!
+			}
 			pending << source
 		}
 	}
@@ -105,24 +139,9 @@ struct Translator {
 fn admit_translator(staging string, base string) !Translator {
 	binary := staging + '/usr/bin/qemu-x86_64'
 	manifest := staging + '/usr/libexec/vinix-dota2/qemu-build.json'
-	if !os.is_file(binary) || os.is_link(binary) || !os.is_file(manifest) {
-		return error('translator stage lacks qemu-x86_64 or its build manifest')
-	}
-	record := json2.decode[json2.Any](os.read_file(manifest)!)!.as_map()
-	hash := digest(binary)!
-	if (record['binary_sha256'] or { json2.Any('') }).str() != hash {
-		return error('translator differs from its build manifest')
-	}
-	if (record['native_dependencies'] or { json2.Any('missing') }).as_array().len != 0 {
-		return error('translator must be static')
-	}
-	inputs := (record['inputs'] or { json2.Any(map[string]json2.Any{}) }).as_map()
-	patches := (inputs['patches'] or { json2.Any(map[string]json2.Any{}) }).as_map()
 	patch := base + '/build-support/dota2/qemu/splitwx-fork.patch'
-	if (patches['splitwx-fork.patch'] or { json2.Any('') }).str() != digest(patch)! {
-		return error('translator was not built with this checkout\'s splitwx-fork.patch')
-	}
-	return Translator{binary: binary, manifest: manifest, digest: hash}
+	wineadapter.admit_forksafe_translator(binary, manifest, patch)!
+	return Translator{ binary: binary, manifest: manifest, digest: wineadapter.qemu_forksafe_input }
 }
 
 fn build() ! {
@@ -131,7 +150,9 @@ fn build() ! {
 		return error('usage: wine-build ARCH TRANSLATION_STAGE OUTPUT V MUSL_SYSROOT GCC_RUNTIME NOTICES PE_PRODUCER --local-qualification-only [TRANSLATOR_STAGE]')
 	}
 	arch := os.args[1]
-	if arch !in ['aarch64', 'x86_64'] { return error('Wine producer architecture must be aarch64 or x86_64') }
+	if arch !in ['aarch64', 'x86_64'] {
+		return error('Wine producer architecture must be aarch64 or x86_64')
+	}
 	// AArch64 runs x86 code through the source-built translator from
 	// build-support/dota2/qemu-stage; x86_64 runs it natively.
 	if (arch == 'aarch64') != (os.args.len == 11) {
@@ -144,7 +165,7 @@ fn build() ! {
 	gcc := os.real_path(os.args[6])
 	notices := os.real_path(os.args[7])
 	pe_directory := os.real_path(os.args[8])
-	base := os.dir(os.dir(os.dir(os.real_path(@FILE)))))
+	base := os.dir(os.dir(os.dir(os.real_path(@FILE))))
 	mut pe := wineadapter.admit_local_pe_proof(pe_directory, base + '/tests/packages/wine-native/program.v', base + '/tests/packages/wine-pe-check.v')!
 	defer { pe.close() }
 	application := pe.executable
@@ -160,24 +181,36 @@ fn build() ! {
 	runtime := prepared + '/runtime'
 	app := prepared + '/application'
 	mut inputs := map[string]string{}
-	for path in [os.executable(), '/opt/homebrew/opt/llvm/bin/llvm-readelf', '/usr/bin/tar']! { inputs[path] = digest(path)! }
-	os.write_file(output + '/build-producer.json', json2.encode({'executable': os.executable(), 'compiler': v, 'source': @FILE}) + '\n')!
+	for path in [os.executable(), '/opt/homebrew/opt/llvm/bin/llvm-readelf', '/usr/bin/tar']! {
+		inputs[path] = digest(path)!
+	}
+	os.write_file(output + '/build-producer.json', json2.encode({
+		'executable': os.executable()
+		'compiler':   v
+		'source':     @FILE
+	}) + '\n')!
 	for path, hash in pe.artifacts { inputs[path] = hash }
 	os.write_file(output + '/pe-producer.json', json2.encode({
-		'directory': pe_directory, 'executable': application,
-		'program_source': base + '/tests/packages/wine-native/program.v',
+		'directory':       pe_directory
+		'executable':      application
+		'program_source':  base + '/tests/packages/wine-native/program.v'
 		'producer_source': base + '/tests/packages/wine-pe-check.v'
 	}) + '\n')!
 	mut seeds := []string{}
 	for relative in ['/usr/bin/wine', '/usr/bin/wineserver', '/lib/ld-musl-x86_64.so.1']! {
-		destination := if relative.starts_with('/usr/bin/') { '/usr/libexec/vinix-wine/' + os.base(relative) } else { relative }
+		destination := if relative.starts_with('/usr/bin/') {
+			'/usr/libexec/vinix-wine/' + os.base(relative)
+		} else {
+			relative
+		}
 		copy_input(root + relative, runtime + '/root' + destination, mut inputs)!
 		seeds << root + relative
 	}
 	// An ordinary loader copy keeps /proc/self/exe in usr/bin, where Wine
 	// discovers its native child bridges and ../share/wine resources.
 	copy_input(root + '/lib/ld-musl-x86_64.so.1', runtime + '/root/usr/bin/vinix-wine-musl', mut inputs)!
-	for directory in ['/usr/lib/wine/x86_64-windows', '/usr/lib/wine/x86_64-unix', '/usr/share/wine', '/etc/fonts']! {
+	for directory in ['/usr/lib/wine/x86_64-windows', '/usr/lib/wine/x86_64-unix', '/usr/share/wine',
+		'/etc/fonts']! {
 		for path in os.walk_ext(root + directory, '') {
 			if os.is_dir(path) { continue }
 			if !os.is_file(path) { return error('Wine data node is not an ordinary file: ' + path) }
@@ -199,28 +232,46 @@ fn build() ! {
 	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so']! {
 		text := os.read_file(root + part)!
 		patched := wineadapter.private_server_patch(text, part.ends_with('ntdll.so'))!
-		destination := if part == '/usr/bin/wineserver' { '/usr/libexec/vinix-wine/wineserver' } else { part }
+		destination := if part == '/usr/bin/wineserver' {
+			'/usr/libexec/vinix-wine/wineserver'
+		} else {
+			part
+		}
 		os.write_file(runtime + '/root' + destination, patched)!
-		unsafe { text.free(); patched.free() }
+		unsafe {
+			text.free()
+			patched.free()
+		}
 	}
 	if arch == 'aarch64' {
 		translator := admit_translator(os.real_path(os.args[10]), base)!
 		copy_input(translator.binary, runtime + '/bin/qemu-x86_64', mut inputs)!
 		inputs[translator.manifest] = digest(translator.manifest)!
+		fork_patch := base + '/build-support/dota2/qemu/splitwx-fork.patch'
+		inputs[fork_patch] = digest(fork_patch)!
 		// The stock Alpine translator stays the input the guest control uses:
 		// without W+X it must fail, while the packaged one must run.
 		original := stage + '/usr/bin/qemu-x86_64'
 		inputs[original] = digest(original)!
 		os.write_file(output + '/translator-patch.json', json2.encode({
-			'input': original, 'input_sha256': inputs[original],
-			'output': runtime + '/bin/qemu-x86_64', 'output_sha256': digest(runtime + '/bin/qemu-x86_64')!,
-			'translator': translator.binary, 'translator_sha256': translator.digest,
-			'translator_manifest': translator.manifest,
-			'scope': 'local-qualification-only: source-built QEMU 9.1.2 with splitwx-fork.patch; split RW/RX chosen when W+X is refused; private JIT across fork'
+			'input':                      original
+			'input_sha256':               inputs[original]
+			'output':                     runtime + '/bin/qemu-x86_64'
+			'output_sha256':              digest(runtime + '/bin/qemu-x86_64')!
+			'translator':                 translator.binary
+			'translator_sha256':          translator.digest
+			'translator_manifest':        translator.manifest
+			'translator_manifest_sha256': inputs[translator.manifest]
+			'fork_patch':                 fork_patch
+			'fork_patch_sha256':          inputs[fork_patch]
+			'method':                     'pinned-forksafe-v1'
+			'scope':                      wineadapter.qemu_forksafe_scope
 		}) + '\n')!
 	}
 	for path in os.walk_ext(notices, '') {
-		if os.lstat(path)!.get_filetype() != .regular { return error('Wine notices/source offer must contain ordinary files') }
+		if os.lstat(path)!.get_filetype() != .regular {
+			return error('Wine notices/source offer must contain ordinary files')
+		}
 		copy_input(path, output + '/publisher-notices/' + path[notices.len + 1..], mut inputs)!
 	}
 	copy_input(notices + '/runtime-LICENSE.txt', runtime + '/licenses/runtime-LICENSE.txt', mut inputs)!
@@ -229,63 +280,106 @@ fn build() ! {
 	// exhausting the format's selector bound with individual recipe fragments.
 	mut copied_offer := wineadapter.admit_local_source_offer(output + '/publisher-notices', 'org.vinix.wine-runtime', '9.17-r1', arch)!
 	copied_offer.close()
-	invoke(['/usr/bin/tar', '--format=ustar', '-cf', runtime + '/licenses/local-source-evidence.tar', '-C', output + '/publisher-notices', '.'], output + '/logs/source-evidence.log')!
+	invoke(['/usr/bin/tar', '--format=ustar', '-cf', runtime + '/licenses/local-source-evidence.tar',
+		'-C', output + '/publisher-notices', '.'], output + '/logs/source-evidence.log')!
 	mut checked_offer := wineadapter.admit_local_source_offer(output + '/publisher-notices', 'org.vinix.wine-runtime', '9.17-r1', arch)!
 	checked_offer.close()
 	copy_input(application, app + '/bin/program.exe', mut inputs)!
 	for path in [base + '/tools/packages/wine-runner.v', @FILE] {
 		inputs[path] = digest(path)!
 	}
-	for directory in [base + '/tools/packages/wineadapter', base + '/tools/packages/appsdk', base + '/tools/packages/pkgprotocol', os.dir(v) + '/vlib', os.dir(v) + '/thirdparty', sysroot + '/usr/include', sysroot + '/usr/lib', sysroot + '/lib', gcc] {
-		for path in os.walk_ext(directory, '') { if os.is_file(path) { inputs[path] = digest(path)! } }
+	for directory in [base + '/tools/packages/wineadapter', base + '/tools/packages/appsdk',
+		base + '/tools/packages/pkgprotocol', os.dir(v) + '/vlib', os.dir(v) + '/thirdparty',
+		sysroot + '/usr/include', sysroot + '/usr/lib', sysroot + '/lib', gcc] {
+		for path in os.walk_ext(directory, '', hidden: true) {
+			if os.is_file(path) { inputs[path] = digest(path)! }
+		}
 	}
-	for path in [v, '/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', '/usr/bin/tar'] { inputs[path] = digest(path)! }
+	for path in [v, '/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', '/usr/bin/tar'] {
+		inputs[path] = digest(path)!
+	}
 	os.write_file(output + '/inputs-before-build.json', json2.encode(inputs) + '\n')!
 	generated := output + '/build/wine-runner.c'
-	invoke([v, '-backend', 'c', '-prod', '-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
-		'-gc', 'none', '-manualfree', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-o', generated,
+	invoke([v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
+		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree', '-d',
+		'no_backtrace', '-d', 'no_segfault_handler', '-o', generated,
 		base + '/tools/packages/wine-runner.v'], output + '/logs/v.log')!
 	runtime_c := output + '/build/runtime.c'
 	os.write_file(runtime_c, '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
 		os.dir(v) + '/vlib/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + os.dir(v) + '/vlib/sync/thread_helper.h"\n')!
 	os.mkdir_all(runtime + '/bin')!
-	invoke(['/opt/homebrew/opt/llvm/bin/clang', '--target=' + arch + '-linux-musl', '--sysroot=' + sysroot,
-		'--gcc-install-dir=' + gcc, '-fuse-ld=lld', '-O2', '-w', '-fno-stack-protector', '-static', '-D_GNU_SOURCE',
-		'-Wno-error=incompatible-pointer-types', generated, runtime_c, '-lm', '-lpthread', '-o', runtime + '/bin/wine-runner'], output + '/logs/cc.log')!
-	for name in ['wine64', 'wineserver']! { os.cp(runtime + '/bin/wine-runner', runtime + '/bin/' + name)! }
-	for name in ['wine', 'wine64', 'wineserver']! { os.cp(runtime + '/bin/wine-runner', runtime + '/root/usr/bin/' + name)! }
+	invoke(['/opt/homebrew/opt/llvm/bin/clang', '--target=' + arch + '-linux-musl',
+		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-fuse-ld=lld', '-O2', '-w',
+		'-fno-stack-protector', '-static', '-D_GNU_SOURCE', '-Wno-error=incompatible-pointer-types',
+		generated, runtime_c, '-lm', '-lpthread', '-o', runtime + '/bin/wine-runner'], output + '/logs/cc.log')!
+	for name in ['wine64', 'wineserver']! {
+		os.cp(runtime + '/bin/wine-runner', runtime + '/bin/' + name)!
+	}
+	for name in ['wine', 'wine64', 'wineserver']! {
+		os.cp(runtime + '/bin/wine-runner', runtime + '/root/usr/bin/' + name)!
+	}
 	wineadapter.admit_private_layout(runtime, inputs)!
 	for role in ['application', 'runtime']! {
 		payload := prepared + '/' + role
 		mut entries := []Entry{}
 		for path in os.walk_ext(payload, '') {
-			if os.lstat(path)!.get_filetype() != .regular { return error('Wine prepared payload must use ordinary files') }
+			if os.lstat(path)!.get_filetype() != .regular {
+				return error('Wine prepared payload must use ordinary files')
+			}
 			relative := path[payload.len + 1..]
-			entries << Entry{source: role + '/' + relative, path: relative}
+			entries << Entry{ source: role + '/' + relative, path: relative }
 		}
 		manifest := if role == 'runtime' {
-			Manifest{id: 'org.vinix.wine-runtime', version: '9.17.1', architecture: arch, name: 'Wine Win64 runtime',
-				description: 'Private-prefix Wine 9.17 with explicit signed Win64 application closure', homepage: 'https://www.winehq.org/',
-				license: 'LicenseRef-Vinix-Wine-Local-Qualification', kind: 'runtime'}
+			Manifest{
+				id:           'org.vinix.wine-runtime'
+				version:      '9.17.1'
+				architecture: arch
+				name:         'Wine Win64 runtime'
+				description:  'Private-prefix Wine 9.17 with explicit signed Win64 application closure'
+				homepage:     'https://www.winehq.org/'
+				license:      'LicenseRef-Vinix-Wine-Local-Qualification'
+				kind:         'runtime'
+			}
 		} else {
-			Manifest{id: 'org.vinix.wine-win64-probe', version: '1.0.0', architecture: arch, name: 'Wine Win64 qualification probe',
-				description: 'Local Windows API qualification with an isolated explicit Wine runtime', homepage: 'https://github.com/vlang/vinix',
-				license: 'GPL-2.0-or-later', kind: 'windows', runtime: 'org.vinix.wine-runtime', entrypoint: 'bin/wine-runner',
-				arguments: ['@APP@/bin/program.exe'], permissions: ['process'],
-				dependencies: [Dependency{'org.vinix.wine-runtime', '9.17.1', '10.0.0'}]}
+			Manifest{
+				id:           'org.vinix.wine-win64-probe'
+				version:      '1.0.0'
+				architecture: arch
+				name:         'Wine Win64 qualification probe'
+				description:  'Local Windows API qualification with an isolated explicit Wine runtime'
+				homepage:     'https://github.com/vlang/vinix'
+				license:      'GPL-2.0-or-later'
+				kind:         'windows'
+				runtime:      'org.vinix.wine-runtime'
+				entrypoint:   'bin/wine-runner'
+				arguments:    ['@APP@/bin/program.exe']
+				permissions:  ['process']
+				dependencies: [Dependency{'org.vinix.wine-runtime', '9.17.1', '10.0.0'}]
+			}
 		}
-		os.write_file(output + '/' + role + '.json', json2.encode(Recipe{manifest: manifest, entries: entries}) + '\n')!
+		os.write_file(output + '/' + role + '.json', json2.encode(Recipe{ manifest: manifest, entries: entries }) + '\n')!
 	}
 	mut checked_pe := wineadapter.admit_local_pe_proof(pe_directory, base + '/tests/packages/wine-native/program.v', base + '/tests/packages/wine-pe-check.v')!
 	defer { checked_pe.close() }
-	if checked_pe.executable != application || checked_pe.artifacts != pe.artifacts { return error('Wine PE producer proof changed') }
-	for path, hash in inputs { if digest(path)! != hash { return error('Wine producer input changed: ' + path) } }
+	if checked_pe.executable != application || checked_pe.artifacts != pe.artifacts {
+		return error('Wine PE producer proof changed')
+	}
+	for path, hash in inputs {
+		if digest(path)! != hash { return error('Wine producer input changed: ' + path) }
+	}
 	verify_sources()!
 	os.write_file(output + '/inputs-verified.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
-	for path in os.walk_ext(output, '') { if os.is_file(path) { outputs[path[output.len + 1..]] = digest(path)! } }
+	for path in os.walk_ext(output, '') {
+		if os.is_file(path) { outputs[path[output.len + 1..]] = digest(path)! }
+	}
 	os.write_file(output + '/outputs.json', json2.encode(outputs) + '\n')!
 	println('Wine prepared ' + arch + ': ' + prepared)
 }
 
-fn main() { build() or { eprintln(err); exit(1) } }
+fn main() {
+	build() or {
+		eprintln(err)
+		exit(1)
+	}
+}

@@ -10,6 +10,7 @@ import plainiso
 import time
 import tests.packages.winesource
 import tools.packages.pkgcore
+import tools.packages.wineadapter
 
 fn digest(path string) !string {
 	return winesource.file_digest(path)
@@ -125,10 +126,16 @@ fn check() ! {
 		translator_busybox = os.dir(os.dir(os.dir(translator_original))) + '/usr/libexec/vinix-x86_64/root/bin/busybox'
 		inputs[translator_original] = digest(translator_original)!
 		inputs[translator_busybox] = digest(translator_busybox)!
+		if patch['method'] == 'pinned-forksafe-v1' {
+			wineadapter.admit_forksafe_translator(patch['translator'], patch['translator_manifest'], patch['fork_patch'])!
+			for name in ['translator', 'translator_manifest', 'fork_patch']! {
+				inputs[patch[name]] = digest(patch[name])!
+			}
+		}
 	}
 	for path in [os.executable(), host.v, kernel, host.qemu, host.firmware, @FILE,
-		root + '/tests/packages/wine-native/main.v', root + '/tests/packages/winesource/closure.v', '/opt/homebrew/opt/llvm/bin/clang',
-		'/opt/homebrew/bin/ld.lld', sandbox] {
+		root + '/tests/packages/wine-native/main.v', root + '/tests/packages/winesource/closure.v',
+		'/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', sandbox] {
 		inputs[path] = digest(path)!
 	}
 	if host.firmware_vars != '' { inputs[host.firmware_vars] = digest(host.firmware_vars)! }
@@ -136,7 +143,7 @@ fn check() ! {
 		root + '/tests/hardware-platform/hwhost', root + '/tests/hardware-platform/plainiso',
 		os.dir(host.v) + '/vlib', os.dir(host.v) + '/thirdparty', sysroot + '/usr/include',
 		sysroot + '/usr/lib', sysroot + '/lib', gcc, prepared] {
-		for path in os.walk_ext(directory, '') {
+		for path in os.walk_ext(directory, '', hidden: true) {
 			if os.is_file(path) { inputs[path] = digest(path)! }
 		}
 	}
@@ -194,7 +201,8 @@ fn check() ! {
 	mut generated := map[string]string{}
 	for program in ['guest', 'package']! {
 		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
-			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt', 'sources-built.txt'] {
+			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
+			'sources-built.txt'] {
 			path := 'build-' + program + '/' + name
 			generated[path] = digest(work + '/' + path)!
 		}
