@@ -3,6 +3,7 @@ module main
 import os
 import json2
 import crypto.sha256
+import certificateprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1360,6 +1361,15 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->modemIdentifiers(Landroid/conten
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->optionalStorageStats(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->serialTlsCache(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->forceLayoutProbe(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/CertificateProbe;->check()V
+const-string v0, "user"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/os/UserManager;
+invoke-virtual {v0}, Landroid/os/UserManager;->isGuestUser()Z
+move-result v0
+const/4 v1, 0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1596,10 +1606,13 @@ fn main() {
 		}, prettify: true))!
 		return
 	}
-	if os.args.len != 3 { panic('usage: current-api-fixture TEMPLATE_FIXTURE FRESH_OUTPUT') }
+	network := os.args.len == 4 && os.args[3] == '--certificate-network'
+	if os.args.len != 3 && !network { panic('usage: current-api-fixture TEMPLATE_FIXTURE FRESH_OUTPUT [--certificate-network]') }
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
+	certificateprobe.install(root)!
+	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;
 .super Landroid/widget/TableLayout;
 .field public requests:I
@@ -1843,7 +1856,12 @@ iget v0, p0, Lorg/vinix/bootstrap/TestNetwork;->state:I
 return v0
 .end method
 ')!
-	os.write_file(root + '/smali/Main.smali', main_source + intent_source + user_source + boolean_source() + subscription_source)!
+	mut main_text := main_source + intent_source + user_source + boolean_source() + subscription_source
+	if network {
+		call := 'invoke-static {}, Lorg/vinix/bootstrap/CertificateProbe;->check()V'
+		main_text = main_text.replace(call, call + '\ninvoke-static {}, Lorg/vinix/bootstrap/CertificateNetwork;->check()V')
+	}
+	os.write_file(root + '/smali/Main.smali', main_text)!
 	subscription_fixture(root)!
 	os.write_file(root + '/smali/TestAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestAccounts;
 .super Landroid/accounts/AccountManager;

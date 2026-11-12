@@ -35,6 +35,10 @@ Guest r40 rendered Explore after Skip, then hit a View.forceLayout/TableLayout
 requestLayout recursion and StackOverflowError on the main looper. Its
 disk-retained private log also records the missing secure Android socket
 factory overload; neither tiles nor search/routes/login are qualified.
+Guest r41's log records the next uncaught GMS check-in query, isGuestUser.
+Guest r44 passes the complete API suite plus secure socket-factory tests,
+trusted HTTP, three invalid-host/chain rejection pairs and a stalled-peer
+handshake timeout. Its actual Maps retry is still pending.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -1207,3 +1211,110 @@ unchanged-spec measurement ran again only when forced. Snapshot
 `force-layout-api-readback-20261112-r1` retain its two-entry export, archive
 SHA256 `a77d51aa3934e06ef5d6802556c2597fa96bbcca9079fa88215dc7271c7ecbac`.
 The fixture bind was released before broker preparation and the Maps retry.
+
+Guest r41's Maps retry rendered onboarding but went blank after Skip.
+The complete disk-retained log records an uncaught GMS check-in call to
+UserManager.isGuestUser at bpiq.m source11, with no repeated layout overflow.
+Read-only exported `maps-current-20261112-r41/maps.retained.log` has SHA256
+`924e32a2530863d3bd7e28061115ec4d99be708fd570bbd8a5ba119395523d8d`.
+Its stopped data image has SHA256
+`61f3e04f0000ddb9fada9d481414681a01a2c02cc49a1a83d293dfc65bdceb85`.
+Snapshot `maps-guest-user-final-uart-20261112-r1` has SHA256
+`1b6358dc97c25e5f348c7ed69a5663ebeb43d835bac4d4d18ac3f2c98f96fcc7`.
+Only the verified owned QEMU PID67288 was stopped after syncing. Minimum
+observed disk was7253815296 bytes and MemFree48752KiB. Functional Maps
+qualification remains pending.
+
+`framework_guest_user.v` returns false for this backend's one persistent
+Android system user; no guest-user backend exists. Exact GMS caller readback
+is `gms-guest-user-caller-20261112-r2/bpiq.smali` at isGuestUser source11.
+An initial diagnostic invocation omitted the descriptor delimiters and did
+not produce a class; the corrected readback reuses its extracted DEX.
+
+`framework_certificate_factory.v` supplies the observed secure
+SSLCertificateSocketFactory.getDefault(int, SSLSessionCache) entry and its
+timeout constructor/default overload. It delegates to the existing default
+JSSE context, retaining its trust policy. Host-name overloads complete the
+handshake and check the default HTTPS hostname verifier before returning.
+Address-only and unconnected overloads retain Android's caller-owned hostname
+verification requirement. The socket wrapper applies the handshake timeout
+to explicit and first-I/O handshakes, restores the application's read timeout
+on success and closes failed transports. No insecure factory or trust-manager
+override is added. The optional cache retains its existing inert backend.
+Contract: [Android secure socket factory](https://developer.android.com/reference/android/net/SSLCertificateSocketFactory).
+
+The deterministic signed probe covers first read/write handshake dispatch,
+explicit handshake, read-timeout restoration, failure cleanup, socket options
+and the unconnected factory. The optional `--certificate-network` fixture
+adds trusted Google HTTP, wrong-host rejection and self-signed-chain rejection.
+Only certificate-specific failures can satisfy rejection: a certificate
+exception cause, the exact wolfSSL self-signed error -275 or no-signer error
+-188. DNS failures, timeouts, generic SSL errors and successful connections
+cannot pass. The native no-signer meaning is documented by
+[wolfSSL](https://www.wolfssl.com/documentation/manuals/wolfssl/appendix06.html).
+
+Guest r42 used SDK `framework-certificate-20261112-r2`. Its first fixture r34
+rejected self-signed TLS but the new test required a nested CertificateException;
+wolfSSL supplied the specific native SSLHandshakeException without that cause.
+The corrected r35 fixture passed the complete API suite and live TLS checks
+as UID/GID10160, ready/pass once, drained EOF and exit0. Snapshot
+`certificate-network-api-uart-20261112-r1` and strict readback
+`certificate-network-api-readback-20261112-r1` retain archive SHA256
+`2271670243fdc1a24f269f13062d5e6d5766ad14f95b188c3a1de33d884c4660`.
+
+The next combined test passed the stalled-peer timeout but failed a later
+negative-case assertion without retaining its underlying certificate detail.
+The revised diagnostics retain the native error and endpoint, and the final
+fixture repeats both rejection cases three times. No historical checker was
+changed. The r37 fixture passed timeout, trusted HTTP and both rejection cases
+in r42. `certificate-stall-server.v` recorded the ClientHello and withheld the
+handshake for ten seconds; the client required SocketTimeoutException within
+five seconds and a closed transport with its 250ms factory timeout.
+Snapshot `certificate-stall-api-uart-20261112-r1` retains the exact append
+interval after the earlier receipt; strict readback
+`certificate-stall-api-readback-20261112-r1` retains archive SHA256
+`8536544f9bc5445823a07e7146d4524b8a3aed49af25e1908a6cee14db7f2c2e`.
+The read-only exported final child log has SHA256
+`a57d9ce06a162d90f8a7aa6a2bc86c5a2dcc110e880c22a5ebf8ef1b9127b593`.
+The synced, stopped r42 disk has SHA256
+`b8a463789404d70c8a3a1ec639c5bd05af9b8f857570c7ac5eb99111e4f581f3`.
+No Maps retry used r42. The single-use loopback `current-fixture-serve.v`
+delivered replacement signed APKs; host and guest SHA256 matched before each
+run, and the runner retained their actual identities independently.
+
+Final SDK `framework-certificate-20261112-r3` also rejects non-SSL arguments
+to verifyHostname with IllegalArgumentException without closing the caller's
+plain socket. Full SDK assembly/readback passed under the original caps:
+0/0, complete cleanup, 3734ms, RSS469172224, shared growth31453184 bytes.
+Final signed fixture r39 adds that regression and three rejection pairs;
+build/link/sign/verification passed0/0, complete cleanup,1070ms,
+RSS142000128 and shared growth17125376 bytes. ARM qualification is pending.
+
+Staging r43 stopped at the original shared-growth cap: 547020800 bytes
+observed, guard125, child-1, cleanup initially incomplete. A subsequent
+process check found no surviving selected group6250 or staging process;
+`certificate-stage-cleanup-followup-2.log` preserves that check. No r43 VM was
+started and no failed image was reused. The caps remain unchanged.
+
+Fresh staging r44 passed0/0 with complete cleanup under those same caps:
+5792ms, RSS36929536 and shared growth206790656 bytes. Host UUID inspection,
+read-only e2fsck and initial-image hash verification passed before boot.
+The first r44 test passed timeout, trusted HTTP and two rejection pairs, but
+the third self-signed connection ended with native socket error -308 instead
+of a certificate verdict. It correctly failed qualification. The fixture
+now retries only that exact transport error, on a new connection, at most
+three attempts per case. It still requires three successful rejection pairs;
+no socket error is counted as a certificate rejection.
+
+Final signed fixture r40 passed build/link/sign/verification under the
+original caps:0/0, complete cleanup,1394ms, RSS106315776 and shared growth
+18780160 bytes. The complete fixture passed on ARM in r44 as UID/GID10160,
+ready/pass once, drained EOF and exit0, including the plain-socket contract
+and all three rejection pairs. Snapshot `certificate-final-api-uart-20261112-r1`,
+plan `certificate-final-api-plan-20261112-r1.json` and strict independent
+readback `certificate-final-api-readback-20261112-r1` retain archive SHA256
+`ceb98bfd45e1c3419720442b5d13d4053c7b016d2e0be0c088c294abdb052603`.
+The runtime SDK SHA256 matches the host artifact
+`5ea39caa3fa81f62aaddad082f8fb4494aaf3f0c822f0dbaa7850c4baba05cfa`.
+The fixture bind was released before broker preparation. Actual map tiles,
+search, routing and login remain unqualified.

@@ -38,6 +38,8 @@ fn main() {
 	androidtools.framework_storage_stats_type(root + '/smali')!
 	androidtools.framework_serial_tls_cache(root + '/smali')!
 	androidtools.framework_force_layout(root + '/smali')!
+	androidtools.framework_certificate_factory(root + '/smali')!
+	androidtools.framework_guest_user(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -71,6 +73,10 @@ fn main() {
 	types << 'android/os/Build'
 	types << 'android/net/SSLSessionCache'
 	types << 'android/view/View'
+	types << 'android/net/SSLCertificateSocketFactory'
+	types << 'android/net/VinixCertificateSocket'
+	types << 'android/net/VinixCertificateInput'
+	types << 'android/net/VinixCertificateOutput'
 	types << r'android/app/job/JobInfo$Builder'
 	types << 'android/content/pm/PackageParser'
 	types << 'android/content/pm/IPackageDeleteObserver'
