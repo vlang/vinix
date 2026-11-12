@@ -8,15 +8,16 @@ scalar iN values. The return is exactly a literal, unpacked `{iN, i1}`:
 the wrapped N-bit arithmetic result followed by the overflow flag.
 See [LLVM's contract](https://llvm.org/docs/LangRef.html#arithmetic-with-overflow-intrinsics).
 
-The CALL result can be consumed only by `extractvalue` with one literal index,
-zero for the arithmetic value or one for the flag. Extracted scalars can use
+The CALL result can be consumed by `extractvalue` with one literal index,
+zero for the arithmetic value or one for the flag, or carried through
+[bounded pair select/PHI flow](SCALAR-PAIR-FLOW.md). Extracted scalars can use
 ordinary arithmetic, freeze, control flow and PHIs. Input poison propagates
 through both extracted fields; undef operands still error. Overflow sets the
 flag without poisoning either field. No valid data bit is reserved for a tag,
 including at i64. CALL, extraction and every other visited instruction each
 consume a step under the existing budget.
 
-Aggregate arguments, returns, constants, select/PHIs, freeze and insertvalue
+Aggregate arguments, returns, constants, freeze and insertvalue
 remain outside this profile. The integer-only API continues rejecting calls
 and aggregate extraction. All blocks are preflighted, including unvisited
 ones. Direct-call identity, canonical name/width, signature, flags, calling

@@ -137,7 +137,11 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				}
 				first_operand++ // The validated callee is a declaration, not a scalar value.
 			}
-			if code == 26 {
+			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
+			if pair_flow {
+				if !binary32 { return error('AIR overflow: mixed pair control flow required') }
+				p.scalar_pair_flow(op, s.base_id, code != 16)!
+			} else if code == 26 {
 				if !binary32 || !inst.has_result || op.operands_count != 1 || op.opcode != 0 || op.targets_count != 0 || op.indices_count != 1 || op.indices_start < 0 || op.indices_start >= p.indices.len { return error('AIR overflow: extract shape/index') }
 				operand := p.operands[first_operand]
 				element := p.scalar_overflow_element(operand.type_index)!
@@ -148,7 +152,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				for operand in p.operands[first_operand..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
 			}
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
-			if inst.has_result { if !overflow_result { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
+			if inst.has_result { if !overflow_result && !pair_flow { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			floating_result := inst.has_result && p.types[op.result_type].kind in [.float_t, .half_t]!
 			allowed_flags := if code == 34 { u64(32768) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
@@ -263,6 +267,11 @@ fn (m &IntegerMachine) read_overflow(operand_index int) !IntegerValue {
 	return value
 }
 
+fn (m &IntegerMachine) read_flow(operand_index int) !IntegerValue {
+	if m.p.types[m.p.operands[operand_index].type_index].kind == .struct_t { return m.read_overflow(operand_index)! }
+	return m.read(operand_index)!
+}
+
 // Execute valid LLVM IR within the checked scalar profile. No host pointers,
 // global state, memory operations, calls, floating point or Metal submission.
 pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int) !IRIntegerRun {
@@ -288,7 +297,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			mut incoming := -1
 			for i in 0 .. op.targets_count { if p.targets[op.targets_start + i] == previous { incoming = op.operands_start + i; break } }
 			if incoming < 0 { return error('AIR integer: PHI lacks executed predecessor') }
-			pending[phis] = m.read(incoming)!; phis++
+			pending[phis] = m.read_flow(incoming)!; phis++
 		}
 		// All incoming PHIs read the previous iteration before any is assigned.
 		for i in 0 .. phis { m.put(bodies.instructions[block.first + i], pending[i]) }
@@ -342,7 +351,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 						result = IntegerValue{value: value & constant_mask(dest_bits)}
 					}
 				}
-				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true} } else { m.read(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
+				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true, aggregate: p.types[op.result_type].kind == .struct_t} } else { m.read_flow(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
 				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
 				58 { result = m.read_frozen(start)! }
 				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }
