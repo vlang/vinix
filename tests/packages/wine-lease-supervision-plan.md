@@ -15,11 +15,35 @@ after client exit and release after worker retirement. A pipe gates the worker
 without relying on a sleep to keep it alive; a 30-second alarm bounds blocking
 operations. Descendants explicitly close the holder's lease descriptor.
 Run the Linux executable with one fresh absolute external state directory.
-Both Linux architecture declarations pass V checking. Native compilation and
-execution remain pending; this is not race coverage or Wine lifetime acceptance.
+The native controller `tests/packages/wine-subreaper-check.v` now compiles and
+boots both architectures. Final `arm-07` and `x86-07` runs pass the positive
+probe and a disabled-subreaper control which must detect missing adoption.
+The probe runs outside PID 1 as uid/gid 1000 with no supplementary groups;
+PID 1 adoption alone cannot satisfy the positive assertion. Explicit `i32`
+pipe slots match C's descriptor ABI. Earlier production-build, missing GCC,
+pipe-width and x86 boot/console failures remain retained. ARM uses the selected
+musl-cross GCC runtime; x86 uses the existing plain-USTAR ISO helper and com1.
+This is not race coverage or Wine lifetime acceptance.
 The current clone-parent publication and exit adoption paths still require
 the coordinated review and deterministic controls described below. No production
 lease handling is changed by this probe.
+
+The controller binds its embedded sources, discovers and admits actual parsed
+guest V sources, records commands/generated C/QEMU arguments, and checks selected
+tool/kernel/firmware/source hashes and generated artifacts before/after boot.
+It does not inventory the complete C toolchain/sysroot, prove reproducibility,
+measure kernel leaks or exercise pledge/unveil. Both selected kernels remain
+unchanged from the earlier Wine pledge qualification. The successful runs end
+with the fixture alive; guest shutdown is not qualified.
+
+Complete raw attempts and source copies are retained at
+`/Users/alex/.cache/vinix-wine-subreaper-20261112-01`.
+The external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-subreaper-20261112-01.inventory.json`,
+SHA-256 `3329ea4f6ef815d110738f43e03c8f47ac9f5a5954ea1fcb9a4121626023fd83`.
+Recording and separate complete verification use the maintained workspace
+inventory tool from `845f18d93`; adjacent record/check logs retain results.
+This is an in-place integrity seal; keep originals and historical namespaces.
 
 ## Existing contract and gap
 

@@ -10,20 +10,25 @@ import time
 #include <sys/file.h>
 #include <fcntl.h>
 #include <unistd.h>
-fn C.prctl(int, ...voidptr) int
-fn C.fork() int
-fn C.waitpid(int, &i32, int) int
-fn C.pipe(&int) int
-fn C.read(int, voidptr, usize) isize
-fn C.write(int, voidptr, usize) isize
-fn C.close(int) int
-fn C.open(&char, int, ...int) int
-fn C.flock(int, int) int
-fn C.setsid() int
+#include <grp.h>
+fn C.setgroups(uint, voidptr) int
+fn C.setgid(u32) int
+fn C.setuid(u32) int
+fn C.dup2(int, int) int
+fn C.prctl(i32, ...voidptr) i32
+fn C.fork() i32
+fn C.waitpid(i32, &i32, i32) i32
+fn C.pipe(&i32) i32
+fn C.read(i32, voidptr, uint) i64
+fn C.write(i32, voidptr, uint) i64
+fn C.close(i32) i32
+fn C.open(&char, i32, ...i32) i32
+fn C.flock(i32, i32) i32
+fn C.setsid() i32
 fn C._exit(int)
 fn C.alarm(u32) u32
 
-fn probe(directory string) ! {
+fn probe(directory string, subreaper bool) ! {
 	// Bound even the blocking initial wait and pipe operations. On failure,
 	// closing the holder's sole gate writer lets the worker retire on EOF.
 	C.alarm(30)
@@ -35,10 +40,11 @@ fn probe(directory string) ! {
 	if lease < 0 { return error('open lease failed') }
 	defer { C.close(lease) }
 	if C.flock(lease, C.LOCK_SH | C.LOCK_NB) != 0 { return error('shared lease failed') }
-	if C.prctl(36, voidptr(1), voidptr(0), voidptr(0), voidptr(0)) != 0 { return error('SET subreaper failed') }
+	if os.getpid() == 1 || os.geteuid() != 1000 { return error('probe requires non-init uid 1000') }
+	if C.prctl(36, voidptr(if subreaper { 1 } else { 0 }), voidptr(0), voidptr(0), voidptr(0)) != 0 { return error('SET subreaper failed') }
 	mut enabled := i32(0)
-	if C.prctl(37, &enabled, voidptr(0), voidptr(0), voidptr(0)) != 0 || enabled != 1 { return error('GET subreaper failed') }
-	mut gate := [int(-1), -1]!
+	if C.prctl(37, &enabled, voidptr(0), voidptr(0), voidptr(0)) != 0 || enabled != if subreaper { 1 } else { 0 } { return error('GET subreaper failed') }
+	mut gate := [i32(-1), -1]!
 	if C.pipe(&gate[0]) != 0 { return error('gate pipe failed') }
 	defer { C.close(gate[0]); C.close(gate[1]) }
 	client := C.fork()
@@ -81,6 +87,33 @@ fn probe(directory string) ! {
 }
 
 fn main() {
-	if os.args.len != 2 { eprintln('usage: wine-subreaper-probe FRESH_EXTERNAL_DIRECTORY'); exit(2) }
-	probe(os.args[1]) or { eprintln(err); exit(1) }
+	if os.getpid() == 1 {
+		console := $if arm64 { '/dev/console' } $else { '/dev/com1' }
+		fd := C.open(console.str, C.O_WRONLY)
+		if fd >= 0 { C.dup2(fd, 1); C.dup2(fd, 2); if fd > 2 { C.close(fd) } }
+		guest() or { eprintln('HWTEST FAIL subreaper: ' + err.msg()) }
+		for { time.sleep(time.second) }
+	}
+	if os.args.len !in [2, 3] { eprintln('usage: wine-subreaper-probe FRESH_EXTERNAL_DIRECTORY [--without-subreaper]'); exit(2) }
+	if os.args.len == 3 && os.args[2] != '--without-subreaper' { exit(2) }
+	probe(os.args[1], os.args.len == 2) or { eprintln(err); exit(1) }
+}
+
+fn guest() ! {
+	os.mkdir_all('/tmp')!; os.chmod('/tmp', 0o1777)!
+	for disabled in [false, true]! {
+		pid := C.fork()
+		if pid < 0 { return error('fixture fork failed') }
+		if pid == 0 {
+			if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(80) }
+			probe(if disabled { '/tmp/control' } else { '/tmp/positive' }, !disabled) or {
+				if disabled && err.msg() == 'live adopted descendant missing' { C._exit(42) }
+				eprintln(err); C._exit(81)
+			}
+			C._exit(0)
+		}
+		mut status := i32(0)
+		if C.waitpid(pid, &status, 0) != pid || status != if disabled { 42 << 8 } else { 0 } { return error('fixture status differs: ' + status.str()) }
+	}
+	println('HWTEST PASS subreaper prerequisite positive and disabled control')
 }
