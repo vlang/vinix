@@ -78,7 +78,14 @@ their absolute-value bit pattern. Poison input propagates and undef rejects;
 freeze can consume the poisoned minimum. Each call costs one step and shares
 the scalar validator, immediate checks and evaluator.
 
-Only ordinary direct calls to these twelve families' exact declarations are admitted:
+Direct LLVM `sadd.sat`/`uadd.sat`/`ssub.sat`/`usub.sat` support two matching
+scalar i1..i64 operands and results. Signed variants clamp to the signed
+minimum/maximum; unsigned variants clamp to zero/unsigned maximum. Defined
+arithmetic overflow saturates instead of producing poison. Poison operands
+still propagate and undef rejects. Each call costs one step and reuses the
+scalar validator and evaluator. Saturating shifts remain unsupported here.
+
+Only ordinary direct calls to these sixteen families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -160,5 +167,7 @@ rotation/amount boundaries and separate poison/undef/padding-choice controls.
 against native LLVM, including boundary matrices and separate poison controls.
 `tests/ios/air-memory-abs.v` checks absolute-value buffer functions, defined
 native inputs, minimum-poison flags and per-call flag checks after cache hits.
+`tests/ios/air-memory-saturating.v` checks saturating add/sub buffer functions
+against defined native LLVM, boundary matrices and separate poison controls.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
