@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if id == .fma { return 3 }
-	return if id in [.copysign, .minimum, .maximum]! { 2 } else { 1 }
+	return if id in [.copysign, .minimum, .maximum, .ldexp]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
@@ -21,6 +21,7 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.maximum.f16', 'llvm.maximum.f32' { ScalarIntrinsic.maximum }
 		'llvm.sqrt.f16', 'llvm.sqrt.f32' { ScalarIntrinsic.sqrt }
 		'llvm.fma.f16', 'llvm.fma.f32' { ScalarIntrinsic.fma }
+		'llvm.ldexp.f16.i32', 'llvm.ldexp.f32.i32' { ScalarIntrinsic.ldexp }
 		else { return error('AIR intrinsic: unsupported callee') }
 	}
 }
@@ -41,9 +42,14 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	result := ir.references[signature.refs_start]
 	if result != op.result_type { return error('AIR intrinsic: return type') }
 	bits := p.execution_bits(result, true)!
-	if p.types[result].kind !in [.float_t, .half_t]! || bits != if f.name.ends_with('.f16') { u32(16) } else { u32(32) } { return error('AIR intrinsic: name/type mismatch') }
+	half := f.name.ends_with('.f16') || (id == .ldexp && f.name.ends_with('.f16.i32'))
+	if p.types[result].kind !in [.float_t, .half_t]! || bits != if half { u32(16) } else { u32(32) } { return error('AIR intrinsic: name/type mismatch') }
 	for i in 0 .. arity {
-		if ir.references[signature.refs_start + i + 1] != result || p.operands[op.operands_start + i + 1].type_index != result { return error('AIR intrinsic: homogeneous argument types') }
+		argument := ir.references[signature.refs_start + i + 1]
+		if argument < 0 || argument >= p.types.len || p.operands[op.operands_start + i + 1].type_index != argument { return error('AIR intrinsic: argument type identity') }
+		if id == .ldexp && i == 1 {
+			if p.types[argument].kind != .integer_t || p.types[argument].bits != 32 { return error('AIR intrinsic: signed i32 exponent required') }
+		} else if argument != result { return error('AIR intrinsic: homogeneous floating arguments required') }
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
@@ -90,6 +96,7 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if id == .fabs { return abs }
 	if id == .copysign { return abs | (b & sign_mask) }
 	if id == .sqrt { return scalar_intrinsic_sqrt(bits, a) }
+	if id == .ldexp { return scalar_intrinsic_ldexp(bits, a, b) }
 	if id in [.minimum, .maximum]! {
 		infinity := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
 		other := b & (sign_mask - 1)
@@ -125,6 +132,23 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	}
 	if increment { rounded += unit }
 	return sign | rounded
+}
+
+fn scalar_intrinsic_ldexp(bits u32, value u64, exponent u64) u64 {
+	sign_mask := u64(1) << (bits - 1); sign := value & sign_mask; abs := value & (sign_mask - 1)
+	inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
+	if abs > inf { return if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) } }
+	if abs == 0 || abs == inf { return sign | abs }
+	scale := i64(i32(u32(exponent)))
+	// Every finite half/float overflows or rounds to zero outside this bound.
+	// Bound the addition before converting to int, even for INT_MIN/MAX.
+	if scale > 512 { return sign | inf }; if scale < -512 { return sign }
+	if bits == 16 {
+		finite := binary16_finite(u16(value))
+		return u64(binary16_pack(u16(sign), finite.exponent + int(scale), finite.significand << 3))
+	}
+	finite := binary32_finite(u32(value))
+	return u64(binary32_pack(u32(sign), finite.exponent + int(scale), finite.significand << 3))
 }
 
 // Restoring integer square root for the at-most-54-bit scaled significands

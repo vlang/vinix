@@ -21,7 +21,7 @@ There is no intermediate product overflow, underflow or rounding.
 All evaluation uses integer operations. There is no host FP instruction,
 libm, LLVM dependency, allocation or native function invocation in production.
 The existing three owned execution arrays and cleanup remain unchanged; the
-declaration cache is now twenty-six fixed stack entries. Generated AArch64 C
+declaration cache is now twenty-eight fixed stack entries. Generated AArch64 C
 confirms the two limb arrays and declaration cache use stack storage. This is
 not a retained-allocation measurement.
 

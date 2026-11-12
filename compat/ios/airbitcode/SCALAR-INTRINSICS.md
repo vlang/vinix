@@ -14,6 +14,7 @@ these LLVM declarations for scalar half (`.f16`) and float (`.f32`):
 | `llvm.minimum` / `llvm.maximum` | Select the lesser / greater operand, propagate NaNs, and order -0 below +0. |
 | `llvm.sqrt` | Correctly rounded square root, nearest/ties to even; retain negative zero and choose a quiet NaN for negative nonzero inputs. |
 | `llvm.fma` | Fused multiply-add with one nearest/ties-to-even rounding after the exact product and addition. |
+| `llvm.ldexp` | Scale half/float by a signed i32 power of two, with one final nearest/ties-to-even round. |
 
 Results keep the floating-point type. `scalar_intrinsics.v` manipulates integer
 sign/exponent/fraction bits; no host FP instruction, environment, libm or LLVM
@@ -50,7 +51,7 @@ Declaration attributes admit only function-level `nounwind`, `readnone`,
 `nocreateundeforpoison` and `memory(none)` (bitcode memory versions 0/1/2).
 Return/parameter, string/type, `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A twenty-six-entry fixed stack cache validates each admitted
+validation budget. A twenty-eight-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -61,6 +62,8 @@ The integer-only entry point still rejects floating point and all calls.
 [Scalar FMA](SCALAR-FMA.md) adds a ternary call with exact fixed-stack integer
 accumulation, gradual underflow and rounding after cancellation. Its separate
 maintained checker compares 1,505,792 native LLVM results across both precisions.
+[Power-of-two scaling](SCALAR-LDEXP.md) admits the exact `.f16.i32` and `.f32.i32`
+names, with a floating first argument/result and a signed i32 second argument.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting
@@ -74,24 +77,27 @@ independent multiplication inequalities for root/remainder results, including
 exact squares and neighbors near the 54-bit bound.
 
 `tests/ios/air-scalar-intrinsics.v self-test LLVM_AS FRESH_EXTERNAL_DIR` generates
-34 functions: twelve primitives, three chains and two bounded loops for each
+36 functions: thirteen primitives, three chains and two bounded loops for each
 precision. Half inputs cover all 65,536 encodings in every case. Float inputs
 cover 32 fixed edges, 65,536 mixed-bit inputs and 65,536 signed midpoint/neighbor
 inputs across exponents 0..22. Extrema additionally exhaust every half encoding
 against sixteen boundary peers in both argument orders, and all 32-by-32 float
 edge pairs. Square root also receives 196,608 neighbors of squared exact
 float-root midpoints, formed independently using u64 products and shifts across
-the normal exponent range. It compares **7,735,840 results**: 6,350,194 bit-exact
-results and 1,385,646 rounding/arithmetic NaN-class cases. Non-math
+the normal exponent range. Scaling adds 2,097,152 boundary pairs against sixteen
+signed exponent values. It compares **10,029,632 results**: 8,604,902 bit-exact
+results and 1,424,730 rounding/arithmetic NaN-class cases. Non-math
 operations preserve NaN bits exactly. Primitive CALL/return results cost two
 instructions; the sign/rounding chain costs four and the extrema/square-root
 chains three. The square-root loop feeds back its result through a PHI.
+Scaling wrappers also cost three instructions, including their exponent cast.
 Nine rejecting fixtures, three poison results, sixteen extrema poison/undef
 controls, four square-root poison/undef controls, lazy select, budget/integer
 isolation, eight call-metadata corruptions,
 two declaration-attribute corruptions, five result corruptions and six
 distinguishing host-rounding controls plus four square-root host-rounding
-controls pass. Square-root controls use sqrt(2) under upward rounding and
+controls pass. Scaling adds eight poison/undef, two exponent-type and four
+host-rounding controls. Square-root controls use sqrt(2) under upward rounding and
 sqrt(5) under downward rounding, where nearest-mode results differ in each
 precision. Native calls run only in the
 default environment; LLVM/JIT/native code is not sanitizer-instrumented.
@@ -100,7 +106,7 @@ The host LLVM backend's half `copysign` quiets signaling NaNs: input `0x7c01`
 with a negative sign produces `0xfe01` where the contract requires `0xfc01`.
 The native observation and initial failing corpus are retained. This one case
 uses a defined native LLVM integer bit-operation reference for all 65,536
-inputs; the remaining 7,670,304 comparisons use native floating-point wrappers.
+inputs; the remaining 9,964,096 comparisons use native floating-point wrappers.
 The reference does not relax payload checks or change production semantics.
 IR/bitcode, every comparison, native diagnostic, assembler/JIT/fenv identities
 and logs are preserved outside Git. The tool executes only its own fixture.

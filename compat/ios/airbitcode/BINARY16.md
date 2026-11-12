@@ -15,6 +15,7 @@ The half profile supports:
 - [Signed/unsigned numeric conversions between half and i1..i64](BINARY16-INTEGER.md).
 - [Selected scalar LLVM absolute-value, sign-copy, rounding, minimum/maximum and square-root intrinsics](SCALAR-INTRINSICS.md).
 - [Fused multiply-add with one final rounding](SCALAR-FMA.md).
+- [Power-of-two scaling with a signed i32 exponent](SCALAR-LDEXP.md).
 
 `binary16_cast.v` uses integer significands, exponent shifts and guard/round/
 sticky bits. Narrowing preserves signed zero and gradual underflow; rounding

@@ -43,6 +43,14 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 	mut cases := []IntrinsicCase{}; cases.flags |= .noslices
 	for bits in [u32(16), 32]! {
 		typ := if bits == 16 { 'half' } else { 'float' }
+		ldexp_entry := IntrinsicCase{'ldexp_${bits}', bits, true, 3}; unsafe { cases.push_many(&ldexp_entry, 1) }
+		ldexp_text := 'declare ${typ} @llvm.ldexp.f${bits}.i32(${typ}, i32)\ndefine ${typ} @ldexp_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %scale = trunc i64 %c to i32\n  %r = call ${typ} @llvm.ldexp.f${bits}.i32(${typ} %x, i32 %scale)\n  ret ${typ} %r\n}\n'; source.write_string(ldexp_text); unsafe { ldexp_text.free() }
+		for state in ['poison', 'undef'] {
+			for side in 0 .. 2 {
+				left := if side == 0 { state } else { '%x' }; right := if side == 1 { state } else { '0' }
+				control := 'define ${typ} @ldexp_${state}_${side}_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.ldexp.f${bits}.i32(${typ} ${left}, i32 ${right})\n  ret ${typ} %r\n}\n'; source.write_string(control); unsafe { control.free() }
+			}
+		}
 		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum', 'sqrt'] {
 			name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, op !in ['fabs', 'copysign'], 2}; unsafe { cases.push_many(&entry, 1) }
 			binary := op in ['copysign', 'minimum', 'maximum']
@@ -236,6 +244,21 @@ fn main() {
 			row := 'sqrt_boundary_32\t${a}\t0\t0\t${actual.value}\t${expected}\tfalse\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }; comparisons++; sqrt_boundaries++
 		}
 	}
+	mut scaling_pairs := 0
+	scales := [u32(0x80000000), u32(-512), u32(-150), u32(-25), u32(-24), u32(-15), u32(-1), u32(0), u32(1), u32(14), u32(15), u32(24), u32(127), u32(128), u32(512), u32(0x7fffffff)]!
+	for bits in [u32(16), 32]! {
+		name := 'ldexp_${bits}'; reference_name := 'reference_${name}'; defer { unsafe { name.free(); reference_name.free() } }
+		index := function_index(ir, name)!; address := C.LLVMGetFunctionAddress(engine, reference_name.str); if address == 0 { panic('missing scaling reference') }; reference := unsafe { NativeBits(voidptr(address)) }; c := IntrinsicCase{name, bits, true, 3}
+		for sample in 0 .. 65536 {
+			a := if bits == 16 { u64(sample) } else { u64(pattern(sample, 0x510e527fade682d1)) }
+			for scale in scales {
+				args := [a | 0x100000000, u64(0), u64(scale) | 0x200000000]; defer { unsafe { args.free() } }
+				actual := p.run_scalar_function(ir, stream, pools, bodies, index, args, 256)!; expected := reference(args[0], 0, args[2])
+				nan_class := compare(actual, expected, c) or { row := 'FAIL ldexp ${bits} a=${a} scale=${scale} got=${actual.value} expected=${expected}'; results.writeln(row)!; panic(row) }
+				row := 'ldexp_boundary_${bits}\t${a}\t0\t${scale}\t${actual.value}\t${expected}\t${nan_class}\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }; comparisons++; scaling_pairs++; if nan_class { nan_cases++ }
+			}
+		}
+	}
 	args := [u64(0xbf000000), 0, 0]; defer { unsafe { args.free() } }; mut guards := 0
 	for name in ['guard_defined', 'guard_unknown', 'guard_tail', 'guard_fmf', 'guard_return_attr', 'guard_parameter_attr', 'guard_undef', 'guard_dead', 'guard_indirect'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported intrinsic fixture') }
 	for name in ['poison_unary', 'poison_left', 'poison_right'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('intrinsic poison lost') } }
@@ -256,6 +279,19 @@ fn main() {
 		if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, poison_name)!, args, 64)!.poison { panic('sqrt poison lost') }; sqrt_controls++
 		p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, undef_name)!, args, 64) or { sqrt_controls++; continue }; panic('accepted sqrt undef')
 	}
+	mut scaling_controls := 0
+	for bits in [16, 32]! { for side in 0 .. 2 {
+		poison_name := 'ldexp_poison_${side}_${bits}'; undef_name := 'ldexp_undef_${side}_${bits}'; defer { unsafe { poison_name.free(); undef_name.free() } }
+		if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, poison_name)!, args, 64)!.poison { panic('scaling poison lost') }; scaling_controls++
+		p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, undef_name)!, args, 64) or { scaling_controls++; continue }; panic('scaling undef accepted')
+	} }
+	scaling_index := function_index(ir, 'ldexp_32')!; scaling_slot := bodies.scopes[scaling_index + 1].instructions_start + 1
+	scaling_op := p.instructions[scaling_slot]; exponent_slot := scaling_op.operands_start + 2; exponent_operand := p.operands[exponent_slot]
+	mut scaling_type_controls := 0
+	for wrong_type in [-1, scaling_op.result_type]! {
+		p.operands[exponent_slot] = airbitcode.IRTypedOperand{...exponent_operand, type_index: wrong_type}
+		p.run_scalar_function(ir, stream, pools, bodies, scaling_index, args, 64) or { scaling_type_controls++; continue }; panic('accepted non-i32 scaling argument')
+	}; p.operands[exponent_slot] = exponent_operand
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != 0x3f000000 { panic('intrinsic select not lazy') }
 	index := function_index(ir, 'fabs_32')!; slot := bodies.scopes[index + 1].instructions_start; original := p.instructions[slot]
 	if _ := p.run_scalar_function(ir, stream, pools, bodies, index, args, 1) { panic('intrinsic budget accepted') }
@@ -301,7 +337,10 @@ fn main() {
 			rounding_args := [input, u64(0), 0]; defer { unsafe { rounding_args.free() } }
 			expected := if mode == C.FE_UPWARD { if bits == 16 { u64(0x3da8) } else { u64(0x3fb504f3) } } else { if bits == 16 { u64(0x4079) } else { u64(0x400f1bbd) } }
 			if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, rounding_args, 64)!.value != expected { panic('sqrt used host rounding mode') }
+			scaling_name := 'ldexp_${bits}'; defer { unsafe { scaling_name.free() } }
+			scaling_args := [if mode == C.FE_UPWARD { u64(1) } else { u64(3) }, 0, 0xffffffff]; defer { unsafe { scaling_args.free() } }
+			if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, scaling_name)!, scaling_args, 64)!.value != if mode == C.FE_UPWARD { u64(0) } else { u64(2) } { panic('ldexp used host rounding mode') }
 		}
 	}
-	println('LLVM-SCALAR-INTRINSICS: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} arithmetic NaN-class cases), including ${extrema_pairs} extrema boundary pairs and ${sqrt_boundaries} squared-midpoint neighbors; ${guards} guards, three poison results, ${extrema_controls} extrema/${sqrt_controls} sqrt poison/undef controls, lazy select, budget/integer isolation, ${metadata_controls} metadata/${attribute_controls} declaration/${controls} result corruptions and ten host-rounding controls PASS; no AIR shader or iOS app executed')
+	println('LLVM-SCALAR-INTRINSICS: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} arithmetic NaN-class cases), including ${extrema_pairs} extrema/${sqrt_boundaries} sqrt/${scaling_pairs} scaling boundary pairs; ${guards} guards, three poison results, ${extrema_controls} extrema/${sqrt_controls} sqrt/${scaling_controls} scaling poison/undef controls, ${scaling_type_controls} exponent-type controls, lazy select, budget/integer isolation, ${metadata_controls} metadata/${attribute_controls} declaration/${controls} result corruptions and fourteen host-rounding controls PASS; no AIR shader or iOS app executed')
 }

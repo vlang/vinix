@@ -26,6 +26,8 @@ value, sign copying, integral rounding, NaN-propagating minimum/maximum and squa
 for half and float.
 [Fused multiply-add](SCALAR-FMA.md) also supports three half or float operands
 with one final rounding after exact multiplication and addition.
+[Power-of-two scaling](SCALAR-LDEXP.md) accepts a signed i32 exponent for either
+floating precision.
 
 `binary32.v` implements arithmetic using unsigned integer significands,
 exponents and guard/round/sticky bits. It rounds to nearest, ties to even and
