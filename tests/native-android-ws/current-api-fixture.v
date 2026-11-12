@@ -5,6 +5,64 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static shortcuts()V
+.locals 5
+new-instance v0, Landroid/content/pm/ShortcutManager;
+invoke-direct {v0}, Landroid/content/pm/ShortcutManager;-><init>()V
+invoke-static {}, Ljava/util/Collections;->emptyList()Ljava/util/List;
+move-result-object v1
+invoke-virtual {v0, v1}, Landroid/content/pm/ShortcutManager;->removeDynamicShortcuts(Ljava/util/List;)V
+new-instance v1, Ljava/util/ArrayList;
+invoke-direct {v1}, Ljava/util/ArrayList;-><init>()V
+const-string v2, "absent-shortcut"
+invoke-virtual {v1, v2}, Ljava/util/ArrayList;->add(Ljava/lang/Object;)Z
+invoke-virtual {v1, v2}, Ljava/util/ArrayList;->add(Ljava/lang/Object;)Z
+invoke-virtual {v0, v1}, Landroid/content/pm/ShortcutManager;->removeDynamicShortcuts(Ljava/util/List;)V
+invoke-virtual {v0, v1}, Landroid/content/pm/ShortcutManager;->removeDynamicShortcuts(Ljava/util/List;)V
+invoke-virtual {v1}, Ljava/util/ArrayList;->size()I
+move-result v2
+const/4 v3, 2
+invoke-static {v2, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/content/pm/ShortcutManager;->getDynamicShortcuts()Ljava/util/List;
+move-result-object v2
+invoke-interface {v2}, Ljava/util/List;->size()I
+move-result v2
+const/4 v3, 0
+invoke-static {v2, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:null_ids_start
+invoke-virtual {v0, v3}, Landroid/content/pm/ShortcutManager;->removeDynamicShortcuts(Ljava/util/List;)V
+:null_ids_end
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+:null_ids
+move-exception v4
+invoke-virtual {v1}, Ljava/util/ArrayList;->clear()V
+invoke-virtual {v1, v3}, Ljava/util/ArrayList;->add(Ljava/lang/Object;)Z
+:null_id_start
+invoke-virtual {v0, v1}, Landroid/content/pm/ShortcutManager;->removeDynamicShortcuts(Ljava/util/List;)V
+:null_id_end
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+:null_id
+move-exception v4
+invoke-virtual {v1}, Ljava/util/ArrayList;->clear()V
+const-string v2, ""
+invoke-virtual {v1, v2}, Ljava/util/ArrayList;->add(Ljava/lang/Object;)Z
+:empty_id_start
+invoke-virtual {v0, v1}, Landroid/content/pm/ShortcutManager;->removeDynamicShortcuts(Ljava/util/List;)V
+:empty_id_end
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+:empty_id
+move-exception v4
+return-void
+.catch Ljava/lang/NullPointerException; {:null_ids_start .. :null_ids_end} :null_ids
+.catch Ljava/lang/IllegalArgumentException; {:null_id_start .. :null_id_end} :null_id
+.catch Ljava/lang/IllegalArgumentException; {:empty_id_start .. :empty_id_end} :empty_id
+.end method
 .method public static subscriptions()V
 .locals 6
 new-instance v0, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;
@@ -364,6 +422,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->properties()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
 new-instance v0, Landroid/content/pm/ShortcutManager;
 invoke-direct {v0}, Landroid/content/pm/ShortcutManager;-><init>()V
 invoke-virtual {v0}, Landroid/content/pm/ShortcutManager;->getDynamicShortcuts()Ljava/util/List;

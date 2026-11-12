@@ -344,3 +344,33 @@ and readback `shortcut-api-readback-20261112-r1` retain the two-entry export,
 archive checksum
 `e8cfa288e4cb833555e9d9307afb44f753db3f7b447c833568ac450b64676b56`.
 The test mount was released before the next broker/Maps attempt.
+
+Guest r15 advanced past that query to missing
+`ShortcutManager.removeDynamicShortcuts(List)` in `dsew.c` source17, in the
+same Nearby cleanup. Full log delimiters are `SHORTCUT-MAPS-LOG-BEGIN` /
+`SHORTCUT-MAPS-LOG-END`; snapshot `maps-shortcut-uart-20261112-r1` has SHA256
+`e5fca645c1b1bd1e79837e1005fd1916e3526493bc5e23a0154969f98913a3f2`.
+The helper now accepts removal of unknown IDs from the empty backend without
+modifying the caller's list. It rejects a null list and null/empty IDs rather
+than silently accepting malformed input. This still does not qualify the
+existing shortcut publication methods.
+
+SDK `framework-shortcut-remove-20261112-r1` passed guarded assembly/readback
+in5,513 ms, RSS492,306,432, growth28,418,048, guard/child0/0, cleanup complete.
+Signed fixture `current-api-fixture-20261112-r11` passed on ARM in guest r16,
+including all earlier checks, immutable empty-list input, repeated removal of
+duplicate unknown IDs, preserved input size, empty resulting query, null-list
+NPE and null/empty-ID IllegalArgumentException. Runner readiness/pass, EOF
+drain and exit0 were observed. Snapshot
+`shortcut-remove-api-uart-20261112-r1`, plan
+`shortcut-remove-api-plan-20261112-r1.json` and readback
+`shortcut-remove-api-readback-20261112-r1` preserve its two-entry export,
+archive checksum
+`1b45c2f333ae26536cd7ddc8d473c944ad67833ba793017955fa04e0127f0d62`.
+The test mount was released before the next broker/Maps attempt.
+
+Source commits for the current successors are `bd22fdcaf` (boolean properties),
+`1c80302ca` (boot loader), `06c1b8639` (subscription failure dispatch) and
+`abdfdaa40` (shortcut query). Removal is built from `abdfdaa40` plus the
+helper/fixture changes in this report's commit. All named artifact directories
+remain under the external work directory above; raw evidence is not in Git.
