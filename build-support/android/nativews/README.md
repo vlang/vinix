@@ -618,6 +618,17 @@ With tree tracing enabled, `VINIX_ANDROID_TRACE_SURFACE_DUMP` selects an
 application SurfaceView diagnostic method with a `(String, PrintWriter)`
 signature. At most three calls report the application's own surface state;
 production launchers leave this unset.
+The protected Maps broker accepts `--trace-surface-dump=METHOD`, records the
+selection in its session and launch receipts, and enables tree sampling for
+these calls. Method names are bounded ASCII Java identifiers. An absent or
+invalid persisted selection clears inherited surface-dump settings. Diagnostic
+output stays in the private Maps log. For example, select `tI` only after
+checking that signature in the actual APK; names can change between versions.
+`build-current-maps-controller.v` builds with the current V executable and
+retains its V input hashes, source copies, commands and host self-test output.
+`maps-current-guest.v` accepts `VINIX_CURRENT_ACCOUNT_CONTROLLER` to deploy
+the same controller bytes at both protected launch paths and update their
+deployment hashes.
 
 Single-pointer WS input enters `dispatchTouchEvent` at the window root.
 ViewGroups retain the consuming child for the gesture, translate local

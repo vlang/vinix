@@ -1864,3 +1864,40 @@ harmless null/oversized/zero-length payloads. Snapshot
 `59bf802879ea379eb3bba44682b456b0c7cc8a10449be034022af843871155f2`.
 The fixture bind was released before broker preparation. Full Maps functionality
 and its actual retry remain pending.
+
+### Protected surface diagnostics, current V continuation
+
+On continuation, r56's QEMU PID was absent and its QMP socket refused
+connections. No orderly-stop or sign-in result was retained; its final serial
+observation is at watcher163181ms. Treat this attempt as interrupted, not a
+completed stability or login check. Offline extraction retained maps.log
+SHA256 `4cd3e8aced4bea0117de26d23fe618f3a33e0779761773121deba654ad5c1a8c`
+and app-data image SHA256
+`fec1e614caed1315bc6f99e0726958d20ec77cce1be1bbd8638e4205acdf7860`.
+No uncaught exception appears in that incomplete log.
+
+The broker now carries an explicit `--trace-surface-dump=METHOD` through its
+protected session, private launch and diagnostic receipts. It validates the
+method name, clears ambient selections when disabled and enables the existing
+sampled tree callback. Host self-tests cover defaults, malformed/duplicate
+options, legacy sessions, independent selections, round trips and private-log
+exclusion. Production defaults remain disabled. Current staging can replace
+both controller paths together and record the deployed hashes.
+
+`build-current-maps-controller.v` retains the available compiler identity, V
+source inputs and hashes, command arguments, exit statuses and output.
+Bundle `surface-controller-build-20261112-r6` used V0.5.2 5909f83 and passed
+host self-tests plus a static AArch64 ELF build under the unchanged guard:
+0/0, complete cleanup,14606ms, RSS602767360, shared growth30130176 bytes.
+Earlier r3 and r5 attempts exceeded aggregate RSS and were not deployed; r2
+rejected an unsupported compiler option. Explicit serial compilation passed
+without changing caps. This is retained V/build evidence, not an exhaustive
+native dependency audit or application qualification.
+
+Fresh r58 staging passed0/0, complete cleanup,16385ms, RSS37601280,
+shared growth152510464 bytes. Volume identity and read-only e2fsck passed.
+It selects the already ARM-qualified r53 fixture, StatsLog SDK, current r5
+JNI, mandatory delegate-last core and TLS lifetime boot jars, plus the new
+controller. r57 failed before staging because the requested stage executable
+was absent; it supplied no VM or runtime evidence. The surface diagnostic and
+actual Maps retry on r58 remain pending.

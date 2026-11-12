@@ -73,6 +73,15 @@ fn stage(parent string, framework string, native string, root string) ! {
 		inputs['/' + relative] = json2.Any(sha256.sum(os.read_bytes(root + '/payload/' + relative)!).hex())
 	}
 	deployment['inputs_sha256'] = json2.Any(inputs)
+	if controller := os.getenv_opt('VINIX_CURRENT_ACCOUNT_CONTROLLER') {
+		for relative in ['/opt/vinix-maps-account/bin/maps-account-guest', '/usr/bin/run-android-calculator'] {
+			os.mkdir_all(os.dir(root + '/payload' + relative))!
+			os.cp(controller, root + '/payload' + relative)!
+			os.chmod(root + '/payload' + relative, 0o755)!
+			inputs[relative] = json2.Any(media.hash(root + '/payload' + relative)!)
+		}
+		deployment['inputs_sha256'] = json2.Any(inputs)
+	}
 	if boot := os.getenv_opt('VINIX_CURRENT_CORE_LIBART') {
 		relative := '/opt/vinix-android-aarch64/usr/lib/java/dex/art/core-libart-hostdex.jar'
 		os.mkdir_all(os.dir(root + '/payload' + relative))!
@@ -107,7 +116,9 @@ fn stage(parent string, framework string, native string, root string) ! {
 	}
 	if data_disk == '1' { app_data_disk(root)! }
 	os.setenv('COPYFILE_DISABLE', '1', true)
-	command(['/usr/bin/tar', '-cf', root + '/maps-current.tar', '-C', root + '/payload', 'opt'])!
+	mut archive := ['/usr/bin/tar', '-cf', root + '/maps-current.tar', '-C', root + '/payload', 'opt']
+	if os.is_dir(root + '/payload/usr') { archive << 'usr' }
+	command(archive)!
 	config := os.read_file(parent + '/limine-after.conf')! + '    module_path: boot():/boot/maps-current.tar\n'
 	os.write_file(root + '/limine-after.conf', config)!
 	command(['/opt/homebrew/bin/mcopy', '-i', root + '/boot.img', root + '/maps-current.tar', '::/boot/maps-current.tar'])!

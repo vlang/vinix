@@ -127,6 +127,7 @@ struct MapsLaunch {
 	desktop          Identity
 	trace_onboarding bool
 	trace_tls        bool
+	trace_surface_dump string
 }
 
 fn hash(path string) !string {
@@ -587,6 +588,7 @@ struct Session {
 	desktop          DesktopIdentity
 	trace_onboarding bool
 	trace_tls        bool
+	trace_surface_dump string
 }
 
 struct StopRequest {
@@ -827,6 +829,7 @@ struct Receipt {
 	started_utc      string
 	trace_onboarding bool
 	trace_tls        bool
+	trace_surface_dump string
 mut:
 	finished_utc      string
 	status            string = 'failed'
@@ -1429,7 +1432,7 @@ fn select_environment(build Build, principal string) ! {
 // these diagnostics; unrelated ambient values cannot enable them.
 fn select_maps_diagnostics(session Session) {
 	for key in ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS'] {
-		if session.trace_onboarding {
+		if session.trace_onboarding || (key == 'VINIX_ANDROID_TRACE_TREE' && valid_surface_dump(session.trace_surface_dump)) {
 			os.setenv(key, '1', true)
 		} else {
 			os.unsetenv(key)
@@ -1440,12 +1443,28 @@ fn select_maps_diagnostics(session Session) {
 	} else {
 		os.unsetenv('VINIX_ANDROID_TRACE_TLS')
 	}
+	// Revalidate persisted input before passing a method name to JNI.
+	if valid_surface_dump(session.trace_surface_dump) {
+		os.setenv('VINIX_ANDROID_TRACE_SURFACE_DUMP', session.trace_surface_dump, true)
+	} else {
+		os.unsetenv('VINIX_ANDROID_TRACE_SURFACE_DUMP')
+	}
+}
+
+fn valid_surface_dump(name string) bool {
+	if name.len == 0 || name.len > 128 { return false }
+	for index, c in name.bytes() {
+		if c.is_letter() || c in [`_`, `$`] || (index > 0 && c.is_digit()) { continue }
+		return false
+	}
+	return true
 }
 
 struct DiagnosticSelection {
 mut:
 	trace_onboarding bool
 	trace_tls        bool
+	trace_surface_dump string
 }
 
 fn broker_diagnostics(args []string) !DiagnosticSelection {
@@ -1465,7 +1484,14 @@ fn broker_diagnostics(args []string) !DiagnosticSelection {
 				if selected.trace_tls { return error('duplicate TLS trace option') }
 				selected.trace_tls = true
 			}
-			else { return error('unsupported broker option: ' + argument) }
+			else {
+				if !argument.starts_with('--trace-surface-dump=') { return error('unsupported broker option: ' + argument) }
+				name := argument.all_after('=')
+				if selected.trace_surface_dump != '' || !valid_surface_dump(name) {
+					return error('invalid or duplicate surface dump method')
+				}
+				selected.trace_surface_dump = name
+			}
 		}
 	}
 	return selected
@@ -1818,6 +1844,7 @@ fn broker_session(mut receipt Receipt) ! {
 				desktop:          receipt.desktop
 				trace_onboarding: receipt.trace_onboarding
 				trace_tls:        receipt.trace_tls
+				trace_surface_dump: receipt.trace_surface_dump
 			}
 			publish_fresh(broker_root + '/session.json', json2.encode(session) + '\n', 0o444)!
 			receipt.service_ready = true
@@ -1874,6 +1901,7 @@ fn launch_maps() ! {
 		process: identity(os.getpid())!, app_host: host, desktop: desktop.process
 		trace_onboarding: session.trace_onboarding
 		trace_tls:        session.trace_tls
+		trace_surface_dump: session.trace_surface_dump
 	}
 	check_maps_launch(launched, desktop)!
 	if app_host_identity(launched.process, desktop)! != host {
@@ -1885,6 +1913,7 @@ fn launch_maps() ! {
 		println('MAPS-ACCOUNT-ONBOARDING-TRACE tree=1 threads=1 private-log=maps.log')
 	}
 	if session.trace_tls { println('MAPS-ACCOUNT-TLS-TRACE private-log=maps.log') }
+	if session.trace_surface_dump != '' { println('MAPS-ACCOUNT-SURFACE-DUMP method=' + session.trace_surface_dump + ' private-log=maps.log') }
 	os.execvp(launcher_path, [maps_apk])!
 }
 
@@ -1906,12 +1935,24 @@ fn onboarding_trace_self_test() ! {
 		selected := broker_diagnostics(arguments)!
 		if !selected.trace_tls || !selected.trace_onboarding { return error('independent diagnostics selections lost') }
 	}
+	for name in ['tI', '_dump', '$dump2'] {
+		selected := broker_diagnostics(['--trace-surface-dump=' + name, '--broker'])!
+		if selected.trace_surface_dump != name || selected.trace_tls || selected.trace_onboarding {
+			return error('surface diagnostic selection differs')
+		}
+	}
+	for name in ['', '2dump', 'dump/method', 'dump\n', 'a=b', 'x'.repeat(129)] {
+		if _ := broker_diagnostics(['--trace-surface-dump=' + name]) { return error('invalid surface dump accepted') }
+	}
+	if _ := broker_diagnostics(['--trace-surface-dump=tI', '--trace-surface-dump=tI']) {
+		return error('duplicate surface dump accepted')
+	}
 	for arguments in [['--broker', '--broker'], ['--trace-onboarding', '--trace-onboarding'],
 		['--trace-tls', '--trace-tls'], ['--launch', '--trace-onboarding'], ['--launch', '--trace-tls'],
 		['--trace-onboarding=1'], ['--trace-tls=1'], ['--trace-TLS'], ['']] {
 		if _ := broker_diagnostics(arguments) { return error('invalid trace invocation accepted') }
 	}
-	keys := ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS', 'VINIX_ANDROID_TRACE_TLS']
+	keys := ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS', 'VINIX_ANDROID_TRACE_TLS', 'VINIX_ANDROID_TRACE_SURFACE_DUMP']
 	mut previous := map[string]string{}
 	for key in keys {
 		if value := os.getenv_opt(key) { previous[key] = value }
@@ -1922,19 +1963,31 @@ fn onboarding_trace_self_test() ! {
 		}
 	}
 	legacy := json2.decode[Session]('{"kind":"vinix-maps-account-session-v1"}')!
-	if legacy.trace_onboarding || legacy.trace_tls { return error('legacy session enabled diagnostics') }
+	if legacy.trace_onboarding || legacy.trace_tls || legacy.trace_surface_dump != '' { return error('legacy session enabled diagnostics') }
 	legacy_launch := json2.decode[MapsLaunch]('{}')!
 	legacy_receipt := json2.decode[Receipt]('{}')!
 	if legacy_launch.trace_tls || legacy_receipt.trace_tls { return error('legacy receipt enabled TLS traces') }
 	for selection in [DiagnosticSelection{}, DiagnosticSelection{ trace_onboarding: true },
-		DiagnosticSelection{ trace_tls: true }, DiagnosticSelection{ trace_onboarding: true, trace_tls: true }] {
+		DiagnosticSelection{ trace_tls: true }, DiagnosticSelection{ trace_onboarding: true, trace_tls: true },
+		DiagnosticSelection{ trace_surface_dump: 'tI' },
+		DiagnosticSelection{ trace_onboarding: true, trace_tls: true, trace_surface_dump: 'tI' }] {
 		for key in keys { os.setenv(key, 'ambient-must-not-select-diagnostics', true) }
 		session := json2.decode[Session](json2.encode(Session{
 			trace_onboarding: selection.trace_onboarding, trace_tls: selection.trace_tls
+			trace_surface_dump: selection.trace_surface_dump
 		}))!
 		select_maps_diagnostics(session)
 		for key in keys {
-			enabled := if key == 'VINIX_ANDROID_TRACE_TLS' { selection.trace_tls } else { selection.trace_onboarding }
+			if key == 'VINIX_ANDROID_TRACE_SURFACE_DUMP' {
+				if os.getenv(key) != selection.trace_surface_dump { return error('surface dump environment differs') }
+				if selection.trace_surface_dump == '' {
+					if _ := os.getenv_opt(key) { return error('ambient surface dump survived disabled session') }
+				}
+				continue
+			}
+			enabled := if key == 'VINIX_ANDROID_TRACE_TLS' { selection.trace_tls } else {
+				selection.trace_onboarding || (key == 'VINIX_ANDROID_TRACE_TREE' && selection.trace_surface_dump != '')
+			}
 			if enabled {
 				if os.getenv(key) != '1' { return error('session trace selection did not reach Maps environment') }
 			} else if _ := os.getenv_opt(key) {
@@ -1943,21 +1996,27 @@ fn onboarding_trace_self_test() ! {
 		}
 		launch := json2.decode[MapsLaunch](json2.encode(MapsLaunch{
 			trace_onboarding: session.trace_onboarding, trace_tls: session.trace_tls
+			trace_surface_dump: session.trace_surface_dump
 		}))!
-		if launch.trace_onboarding != selection.trace_onboarding || launch.trace_tls != selection.trace_tls {
+		if launch.trace_onboarding != selection.trace_onboarding || launch.trace_tls != selection.trace_tls
+			|| launch.trace_surface_dump != selection.trace_surface_dump {
 			return error('Maps trace receipt lost session selection')
 		}
 	}
+	os.setenv('VINIX_ANDROID_TRACE_SURFACE_DUMP', 'ambient', true)
+	select_maps_diagnostics(Session{ trace_surface_dump: 'bad/name' })
+	if _ := os.getenv_opt('VINIX_ANDROID_TRACE_SURFACE_DUMP') { return error('invalid persisted surface dump survived') }
 	root := os.join_path(os.temp_dir(), 'vinix-maps-trace-' + os.getpid().str() + '-' + time.sys_mono_now().str())
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
 	os.chmod(root, 0o700)!
 	for name in ['broker.log', 'maps.log'] { os.write_file(root + '/' + name, 'private-onboarding-and-tls-sentinel')! }
-	os.write_file(root + '/receipt.json', json2.encode(Receipt{ trace_onboarding: true, trace_tls: true }))!
+	os.write_file(root + '/receipt.json', json2.encode(Receipt{ trace_onboarding: true, trace_tls: true, trace_surface_dump: 'tI' }))!
 	retained := json2.decode[Archive](archive(root)!)!
 	if retained.entries.len != 1 || retained.entries[0].path != 'receipt.json'
 		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_onboarding
-		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_tls {
+		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_tls
+		|| json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_surface_dump != 'tI' {
 		return error('diagnostics escaped private logs or lost public opt-in receipt')
 	}
 }
@@ -2769,7 +2828,7 @@ fn main() {
 		return
 	}
 	diagnostics := broker_diagnostics(os.args[1..]) or {
-		eprintln('usage: maps-account-guest [--broker [--trace-onboarding] [--trace-tls]|--launch|--stop|--self-test]')
+		eprintln('usage: maps-account-guest [--broker [--trace-onboarding] [--trace-tls] [--trace-surface-dump=METHOD]|--launch|--stop|--self-test]')
 		eprintln(err)
 		exit(1)
 	}
@@ -2779,6 +2838,7 @@ fn main() {
 	}
 	mut receipt := Receipt{
 		started_utc: time.utc().str(), trace_onboarding: diagnostics.trace_onboarding, trace_tls: diagnostics.trace_tls
+		trace_surface_dump: diagnostics.trace_surface_dump
 	}
 	broker_session(mut receipt) or {
 		receipt.status = 'failed'
