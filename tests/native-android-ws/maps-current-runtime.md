@@ -2302,3 +2302,7 @@ native r5 and mandatory core/TLS jars. Staging passed0/0, complete cleanup,
 controller hashes match their build outputs; volume identity, read-only e2fsck
 and initial hash passed. ARM/API and memory comparison are pending; host tests
 and builds alone do not establish the memory reduction or fix the native fault.
+
+r66's completed ARM/API check, preparation-memory reduction,600-second
+observation, working Louvre search and remaining account native fault are
+recorded in [the current memory runtime report](maps-current-memory-runtime-20261112.md).
