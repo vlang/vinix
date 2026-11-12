@@ -23,4 +23,29 @@ fn sm_copy_texture(encoder u64, selector &char, source u64, source_slice u64, so
 }
 fn sm_texture_blit_start(encoder u64) {
 	sm_method(encoder, c'copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:', u64(unsafe { voidptr(sm_copy_texture) }), c'v136@0:8@16Q24Q32{MTLOrigin=QQQ}40{MTLSize=QQQ}64@88Q96Q104{MTLOrigin=QQQ}112')
+	sm_method(encoder, c'copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:', u64(unsafe { voidptr(sm_buffer_to_texture) }), c'v120@0:8@16Q24Q32Q40{MTLSize=QQQ}48@72Q80Q88{MTLOrigin=QQQ}96')
+	sm_method(encoder, c'copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:', u64(unsafe { voidptr(sm_texture_to_buffer) }), c'v120@0:8@16Q24Q32{MTLOrigin=QQQ}40{MTLSize=QQQ}64@88Q96Q104Q112')
 }
+fn sm_buffer_texture_copy(encoder u64, buffer u64, offset u64, row u64, image u64, size SoftwareMetalSize, texture u64, slice u64, level u64, origin SoftwareMetalOrigin, upload bool) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	h := sm_check(encoder, 'VinixSoftwareMTLBlitCommandEncoder')
+	mut state := obj_header(h.fields[0]).software_metal
+	if !h.valid || !state.active || state.status != 0 { panic('iOS: Metal encoding has ended') }
+	b := sm_check(buffer, 'VinixSoftwareMTLBuffer'); t := sm_check(texture, 'VinixSoftwareMTLTexture')
+	device := obj_header(obj_header(h.fields[0]).fields[0]).fields[0]
+	if b.fields[0] != device || t.fields[0] != device { panic('iOS: Metal transfer resources belong to another device') }
+	a := t.cv_metal
+	if slice != 0 || level != 0 || origin.z != 0 || size.depth != 1 || size.width == 0 || size.height == 0 || image != 0 { panic('iOS: unsupported Metal buffer/texture layout') }
+	if !sm_range(a.width, origin.x, size.width) || !sm_range(a.height, origin.y, size.height) { panic('iOS: Metal transfer region exceeds texture') }
+	pixel := sm_pixel_size(a.format); width := size.width * pixel
+	if offset % pixel != 0 || row % pixel != 0 || row < width || row > 16384 * pixel { panic('iOS: Metal transfer offset/row alignment or size') }
+	// Dimensions and row pitch are bounded before this multiplication.
+	span := (size.height - 1) * row + width
+	if !sm_range(u64(b.data.len), offset, span) { panic('iOS: Metal transfer span exceeds buffer') }
+	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
+	texture_offset := (origin.y * a.width + origin.x) * pixel
+	state.ops << SoftwareMetalCopy{source: objc_retain(if upload { buffer } else { texture }), destination: objc_retain(if upload { texture } else { buffer }), source_offset: if upload { offset } else { texture_offset }, destination_offset: if upload { texture_offset } else { offset }, size: width, rows: size.height, source_stride: if upload { row } else { a.width * pixel }, destination_stride: if upload { a.width * pixel } else { row }}
+}
+fn sm_buffer_to_texture(encoder u64, selector &char, source u64, offset u64, row u64, image u64, size SoftwareMetalSize, destination u64, slice u64, level u64, origin SoftwareMetalOrigin) { sm_buffer_texture_copy(encoder, source, offset, row, image, size, destination, slice, level, origin, true) }
+fn sm_texture_to_buffer(encoder u64, selector &char, source u64, slice u64, level u64, origin SoftwareMetalOrigin, size SoftwareMetalSize, destination u64, offset u64, row u64, image u64) { sm_buffer_texture_copy(encoder, destination, offset, row, image, size, source, slice, level, origin, false) }

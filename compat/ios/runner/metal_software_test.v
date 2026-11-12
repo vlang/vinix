@@ -15,6 +15,57 @@ type SMSet = fn (u64, &char, u64)
 type SMPut = fn (u64, &char, SoftwareMetalRegion, u64, u64, u64)
 type SMRead = fn (u64, &char, u64, u64, SoftwareMetalRegion, u64)
 type SMTextureCopy = fn (u64, &char, u64, u64, u64, SoftwareMetalOrigin, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)
+type SMUpload = fn (u64, &char, u64, u64, u64, u64, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)
+type SMDownload = fn (u64, &char, u64, u64, u64, SoftwareMetalOrigin, SoftwareMetalSize, u64, u64, u64, u64)
+fn sm_test_buffer_texture(encoder u64, buffer u64, offset u64, row u64, image u64, size SoftwareMetalSize, texture u64, slice u64, level u64, origin SoftwareMetalOrigin, upload bool) {
+	if upload { unsafe { SMUpload(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:', buffer, offset, row, image, size, texture, slice, level, origin) } }
+	else { unsafe { SMDownload(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:', texture, slice, level, origin, size, buffer, offset, row, image) } }
+}
+fn test_software_metal_buffer_texture_roundtrip() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start()
+		for format in [u64(10), 30, 80, 81]! {
+			pool := objc_pool_push(); d := metal_create_system_default_device(); pixel := sm_pixel_size(format)
+			a := sm_test_texture(d, sm_test_descriptor(format, 7, 5, 0)); b := sm_test_texture(d, sm_test_descriptor(format, 7, 5, 0))
+			input := sm_test_buffer(d, 128, 0); output := sm_test_buffer(d, 128, 0); final := sm_test_buffer(d, 128, 0)
+			for i in 0 .. 128 { unsafe { *(&u8(sm_send(input, c'contents') + u64(i))) = u8(i * 11 + 5); *(&u8(sm_send(output, c'contents') + u64(i))) = 0xcc } }
+			q := sm_send(d, c'newCommandQueue'); cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder')
+			size := SoftwareMetalSize{width: 3, height: 2, depth: 1}; origin := SoftwareMetalOrigin{x: 1, y: 1}
+			sm_test_buffer_texture(enc, input, 4 * pixel, 5 * pixel, 0, size, a, 0, 0, origin, true)
+			sm_test_texture_copy(enc, a, 0, 0, origin, size, b, 0, 0, origin)
+			sm_test_buffer_texture(enc, output, 8 * pixel, 6 * pixel, 0, size, b, 0, 0, origin, false)
+			sm_test_copy(enc, output, 0, final, 0, 128)
+			for i in 0 .. 128 { assert unsafe { *(&u8(sm_send(output, c'contents') + u64(i))) } == 0xcc }
+			unsafe { *(&u8(sm_send(input, c'contents') + 4 * pixel)) = 0xff }
+			objc_release(input); objc_release(output); objc_release(a); objc_release(q); objc_release(d)
+			sm_call(enc, c'endEncoding'); sm_call(cmd, c'commit'); sm_call(cmd, c'waitUntilCompleted')
+			for i in 0 .. 128 {
+				position := u64(i); first := 8 * pixel; second := 14 * pixel
+				inside := (position >= first && position < first + 3 * pixel) || (position >= second && position < second + 3 * pixel)
+				index := if position >= second { 9 * pixel + position - second } else { 4 * pixel + position - first }
+				expected := if inside { if index == 4 * pixel { u8(0xff) } else { u8(index * 11 + 5) } } else { u8(0xcc) }
+				assert unsafe { *(&u8(sm_send(final, c'contents') + position)) } == expected
+			}
+			for upload in [true, false]! { for mode in 0 .. 10 {
+				child := C.fork(); assert child >= 0
+				if child == 0 {
+					C.close(1); C.close(2)
+					dev := metal_create_system_default_device(); queue := sm_send(dev, c'newCommandQueue'); command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'blitCommandEncoder')
+					tex := sm_test_texture(dev, sm_test_descriptor(format, 7, 5, 0)); buf := sm_test_buffer(if mode == 8 { metal_create_system_default_device() } else { dev }, 128, 0)
+					if mode == 9 { sm_call(encoder, c'endEncoding') }
+					sm_test_buffer_texture(encoder, buf, if mode == 0 { ~u64(0) } else if mode == 1 { u64(124) } else { u64(0) }, if mode == 2 { u64(1) } else if mode == 3 { ~u64(0) } else { 5 * pixel }, if mode == 4 { u64(1) } else { 0 }, size, tex, if mode == 5 { u64(1) } else { 0 }, if mode == 6 { u64(1) } else { 0 }, if mode == 7 { SoftwareMetalOrigin{x: 7} } else { origin }, upload)
+					C._exit(0)
+				}
+				mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+			} }
+			objc_release(b); objc_release(final); objc_pool_pop(pool)
+			assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		}
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-BUFFER-TEXTURE: four formats, both long-selector ABIs, deferred mixed-command round trips, padded rows/offsets, retained resources, ten rejection modes per direction and two drained runtimes PASS')
+}
 fn sm_test_texture_copy(encoder u64, source u64, slice u64, level u64, origin SoftwareMetalOrigin, size SoftwareMetalSize, destination u64, target_slice u64, target_level u64, target SoftwareMetalOrigin) {
 	unsafe { SMTextureCopy(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:', source, slice, level, origin, size, destination, target_slice, target_level, target) }
 }

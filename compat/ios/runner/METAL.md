@@ -16,6 +16,8 @@ Implemented Objective-C API:
   `waitUntilCompleted`, `status`, `error`.
 - Blit encoder: `copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:`,
   `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
+  `copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
+  `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:`,
   `endEncoding`.
 - Texture descriptor: `texture2DDescriptorWithPixelFormat:width:height:mipmapped:`
   plus width, height, pixel-format, usage and storage-mode setters.
@@ -55,7 +57,7 @@ checks use subtraction to avoid overflow; overlapping ranges in the same
 buffer reject. Zero-length copies at the end of a buffer are valid. Each
 command buffer is limited to 65,536 copies. Invalid encoding/state/ranges fail
 explicitly. Client accesses through `contents` still require synchronization
-with command submission. Buffer/texture transfers, shader/render methods,
+with command submission. Shader/render methods,
 IOSurface imports and presentation remain absent.
 
 Texture-to-texture blits copy positive 2D regions between textures with the
@@ -67,6 +69,17 @@ row offsets/strides, then commit reads source bytes and copies each row in
 command order. CPU uploads before commit are therefore observed. Texture and
 buffer copies share one ordered command array and its 65,536-operation limit.
 See [Apple's copy contract](https://developer.apple.com/documentation/metal/mtlblitcommandencoder/copy%28from%3Asourceslice%3Asourcelevel%3Asourceorigin%3Asourcesize%3Ato%3Adestinationslice%3Adestinationlevel%3Adestinationorigin%3A%29).
+
+Buffer-to-texture and texture-to-buffer blits use the same deferred row-copy
+commands. They accept the existing 2D formats, slice/level zero and positive
+regions. Buffer offsets and row pitches must be pixel aligned; pitch must
+cover the copied row and cannot exceed 16,384 pixels. Bytes-per-image must be
+zero in this 2D profile. The full span, including padding between rows, must
+fit the buffer. Only pixel bytes are copied, leaving destination padding and
+neighbors unchanged. Both resources must belong to the queue's device and
+remain retained until command-buffer destruction. Options-bearing selectors,
+3D, compressed formats and private storage remain unsupported. See
+[Apple's buffer transfer contract](https://developer.apple.com/documentation/metal/mtlblitcommandencoder/copy%28from%3Asourceoffset%3Asourcebytesperrow%3Asourcebytesperimage%3Asourcesize%3Ato%3Adestinationslice%3Adestinationlevel%3Adestinationorigin%3Aoptions%3A%29?language=objc).
 
 Run the maintained V harness from the repository root:
 
