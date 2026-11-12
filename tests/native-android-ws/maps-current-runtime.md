@@ -1936,3 +1936,64 @@ build and host self-tests passed0/0, complete cleanup,22742ms, RSS519323648,
 shared growth38219776 bytes, with the original limits unchanged. The output
 is `surface-controller-build-20261112-r10/maps-account-guest`; optimized ARM
 runtime timing remains pending. r59 continues with r9 unchanged.
+
+### Key-generation request metadata
+
+r59 passed companion publication with the ledger fix, then GMS exited before
+readiness. Its complete private log reports an uncaught NoSuchMethodError on
+thread DG for KeyGenParameterSpec.Builder.setAlgorithmParameterSpec, in bvpd.a
+source57. Selected caller readback `gms-keygen-caller-20261112-r1` shows
+ECGenParameterSpec(secp256r1), SHA-512 digests, an attestation challenge and
+optional reflective unique-ID configuration. KeyPairGenerator operations are
+inside its Exception boundary, which cannot catch the missing-method Error.
+Only verified r59 QEMU PID21308 was synced and stopped. Broker log SHA256 is
+`e2fbb0adabab412fb7b58fa1ba289157c2b619f1edc96048883903e654462b8a`,
+receipt `5ebb2374ef2b997fbbc1dd56634989cb89284fed8cc28052ed1525222ab74b75`,
+serial `e1b88b7c69f553a8e8a215dc0e79d4b7dceb48ed6cbdc6476003def6a1cf6edb`,
+and image `b11075ebc346bf38df680ca6e4cb91041e2fba4b6277240bb6c2d515e1d44555`.
+
+`framework_keygen_parameters.v` stores those request parameters, rejects a null
+algorithm spec, distinguishes unspecified/null digests from an empty array,
+and returns independent built snapshots with copied mutable arrays. Existing
+alias, purposes, key size and authentication configuration survive the copy.
+Private block-mode/padding fields retain their enclosing-class accessor
+boundary. This follows the request/value semantics in
+[Android's KeyGenParameterSpec](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/keystore/java/android/security/keystore/KeyGenParameterSpec.java).
+No key-pair provider, attestation certificate or device identity is added.
+
+The signed normal fixture includes null/default/empty/unspecified behavior,
+builder reuse, curve and existing-field preservation, distinct snapshots and
+array isolation at setters, build and getters. First ARM attempt r60 rejected
+integer field instructions for boolean metadata; r61 then rejected direct
+access to an existing private array field. Both were fixed, rather than
+relaxing verification. Only owned QEMU PIDs34198 and57948 were synced/stopped.
+Their retained child logs have SHA256
+`e07eacfa8916f573874713929081c288d6e06ed399043b4c03e48a0e203945db` and
+`71b925e773d4f7bb0e6f55b32ef58772e714f4595eb969dc881bbeae30f8cc66`;
+image hashes are
+`9efc0bb319ba0e27b40477e37442eb9a4dbd2ec7c974790eba05bde65bfadfdb` and
+`235b626ba67b7e0e25a8b0845b334feff39e903a73e396dfe4b2c9f798456c1a`.
+
+The shared current V advanced to0.5.2 6422d39. It failed compiling an existing
+direct split-iteration with an unresolved string__split_next helper; its
+compatibility frontend also rejected existing syntax. Materializing that
+method-block array before iteration let the current new backend compile.
+The replacement behavior, missing/duplicate checks and access controls remain
+unchanged. SDK builder `keygen-builder-20261112-r5` and SDK
+`framework-keygen-parameters-20261112-r4` passed guarded full assembly/readback:
+0/0, complete cleanup,1874ms, RSS472645632, shared growth28061696 bytes.
+Signed fixture r55/toolr58 passed0/0, complete cleanup,1052ms, RSS153387008,
+shared growth25165824 bytes. r62 staging passed0/0, complete cleanup,4380ms,
+RSS37699584, shared growth251441152 bytes, followed by volume identity and
+read-only e2fsck. The new ARM fixture and actual broker retry remain pending.
+
+The complete signed r55 fixture passed on ARM in r62 as UID/GID10160,
+ready/pass once, drained through EOF and exit0. KeyGenProbe and the existing
+EGL/GLES client-pixel and framework regressions all passed. Snapshot
+`keygen-api-uart-20261112-r1` full SHA256 is
+`43199d0c7d8ce06140250bd0428da6212dcf097a9b50835a3c451a64f0b308f8`;
+the matching plan and strict byte readback `keygen-api-readback-20261112-r1`
+use zero removals and retain archive SHA256
+`fed1719bae2f7029f5c6adddda7e790077788df340139bd5c4955aa4febc1b3f`.
+The fixture bind was released before preparing the GMS broker. Full Maps
+functionality, current tiles/route geometry and sign-in remain unqualified.

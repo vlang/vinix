@@ -50,6 +50,7 @@ fn main() {
 	androidtools.framework_graphic_text(root + '/smali')!
 	androidtools.framework_device_config(root + '/smali')!
 	androidtools.framework_stats_log(root + '/smali')!
+	androidtools.framework_keygen_parameters(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -57,6 +58,8 @@ fn main() {
 		'android/nfc/Tag', 'android/nfc/NdefMessage', 'android/hardware/usb/UsbDevice', 'android/hardware/usb/UsbAccessory']
 	for name in types.clone() { types << name + r'$VinixCreator' }
 	types << 'android/accounts/AccountManager'
+	types << 'android/security/keystore/KeyGenParameterSpec'
+	types << r'android/security/keystore/KeyGenParameterSpec$Builder'
 	types << 'android/atl/VinixAccountFuture'
 	types << 'android/telephony/TelephonyManager'
 	types << 'android/content/IntentFilter'

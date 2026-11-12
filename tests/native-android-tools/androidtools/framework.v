@@ -35,7 +35,8 @@ pub fn framework_assemble(smali string, dex string, tools string, java string) !
 pub fn framework_replace_method(source string, name string, declaration string) !string {
  mut text := source
  mut found := false
- for block in source.split('.method ') {
+ blocks := source.split('.method ')
+ for block in blocks {
   if !block.all_before('\n').ends_with(' ' + name) { continue }
   if found { return error('duplicate framework method: ' + name) }
   end := block.index('.end method') or { return error('unterminated framework method: ' + name) }
@@ -224,6 +225,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_graphic_text(smali)!
  framework_device_config(smali)!
  framework_stats_log(smali)!
+ framework_keygen_parameters(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!
