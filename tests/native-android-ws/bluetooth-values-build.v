@@ -18,6 +18,7 @@ fn main() {
 	androidtools.framework_intent_to_uri(root + '/smali')!
 	androidtools.framework_tethering(root + '/smali')!
 	androidtools.framework_user_parcel(root + '/smali')!
+	androidtools.framework_system_boolean(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -33,6 +34,7 @@ fn main() {
 	types << 'android/content/Intent'
 	types << 'android/net/ConnectivityManager'
 	types << 'android/os/UserHandle'
+	types << 'android/os/SystemProperties'
 	types << r'android/os/UserHandle$VinixCreator'
 	for args in [[java, '-Xmx256m', '-cp', cp, 'org.jf.smali.Main', 'assemble', '--api', '28', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'],
 		['/usr/bin/zip', '-q', '-j', root + '/api-impl.jar', root + '/classes.dex'],

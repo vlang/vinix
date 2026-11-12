@@ -4,6 +4,39 @@ import os
 import json2
 import crypto.sha256
 
+fn boolean_source() string {
+	// Reflect only to seed this isolated test process's existing property map;
+	// do not expose a pretend system-wide property setter in the framework.
+	mut source := r'
+.method public static properties()V
+.locals 6
+const-class v0, Landroid/os/SystemProperties;
+const-string v1, "properties"
+invoke-virtual {v0, v1}, Ljava/lang/Class;->getDeclaredField(Ljava/lang/String;)Ljava/lang/reflect/Field;
+move-result-object v0
+const/4 v1, 1
+invoke-virtual {v0, v1}, Ljava/lang/reflect/Field;->setAccessible(Z)V
+const/4 v1, 0
+invoke-virtual {v0, v1}, Ljava/lang/reflect/Field;->get(Ljava/lang/Object;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Ljava/util/Properties;
+const-string v1, "vinix.fixture.boolean"
+'
+	for token in ['<missing>', '', 'unknown', 'TRUE', ' true', '1', 'y', 'yes', 'on', 'true', '0', 'n', 'no', 'off', 'false'] {
+		if token == '<missing>' {
+			source += 'invoke-virtual {v0, v1}, Ljava/util/Properties;->remove(Ljava/lang/Object;)Ljava/lang/Object;\n'
+		} else {
+			source += 'const-string v2, "${token}"\ninvoke-virtual {v0, v1, v2}, Ljava/util/Properties;->setProperty(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/Object;\n'
+		}
+		for fallback in [0, 1] {
+			expected := if token in ['1', 'y', 'yes', 'on', 'true'] { 1 } else if token in ['0', 'n', 'no', 'off', 'false'] { 0 } else { fallback }
+			source += 'const/4 v3, ${fallback}\ninvoke-static {v1, v3}, Landroid/os/SystemProperties;->getBoolean(Ljava/lang/String;Z)Z\nmove-result v4\nconst/4 v5, ${expected}\ninvoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V\n'
+		}
+	}
+	source += 'invoke-virtual {v0, v1}, Ljava/util/Properties;->remove(Ljava/lang/Object;)Ljava/lang/Object;\nreturn-void\n.end method\n'
+	return source
+}
+
 const user_source = r'
 .method public static users()V
 .locals 6
@@ -197,6 +230,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->parcel()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->properties()V
 new-instance v0, Landroid/telephony/TelephonyManager;
 invoke-direct {v0}, Landroid/telephony/TelephonyManager;-><init>()V
 invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->isVoiceCapable()Z
@@ -429,7 +463,7 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
-	os.write_file(root + '/smali/Main.smali', main_source + intent_source + user_source)!
+	os.write_file(root + '/smali/Main.smali', main_source + intent_source + user_source + boolean_source())!
 	os.write_file(root + '/smali/TestAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestAccounts;
 .super Landroid/accounts/AccountManager;
 .field public snapshot:[Landroid/accounts/Account;

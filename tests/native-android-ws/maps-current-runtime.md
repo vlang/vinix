@@ -1,6 +1,8 @@
 # Current Maps runtime work — 2026-11-12
 
-Current V is `/Users/alex/code/v/v` (`0.5.2 f2edf66`). The new
+Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
+`0.5.2 596e18d` for the SystemProperties successor). Builds use the available
+compiler at that path without requiring a historical revision. The new
 `maps-current-guest.v` stages available boot media with selected framework and
 native outputs, updating deployment input metadata from those actual files.
 It uses fresh APFS clones and leaves the original media unchanged.
@@ -200,3 +202,27 @@ checksum `2f84085fb7f32ab87531df96c081901e748242c261894d1a2e27877e92fa1f8d`.
 whose superclass chains lack Parcelable. Its diagnostic candidate output is
 `parcel-type-audit-20261112-r2.json`; it makes no claim that those other
 classes have complete parcel implementations, and changes no class definitions.
+
+Guest r11 advanced to `IncompatibleClassChangeError` in `fbfh.a` source354:
+GMS invokes `SystemProperties.getBoolean(String,boolean)` statically, while
+the framework declared it virtual. The complete broker log is retained
+between `USER-PARCEL-FULL-LOG-BEGIN` and `USER-PARCEL-FULL-LOG-END` in r11 UART.
+`framework_system_boolean.v` replaces it with the static contract, accepting
+the exact lowercase true/false tokens in Android's
+[boolean property parser](https://android.googlesource.com/platform/system/libbase/+/refs/heads/main/parsebool.cpp)
+and preserving the supplied default for missing/empty/unknown values.
+It uses the existing property map and adds no property setter or backend.
+
+SDK `framework-system-boolean-20261112-r1` passed guarded full assembly and
+selected DEX readback in4,331 ms, RSS475,545,600, growth61,726,720,
+guard/child0/0 with complete cleanup under the original caps.
+Fixture `current-api-fixture-20261112-r6` passed on ARM in guest r12:
+all earlier API checks, static invocation, all ten accepted boolean tokens
+with both defaults, missing/empty/unknown/uppercase/whitespace fallbacks.
+Reflection seeds only the fixture process's map, and removes its temporary key.
+The runner completed its EOF drain, exited0 and emitted its complete export.
+Snapshot `current-api-uart-20261112-r5`, plan `current-api-plan-20261112-r5.json`
+and independent readback `current-api-readback-20261112-r5` preserve its two
+entries without removals, archive checksum
+`f0ccbfbbe03b9aa95067435eea5f16fcb5a94330643ac984ab439314ff7f4bb7`.
+The fixture bind mount was released before the next broker attempt.
