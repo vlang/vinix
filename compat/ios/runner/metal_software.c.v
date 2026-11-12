@@ -3,7 +3,7 @@ module main
 
 // Deliberately opt-in until shader execution and presentation are implemented.
 // All API state is serialized by the runtime's recursive Objective-C lock.
-struct SoftwareMetalCopy { source u64 destination u64 source_offset u64 destination_offset u64 size u64 rows u64 = 1 source_stride u64 destination_stride u64 }
+struct SoftwareMetalCopy { source u64 destination u64 source_offset u64 destination_offset u64 size u64 rows u64 = 1 source_stride u64 destination_stride u64 fill bool fill_value u8 }
 struct SoftwareMetalCommands {
 mut:
 	ops []SoftwareMetalCopy
@@ -110,6 +110,11 @@ fn sm_commit(command u64, selector &char) {
 	state.status = 2
 	for op in state.ops {
 		if op.size == 0 { continue }
+		if op.fill {
+			dst := obj_header(op.destination)
+			unsafe { C.memset(voidptr(u64(dst.data.data) + op.destination_offset), int(op.fill_value), usize(op.size)) }
+			continue
+		}
 		src := obj_header(op.source); dst := obj_header(op.destination)
 		for row in u64(0) .. op.rows {
 			unsafe { C.memcpy(voidptr(u64(dst.data.data) + op.destination_offset + row * op.destination_stride), voidptr(u64(src.data.data) + op.source_offset + row * op.source_stride), usize(op.size)) }
@@ -199,4 +204,19 @@ fn software_metal_start() {
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 	sm_texture_start(device)
 	sm_texture_blit_start(encoder)
+	sm_method(encoder, c'fillBuffer:range:value:', u64(unsafe { voidptr(sm_fill) }), c'v48@0:8@16{_NSRange=QQ}24C40')
+}
+struct SoftwareMetalRange { location u64 length u64 }
+fn sm_fill(encoder u64, selector &char, buffer u64, range SoftwareMetalRange, value u8) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	h := sm_check(encoder, 'VinixSoftwareMTLBlitCommandEncoder')
+	mut state := obj_header(h.fields[0]).software_metal
+	if !h.valid || !state.active || state.status != 0 { panic('iOS: Metal encoding has ended') }
+	b := sm_check(buffer, 'VinixSoftwareMTLBuffer')
+	device := obj_header(obj_header(h.fields[0]).fields[0]).fields[0]
+	if b.fields[0] != device { panic('iOS: Metal fill buffer belongs to another device') }
+	if !sm_range(u64(b.data.len), range.location, range.length) { panic('iOS: Metal fill range exceeds buffer') }
+	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
+	state.ops << SoftwareMetalCopy{destination: objc_retain(buffer), destination_offset: range.location, size: range.length, fill: true, fill_value: value}
 }

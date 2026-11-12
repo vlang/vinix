@@ -15,6 +15,53 @@ type SMVoid = fn (u64, &char)
 type SMDescriptor = fn (u64, &char, u64, u64, u64, u8) u64
 type SMTexture = fn (u64, &char, u64) u64
 type SMSet = fn (u64, &char, u64)
+type SMFill = fn (u64, &char, u64, SoftwareMetalRange, u8)
+fn sm_test_fill(encoder u64, buffer u64, range SoftwareMetalRange, value u8) { unsafe { SMFill(voidptr(C.ios_objc_msgsend))(encoder, c'fillBuffer:range:value:', buffer, range, value) } }
+fn test_software_metal_deferred_buffer_fills() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
+		for value in 0 .. 256 {
+			pool := objc_pool_push()
+			a := sm_test_buffer(d, 64, 0); b := sm_test_buffer(d, 64, 0); c := sm_test_buffer(d, 64, 0)
+			C.memset(unsafe { voidptr(sm_send(a, c'contents')) }, 0x11, 64); C.memset(unsafe { voidptr(sm_send(b, c'contents')) }, 0xfe, 64)
+			range := match value % 5 { 0 { SoftwareMetalRange{length: 64} } 1 { SoftwareMetalRange{location: 64} } 2 { SoftwareMetalRange{location: 3, length: 17} } 3 { SoftwareMetalRange{location: 63, length: 1} } else { SoftwareMetalRange{location: 1, length: 62} } }
+			command := sm_send(q, c'commandBuffer'); encoder := sm_send(command, c'blitCommandEncoder')
+			sm_test_fill(encoder, a, range, u8(value)); sm_test_copy(encoder, a, 0, b, 0, 64)
+			sm_test_fill(encoder, c, SoftwareMetalRange{length: 64}, u8(value))
+			sm_test_fill(encoder, a, SoftwareMetalRange{length: 4}, 0x22); sm_test_copy(encoder, a, 0, c, 0, 4)
+			for i in 0 .. 64 { assert unsafe { *(&u8(sm_send(a, c'contents') + u64(i))) } == 0x11 && unsafe { *(&u8(sm_send(b, c'contents') + u64(i))) } == 0xfe }
+			objc_release(a); sm_call(encoder, c'endEncoding'); sm_call(command, c'commit'); sm_call(command, c'waitUntilCompleted')
+			for i in u64(0) .. 64 {
+				expected := if i >= range.location && i - range.location < range.length { u8(value) } else { u8(0x11) }
+				assert unsafe { *(&u8(sm_send(b, c'contents') + i)) } == expected
+				assert unsafe { *(&u8(sm_send(c, c'contents') + i)) } == if i < 4 { u8(0x22) } else { u8(value) }
+			}
+			objc_release(b); objc_release(c); objc_pool_pop(pool)
+			assert ios_runtime.live == 2
+		}
+		// An abandoned command releases its retained fill destination.
+		pool := objc_pool_push(); unused := sm_send(q, c'commandBuffer'); enc := sm_send(unused, c'blitCommandEncoder'); buffer := sm_test_buffer(d, 8, 0)
+		sm_test_fill(enc, buffer, SoftwareMetalRange{length: 8}, 0xff); objc_release(buffer); objc_pool_pop(pool)
+		assert ios_runtime.live == 2
+		for mode in 0 .. 8 {
+			child := C.fork(); assert child >= 0
+			if child == 0 {
+				C.close(1); C.close(2)
+				command := sm_send(q, c'commandBuffer'); encoder := sm_send(command, c'blitCommandEncoder')
+				buf := if mode == 6 { objc_allocate(ios_runtime.names['NSObject']) } else { sm_test_buffer(if mode == 3 { metal_create_system_default_device() } else { d }, 64, 0) }
+				if mode in [4, 5]! { sm_call(encoder, c'endEncoding') }; if mode == 5 { sm_call(command, c'commit') }
+				range := match mode { 0 { SoftwareMetalRange{location: ~u64(0), length: 1} } 1 { SoftwareMetalRange{location: 64, length: 1} } 2 { SoftwareMetalRange{location: 1, length: ~u64(0)} } 7 { SoftwareMetalRange{location: 65} } else { SoftwareMetalRange{length: 4} } }
+				sm_test_fill(encoder, buf, range, 0xff); C._exit(0)
+			}
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		}
+		objc_release(q); objc_release(d)
+		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-FILL: 256 byte values, inline range ABI, deferred ordered fill/copy/fill/copy, edges/empty ranges, retained destinations, abandonment, eight rejection modes and two drained runtimes PASS')
+}
 type SMPut = fn (u64, &char, SoftwareMetalRegion, u64, u64, u64)
 type SMRead = fn (u64, &char, u64, u64, SoftwareMetalRegion, u64)
 type SMTextureCopy = fn (u64, &char, u64, u64, u64, SoftwareMetalOrigin, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)

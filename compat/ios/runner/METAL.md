@@ -15,6 +15,7 @@ Implemented Objective-C API:
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
   `waitUntilCompleted`, `addCompletedHandler:`, `status`, `error`.
 - Blit encoder: `copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:`,
+  `fillBuffer:range:value:`,
   `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
   `copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
   `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:`,
@@ -50,6 +51,13 @@ device, queue and buffer creation transfer a reference to the caller.
 
 Copies execute in encoding order when committed, under the runtime's recursive
 lock. Commit completes synchronously and transitions status from 0 to 2 to 4.
+Buffer fills participate in the same command order: each records a retained
+destination, byte range and 8-bit value, and writes only when committed.
+Ranges are byte granular; an empty range at the end of a buffer is valid.
+Overflowing/out-of-bounds ranges, foreign-device buffers and ended encoders
+reject before recording. Fill commands use the existing operation array and
+its shared limit; they retain no source object. See
+[Apple's fill API](https://developer.apple.com/documentation/metal/mtlblitcommandencoder/fillbuffer%3Arange%3Avalue%3A).
 Completion means destination bytes are visible to the CPU. Commit invokes
 completed handlers synchronously, in registration order, outside the runtime
 lock. Handlers receive the command buffer at status 4. Registration copies the
