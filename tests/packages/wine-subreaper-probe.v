@@ -25,6 +25,10 @@ fn C.close(i32) i32
 fn C.open(&char, i32, ...i32) i32
 fn C.flock(i32, i32) i32
 fn C.setsid() i32
+fn C.getpid() i32
+fn C.getppid() i32
+fn C.kill(i32, i32) i32
+fn C.pause() i32
 fn C._exit(int)
 fn C.alarm(u32) u32
 
@@ -115,5 +119,75 @@ fn guest() ! {
 		mut status := i32(0)
 		if C.waitpid(pid, &status, 0) != pid || status != if disabled { 42 << 8 } else { 0 } { return error('fixture status differs: ' + status.str()) }
 	}
+	pid := C.fork()
+	if pid < 0 { return error('nested fixture fork failed') }
+	if pid == 0 {
+		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(80) }
+		nested() or { eprintln(err); C._exit(81) }
+		C._exit(0)
+	}
+	mut status := i32(0)
+	if C.waitpid(pid, &status, 0) != pid || status != 0 { return error('nested fixture failed status=' + status.str()) }
 	println('HWTEST PASS subreaper prerequisite positive and disabled control')
+}
+
+// Fixed-size pipe handshakes establish both adoption points without sleeps.
+fn transfer_byte(fd i32, sending bool, wanted u8) bool {
+	mut value := wanted
+	for {
+		count := if sending { C.write(fd, &value, 1) } else { C.read(fd, &value, 1) }
+		if count < 0 && C.errno == C.EINTR { continue }
+		return count == 1 && value == wanted
+	}
+}
+
+fn nested() ! {
+	C.alarm(30)
+	defer { C.alarm(0) }
+	if C.prctl(36, voidptr(1), voidptr(0), voidptr(0), voidptr(0)) != 0 { return error('outer subreaper setup failed') }
+	outer := C.getpid()
+	mut command := [i32(-1), -1]!
+	mut reply := [i32(-1), -1]!
+	if C.pipe(&command[0]) != 0 { return error('nested command pipe failed') }
+	defer { C.close(command[0]); C.close(command[1]) }
+	if C.pipe(&reply[0]) != 0 { return error('nested reply pipe failed') }
+	defer { C.close(reply[0]); C.close(reply[1]) }
+	inner := C.fork()
+	if inner < 0 { return error('inner subreaper fork failed') }
+	if inner == 0 {
+		C.alarm(20)
+		C.close(command[1]); C.close(reply[0])
+		if C.prctl(36, voidptr(1), voidptr(0), voidptr(0), voidptr(0)) != 0 { C._exit(90) }
+		owner := C.getpid()
+		client := C.fork()
+		if client < 0 { C._exit(91) }
+		if client == 0 {
+			worker := C.fork()
+			if worker < 0 { C._exit(92) }
+			if worker > 0 { C._exit(37) }
+			if C.setsid() < 0 { C._exit(93) }
+			if !transfer_byte(command[0], false, 11) || C.getppid() != owner
+				|| !transfer_byte(reply[1], true, 12) { C._exit(94) }
+			if !transfer_byte(command[0], false, 21) || C.getppid() != outer
+				|| !transfer_byte(reply[1], true, 22) { C._exit(95) }
+			C._exit(23)
+		}
+		mut status := i32(0)
+		if C.waitpid(client, &status, 0) != client || status != 37 << 8 { C._exit(96) }
+		if !transfer_byte(reply[1], true, 10) { C._exit(97) }
+		// The outer fixture kills this adopter only after its worker confirms PPID.
+		for { C.pause() }
+	}
+	C.close(command[0]); command[0] = -1
+	C.close(reply[1]); reply[1] = -1
+	if !transfer_byte(reply[0], false, 10) || !transfer_byte(command[1], true, 11)
+		|| !transfer_byte(reply[0], false, 12) { return error('nearest subreaper adoption failed') }
+	if C.kill(inner, 15) != 0 { return error('inner subreaper termination failed') }
+	mut status := i32(0)
+	if C.waitpid(inner, &status, 0) != inner || status != 15 { return error('inner subreaper signal status differs') }
+	if !transfer_byte(command[1], true, 21) || !transfer_byte(reply[0], false, 22) { return error('outer subreaper transfer failed') }
+	worker := C.waitpid(-1, &status, 0)
+	if worker <= 0 || status != 23 << 8 { return error('transferred worker status differs') }
+	if C.waitpid(-1, &status, C.WNOHANG) != -1 || C.errno != C.ECHILD { return error('nested descendants remain') }
+	println('WINE SUBREAPER TRANSFER PASS nearest-adopter confirmed; adopter signal death; outer adoption confirmed; worker=23; ECHILD')
 }

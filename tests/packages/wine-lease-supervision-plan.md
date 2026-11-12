@@ -45,6 +45,30 @@ Recording and separate complete verification use the maintained workspace
 inventory tool from `845f18d93`; adjacent record/check logs retain results.
 This is an in-place integrity seal; keep originals and historical namespaces.
 
+The follow-up to `913a98e1a` adds a controlled nested-adopter transfer check.
+An ordinary non-init outer subreaper starts an inner subreaper, which starts
+a client and detached-session worker. After client status 37 is collected,
+pipe handshakes require the worker's PPID to name the inner subreaper. Only
+then does the outer send SIGTERM to the inner and require signal status 15.
+A second handshake requires the worker's PPID to name the outer; worker
+status 23 and a final ECHILD complete the check. Both waits use explicit
+32-bit status slots, pipe operations retry EINTR, and alarms bound blocking
+failure paths. This controls death after completed adoption, not death during
+publication; neither publication-race finding below is resolved.
+
+Fresh `arm-02` and `x86-02` runs pass this new required marker and the existing
+lease/disabled-subreaper checks on the same unchanged selected kernels.
+The first compile attempts failed because a helper parameter shadowed C's
+write function; those attempts remain retained, alongside the final sources,
+generated C, commands and run receipts, at
+`/Users/alex/.cache/vinix-wine-subreaper-transfer-20261112-01`.
+The complete typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-subreaper-transfer-20261112-01.inventory.json`,
+SHA-256 `cc52e860b6b0eab86dc2edddf6d7276515db450828434f11192ffecc2c499118`.
+Recording and separate complete verification pass with the same retained
+inventory tool; originals remain required. Scope and toolchain limitations
+above still apply. No production supervisor or kernel fix is claimed.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

@@ -50,6 +50,7 @@ fn run() ! {
 	boot_host := if arch == 'x86_64' { hwhost.Host{ ...host, root: plainiso.prepare(root, work)! } } else { host }
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'subreaper-prerequisite', arches: [arch], ending: .running,
 		required: ['WINE SUBREAPER PREREQUISITE PASS client=37 adopted-session-worker=23 live-lease-busy retired-lease-free',
+			'WINE SUBREAPER TRANSFER PASS nearest-adopter confirmed; adopter signal death; outer adoption confirmed; worker=23; ECHILD',
 			'HWTEST PASS subreaper prerequisite positive and disabled control'], forbidden: ['HWTEST FAIL', 'Kernel panic']},
 		hwhost.Run{kernel: os.args[3], guest: work + '/probe', state: work + '/boot', timeout: 90, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
