@@ -1154,8 +1154,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Signed x86 graphical calculator qualification](tests/packages/wine-gui-check.md)
     now passes authenticated paint, real pointer arithmetic, natural close,
     fixture retirement and independent signature/pixel/runtime admission,
-    with eleven targeted evidence refusals. ARM graphical startup, desktop
-    embedding, detached-server lease coverage, complete source and
+    with eleven targeted evidence refusals. A subsequent
+    [ARM shared-page diagnostic](tests/packages/wine-shared-pages-check.md)
+    passes twelve native/translated cases and measures unsupported 4 KiB
+    shared views on its 16 KiB host; ARM graphical startup remains open.
+    Desktop embedding, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native

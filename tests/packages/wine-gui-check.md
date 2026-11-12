@@ -90,7 +90,9 @@ The passing run's `before.png` SHA-256 is
 
 The ARM graphical attempt remains refused: Wine cannot map its shared
 user-data section and Explorer exits before the calculator window is created.
-The same mapping error appears in its passing console log. ARM graphical
+The same mapping error appears in its passing console log. A subsequent
+[shared-page diagnostic](wine-shared-pages-check.md) measures the translator's
+4 KiB shared-mapping limitations on the 16 KiB ARM host. ARM graphical
 startup, desktop embedding, broader applications/exception coverage, complete
 corresponding source and redistribution/catalog acceptance remain open.
 Section 14 remains unchecked.
