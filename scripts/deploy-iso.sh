@@ -19,6 +19,9 @@
 # source -- the Alpine package layers the arm64 desktop is assembled from,
 # ui2, the V compiler -- comes from this checkout and the environment, as for
 # the regular build scripts; set V to pick a compiler.
+# VINIX_IOS_RELEASE_RUNTIME may retain a previously published optional runtime.
+# Set VINIX_IOS_RELEASE_RUNTIME_SHA256 and VINIX_IOS_RELEASE_RUNTIME_ORIGIN too;
+# its static ARM64 ELF and checksum are verified and its origin is recorded.
 #
 # Outputs, in build-release/TAG:
 #
@@ -272,11 +275,18 @@ if [ "$BUILD_ARM64" -eq 1 ]; then
 
     # The iOS runtime the first-run app page offers, which machines download
     # from their release rather than build: the images carry no V compiler.
-    VINIX_IOS_BUILD_DIR="$WORK/ios" \
-    VINIX_AARCH64_SYSROOT="$SCRIPT_DIR/build-aarch64-userland/staging" \
-        "$SRC/scripts/build-ios-aarch64.sh" --runner-only
     IOS_RUNTIME="$OUT/vinix-ios-runtime-arm64"
-    install -m755 "$WORK/ios/staging/usr/bin/run-ios" "$IOS_RUNTIME"
+    if [ -n "${VINIX_IOS_RELEASE_RUNTIME:-}" ]; then
+        : "${VINIX_IOS_RELEASE_RUNTIME_SHA256:?set the published iOS runtime checksum}"
+        : "${VINIX_IOS_RELEASE_RUNTIME_ORIGIN:?set the published iOS runtime origin}"
+        "$SRC/build-support/run-v-tool.sh" "$SRC/build-support/ios/stage-release-runtime.v" \
+            "$VINIX_IOS_RELEASE_RUNTIME" "$IOS_RUNTIME" "$VINIX_IOS_RELEASE_RUNTIME_SHA256"
+    else
+        VINIX_IOS_BUILD_DIR="$WORK/ios" \
+        VINIX_AARCH64_SYSROOT="$SCRIPT_DIR/build-aarch64-userland/staging" \
+            "$SRC/scripts/build-ios-aarch64.sh" --runner-only
+        install -m755 "$WORK/ios/staging/usr/bin/run-ios" "$IOS_RUNTIME"
+    fi
     file "$IOS_RUNTIME" | grep -q 'ARM aarch64.*statically linked' ||
         die "the iOS runtime is not a static arm64 executable"
     if command -v sha256sum >/dev/null 2>&1; then
@@ -394,6 +404,11 @@ describe_boot() {
     echo "\`vinix-x11-*.tar.gz\` files of this release. Python is a \`pkg install python3\`"
     echo "away; the V compiler and Oh My Zsh are left out too. The iOS runtime the first"
     echo "launch offers on arm64 is \`vinix-ios-runtime-arm64\`, prebuilt."
+    if [ "$BUILD_ARM64" -eq 1 ] && [ -n "${VINIX_IOS_RELEASE_RUNTIME:-}" ]; then
+        echo
+        echo "The optional iOS runtime is retained from $VINIX_IOS_RELEASE_RUNTIME_ORIGIN."
+        echo "Its verified SHA-256 is \`$VINIX_IOS_RELEASE_RUNTIME_SHA256\`."
+    fi
     echo
     echo "### VirtualBox"
     echo

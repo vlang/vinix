@@ -1180,6 +1180,12 @@ that architecture here), and publishes them with checksums as a GitHub release:
 ./scripts/deploy-iso.sh --draft --tag=iso-2026-10-01
 ```
 
+To retain a published optional iOS runtime while rebuilding both desktop images,
+set `VINIX_IOS_RELEASE_RUNTIME` to its local executable,
+`VINIX_IOS_RELEASE_RUNTIME_SHA256` to its published checksum, and
+`VINIX_IOS_RELEASE_RUNTIME_ORIGIN` to its release download URL. Deployment verifies
+the checksum and static ARM64 ELF headers and records the origin in the notes.
+
 `./scripts/test-iso.sh vinix-amd64.iso vinix-arm64.iso` runs the same boot tests on any
 image: amd64 through BIOS with VirtualBox's defaults and through UEFI, arm64 with
 virtio and with USB input. A boot passes when the desktop is on screen and
