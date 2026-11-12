@@ -39,6 +39,9 @@ Guest r41's log records the next uncaught GMS check-in query, isGuestUser.
 Guest r44 passes the complete API suite plus secure socket-factory tests,
 trusted HTTP, three invalid-host/chain rejection pairs and a stalled-peer
 handshake timeout. Its actual Maps retry is still pending.
+That retry exited after Skip on a Play Store secondary-service DI class cast.
+Guest r45 passes scoped service-creation failure and ResultReceiver callback
+regressions; its actual Maps retry is pending.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -1318,3 +1321,68 @@ The runtime SDK SHA256 matches the host artifact
 `5ea39caa3fa81f62aaddad082f8fb4494aaf3f0c822f0dbaa7850c4baba05cfa`.
 The fixture bind was released before broker preparation. Actual map tiles,
 search, routing and login remain unqualified.
+
+With source `f7add1d38`, guest r44 rendered onboarding and exited after Skip
+on ClassCastException in MultiUserCoordinatorService.onCreate: its graph rsz
+does not implement the expected akab entry point. The installed manifest
+declares that service in `:background` with singleUser=true. Caller readback
+is `vending-multiuser-caller-20261112-r2`; the preserved manifest dump is
+`vending-manifest-20261112-r1.txt`. Named services currently share ART, so this
+secondary-service creation exception escaped into the primary Maps looper.
+No missing serial, cache, guest-user or socket-factory linkage error recurred.
+
+The log also records Bundle rejecting a GMS
+OnSyncCompletedListener$Receiver because the ResultReceiver placeholder did
+not implement Parcelable. Fresh caller readback
+`gms-result-receiver-caller-20261112-r2/classes7.dex` confirms that subclass's
+ResultReceiver superclass. Complete r44 Maps log
+`maps-current-20261112-r44/maps.retained.log` has SHA256
+`2dc1f29822fcdbb89e8a0da68dc2452c2677bb0f37c35bc1db0eff248105e0be`.
+Stopped disk SHA256 is
+`639dfd1ddff21073cd758cc03bc86d2f2eb5f1de31fba9c0746e24580ee58728`;
+snapshot `maps-multiuser-final-uart-20261112-r1` has SHA256
+`d9fb3b31d96144e2cab553c640a4bcb566598bffd18ecbae195fb8a887f84f2e`.
+Only verified owned QEMU PID9172 was stopped after syncing.
+
+`framework_service_create_failure.v` contains RuntimeException from onCreate
+only for a registered component owned by another package or declared in a
+different process from the primary app. Unknown/mismatched components and
+primary-process service failures propagate the original exception. Failed
+creations do not enter the service cache or receive bind/start callbacks.
+Accepted binding registrations remain available for the caller's normal
+unbind, with delivery canceled. Client callback exceptions stay outside this
+boundary. The original failure is logged. This contains a secondary failure;
+it does not repair Play Store's DI graph or implement separate process hosting.
+[Android's process declaration](https://developer.android.com/guide/topics/manifest/service-element#proc)
+defines the intended process boundary.
+
+`framework_result_receiver.v` replaces the constructor-only placeholder with
+Parcelable/CREATOR, local delivery, asynchronous Handler delivery and Binder
+parcel transport using the standard IResultReceiver descriptor. Callback
+parcels are recycled on success and failure; RemoteException follows the API's
+best-effort delivery behavior. This uses the existing Binder backend and adds
+no process lifecycle or authority grant. Contract:
+[ResultReceiver](https://developer.android.com/reference/android/os/ResultReceiver).
+
+SDK `framework-service-create-20261112-r3` passed guarded full assembly and
+selected DEX readback:0/0, complete cleanup,3799ms, RSS483835904 and shared
+growth29421568 bytes. Signed fixture r43 passed build/link/sign/verification:
+0/0, complete cleanup,1287ms, RSS150044672 and shared growth24637440 bytes.
+Guest r45 staging passed0/0, complete cleanup,10190ms, RSS36634624 and shared
+growth267366400 bytes. Host UUID inspection, read-only e2fsck and initial disk
+hash verification passed. VM resources remain12GiB/4 CPUs.
+
+The complete fixture passed on ARM in r45 as UID/GID10160, ready/pass once,
+drained EOF and exit0. It checks primary/mismatched failure identity, repeated
+failed secondary creation without caching, no start/bind/destroy callbacks on
+failed instances, normal unbind, and an unrelated healthy service's complete
+lifecycle. ResultReceiver checks include the Intent Parcelable pattern,
+direct and parcel callbacks with null/non-null bundles, stable Binder identity,
+callback lifetime after parcel recycling, descriptor rejection and a worker
+delivering asynchronously to the main Handler. Snapshot
+`service-receiver-api-uart-20261112-r1`, plan
+`service-receiver-api-plan-20261112-r1.json` and strict readback
+`service-receiver-api-readback-20261112-r1` retain archive SHA256
+`f762b96df595d5a031ba01446e35229d3bf215948724d4fdd3a2f46f41f951c9`.
+The fixture bind was released before broker preparation. Maps functionality
+remains unqualified.

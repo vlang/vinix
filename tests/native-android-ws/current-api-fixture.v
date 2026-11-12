@@ -4,6 +4,8 @@ import os
 import json2
 import crypto.sha256
 import certificateprobe
+import servicefailureprobe
+import resultreceiverprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1370,6 +1372,8 @@ invoke-virtual {v0}, Landroid/os/UserManager;->isGuestUser()Z
 move-result v0
 const/4 v1, 0
 invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-static {p0}, Lorg/vinix/bootstrap/ServiceFailureProbe;->check(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/ResultReceiverProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1612,6 +1616,8 @@ fn main() {
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
 	certificateprobe.install(root)!
+	servicefailureprobe.install(root)!
+	resultreceiverprobe.install(root)!
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;
 .super Landroid/widget/TableLayout;
@@ -1879,7 +1885,7 @@ return-object v0
 ')!
 	// Declare the callback service in the APK; scheduling must not rely on an
 	// undeclared class even if the current scheduler can instantiate one.
-	os.write_file(root + '/AndroidManifest.xml', '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.bootstrap" android:versionCode="1"><uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35"/><application android:label="Current API fixture"><activity android:name="org.vinix.bootstrap.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><service android:name="org.vinix.bootstrap.TestJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false"/></application></manifest>')!
+	os.write_file(root + '/AndroidManifest.xml', '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.bootstrap" android:versionCode="1"><uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35"/><application android:label="Current API fixture"><activity android:name="org.vinix.bootstrap.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><service android:name="org.vinix.bootstrap.TestJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false"/>' + servicefailureprobe.manifest() + '</application></manifest>')!
 	if os.system_args([os.abs_path('build/android-native-ws/aapt2'), 'link', '-I',
 		os.abs_path('build/android-framework/opensudoku/overlay/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/framework-res.apk'),
 		'--manifest', root + '/AndroidManifest.xml', '-o', root + '/unsigned.apk']) != 0 {

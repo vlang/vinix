@@ -40,6 +40,8 @@ fn main() {
 	androidtools.framework_force_layout(root + '/smali')!
 	androidtools.framework_certificate_factory(root + '/smali')!
 	androidtools.framework_guest_user(root + '/smali')!
+	androidtools.framework_service_create_failure(root + '/smali')!
+	androidtools.framework_result_receiver(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -77,6 +79,12 @@ fn main() {
 	types << 'android/net/VinixCertificateSocket'
 	types << 'android/net/VinixCertificateInput'
 	types << 'android/net/VinixCertificateOutput'
+	types << 'android/atl/ATLLoadedApp'
+	types << r'android/atl/ATLLoadedApp$1'
+	types << 'android/os/ResultReceiver'
+	types << 'android/os/VinixResultReceiverBinder'
+	types << 'android/os/VinixResultReceiverDelivery'
+	types << 'android/os/VinixResultReceiverCreator'
 	types << r'android/app/job/JobInfo$Builder'
 	types << 'android/content/pm/PackageParser'
 	types << 'android/content/pm/IPackageDeleteObserver'
