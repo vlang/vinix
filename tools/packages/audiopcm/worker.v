@@ -144,7 +144,7 @@ fn stream(fd int, guard int, id string, generation u64, manifest string) ! {
 		for at < int(length) {
 			remaining_ms(deadline)!
 			lease_alive(guard, 0)!
-			n := C.write(dsp, unsafe { &bytes[0] + at }, usize(int(length) - at))
+			n := C.write(dsp, unsafe { &bytes[0] + at }, uint(int(length) - at))
 			if n < 0 && C.errno == C.EINTR { continue }
 			if n < 0 && C.errno == C.EAGAIN { lease_alive(guard, 5)!; continue }
 			if n <= 0 { answer(fd, guard, false)!; return error('audio output write refused') }

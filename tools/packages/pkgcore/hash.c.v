@@ -76,7 +76,7 @@ fn hash_opened(fd int, expected u64, path string, options HashReadOptions) !stri
 	for done < expected {
 		remaining := expected - done
 		amount := if remaining < u64(buffer.len) { int(remaining) } else { buffer.len }
-		count := C.read(fd, buffer.data, usize(amount))
+		count := C.read(fd, buffer.data, uint(amount))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read payload: ${path}') }
 		if count == 0 { return error('payload changed size while hashing: ${path}') }

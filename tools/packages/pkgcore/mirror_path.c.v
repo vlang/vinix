@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-fn C.getcwd(&char, usize) &char
+fn C.getcwd(&char, uint) &char
 fn C.realpath(&char, &char) &char
 
 // Preserve the existing lexical absolute-path contract without the standard

@@ -25,7 +25,7 @@ pub struct ImageIntegration {
 struct ImageIntegrationOptions {
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	available_space fn (string) !u64 = free_bytes
-	write fn (int, voidptr, usize) isize = atomic_write_bytes
+	write fn (int, voidptr, uint) int = atomic_write_bytes
 	flush fn (int) int = atomic_flush
 }
 
@@ -163,7 +163,7 @@ fn (output &ImageIntegrationOutput) matches(name string) bool {
 	if output.link == '' { return output.fd >= 0 && atomic_name_matches(output.parent, name, output.fd) }
 	if info.st_mode & 0o170000 != 0o120000 { return false }
 	mut target := [128]u8{}
-	count := C.readlinkat(output.parent, name.str, unsafe { &target[0] }, usize(target.len))
+	count := C.readlinkat(output.parent, name.str, unsafe { &target[0] }, uint(target.len))
 	return count == output.link.len && unsafe { tos(&target[0], int(count)) } == output.link
 }
 
@@ -258,7 +258,7 @@ fn (plan &ImageIntegration) publish_with(options ImageIntegrationOptions) ! {
 				data := plan.bytes[if i < 2 { i } else { i - 1 }]
 				mut offset := 0
 				for offset < data.len {
-					count := options.write(output.fd, unsafe { &u8(data.data) + offset }, usize(data.len - offset))
+					count := options.write(output.fd, unsafe { &u8(data.data) + offset }, uint(data.len - offset))
 					if count < 0 && C.errno == C.EINTR { continue }
 					if count <= 0 || count > data.len - offset { return error('cannot write image integration temporary; check disk space') }
 					offset += int(count)

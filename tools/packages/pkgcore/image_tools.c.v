@@ -17,7 +17,7 @@ pub struct ImageToolBuild {
 struct ImageToolOptions {
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
 	available_space fn (string) !u64 = free_bytes
-	write fn (int, voidptr, usize) isize = atomic_write_bytes
+	write fn (int, voidptr, uint) int = atomic_write_bytes
 	flush fn (int) int = atomic_flush
 }
 
@@ -187,7 +187,7 @@ fn (build &ImageToolBuild) publish_with(options ImageToolOptions) ! {
 		data := binaries[i]
 		mut offset := 0
 		for offset < data.len {
-			count := options.write(fd, unsafe { &u8(data.data) + offset }, usize(data.len - offset))
+			count := options.write(fd, unsafe { &u8(data.data) + offset }, uint(data.len - offset))
 			if count < 0 && C.errno == C.EINTR { continue }
 			if count <= 0 || count > data.len - offset { return error('cannot write image tool temporary; check disk space') }
 			offset += int(count)

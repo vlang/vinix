@@ -60,7 +60,7 @@ fn read_signing_seed(path string, options SigningSeedOptions) !SigningSeed {
 	defer { retire_signing_bytes(mut bytes) }
 	mut done := 0
 	for done < bytes.len {
-		count := C.read(fd, unsafe { &u8(bytes.data) + done }, usize(bytes.len - done))
+		count := C.read(fd, unsafe { &u8(bytes.data) + done }, uint(bytes.len - done))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read publisher signing seed') }
 		if count == 0 { break }

@@ -7,8 +7,8 @@ import encoding.utf8
 
 #include <unistd.h>
 
-fn C.read(int, voidptr, usize) isize
-fn C.write(int, voidptr, usize) isize
+fn C.read(int, voidptr, uint) int
+fn C.write(int, voidptr, uint) int
 
 pub const window_protocol = 1
 pub const window_text_protocol = 2
@@ -205,7 +205,7 @@ pub fn publish_window_frame(frame WindowFrame) ! {
 	defer { unsafe { text.free(); line.free() } }
 	mut sent := 0
 	for sent < line.len {
-		written := C.write(1, unsafe { line.str + sent }, usize(line.len - sent))
+		written := C.write(1, unsafe { line.str + sent }, uint(line.len - sent))
 		if written < 0 && C.errno == C.EINTR { continue }
 		if written <= 0 { return error('native window output is unavailable') }
 		sent += int(written)

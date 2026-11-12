@@ -8,7 +8,7 @@ import os
 #include <stdlib.h>
 
 fn C.openat(int, &char, int, ...int) int
-fn C.readlinkat(int, &char, voidptr, usize) isize
+fn C.readlinkat(int, &char, voidptr, uint) int
 fn C.fstat(int, &C.stat) int
 fn C.fdopendir(int) voidptr
 fn C.closedir(voidptr) int
@@ -107,7 +107,7 @@ fn import_node(root int, source string) !ImportNode {
 				return error('invalid guest path component')
 			}
 			mut link := [4097]u8{}
-			count := C.readlinkat(directory, part.str, unsafe { &link[0] }, usize(link.len))
+			count := C.readlinkat(directory, part.str, unsafe { &link[0] }, uint(link.len))
 			if count >= 0 {
 				C.close(directory)
 				links++
@@ -322,7 +322,7 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 	defer { unsafe { buffer.free() } }
 	mut copied := u64(0)
 	for {
-		count := C.read(node.fd, buffer.data, usize(buffer.len))
+		count := C.read(node.fd, buffer.data, uint(buffer.len))
 		if count < 0 {
 			if C.errno == C.EINTR { continue }
 			return error('cannot read prepared payload: ${source}')
@@ -332,7 +332,7 @@ fn (mut importer RootImport) copy_at(source string, target string, depth int) ! 
 		if copied > node.bytes { return error('prepared payload grew during import: ${source}') }
 		mut sent := 0
 		for sent < count {
-			written := C.write(output, unsafe { &u8(buffer.data) + sent }, usize(int(count) - sent))
+			written := C.write(output, unsafe { &u8(buffer.data) + sent }, uint(int(count) - sent))
 			if written < 0 && C.errno == C.EINTR { continue }
 			if written <= 0 { return error('cannot write prepared payload; check disk space: ' + target) }
 			sent += int(written)

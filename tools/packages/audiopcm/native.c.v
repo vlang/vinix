@@ -35,10 +35,10 @@ fn C.listen(int, int) int
 fn C.accept(int, voidptr, voidptr) int
 fn C.getsockopt(int, int, int, voidptr, &u32) int
 fn C.setsockopt(int, int, int, voidptr, u32) int
-fn C.vinix_pcm_send(i32, voidptr, usize, i32) isize
-fn C.vinix_pcm_recv(i32, voidptr, usize, i32) isize
-fn C.read(int, voidptr, usize) isize
-fn C.write(int, voidptr, usize) isize
+fn C.vinix_pcm_send(i32, voidptr, uint, i32) int
+fn C.vinix_pcm_recv(i32, voidptr, uint, i32) int
+fn C.read(int, voidptr, uint) int
+fn C.write(int, voidptr, uint) int
 fn C.close(int) int
 fn C.open(&char, int, ...int) int
 fn C.openat(int, &char, int, ...int) int
@@ -146,7 +146,7 @@ fn read_exact(fd int, bytes voidptr, length int, guard int) ! {
 	deadline := time.sys_mono_now() + 5_000_000_000
 	for at < length {
 		ready(fd, 1, guard, remaining_ms(deadline)!)!
-		n := C.vinix_pcm_recv(i32(fd), unsafe { &u8(bytes) + at }, usize(length - at), 0)
+		n := C.vinix_pcm_recv(i32(fd), unsafe { &u8(bytes) + at }, uint(length - at), 0)
 		if n < 0 && C.errno in [C.EINTR, C.EAGAIN] { continue }
 		if n <= 0 { return error('audio connection closed') }
 		at += int(n)
@@ -160,7 +160,7 @@ fn write_exact(fd int, bytes voidptr, length int, guard int) ! {
 		ready(fd, 4, guard, remaining_ms(deadline)!)!
 		$if macos { mut one := i32(1); C.setsockopt(fd, C.SOL_SOCKET, C.SO_NOSIGPIPE, &one, u32(sizeof(i32))) }
 		flags := $if macos { 0 } $else { C.MSG_NOSIGNAL }
-		n := C.vinix_pcm_send(i32(fd), unsafe { &u8(bytes) + at }, usize(length - at), i32(flags))
+		n := C.vinix_pcm_send(i32(fd), unsafe { &u8(bytes) + at }, uint(length - at), i32(flags))
 		if n < 0 && C.errno in [C.EINTR, C.EAGAIN] { continue }
 		if n <= 0 { return error('audio connection closed') }
 		at += int(n)

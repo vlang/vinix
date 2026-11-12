@@ -19,20 +19,20 @@ import time
 #define vinix_launch_space CMSG_SPACE
 #define vinix_launch_poll poll
 
-struct C.vinix_launch_iovec { mut: iov_base voidptr iov_len usize }
-struct C.vinix_launch_msghdr { mut: msg_iov &C.vinix_launch_iovec msg_iovlen usize msg_control voidptr msg_controllen usize msg_flags int }
-struct C.vinix_launch_cmsghdr { mut: cmsg_len usize cmsg_level int cmsg_type int }
-fn C.vinix_launch_sendmsg(int, &C.vinix_launch_msghdr, int) isize
-fn C.vinix_launch_recvmsg(int, &C.vinix_launch_msghdr, int) isize
+struct C.vinix_launch_iovec { mut: iov_base voidptr iov_len uint }
+struct C.vinix_launch_msghdr { mut: msg_iov &C.vinix_launch_iovec msg_iovlen uint msg_control voidptr msg_controllen uint msg_flags int }
+struct C.vinix_launch_cmsghdr { mut: cmsg_len uint cmsg_level int cmsg_type int }
+fn C.vinix_launch_sendmsg(int, &C.vinix_launch_msghdr, int) int
+fn C.vinix_launch_recvmsg(int, &C.vinix_launch_msghdr, int) int
 fn C.vinix_launch_firsthdr(&C.vinix_launch_msghdr) &C.vinix_launch_cmsghdr
 fn C.vinix_launch_nexthdr(&C.vinix_launch_msghdr, &C.vinix_launch_cmsghdr) &C.vinix_launch_cmsghdr
 fn C.vinix_launch_data(&C.vinix_launch_cmsghdr) voidptr
-fn C.vinix_launch_len(usize) usize
-fn C.vinix_launch_space(usize) usize
+fn C.vinix_launch_len(uint) uint
+fn C.vinix_launch_space(uint) uint
 fn C.vinix_launch_poll(voidptr, u64, int) int
 fn C.getgroups(int, &u32) int
-fn C.read(int, voidptr, usize) isize
-fn C.write(int, voidptr, usize) isize
+fn C.read(int, voidptr, uint) int
+fn C.write(int, voidptr, uint) int
 fn C.close(int) int
 fn C.fcntl(int, int, ...int) int
 
@@ -55,7 +55,7 @@ fn read_exact(fd int, data voidptr, length int, deadline u64) ! {
 	mut at := 0
 	for at < length {
 		ready(fd, deadline)!
-		count := C.read(fd, unsafe { &u8(data) + at }, usize(length - at))
+		count := C.read(fd, unsafe { &u8(data) + at }, uint(length - at))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count <= 0 { return error('isolated package request was interrupted') }
 		at += int(count)
@@ -65,7 +65,7 @@ fn read_exact(fd int, data voidptr, length int, deadline u64) ! {
 fn write_exact(fd int, data voidptr, length int) ! {
 	mut at := 0
 	for at < length {
-		count := C.write(fd, unsafe { &u8(data) + at }, usize(length - at))
+		count := C.write(fd, unsafe { &u8(data) + at }, uint(length - at))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count <= 0 { return error('isolated package connection was interrupted') }
 		at += int(count)
@@ -104,7 +104,7 @@ pub fn send_streams(fd int, streams [3]i32) ! {
 	header := C.vinix_launch_firsthdr(&message)
 	unsafe {
 		header.cmsg_level = C.SOL_SOCKET; header.cmsg_type = C.SCM_RIGHTS; header.cmsg_len = C.vinix_launch_len(3 * sizeof(i32))
-		vmemcpy(C.vinix_launch_data(header), &streams[0], 3 * sizeof(i32))
+		vmemcpy(C.vinix_launch_data(header), &streams[0], int(3 * sizeof(i32)))
 	}
 	if C.vinix_launch_sendmsg(fd, &message, 0) != 1 { return error('cannot pass application standard streams') }
 }
@@ -114,7 +114,7 @@ pub fn receive_streams(fd int) ![3]i32 {
 	mut byte := u8(0)
 	mut control := [128]u64{} // collect and close all delivered rights on malformed input
 	mut vector := C.vinix_launch_iovec{ iov_base: &byte, iov_len: 1 }
-	mut message := C.vinix_launch_msghdr{ msg_iov: &vector, msg_iovlen: 1, msg_control: &control[0], msg_controllen: usize(sizeof(control)) }
+	mut message := C.vinix_launch_msghdr{ msg_iov: &vector, msg_iovlen: 1, msg_control: &control[0], msg_controllen: uint(sizeof(control)) }
 	count := C.vinix_launch_recvmsg(fd, &message, 0)
 	mut streams := [i32(-1), -1, -1]!
 	mut found := 0
@@ -153,7 +153,7 @@ pub fn receive_result(fd int, request Request) !int {
 	mut bytes := [129]u8{}
 	mut used := 0
 	for used < bytes.len {
-		count := C.read(fd, unsafe { &bytes[used] }, usize(bytes.len - used))
+		count := C.read(fd, unsafe { &bytes[used] }, uint(bytes.len - used))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('isolated application completion was interrupted') }
 		if count == 0 {

@@ -22,13 +22,13 @@ fn C.geteuid() i32
 fn C.fstat(int, &C.stat) int
 fn C.fstatat(int, &char, &C.stat, int) int
 fn C.close(int) int
-fn C.read(int, voidptr, usize) isize
-fn C.write(int, voidptr, usize) isize
+fn C.read(int, voidptr, uint) int
+fn C.write(int, voidptr, uint) int
 fn C.unlinkat(int, &char, int) int
-fn C.strlen(&char) usize
+fn C.strlen(&char) uint
 fn C.strcmp(&char, &char) int
-fn C.strncmp(&char, &char, usize) int
-fn C.snprintf(&char, usize, &char, ...) int
+fn C.strncmp(&char, &char, uint) int
+fn C.snprintf(&char, uint, &char, ...) int
 
 // Only canonical local display names are admitted. Hostnames, screen suffixes,
 // alternate transports and leading zeroes cannot select a different socket.
@@ -76,11 +76,11 @@ pub fn open_surface(root &char, path &char, uid u32, system_owner u32, create bo
 		} else {
 			C.snprintf(&prefix[0], sizeof(prefix), c'%srun/user/%u/vinix-hosted-x11/', root, uid)
 		}
-		if length < 1 || length >= int(sizeof(prefix)) || C.strncmp(path, &prefix[0], usize(length)) != 0 { return -1 }
+		if length < 1 || length >= int(sizeof(prefix)) || C.strncmp(path, &prefix[0], uint(length)) != 0 { return -1 }
 		leaf := path + length
 		leaf_length := C.strlen(leaf)
 		if leaf_length == 0 || leaf_length > 96 { return -1 }
-		for i := usize(0); i < leaf_length; i++ {
+		for i := uint(0); i < leaf_length; i++ {
 			ch := leaf[i]
 			if !((ch >= `a` && ch <= `z`) || (ch >= `A` && ch <= `Z`) || (ch >= `0` && ch <= `9`) || ch == `-` || ch == `_`) { return -1 }
 		}
@@ -148,7 +148,7 @@ pub fn create_authority(surface int, display &char) bool {
 		if entropy < 0 { return false }
 		mut used := 0
 		for used < 16 {
-			n := C.read(entropy, &cookie[0] + used, usize(16-used))
+			n := C.read(entropy, &cookie[0] + used, uint(16-used))
 			if n <= 0 { C.close(entropy); return false }
 			used += int(n)
 		}
@@ -161,7 +161,7 @@ pub fn create_authority(surface int, display &char) bool {
 		if fd < 0 { return false }
 		mut written := 0
 		for written < length {
-			n := C.write(fd, &bytes[0]+written, usize(length-written))
+			n := C.write(fd, &bytes[0]+written, uint(length-written))
 			if n <= 0 { C.close(fd); C.unlinkat(surface, c'Xauthority', 0); return false }
 			written += int(n)
 		}
@@ -185,7 +185,7 @@ pub fn authority_matches(surface int, display &char, uid u32) bool {
 		mut bytes := [64]u8{}
 		mut used := 0
 		for used < 64 {
-			n := C.read(fd, &bytes[0]+used, usize(64-used))
+			n := C.read(fd, &bytes[0]+used, uint(64-used))
 			if n < 0 { C.close(fd); return false }
 			if n == 0 { break }
 			used += int(n)
@@ -206,7 +206,7 @@ pub fn admit(root &char, authority &char, display &char, uid u32, system_owner u
 		length := C.strlen(authority)
 		if length < 12 || length > 4095 || C.strcmp(authority+length-11, c'/Xauthority') != 0 { return false }
 		mut path := [4096]char{}
-		for i := usize(0); i < length-11; i++ { path[i] = authority[i] }
+		for i := uint(0); i < length-11; i++ { path[i] = authority[i] }
 		surface := open_surface(root, &path[0], uid, system_owner, false)
 		if surface < 0 { return false }
 		valid := authority_matches(surface, display, uid) && socket_matches(root, display, uid, system_owner)

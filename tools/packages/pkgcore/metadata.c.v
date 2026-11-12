@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-fn C.read(int, voidptr, usize) isize
+fn C.read(int, voidptr, uint) int
 
 struct MetadataReadOptions {
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
@@ -33,7 +33,7 @@ fn read_metadata_with(path string, options MetadataReadOptions) !string {
 	defer { unsafe { bytes.free() } }
 	mut done := 0
 	for done < bytes.len {
-		count := C.read(fd, unsafe { &u8(bytes.data) + done }, usize(bytes.len - done))
+		count := C.read(fd, unsafe { &u8(bytes.data) + done }, uint(bytes.len - done))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read package metadata: ${path}') }
 		if count == 0 { break }

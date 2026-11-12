@@ -103,8 +103,8 @@ fn test_launch_plan_matrix_retires_success_storage_and_keeps_inputs_literal() {
 					mut plan := application_launch_plan(config, '/var/lib/vinix-packages', selected, 'app', '/home/user/data', 1000, 1000, input)!
 					assert plan.program == '/usr/bin/vinix-sandbox'
 					assert plan.directory == if input.data_cwd { '/home/user/data' } else { '/var/lib/vinix-packages/generations/42/apps/app' }
-					assert plan.arguments[5] == if kind == 'windows' && input.terminal { 'stdio rpath wpath cpath flock exec prot_exec fattr tty inet dns proc unix' }
-						else if kind == 'windows' { 'stdio rpath wpath cpath flock exec prot_exec fattr inet dns proc unix' }
+					assert plan.arguments[5] == if kind == 'windows' && input.terminal { 'stdio rpath wpath cpath flock exec prot_exec fattr sendfd recvfd tty inet dns proc unix' }
+						else if kind == 'windows' { 'stdio rpath wpath cpath flock exec prot_exec fattr sendfd recvfd inet dns proc unix' }
 						else if input.window { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }
 						else if input.terminal { 'stdio rpath wpath cpath flock exec prot_exec tty inet dns proc unix' }
 						else { 'stdio rpath wpath cpath flock exec prot_exec inet dns proc unix' }

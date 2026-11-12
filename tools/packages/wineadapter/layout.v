@@ -14,7 +14,7 @@ fn layout_bytes(path string) !string {
 	defer { unsafe { bytes.free() } }
 	mut count := 0
 	for count < bytes.len {
-		n := C.read(fd, unsafe { &bytes[count] }, usize(bytes.len - count))
+		n := C.read(fd, unsafe { &bytes[count] }, uint(bytes.len - count))
 		if n <= 0 { return error('incomplete Wine layout file: ' + path) }
 		count += int(n)
 	}

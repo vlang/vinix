@@ -92,13 +92,51 @@ fn dependencies(seeds []string, root string, destination string, work string, mu
 	}
 }
 
+struct Translator {
+	binary   string
+	manifest string
+	digest   string
+}
+
+// Admits the static translator staged by build-support/dota2/qemu-stage. Its
+// build manifest must name this checkout's splitwx-fork.patch, which keeps the
+// split RW/RX JIT private across fork; the Alpine translator shares it and
+// crashes after the first fork (tests/packages/wine-translation-fork-check.md).
+fn admit_translator(staging string, base string) !Translator {
+	binary := staging + '/usr/bin/qemu-x86_64'
+	manifest := staging + '/usr/libexec/vinix-dota2/qemu-build.json'
+	if !os.is_file(binary) || os.is_link(binary) || !os.is_file(manifest) {
+		return error('translator stage lacks qemu-x86_64 or its build manifest')
+	}
+	record := json2.decode[json2.Any](os.read_file(manifest)!)!.as_map()
+	hash := digest(binary)!
+	if (record['binary_sha256'] or { json2.Any('') }).str() != hash {
+		return error('translator differs from its build manifest')
+	}
+	if (record['native_dependencies'] or { json2.Any('missing') }).as_array().len != 0 {
+		return error('translator must be static')
+	}
+	inputs := (record['inputs'] or { json2.Any(map[string]json2.Any{}) }).as_map()
+	patches := (inputs['patches'] or { json2.Any(map[string]json2.Any{}) }).as_map()
+	patch := base + '/build-support/dota2/qemu/splitwx-fork.patch'
+	if (patches['splitwx-fork.patch'] or { json2.Any('') }).str() != digest(patch)! {
+		return error('translator was not built with this checkout\'s splitwx-fork.patch')
+	}
+	return Translator{binary: binary, manifest: manifest, digest: hash}
+}
+
 fn build() ! {
 	verify_sources()!
-	if os.args.len != 10 || os.args[9] != '--local-qualification-only' {
-		return error('usage: wine-build ARCH TRANSLATION_STAGE OUTPUT V MUSL_SYSROOT GCC_RUNTIME NOTICES PE_PRODUCER --local-qualification-only')
+	if os.args.len !in [10, 11] || os.args[9] != '--local-qualification-only' {
+		return error('usage: wine-build ARCH TRANSLATION_STAGE OUTPUT V MUSL_SYSROOT GCC_RUNTIME NOTICES PE_PRODUCER --local-qualification-only [TRANSLATOR_STAGE]')
 	}
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('Wine producer architecture must be aarch64 or x86_64') }
+	// AArch64 runs x86 code through the source-built translator from
+	// build-support/dota2/qemu-stage; x86_64 runs it natively.
+	if (arch == 'aarch64') != (os.args.len == 11) {
+		return error('TRANSLATOR_STAGE is required for aarch64 and refused for x86_64')
+	}
 	stage := os.real_path(os.args[2])
 	output := os.abs_path(os.args[3])
 	v := os.real_path(os.args[4])
@@ -166,17 +204,19 @@ fn build() ! {
 		unsafe { text.free(); patched.free() }
 	}
 	if arch == 'aarch64' {
-		copy_input(stage + '/usr/bin/qemu-x86_64', runtime + '/bin/qemu-x86_64', mut inputs)!
-		text := os.read_file(runtime + '/bin/qemu-x86_64')!
-		patched := wineadapter.splitwx_patch(text)!
-		os.write_file(runtime + '/bin/qemu-x86_64', patched)!
-		os.chmod(runtime + '/bin/qemu-x86_64', 0o755)!
-		unsafe { text.free(); patched.free() }
+		translator := admit_translator(os.real_path(os.args[10]), base)!
+		copy_input(translator.binary, runtime + '/bin/qemu-x86_64', mut inputs)!
+		inputs[translator.manifest] = digest(translator.manifest)!
+		// The stock Alpine translator stays the input the guest control uses:
+		// without W+X it must fail, while the packaged one must run.
+		original := stage + '/usr/bin/qemu-x86_64'
+		inputs[original] = digest(original)!
 		os.write_file(output + '/translator-patch.json', json2.encode({
-			'input': stage + '/usr/bin/qemu-x86_64', 'input_sha256': wineadapter.qemu_splitwx_input,
+			'input': original, 'input_sha256': inputs[original],
 			'output': runtime + '/bin/qemu-x86_64', 'output_sha256': digest(runtime + '/bin/qemu-x86_64')!,
-			'scope': 'local-qualification-only: exact AArch64 tcg_init_machine argument instruction forces splitwx=1; no RWX fallback',
-			'offset': '0x85c64', 'before': '612e40b9', 'after': '21008052'
+			'translator': translator.binary, 'translator_sha256': translator.digest,
+			'translator_manifest': translator.manifest,
+			'scope': 'local-qualification-only: source-built QEMU 9.1.2 with splitwx-fork.patch; split RW/RX chosen when W+X is refused; private JIT across fork'
 		}) + '\n')!
 	}
 	for path in os.walk_ext(notices, '') {

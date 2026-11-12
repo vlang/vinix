@@ -13,7 +13,7 @@ import tools.packages.pkgcore
 
 fn C.dup2(int, int) int
 fn C.flock(int, int) int
-fn C.setgroups(usize, voidptr) int
+fn C.setgroups(uint, voidptr) int
 fn C.setresgid(u32, u32, u32) int
 fn C.setresuid(u32, u32, u32) int
 fn C.execv(&char, &&char) int
@@ -101,7 +101,7 @@ fn native_loader_smoke(generation string) ! {
 	defer { unsafe { output.free() } }
 	mut buffer := [4096]u8{}
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count > 0 {
 			if output.len + int(count) > 65536 {
 				return error('native loader smoke output exceeded bound')
@@ -114,7 +114,7 @@ fn native_loader_smoke(generation string) ! {
 	}
 	child.wait()
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count <= 0 { break }
 		if output.len + int(count) > 65536 {
 			return error('native loader smoke output exceeded bound')
@@ -151,7 +151,7 @@ fn smoke_status(qemu string, root string) !int {
 	mut total := 0
 	mut buffer := [4096]u8{}
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count > 0 {
 			total += int(count)
 			if total > 65536 { return error('translator smoke output exceeded bound') }
@@ -163,7 +163,7 @@ fn smoke_status(qemu string, root string) !int {
 	}
 	child.wait()
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count <= 0 { break }
 		total += int(count)
 		if total > 65536 { return error('translator smoke output exceeded bound') }
@@ -313,7 +313,7 @@ fn diagnostic_command(plan pkgcore.Launch, arguments []string, label string) ! {
 	mut raw_status := i32(0)
 	mut timed_out := false
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count > 0 {
 			if bytes.len + count > 65536 { return error('diagnostic output exceeded bound') }
 			for index in 0 .. int(count) { bytes << buffer[index] }
@@ -343,7 +343,7 @@ fn diagnostic_command(plan pkgcore.Launch, arguments []string, label string) ! {
 	// from waiting for the same child again. Record signal and exit separately.
 	child.status = .exited
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count <= 0 { break }
 		if bytes.len + count > 65536 { return error('diagnostic output exceeded bound') }
 		for index in 0 .. int(count) { bytes << buffer[index] }
@@ -516,7 +516,7 @@ fn run() ! {
 	defer { unsafe { pids.free() } }
 	deadline := time.sys_mono_now() + 180 * time.second
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count > 0 {
 			if bytes.len + count > 1024 * 1024 { return error('Wine output exceeded bound') }
 			for i in 0 .. int(count) { bytes << buffer[i] }
@@ -539,7 +539,7 @@ fn run() ! {
 	child.wait()
 	// Drain bytes that became readable together with child exit.
 	for {
-		count := C.read(fd, &buffer[0], usize(buffer.len))
+		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count <= 0 { break }
 		if bytes.len + count > 1024 * 1024 { return error('Wine output exceeded bound') }
 		for i in 0 .. int(count) { bytes << buffer[i] }

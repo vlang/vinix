@@ -9,7 +9,7 @@ import tools.packages.pkgprotocol
 #include <signal.h>
 #define vinix_package_poll poll
 #define vinix_package_waitpid waitpid
-fn C.vinix_package_poll(voidptr, usize, int) int
+fn C.vinix_package_poll(voidptr, uint, int) int
 fn C.pipe(&i32) int
 fn C.pipe2(&i32, int) int
 fn C.fcntl(int, int, ...int) int
@@ -120,7 +120,7 @@ fn pump_https_output(output HttpsOutput, path string, maximum u64, offset u64, a
 		if ready < 0 && C.errno == C.EINTR { continue }
 		if ready < 0 { return error('cannot monitor download output') }
 		if ready > 0 {
-			count := C.read(fds[0], buffer.data, usize(buffer.len))
+			count := C.read(fds[0], buffer.data, uint(buffer.len))
 			if count < 0 && (C.errno == C.EINTR || C.errno == C.EAGAIN || C.errno == C.EWOULDBLOCK) { continue }
 			if count < 0 { return error('cannot read download output') }
 			if count == 0 { break }
@@ -130,7 +130,7 @@ fn pump_https_output(output HttpsOutput, path string, maximum u64, offset u64, a
 			started = true
 			mut sent := 0
 			for sent < int(count) {
-				written := C.write(output.fd, unsafe { &u8(buffer.data) + sent }, usize(int(count) - sent))
+				written := C.write(output.fd, unsafe { &u8(buffer.data) + sent }, uint(int(count) - sent))
 				if written < 0 && C.errno == C.EINTR { continue }
 				if written <= 0 { return error('cannot write download destination; check disk space: ${path}') }
 				sent += int(written)

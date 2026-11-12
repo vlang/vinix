@@ -13,7 +13,7 @@ fn login_number(path string) !u32 {
 	mut bytes := [12]u8{}
 	mut used := 0
 	for used < bytes.len {
-		count := C.read(fd, unsafe { &bytes[used] }, usize(bytes.len - used))
+		count := C.read(fd, unsafe { &bytes[used] }, uint(bytes.len - used))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('audio login identity unavailable') }
 		if count == 0 { break }

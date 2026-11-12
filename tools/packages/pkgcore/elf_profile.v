@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module pkgcore
 
-fn C.pread(int, voidptr, usize, i64) isize
+fn C.pread(int, voidptr, uint, i64) int
 
 fn profile_read_at(fd int, offset u64, mut bytes []u8) ! {
 	mut done := 0
 	for done < bytes.len {
-		count := C.pread(fd, unsafe { &u8(bytes.data) + done }, usize(bytes.len - done), i64(offset + u64(done)))
+		count := C.pread(fd, unsafe { &u8(bytes.data) + done }, uint(bytes.len - done), i64(offset + u64(done)))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count <= 0 { return error('cannot read executable profile headers') }
 		done += int(count)

@@ -12,8 +12,8 @@ fn C.mkdirat(int, &char, u32) int
 fn C.fstat(int, &C.stat) int
 fn C.close(int) int
 fn C.symlinkat(&char, int, &char) int
-fn C.readlinkat(int, &char, &char, usize) isize
-fn C.write(int, voidptr, usize) isize
+fn C.readlinkat(int, &char, &char, uint) int
+fn C.write(int, voidptr, uint) int
 fn C.geteuid() i32
 
 pub struct Prefix {

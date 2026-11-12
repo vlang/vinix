@@ -74,7 +74,7 @@ fn session_executable() !string {
 		// The pinned os.executable moves its path buffer to an unretired heap
 		// allocation. Read the kernel identity with bounded stack scratch instead.
 		mut bytes := [4097]u8{}
-		count := C.readlinkat(C.AT_FDCWD, c'/proc/self/exe', unsafe { &bytes[0] }, usize(bytes.len))
+		count := C.readlinkat(C.AT_FDCWD, c'/proc/self/exe', unsafe { &bytes[0] }, uint(bytes.len))
 		if count <= 0 || count > 4096 {
 			return error('cannot determine package service executable from /proc/self/exe')
 		}

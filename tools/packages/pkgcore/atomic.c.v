@@ -8,11 +8,11 @@ fn C.renameat(int, &char, int, &char) int
 struct AtomicWriteOptions {
 	exclusive bool
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
-	write fn (int, voidptr, usize) isize = atomic_write_bytes
+	write fn (int, voidptr, uint) int = atomic_write_bytes
 	flush fn (int) int = atomic_flush
 }
 
-fn atomic_write_bytes(fd int, data voidptr, count usize) isize { return C.write(fd, data, count) }
+fn atomic_write_bytes(fd int, data voidptr, count uint) int { return C.write(fd, data, count) }
 fn atomic_flush(fd int) int { return C.fsync(fd) }
 
 fn create_atomic_file(parent int) !(int, string) {
@@ -120,7 +120,7 @@ fn atomic_write_with(path string, text string, options AtomicWriteOptions) ! {
 	check_atomic_temporary(directory, leaf, fd, 0)!
 	mut offset := 0
 	for offset < text.len {
-		written := options.write(fd, unsafe { text.str + offset }, usize(text.len - offset))
+		written := options.write(fd, unsafe { text.str + offset }, uint(text.len - offset))
 		if written < 0 && C.errno == C.EINTR { continue }
 		if written <= 0 || written > text.len - offset { return error('cannot write package metadata; check disk space') }
 		offset += int(written)

@@ -8,7 +8,7 @@ fn C.renameatx_np(int, &char, int, &char, u32) int
 
 struct KeygenOptions {
 	checkpoint fn (string, string) ! = mirror_no_checkpoint
-	write fn (int, voidptr, usize) isize = atomic_write_bytes
+	write fn (int, voidptr, uint) int = atomic_write_bytes
 	flush fn (int) int = atomic_flush
 }
 
@@ -123,7 +123,7 @@ fn keygen_with(path string, options KeygenOptions) !string {
 	text[64] = `\n`
 	mut offset := 0
 	for offset < text.len {
-		written := options.write(fd, unsafe { &u8(text.data) + offset }, usize(text.len - offset))
+		written := options.write(fd, unsafe { &u8(text.data) + offset }, uint(text.len - offset))
 		if written < 0 && C.errno == C.EINTR { continue }
 		if written <= 0 || written > text.len - offset { return error('cannot write signing seed; check storage and retry') }
 		offset += int(written)

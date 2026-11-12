@@ -78,7 +78,7 @@ fn run_launch_process(launch Launch) !int {
 	C.close(fds[1])
 	code := launch_wait(pid)!
 	mut record := [2]i32{}
-	mut count := isize(0)
+	mut count := int(0)
 	for {
 		count = C.read(fds[0], unsafe { &record[0] }, 8)
 		if count < 0 && C.errno == C.EINTR { continue }

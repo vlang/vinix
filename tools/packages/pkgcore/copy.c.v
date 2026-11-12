@@ -121,13 +121,13 @@ fn copy_opened_with(input CopySource, source string, target string, offset u64, 
 	for bytes < input.bytes {
 		remaining := input.bytes - bytes
 		amount := if remaining < u64(buffer.len) { int(remaining) } else { buffer.len }
-		count := C.read(input.fd, buffer.data, usize(amount))
+		count := C.read(input.fd, buffer.data, uint(amount))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read copy source: ${source}') }
 		if count == 0 { return error('copy source changed size while reading: ${source}') }
 		mut sent := 0
 		for sent < int(count) {
-			written := C.write(output, unsafe { &u8(buffer.data) + sent }, usize(int(count) - sent))
+			written := C.write(output, unsafe { &u8(buffer.data) + sent }, uint(int(count) - sent))
 			if written < 0 && C.errno == C.EINTR { continue }
 			if written <= 0 { return error('cannot write payload (check disk space): ${target}') }
 			sent += int(written)

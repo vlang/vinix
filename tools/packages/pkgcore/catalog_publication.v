@@ -31,7 +31,7 @@ fn publication_catalog_text(path string, options MetadataReadOptions) !(bool, st
 	defer { unsafe { bytes.free() } }
 	mut done := 0
 	for done < bytes.len {
-		count := C.read(fd, unsafe { &u8(bytes.data) + done }, usize(bytes.len - done))
+		count := C.read(fd, unsafe { &u8(bytes.data) + done }, uint(bytes.len - done))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read publisher catalog lock') }
 		if count == 0 { break }

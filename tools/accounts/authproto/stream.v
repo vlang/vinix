@@ -10,7 +10,7 @@ module authproto
 fn read_exact(fd int, buffer voidptr, length int) ! {
 	mut done := 0
 	for done < length {
-		got := C.read(fd, unsafe { &u8(buffer) + done }, usize(length - done))
+		got := C.read(fd, unsafe { &u8(buffer) + done }, uint(length - done))
 		if got < 0 {
 			if C.errno == C.EINTR {
 				continue
@@ -64,7 +64,7 @@ pub fn write_frame(fd int, frame Frame) ! {
 	}
 	mut done := 0
 	for done < data.len {
-		put := C.write(fd, unsafe { &data[done] }, usize(data.len - done))
+		put := C.write(fd, unsafe { &data[done] }, uint(data.len - done))
 		if put < 0 {
 			if C.errno == C.EINTR {
 				continue

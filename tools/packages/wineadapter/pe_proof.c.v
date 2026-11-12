@@ -88,7 +88,7 @@ fn pe_digest(path string) !string {
 	mut sum := []u8{len: 32}
 	defer { unsafe { buffer.free(); sum.free(); hash.free(); free(hash) } }
 	for {
-		count := C.read(fd, buffer.data, usize(buffer.len))
+		count := C.read(fd, buffer.data, uint(buffer.len))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read Win64 proof input') }
 		if count == 0 { break }
@@ -192,7 +192,7 @@ fn pe_output_bytes(directory int, name string) !string {
 	defer { unsafe { bytes.free() } }
 	mut count := 0
 	for count < bytes.len {
-		n := C.read(fd, unsafe { &bytes[count] }, usize(bytes.len - count))
+		n := C.read(fd, unsafe { &bytes[count] }, uint(bytes.len - count))
 		if n < 0 && C.errno == C.EINTR { continue }
 		if n <= 0 { return error('Win64 proof output is incomplete') }
 		count += int(n)

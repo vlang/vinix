@@ -26,11 +26,11 @@ fn main() {
 		!variable(c'VINIX_APP_RUNTIME_ID', 'org.vinix.wine-runtime') || !variable(c'USER', 'vinix') ||
 		!variable(c'WINEARCH', 'win64') { exit(21) }
 	file := C.CreateFileA(c'C:\\users\\vinix\\Temp\\real-win64.txt', 0x40000000, 0, unsafe { nil }, 2, 0x80, unsafe { nil })
-	if file == voidptr(isize(-1)) { exit(22) }
+	if file == voidptr(int(-1)) { exit(22) }
 	if !write(file, 'real Win64 Windows API execution\r\n') { C.CloseHandle(file); exit(23) }
 	C.CloseHandle(file)
 	denied := C.CreateFileA(c'Z:\\home\\alex\\denied-wine.txt', 0x40000000, 0, unsafe { nil }, 2, 0x80, unsafe { nil })
-	if denied != voidptr(isize(-1)) { C.CloseHandle(denied); exit(26) }
+	if denied != voidptr(int(-1)) { C.CloseHandle(denied); exit(26) }
 	if !write(C.GetStdHandle(u32(0xfffffff5)), 'VINIX SIGNED REAL WIN64 READY\n') { exit(24) }
 	// Let the native observer inspect actual Wine/translator UID and socket DAC.
 	C.Sleep(5000)

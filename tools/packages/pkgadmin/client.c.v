@@ -16,14 +16,14 @@ pub fn run(arguments []string) !int {
 }
 
 $if macos {
-	fn C.memset_s(voidptr, usize, int, usize) int
+	fn C.memset_s(voidptr, uint, int, uint) int
 } $else {
-	fn C.explicit_bzero(voidptr, usize)
+	fn C.explicit_bzero(voidptr, uint)
 }
 fn erase_password(data voidptr, length int) {
 	if length == 0 { return }
-	$if macos { C.memset_s(data, usize(length), 0, usize(length)) }
-	$else { C.explicit_bzero(data, usize(length)) }
+	$if macos { C.memset_s(data, uint(length), 0, uint(length)) }
+	$else { C.explicit_bzero(data, uint(length)) }
 }
 fn read_password(input int) ![]u8 {
 	mut saved := C.termios{}
@@ -126,7 +126,7 @@ fn receive_output(fd int, request Request) !int {
 	mut code := -1
 	mut skip := false
 	for {
-		count := C.read(fd, &bytes[0], usize(bytes.len))
+		count := C.read(fd, &bytes[0], uint(bytes.len))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('administrator package output failed; check package state before retrying') }
 		if count == 0 { break }

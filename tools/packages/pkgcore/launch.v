@@ -138,13 +138,16 @@ fn application_launch_plan(config Config, directory string, state State, id stri
 	defer { if !accepted { appsdk.free_values(mut args) } }
 	// Advisory locks coordinate writes to already unveiled app data. They grant
 	// no additional paths or inherited descriptors; SQLite requires F_SETLK.
-	mut promises := []string{cap: 13}
+	mut promises := []string{cap: 15}
 	for value in ['stdio', 'rpath', 'wpath', 'cpath', 'flock', 'exec', 'prot_exec']! { promises << value.clone() }
 	defer { appsdk.free_values(mut promises) }
 	// Wine chmods its private server socket and prefix files. Real-root launch
 	// admits root-owned payloads before dropping identity; fattr does not let
 	// the application change their metadata through inherited/open descriptors.
 	if p.kind == 'windows' { promises << 'fattr' }
+	// Wine clients and their server pass descriptors over the private server
+	// socket (SCM_RIGHTS); without these promises the first request aborts.
+	if p.kind == 'windows' { promises << 'sendfd'; promises << 'recvfd' }
 	if input.terminal { promises << 'tty' }
 	if 'network' in p.permissions { promises << 'inet'; promises << 'dns' }
 	if 'process' in p.permissions { promises << 'proc' }

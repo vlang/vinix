@@ -60,8 +60,8 @@ fn run_wine() ! {
 	defer { unsafe { translated.free() } }
 	$if arm64 {
 		translated = context.runtime_directory + '/bin/qemu-x86_64'
-		// The exact admitted translator forces separate RW/RX code mappings.
-		// Its Linux-user CLI does not implement a -split-wx switch.
+		// The admitted source-built translator chooses separate RW/RX code
+		// mappings itself when W+X is refused, and keeps them private across fork.
 		for argument in [translated, '-B', '0x100000000', '-L', root]! { command << argument }
 	}
 	for argument in [loader, '--library-path', libraries, '--argv0', identity, '--', program]! { command << argument }

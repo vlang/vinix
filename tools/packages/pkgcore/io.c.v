@@ -14,9 +14,9 @@ $if linux {
 }
 
 struct C.statvfs {
-	f_bsize  usize
-	f_frsize usize
-	f_bavail usize
+	f_bsize  uint
+	f_frsize uint
+	f_bavail uint
 }
 
 fn C.statvfs(&char, &C.statvfs) int
@@ -28,7 +28,7 @@ fn C.execv(&char, &&char) int
 fn C.chown(&char, i32, i32) int
 fn C.rename(&char, &char) int
 fn C.fchmod(int, u32) int
-fn C.write(int, voidptr, usize) isize
+fn C.write(int, voidptr, uint) int
 fn C.syscall(i64, ...voidptr) i64
 fn C.renamex_np(&char, &char, u32) int
 
