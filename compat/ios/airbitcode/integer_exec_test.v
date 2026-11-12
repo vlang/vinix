@@ -312,3 +312,40 @@ fn test_scalar_binary32_remainder_instruction_and_guards() {
 	if _ := f.scalar([u64(0), 0], 2) { assert false, 'remainder fast math flags' }
 	println('AIR-SCALAR-REMAINDER: decoded frem, masking, kinds/widths/steps, signed zero, invalid NaN, both operand poison/undef/constants, FMF and budget guards PASS')
 }
+fn test_scalar_binary16_conversions_and_profile_guards() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.types.flags |= .noslices; f.types[0] = IRType{kind: .float_t}; f.types << IRType{kind: .half_t}
+	f.refs[0] = 3; f.constants[0] = IRConstant{...f.constants[0], kind: .floating, bits: 32}; f.words[0] = 0x3f803000
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 3, 7]); f.add(10, [u64(1)])
+	narrow := f.scalar([u64(0x13f801000), 0], 2)!
+	assert narrow.kind == .binary16 && narrow.bits == 16 && narrow.value == 0x3c00 && !narrow.poison && narrow.steps == 2
+	if _ := f.scalar([u64(0), 0], 1) { assert false, 'precision conversion budget' }
+	if _ := f.run([u64(0), 0], 2) { assert false, 'integer entry accepted precision conversion' }
+	f.values[f.records[2].values_start] = 1
+	assert f.scalar([u64(0), 0], 2)!.value == 0x3c02
+	f.constants[0] = IRConstant{...f.constants[0], kind: .poison}
+	assert f.scalar([u64(0), 0], 2)!.poison
+	f.constants[0] = IRConstant{...f.constants[0], kind: .undef}
+	if _ := f.scalar([u64(0), 0], 2) { assert false, 'precision conversion undef' }
+	f.refs[0] = 0; f.refs[1] = 3; f.arguments[0] = 3
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 0, 8]); f.add(10, [u64(1)])
+	wide := f.scalar([u64(0x18001), 0], 2)!
+	assert wide.kind == .binary32 && wide.bits == 32 && wide.value == 0xb3800000 && !wide.poison && wide.steps == 2
+	f.refs[0] = 3
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(56, [u64(3), 0]); f.add(10, [u64(1)])
+	assert f.scalar([u64(0x7c01), 0], 2)!.value == 0xfc01 // Preserve signaling NaN bits.
+	// Reject half arithmetic throughout the function, even if the result is unused.
+	f.refs[2] = 3; f.arguments[1] = 3
+	for op in [u64(0), 1, 2, 4, 6]! {
+		f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, op]); f.add(10, [u64(3)])
+		if _ := f.scalar([u64(0x3c00), 0x4000], 3) { assert false, 'half arithmetic accepted' }
+	}
+	f.refs[0] = 1
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(28, [u64(3), 2, 0]); f.add(10, [u64(1)])
+	if _ := f.scalar([u64(0x3c00), 0x4000], 3) { assert false, 'half comparison accepted' }
+	f.refs[0] = 3; f.refs[1] = 0; f.arguments[0] = 0
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 3, 7, 2]); f.add(10, [u64(1)])
+	if _ := f.scalar([u64(0), 0], 2) { assert false, 'precision fast math flags' }
+	println('AIR-SCALAR-BINARY16: decoded precision conversions, kind/width/step/masking, poison/undef/constants, exact fneg and arithmetic/comparison/flag/profile/budget guards PASS')
+}

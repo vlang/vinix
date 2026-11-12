@@ -23,8 +23,10 @@ guard/round/sticky packer. No host numeric cast or floating-point environment
 participates. Integer normalization takes at most 63 shifts; float normalization
 is bounded by the binary32 format. There are no new execution arrays. Poison
 operands propagate, selected undef errors, and nonzero conversion flags reject,
-including `nneg`/fast-math flags. Precision conversions and saturating intrinsic
-execution remain outside the interpreter. The integer-only API is unchanged.
+including `nneg`/fast-math flags. Numeric half/integer conversions and saturating
+intrinsic execution remain outside the interpreter; precision conversions
+between half and float are described in [BINARY16.md](BINARY16.md).
+The integer-only API is unchanged.
 
 `binary32_cast_test.v` checks 22 exact integer-to-float patterns, 34
 float-to-integer patterns, invalid widths and 262,140 exhaustive exact signed/

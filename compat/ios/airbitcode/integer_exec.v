@@ -125,12 +125,13 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
 			code := stream.records[inst.record].code
 			if inst.has_result { p.execution_bits(op.result_type, binary32)!; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
-			floating_result := inst.has_result && p.types[op.result_type].kind == .float_t
+			floating_result := inst.has_result && p.types[op.result_type].kind in [.float_t, .half_t]!
 			allowed_flags := if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
 				2, 9, 28 {
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
+					if p.types[p.operands[op.operands_start].type_index].kind == .half_t { return error('AIR scalar: binary16 arithmetic/comparison unsupported') }
 					fp := p.types[p.operands[op.operands_start].type_index].kind == .float_t
 					if code == 2 {
 						if (fp && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!fp && op.opcode > 12) { return error('AIR scalar: binary opcode') }
@@ -145,9 +146,13 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 						p.integer_bits(op.result_type)!
 					} else if binary32 && op.opcode in [u32(5), 6]! {
 						p.integer_bits(source)!
-						if !floating_result { return error('AIR scalar: binary32 conversion result required') }
+						if p.types[op.result_type].kind != .float_t { return error('AIR scalar: binary32 conversion result required') }
 					}
-					else if !binary32 || op.opcode != 11 || p.execution_bits(source, binary32)! != 32 || p.execution_bits(op.result_type, binary32)! != 32 || (p.types[source].kind == .float_t) == floating_result { return error('AIR scalar: unsupported cast') }
+					else if binary32 && op.opcode == 7 {
+						if p.types[source].kind != .float_t || p.types[op.result_type].kind != .half_t { return error('AIR scalar: only binary32 to binary16 truncation supported') }
+					} else if binary32 && op.opcode == 8 {
+						if p.types[source].kind != .half_t || p.types[op.result_type].kind != .float_t { return error('AIR scalar: only binary16 to binary32 extension supported') }
+					} else if !binary32 || op.opcode != 11 || p.execution_bits(source, binary32)! != p.execution_bits(op.result_type, binary32)! || (p.types[source].kind in [.float_t, .half_t]!) == floating_result { return error('AIR scalar: unsupported cast') }
 				}
 				5, 29 { if op.operands_count != 3 { return error('AIR integer: select arity') } }
 				16 { if phis != index - block.first || op.operands_count == 0 || op.targets_count != op.operands_count { return error('AIR integer: PHI grouping/arity') }; phis++ }
@@ -155,7 +160,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
 				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
-				56 { if !binary32 || !floating_result || op.operands_count != 1 { return error('AIR scalar: binary32 fneg required') } }
+				56 { if !binary32 || !floating_result || op.operands_count != 1 { return error('AIR scalar: floating fneg required') } }
 				else { return error('AIR integer: instruction outside execution profile') }
 			}
 		}
@@ -198,7 +203,7 @@ fn (m &IntegerMachine) read(operand_index int) !IntegerValue {
 	if value.kind != .constant { return error('AIR integer: declarations are not integer values') }
 	c := m.pools.constants[value.constant_index]
 	if c.kind == .poison { return IntegerValue{poison: true} }
-	expected := if m.p.types[operand.type_index].kind == .float_t { IRConstantKind.floating } else { IRConstantKind.integer }
+	expected := if m.p.types[operand.type_index].kind in [.float_t, .half_t]! { IRConstantKind.floating } else { IRConstantKind.integer }
 	if c.kind != .zero && (c.kind != expected || c.splat) { return error('AIR scalar: undef/expressions unsupported') }
 	return IntegerValue{value: m.pools.scalar_bits(value.constant_index)! & constant_mask(bits)}
 }
@@ -263,6 +268,8 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 					if input.poison { result = IntegerValue{poison: true} }
 					else if op.opcode in [u32(3), 4]! { result = binary32_to_integer(dest_bits, op.opcode == 4, u32(input.value))! }
 					else if op.opcode in [u32(5), 6]! { result = IntegerValue{value: binary32_from_integer(source_bits, op.opcode == 6, input.value)!} }
+					else if op.opcode == 7 { result = IntegerValue{value: binary16_from_binary32(u32(input.value))} }
+					else if op.opcode == 8 { result = IntegerValue{value: binary16_to_binary32(u16(input.value))} }
 					else {
 						mut value := input.value & constant_mask(source_bits)
 						if op.opcode == 2 && value & (u64(1) << (source_bits - 1)) != 0 { value |= ~constant_mask(source_bits) }
@@ -270,7 +277,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 					}
 				}
 				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true} } else { m.read(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
-				56 { input := m.read(start)!; result = IntegerValue{value: input.value ^ 0x80000000, poison: input.poison} }
+				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
 				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }
 				11 {
 					mut target := 0

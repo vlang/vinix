@@ -7,9 +7,10 @@ result := p.run_scalar_function(ir, stream, pools, bodies, function_index,
     argument_bits, step_limit)!
 ```
 
-This mixed profile accepts i1..i64 and LLVM `float` (IEEE binary32). Arguments
+This mixed profile accepts i1..i64, LLVM `float` (IEEE binary32), and
+[`half` storage/precision conversions](BINARY16.md) (IEEE binary16). Arguments
 are raw u64 bit patterns, masked to their declared widths. `IRScalarRun` reports
-the return `kind` (`integer` or `binary32`), `bits`, raw `value`, `poison` and
+the return `kind` (`integer`, `binary32` or `binary16`), `bits`, raw `value`, `poison` and
 `steps`. Do not consume `value` when poison is true. The existing integer entry
 point keeps its integer-only profile and result type.
 
@@ -54,8 +55,9 @@ charges and three owned temporary arrays. It borrows its inputs and frees those
 arrays on success/error. Input validity, dominance and full CFG/PHI correctness
 remain caller preconditions; this is not a general LLVM verifier.
 
-Outside this profile: half/bfloat16/double, vectors,
-precision conversions, fast/constrained operations,
+Outside this profile: half arithmetic/comparisons and half/integer numeric
+conversions, bfloat16/double, vectors, precision conversions beyond half/float,
+fast/constrained operations,
 function attributes, calls/intrinsics, pointers, memory and Metal commands.
 These are explicit unsupported cases, not approximated operations.
 

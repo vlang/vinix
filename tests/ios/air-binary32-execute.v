@@ -97,8 +97,8 @@ define float @guard_frem_fmf(float %x, float %y, i64 %c) { %r = frem fast float 
 define float @guard_precision(float %x, float %y, i64 %c) { %d = fpext float %x to double
   %r = fptrunc double %d to float
   ret float %r }
-define float @guard_half(float %x, float %y, i64 %c) { %h = fptrunc float %x to half
-  %r = fpext half %h to float
+define float @guard_bfloat(float %x, float %y, i64 %c) { %h = fptrunc float %x to bfloat
+  %r = fpext bfloat %h to float
   ret float %r }
 define float @guard_undef(float %x, float %y, i64 %c) { ret float undef }
 define float @guard_freeze(float %x, float %y, i64 %c) { %r = freeze float poison
@@ -194,7 +194,7 @@ fn main() {
 	}
 	args := [u64(0x3f800000), 0x40000000, 0]; defer { unsafe { args.free() } }
 	mut guards := 0
-	for name in ['guard_fmf', 'guard_frem_fmf', 'guard_precision', 'guard_half', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary32 fixture') }
+	for name in ['guard_fmf', 'guard_frem_fmf', 'guard_precision', 'guard_bfloat', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary32 fixture') }
 	for name in ['poison_add', 'poison_divide', 'poison_remainder_left', 'poison_remainder_right', 'poison_compare'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('binary32 poison lost') } }
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != args[0] { panic('binary32 select was not lazy') }
 	baseline := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'fadd')!, args, 64)!; mut controls := 0
