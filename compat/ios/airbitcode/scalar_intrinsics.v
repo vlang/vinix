@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum }
+fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
+	return if id in [.copysign, .minimum, .maximum]! { 2 } else { 1 }
+}
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
 		'llvm.fabs.f16', 'llvm.fabs.f32' { ScalarIntrinsic.fabs }
@@ -13,6 +16,8 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.roundeven.f16', 'llvm.roundeven.f32' { ScalarIntrinsic.roundeven }
 		'llvm.rint.f16', 'llvm.rint.f32' { ScalarIntrinsic.rint }
 		'llvm.nearbyint.f16', 'llvm.nearbyint.f32' { ScalarIntrinsic.nearbyint }
+		'llvm.minimum.f16', 'llvm.minimum.f32' { ScalarIntrinsic.minimum }
+		'llvm.maximum.f16', 'llvm.maximum.f32' { ScalarIntrinsic.maximum }
 		else { return error('AIR intrinsic: unsupported callee') }
 	}
 }
@@ -28,7 +33,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	pointer := p.types[callee.type_index]
 	if pointer.kind != .pointer_t || pointer.address_space != 0 { return error('AIR intrinsic: default scalar callee pointer required') }
 	signature := ir.types[f.signature]
-	arity := if id == .copysign { 2 } else { 1 }
+	arity := scalar_intrinsic_arity(id)
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 { return error('AIR intrinsic: fixed signature/arity') }
 	result := ir.references[signature.refs_start]
 	if result != op.result_type { return error('AIR intrinsic: return type') }
@@ -80,6 +85,15 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	abs := a & (sign_mask - 1)
 	if id == .fabs { return abs }
 	if id == .copysign { return abs | (b & sign_mask) }
+	if id in [.minimum, .maximum]! {
+		infinity := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
+		other := b & (sign_mask - 1)
+		if abs > infinity || other > infinity { return if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) } }
+		// IEEE minimum/maximum order -0 below +0 in either argument order.
+		if abs == 0 && other == 0 { return if id == .minimum { (a | b) & sign_mask } else { (a & b) & sign_mask } }
+		less := if (a ^ b) & sign_mask != 0 { sign != 0 } else if sign == 0 { abs < other } else { abs > other }
+		return if less == (id == .minimum) { a } else { b }
+	}
 	fraction_bits := if bits == 16 { 10 } else { 23 }; bias := if bits == 16 { 15 } else { 127 }
 	infinity := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
 	if abs > infinity { return if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) } }

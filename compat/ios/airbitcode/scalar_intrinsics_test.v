@@ -46,3 +46,34 @@ fn test_scalar_intrinsic_attribute_encodings_and_budget() {
 	if _ := scalar_intrinsic_attributes(stream, 1, 1) { assert false, 'attribute scan budget' }
 	println('AIR-SCALAR-INTRINSIC-ATTRIBUTES: canonical function enums and memory(none) versions 0/1/2, memory/strictfp/string/return/parameter/missing/budget guards PASS')
 }
+
+fn test_scalar_intrinsic_minimum_maximum() {
+	// Both argument orders must agree, including signed zeros and sNaNs.
+	for bits in [u32(16), 32]! {
+		sign := u64(1) << (bits - 1)
+		one := if bits == 16 { u64(0x3c00) } else { u64(0x3f800000) }
+		inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
+		qn := if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) }
+		cases := [[u64(0), sign, sign, 0], [sign, sign, sign, sign], [u64(0), 0, 0, 0],
+			[one, one | sign, one | sign, one], [one | sign, 1 | sign, one | sign, 1 | sign],
+			[u64(1), one, 1, one], [inf, one, one, inf], [inf | sign, inf, inf | sign, inf],
+			[inf + 1, one, qn, qn], [one, (qn + 1) | sign, qn, qn],
+			[inf + 1, (inf + 1) | sign, qn, qn]]
+		defer { unsafe { for row in cases { row.free() }; cases.free() } }
+		for row in cases {
+			for swapped in [false, true]! {
+				a := row[int(swapped)]; b := row[int(!swapped)]
+				assert scalar_intrinsic_value(.minimum, bits, a, b)! == row[2]
+				assert scalar_intrinsic_value(.maximum, bits, a, b)! == row[3]
+			}
+		}
+		for op in ['minimum', 'maximum'] {
+			name := 'llvm.${op}.f${bits}'; defer { unsafe { name.free() } }
+			assert scalar_intrinsic_arity(scalar_intrinsic_name(name)!) == 2
+		}
+	}
+	for name in ['llvm.minnum.f32', 'llvm.maxnum.f16', 'llvm.minimum.f64', 'llvm.maximum.v2f32', 'air.minimum.f32'] {
+		if _ := scalar_intrinsic_name(name) { assert false, 'unsupported extremum name' }
+	}
+	println('AIR-SCALAR-EXTREMA: 88 exact results across both precisions/orders, binary arity and unsupported names PASS')
+}

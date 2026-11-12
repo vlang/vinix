@@ -43,11 +43,22 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 	mut cases := []IntrinsicCase{}; cases.flags |= .noslices
 	for bits in [u32(16), 32]! {
 		typ := if bits == 16 { 'half' } else { 'float' }
-		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint'] {
+		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum'] {
 			name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, op !in ['fabs', 'copysign'], 2}; unsafe { cases.push_many(&entry, 1) }
-			args := if op == 'copysign' { '${typ} %x, ${typ} %y' } else { '${typ} %x' }
-			params := if op == 'copysign' { '${typ}, ${typ}' } else { typ }
-			text := 'declare ${typ} @llvm.${op}.f${bits}(${params})\ndefine ${typ} @${name}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.${op}.f${bits}(${args})\n  ret ${typ} %r\n}\n'; source.write_string(text); unsafe { args.free(); if op == 'copysign' { params.free() }; text.free() }
+			binary := op in ['copysign', 'minimum', 'maximum']
+			args := if binary { '${typ} %x, ${typ} %y' } else { '${typ} %x' }
+			params := if binary { '${typ}, ${typ}' } else { typ }
+			text := 'declare ${typ} @llvm.${op}.f${bits}(${params})\ndefine ${typ} @${name}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.${op}.f${bits}(${args})\n  ret ${typ} %r\n}\n'; source.write_string(text); unsafe { args.free(); if binary { params.free() }; text.free() }
+		}
+		chain_entry := IntrinsicCase{'extrema_chain_${bits}', bits, true, 3}; unsafe { cases.push_many(&chain_entry, 1) }
+		chain := 'define ${typ} @extrema_chain_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.minimum.f${bits}(${typ} %x, ${typ} %y)\n  %r = call ${typ} @llvm.maximum.f${bits}(${typ} %a, ${typ} %x)\n  ret ${typ} %r\n}\n'; source.write_string(chain); unsafe { chain.free() }
+		for op in ['minimum', 'maximum'] {
+			for state in ['poison', 'undef'] {
+				for side in 0 .. 2 {
+					left := if side == 0 { state } else { '%x' }; right := if side == 1 { state } else { '%y' }
+					control := 'define ${typ} @${op}_${state}_${side}_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.${op}.f${bits}(${typ} ${left}, ${typ} ${right})\n  ret ${typ} %r\n}\n'; source.write_string(control); unsafe { control.free() }
+				}
+			}
 		}
 		for op in ['chain', 'loop'] { name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, true, if op == 'chain' { 4 } else { 0 }}; unsafe { cases.push_many(&entry, 1) } }
 		flow := 'define ${typ} @chain_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.fabs.f${bits}(${typ} %x)\n  %b = call ${typ} @llvm.copysign.f${bits}(${typ} %a, ${typ} %y)\n  %r = call ${typ} @llvm.roundeven.f${bits}(${typ} %b)\n  ret ${typ} %r\n}\ndefine ${typ} @loop_${bits}(${typ} %x, ${typ} %y, i64 %c) {\nentry: %n = and i64 %c, 7\n  br label %loop\nloop: %a = phi ${typ} [ %x, %entry ], [ %sum, %loop ]\n  %i = phi i64 [ 0, %entry ], [ %inc, %loop ]\n  %r = call ${typ} @llvm.floor.f${bits}(${typ} %a)\n  %sum = fadd ${typ} %r, %y\n  %inc = add i64 %i, 1\n  %again = icmp ult i64 %inc, %n\n  br i1 %again, label %loop, label %exit\nexit: ret ${typ} %sum\n}\n'; source.write_string(flow); unsafe { flow.free() }
@@ -178,9 +189,40 @@ fn main() {
 			comparisons++; if nan_class { nan_cases++ }
 		}
 	}
+	// Exhaust every half encoding against sixteen boundary peers, in both
+	// argument orders. Float boundaries use the full 32-by-32 edge matrix.
+	half_edges := [u32(0), 0x8000, 1, 0x8001, 0x03ff, 0x0400, 0x3c00, 0xbc00, 0x7bff, 0xfbff, 0x7c00, 0xfc00, 0x7c01, 0xfc01, 0x7e55, 0xfe55]!
+	mut extrema_pairs := 0
+	for c in cases {
+		if !c.name.starts_with('minimum_') && !c.name.starts_with('maximum_') { continue }
+		index := function_index(ir, c.name)!; reference_name := 'reference_${c.name}'; defer { unsafe { reference_name.free() } }
+		address := C.LLVMGetFunctionAddress(engine, reference_name.str); if address == 0 { panic('missing extrema reference') }; reference := unsafe { NativeBits(voidptr(address)) }
+		for sample in 0 .. if c.bits == 16 { 65536 * 16 * 2 } else { 32 * 32 } {
+			left := if c.bits == 16 { u64(sample / 32) } else { u64(edges[sample / 32]) }
+			right := if c.bits == 16 { u64(half_edges[(sample / 2) % 16]) } else { u64(edges[sample % 32]) }
+			a := if c.bits == 16 && sample & 1 != 0 { right } else { left }
+			b := if c.bits == 16 && sample & 1 != 0 { left } else { right }
+			args := [a, b, u64(0)]; defer { unsafe { args.free() } }
+			actual := p.run_scalar_function(ir, stream, pools, bodies, index, args, 256)!; expected := reference(a, b, 0)
+			nan_class := compare(actual, expected, c) or { row := 'FAIL ${c.name} edge a=${a} b=${b} got=${actual.value} expected=${expected}'; results.writeln(row)!; panic(row) }
+			row := '${c.name}\t${a}\t${b}\t0\t${actual.value}\t${expected}\t${nan_class}\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }
+			comparisons++; extrema_pairs++; if nan_class { nan_cases++ }
+		}
+	}
 	args := [u64(0xbf000000), 0, 0]; defer { unsafe { args.free() } }; mut guards := 0
 	for name in ['guard_defined', 'guard_unknown', 'guard_tail', 'guard_fmf', 'guard_return_attr', 'guard_parameter_attr', 'guard_undef', 'guard_dead', 'guard_indirect'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported intrinsic fixture') }
 	for name in ['poison_unary', 'poison_left', 'poison_right'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('intrinsic poison lost') } }
+	mut extrema_controls := 0
+	for bits in [16, 32]! {
+		for op in ['minimum', 'maximum'] {
+			for side in 0 .. 2 {
+				poison_name := '${op}_poison_${side}_${bits}'; undef_name := '${op}_undef_${side}_${bits}'
+				defer { unsafe { poison_name.free(); undef_name.free() } }
+				if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, poison_name)!, args, 64)!.poison { panic('extrema poison lost') }; extrema_controls++
+				p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, undef_name)!, args, 64) or { extrema_controls++; continue }; panic('accepted extrema undef')
+			}
+		}
+	}
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != 0x3f000000 { panic('intrinsic select not lazy') }
 	index := function_index(ir, 'fabs_32')!; slot := bodies.scopes[index + 1].instructions_start; original := p.instructions[slot]
 	if _ := p.run_scalar_function(ir, stream, pools, bodies, index, args, 1) { panic('intrinsic budget accepted') }
@@ -211,7 +253,7 @@ fn main() {
 	altered_values[group_start + 1] = 1 // parameter attribute slot
 	if _ := p.run_scalar_function(ir, altered_stream, pools, bodies, index, args, 64) { panic('accepted parameter declaration attribute') } else { attribute_controls++ }
 	baseline := p.run_scalar_function(ir, stream, pools, bodies, index, args, 64)!; mut controls := 0
-	for changed in [airbitcode.IRScalarRun{...baseline, value: baseline.value ^ 1}, airbitcode.IRScalarRun{...baseline, kind: .integer}, airbitcode.IRScalarRun{...baseline, bits: 16}, airbitcode.IRScalarRun{...baseline, poison: true}, airbitcode.IRScalarRun{...baseline, steps: 1}] { compare(changed, baseline.value, cases[11]) or { controls++; continue }; panic('accepted corrupted intrinsic result') }
+	for changed in [airbitcode.IRScalarRun{...baseline, value: baseline.value ^ 1}, airbitcode.IRScalarRun{...baseline, kind: .integer}, airbitcode.IRScalarRun{...baseline, bits: 16}, airbitcode.IRScalarRun{...baseline, poison: true}, airbitcode.IRScalarRun{...baseline, steps: 1}] { compare(changed, baseline.value, IntrinsicCase{'fabs_32', 32, false, 2}) or { controls++; continue }; panic('accepted corrupted intrinsic result') }
 	for mode in [C.FE_UPWARD, C.FE_DOWNWARD]! {
 		if C.fesetround(mode) != 0 { panic('cannot set rounding control') }
 		for name in ['rint_32', 'nearbyint_32', 'roundeven_32'] {
@@ -220,5 +262,5 @@ fn main() {
 			if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, rounding_args, 64)!.value != expected { panic('intrinsic used host rounding mode') }
 		}
 	}
-	println('LLVM-SCALAR-INTRINSICS: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} arithmetic NaN-class cases), ${guards} guards, three poison results, lazy select, budget/integer isolation, ${metadata_controls} metadata/${attribute_controls} declaration/${controls} result corruptions and six host-rounding controls PASS; no AIR shader or iOS app executed')
+	println('LLVM-SCALAR-INTRINSICS: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} arithmetic NaN-class cases), including ${extrema_pairs} boundary pairs; ${guards} guards, three poison results, ${extrema_controls} extrema poison/undef controls, lazy select, budget/integer isolation, ${metadata_controls} metadata/${attribute_controls} declaration/${controls} result corruptions and six host-rounding controls PASS; no AIR shader or iOS app executed')
 }

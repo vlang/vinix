@@ -22,7 +22,8 @@ Integer operations and control flow remain available. Select and simultaneous
 PHIs can carry either kind. All instructions, including unvisited blocks, must
 belong to the supported profile. Floating-point fast-math flags reject.
 Selected [scalar LLVM intrinsic calls](SCALAR-INTRINSICS.md) support absolute
-value, sign copying and integral rounding for half and float.
+value, sign copying, integral rounding and NaN-propagating minimum/maximum
+for half and float.
 
 `binary32.v` implements arithmetic using unsigned integer significands,
 exponents and guard/round/sticky bits. It rounds to nearest, ties to even and
