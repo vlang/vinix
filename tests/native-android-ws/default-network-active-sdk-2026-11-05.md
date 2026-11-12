@@ -1,5 +1,59 @@
 # Default network activity SDK tooling checkpoint
 
+## Resume on 2026-11-12
+
+The full SDK retry and a separate fresh-process complete integrity readback
+passed. Native production is now blocked by missing historical bundles rather
+than disk pressure. This supersedes the pending-SDK status below; the original
+2026-11-05 evidence and failures remain required.
+
+Resume source revision: `554908ef4`. The retained producer executable still
+matches `7118b8946857569f2d9eb678b1a721974348853726592ea6d3fb6dc018d6a447`.
+It produced `S/combined-account-webview-default-network-active-framework-2026-11-05-r5`
+with the original predecessor pins and unchanged limits. The narrow producer
+passed its preservation checks for 2,117 classes and its complete output seal.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `sha256.json` | `17d09d2f20124e3f8badd4b5c1ed30197b26a5bfccc4c46736e4d673dd3effe6` |
+| `build.json` | `61b03ed0a81b911a8e17263003a8df02a176fd28fc7615f58ad6c19822457ac6` |
+| `api-impl.jar` | `127adcd698a8e95717bafdf74c3ba21c8dee9838efa02c2206d07957ff394fdd` |
+| `classes.dex` | `506b38602dce437693517bce13414ba0f6fc4192d0289db70f9988d5fb6a38c3` |
+
+Controls remain in `C` below. `sdk-build-r5.guard.json` records guard/child
+0/0, empty reason, complete cleanup, 9,887 ms, 501,039,104 bytes sampled
+aggregate RSS and 157,020,160 bytes shared disk growth. Its SHA-256 is
+`6be5490c14331482f744e4613d6ef2ffd0ad9dff2890a9cb338f10d26c4b99f4`.
+The producer's `--check` ran in a fresh process under the same limits and a
+16 MiB file cap; `sdk-readback-2026-11-12-r1.log` records
+`COMBINED-FRAMEWORK-INTEGRITY-PASS` for the exact manifest above.
+Its guard/child exited 0/0 with complete cleanup in 624 ms; the readback guard
+receipt SHA-256 is
+`ef1f03071f351a640b9cb37978ad6ae277d1d1f27f63bca0e754c35dc3866e78`.
+
+The retained `current-native-builder-hash-host-r1` was attempted under the
+original limits into fresh `S/current-native-build-2026-11-12-default-network-active-r1`.
+It failed opening
+`S/headless-service-native-build-2026-10-26-r5/tools/v_old276` (ENOENT).
+`native-build-2026-11-12-r1.guard.json` records guard/child 1/1 and complete
+cleanup; SHA-256 is
+`5ae4072ee696786d3284925ff5eb59c696ff23bccdca4b489d7fda78dec91820`.
+Preserve that failed root and use a fresh root for the next attempt.
+
+Restore the complete original bundles at their canonical paths before retrying:
+
+| Missing bundle under `S` | Required manifest SHA-256 |
+| --- | --- |
+| `headless-service-native-build-2026-10-26-r5` | `d99195272b8af813679cf54fed9f1e0341e6f1115804ac09c1cd2d5a8f942e3e` |
+| `current-native-build-2026-10-27-startup-r1` | `a62bf4a8a4ef8d1c000f82395ec64b145c9c4d6df25f12077f75d96d341e0a20` |
+| `current-native-build-2026-11-04-process-packages-r1` | `0b8ad44d408b90824a69fa7d42c9376965eaa34a93dc81b056050ef227bc3d7f` |
+| `combined-account-webview-process-packages-framework-2026-11-04-r2` | `4a354ead173048b39fb26cce709922f8954e27e53e2d3a5d92ecdf427db0645d` |
+
+The last two are required by the unchanged native compatibility reader.
+No substitute compiler or partial bundle was admitted. Native output pins,
+delivery qualification, aggregate evidence sealing and ARM execution remain
+pending. CI and guest state were not changed during this resume.
+
 This is a tested source/tooling checkpoint; full SDK production remains
 blocked. Checkpoint base revision is
 `27401f75b42b243c4c512db6de2774130f036ba7`; exact compiled source bytes and
