@@ -6,8 +6,9 @@ select and PHIs share a checked source policy: an exactly typed instruction
 result or one of these two constant kinds. Constant-pool lookup preserves
 module/function scope and rejects arguments, declarations, mismatched types,
 splats and other constant kinds. All blocks are preflighted, including
-unchosen sources. Explicit field-list constants and undef pairs remain
-unsupported, as do aggregate arguments/returns, freeze and other layouts.
+unchosen sources. Other parsed constant records, including aggregate
+field-list and undef records, remain unsupported, as do aggregate
+arguments/returns, freeze and other layouts.
 The integer-only API retains its scalar profile.
 
 Zero creates two defined zero fields. Poison marks both fields poison.
