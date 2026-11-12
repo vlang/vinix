@@ -108,6 +108,47 @@ This is an in-place integrity seal. Keep the worktree, original linked
 dependencies, selected external compiler and historical namespaces. Link
 targets are recorded; this is not a complete toolchain-content inventory.
 
+## Clone-parent publication coordination, 2026-11-13
+
+The follow-up built from `9cb643dc2` removes early raw parent-table reads from
+both architecture clone paths. Shared `userland/child_publication.v` selects
+the parent only after descriptor/thread/TID setup, holding the process-table
+lock through PPID assignment and child-list insertion. A CLONE_PARENT creator's
+current parent is used if still live; otherwise the locked reaper lookup skips
+exiting ancestors. No selected parent pointer escapes the lock. Ordinary clone
+keeps the creator as parent; process teardown already waits for that creator's
+active kernel thread. The existing creator fallback when no reaper exists and
+init-death limitations remain. No workload-linked lease guarantee is added.
+
+Both kernels build successfully in the isolated sparse worktree
+`/Users/alex/.cache/vinix-clone-parent-20261113-01`, retaining build logs,
+saved architecture kernels, ARM generated C, final x86 generated C, both
+changed clone paths and the new helper. Generated C inspection confirms the
+helper uses borrowed pointers and a stack pointer temporary for insertion;
+it adds no per-call allocation beyond the existing child-list growth.
+
+The expanded native prerequisite suite passes `arm-01` and `x86-01` in
+`/Users/alex/.cache/vinix-clone-parent-probe-20261113-01`.
+Eight paired ordinary/CLONE_PARENT rounds verify exact child PPIDs, creator
+versus outer wait ownership, statuses 37/29 and final ECHILD. The previous
+lease, disabled-subreaper and nested-transfer checks also pass. The controller
+requires the new marker and retains parsed guest sources, generated C, commands,
+kernel/tool hashes and before/after admission. These are behavior regressions;
+they do not force exit during the original early-selection window, qualify
+all clone flags/namespaces, measure kernel leaks or requalify real Wine.
+Deterministic race controls and production Wine supervision remain open.
+
+Complete in-place typed inventories, both recorded and independently checked:
+
+- `/Users/alex/Library/Caches/vinix-codex/section14/clone-parent-kernel-20261113-01.inventory.json`,
+  SHA-256 `fa1495150f4c093ff0f93d6b18ccdeb3eaeeaf7863d4569b00a374e35388d713`.
+- `/Users/alex/Library/Caches/vinix-codex/section14/clone-parent-probe-20261113-01.inventory.json`,
+  SHA-256 `6bb1a35787c5c14d260e3c47a10bc391fefcba10ad266a8251aec4340337f40d`.
+
+Adjacent logs retain both passes. Keep both original workspaces and the linked
+dependencies/tool namespaces; link targets are recorded without claiming a
+complete toolchain-content inventory. The earlier sealed workspaces are intact.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

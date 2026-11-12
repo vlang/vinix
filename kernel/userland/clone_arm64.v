@@ -212,17 +212,6 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 		new_process.cgroup_account = fs.cgroup_account_of(cgroup)
 	}
 
-	// CLONE_PARENT makes the child its creator's sibling: runc's init stages
-	// are all children of the runtime that started the first of them.
-	mut parent_process := old_process
-	if flags & clone_parent != 0 && old_process.ppid > 0 {
-		mut grandparent := processes[old_process.ppid]
-		if grandparent != unsafe { nil } {
-			parent_process = grandparent
-			new_process.ppid = grandparent.pid
-		}
-	}
-
 	// Duplicate the descriptor table, preserving each fd's O_CLOEXEC flag. The
 	// open numbers are read under the table's lock: another thread of the
 	// parent may make a descriptor meanwhile, and grow the table as it does.
@@ -283,9 +272,7 @@ fn clone_new_process(state &cpulocal.GPRState, flags u64, child_stack u64, paren
 			sizeof(u32))
 	}
 
-	parent_process.children_lock.acquire()
-	parent_process.children << new_process
-	parent_process.children_lock.release()
+	publish_clone_child(mut new_process, old_process, flags & clone_parent != 0)
 
 	// Another parent thread can reap the child as soon as it runs.
 	pid := proc.pid_in(new_process, viewer)

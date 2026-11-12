@@ -6,6 +6,7 @@ import os
 import time
 
 #include <sys/prctl.h>
+#include <sys/syscall.h>
 #include <sys/wait.h>
 #include <sys/file.h>
 #include <fcntl.h>
@@ -29,6 +30,7 @@ fn C.getpid() i32
 fn C.getppid() i32
 fn C.kill(i32, i32) i32
 fn C.pause() i32
+fn C.syscall(i64, ...) i64
 fn C._exit(int)
 fn C.alarm(u32) u32
 
@@ -124,6 +126,7 @@ fn guest() ! {
 	if pid == 0 {
 		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(80) }
 		nested() or { eprintln(err); C._exit(81) }
+		clone_parent_probe() or { eprintln(err); C._exit(82) }
 		C._exit(0)
 	}
 	mut status := i32(0)
@@ -190,4 +193,40 @@ fn nested() ! {
 	if worker <= 0 || status != 23 << 8 { return error('transferred worker status differs') }
 	if C.waitpid(-1, &status, C.WNOHANG) != -1 || C.errno != C.ECHILD { return error('nested descendants remain') }
 	println('WINE SUBREAPER TRANSFER PASS nearest-adopter confirmed; adopter signal death; outer adoption confirmed; worker=23; ECHILD')
+}
+
+fn clone_parent_probe() ! {
+	C.alarm(30)
+	defer { C.alarm(0) }
+	outer := C.getpid()
+	for _ in 0 .. 8 {
+		for sibling in [false, true]! {
+			creator := C.fork()
+			if creator < 0 { return error('clone creator fork failed') }
+			if creator == 0 {
+				owner := C.getpid()
+				flags := u64(17) | if sibling { u64(0x8000) } else { u64(0) }
+				child := i32(C.syscall(C.SYS_clone, flags, u64(0), u64(0), u64(0), u64(0)))
+				if child < 0 { C._exit(90) }
+				if child == 0 {
+					if C.getppid() != if sibling { outer } else { owner } { C._exit(91) }
+					C._exit(29)
+				}
+				mut status := i32(0)
+				if sibling {
+					if C.waitpid(child, &status, C.WNOHANG) != -1 || C.errno != C.ECHILD { C._exit(92) }
+				} else {
+					if C.waitpid(child, &status, 0) != child || status != 29 << 8 { C._exit(93) }
+				}
+				C._exit(37)
+			}
+			mut status := i32(0)
+			if C.waitpid(creator, &status, 0) != creator || status != 37 << 8 { return error('clone creator status differs') }
+			if sibling {
+				if C.waitpid(-1, &status, 0) <= 0 || status != 29 << 8 { return error('CLONE_PARENT sibling status differs') }
+			}
+			if C.waitpid(-1, &status, C.WNOHANG) != -1 || C.errno != C.ECHILD { return error('clone descendants remain') }
+		}
+	}
+	println('WINE CLONE_PARENT PASS eight sibling and ordinary controls; exact PPID and wait ownership; statuses 37/29; ECHILD')
 }
