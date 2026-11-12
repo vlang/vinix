@@ -31,4 +31,16 @@ fn main() {
 	} else {
 		os.write_file(output + '/execute_capture_nix.c', '// Runtime emitted inline by the selected V compiler.\n') or { panic(err) }
 	}
+	// ui2's CPU-only text measurement uses fontstash even without a GPU backend.
+	// Its #flag source and include directory must survive a manual cross link.
+	fontstash := os.join_path(@VEXEROOT, 'vlib', 'fontstash', 'fontstash_impl.c')
+	if os.is_file(fontstash) {
+		os.cp(fontstash, output + '/fontstash_impl.c') or { panic(err) }
+	} else {
+		os.write_file(output + '/fontstash_impl.c', '// Runtime emitted inline by the selected V compiler.\n') or { panic(err) }
+	}
+	for name in ['fontstash.h', 'stb_truetype.h'] {
+		header := os.join_path(@VEXEROOT, 'thirdparty', 'fontstash', name)
+		if os.is_file(header) { os.cp(header, output + '/' + name) or { panic(err) } }
+	}
 }

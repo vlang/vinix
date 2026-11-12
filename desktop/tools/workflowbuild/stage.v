@@ -5,6 +5,7 @@ import os
 import strings
 import hosttest
 import stagehost
+import encoding.hex
 
 pub fn run(program string, args []string) ! {
 	mut p := os.new_process(program)
@@ -60,6 +61,13 @@ pub fn stage(root string, ui string, dest string, cross bool) ! {
 		os.cp_all('${ui}/${directory}', '${dest}/modules/ui2/${directory}', true)!
 		for name in os.ls('${dest}/modules/ui2/${directory}')! {
 			if name.ends_with('_tmp.v') { os.rm('${dest}/modules/ui2/${directory}/${name}')! }
+		}
+	}
+	for name in ['monitor_linux.v', 'monitor_nix.v'] {
+		path := '${dest}/modules/ui2/ui/${name}'
+		if os.is_file(path) {
+			staged := stagehost.staged_source(name, path)!
+			os.write_file_array(path, hex.decode(staged.str())!)!
 		}
 	}
 	os.cp('${root}/desktop/tools/ui2_headless_bounds.v', '${dest}/modules/ui2/ui/vinix_headless_backend.v')!

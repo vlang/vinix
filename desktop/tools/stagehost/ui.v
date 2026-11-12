@@ -10,7 +10,7 @@ pub fn staged_source(name string, source string) !json2.Any {
 	if name in ['monitor_linux.v', 'monitor_nix.v'] {
 		// The compositor has fbdev outputs, not an X11 connection. ui2 uses
 		// zero for an unknown refresh rate, including its other headless ports.
-		return json2.Any('module ui2\nfn native_monitor_refresh_rate() f64 { return 0 }\n'.bytes().hex())
+		return json2.Any('module ui2\n$if linux || freebsd || openbsd || netbsd || dragonfly || solaris {\nfn native_monitor_refresh_rate() f64 { return 0 }\n}\n'.bytes().hex())
 	}
 	if name in ['file_dialog_linux.v', 'message_box_linux.v', 'file_dialog_nix.v', 'message_box_nix.v'] {
 		return json2.Any(read(source, '')!.replace('os.execute(command)', "os.exec(['/bin/sh', '-c', command])").bytes().hex())

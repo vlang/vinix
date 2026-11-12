@@ -636,12 +636,13 @@ if [ "$DESKTOP_CACHE_HIT" -eq 0 ]; then
     "$LLVM_BIN/clang" --target=aarch64-linux-musl -static -nostdinc -nostdlib \
         -isystem "$CC_SHIM" \
         -isystem "$GCCLIB/include" -isystem "$SYSROOT/usr/include" \
-        -I "$APP_SRC" \
+        -I "$APP_SRC" -I "$BUILD_DIR/v-runtime" \
         -D_GNU_SOURCE -O2 -fno-stack-protector -w \
         "$SYSROOT/usr/lib/crt1.o" "$SYSROOT/usr/lib/crti.o" "$GCCLIB/crtbeginT.o" \
         "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" "$BUILD_DIR/gpu-present-soft.c" \
         "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
         "$BUILD_DIR/v-runtime/execute_capture_nix.c" \
+        "$BUILD_DIR/v-runtime/fontstash_impl.c" \
         -L"$SYSROOT/usr/lib" -L"$GCCLIB" -lgcc_eh -lc -lgcc -lm \
         "$GCCLIB/crtend.o" "$SYSROOT/usr/lib/crtn.o" \
         -fuse-ld=lld -B"$LLVM_BIN" \
@@ -675,11 +676,12 @@ if [ "$GPU_CACHE_AVAILABLE" -eq 1 ]; then
         "$LLVM_BIN/clang" --target=aarch64-linux-musl \
             --sysroot="$GPU_SYSROOT" --gcc-install-dir="$GCCLIB" -static-libgcc \
             -isystem "$CC_SHIM" \
-            -I "$APP_SRC" -I "$ASAHI_STAGING/usr/include" \
+            -I "$APP_SRC" -I "$BUILD_DIR/v-runtime" -I "$ASAHI_STAGING/usr/include" \
             -D_GNU_SOURCE -O2 -fno-pie -no-pie -fno-stack-protector -w \
             "$BUILD_DIR/desktop.c" "$BUILD_DIR/execinfo.c" \
             "$BUILD_DIR/v-runtime/segfault_handler_nix.c" \
             "$BUILD_DIR/v-runtime/execute_capture_nix.c" \
+            "$BUILD_DIR/v-runtime/fontstash_impl.c" \
             "$BUILD_DIR/gpu-present.c" \
             -L"$ASAHI_STAGING/usr/lib" \
             -Wl,-rpath-link,"$ASAHI_STAGING/usr/lib" \
