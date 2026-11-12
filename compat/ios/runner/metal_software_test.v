@@ -410,8 +410,8 @@ fn test_software_metal_iosurface_imports() {
 				mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
 				// CPU writes through either import are visible through the other.
 				mut bytes := [256]u8{}; for i in 0 .. bytes.len { bytes[i] = u8(i % 251) }
-				sm_test_put(texture, SoftwareMetalRegion{0, 0, 0, width, height, 1}, 0, u64(unsafe { &bytes[0] }), 32)
-				mut readback := [256]u8{}; sm_test_read(alias, SoftwareMetalRegion{0, 0, 0, width, height, 1}, 0, u64(unsafe { &readback[0] }), 32)
+				sm_test_transfer_slice(texture, SoftwareMetalRegion{0, 0, 0, width, height, 1}, 0, 0, u64(unsafe { &bytes[0] }), 32, 0, true)
+				mut readback := [256]u8{}; sm_test_transfer_slice(alias, SoftwareMetalRegion{0, 0, 0, width, height, 1}, 0, 0, u64(unsafe { &readback[0] }), 32, 0, false)
 				for y in u64(0) .. height { for x in u64(0) .. width * pixel { assert readback[int(y * 32 + x)] == bytes[int(y * 32 + x)] } }
 				// Import a narrower descriptor, preserving the underlying plane pitch.
 				sm_test_set(descriptor, c'setWidth:', width - 1)
@@ -495,6 +495,46 @@ fn test_software_metal_deferred_buffer_fills() {
 	println('IOS-SOFTWARE-METAL-FILL: 256 byte values, inline range ABI, deferred ordered fill/copy/fill/copy, edges/empty ranges, retained destinations, abandonment, eight rejection modes and two drained runtimes PASS')
 }
 type SMPut = fn (u64, &char, SoftwareMetalRegion, u64, u64, u64)
+type SMPutSlice = fn (u64, &char, SoftwareMetalRegion, u64, u64, u64, u64, u64)
+type SMReadSlice = fn (u64, &char, u64, u64, u64, SoftwareMetalRegion, u64, u64)
+fn sm_test_transfer_slice(texture u64, region SoftwareMetalRegion, level u64, slice u64, bytes u64, row u64, image u64, write bool) {
+	if write { unsafe { SMPutSlice(voidptr(C.ios_objc_msgsend))(texture, c'replaceRegion:mipmapLevel:slice:withBytes:bytesPerRow:bytesPerImage:', region, level, slice, bytes, row, image) } }
+	else { unsafe { SMReadSlice(voidptr(C.ios_objc_msgsend))(texture, c'getBytes:bytesPerRow:bytesPerImage:fromRegion:mipmapLevel:slice:', bytes, row, image, region, level, slice) } }
+}
+fn test_software_metal_cpu_slice_transfers() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
+		for format in [u64(10), 30, 80, 81]! {
+			root := sm_test_texture(d, sm_test_descriptor(format, 5, 4, 0)); view := sm_test_view(root, format); objc_release(root)
+			pixel := sm_pixel_size(format); region := SoftwareMetalRegion{x: 1, y: 1, width: 3, height: 2, depth: 1}
+			mut input := [128]u8{}; mut output := [128]u8{}; for i in 0 .. 128 { input[i] = u8(i + 1); output[i] = 0xcc }
+			for write in [false, true]! {
+				if write { sm_test_transfer_slice(view, region, 0, 0, u64(unsafe { &input[4] }), 4 * pixel, 0, true); sm_test_read(view, region, 0, u64(unsafe { &output[4] }), 5 * pixel) }
+				else { sm_test_put(view, region, 0, u64(unsafe { &input[4] }), 4 * pixel); sm_test_transfer_slice(view, region, 0, 0, u64(unsafe { &output[4] }), 5 * pixel, 0, false) }
+				for i in 0 .. 128 {
+					if i >= 4 && i < int(4 + 3 * pixel) { assert output[i] == input[i] }
+					else if i >= int(4 + 5 * pixel) && i < int(4 + 8 * pixel) { assert output[i] == input[i - int(pixel)] }
+					else { assert output[i] == 0xcc }
+				}
+				for mode in 0 .. 9 {
+					child := C.fork(); assert child >= 0
+					if child == 0 {
+						C.close(1); C.close(2)
+						r := match mode { 5 { SoftwareMetalRegion{...region, x: ~u64(0)} } 6 { SoftwareMetalRegion{...region, width: 0} } 8 { SoftwareMetalRegion{...region, depth: 2} } else { region } }
+						sm_test_transfer_slice(view, r, if mode == 2 { u64(1) } else { 0 }, if mode == 1 { ~u64(0) } else { 0 }, if mode == 3 { u64(0) } else { u64(unsafe { &input[0] }) }, if mode == 4 { ~u64(0) } else if mode == 7 { pixel } else { 4 * pixel }, if mode == 0 { ~u64(0) } else { 0 }, write); C._exit(0)
+					}
+					mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+				}
+			}
+			// Single-row zero pitch remains valid through both full selectors.
+			one := SoftwareMetalRegion{width: 1, height: 1, depth: 1}; sm_test_transfer_slice(view, one, 0, 0, u64(unsafe { &input[0] }), 0, 0, true); sm_test_transfer_slice(view, one, 0, 0, u64(unsafe { &output[0] }), 0, 0, false)
+			for i in 0 .. int(pixel) { assert output[i] == input[i] }; objc_release(view)
+		}
+		objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-CPU-SLICES: both full selector ABIs, four formats, short/full cross-checks, view lifetimes, subregions/padded client rows, zero-pitch single row, nine invalid modes in both directions and two drained runtimes PASS')
+}
 type SMRead = fn (u64, &char, u64, u64, SoftwareMetalRegion, u64)
 type SMTextureCopy = fn (u64, &char, u64, u64, u64, SoftwareMetalOrigin, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)
 type SMUpload = fn (u64, &char, u64, u64, u64, u64, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)

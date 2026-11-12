@@ -37,7 +37,9 @@ Implemented Objective-C API:
   `newTextureViewWithPixelFormat:textureType:levels:slices:`,
   `parentRelativeSlice`,
   `replaceRegion:mipmapLevel:withBytes:bytesPerRow:` and
-  `getBytes:bytesPerRow:fromRegion:mipmapLevel:`.
+  `getBytes:bytesPerRow:fromRegion:mipmapLevel:`,
+  `replaceRegion:mipmapLevel:slice:withBytes:bytesPerRow:bytesPerImage:` and
+  `getBytes:bytesPerRow:bytesPerImage:fromRegion:mipmapLevel:slice:`.
 
 Sampler descriptors have the SDK defaults: nearest min/mag filters, no mip
 filter, anisotropy one, clamp-to-edge addressing, transparent-black border,
@@ -92,6 +94,10 @@ arithmetic before copying rows; caller memory must cover the requested span.
 Pitch must be a multiple of the pixel size; zero pitch is accepted for a
 single row, following [Apple's transfer contract](https://developer.apple.com/documentation/metal/mtltexture/replace%28region%3Amipmaplevel%3Awithbytes%3Abytesperrow%3A%29).
 Only requested pixel bytes are touched, preserving client row padding.
+The full CPU transfer selectors use the same checks and storage path, requiring
+slice zero and bytes-per-image zero for this 2D profile. Invalid values reject
+before accessing client bytes. They also work on views and IOSurface planes;
+3D and array-slice transfers remain unsupported.
 
 Only resource options zero (shared storage, default cache/hazards) are
 supported. Buffers must have a positive length at most 64 MiB; rejected

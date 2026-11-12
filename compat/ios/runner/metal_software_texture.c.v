@@ -142,6 +142,14 @@ fn sm_texture_transfer(object u64, region SoftwareMetalRegion, level u64, bytes 
 }
 fn sm_texture_put(object u64, selector &char, region SoftwareMetalRegion, level u64, bytes u64, row u64) { sm_texture_transfer(object, region, level, bytes, row, true) }
 fn sm_texture_read(object u64, selector &char, bytes u64, row u64, region SoftwareMetalRegion, level u64) { sm_texture_transfer(object, region, level, bytes, row, false) }
+fn sm_texture_put_slice(object u64, selector &char, region SoftwareMetalRegion, level u64, slice u64, bytes u64, row u64, image u64) {
+	if slice != 0 || image != 0 { panic('iOS: software Metal CPU transfer requires slice zero and bytesPerImage zero') }
+	sm_texture_transfer(object, region, level, bytes, row, true)
+}
+fn sm_texture_read_slice(object u64, selector &char, bytes u64, row u64, image u64, region SoftwareMetalRegion, level u64, slice u64) {
+	if slice != 0 || image != 0 { panic('iOS: software Metal CPU transfer requires slice zero and bytesPerImage zero') }
+	sm_texture_transfer(object, region, level, bytes, row, false)
+}
 fn sm_texture_start(device u64) {
 	texture := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSoftwareMTLTexture', 0)
 	objc_register_class(texture)
@@ -159,4 +167,6 @@ fn sm_texture_start(device u64) {
 	sm_method(texture, c'device', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')
 	sm_method(texture, c'replaceRegion:mipmapLevel:withBytes:bytesPerRow:', u64(unsafe { voidptr(sm_texture_put) }), c'v88@0:8{MTLRegion={MTLOrigin=QQQ}{MTLSize=QQQ}}16Q64r^v72Q80')
 	sm_method(texture, c'getBytes:bytesPerRow:fromRegion:mipmapLevel:', u64(unsafe { voidptr(sm_texture_read) }), c'v88@0:8^v16Q24{MTLRegion={MTLOrigin=QQQ}{MTLSize=QQQ}}32Q80')
+	sm_method(texture, c'replaceRegion:mipmapLevel:slice:withBytes:bytesPerRow:bytesPerImage:', u64(unsafe { voidptr(sm_texture_put_slice) }), c'v104@0:8{MTLRegion={MTLOrigin=QQQ}{MTLSize=QQQ}}16Q64Q72r^v80Q88Q96')
+	sm_method(texture, c'getBytes:bytesPerRow:bytesPerImage:fromRegion:mipmapLevel:slice:', u64(unsafe { voidptr(sm_texture_read_slice) }), c'v104@0:8^v16Q24Q32{MTLRegion={MTLOrigin=QQQ}{MTLSize=QQQ}}40Q88Q96')
 }
