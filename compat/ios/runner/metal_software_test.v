@@ -1111,7 +1111,12 @@ fn test_software_metal_texture_storage_region_abi_and_lifetimes() {
 fn sm_send(object u64, selector &char) u64 { return unsafe { SMGet(voidptr(C.ios_objc_msgsend))(object, selector) } }
 type SMComputeBuffer = fn (u64, &char, u64, u64, u64)
 type SMComputeDispatch = fn (u64, &char, SoftwareMetalSize, SoftwareMetalSize)
+type SMComputeOffset = fn (u64, &char, u64, u64)
+type SMComputeBuffers = fn (u64, &char, u64, u64, SoftwareMetalRange)
 fn sm_test_compute_buffer(encoder u64, buffer u64, offset u64, slot u64) { unsafe { SMComputeBuffer(voidptr(C.ios_objc_msgsend))(encoder, c'setBuffer:offset:atIndex:', buffer, offset, slot) } }
+fn sm_test_compute_bytes(encoder u64, bytes u64, length u64, slot u64) { unsafe { SMComputeBuffer(voidptr(C.ios_objc_msgsend))(encoder, c'setBytes:length:atIndex:', bytes, length, slot) } }
+fn sm_test_compute_offset(encoder u64, offset u64, slot u64) { unsafe { SMComputeOffset(voidptr(C.ios_objc_msgsend))(encoder, c'setBufferOffset:atIndex:', offset, slot) } }
+fn sm_test_compute_buffers(encoder u64, buffers u64, offsets u64, range SoftwareMetalRange) { unsafe { SMComputeBuffers(voidptr(C.ios_objc_msgsend))(encoder, c'setBuffers:offsets:withRange:', buffers, offsets, range) } }
 fn sm_test_compute_dispatch(encoder u64, selector &char, width u64) { unsafe { SMComputeDispatch(voidptr(C.ios_objc_msgsend))(encoder, selector, SoftwareMetalSize{width, 1, 1}, SoftwareMetalSize{1, 1, 1}) } }
 fn sm_test_compute_pipeline(device u64, library u64, name string, output &u64) u64 {
 	text := owned_string(name)
@@ -1123,10 +1128,10 @@ fn sm_test_compute_pipeline(device u64, library u64, name string, output &u64) u
 }
 // Portable LLVM fixtures with classic AIR metadata. They exercise our explicit
 // interpreter profile and are not compiler-produced/native Metal libraries.
-fn sm_test_compute_library() ![]u8 {
+fn sm_test_compute_library(label string) ![]u8 {
 	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR')
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
-	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic' } else { '/normal' }
+	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
 	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'no_metadata']
 	mut source := strings.new_builder(8192)
@@ -1166,7 +1171,7 @@ fn sm_test_compute_library() ![]u8 {
 }
 fn test_software_metal_compute() {
 	$if !ios_metal_software ? { return }
-	bytes := sm_test_compute_library()!
+	bytes := sm_test_compute_library('compute')!
 	defer { unsafe { bytes.free() } }
 	for _ in 0 .. 2 {
 		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
@@ -1284,6 +1289,152 @@ fn test_software_metal_compute() {
 	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty and indexed kernels, derived bounds, single-thread dispatch selectors, deferred integer/float execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
+struct SMBindingReentry {
+	encoder u64
+	first u64
+	second u64
+	inline bool
+mut:
+	calls int
+}
+fn sm_binding_reentry(block u64, pointer u64, length u64) {
+	mut p := unsafe { &SMBindingReentry(read64(block + 32)) }
+	state := obj_header(p.encoder).metal_compute
+	if p.inline {
+		assert state.inline_slots & (u32(1) << 24) != 0 && state.offsets[24] == 0
+		assert unsafe { *(&u32(sm_send(state.buffers[24], c'contents'))) } == 77
+	} else { assert state.buffers[24] == p.first && state.buffers[25] == p.second }
+	// An update made by client cleanup must remain visible after the outer
+	// setter returns. This runs under the runtime's recursive lock.
+	sm_test_compute_buffer(p.encoder, p.first, 0, 26)
+	p.calls++
+	assert C.munmap(unsafe { voidptr(pointer) }, usize(length)) == 0
+}
+fn test_software_metal_compute_bindings() {
+	$if !ios_metal_software ? { return }
+	bytes := sm_test_compute_library('bindings')!
+	defer { unsafe { bytes.free() } }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
+		library := sm_library_bytes(d, bytes.clone(), unsafe { nil }); assert library != 0
+		pipeline := sm_test_compute_pipeline(d, library, 'sum', unsafe { nil }); assert pipeline != 0
+		queue := sm_send(d, c'newCommandQueue'); output := sm_test_buffer(d, 64, 0)
+		a := sm_test_buffer(d, 64, 0); b := sm_test_buffer(d, 64, 0)
+		ap := sm_send(a, c'contents'); bp := sm_send(b, c'contents'); outp := sm_send(output, c'contents')
+		unsafe { *(&u32(ap + 4)) = 100; *(&u32(bp + 8)) = 200; C.memset(voidptr(outp), 0xcc, 64) }
+		command_pool := objc_pool_push()
+		command := sm_send(queue, c'commandBuffer'); objc_retain(command)
+		encoder := sm_send(command, c'computeCommandEncoder')
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+		mut buffers := [8]u64{}; mut offsets := [8]u64{}
+		buffers[0] = a; offsets[0] = 4; buffers[3] = b; offsets[3] = 8; buffers[7] = output
+		sm_test_compute_buffers(encoder, u64(unsafe { &buffers[0] }), u64(unsafe { &offsets[0] }), SoftwareMetalRange{0, 8})
+		// Caller arrays are copied, while explicit buffer contents stay deferred.
+		buffers[0] = 0; offsets[3] = 64
+		sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+		mut words := [4]u32{}
+		words[0] = 7; words[1] = 11; words[2] = 13
+		sm_test_compute_bytes(encoder, u64(unsafe { &words[0] }), 4, 0)
+		sm_test_compute_bytes(encoder, u64(unsafe { &words[1] }), 4, 3)
+		sm_test_compute_offset(encoder, 4, 7)
+		sm_test_compute_dispatch(encoder, c'dispatchThreadgroups:threadsPerThreadgroup:', 1)
+		words[0] = 1000; words[1] = 2000 // Neither source address is retained.
+		// Replacing inline bytes allocates a new snapshot and resets its offset.
+		sm_test_compute_bytes(encoder, u64(unsafe { &words[2] }), 4, 0)
+		sm_test_compute_offset(encoder, 8, 7)
+		sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+		words[2] = 3000
+		// Explicit setBuffer replaces inline bytes and permits offset updates.
+		sm_test_compute_buffer(encoder, a, 0, 0); sm_test_compute_offset(encoder, 4, 0)
+		sm_test_compute_buffer(encoder, b, 8, 3); sm_test_compute_offset(encoder, 12, 7)
+		sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+		// Exercise all 31 slots, empty end ranges, nil clearing and the 4 KiB edge.
+		mut all_buffers := [31]u64{}; mut all_offsets := [31]u64{}
+		for i in 0 .. 31 { all_buffers[i] = a }
+		sm_test_compute_buffers(encoder, u64(unsafe { &all_buffers[0] }), u64(unsafe { &all_offsets[0] }), SoftwareMetalRange{0, 31})
+		sm_test_compute_buffers(encoder, 0, 0, SoftwareMetalRange{31, 0})
+		mut inline := [4096]u8{}
+		inline[0] = 31
+		sm_test_compute_bytes(encoder, u64(unsafe { &inline[0] }), 4096, 30)
+		assert sm_buffer_length(obj_header(obj_header(encoder).metal_compute.buffers[30])) == 4096
+		all_buffers[30] = 0; all_offsets[30] = ~u64(0)
+		sm_test_compute_buffers(encoder, u64(unsafe { &all_buffers[30] }), u64(unsafe { &all_offsets[30] }), SoftwareMetalRange{30, 1})
+		assert obj_header(encoder).metal_compute.buffers[30] == 0 && obj_header(encoder).metal_compute.inline_slots == 0
+		// A permutation remains valid when the encoder owns the only references.
+		x := sm_test_buffer(d, 8, 0); y := sm_test_buffer(d, 8, 0)
+		mut swap := [x, y]!; position := [u64(0), 0]!
+		sm_test_compute_buffers(encoder, u64(unsafe { &swap[0] }), u64(unsafe { &position[0] }), SoftwareMetalRange{20, 2})
+		objc_release(x); objc_release(y); swap[0] = y; swap[1] = x
+		sm_test_compute_buffers(encoder, u64(unsafe { &swap[0] }), u64(unsafe { &position[0] }), SoftwareMetalRange{20, 2})
+		assert obj_header(encoder).metal_compute.buffers[20] == y && obj_header(encoder).metal_compute.buffers[21] == x
+		// Replacing no-copy buffers may synchronously invoke client code.
+		for mode in 0 .. 2 {
+			mut probe := SMBindingReentry{encoder: encoder, first: a, second: b, inline: mode == 1}
+			descriptor := [u64(0), u64(sizeof(SMCompletionBlock))]!
+			block := SMCompletionBlock{isa: block_isa(0), invoke: u64(unsafe { voidptr(sm_binding_reentry) }), descriptor: u64(unsafe { &descriptor[0] }), capture: u64(unsafe { &probe })}
+			page := u64(C.getpagesize())
+			for slot in 24 .. if mode == 0 { 26 } else { 25 } {
+				memory := C.mmap(unsafe { nil }, usize(page), 3, 0x1002, -1, 0); assert u64(memory) != ~u64(0)
+				old := sm_test_no_copy(d, u64(memory), page, 0, u64(unsafe { &block })); assert old != 0
+				sm_test_compute_buffer(encoder, old, 0, u64(slot)); objc_release(old)
+			}
+			if mode == 0 {
+				replacements := [a, b]!
+				sm_test_compute_buffers(encoder, u64(unsafe { &replacements[0] }), u64(unsafe { &position[0] }), SoftwareMetalRange{24, 2})
+			} else {
+				value := u32(77)
+				sm_test_compute_bytes(encoder, u64(unsafe { &value }), 4, 24)
+			}
+			assert probe.calls == if mode == 0 { 2 } else { 1 }
+			assert obj_header(encoder).metal_compute.buffers[26] == a
+		}
+		for mode in 0 .. 16 {
+			child := C.fork(); assert child >= 0
+			if child == 0 {
+				C.close(1); C.close(2)
+				match mode {
+					0 { sm_test_compute_bytes(encoder, 0, 4, 0) }
+					1 { sm_test_compute_bytes(encoder, u64(unsafe { &words[0] }), 0, 0) }
+					2 { sm_test_compute_bytes(encoder, u64(unsafe { &inline[0] }), 4097, 0) }
+					3 { sm_test_compute_bytes(encoder, ~u64(0), 4, 0) }
+					4 { sm_test_compute_bytes(encoder, u64(unsafe { &words[0] }), 4, 31) }
+					5 { sm_test_compute_offset(encoder, 0, 31) }
+					6 { sm_test_compute_offset(encoder, 65, 0) }
+					7 { sm_test_compute_offset(encoder, 0, 30) }
+					8 { sm_test_compute_bytes(encoder, u64(unsafe { &words[0] }), 4, 30); sm_test_compute_offset(encoder, 0, 30) }
+					9 { sm_test_compute_buffers(encoder, 0, 0, SoftwareMetalRange{30, 2}) }
+					10 { sm_test_compute_buffers(encoder, 0, 0, SoftwareMetalRange{~u64(0), 2}) }
+					11 { sm_test_compute_buffers(encoder, 0, u64(unsafe { &offsets[0] }), SoftwareMetalRange{0, 1}) }
+					12 { sm_test_compute_buffers(encoder, u64(unsafe { &buffers[0] }), 0, SoftwareMetalRange{0, 1}) }
+					13 { sm_test_compute_buffers(encoder, ~u64(0), u64(unsafe { &offsets[0] }), SoftwareMetalRange{0, 1}) }
+					14 { all_offsets[0] = 65; sm_test_compute_buffers(encoder, u64(unsafe { &all_buffers[0] }), u64(unsafe { &all_offsets[0] }), SoftwareMetalRange{0, 2}) }
+					else { other := metal_create_system_default_device(); foreign := sm_test_buffer(other, 8, 0); all_buffers[1] = foreign; sm_test_compute_buffers(encoder, u64(unsafe { &all_buffers[0] }), u64(unsafe { &all_offsets[0] }), SoftwareMetalRange{0, 2}) }
+				}
+				C._exit(0)
+			}
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		}
+		sm_call(encoder, c'endEncoding')
+		for mode in 0 .. 3 {
+			child := C.fork(); assert child >= 0
+			if child == 0 {
+				C.close(1); C.close(2)
+				match mode { 0 { sm_test_compute_bytes(encoder, u64(unsafe { &words[0] }), 4, 0) } 1 { sm_test_compute_offset(encoder, 0, 0) } else { sm_test_compute_buffers(encoder, 0, 0, SoftwareMetalRange{31, 0}) } }
+				C._exit(0)
+			}
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		}
+		objc_pool_pop(command_pool) // Destroys the encoder and its unrecorded bindings.
+		unsafe { *(&u32(ap + 4)) = 123; *(&u32(bp + 8)) = 456 }
+		objc_release(pipeline); objc_release(library); objc_release(a); objc_release(b); objc_release(output); objc_release(queue); objc_release(d)
+		assert unsafe { *(&u32(outp)) } == u32(0xcccccccc)
+		sm_call(command, c'commit'); assert sm_send(command, c'status') == 4
+		for i, expected in [u32(579), 18, 24, 579]! { assert unsafe { *(&u32(outp + u64(i * 4))) } == expected }
+		for i in 16 .. 64 { assert unsafe { *(&u8(outp + u64(i))) } == 0xcc }
+		objc_release(command); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-COMPUTE-BINDINGS: inline copies and 4096-byte edge, offset updates, bulk range ABI, copied arrays, nil slots, sole-owner swaps, reentrant client deallocation, four deferred snapshots, encoder destruction, 19 rejected inputs/states and two drained runtimes PASS')
+}
 fn sm_test_buffer(device u64, length u64, options u64) u64 { return unsafe { SMBuffer(voidptr(C.ios_objc_msgsend))(device, c'newBufferWithLength:options:', length, options) } }
 fn sm_test_copy(encoder u64, src u64, a u64, dst u64, b u64, size u64) { unsafe { SMCopy(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', src, a, dst, b, size) } }
 fn sm_test_reject(mode int) {

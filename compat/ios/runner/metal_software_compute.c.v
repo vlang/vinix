@@ -112,6 +112,7 @@ mut:
 	pipeline u64
 	buffers [31]u64
 	offsets [31]u64
+	inline_slots u32
 }
 fn sm_compute_bindings_free(state &SoftwareMetalComputeBindings) {
 	objc_release(state.pipeline)
@@ -165,7 +166,63 @@ fn sm_compute_set_buffer(encoder u64, selector &char, buffer u64, offset u64, in
 	old := h.metal_compute.buffers[index]
 	h.metal_compute.buffers[index] = objc_retain(buffer)
 	h.metal_compute.offsets[index] = offset
+	h.metal_compute.inline_slots &= ~(u32(1) << u32(index))
 	objc_release(old)
+}
+fn sm_compute_set_bytes(encoder u64, selector &char, bytes u64, length u64, index u64) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	mut h := sm_compute_active(encoder)
+	if index >= 31 || length == 0 || length > 4096 || bytes == 0 || bytes > ~u64(0) - length { panic('iOS: Metal inline bytes require 1..4096 readable bytes and a valid slot') }
+	device := obj_header(obj_header(h.fields[0]).fields[0]).fields[0]
+	buffer := sm_buffer_bytes(device, c'newBufferWithBytes:length:options:', bytes, length, 0)
+	if buffer == 0 { panic('iOS: cannot allocate Metal inline bytes') }
+	// Transfer the owned buffer to the encoder; recorded dispatches retain it
+	// independently. Publish everything before releasing reentrant client storage.
+	old := h.metal_compute.buffers[index]
+	h.metal_compute.buffers[index] = buffer
+	h.metal_compute.offsets[index] = 0
+	h.metal_compute.inline_slots |= u32(1) << u32(index)
+	objc_release(old)
+}
+fn sm_compute_set_offset(encoder u64, selector &char, offset u64, index u64) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	mut h := sm_compute_active(encoder)
+	if index >= 31 || h.metal_compute.buffers[index] == 0 || h.metal_compute.inline_slots & (u32(1) << u32(index)) != 0 { panic('iOS: Metal offset update requires an explicit buffer binding') }
+	b := obj_header(h.metal_compute.buffers[index])
+	if offset > sm_buffer_length(b) { panic('iOS: Metal compute offset exceeds buffer') }
+	h.metal_compute.offsets[index] = offset
+}
+fn sm_compute_set_buffers(encoder u64, selector &char, buffers u64, offsets u64, range SoftwareMetalRange) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	mut h := sm_compute_active(encoder)
+	if !sm_range(31, range.location, range.length) { panic('iOS: Metal compute binding range exceeds slots') }
+	if range.length == 0 { return }
+	size := range.length * 8
+	if buffers == 0 || offsets == 0 || buffers > ~u64(0) - size || offsets > ~u64(0) - size { panic('iOS: Metal compute binding arrays are unavailable') }
+	mut incoming := [31]u64{}; mut positions := [31]u64{}; mut previous := [31]u64{}
+	unsafe { C.memcpy(&incoming[0], voidptr(buffers), usize(size)); C.memcpy(&positions[0], voidptr(offsets), usize(size)) }
+	device := obj_header(obj_header(h.fields[0]).fields[0]).fields[0]
+	// Validate the complete request, then retain every incoming reference before
+	// replacing/releasing any old slot. Swaps and aliases may share sole owners.
+	for i in 0 .. int(range.length) {
+		if incoming[i] == 0 { continue }
+		b := sm_check(incoming[i], 'VinixSoftwareMTLBuffer')
+		if b.fields[0] != device || positions[i] > sm_buffer_length(b) { panic('iOS: invalid Metal compute buffer array entry') }
+	}
+	for i in 0 .. int(range.length) { objc_retain(incoming[i]) }
+	for i in 0 .. int(range.length) {
+		slot := int(range.location) + i
+		previous[i] = h.metal_compute.buffers[slot]
+		h.metal_compute.buffers[slot] = incoming[i]
+		h.metal_compute.offsets[slot] = positions[i]
+		h.metal_compute.inline_slots &= ~(u32(1) << u32(slot))
+	}
+	// Client no-copy deallocators can reenter here; no encoder state is read
+	// after this point, and all slots already expose the completed update.
+	for i in 0 .. int(range.length) { objc_release(previous[i]) }
 }
 fn sm_compute_validate(state &SoftwareMetalComputeBindings) {
 	if state.pipeline == 0 { panic('iOS: Metal compute dispatch requires a pipeline') }
@@ -214,6 +271,9 @@ fn sm_compute_start(device u64, command u64) {
 	sm_method(command, c'computeCommandEncoder', u64(unsafe { voidptr(sm_compute_encoder) }), c'@16@0:8')
 	sm_method(encoder, c'setComputePipelineState:', u64(unsafe { voidptr(sm_compute_set_pipeline) }), c'v24@0:8@16')
 	sm_method(encoder, c'setBuffer:offset:atIndex:', u64(unsafe { voidptr(sm_compute_set_buffer) }), c'v40@0:8@16Q24Q32')
+	sm_method(encoder, c'setBytes:length:atIndex:', u64(unsafe { voidptr(sm_compute_set_bytes) }), c'v40@0:8r^v16Q24Q32')
+	sm_method(encoder, c'setBufferOffset:atIndex:', u64(unsafe { voidptr(sm_compute_set_offset) }), c'v32@0:8Q16Q24')
+	sm_method(encoder, c'setBuffers:offsets:withRange:', u64(unsafe { voidptr(sm_compute_set_buffers) }), c'v48@0:8r^@16r^Q24{_NSRange=QQ}32')
 	for selector in [c'dispatchThreadgroups:threadsPerThreadgroup:', c'dispatchThreads:threadsPerThreadgroup:']! { sm_method(encoder, selector, u64(unsafe { voidptr(sm_compute_dispatch) }), c'v64@0:8{MTLSize=QQQ}16{MTLSize=QQQ}40') }
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 }

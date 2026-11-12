@@ -27,6 +27,8 @@ Implemented Objective-C API:
 - Compute pipeline: `device`, `maxTotalThreadsPerThreadgroup`,
   `threadExecutionWidth`, `staticThreadgroupMemoryLength`.
 - Compute encoder: `setComputePipelineState:`, `setBuffer:offset:atIndex:`,
+  `setBytes:length:atIndex:`, `setBufferOffset:atIndex:`,
+  `setBuffers:offsets:withRange:`,
   `dispatchThreads:threadsPerThreadgroup:`,
   `dispatchThreadgroups:threadsPerThreadgroup:`, `endEncoding`.
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`,
@@ -277,6 +279,28 @@ interpreter failure sets command status 5 and an owned NSError in
 commands are skipped. The domain global is exported from Metal.framework.
 Scheduled/completed notifications and waits still finish.
 Clients must synchronize direct buffer access against submission.
+
+`setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
+owned internal buffer and replaces that slot with offset zero. It does not
+retain the client pointer. Each dispatch retains its own buffer reference, so
+later stack writes, inline replacements and explicit buffer rebindings cannot
+alter recorded inline data. Nil pointers, zero/oversized lengths, overflowing
+address spans and slots outside 0..30 reject. This profile requires an explicit
+MTLBuffer binding for `setBufferOffset:atIndex:`; inline and unset slots reject.
+An offset at the buffer end is allowed, with kernel extents/alignment checked
+when dispatching. See [Apple's inline-byte API](https://developer.apple.com/documentation/metal/mtlcomputecommandencoder/setbytes(_:length:index:)).
+
+`setBuffers:offsets:withRange:` copies handle and offset arrays for a range
+within slots 0..30. The empty range at location 31 is valid without arrays;
+nonempty requests require both readable arrays. Nil entries clear slots and
+their offsets are ignored. All resources, devices and offsets are validated
+before mutation; all incoming handles are retained before replacing any slot.
+This supports swaps where only the encoder owns the buffers. Explicit single
+and bulk bindings reset inline state. Updates publish all new state before
+releasing replaced resources, so reentrant no-copy deallocators observe the
+completed update and may make further binding changes. Recorded dispatches
+retain their earlier handle/offset snapshots. All setters require active,
+uncommitted encoding.
 
 Forward constant GEPs may select scalar array/structure/vector elements and
 chain from earlier GEPs. They require explicit little-endian layouts with
