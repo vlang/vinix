@@ -59,7 +59,7 @@ Except parameter two's `immarg` on classification, zero counts and integer abs,
 return/parameter, string/type,
 `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. An 808-entry fixed stack cache validates each admitted
+validation budget. A 1064-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -89,6 +89,8 @@ including dynamic shift amounts and rotations, in another two width ranges.
 `umin`/`umax` at i1..i64, in four more independent width ranges.
 [Integer absolute value](SCALAR-INTEGER-ABS.md) adds `abs` at i1..i64, with a
 constant i1 minimum-poison flag and its own width range.
+[Saturating arithmetic](SCALAR-SATURATING.md) adds signed and unsigned
+`sadd.sat`/`uadd.sat`/`ssub.sat`/`usub.sat` at i1..i64, in four more width ranges.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting
