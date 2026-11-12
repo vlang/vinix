@@ -18,6 +18,9 @@ Maps rendered onboarding in r31, then exited after Skip on Play Store code
 passing the null system shared-library catalog into Arrays.asList.
 Guest r32 passed that regression and advanced to a missing staged-install
 session query, with missing job-property getters also logged.
+Guest r33 passed those regressions and rendered the Explore/search/control
+screen, then lost its main looper on missing JobParameters.getJobId. Tiles
+were not rendered before that failure.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -917,3 +920,42 @@ Snapshot `job-install-api-uart-20261112-r1`, plan
 `job-install-api-readback-20261112-r1` retain its two-entry export, archive
 SHA256 `154ef88682a03c9d6c802c3e42aaf7f9cd2025200034387407b79119824171c5`.
 The fixture bind was released before broker startup and the next Maps retry.
+
+Guest r33 advanced past onboarding to the real Explore screen with Search
+here, map controls, Local vibe and navigation tabs (`maps-after-skip.png`).
+The map region remained empty. The process then failed its main looper on
+JobParameters.getJobId in Play Store `asuf.onStartJob`, called from the
+existing JobScheduler callback. The bridge disconnected; there is no clean
+Maps exit or map-tile qualification. Prior job getter and staged-session
+linkage failures are absent. Caller readback is retained at
+`vending-job-parameters-caller-20261112-r1/classes.dex/asuf.smali`.
+
+Immutable snapshot `maps-job-install-final-uart-20261112-r1` has SHA256
+`0842e579f0551212605e2bf06cf104d348c0e6f4ebf5e86775bd5c7a2cc6e140`.
+Full app log markers are JOB-INSTALL-MAPS-LOG-BEGIN/END. The watcher sampled
+minimum disk7952642048 bytes and MemFree33792KiB before verified shutdown at
+about359 seconds; no600-second stability result is claimed.
+Its synced, stopped data image has SHA256
+`ef87c2be044c1ca686be1bb6835b624f0662e9b61d0b08a9f824b5bf6cdcfac8`.
+
+`framework_job_parameters.v` returns the ID from the JobInfo already carried
+by the scheduler's JobParameters object. It changes no scheduling behavior.
+The signed fixture now declares a non-exported BIND_JOB_SERVICE service in
+its own generated manifest, schedules a zero-latency one-shot job and checks
+the real onStartJob callback's ID, extras and exactly-one count before its
+existing main-queue pass fence. It also checks that the callback is queued,
+not inline. There is no reflective constructor access or undeclared service.
+
+SDK `framework-job-parameters-20261112-r1` passed guarded full assembly and
+DEX readback: guard/child0/0, complete cleanup,4768ms, RSS464896000 and shared
+growth29405184 bytes. Signed fixture r28 build/link/sign/verify passed0/0,
+complete cleanup,1737ms, RSS138297344 and growth25059328 bytes. Guest r34
+stages that pair under the unchanged native/core, volume probe and VM budget.
+
+The complete signed r28 fixture passed on ARM in r34 as UID/GID10160,
+including the real scheduled callback, ready/pass once, drained EOF and exit0.
+Snapshot `job-parameters-api-uart-20261112-r1`, plan
+`job-parameters-api-plan-20261112-r1.json` and strict independent readback
+`job-parameters-api-readback-20261112-r1` retain its two-entry export, archive
+SHA256 `1c2746eb7b06924d8fef255c6b1a9c10abf97c8b7d1bc5b14c6136fdda556999`.
+The fixture bind was released before the broker retry.

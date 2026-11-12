@@ -5,6 +5,36 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static scheduleProbeJob(Landroid/content/Context;)V
+.locals 6
+new-instance v0, Landroid/content/ComponentName;
+const-string v1, "org.vinix.bootstrap"
+const-string v2, "org.vinix.bootstrap.TestJobService"
+invoke-direct {v0, v1, v2}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+new-instance v1, Landroid/app/job/JobInfo$Builder;
+const v2, 0x1234567
+invoke-direct {v1, v2, v0}, Landroid/app/job/JobInfo$Builder;-><init>(ILandroid/content/ComponentName;)V
+new-instance v0, Landroid/os/PersistableBundle;
+invoke-direct {v0}, Landroid/os/PersistableBundle;-><init>()V
+const-string v2, "job-payload"
+const/16 v3, 73
+invoke-virtual {v0, v2, v3}, Landroid/os/PersistableBundle;->putInt(Ljava/lang/String;I)V
+invoke-virtual {v1, v0}, Landroid/app/job/JobInfo$Builder;->setExtras(Landroid/os/PersistableBundle;)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
+move-result-object v1
+const-string v0, "jobscheduler"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/app/job/JobScheduler;
+invoke-virtual {v0, v1}, Landroid/app/job/JobScheduler;->schedule(Landroid/app/job/JobInfo;)I
+move-result v0
+const/4 v1, 1
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget v0, Lorg/vinix/bootstrap/TestJobService;->calls:I
+const/4 v1, 0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+.end method
 .method public static jobInstallQueries(Landroid/content/Context;)V
 .locals 8
 invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
@@ -866,6 +896,8 @@ const/4 v2, 1
 invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
 sget v1, Lorg/vinix/bootstrap/TestUserBroadcast;->calls:I
 invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget v1, Lorg/vinix/bootstrap/TestJobService;->calls:I
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
 const-string v1, "CURRENT-API-PASS"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
@@ -1156,6 +1188,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->buildAndObserver()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->storageDatabase(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sharedLibraryCatalog(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->jobInstallQueries(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->scheduleProbeJob(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1396,6 +1429,42 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
+	os.write_file(root + '/smali/TestJobService.smali', r'.class public Lorg/vinix/bootstrap/TestJobService;
+.super Landroid/app/job/JobService;
+.field public static calls:I
+.method public constructor <init>()V
+.locals 0
+invoke-direct {p0}, Landroid/app/job/JobService;-><init>()V
+return-void
+.end method
+.method public onStartJob(Landroid/app/job/JobParameters;)Z
+.locals 3
+invoke-virtual {p1}, Landroid/app/job/JobParameters;->getJobId()I
+move-result v0
+const v1, 0x1234567
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {p1}, Landroid/app/job/JobParameters;->getExtras()Landroid/os/PersistableBundle;
+move-result-object v0
+const-string v1, "job-payload"
+invoke-virtual {v0, v1}, Landroid/os/PersistableBundle;->getInt(Ljava/lang/String;)I
+move-result v0
+const/16 v1, 73
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget v0, Lorg/vinix/bootstrap/TestJobService;->calls:I
+add-int/lit8 v0, v0, 1
+sput v0, Lorg/vinix/bootstrap/TestJobService;->calls:I
+const/4 v1, 1
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const/4 v0, 0
+return v0
+.end method
+.method public onStopJob(Landroid/app/job/JobParameters;)Z
+.locals 1
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.end method
+')!
 	os.write_file(root + '/smali/TestDataObserver.smali', r'.class public Lorg/vinix/bootstrap/TestDataObserver;
 .super Landroid/os/Binder;
 .implements Landroid/content/pm/IPackageDataObserver;
@@ -1528,7 +1597,14 @@ iget-object v0, p0, Lorg/vinix/bootstrap/TestAccounts;->snapshot:[Landroid/accou
 return-object v0
 .end method
 ')!
-	os.cp(base + '/unsigned.apk', root + '/unsigned.apk')!
+	// Declare the callback service in the APK; scheduling must not rely on an
+	// undeclared class even if the current scheduler can instantiate one.
+	os.write_file(root + '/AndroidManifest.xml', '<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.vinix.bootstrap" android:versionCode="1"><uses-sdk android:minSdkVersion="28" android:targetSdkVersion="35"/><application android:label="Current API fixture"><activity android:name="org.vinix.bootstrap.Main" android:exported="true"><intent-filter><action android:name="android.intent.action.MAIN"/><category android:name="android.intent.category.LAUNCHER"/></intent-filter></activity><service android:name="org.vinix.bootstrap.TestJobService" android:permission="android.permission.BIND_JOB_SERVICE" android:exported="false"/></application></manifest>')!
+	if os.system_args([os.abs_path('build/android-native-ws/aapt2'), 'link', '-I',
+		os.abs_path('build/android-framework/opensudoku/overlay/opt/vinix-android-aarch64/usr/lib/java/dex/android_translation_layer/framework-res.apk'),
+		'--manifest', root + '/AndroidManifest.xml', '-o', root + '/unsigned.apk']) != 0 {
+		panic('fixture manifest link failed')
+	}
 	sandbox_assets(root)!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	tools := '/Users/alex/code/vinix/build/android-framework/tools'
