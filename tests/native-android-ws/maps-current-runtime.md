@@ -1654,3 +1654,32 @@ checks consistency with the unmanaged/no-device-owner state. Snapshot
 `update-policy-api-readback-20261112-r1` retain archive SHA256
 `6150e91ec4de9224959efc2defce80a4e93e976ba8e6ca290c2d3a02a7dcef06`.
 The fixture bind was released before broker preparation and the Maps retry.
+
+Guest r51 did not reach broker readiness, so no Maps launch was attempted.
+After input/companion preparation it reported `real GMS authenticator did not
+attach before deadline`; the original45-second attachment limit was retained.
+Its private broker log contains only the listening-socket announcement, without
+a Java crash. During preparation, read-only probes showed the controller
+advancing from browser assets to GMS/Play Store APKs. The complete receipt
+records started14:04:18 and finished14:13:02 UTC. No host-memory shortage was
+observed in the later probe; the startup failure's cause is not established.
+
+Only verified owned QEMU PID32397 was synced and stopped. The complete raw data
+image remains at `maps-current-20261112-r51/app-data.ext2`, SHA256
+`070597c3a11424cccd2eb2db8b8b7daa03090df341a4c6fbf75d989d01898c4a`.
+Read-only debugfs extraction retained result contents under
+`maps-current-20261112-r51/retained-results/results`. Host chown attempts were
+denied; original ownership metadata remains in the raw image and receipts.
+Receipt SHA256 is `91bac066f3c728786746117934c04dbbc4d50f974b9b5f7b60ec2c932cb5b560`;
+broker.log SHA256 is `9c47814b4e6aeb647bbb450b895c88ed4bc28ac2ecf3a374cdaa7c4617d6995a`.
+Snapshot `maps-auth-attach-final-uart-20261112-r1` has full SHA256
+`4d7ec259f400330ce4c12d347a9963a26a64ed3765f14036882af320ff4c85f9`.
+A diagnostic receipt print interleaved with the broker's UART export. No strict
+reconstruction or removal is claimed for that export; its original complete
+disk bundle is preserved. The earlier successful API export remains separate
+and strictly verified. A fresh unchanged-artifact retry is being prepared.
+
+Fresh r52 staging passed0/0, complete cleanup,32756ms, RSS37601280, shared
+growth218722304 bytes. Its UUID, read-only e2fsck and initial-image hash checks
+passed before boot. SDK, JNI, core and wolfJSSE inputs are unchanged from the
+successful r51 API run. Broker preparation has begun; no Maps result is claimed.
