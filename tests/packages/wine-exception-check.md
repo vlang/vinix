@@ -64,6 +64,18 @@ workspace. Complete unchanged compiler, MinGW, distribution/translator,
 sysroot/GCC and kernel inputs remain in the
 [pinned-input bundle](wine-forksafe-retention-check.md); keep both bundles.
 
+The complete workspace archive is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-exceptions-20261112-01.tar.gz`.
+Archive SHA-256:
+`8078d1ff2ed61cad27f818e96f5d96adf934408432eff82563ae3b0f4915bce8`.
+Its adjacent `.inventory.txt` SHA-256 is
+`4c9e5ef5fdaa6006ee892a9713dd296c17db7ac70d6af569fb7997aa28813f4d`.
+The archive tool exited 0 after restoring and comparing all types, modes, links,
+sizes and hashes with the original tree. Original and restored root modes are
+both 755. The archived report predates this checksum paragraph, avoiding a
+recursive checksum dependency. Implementation and qualification are committed
+as `e76d88022`.
+
 Graphical Wine, broader exception/signal and stack-based SEH compatibility,
 detached-server lease supervision, complete corresponding source and release
 acceptance remain open. Section 14 remains unchecked.
