@@ -128,6 +128,7 @@ struct MapsLaunch {
 	trace_onboarding bool
 	trace_tls        bool
 	trace_surface_dump string
+	trace_surface_fields string
 }
 
 fn hash(path string) !string {
@@ -594,6 +595,7 @@ struct Session {
 	trace_onboarding bool
 	trace_tls        bool
 	trace_surface_dump string
+	trace_surface_fields string
 }
 
 struct StopRequest {
@@ -835,6 +837,7 @@ struct Receipt {
 	trace_onboarding bool
 	trace_tls        bool
 	trace_surface_dump string
+	trace_surface_fields string
 mut:
 	finished_utc      string
 	status            string = 'failed'
@@ -1438,7 +1441,8 @@ fn select_environment(build Build, principal string) ! {
 // these diagnostics; unrelated ambient values cannot enable them.
 fn select_maps_diagnostics(session Session) {
 	for key in ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS'] {
-		if session.trace_onboarding || (key == 'VINIX_ANDROID_TRACE_TREE' && valid_surface_dump(session.trace_surface_dump)) {
+		if session.trace_onboarding || (key == 'VINIX_ANDROID_TRACE_TREE'
+			&& (valid_surface_dump(session.trace_surface_dump) || valid_surface_fields(session.trace_surface_fields))) {
 			os.setenv(key, '1', true)
 		} else {
 			os.unsetenv(key)
@@ -1455,6 +1459,11 @@ fn select_maps_diagnostics(session Session) {
 	} else {
 		os.unsetenv('VINIX_ANDROID_TRACE_SURFACE_DUMP')
 	}
+	if valid_surface_fields(session.trace_surface_fields) {
+		os.setenv('VINIX_ANDROID_TRACE_SURFACE_FIELDS', session.trace_surface_fields, true)
+	} else {
+		os.unsetenv('VINIX_ANDROID_TRACE_SURFACE_FIELDS')
+	}
 }
 
 fn valid_surface_dump(name string) bool {
@@ -1466,11 +1475,38 @@ fn valid_surface_dump(name string) bool {
 	return true
 }
 
+// Match the native reader's bounds. Numeric components select a bounded
+// array/list index; all other components are literal Java field identifiers.
+fn valid_surface_fields(value string) bool {
+	if value.len == 0 || value.len > 4095 { return false }
+	paths := value.split(',')
+	if paths.len > 16 { return false }
+	for path in paths {
+		if path.len == 0 || path.len > 255 { return false }
+		parts := path.split('.')
+		if parts.len > 16 { return false }
+		for part in parts {
+			if part.len == 0 { return false }
+			if part[0].is_digit() {
+				if part.len > 1 && part[0] == `0` { return false }
+				mut index := u32(0)
+				for digit in part.bytes() {
+					if !digit.is_digit() { return false }
+					index = index * 10 + u32(digit - `0`)
+					if index > 65535 { return false }
+				}
+			} else if !valid_surface_dump(part) { return false }
+		}
+	}
+	return true
+}
+
 struct DiagnosticSelection {
 mut:
 	trace_onboarding bool
 	trace_tls        bool
 	trace_surface_dump string
+	trace_surface_fields string
 }
 
 fn broker_diagnostics(args []string) !DiagnosticSelection {
@@ -1491,6 +1527,14 @@ fn broker_diagnostics(args []string) !DiagnosticSelection {
 				selected.trace_tls = true
 			}
 			else {
+				if argument.starts_with('--trace-surface-fields=') {
+					paths := argument.all_after('=')
+					if selected.trace_surface_fields != '' || !valid_surface_fields(paths) {
+						return error('invalid or duplicate surface field paths')
+					}
+					selected.trace_surface_fields = paths
+					continue
+				}
 				if !argument.starts_with('--trace-surface-dump=') { return error('unsupported broker option: ' + argument) }
 				name := argument.all_after('=')
 				if selected.trace_surface_dump != '' || !valid_surface_dump(name) {
@@ -1851,6 +1895,7 @@ fn broker_session(mut receipt Receipt) ! {
 				trace_onboarding: receipt.trace_onboarding
 				trace_tls:        receipt.trace_tls
 				trace_surface_dump: receipt.trace_surface_dump
+				trace_surface_fields: receipt.trace_surface_fields
 			}
 			publish_fresh(broker_root + '/session.json', json2.encode(session) + '\n', 0o444)!
 			receipt.service_ready = true
@@ -1908,6 +1953,7 @@ fn launch_maps() ! {
 		trace_onboarding: session.trace_onboarding
 		trace_tls:        session.trace_tls
 		trace_surface_dump: session.trace_surface_dump
+		trace_surface_fields: session.trace_surface_fields
 	}
 	check_maps_launch(launched, desktop)!
 	if app_host_identity(launched.process, desktop)! != host {
@@ -1920,10 +1966,12 @@ fn launch_maps() ! {
 	}
 	if session.trace_tls { println('MAPS-ACCOUNT-TLS-TRACE private-log=maps.log') }
 	if session.trace_surface_dump != '' { println('MAPS-ACCOUNT-SURFACE-DUMP method=' + session.trace_surface_dump + ' private-log=maps.log') }
+	if valid_surface_fields(session.trace_surface_fields) { println('MAPS-ACCOUNT-SURFACE-FIELDS paths=' + session.trace_surface_fields + ' private-log=maps.log') }
 	os.execvp(launcher_path, [maps_apk])!
 }
 
 fn onboarding_trace_self_test() ! {
+	surface_fields_self_test()!
 	for arguments in [ []string{}, ['--broker'] ] {
 		if broker_diagnostics(arguments)! != DiagnosticSelection{} { return error('default broker enabled diagnostics') }
 	}
@@ -1958,7 +2006,7 @@ fn onboarding_trace_self_test() ! {
 		['--trace-onboarding=1'], ['--trace-tls=1'], ['--trace-TLS'], ['']] {
 		if _ := broker_diagnostics(arguments) { return error('invalid trace invocation accepted') }
 	}
-	keys := ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS', 'VINIX_ANDROID_TRACE_TLS', 'VINIX_ANDROID_TRACE_SURFACE_DUMP']
+	keys := ['VINIX_ANDROID_TRACE_TREE', 'VINIX_ANDROID_TRACE_THREADS', 'VINIX_ANDROID_TRACE_TLS', 'VINIX_ANDROID_TRACE_SURFACE_DUMP', 'VINIX_ANDROID_TRACE_SURFACE_FIELDS']
 	mut previous := map[string]string{}
 	for key in keys {
 		if value := os.getenv_opt(key) { previous[key] = value }
@@ -1969,21 +2017,34 @@ fn onboarding_trace_self_test() ! {
 		}
 	}
 	legacy := json2.decode[Session]('{"kind":"vinix-maps-account-session-v1"}')!
-	if legacy.trace_onboarding || legacy.trace_tls || legacy.trace_surface_dump != '' { return error('legacy session enabled diagnostics') }
+	if legacy.trace_onboarding || legacy.trace_tls || legacy.trace_surface_dump != ''
+		|| legacy.trace_surface_fields != '' { return error('legacy session enabled diagnostics') }
 	legacy_launch := json2.decode[MapsLaunch]('{}')!
 	legacy_receipt := json2.decode[Receipt]('{}')!
-	if legacy_launch.trace_tls || legacy_receipt.trace_tls { return error('legacy receipt enabled TLS traces') }
+	if legacy_launch.trace_tls || legacy_receipt.trace_tls || legacy_launch.trace_surface_fields != ''
+		|| legacy_receipt.trace_surface_fields != '' { return error('legacy receipt enabled diagnostics') }
 	for selection in [DiagnosticSelection{}, DiagnosticSelection{ trace_onboarding: true },
 		DiagnosticSelection{ trace_tls: true }, DiagnosticSelection{ trace_onboarding: true, trace_tls: true },
 		DiagnosticSelection{ trace_surface_dump: 'tI' },
+		DiagnosticSelection{ trace_surface_fields: 'b.a.K,b.a.L' },
+		DiagnosticSelection{ trace_surface_fields: 'b.a.K', trace_surface_dump: 'tI' },
+		DiagnosticSelection{ trace_surface_fields: 'b.a.L', trace_tls: true },
 		DiagnosticSelection{ trace_onboarding: true, trace_tls: true, trace_surface_dump: 'tI' }] {
 		for key in keys { os.setenv(key, 'ambient-must-not-select-diagnostics', true) }
 		session := json2.decode[Session](json2.encode(Session{
 			trace_onboarding: selection.trace_onboarding, trace_tls: selection.trace_tls
 			trace_surface_dump: selection.trace_surface_dump
+			trace_surface_fields: selection.trace_surface_fields
 		}))!
 		select_maps_diagnostics(session)
 		for key in keys {
+			if key == 'VINIX_ANDROID_TRACE_SURFACE_FIELDS' {
+				if os.getenv(key) != selection.trace_surface_fields { return error('surface fields environment differs') }
+				if selection.trace_surface_fields == '' {
+					if _ := os.getenv_opt(key) { return error('ambient surface fields survived disabled session') }
+				}
+				continue
+			}
 			if key == 'VINIX_ANDROID_TRACE_SURFACE_DUMP' {
 				if os.getenv(key) != selection.trace_surface_dump { return error('surface dump environment differs') }
 				if selection.trace_surface_dump == '' {
@@ -1992,7 +2053,8 @@ fn onboarding_trace_self_test() ! {
 				continue
 			}
 			enabled := if key == 'VINIX_ANDROID_TRACE_TLS' { selection.trace_tls } else {
-				selection.trace_onboarding || (key == 'VINIX_ANDROID_TRACE_TREE' && selection.trace_surface_dump != '')
+				selection.trace_onboarding || (key == 'VINIX_ANDROID_TRACE_TREE'
+					&& (selection.trace_surface_dump != '' || selection.trace_surface_fields != ''))
 			}
 			if enabled {
 				if os.getenv(key) != '1' { return error('session trace selection did not reach Maps environment') }
@@ -2003,27 +2065,69 @@ fn onboarding_trace_self_test() ! {
 		launch := json2.decode[MapsLaunch](json2.encode(MapsLaunch{
 			trace_onboarding: session.trace_onboarding, trace_tls: session.trace_tls
 			trace_surface_dump: session.trace_surface_dump
+			trace_surface_fields: session.trace_surface_fields
 		}))!
 		if launch.trace_onboarding != selection.trace_onboarding || launch.trace_tls != selection.trace_tls
-			|| launch.trace_surface_dump != selection.trace_surface_dump {
+			|| launch.trace_surface_dump != selection.trace_surface_dump
+			|| launch.trace_surface_fields != selection.trace_surface_fields {
 			return error('Maps trace receipt lost session selection')
 		}
 	}
 	os.setenv('VINIX_ANDROID_TRACE_SURFACE_DUMP', 'ambient', true)
 	select_maps_diagnostics(Session{ trace_surface_dump: 'bad/name' })
 	if _ := os.getenv_opt('VINIX_ANDROID_TRACE_SURFACE_DUMP') { return error('invalid persisted surface dump survived') }
+	os.setenv('VINIX_ANDROID_TRACE_SURFACE_FIELDS', 'ambient', true)
+	select_maps_diagnostics(Session{ trace_surface_fields: 'b..a' })
+	if _ := os.getenv_opt('VINIX_ANDROID_TRACE_SURFACE_FIELDS') { return error('invalid persisted surface fields survived') }
+	if _ := os.getenv_opt('VINIX_ANDROID_TRACE_TREE') { return error('invalid surface fields enabled tree trace') }
 	root := os.join_path(os.temp_dir(), 'vinix-maps-trace-' + os.getpid().str() + '-' + time.sys_mono_now().str())
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
 	os.chmod(root, 0o700)!
 	for name in ['broker.log', 'maps.log'] { os.write_file(root + '/' + name, 'private-onboarding-and-tls-sentinel')! }
-	os.write_file(root + '/receipt.json', json2.encode(Receipt{ trace_onboarding: true, trace_tls: true, trace_surface_dump: 'tI' }))!
+	os.write_file(root + '/receipt.json', json2.encode(Receipt{ trace_onboarding: true, trace_tls: true, trace_surface_dump: 'tI', trace_surface_fields: 'b.a.L' }))!
 	retained := json2.decode[Archive](archive(root)!)!
 	if retained.entries.len != 1 || retained.entries[0].path != 'receipt.json'
 		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_onboarding
 		|| !json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_tls
-		|| json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_surface_dump != 'tI' {
+		|| json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_surface_dump != 'tI'
+		|| json2.decode[Receipt](base64.decode_str(retained.entries[0].data))!.trace_surface_fields != 'b.a.L' {
 		return error('diagnostics escaped private logs or lost public opt-in receipt')
+	}
+}
+
+fn surface_fields_self_test() ! {
+	longest_path := 'a'.repeat(128) + '.' + 'b'.repeat(126)
+	max_paths := []string{len: 16, init: longest_path}.join(',')
+	for value in ['b.a.K,b.a.L', 'b.a.L.f.value', 'items.0.name', 'items.65535',
+		'_' + '$' + 'capture', 'a.'.repeat(15) + 'a', 'a,'.repeat(15) + 'a', max_paths] {
+		if !valid_surface_fields(value) { return error('valid surface field selection rejected') }
+		for args in [['--broker', '--trace-surface-fields=' + value], ['--trace-surface-fields=' + value, '--broker']] {
+			selected := broker_diagnostics(args)!
+			if selected.trace_surface_fields != value || selected.trace_onboarding
+				|| selected.trace_tls || selected.trace_surface_dump != '' {
+				return error('surface field selection changed unrelated diagnostics')
+			}
+		}
+	}
+	for value in ['', '.a', 'a.', 'a..b', ',a', 'a,', 'a,,b', 'a/field', 'a\n', 'a\x00b',
+		'a=other', 'a;other', 'a.00', 'a.65536', 'a.999999999999999999', 'a.1x',
+		'a.-1', 'a[0]', 'a()','a.'.repeat(16) + 'a', 'a,'.repeat(16) + 'a',
+		'a'.repeat(129), longest_path + 'x', max_paths + ',a'] {
+		if valid_surface_fields(value) { return error('invalid surface field selection accepted') }
+		if _ := broker_diagnostics(['--broker', '--trace-surface-fields=' + value]) {
+			return error('invalid surface fields CLI accepted')
+		}
+	}
+	if _ := broker_diagnostics(['--broker', '--trace-surface-fields=b.a.K', '--trace-surface-fields=b.a.L']) {
+		return error('duplicate surface field option accepted')
+	}
+	if _ := broker_diagnostics(['--broker', '--trace-surface-fields']) {
+		return error('surface field option without paths accepted')
+	}
+	combined := broker_diagnostics(['--broker', '--trace-surface-fields=b.a.L', '--trace-surface-dump=tI'])!
+	if combined.trace_surface_fields != 'b.a.L' || combined.trace_surface_dump != 'tI' {
+		return error('independent surface diagnostics lost')
 	}
 }
 
@@ -2834,7 +2938,7 @@ fn main() {
 		return
 	}
 	diagnostics := broker_diagnostics(os.args[1..]) or {
-		eprintln('usage: maps-account-guest [--broker [--trace-onboarding] [--trace-tls] [--trace-surface-dump=METHOD]|--launch|--stop|--self-test]')
+		eprintln('usage: maps-account-guest [--broker [--trace-onboarding] [--trace-tls] [--trace-surface-dump=METHOD] [--trace-surface-fields=PATHS]|--launch|--stop|--self-test]')
 		eprintln(err)
 		exit(1)
 	}
@@ -2845,6 +2949,7 @@ fn main() {
 	mut receipt := Receipt{
 		started_utc: time.utc().str(), trace_onboarding: diagnostics.trace_onboarding, trace_tls: diagnostics.trace_tls
 		trace_surface_dump: diagnostics.trace_surface_dump
+		trace_surface_fields: diagnostics.trace_surface_fields
 	}
 	broker_session(mut receipt) or {
 		receipt.status = 'failed'

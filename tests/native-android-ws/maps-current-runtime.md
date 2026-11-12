@@ -21,7 +21,10 @@ passed the signed ARM API regression, including a real HTTPS 204 response and
 offline checks. r74's actual Maps validation succeeded; Explore remained blank
 and the main looper exited on missing JobParameters.getNetwork during search.
 The [job network/key authentication metadata repair](maps-job-network-keygen-runtime-20261113.md)
-passed the signed ARM regression in r75. Its actual Maps retry is pending.
+passed the signed ARM regression in r75. Maps then returned real Louvre details
+and photos and an Eiffel Tower-to-Louvre route/turn preview without the previous
+main-looper failure. Tiles and route geometry remained blank. No account has
+authenticated; renderer-state investigation continues.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

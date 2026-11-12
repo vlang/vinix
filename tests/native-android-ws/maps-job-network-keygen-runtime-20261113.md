@@ -64,4 +64,22 @@ receipt 03df6e68a9d40b803f5c914d769a71cca4651aa928ef2dd97880414d0b398024.
 Readback reconstructs the unchanged two-entry export with zero removals:
 archive 191db2bebc089c462dc9b57647fb6663366b95e29439a4c9e42d8a532e4befb2;
 child 4ee73ffbc7ba0053e8222c69c123d90ba310df59c0ce1a32923f017afe9e7d24.
-The actual Maps retry is pending; these API checks do not qualify full Maps.
+r75's actual Maps run reached Explore, real Louvre results (4.7 stars,
+382551 reviews), details and photos, then an Eiffel Tower-to-Louvre route with
+a 9-minute driving estimate. The route preview displayed a turn instruction
+(Head toward Pont d'Iéna). Tiles and route geometry remained blank. The retained
+Maps and GMS logs contain no main-looper/uncaught failure, NoSuchMethodError,
+auth-pump failure or service-exit marker. Google sign-in was not attempted.
+These observations establish progress past r74's job API failure, not full Maps.
+
+The complete 600134 ms watch retained at least 4753648 KiB free memory and
+7240785920 bytes free app storage. After sync returned a guest prompt, owned
+QEMU PID 82022 was stopped and verified absent before read-only extraction.
+The broker receipt was still ready, awaiting account interaction; no clean
+application exit or authentication is claimed. maps-current-20261113-r75 retains
+screenshots, logs, receipt, complete UART, raw image and retained.sha256.
+Final image SHA256 c42cbfb94467c2c7ddde289eed861a2c40a3814c83e6c3e04f407b93774fd0a5;
+Maps log 582027ce3ca800000be09081c5765d2205c0840c606849dc6e69f4441896e4d6;
+broker log 53d82179404583d2c78498b4b38c325ae4430ff199c7fcc7276d3aa30f1a3173;
+receipt 82b453bc1d1f0dfd4decb5ccbb7436df067712d4abc45543e7a9a17cb49a2667;
+UART 8fb8b8955df57b579879c3ab94ea33a31e20c5ff2b5adeb793d3eff1b3a66730.
