@@ -12,8 +12,10 @@ full signed ARM regression in r70. The normal runtime reached Explore with a
 blank map and a check-in timeout page, then exited after cancellation/transport
 failure. A [local-expiry crossing fix](maps-auth-local-expiry-20261113.md) passed
 all 33 ASan and ordinary protocol tests and ARM compilation; runtime retry is
-pending. r71 is separately testing a JIT-enabled native candidate, which has
-passed the full signed API regression but is not yet Maps-qualified.
+pending. The [JIT experiment](maps-jit-runtime-20261113.md) passed the signed API
+regression in r71/r72. r72 rendered onboarding and a Google account error page,
+then exited with an account-query timeout in its log. JIT remains disabled by
+default; these attempts qualify neither full Maps nor local expiry handling.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.
