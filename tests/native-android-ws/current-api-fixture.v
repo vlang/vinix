@@ -1,0 +1,273 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+import os
+import json2
+import crypto.sha256
+
+const main_source = r'.class public Lorg/vinix/bootstrap/Main;
+.super Landroid/app/Activity;
+.method public constructor <init>()V
+.locals 0
+invoke-direct {p0}, Landroid/app/Activity;-><init>()V
+return-void
+.end method
+.method protected onCreate(Landroid/os/Bundle;)V
+.locals 2
+invoke-super {p0, p1}, Landroid/app/Activity;->onCreate(Landroid/os/Bundle;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->mime()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->parcel()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
+new-instance v0, Landroid/telephony/TelephonyManager;
+invoke-direct {v0}, Landroid/telephony/TelephonyManager;-><init>()V
+invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->isVoiceCapable()Z
+move-result v0
+const/4 v1, 0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "CURRENT-API-PASS"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+.end method
+.method public static expect(II)V
+.locals 1
+if-eq p0, p1, :ok
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+:ok
+return-void
+.end method
+.method public static mime()V
+.locals 10
+new-instance v0, Landroid/content/IntentFilter;
+const-string v1, "A"
+invoke-direct {v0, v1}, Landroid/content/IntentFilter;-><init>(Ljava/lang/String;)V
+const-string v2, "image/*"
+invoke-virtual {v0, v2}, Landroid/content/IntentFilter;->addDataType(Ljava/lang/String;)V
+invoke-virtual {v0, v2}, Landroid/content/IntentFilter;->addDataType(Ljava/lang/String;)V
+invoke-virtual {v0}, Landroid/content/IntentFilter;->countDataTypes()I
+move-result v7
+const/4 v8, 1
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v2, "image/png"
+invoke-virtual {v0, v2}, Landroid/content/IntentFilter;->hasDataType(Ljava/lang/String;)Z
+move-result v7
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v3, "content"
+const-string v4, "content://test/image"
+invoke-static {v4}, Landroid/net/Uri;->parse(Ljava/lang/String;)Landroid/net/Uri;
+move-result-object v4
+const/4 v5, 0
+const/4 v6, 0
+invoke-virtual/range {v0 .. v6}, Landroid/content/IntentFilter;->match(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/net/Uri;Ljava/util/Set;Ljava/lang/String;)I
+move-result v7
+const v8, 0x608000
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v1, "B"
+invoke-virtual/range {v0 .. v6}, Landroid/content/IntentFilter;->match(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/net/Uri;Ljava/util/Set;Ljava/lang/String;)I
+move-result v7
+const/4 v8, -3
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v1, "A"
+const-string v2, "text/plain"
+invoke-virtual/range {v0 .. v6}, Landroid/content/IntentFilter;->match(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/net/Uri;Ljava/util/Set;Ljava/lang/String;)I
+move-result v7
+const/4 v8, -1
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v2, "image/png"
+const-string v3, "https"
+invoke-virtual/range {v0 .. v6}, Landroid/content/IntentFilter;->match(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/net/Uri;Ljava/util/Set;Ljava/lang/String;)I
+move-result v7
+const/4 v8, -2
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v3, "content"
+new-instance v5, Ljava/util/HashSet;
+invoke-direct {v5}, Ljava/util/HashSet;-><init>()V
+const-string v9, "missing"
+invoke-interface {v5, v9}, Ljava/util/Set;->add(Ljava/lang/Object;)Z
+invoke-virtual/range {v0 .. v6}, Landroid/content/IntentFilter;->match(Ljava/lang/String;Ljava/lang/String;Ljava/lang/String;Landroid/net/Uri;Ljava/util/Set;Ljava/lang/String;)I
+move-result v7
+const/4 v8, -4
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:bad_start
+const-string v9, "broken"
+invoke-virtual {v0, v9}, Landroid/content/IntentFilter;->addDataType(Ljava/lang/String;)V
+:bad_end
+new-instance v9, Ljava/lang/AssertionError;
+invoke-direct {v9}, Ljava/lang/AssertionError;-><init>()V
+throw v9
+.catch Landroid/content/IntentFilter$MalformedMimeTypeException; {:bad_start .. :bad_end} :bad_expected
+:bad_expected
+move-exception v9
+invoke-virtual {v0}, Landroid/content/IntentFilter;->countDataTypes()I
+move-result v7
+const/4 v8, 1
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Landroid/content/IntentFilter;
+invoke-direct {v0}, Landroid/content/IntentFilter;-><init>()V
+const/4 v3, 0
+const/4 v4, 0
+invoke-virtual {v0, v2, v3, v4}, Landroid/content/IntentFilter;->matchData(Ljava/lang/String;Ljava/lang/String;Landroid/net/Uri;)I
+move-result v7
+const/4 v8, -2
+invoke-static {v7, v8}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+.end method
+.method public static parcel()V
+.locals 8
+const-string v0, "01234567-89ab-cdef-8123-456789abcdef"
+invoke-static {v0}, Landroid/os/ParcelUuid;->fromString(Ljava/lang/String;)Landroid/os/ParcelUuid;
+move-result-object v0
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v1
+const/4 v2, 0
+invoke-virtual {v0, v1, v2}, Landroid/os/ParcelUuid;->writeToParcel(Landroid/os/Parcel;I)V
+invoke-virtual {v1, v2}, Landroid/os/Parcel;->setDataPosition(I)V
+sget-object v3, Landroid/os/ParcelUuid;->CREATOR:Landroid/os/Parcelable$Creator;
+invoke-interface {v3, v1}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;
+move-result-object v4
+invoke-virtual {v0, v4}, Landroid/os/ParcelUuid;->equals(Ljava/lang/Object;)Z
+move-result v5
+const/4 v6, 1
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-interface {v3, v6}, Landroid/os/Parcelable$Creator;->newArray(I)[Ljava/lang/Object;
+move-result-object v4
+instance-of v5, v4, [Landroid/os/ParcelUuid;
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1}, Landroid/os/Parcel;->recycle()V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v1
+const v0, 0x200404
+invoke-virtual {v1, v0}, Landroid/os/Parcel;->writeInt(I)V
+invoke-virtual {v1, v2}, Landroid/os/Parcel;->setDataPosition(I)V
+sget-object v3, Landroid/bluetooth/BluetoothClass;->CREATOR:Landroid/os/Parcelable$Creator;
+invoke-interface {v3, v1}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;
+move-result-object v4
+check-cast v4, Landroid/bluetooth/BluetoothClass;
+invoke-virtual {v4}, Landroid/bluetooth/BluetoothClass;->getDeviceClass()I
+move-result v5
+const/16 v7, 0x404
+invoke-static {v5, v7}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const v7, 0x200000
+invoke-virtual {v4, v7}, Landroid/bluetooth/BluetoothClass;->hasService(I)Z
+move-result v5
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1}, Landroid/os/Parcel;->recycle()V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v1
+const-string v0, "01:23:45:67:89:AB"
+invoke-virtual {v1, v0}, Landroid/os/Parcel;->writeString(Ljava/lang/String;)V
+invoke-virtual {v1, v2}, Landroid/os/Parcel;->setDataPosition(I)V
+sget-object v3, Landroid/bluetooth/BluetoothDevice;->CREATOR:Landroid/os/Parcelable$Creator;
+invoke-interface {v3, v1}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;
+move-result-object v4
+check-cast v4, Landroid/bluetooth/BluetoothDevice;
+invoke-virtual {v4}, Landroid/bluetooth/BluetoothDevice;->getAddress()Ljava/lang/String;
+move-result-object v4
+invoke-virtual {v0, v4}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v5
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1}, Landroid/os/Parcel;->recycle()V
+return-void
+.end method
+.method public static accounts()V
+.locals 8
+new-instance v0, Lorg/vinix/bootstrap/TestAccounts;
+invoke-direct {v0}, Lorg/vinix/bootstrap/TestAccounts;-><init>()V
+const/4 v7, 0
+new-array v1, v7, [Landroid/accounts/Account;
+iput-object v1, v0, Lorg/vinix/bootstrap/TestAccounts;->snapshot:[Landroid/accounts/Account;
+const-string v1, "type"
+const/4 v7, 1
+new-array v2, v7, [Ljava/lang/String;
+const/4 v6, 0
+const-string v5, "feature"
+aput-object v5, v2, v6
+const/4 v3, 0
+const/4 v4, 0
+invoke-virtual {v0, v1, v2, v3, v4}, Landroid/accounts/AccountManager;->getAccountsByTypeAndFeatures(Ljava/lang/String;[Ljava/lang/String;Landroid/accounts/AccountManagerCallback;Landroid/os/Handler;)Landroid/accounts/AccountManagerFuture;
+move-result-object v5
+invoke-interface {v5}, Landroid/accounts/AccountManagerFuture;->getResult()Ljava/lang/Object;
+move-result-object v5
+check-cast v5, [Landroid/accounts/Account;
+array-length v5, v5
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-array v5, v7, [Landroid/accounts/Account;
+new-instance v6, Landroid/accounts/Account;
+const-string v7, "name"
+invoke-direct {v6, v7, v1}, Landroid/accounts/Account;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+const/4 v7, 0
+aput-object v6, v5, v7
+iput-object v5, v0, Lorg/vinix/bootstrap/TestAccounts;->snapshot:[Landroid/accounts/Account;
+:features_start
+invoke-virtual {v0, v1, v2, v3, v4}, Landroid/accounts/AccountManager;->getAccountsByTypeAndFeatures(Ljava/lang/String;[Ljava/lang/String;Landroid/accounts/AccountManagerCallback;Landroid/os/Handler;)Landroid/accounts/AccountManagerFuture;
+move-result-object v5
+invoke-interface {v5}, Landroid/accounts/AccountManagerFuture;->getResult()Ljava/lang/Object;
+:features_end
+new-instance v5, Ljava/lang/AssertionError;
+invoke-direct {v5}, Ljava/lang/AssertionError;-><init>()V
+throw v5
+.catch Landroid/accounts/AuthenticatorException; {:features_start .. :features_end} :unsupported
+:unsupported
+move-exception v5
+const/4 v2, 0
+invoke-virtual {v0, v1, v2, v3, v4}, Landroid/accounts/AccountManager;->getAccountsByTypeAndFeatures(Ljava/lang/String;[Ljava/lang/String;Landroid/accounts/AccountManagerCallback;Landroid/os/Handler;)Landroid/accounts/AccountManagerFuture;
+move-result-object v5
+invoke-interface {v5}, Landroid/accounts/AccountManagerFuture;->getResult()Ljava/lang/Object;
+move-result-object v5
+check-cast v5, [Landroid/accounts/Account;
+array-length v5, v5
+const/4 v6, 1
+invoke-static {v5, v6}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+.end method
+'
+
+fn main() {
+	if os.args.len == 4 && os.args[1] == '--plan' {
+		serial := os.read_file(os.args[2])!
+		if serial.len > 8 * 1024 * 1024 || os.exists(os.args[3]) { panic('bounded input and fresh plan required') }
+		prefix := 'VINIX-SERVICE-QUERY-RESULTS-1 '
+		headers := serial.split_into_lines().filter(it.starts_with(prefix + 'BEGIN '))
+		if headers.len != 1 { panic('one complete fixture export required') }
+		fields := headers[0].fields()
+		if fields.len != 5 || !serial.contains(prefix + 'END ' + fields[2..].join(' ')) { panic('incomplete fixture export') }
+		os.write_file(os.args[3], json2.encode({
+			'version': json2.Any(2), 'frame_prefix': json2.Any(prefix),
+			'serial_sha256': json2.Any(sha256.sum(serial.bytes()).hex()),
+			'archive_sha256': json2.Any(fields[2]), 'archive_bytes': json2.Any(fields[3].int()),
+			'archive_chunks': json2.Any(fields[4].int()), 'removals': json2.Any([]json2.Any{})
+		}, prettify: true))!
+		return
+	}
+	if os.args.len != 3 { panic('usage: current-api-fixture TEMPLATE_FIXTURE FRESH_OUTPUT') }
+	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
+	if os.exists(root) { panic('fresh output required') }
+	os.mkdir_all(root + '/smali')!
+	os.write_file(root + '/smali/Main.smali', main_source)!
+	os.write_file(root + '/smali/TestAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestAccounts;
+.super Landroid/accounts/AccountManager;
+.field public snapshot:[Landroid/accounts/Account;
+.method public constructor <init>()V
+.locals 0
+invoke-direct {p0}, Landroid/accounts/AccountManager;-><init>()V
+return-void
+.end method
+.method public getAccountsByType(Ljava/lang/String;)[Landroid/accounts/Account;
+.locals 1
+iget-object v0, p0, Lorg/vinix/bootstrap/TestAccounts;->snapshot:[Landroid/accounts/Account;
+return-object v0
+.end method
+')!
+	os.cp(base + '/unsigned.apk', root + '/unsigned.apk')!
+	java := '/opt/homebrew/opt/openjdk@25/bin/java'
+	tools := '/Users/alex/code/vinix/build/android-framework/tools'
+	signer := '/Users/alex/code/vinix/build/android-native-ws/android-15/lib/apksigner.jar'
+	for args in [[java, '-Xmx256m', '-cp', tools + '/*', 'org.jf.smali.Main', 'assemble', '--api', '28', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'],
+		['/usr/bin/zip', '-q', '-j', root + '/unsigned.apk', root + '/classes.dex'],
+		[java, '-Xmx256m', '-jar', signer, 'sign', '--ks', base + '/fixture.p12', '--ks-key-alias', 'fixture', '--ks-pass', 'pass:android', '--key-pass', 'pass:android', '--out', root + '/probe.apk', root + '/unsigned.apk'],
+		[java, '-Xmx256m', '-jar', signer, 'verify', '--verbose', root + '/probe.apk']] {
+		if os.system_args(args) != 0 { panic('fixture build failed') }
+	}
+	println('CURRENT-API-FIXTURE ' + root + '/probe.apk')
+}

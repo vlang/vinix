@@ -86,3 +86,52 @@ The former appears in `bizf.a` source41, the latter in `cizh.i` source10 on
 service creation. Its full broker log is retained between
 `FEATURES-FULL-LOG-BEGIN` and `FEATURES-FULL-LOG-END` in the serial log.
 Maps has not reached a usable window or a functional pass.
+
+`framework_intent_mime.v` adds unavailable voice capability plus MIME filter
+storage, validation and matching. The match implementation checks MIME
+wildcards, explicit schemes or default content/file schemes for typed filters,
+actions and category subsets. Existing authority/path stubs remain outside
+this change. Guest r7 advanced beyond those calls to a missing
+`ContactsContract.AUTHORITY_URI` field during Icing service initialization.
+Its full log is retained between `MIME-FULL-LOG-BEGIN` and `MIME-FULL-LOG-END`.
+`framework_contacts_authority.v` adds `AUTHORITY` and the parsed
+`content://com.android.contacts` URI independently of provider availability.
+
+The final SDK for this checkpoint is `framework-contacts-mime-20261112-r1`.
+It passed full assembly/readback under the original limits in3,670 ms,
+sampled RSS500,662,272, growth28,094,464, guard/child0/0 and complete cleanup.
+The earlier `framework-mime-voice-20261112-r1` retains the first MIME build;
+the final SDK also fixes empty-filter mismatch classification and scheme/type
+failure precedence.
+
+The signed regression at `current-api-fixture-20261112-r2/probe.apk` passed
+on ARM in `maps-current-20261112-r8` using the caller-selected
+`onboarding-api-run --current-api` profile, isolated UID/GID10160,
+`/opt/current-api-runtime` and `/var/lib/current-api-r1`. It exercised:
+
+- MIME duplicate suppression, subtype wildcard matching, action/type/scheme/
+  category rejection, malformed MIME exceptions and empty-filter rejection.
+- ParcelUuid parcel roundtrip and typed creator arrays, BluetoothClass parcel
+  masks/service bits, BluetoothDevice parcel address roundtrip.
+- Empty account feature queries, nonempty queries without requested features,
+  explicit authenticator errors for unsupported nonempty feature filtering.
+- False voice capability on this guest without a modem.
+
+The runtime runner observed exactly one pass and readiness marker, closed
+input, drained through EOF and required clean child exit. It printed
+`ONBOARDING-API-RUN-PASS`. Snapshot `current-api-uart-20261112-r1` preserves
+the original full UART and its receipt; plan `current-api-plan-20261112-r1.json`
+selects the complete fixture export without removals. The unchanged
+`diagnostic-uart-reconstruct.v` independently passed against that snapshot
+and plan, retaining the two-entry archive at `current-api-readback-20261112-r1`.
+Its archive checksum is
+`2dfe8244454aa819f9c7c0e0e8dbf92f0ef446cd2d9f1060e845d93574dcaf1c`.
+The test mount was released before the GMS broker attempt in the same guest.
+This verifies the selected API paths; it does not establish callback ordering,
+full NFC/USB implementations, complete URI authority/path matching, or Maps
+functionality. GMS still exited during the subsequent attempt.
+The next fatal trace is missing `Intent.toUri(I)String` in `cuwy.b` source38,
+used for an explicit MAIN intent with package, component and launcher category.
+The retained caller at `maps-intent-serialize-caller-20261112-r1` shows both
+URI_INTENT_SCHEME (1) and URI_ANDROID_APP_SCHEME (2) paths. Guest r8's complete
+log is retained between `CONTACTS-FULL-LOG-BEGIN` and `CONTACTS-FULL-LOG-END`.

@@ -176,6 +176,9 @@ pub fn write_framework_classes(smali string) ! {
  framework_bluetooth_values(smali)!
  framework_parcel_uuid(smali)!
  framework_peripheral_types(smali)!
+ framework_voice_capability(smali)!
+ framework_intent_mime(smali)!
+ framework_contacts_authority(smali)!
  framework_content_clients(smali)!
  framework_text_widgets(smali)!
  framework_text_hints(smali)!

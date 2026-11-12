@@ -1382,9 +1382,25 @@ fn run() ! {
 		return
 	}
 	mut arguments := os.args[1..]
+	// Current-checkout diagnostics select the files supplied by the caller;
+	// historical profiles below retain their original artifact identities.
+	current_api := arguments.len == 6 && arguments[0] == '--current-api'
+	if current_api {
+		arguments = arguments.clone()
+		arguments[0] = '--settings-global'
+	}
 	require(arguments.len == 6 && arguments[0] in ['--child-attach', '--settings-global', '--application-restrictions', '--authenticator-private-exception', '--maps-network', '--authenticator-worker', '--maps-network-v2', '--authenticator-binder-identity', '--maps-network-v3', '--service-lifecycle', '--platform-fragments', '--image-bounds', '--window-system-ui', '--seed-account-options', '--persistent-data-block', '--bitmap-tiles', '--connectivity-truth', '--window-animations', '--layout-alignment', '--user-restrictions', '--bundle-cross-profile', '--user-restrictions-bundle', '--resources-float', '--paint-drawable', '--dialog-theme', '--intent-extras', '--resource-locks', '--pending-intent', '--stable-display', '--asset-locales', '--unmanaged-queries', '--stats-unavailable', '--subscription-service', '--autofill-service', '--keyguard-policy', '--broadcast-permission', '--broadcast-permission-v2', '--secure-settings', '--usage-inactive', '--messenger-binder', '--messenger-binder-v2', '--event-log', '--build-abis', '--webview-package', '--bootclasspath', '--bootclasspath-jni', '--traffic-stats-uid', '--process-packages', '--global-settings-string', '--default-network-active'],
 		'usage: onboarding-api-run (--child-attach|--settings-global|--application-restrictions|--authenticator-private-exception|--maps-network|--authenticator-worker|--maps-network-v2|--authenticator-binder-identity|--maps-network-v3|--service-lifecycle|--platform-fragments|--image-bounds|--window-system-ui|--seed-account-options|--persistent-data-block|--bitmap-tiles|--connectivity-truth|--window-animations|--layout-alignment|--user-restrictions|--bundle-cross-profile|--user-restrictions-bundle|--resources-float|--paint-drawable|--dialog-theme|--intent-extras|--resource-locks|--pending-intent|--stable-display|--asset-locales|--unmanaged-queries|--stats-unavailable|--subscription-service|--autofill-service|--keyguard-policy|--broadcast-permission|--broadcast-permission-v2|--secure-settings|--usage-inactive|--messenger-binder|--messenger-binder-v2|--event-log|--build-abis|--webview-package|--bootclasspath|--bootclasspath-jni|--traffic-stats-uid|--process-packages|--global-settings-string|--default-network-active) RUNTIME APK UID GID FRESH_OUTPUT | selftest')!
-	profile := if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
+	profile := if current_api {
+		FixtureProfile{
+			name: 'current-api'
+			apk_sha: input_pin(arguments[2])!
+			framework_sha: input_pin(arguments[1] + '/usr/lib/java/dex/android_translation_layer/api-impl.jar')!
+			native_sha: input_pin(arguments[1] + '/usr/lib/art/libvinix-android-native.so')!
+			pass_marker: 'CURRENT-API-PASS'
+			scope: 'Caller-selected current SDK/native and regression APK; no historical version requirement'
+		}
+	} else if arguments[0] == '--authenticator-private-exception' { authenticator_exception_profile() }
 		else if arguments[0] == '--default-network-active' { default_network_active_profile() }
 		else if arguments[0] == '--global-settings-string' { global_settings_string_profile() }
 		else if arguments[0] == '--process-packages' { process_packages_profile() }

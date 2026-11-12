@@ -1,5 +1,21 @@
 # Standalone onboarding API regressions
 
+For current-checkout work, use
+`onboarding-api-run --current-api RUNTIME APK UID GID FRESH_OUTPUT`.
+This selects the supplied APK and current runtime rather than requiring a
+historical framework/native/APK identity. It requires the exact marker
+`CURRENT-API-PASS`, and preserves the same isolated credentials, explicit
+environment, input lifecycle, deadlines, log bounds and complete EOF checks.
+The selected inputs are recorded and checked for mutation during execution.
+
+`current-api-fixture.v TEMPLATE_FIXTURE FRESH_OUTPUT` builds the current
+MIME/parcel/account-future/voice regression. The template provides an unsigned
+APK declaring `org.vinix.bootstrap.Main` and `fixture.p12`; the generator
+replaces its DEX with the regression and signs/verifies the resulting APK.
+`current-api-fixture.v --plan SNAPSHOT_LOG FRESH_PLAN_JSON` prepares a plan
+for the existing diagnostic UART reconstructor, selecting one complete export
+with no byte removals. Capture the UART with `uart-snapshot.v` first.
+
 `onboarding-api-run.v` executes either the child-attachment regression or the
 `Settings.Global.putInt` contract regression. Both are signed standalone APKs
 with activity `org/vinix/bootstrap/Main`. The mandatory `--child-attach` or

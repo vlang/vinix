@@ -37,6 +37,13 @@ fn stage(parent string, framework string, native string, root string) ! {
 	deployment['inputs_sha256'] = json2.Any(inputs)
 	os.mkdir_all(root + '/payload/opt/vinix-maps-account')!
 	os.write_file(root + '/payload/opt/vinix-maps-account/build.json', json2.encode(deployment))!
+	if fixture := os.getenv_opt('VINIX_CURRENT_API_FIXTURE') {
+		runner := os.getenv_opt('VINIX_CURRENT_API_RUNNER') or { return error('fixture requires VINIX_CURRENT_API_RUNNER') }
+		os.mkdir_all(root + '/payload/opt/current-api')!
+		os.cp(fixture, root + '/payload/opt/current-api/probe.apk')!
+		os.cp(runner, root + '/payload/opt/current-api/run')!
+		os.chmod(root + '/payload/opt/current-api/run', 0o755)!
+	}
 	os.setenv('COPYFILE_DISABLE', '1', true)
 	command(['/usr/bin/tar', '-cf', root + '/maps-current.tar', '-C', root + '/payload', 'opt'])!
 	config := os.read_file(parent + '/limine-after.conf')! + '    module_path: boot():/boot/maps-current.tar\n'
