@@ -13,6 +13,7 @@ The half profile supports:
 - Bitcasts between half and i16, arguments, constants, return, select and PHIs.
 - `fneg half`, which changes only the sign bit, including for signaling NaNs.
 - [Signed/unsigned numeric conversions between half and i1..i64](BINARY16-INTEGER.md).
+- [Selected scalar LLVM absolute-value, sign-copy and rounding intrinsics](SCALAR-INTRINSICS.md).
 
 `binary16_cast.v` uses integer significands, exponent shifts and guard/round/
 sticky bits. Narrowing preserves signed zero and gradual underflow; rounding
@@ -44,7 +45,7 @@ shifts for float input and ten shifts for half input. The existing execution
 arrays, their ownership and instruction/loop budgets are unchanged. Matching
 immutable indexes and valid LLVM IR remain preconditions.
 
-`bfloat16`, `double`, vectors, memory and intrinsics reject, including in
+`bfloat16`, `double`, vectors, memory and other intrinsics reject, including in
 unvisited blocks. The integer-only entry point
 still rejects all floating-point types.
 

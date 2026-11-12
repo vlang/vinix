@@ -100,7 +100,7 @@ fn integer_compare(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerVal
 	result := match op { 32 { x == y } 33 { x != y } 34 { x > y } 35 { x >= y } 36 { x < y } 37 { x <= y } 38 { signed_x > signed_y } 39 { signed_x >= signed_y } 40 { signed_x < signed_y } else { signed_x <= signed_y } }
 	return IntegerValue{value: u64(result)}
 }
-fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunctionBodies, function int, binary32 bool) !IntegerProfile {
+fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, binary32 bool) !IntegerProfile {
 	if function < 0 || function >= ir.functions.len || function + 1 >= bodies.scopes.len || p.instructions.len != bodies.instructions.len { return error('AIR integer: function index') }
 	f := ir.functions[function]; scope := function + 1; s := bodies.scopes[scope]
 	if f.declaration || !s.active || f.calling_convention != 0 || f.signature < 0 || f.signature >= ir.types.len || f.record < 0 || f.record >= stream.records.len { return error('AIR integer: defined ordinary function required') }
@@ -113,6 +113,8 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 	if ir_values(stream, raw)[6] != 0 { return error('AIR integer: function attributes unsupported') }
 	if s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.blocks_start < 0 || s.blocks_count < 1 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR integer: body ranges') }
 	mut max_phis := 0
+	mut intrinsic_declarations := [18]int{}
+	mut intrinsic_work := 0
 	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
 		block := bodies.blocks[block_index]
 		if block.scope != scope || block.first < s.instructions_start || block.count < 1 || block.first > s.instructions_start + s.instructions_count || block.count > s.instructions_start + s.instructions_count - block.first { return error('AIR integer: block range') }
@@ -121,14 +123,26 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 			inst := bodies.instructions[index]; op := p.instructions[index]
 			if inst.scope != scope || inst.block != block_index || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded { return error('AIR integer: decoded instructions required') }
 			if op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start || op.targets_start < 0 || op.targets_count < 0 || op.targets_start > p.targets.len || op.targets_count > p.targets.len - op.targets_start { return error('AIR integer: operand/target range') }
-			for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
-			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
 			code := stream.records[inst.record].code
+			mut first_operand := op.operands_start
+			if code == 34 {
+				if !binary32 || !inst.has_result { return error('AIR intrinsic: mixed scalar result required') }
+				key, attributes := p.scalar_intrinsic_call(ir, stream, pools, op)!
+				if intrinsic_declarations[key] != 0 && intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR intrinsic: duplicate reserved declaration') }
+				if intrinsic_declarations[key] == 0 {
+					intrinsic_work += scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)!
+					intrinsic_declarations[key] = op.callee_function + 1
+				}
+				first_operand++ // The validated callee is a declaration, not a scalar value.
+			}
+			for operand in p.operands[first_operand..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
+			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
 			if inst.has_result { p.execution_bits(op.result_type, binary32)!; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			floating_result := inst.has_result && p.types[op.result_type].kind in [.float_t, .half_t]!
-			allowed_flags := if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+			allowed_flags := if code == 34 { u64(32768) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
+				34 {} // Checked direct intrinsic, including its attributes, above.
 				2, 9, 28 {
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
 					fp := p.types[p.operands[op.operands_start].type_index].kind in [.float_t, .half_t]!
@@ -218,7 +232,7 @@ pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools
 }
 fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int, binary32 bool) !IRIntegerRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR integer: step limit range') }
-	profile := p.integer_profile(ir, stream, bodies, function, binary32)!
+	profile := p.integer_profile(ir, stream, pools, bodies, function, binary32)!
 	s := bodies.scopes[profile.scope]; signature := ir.types[ir.functions[function].signature]
 	if profile.scope >= pools.scopes.len { return error('AIR integer: constant-pool scope') }
 	if arguments.len != signature.refs_count - 1 || pools.scopes[profile.scope].arguments_count != arguments.len { return error('AIR integer: argument count') }
@@ -248,6 +262,12 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			start := op.operands_start
 			mut result := IntegerValue{}
 			match code {
+				34 {
+					id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
+					a := m.read(start + 1)!
+					b := if id == .copysign { m.read(start + 2)! } else { IntegerValue{} }
+					result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: scalar_intrinsic_value(id, p.execution_bits(op.result_type, binary32)!, a.value, b.value)!} }
+				}
 				2 {
 					a := m.read(start)!; b := m.read(start + 1)!
 					if p.types[op.result_type].kind == .float_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary32_binary(op.opcode, u32(a.value), u32(b.value))!} } }

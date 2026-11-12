@@ -21,6 +21,8 @@ and [numeric i1..i64 conversions](BINARY32-CASTS.md).
 Integer operations and control flow remain available. Select and simultaneous
 PHIs can carry either kind. All instructions, including unvisited blocks, must
 belong to the supported profile. Floating-point fast-math flags reject.
+Selected [scalar LLVM intrinsic calls](SCALAR-INTRINSICS.md) support absolute
+value, sign copying and integral rounding for half and float.
 
 `binary32.v` implements arithmetic using unsigned integer significands,
 exponents and guard/round/sticky bits. It rounds to nearest, ties to even and
@@ -57,7 +59,8 @@ remain caller preconditions; this is not a general LLVM verifier.
 
 Outside this profile: bfloat16/double, vectors, precision conversions beyond
 half/float, fast/constrained operations,
-function attributes, calls/intrinsics, pointers, memory and Metal commands.
+function attributes, general calls/other intrinsics, pointers as values,
+memory and Metal commands.
 These are explicit unsupported cases, not approximated operations.
 
 `binary32_test.v` checks 34 exact rounding/special-value patterns, 30 exact
