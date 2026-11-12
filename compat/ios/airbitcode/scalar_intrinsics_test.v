@@ -98,15 +98,17 @@ fn test_scalar_intrinsic_minimum_maximum() {
 				numeric := if a & (sign - 1) > inf && b & (sign - 1) <= inf { b } else if b & (sign - 1) > inf && a & (sign - 1) <= inf { a } else { qn }
 				assert scalar_intrinsic_value(.minimumnum, bits, a, b)! == if a & (sign - 1) > inf || b & (sign - 1) > inf { numeric } else { row[2] }
 				assert scalar_intrinsic_value(.maximumnum, bits, a, b)! == if a & (sign - 1) > inf || b & (sign - 1) > inf { numeric } else { row[3] }
+				assert scalar_intrinsic_value(.minnum, bits, a, b)! == if a & (sign - 1) > inf || b & (sign - 1) > inf { numeric } else { row[2] }
+				assert scalar_intrinsic_value(.maxnum, bits, a, b)! == if a & (sign - 1) > inf || b & (sign - 1) > inf { numeric } else { row[3] }
 			}
 		}
-		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] {
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum', 'minnum', 'maxnum'] {
 			name := 'llvm.${op}.f${bits}'; defer { unsafe { name.free() } }
 			assert scalar_intrinsic_arity(scalar_intrinsic_name(name)!) == 2
 		}
 	}
-	for name in ['llvm.minnum.f32', 'llvm.maxnum.f16', 'llvm.minimum.f64', 'llvm.maximum.v2f32', 'air.minimum.f32'] {
+	for name in ['llvm.minnum.f64', 'llvm.maxnum.v2f16', 'llvm.minnum.f16.i32', 'llvm.minimum.f64', 'llvm.maximum.v2f32', 'air.minimum.f32', 'air.minnum.f32'] {
 		if _ := scalar_intrinsic_name(name) { assert false, 'unsupported extremum name' }
 	}
-	println('AIR-SCALAR-EXTREMA: 176 exact results across four operations, both precisions/orders, binary arity and unsupported names PASS')
+	println('AIR-SCALAR-EXTREMA: 264 exact results across six operations, both precisions/orders, binary arity and unsupported names PASS')
 }

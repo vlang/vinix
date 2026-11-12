@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if id in [.fma, .fmuladd]! { return 3 }
-	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum]! { 2 } else { 1 }
+	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
@@ -25,6 +25,8 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.minimumnum.f16', 'llvm.minimumnum.f32' { ScalarIntrinsic.minimumnum }
 		'llvm.maximumnum.f16', 'llvm.maximumnum.f32' { ScalarIntrinsic.maximumnum }
 		'llvm.fmuladd.f16', 'llvm.fmuladd.f32' { ScalarIntrinsic.fmuladd }
+		'llvm.minnum.f16', 'llvm.minnum.f32' { ScalarIntrinsic.minnum }
+		'llvm.maxnum.f16', 'llvm.maxnum.f32' { ScalarIntrinsic.maxnum }
 		else { return error('AIR intrinsic: unsupported callee') }
 	}
 }
@@ -100,15 +102,17 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if id == .copysign { return abs | (b & sign_mask) }
 	if id == .sqrt { return scalar_intrinsic_sqrt(bits, a) }
 	if id == .ldexp { return scalar_intrinsic_ldexp(bits, a, b) }
-	if id in [.minimum, .maximum, .minimumnum, .maximumnum]! {
+	if id in [.minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum]! {
 		infinity := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
 		other := b & (sign_mask - 1)
-		if id in [.minimumnum, .maximumnum]! {
+		// LLVM permits minnum/maxnum to refine to minimumNumber/maximumNumber:
+		// consistently treat an sNaN as quiet and prefer the other number.
+		if id in [.minimumnum, .maximumnum, .minnum, .maxnum]! {
 			if abs > infinity && other <= infinity { return b }
 			if other > infinity && abs <= infinity { return a }
 		}
 		if abs > infinity || other > infinity { return if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) } }
-		minimum := id in [.minimum, .minimumnum]!
+		minimum := id in [.minimum, .minimumnum, .minnum]!
 		// IEEE minimum/maximum order -0 below +0 in either argument order.
 		if abs == 0 && other == 0 { return if minimum { (a | b) & sign_mask } else { (a & b) & sign_mask } }
 		less := if (a ^ b) & sign_mask != 0 { sign != 0 } else if sign == 0 { abs < other } else { abs > other }

@@ -51,13 +51,14 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 				control := 'define ${typ} @ldexp_${state}_${side}_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.ldexp.f${bits}.i32(${typ} ${left}, i32 ${right})\n  ret ${typ} %r\n}\n'; source.write_string(control); unsafe { control.free() }
 			}
 		}
-		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum', 'sqrt', 'minimumnum', 'maximumnum'] {
+		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum', 'sqrt', 'minimumnum', 'maximumnum', 'minnum', 'maxnum'] {
 			name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, op !in ['fabs', 'copysign'], 2}; unsafe { cases.push_many(&entry, 1) }
-			binary := op in ['copysign', 'minimum', 'maximum', 'minimumnum', 'maximumnum']
+			binary := op in ['copysign', 'minimum', 'maximum', 'minimumnum', 'maximumnum', 'minnum', 'maxnum']
 			args := if binary { '${typ} %x, ${typ} %y' } else { '${typ} %x' }
 			params := if binary { '${typ}, ${typ}' } else { typ }
 			text := 'declare ${typ} @llvm.${op}.f${bits}(${params})\ndefine ${typ} @${name}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.${op}.f${bits}(${args})\n  ret ${typ} %r\n}\n'; source.write_string(text); unsafe { args.free(); if binary { params.free() }; text.free() }
 		}
+		mixed := 'define ${typ} @legacy_mix_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.minnum.f${bits}(${typ} %x, ${typ} %y)\n  %b = call ${typ} @llvm.minimumnum.f${bits}(${typ} %a, ${typ} %y)\n  %d = call ${typ} @llvm.maxnum.f${bits}(${typ} %b, ${typ} %x)\n  %r = call ${typ} @llvm.maximumnum.f${bits}(${typ} %d, ${typ} %y)\n  ret ${typ} %r\n}\n'; source.write_string(mixed); unsafe { mixed.free() }
 		for op in ['sqrt_abs', 'sqrt_loop'] {
 			name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, true, if op == 'sqrt_abs' { 3 } else { 0 }}; unsafe { cases.push_many(&entry, 1) }
 		}
@@ -67,7 +68,7 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 		}
 		chain_entry := IntrinsicCase{'extrema_chain_${bits}', bits, true, 3}; unsafe { cases.push_many(&chain_entry, 1) }
 		chain := 'define ${typ} @extrema_chain_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.minimum.f${bits}(${typ} %x, ${typ} %y)\n  %r = call ${typ} @llvm.maximum.f${bits}(${typ} %a, ${typ} %x)\n  ret ${typ} %r\n}\n'; source.write_string(chain); unsafe { chain.free() }
-		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] {
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum', 'minnum', 'maxnum'] {
 			for state in ['poison', 'undef'] {
 				for side in 0 .. 2 {
 					left := if side == 0 { state } else { '%x' }; right := if side == 1 { state } else { '%y' }
@@ -135,7 +136,17 @@ define i64 @diagnostic_half_copysign(i64 %a, i64 %b, i64 %c) {
 			continue
 		}
 		typ := if c.bits == 16 { 'half' } else { 'float' }
-		wrapper := 'define i64 @reference_${c.name}(i64 %a, i64 %b, i64 %c) {\n  %ai = trunc i64 %a to i${c.bits}\n  %bi = trunc i64 %b to i${c.bits}\n  %x = bitcast i${c.bits} %ai to ${typ}\n  %y = bitcast i${c.bits} %bi to ${typ}\n  %r = call ${typ} @${c.name}(${typ} %x, ${typ} %y, i64 %c)\n  %bits = bitcast ${typ} %r to i${c.bits}\n  %out = zext i${c.bits} %bits to i64\n  ret i64 %out\n}\n'; source.write_string(wrapper); unsafe { wrapper.free() }
+		// Qualify the deterministic number-preferring refinement, not a native
+		// legacy lowering that may choose sNaN propagation or misorder zeros.
+		legacy := c.name.starts_with('minnum_') || c.name.starts_with('maxnum_')
+		target := c.name.replace('minnum_', 'minimumnum_').replace('maxnum_', 'maximumnum_')
+		defer { unsafe { target.free() } }
+		wrapper := 'define i64 @reference_${c.name}(i64 %a, i64 %b, i64 %c) {\n  %ai = trunc i64 %a to i${c.bits}\n  %bi = trunc i64 %b to i${c.bits}\n  %x = bitcast i${c.bits} %ai to ${typ}\n  %y = bitcast i${c.bits} %bi to ${typ}\n  %r = call ${typ} @${target}(${typ} %x, ${typ} %y, i64 %c)\n  %bits = bitcast ${typ} %r to i${c.bits}\n  %out = zext i${c.bits} %bits to i64\n  ret i64 %out\n}\n'; source.write_string(wrapper)
+		if legacy {
+			diagnostic := wrapper.replace('reference_', 'diagnostic_').replace('@' + target + '(', '@' + c.name + '(')
+			source.write_string(diagnostic); unsafe { diagnostic.free() }
+		}
+		unsafe { wrapper.free() }
 	}
 	return cases
 }
@@ -207,9 +218,34 @@ fn main() {
 	// Exhaust every half encoding against sixteen boundary peers, in both
 	// argument orders. Float boundaries use the full 32-by-32 edge matrix.
 	half_edges := [u32(0), 0x8000, 1, 0x8001, 0x03ff, 0x0400, 0x3c00, 0xbc00, 0x7bff, 0xfbff, 0x7c00, 0xfc00, 0x7c01, 0xfc01, 0x7e55, 0xfe55]!
+	// Keep actual legacy native outcomes as diagnostics. Only sNaN-to-NaN
+	// choices may differ semantically; signed-zero violations are counted
+	// explicitly and never relax production/refinement comparisons.
+	mut legacy_log := os.create(out + '/legacy-native.tsv')!; defer { legacy_log.close() }
+	legacy_log.writeln('function\ta\tb\tnative\trefinement\tsnan_choice\tzero_violation')!
+	mut legacy_diagnostics := 0; mut legacy_snan_choices := 0; mut legacy_zero_violations := 0
+	for bits in [u32(16), 32]! { for op in ['minnum', 'maxnum'] {
+		name := '${op}_${bits}'; native_name := 'diagnostic_${name}'; reference_name := 'reference_${name}'
+		defer { unsafe { name.free(); native_name.free(); reference_name.free() } }
+		native_address := C.LLVMGetFunctionAddress(engine, native_name.str); reference_address := C.LLVMGetFunctionAddress(engine, reference_name.str)
+		if native_address == 0 || reference_address == 0 { panic('missing legacy diagnostic') }
+		native := unsafe { NativeBits(voidptr(native_address)) }; reference := unsafe { NativeBits(voidptr(reference_address)) }
+		sign := u64(1) << (bits - 1); inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }; quiet := if bits == 16 { u64(0x200) } else { u64(0x400000) }
+		for i in 0 .. if bits == 16 { 16 * 16 } else { 32 * 32 } {
+			a := if bits == 16 { u64(half_edges[i / 16]) } else { u64(edges[i / 32]) }; b := if bits == 16 { u64(half_edges[i % 16]) } else { u64(edges[i % 32]) }
+			actual := native(a, b, 0); expected := reference(a, b, 0)
+			actual_nan := actual & (sign - 1) > inf; expected_nan := expected & (sign - 1) > inf
+			left_snan := a & (sign - 1) > inf && a & quiet == 0; right_snan := b & (sign - 1) > inf && b & quiet == 0
+			snan_choice := actual_nan && !expected_nan && (left_snan || right_snan)
+			zero_violation := a & (sign - 1) == 0 && b & (sign - 1) == 0 && actual != expected
+			if actual != expected && !(actual_nan && expected_nan) && !snan_choice && !zero_violation { panic('unexpected native legacy mismatch') }
+			if snan_choice { legacy_snan_choices++ }; if zero_violation { legacy_zero_violations++ }; legacy_diagnostics++
+			row := '${name}\t${a}\t${b}\t${actual}\t${expected}\t${snan_choice}\t${zero_violation}'; legacy_log.writeln(row)!; unsafe { row.free() }
+		}
+	} }
 	mut extrema_pairs := 0
 	for c in cases {
-		if !c.name.starts_with('minimum') && !c.name.starts_with('maximum') { continue }
+		if !c.name.starts_with('minimum') && !c.name.starts_with('maximum') && !c.name.starts_with('minnum_') && !c.name.starts_with('maxnum_') { continue }
 		index := function_index(ir, c.name)!; reference_name := 'reference_${c.name}'; defer { unsafe { reference_name.free() } }
 		address := C.LLVMGetFunctionAddress(engine, reference_name.str); if address == 0 { panic('missing extrema reference') }; reference := unsafe { NativeBits(voidptr(address)) }
 		for sample in 0 .. if c.bits == 16 { 65536 * 16 * 2 } else { 32 * 32 } {
@@ -264,7 +300,7 @@ fn main() {
 	for name in ['poison_unary', 'poison_left', 'poison_right'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('intrinsic poison lost') } }
 	mut extrema_controls := 0
 	for bits in [16, 32]! {
-		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] {
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum', 'minnum', 'maxnum'] {
 			for side in 0 .. 2 {
 				poison_name := '${op}_poison_${side}_${bits}'; undef_name := '${op}_undef_${side}_${bits}'
 				defer { unsafe { poison_name.free(); undef_name.free() } }
@@ -296,6 +332,30 @@ fn main() {
 	index := function_index(ir, 'fabs_32')!; slot := bodies.scopes[index + 1].instructions_start; original := p.instructions[slot]
 	if _ := p.run_scalar_function(ir, stream, pools, bodies, index, args, 1) { panic('intrinsic budget accepted') }
 	if _ := p.run_integer_function(ir, stream, pools, bodies, index, args, 64) { panic('integer-only API accepted intrinsic') }
+	// Both new spellings retain the strict call profile, budget and integer
+	// isolation. Flipping a signed zero must fail the exact comparator.
+	mut legacy_controls := 0
+	for bits in [u32(16), 32]! { for op in ['minnum', 'maxnum'] {
+		name := '${op}_${bits}'; defer { unsafe { name.free() } }; legacy_index := function_index(ir, name)!
+		legacy_slot := bodies.scopes[legacy_index + 1].instructions_start; saved := p.instructions[legacy_slot]
+		for changed in [airbitcode.IRTypedInstruction{...saved, fast_math_flags: 1}, airbitcode.IRTypedInstruction{...saved, flags: saved.flags | 1}, airbitcode.IRTypedInstruction{...saved, operands_count: 2}] {
+			p.instructions[legacy_slot] = changed
+			p.run_scalar_function(ir, stream, pools, bodies, legacy_index, args, 64) or { legacy_controls++; continue }; panic('accepted legacy flags/arity')
+		}; p.instructions[legacy_slot] = saved
+		if _ := p.run_scalar_function(ir, stream, pools, bodies, legacy_index, args, 1) { panic('legacy budget accepted') } else { legacy_controls++ }
+		if _ := p.run_integer_function(ir, stream, pools, bodies, legacy_index, args, 64) { panic('legacy integer API accepted') } else { legacy_controls++ }
+		zero_args := [u64(0), u64(1) << (bits - 1), 0]; defer { unsafe { zero_args.free() } }
+		zero := p.run_scalar_function(ir, stream, pools, bodies, legacy_index, zero_args, 64)!
+		expected := if op == 'minnum' { u64(1) << (bits - 1) } else { u64(0) }
+		compare(zero, expected, IntrinsicCase{name, bits, true, 2})!
+		compare(airbitcode.IRScalarRun{...zero, value: zero.value ^ (u64(1) << (bits - 1))}, expected, IntrinsicCase{name, bits, true, 2}) or { legacy_controls++; continue }; panic('accepted legacy zero sign corruption')
+	} }; if legacy_controls != 24 { panic('legacy guard failed to reject') }
+	for bits in [u32(16), 32]! {
+		name := 'legacy_mix_${bits}'; defer { unsafe { name.free() } }
+		mixed_args := [u64(1) << (bits - 1), u64(0), 0]; defer { unsafe { mixed_args.free() } }
+		mixed := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, mixed_args, 64)!
+		if mixed.poison || mixed.value != 0 || mixed.bits != bits || mixed.steps != 5 { panic('legacy/refined declarations collided in cache') }
+	}
 	mut metadata_controls := 0
 	for changed in [airbitcode.IRTypedInstruction{...original, callee_function: -1}, airbitcode.IRTypedInstruction{...original, callee_function: ir.functions.len}, airbitcode.IRTypedInstruction{...original, call_signature: -1}, airbitcode.IRTypedInstruction{...original, attribute_set: 1}, airbitcode.IRTypedInstruction{...original, calling_convention: 8}, airbitcode.IRTypedInstruction{...original, fast_math_flags: 1}, airbitcode.IRTypedInstruction{...original, operands_count: 1}] {
 		p.instructions[slot] = changed
@@ -342,5 +402,6 @@ fn main() {
 			if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, scaling_name)!, scaling_args, 64)!.value != if mode == C.FE_UPWARD { u64(0) } else { u64(2) } { panic('ldexp used host rounding mode') }
 		}
 	}
+	println('LLVM-LEGACY-EXTREMA: ${legacy_diagnostics} native diagnostics (${legacy_snan_choices} permitted sNaN choices, ${legacy_zero_violations} signed-zero backend violations), ${legacy_controls} rejecting controls PASS')
 	println('LLVM-SCALAR-INTRINSICS: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} arithmetic NaN-class cases), including ${extrema_pairs} extrema/${sqrt_boundaries} sqrt/${scaling_pairs} scaling boundary pairs; ${guards} guards, three poison results, ${extrema_controls} extrema/${sqrt_controls} sqrt/${scaling_controls} scaling poison/undef controls, ${scaling_type_controls} exponent-type controls, lazy select, budget/integer isolation, ${metadata_controls} metadata/${attribute_controls} declaration/${controls} result corruptions and fourteen host-rounding controls PASS; no AIR shader or iOS app executed')
 }

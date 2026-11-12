@@ -13,6 +13,7 @@ these LLVM declarations for scalar half (`.f16`) and float (`.f32`):
 | `llvm.roundeven` / `llvm.rint` / `llvm.nearbyint` | Round to nearest integer, ties to even in LLVM's default environment. |
 | `llvm.minimum` / `llvm.maximum` | Select the lesser / greater operand, propagate NaNs, and order -0 below +0. |
 | `llvm.minimumnum` / `llvm.maximumnum` | Select the numeric operand if exactly one input is NaN, otherwise the lesser / greater value, ordering -0 below +0. |
+| `llvm.minnum` / `llvm.maxnum` | Consistently choose the permitted `minimumnum` / `maximumnum` refinement, including for signaling NaNs. |
 | `llvm.sqrt` | Correctly rounded square root, nearest/ties to even; retain negative zero and choose a quiet NaN for negative nonzero inputs. |
 | `llvm.fma` | Fused multiply-add with one nearest/ties-to-even rounding after the exact product and addition. |
 | `llvm.fmuladd` | Optional-fusion multiply-add; this interpreter consistently chooses fused evaluation. |
@@ -22,8 +23,9 @@ Results keep the floating-point type. `scalar_intrinsics.v` manipulates integer
 sign/exponent/fraction bits; no host FP instruction, environment, libm or LLVM
 dependency participates in production. Signed zeros and infinities retain
 their IEEE results. Rounding NaNs choose the existing preferred positive quiet
-NaN; extrema also choose that NaN if either input is NaN, including a signaling
-NaN. Their finite results are exact input bits, with negative zero selected by
+NaN; `minimum`/`maximum` also choose that NaN if either input is NaN, including a signaling
+NaN. Number-preferring extrema choose it only when both inputs are NaNs.
+Their finite results are exact input bits, with negative zero selected by
 `minimum` and positive zero by `maximum` when zero signs differ.
 `fabs`/`copysign` preserve payload and signaling bits. Selected undef
 errors and poison operands propagate. Dynamic/constrained FP environments,
@@ -53,7 +55,7 @@ Declaration attributes admit only function-level `nounwind`, `readnone`,
 `nocreateundeforpoison` and `memory(none)` (bitcode memory versions 0/1/2).
 Return/parameter, string/type, `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A thirty-four-entry fixed stack cache validates each admitted
+validation budget. A thirty-eight-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -71,17 +73,19 @@ names, with a floating first argument/result and a signed i32 second argument.
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting
 memory/strictfp/string/return/parameter/missing/budget cases.
-An additional 176 exact extrema results check all four extrema operations, both precisions and argument
+An additional 264 exact extrema results check all six extrema operations, both precisions and argument
 orders, including signed zeros, subnormals, infinities and quiet/signaling NaNs.
 `minimumnum`/`maximumnum` suppress either quiet or signaling NaN when the other
 operand is numeric, preserving that numeric operand's exact bits. Two NaNs
-choose the preferred quiet NaN. `minnum`/`maxnum` and AIR aliases remain unsupported.
+choose the preferred quiet NaN. `minnum`/`maxnum` consistently choose the same
+number-preferring behavior. LLVM explicitly permits this refinement; it can
+otherwise propagate a signaling NaN. AIR aliases remain unsupported.
 Square-root units check 32 exact values, unary/name/width guards and 327,680
 independent multiplication inequalities for root/remainder results, including
 exact squares and neighbors near the 54-bit bound.
 
 `tests/ios/air-scalar-intrinsics.v self-test LLVM_AS FRESH_EXTERNAL_DIR` generates
-40 functions: fifteen primitives, three chains and two bounded loops for each
+44 functions: seventeen primitives, three chains and two bounded loops for each
 precision. Half inputs cover all 65,536 encodings in every case. Float inputs
 cover 32 fixed edges, 65,536 mixed-bit inputs and 65,536 signed midpoint/neighbor
 inputs across exponents 0..22. Extrema additionally exhaust every half encoding
@@ -89,13 +93,13 @@ against sixteen boundary peers in both argument orders, and all 32-by-32 float
 edge pairs. Square root also receives 196,608 neighbors of squared exact
 float-root midpoints, formed independently using u64 products and shifts across
 the normal exponent range. Scaling adds 2,097,152 boundary pairs against sixteen
-signed exponent values. It compares **14,619,264 results**: 13,161,614 bit-exact
-results and 1,457,650 rounding/arithmetic NaN-class cases. Non-math
+signed exponent values. It compares **19,208,896 results**: 17,718,326 bit-exact
+results and 1,490,570 rounding/arithmetic NaN-class cases. Non-math
 operations preserve NaN bits exactly. Primitive CALL/return results cost two
 instructions; the sign/rounding chain costs four and the extrema/square-root
 chains three. The square-root loop feeds back its result through a PHI.
 Scaling wrappers also cost three instructions, including their exponent cast.
-Nine rejecting fixtures, three poison results, thirty-two extrema poison/undef
+Nine rejecting fixtures, three poison results, forty-eight extrema poison/undef
 controls, four square-root poison/undef controls, lazy select, budget/integer
 isolation, eight call-metadata corruptions,
 two declaration-attribute corruptions, five result corruptions and six
@@ -106,11 +110,21 @@ sqrt(5) under downward rounding, where nearest-mode results differ in each
 precision. Native calls run only in the
 default environment; LLVM/JIT/native code is not sanitizer-instrumented.
 
+For `minnum`/`maxnum`, production comparisons deliberately call native
+`minimumnum`/`maximumnum` to qualify the chosen refinement. A separate
+`legacy-native.tsv` records 2,560 actual native legacy results over both edge
+matrices, distinguishing permitted sNaN propagation from backend signed-zero
+violations. Neither category relaxes production's exact numeric bits or zero
+signs. Twenty-four controls reject flags/arity, insufficient budgets, integer
+entry-point use and flipped zero signs for the four new overloads.
+Two additional chains mix all four legacy/refined declarations, verifying
+distinct cache identities and five executed instructions per chain.
+
 The host LLVM backend's half `copysign` quiets signaling NaNs: input `0x7c01`
 with a negative sign produces `0xfe01` where the contract requires `0xfc01`.
 The native observation and initial failing corpus are retained. This one case
 uses a defined native LLVM integer bit-operation reference for all 65,536
-inputs; the remaining 14,553,728 comparisons use native floating-point wrappers.
+inputs; the remaining 19,143,360 comparisons use native floating-point wrappers.
 The reference does not relax payload checks or change production semantics.
 IR/bitcode, every comparison, native diagnostic, assembler/JIT/fenv identities
 and logs are preserved outside Git. The tool executes only its own fixture.
@@ -125,6 +139,8 @@ References: [LLVM fabs](https://llvm.org/docs/LangRef.html#llvm-fabs-intrinsic),
 [maximum](https://llvm.org/docs/LangRef.html#llvm-maximum-intrinsic),
 [minimumNumber](https://llvm.org/docs/LangRef.html#llvm-minimumnum-intrinsic),
 [maximumNumber](https://llvm.org/docs/LangRef.html#llvm-maximumnum-intrinsic),
+[legacy minnum](https://llvm.org/docs/LangRef.html#llvm-minnum-intrinsic),
+[legacy maxnum](https://llvm.org/docs/LangRef.html#llvm-maxnum-intrinsic),
 [square root](https://llvm.org/docs/LangRef.html#llvm-sqrt-intrinsic),
 [default environment](https://llvm.org/docs/LangRef.html#floating-point-environment),
 [memory attribute decoding](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Bitcode/Reader/BitcodeReader.cpp).
