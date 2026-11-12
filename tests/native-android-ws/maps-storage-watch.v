@@ -5,6 +5,7 @@ module main
 import os
 import strconv
 import time
+import processsnapshot
 
 fn memory_kib(text string, key string) !u64 {
 	mut found := false
@@ -48,7 +49,12 @@ fn observe() ! {
 }
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--memory-snapshot' {
+		processsnapshot.capture(os.args[2]) or { eprintln('MAPS-MEMORY-SNAPSHOT-FAILED ' + err.msg()); exit(1) }
+		return
+	}
 	if os.args.len == 2 && os.args[1] == '--selftest' {
+		processsnapshot.self_test()!
 		assert memory_kib('MemTotal: 123 kB\nMemFree: 7 kB\n', 'MemFree')! == 7
 		for text in ['MemFree: 7 MB', 'MemFree: 7 kB\nMemFree: 8 kB', 'MemTotal: 7 kB', 'MemFree: -1 kB'] {
 			if _ := memory_kib(text, 'MemFree') { panic('invalid observation accepted') }
@@ -56,6 +62,6 @@ fn main() {
 		println('MAPS-STORAGE-WATCH-SELFTEST-PASS')
 		return
 	}
-	if os.args.len != 1 { eprintln('usage: maps-storage-watch [--selftest]'); exit(2) }
+	if os.args.len != 1 { eprintln('usage: maps-storage-watch [--selftest | --memory-snapshot FRESH_OUTPUT]'); exit(2) }
 	observe() or { eprintln('MAPS-STORAGE-WATCH-FAILED ' + err.msg()); exit(1) }
 }

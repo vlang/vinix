@@ -2175,3 +2175,30 @@ receipt `de94091b0cd09d4dc416b1a5e01efe9b54e9249fc72fe8db98fdc49410f2e0b9`,
 serial `def577a2ee264f8da7ced2cece5665492743b67c7cd23a1750192250ecf21e42`,
 and data image
 `65eb7852574a7c960dbc33bbe0b6d30e7aa71477cf43d747746d71aa8db54151`.
+
+The storage observer now has an explicit one-shot
+`--memory-snapshot FRESH_OUTPUT` diagnostic. It retains process stat/status/maps/
+smaps files in a private fresh directory, with128-process,4096-directory-entry,
+per-file and64MiB total capture bounds. Start times bracket each process to
+detect PID reuse; the files remain non-atomic samples. Missing proc features
+and disappearing processes are reported, not silently asserted complete.
+Normal600-second storage observation is unchanged. It does not read process
+environments, credentials or request authority.
+
+Current V6422d39 built the ARM observer r3 under the original guard:0/0,
+complete cleanup,2112ms, RSS207028224, growth1945600 bytes. SHA256 is
+`555128baf2d57c44f93359d0799fa3212ddaf7812ffbff68d337ad780c93d1df`.
+Host ASan GC-none selftests passed (address checks enabled, leak detection
+disabled) after catching and fixing an initial double-free: current V's typed
+string-array free already releases its elements. Tests cover decimal overflow,
+malformed/duplicate RSS, stat comm parentheses, truncated stat, exact/oversized/
+empty input, byte-preserving capture and refusal to overwrite evidence.
+Sources/checksums and logs remain under `maps-memory-watch-*20261112-r3`.
+
+Fresh r65 staged the same qualified runtime with this observer, passing0/0,
+complete cleanup,4670ms, RSS36700160, growth149897216 bytes. Volume inspection,
+read-only e2fsck and initial image hash passed. The observer selftests passed
+on ARM, then its first real pre-broker snapshot retained all four files for
+six processes (354327 bytes), with stable start times. This kernel's status
+files do not yield VmRSS in the observer's Android/Linux format; the raw maps/
+smaps are retained for inspection. Maps runtime memory sampling follows.
