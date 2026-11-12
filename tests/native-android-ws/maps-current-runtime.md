@@ -2150,3 +2150,28 @@ archive SHA256
 `c8f7c8f981be854cea567c993773d9ab375dc2e1a58383c4f79ba36f98a2d895`.
 This API pass does not establish Maps tile rendering or account completion;
 the real Maps retry follows after releasing the API bind.
+
+r64 reached onboarding and anonymous Explore after Skip. The map remained
+beige, with no tiles or geometry; both retained EGL frame samples are uniformly
+opaque f0ede5ff. A Louvre query opened an empty details panel and did not
+produce a qualified result before it was dismissed. No current search/route
+pass is claimed. Avatar / Sign in opened the account window, but at watch
+353589ms the kernel reported `oom: out of memory: killed main, which held
+3456 MiB`. Maps exited and the broker later reported account input disconnected.
+There is no new missing-method/uncaught marker in the complete Maps log.
+The killed process identity beyond the kernel's name is not established by
+that message; a subsequent process listing was too late, after broker cleanup.
+This run requires per-process memory measurements before attributing the OOM
+to Java heap, native mappings, stacks, another process or the kernel.
+
+The12GiB/4CPU VM limit is unchanged. The watch reached only418764ms before
+stopping, minimum app-data space7235670016 bytes and MemFree32784KiB;
+this is a failure, not a600-second stability pass. Only verified owned QEMU
+92229 was synced and stopped, then the complete offline artifacts retained
+under `maps-current-20261112-r64`. Maps SHA256 is
+`1fc0897e686cdf360353f3456479fea6e2239509b9405d1e7c30678ceff409c1`,
+broker `fa894999296a21df1312ee92d4d74e1e497d0f2164f0dcb2aaf789f78a8ffc3a`,
+receipt `de94091b0cd09d4dc416b1a5e01efe9b54e9249fc72fe8db98fdc49410f2e0b9`,
+serial `def577a2ee264f8da7ced2cece5665492743b67c7cd23a1750192250ecf21e42`,
+and data image
+`65eb7852574a7c960dbc33bbe0b6d30e7aa71477cf43d747746d71aa8db54151`.
