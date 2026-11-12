@@ -256,6 +256,12 @@ fn (mut m IntegerMachine) put(inst IRInstruction, value IntegerValue) {
 	slot := int(inst.next_value - m.bodies.scopes[m.scope].base_id)
 	m.values[slot] = value; m.known[slot] = true
 }
+fn (m &IntegerMachine) binary_value(op IRTypedInstruction) !IntegerValue {
+	a := m.read(op.operands_start)!; b := m.read(op.operands_start + 1)!
+	if m.p.types[op.result_type].kind == .float_t { return if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary32_binary(op.opcode, u32(a.value), u32(b.value))!} } }
+	if m.p.types[op.result_type].kind == .half_t { return if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary16_binary(op.opcode, u16(a.value), u16(b.value))!} } }
+	return integer_binary_flags(op.opcode, op.flags, m.p.integer_bits(op.result_type)!, a, b)!
+}
 
 fn (m &IntegerMachine) read_frozen(operand_index int) !IntegerValue {
 	operand := m.p.operands[operand_index]
@@ -340,12 +346,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 					bits := p.integer_bits(p.scalar_overflow_element(op.result_type)!)!
 					result = scalar_pair_insert_value(pair, inserted, p.indices[op.indices_start], bits)!
 				}
-				2 {
-					a := m.read(start)!; b := m.read(start + 1)!
-					if p.types[op.result_type].kind == .float_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary32_binary(op.opcode, u32(a.value), u32(b.value))!} } }
-					else if p.types[op.result_type].kind == .half_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary16_binary(op.opcode, u16(a.value), u16(b.value))!} } }
-					else { result = integer_binary_flags(op.opcode, op.flags, p.integer_bits(op.result_type)!, a, b)! }
-				}
+				2 { result = m.binary_value(op)! }
 				9, 28 {
 					fp := p.types[p.operands[start].type_index].kind in [.float_t, .half_t]!
 					if fp && op.opcode in [u32(0), 15]! { result = IntegerValue{value: u64(op.opcode == 15)} }

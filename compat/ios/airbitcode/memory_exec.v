@@ -18,8 +18,8 @@ fn (p IRTypedProgram) memory_argument(pools IRConstantPools, scope int, operand 
 	if v.kind != .argument || o.number < pools.module_values || u64(o.number - pools.module_values) >= u64(count) { return error('AIR memory execution: direct pointer argument required') }
 	return int(o.number - pools.module_values)
 }
-// Narrow execution profile for copies/constant stores: a defined ordinary void
-// function, pointer arguments, one block, scalar loads/stores and final ret void.
+// Narrow execution profile: an ordinary void function, pointer arguments, one
+// block, scalar loads/stores, flag-free binary operations and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -45,6 +45,14 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		if inst.scope != scope || inst.block != s.blocks_start || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded || op.flags != 0 || op.is_volatile || op.targets_count != 0 || op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start { return error('AIR memory execution: decoded access required') }
 		code := stream.records[inst.record].code
 		if index == block.first + block.count - 1 { if code != 10 || inst.has_result || op.operands_count != 0 { return error('AIR memory execution: ret void required') }; continue }
+		if code == 2 {
+			p.execution_bits(op.result_type, true)!
+			if !inst.has_result || op.operands_count != 2 || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: binary result/arity') }
+			for operand in p.operands[op.operands_start..op.operands_start + 2] { if operand.type_index != op.result_type { return error('AIR memory execution: binary operand type') } }
+			floating := p.types[op.result_type].kind in [.float_t, .half_t]!
+			if (floating && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!floating && op.opcode > 12) { return error('AIR memory execution: binary opcode') }
+			continue
+		}
 		if code !in [u64(20), 24, 44]! || op.operands_count != (if code == 20 { 1 } else { 2 }) || inst.has_result != (code == 20) { return error('AIR memory execution: scalar load/store required') }
 		binding := p.memory_argument(pools, scope, op.operands_start, bindings.len)!
 		bits := p.execution_bits(op.source_type, true)!; bytes := u64((bits + 7) / 8); b := bindings[binding]
@@ -58,6 +66,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 	for index in block.first .. block.first + block.count {
 		m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
 		if code == 10 { return IRVoidRun{steps: m.steps} }
+		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
 		binding := p.memory_argument(pools, scope, op.operands_start, bindings.len)!
 		bits := p.execution_bits(op.source_type, true)!; bytes := int((bits + 7) / 8); offset := int(bindings[binding].offset)
 		if code == 20 {

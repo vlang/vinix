@@ -13,7 +13,7 @@ fn main() {
 		typ := if i <= 64 { 'i${i}' } else if i == 65 { 'half' } else { 'float' }
 		source.write_string('define void @copy_${i}(ptr %src, ptr %dst) {\n %v = load ${typ}, ptr %src, align 1\n store ${typ} %v, ptr %dst, align 1\n ret void\n}\n')
 	}
-	source.write_string('define void @constant(ptr %dst) { store i32 305419896, ptr %dst, align 1\n ret void }\ndefine void @poison(ptr %dst) { store i32 poison, ptr %dst, align 1\n ret void }\ndefine void @undef(ptr %dst) { store i32 undef, ptr %dst, align 1\n ret void }\ndefine void @volatile(ptr %dst) { store volatile i32 1, ptr %dst, align 1\n ret void }\ndefine void @aligned(ptr %src, ptr %dst) { %v = load i32, ptr %src, align 4\n store i32 %v, ptr %dst, align 4\n ret void }\ndefine void @unsupported(ptr %dst) { store i32 1, ptr %dst, align 1\n %v = add i32 2, 3\n ret void }\n')
+	source.write_string('define void @constant(ptr %dst) { store i32 305419896, ptr %dst, align 1\n ret void }\ndefine void @poison(ptr %dst) { store i32 poison, ptr %dst, align 1\n ret void }\ndefine void @undef(ptr %dst) { store i32 undef, ptr %dst, align 1\n ret void }\ndefine void @volatile(ptr %dst) { store volatile i32 1, ptr %dst, align 1\n ret void }\ndefine void @aligned(ptr %src, ptr %dst) { %v = load i32, ptr %src, align 4\n store i32 %v, ptr %dst, align 4\n ret void }\ndefine void @unsupported(ptr %dst) { store i32 1, ptr %dst, align 1\n %v = add nuw i32 2, 3\n ret void }\n')
 	os.write_file(out + '/input.ll', source.str())!
 	mut extra := os.open_append(out + '/input.ll')!
 	extra.write_string('define void @spaces(ptr addrspace(2) %src, ptr addrspace(1) %dst) { %v = load i32, ptr addrspace(2) %src, align 1\n store i32 %v, ptr addrspace(1) %dst, align 1\n ret void }\n')!; extra.close()

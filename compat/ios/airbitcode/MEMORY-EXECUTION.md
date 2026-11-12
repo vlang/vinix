@@ -1,10 +1,13 @@
 # Bounded scalar memory execution
 
 `run_memory_function` executes a defined ordinary void function with pointer
-arguments, one basic block, scalar loads/stores and a final ret void. It accepts
-i1..i64, half and float memory values. No arithmetic, GEP, alloca, pointer
-casts, branches, atomics, volatile accesses, calls or aggregate loads/stores
-are included yet. The separate scalar/void APIs retain their existing profiles.
+arguments, one basic block, scalar loads/stores, flag-free binary operations
+and a final ret void. It accepts i1..i64, half and float memory values.
+Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
+interpreter's arithmetic, undefined-operation guards and poison propagation.
+Flags (including fast-math), GEP, alloca, pointer casts, branches, atomics,
+volatile accesses, calls or aggregate loads/stores
+are rejected. The separate scalar/void APIs retain their existing profiles.
 
 Each pointer argument binds to an IRMemoryBinding with borrowed mutable data,
 a byte offset, declared virtual base alignment and write permission. At most
@@ -23,14 +26,16 @@ Valid LLVM IR and matching immutable parsed indexes remain preconditions.
 
 Loads assemble little-endian bytes and mask narrow integer padding bits.
 Stores write only the scalar's ceil(bits/8) bytes, zeroing unused high bits.
-Floating values preserve raw bits. Buffer bytes are treated as defined values;
+Loads/stores preserve floating raw bits. Buffer bytes are treated as defined values;
 uninitialized-memory/poison shadow tracking is not implemented. Poison stores
 and selected undef reject. Dynamic value errors can leave earlier stores
-visible; errors do not roll back memory. Every load/store/return costs one step,
-with the existing maximum step limit. Preflight rejects an insufficient budget.
+visible; errors do not roll back memory. Every load/store/binary/return costs
+one step, with the existing maximum step limit. Preflight rejects an insufficient budget.
 Execution scratch arrays are freed on success and failure; binding data is not.
 
 `tests/ios/air-memory-execute.v` assembles LLVM fixtures and checks 16,896 copies
-against independent byte expectations, guards and constant stores. This API is
-interpreter groundwork: Metal buffer binding, pipelines and dispatch remain
-pending.
+against independent byte expectations, guards and constant stores. Execution is
+also checked against native LLVM by `tests/ios/air-memory-arithmetic.v` for
+load/compute/store bodies, including poison consumption and budget guards.
+This is interpreter groundwork: Metal buffer binding, pipelines and dispatch
+remain pending.
