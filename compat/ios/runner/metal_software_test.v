@@ -2,6 +2,7 @@
 module main
 
 import crypto.sha256
+import os
 
 #include <sys/wait.h>
 fn C.waitpid(int, &int, int) int
@@ -18,6 +19,49 @@ type SMDescriptor = fn (u64, &char, u64, u64, u64, u8) u64
 type SMTexture = fn (u64, &char, u64) u64
 type SMSet = fn (u64, &char, u64)
 type SMLibrary = fn (u64, &char, u64, &u64) u64
+fn C.mkfifo(&char, u32) int
+fn sm_test_library_file(d u64, name u64, output &u64) u64 { return unsafe { SMLibrary(voidptr(C.ios_objc_msgsend))(d, c'newLibraryWithFile:error:', name, output) } }
+fn test_software_metal_library_files() {
+	$if !ios_metal_software ? { return }
+	for iteration in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
+		assert dispatch_runtime == unsafe { nil }
+		directory := os.join_path(os.temp_dir(), 'metal-library-files-' + C.getpid().str() + '-' + iteration.str())
+		os.mkdir(directory)!
+		for wrapped in [false, true]! { for aliased in [false, true]! {
+			path := os.join_path(directory, 'shaders π ' + wrapped.str() + aliased.str() + '.metallib')
+			bytes := sm_library_fixture(['v_main', 'f_main', 'k_π'], wrapped, aliased); os.write_file_array(path, bytes)!; unsafe { bytes.free() }
+			name := owned_string(path); mut failure := u64(0xfeed)
+			library := sm_test_library_file(d, name, &failure); assert library != 0 && failure == 0xfeed
+			names := sm_send(library, c'functionNames'); assert sm_send(names, c'count') == 3
+			function := unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(library, c'newFunctionWithName:', obj_header(names).items[2]) }
+			assert function != 0 && sm_send(function, c'functionType') == 3
+			// Storage is independent of the file and the path object.
+			os.write_file(path, 'replaced')!; objc_release(name); objc_release(library)
+			assert string_text(sm_send(function, c'name')) == 'k_π' && sm_send(function, c'device') == d
+			objc_release(function)
+		} }
+		empty_path := os.join_path(directory, 'empty.metallib'); empty := sm_library_fixture([], false, false); os.write_file_array(empty_path, empty)!; unsafe { empty.free() }
+		name := owned_string(empty_path); library := sm_test_library_file(d, name, unsafe { nil }); assert library != 0; objc_release(library); objc_release(name)
+		large_path := os.join_path(directory, 'large.metallib'); fd := C.open(large_path.str, C.O_CREAT | C.O_WRONLY, 0o600); assert fd >= 0 && C.ftruncate(fd, 268435457) == 0; C.close(fd)
+		fifo_path := os.join_path(directory, 'pipe.metallib'); assert C.mkfifo(fifo_path.str, 0o600) == 0
+		for mode in 0 .. 8 {
+			text := match mode { 0 { os.join_path(directory, 'missing') } 1 { directory } 2 { large_path } 3 { fifo_path } 4 { empty_path + '\x00suffix' } 5 { 'x'.repeat(1024) } 6 { '' } else { empty_path } }
+			path := owned_string(text); mut failure := u64(0)
+			if mode == 7 { os.write_file(empty_path, 'bad')! }
+			assert sm_test_library_file(d, path, &failure) == 0
+			sm_library_check_error(failure, if mode == 0 { i64(6) } else if mode == 7 { i64(3) } else { i64(1) })
+			assert sm_test_library_file(d, path, unsafe { nil }) == 0
+			objc_release(path)
+		}
+		for path in [u64(0), d]! { mut failure := u64(0); assert sm_test_library_file(d, path, &failure) == 0; sm_library_check_error(failure, 1) }
+		// Remove the sparse oversized fixture; it has no payload evidence to retain.
+		os.rm(large_path)!; os.rm(fifo_path)!
+		objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-LIBRARY-FILES: raw/wrapped/shared containers, Unicode paths, independent file/function lifetimes, empty library, ten invalid inputs including sparse oversized files and nonblocking FIFOs, optional NSError and two drained runtimes without dispatch PASS')
+}
 fn sm_test_library(device u64, data u64, output &u64) u64 { return unsafe { SMLibrary(voidptr(C.ios_objc_msgsend))(device, c'newLibraryWithData:error:', data, output) } }
 fn sm_library_number(mut data []u8, offset int, count int, value u64) { for i in 0 .. count { data[offset + i] = u8(value >> u32(i * 8)) } }
 fn sm_library_append(mut data []u8, count int, value u64) { start := data.len; for _ in 0 .. count { data << u8(0) }; sm_library_number(mut data, start, count, value) }

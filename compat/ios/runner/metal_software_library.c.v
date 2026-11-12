@@ -44,6 +44,10 @@ fn sm_library_data(device u64, selector &char, data u64, output &u64) u64 {
 	mapped := darwin_dispatch_data_create_map(data, &pointer, &mapped_size)
 	bytes := unsafe { (&u8(pointer)).vbytes(int(mapped_size)).clone() }
 	darwin_dispatch_release(mapped) // No dispatch storage or callbacks retained by the library.
+	return sm_library_bytes(device, bytes, output)
+}
+// Takes ownership of bytes on success and failure.
+fn sm_library_bytes(device u64, bytes []u8, output &u64) u64 {
 	index := metallib.parse(bytes) or {
 		unsafe { bytes.free() }
 		return sm_library_error(output, 3, err.msg())
@@ -67,6 +71,47 @@ fn sm_library_data(device u64, selector &char, data u64, output &u64) u64 {
 	h.data = bytes
 	h.metal_library = state
 	return library // newLibrary transfers +1; success leaves NSError ** untouched.
+}
+fn sm_library_file(device u64, selector &char, filename u64, output &u64) u64 {
+	C.ios_objc_initialize_lock()
+	sm_check(device, 'VinixSoftwareMTLDevice')
+	if filename == 0 || !objc_is_kind(filename, ios_runtime.names['NSString']) {
+		C.ios_objc_initialize_unlock()
+		return sm_library_error(output, 1, 'Software Metal library path requires NSString')
+	}
+	text := string_text(filename)
+	if text.len == 0 || text.len > 1023 || text.contains('\x00') {
+		C.ios_objc_initialize_unlock()
+		return sm_library_error(output, 1, 'Invalid software Metal library path')
+	}
+	path := text.clone()
+	C.ios_objc_initialize_unlock()
+	defer { unsafe { path.free() } }
+	// Nonblocking open prevents special files such as FIFOs waiting for a writer.
+	fd := C.open(path.str, C.O_RDONLY | C.O_NONBLOCK)
+	if fd < 0 { return sm_library_error(output, 6, 'Cannot open compiled Metal library file') }
+	defer { C.close(fd) }
+	mut fields := [20]u64{}
+	if C.ios_stat_info(unsafe { nil }, i32(fd), 2, unsafe { &fields[0] }) != 0 { return sm_library_error(output, 2, 'Cannot stat compiled Metal library file') }
+	if fields[1] & 0xf000 != 0x8000 { return sm_library_error(output, 1, 'Software Metal libraries require regular files') }
+	if fields[15] > u64(metallib.max_library_size) { return sm_library_error(output, 1, 'Software Metal library exceeds 256 MiB') }
+	mut bytes := []u8{len: int(fields[15])}
+	mut offset := 0
+	for offset < bytes.len {
+		count := C.read(fd, unsafe { &bytes[offset] }, usize(bytes.len - offset))
+		if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }
+		if count <= 0 { unsafe { bytes.free() }; return sm_library_error(output, 3, 'Cannot read complete compiled Metal library') }
+		offset += int(count)
+	}
+	// Reject growth after stat rather than silently accepting a prefix.
+	mut extra := u8(0)
+	for {
+		count := C.read(fd, &extra, 1)
+		if count < 0 && unsafe { *C.ios_errno_address() } == C.EINTR { continue }
+		if count != 0 { unsafe { bytes.free() }; return sm_library_error(output, 3, 'Compiled Metal library changed during read') }
+		break
+	}
+	return sm_library_bytes(device, bytes, output)
 }
 fn sm_library_get(object u64, selector &char) u64 {
 	C.ios_objc_initialize_lock()
@@ -111,6 +156,7 @@ fn sm_library_start(device u64) {
 	}
 	library := ios_runtime.names['VinixSoftwareMTLLibrary']; function := ios_runtime.names['VinixSoftwareMTLFunction']
 	sm_method(device, c'newLibraryWithData:error:', u64(unsafe { voidptr(sm_library_data) }), c'@32@0:8@16^@24')
+	sm_method(device, c'newLibraryWithFile:error:', u64(unsafe { voidptr(sm_library_file) }), c'@32@0:8@16^@24')
 	for selector in [c'device', c'functionNames']! { sm_method(library, selector, u64(unsafe { voidptr(sm_library_get) }), c'@16@0:8') }
 	sm_method(library, c'newFunctionWithName:', u64(unsafe { voidptr(sm_library_function) }), c'@24@0:8@16')
 	for selector in [c'device', c'name']! { sm_method(function, selector, u64(unsafe { voidptr(sm_function_get) }), c'@16@0:8') }

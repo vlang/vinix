@@ -10,7 +10,8 @@ Implemented Objective-C API:
 
 - Device: `newBufferWithLength:options:`, `newBufferWithBytes:length:options:`,
   `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`,
-  `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`.
+  `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`,
+  `newLibraryWithFile:error:`.
 - Library: `device`, `functionNames`, `newFunctionWithName:`.
 - Function: `device`, `name`, `functionType` (metadata handles only).
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
@@ -109,8 +110,17 @@ Success leaves the error slot untouched.
 These handles expose container metadata. AIR instruction verification,
 specialization, pipeline creation and shader execution remain pending; even
 a valid container does not establish executable LLVM IR. Source compilation,
-file/URL loading and default libraries remain unsupported. See
+URL loading and default libraries remain unsupported. See
 [Apple's dispatch-data library API](https://developer.apple.com/documentation/metal/mtldevice/makelibrary%28data%3A%29).
+
+Filename loading uses the same validation and ownership path without requiring
+dispatch initialization. It accepts nonempty NSString paths up to 1,023 UTF-8
+bytes without embedded NULs. Files must be regular and at most 256 MiB; a
+nonblocking open prevents FIFOs from waiting for a writer. Reads retry EINTR,
+reject early EOF and check for growth beyond the stat size. Open failures
+return library error 6, stat failures 2, invalid paths/file types/size 1 and
+incomplete or malformed content 3. Files may be replaced or deleted after
+loading; the library keeps its own bytes. Source compilation remains absent.
 
 Texture-to-texture blits copy positive 2D regions between textures with the
 same pixel format and device. Only slice/level zero, origin z zero and depth
