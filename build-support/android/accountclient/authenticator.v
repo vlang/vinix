@@ -118,6 +118,16 @@ fn (mut a Authenticator) disconnect() {
 	a.completed = [32]CompletedAuthSession{}
 }
 
+// Caller holds the authenticator mutex. Encoding borrows the capability;
+// enqueue retains its own wire copy, never a pointer into the retiring session.
+fn (mut a Authenticator) queue_cancellation(id u64, capability []u8) ! {
+	ack := accountipc.failure(id, 4, 'Account request cancelled')
+	defer { unsafe { ack.options.free() } }
+	wire := accountipc.encode_event(accountipc.Event{...ack, capability: capability}, true)!
+	defer { unsafe { wire.free() } }
+	a.stream.enqueue(wire)!
+}
+
 @[export: 'vinix_android_authenticator_read']
 pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 	if handle == unsafe { nil } || session == unsafe { nil } { return -1 }
@@ -128,6 +138,11 @@ pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 	a.clear_current()
 	for id, value in a.sessions {
 		if time.sys_mono_now() - value.started >= 5 * time.minute {
+			// A root cancellation may already be queued behind this deadline
+			// check. Send a terminal failure and remember only its capability
+			// for the single crossing cancel, just as for other terminal replies.
+			a.queue_cancellation(id, value.command.capability) or { a.disconnect(); return -1 }
+			a.remember_completed(id, value.command.capability)
 			a.retire(id)
 			unsafe { *session = id }
 			return 2
@@ -158,13 +173,7 @@ pub fn auth_read(handle voidptr, session &u64, timeout i32) i32 {
 			a.disconnect(); return -1
 		}
 		if !same_capability(event.capability, value.command.capability) { a.disconnect(); return -1 }
-		ack := accountipc.failure(event.id, 4, 'Account request cancelled')
-		defer { unsafe { ack.options.free() } }
-		wire := accountipc.encode_event(accountipc.Event{...ack, capability: event.capability}, true) or {
-			a.disconnect(); return -1
-		}
-		defer { unsafe { wire.free() } }
-		a.stream.enqueue(wire) or { a.disconnect(); return -1 }
+		a.queue_cancellation(event.id, event.capability) or { a.disconnect(); return -1 }
 		a.retire(event.id)
 		unsafe { *session = event.id }
 		return 2

@@ -8,7 +8,12 @@ retry reached a check-in timeout page. The [unbound GL query guard](maps-unbound
 also passed the full signed ARM regression. r69 then exited on the missing
 ConnectivityManager.OnNetworkActiveListener type. The
 [listener repair](maps-network-active-listener-runtime-20261113.md) passed the
-full signed ARM regression in r70; the real Maps retry is pending.
+full signed ARM regression in r70. The normal runtime reached Explore with a
+blank map and a check-in timeout page, then exited after cancellation/transport
+failure. A [local-expiry crossing fix](maps-auth-local-expiry-20261113.md) passed
+all 33 ASan and ordinary protocol tests and ARM compilation; runtime retry is
+pending. r71 is separately testing a JIT-enabled native candidate, which has
+passed the full signed API regression but is not yet Maps-qualified.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

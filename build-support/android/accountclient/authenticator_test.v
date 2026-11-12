@@ -98,6 +98,91 @@ fn test_authenticator_cancellation_expiration_and_builder_survives_close() {
 	auth_response_free(last)
 }
 
+fn test_local_expiration_and_root_cancel_cross_without_reopening_authority() {
+	for forged in [false, true] {
+		mut owner, mut peer := auth_pair()
+		defer { auth_close(owner); peer.close(); unsafe { free(peer) } }
+		auth_dispatch(mut peer, 7)
+		mut id := u64(0)
+		assert auth_read(owner, &id, 0) == 1
+		late := auth_response(owner, 7, 1)
+		assert auth_read(owner, &id, 0) == 0 // release borrowed getter view
+		old := owner.sessions[7] or { panic('missing session') }
+		owner.sessions[7] = &AuthSession{command: old.command, started: time.sys_mono_now() - 5 * time.minute}
+		unsafe { free(old) }
+		wire := accountipc.encode_event(accountipc.Event{kind: .cancel, id: 7,
+			capability: []u8{len: 32, init: if forged { u8(8) } else { u8(7) }}}, true) or { panic(err) }
+		defer { unsafe { wire.free() } }
+		peer.enqueue(wire) or { panic(err) }
+		peer.flush() or { panic(err) }
+		// The local deadline is examined before the already queued root cancel.
+		assert auth_read(owner, &id, 0) == 2 && id == 7
+		assert auth_response(owner, 7, 1) == unsafe { nil }
+		assert auth_response_send(late) == -1
+		auth_response_free(late)
+		assert auth_read(owner, &id, 0) == if forged { -1 } else { 0 }
+		assert owner.closed == forged
+		packet := peer.read(0) or { panic(err) }
+		assert packet.available && packet.header.kind == .failure
+		ack := accountipc.decode_event(packet.header, packet.body, true) or { panic(err) }
+		assert ack.id == 7 && ack.capability == []u8{len: 32, init: 7}
+		assert ack.options.len == 2 && ack.options[0].key == 'errorCode'
+		assert ack.options[0].value.number == 4
+		accountipc.dispose_event(ack)
+		unsafe { packet.body.free() }
+		if !forged {
+			auth_dispatch(mut peer, 11)
+			assert auth_read(owner, &id, 0) == 1 && id == 11
+			// Only one matching crossing cancel is accepted; replay stays fatal.
+			peer.enqueue(wire) or { panic(err) }
+			peer.flush() or { panic(err) }
+			assert auth_read(owner, &id, 0) == -1 && owner.closed
+		}
+	}
+}
+
+fn test_local_expiration_keeps_the_complete_bounded_crossing_window() {
+	mut owner, mut peer := auth_pair()
+	defer { auth_close(owner); peer.close(); unsafe { free(peer) } }
+	mut id := u64(0)
+	for value in 1 .. 33 {
+		auth_dispatch(mut peer, u64(value))
+		assert auth_read(owner, &id, 0) == 1 && id == u64(value)
+	}
+	assert auth_read(owner, &id, 0) == 0
+	for key, old in owner.sessions {
+		owner.sessions[key] = &AuthSession{command: old.command, started: time.sys_mono_now() - 5 * time.minute}
+		unsafe { free(old) }
+	}
+	mut expired := []u64{}
+	for _ in 0 .. 32 {
+		assert auth_read(owner, &id, 0) == 2 && id !in expired
+		expired << id
+	}
+	assert owner.sessions.len == 0 && auth_read(owner, &id, 0) == 0
+	mut acknowledged := []u64{}
+	for _ in 0 .. 32 {
+		// Output flushing is deliberately bounded per pump iteration.
+		assert auth_read(owner, &id, 0) == 0
+		packet := peer.read(0) or { panic(err) }
+		assert packet.available && packet.header.kind == .failure
+		ack := accountipc.decode_event(packet.header, packet.body, true) or { panic(err) }
+		assert ack.id in expired && ack.id !in acknowledged
+		assert ack.capability == []u8{len: 32, init: u8(ack.id)}
+		acknowledged << ack.id
+		accountipc.dispose_event(ack)
+		unsafe { packet.body.free() }
+	}
+	for value in 1 .. 33 {
+		wire := accountipc.encode_event(accountipc.Event{kind: .cancel, id: u64(value),
+			capability: []u8{len: 32, init: u8(value)}}, true) or { panic(err) }
+		peer.enqueue(wire) or { panic(err) }
+		peer.flush() or { panic(err) }
+		unsafe { wire.free() }
+		assert auth_read(owner, &id, 0) == 0 && !owner.closed
+	}
+}
+
 fn test_completed_response_and_cancel_cross_without_reopening_authority() {
 	for forged in [false, true] {
 		mut owner, mut peer := auth_pair()

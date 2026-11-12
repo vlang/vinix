@@ -55,5 +55,23 @@ These are byte-export/regression results, not a new historical strict-import pas
 
 The API bind was released before broker preparation. The real r70 Maps retry
 uses normal --broker operation, with extra onboarding/tree/thread/TLS/surface
-diagnostics disabled to avoid their timing overhead. Its account result and
-map geometry remain pending; the API regression alone qualifies neither.
+diagnostics disabled. Add account reached the server-communication error page;
+the log again identifies CheckinHelper's 10000 ms timeout, followed later by
+successful check-ins. Returning to Maps and selecting Skip rendered Explore
+with the same blank map. No search result or route was qualified before the
+service exited after account cancellation and a transport-read failure. The
+listener class-resolution failure did not recur; no native fatal signal or OOM
+kill was observed. The [local-expiry regression](maps-auth-local-expiry-20261113.md)
+records the next reproduced transport gap without asserting it caused this exit.
+
+The 600180 ms observation completed with minimum MemFree 4421824 KiB and
+app-data space 7242964992 bytes. Guest sync returned before owned QEMU PID 15996
+was stopped and confirmed absent. Complete r70 evidence was then copied offline:
+
+| Artifact | SHA256 |
+|---|---|
+| maps.retained.log | d819f7ca394a809b0c8c9d929ab22a3a285e4f9f917dc151221424d4541bd9ba |
+| broker.retained.log | 6a95ef64431298982b3c245ed8ff54518383c65bcb09c347a8c88c2a23198720 |
+| receipt.retained.json | 0f24ad5a48ccbfb70c811b4e2bca17b445414a21debb9d832d0ad1329ebce01b |
+| serial.log | 1564b55460bf93437da541ddc9bda1c8888be7ff365f48796a04f58af08ac13b |
+| app-data.ext2 final | 11476ad81e7864a7e370369f08a98c8090dfaed07c77339018d8ee2cc26dd0ec |
