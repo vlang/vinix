@@ -31,13 +31,14 @@ existing whitelist; parameter/return attributes, including `immarg`, reject
 for these unary operations. All blocks are checked, including unvisited ones.
 Valid LLVM IR and matching immutable indexes remain preconditions.
 
-The fixed stack declaration cache has 1192 entries: forty floating-overload
-slots followed by eighteen independent 64-width integer ranges, including the
+The fixed stack declaration cache has 1320 entries: forty floating-overload
+slots followed by twenty independent 64-width integer ranges, including the
 [leading/trailing zero counts](SCALAR-ZERO-COUNTS.md),
 [funnel shifts](SCALAR-FUNNEL.md), [integer extrema](SCALAR-INTEGER-EXTREMA.md),
 [integer absolute value](SCALAR-INTEGER-ABS.md),
-[saturating arithmetic](SCALAR-SATURATING.md) and
-[saturating left shifts](SCALAR-SATURATING-SHIFT.md).
+[saturating arithmetic](SCALAR-SATURATING.md),
+[saturating left shifts](SCALAR-SATURATING-SHIFT.md) and
+[bit extraction/deposition](SCALAR-BIT-PERMUTATION.md).
 Only four slots
 in the byte-swap range are admitted. Each declaration is attribute-validated
 once per run under the shared 1,000,000-work limit; duplicate reserved

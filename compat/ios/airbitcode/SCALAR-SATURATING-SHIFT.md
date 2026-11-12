@@ -27,8 +27,8 @@ supported. Vectors, wider integers, malformed suffixes and AIR aliases reject.
 All blocks are preflighted. Valid LLVM IR and matching immutable indexes remain
 preconditions.
 
-The fixed stack cache has 1192 entries: forty floating-overload slots and
-eighteen independent 64-width integer ranges. The two shift families use
+The fixed stack cache has 1320 entries: forty floating-overload slots and
+twenty independent 64-width integer ranges. The two shift families use
 separate ranges. The shared 1,000,000-work attribute limit, fixed two-ID
 attribute storage and three existing owned execution arrays/cleanup remain.
 Retained allocation is not measured.

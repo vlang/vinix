@@ -113,7 +113,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	if ir_values(stream, raw)[6] != 0 { return error('AIR integer: function attributes unsupported') }
 	if s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.blocks_start < 0 || s.blocks_count < 1 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR integer: body ranges') }
 	mut max_phis := 0
-	mut intrinsic_declarations := [1192]int{} // Forty FP slots, eighteen integer families at 64 widths.
+	mut intrinsic_declarations := [1320]int{} // Forty FP slots, twenty integer families at 64 widths.
 	mut intrinsic_work := 0
 	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
 		block := bodies.blocks[block_index]
