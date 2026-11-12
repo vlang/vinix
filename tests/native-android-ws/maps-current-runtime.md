@@ -1802,3 +1802,65 @@ zero removals `gles-device-config-api-readback-20261112-r1` retain archive
 SHA256 `164d1fceb234e0bd640dbeed5f9a5b099a829cec95c70ba5dded3c08424a03c6`.
 The fixture bind was released before GMS broker preparation. Actual Maps tile,
 route-preview and login qualification remains pending.
+
+With source `d521b3e66`, r55 again returned Louvre Museum details and photos,
+then Eiffel Tower→Louvre estimates of11-minute driving,30-minute transit and
+46-minute walking. Route Preview opened and displayed the first instruction,
+"Head toward Pont d'Iéna". The map and route geometry remained blank. The
+complete log contains no repeated missing GLES client-pointer or DeviceConfig
+linkage. It records two EGL frames of uniform opaque beige, matching later
+compositor samples; sampled GL-Map stacks wait in blfc.run source537. These
+observations locate the blank content before composition without establishing
+the renderer's readiness failure. Captures and complete log remain private.
+
+The600-second watcher completed at600248ms with minimum app-data space
+7237775360 bytes and minimum MemFree183232KiB. This proves completion of the
+storage observation, not full functionality or indefinite memory stability.
+Maps subsequently exited with an uncaught missing android.util.StatsLog in
+csev.g source122, called by a GMS credential-registry worker. Fresh caller
+readback `gms-stats-log-caller-20261112-r1` identifies writeRaw([BI)V on this
+selected runtime path. The caller's newer StatsEvent path was not entered.
+
+Only verified owned QEMU PID61542 was synced and stopped. Complete log SHA256
+is `37a4981ddf1d13d8d430ddfe05dc985eba49eadfdde47833f63fc772b40241d9`;
+data-image SHA256 is
+`5c33c1e41b936df16fddef967710413b2091f6410b47bc5b885d1bc1a8107a4a`.
+Snapshot `maps-stats-final-uart-20261112-r1` has full SHA256
+`b679da61011c4ff7e6f138cdd134add92c99dc27f297f43ab801f42f8699f044`.
+
+`framework_stats_log.v` supplies the observed legacy best-effort writeRaw entry
+point. The runtime has no statsd transport and drops optional events; it
+returns no delivery status and never modifies the supplied array. Null and
+oversized payloads remain harmless, as in [Android's legacy implementation](https://github.com/aosp-mirror/platform_frameworks_base/blob/android-10.0.0_r1/core/jni/android_util_StatsLog.cpp).
+The newer StatsEvent serialization API remains unsupported. SDK
+`framework-stats-log-20261112-r1` passed guarded assembly/readback:0/0,
+complete cleanup,10243ms, RSS465747968, shared growth133763072 bytes. Signed
+fixture r53 passed build/link/sign/verification:0/0, complete cleanup,3074ms,
+RSS190201856, shared growth64225280 bytes. Current V at the usual path was
+used; its version was observed advancing from8415951 to8ccd6ad while these
+tools were prepared. No historical compiler requirement was introduced.
+
+Guest r56 staging passed0/0, complete cleanup,22003ms, RSS37601280, shared
+growth217210880 bytes. UUID, read-only e2fsck and initial-image hash checks
+passed before boot. Host free space had fallen to roughly6GiB; original
+reserve/growth guards remained enforced. ARM qualification remains pending.
+
+`maps-dex-interfaces.v` locates direct DEX interface implementations with
+bounded inputs and checked table/string offsets. Its scan of the retained Maps
+DEX files identified bkue and axmw as direct blfb implementations, enabling
+fresh selected-class readback without whole-APK disassembly. Related retained
+readbacks are `maps-gl-wait-caller-20261112-r2`,
+`maps-gl-state-caller-20261112-r1`, `maps-gl-view-caller-20261112-r1` and
+`maps-gl-ready-caller-20261112-r1`. The earlier r1 wait-caller attempt used a
+nonexistent APK path, failed extraction and supplied no evidence.
+
+The complete signed r53 fixture passed on ARM in r56 as UID/GID10160,
+ready/pass once, drained EOF and exit0. It includes the existing EGL/client
+pixel and DeviceConfig checks, plus legacy raw-stats input preservation and
+harmless null/oversized/zero-length payloads. Snapshot
+`stats-log-api-uart-20261112-r1`, plan
+`stats-log-api-plan-20261112-r1.json` and strict byte readback with zero removals
+`stats-log-api-readback-20261112-r1` retain archive SHA256
+`59bf802879ea379eb3bba44682b456b0c7cc8a10449be034022af843871155f2`.
+The fixture bind was released before broker preparation. Full Maps functionality
+and its actual retry remain pending.
