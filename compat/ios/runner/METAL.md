@@ -310,6 +310,16 @@ cost. Unknown/wrong-family flags and floating fast-math flags reject during
 pipeline creation. Synthetic deferred kernels check defined flagged sums,
 freezing overflow poison, and failed command completion when poison is stored.
 
+Buffer kernels admit direct LLVM `ctpop`, `bitreverse`, `bswap`, `ctlz` and
+`cttz` calls with the scalar interpreter's exact declaration, signature and
+attribute checks. Counts/reversal support i1..i64; bswap requires a multiple
+of sixteen bits. Zero-count flags must be defined literal i1 constants.
+Zero input returns the width when the flag is false and poison when true;
+freeze can define that result before storing. Calls cost one step and execute
+inside the interpreter. Other intrinsics, indirect calls, call-site attributes,
+tail calls and fast-math calls remain unsupported. Synthetic deferred kernels
+combine all five operations and consume zero-poison results through freeze.
+
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not
 retain the client pointer. Each dispatch retains its own buffer reference, so

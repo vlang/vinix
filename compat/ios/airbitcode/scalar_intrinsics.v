@@ -2,6 +2,17 @@
 module airbitcode
 
 enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow }
+// Validation remains the caller's responsibility. This evaluates only decoded,
+// admitted intrinsics; it never calls the declaration or a host function pointer.
+fn (m &IntegerMachine) intrinsic_value(ir IRModule, op IRTypedInstruction) !IntegerValue {
+	id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
+	start := op.operands_start; a := m.read(start + 1)!
+	arity := scalar_intrinsic_arity(id)
+	b := if arity >= 2 { m.read(start + 2)! } else { IntegerValue{} }
+	c := if arity == 3 { m.read(start + 3)! } else { IntegerValue{} }
+	bits := m.p.execution_bits(if id == .is_fpclass || scalar_integer_overflow(id) { m.p.operands[start + 1].type_index } else { op.result_type }, m.binary32)!
+	return if a.poison || b.poison || c.poison { IntegerValue{poison: true, aggregate: scalar_integer_overflow(id), flag_poison: scalar_integer_overflow(id)} } else if scalar_integer_overflow(id) { scalar_integer_overflow_value(id, bits, a.value, b.value)! } else if scalar_integer_saturating_shift(id) { scalar_integer_saturating_shift_value(id, bits, a.value, b.value)! } else if id == .iabs { scalar_integer_abs_value(bits, a.value, b.value)! } else if scalar_integer_zero_count(id) { scalar_integer_zero_count_value(id, bits, a.value, b.value)! } else { IntegerValue{value: if id in [.fma, .fmuladd]! { scalar_fma(bits, a.value, b.value, c.value)! } else if scalar_integer_funnel(id) { scalar_integer_funnel_value(id, bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
+}
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if scalar_integer_overflow(id) { return 2 }
 	if id in [.fma, .fmuladd, .fshl, .fshr]! { return 3 }

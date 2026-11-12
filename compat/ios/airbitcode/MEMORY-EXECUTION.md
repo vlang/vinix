@@ -8,7 +8,7 @@ It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
 Fast-math flags, alloca, pointer casts, branches, atomics,
-volatile accesses, calls or aggregate loads/stores
+volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
 Integer add/sub/mul/shl accept `nuw`, `nsw` or both. Integer udiv/sdiv/lshr/ashr
@@ -48,6 +48,22 @@ fixed zero choice for poison or undef. Every use of its SSA result sees that
 same choice. It does not prevent an earlier instruction from rejecting undef
 or another dynamic error. Both operations require zero flags and cost one
 step. Pointer/vector/aggregate freezes remain unsupported by this API.
+
+Direct LLVM integer bit intrinsics `ctpop`, `bitreverse`, `bswap`, `ctlz` and
+`cttz` are supported using the scalar executor's declaration/signature,
+attribute and value checks. Counts and reversal accept i1..i64; byte swap
+accepts i16/i32/i48/i64. Zero-count calls require a literal defined i1
+zero-poison flag. With that flag false, zero returns the width; with it true,
+zero produces poison. Poison input propagates, undef input rejects, and
+freeze may consume a poison result. Each call costs one step.
+
+Only ordinary direct calls to the exact reserved declarations are admitted:
+no call-site attributes, fast-math flags, tail calls, indirect calls or other
+intrinsics. Harmless declaration properties and parameter two's immarg use
+the existing scalar allowlist and cumulative attribute-work limit. Each
+declaration's attributes are checked once per profile; each call's signature
+and constant flag are checked independently. No declaration or host pointer
+is invoked by execution. Unsupported calls after stores reject in preflight.
 
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
@@ -97,7 +113,7 @@ Loads/stores preserve floating raw bits. Buffer bytes are treated as defined val
 uninitialized-memory/poison shadow tracking is not implemented. Poison stores
 and selected undef reject. Dynamic value errors can leave earlier stores
 visible; errors do not roll back memory. Every load, store, binary operation,
-comparison, select, cast, fneg, freeze, GEP and return costs one step, with the existing
+comparison, select, cast, fneg, freeze, intrinsic, GEP and return costs one step, with the existing
 maximum step limit. Preflight rejects an insufficient budget.
 Execution scratch arrays are freed on success and failure; binding data is not.
 
@@ -113,5 +129,7 @@ native LLVM conversions, with separate poison and unsupported-input controls.
 raw-bit expectations, all half encodings, and separate indeterminate choices.
 `tests/ios/air-memory-flags.v` checks integer flags across all widths against a
 defined widened LLVM value/poison-tag reference without executing native poison.
+`tests/ios/air-memory-bits.v` checks bit intrinsic buffer functions against
+defined native LLVM execution, with separate zero/poison/undef/call controls.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.

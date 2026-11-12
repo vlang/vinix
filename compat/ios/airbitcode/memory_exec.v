@@ -101,14 +101,28 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	defer { unsafe { pointers.free() } }
 	mut layouts := IRTypeLayouts{}
 	defer { layouts.free() }
+	mut intrinsic_declarations := [360]int{} // Forty FP slots + five integer families.
+	mut intrinsic_work := 0
 	for index in block.first .. block.first + block.count {
 		inst := bodies.instructions[index]; op := p.instructions[index]
 		if inst.scope != scope || inst.block != s.blocks_start || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded || op.is_volatile || op.targets_count != 0 || op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start { return error('AIR memory execution: decoded access required') }
 		code := stream.records[inst.record].code
 		gep := code in [u64(4), 30, 43]!
-		allowed_flags := if gep { u64(7) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 		if op.flags & ~allowed_flags != 0 { return error('AIR memory execution: unsupported flags') }
 		if index == block.first + block.count - 1 { if code != 10 || inst.has_result || op.operands_count != 0 { return error('AIR memory execution: ret void required') }; continue }
+		if code == 34 {
+			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: intrinsic result') }
+			key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
+			id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
+			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz]! { return error('AIR memory execution: unsupported intrinsic') }
+			if key < 0 || key >= intrinsic_declarations.len || (intrinsic_declarations[key] != 0 && intrinsic_declarations[key] != op.callee_function + 1) { return error('AIR memory execution: duplicate intrinsic declaration') }
+			if intrinsic_declarations[key] == 0 {
+				intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, second_immarg)!
+				intrinsic_declarations[key] = op.callee_function + 1
+			}
+			continue
+		}
 		if gep {
 			if !inst.has_result || op.operands_count < 1 || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: GEP result/arity') }
 			if ir.data_layout.len == 0 { return error('AIR memory execution: explicit GEP data layout required') }
@@ -184,6 +198,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 	for index in block.first .. block.first + block.count {
 		m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
 		if code == 10 { return IRVoidRun{steps: m.steps} }
+		if code == 34 { value := m.intrinsic_value(ir, op)!; m.put(inst, value); continue }
 		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
 		if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
 		if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }

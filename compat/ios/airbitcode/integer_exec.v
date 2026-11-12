@@ -324,15 +324,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			start := op.operands_start
 			mut result := IntegerValue{}
 			match code {
-				34 {
-					id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
-					a := m.read(start + 1)!
-					arity := scalar_intrinsic_arity(id)
-					b := if arity >= 2 { m.read(start + 2)! } else { IntegerValue{} }
-					c := if arity == 3 { m.read(start + 3)! } else { IntegerValue{} }
-					bits := p.execution_bits(if id == .is_fpclass || scalar_integer_overflow(id) { p.operands[start + 1].type_index } else { op.result_type }, binary32)!
-					result = if a.poison || b.poison || c.poison { IntegerValue{poison: true, aggregate: scalar_integer_overflow(id), flag_poison: scalar_integer_overflow(id)} } else if scalar_integer_overflow(id) { scalar_integer_overflow_value(id, bits, a.value, b.value)! } else if scalar_integer_saturating_shift(id) { scalar_integer_saturating_shift_value(id, bits, a.value, b.value)! } else if id == .iabs { scalar_integer_abs_value(bits, a.value, b.value)! } else if scalar_integer_zero_count(id) { scalar_integer_zero_count_value(id, bits, a.value, b.value)! } else { IntegerValue{value: if id in [.fma, .fmuladd]! { scalar_fma(bits, a.value, b.value, c.value)! } else if scalar_integer_funnel(id) { scalar_integer_funnel_value(id, bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
-				}
+				34 { result = m.intrinsic_value(ir, op)! }
 				26 {
 					pair := m.read_overflow(start)!
 					result = IntegerValue{value: if p.indices[op.indices_start] == 0 { pair.value } else { u64(pair.overflow) }, poison: if p.indices[op.indices_start] == 0 { pair.poison } else { pair.flag_poison }}
