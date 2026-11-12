@@ -1,7 +1,7 @@
 # Wine shared user data and private dispatcher, 2026-11-12
 
-Source baseline: `b96bff645`, plus the implementation and qualification sources
-in this checkpoint. This continues [offline bootstrap](wine-bootstrap-check.md)
+Implementation and qualification source checkpoint: `2737f1e80`, building on
+`b96bff645`. This continues [offline bootstrap](wine-bootstrap-check.md)
 and the [shared-file alias diagnostic](wine-shared-pages-check.md).
 
 The pinned Wine runtime now maps its private KUSER section as a coherent
@@ -97,3 +97,22 @@ Original namespaces and the complete pinned dependency bundle remain required.
 The earlier sealed workspaces remain intact. These local results do not
 establish general partial-host-page shared mapping support, WOW64 support,
 desktop embedding or completion of roadmap section 14.
+
+The complete retained workspace is sealed by the typed inventory
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-shared-user-20261112-01.inventory.json`,
+SHA-256 `66e7a8785e1d6885e20db49e3b5d598ed6e1fda29bff201379d6fda1b4641200`.
+The maintained V inventory tool from `845f18d93` compared two complete trees
+before recording; a separate `check-inventory` invocation passed against the
+retained original. Adjacent `inventory-record.log` and `inventory-check.log`
+record both passes. Coverage includes every logical file byte, size, type,
+mode, directory/root mode and symlink target, including failed attempts.
+The tool and its source are retained in the workspace; its selftest passes
+four archive refusals and eight typed-inventory refusals.
+
+Selected maintained sources from `2737f1e80` are retained as
+`source-2737f1e80.tar` inside the workspace, alongside the run-specific parsed
+source closures. Available storage headroom precluded another full archive;
+this is an in-place integrity receipt, not a compressed archive. The complete
+original workspace, namespaces and pinned dependency bundles remain intact
+and required; this seal does not replace historical launch auditors or
+authorize deleting expanded evidence.
