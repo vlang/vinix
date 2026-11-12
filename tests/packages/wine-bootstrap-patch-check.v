@@ -18,7 +18,8 @@ fn run() ! {
 	if input != original || input.len != patched.len { return error('bootstrap patch mutated input or changed size') }
 	after := '\xb8\x01\x00\x00\x00'
 	for at in 0 .. input.len {
-		wanted := if at >= 0x6864 && at < 0x6869 { after[at - 0x6864] } else { input[at] }
+		wanted := if at >= 0x6864 && at < 0x6869 { after[at - 0x6864] }
+			else if at >= 0x62d2 && at < 0x62d6 { '\x00\x40\x00\x00'[at - 0x62d2] } else { input[at] }
 		if patched[at] != wanted { return error('bootstrap patch changed unrelated byte') }
 	}
 	refuse('')!; refuse(patched)!; refuse(input[..input.len - 1])!
@@ -28,7 +29,7 @@ fn run() ! {
 		refuse(changed)!
 		unsafe { changed.free() }
 	}
-	println('WINE BOOTSTRAP PATCH PASS immutable input, exact five-byte literal-name fallback and 10 refusals')
+	println('WINE BOOTSTRAP PATCH PASS immutable input, exact literal-name/shared-view composition and 10 refusals')
 }
 
 fn main() { run() or { eprintln(err); exit(1) } }

@@ -551,6 +551,8 @@ fn run() ! {
 		|| ($if amd64 { text.count('VINIX SIGNED WIN64 WX PASS\n') != 1 } $else { false })
 		|| text.count('VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS\n') != 1
 		|| text.count('VINIX SIGNED WIN64 READ FAULT RECOVERY PASS\n') != 1
+		|| text.count('VINIX SIGNED WIN64 SHARED USER DATA PASS\n') != 1
+		|| text.count('VINIX SIGNED WIN64 PRIVATE DISPATCH PAGE PASS\n') != 1
 		|| text.count('VINIX SIGNED REAL WIN64 READY\n') != 1
 		|| text.count('VINIX SIGNED REAL WIN64 PASS\n') != 1 {
 		$if amd64 {

@@ -93,3 +93,9 @@ tool/archive hashes. The archived source snapshot is `b2f1239ce`; this final
 checksum report follows compression to avoid recursively including its own
 archive checksum. Originals remain retained. Integrity sealing adds no launch
 qualification and authorizes no removal of expanded evidence.
+
+The subsequent [shared-user-data checkpoint](wine-shared-user-check.md) gives
+the private section coherent host-page-compatible views and separates Wine's
+dispatcher page. Its fresh ARM console and graphical calculator runs pass with
+an explicit 3 GiB guest after tracing a 1 GiB child-launch failure to `ENOMEM`.
+The earlier failed bootstrap attempts and this archive remain unchanged.

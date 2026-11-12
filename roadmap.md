@@ -1165,6 +1165,17 @@ architectures; broader release/catalog/runtime acceptance remains open.
     paint/input/close still passes with eleven GUI refusals. The ARM
     retry removes the socket abort but retains shared-user-data mapping and
     services startup failures; ARM graphical acceptance remains open.
+    The subsequent [host-page-compatible shared-data qualification](tests/packages/wine-shared-user-check.md)
+    enlarges the private KUSER section to 16 KiB and moves Wine's private
+    dispatcher to a separate host page, updating all 663 generated syscall
+    stubs. Real signed console execution, coherent aliases and private child
+    isolation pass on both architectures, with 73 x86/82 ARM evidence refusals.
+    A syscall trace identifies the remaining child startup failure in the
+    1 GiB ARM test guest as `fork` returning `ENOMEM`. With an explicit 3 GiB
+    ARM guest, the signed graphical calculator now passes real paint, pointer
+    arithmetic to `42`, natural close and process retirement too. This qualifies
+    that local calculator/runtime closure; general partial-page shared mapping
+    support and broader Windows application acceptance remain open.
     Desktop embedding, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)

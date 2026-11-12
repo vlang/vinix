@@ -47,6 +47,7 @@ fn private_executable(path string) bool {
 		'/runtime/root/usr/lib/wine/x86_64-unix/ntdll.so',
 		'/runtime/root/usr/lib/libfreetype.so.6', '/runtime/root/usr/lib/libfontconfig.so.1',
 		'/runtime/root/usr/lib/wine/x86_64-unix/winex11.so',
+		'/runtime/root/usr/lib/wine/x86_64-windows/ntdll.dll', '/runtime/root/usr/lib/wine/x86_64-windows/win32u.dll',
 		'/runtime/root/usr/lib/wine/x86_64-windows/wineboot.exe']! {
 		if path.ends_with(suffix) { return true }
 	}
@@ -194,7 +195,7 @@ fn checks() ! {
 		clone_tree(run, directory)!
 		mut selected_prepared := prepared
 		mut expected := ''
-		if name.starts_with('producer-') || name in ['forksafe-manifest-binding',
+		if name.starts_with('producer-') || name.starts_with('wine-shared-') || name in ['forksafe-manifest-binding',
 			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
 			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
 			'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
@@ -251,6 +252,21 @@ fn checks() ! {
 				reseal_producer(directory, selected_prepared, receipt)!
 			}
 			expected = if name.ends_with('font-input') { 'missing Wine graphics font input:' } else { 'missing Wine layout input:' }
+		} else if name.starts_with('wine-shared-') {
+			part := if name == 'wine-shared-server' { '/usr/libexec/vinix-wine/wineserver' }
+				else if name == 'wine-shared-boot' { '/usr/lib/wine/x86_64-windows/wineboot.exe' }
+				else if name == 'wine-shared-ntdll-pe' { '/usr/lib/wine/x86_64-windows/ntdll.dll' }
+				else if name == 'wine-shared-win32u-pe' { '/usr/lib/wine/x86_64-windows/win32u.dll' }
+				else { '/usr/lib/wine/x86_64-unix/ntdll.so' }
+			field := match name { 'wine-shared-server' { 0x1deac } 'wine-shared-boot' { 0x62d2 } 'wine-shared-reader' { 0x5ce35 } 'wine-shared-dispatch-page' { 0x3c410 } 'wine-shared-ntdll-pe' { 0x5475b } 'wine-shared-win32u-pe' { 0x96db } else { 0x5e517 } }
+			file := 'prepared/' + architecture + '/runtime/root' + part
+			changed := os.read_file(selected_prepared + '/' + file)!
+			before := if name in ['wine-shared-server', 'wine-shared-boot'] { '\x10\x07\x00\x00' }
+				else if name.ends_with('-pe') { '\x00\x10\xfe\x7f' } else { '\x00\x10\x00\x00' }
+			unsafe { vmemcpy(changed.str + field, before.str, before.len) }
+			replace(selected_prepared + '/' + file, changed)!
+			reseal_producer(directory, selected_prepared, file)!
+			expected = 'Wine binary differs from the exact private-runtime patch: '
 		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
 			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font', 'wine-graphics-shm-fallback', 'wine-bootstrap-canonical-name'] {
 			part := if name in ['wine-server-resealed-patch', 'wine-server-proc-nls'] {
@@ -318,9 +334,17 @@ fn checks() ! {
 			}
 			replace(directory + '/result.json', json2.encode(outcome))!
 			expected = 'requires uninterrupted passing native Wine outcome'
+		} else if name == 'vm-memory' {
+			path := directory + '/boot/qemu-0.argv.json'
+			mut command := json2.decode[[]string](os.read_file(path)!)!
+			at := command.index('-m')
+			if at < 0 || at + 1 >= command.len { return error('baseline VM memory argument missing') }
+			command[at + 1] = if architecture == 'aarch64' { '1024' } else { '3072' }
+			replace(path, json2.encode(command))!
+			expected = 'Wine guest memory command differs'
 		} else if name in ['missing-ready', 'duplicate-ready', 'missing-pass', 'marker-order',
 			'forbidden', 'missing-smoke-marker', 'missing-image-marker', 'missing-wx-marker',
-			'missing-software-exception', 'missing-read-fault', 'duplicate-read-fault', 'exception-marker-order'] {
+			'missing-software-exception', 'missing-read-fault', 'duplicate-read-fault', 'exception-marker-order', 'missing-shared-user-data', 'missing-private-dispatch-page'] {
 			serial := os.read_file(directory + '/boot/serial.log')!
 			ready := 'VINIX SIGNED REAL WIN64 READY'
 			pass := 'HWTEST PASS packaged-Wine'
@@ -337,6 +361,10 @@ fn checks() ! {
 				changed = serial.replace('VINIX SIGNED WIN64 WX PASS', 'removed WX')
 			} else if name == 'missing-software-exception' {
 				changed = serial.replace('VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS', 'removed SOFTWARE')
+			} else if name == 'missing-shared-user-data' {
+				changed = serial.replace('VINIX SIGNED WIN64 SHARED USER DATA PASS', 'removed SHARED USER DATA')
+			} else if name == 'missing-private-dispatch-page' {
+				changed = serial.replace('VINIX SIGNED WIN64 PRIVATE DISPATCH PAGE PASS', 'removed PRIVATE DISPATCH PAGE')
 			} else if name == 'missing-read-fault' {
 				changed = serial.replace('VINIX SIGNED WIN64 READ FAULT RECOVERY PASS', 'removed FAULT')
 			} else if name == 'duplicate-read-fault' {

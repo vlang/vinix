@@ -92,6 +92,13 @@ fn check() ! {
 	}
 	inputs := hashes(run + '/inputs.json')!
 	if inputs != hashes(run + '/inputs-verified.json')! { return error('GUI verified inventory differs') }
+	vm_command := argv(run + '/boot/qemu-0.argv.json')!
+	memory_at := vm_command.index('-m')
+	if vm_command.len == 0 || vm_command.filter(it == '-m').len != 1
+		|| memory_at < 0 || memory_at + 1 >= vm_command.len
+		|| vm_command[memory_at + 1] != if arch == 'aarch64' { '3072' } else { '1024' } {
+		return error('Wine GUI guest memory command differs')
+	}
 	for path, expected in hashes(run + '/inputs-before-build.json')! {
 		if inputs[path] != expected { return error('GUI prebuild inventory differs') }
 	}
@@ -220,7 +227,7 @@ fn check() ! {
 	if os.walk_ext(installed + '/org.vinix.wine-runtime', '', hidden: true).filter(os.is_file(it)).len != count { return error('GUI runtime file set differs') }
 	mut artifacts := map[string]string{}
 	for name in ['declaration.json', 'inputs.json', 'inputs-verified.json', 'generated-before-boot.json', 'result.json',
-		'boot/serial.log', 'boot/qemu.log', 'boot/qmp.log', 'boot/initramfs.tar', 'before.png', 'after.png',
+		'boot/serial.log', 'boot/qemu.log', 'boot/qemu-0.argv.json', 'boot/qmp.log', 'boot/initramfs.tar', 'before.png', 'after.png',
 		'publisher/index.json', 'publisher/index.sig'] {
 		artifacts[name] = digest(run + '/' + name)!
 	}

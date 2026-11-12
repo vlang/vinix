@@ -257,7 +257,7 @@ fn check() ! {
 	} else {
 		host
 	}
-	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{ kernel: kernel, guest: guest, extras: extras, state: work + '/boot', timeout: 600, keep: true })
+	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{ kernel: kernel, guest: guest, extras: extras, state: work + '/boot', timeout: 600, keep: true, memory_mib: if arch == 'aarch64' { 3072 } else { 1024 } })
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	verify(inputs)!
 	for path, expected in generated {

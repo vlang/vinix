@@ -88,7 +88,9 @@ pub fn private_runtime_patch(input string, client bool) !string {
 	if client {
 		defer { unsafe { result.free() } }
 		pe_mapping_patch(input, result)!
-		return pe_unwind_patch(input, result)
+		unwound := pe_unwind_patch(input, result)!
+		patch_shared_user_sites(input, unwound, 'client') or { unsafe { unwound.free() }; return err }
+		return unwound
 	}
 	before := '\x41\x57\x31\xf6\x48\x8d\x3d\x40\xf9\x00\x00\x41\x56\x41\x55\x41\x54\x55\x53\x48\x83\xec\x28\xc7\x44\x24\x14\x80\x01\x00\x00\xff\x15\xe3\x3c\x03\x00'
 	// main stores argv[0] at virtual address 0x93d20; this instruction at
@@ -102,6 +104,7 @@ pub fn private_runtime_patch(input string, client bool) !string {
 	}
 	after := '\x48\x8b\x3d\x35\x4d\x03\x00'
 	unsafe { vmemcpy(result.str + 0x5efe4, after.str, after.len) }
+	patch_shared_user_sites(input, result, 'server') or { unsafe { result.free() }; return err }
 	return result
 }
 

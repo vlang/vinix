@@ -196,7 +196,7 @@ fn check() ! {
 	result := hwhost.run_scenario(boot_host, hwhost.Scenario{
 		name: 'packaged-Wine-GUI', arches: [arch], qemu_x86_64: ['-cpu', 'max'], ending: .running,
 		required: ['HWTEST PASS packaged-Wine-GUI'], forbidden: ['HWTEST FAIL', 'WINE GUI FAIL', 'Kernel panic']
-	}, hwhost.Run{kernel: kernel, guest: build + '/guest', extras: extras, state: work + '/boot', timeout: 600, keep: true})
+	}, hwhost.Run{kernel: kernel, guest: build + '/guest', extras: extras, state: work + '/boot', timeout: 600, keep: true, memory_mib: if arch == 'aarch64' { 3072 } else { 1024 }})
 	os.write_file(work + '/result.json', json2.encode(result))!
 	verify(inputs)!
 	for path, expected in generated { if digest(work + '/' + path)! != expected { return error('GUI generated output changed: ' + path) } }

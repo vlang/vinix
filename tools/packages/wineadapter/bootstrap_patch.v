@@ -27,5 +27,6 @@ pub fn private_bootstrap_patch(input string) !string {
 	result := input.clone()
 	after := '\xb8\x01\x00\x00\x00' // mov eax,1: existing failure branch, same five bytes
 	unsafe { vmemcpy(result.str + offset, after.str, after.len) }
+	patch_shared_user_sites(input, result, 'boot') or { unsafe { result.free() }; return err }
 	return result
 }

@@ -27,6 +27,11 @@ fn run() ! {
 		if client { wineunwind.check(input, patched)! }
 		instruction := '\x48\x8b\x3d\x35\x4d\x03\x00'
 		client_sites := {
+			0x3c3f9: '\x00\x40\x00\x00'
+			0x3c410: '\x00\x40\x00\x00'
+			0x3c424: '\x00\x40\x00\x00'
+			0x5e517: '\x00\x40\x00\x00'
+			0x5ce35: '\x00\x40\x00\x00'
 			0x98: '\xb9'
 			0xa0: '\xb9'
 			0x5a25f: '\x29'
@@ -40,6 +45,7 @@ fn run() ! {
 		for i in 0 .. private.len {
 			if client && wineunwind.metadata_byte(i) { continue }
 			mut wanted := if !client && i >= 0x5efe4 && i < 0x5efeb { instruction[i - 0x5efe4] } else { private[i] }
+			if !client && i >= 0x1deac && i < 0x1deb0 { wanted = '\x00\x40\x00\x00'[i - 0x1deac] }
 			if client {
 				for offset, text in client_sites {
 					if i >= offset && i < offset + text.len { wanted = text[i - offset] }
@@ -67,7 +73,7 @@ fn run() ! {
 			}
 		}
 	}
-	println('WINE RUNTIME PATCH PASS exact server/client composition, immutable inputs and 25 refusals')
+	println('WINE RUNTIME PATCH PASS exact server/client composition, immutable inputs and 30 refusals')
 }
 
 fn main() {

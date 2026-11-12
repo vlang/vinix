@@ -23,7 +23,10 @@ pub fn names(architecture string, forksafe bool) ![]string {
 		'producer-missing-graphics-library-input', 'producer-missing-graphics-font-input',
 		'wine-graphics-resealed-library', 'wine-graphics-resealed-font',
 		'producer-missing-graphics-driver-input', 'wine-graphics-shm-fallback',
-		'producer-missing-bootstrap-input', 'wine-bootstrap-canonical-name']
+		'producer-missing-bootstrap-input', 'wine-bootstrap-canonical-name',
+		'wine-shared-server', 'wine-shared-boot', 'wine-shared-reservation',
+		'wine-shared-reader', 'missing-shared-user-data', 'wine-shared-dispatch-page',
+		'wine-shared-ntdll-pe', 'wine-shared-win32u-pe', 'missing-private-dispatch-page', 'vm-memory']
 	if architecture == 'aarch64' {
 		result << ['translator-declaration', 'translator-resealed-patch', 'translator-resealed-smoke',
 			'missing-smoke-marker', 'missing-arm-loader-input', 'missing-firmware-vars-input',

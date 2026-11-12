@@ -134,6 +134,7 @@ fn retain() ! {
 		'tools/packages/wineadapter/patch.v':           $embed_file('../../tools/packages/wineadapter/patch.v').to_string()
 		'tools/packages/wineadapter/graphics_patch.v':  $embed_file('../../tools/packages/wineadapter/graphics_patch.v').to_string()
 		'tools/packages/wineadapter/bootstrap_patch.v': $embed_file('../../tools/packages/wineadapter/bootstrap_patch.v').to_string()
+		'tools/packages/wineadapter/shared_user_patch.v': $embed_file('../../tools/packages/wineadapter/shared_user_patch.v').to_string()
 		'tools/packages/wineadapter/unwind.v':          $embed_file('../../tools/packages/wineadapter/unwind.v').to_string()
 		'tools/packages/wineadapter/fork_translator.v': $embed_file('../../tools/packages/wineadapter/fork_translator.v').to_string()
 		'tools/packages/wineadapter/layout.v':          $embed_file('../../tools/packages/wineadapter/layout.v').to_string()
@@ -407,6 +408,13 @@ fn retain() ! {
 	if result.scenario != 'packaged-Wine' || !result.passed || result.interrupted || result.reason != '' {
 		return error('requires uninterrupted passing native Wine outcome')
 	}
+	vm_command := argv(run + '/boot/qemu-0.argv.json')!
+	memory_at := vm_command.index('-m')
+	if vm_command.len == 0 || vm_command[0] != declaration['qemu']
+		|| vm_command.filter(it == '-m').len != 1 || memory_at < 0 || memory_at + 1 >= vm_command.len
+		|| vm_command[memory_at + 1] != if arch == 'aarch64' { '3072' } else { '1024' } {
+		return error('Wine guest memory command differs')
+	}
 	serial := os.read_file(run + '/boot/serial.log')!
 	for forbidden in [...hwhost.always_forbidden, 'Kernel panic'] {
 		if serial.contains(forbidden) { return error('forbidden serial marker: ' + forbidden) }
@@ -418,6 +426,8 @@ fn retain() ! {
 	markers << 'VINIX SIGNED WIN64 IMAGE PROTECTION PASS'
 	if arch == 'x86_64' { markers << 'VINIX SIGNED WIN64 WX PASS' }
 	markers << ['VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS', 'VINIX SIGNED WIN64 READ FAULT RECOVERY PASS']
+	markers << 'VINIX SIGNED WIN64 SHARED USER DATA PASS'
+	markers << 'VINIX SIGNED WIN64 PRIVATE DISPATCH PAGE PASS'
 	markers << ['VINIX SIGNED REAL WIN64 READY', 'VINIX SIGNED REAL WIN64 PASS',
 		'HWTEST INFO Wine signed-real-Win64 ordinary-private-prefix socket lease Windows-API outside-write-refused natural-exit PASS',
 		'HWTEST PASS packaged-Wine']
@@ -433,7 +443,7 @@ fn retain() ! {
 	}
 	for name in ['inputs-before-build.json', 'inputs.json', 'inputs-verified.json',
 		'generated-before-boot.json', 'declaration.json', 'result.json', 'boot/serial.log',
-		'boot/qemu.log', 'boot/image.log', 'boot/qmp.log', 'boot/initramfs.tar'] {
+		'boot/qemu.log', 'boot/qemu-0.argv.json', 'boot/image.log', 'boot/qmp.log', 'boot/initramfs.tar'] {
 		add(mut paths, 'native-evidence/' + name, run + '/' + name)!
 	}
 	if arch == 'x86_64' {

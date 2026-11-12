@@ -37,7 +37,7 @@ fn run() ! {
 	mut refused := []string{}
 	for name in ['copied-baseline', 'failed-outcome', 'diagnostic-outcome', 'missing-auth-marker',
 		'duplicate-result', 'changed-frame-hash', 'changed-png', 'missing-generated-guest',
-		'missing-shell-input', 'resealed-pe', 'resealed-runtime', 'changed-publisher-signature'] {
+		'missing-shell-input', 'resealed-pe', 'resealed-runtime', 'changed-publisher-signature', 'vm-memory'] {
 		copy := out + '/' + name
 		if invoke(['/bin/cp', '-cRp', original, copy], out + '/' + name + '-copy.log')! != 0 { return error('GUI control clone failed') }
 		// The unchanged boot image/staging evidence belongs to the retained
@@ -77,6 +77,14 @@ fn run() ! {
 				replace(copy + '/boot/serial.log', changed)!
 				expected = 'GUI frame bytes differ'
 			}
+		} else if name == 'vm-memory' {
+			path := copy + '/boot/qemu-0.argv.json'
+			mut command := json2.decode[[]string](os.read_file(path)!)!
+			at := command.index('-m')
+			if at < 0 || at + 1 >= command.len { return error('baseline GUI memory argument missing') }
+			command[at + 1] = if command[at + 1] == '3072' { '1024' } else { '3072' }
+			replace(path, json2.encode(command))!
+			expected = 'Wine GUI guest memory command differs'
 		} else if name == 'changed-png' {
 			os.rm(copy + '/before.png')!; os.cp(copy + '/after.png', copy + '/before.png')!
 			expected = 'GUI PNG pixels differ from captured frame'
@@ -114,9 +122,9 @@ fn run() ! {
 		}
 	}
 	for path, expected in inputs { if digest(path)! != expected { return error('GUI control input changed') } }
-	if refused.len != 11 { return error('GUI refusal count differs') }
+	if refused.len != 12 { return error('GUI refusal count differs') }
 	os.write_file(out + '/controls.json', json2.encode(Report{baseline: 'original and copied admitted', refused: refused, inputs: inputs}))!
-	println('WINE GUI CONTROLS PASS original/copied baselines and 11 targeted refusals')
+	println('WINE GUI CONTROLS PASS original/copied baselines and 12 targeted refusals')
 }
 
 fn main() { run() or { eprintln(err); exit(1) } }

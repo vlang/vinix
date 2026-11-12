@@ -52,6 +52,7 @@ fn check() ! {
 	source(root, 'tools/packages/wineadapter/patch.v', $embed_file('../../tools/packages/wineadapter/patch.v').to_string())!
 	source(root, 'tools/packages/wineadapter/graphics_patch.v', $embed_file('../../tools/packages/wineadapter/graphics_patch.v').to_string())!
 	source(root, 'tools/packages/wineadapter/bootstrap_patch.v', $embed_file('../../tools/packages/wineadapter/bootstrap_patch.v').to_string())!
+	source(root, 'tools/packages/wineadapter/shared_user_patch.v', $embed_file('../../tools/packages/wineadapter/shared_user_patch.v').to_string())!
 	runtime := os.real_path(os.args[1])
 	defer { unsafe { runtime.free() } }
 	st := os.lstat(os.args[2])!
@@ -81,7 +82,7 @@ fn check() ! {
 		'/root/lib/ld-musl-x86_64.so.1', '/root/usr/bin/vinix-wine-musl',
 		'/root/usr/libexec/vinix-wine/wine', '/root/usr/libexec/vinix-wine/wineserver',
 		'/root/usr/lib/wine/x86_64-unix/ntdll.so', '/root/usr/lib/wine/x86_64-unix/winex11.so',
-		'/root/usr/lib/wine/x86_64-windows/wineboot.exe']! {
+		'/root/usr/lib/wine/x86_64-windows/wineboot.exe', '/root/usr/lib/wine/x86_64-windows/ntdll.dll', '/root/usr/lib/wine/x86_64-windows/win32u.dll']! {
 		path := copy_path + suffix
 		original := runtime + suffix
 		defer { unsafe { path.free(); original.free() } }
@@ -117,7 +118,7 @@ fn check() ! {
 	report_path := out + '/controls.json'
 	defer { unsafe { report.free(); text.free(); report_path.free() } }
 	os.write_file(report_path, text)!
-	println('WINE LAYOUT PASS: original/copied baselines and 13 private-executable refusals')
+	println('WINE LAYOUT PASS: original/copied baselines and 15 private-executable refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

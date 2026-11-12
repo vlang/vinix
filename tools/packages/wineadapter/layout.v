@@ -158,13 +158,14 @@ pub fn admit_private_layout(runtime string, inputs map[string]string) ! {
 			return error('Wine private loader/client differs: ' + copy.consumed)
 		}
 	}
-	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so', '/usr/lib/wine/x86_64-unix/winex11.so', '/usr/lib/wine/x86_64-windows/wineboot.exe']! {
+	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so', '/usr/lib/wine/x86_64-unix/winex11.so', '/usr/lib/wine/x86_64-windows/wineboot.exe', '/usr/lib/wine/x86_64-windows/ntdll.dll', '/usr/lib/wine/x86_64-windows/win32u.dll']! {
 		original := layout_input(inputs, part)!
 		defer { unsafe { original.free() } }
 		bytes := layout_bytes(original)!
 		defer { unsafe { bytes.free() } }
 		patched := if part.ends_with('winex11.so') { private_graphics_patch(bytes)! }
 			else if part.ends_with('wineboot.exe') { private_bootstrap_patch(bytes)! }
+			else if part.ends_with('.dll') { private_dispatcher_pe_patch(bytes, part.ends_with('/ntdll.dll'))! }
 			else { private_runtime_patch(bytes, part.ends_with('ntdll.so'))! }
 		defer { unsafe { patched.free() } }
 		path := runtime + '/root' + if part == '/usr/bin/wineserver' {
