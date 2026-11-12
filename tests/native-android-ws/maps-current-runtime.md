@@ -7,7 +7,10 @@ onboarding in that guest but exited after Skip; native account ownership
 checks remain enforced. Guest r22 passed user/broadcast checks, then Maps
 exited on the missing platform-module query. Guest r23 passed that addition
 and rendered onboarding, then exited after Skip on missing sandbox metadata.
-Guest r25 passed the sandbox metadata regression; the next Maps retry follows.
+Guest r25 passed the sandbox metadata regression, then Maps exited on an
+inaccessible package-delete observer placeholder; BASE_OS was also missing.
+Guest r27 tests the corresponding observer types and build-field fixes.
+Its ARM regression passed; another Maps desktop attempt follows.
 Startup storage remains tight under the unchanged guest memory budget.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
@@ -693,3 +696,57 @@ Caller inspection `vending-sandbox-metadata-caller-20261112-r1` confirms
 aqxh.l reads that field directly after its platform-version gate. The test
 bind mount was released before broker preparation and the next Maps attempt.
 This successor uses `d5adecec5` plus this commit's source changes.
+
+Guest r25's Maps attempt exited before onboarding. It reported a missing
+Build.VERSION.BASE_OS in a failed GMS-compliance future, and an uncaught
+IllegalAccessError in Play Store amli when referencing the package-private
+IPackageDeleteObserver placeholder. Its full log delimiters are
+`SANDBOX-METADATA-MAPS-LOG-BEGIN` / `END`; snapshot
+`maps-sandbox-metadata-uart-20261112-r1` has full-log SHA256
+`aa632a8b32ba3de3d3ac0e3299f4a4dd2257ca052e7fcb68c8120e27d7fc4383`.
+`vending-delete-observer-caller-20261112-r1` retains amli's reflective method
+lookup and biwu's BASE_OS read. No ENOSPC occurred in the exported Maps log;
+the observer sampled available storage down to162136064 bytes. This run's
+observer was stopped with its verified VM after the app exited, rather than
+waiting for another ten-minute diagnostic completion.
+
+`framework_build_base.v` adds public static final BASE_OS, initialized once
+from SystemProperties.get("ro.build.version.base_os", ""), matching the
+[Android build-field contract](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-10.0.0_r1/core/java/android/os/Build.java).
+No base OS build is invented when that property is absent.
+`framework_package_observers.v` replaces the inaccessible concrete placeholders
+for IPackageDeleteObserver and IPackageDataObserver with public interfaces
+extending IInterface and declaring packageDeleted/onRemoveCompleted, following
+the [delete callback](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-10.0.0_r1/core/java/android/content/pm/IPackageDeleteObserver.aidl)
+and [data callback](https://raw.githubusercontent.com/aosp-mirror/platform_frameworks_base/android-10.0.0_r1/core/java/android/content/pm/IPackageDataObserver.aidl)
+contracts. The retained amli constructor references both types in adjacent
+reflective lookups, so both are included in the same successor.
+It adds no package-delete authority, remote observer protocol or uninstaller.
+The existing deletePackage stub is unchanged and is not qualified as deletion.
+
+SDK `framework-build-observer-20261112-r1` passed full assembly/readback in
+4296ms, RSS460488704 and shared growth85291008 bytes, guard/child0/0 with
+complete cleanup. Signed fixture r22 checks field visibility/modifiers and
+property agreement, public interface access, a fixture Binder implementation,
+queryLocalInterface/asBinder identity and a manually invoked callback's
+arguments/count. No package-deletion request is made. This narrower
+intermediate was not qualified on ARM. Guest r26 booted it but ran no API regression
+or broker retry; it was stopped after verifying its QEMU identity. The final
+successor adds both observer types, fixture r23 and guest r27, retaining the
+same core/native/VM resource configuration.
+
+SDK `framework-build-observers-20261112-r2` (plural observers) passed guarded
+full assembly/readback in5104ms, RSS478134272 and shared growth50933760 bytes,
+guard/child0/0 with complete cleanup. Fixture r23 adds a separate data-observer
+Binder implementation and tests its interface access, local descriptor and
+Binder identity, callback package, false result and count. Both callback
+tests are manual local calls; they claim no deletion, data removal or remote
+service operation. Guest r27 stages this final SDK/fixture pair.
+
+Fixture r23 passed on ARM in r27 with all earlier checks, runner readiness,
+pass, EOF drain and exit0. Snapshot `build-observers-api-uart-20261112-r1`, plan
+`build-observers-api-plan-20261112-r1.json` and independent readback
+`build-observers-api-readback-20261112-r1` retain its two-entry export, archive
+SHA256 `3e67d0ae409ed667bed78dd450e1f0f72b7a42617c5508fa000035da2dc72726`.
+The fixture bind was released before broker preparation and another desktop
+Maps launch. This successor uses `ac898f13c` plus this commit's source changes.

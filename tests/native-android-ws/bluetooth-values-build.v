@@ -29,6 +29,8 @@ fn main() {
 	androidtools.framework_user_broadcast(root + '/smali')!
 	androidtools.framework_module_catalog(root + '/smali')!
 	androidtools.framework_sandbox_metadata(root + '/smali')!
+	androidtools.framework_build_base(root + '/smali')!
+	androidtools.framework_package_observers(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -56,6 +58,9 @@ fn main() {
 	types << 'android/content/pm/ApplicationInfo'
 	types << 'android/content/pm/PackageManager'
 	types << 'android/content/pm/PackageParser'
+	types << 'android/content/pm/IPackageDeleteObserver'
+	types << 'android/content/pm/IPackageDataObserver'
+	types << r'android/os/Build$VERSION'
 	types << 'android/telephony/VinixSubscriptionFailure'
 	types << r'android/telephony/SubscriptionManager$OnSubscriptionsChangedListener'
 	types << r'android/os/UserHandle$VinixCreator'

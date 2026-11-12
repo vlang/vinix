@@ -203,6 +203,8 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_user_broadcast(smali)!
  framework_module_catalog(smali)!
  framework_sandbox_metadata(smali)!
+ framework_build_base(smali)!
+ framework_package_observers(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!

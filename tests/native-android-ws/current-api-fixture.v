@@ -5,6 +5,80 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static buildAndObserver()V
+.locals 6
+const-string v0, "ro.build.version.base_os"
+const-string v1, ""
+invoke-static {v0, v1}, Landroid/os/SystemProperties;->get(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;
+move-result-object v0
+sget-object v1, Landroid/os/Build$VERSION;->BASE_OS:Ljava/lang/String;
+invoke-virtual {v0, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v0
+const/4 v2, 1
+invoke-static {v0, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-class v0, Landroid/os/Build$VERSION;
+const-string v1, "BASE_OS"
+invoke-virtual {v0, v1}, Ljava/lang/Class;->getField(Ljava/lang/String;)Ljava/lang/reflect/Field;
+move-result-object v0
+invoke-virtual {v0}, Ljava/lang/reflect/Field;->getModifiers()I
+move-result v0
+and-int/lit8 v0, v0, 0x19
+const/16 v1, 0x19
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-class v0, Landroid/content/pm/IPackageDeleteObserver;
+invoke-virtual {v0}, Ljava/lang/Class;->isInterface()Z
+move-result v0
+invoke-static {v0, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Lorg/vinix/bootstrap/TestDeleteObserver;
+invoke-direct {v0}, Lorg/vinix/bootstrap/TestDeleteObserver;-><init>()V
+invoke-interface {v0}, Landroid/os/IInterface;->asBinder()Landroid/os/IBinder;
+move-result-object v1
+if-ne v1, v0, :observer_failed
+const-string v3, "android.content.pm.IPackageDeleteObserver"
+invoke-interface {v1, v3}, Landroid/os/IBinder;->queryLocalInterface(Ljava/lang/String;)Landroid/os/IInterface;
+move-result-object v1
+if-ne v1, v0, :observer_failed
+const-string v3, "org.vinix.fixture.callback"
+const/4 v4, -6
+invoke-interface {v0, v3, v4}, Landroid/content/pm/IPackageDeleteObserver;->packageDeleted(Ljava/lang/String;I)V
+iget v1, v0, Lorg/vinix/bootstrap/TestDeleteObserver;->calls:I
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v1, v0, Lorg/vinix/bootstrap/TestDeleteObserver;->code:I
+invoke-static {v1, v4}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget-object v1, v0, Lorg/vinix/bootstrap/TestDeleteObserver;->name:Ljava/lang/String;
+invoke-virtual {v3, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-class v0, Landroid/content/pm/IPackageDataObserver;
+invoke-virtual {v0}, Ljava/lang/Class;->isInterface()Z
+move-result v0
+invoke-static {v0, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Lorg/vinix/bootstrap/TestDataObserver;
+invoke-direct {v0}, Lorg/vinix/bootstrap/TestDataObserver;-><init>()V
+invoke-interface {v0}, Landroid/os/IInterface;->asBinder()Landroid/os/IBinder;
+move-result-object v1
+if-ne v1, v0, :observer_failed
+const-string v3, "android.content.pm.IPackageDataObserver"
+invoke-interface {v1, v3}, Landroid/os/IBinder;->queryLocalInterface(Ljava/lang/String;)Landroid/os/IInterface;
+move-result-object v1
+if-ne v1, v0, :observer_failed
+const-string v3, "org.vinix.fixture.callback"
+const/4 v4, 0
+invoke-interface {v0, v3, v4}, Landroid/content/pm/IPackageDataObserver;->onRemoveCompleted(Ljava/lang/String;Z)V
+iget v1, v0, Lorg/vinix/bootstrap/TestDataObserver;->calls:I
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget-boolean v1, v0, Lorg/vinix/bootstrap/TestDataObserver;->success:Z
+invoke-static {v1, v4}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget-object v1, v0, Lorg/vinix/bootstrap/TestDataObserver;->name:Ljava/lang/String;
+invoke-virtual {v3, v1}, Ljava/lang/String;->equals(Ljava/lang/Object;)Z
+move-result v1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+:observer_failed
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.end method
 .method public static sandboxMetadata(Landroid/content/Context;)V
 .locals 4
 new-instance v0, Landroid/content/pm/ApplicationInfo;
@@ -890,6 +964,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->accountPackages(Landroid/content
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->userBroadcasts(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->moduleCatalog(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sandboxMetadata(Landroid/content/Context;)V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->buildAndObserver()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1130,6 +1205,60 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
+	os.write_file(root + '/smali/TestDataObserver.smali', r'.class public Lorg/vinix/bootstrap/TestDataObserver;
+.super Landroid/os/Binder;
+.implements Landroid/content/pm/IPackageDataObserver;
+.field public calls:I
+.field public success:Z
+.field public name:Ljava/lang/String;
+.method public constructor <init>()V
+.locals 1
+invoke-direct {p0}, Landroid/os/Binder;-><init>()V
+const-string v0, "android.content.pm.IPackageDataObserver"
+invoke-virtual {p0, p0, v0}, Landroid/os/Binder;->attachInterface(Landroid/os/IInterface;Ljava/lang/String;)V
+return-void
+.end method
+.method public asBinder()Landroid/os/IBinder;
+.locals 0
+return-object p0
+.end method
+.method public onRemoveCompleted(Ljava/lang/String;Z)V
+.locals 1
+iput-object p1, p0, Lorg/vinix/bootstrap/TestDataObserver;->name:Ljava/lang/String;
+iput-boolean p2, p0, Lorg/vinix/bootstrap/TestDataObserver;->success:Z
+iget v0, p0, Lorg/vinix/bootstrap/TestDataObserver;->calls:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestDataObserver;->calls:I
+return-void
+.end method
+')!
+	os.write_file(root + '/smali/TestDeleteObserver.smali', r'.class public Lorg/vinix/bootstrap/TestDeleteObserver;
+.super Landroid/os/Binder;
+.implements Landroid/content/pm/IPackageDeleteObserver;
+.field public calls:I
+.field public code:I
+.field public name:Ljava/lang/String;
+.method public constructor <init>()V
+.locals 1
+invoke-direct {p0}, Landroid/os/Binder;-><init>()V
+const-string v0, "android.content.pm.IPackageDeleteObserver"
+invoke-virtual {p0, p0, v0}, Landroid/os/Binder;->attachInterface(Landroid/os/IInterface;Ljava/lang/String;)V
+return-void
+.end method
+.method public asBinder()Landroid/os/IBinder;
+.locals 0
+return-object p0
+.end method
+.method public packageDeleted(Ljava/lang/String;I)V
+.locals 1
+iput-object p1, p0, Lorg/vinix/bootstrap/TestDeleteObserver;->name:Ljava/lang/String;
+iput p2, p0, Lorg/vinix/bootstrap/TestDeleteObserver;->code:I
+iget v0, p0, Lorg/vinix/bootstrap/TestDeleteObserver;->calls:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestDeleteObserver;->calls:I
+return-void
+.end method
+')!
 	os.write_file(root + '/smali/TestUserBroadcast.smali', r'.class public Lorg/vinix/bootstrap/TestUserBroadcast;
 .super Landroid/content/BroadcastReceiver;
 .field public static calls:I
