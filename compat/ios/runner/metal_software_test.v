@@ -305,6 +305,42 @@ fn test_software_metal_compiled_library_metadata() {
 	println('IOS-SOFTWARE-METAL-LIBRARY: raw/wrapped and independent/shared module containers, leaf/rope dispatch ABI, owned bytes, names/types/UTF-8, function lifetimes, empty/missing functions, truncations/hash/range/type errors, optional NSError, bounded 512 MiB rope rejection, eight workers and two drained runtimes PASS')
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
+fn sm_texture_descriptor_profile(api SMSamplerAPI) {
+	d := unsafe { SMDescriptor(api.send)(api.cls, api.sel(c'texture2DDescriptorWithPixelFormat:width:height:mipmapped:'), 80, 7, 3, 0) }; assert d != 0
+	assert api.get(d, c'width') == 7 && api.get(d, c'height') == 3 && api.get(d, c'pixelFormat') == 80
+	for zone in [false, true]! {
+		api.set(d, c'setWidth:', 11); api.set(d, c'setHeight:', 5); api.set(d, c'setPixelFormat:', 81); api.set(d, c'setUsage:', 17); api.set(d, c'setStorageMode:', 0)
+		copy := if zone { unsafe { SMTexture(api.send)(d, api.sel(c'copyWithZone:'), 0) } } else { api.get(d, c'copy') }
+		assert copy != 0 && copy != d
+		api.set(d, c'setWidth:', 2); api.set(d, c'setHeight:', 1); api.set(d, c'setPixelFormat:', 10); api.set(d, c'setUsage:', 1); api.set(d, c'setStorageMode:', 2)
+		assert api.get(copy, c'width') == 11 && api.get(copy, c'height') == 5 && api.get(copy, c'pixelFormat') == 81 && api.get(copy, c'usage') == 17 && api.get(copy, c'storageMode') == 0
+		api.set(copy, c'setWidth:', 13); assert api.get(d, c'width') == 2; api.get(copy, c'release')
+	}
+}
+fn test_software_metal_texture_descriptor_copies() {
+	$if !ios_metal_software ? { return }
+	$if macos {
+		metal := C.dlopen(c'/System/Library/Frameworks/Metal.framework/Metal', 2); objc := C.dlopen(c'/usr/lib/libobjc.A.dylib', 2); assert metal != unsafe { nil } && objc != unsafe { nil }
+		get_class := C.dlsym(objc, c'objc_getClass'); send := C.dlsym(objc, c'objc_msgSend'); sel := C.dlsym(objc, c'sel_registerName')
+		assert get_class != unsafe { nil } && send != unsafe { nil } && sel != unsafe { nil }
+		cls := unsafe { SMSamplerName(get_class)(c'MTLTextureDescriptor') }; assert cls != 0
+		api := SMSamplerAPI{send, unsafe { SMSamplerName(sel) }, cls}
+		pool_cls := unsafe { SMSamplerName(get_class)(c'NSAutoreleasePool') }; pool := api.get(pool_cls, c'new'); sm_texture_descriptor_profile(api); api.get(pool, c'drain')
+		assert C.dlclose(objc) == 0 && C.dlclose(metal) == 0
+	}
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device()
+		sm_texture_descriptor_profile(SMSamplerAPI{unsafe { voidptr(C.ios_objc_msgsend) }, objc_selector, ios_runtime.names['MTLTextureDescriptor']})
+		for format in [u64(10), 30, 80, 81]! {
+			inner := objc_pool_push(); original := sm_test_descriptor(format, 3, 2, 0); copy := sm_send(original, c'copy'); objc_pool_pop(inner)
+			assert sm_send(copy, c'width') == 3 && sm_send(copy, c'pixelFormat') == format
+			t := sm_test_texture(d, copy); assert t != 0; sm_test_set(copy, c'setWidth:', 9); assert sm_send(t, c'width') == 3
+			next := sm_send(copy, c'copy'); objc_release(copy); assert sm_send(next, c'width') == 9; objc_release(next); objc_release(t)
+		}
+		objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-DESCRIPTOR-COPY: native property/copy reference, five NSUInteger getters, copy and copyWithZone, bidirectional independence, four-format allocation after factory pool drain, immutable texture snapshots and two drained runtimes PASS')
+}
 type SMBufferTexture = fn (u64, &char, u64, u64, u64) u64
 fn sm_test_linear_alignment(device u64, format u64) u64 { return unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(device, c'minimumLinearTextureAlignmentForPixelFormat:', format) } }
 fn test_software_metal_linear_alignment() {

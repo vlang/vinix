@@ -89,6 +89,18 @@ fn sm_descriptor_set(object u64, selector &char, value u64) {
 		else { panic('iOS: unsupported software Metal descriptor setter') }
 	}
 }
+fn sm_descriptor_copy(object u64, selector &char, zone u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	input := cv_metal_state(object, ios_runtime.names['VinixMetalTextureDescriptor'])
+	state := unsafe { &CVMetalState(C.malloc(sizeof(CVMetalState))) }
+	if state == unsafe { nil } { return 0 }
+	unsafe { *state = *input }
+	copy := objc_allocate(ios_runtime.names['VinixMetalTextureDescriptor'])
+	obj_header(copy).cv_metal = state
+	return copy // NSCopying returns a +1 descriptor with independent metadata.
+}
+fn sm_descriptor_copy_plain(object u64, selector &char) u64 { return sm_descriptor_copy(object, selector, 0) }
 fn sm_new_texture(device u64, selector &char, descriptor u64) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -199,6 +211,8 @@ fn sm_texture_start(device u64) {
 	sm_method(texture, c'iosurfacePlane', u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8')
 	sm_method(read64(ios_runtime.names['MTLTextureDescriptor']), c'texture2DDescriptorWithPixelFormat:width:height:mipmapped:', u64(unsafe { voidptr(sm_descriptor) }), c'@48@0:8Q16Q24Q32B40')
 	for selector in [c'setWidth:', c'setHeight:', c'setPixelFormat:', c'setUsage:', c'setStorageMode:']! { sm_method(ios_runtime.names['VinixMetalTextureDescriptor'], selector, u64(unsafe { voidptr(sm_descriptor_set) }), c'v24@0:8Q16') }
+	sm_method(ios_runtime.names['VinixMetalTextureDescriptor'], c'copy', u64(unsafe { voidptr(sm_descriptor_copy_plain) }), c'@16@0:8')
+	sm_method(ios_runtime.names['VinixMetalTextureDescriptor'], c'copyWithZone:', u64(unsafe { voidptr(sm_descriptor_copy) }), c'@24@0:8^{_NSZone=}16')
 	for selector in [c'width', c'height', c'pixelFormat', c'usage', c'textureType', c'depth', c'arrayLength', c'mipmapLevelCount', c'sampleCount', c'storageMode', c'cpuCacheMode', c'resourceOptions', c'hazardTrackingMode']! { sm_method(texture, selector, u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8') }
 	sm_method(texture, c'device', u64(unsafe { voidptr(sm_texture_get) }), c'@16@0:8')
 	sm_method(texture, c'replaceRegion:mipmapLevel:withBytes:bytesPerRow:', u64(unsafe { voidptr(sm_texture_put) }), c'v88@0:8{MTLRegion={MTLOrigin=QQQ}{MTLSize=QQQ}}16Q64r^v72Q80')

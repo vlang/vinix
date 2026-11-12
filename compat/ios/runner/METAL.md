@@ -33,7 +33,11 @@ Implemented Objective-C API:
   `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:`,
   `endEncoding`.
 - Texture descriptor: `texture2DDescriptorWithPixelFormat:width:height:mipmapped:`
-  plus width, height, pixel-format, usage and storage-mode setters.
+  plus width, height, pixel-format, usage and storage-mode getters/setters,
+  `copy` and `copyWithZone:`. Copies own independent metadata and survive the
+  source descriptor's autorelease pool. Allocated textures snapshot each
+  descriptor. General `init` construction and other descriptor fields remain
+  outside this profile.
 - Texture: dimension/format/usage/device/storage queries, `iosurface`, `iosurfacePlane`,
   `buffer`, `bufferOffset`, `bufferBytesPerRow`,
   `newTextureViewWithPixelFormat:`, `parentTexture`, `parentRelativeLevel`,
