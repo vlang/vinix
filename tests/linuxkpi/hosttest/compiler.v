@@ -108,7 +108,8 @@ pub fn scalar_metadata(source string, text string) !string {
 			if module_foreign_scalars(raw, name) != 1 {
 				return error('Native scalar metadata lacks one foreign V declaration: ${name}')
 			}
-			for statement in text.split(';') {
+			statements := text.split(';')
+			for statement in statements {
 				if module_has_word(statement, 'typedef') && module_trim(statement).ends_with(name)
 					&& module_has_word(module_trim(statement), name) {
 					return error('Native scalar alias conflicts with compiler declaration: ${name}')

@@ -128,7 +128,8 @@ fn generate_module_with_runners(source string, output string, arch string, defin
 	module_copy(source, module_join(work, name))!
 	mut imported_abiargs := false
 	for path in module_paths(source)! {
-		for line in module_read(path)!.split('\n') {
+		lines := module_read(path)!.split('\n')
+		for line in lines {
 			trimmed := module_trim(line)
 			if trimmed.starts_with('import abiargs') {
 				tail := trimmed['import abiargs'.len..]
@@ -167,7 +168,8 @@ fn readonly_metadata(source string, marker string) !map[string][]string {
 	mut paths := module_paths(source)!
 	paths.sort()
 	for path in paths {
-		for line in module_read(path)!.split('\n') {
+		lines := module_read(path)!.split('\n')
+		for line in lines {
 			if !line.starts_with(marker) { continue }
 			value := module_trim_right(line[marker.len..])
 			pieces := value.split('.')
@@ -276,7 +278,8 @@ pub fn emit_module_header(source string, output string, header string) ! {
 		name_start := declaration.index(name) or { return error('substring not found') }
 		mut types := [module_trim(declaration[..name_start])]
 		parameter_text := declaration.all_after('(').all_before_last(');')
-		for parameter in parameter_text.split(',') { types << module_parameter_type(parameter) }
+		parameter_parts := parameter_text.split(',')
+		for parameter in parameter_parts { types << module_parameter_type(parameter) }
 		mut allowed := ['void', 'bool', 'char', 'short', 'int', 'long', 'float', 'double', 'const',
 			'signed', 'unsigned', 'size_t', 'intptr_t']
 		for prefix in ['', 'u'] {

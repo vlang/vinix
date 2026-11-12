@@ -39,7 +39,7 @@ fn build(framework string, output string) ! {
 	for name in ['androidfw_c_api.h', 'sqlite3.h', 'stb_image.h', 'stb_truetype.h'] {
 		os.cp(headers + '/' + name, output + '/native/' + name)!
 	}
-	run([v, '-path', '@vlib|' + repo + '/tests/linuxkpi', '-o', output + '/tools/generate', repo + '/tests/linuxkpi/generate_module.v'], output + '/compile-generator.log')!
+	run([v, '-new-compiler', '-no-parallel', '-nocache', '-cc', 'cc', '-path', '@vlib|' + repo + '/tests/linuxkpi', '-o', output + '/tools/generate', repo + '/tests/linuxkpi/generate_module.v'], output + '/compile-generator.log')!
 	run([output + '/tools/generate', output + '/native/atlframework', output + '/native/android-native.c', '--arch', 'arm64'], output + '/generate.log')!
 	runtime := os.getenv_opt('VINIX_ANDROID_RUNTIME') or {
 		repo + '/build/android-framework/calculator/overlay/opt/vinix-android-aarch64'
