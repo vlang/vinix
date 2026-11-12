@@ -19,8 +19,23 @@ fn (p IRTypedProgram) execution_bits(index int, binary32 bool) !u32 {
 // It shares the integer interpreter's ownership, control-flow, validity and
 // work constraints.
 pub fn (p IRTypedProgram) run_scalar_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int) !IRScalarRun {
-	run := p.run_scalar_bits(ir, stream, pools, bodies, function, arguments, step_limit, true)!
+	run := p.run_scalar_bits(ir, stream, pools, bodies, function, arguments, step_limit, true, false)!
 	typ := ir.types[ir.references[ir.types[ir.functions[function].signature].refs_start]]
 	kind := match typ.kind { .float_t { IRScalarKind.binary32 } .half_t { IRScalarKind.binary16 } else { IRScalarKind.integer } }
 	return IRScalarRun{kind, run.bits, run.value, run.poison, run.steps}
+}
+pub struct IRVoidRun {
+pub:
+	steps int
+}
+fn (p IRTypedProgram) execution_return_bits(index int, mixed bool, void_result bool) !u32 {
+	if !void_result { return p.execution_bits(index, mixed)! }
+	if index < 0 || index >= p.types.len || p.types[index].kind != .void_t { return error('AIR void: void return type required') }
+	return 0
+}
+// Executes the existing mixed scalar profile with ret void as its terminator.
+// Ordinary defined functions only; this does not bind kernel arguments or memory.
+pub fn (p IRTypedProgram) run_void_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int) !IRVoidRun {
+	run := p.run_scalar_bits(ir, stream, pools, bodies, function, arguments, step_limit, true, true)!
+	return IRVoidRun{steps: run.steps}
 }

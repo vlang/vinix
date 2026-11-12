@@ -72,6 +72,26 @@ fn (f IntegerFixture) scalar(arguments []u64, limit int) !IRScalarRun {
 	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
 	return p.run_scalar_function(ir, stream, pools, bodies, 0, arguments, limit)!
 }
+fn (f IntegerFixture) void_run(arguments []u64, limit int) !IRVoidRun {
+	declarations := [0]; defer { unsafe { declarations.free() } }
+	pools := IRConstantPools{declarations: declarations, scopes: f.scopes, constants: f.constants, words: f.words, arguments: f.arguments, module_values: 1}
+	ir := f.ir(); stream := f.stream(); bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }
+	p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
+	return p.run_void_function(ir, stream, pools, bodies, 0, arguments, limit)!
+}
+fn test_void_returns_keep_scalar_profiles_separate() {
+	mut f := integer_fixture(); defer { f.free() }
+	if _ := f.void_run([u64(1), 2], 10) { assert false, 'nonvoid function accepted' }
+	f.types << IRType{kind: .void_t}; f.refs[0] = f.types.len - 1
+	f.records.clear(); f.values.clear(); f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 0]); f.add(10, [])
+	assert f.void_run([u64(2), 3], 2)!.steps == 2
+	if _ := f.run([u64(2), 3], 2) { assert false, 'integer API accepted void' }
+	if _ := f.scalar([u64(2), 3], 2) { assert false, 'scalar API accepted void' }
+	for limit in [0, 1, max_integer_execution_steps + 1] { if _ := f.void_run([u64(2), 3], limit) { assert false, 'void budget' } }
+	if _ := f.void_run([u64(2)], 2) { assert false, 'void argument count' }
+	println('AIR-VOID: explicit API, arithmetic and ret void, precise budgets/counts and strict scalar API separation PASS')
+}
 fn (f &IntegerFixture) free() { unsafe { f.blocks.free(); f.records.free(); f.values.free(); f.types.free(); f.refs.free(); f.functions.free(); f.scopes.free(); f.constants.free(); f.words.free(); f.arguments.free() } }
 fn test_integer_function_branches_arguments_and_budgets() {
 	mut f := integer_fixture(); defer { f.free() }

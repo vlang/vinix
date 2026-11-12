@@ -100,13 +100,13 @@ fn integer_compare(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerVal
 	result := match op { 32 { x == y } 33 { x != y } 34 { x > y } 35 { x >= y } 36 { x < y } 37 { x <= y } 38 { signed_x > signed_y } 39 { signed_x >= signed_y } 40 { signed_x < signed_y } else { signed_x <= signed_y } }
 	return IntegerValue{value: u64(result)}
 }
-fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, binary32 bool) !IntegerProfile {
+fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, binary32 bool, void_result bool) !IntegerProfile {
 	if function < 0 || function >= ir.functions.len || function + 1 >= bodies.scopes.len || p.instructions.len != bodies.instructions.len { return error('AIR integer: function index') }
 	f := ir.functions[function]; scope := function + 1; s := bodies.scopes[scope]
 	if f.declaration || !s.active || f.calling_convention != 0 || f.signature < 0 || f.signature >= ir.types.len || f.record < 0 || f.record >= stream.records.len { return error('AIR integer: defined ordinary function required') }
 	signature := ir.types[f.signature]
 	if signature.kind != .function_t || signature.vararg || signature.refs_count < 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start { return error('AIR integer: fixed signature required') }
-	return_bits := p.execution_bits(ir.references[signature.refs_start], binary32)!
+	return_bits := p.execution_return_bits(ir.references[signature.refs_start], binary32, void_result)!
 	for i in 1 .. signature.refs_count { p.execution_bits(ir.references[signature.refs_start + i], binary32)! }
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR integer: module-v2 function record required') }
@@ -195,7 +195,10 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				}
 				5, 29 { if op.operands_count != 3 { return error('AIR integer: select arity') } }
 				16 { if phis != index - block.first || op.operands_count == 0 || op.targets_count != op.operands_count { return error('AIR integer: PHI grouping/arity') }; phis++ }
-				10 { if op.operands_count != 1 || p.execution_bits(p.operands[op.operands_start].type_index, binary32)! != return_bits { return error('AIR integer: return type') } }
+				10 {
+					if return_bits == 0 { if op.operands_count != 0 { return error('AIR void: return operand') } }
+					else if op.operands_count != 1 || p.execution_bits(p.operands[op.operands_start].type_index, binary32)! != return_bits { return error('AIR integer: return type') }
+				}
 				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
 				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
@@ -285,11 +288,11 @@ fn (m &IntegerMachine) read_flow(operand_index int) !IntegerValue {
 // Execute valid LLVM IR within the checked scalar profile. No host pointers,
 // global state, memory operations, calls, floating point or Metal submission.
 pub fn (p IRTypedProgram) run_integer_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int) !IRIntegerRun {
-	return p.run_scalar_bits(ir, stream, pools, bodies, function, arguments, step_limit, false)!
+	return p.run_scalar_bits(ir, stream, pools, bodies, function, arguments, step_limit, false, false)!
 }
-fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int, binary32 bool) !IRIntegerRun {
+fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, arguments []u64, step_limit int, binary32 bool, void_result bool) !IRIntegerRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR integer: step limit range') }
-	profile := p.integer_profile(ir, stream, pools, bodies, function, binary32)!
+	profile := p.integer_profile(ir, stream, pools, bodies, function, binary32, void_result)!
 	s := bodies.scopes[profile.scope]; signature := ir.types[ir.functions[function].signature]
 	if profile.scope >= pools.scopes.len { return error('AIR integer: constant-pool scope') }
 	if arguments.len != signature.refs_count - 1 || pools.scopes[profile.scope].arguments_count != arguments.len { return error('AIR integer: argument count') }
@@ -369,7 +372,10 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true, aggregate: p.types[op.result_type].kind == .struct_t, flag_poison: p.types[op.result_type].kind == .struct_t} } else { m.read_flow(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
 				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
 				58 { result = if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
-				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }
+				10 {
+					if profile.return_bits == 0 { return IRIntegerRun{steps: m.steps} }
+					value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps}
+				}
 				11 {
 					mut target := 0
 					if op.operands_count == 1 { condition := m.read(start)!; if condition.poison { return error('AIR integer: poison branch condition') }; target = if condition.value & 1 != 0 { 0 } else { 1 } }
