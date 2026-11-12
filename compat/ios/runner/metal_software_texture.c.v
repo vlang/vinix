@@ -5,6 +5,36 @@ struct SoftwareMetalRegion { x u64 y u64 z u64 width u64 height u64 depth u64 }
 fn sm_pixel_size(format u64) u64 {
 	return match format { 10 { u64(1) } 30 { u64(2) } 80, 81 { u64(4) } else { u64(0) } }
 }
+// Imported textures borrow a plane address and retain its IOSurface in fields[1].
+// mutation stores the immutable plane index; ordinary textures own data instead.
+fn sm_storage_base(h &ObjHeader) u64 { return if h.external_data != 0 { h.external_data } else { u64(h.data.data) } }
+fn sm_texture_stride(h &ObjHeader) u64 { return if h.fields[1] != 0 { cv_surface_plane_row(h.fields[1], h.mutation) } else { h.cv_metal.width * sm_pixel_size(h.cv_metal.format) } }
+fn sm_surface_texture(device u64, selector &char, descriptor u64, surface u64, plane u64) u64 {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	sm_check(device, 'VinixSoftwareMTLDevice')
+	h := ios_runtime.objects[descriptor] or { return 0 }
+	s := ios_runtime.objects[surface] or { return 0 }
+	if h.cls != ios_runtime.names['VinixMetalTextureDescriptor'] || h.cv_metal == unsafe { nil } || s.cls != cv_surface_type_id() || s.cv_pixel == unsafe { nil } { return 0 }
+	input := h.cv_metal; pixels := s.cv_pixel
+	count := if pixels.planes == 0 { u64(1) } else { pixels.planes }
+	if plane >= count { return 0 }
+	expected := if pixels.planes == 0 { u64(80) } else if plane == 0 { u64(10) } else { u64(30) }
+	if input.format != expected && !(expected == 80 && input.format == 81) { return 0 }
+	if input.storage != 0 || input.usage & ~u64(31) != 0 || input.width == 0 || input.height == 0 || input.width > 16384 || input.height > 16384 || input.width > cv_surface_plane_width(surface, plane) || input.height > cv_surface_plane_height(surface, plane) { return 0 }
+	pixel := sm_pixel_size(input.format); row := cv_surface_plane_row(surface, plane)
+	if row < input.width * pixel || row > software_metal_max_buffer || input.height - 1 > (software_metal_max_buffer - input.width * pixel) / row { return 0 }
+	mut state := unsafe { &CVMetalState(C.calloc(1, sizeof(CVMetalState))) }
+	if state == unsafe { nil } { return 0 }
+	unsafe { *state = *input }
+	texture := sm_new('VinixSoftwareMTLTexture', device)
+	mut target := obj_header(texture)
+	target.cv_metal = state
+	target.fields[1] = objc_retain(surface)
+	target.mutation = plane
+	target.external_data = cv_surface_plane_base(surface, plane)
+	return texture
+}
 fn sm_descriptor(cls u64, selector &char, format u64, width u64, height u64, mipmapped u8) u64 {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -56,6 +86,7 @@ fn sm_texture_get(object u64, selector &char) u64 {
 	return match ctext(u64(selector)) {
 		'width' { state.width } 'height' { state.height } 'pixelFormat' { state.format }
 		'usage' { state.usage } 'device' { h.fields[0] }
+		'iosurface' { h.fields[1] } 'iosurfacePlane' { h.mutation }
 		'textureType' { u64(2) }
 		'depth', 'arrayLength', 'mipmapLevelCount', 'sampleCount' { u64(1) }
 		'storageMode', 'cpuCacheMode', 'resourceOptions', 'hazardTrackingMode' { u64(0) }
@@ -73,7 +104,7 @@ fn sm_texture_transfer(object u64, region SoftwareMetalRegion, level u64, bytes 
 	extent := pitch * (region.height - 1) + width
 	if bytes > ~u64(0) - extent { panic('iOS: software Metal texture pointer overflow') }
 	for y in u64(0) .. region.height {
-		texture := u64(h.data.data) + ((region.y + y) * state.width + region.x) * pixel
+		texture := sm_storage_base(h) + (region.y + y) * sm_texture_stride(h) + region.x * pixel
 		client := bytes + y * pitch
 		if write { C.memcpy(unsafe { voidptr(texture) }, unsafe { voidptr(client) }, usize(width)) }
 		else { C.memcpy(unsafe { voidptr(client) }, unsafe { voidptr(texture) }, usize(width)) }
@@ -85,6 +116,9 @@ fn sm_texture_start(device u64) {
 	texture := objc_allocate_class(ios_runtime.names['NSObject'], c'VinixSoftwareMTLTexture', 0)
 	objc_register_class(texture)
 	sm_method(device, c'newTextureWithDescriptor:', u64(unsafe { voidptr(sm_new_texture) }), c'@24@0:8@16')
+	sm_method(device, c'newTextureWithDescriptor:iosurface:plane:', u64(unsafe { voidptr(sm_surface_texture) }), c'@40@0:8@16^{__IOSurface=}24Q32')
+	sm_method(texture, c'iosurface', u64(unsafe { voidptr(sm_texture_get) }), c'^{__IOSurface=}16@0:8')
+	sm_method(texture, c'iosurfacePlane', u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8')
 	sm_method(read64(ios_runtime.names['MTLTextureDescriptor']), c'texture2DDescriptorWithPixelFormat:width:height:mipmapped:', u64(unsafe { voidptr(sm_descriptor) }), c'@48@0:8Q16Q24Q32B40')
 	for selector in [c'setWidth:', c'setHeight:', c'setPixelFormat:', c'setUsage:', c'setStorageMode:']! { sm_method(ios_runtime.names['VinixMetalTextureDescriptor'], selector, u64(unsafe { voidptr(sm_descriptor_set) }), c'v24@0:8Q16') }
 	for selector in [c'width', c'height', c'pixelFormat', c'usage', c'textureType', c'depth', c'arrayLength', c'mipmapLevelCount', c'sampleCount', c'storageMode', c'cpuCacheMode', c'resourceOptions', c'hazardTrackingMode']! { sm_method(texture, selector, u64(unsafe { voidptr(sm_texture_get) }), c'Q16@0:8') }

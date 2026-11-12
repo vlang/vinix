@@ -15,6 +15,77 @@ type SMVoid = fn (u64, &char)
 type SMDescriptor = fn (u64, &char, u64, u64, u64, u8) u64
 type SMTexture = fn (u64, &char, u64) u64
 type SMSet = fn (u64, &char, u64)
+type SMSurface = fn (u64, &char, u64, u64, u64) u64
+fn sm_test_surface(d u64, descriptor u64, surface u64, plane u64) u64 { return unsafe { SMSurface(voidptr(C.ios_objc_msgsend))(d, c'newTextureWithDescriptor:iosurface:plane:', descriptor, surface, plane) } }
+fn test_software_metal_iosurface_imports() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start()
+		for format_index, format in [u32(0x42475241), 0x42475241, 0x34323076, 0x34323066]! {
+			for plane in 0 .. if format == 0x42475241 { 1 } else { 2 } {
+				pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
+				attrs := objc_allocate(ios_runtime.names['NSDictionary']); empty := objc_allocate(ios_runtime.names['NSDictionary'])
+				key := cf_string_create(0, c'IOSurfaceProperties', 0x08000100)
+				dictionary_insert_copy(attrs, empty, key); objc_release(empty); objc_release(key)
+				mut image := u64(0); assert cv_pixel_create(0, 7, 3, format, attrs, &image) == 0; objc_release(attrs)
+				surface := cv_pixel_surface(image); width := cv_surface_plane_width(surface, u64(plane)); height := cv_surface_plane_height(surface, u64(plane))
+				metal := if format == 0x42475241 { u64(80 + format_index) } else if plane == 0 { u64(10) } else { u64(30) }
+				pixel := sm_pixel_size(metal); row := cv_surface_plane_row(surface, u64(plane)); base := cv_surface_plane_base(surface, u64(plane))
+				assert row > width * pixel
+				C.memset(unsafe { voidptr(base) }, 0xcc, usize(row * height))
+				mut cache := u64(0); assert cv_metal_cache_create(0, 0, d, 0, &cache) == 0
+				mut view := u64(0); assert cv_metal_create_view(0, cache, image, 0, metal, width, height, u64(plane), &view) == 0
+				texture := objc_retain(cv_metal_get_texture(view)); descriptor := sm_test_descriptor(metal, width, height, 0)
+				alias := sm_test_surface(d, descriptor, surface, u64(plane)); assert alias != 0
+				assert sm_send(texture, c'iosurface') == surface && sm_send(texture, c'iosurfacePlane') == u64(plane) && sm_send(texture, c'usage') == 23
+				for mode in 0 .. 11 {
+					bad := sm_test_descriptor(metal, width, height, 0)
+					match mode { 0 { sm_test_set(bad, c'setWidth:', 0) } 1 { sm_test_set(bad, c'setWidth:', width + 1) } 2 { sm_test_set(bad, c'setHeight:', height + 1) } 3 { sm_test_set(bad, c'setPixelFormat:', if metal == 10 { 30 } else { 10 }) } 4 { sm_test_set(bad, c'setStorageMode:', 2) } 5 { sm_test_set(bad, c'setUsage:', 32) } else {} }
+					assert sm_test_surface(d, if mode == 9 { 0 } else if mode == 10 { image } else { bad }, if mode == 7 { image } else if mode == 8 { 0 } else { surface }, if mode == 6 { 2 } else { u64(plane) }) == 0
+				}
+				// Separate imports of one plane must reject overlapping rectangles.
+				child := C.fork(); assert child >= 0
+				if child == 0 { C.close(1); C.close(2); cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder'); sm_test_texture_copy(enc, texture, 0, 0, SoftwareMetalOrigin{}, SoftwareMetalSize{1, 1, 1}, alias, 0, 0, SoftwareMetalOrigin{}); C._exit(0) }
+				mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+				// CPU writes through either import are visible through the other.
+				mut bytes := [256]u8{}; for i in 0 .. bytes.len { bytes[i] = u8(i % 251) }
+				sm_test_put(texture, SoftwareMetalRegion{0, 0, 0, width, height, 1}, 0, u64(unsafe { &bytes[0] }), 32)
+				mut readback := [256]u8{}; sm_test_read(alias, SoftwareMetalRegion{0, 0, 0, width, height, 1}, 0, u64(unsafe { &readback[0] }), 32)
+				for y in u64(0) .. height { for x in u64(0) .. width * pixel { assert readback[int(y * 32 + x)] == bytes[int(y * 32 + x)] } }
+				// Import a narrower descriptor, preserving the underlying plane pitch.
+				sm_test_set(descriptor, c'setWidth:', width - 1)
+				narrow := sm_test_surface(d, descriptor, surface, u64(plane)); assert narrow != 0
+				owned := sm_test_texture(d, descriptor); assert sm_send(owned, c'iosurface') == 0
+				input := sm_test_buffer(d, 128, 0); output := sm_test_buffer(d, 128, 0)
+				C.memset(unsafe { voidptr(sm_send(input, c'contents')) }, 0x6b, 128)
+				C.memset(unsafe { voidptr(sm_send(output, c'contents')) }, 0xee, 128)
+				command := sm_send(q, c'commandBuffer'); encoder := sm_send(command, c'blitCommandEncoder'); size := SoftwareMetalSize{width - 1, height, 1}
+				sm_test_buffer_texture(encoder, input, 0, 32, 0, size, narrow, 0, 0, SoftwareMetalOrigin{}, true)
+				sm_test_texture_copy(encoder, narrow, 0, 0, SoftwareMetalOrigin{}, size, owned, 0, 0, SoftwareMetalOrigin{})
+				sm_test_texture_copy(encoder, owned, 0, 0, SoftwareMetalOrigin{}, size, alias, 0, 0, SoftwareMetalOrigin{})
+				sm_test_buffer_texture(encoder, output, 0, 32, 0, size, texture, 0, 0, SoftwareMetalOrigin{}, false)
+				assert unsafe { *(&u8(base)) } == 0 // Still the earlier CPU pattern.
+				cv_metal_flush(cache, 0); objc_release(view); objc_release(cache); objc_release(image)
+				objc_release(texture); objc_release(alias); objc_release(narrow); objc_release(owned); objc_release(input)
+				sm_call(encoder, c'endEncoding'); sm_call(command, c'commit')
+				for y in u64(0) .. height { for x in u64(0) .. row {
+					expected := if x < (width - 1) * pixel { u8(0x6b) } else if x < width * pixel { bytes[int(y * 32 + x)] } else { u8(0xcc) }
+					assert unsafe { *(&u8(base + y * row + x)) } == expected
+				} }
+				for i in u64(0) .. 128 { assert unsafe { *(&u8(sm_send(output, c'contents') + i)) } == if i / 32 < height && i % 32 < (width - 1) * pixel { u8(0x6b) } else { u8(0xee) } }
+				// Disjoint rectangles through distinct aliases remain valid.
+				next := sm_send(q, c'commandBuffer'); blit := sm_send(next, c'blitCommandEncoder')
+				sm_test_texture_copy(blit, texture, 0, 0, SoftwareMetalOrigin{}, SoftwareMetalSize{1, 1, 1}, alias, 0, 0, SoftwareMetalOrigin{width - 1, 0, 0})
+				sm_call(blit, c'endEncoding'); sm_call(next, c'commit')
+				for x in u64(0) .. pixel { assert unsafe { *(&u8(base + (width - 1) * pixel + x)) } == 0x6b }
+				objc_release(output); objc_release(q); objc_release(d); objc_pool_pop(pool)
+				assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+			}
+		}
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-IOSURFACE: four Metal formats, BGRA/420v/420f planes, CoreVideo cache imports, shared CPU bytes, padded and narrowed strides, deferred buffer/texture blits, owners released before commit, eleven invalid imports, alias overlap/disjoint checks and two drained runtimes PASS')
+}
 type SMFill = fn (u64, &char, u64, SoftwareMetalRange, u8)
 fn sm_test_fill(encoder u64, buffer u64, range SoftwareMetalRange, value u8) { unsafe { SMFill(voidptr(C.ios_objc_msgsend))(encoder, c'fillBuffer:range:value:', buffer, range, value) } }
 fn test_software_metal_deferred_buffer_fills() {

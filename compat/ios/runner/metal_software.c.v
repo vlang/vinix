@@ -117,7 +117,7 @@ fn sm_commit(command u64, selector &char) {
 		}
 		src := obj_header(op.source); dst := obj_header(op.destination)
 		for row in u64(0) .. op.rows {
-			unsafe { C.memcpy(voidptr(u64(dst.data.data) + op.destination_offset + row * op.destination_stride), voidptr(u64(src.data.data) + op.source_offset + row * op.source_stride), usize(op.size)) }
+			unsafe { C.memcpy(voidptr(sm_storage_base(dst) + op.destination_offset + row * op.destination_stride), voidptr(sm_storage_base(src) + op.source_offset + row * op.source_stride), usize(op.size)) }
 		}
 	}
 	state.status = 4 // Completion is synchronous; bytes are visible before return.

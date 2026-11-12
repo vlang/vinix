@@ -75,6 +75,7 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-BUFFER-TEXTURE:'), 'missing buffer/texture test marker' } }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-COMPLETION:'), 'missing completion test marker' } }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-FILL:'), 'missing buffer fill test marker' } }
+	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-IOSURFACE:'), 'missing IOSurface test marker' } }
 }
 
 fn main() {

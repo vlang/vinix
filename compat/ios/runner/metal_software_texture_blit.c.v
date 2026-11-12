@@ -15,11 +15,11 @@ fn sm_copy_texture(encoder u64, selector &char, source u64, source_slice u64, so
 	a := src.cv_metal; b := dst.cv_metal
 	if source_slice != 0 || destination_slice != 0 || source_level != 0 || destination_level != 0 || origin.z != 0 || target.z != 0 || size.depth != 1 || size.width == 0 || size.height == 0 || a.format != b.format { panic('iOS: unsupported Metal texture blit layout/format') }
 	if !sm_range(a.width, origin.x, size.width) || !sm_range(a.height, origin.y, size.height) || !sm_range(b.width, target.x, size.width) || !sm_range(b.height, target.y, size.height) { panic('iOS: Metal texture blit region exceeds texture') }
-	if source == destination && origin.x < target.x + size.width && target.x < origin.x + size.width && origin.y < target.y + size.height && target.y < origin.y + size.height { panic('iOS: overlapping Metal texture blit regions') }
+	if sm_storage_base(src) == sm_storage_base(dst) && origin.x < target.x + size.width && target.x < origin.x + size.width && origin.y < target.y + size.height && target.y < origin.y + size.height { panic('iOS: overlapping Metal texture blit regions') }
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	pixel := sm_pixel_size(a.format)
-	// Texture allocation bounds guarantee all row offsets remain within 64 MiB.
-	state.ops << SoftwareMetalCopy{source: objc_retain(source), destination: objc_retain(destination), source_offset: (origin.y * a.width + origin.x) * pixel, destination_offset: (target.y * b.width + target.x) * pixel, size: size.width * pixel, rows: size.height, source_stride: a.width * pixel, destination_stride: b.width * pixel}
+	// Owned allocations and imported spans are both bounded to 64 MiB.
+	state.ops << SoftwareMetalCopy{source: objc_retain(source), destination: objc_retain(destination), source_offset: origin.y * sm_texture_stride(src) + origin.x * pixel, destination_offset: target.y * sm_texture_stride(dst) + target.x * pixel, size: size.width * pixel, rows: size.height, source_stride: sm_texture_stride(src), destination_stride: sm_texture_stride(dst)}
 }
 fn sm_texture_blit_start(encoder u64) {
 	sm_method(encoder, c'copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:', u64(unsafe { voidptr(sm_copy_texture) }), c'v136@0:8@16Q24Q32{MTLOrigin=QQQ}40{MTLSize=QQQ}64@88Q96Q104{MTLOrigin=QQQ}112')
@@ -44,8 +44,8 @@ fn sm_buffer_texture_copy(encoder u64, buffer u64, offset u64, row u64, image u6
 	span := (size.height - 1) * row + width
 	if !sm_range(u64(b.data.len), offset, span) { panic('iOS: Metal transfer span exceeds buffer') }
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
-	texture_offset := (origin.y * a.width + origin.x) * pixel
-	state.ops << SoftwareMetalCopy{source: objc_retain(if upload { buffer } else { texture }), destination: objc_retain(if upload { texture } else { buffer }), source_offset: if upload { offset } else { texture_offset }, destination_offset: if upload { texture_offset } else { offset }, size: width, rows: size.height, source_stride: if upload { row } else { a.width * pixel }, destination_stride: if upload { a.width * pixel } else { row }}
+	texture_offset := origin.y * sm_texture_stride(t) + origin.x * pixel
+	state.ops << SoftwareMetalCopy{source: objc_retain(if upload { buffer } else { texture }), destination: objc_retain(if upload { texture } else { buffer }), source_offset: if upload { offset } else { texture_offset }, destination_offset: if upload { texture_offset } else { offset }, size: width, rows: size.height, source_stride: if upload { row } else { sm_texture_stride(t) }, destination_stride: if upload { sm_texture_stride(t) } else { row }}
 }
 fn sm_buffer_to_texture(encoder u64, selector &char, source u64, offset u64, row u64, image u64, size SoftwareMetalSize, destination u64, slice u64, level u64, origin SoftwareMetalOrigin) { sm_buffer_texture_copy(encoder, source, offset, row, image, size, destination, slice, level, origin, true) }
 fn sm_texture_to_buffer(encoder u64, selector &char, source u64, slice u64, level u64, origin SoftwareMetalOrigin, size SoftwareMetalSize, destination u64, offset u64, row u64, image u64) { sm_buffer_texture_copy(encoder, destination, offset, row, image, size, source, slice, level, origin, false) }

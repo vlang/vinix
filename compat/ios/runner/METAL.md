@@ -9,7 +9,8 @@ textures, present drawables or use a GPU. It cannot yet render Fortnite.
 Implemented Objective-C API:
 
 - Device: `newBufferWithLength:options:`, `newBufferWithBytes:length:options:`,
-  `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`.
+  `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`,
+  `newTextureWithDescriptor:iosurface:plane:`.
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
 - Queue: `commandBuffer`, `device`.
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
@@ -22,7 +23,7 @@ Implemented Objective-C API:
   `endEncoding`.
 - Texture descriptor: `texture2DDescriptorWithPixelFormat:width:height:mipmapped:`
   plus width, height, pixel-format, usage and storage-mode setters.
-- Texture: dimension/format/usage/device/storage queries,
+- Texture: dimension/format/usage/device/storage queries, `iosurface`, `iosurfacePlane`,
   `replaceRegion:mipmapLevel:withBytes:bytesPerRow:` and
   `getBytes:bytesPerRow:fromRegion:mipmapLevel:`.
 
@@ -32,6 +33,17 @@ conversion. Only shared, single-level, single-sample 2D storage is supported,
 with dimensions 1..16,384 and at most 64 MiB per texture. Mipmapped descriptor
 creation and unsupported allocations return nil. Textures snapshot descriptor
 metadata, own zero-initialized storage and retain their device independently.
+IOSurface imports instead retain the supplied local surface and borrow its
+selected plane, preserving the plane's row stride even for narrower descriptors.
+The CoreVideo Metal texture cache can now import BGRA (80/81), 420v and 420f
+planes (10/30) through this device. CPU transfers and deferred blits access the
+same bytes; no snapshot or color conversion occurs. Imports validate plane,
+format, dimensions, shared storage, usage and a maximum 64 MiB addressed span.
+Textures keep their surface alive independently of the pixel buffer, cache and
+view. `iosurface` returns nil for ordinary owned textures. Imported aliases of
+one plane share overlap checks when encoding texture copies. Mach-port and
+global-ID surface imports remain unsupported. See
+[Apple's surface texture API](https://developer.apple.com/documentation/metal/mtldevice/maketexture%28descriptor%3Aiosurface%3Aplane%3A%29).
 Descriptor/texture state is freed through the existing CoreVideo metadata
 destructor; pixel storage and device references use normal object cleanup.
 Transfers validate positive 2D regions, level zero, row pitch and pointer
@@ -76,8 +88,7 @@ checks use subtraction to avoid overflow; overlapping ranges in the same
 buffer reject. Zero-length copies at the end of a buffer are valid. Each
 command buffer is limited to 65,536 copies. Invalid encoding/state/ranges fail
 explicitly. Client accesses through `contents` still require synchronization
-with command submission. Shader/render methods,
-IOSurface imports and presentation remain absent.
+with command submission. Shader/render methods and presentation remain absent.
 
 Texture-to-texture blits copy positive 2D regions between textures with the
 same pixel format and device. Only slice/level zero, origin z zero and depth
