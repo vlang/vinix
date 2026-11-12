@@ -24,7 +24,7 @@ including `immarg`, reject for these operations. Vectors, wider integers,
 malformed decimal suffixes and AIR aliases reject. Valid LLVM IR and matching
 immutable indexes remain preconditions.
 
-The fixed stack cache has 1064 entries: forty floating-overload slots and sixteen
+The fixed stack cache has 1192 entries: forty floating-overload slots and eighteen
 independent 64-width integer ranges. The four extrema families use separate
 ranges. Attribute validation runs once per admitted declaration under the
 shared 1,000,000-work limit. The three owned execution arrays and their cleanup

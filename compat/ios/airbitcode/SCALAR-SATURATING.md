@@ -16,6 +16,9 @@ i1 and INT64_MIN without host signed arithmetic or overflow. No host builtin,
 LLVM, FP or new allocation participates in numerical evaluation. Unary integer
 evaluators reject these binary operations.
 
+[Saturating left shifts](SCALAR-SATURATING-SHIFT.md) use separate poison-aware
+evaluation because a shift amount at least as large as the width produces poison.
+
 The [direct-call profile](SCALAR-INTRINSICS.md) requires canonical reserved
 names, exact integer widths, homogeneous fixed signatures, external declaration
 identity, ordinary calling convention, default pointer address space and the
@@ -26,8 +29,8 @@ Vectors, wider integers, malformed decimal suffixes and AIR aliases reject.
 All blocks are preflighted. Valid LLVM IR and matching immutable indexes
 remain preconditions.
 
-The fixed stack cache has 1064 entries: forty floating-overload slots and
-sixteen independent 64-width integer ranges. The four saturating families use
+The fixed stack cache has 1192 entries: forty floating-overload slots and
+eighteen independent 64-width integer ranges. The four saturating families use
 separate ranges. Attribute validation runs once per admitted declaration under
 the shared 1,000,000-work limit. Fixed two-ID attribute storage and the three
 existing owned execution arrays/cleanup remain. Retained allocation is not measured.
