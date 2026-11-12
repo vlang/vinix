@@ -57,7 +57,14 @@ zero-poison flag. With that flag false, zero returns the width; with it true,
 zero produces poison. Poison input propagates, undef input rejects, and
 freeze may consume a poison result. Each call costs one step.
 
-Only ordinary direct calls to the exact reserved declarations are admitted:
+Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
+the result type. The amount is reduced modulo the width, so equal operands
+produce rotations and oversized amounts are defined. A zero amount selects
+the first input for fshl and the second for fshr. All operands are evaluated;
+poison propagates even in an otherwise unused half at zero shift, and undef
+rejects. These calls reuse scalar evaluation and cost one step each.
+
+Only ordinary direct calls to these seven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -109,7 +116,9 @@ Valid LLVM IR and matching immutable parsed indexes remain preconditions.
 
 Loads assemble little-endian bytes and mask narrow integer padding bits.
 Stores write only the scalar's ceil(bits/8) bytes, zeroing unused high bits.
-Loads/stores preserve floating raw bits. Buffer bytes are treated as defined values;
+Loads/stores preserve floating raw bits. Nonzero padding in a narrow integer
+load uses the profile's masked defined choice rather than tracking LLVM load
+poison. Native reference comparisons require zero input padding. Buffer bytes are treated as defined values;
 uninitialized-memory/poison shadow tracking is not implemented. Poison stores
 and selected undef reject. Dynamic value errors can leave earlier stores
 visible; errors do not roll back memory. Every load, store, binary operation,
@@ -131,5 +140,7 @@ raw-bit expectations, all half encodings, and separate indeterminate choices.
 defined widened LLVM value/poison-tag reference without executing native poison.
 `tests/ios/air-memory-bits.v` checks bit intrinsic buffer functions against
 defined native LLVM execution, with separate zero/poison/undef/call controls.
+`tests/ios/air-memory-funnel.v` checks three-input funnel buffer functions,
+rotation/amount boundaries and separate poison/undef/padding-choice controls.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.

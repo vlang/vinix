@@ -1133,13 +1133,17 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
 	source.write_string('declare i32 @llvm.ctpop.i32(i32)\ndeclare i32 @llvm.bitreverse.i32(i32)\ndeclare i32 @llvm.bswap.i32(i32)\ndeclare i32 @llvm.ctlz.i32(i32, i1 immarg)\ndeclare i32 @llvm.cttz.i32(i32, i1 immarg)\n')
+	source.write_string('declare i32 @llvm.fshl.i32(i32, i32, i32)\ndeclare i32 @llvm.fshr.i32(i32, i32, i32)\n')
 	for name in names {
 		if name == 'empty' { source.write_string('define void @empty() { ret void }\n'); continue }
+		if name == 'funnel' {
+			source.write_string('define void @funnel(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load i32, ptr addrspace(2) %a, align 4\n %y = load i32, ptr addrspace(2) %b, align 4\n %sp = getelementptr i32, ptr addrspace(2) %a, i64 1\n %s = load i32, ptr addrspace(2) %sp, align 4\n %left = call i32 @llvm.fshl.i32(i32 %x, i32 %y, i32 %s)\n %right = call i32 @llvm.fshr.i32(i32 %x, i32 %y, i32 %s)\n store i32 %left, ptr addrspace(1) %out, align 4\n %next = getelementptr i32, ptr addrspace(1) %out, i64 1\n store i32 %right, ptr addrspace(1) %next, align 4\n ret void }\n'); continue
+		}
 		if name in ['bits', 'bits_frozen'] {
 			flag := if name == 'bits_frozen' { 'true' } else { 'false' }
 			source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load i32, ptr addrspace(2) %a, align 4\n %y = load i32, ptr addrspace(2) %b, align 4\n %pop = call i32 @llvm.ctpop.i32(i32 %x)\n %rev = call i32 @llvm.bitreverse.i32(i32 %x)\n %swap = call i32 @llvm.bswap.i32(i32 %rev)\n %lead0 = call i32 @llvm.ctlz.i32(i32 %y, i1 ${flag})\n %trail0 = call i32 @llvm.cttz.i32(i32 %y, i1 ${flag})\n %lead = freeze i32 %lead0\n %trail = freeze i32 %trail0\n %sum = add i32 %pop, %lead\n %v = add i32 %sum, %trail\n store i32 %swap, ptr addrspace(1) %out, align 4\n %next = getelementptr i32, ptr addrspace(1) %out, i64 1\n store i32 %v, ptr addrspace(1) %next, align 4\n ret void }\n'); continue
@@ -1164,8 +1168,8 @@ fn sm_test_compute_library(label string) ![]u8 {
 		compute := if name in ['max', 'float_max'] { '%c = ${cmp} ${typ} %x, %y\n %v = select i1 %c, ${typ} %x, ${typ} %y\n' } else if name == 'frozen_sum' { '%bad = ${op} i32 %x, %y\n %v = freeze i32 %bad\n' } else { '%v = ${op} ${typ} %x, %y\n' }
 		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n ${gep}%x = load ${typ}, ptr addrspace(2) ${a}, align 4\n %y = load ${typ}, ptr addrspace(2) ${b}, align 4\n ${prior}${compute}store ${typ} %v, ptr addrspace(1) ${dst}, align 4\n ret void\n}\n')
 	}
-	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180}\n')
-	for i, name in names[..19] {
+	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190}\n')
+	for i, name in names[..20] {
 		n := i * 10
 		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n!${n + 1} = !{}\n')
 		if name == 'empty' { source.write_string('!${n + 2} = !{}\n'); continue }
@@ -1342,6 +1346,14 @@ fn test_software_metal_compute() {
 		sm_call(bits_command, c'commit'); assert sm_send(bits_command, c'status') == 4
 		assert unsafe { *(&u32(outp + 16)) } == u32(0x80c4a2e6) && unsafe { *(&u32(outp + 20)) } == 43
 		assert unsafe { *(&u32(outp + 24)) } == u32(0x80c4a2e6) && unsafe { *(&u32(outp + 28)) } == 12
+		funnel_command := sm_send(queue, c'commandBuffer'); funnel_encoder := sm_send(funnel_command, c'computeCommandEncoder')
+		funnel_pipeline := sm_test_compute_pipeline(d, library, 'funnel', unsafe { nil }); assert funnel_pipeline != 0
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(funnel_encoder, c'setComputePipelineState:', funnel_pipeline) }
+		sm_test_compute_buffer(funnel_encoder, a, 0, 0); sm_test_compute_buffer(funnel_encoder, b, 0, 3); sm_test_compute_buffer(funnel_encoder, output, 16, 7)
+		sm_test_compute_dispatch(funnel_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(funnel_encoder, c'endEncoding'); objc_release(funnel_pipeline)
+		unsafe { *(&u32(ap)) = 0x01234567; *(&u32(ap + 4)) = 36; *(&u32(bp)) = 0x89abcdef }
+		sm_call(funnel_command, c'commit'); assert sm_send(funnel_command, c'status') == 4
+		assert unsafe { *(&u32(outp + 16)) } == u32(0x12345678) && unsafe { *(&u32(outp + 20)) } == u32(0x789abcde)
 		unsafe { *(&u32(bp)) = 0 } // Preserve the later division-by-zero fixture.
 		// A second dispatch aliases output to an input; resources remain live
 		// after caller releases its handles, through the recorded snapshot.
@@ -1374,7 +1386,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {

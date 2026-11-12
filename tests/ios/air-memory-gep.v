@@ -94,11 +94,15 @@ fn main() {
 			mut input := []u8{len: 64}; mut actual := []u8{len: 64, init: 0xcc}; mut expected := actual.clone()
 			mut state := u64(sample + 1) * u64(0x9e3779b97f4a7c15)
 			for i in 0 .. 64 { state ^= state << 13; state ^= state >> 7; state ^= state << 17; input[i] = u8(state >> 56) }
+			// Nonzero narrow-load padding is LLVM poison. Keep the native copy
+			// reference defined; interpreter-only masking is checked separately.
+			width := (c.bits + 7) / 8
+			if c.bits % 8 != 0 { input[int(profile.arguments[0].minimum_size) - 1] &= u8((1 << (c.bits % 8)) - 1) }
 			mut bindings := [airbitcode.IRMemoryBinding{data: input}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
 			assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, profile.steps)!.steps == profile.steps
 			unsafe { NativeCopy(voidptr(address))(input.data, expected.data) }
-			// LLVM leaves high padding bits unspecified for narrow integers.
-			width := (c.bits + 7) / 8; destination := int(profile.arguments[1].minimum_size) - width
+			// Ignore unused native destination padding for narrow integers.
+			destination := int(profile.arguments[1].minimum_size) - width
 			for i in 0 .. 64 {
 				if i == destination + width - 1 && c.bits % 8 != 0 { assert actual[i] == expected[i] & u8((1 << (c.bits % 8)) - 1), c.name }
 				else { assert actual[i] == expected[i], c.name }

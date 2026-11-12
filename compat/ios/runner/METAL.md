@@ -316,9 +316,18 @@ attribute checks. Counts/reversal support i1..i64; bswap requires a multiple
 of sixteen bits. Zero-count flags must be defined literal i1 constants.
 Zero input returns the width when the flag is false and poison when true;
 freeze can define that result before storing. Calls cost one step and execute
-inside the interpreter. Other intrinsics, indirect calls, call-site attributes,
-tail calls and fast-math calls remain unsupported. Synthetic deferred kernels
+inside the interpreter. Indirect calls, call-site attributes, tail calls and
+fast-math calls remain unsupported. Admitted intrinsic families are these five
+and the funnel intrinsics below. Synthetic deferred kernels
 combine all five operations and consume zero-poison results through freeze.
+
+Direct LLVM `fshl`/`fshr` calls support three matching i1..i64 operands. Amounts
+are reduced modulo the width; equal inputs produce rotations. Zero amount
+chooses the first input for fshl and the second for fshr. Poison in any input
+propagates and undef rejects, including at zero amount. Calls cost one step
+and use the same direct-call/attribute checks as bit intrinsics. A synthetic
+deferred kernel loads two inputs and an amount from buffers, executes both
+directions and stores two results using checked GEPs.
 
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not
