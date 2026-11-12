@@ -1997,3 +1997,41 @@ use zero removals and retain archive SHA256
 `fed1719bae2f7029f5c6adddda7e790077788df340139bd5c4955aa4febc1b3f`.
 The fixture bind was released before preparing the GMS broker. Full Maps
 functionality, current tiles/route geometry and sign-in remain unqualified.
+
+r62 reached GMS readiness with the optimized current-V controller. Maps
+rendered onboarding; Sign in opened the chooser and Add account began the
+actual GMS WrapperControlledActivity/GlifAuthAccountLayout flow. The broker
+then exited with `authenticator returned an unknown session`. Maps subsequently
+reported a failed/timed-out native account query. No Google login page,
+credentials or authentication success was observed. This run did not exercise
+anonymous search/routes or establish current tile rendering.
+
+The selected SurfaceView dump ran three times. Its later samples show a
+480x640 surface, EGL context/surface present, unpaused rendering, no bad
+surface, renderComplete=true, renderSignaled=false, an empty event queue and
+the GL-Map thread waiting. This rules out those sampled lifecycle failures;
+it does not identify the missing map scene/request. Captures remain in r62.
+
+Only verified owned QEMU PID62886 was synced and stopped. Complete Maps log
+SHA256 is `226fa45e6dbcb61fbd04f1c4875c68548db454a9e3cf38e62d6d4a3d08e61810`,
+broker log `0a834239b294053913f57fa903c1e825af9b1c461aa391e6af731c6488f45bfa`,
+receipt `42e55480eadefa4119d2d5fc6bd12749d264fdde6e7e7e288cc7d901df16cda3`,
+serial `aca1c8d1ce8dfe27d5ce829a13beecfcd0d89c98b21b49aa44674b2fdb134433`,
+and data image
+`ddd93b7e37d233d4cd05976b53056612471b9ff8f5b96e99c71409fff41909e5`.
+The storage watch stopped before600 seconds; its minimum app-data space was
+7246454784 bytes and minimum MemFree164896KiB. It is not a stability pass.
+
+Current-V protocol checks exposed the same implicit-string-copy assumption
+in accountmanifest.string_pool. It appended a decoded string and freed its
+storage; fixture diagnostics showed zeroed/corrupted manifest names. The pool
+now clones each retained string explicitly. Class-name splitting is also
+materialized before iteration to avoid the current compiler's unresolved
+split helper. All existing package, namespace, component, complete-document,
+CRC, compression and malformed UTF-8/UTF-16 rejection checks remain enforced.
+The focused activity test passed. Full18-file protocol/manifest suites in
+`account-protocol-plain-20261112-r2` and `account-protocol-asan-20261112-r1`
+passed with the pending cancellation-race changes:0/0, complete cleanup,
+34293/40332ms, RSS378896384/486998016, shared growth107245568/110616576 bytes.
+ASan checks address lifetimes, with leak detection disabled for the existing
+manual-allocation fixtures. Paired ARM protocol deployment remains pending.

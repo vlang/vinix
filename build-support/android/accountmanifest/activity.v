@@ -50,8 +50,9 @@ fn string_pool(data []u8, header int) ![]string {
 		if offset < 0 || offset >= data.len - start { return error('manifest string offset out of bounds') }
 		value, weight := manifest_pool_string(data, start + offset, utf8_pool, manifest_limit * 4 - decoded_bytes)!
 		decoded_bytes += weight
-		// Appending to []string clones the string; release the decoder's copy.
-		result << value
+		// The pool owns independent storage before the decoder's temporary
+		// is released; appending a string only copies its pointer and length.
+		result << value.clone()
 		unsafe { value.free() }
 	}
 	accepted = true
@@ -131,7 +132,8 @@ fn class_name(value string, package_name string) !string {
 		value
 	}
 	if full.len == 0 || full.len > 2048 { return error('invalid Activity class name') }
-	for segment in full.split('.') {
+	segments := full.split('.')
+	for segment in segments {
 		if segment == '' || !(segment[0].is_letter() || segment[0] in [`_`, `$`])
 			|| !segment.bytes().all(it.is_letter() || it.is_digit() || it in [`_`, `$`]) {
 			return error('invalid Activity class name')
