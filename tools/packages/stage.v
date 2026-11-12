@@ -17,6 +17,9 @@ fn invoke(program string, arguments []string) ! {
 fn compile_image_tools(build &pkgcore.ImageToolBuild, architecture string, repository string, v string, cc string, compiler_args []string) ! {
 	work := build.directory()!
 	defer { unsafe { work.free() } }
+	mut runtime_sources := []string{}
+	process_runtime := os.dir(v) + '/vlib/os/execute_capture_nix.c'
+	if os.is_file(process_runtime) { runtime_sources << process_runtime }
 	for pair in [['vinix-package', 'tools/packages/main.v'], ['vinix-session', 'tools/accounts/session.v'],
 		['vinix-linux-runner', 'tools/packages/linux-runner.v']] {
 		source := work + '/' + pair[0] + '.c'
@@ -27,7 +30,7 @@ fn compile_image_tools(build &pkgcore.ImageToolBuild, architecture string, repos
 			'-enable-globals', '-gc', 'none', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-os', 'linux', '-arch',
 			if architecture == 'aarch64' { 'arm64' } else { 'amd64' }, '-o', source, repository + '/' + pair[1]])!
 		build.check()!
-		invoke(cc, [...compiler_args[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source,
+		invoke(cc, [...compiler_args[1..], '-static', '-O2', '-std=gnu11', '-D_GNU_SOURCE', source, ...runtime_sources,
 			'-o', binary, '-lm', '-lpthread'])!
 		build.check()!
 	}

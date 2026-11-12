@@ -138,7 +138,9 @@ fn stage_leaf_names(directory int) ![]string {
 			|| child.st_mode & 0o170000 == 0o040000 {
 			return error('generation contents changed or removal failed; retain the tree and retry retirement after inspection')
 		}
-		names << name
+		// readdir owns this buffer and closedir releases it. Retirement unlinks
+		// these names only after enumeration has finished.
+		names << name.clone()
 	}
 	retained = true
 	return names
