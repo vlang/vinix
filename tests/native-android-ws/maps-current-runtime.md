@@ -1561,3 +1561,50 @@ Fresh r49 stages the same tested SDK/native/core and boot r3 from the outset.
 Its stage passed0/0, complete cleanup,8206ms, RSS37060608, shared growth
 136142848 bytes. UUID, read-only e2fsck and initial-image hash checks passed.
 The actual Maps retry remains pending.
+
+With source `cc1e07257`, r49 reached Explore/Local vibe after Skip and stayed
+alive past the prior wolfSSL crash. A Louvre search was entered, but no search
+result or map imagery was qualified. Complete disk-retained logs identify
+uncaught GMS NearbyDiscovery Display.getState linkage failure in dvyc.a
+source11, followed by a primary-looper missing Telephony.Sms.CONTENT_URI in
+fgiz.a source7, called by EmergencyPersistentChimeraService.onStartCommand.
+The previous native TLS crash did not recur in this log. Exact caller readback
+is `gms-display-sms-caller-20261112-r1`, classes2.dex/dvyc and classes11.dex/fgiz.
+
+On resumption, QEMU PID83685 was absent and its QMP socket refused connections;
+the stop reason is not established. Read-only extraction retained complete log
+`maps-current-20261112-r49/maps.retained.log`, SHA256
+`8245699dc7ff3cf887262fa65be7bd35de7357f9e03d6ca24dd83c048fdf19a2`.
+The stopped data image has SHA256
+`ad90004564afb66c7db2f9a57907f136126c394d96f096141cd7fb11d0f81a36`.
+Snapshot `maps-display-sms-final-uart-20261112-r1` has full SHA256
+`64c51e7c00cf7142afa190ad9e5b240af76f12bcee55a8ef7c5c4c6acfb9866c`.
+The last watcher sample is364502ms; minimum available disk7246450688 bytes,
+MemFree83056KiB. No600-second stability or controlled clean stop is claimed.
+
+`framework_display_sms.v` exposes the current desktop adapter's one continuously
+driven display as STATE_ON, consistent with its default-display object. The
+catalog now enumerates that display, returns null for unsupported IDs and
+returns independent arrays. This adapter has no suspend/hotplug/display-power
+control. [Display's Android contract](https://developer.android.com/reference/android/view/Display#getState())
+defines STATE_ON=2. The SMS addition supplies the standard [content://sms URI](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/core/java/android/provider/Telephony.java);
+it does not add a provider, messages or change notifications. Existing
+ContentResolver absent-provider behavior remains unchanged.
+
+SDK `framework-display-sms-20261112-r1` passed guarded assembly/readback:0/0,
+complete cleanup,2579ms, RSS458522624, shared growth288309248 bytes. Signed
+fixture r48 passed build/link/sign/verification:0/0, complete cleanup,1019ms,
+RSS167018496, shared growth15273984 bytes. Guest r50 staging passed0/0,
+complete cleanup,9672ms, RSS36847616, shared growth134238208 bytes. UUID,
+read-only e2fsck and initial-image hash verification passed before boot.
+ARM qualification and the actual Maps retry remain pending.
+
+The complete signed r48 fixture passed on ARM in r50 as UID/GID10160,
+readiness/pass once, drained EOF and exit0. It checks default display state
+through DisplayManager and WindowManager, unsupported IDs, independent display
+arrays, SMS URI identity, absent-provider query and no fabricated observer
+callback. Snapshot `display-sms-api-uart-20261112-r1`, plan
+`display-sms-api-plan-20261112-r1.json` and strict readback
+`display-sms-api-readback-20261112-r1` retain archive SHA256
+`8095562e00f78547cfa0fbc893ba9560c58dec4bb3c38fc44ab2db417329ffd0`.
+The fixture bind was released before broker preparation and the Maps retry.
