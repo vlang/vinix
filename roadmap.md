@@ -1137,6 +1137,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     A native GCC test recovers the caller and six saved registers, rejects the
     missing-frame control and checks retirement; both signed Win64 runs and
     independent retainers pass, with 51 x86 evidence refusals.
+    [Vectored exception continuation](tests/packages/wine-exception-check.md)
+    now passes signed software exceptions, protected-page read-fault recovery,
+    handler ordering and removal on both architectures, with independent
+    receipt admission and all 55 x86/64 ARM evidence refusals. Stack-based SEH
+    and broader signal coverage remain open.
     Graphical execution, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)

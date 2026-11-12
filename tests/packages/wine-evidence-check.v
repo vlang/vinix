@@ -280,7 +280,8 @@ fn checks() ! {
 			replace(directory + '/result.json', json2.encode(outcome))!
 			expected = 'requires uninterrupted passing native Wine outcome'
 		} else if name in ['missing-ready', 'duplicate-ready', 'missing-pass', 'marker-order',
-			'forbidden', 'missing-smoke-marker', 'missing-image-marker', 'missing-wx-marker'] {
+			'forbidden', 'missing-smoke-marker', 'missing-image-marker', 'missing-wx-marker',
+			'missing-software-exception', 'missing-read-fault', 'duplicate-read-fault', 'exception-marker-order'] {
 			serial := os.read_file(directory + '/boot/serial.log')!
 			ready := 'VINIX SIGNED REAL WIN64 READY'
 			pass := 'HWTEST PASS packaged-Wine'
@@ -295,6 +296,16 @@ fn checks() ! {
 				changed = serial.replace('VINIX SIGNED WIN64 IMAGE PROTECTION PASS', 'removed IMAGE')
 			} else if name == 'missing-wx-marker' {
 				changed = serial.replace('VINIX SIGNED WIN64 WX PASS', 'removed WX')
+			} else if name == 'missing-software-exception' {
+				changed = serial.replace('VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS', 'removed SOFTWARE')
+			} else if name == 'missing-read-fault' {
+				changed = serial.replace('VINIX SIGNED WIN64 READ FAULT RECOVERY PASS', 'removed FAULT')
+			} else if name == 'duplicate-read-fault' {
+				changed = serial + '\nVINIX SIGNED WIN64 READ FAULT RECOVERY PASS\n'
+			} else if name == 'exception-marker-order' {
+				changed = serial.replace('VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS', '__CONTROL_EXCEPTION__')
+					.replace('VINIX SIGNED WIN64 READ FAULT RECOVERY PASS', 'VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS')
+					.replace('__CONTROL_EXCEPTION__', 'VINIX SIGNED WIN64 READ FAULT RECOVERY PASS')
 			} else if name == 'missing-smoke-marker' {
 				changed = serial.replace('HWTEST INFO Wine translated BusyBox true ordinary split-WX control PASS', 'removed smoke')
 			} else if name == 'marker-order' {
@@ -305,7 +316,7 @@ fn checks() ! {
 			replace(directory + '/boot/serial.log', changed)!
 			expected = if name == 'forbidden' {
 				'forbidden serial marker'
-			} else if name == 'marker-order' {
+			} else if name in ['marker-order', 'exception-marker-order'] {
 				'native Wine marker order differs'
 			} else {
 				'missing or duplicated exact marker'

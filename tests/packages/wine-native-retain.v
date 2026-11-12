@@ -20,7 +20,7 @@ struct WineOutcome {
 struct WineReceipt {
 	format         int = 1
 	architecture   string
-	scope          string = 'local-only signed Wine Win64 console probe under an ordinary Vinix account; actual Windows APIs, private prefix/socket, generation lease release, natural child exit; harness stops guest after PASS; no Calculator UI or redistribution qualification'
+	scope          string = 'local-only signed Wine Win64 console probe under an ordinary Vinix account; actual Windows APIs, vectored software/read-fault recovery, private prefix/socket, generation lease release, natural child exit; harness stops guest after PASS; no broad SEH, Calculator UI or redistribution qualification'
 	markers        []string
 	artifacts      map[string]string
 	artifact_paths map[string]string
@@ -414,6 +414,7 @@ fn retain() ! {
 	}
 	markers << 'VINIX SIGNED WIN64 IMAGE PROTECTION PASS'
 	if arch == 'x86_64' { markers << 'VINIX SIGNED WIN64 WX PASS' }
+	markers << ['VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS', 'VINIX SIGNED WIN64 READ FAULT RECOVERY PASS']
 	markers << ['VINIX SIGNED REAL WIN64 READY', 'VINIX SIGNED REAL WIN64 PASS',
 		'HWTEST INFO Wine signed-real-Win64 ordinary-private-prefix socket lease Windows-API outside-write-refused natural-exit PASS',
 		'HWTEST PASS packaged-Wine']

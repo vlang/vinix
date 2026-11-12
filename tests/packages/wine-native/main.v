@@ -549,6 +549,8 @@ fn run() ! {
 	println(text)
 	if child.code != 0 || !observed || text.count('VINIX SIGNED WIN64 IMAGE PROTECTION PASS\n') != 1
 		|| ($if amd64 { text.count('VINIX SIGNED WIN64 WX PASS\n') != 1 } $else { false })
+		|| text.count('VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS\n') != 1
+		|| text.count('VINIX SIGNED WIN64 READ FAULT RECOVERY PASS\n') != 1
 		|| text.count('VINIX SIGNED REAL WIN64 READY\n') != 1
 		|| text.count('VINIX SIGNED REAL WIN64 PASS\n') != 1 {
 		$if amd64 {

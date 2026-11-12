@@ -22,6 +22,135 @@ struct C.wine_memory_information {
 }
 fn C.wine_virtual_query(voidptr, &C.wine_memory_information, u64) u64
 
+// Keep the callback's exact C LONG type: V's Windows alias lowers to int,
+// which has the same width but is incompatible with MinGW's long callback.
+#define wine_exception_result LONG
+@[typedef]
+struct C.wine_exception_result {}
+@[typedef]
+struct C.EXCEPTION_RECORD {
+	ExceptionCode u32
+	ExceptionFlags u32
+	ExceptionAddress voidptr
+	NumberParameters u32
+	ExceptionInformation [15]u64
+}
+@[typedef]
+struct C.CONTEXT {
+mut:
+	Rax u64
+	Rcx u64
+	Rip u64
+}
+@[typedef]
+struct C.EXCEPTION_POINTERS {
+	ExceptionRecord &C.EXCEPTION_RECORD
+	ContextRecord &C.CONTEXT
+}
+fn C.AddVectoredExceptionHandler(u32, fn (&C.EXCEPTION_POINTERS) C.wine_exception_result) voidptr
+fn C.RemoveVectoredExceptionHandler(voidptr) u32
+fn C.RaiseException(u32, u32, u32, &u64)
+
+struct ExceptionOrder {
+mut:
+	visits int
+}
+
+type ReadProbe = fn (voidptr) int
+
+// Recognize only this fixture's continuable software exception. Its borrowed
+// stack record is alive until RaiseException returns; callbacks allocate nothing.
+fn software_exception(info &C.EXCEPTION_POINTERS, digit int) bool {
+	record := info.ExceptionRecord
+	if record.ExceptionCode != 0xe042564e || record.ExceptionFlags != 0
+		|| record.NumberParameters != 3 || record.ExceptionInformation[1] != 0x56494e4958
+		|| record.ExceptionInformation[2] !in [u64(1), 2] { return false }
+	mut order := unsafe { &ExceptionOrder(record.ExceptionInformation[0]) }
+	order.visits = order.visits * 10 + digit
+	return digit == 2 || record.ExceptionInformation[2] == 1
+}
+
+// The only hardware fault accepted is the fixture's two-byte read instruction,
+// followed by RET and an identifying byte sequence, against a PAGE_NOACCESS page.
+// Returning through the modified context proves both RIP and RAX restoration.
+fn read_exception(info &C.EXCEPTION_POINTERS, result int) bool {
+	record := info.ExceptionRecord
+	mut context := info.ContextRecord
+	if record.ExceptionCode != 0xc0000005 || record.ExceptionFlags != 0
+		|| record.NumberParameters != 2 || record.ExceptionInformation[0] != 0
+		|| record.ExceptionAddress != voidptr(context.Rip)
+		|| record.ExceptionInformation[1] != context.Rcx { return false }
+	signature := '\x8b\x01\xc3\x90VINIX'
+	if unsafe { tos(&u8(record.ExceptionAddress), signature.len) } != signature { return false }
+	mut memory := C.wine_memory_information{}
+	if C.wine_virtual_query(voidptr(context.Rcx), &memory, sizeof(C.wine_memory_information)) == 0
+		|| memory.Protect != 1 || memory.Type != 0x20000 { return false }
+	context.Rax = u64(result)
+	context.Rip += 2
+	return true
+}
+
+fn exception_result(value i32) C.wine_exception_result {
+	mut result := C.wine_exception_result{}
+	unsafe { vmemcpy(&result, &value, int(sizeof(value))) }
+	return result
+}
+
+fn exception_first(info &C.EXCEPTION_POINTERS) C.wine_exception_result {
+	if software_exception(info, 1) || read_exception(info, 42) { return exception_result(-1) }
+	return exception_result(0)
+}
+
+fn exception_last(info &C.EXCEPTION_POINTERS) C.wine_exception_result {
+	if software_exception(info, 2) || read_exception(info, 84) { return exception_result(-1) }
+	return exception_result(0)
+}
+
+fn vectored_exceptions(output voidptr) bool {
+	if sizeof(C.wine_exception_result) != 4 { return false }
+	// Two independent registrations distinguish search, priority and removal.
+	mut last := C.AddVectoredExceptionHandler(0, exception_last)
+	if last == unsafe { nil } { return false }
+	defer { if last != unsafe { nil } { C.RemoveVectoredExceptionHandler(last) } }
+	mut first := C.AddVectoredExceptionHandler(1, exception_first)
+	if first == unsafe { nil } { return false }
+	defer { if first != unsafe { nil } { C.RemoveVectoredExceptionHandler(first) } }
+	mut order := ExceptionOrder{}
+	mut arguments := [u64(unsafe { &order }), 0x56494e4958, 1]!
+	C.RaiseException(0xe042564e, 0, 3, &arguments[0])
+	if order.visits != 1 { return false }
+	order.visits = 0
+	arguments[2] = 2
+	C.RaiseException(0xe042564e, 0, 3, &arguments[0])
+	if order.visits != 12 { return false }
+	page := C.VirtualAlloc(unsafe { nil }, 4096, 0x3000, 4)
+	code := C.VirtualAlloc(unsafe { nil }, 4096, 0x3000, 4)
+	defer {
+		if page != unsafe { nil } { C.VirtualFree(page, 0, 0x8000) }
+		if code != unsafe { nil } { C.VirtualFree(code, 0, 0x8000) }
+	}
+	if page == unsafe { nil } || code == unsafe { nil } { return false }
+	instruction := '\x8b\x01\xc3\x90VINIX'
+	unsafe { &u32(page)[0] = 17; vmemcpy(code, instruction.str, instruction.len) }
+	mut old := C.DWORD(0)
+	if !C.VirtualProtect(code, 4096, 0x20, &old) || old != 4 { return false }
+	probe := unsafe { ReadProbe(code) }
+	if probe(page) != 17 { return false }
+	if !C.VirtualProtect(page, 4096, 1, &old) || old != 4 { return false }
+	if probe(page) != 42 { return false }
+	if C.RemoveVectoredExceptionHandler(first) == 0 { return false }
+	first = unsafe { nil }
+	order.visits = 0
+	arguments[2] = 1
+	C.RaiseException(0xe042564e, 0, 3, &arguments[0])
+	if order.visits != 2 { return false }
+	if !write(output, 'VINIX SIGNED WIN64 SOFTWARE EXCEPTION PASS\n') { return false }
+	if probe(page) != 84 { return false }
+	if C.RemoveVectoredExceptionHandler(last) == 0 { return false }
+	last = unsafe { nil }
+	return write(output, 'VINIX SIGNED WIN64 READ FAULT RECOVERY PASS\n')
+}
+
 type ExecutableProbe = fn () int
 
 fn image_memory() bool {
@@ -80,6 +209,7 @@ fn main() {
 		if !wx_memory() { exit(28) }
 		if !write(output, 'VINIX SIGNED WIN64 WX PASS\n') { exit(29) }
 	} else if !variable(c'VINIX_APP_ARCHITECTURE', 'aarch64') { exit(29) }
+	if !vectored_exceptions(output) { exit(30) }
 	file := C.CreateFileA(c'C:\\users\\vinix\\Temp\\real-win64.txt', 0x40000000, 0, unsafe { nil }, 2, 0x80, unsafe { nil })
 	if file == voidptr(int(-1)) { exit(22) }
 	if !write(file, 'real Win64 Windows API execution\r\n') { C.CloseHandle(file); exit(23) }
