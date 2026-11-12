@@ -469,6 +469,54 @@ fn sm_completion_until(value &u64) {
 	for _ in 0 .. 20000 { if C.__atomic_load_n(value, 5) != 0 { return }; C.usleep(100) }
 	assert false, 'completion callback timed out'
 }
+fn sm_scheduled_query(command u64) { assert sm_send(command, c'status') == 3 }
+fn sm_scheduled_invoke(block u64, command u64) {
+	probe := unsafe { &SMCompletionProbe(read64(block + 32)) }
+	assert sm_send(command, c'status') == 3 && unsafe { *(&u64(sm_send(probe.owner, c'contents'))) } == 0
+	worker := spawn sm_scheduled_query(command); worker.wait()
+	C.__atomic_fetch_add(unsafe { &probe.calls }, 1, 5)
+	C.__atomic_store_n(unsafe { &probe.entered }, 1, 5)
+	for C.__atomic_load_n(unsafe { &probe.gate }, 5) != 0 { C.usleep(100) }
+}
+fn sm_scheduled_wait(command u64, probe &SMCompletionProbe) {
+	C.__atomic_store_n(unsafe { &probe.wait_entered }, 1, 5)
+	sm_call(command, c'waitUntilScheduled')
+	C.__atomic_store_n(unsafe { &probe.wait_done }, 1, 5)
+}
+fn test_software_metal_scheduled_handlers() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue'); cmd := sm_send(q, c'commandBuffer')
+		target := sm_test_buffer(d, 8, 0); source := sm_test_buffer(d, 8, 0)
+		unsafe { *(&u64(sm_send(source, c'contents'))) = 0x123456789abcdef0 }
+		encoder := sm_send(cmd, c'blitCommandEncoder'); sm_test_copy(encoder, source, 0, target, 0, 8); sm_call(encoder, c'endEncoding'); objc_release(source)
+		mut scheduled := SMCompletionProbe{owner: target, gate: 1}; mut completed := SMCompletionProbe{owner: target, gate: 1}
+		descriptor := [u64(0), u64(sizeof(SMCompletionBlock)), u64(unsafe { voidptr(sm_completion_copy) }), u64(unsafe { voidptr(sm_completion_drop) })]!
+		block := SMCompletionBlock{isa: block_isa(0), flags: u32(1) << 25, invoke: u64(unsafe { voidptr(sm_scheduled_invoke) }), descriptor: u64(unsafe { &descriptor[0] }), capture: u64(unsafe { &scheduled })}
+		for _ in 0 .. 3 { sm_test_set(cmd, c'addScheduledHandler:', u64(unsafe { &block })) }
+		completion := SMCompletionBlock{...block, invoke: u64(unsafe { voidptr(sm_completion_invoke) }), capture: u64(unsafe { &completed })}
+		sm_test_set(cmd, c'addCompletedHandler:', u64(unsafe { &completion })); objc_release(target)
+		commit := spawn sm_completion_commit(cmd); sm_completion_until(unsafe { &scheduled.entered })
+		waiter := spawn sm_scheduled_wait(cmd, unsafe { &scheduled }); sm_completion_until(unsafe { &scheduled.wait_entered }); C.usleep(2000)
+		assert C.__atomic_load_n(unsafe { &scheduled.wait_done }, 5) == 0
+		C.__atomic_store_n(unsafe { &scheduled.gate }, 0, 5); sm_completion_until(unsafe { &completed.entered }); sm_completion_until(unsafe { &scheduled.wait_done }); waiter.wait()
+		assert sm_send(cmd, c'status') == 4 && scheduled.calls == 3 && scheduled.copies == 3 && scheduled.drops == 3
+		C.__atomic_store_n(unsafe { &completed.gate }, 0, 5); commit.wait(); sm_call(cmd, c'waitUntilScheduled'); sm_call(cmd, c'waitUntilCompleted')
+		assert completed.calls == 1 && completed.drops == 1
+		inner := objc_pool_push(); unused := sm_send(q, c'commandBuffer')
+		mut abandoned := SMCompletionProbe{owner: objc_allocate(ios_runtime.names['NSObject'])}
+		abandon := SMCompletionBlock{...block, capture: u64(unsafe { &abandoned })}
+		sm_test_set(unused, c'addScheduledHandler:', u64(unsafe { &abandon })); objc_release(abandoned.owner)
+		for mode in 0 .. 3 {
+			child := C.fork(); assert child >= 0
+			if child == 0 { C.close(1); C.close(2); if mode == 0 { sm_call(unused, c'waitUntilScheduled') } else { sm_test_set(cmd, c'addScheduledHandler:', if mode == 1 { u64(0) } else { u64(unsafe { &block }) }) }; C._exit(0) }
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		}
+		objc_pool_pop(inner); assert abandoned.calls == 0 && abandoned.copies == 1 && abandoned.drops == 1
+		objc_release(q); objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-SCHEDULED: copied captures, three callbacks at status 3 before copies, unlocked worker queries, concurrent scheduled wait, completion separation, abandonment, three invalid states and two drained runtimes PASS')
+}
 fn test_software_metal_completed_handlers_and_wait() {
 	$if !ios_metal_software ? { return }
 	for _ in 0 .. 2 {

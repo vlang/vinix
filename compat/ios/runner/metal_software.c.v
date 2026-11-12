@@ -8,6 +8,8 @@ struct SoftwareMetalCommands {
 mut:
 	ops []SoftwareMetalCopy
 	completed []u64
+	scheduled []u64
+	scheduled_finished bool
 	active bool
 	status u64
 	finished bool
@@ -31,7 +33,8 @@ fn software_metal_dispose(mut header ObjHeader) {
 	mut state := header.software_metal
 	for op in state.ops { objc_release(op.source); objc_release(op.destination) }
 	for block in state.completed { block_release(block) }
-	unsafe { state.ops.free(); state.completed.free() }
+	for block in state.scheduled { block_release(block) }
+	unsafe { state.ops.free(); state.completed.free(); state.scheduled.free() }
 	C.free(state)
 	header.software_metal = unsafe { nil }
 }
@@ -65,6 +68,8 @@ fn sm_command_buffer(queue u64, selector &char) u64 {
 	state.ops.flags |= .noslices
 	state.completed = []u64{}
 	state.completed.flags |= .noslices
+	state.scheduled = []u64{}
+	state.scheduled.flags |= .noslices
 	obj_header(command).software_metal = state
 	return objc_autorelease(command)
 }
@@ -108,6 +113,16 @@ fn sm_commit(command u64, selector &char) {
 	objc_retain(command)
 	defer { objc_release(command) }
 	state.status = 2
+	state.status = 3
+	C.ios_objc_initialize_unlock()
+	for i in 0 .. state.scheduled.len {
+		block := state.scheduled[i]
+		state.scheduled[i] = 0
+		unsafe { SoftwareMetalCompletion(voidptr(read64(block + 16)))(block, command) }
+		block_release(block)
+	}
+	C.ios_objc_initialize_lock()
+	state.scheduled_finished = true
 	for op in state.ops {
 		if op.size == 0 { continue }
 		if op.fill {
@@ -139,7 +154,7 @@ fn sm_wait(command u64, selector &char) {
 		C.ios_objc_initialize_lock()
 		state := sm_check(command, 'VinixSoftwareMTLCommandBuffer').software_metal
 		if state.status == 0 { panic('iOS: Metal wait requires a committed buffer') }
-		done := state.finished
+		done := if ctext(u64(selector)) == 'waitUntilScheduled' { state.scheduled_finished } else { state.finished }
 		C.ios_objc_initialize_unlock()
 		if done { return }
 		C.usleep(100)
@@ -152,12 +167,14 @@ fn sm_add_completed(command u64, selector &char, block u64) {
 	copied := block_copy(block)
 	C.ios_objc_initialize_lock()
 	mut state := sm_check(command, 'VinixSoftwareMTLCommandBuffer').software_metal
-	if state.status != 0 || state.completed.len >= 4096 {
+	scheduled := ctext(u64(selector)) == 'addScheduledHandler:'
+	count := if scheduled { state.scheduled.len } else { state.completed.len }
+	if state.status != 0 || count >= 4096 {
 		C.ios_objc_initialize_unlock()
 		block_release(copied)
 		panic('iOS: Metal handler registration requires uncommitted buffer and at most 4096 handlers')
 	}
-	state.completed << copied
+	if scheduled { state.scheduled << copied } else { state.completed << copied }
 	C.ios_objc_initialize_unlock()
 }
 fn sm_get(object u64, selector &char) u64 {
@@ -200,6 +217,8 @@ fn software_metal_start() {
 	sm_method(command, c'commit', u64(unsafe { voidptr(sm_commit) }), c'v16@0:8')
 	sm_method(command, c'waitUntilCompleted', u64(unsafe { voidptr(sm_wait) }), c'v16@0:8')
 	sm_method(command, c'addCompletedHandler:', u64(unsafe { voidptr(sm_add_completed) }), c'v24@0:8@?16')
+	sm_method(command, c'addScheduledHandler:', u64(unsafe { voidptr(sm_add_completed) }), c'v24@0:8@?16')
+	sm_method(command, c'waitUntilScheduled', u64(unsafe { voidptr(sm_wait) }), c'v16@0:8')
 	sm_method(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', u64(unsafe { voidptr(sm_copy) }), c'v56@0:8@16Q24@32Q40Q48')
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 	sm_texture_start(device)

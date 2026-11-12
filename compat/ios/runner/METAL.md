@@ -22,7 +22,8 @@ Implemented Objective-C API:
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
 - Queue: `commandBuffer`, `device`.
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
-  `waitUntilCompleted`, `addCompletedHandler:`, `status`, `error`.
+  `waitUntilCompleted`, `addCompletedHandler:`, `waitUntilScheduled`,
+  `addScheduledHandler:`, `status`, `error`.
 - Blit encoder: `copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:`,
   `fillBuffer:range:value:`,
   `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
@@ -86,7 +87,7 @@ destruction. Autorelease ownership applies to command buffers and encoders;
 device, queue and buffer creation transfer a reference to the caller.
 
 Copies execute in encoding order when committed, under the runtime's recursive
-lock. Commit completes synchronously and transitions status from 0 to 2 to 4.
+lock. Commit completes synchronously and transitions status from 0 to 2 to 3 to 4.
 Buffer fills participate in the same command order: each records a retained
 destination, byte range and 8-bit value, and writes only when committed.
 Ranges are byte granular; an empty range at the end of a buffer is valid.
@@ -104,7 +105,13 @@ the command buffer until all handlers return. `waitUntilCompleted` waits for
 both work and all handlers, including when another thread commits the buffer;
 the implementation polls under short lock acquisitions. Waiting before commit
 rejects, and calling wait on the same command from one of its handlers would
-deadlock. Scheduled handlers remain unsupported. See
+deadlock. Scheduled handlers follow the same copying, ordering, release and
+registration rules with a separate 4,096-handler limit. They run outside the
+lock at status 3 before deferred copies/fills execute. `waitUntilScheduled`
+waits for all scheduled handlers to return, independently of completed
+handlers, and rejects waiting before commit. Waiting for scheduling from a
+scheduled callback on the same command would deadlock. These are synchronous
+CPU scheduling notifications; they do not submit work to a GPU. See
 [Apple's handler contract](https://developer.apple.com/documentation/metal/mtlcommandbuffer/addcompletedhandler%28_%3A%29).
 Encoding cannot overlap on one command buffer; every encoder
 must end before commit. Resources must belong to the queue's device. Bounds
