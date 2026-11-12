@@ -113,7 +113,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	if ir_values(stream, raw)[6] != 0 { return error('AIR integer: function attributes unsupported') }
 	if s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.blocks_start < 0 || s.blocks_count < 1 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR integer: body ranges') }
 	mut max_phis := 0
-	mut intrinsic_declarations := [24]int{} // Twelve intrinsics, two precisions.
+	mut intrinsic_declarations := [26]int{} // Thirteen intrinsics, two precisions.
 	mut intrinsic_work := 0
 	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
 		block := bodies.blocks[block_index]
@@ -265,8 +265,11 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				34 {
 					id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
 					a := m.read(start + 1)!
-					b := if scalar_intrinsic_arity(id) == 2 { m.read(start + 2)! } else { IntegerValue{} }
-					result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: scalar_intrinsic_value(id, p.execution_bits(op.result_type, binary32)!, a.value, b.value)!} }
+					arity := scalar_intrinsic_arity(id)
+					b := if arity >= 2 { m.read(start + 2)! } else { IntegerValue{} }
+					c := if arity == 3 { m.read(start + 3)! } else { IntegerValue{} }
+					bits := p.execution_bits(op.result_type, binary32)!
+					result = if a.poison || b.poison || c.poison { IntegerValue{poison: true} } else { IntegerValue{value: if id == .fma { scalar_fma(bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
 				}
 				2 {
 					a := m.read(start)!; b := m.read(start + 1)!

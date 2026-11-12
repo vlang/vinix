@@ -13,6 +13,7 @@ these LLVM declarations for scalar half (`.f16`) and float (`.f32`):
 | `llvm.roundeven` / `llvm.rint` / `llvm.nearbyint` | Round to nearest integer, ties to even in LLVM's default environment. |
 | `llvm.minimum` / `llvm.maximum` | Select the lesser / greater operand, propagate NaNs, and order -0 below +0. |
 | `llvm.sqrt` | Correctly rounded square root, nearest/ties to even; retain negative zero and choose a quiet NaN for negative nonzero inputs. |
+| `llvm.fma` | Fused multiply-add with one nearest/ties-to-even rounding after the exact product and addition. |
 
 Results keep the floating-point type. `scalar_intrinsics.v` manipulates integer
 sign/exponent/fraction bits; no host FP instruction, environment, libm or LLVM
@@ -49,13 +50,17 @@ Declaration attributes admit only function-level `nounwind`, `readnone`,
 `nocreateundeforpoison` and `memory(none)` (bitcode memory versions 0/1/2).
 Return/parameter, string/type, `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A twenty-four-entry fixed stack cache validates each admitted
+validation budget. A twenty-six-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
 instruction, without recursion or host function invocation. Valid LLVM IR and
 matching immutable indexes remain preconditions; this is not a full verifier.
 The integer-only entry point still rejects floating point and all calls.
+
+[Scalar FMA](SCALAR-FMA.md) adds a ternary call with exact fixed-stack integer
+accumulation, gradual underflow and rounding after cancellation. Its separate
+maintained checker compares 1,505,792 native LLVM results across both precisions.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting

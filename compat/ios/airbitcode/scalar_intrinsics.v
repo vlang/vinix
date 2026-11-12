@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
+	if id == .fma { return 3 }
 	return if id in [.copysign, .minimum, .maximum]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
@@ -19,6 +20,7 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.minimum.f16', 'llvm.minimum.f32' { ScalarIntrinsic.minimum }
 		'llvm.maximum.f16', 'llvm.maximum.f32' { ScalarIntrinsic.maximum }
 		'llvm.sqrt.f16', 'llvm.sqrt.f32' { ScalarIntrinsic.sqrt }
+		'llvm.fma.f16', 'llvm.fma.f32' { ScalarIntrinsic.fma }
 		else { return error('AIR intrinsic: unsupported callee') }
 	}
 }
@@ -82,6 +84,7 @@ fn scalar_intrinsic_attributes(stream Stream, set u64, limit int) !int {
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if bits !in [u32(16), 32]! { return error('AIR intrinsic: floating width') }
+	if id == .fma { return error('AIR intrinsic: three FMA arguments required') }
 	sign_mask := u64(1) << (bits - 1); sign := a & sign_mask
 	abs := a & (sign_mask - 1)
 	if id == .fabs { return abs }

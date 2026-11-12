@@ -24,6 +24,8 @@ belong to the supported profile. Floating-point fast-math flags reject.
 Selected [scalar LLVM intrinsic calls](SCALAR-INTRINSICS.md) support absolute
 value, sign copying, integral rounding, NaN-propagating minimum/maximum and square root
 for half and float.
+[Fused multiply-add](SCALAR-FMA.md) also supports three half or float operands
+with one final rounding after exact multiplication and addition.
 
 `binary32.v` implements arithmetic using unsigned integer significands,
 exponents and guard/round/sticky bits. It rounds to nearest, ties to even and
