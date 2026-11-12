@@ -199,6 +199,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_boot_classpath(smali)!
  framework_restrictions_service(smali)!
  framework_runtime_queries(smali)!
+ framework_account_package_query(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!

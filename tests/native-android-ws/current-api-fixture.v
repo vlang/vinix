@@ -5,6 +5,63 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static accountPackages(Landroid/content/Context;)V
+.locals 8
+invoke-virtual {p0}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+move-result-object v0
+const-string v1, "org.vinix.not.owner"
+const-string v2, "org.vinix.fixture"
+new-instance v3, Lorg/vinix/bootstrap/TestPackageAccounts;
+invoke-direct {v3}, Lorg/vinix/bootstrap/TestPackageAccounts;-><init>()V
+new-instance v4, Landroid/accounts/Account;
+const-string v5, "fixture@example.invalid"
+invoke-direct {v4, v5, v2}, Landroid/accounts/Account;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+const/4 v5, 1
+new-array v6, v5, [Landroid/accounts/Account;
+const/4 v7, 0
+aput-object v4, v6, v7
+iput-object v6, v3, Lorg/vinix/bootstrap/TestPackageAccounts;->snapshot:[Landroid/accounts/Account;
+invoke-virtual {v3, v2, v0}, Landroid/accounts/AccountManager;->getAccountsByTypeForPackage(Ljava/lang/String;Ljava/lang/String;)[Landroid/accounts/Account;
+move-result-object v4
+array-length v4, v4
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v6, Ljava/lang/SecurityException;
+const-string v4, "fixture backend denial"
+invoke-direct {v6, v4}, Ljava/lang/SecurityException;-><init>(Ljava/lang/String;)V
+iput-object v6, v3, Lorg/vinix/bootstrap/TestPackageAccounts;->denial:Ljava/lang/SecurityException;
+invoke-virtual {v3, v2, v1}, Landroid/accounts/AccountManager;->getAccountsByTypeForPackage(Ljava/lang/String;Ljava/lang/String;)[Landroid/accounts/Account;
+move-result-object v4
+array-length v4, v4
+invoke-static {v4, v7}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:own_denied_start
+invoke-virtual {v3, v2, v0}, Landroid/accounts/AccountManager;->getAccountsByTypeForPackage(Ljava/lang/String;Ljava/lang/String;)[Landroid/accounts/Account;
+:own_denied_end
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+:own_denied
+move-exception v4
+if-ne v4, v6, :account_package_failed
+new-instance v0, Landroid/app/AppOpsManager;
+invoke-direct {v0}, Landroid/app/AppOpsManager;-><init>()V
+invoke-static {}, Landroid/os/Process;->myUid()I
+move-result v2
+:native_owner_start
+invoke-virtual {v0, v2, v1}, Landroid/app/AppOpsManager;->checkPackage(ILjava/lang/String;)V
+:native_owner_end
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+:native_owner_denied
+move-exception v4
+return-void
+:account_package_failed
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+.catch Ljava/lang/SecurityException; {:own_denied_start .. :own_denied_end} :own_denied
+.catch Ljava/lang/SecurityException; {:native_owner_start .. :native_owner_end} :native_owner_denied
+.end method
 .method public static runtimeQueries(Landroid/content/Context;)V
 .locals 8
 new-instance v0, Landroid/os/UserManager;
@@ -658,6 +715,7 @@ move-result-object v0
 invoke-static {v0}, Lorg/vinix/bootstrap/Main;->secureLongs(Landroid/content/ContentResolver;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->stableDensity()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->runtimeQueries(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->accountPackages(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -898,6 +956,25 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
+	os.write_file(root + '/smali/TestPackageAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestPackageAccounts;
+.super Landroid/accounts/AccountManager;
+.field public snapshot:[Landroid/accounts/Account;
+.field public denial:Ljava/lang/SecurityException;
+.method public constructor <init>()V
+.locals 0
+invoke-direct {p0}, Landroid/accounts/AccountManager;-><init>()V
+return-void
+.end method
+.method public getAccountsByType(Ljava/lang/String;)[Landroid/accounts/Account;
+.locals 1
+iget-object v0, p0, Lorg/vinix/bootstrap/TestPackageAccounts;->denial:Ljava/lang/SecurityException;
+if-eqz v0, :snapshot
+throw v0
+:snapshot
+iget-object v0, p0, Lorg/vinix/bootstrap/TestPackageAccounts;->snapshot:[Landroid/accounts/Account;
+return-object v0
+.end method
+')!
 	os.write_file(root + '/smali/TestNetwork.smali', r'.class public Lorg/vinix/bootstrap/TestNetwork;
 .super Landroid/net/ConnectivityManager;
 .field public state:I

@@ -25,6 +25,7 @@ fn main() {
 	androidtools.framework_stable_density(root + '/smali')!
 	androidtools.framework_secure_longs(root + '/smali')!
 	androidtools.framework_runtime_queries(root + '/smali')!
+	androidtools.framework_account_package_query(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'

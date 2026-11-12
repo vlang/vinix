@@ -1,9 +1,9 @@
 # Current Maps runtime work — 2026-11-12
 
 Full Maps qualification is pending. Onboarding rendered in guest r12; map
-tiles, search, routing and login have not passed. Guest r20 validates the
-current read-API additions. The account target-query path is the next known
-startup blocker; native account ownership checks remain enforced.
+tiles, search, routing and login have not passed. Guest r21 validates the
+current read APIs and the caller-scoped account-query adapter. A fresh Maps
+retry follows; native account ownership checks remain enforced.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -515,3 +515,44 @@ were observed. Snapshot `runtime-query-api-uart-20261112-r1`, plan
 The test mount was released before broker preparation. A Maps retry awaits
 the separately investigated package-query path; its native ownership check
 has not been relaxed. This successor uses `bec488e01` plus this commit's sources.
+
+The account failure in r19 came from GMS `cxly.q` / `ajrb.e` while running
+inside the Maps process. Inspections `gms-package-account-caller-20261112-r1`
+and `gms-target-package-caller-20261112-r1` retain those wrappers. Android's
+[target-query service contract](https://android.googlesource.com/platform/frameworks/base/+/refs/heads/main/services/core/java/com/android/server/accounts/AccountManagerService.java)
+separates authenticated caller/op-package checks from the target package and
+returns no accounts for denied target queries. The previous adapter passed
+the target directly into a native caller-ownership guard.
+
+`framework_account_package_query.v` defines the direct bridge's visibility
+domain as the authenticated caller's own package. Its existing native
+AppOps.checkPackage check gates delegation to getAccountsByType, whose broker
+query retains the real process identity. A target outside this direct scope
+returns a fresh empty Account array without querying account data. The catch
+range contains only the ownership probe; account-backend errors propagate.
+This grants no authenticator role or foreign-package visibility. Privileged
+cross-package disclosure still requires the existing broker capability path;
+this adapter does not implement arbitrary target filtering for owner calls.
+Native store, mutation and AppOps guard code is unchanged.
+
+SDK `framework-account-package-query-20261112-r1` passed guarded full assembly
+and readback in 4,514 ms, RSS 479,297,536, growth 44,826,624,
+guard/child 0/0 with complete cleanup. The unchanged native guard checker
+passed its production closure and all 20 compiled negative mutations with
+current V (`VEXE=/Users/alex/code/v/v`), retaining inputs and results at
+`account-store-guard-check-20261112-r1`; its sha256.json checksum is
+`3aa7860696c47c25ed8f4c546b91a4d8b1f01b2b41629d0beafb10fa24b35b53`.
+
+Signed fixture `current-api-fixture-20261112-r16` passed on ARM in guest r21,
+including all earlier checks. Real native AppOps verifies the primary package
+and still rejects a foreign package. A fixture AccountManager subtype supplies
+an own-scope snapshot and then a sentinel SecurityException: own queries see
+the snapshot or the identical backend exception, while foreign queries return
+empty without invoking that backend. This is a controlled query test, not a
+Google account login or a new disclosure grant. Runner readiness/pass, EOF
+drain and exit0 were observed. Snapshot `account-package-api-uart-20261112-r1`,
+plan `account-package-api-plan-20261112-r1.json` and independent readback
+`account-package-api-readback-20261112-r1` preserve its two-entry export,
+checksum `e8630702d04e880a31754ee5e7752b51ef629a0c24a7bd5e2db27cbc761c56a2`.
+The test mount was released before broker preparation and Maps retry. This
+successor uses `9b706a845` plus this commit's source changes.
