@@ -5,7 +5,7 @@ import airbitcode
 
 // An experimental CPU interpreter, never a native Metal/GPU pipeline. Parsed
 // indexes borrow the retained library's immutable bytes. Only direct scalar
-// buffer arguments and a single invocation are supported.
+// buffer arguments, forward constant GEPs and a single invocation are supported.
 struct SoftwareMetalKernelArgument {
 	slot int
 	alignment u64

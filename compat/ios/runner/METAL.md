@@ -244,8 +244,8 @@ file. Neither entry point requires dispatch initialization.
 Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, one-block
 [scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
-flag-free binary arithmetic, direct pointer arguments, explicit access alignment
-and final ret void. Calling convention and LLVM function attributes must be
+flag-free binary arithmetic, pointer arguments with supported constant GEPs,
+explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
 Valid LLVM IR remains a precondition. No source compilation is provided.
 
@@ -261,7 +261,8 @@ and uses the library NSError path for unsupported/invalid input.
 Both compute dispatch selectors require grid and threadgroup dimensions
 exactly `(1, 1, 1)`. The reported thread execution width and maximum group size
 are one; static threadgroup memory is zero. There are no thread IDs, loops,
-GEP, vectors, texture access, barriers or threadgroup memory in this profile.
+dynamic/negative GEP indexes, vector values, texture access, barriers or
+threadgroup memory in this profile.
 Setting a buffer accepts nil to clear a slot; dispatch requires every argument
 to have an in-bounds, aligned binding from the queue's device. Encoding checks
 state and resource requirements before recording work.
@@ -276,6 +277,15 @@ interpreter failure sets command status 5 and an owned NSError in
 commands are skipped. The domain global is exported from Metal.framework.
 Scheduled/completed notifications and waits still finish.
 Clients must synchronize direct buffer access against submission.
+
+Forward constant GEPs may select scalar array/structure/vector elements and
+chain from earlier GEPs. They require explicit little-endian layouts with
+64-bit pointer/index widths and defined nonnegative i1..i64 literals. Known
+inbounds/nusw/nuw flags use the executor's checked, nonwrapping offset profile.
+Pipeline buffer extents include every derived/unused pointer and accessed byte;
+dispatch validates the combined extent plus the binding offset before recording.
+Derived access offsets must independently satisfy alignment. Runtime loads and
+stores use the preflighted virtual offsets, never AIR-supplied host addresses.
 
 The compute tests assemble synthetic LLVM modules with AIR metadata and check
 Objective-C dispatch ABI and byte results. They do not establish compatibility
