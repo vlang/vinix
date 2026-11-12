@@ -113,7 +113,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	if ir_values(stream, raw)[6] != 0 { return error('AIR integer: function attributes unsupported') }
 	if s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.blocks_start < 0 || s.blocks_count < 1 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR integer: body ranges') }
 	mut max_phis := 0
-	mut intrinsic_declarations := [232]int{} // Forty FP slots, three integer families at 64 widths.
+	mut intrinsic_declarations := [360]int{} // Forty FP slots, five integer families at 64 widths.
 	mut intrinsic_work := 0
 	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
 		block := bodies.blocks[block_index]
@@ -127,10 +127,10 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			mut first_operand := op.operands_start
 			if code == 34 {
 				if !binary32 || !inst.has_result { return error('AIR intrinsic: mixed scalar result required') }
-				key, attributes := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
+				key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
 				if intrinsic_declarations[key] != 0 && intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR intrinsic: duplicate reserved declaration') }
 				if intrinsic_declarations[key] == 0 {
-					intrinsic_work += if key / 2 == int(ScalarIntrinsic.is_fpclass) { scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, true)! } else { scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)! }
+					intrinsic_work += if second_immarg { scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, true)! } else { scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)! }
 					intrinsic_declarations[key] = op.callee_function + 1
 				}
 				first_operand++ // The validated callee is a declaration, not a scalar value.
@@ -269,7 +269,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 					b := if arity >= 2 { m.read(start + 2)! } else { IntegerValue{} }
 					c := if arity == 3 { m.read(start + 3)! } else { IntegerValue{} }
 					bits := p.execution_bits(if id == .is_fpclass { p.operands[start + 1].type_index } else { op.result_type }, binary32)!
-					result = if a.poison || b.poison || c.poison { IntegerValue{poison: true} } else { IntegerValue{value: if id in [.fma, .fmuladd]! { scalar_fma(bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
+					result = if a.poison || b.poison || c.poison { IntegerValue{poison: true} } else if scalar_integer_zero_count(id) { scalar_integer_zero_count_value(id, bits, a.value, b.value)! } else { IntegerValue{value: if id in [.fma, .fmuladd]! { scalar_fma(bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
 				}
 				2 {
 					a := m.read(start)!; b := m.read(start + 1)!

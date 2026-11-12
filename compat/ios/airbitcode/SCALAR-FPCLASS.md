@@ -35,14 +35,14 @@ call-site attributes, vectors, other precisions and AIR aliases reject.
 Valid LLVM IR and matching immutable indexes remain preconditions.
 
 Declaration validation retains the [existing harmless function attributes](SCALAR-INTRINSICS.md).
-Only classification permits a second attribute group, containing exactly
+Classification and integer zero counts permit a second attribute group, containing exactly
 parameter two's enum `immarg` (bitcode attribute 60). Other parameter/return,
 string/type or duplicate slot groups reject. A fixed two-ID stack array handles
 the groups under the existing shared 1,000,000-work budget. Mask constancy is
 checked even when the declaration has no attribute list. Declaration cache
 keys use the floating input width, keeping both overloads distinct despite
 their shared i1 result. The cache reserves forty floating-overload slots within
-the 232-entry fixed stack cache shared with integer bit intrinsics. No new owned
+the 360-entry fixed stack cache shared with integer bit intrinsics. No new owned
 execution arrays are introduced; the existing three arrays and cleanup remain.
 A CALL costs one executed instruction; primitive CALL/return takes two.
 
