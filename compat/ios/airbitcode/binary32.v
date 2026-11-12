@@ -55,9 +55,10 @@ fn binary32_add(a u32, b u32) u32 {
 	return binary32_pack(sign, exponent, significand)
 }
 fn binary32_binary(op u32, a u32, b u32) !u32 {
-	if op !in [u32(0), 1, 2, 4]! { return error('AIR binary32: unsupported operation') }
+	if op !in [u32(0), 1, 2, 4, 6]! { return error('AIR binary32: unsupported operation') }
 	if op == 0 { return binary32_add(a, b) }
 	if op == 1 { return binary32_add(a, b ^ 0x80000000) }
+	if op == 6 { return binary32_remainder(a, b) }
 	if binary32_is_nan(a) || binary32_is_nan(b) { return binary32_nan }
 	x := a & 0x7fffffff; y := b & 0x7fffffff; sign := (a ^ b) & 0x80000000
 	if op == 2 {
@@ -77,6 +78,30 @@ fn binary32_binary(op u32, a u32, b u32) !u32 {
 	numerator := l.significand << if adjust { 27 } else { 26 }
 	quotient := (numerator / r.significand) | u64(numerator % r.significand != 0)
 	return binary32_pack(sign, l.exponent - r.exponent - int(adjust), quotient)
+}
+// LLVM frem has fmod semantics: truncate the quotient toward zero, and keep
+// the dividend's sign, including an exact zero. Reduce integer significands
+// instead of rounding a quotient (which may overflow even for finite inputs).
+fn binary32_remainder(a u32, b u32) u32 {
+	x := a & 0x7fffffff; y := b & 0x7fffffff; sign := a & 0x80000000
+	if binary32_is_nan(a) || binary32_is_nan(b) || x == 0x7f800000 || y == 0 { return binary32_nan }
+	if x < y { return a } // Includes signed zero and a finite dividend / infinity.
+	if x == y { return sign }
+	l := binary32_finite(a); r := binary32_finite(b)
+	mut remainder := l.significand
+	// At most 276 iterations: normalized exponents range from -149 to 127.
+	// Each subtraction leaves less than the divisor; the shift fits in 25 bits.
+	for _ in 0 .. l.exponent - r.exponent {
+		if remainder >= r.significand { remainder -= r.significand }
+		remainder <<= 1
+	}
+	if remainder >= r.significand { remainder -= r.significand }
+	if remainder == 0 { return sign }
+	mut exponent := r.exponent
+	for remainder < u64(1) << 23 { remainder <<= 1; exponent-- }
+	// The exact remainder is representable, including subnormals. No quotient
+	// rounding, host FP instruction, environment or allocation participates.
+	return binary32_pack(sign, exponent, remainder << 3)
 }
 fn binary32_compare(predicate u32, a u32, b u32) !bool {
 	if predicate > 15 { return error('AIR binary32: comparison predicate') }

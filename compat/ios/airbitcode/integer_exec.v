@@ -133,7 +133,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
 					fp := p.types[p.operands[op.operands_start].type_index].kind == .float_t
 					if code == 2 {
-						if (fp && op.opcode !in [u32(0), 1, 2, 4]!) || (!fp && op.opcode > 12) { return error('AIR scalar: binary opcode') }
+						if (fp && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!fp && op.opcode > 12) { return error('AIR scalar: binary opcode') }
 					} else if (fp && op.opcode > 15) || (!fp && (op.opcode < 32 || op.opcode > 41)) { return error('AIR scalar: predicate') }
 				}
 				3 {

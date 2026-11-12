@@ -43,7 +43,7 @@ struct FloatCase { name string kind CaseKind }
 fn add_case(mut cases []FloatCase, name string, kind CaseKind) { entry := FloatCase{name, kind}; unsafe { cases.push_many(&entry, 1) } }
 fn fixture(mut source strings.Builder) []FloatCase {
 	mut cases := []FloatCase{}; cases.flags |= .noslices
-	for mnemonic in ['fadd', 'fsub', 'fmul', 'fdiv'] {
+	for mnemonic in ['fadd', 'fsub', 'fmul', 'fdiv', 'frem'] {
 		name := mnemonic.clone(); add_case(mut cases, name, .arithmetic)
 		line := 'define float @${name}(float %x, float %y, i64 %c) {\n  %r = ${mnemonic} float %x, %y\n  ret float %r\n}\n'; source.write_string(line); unsafe { line.free() }
 	}
@@ -92,7 +92,7 @@ exit: ret float %a
 }
 define float @guard_fmf(float %x, float %y, i64 %c) { %r = fadd fast float %x, %y
   ret float %r }
-define float @guard_frem(float %x, float %y, i64 %c) { %r = frem float %x, %y
+define float @guard_frem_fmf(float %x, float %y, i64 %c) { %r = frem fast float %x, %y
   ret float %r }
 define float @guard_precision(float %x, float %y, i64 %c) { %d = fpext float %x to double
   %r = fptrunc double %d to float
@@ -107,6 +107,10 @@ define noundef float @guard_attributes(float %x, float %y, i64 %c) { ret float %
 define float @poison_add(float %x, float %y, i64 %c) { %r = fadd float %x, poison
   ret float %r }
 define float @poison_divide(float %x, float %y, i64 %c) { %r = fdiv float %x, poison
+  ret float %r }
+define float @poison_remainder_left(float %x, float %y, i64 %c) { %r = frem float poison, %y
+  ret float %r }
+define float @poison_remainder_right(float %x, float %y, i64 %c) { %r = frem float %x, poison
   ret float %r }
 define i1 @poison_compare(float %x, float %y, i64 %c) { %r = fcmp oeq float %x, poison
   ret i1 %r }
@@ -173,11 +177,15 @@ fn main() {
 	for c in cases {
 		index := function_index(ir, c.name)!; reference_name := 'reference_${c.name}'; defer { unsafe { reference_name.free() } }
 		address := C.LLVMGetFunctionAddress(engine, reference_name.str); if address == 0 { panic('missing binary32 native wrapper') }; reference := unsafe { NativeBits(voidptr(address)) }
-		for sample in 0 .. 1024 + if c.kind == .arithmetic { 65536 } else { 4096 } {
-			a := if sample < 1024 { edges[sample / 32] } else { pattern(sample, 0x123456789abcdef0) }
-			b := if sample < 1024 { edges[sample % 32] } else { pattern(sample, 0xfedcba9876543210) }
+		for sample in 0 .. 1024 + if c.name == 'frem' { 131072 } else if c.kind == .arithmetic { 65536 } else { 4096 } {
+			// Extra remainder sweep covers every pair of encoded exponents,
+			// with mixed significands/signs (including zeros, infinities/NaNs).
+			sweep := sample - 1024 - 65536
+			a := if sample < 1024 { edges[sample / 32] } else if sweep >= 0 { (u32(sweep / 256) << 23) | (pattern(sample, 0x123456789abcdef0) & 0x807fffff) } else { pattern(sample, 0x123456789abcdef0) }
+			b := if sample < 1024 { edges[sample % 32] } else if sweep >= 0 { (u32(sweep % 256) << 23) | (pattern(sample, 0xfedcba9876543210) & 0x807fffff) } else { pattern(sample, 0xfedcba9876543210) }
 			third := u64(pattern(sample, 0x9876543210abcdef)); args := [u64(a) | 0x100000000, u64(b) | 0x200000000, third]; defer { unsafe { args.free() } }
 			actual := p.run_scalar_function(ir, stream, pools, bodies, index, args, 512)!
+			if c.name == 'frem' && actual.steps != 2 { panic('remainder instruction count differs') }
 			expected := reference(args[0], args[1], third)
 			nan_class := compare(actual, expected, c.kind) or { row := 'FAIL ${c.name} a=${a} b=${b} got=${actual.value} expected=${expected}'; results.writeln(row)!; panic(row) }
 			row := '${c.name}\t${a}\t${b}\t${third}\t${actual.value}\t${expected}\t${nan_class}\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }
@@ -186,8 +194,8 @@ fn main() {
 	}
 	args := [u64(0x3f800000), 0x40000000, 0]; defer { unsafe { args.free() } }
 	mut guards := 0
-	for name in ['guard_fmf', 'guard_frem', 'guard_precision', 'guard_half', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary32 fixture') }
-	for name in ['poison_add', 'poison_divide', 'poison_compare'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('binary32 poison lost') } }
+	for name in ['guard_fmf', 'guard_frem_fmf', 'guard_precision', 'guard_half', 'guard_undef', 'guard_freeze', 'guard_attributes'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported binary32 fixture') }
+	for name in ['poison_add', 'poison_divide', 'poison_remainder_left', 'poison_remainder_right', 'poison_compare'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('binary32 poison lost') } }
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != args[0] { panic('binary32 select was not lazy') }
 	baseline := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'fadd')!, args, 64)!; mut controls := 0
 	for changed in [airbitcode.IRScalarRun{...baseline, value: baseline.value ^ 1}, airbitcode.IRScalarRun{...baseline, kind: .integer}, airbitcode.IRScalarRun{...baseline, bits: 64}, airbitcode.IRScalarRun{...baseline, poison: true}, airbitcode.IRScalarRun{...baseline, steps: 0}] { compare(changed, baseline.value, .arithmetic) or { controls++; continue }; panic('accepted corrupted binary32 result') }
@@ -196,6 +204,8 @@ fn main() {
 		rounding_args := [u64(0x3f800000), if mode == C.FE_UPWARD { u64(0x33800000) } else { u64(0x34400000) }, 0]; defer { unsafe { rounding_args.free() } }
 		expected := if mode == C.FE_UPWARD { u64(0x3f800000) } else { u64(0x3f800002) }
 		if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'fadd')!, rounding_args, 64)!.value != expected { panic('software binary32 depended on host rounding mode') }
+		remainder_args := [u64(0x7f7fffff), 11, 0]; defer { unsafe { remainder_args.free() } }
+		if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'frem')!, remainder_args, 64)!.value != 10 { panic('software remainder depended on host rounding mode') }
 	}
-	println('LLVM-BINARY32-EXECUTION: ${cases.len} functions, ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class comparisons); ${guards} guarded failures, three poison results, lazy select, ${controls} corruptions and two host-rounding controls PASS; no AIR shader or iOS app executed')
+	println('LLVM-BINARY32-EXECUTION: ${cases.len} functions, ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class comparisons); ${guards} guarded failures, five poison results, lazy select, ${controls} corruptions and four host-rounding controls PASS; no AIR shader or iOS app executed')
 }

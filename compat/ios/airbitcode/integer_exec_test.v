@@ -286,3 +286,29 @@ fn test_scalar_binary32_numeric_conversion_instructions() {
 	if _ := f.scalar([u64(1), 0], 3) { assert false, 'conversion nneg flags' }
 	println('AIR-SCALAR-CASTS: decoded numeric conversions, result kinds/widths, range/operand poison, undef and nonzero flag rejection PASS')
 }
+fn test_scalar_binary32_remainder_instruction_and_guards() {
+	mut f := integer_fixture(); defer { f.free() }
+	f.types[0] = IRType{kind: .float_t}; f.constants[0] = IRConstant{...f.constants[0], kind: .floating, bits: 32}; f.words[0] = 0x40000000
+	f.functions[0] = IRFunction{...f.functions[0], basic_blocks: 1}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 6]); f.add(10, [u64(1)])
+	run := f.scalar([u64(0x1c0e00000), 0x240800000], 2)!
+	assert run.kind == .binary32 && run.bits == 32 && run.value == 0xc0400000 && !run.poison && run.steps == 2
+	assert f.scalar([u64(0xc0800000), 0x40000000], 2)!.value == 0x80000000
+	invalid := f.scalar([u64(0x3f800000), 0], 2)!
+	assert !invalid.poison && invalid.value == binary32_nan
+	if _ := f.scalar([u64(0), 0], 1) { assert false, 'remainder budget' }
+	if _ := f.run([u64(0), 0], 2) { assert false, 'integer profile accepted float remainder' }
+	for operand in 0 .. 2 {
+		f.values[f.records[2].values_start + operand] = 1
+		f.constants[0] = IRConstant{...f.constants[0], kind: .poison}
+		assert f.scalar([u64(0), 0], 2)!.poison
+		f.constants[0] = IRConstant{...f.constants[0], kind: .undef}
+		if _ := f.scalar([u64(0), 0], 2) { assert false, 'remainder read undef' }
+		f.constants[0] = IRConstant{...f.constants[0], kind: .floating}
+		assert f.scalar([u64(0x40e00000), 0x40800000], 2)!.value == if operand == 0 { u64(0x40000000) } else { u64(0x3f800000) }
+		f.values[f.records[2].values_start + operand] = u64(3 - operand)
+	}
+	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, 6, 2]); f.add(10, [u64(1)])
+	if _ := f.scalar([u64(0), 0], 2) { assert false, 'remainder fast math flags' }
+	println('AIR-SCALAR-REMAINDER: decoded frem, masking, kinds/widths/steps, signed zero, invalid NaN, both operand poison/undef/constants, FMF and budget guards PASS')
+}
