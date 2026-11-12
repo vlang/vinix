@@ -14,6 +14,65 @@ type SMTexture = fn (u64, &char, u64) u64
 type SMSet = fn (u64, &char, u64)
 type SMPut = fn (u64, &char, SoftwareMetalRegion, u64, u64, u64)
 type SMRead = fn (u64, &char, u64, u64, SoftwareMetalRegion, u64)
+type SMTextureCopy = fn (u64, &char, u64, u64, u64, SoftwareMetalOrigin, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)
+fn sm_test_texture_copy(encoder u64, source u64, slice u64, level u64, origin SoftwareMetalOrigin, size SoftwareMetalSize, destination u64, target_slice u64, target_level u64, target SoftwareMetalOrigin) {
+	unsafe { SMTextureCopy(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:', source, slice, level, origin, size, destination, target_slice, target_level, target) }
+}
+fn test_software_metal_deferred_texture_blits() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start()
+		for format in [u64(10), 30, 80, 81]! {
+			pool := objc_pool_push(); device := metal_create_system_default_device(); pixel := sm_pixel_size(format)
+			a := sm_test_texture(device, sm_test_descriptor(format, 7, 5, 0)); b := sm_test_texture(device, sm_test_descriptor(format, 9, 6, 0)); c := sm_test_texture(device, sm_test_descriptor(format, 5, 4, 0))
+			mut input := [160]u8{}; mut output := [256]u8{}
+			for i in 0 .. 160 { input[i] = u8(i * 13 + 7) }
+			sm_test_put(a, SoftwareMetalRegion{width: 7, height: 5, depth: 1}, 0, u64(&input[0]), 7 * pixel)
+			queue := sm_send(device, c'newCommandQueue'); command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'blitCommandEncoder')
+			origin := SoftwareMetalOrigin{x: 1, y: 1}; target := SoftwareMetalOrigin{x: 3, y: 2}; size := SoftwareMetalSize{width: 3, height: 2, depth: 1}
+			sm_test_texture_copy(encoder, a, 0, 0, origin, size, b, 0, 0, target)
+			sm_test_texture_copy(encoder, b, 0, 0, target, size, c, 0, 0, origin)
+			sm_test_read(b, SoftwareMetalRegion{width: 9, height: 6, depth: 1}, 0, u64(&output[0]), 9 * pixel)
+			for i in 0 .. int(54 * pixel) { assert output[i] == 0 }
+			// Recording retains resources, but reads their bytes when committed.
+			input[0] = 0xff
+			sm_test_put(a, SoftwareMetalRegion{x: 1, y: 1, width: 1, height: 1, depth: 1}, 0, u64(&input[0]), 0)
+			sm_call(encoder, c'endEncoding'); second := sm_send(command, c'blitCommandEncoder')
+			sm_test_texture_copy(second, c, 0, 0, origin, SoftwareMetalSize{width: 3, height: 1, depth: 1}, c, 0, 0, SoftwareMetalOrigin{y: 3})
+			sm_call(second, c'endEncoding'); objc_release(a); objc_release(queue); objc_release(device)
+			sm_call(command, c'commit'); sm_call(command, c'waitUntilCompleted')
+			sm_test_read(b, SoftwareMetalRegion{width: 9, height: 6, depth: 1}, 0, u64(&output[0]), 9 * pixel)
+			for y in 0 .. 6 { for x in 0 .. 9 { for byte in 0 .. int(pixel) {
+				expected := if y == 2 && x == 3 { input[byte] } else if y >= 2 && y < 4 && x >= 3 && x < 6 { input[((y - 1) * 7 + x - 2) * int(pixel) + byte] } else { u8(0) }
+				assert output[(y * 9 + x) * int(pixel) + byte] == expected
+			} } }
+			sm_test_read(c, SoftwareMetalRegion{width: 5, height: 4, depth: 1}, 0, u64(&output[0]), 5 * pixel)
+			for y in 0 .. 4 { for x in 0 .. 5 { for byte in 0 .. int(pixel) {
+				copied := (y >= 1 && y < 3 && x >= 1 && x < 4) || (y == 3 && x < 3)
+				sx := if y == 3 { x + 1 } else { x }; sy := if y == 3 { 1 } else { y }
+				expected := if copied { if sx == 1 && sy == 1 { input[byte] } else { input[(sy * 7 + sx) * int(pixel) + byte] } } else { u8(0) }
+				assert output[(y * 5 + x) * int(pixel) + byte] == expected
+			} } }
+			for mode in 0 .. 10 {
+				child := C.fork(); assert child >= 0
+				if child == 0 {
+					C.close(1); C.close(2)
+					d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue'); cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder')
+					src := sm_test_texture(d, sm_test_descriptor(format, 7, 5, 0))
+					dst := if mode == 8 { src } else { sm_test_texture(if mode == 7 { metal_create_system_default_device() } else { d }, sm_test_descriptor(if mode == 6 { if format == 10 { u64(30) } else { u64(10) } } else { format }, 7, 5, 0)) }
+					if mode == 9 { sm_call(enc, c'endEncoding') }
+					sm_test_texture_copy(enc, src, if mode == 0 { u64(1) } else { 0 }, if mode == 1 { u64(1) } else { 0 }, if mode == 2 { SoftwareMetalOrigin{x: ~u64(0)} } else { origin }, if mode == 3 { SoftwareMetalSize{...size, width: 0} } else { size }, dst, if mode == 4 { u64(1) } else { 0 }, if mode == 5 { u64(1) } else { 0 }, origin)
+					C._exit(0)
+				}
+				mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+			}
+			objc_release(b); objc_release(c); objc_pool_pop(pool)
+			assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		}
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-TEXTURE-BLITS: four formats, aggregate/stack argument ABI, deferred dependent copies, different strides, same-texture disjoint copies, retained resources, ten rejection modes and two drained runtimes PASS')
+}
 fn sm_test_descriptor(format u64, width u64, height u64, mipmapped u8) u64 { return unsafe { SMDescriptor(voidptr(C.ios_objc_msgsend))(ios_runtime.names['MTLTextureDescriptor'], c'texture2DDescriptorWithPixelFormat:width:height:mipmapped:', format, width, height, mipmapped) } }
 fn sm_test_texture(device u64, descriptor u64) u64 { return unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(device, c'newTextureWithDescriptor:', descriptor) } }
 fn sm_test_set(object u64, selector &char, value u64) { unsafe { SMSet(voidptr(C.ios_objc_msgsend))(object, selector, value) } }

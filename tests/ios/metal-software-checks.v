@@ -71,6 +71,7 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	expected := if fixture == 'metal_software_test.v' { 'IOS-SOFTWARE-METAL: Objective-C buffer/queue/command/blit ABI' } else { 'IOS-METAL-DEVICE: scoped no-argument import, nil without a Metal backend' }
 	for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains(expected), 'missing Metal test execution marker' }
 	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-TEXTURES:'), 'missing texture test marker' } }
+	if fixture == 'metal_software_test.v' { for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-TEXTURE-BLITS:'), 'missing texture blit test marker' } }
 }
 
 fn main() {

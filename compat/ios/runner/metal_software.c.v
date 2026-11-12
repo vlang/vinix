@@ -3,7 +3,7 @@ module main
 
 // Deliberately opt-in until shader execution and presentation are implemented.
 // All API state is serialized by the runtime's recursive Objective-C lock.
-struct SoftwareMetalCopy { source u64 destination u64 source_offset u64 destination_offset u64 size u64 }
+struct SoftwareMetalCopy { source u64 destination u64 source_offset u64 destination_offset u64 size u64 rows u64 = 1 source_stride u64 destination_stride u64 }
 struct SoftwareMetalCommands {
 mut:
 	ops []SoftwareMetalCopy
@@ -86,7 +86,7 @@ fn sm_copy(encoder u64, selector &char, source u64, source_offset u64, destinati
 	if !sm_range(u64(src.data.len), source_offset, size) || !sm_range(u64(dst.data.len), destination_offset, size) { panic('iOS: Metal blit range exceeds buffer') }
 	if source == destination && size > 0 && source_offset < destination_offset + size && destination_offset < source_offset + size { panic('iOS: overlapping Metal blit ranges') }
 	if state.ops.len >= 65536 { panic('iOS: software Metal command limit') }
-	state.ops << SoftwareMetalCopy{objc_retain(source), objc_retain(destination), source_offset, destination_offset, size}
+	state.ops << SoftwareMetalCopy{source: objc_retain(source), destination: objc_retain(destination), source_offset: source_offset, destination_offset: destination_offset, size: size}
 }
 fn sm_end(encoder u64, selector &char) {
 	C.ios_objc_initialize_lock()
@@ -105,7 +105,9 @@ fn sm_commit(command u64, selector &char) {
 	for op in state.ops {
 		if op.size == 0 { continue }
 		src := obj_header(op.source); dst := obj_header(op.destination)
-		unsafe { C.memcpy(voidptr(u64(dst.data.data) + op.destination_offset), voidptr(u64(src.data.data) + op.source_offset), usize(op.size)) }
+		for row in u64(0) .. op.rows {
+			unsafe { C.memcpy(voidptr(u64(dst.data.data) + op.destination_offset + row * op.destination_stride), voidptr(u64(src.data.data) + op.source_offset + row * op.source_stride), usize(op.size)) }
+		}
 	}
 	state.status = 4 // Completion is synchronous; bytes are visible before return.
 }
@@ -156,4 +158,5 @@ fn software_metal_start() {
 	sm_method(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', u64(unsafe { voidptr(sm_copy) }), c'v56@0:8@16Q24@32Q40Q48')
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 	sm_texture_start(device)
+	sm_texture_blit_start(encoder)
 }

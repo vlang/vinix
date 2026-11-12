@@ -15,6 +15,7 @@ Implemented Objective-C API:
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
   `waitUntilCompleted`, `status`, `error`.
 - Blit encoder: `copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:`,
+  `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
   `endEncoding`.
 - Texture descriptor: `texture2DDescriptorWithPixelFormat:width:height:mipmapped:`
   plus width, height, pixel-format, usage and storage-mode setters.
@@ -54,8 +55,18 @@ checks use subtraction to avoid overflow; overlapping ranges in the same
 buffer reject. Zero-length copies at the end of a buffer are valid. Each
 command buffer is limited to 65,536 copies. Invalid encoding/state/ranges fail
 explicitly. Client accesses through `contents` still require synchronization
-with command submission. Texture blit commands, shader/render methods,
+with command submission. Buffer/texture transfers, shader/render methods,
 IOSurface imports and presentation remain absent.
+
+Texture-to-texture blits copy positive 2D regions between textures with the
+same pixel format and device. Only slice/level zero, origin z zero and depth
+one are supported. Both regions must fit; this bounded API rejects out-of-range
+sizes instead of clamping. Overlapping regions in the same texture reject;
+disjoint regions are supported. Encoding retains both textures and records
+row offsets/strides, then commit reads source bytes and copies each row in
+command order. CPU uploads before commit are therefore observed. Texture and
+buffer copies share one ordered command array and its 65,536-operation limit.
+See [Apple's copy contract](https://developer.apple.com/documentation/metal/mtlblitcommandencoder/copy%28from%3Asourceslice%3Asourcelevel%3Asourceorigin%3Asourcesize%3Ato%3Adestinationslice%3Adestinationlevel%3Adestinationorigin%3A%29).
 
 Run the maintained V harness from the repository root:
 
