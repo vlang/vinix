@@ -58,6 +58,7 @@ fn verify_sources() ! {
 		os.dir(@FILE) + '/wine-runner.v':                 $embed_file('wine-runner.v').to_string()
 		os.dir(@FILE) + '/wineadapter/layout.v':          $embed_file('wineadapter/layout.v').to_string()
 		os.dir(@FILE) + '/wineadapter/patch.v':           $embed_file('wineadapter/patch.v').to_string()
+		os.dir(@FILE) + '/wineadapter/unwind.v':          $embed_file('wineadapter/unwind.v').to_string()
 		os.dir(@FILE) + '/wineadapter/fork_translator.v': $embed_file('wineadapter/fork_translator.v').to_string()
 	} {
 		if digest(path)! != sha256.hexhash(contents) {

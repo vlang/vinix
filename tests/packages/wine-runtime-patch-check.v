@@ -3,6 +3,7 @@ module main
 
 import os
 import tools.packages.wineadapter
+import tests.packages.wineunwind
 
 fn refused(input string, client bool) ! {
 	wineadapter.private_runtime_patch(input, client) or {
@@ -22,7 +23,8 @@ fn run() ! {
 		private := wineadapter.private_server_patch(input, client)!
 		patched := wineadapter.private_runtime_patch(input, client)!
 		defer { unsafe { path.free(); input.free(); original.free(); private.free(); patched.free() } }
-		if input != original || patched.len != private.len { return error('input or output size changed') }
+		if input != original || (!client && patched.len != private.len) { return error('input or output size changed') }
+		if client { wineunwind.check(input, patched)! }
 		instruction := '\x48\x8b\x3d\x35\x4d\x03\x00'
 		client_sites := {
 			0x98: '\xb9'
@@ -35,7 +37,8 @@ fn run() ! {
 			0x61ba0: '\x8b\x84\x24\xac\x00\x00\x00\x4c\x8b\xbc\x24\xb8\x00\x00\x00\x41\x80\x4f\x30\x04\xe9\xbe\x87\xff\xff'
 			0x829b0: '\x2c'
 		}
-		for i in 0 .. patched.len {
+		for i in 0 .. private.len {
+			if client && wineunwind.metadata_byte(i) { continue }
 			mut wanted := if !client && i >= 0x5efe4 && i < 0x5efeb { instruction[i - 0x5efe4] } else { private[i] }
 			if client {
 				for offset, text in client_sites {

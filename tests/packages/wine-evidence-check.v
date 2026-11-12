@@ -193,7 +193,8 @@ fn checks() ! {
 		if name.starts_with('producer-') || name in ['forksafe-manifest-binding',
 			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
 			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
-			'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image'] {
+			'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
+			'wine-client-unwind-index', 'wine-client-unwind-cfa'] {
 			selected_prepared = directory + '/prepared'
 			prepared_copy(directory, prepared, selected_prepared)!
 		}
@@ -230,8 +231,9 @@ fn checks() ! {
 				expected = 'missing ARM boot input declaration:'
 			}
 			replace(directory + '/declaration.json', json2.encode(declaration))!
-		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image'] {
-			part := if name !in ['wine-client-resealed-patch', 'wine-client-rwx-image'] {
+		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
+			'wine-client-unwind-index', 'wine-client-unwind-cfa'] {
+			part := if name in ['wine-server-resealed-patch', 'wine-server-proc-nls'] {
 				'/usr/libexec/vinix-wine/wineserver'
 			} else {
 				'/usr/lib/wine/x86_64-unix/ntdll.so'
@@ -247,6 +249,10 @@ fn checks() ! {
 			} else if name == 'wine-client-rwx-image' {
 				// Restore RWX in one initial-image path, then reseal all hashes.
 				unsafe { changed.str[0x5a25f] = 0x2d }
+			} else if name == 'wine-client-unwind-index' {
+				unsafe { changed.str[0x8df98] = 0xbd } // Omit the appended index entry.
+			} else if name == 'wine-client-unwind-cfa' {
+				unsafe { changed.str[0x8df6a] ^= 1 } // Change the CFA by one byte.
 			} else {
 				unsafe { changed.str[0] ^= 1 }
 			}

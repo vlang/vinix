@@ -1132,6 +1132,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     fixes initial writable/executable image requests: fresh signed Win64 console
     execution and independent retention pass on both architectures. Native x86
     also passes RW-to-RX execution, W+X refusal and all 49 evidence controls.
+    Its [trampoline unwind metadata](tests/packages/wine-unwind-check.md) now
+    preserves all 701 original frame programs and adds the loader hook's frame.
+    A native GCC test recovers the caller and six saved registers, rejects the
+    missing-frame control and checks retirement; both signed Win64 runs and
+    independent retainers pass, with 51 x86 evidence refusals.
     Graphical execution, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
