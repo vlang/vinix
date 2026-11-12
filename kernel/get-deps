@@ -81,7 +81,7 @@ clone_repo_commit \
     9d0f67b89db1d83236f9ac291339248ba3d5f479
 
 download_by_hash \
-    https://github.com/charlesnicholson/nanoprintf/raw/0281ccf0b4105b194d5afb2cbb3cf308b9129d3a/nanoprintf.h \
+    https://raw.githubusercontent.com/charlesnicholson/nanoprintf/0281ccf0b4105b194d5afb2cbb3cf308b9129d3a/nanoprintf.h \
     c/nanoprintf_orig.h \
     cb4f3b6fdb061c204fc641a3fd950d89daae1097bb1585f881cff056f775f6f1
 sed '/NPF_WRITEBACK(LONG_DOUBLE/d' c/nanoprintf_orig.h >c/nanoprintf.h
