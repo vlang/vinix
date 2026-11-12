@@ -22,6 +22,19 @@ checksum. The existing `.github/workflows/m1-wifi-build.yml` demonstrates
 artifact uploads. Do not remove checks from an auditor to make a partial bundle
 pass.
 
+For a large immutable workspace retained in place,
+`tests/ios/swift-staging-archive.v check-archive-root ARCHIVE SHA256 ROOT`
+decodes every archived payload and compares the complete named root's paths,
+types, modes, links, sizes and hashes, including the root mode. Its parent may
+contain unrelated workspaces; all members inside the named root must match.
+The existing restoration and coverage modes keep their original contracts.
+`tests/packages/wine-workspace-archive.v SOURCE NEW_ARCHIVE.tar.gz CHECKER`
+records the original typed inventory before compression, invokes that check,
+and rechecks the full original inventory and archive checksum afterward. It
+retains originals and avoids another expanded copy. This does not authorize
+retiring expanded evidence or substitute for launch auditors or restoration
+requirements before deletion.
+
 For a complete diagnostic bundle whose outcome falls outside a historical
 auditor's contract, preserve that auditor and its rejection. The V tool
 `tests/ios/evidence-delta-archive.v record-inventory BUNDLE EXTERNAL-RECEIPT`

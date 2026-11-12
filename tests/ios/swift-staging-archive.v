@@ -81,6 +81,22 @@ fn check_archive(archive string, expected_sha string, restored string) ! {
 	println('Pinned archive and complete restored bytes, paths, types, modes and link targets: PASS')
 }
 
+// Verify one complete named source tree while its parent may contain other
+// workspaces. Decode every archive entry; never follow a linked root. This
+// seals originals in place and grants no permission to retire expanded data.
+fn check_archive_root(archive string, expected_sha string, root string) ! {
+	if expected_sha.len != 64 || digest(archive)! != expected_sha { return error('archive checksum mismatch') }
+	if os.is_link(archive) || !os.is_file(archive) || os.is_link(root) || !os.is_dir(root) { return error('requires regular archive and ordinary complete root') }
+	mut expected, top := archive_inventory(archive)!
+	if top == '' || os.base(root) != top { return error('archive named root differs') }
+	mut actual := inventory(os.dir(root), top)!
+	actual << 'directory\t' + (int(os.lstat(root)!.mode) & 0o7777).str() + '\t' + top
+	expected.sort(); actual.sort()
+	if expected != actual { return error('archive/named-root typed inventories differ') }
+	if digest(archive)! != expected_sha { return error('archive changed during verification') }
+	println('Pinned archive and complete named root bytes, paths, types, modes and link targets: PASS; originals retained')
+}
+
 fn archive_inventory(archive string) !([]string, string) {
 	result := os.exec(['/usr/bin/tar', '--format=mtree', '--options=mtree:sha256', '-cf', '-', '@' + archive])
 	if result.exit_code != 0 { return error('archive decode failed: ' + result.output) }
@@ -179,6 +195,7 @@ fn selftest(root string) ! {
 	check(archive, restored)!
 	archive_sha := digest(archive)!
 	check_archive(archive, archive_sha, restored)!
+	check_archive_root(archive, archive_sha, restored + '/input')!
 	// Coverage permits extra retained entries; every retiring entry must match.
 	subset := root + '/subset/input'
 	os.mkdir_all(subset + '/nested')!
@@ -210,38 +227,56 @@ fn selftest(root string) ! {
 	os.write_file(path, 'payloae')!
 	if _ := check(archive, restored) { return error('accepted changed bytes') }
 	if _ := check_archive(archive, archive_sha, restored) { return error('archive accepted changed bytes') }
+	if _ := check_archive_root(archive, archive_sha, restored + '/input') { return error('named root accepted changed bytes') }
 	os.write_file(path, 'payload')!
+	os.rm(path)!; os.mkdir(path)!
+	if _ := check_archive_root(archive, archive_sha, restored + '/input') { return error('named root accepted changed type') }
+	os.rmdir(path)!; os.write_file(path, 'payload')!
 	os.chmod(path, 0o640)!
 	if _ := check(archive, restored) { return error('accepted changed mode') }
 	if _ := check_archive(archive, archive_sha, restored) { return error('archive accepted changed mode') }
+	if _ := check_archive_root(archive, archive_sha, restored + '/input') { return error('named root accepted changed mode') }
 	os.chmod(path, 0o750)!
 	os.rm(restored + '/input/link')!
 	os.symlink('nested/other', restored + '/input/link')!
 	if _ := check(archive, restored) { return error('accepted changed link') }
 	if _ := check_archive(archive, archive_sha, restored) { return error('archive accepted changed link') }
+	if _ := check_archive_root(archive, archive_sha, restored + '/input') { return error('named root accepted changed link') }
 	os.rm(restored + '/input/link')!
 	os.symlink('nested/data', restored + '/input/link')!
 	os.write_file(restored + '/extra', 'extra')!
 	if _ := check(archive, restored) { return error('accepted extra entry') }
 	if _ := check_archive(archive, archive_sha, restored) { return error('archive accepted extra entry') }
+	check_archive_root(archive, archive_sha, restored + '/input')!
 	os.rm(restored + '/extra')!
+	os.write_file(restored + '/input/extra', 'extra')!
+	if _ := check_archive_root(archive, archive_sha, restored + '/input') { return error('named root accepted extra member') }
+	os.rm(restored + '/input/extra')!
 	os.rm(path)!
 	if _ := check(archive, restored) { return error('accepted missing entry') }
 	if _ := check_archive(archive, archive_sha, restored) { return error('archive accepted missing entry') }
+	if _ := check_archive_root(archive, archive_sha, restored + '/input') { return error('named root accepted missing member') }
 	os.write_file(path, 'payload')!; os.chmod(path, 0o750)!
 	check(archive, restored)!
 	os.chmod(restored + '/input', 0o750)!
 	if _ := check_archive(archive, archive_sha, restored) { return error('archive accepted changed root mode') }
+	if _ := check_archive_root(archive, archive_sha, restored + '/input') { return error('named root accepted changed root mode') }
 	os.chmod(restored + '/input', 0o755)!
 	if _ := check_archive(archive, '0'.repeat(64), restored) { return error('accepted wrong archive binding') }
+	if _ := check_archive_root(archive, '0'.repeat(64), restored + '/input') { return error('named root accepted wrong archive binding') }
 	check_archive(archive, archive_sha, restored)!
+	check_archive_root(archive, archive_sha, restored + '/input')!
 	os.write_file(archive + '.inventory.txt', 'corrupt')!
 	if _ := check(archive, restored) { return error('accepted corrupt receipt') }
 	println('Staging archive checker: six corruption controls PASS')
 	println('Direct archive checker: seven corruption controls PASS')
+	println('Named root archive checker: eight corruption controls PASS')
 }
 
 fn main() {
+	if os.args.len == 5 && os.args[1] == 'check-archive-root' {
+		check_archive_root(os.abs_path(os.args[2]), os.args[3], os.abs_path(os.args[4]))!; return
+	}
 	if os.args.len == 6 && os.args[1] == 'check-coverage' {
 		check_coverage(os.abs_path(os.args[2]), os.args[3], os.abs_path(os.args[4]), os.args[5])!; return
 	}
