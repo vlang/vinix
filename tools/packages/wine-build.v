@@ -58,6 +58,7 @@ fn verify_sources() ! {
 		os.dir(@FILE) + '/wine-runner.v':                 $embed_file('wine-runner.v').to_string()
 		os.dir(@FILE) + '/wineadapter/layout.v':          $embed_file('wineadapter/layout.v').to_string()
 		os.dir(@FILE) + '/wineadapter/patch.v':           $embed_file('wineadapter/patch.v').to_string()
+		os.dir(@FILE) + '/wineadapter/graphics_patch.v':  $embed_file('wineadapter/graphics_patch.v').to_string()
 		os.dir(@FILE) + '/wineadapter/unwind.v':          $embed_file('wineadapter/unwind.v').to_string()
 		os.dir(@FILE) + '/wineadapter/fork_translator.v': $embed_file('wineadapter/fork_translator.v').to_string()
 	} {
@@ -238,9 +239,10 @@ fn build() ! {
 	if digest(runtime + '/root/usr/share/wine/wine.inf')! != inputs[root + '/usr/share/wine/wine.inf'] {
 		return error('Wine INF resource differs from its distribution input')
 	}
-	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so']! {
+	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so', '/usr/lib/wine/x86_64-unix/winex11.so']! {
 		text := os.read_file(root + part)!
-		patched := wineadapter.private_runtime_patch(text, part.ends_with('ntdll.so'))!
+		patched := if part.ends_with('winex11.so') { wineadapter.private_graphics_patch(text)! }
+			else { wineadapter.private_runtime_patch(text, part.ends_with('ntdll.so'))! }
 		destination := if part == '/usr/bin/wineserver' {
 			'/usr/libexec/vinix-wine/wineserver'
 		} else {

@@ -158,12 +158,13 @@ pub fn admit_private_layout(runtime string, inputs map[string]string) ! {
 			return error('Wine private loader/client differs: ' + copy.consumed)
 		}
 	}
-	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so']! {
+	for part in ['/usr/bin/wineserver', '/usr/lib/wine/x86_64-unix/ntdll.so', '/usr/lib/wine/x86_64-unix/winex11.so']! {
 		original := layout_input(inputs, part)!
 		defer { unsafe { original.free() } }
 		bytes := layout_bytes(original)!
 		defer { unsafe { bytes.free() } }
-		patched := private_runtime_patch(bytes, part.ends_with('ntdll.so'))!
+		patched := if part.ends_with('winex11.so') { private_graphics_patch(bytes)! }
+			else { private_runtime_patch(bytes, part.ends_with('ntdll.so'))! }
 		defer { unsafe { patched.free() } }
 		path := runtime + '/root' + if part == '/usr/bin/wineserver' {
 			'/usr/libexec/vinix-wine/wineserver'

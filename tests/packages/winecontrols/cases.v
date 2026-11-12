@@ -21,7 +21,8 @@ pub fn names(architecture string, forksafe bool) ![]string {
 		'wine-client-rwx-image', 'missing-image-marker', 'wine-client-unwind-index', 'wine-client-unwind-cfa',
 		'missing-software-exception', 'missing-read-fault', 'duplicate-read-fault', 'exception-marker-order',
 		'producer-missing-graphics-library-input', 'producer-missing-graphics-font-input',
-		'wine-graphics-resealed-library', 'wine-graphics-resealed-font']
+		'wine-graphics-resealed-library', 'wine-graphics-resealed-font',
+		'producer-missing-graphics-driver-input', 'wine-graphics-shm-fallback']
 	if architecture == 'aarch64' {
 		result << ['translator-declaration', 'translator-resealed-patch', 'translator-resealed-smoke',
 			'missing-smoke-marker', 'missing-arm-loader-input', 'missing-firmware-vars-input',

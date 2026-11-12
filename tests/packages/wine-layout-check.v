@@ -50,6 +50,7 @@ fn check() ! {
 	source(root, 'tests/packages/wine-layout-check.v', $embed_file('wine-layout-check.v').to_string())!
 	source(root, 'tools/packages/wineadapter/layout.v', $embed_file('../../tools/packages/wineadapter/layout.v').to_string())!
 	source(root, 'tools/packages/wineadapter/patch.v', $embed_file('../../tools/packages/wineadapter/patch.v').to_string())!
+	source(root, 'tools/packages/wineadapter/graphics_patch.v', $embed_file('../../tools/packages/wineadapter/graphics_patch.v').to_string())!
 	runtime := os.real_path(os.args[1])
 	defer { unsafe { runtime.free() } }
 	st := os.lstat(os.args[2])!
@@ -72,13 +73,13 @@ fn check() ! {
 	defer { unsafe { copy_path.free() } }
 	os.cp_all(runtime, copy_path, false)!
 	wineadapter.admit_private_layout(copy_path, inputs)!
-	mut refused := []string{cap: 10}
+	mut refused := []string{cap: 11}
 	defer { unsafe { (&array(&refused)).free() } }
 	for suffix in ['/bin/wine64', '/bin/wineserver', '/root/usr/bin/wine',
 		'/root/usr/bin/wine64', '/root/usr/bin/wineserver',
 		'/root/lib/ld-musl-x86_64.so.1', '/root/usr/bin/vinix-wine-musl',
 		'/root/usr/libexec/vinix-wine/wine', '/root/usr/libexec/vinix-wine/wineserver',
-		'/root/usr/lib/wine/x86_64-unix/ntdll.so']! {
+		'/root/usr/lib/wine/x86_64-unix/ntdll.so', '/root/usr/lib/wine/x86_64-unix/winex11.so']! {
 		path := copy_path + suffix
 		original := runtime + suffix
 		defer { unsafe { path.free(); original.free() } }
@@ -114,7 +115,7 @@ fn check() ! {
 	report_path := out + '/controls.json'
 	defer { unsafe { report.free(); text.free(); report_path.free() } }
 	os.write_file(report_path, text)!
-	println('WINE LAYOUT PASS: original/copied baselines and 11 private-executable refusals')
+	println('WINE LAYOUT PASS: original/copied baselines and 12 private-executable refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

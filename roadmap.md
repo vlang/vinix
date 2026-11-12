@@ -1147,6 +1147,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     provenance. Fresh signed console runs pass on both architectures with
     59 x86/68 ARM evidence refusals. The calculator's graphical run still
     fails during window display; painting/input/close remain unqualified.
+    Its [private XImage fallback](tests/packages/wine-ximage-check.md) now
+    avoids a forbidden SysV allocation without changing sandbox permissions.
+    Fresh signed console runs and all 61 x86/70 ARM evidence refusals pass.
+    X86 paint, pointer arithmetic and close are observed, with final GUI
+    cleanup qualification and ARM graphical startup still open.
     Graphical execution, detached-server lease coverage, complete source and
     redistribution acceptance remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)

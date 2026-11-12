@@ -45,7 +45,8 @@ fn private_executable(path string) bool {
 		'/runtime/root/usr/bin/vinix-wine-musl', '/runtime/root/lib/ld-musl-x86_64.so.1',
 		'/runtime/root/usr/libexec/vinix-wine/wine', '/runtime/root/usr/libexec/vinix-wine/wineserver',
 		'/runtime/root/usr/lib/wine/x86_64-unix/ntdll.so',
-		'/runtime/root/usr/lib/libfreetype.so.6', '/runtime/root/usr/lib/libfontconfig.so.1']! {
+		'/runtime/root/usr/lib/libfreetype.so.6', '/runtime/root/usr/lib/libfontconfig.so.1',
+		'/runtime/root/usr/lib/wine/x86_64-unix/winex11.so']! {
 		if path.ends_with(suffix) { return true }
 	}
 	return false
@@ -196,7 +197,7 @@ fn checks() ! {
 			'pe-executable-binding', 'resealed-prepared-pe', 'source-offer-closure',
 			'translator-declaration', 'translator-resealed-patch', 'wine-server-resealed-patch',
 			'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
-			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font'] {
+			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font', 'wine-graphics-shm-fallback'] {
 			selected_prepared = directory + '/prepared'
 			prepared_copy(directory, prepared, selected_prepared)!
 		}
@@ -233,11 +234,12 @@ fn checks() ! {
 				expected = 'missing ARM boot input declaration:'
 			}
 			replace(directory + '/declaration.json', json2.encode(declaration))!
-		} else if name in ['producer-missing-graphics-library-input', 'producer-missing-graphics-font-input'] {
+		} else if name in ['producer-missing-graphics-library-input', 'producer-missing-graphics-font-input', 'producer-missing-graphics-driver-input'] {
 			captured := read_map(selected_prepared + '/inputs-verified.json')!
 			mut candidates := captured.keys().filter(if name.ends_with('library-input') {
 				it.ends_with('/usr/libexec/vinix-x86_64/root/usr/lib/libfreetype.so.6.20.2')
-			} else { it.contains('/usr/libexec/vinix-x86_64/root/usr/share/fonts/') && it.ends_with('.ttf') })
+			} else if name.ends_with('driver-input') { it.ends_with('/usr/libexec/vinix-x86_64/root/usr/lib/wine/x86_64-unix/winex11.so') }
+			else { it.contains('/usr/libexec/vinix-x86_64/root/usr/share/fonts/') && it.ends_with('.ttf') })
 			candidates.sort()
 			if candidates.len == 0 { return error('graphics control input missing') }
 			for receipt in ['inputs-before-build.json', 'inputs-verified.json']! {
@@ -246,9 +248,9 @@ fn checks() ! {
 				replace(selected_prepared + '/' + receipt, json2.encode(changed))!
 				reseal_producer(directory, selected_prepared, receipt)!
 			}
-			expected = if name.ends_with('library-input') { 'missing Wine layout input:' } else { 'missing Wine graphics font input:' }
+			expected = if name.ends_with('font-input') { 'missing Wine graphics font input:' } else { 'missing Wine layout input:' }
 		} else if name in ['wine-server-resealed-patch', 'wine-client-resealed-patch', 'wine-server-proc-nls', 'wine-client-rwx-image',
-			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font'] {
+			'wine-client-unwind-index', 'wine-client-unwind-cfa', 'wine-graphics-resealed-library', 'wine-graphics-resealed-font', 'wine-graphics-shm-fallback'] {
 			part := if name in ['wine-server-resealed-patch', 'wine-server-proc-nls'] {
 				'/usr/libexec/vinix-wine/wineserver'
 			} else if name == 'wine-graphics-resealed-library' {
@@ -258,6 +260,8 @@ fn checks() ! {
 				fonts.sort()
 				if fonts.len == 0 { return error('graphics control font missing') }
 				'/usr/share/fonts/' + fonts[0].all_after('/usr/share/fonts/')
+			} else if name == 'wine-graphics-shm-fallback' {
+				'/usr/lib/wine/x86_64-unix/winex11.so'
 			} else {
 				'/usr/lib/wine/x86_64-unix/ntdll.so'
 			}
@@ -276,6 +280,9 @@ fn checks() ! {
 				unsafe { changed.str[0x8df98] = 0xbd } // Omit the appended index entry.
 			} else if name == 'wine-client-unwind-cfa' {
 				unsafe { changed.str[0x8df6a] ^= 1 } // Change the CFA by one byte.
+			} else if name == 'wine-graphics-shm-fallback' {
+				instruction := '\xff\x15\x88\x51\x06\x00'
+				unsafe { vmemcpy(changed.str + 0x7e3a, instruction.str, instruction.len) }
 			} else {
 				unsafe { changed.str[0] ^= 1 }
 			}
