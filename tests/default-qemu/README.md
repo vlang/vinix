@@ -46,3 +46,20 @@ immediate motion fails; with the delay, motion and buttons pass but scrolling
 fails. Under single-CPU KVM, even the delayed test stops receiving input.
 The parser unit tests additionally cover malformed headers, overflow packets,
 partial packets, nine-bit signed axes, and both PS/2 wheel packet formats.
+
+## Desktop session diagnostics
+
+`session-entry.v` imports a diagnostic init wrapper. In a disposable test
+initramfs, rename the release `/sbin/init` to `/sbin/init-original` and install
+this wrapper as `/sbin/init`. Compile with V's `-translated -no-builtin` flags
+and link against the release musl SDK, as for the pointer fixture in `build.v`.
+It captures the release init and desktop output on COM1 and provides a root
+shell on COM2. Attach file logging to the first QEMU serial port and a local
+Unix socket to the second. This wrapper must never ship in a normal ISO.
+
+The stylesheet regression tests live in `desktop/tools/tests/memory_test.v`.
+Run them with the desktop's host-test staging and `-d track_heap`. They check
+40 desktop redraws, 40 frames sharing Calculator's cached declarations, and
+closing Calculator before its first frame. All must retain zero allocations.
+The session diagnosis and rebuild limitations are recorded in
+`session-validation.md`.
