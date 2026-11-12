@@ -46,6 +46,7 @@ fn main() {
 	androidtools.framework_contacts_directory(root + '/smali')!
 	androidtools.framework_vm_policy(root + '/smali')!
 	androidtools.framework_display_sms(root + '/smali')!
+	androidtools.framework_update_policy(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -96,6 +97,8 @@ fn main() {
 	types << 'android/view/Display'
 	types << 'android/hardware/display/DisplayManager'
 	types << r'android/provider/Telephony$Sms'
+	types << 'android/app/admin/DevicePolicyManager'
+	types << 'android/app/admin/SystemUpdatePolicy'
 	types << r'android/os/StrictMode$VmPolicy'
 	types << r'android/os/StrictMode$VmPolicy$Builder'
 	types << r'android/os/StrictMode$OnVmViolationListener'

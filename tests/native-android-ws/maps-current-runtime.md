@@ -1608,3 +1608,49 @@ callback. Snapshot `display-sms-api-uart-20261112-r1`, plan
 `display-sms-api-readback-20261112-r1` retain archive SHA256
 `8095562e00f78547cfa0fbc893ba9560c58dec4bb3c38fc44ab2db417329ffd0`.
 The fixture bind was released before broker preparation and the Maps retry.
+
+With source `00cafadd8`, r50 reached Explore after Skip, then exited during a
+Louvre search attempt. Complete logs identify an uncaught GMS update-control
+worker calling missing DevicePolicyManager.getSystemUpdatePolicy in fhpe.a
+source37. The exact caller checks for null before any policy-specific work.
+Fresh readbacks are `gms-update-policy-caller-20261112-r1` and
+`gms-update-control-caller-20261112-r1`; they retain the surrounding control
+path as well as the immediate caller. No search, map or route result was
+qualified, and the previous Display/SMS linkage failures did not recur.
+
+Complete log `maps-current-20261112-r50/maps.retained.log` has SHA256
+`2db7f8d34122d28871d4ea0910a09c9515c3cd570961bcfa163d8deb60f5974d`.
+Only verified owned QEMU PID4382 was synced and stopped. The data-image SHA256
+is `fc2c7e15556d6eb977950ed36775222eaac38b7cd9a84559beb4e566bf7749f8`.
+Snapshot `maps-update-policy-final-uart-20261112-r1` has full SHA256
+`f1e48c67127d1c84f1823a153b635f00580fc2c889fdaac1e05823699742c21d`.
+Last watcher sample295748ms, minimum disk7244890112 bytes, MemFree106960KiB.
+This is not a full600-second stability result.
+
+`framework_update_policy.v` returns null for the absent managed update policy
+and supplies its resolvable return type with a private constructor. It creates
+no policy object and adds no device-owner, management or update authority.
+[Android's query contract](https://developer.android.com/reference/android/app/admin/DevicePolicyManager#getSystemUpdatePolicy())
+defines null when no policy is set. Value factories and policy installation
+remain unsupported; the observed caller takes the null branch.
+
+SDK `framework-update-policy-20261112-r1` passed guarded assembly/readback:0/0,
+complete cleanup,3042ms, RSS471056384, shared growth155389952 bytes. Signed
+fixture r49 passed build/link/sign/verification:0/0, complete cleanup,1262ms,
+RSS165019648, shared growth30089216 bytes. ARM qualification remains pending.
+
+Guest r51 staging passed0/0, complete cleanup,52287ms, RSS37535744, shared
+growth456011776 bytes. An early inspection/launch attempt before staging
+completion refused missing metadata/launch arguments and started no VM.
+Post-completion UUID, read-only e2fsck and initial-image hash checks passed
+before the actual launch. The original limits were retained.
+
+The complete signed r49 fixture passed on ARM in r51 as UID/GID10160,
+ready/pass once, drained EOF and exit0. It resolves the policy return type,
+checks null-policy queries repeatedly through both service lookup forms, and
+checks consistency with the unmanaged/no-device-owner state. Snapshot
+`update-policy-api-uart-20261112-r1`, plan
+`update-policy-api-plan-20261112-r1.json` and strict readback
+`update-policy-api-readback-20261112-r1` retain archive SHA256
+`6150e91ec4de9224959efc2defce80a4e93e976ba8e6ca290c2d3a02a7dcef06`.
+The fixture bind was released before broker preparation and the Maps retry.

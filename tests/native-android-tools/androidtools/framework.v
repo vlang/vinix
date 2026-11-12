@@ -220,6 +220,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_contacts_directory(smali)!
  framework_vm_policy(smali)!
  framework_display_sms(smali)!
+ framework_update_policy(smali)!
  framework_assemble(smali, work + '/classes.dex', tools, java)!
  next := work + '/api-impl.jar'
  os.cp(input, next)!
