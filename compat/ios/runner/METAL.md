@@ -13,7 +13,7 @@ Implemented Objective-C API:
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
 - Queue: `commandBuffer`, `device`.
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
-  `waitUntilCompleted`, `status`, `error`.
+  `waitUntilCompleted`, `addCompletedHandler:`, `status`, `error`.
 - Blit encoder: `copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:`,
   `copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
   `copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:`,
@@ -50,8 +50,19 @@ device, queue and buffer creation transfer a reference to the caller.
 
 Copies execute in encoding order when committed, under the runtime's recursive
 lock. Commit completes synchronously and transitions status from 0 to 2 to 4.
-Completion means destination bytes are visible to the CPU. Wait requires a
-committed buffer. Encoding cannot overlap on one command buffer; every encoder
+Completion means destination bytes are visible to the CPU. Commit invokes
+completed handlers synchronously, in registration order, outside the runtime
+lock. Handlers receive the command buffer at status 4. Registration copies the
+block (including captures) and is allowed only before commit, with at most
+4,096 handlers. Each copied block is released after invocation; abandoning an
+uncommitted buffer releases handlers without invoking them. Commit retains
+the command buffer until all handlers return. `waitUntilCompleted` waits for
+both work and all handlers, including when another thread commits the buffer;
+the implementation polls under short lock acquisitions. Waiting before commit
+rejects, and calling wait on the same command from one of its handlers would
+deadlock. Scheduled handlers remain unsupported. See
+[Apple's handler contract](https://developer.apple.com/documentation/metal/mtlcommandbuffer/addcompletedhandler%28_%3A%29).
+Encoding cannot overlap on one command buffer; every encoder
 must end before commit. Resources must belong to the queue's device. Bounds
 checks use subtraction to avoid overflow; overlapping ranges in the same
 buffer reject. Zero-length copies at the end of a buffer are valid. Each

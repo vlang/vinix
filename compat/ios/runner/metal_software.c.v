@@ -7,8 +7,10 @@ struct SoftwareMetalCopy { source u64 destination u64 source_offset u64 destinat
 struct SoftwareMetalCommands {
 mut:
 	ops []SoftwareMetalCopy
+	completed []u64
 	active bool
 	status u64
+	finished bool
 }
 const software_metal_max_buffer = u64(64 * 1024 * 1024)
 fn sm_new(name string, owner u64) u64 {
@@ -28,7 +30,8 @@ fn software_metal_dispose(mut header ObjHeader) {
 	if header.software_metal == unsafe { nil } { return }
 	mut state := header.software_metal
 	for op in state.ops { objc_release(op.source); objc_release(op.destination) }
-	unsafe { state.ops.free() }
+	for block in state.completed { block_release(block) }
+	unsafe { state.ops.free(); state.completed.free() }
 	C.free(state)
 	header.software_metal = unsafe { nil }
 }
@@ -60,6 +63,8 @@ fn sm_command_buffer(queue u64, selector &char) u64 {
 	if state == unsafe { nil } { objc_release(command); return 0 }
 	state.ops = []SoftwareMetalCopy{}
 	state.ops.flags |= .noslices
+	state.completed = []u64{}
+	state.completed.flags |= .noslices
 	obj_header(command).software_metal = state
 	return objc_autorelease(command)
 }
@@ -98,9 +103,10 @@ fn sm_end(encoder u64, selector &char) {
 }
 fn sm_commit(command u64, selector &char) {
 	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
 	mut state := sm_check(command, 'VinixSoftwareMTLCommandBuffer').software_metal
 	if state.status != 0 || state.active { panic('iOS: Metal commit requires ended encoders and an uncommitted buffer') }
+	objc_retain(command)
+	defer { objc_release(command) }
 	state.status = 2
 	for op in state.ops {
 		if op.size == 0 { continue }
@@ -110,11 +116,44 @@ fn sm_commit(command u64, selector &char) {
 		}
 	}
 	state.status = 4 // Completion is synchronous; bytes are visible before return.
+	C.ios_objc_initialize_unlock()
+	for i in 0 .. state.completed.len {
+		block := state.completed[i]
+		state.completed[i] = 0
+		unsafe { SoftwareMetalCompletion(voidptr(read64(block + 16)))(block, command) }
+		block_release(block)
+	}
+	C.ios_objc_initialize_lock()
+	state.finished = true
+	C.ios_objc_initialize_unlock()
 }
 fn sm_wait(command u64, selector &char) {
+	objc_retain(command)
+	defer { objc_release(command) }
+	for {
+		C.ios_objc_initialize_lock()
+		state := sm_check(command, 'VinixSoftwareMTLCommandBuffer').software_metal
+		if state.status == 0 { panic('iOS: Metal wait requires a committed buffer') }
+		done := state.finished
+		C.ios_objc_initialize_unlock()
+		if done { return }
+		C.usleep(100)
+	}
+}
+type SoftwareMetalCompletion = fn (u64, u64)
+fn sm_add_completed(command u64, selector &char, block u64) {
+	if !is_block(block) || read64(block + 16) == 0 { panic('iOS: Metal completion handler requires a block') }
+	// Copy helpers may run client code; keep them outside the runtime lock.
+	copied := block_copy(block)
 	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
-	if sm_check(command, 'VinixSoftwareMTLCommandBuffer').software_metal.status != 4 { panic('iOS: Metal wait requires a committed buffer') }
+	mut state := sm_check(command, 'VinixSoftwareMTLCommandBuffer').software_metal
+	if state.status != 0 || state.completed.len >= 4096 {
+		C.ios_objc_initialize_unlock()
+		block_release(copied)
+		panic('iOS: Metal handler registration requires uncommitted buffer and at most 4096 handlers')
+	}
+	state.completed << copied
+	C.ios_objc_initialize_unlock()
 }
 fn sm_get(object u64, selector &char) u64 {
 	C.ios_objc_initialize_lock()
@@ -155,6 +194,7 @@ fn software_metal_start() {
 	sm_method(command, c'error', u64(unsafe { voidptr(sm_get) }), c'@16@0:8')
 	sm_method(command, c'commit', u64(unsafe { voidptr(sm_commit) }), c'v16@0:8')
 	sm_method(command, c'waitUntilCompleted', u64(unsafe { voidptr(sm_wait) }), c'v16@0:8')
+	sm_method(command, c'addCompletedHandler:', u64(unsafe { voidptr(sm_add_completed) }), c'v24@0:8@?16')
 	sm_method(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', u64(unsafe { voidptr(sm_copy) }), c'v56@0:8@16Q24@32Q40Q48')
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 	sm_texture_start(device)

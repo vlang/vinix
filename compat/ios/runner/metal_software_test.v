@@ -3,6 +3,9 @@ module main
 
 #include <sys/wait.h>
 fn C.waitpid(int, &int, int) int
+fn C.__atomic_fetch_add(&u64, u64, int) u64
+fn C.__atomic_load_n(&u64, int) u64
+fn C.__atomic_store_n(&u64, u64, int)
 type SMGet = fn (u64, &char) u64
 type SMCreate = fn () u64
 type SMBuffer = fn (u64, &char, u64, u64) u64
@@ -17,6 +20,89 @@ type SMRead = fn (u64, &char, u64, u64, SoftwareMetalRegion, u64)
 type SMTextureCopy = fn (u64, &char, u64, u64, u64, SoftwareMetalOrigin, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)
 type SMUpload = fn (u64, &char, u64, u64, u64, u64, SoftwareMetalSize, u64, u64, u64, SoftwareMetalOrigin)
 type SMDownload = fn (u64, &char, u64, u64, u64, SoftwareMetalOrigin, SoftwareMetalSize, u64, u64, u64, u64)
+struct SMCompletionBlock { isa u64 flags u32 reserved u32 invoke u64 descriptor u64 capture u64 }
+struct SMCompletionProbe {
+	owner u64
+mut:
+	copies u64
+	drops u64
+	calls u64
+	entered u64
+	gate u64
+	wait_entered u64
+	wait_done u64
+}
+fn sm_completion_copy(destination u64, source u64) {
+	probe := unsafe { &SMCompletionProbe(read64(source + 32)) }
+	objc_retain(probe.owner)
+	C.__atomic_fetch_add(unsafe { &probe.copies }, 1, 5)
+}
+fn sm_completion_drop(block u64) {
+	probe := unsafe { &SMCompletionProbe(read64(block + 32)) }
+	objc_release(probe.owner)
+	C.__atomic_fetch_add(unsafe { &probe.drops }, 1, 5)
+}
+fn sm_completion_query(command u64) { assert sm_send(command, c'status') == 4 }
+fn sm_completion_invoke(block u64, command u64) {
+	probe := unsafe { &SMCompletionProbe(read64(block + 32)) }
+	assert sm_send(command, c'status') == 4 && obj_header(probe.owner).refs > 0
+	assert unsafe { *(&u64(sm_send(probe.owner, c'contents'))) } == u64(0x123456789abcdef0)
+	worker := spawn sm_completion_query(command); worker.wait() // Requires unlocked callbacks.
+	C.__atomic_fetch_add(unsafe { &probe.calls }, 1, 5)
+	C.__atomic_store_n(unsafe { &probe.entered }, 1, 5)
+	for C.__atomic_load_n(unsafe { &probe.gate }, 5) != 0 { C.usleep(100) }
+}
+fn sm_completion_commit(command u64) { pool := objc_pool_push(); sm_call(command, c'commit'); objc_pool_pop(pool) }
+fn sm_completion_wait(command u64, probe &SMCompletionProbe) {
+	C.__atomic_store_n(unsafe { &probe.wait_entered }, 1, 5)
+	sm_call(command, c'waitUntilCompleted')
+	C.__atomic_store_n(unsafe { &probe.wait_done }, 1, 5)
+}
+fn sm_completion_until(value &u64) {
+	for _ in 0 .. 20000 { if C.__atomic_load_n(value, 5) != 0 { return }; C.usleep(100) }
+	assert false, 'completion callback timed out'
+}
+fn test_software_metal_completed_handlers_and_wait() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push()
+		d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue'); cmd := sm_send(q, c'commandBuffer')
+		owner := sm_test_buffer(d, 8, 0); source := sm_test_buffer(d, 8, 0)
+		unsafe { *(&u64(sm_send(source, c'contents'))) = 0x123456789abcdef0 }
+		encoder := sm_send(cmd, c'blitCommandEncoder'); sm_test_copy(encoder, source, 0, owner, 0, 8); sm_call(encoder, c'endEncoding'); objc_release(source)
+		mut probe := SMCompletionProbe{owner: owner, gate: 1}
+		descriptor := [u64(0), u64(sizeof(SMCompletionBlock)), u64(unsafe { voidptr(sm_completion_copy) }), u64(unsafe { voidptr(sm_completion_drop) })]!
+		block := SMCompletionBlock{isa: block_isa(0), flags: u32(1) << 25, invoke: u64(unsafe { voidptr(sm_completion_invoke) }), descriptor: u64(unsafe { &descriptor[0] }), capture: u64(unsafe { &probe })}
+		for _ in 0 .. 3 { sm_test_set(cmd, c'addCompletedHandler:', u64(unsafe { &block })) }
+		assert probe.copies == 3 && probe.drops == 0 && ios_runtime.block_refs.len == 3
+		objc_release(owner)
+		commit := spawn sm_completion_commit(cmd)
+		sm_completion_until(unsafe { &probe.entered })
+		waiter := spawn sm_completion_wait(cmd, unsafe { &probe })
+		sm_completion_until(unsafe { &probe.wait_entered }); C.usleep(2000)
+		assert C.__atomic_load_n(unsafe { &probe.wait_done }, 5) == 0
+		C.__atomic_store_n(unsafe { &probe.gate }, 0, 5)
+		commit.wait(); waiter.wait()
+		assert probe.calls == 3 && probe.drops == 3 && ios_runtime.block_refs.len == 0 && probe.wait_done == 1
+		// Uncommitted command disposal releases captures without invoking them.
+		mut abandoned := SMCompletionProbe{owner: objc_allocate(ios_runtime.names['NSObject'])}
+		abandoned_block := SMCompletionBlock{...block, capture: u64(unsafe { &abandoned })}
+		inner := objc_pool_push(); unused := sm_send(q, c'commandBuffer')
+		sm_test_set(unused, c'addCompletedHandler:', u64(unsafe { &abandoned_block })); objc_release(abandoned.owner); objc_pool_pop(inner)
+		assert abandoned.copies == 1 && abandoned.drops == 1 && abandoned.calls == 0
+		mut late := SMCompletionProbe{owner: objc_allocate(ios_runtime.names['NSObject'])}
+		late_block := SMCompletionBlock{...block, capture: u64(unsafe { &late })}
+		for mode in 0 .. 2 {
+			child := C.fork(); assert child >= 0
+			if child == 0 { C.close(1); C.close(2); sm_test_set(cmd, c'addCompletedHandler:', if mode == 0 { u64(0) } else { u64(unsafe { &late_block }) }); C._exit(0) }
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+		}
+		objc_release(late.owner); objc_release(q); objc_release(d); objc_pool_pop(pool)
+		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && ios_runtime.block_refs.len == 0
+		objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-COMPLETION: copied block ABI/capture lifetimes, three callbacks, unlocked worker queries, concurrent wait, abandoned buffers, invalid/late handlers and two drained runtimes PASS')
+}
 fn sm_test_buffer_texture(encoder u64, buffer u64, offset u64, row u64, image u64, size SoftwareMetalSize, texture u64, slice u64, level u64, origin SoftwareMetalOrigin, upload bool) {
 	if upload { unsafe { SMUpload(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromBuffer:sourceOffset:sourceBytesPerRow:sourceBytesPerImage:sourceSize:toTexture:destinationSlice:destinationLevel:destinationOrigin:', buffer, offset, row, image, size, texture, slice, level, origin) } }
 	else { unsafe { SMDownload(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromTexture:sourceSlice:sourceLevel:sourceOrigin:sourceSize:toBuffer:destinationOffset:destinationBytesPerRow:destinationBytesPerImage:', texture, slice, level, origin, size, buffer, offset, row, image) } }
