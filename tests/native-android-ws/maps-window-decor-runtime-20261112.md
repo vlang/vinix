@@ -43,5 +43,34 @@ Plan/readback r1 reconstruct the unchanged export with zero removals,
 archive360fd5c5f0245cc32bf9300cac282f207ce124c1857b6e96613f6b37aa147d80.
 This is byte-export evidence, not a new result from the historical strict importer.
 
-The API bind was released before broker preparation. Real sign-in retry and
-map tile/route rendering remain pending; the regression pass proves neither.
+The API bind was released before broker preparation. In the real retry, Add
+account reached PreAddAccountActivity and then a Google account error page:
+"Something went wrong / There was a problem communicating with Google servers."
+The private log identifies CheckinHelper's 10000 ms timeout and a false check-in
+result. Later the same log reports successful check-in requests and operation
+completion. This establishes neither login nor successful authentication.
+There were no decor-view warnings, native fatal signals or OOM kills in the
+retained broker log. This observation alone does not attribute earlier crashes
+to the Window change. Tile and route geometry were not exercised in this retry.
+
+The 600283 ms watch completed: minimum MemFree 4250832 KiB, minimum app-data
+space 7230132224 bytes. Two non-atomic process snapshots, before and after Add
+account, completed; their overhead overlapped account startup and may affect
+timing. The next retry omits that broad snapshot. After guest sync returned,
+owned QEMU PID 27676 was stopped and confirmed absent before offline extraction.
+The receipt was still ready-awaiting-user-account-interaction when the VM was
+stopped; it is not a completed account-flow result. Snapshot contents were copied
+but guest ownership could not be reproduced on the host; the raw disk is the
+metadata authority.
+
+Retained r68 artifacts:
+
+| Artifact | SHA256 |
+|---|---|
+| maps.retained.log | 738b9ae4e1017160f9746f698a7fc3ccf47f52f765a928bcdd4a469f953a413d |
+| broker.retained.log | 8e592ad3ed02913f0af27d839a58590ef1a537d9f5bc76e2b4b3bc1dfb9c9895 |
+| receipt.retained.json | b379ce0937db494f188198f1e438846823e37125f1e1de14c7f2f9d48f7bf06c |
+| serial.log | 552ba6dce02b2a8a954fd9dce58961cb3e8cb618f28f4c1d94900f251ae5bd4e |
+| account-visible.png | 5bbf8f29f22ca545ac02c4bc4b36471369ab0b8c697ef91fbd6a919188576764 |
+| app-data.ext2 final | f97f9c08095c2e14e52cfd4e96c67acb0edad987211bd14437b528f5b2c5c3fd |
+| memory-retained.sha256 | 7cf01916728c5fb6f2f59998e9e2c5afea8f4a7e9131006913f83939cf70ac70 |

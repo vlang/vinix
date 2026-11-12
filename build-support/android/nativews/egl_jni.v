@@ -32,6 +32,10 @@ fn ws_egl_java_terminate(e voidptr, object voidptr) u8 {
 
 fn ws_gl_java_string(e voidptr, name i32) voidptr {
 	unsafe {
+		// Mesa's generated dispatch stub dereferences a null dispatch table on
+		// an unbound thread. Android's no-context GL hooks return no string.
+		// Context ownership is per thread: do not borrow another thread's GL.
+		if ws_egl_current_context() == nil { return nil }
 		text := WsGlGetString(ws_egl_proc(c'glGetString'))(u32(name))
 		return if text == nil { nil } else { WsNewUtf(slot(e, 167))(e, text) }
 	}

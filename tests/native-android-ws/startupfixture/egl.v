@@ -4,7 +4,9 @@ module startupfixture
 import os
 
 fn install_egl_probe(dir string) ! {
+	install_gles_no_context_probe(dir)!
 	mut check := '
+invoke-static {}, Lorg/vinix/bootstrap/GlesNoContextProbe;->check()V
 invoke-static {}, Ljavax/microedition/khronos/egl/EGLContext;->getEGL()Ljavax/microedition/khronos/egl/EGL;
 move-result-object v0
 check-cast v0, Lcom/google/android/gles_jni/EGLImpl;
@@ -64,6 +66,7 @@ if-nez v8, :bad
 invoke-virtual {v6}, Ljavax/microedition/khronos/egl/EGLContext;->getGL()Ljavax/microedition/khronos/opengles/GL;
 move-result-object v3
 check-cast v3, Ljavax/microedition/khronos/opengles/GL10;
+invoke-static {}, Lorg/vinix/bootstrap/GlesNoContextProbe;->worker()V
 const/16 v8, 0x1f02
 invoke-interface {v3, v8}, Ljavax/microedition/khronos/opengles/GL10;->glGetString(I)Ljava/lang/String;
 move-result-object v3
@@ -108,6 +111,7 @@ if-eqz v8, :bad
 invoke-virtual {v0}, Lcom/google/android/gles_jni/EGLImpl;->eglReleaseThread()Z
 move-result v8
 if-eqz v8, :bad
+invoke-static {}, Lorg/vinix/bootstrap/GlesNoContextProbe;->check()V
 invoke-virtual {v0}, Lcom/google/android/gles_jni/EGLImpl;->eglGetCurrentContext()Ljavax/microedition/khronos/egl/EGLContext;
 move-result-object v8
 sget-object v9, Ljavax/microedition/khronos/egl/EGL10;->EGL_NO_CONTEXT:Ljavax/microedition/khronos/egl/EGLContext;
@@ -133,7 +137,7 @@ goto :bad
 :short_ok
 move-exception v8
 sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "BOOTSTRAP-JAVA-EGL-PASS config-capacity context surface current GL-string GLES20-errors no-current-context deferred-destroy array-validation"
+const-string v1, "BOOTSTRAP-JAVA-EGL-PASS config-capacity context surface current GL-string GLES20-errors no-current-context unbound-GL-string thread-isolation deferred-destroy array-validation"
 invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 :bad
