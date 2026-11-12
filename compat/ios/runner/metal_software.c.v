@@ -203,6 +203,7 @@ fn software_metal_start() {
 	sm_method(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', u64(unsafe { voidptr(sm_copy) }), c'v56@0:8@16Q24@32Q40Q48')
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 	sm_texture_start(device)
+	sm_library_start(device)
 	sm_texture_blit_start(encoder)
 	sm_method(encoder, c'fillBuffer:range:value:', u64(unsafe { voidptr(sm_fill) }), c'v48@0:8@16{_NSRange=QQ}24C40')
 }

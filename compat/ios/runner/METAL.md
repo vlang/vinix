@@ -10,7 +10,9 @@ Implemented Objective-C API:
 
 - Device: `newBufferWithLength:options:`, `newBufferWithBytes:length:options:`,
   `newCommandQueue`, `maxBufferLength`, `newTextureWithDescriptor:`,
-  `newTextureWithDescriptor:iosurface:plane:`.
+  `newTextureWithDescriptor:iosurface:plane:`, `newLibraryWithData:error:`.
+- Library: `device`, `functionNames`, `newFunctionWithName:`.
+- Function: `device`, `name`, `functionType` (metadata handles only).
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`.
 - Queue: `commandBuffer`, `device`.
 - Command buffer: `blitCommandEncoder`, `commandQueue`, `device`, `commit`,
@@ -89,6 +91,26 @@ buffer reject. Zero-length copies at the end of a buffer are valid. Each
 command buffer is limited to 65,536 copies. Invalid encoding/state/ranges fail
 explicitly. Client accesses through `contents` still require synchronization
 with command submission. Shader/render methods and presentation remain absent.
+
+Compiled-library loading accepts live dispatch data containing the existing
+[MTLB v2 reader's profile](../metallib/README.md). Inputs are capped at 256 MiB
+before a concatenated dispatch-data object is flattened. The library copies
+the bytes, validates container ranges, unique UTF-8 names and AIR module hashes,
+and retains the parsed index until destruction. Input dispatch objects can be
+released immediately after creation. Only vertex, fragment and kernel metadata
+are accepted, with function types 1, 2 and 3. `functionNames` returns an
+autoreleased array of copied strings; each named function is a new owned handle
+that keeps its library and device alive. Missing names return nil. Failure
+returns nil and, when requested, an autoreleased NSError in
+`MTLLibraryErrorDomain`: unsupported input/profile (1), allocation failure (2)
+or malformed container (3). The domain global is available from Metal.framework.
+Success leaves the error slot untouched.
+
+These handles expose container metadata. AIR instruction verification,
+specialization, pipeline creation and shader execution remain pending; even
+a valid container does not establish executable LLVM IR. Source compilation,
+file/URL loading and default libraries remain unsupported. See
+[Apple's dispatch-data library API](https://developer.apple.com/documentation/metal/mtldevice/makelibrary%28data%3A%29).
 
 Texture-to-texture blits copy positive 2D regions between textures with the
 same pixel format and device. Only slice/level zero, origin z zero and depth

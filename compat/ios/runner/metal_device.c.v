@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
-// The software backend currently executes shared-buffer blits only. Keep it
+// The software backend executes shared-resource blits and indexes libraries. Keep it
 // opt-in; the ordinary runner cannot yet execute an application's Metal shaders.
 fn metal_create_system_default_device() u64 {
 	$if ios_metal_software ? {
@@ -13,6 +13,7 @@ fn metal_create_system_default_device() u64 {
 fn metal_device_symbol(symbol string) ?u64 {
 	return match symbol {
 		'_MTLCreateSystemDefaultDevice' { u64(unsafe { voidptr(metal_create_system_default_device) }) }
+		'_MTLLibraryErrorDomain' { framework_string_constant(symbol, 'MTLLibraryErrorDomain') }
 		else { none }
 	}
 }

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module main
 
+import crypto.sha256
+
 #include <sys/wait.h>
 fn C.waitpid(int, &int, int) int
 fn C.__atomic_fetch_add(&u64, u64, int) u64
@@ -15,6 +17,118 @@ type SMVoid = fn (u64, &char)
 type SMDescriptor = fn (u64, &char, u64, u64, u64, u8) u64
 type SMTexture = fn (u64, &char, u64) u64
 type SMSet = fn (u64, &char, u64)
+type SMLibrary = fn (u64, &char, u64, &u64) u64
+fn sm_test_library(device u64, data u64, output &u64) u64 { return unsafe { SMLibrary(voidptr(C.ios_objc_msgsend))(device, c'newLibraryWithData:error:', data, output) } }
+fn sm_library_number(mut data []u8, offset int, count int, value u64) { for i in 0 .. count { data[offset + i] = u8(value >> u32(i * 8)) } }
+fn sm_library_append(mut data []u8, count int, value u64) { start := data.len; for _ in 0 .. count { data << u8(0) }; sm_library_number(mut data, start, count, value) }
+fn sm_library_tag(mut data []u8, name string, payload []u8) { data << name.bytes(); sm_library_append(mut data, 2, u64(payload.len)); data << payload }
+// Synthetic container/index fixtures, deliberately not executable LLVM IR.
+fn sm_library_fixture(names []string, wrapped bool, aliased bool) []u8 {
+	mut code := []u8{}; code.flags |= .noslices
+	if wrapped { for value in [u64(0x0b17c0de), 0, 20, 8, 0xffffffff]! { sm_library_append(mut code, 4, value) } }
+	code << [u8(0x42), 0x43, 0xc0, 0xde, 0, 0, 0, 0]
+	digest := sha256.sum(code)
+	defer { unsafe { code.free(); digest.free() } }
+	mut data := []u8{len: 88}; data.flags |= .noslices
+	sm_library_number(mut data, 0, 4, 0x424c544d); sm_library_number(mut data, 6, 2, 2)
+	sm_library_append(mut data, 4, u64(names.len))
+	for i, name in names {
+		start := data.len; sm_library_append(mut data, 4, 0)
+		mut text := name.bytes(); text << u8(0); sm_library_tag(mut data, 'NAME', text); unsafe { text.free() }
+		sm_library_tag(mut data, 'TYPE', [u8(i % 3)])
+		sm_library_tag(mut data, 'HASH', digest)
+		mut offsets := []u8{len: 24}
+		sm_library_number(mut offsets, 0, 8, u64(i * 8)); sm_library_number(mut offsets, 8, 8, u64(i * 8)); sm_library_number(mut offsets, 16, 8, if aliased { u64(0) } else { u64(i * code.len) })
+		sm_library_tag(mut data, 'OFFT', offsets); unsafe { offsets.free() }
+		sm_library_tag(mut data, 'VERS', [u8(2), 0, 7, 0, 3, 0, 0, 0])
+		mut size := []u8{len: 8}; sm_library_number(mut size, 0, 8, u64(code.len)); sm_library_tag(mut data, 'MDSZ', size); unsafe { size.free() }
+		data << 'ENDT'.bytes(); sm_library_number(mut data, start, 4, u64(data.len - start))
+	}
+	sm_library_number(mut data, 24, 8, 88); sm_library_number(mut data, 32, 8, u64(data.len - 92))
+	for field in [40, 56]! {
+		sm_library_number(mut data, field, 8, u64(data.len)); sm_library_number(mut data, field + 8, 8, u64(names.len * 8))
+		for _ in names { sm_library_append(mut data, 4, 8); data << 'ENDT'.bytes() }
+	}
+	sm_library_number(mut data, 72, 8, u64(data.len)); bits := data.len
+	for _ in 0 .. if aliased && names.len > 0 { 1 } else { names.len } { data << code }
+	sm_library_number(mut data, 80, 8, u64(data.len - bits)); sm_library_number(mut data, 16, 8, u64(data.len))
+	return data
+}
+fn sm_library_reader(library u64) {
+	pool := objc_pool_push()
+	for _ in 0 .. 64 { names := sm_send(library, c'functionNames'); assert sm_send(names, c'count') == 3 }
+	objc_pool_pop(pool)
+}
+fn sm_library_check_error(object u64, code i64) {
+	assert objc_is_kind(object, ios_runtime.names['NSError'])
+	assert string_text(sm_send(object, c'domain')) == 'MTLLibraryErrorDomain' && i64(sm_send(object, c'code')) == code
+	assert string_text(sm_send(object, c'localizedDescription')).len > 0
+}
+fn test_software_metal_compiled_library_metadata() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); system_data_start()!
+		for wrapped in [false, true]! { for aliased in [false, true]! {
+			pool := objc_pool_push(); d := metal_create_system_default_device()
+			bytes := sm_library_fixture(['v_main', 'f_main', 'k_π'], wrapped, aliased)
+			// Exercise both a dispatch leaf and concatenated data split inside the header.
+			first := darwin_dispatch_data_create(u64(bytes.data), if aliased { 37 } else { u64(bytes.len) }, 0, 0)
+			second := if aliased { darwin_dispatch_data_create(u64(bytes.data) + 37, u64(bytes.len - 37), 0, 0) } else { u64(dispatch_runtime.empty_data) }
+			data := darwin_dispatch_data_create_concat(first, second)
+			darwin_dispatch_release(first); darwin_dispatch_release(second)
+			mut failure := u64(0xfeed); library := sm_test_library(d, data, &failure)
+			assert library != 0 && failure == 0xfeed && sm_send(library, c'device') == d
+			assert obj_header(library).data.data != bytes.data
+			darwin_dispatch_release(data); unsafe { bytes.free() }; assert dispatch_runtime.data.len == 1
+			names := sm_send(library, c'functionNames'); assert sm_send(names, c'count') == 3
+			mut functions := [3]u64{}
+			for i, expected in ['v_main', 'f_main', 'k_π']! {
+				name := obj_header(names).items[i]; assert string_text(name) == expected
+				functions[i] = unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(library, c'newFunctionWithName:', name) }
+				assert functions[i] != 0 && sm_send(functions[i], c'functionType') == u64(i + 1) && sm_send(functions[i], c'device') == d
+			}
+			missing := owned_string('missing'); assert unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(library, c'newFunctionWithName:', missing) } == 0; objc_release(missing)
+			assert unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(library, c'newFunctionWithName:', 0) } == 0
+			assert unsafe { SMTexture(voidptr(C.ios_objc_msgsend))(library, c'newFunctionWithName:', d) } == 0
+			mut workers := []thread{}; for _ in 0 .. 8 { workers << spawn sm_library_reader(library) }; workers.wait(); unsafe { workers.free() }
+			objc_release(library); objc_release(d)
+			for i, function in functions { assert string_text(sm_send(function, c'name')) == ['v_main', 'f_main', 'k_π'][i]; assert sm_send(function, c'device') != 0; objc_release(function) }
+			objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
+		} }
+		pool := objc_pool_push(); d := metal_create_system_default_device()
+		empty := sm_library_fixture([], false, false); data := darwin_dispatch_data_create(u64(empty.data), u64(empty.len), 0, 0)
+		library := sm_test_library(d, data, unsafe { nil }); assert library != 0 && sm_send(sm_send(library, c'functionNames'), c'count') == 0
+		objc_release(library); darwin_dispatch_release(data); unsafe { empty.free() }
+		for invalid in [u64(0), d, u64(dispatch_runtime.empty_data)]! { mut failure := u64(0); assert sm_test_library(d, invalid, &failure) == 0; sm_library_check_error(failure, if invalid == u64(dispatch_runtime.empty_data) { i64(3) } else { i64(1) }) }
+		base := sm_library_fixture(['sample'], true, false)
+		for length in 0 .. base.len {
+			temporary := objc_pool_push(); truncated := darwin_dispatch_data_create(u64(base.data), u64(length), 0, 0); mut failure := u64(0)
+			assert sm_test_library(d, truncated, &failure) == 0; sm_library_check_error(failure, 3)
+			assert sm_test_library(d, truncated, unsafe { nil }) == 0
+			darwin_dispatch_release(truncated); objc_pool_pop(temporary)
+		}
+		for mode in 0 .. 4 {
+			mut bad := base.clone()
+			match mode { 0 { bad[0] = 0 } 1 { bad[bad.len - 1] ^= 1 } 2 { sm_library_number(mut bad, 72, 8, ~u64(0)) } else { // TYPE follows NAME's six-byte header and terminated sample name.
+				bad[96 + 6 + 7 + 6] = 6
+			} }
+			broken := darwin_dispatch_data_create(u64(bad.data), u64(bad.len), 0, 0); mut failure := u64(0)
+			assert sm_test_library(d, broken, &failure) == 0; sm_library_check_error(failure, if mode == 3 { i64(1) } else { i64(3) })
+			darwin_dispatch_release(broken); unsafe { bad.free() }
+		}
+		unsafe { base.free() }
+		// A shared rope represents 512 MiB using only 30 tiny nodes. Reject before flattening.
+		byte := u8(1); mut rope := darwin_dispatch_data_create(u64(unsafe { &byte }), 1, 0, 0)
+		for _ in 0 .. 29 { next := darwin_dispatch_data_create_concat(rope, rope); darwin_dispatch_release(rope); rope = next }
+		mut failure := u64(0); assert sm_test_library(d, rope, &failure) == 0; sm_library_check_error(failure, 1); darwin_dispatch_release(rope)
+		objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0 && dispatch_runtime.data.len == 1
+		domain_cell := runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_MTLLibraryErrorDomain') or { panic(err) }
+		assert string_text(read64(domain_cell)) == 'MTLLibraryErrorDomain'
+		assert runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_MTLLibraryErrorDomain') or { panic(err) } == domain_cell
+		objc_stop(); system_data_stop()
+	}
+	println('IOS-SOFTWARE-METAL-LIBRARY: raw/wrapped and independent/shared module containers, leaf/rope dispatch ABI, owned bytes, names/types/UTF-8, function lifetimes, empty/missing functions, truncations/hash/range/type errors, optional NSError, bounded 512 MiB rope rejection, eight workers and two drained runtimes PASS')
+}
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
 fn sm_test_surface(d u64, descriptor u64, surface u64, plane u64) u64 { return unsafe { SMSurface(voidptr(C.ios_objc_msgsend))(d, c'newTextureWithDescriptor:iosurface:plane:', descriptor, surface, plane) } }
 fn test_software_metal_iosurface_imports() {
@@ -438,7 +552,7 @@ fn test_software_metal_deferred_blit_abi_lifetimes_and_threads() {
 		address := runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_MTLCreateSystemDefaultDevice') or { panic(err) }
 		device := unsafe { SMCreate(voidptr(address))() }
 		assert device != 0 && sm_send(device, c'maxBufferLength') == software_metal_max_buffer
-		assert !objc_responds(device, c'newLibraryWithData:error:') && !objc_responds(device, c'newRenderPipelineStateWithDescriptor:error:')
+		assert objc_responds(device, c'newLibraryWithData:error:') && !objc_responds(device, c'newRenderPipelineStateWithDescriptor:error:')
 		assert sm_test_buffer(device, 0, 0) == 0 && sm_test_buffer(device, software_metal_max_buffer + 1, 0) == 0 && sm_test_buffer(device, 16, 16) == 0
 		mut bytes := [64]u8{}
 		for i in 0 .. 64 { bytes[i] = u8(i ^ 0xa5) }
