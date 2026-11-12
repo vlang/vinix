@@ -46,7 +46,10 @@ fn build(root string) ! {
 	os.chdir(repo)!
 	imports := '@vlib|' + repo + '/tests/native-android-ws|' + repo + '/tests/linuxkpi|' + repo + '/build-support/android'
 	common := [v, '-new-compiler', '-no-parallel', '-gc', 'none', '-nocache', '-path', imports]
-	arm := ['-os', 'linux', '-arch', 'arm64', '-cc', '/opt/homebrew/bin/aarch64-linux-musl-gcc', '-cflags', '-static -no-pie']
+	// Collect GCC's temporary data more often so optimized hashing fits the
+	// same aggregate memory guard as the serial V generation.
+	arm := ['-os', 'linux', '-arch', 'arm64', '-cc', '/opt/homebrew/bin/aarch64-linux-musl-gcc',
+		'-cflags', '-O2 --param=ggc-min-expand=5 --param=ggc-min-heapsize=8192 -static -no-pie']
 	command([v, 'version'], root + '/v-version.log')!
 	mut inputs := map[string]string{}
 	for target in [ []string{}, arm ] {

@@ -1928,3 +1928,11 @@ RSS603062272, shared growth30302208 bytes, with host self-tests. Fresh r59
 staging passed0/0, complete cleanup,9487ms, RSS37683200, shared growth
 137273344 bytes; volume identity and read-only e2fsck passed. Actual broker
 and Maps qualification of the ledger fix remains pending.
+
+The unoptimized controller's large-input verification took several minutes on
+r58. Current-V controller r10 restores -O2 and reduces GCC's internal
+collection thresholds (`ggc-min-expand=5`, `ggc-min-heapsize=8192`). Its guarded
+build and host self-tests passed0/0, complete cleanup,22742ms, RSS519323648,
+shared growth38219776 bytes, with the original limits unchanged. The output
+is `surface-controller-build-20261112-r10/maps-account-guest`; optimized ARM
+runtime timing remains pending. r59 continues with r9 unchanged.
