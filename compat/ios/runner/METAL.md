@@ -246,8 +246,8 @@ file. Neither entry point requires dispatch initialization.
 Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, one-block
 [scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
-flag-free binary arithmetic/comparisons/select, pointer arguments with supported
-constant GEPs,
+flag-free binary arithmetic/comparisons/select/casts, pointer arguments with
+supported constant GEPs,
 explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
 Valid LLVM IR remains a precondition. No source compilation is provided.
@@ -289,6 +289,14 @@ to the existing failed-command path if stored. Comparisons and selects each
 cost one step, retain zero-flags requirements, and do not add branches or
 skip earlier instructions. Synthetic integer and ordered-float max kernels
 exercise this path through pipeline creation and deferred dispatch.
+
+Buffer kernels also support scalar integer width casts, signed/unsigned
+integer↔half/float conversions, half↔float precision changes and raw bitcasts
+between i16/half or i32/float. Casts have one-step cost and no flags. Pointer,
+vector, aggregate, double and bfloat conversions remain unsupported. Invalid
+float-to-integer inputs yield poison; storing it follows failed-command
+completion, while an unchosen select operand may discard it. Synthetic kernels
+combine signed conversion with floating addition in both directions.
 
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not

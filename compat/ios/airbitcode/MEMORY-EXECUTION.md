@@ -2,8 +2,8 @@
 
 `run_memory_function` executes a defined ordinary void function with pointer
 arguments, one basic block, scalar loads/stores, flag-free binary operations,
-comparisons, scalar select, forward constant GEPs and a final ret void. It accepts
-i1..i64, half and float memory values.
+comparisons, scalar select/casts, forward constant GEPs and a final ret void.
+It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
 Arithmetic flags (including fast-math), alloca, pointer casts, branches, atomics,
@@ -20,6 +20,17 @@ constants do not reject; selected undef errors, and poison conditions/chosen
 values propagate to a rejected poison store. Selection does not skip earlier
 instructions. Pointer, vector and aggregate comparisons/selects and all
 comparison/select flags remain unsupported.
+
+Scalar casts share validation and value conversion with the scalar executor:
+integer truncation/zero extension/sign extension across i1..i64, signed and
+unsigned conversions between those integers and half/float, float-to-half
+truncation, half-to-float extension, and same-width integer/floating bitcasts
+at 16/32 bits. Integer width changes require the correct direction. Flags,
+pointer casts, vector/aggregate casts, double and bfloat remain unsupported.
+Float-to-integer conversion truncates toward zero; NaN, infinity and values
+whose truncated result is outside the destination range produce poison.
+Poison inputs propagate. Selected undef still errors. Storing a poisoned cast
+rejects; a later select can discard its poison result. All casts cost one step.
 
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
@@ -69,9 +80,8 @@ Loads/stores preserve floating raw bits. Buffer bytes are treated as defined val
 uninitialized-memory/poison shadow tracking is not implemented. Poison stores
 and selected undef reject. Dynamic value errors can leave earlier stores
 visible; errors do not roll back memory. Every load, store, binary operation,
-comparison, select, GEP and return costs one step, with the existing maximum
-step limit. Preflight rejects
-an insufficient budget.
+comparison, select, cast, GEP and return costs one step, with the existing
+maximum step limit. Preflight rejects an insufficient budget.
 Execution scratch arrays are freed on success and failure; binding data is not.
 
 `tests/ios/air-memory-execute.v` assembles LLVM fixtures and checks 16,896 copies
@@ -80,5 +90,7 @@ also checked against native LLVM by `tests/ios/air-memory-arithmetic.v` for
 load/compute/store bodies, including poison consumption and budget guards.
 `tests/ios/air-memory-gep.v` compares indexed loads/stores with native LLVM,
 including narrow padding, layouts, GEP flags, chains and preflight failures.
+`tests/ios/air-memory-casts.v` checks load/cast/store bodies against defined
+native LLVM conversions, with separate poison and unsupported-input controls.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.

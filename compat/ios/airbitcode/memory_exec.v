@@ -67,7 +67,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 }
 // Narrow execution profile: an ordinary void function, pointer arguments, one
 // block, scalar loads/stores, forward literal GEPs, flag-free binary operations,
-// comparisons, scalar select and final ret void.
+// comparisons, scalar select/casts and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -128,6 +128,11 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if (floating && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!floating && op.opcode > 12) { return error('AIR memory execution: binary opcode') }
 			continue
 		}
+		if code == 3 {
+			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: cast result') }
+			p.scalar_cast_profile(op, true)!
+			continue
+		}
 		if code in [u64(9), 28, 5, 29]! {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: comparison/select result') }
 			p.execution_bits(op.result_type, true)!
@@ -174,6 +179,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
 		if code == 10 { return IRVoidRun{steps: m.steps} }
 		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
+		if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
 		if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
 		if code in [u64(5), 29]! { value := m.select_value(op)!; m.put(inst, value); continue }
 		if code in [u64(4), 30, 43]! { continue }

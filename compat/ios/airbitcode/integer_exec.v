@@ -176,23 +176,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 						if (fp && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!fp && op.opcode > 12) { return error('AIR scalar: binary opcode') }
 					} else if (fp && op.opcode > 15) || (!fp && (op.opcode < 32 || op.opcode > 41)) { return error('AIR scalar: predicate') }
 				}
-				3 {
-					if op.operands_count != 1 { return error('AIR scalar: cast arity') }
-					source := p.operands[op.operands_start].type_index
-					if op.opcode <= 2 { p.integer_bits(source)!; p.integer_bits(op.result_type)! }
-					else if binary32 && op.opcode in [u32(3), 4]! {
-						if p.types[source].kind !in [.float_t, .half_t]! { return error('AIR scalar: floating conversion source required') }
-						p.integer_bits(op.result_type)!
-					} else if binary32 && op.opcode in [u32(5), 6]! {
-						p.integer_bits(source)!
-						if !floating_result { return error('AIR scalar: floating conversion result required') }
-					}
-					else if binary32 && op.opcode == 7 {
-						if p.types[source].kind != .float_t || p.types[op.result_type].kind != .half_t { return error('AIR scalar: only binary32 to binary16 truncation supported') }
-					} else if binary32 && op.opcode == 8 {
-						if p.types[source].kind != .half_t || p.types[op.result_type].kind != .float_t { return error('AIR scalar: only binary16 to binary32 extension supported') }
-					} else if !binary32 || op.opcode != 11 || p.execution_bits(source, binary32)! != p.execution_bits(op.result_type, binary32)! || (p.types[source].kind in [.float_t, .half_t]!) == floating_result { return error('AIR scalar: unsupported cast') }
-				}
+				3 { p.scalar_cast_profile(op, binary32)! }
 				5, 29 { if op.operands_count != 3 { return error('AIR integer: select arity') } }
 				16 { if phis != index - block.first || op.operands_count == 0 || op.targets_count != op.operands_count { return error('AIR integer: PHI grouping/arity') }; phis++ }
 				10 {
@@ -361,19 +345,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				}
 				2 { result = m.binary_value(op)! }
 				9, 28 { result = m.compare_value(op)! }
-				3 {
-					input := m.read(start)!; source_bits := p.execution_bits(p.operands[start].type_index, binary32)!; dest_bits := p.execution_bits(op.result_type, binary32)!
-					if input.poison { result = IntegerValue{poison: true} }
-					else if op.opcode in [u32(3), 4]! { result = if source_bits == 16 { binary16_to_integer(dest_bits, op.opcode == 4, u16(input.value))! } else { binary32_to_integer(dest_bits, op.opcode == 4, u32(input.value))! } }
-					else if op.opcode in [u32(5), 6]! { result = IntegerValue{value: if dest_bits == 16 { u64(binary16_from_integer(source_bits, op.opcode == 6, input.value)!) } else { u64(binary32_from_integer(source_bits, op.opcode == 6, input.value)!) }} }
-					else if op.opcode == 7 { result = IntegerValue{value: binary16_from_binary32(u32(input.value))} }
-					else if op.opcode == 8 { result = IntegerValue{value: binary16_to_binary32(u16(input.value))} }
-					else {
-						mut value := input.value & constant_mask(source_bits)
-						if op.opcode == 2 && value & (u64(1) << (source_bits - 1)) != 0 { value |= ~constant_mask(source_bits) }
-						result = IntegerValue{value: value & constant_mask(dest_bits)}
-					}
-				}
+				3 { result = m.cast_value(op)! }
 				5, 29 { result = m.select_value(op)! }
 				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
 				58 { result = if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
