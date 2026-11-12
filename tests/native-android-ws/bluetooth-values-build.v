@@ -53,6 +53,7 @@ fn main() {
 	androidtools.framework_keygen_parameters(root + '/smali')!
 	androidtools.framework_egl_error_names(root + '/smali')!
 	androidtools.framework_lookup_constants(root + '/smali')!
+	androidtools.framework_window_decor(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -63,6 +64,7 @@ fn main() {
 	types << 'android/security/keystore/KeyGenParameterSpec'
 	types << r'android/security/keystore/KeyGenParameterSpec$Builder'
 	types << 'android/opengl/GLUtils'
+	types << 'android/view/Window'
 	types << 'android/content/Context'
 	types << r'android/provider/Settings$Global'
 	types << 'android/atl/VinixAccountFuture'
