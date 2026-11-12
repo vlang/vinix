@@ -41,7 +41,13 @@ fn C.posix_spawnattr_setsigdefault(voidptr, voidptr) i32
 fn C.posix_spawnattr_setflags(voidptr, i16) i32
 fn C.posix_spawnattr_setpgroup(voidptr, i32) i32
 fn C.killpg(i32, i32) i32
-// os declares poll with the platform's nfds_t (u32 on Darwin).
+// Some V libraries keep poll behind a C wrapper. Declare the native ABI here
+// too; when os exposes it, this must match its platform-specific nfds_t.
+$if macos || ios || freebsd || openbsd || dragonfly || android || termux {
+	fn C.poll(&C.pollfd, u32, i32) i32
+} $else {
+	fn C.poll(&C.pollfd, uint, i32) i32
+}
 
 struct C.pollfd {
 mut:

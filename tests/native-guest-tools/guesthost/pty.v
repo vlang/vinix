@@ -40,7 +40,13 @@ mut:
 fn C.forkpty(&i32, &char, voidptr, voidptr) i32
 fn C.execve(&char, &&char, &&char) i32
 fn C.killpg(i32, i32) i32
-// os declares poll with the platform's nfds_t (u32 on Darwin).
+// Some V libraries keep poll behind a C wrapper. Declare the native ABI here
+// too; when os exposes it, this must match its platform-specific nfds_t.
+$if macos || ios || freebsd || openbsd || dragonfly || android || termux {
+	fn C.poll(&C.pollfd, u32, i32) i32
+} $else {
+	fn C.poll(&C.pollfd, uint, i32) i32
+}
 fn C.socket(i32, i32, i32) i32
 fn C.connect(i32, &C.sockaddr, u32) i32
 fn C.getsockopt(i32, i32, i32, voidptr, &u32) i32
