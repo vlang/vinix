@@ -26,10 +26,14 @@ fn main() {
 	os.mkdir_all(work) or { panic(err) }
 	defer { os.rmdir_all(work) or {} }
 	source := '${work}/tool.c'
-	command(v, ['-new-compiler', '-target-libc-headers', '-gc', 'none', '-manualfree', '-path', '@vlib|@vmodules|${root}/tests/linuxkpi', '-o', source, '${root}/desktop/tools/workflow_${mode}.v'])
+	command(v, ['-new-compiler', '-gc', 'none', '-manualfree', '-d', 'no_backtrace', '-d',
+		'no_segfault_handler', '-path', '@vlib|@vmodules|${root}/tests/linuxkpi', '-o', source, '${root}/desktop/tools/workflow_${mode}.v'])
 	mut c := os.read_file(source) or { panic(err) }
 	$if macos { c = c.replace('ptrdiff_t offset);', 'int64_t offset);') }
 	os.write_file(source, c) or { panic(err) }
-	command('clang', ['-w', '-O1', source, '-lpthread', '-lm', '-o', '${work}/tool'])
+	mut runtime_sources := []string{}
+	process_runtime := os.dir(v) + '/vlib/os/execute_capture_nix.c'
+	if os.is_file(process_runtime) { runtime_sources << process_runtime }
+	command('clang', ['-w', '-O1', source, ...runtime_sources, '-lpthread', '-lm', '-o', '${work}/tool'])
 	command('${work}/tool', os.args[2..])
 }
