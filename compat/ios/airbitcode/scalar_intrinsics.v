@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
-	if id in [.fma, .fmuladd]! { return 3 }
+	if id in [.fma, .fmuladd, .fshl, .fshr]! { return 3 }
 	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
@@ -70,7 +70,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 			if argument != input { return error('AIR intrinsic: classification input type') }
 		} else if id == .ldexp && i == 1 {
 			if p.types[argument].kind != .integer_t || p.types[argument].bits != 32 { return error('AIR intrinsic: signed i32 exponent required') }
-		} else if argument != result { return error('AIR intrinsic: homogeneous floating arguments required') }
+		} else if argument != result { return error('AIR intrinsic: matching scalar arguments required') }
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
@@ -129,6 +129,7 @@ fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second
 	return work
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
+	if scalar_integer_funnel(id) { return error('AIR intrinsic: three funnel-shift arguments required') }
 	if scalar_integer_zero_count(id) { return error('AIR intrinsic: zero counts require poison-aware evaluation') }
 	if scalar_integer_intrinsic(id) { return scalar_integer_intrinsic_value(id, bits, a)! }
 	if bits !in [u32(16), 32]! { return error('AIR intrinsic: floating width') }
