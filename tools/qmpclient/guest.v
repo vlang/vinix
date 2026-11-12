@@ -66,7 +66,7 @@ fn (mut guest Guest) send(text string) ! {
 	mut position := 0
 	for position < text.len {
 		guest.monitor.ready(true)!
-		count := unsafe { C.send(guest.monitor.connection.sock.handle, text.str + position, usize(text.len - position), flags) }
+		count := unsafe { C.send(guest.monitor.connection.sock.handle, text.str + position, uint(text.len - position), flags) }
 		if count < 0 {
 			if C.errno in [C.EAGAIN, C.EINTR] { continue }
 			return os.error_posix()
@@ -79,7 +79,7 @@ fn (mut guest Guest) send(text string) ! {
 fn (mut guest Guest) byte() !u8 {
 	for guest.position == guest.used {
 		guest.monitor.ready(false)!
-		count := C.recv(guest.monitor.connection.sock.handle, guest.buffer.data, usize(guest.buffer.len), 0)
+		count := C.recv(guest.monitor.connection.sock.handle, guest.buffer.data, uint(guest.buffer.len), 0)
 		if count < 0 {
 			if C.errno in [C.EAGAIN, C.EINTR] { continue }
 			return os.error_posix()
