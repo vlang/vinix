@@ -305,6 +305,43 @@ fn test_software_metal_compiled_library_metadata() {
 	println('IOS-SOFTWARE-METAL-LIBRARY: raw/wrapped and independent/shared module containers, leaf/rope dispatch ABI, owned bytes, names/types/UTF-8, function lifetimes, empty/missing functions, truncations/hash/range/type errors, optional NSError, bounded 512 MiB rope rejection, eight workers and two drained runtimes PASS')
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
+fn test_software_metal_float_texture_storage() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
+		for index, format in [u64(25), 65, 115, 55, 105, 125]! {
+			pixel := [u64(2), 4, 8, 4, 8, 16]![index]; assert sm_test_linear_alignment(d, format) == 256
+			desc := sm_test_descriptor(format, 5, 4, 0); sm_test_set(desc, c'setUsage:', 17)
+			t := sm_test_texture(d, desc); assert t != 0 && sm_send(t, c'pixelFormat') == format
+			view := sm_test_view(t, format); assert view != 0
+			for bad in [u64(10), 30, 70, 80, if format == 25 { u64(55) } else { u64(25) }]! { assert sm_test_view(t, bad) == 0 }
+			mut input := [128]u8{}; mut output := [256]u8{}
+			unit := if index < 3 { 2 } else { 4 }
+			for i in 0 .. int(7 * pixel) {
+				word := if unit == 2 { [u64(0), 0x8000, 0x3c00, 0xbc00, 0x7c00, 0xfc00, 0x7e01, 1]![(i / unit) % 8] } else { [u64(0), 0x80000000, 0x3f800000, 0xbf800000, 0x7f800000, 0xff800000, 0x7fc00001, 1]![(i / unit) % 8] }
+				input[i] = u8(word >> u32((i % unit) * 8))
+			}
+			region := SoftwareMetalRegion{x: 1, y: 1, width: 3, height: 2, depth: 1}
+			sm_test_read(t, region, 0, u64(unsafe { &output[0] }), 3 * pixel); for i in 0 .. int(6 * pixel) { assert output[i] == 0 }
+			sm_test_transfer_slice(view, region, 0, 0, u64(unsafe { &input[0] }), 4 * pixel, 0, true); sm_test_read(t, region, 0, u64(unsafe { &output[0] }), 3 * pixel)
+			for y in 0 .. 2 { for x in 0 .. int(3 * pixel) { assert output[y * int(3 * pixel) + x] == input[y * int(4 * pixel) + x] } }
+			b := sm_test_buffer(d, 2048, 0); target := sm_test_buffer_texture_view(b, desc, 256, 256); assert target != 0
+			source := sm_test_buffer(d, 256, 0); readback := sm_test_buffer(d, 256, 0)
+			C.memcpy(unsafe { voidptr(sm_send(source, c'contents') + pixel) }, unsafe { &input[0] }, usize(7 * pixel)); C.memset(unsafe { voidptr(sm_send(readback, c'contents')) }, 0xcc, 256)
+			cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder'); size := SoftwareMetalSize{width: 3, height: 2, depth: 1}; origin := SoftwareMetalOrigin{x: 1, y: 1}
+			sm_test_buffer_texture(enc, source, pixel, 4 * pixel, 0, size, t, 0, 0, origin, true)
+			sm_test_texture_copy(enc, t, 0, 0, origin, size, target, 0, 0, origin)
+			sm_test_buffer_texture(enc, readback, pixel, 5 * pixel, 0, size, target, 0, 0, origin, false)
+			input[0] ^= 0x5a; unsafe { *(&u8(sm_send(source, c'contents') + pixel)) = input[0] }
+			objc_release(t); objc_release(view); objc_release(b); objc_release(source); sm_call(enc, c'endEncoding'); sm_call(cmd, c'commit')
+			base := sm_send(readback, c'contents')
+			for i in 0 .. 256 { expected := if i >= int(pixel) && i < int(4 * pixel) { input[i - int(pixel)] } else if i >= int(6 * pixel) && i < int(9 * pixel) { input[i - int(2 * pixel)] } else { u8(0xcc) }; assert unsafe { *(&u8(base + u64(i))) } == expected }
+			objc_release(target); objc_release(readback)
+		}
+		objc_release(q); objc_release(d); objc_pool_pop(pool); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-FLOAT-TEXTURES: six half/float formats, 2/4/8/16-byte pixels, raw signed-zero/finite/infinity/NaN/subnormal bits, zero storage, CPU pitches, same-format views, incompatible views rejected, aligned buffer storage, both deferred buffer transfers and texture blits, padding guards, live writes and two drained runtimes PASS')
+}
 fn test_software_metal_rgba8_textures() {
 	$if !ios_metal_software ? { return }
 	for _ in 0 .. 2 {

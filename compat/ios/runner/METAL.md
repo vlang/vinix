@@ -67,7 +67,7 @@ remain absent. Newer reduction-mode and LOD-bias properties are unsupported.
 
 Texture views alias the full single-level 2D storage and retain their immediate
 parent, including for nested views and IOSurface planes. Same-format views
-are supported for all six formats; RGBA 70/71 and BGRA 80/81 reinterpretation
+are supported for all twelve formats; RGBA 70/71 and BGRA 80/81 reinterpretation
 require usage PixelFormatView (16) in this conservative profile. Other format changes return
 nil. Views preserve dimensions, usage, device, plane and padded stride; CPU
 transfers/blits share bytes without conversion. Parent-relative level/slice
@@ -80,6 +80,11 @@ unsupported.
 
 Textures support R8Unorm (10), RG8Unorm (30), RGBA8Unorm (70),
 RGBA8Unorm_sRGB (71), BGRA8Unorm (80) and BGRA8Unorm_sRGB (81).
+Floating storage additionally supports R16Float (25), RG16Float (65),
+RGBA16Float (115), R32Float (55), RG32Float (105) and RGBA32Float (125),
+using 2, 4, 8, 4, 8 and 16 bytes per pixel respectively. CPU and deferred
+transfers preserve raw floating bits, including NaNs and infinities; they do
+not interpret or convert numeric values. Float views require the same format.
 RGBA and BGRA are distinct view families; views cannot swizzle between them.
 Upload/readback preserves raw bytes without color conversion. Only shared,
 single-level, single-sample 2D storage is supported,
@@ -106,7 +111,7 @@ single row, following [Apple's transfer contract](https://developer.apple.com/do
 Only requested pixel bytes are touched, preserving client row padding.
 Buffer-backed textures alias a retained shared buffer with a snapshot of the
 2D descriptor. The device's `minimumLinearTextureAlignmentForPixelFormat:`
-returns 256 for R8Unorm, RG8Unorm, RGBA8Unorm/_sRGB and BGRA8Unorm/_sRGB.
+returns 256 for every supported format, including the six floating formats.
 Queries for other formats fail explicitly. The allocator and query share one alignment policy;
 applications can round row sizes up and align offsets using the query.
 Offset and row pitch must be multiples of 256 bytes; pitch must

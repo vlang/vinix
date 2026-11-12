@@ -3,7 +3,7 @@ module main
 
 struct SoftwareMetalRegion { x u64 y u64 z u64 width u64 height u64 depth u64 }
 fn sm_pixel_size(format u64) u64 {
-	return match format { 10 { u64(1) } 30 { u64(2) } 70, 71, 80, 81 { u64(4) } else { u64(0) } }
+	return match format { 10 { u64(1) } 25, 30 { u64(2) } 55, 65, 70, 71, 80, 81 { u64(4) } 105, 115 { u64(8) } 125 { u64(16) } else { u64(0) } }
 }
 fn sm_linear_alignment(format u64) u64 { return if sm_pixel_size(format) == 0 { u64(0) } else { u64(256) } }
 fn sm_device_linear_alignment(device u64, selector &char, format u64) u64 {
