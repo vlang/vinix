@@ -175,3 +175,28 @@ independent readback `current-api-readback-20261112-r3` retain its two-entry
 archive without removals, checksum
 `7ef3f391c725dee81ec3f34f28469ab86914601c5fecf43a06d3c25724dc174c`.
 The test bind mount was released before the subsequent broker attempt.
+
+Guest r10 advanced to an ART verifier failure in GMS class `etag`, propagated
+to subclass `etaj`. Its `m(...)` method at DEX offset0x9EF supplies
+`UserHandle[]` where `Parcelable[]` is required. The framework UserHandle
+had `describeContents` but no Parcelable interface or parcel writer/creator.
+The retained caller is `maps-verifier-caller-20261112-r1`; the full broker log
+is between `TETHERING-FULL-LOG-BEGIN` and `TETHERING-FULL-LOG-END` in r10 UART.
+
+`framework_user_parcel.v` adds Parcelable, an integer identifier writer,
+typed creator arrays and nullable static read/write helpers with USER_NULL
+(-10000), preserving all existing identity methods and constants. SDK
+`framework-user-parcel-20261112-r1` passed guarded assembly/readback in4,193 ms,
+RSS470,859,776, growth52,391,936, guard/child0/0 and complete cleanup.
+Fixture `current-api-fixture-20261112-r5` passed on ARM in guest r11, including
+all prior API tests and the exact UserHandle[]→Parcelable[] invocation,
+identifier/creator roundtrip, typed creator arrays and static nonnull/null
+parcel roundtrips. Snapshot `current-api-uart-20261112-r4`, plan
+`current-api-plan-20261112-r4.json` and independent readback
+`current-api-readback-20261112-r4` preserve the unmodified two-entry export,
+checksum `2f84085fb7f32ab87531df96c081901e748242c261894d1a2e27877e92fa1f8d`.
+
+`parcel-type-audit.v` provides a read-only scan for other parcel-shaped classes
+whose superclass chains lack Parcelable. Its diagnostic candidate output is
+`parcel-type-audit-20261112-r2.json`; it makes no claim that those other
+classes have complete parcel implementations, and changes no class definitions.

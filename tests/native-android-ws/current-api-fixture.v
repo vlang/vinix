@@ -4,6 +4,67 @@ import os
 import json2
 import crypto.sha256
 
+const user_source = r'
+.method public static users()V
+.locals 6
+const/4 v0, 2
+new-array v1, v0, [Landroid/os/UserHandle;
+invoke-static {v1}, Lorg/vinix/bootstrap/Main;->acceptUsers([Landroid/os/Parcelable;)I
+move-result v2
+invoke-static {v2, v0}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Landroid/os/UserHandle;
+const/16 v1, 42
+invoke-direct {v0, v1}, Landroid/os/UserHandle;-><init>(I)V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v2
+const/4 v3, 0
+invoke-virtual {v0, v2, v3}, Landroid/os/UserHandle;->writeToParcel(Landroid/os/Parcel;I)V
+invoke-virtual {v2, v3}, Landroid/os/Parcel;->setDataPosition(I)V
+sget-object v4, Landroid/os/UserHandle;->CREATOR:Landroid/os/Parcelable$Creator;
+invoke-interface {v4, v2}, Landroid/os/Parcelable$Creator;->createFromParcel(Landroid/os/Parcel;)Ljava/lang/Object;
+move-result-object v5
+check-cast v5, Landroid/os/UserHandle;
+invoke-virtual {v5}, Landroid/os/UserHandle;->getIdentifier()I
+move-result v5
+invoke-static {v5, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-interface {v4, v1}, Landroid/os/Parcelable$Creator;->newArray(I)[Ljava/lang/Object;
+move-result-object v5
+instance-of v5, v5, [Landroid/os/UserHandle;
+const/4 v4, 1
+invoke-static {v5, v4}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v2
+invoke-static {v0, v2}, Landroid/os/UserHandle;->writeToParcel(Landroid/os/UserHandle;Landroid/os/Parcel;)V
+invoke-virtual {v2, v3}, Landroid/os/Parcel;->setDataPosition(I)V
+invoke-static {v2}, Landroid/os/UserHandle;->readFromParcel(Landroid/os/Parcel;)Landroid/os/UserHandle;
+move-result-object v5
+invoke-virtual {v5}, Landroid/os/UserHandle;->getIdentifier()I
+move-result v5
+invoke-static {v5, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+invoke-static {}, Landroid/os/Parcel;->obtain()Landroid/os/Parcel;
+move-result-object v2
+const/4 v0, 0
+invoke-static {v0, v2}, Landroid/os/UserHandle;->writeToParcel(Landroid/os/UserHandle;Landroid/os/Parcel;)V
+invoke-virtual {v2, v3}, Landroid/os/Parcel;->setDataPosition(I)V
+invoke-static {v2}, Landroid/os/UserHandle;->readFromParcel(Landroid/os/Parcel;)Landroid/os/UserHandle;
+move-result-object v5
+if-eqz v5, :null_ok
+new-instance v5, Ljava/lang/AssertionError;
+invoke-direct {v5}, Ljava/lang/AssertionError;-><init>()V
+throw v5
+:null_ok
+invoke-virtual {v2}, Landroid/os/Parcel;->recycle()V
+return-void
+.end method
+.method public static acceptUsers([Landroid/os/Parcelable;)I
+.locals 1
+array-length v0, p0
+return v0
+.end method
+'
+
 const intent_source = r'
 .method public static intent()V
 .locals 10
@@ -135,6 +196,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->mime()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->parcel()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
 new-instance v0, Landroid/telephony/TelephonyManager;
 invoke-direct {v0}, Landroid/telephony/TelephonyManager;-><init>()V
 invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->isVoiceCapable()Z
@@ -367,7 +429,7 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
-	os.write_file(root + '/smali/Main.smali', main_source + intent_source)!
+	os.write_file(root + '/smali/Main.smali', main_source + intent_source + user_source)!
 	os.write_file(root + '/smali/TestAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestAccounts;
 .super Landroid/accounts/AccountManager;
 .field public snapshot:[Landroid/accounts/Account;
