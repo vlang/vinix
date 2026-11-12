@@ -8,6 +8,7 @@ import servicefailureprobe
 import resultreceiverprobe
 import availabilityprobe
 import vmpolicyprobe
+import tlslifetimeprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1615,7 +1616,8 @@ fn main() {
 		return
 	}
 	network := os.args.len == 4 && os.args[3] == '--certificate-network'
-	if os.args.len != 3 && !network { panic('usage: current-api-fixture TEMPLATE_FIXTURE FRESH_OUTPUT [--certificate-network]') }
+	tls_lifetime := os.args.len == 4 && os.args[3] == '--tls-lifetime'
+	if os.args.len != 3 && !network && !tls_lifetime { panic('usage: current-api-fixture TEMPLATE_FIXTURE FRESH_OUTPUT [--certificate-network|--tls-lifetime]') }
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
@@ -1624,6 +1626,7 @@ fn main() {
 	resultreceiverprobe.install(root)!
 	availabilityprobe.install(root)!
 	vmpolicyprobe.install(root)!
+	if tls_lifetime { tlslifetimeprobe.install(root)! }
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;
 .super Landroid/widget/TableLayout;
@@ -1872,6 +1875,10 @@ return v0
 	if network {
 		call := 'invoke-static {}, Lorg/vinix/bootstrap/CertificateProbe;->check()V'
 		main_text = main_text.replace(call, call + '\ninvoke-static {}, Lorg/vinix/bootstrap/CertificateNetwork;->check()V')
+	}
+	if tls_lifetime {
+		call := 'invoke-static {}, Lorg/vinix/bootstrap/CertificateProbe;->check()V'
+		main_text = main_text.replace(call, call + '\ninvoke-static {p0}, Lorg/vinix/bootstrap/TlsLifetimeProbe;->check(Landroid/content/Context;)V')
 	}
 	os.write_file(root + '/smali/Main.smali', main_text)!
 	subscription_fixture(root)!

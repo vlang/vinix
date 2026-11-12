@@ -1484,3 +1484,80 @@ Snapshot `vmpolicy-api-uart-20261112-r1`, plan
 `2b16fa7c67e353c30f79d28b511023a9dccfd523d91694776e4ccaf5d8f9a99a`.
 The fixture bind was released before broker preparation. Actual Maps
 functionality remains unqualified.
+
+With source `c7be0e744`, r47 rendered onboarding, then exited after Skip on a
+native SIGSEGV in wolfSSL_read+28, called by WolfSSLSession.read on an
+OkHttpClientTra thread. The complete log records a concurrent socket close
+immediately beforehand. Exact boot inputs extracted from the retained base
+media are under `wolf-boot-inputs-20261112-r1`; the wolfssljni JAR SHA256 is
+`fed6b0a6f7553bc34f91607b8c86337178bd7afb8aaf5d109aa343f75d20a0c7`.
+Readback shows stream-private read/write locks and unconditional native free
+in close, with no shared active-operation lifetime. This supports a close/I/O
+use-after-free diagnosis; the crash alone does not establish every TLS failure.
+Complete log `maps-current-20261112-r47/maps.retained.log` has SHA256
+`8a4f2da3e03c047394dd314e283833f617f74b466c0e681187aab3bc31ee9b53`.
+Only verified owned QEMU PID35518 was synced and stopped. Its data image has
+SHA256 `54828833d8bd65c510c60c1b7244b43eae44f9f1fba27d2b4ac81c9256050b71`.
+Snapshot `maps-wolf-final-uart-20261112-r1` has SHA256
+`d667fcdd3545e6bca3d88a5d8711f79bb8c3ad5512cfa584573e8bb8a7759f7d`.
+Minimum observed disk was7257812992 bytes and MemFree291472KiB.
+
+`boot_tls_lifetime.v` leases the entire wolfJSSE stream read/write operation,
+including its subsequent native error query and exception paths. Closing
+rejects new leases; idle close retains the original TLS shutdown/cache path,
+while busy close closes only an owned transport and defers native free until
+the last lease exits. Borrowed transports remain caller-owned; an outstanding
+operation retains its session until it completes. A native operation with no
+timeout on such a borrowed transport may remain pending: this older JNI has
+no upstream interruptBlockedIO entry point. The change does not claim to add
+that missing interruption capability. [Upstream wolfJSSE](https://github.com/wolfSSL/wolfssljni/blob/master/src/java/com/wolfssl/provider/jsse/WolfSSLSocket.java)
+also tracks active I/O before native free, using its newer JNI interrupt API.
+
+Boot output `wolf-lifetime-boot-20261112-r1` passed guarded assemble, readback
+and unchanged-control comparison for every unrelated class:0/0, complete
+cleanup,1748ms, RSS196870144, shared growth73752576 bytes. ARM concurrent-I/O
+qualification and the next actual Maps retry remain pending.
+
+The first ARM attempt in r48 correctly failed the pre-existing unconnected
+certificate-socket close check: publishing the closing state before idle
+shutdown made Socket.getSoTimeout reject that shutdown. Boot r3 corrects the
+ordering under the socket monitor, publishing closed after transport cleanup
+and before releasing the monitor. It passed guarded assembly/control/readback:
+0/0, complete cleanup,2113ms, RSS207142912, shared growth786432 bytes. All73
+boot classes remain present; only the three intended socket/stream classes
+differ from the unchanged assembly control. Output SHA256 is
+`e7cff7f1da757082f28593a4b01e3b569a07d8a59eb4b3443eff429d0f38cbee`.
+
+Signed TLS fixture r47 passed build/link/sign/verification:0/0, complete
+cleanup,910ms, RSS168820736, shared growth17297408 bytes. In r48, its complete
+API suite passed with boot r3 as UID/GID10160, ready/pass once, drained EOF
+and exit0. The authenticated loopback fixture checks real concurrent read
+and write closure, bounded close and worker completion, native-session release,
+idle close and double close. A held lease checks that a borrowed transport
+stays open, the native session remains active until the lease exits, and the
+last exit frees it without closing that transport. The server uses a fresh
+test certificate trusted only by the fixture's private SSLContext. Its state
+is `tls-lifetime-server-state-20261112-r1`; the server accepted all four
+connections. The generated certificate/key and signed APK remain outside Git.
+Snapshot `tls-lifetime-api-uart-20261112-r1`, plan
+`tls-lifetime-api-plan-20261112-r1.json` and strict readback
+`tls-lifetime-api-readback-20261112-r1` retain archive SHA256
+`27349326863d4d8f1a246498e5ffa32081b03c17e48f6e05b184c8cac65ccbdf`.
+
+The unchanged signed r40-network fixture also passed with boot r3: trusted
+Google HTTP, three wrong-host/untrusted-chain rejection pairs, and a stalled
+handshake bounded by the configured timeout with transport closure. It ran in
+fresh guest directory current-api-r3 and passed ready/once, EOF and exit0.
+Snapshot `tls-lifetime-network-uart-20261112-r1` preserves the exact append
+interval after the previous snapshot; plan and strict readback of that interval
+retain archive SHA256
+`3c4fcf145b09bc14491e4db2d1cdc0ca6994b186cefd1e094815b6a1c4b4b480`.
+Only verified owned QEMU PID77908 was synced and stopped. Its data-image SHA256
+is `84f62917d7d4d85507b4ead303a1d528eabf9efa62b86e10b2cfe88c596b0c03`.
+Complete child logs are retained in `maps-current-20261112-r48` and the strict
+readbacks. No actual Maps attempt was made in that test-only guest.
+
+Fresh r49 stages the same tested SDK/native/core and boot r3 from the outset.
+Its stage passed0/0, complete cleanup,8206ms, RSS37060608, shared growth
+136142848 bytes. UUID, read-only e2fsck and initial-image hash checks passed.
+The actual Maps retry remains pending.
