@@ -103,3 +103,32 @@ inventory still match their published SHA-256 values. Its complete redundant
 extraction was rechecked successfully, including root mode 755, before removal.
 The original exception workspace and complete archive remain retained. This
 workspace preserves the recheck and retirement logs.
+
+The complete original graphical workspace, including failed attempts and all
+corruption-control trees, is preserved at
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-gui-20261112-01.tar.gz`:
+
+- Archive SHA-256: `7ca979e49c5a9c413bbcaeba1770c306cf701ff9d839f7d47bad5ce782064ab8`.
+- Adjacent `.inventory.txt` SHA-256: `1ed145ed953a1130583b8774080dd21b2b0ee99dcf7f2254c10ba1b861985178`.
+
+The graphical implementation checkpoint is `348e98da5`; the retained
+`gui-source-commit.tar` snapshot is `235d1e3cd`. Compression completed before
+the archive-verifier fix. Its earlier `.audit` remains refused for a typed
+inventory mismatch. The sparse-image reproduction showed that the old mtree
+conversion hashed stored extents rather than logical zero-filled holes.
+No failed run or audit is relabeled as passing.
+
+The corrected verifier and producer at `32460200e` sealed the explicitly
+pinned existing archive in a separate `.verified-audit`. Every logical payload,
+including sparse holes, matches the complete ordinary original tree; paths,
+types, modes, link targets and sizes also match. Full original inventories,
+the archive checksum and selected tool identities remain unchanged across
+verification. The audit preserves the producer/checker sources and binaries.
+Their selftests cover the original corruption controls, changed sparse-hole
+bytes, equivalent allocated zeroes, wrong pins, altered source bytes/links and
+refusal to overwrite receipts. The reader also passes ASan/UBSan; that raw
+selftest is retained under the adjacent `wine-archive-sanitizer-20261112`.
+Original workspaces, namespaces and the complete pinned dependency bundle
+remain required and retained. This integrity seal adds no launch qualification
+and authorizes no removal of expanded evidence. The separately sealed ARM
+diagnostic archive is documented in its [report](wine-shared-pages-check.md).
