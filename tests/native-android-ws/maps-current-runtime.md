@@ -21,6 +21,9 @@ session query, with missing job-property getters also logged.
 Guest r33 passed those regressions and rendered the Explore/search/control
 screen, then lost its main looper on missing JobParameters.getJobId. Tiles
 were not rendered before that failure.
+Guest r34 passed the scheduled callback regression and loaded Explore content,
+then exited on missing TelephonyManager.getImei in GMS check-in. Search did
+not produce a result before that exit.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -959,3 +962,47 @@ Snapshot `job-parameters-api-uart-20261112-r1`, plan
 `job-parameters-api-readback-20261112-r1` retain its two-entry export, archive
 SHA256 `1c2746eb7b06924d8fef255c6b1a9c10abf97c8b7d1bc5b14c6136fdda556999`.
 The fixture bind was released before the broker retry.
+
+Guest r34 loaded Explore and Local vibe's "The foodie drop" content after
+Skip (`maps-after-skip.png`), then exited10 while the Louvre search was being
+entered. The fatal exception is missing TelephonyManager.getImei in GMS
+check-in `biyz.a` source180, not the search UI. It also logged a missing
+JobParameters.isOverrideDeadlineExpired query in Play Store's job controller.
+The prior getJobId main-looper failure is absent. Caller readback at
+`gms-checkin-identifiers-caller-20261112-r1/classes.dex/biyz.smali` shows slot
+enumeration followed by the no-argument IMEI fallback, wrapping its result in
+an optional. No identifier was supplied or manufactured.
+
+Immutable snapshot `maps-job-parameters-final-uart-20261112-r1` has SHA256
+`e9702441c164b0b56fa49d716a2404817be91bb2d56040b5c9e0d906ea5e1bc2`;
+log markers are JOB-PARAMETERS-MAPS-LOG-BEGIN/END. The observer sampled
+minimum disk7951372288 bytes and MemFree42688KiB before verified shutdown at
+about374 seconds. The synced, stopped image SHA256 is
+`885866a812d48ef196f08f449767b8746ed028afa0713fe6e2c5adbe43a5df09`.
+
+`framework_modem_identifiers.v` provides IMEI/MEID query overloads returning
+null for this runtime without modem or SIM slots, consistent with the
+[unavailable identifier result](https://developer.android.com/reference/android/telephony/TelephonyManager#getImei()).
+No hardware feature or identifier backend is added. JobParameters' deadline
+query returns false because the current scheduler dispatches on minimum
+latency and has no deadline-forced execution path. This describes the
+[reason for dispatch](https://developer.android.com/reference/android/app/job/JobParameters#isOverrideDeadlineExpired()),
+not a wall-clock comparison or deadline-enforcement implementation.
+
+SDK `framework-modem-job-20261112-r1` passed guarded full assembly and DEX
+readback: guard/child0/0, cleanup complete,4672ms, RSS465272832 and shared
+growth33198080 bytes. Signed fixture r29 adds zero-phone/absent-feature and
+null identifier checks for no-argument and slots-1/0/1, plus false deadline
+reason during its real latency-triggered callback with a future deadline.
+Its build/sign/verify passed0/0, cleanup complete,1540ms, RSS117227520 and
+growth21749760 bytes. Guest r35 stages that final pair with unchanged
+native/core, volume probe and VM resource budget.
+
+Signed fixture r29 passed on ARM in r35 as UID/GID10160 with disk-backed data,
+including the real callback's false deadline reason and absent modem queries,
+readiness/pass once, drained EOF and exit0. Snapshot
+`modem-job-api-uart-20261112-r1`, plan `modem-job-api-plan-20261112-r1.json`
+and strict independent readback `modem-job-api-readback-20261112-r1` retain
+the two-entry export, archive SHA256
+`81ff2036558ae93b3dae7966ad3c65a7a519c9981660fd87e3f4c6bb6693ceee`.
+The fixture bind was released before broker startup.

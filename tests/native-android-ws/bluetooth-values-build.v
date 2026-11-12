@@ -34,6 +34,7 @@ fn main() {
 	androidtools.framework_shared_library_catalog(root + '/smali')!
 	androidtools.framework_job_install_queries(root + '/smali')!
 	androidtools.framework_job_parameters(root + '/smali')!
+	androidtools.framework_modem_identifiers(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'

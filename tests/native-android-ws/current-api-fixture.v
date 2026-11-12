@@ -5,6 +5,45 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static modemIdentifiers(Landroid/content/Context;)V
+.locals 5
+const-string v0, "phone"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/telephony/TelephonyManager;
+const/4 v2, 0
+invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->getPhoneCount()I
+move-result v1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->getImei()Ljava/lang/String;
+move-result-object v1
+if-nez v1, :modem_failed
+invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->getMeid()Ljava/lang/String;
+move-result-object v1
+if-nez v1, :modem_failed
+const/4 v3, -1
+:slot
+invoke-virtual {v0, v3}, Landroid/telephony/TelephonyManager;->getImei(I)Ljava/lang/String;
+move-result-object v1
+if-nez v1, :modem_failed
+invoke-virtual {v0, v3}, Landroid/telephony/TelephonyManager;->getMeid(I)Ljava/lang/String;
+move-result-object v1
+if-nez v1, :modem_failed
+add-int/lit8 v3, v3, 1
+const/4 v4, 2
+if-lt v3, v4, :slot
+invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+const-string v1, "android.hardware.telephony"
+invoke-virtual {v0, v1}, Landroid/content/pm/PackageManager;->hasSystemFeature(Ljava/lang/String;)Z
+move-result v1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+:modem_failed
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.end method
 .method public static scheduleProbeJob(Landroid/content/Context;)V
 .locals 6
 new-instance v0, Landroid/content/ComponentName;
@@ -20,6 +59,8 @@ const-string v2, "job-payload"
 const/16 v3, 73
 invoke-virtual {v0, v2, v3}, Landroid/os/PersistableBundle;->putInt(Ljava/lang/String;I)V
 invoke-virtual {v1, v0}, Landroid/app/job/JobInfo$Builder;->setExtras(Landroid/os/PersistableBundle;)Landroid/app/job/JobInfo$Builder;
+const-wide/16 v4, 30000
+invoke-virtual {v1, v4, v5}, Landroid/app/job/JobInfo$Builder;->setOverrideDeadline(J)Landroid/app/job/JobInfo$Builder;
 invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
 move-result-object v1
 const-string v0, "jobscheduler"
@@ -1189,6 +1230,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->storageDatabase(Landroid/content
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sharedLibraryCatalog(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->jobInstallQueries(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->scheduleProbeJob(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->modemIdentifiers(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1439,6 +1481,10 @@ return-void
 .end method
 .method public onStartJob(Landroid/app/job/JobParameters;)Z
 .locals 3
+invoke-virtual {p1}, Landroid/app/job/JobParameters;->isOverrideDeadlineExpired()Z
+move-result v0
+const/4 v1, 0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
 invoke-virtual {p1}, Landroid/app/job/JobParameters;->getJobId()I
 move-result v0
 const v1, 0x1234567
