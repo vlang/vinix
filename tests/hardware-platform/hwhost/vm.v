@@ -14,6 +14,7 @@ module hwhost
 
 import os
 import time
+import json2
 
 // The lines of a failing run that are printed with the verdict.
 pub const tail_lines = 40
@@ -35,6 +36,7 @@ pub:
 	extras  string // what the suite adds to the root file system, or ''
 	state   string // this scenario's state directory
 	timeout int    // seconds the machine may run
+	memory_mib int = 1024 // RAM required by this workload
 	keep    bool   // leave the images in the state directory
 	// ... of a scenario that failed only
 	failures_only bool
@@ -107,12 +109,13 @@ fn (mut m Machine) stop() {
 	}
 }
 
-fn qemu_command(host Host, scenario Scenario, media []string, state string, boot int) ![]string {
+fn qemu_command(host Host, scenario Scenario, media []string, state string, boot int, memory_mib int) ![]string {
+	if memory_mib < 1 { return error('guest memory must be positive MiB') }
 	mut command := [host.qemu]
 	if host.arch == 'aarch64' {
 		command << ['-machine', 'virt,gic-version=3']
 		command << host.accelerator()
-		command << ['-m', '1024', '-smp', '4']
+		command << ['-m', memory_mib.str(), '-smp', '4']
 		// The devices scripts/run-aarch64.sh gives the machine: an entropy
 		// source, input, and ramfb for the firmware's framebuffer. The
 		// tests boot what that script boots, less the desktop.
@@ -129,7 +132,7 @@ fn qemu_command(host Host, scenario Scenario, media []string, state string, boot
 		// same one.
 		command << ['-machine', 'q35,smm=off']
 		command << host.accelerator()
-		command << ['-m', '1024', '-smp', '2']
+		command << ['-m', memory_mib.str(), '-smp', '2']
 		command << media
 	}
 	// -no-reboot turns a reset into an exit: a guest that crashes into its
@@ -224,7 +227,8 @@ fn (mut m Machine) run(host Host, scenario Scenario, run Run) ! {
 			media_cmdline = scenario.boot_cmdline(boot)
 			media = boot_media(host, run.kernel, initramfs, media_cmdline, state)!
 		}
-		command := qemu_command(host, scenario, media, state, boot)!
+		command := qemu_command(host, scenario, media, state, boot, run.memory_mib)!
+		os.write_file(os.join_path(state, 'qemu-${boot}.argv.json'), json2.encode(command))!
 		mut log := os.open_append(qemu_log)!
 		log.writeln(command.join(' '))!
 		log.close()
