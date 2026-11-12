@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if id in [.fma, .fmuladd]! { return 3 }
-	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum]! { 2 } else { 1 }
+	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
@@ -27,12 +27,13 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.fmuladd.f16', 'llvm.fmuladd.f32' { ScalarIntrinsic.fmuladd }
 		'llvm.minnum.f16', 'llvm.minnum.f32' { ScalarIntrinsic.minnum }
 		'llvm.maxnum.f16', 'llvm.maxnum.f32' { ScalarIntrinsic.maxnum }
+		'llvm.is.fpclass.f16', 'llvm.is.fpclass.f32' { ScalarIntrinsic.is_fpclass }
 		else { return error('AIR intrinsic: unsupported callee') }
 	}
 }
 // Return the declaration's attribute-list ID after checking direct identity,
 // the reserved name, signature and ordinary CALL header. Never read a pointer.
-fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IRConstantPools, op IRTypedInstruction) !(int, u64) {
+fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IRConstantPools, op IRTypedInstruction, scope int) !(int, u64) {
 	if op.flags != 32768 || op.calling_convention != 0 || op.fast_math_flags != 0 || op.attribute_set != 0 || op.callee_function < 0 || op.callee_function >= ir.functions.len || op.operands_count < 2 { return error('AIR intrinsic: ordinary unflagged direct call required') }
 	f := ir.functions[op.callee_function]
 	id := scalar_intrinsic_name(f.name)!
@@ -46,13 +47,25 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 { return error('AIR intrinsic: fixed signature/arity') }
 	result := ir.references[signature.refs_start]
 	if result != op.result_type { return error('AIR intrinsic: return type') }
-	bits := p.execution_bits(result, true)!
+	input := if id == .is_fpclass { ir.references[signature.refs_start + 1] } else { result }
+	bits := p.execution_bits(input, true)!
 	half := f.name.ends_with('.f16') || (id == .ldexp && f.name.ends_with('.f16.i32'))
-	if p.types[result].kind !in [.float_t, .half_t]! || bits != if half { u32(16) } else { u32(32) } { return error('AIR intrinsic: name/type mismatch') }
+	if p.types[input].kind !in [.float_t, .half_t]! || bits != if half { u32(16) } else { u32(32) } { return error('AIR intrinsic: name/type mismatch') }
+	if id == .is_fpclass && p.integer_bits(result)! != 1 { return error('AIR intrinsic: classification returns i1') }
 	for i in 0 .. arity {
 		argument := ir.references[signature.refs_start + i + 1]
 		if argument < 0 || argument >= p.types.len || p.operands[op.operands_start + i + 1].type_index != argument { return error('AIR intrinsic: argument type identity') }
-		if id == .ldexp && i == 1 {
+		if id == .is_fpclass {
+			if i == 0 {
+				if argument != input { return error('AIR intrinsic: classification input type') }
+			} else {
+				if p.integer_bits(argument)! != 32 { return error('AIR intrinsic: classification i32 mask required') }
+				value := pools.lookup(scope, p.operands[op.operands_start + 2].number)!
+				if value.kind != .constant { return error('AIR intrinsic: classification constant mask required') }
+				constant := pools.constants[value.constant_index]
+				if constant.type_index != argument || constant.splat || constant.kind !in [.zero, .integer]! || pools.scalar_bits(value.constant_index)! > 1023 { return error('AIR intrinsic: classification mask outside ten classes') }
+			}
+		} else if id == .ldexp && i == 1 {
 			if p.types[argument].kind != .integer_t || p.types[argument].bits != 32 { return error('AIR intrinsic: signed i32 exponent required') }
 		} else if argument != result { return error('AIR intrinsic: homogeneous floating arguments required') }
 	}
@@ -61,41 +74,63 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	return int(id) * 2 + int(bits == 16), ir_values(stream, raw)[6]
 }
 // Accept only harmless function-level properties inherent in these intrinsics.
-// Return/parameter, string, type, strictfp and other attributes reject. Scans
-// have a shared profile-work limit and run once per admitted declaration.
+// Return/parameter, string, type, strictfp and other attributes reject, except
+// parameter two's exact immarg on is.fpclass. Scans have a shared profile-work
+// limit and run once per admitted declaration.
 fn scalar_intrinsic_attributes(stream Stream, set u64, limit int) !int {
+	return scalar_intrinsic_attributes_profile(stream, set, limit, false)!
+}
+fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, class_mask bool) !int {
 	if set == 0 { return 0 }
-	mut work := 0; mut number := u64(0); mut group := u64(0)
+	mut work := 0; mut number := u64(0); mut groups := [2]u64{}; mut count := 0
 	for record in stream.records {
 		work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
 		if stream.blocks[record.block].id != 9 { continue }
 		if record.code != 2 { return error('AIR intrinsic: unsupported attribute-list encoding') }
 		number++
 		if number != set { continue }
-		if record.values_count != 1 { return error('AIR intrinsic: only function attributes supported') }
-		group = ir_values(stream, record)[0]; break
+		if record.values_count < 1 || record.values_count > if class_mask { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
+		count = record.values_count
+		for i in 0 .. count { groups[i] = ir_values(stream, record)[i]; if groups[i] == 0 { return error('AIR intrinsic: zero attribute group') } }
+		break
 	}
-	if group == 0 { return error('AIR intrinsic: missing attribute list/group') }
-	for record in stream.records {
-		work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
-		if stream.blocks[record.block].id != 10 || record.code != 3 { continue }
-		values := ir_values(stream, record)
-		if values.len < 2 || values[0] != group { continue }
-		if values[1] != 0xffffffff || values.len > 64 { return error('AIR intrinsic: function attribute group required') }
-		mut cursor := 2
-		for cursor < values.len {
+	if count == 0 { return error('AIR intrinsic: missing attribute list/group') }
+	mut function_seen := false; mut mask_seen := false
+	for i in 0 .. count {
+		mut found := false
+		for record in stream.records {
 			work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
-			if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] in [u64(18), 20, 21, 53, 61, 62, 63, 71, 105]! { cursor += 2 }
-			else if values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 86 && values[cursor + 2] in [u64(0), u64(1) << 56, u64(2) << 56]! { cursor += 3 } // memory(none), versions 0/1/2
-			else { return error('AIR intrinsic: unsupported declaration attribute') }
+			if stream.blocks[record.block].id != 10 || record.code != 3 { continue }
+			values := ir_values(stream, record)
+			if values.len < 2 || values[0] != groups[i] { continue }
+			found = true
+			if class_mask && values[1] == 2 {
+				work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
+				if mask_seen || values.len != 4 || values[2] != 0 || values[3] != 60 { return error('AIR intrinsic: mask immarg attribute required') }
+				mask_seen = true; break // Only parameter two's enum immarg.
+			}
+			if function_seen || values[1] != 0xffffffff || values.len > 64 { return error('AIR intrinsic: function attribute group required') }
+			function_seen = true
+			mut cursor := 2
+			for cursor < values.len {
+				work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
+				if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] in [u64(18), 20, 21, 53, 61, 62, 63, 71, 105]! { cursor += 2 }
+				else if values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 86 && values[cursor + 2] in [u64(0), u64(1) << 56, u64(2) << 56]! { cursor += 3 } // memory(none), versions 0/1/2
+				else { return error('AIR intrinsic: unsupported declaration attribute') }
+			}
+			break
 		}
-		return work
+		if !found { return error('AIR intrinsic: missing attribute group') }
 	}
-	return error('AIR intrinsic: missing attribute group')
+	return work
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if bits !in [u32(16), 32]! { return error('AIR intrinsic: floating width') }
 	if id in [.fma, .fmuladd]! { return error('AIR intrinsic: three multiply-add arguments required') }
+	if id == .is_fpclass {
+		if b > 1023 { return error('AIR intrinsic: classification mask outside ten classes') }
+		return u64(scalar_fpclass(bits, a) & u32(b) != 0)
+	}
 	sign_mask := u64(1) << (bits - 1); sign := a & sign_mask
 	abs := a & (sign_mask - 1)
 	if id == .fabs { return abs }
@@ -144,6 +179,20 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	}
 	if increment { rounded += unit }
 	return sign | rounded
+}
+
+// One of LLVM's ten disjoint classes, read directly from the representation.
+// No floating operation may quiet an sNaN or flush a subnormal before testing.
+fn scalar_fpclass(bits u32, value u64) u32 {
+	sign := u64(1) << (bits - 1); magnitude := value & (sign - 1)
+	inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
+	quiet := if bits == 16 { u64(0x200) } else { u64(0x400000) }
+	if magnitude > inf { return if magnitude & quiet == 0 { u32(1) } else { u32(2) } }
+	negative := value & sign != 0
+	if magnitude == inf { return if negative { u32(4) } else { u32(512) } }
+	if magnitude == 0 { return if negative { u32(32) } else { u32(64) } }
+	if magnitude < if bits == 16 { u64(0x400) } else { u64(0x800000) } { return if negative { u32(16) } else { u32(128) } }
+	return if negative { u32(8) } else { u32(256) }
 }
 
 fn scalar_intrinsic_ldexp(bits u32, value u64, exponent u64) u64 {

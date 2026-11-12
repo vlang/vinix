@@ -18,8 +18,10 @@ these LLVM declarations for scalar half (`.f16`) and float (`.f32`):
 | `llvm.fma` | Fused multiply-add with one nearest/ties-to-even rounding after the exact product and addition. |
 | `llvm.fmuladd` | Optional-fusion multiply-add; this interpreter consistently chooses fused evaluation. |
 | `llvm.ldexp` | Scale half/float by a signed i32 power of two, with one final nearest/ties-to-even round. |
+| `llvm.is.fpclass` | Return an i1 predicate for a constant ten-class mask, preserving signaling NaNs, signed zeros and subnormals. |
 
-Results keep the floating-point type. `scalar_intrinsics.v` manipulates integer
+Math results keep the floating-point type; classification returns i1.
+`scalar_intrinsics.v` manipulates integer
 sign/exponent/fraction bits; no host FP instruction, environment, libm or LLVM
 dependency participates in production. Signed zeros and infinities retain
 their IEEE results. Rounding NaNs choose the existing preferred positive quiet
@@ -53,9 +55,10 @@ are not aliases for these LLVM names.
 Declaration attributes admit only function-level `nounwind`, `readnone`,
 `readonly`, `speculatable`, `willreturn`, `nofree`, `nosync`, `nocallback`,
 `nocreateundeforpoison` and `memory(none)` (bitcode memory versions 0/1/2).
-Return/parameter, string/type, `strictfp`, other memory effects and unknown
+Except classification's mask `immarg`, return/parameter, string/type,
+`strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A thirty-eight-entry fixed stack cache validates each admitted
+validation budget. A forty-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -69,6 +72,9 @@ maintained checker compares 1,980,544 results across both precisions, including
 `fmuladd` against the permitted fused result and separate native-choice diagnostics.
 [Power-of-two scaling](SCALAR-LDEXP.md) admits the exact `.f16.i32` and `.f32.i32`
 names, with a floating first argument/result and a signed i32 second argument.
+[Floating classification](SCALAR-FPCLASS.md) returns i1 from a half/float input
+and an immediate i32 mask. Only this intrinsic admits the exact parameter-two
+`immarg` declaration attribute; the mask is independently checked at every call.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting
