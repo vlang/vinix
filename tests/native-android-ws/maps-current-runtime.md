@@ -318,3 +318,29 @@ Snapshot `subscription-api-uart-20261112-r1`, plan
 export, archive checksum
 `cf63ba65dc6ec3caaeeb18526f5eb4fd92c6562d440dfd80741a606670ebf5e2`.
 The test mount was released before the next broker/Maps attempt.
+
+Guest r14 advanced to missing `ShortcutManager.getDynamicShortcuts()` in
+GMS Nearby initialization (`dsew.a` source19). Full log delimiters are
+`SUBSCRIPTION-MAPS-LOG-BEGIN` / `SUBSCRIPTION-MAPS-LOG-END`; retained snapshot
+`maps-subscription-uart-20261112-r1` has SHA256
+`2df097d717941c785d56154f36c1945b8c0d02a6e0807cf34f41c155d64e927d`.
+`framework_shortcut_query.v` delegates this legacy query to existing
+`getShortcuts(FLAG_MATCH_DYNAMIC)` (flag2), consistently returning a nonnull
+empty list for the current backend. The
+[Android contract](https://developer.android.com/reference/android/content/pm/ShortcutManager)
+defines this as a query for the caller's published dynamic shortcuts.
+This addition does not implement or validate shortcut publication, builders,
+parcel transport or desktop integration; those existing methods are not
+qualified by this read-only test.
+
+SDK `framework-shortcut-query-20261112-r1` passed guarded assembly/readback
+in4,554 ms, RSS476,725,248, growth260,780,032, guard/child0/0 with complete
+cleanup. Signed API fixture `current-api-fixture-20261112-r10` passed in
+ARM guest r15, adding a direct nonnull/zero-size query assertion to all
+earlier checks including queued subscription-failure delivery. Runner
+readiness/pass, EOF drain and exit0 were observed. Snapshot
+`shortcut-api-uart-20261112-r1`, plan `shortcut-api-plan-20261112-r1.json`
+and readback `shortcut-api-readback-20261112-r1` retain the two-entry export,
+archive checksum
+`e8cfa288e4cb833555e9d9307afb44f753db3f7b447c833568ac450b64676b56`.
+The test mount was released before the next broker/Maps attempt.

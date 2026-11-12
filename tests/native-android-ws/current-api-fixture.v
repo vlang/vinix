@@ -364,6 +364,14 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->properties()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
+new-instance v0, Landroid/content/pm/ShortcutManager;
+invoke-direct {v0}, Landroid/content/pm/ShortcutManager;-><init>()V
+invoke-virtual {v0}, Landroid/content/pm/ShortcutManager;->getDynamicShortcuts()Ljava/util/List;
+move-result-object v0
+invoke-interface {v0}, Ljava/util/List;->size()I
+move-result v0
+const/4 v1, 0
+invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
 new-instance v0, Landroid/telephony/TelephonyManager;
 invoke-direct {v0}, Landroid/telephony/TelephonyManager;-><init>()V
 invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->isVoiceCapable()Z
