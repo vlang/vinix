@@ -5,6 +5,57 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static restrictions(Landroid/content/Context;)V
+.locals 6
+const-string v0, "restrictions"
+invoke-virtual {p0, v0}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v0
+check-cast v0, Landroid/content/RestrictionsManager;
+const-class v1, Landroid/content/RestrictionsManager;
+invoke-virtual {p0, v1}, Landroid/content/Context;->getSystemService(Ljava/lang/Class;)Ljava/lang/Object;
+move-result-object v1
+if-ne v0, v1, :failed
+if-eqz v0, :failed
+invoke-virtual {v0}, Landroid/content/RestrictionsManager;->hasRestrictionsProvider()Z
+move-result v1
+const/4 v2, 0
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/content/RestrictionsManager;->getApplicationRestrictions()Landroid/os/Bundle;
+move-result-object v1
+invoke-virtual {v1}, Landroid/os/Bundle;->size()I
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v3, "fixture"
+const/4 v4, 1
+invoke-virtual {v1, v3, v4}, Landroid/os/Bundle;->putBoolean(Ljava/lang/String;Z)V
+invoke-virtual {v0}, Landroid/content/RestrictionsManager;->getApplicationRestrictions()Landroid/os/Bundle;
+move-result-object v3
+if-eq v1, v3, :failed
+invoke-virtual {v3}, Landroid/os/Bundle;->size()I
+move-result v1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v1, "user"
+invoke-virtual {p0, v1}, Landroid/content/Context;->getSystemService(Ljava/lang/String;)Ljava/lang/Object;
+move-result-object v1
+check-cast v1, Landroid/os/UserManager;
+invoke-virtual {p0}, Landroid/content/Context;->getPackageName()Ljava/lang/String;
+move-result-object v3
+invoke-virtual {v1, v3}, Landroid/os/UserManager;->getApplicationRestrictions(Ljava/lang/String;)Landroid/os/Bundle;
+move-result-object v1
+invoke-virtual {v1}, Landroid/os/Bundle;->size()I
+move-result v1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Landroid/content/RestrictionsManager;
+invoke-direct {v0}, Landroid/content/RestrictionsManager;-><init>()V
+invoke-virtual {v0}, Landroid/content/RestrictionsManager;->getApplicationRestrictions()Landroid/os/Bundle;
+move-result-object v0
+if-nez v0, :failed
+return-void
+:failed
+new-instance v0, Ljava/lang/AssertionError;
+invoke-direct {v0}, Ljava/lang/AssertionError;-><init>()V
+throw v0
+.end method
 .method public static shortcuts()V
 .locals 5
 new-instance v0, Landroid/content/pm/ShortcutManager;
@@ -421,6 +472,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->properties()V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
 new-instance v0, Landroid/content/pm/ShortcutManager;

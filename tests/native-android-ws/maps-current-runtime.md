@@ -374,3 +374,39 @@ Source commits for the current successors are `bd22fdcaf` (boolean properties),
 `abdfdaa40` (shortcut query). Removal is built from `abdfdaa40` plus the
 helper/fixture changes in this report's commit. All named artifact directories
 remain under the external work directory above; raw evidence is not in Git.
+
+Guest r16 passed Nearby cleanup and later exited the main looper on a null
+`restrictions` service dependency. Full log delimiters are
+`SHORTCUT-REMOVE-MAPS-LOG-BEGIN` / `SHORTCUT-REMOVE-MAPS-LOG-END`; snapshot
+`maps-shortcut-remove-uart-20261112-r1` has SHA256
+`a16381bf8d1ac8e262c580cebacb818bce7df1ea4b7b61d7d415c6b4f0f29805`.
+The exact `rsy.b` source1071 caller is in the Play Store companion, not the
+same-named interface in Maps. Inspection
+`vending-restrictions-caller-20261112-r1` shows `getSystemService("restrictions")`,
+the RestrictionsManager cast, then `getClass()` on that result. Its
+Application `rra.onCreate` was being started inside the Maps runtime.
+The same log records Cronet's missing native library and explicit Java
+networking fallback; that caught failure is separate from the fatal null.
+
+`framework_restrictions_service.v` supplies cached named/typed service lookups
+with explicit DEX monitor cleanup and an owning context. Its application
+restriction query delegates to the existing UserManager with the owning
+package name, preserving that backend's fresh unmanaged snapshots rather
+than creating a separate policy store. `hasRestrictionsProvider` returns false.
+The retained contextless constructor returns null for its unavailable query.
+Normal generation installs this after the existing service-lookup adapters.
+Permission requests, manifest restriction parsing, administration/enforcement
+and concurrent cache construction are not separately qualified here.
+
+SDK `framework-restrictions-service-20261112-r1` passed guarded assembly and
+readback in3,942 ms, RSS474,234,880, growth28,905,472, guard/child0/0 and
+complete cleanup. Signed fixture `current-api-fixture-20261112-r12` passed on
+ARM in guest r17: named/typed nonnull service identity, absent provider, fresh
+empty snapshots after caller mutation, consistent UserManager query and the
+contextless null result, plus all earlier API checks. Runner readiness/pass,
+EOF drain and exit0 were observed. Snapshot `restrictions-api-uart-20261112-r1`,
+plan `restrictions-api-plan-20261112-r1.json` and independent readback
+`restrictions-api-readback-20261112-r1` preserve its two-entry export, checksum
+`668fa4c92ba3b383cb36db0351668201a20f5d92444849aaab88287f75b7487a`.
+The test mount was released before the next broker/Maps attempt. This
+successor uses `f99306da1` plus this commit's source changes.
