@@ -62,6 +62,8 @@ without reading operands. Other comparisons and arithmetic propagate poison;
 selected undef and unsupported constant expressions still error, except that
 [scalar freeze](SCALAR-FREEZE.md) chooses zero for a direct undef constant or
 poison. Defined freeze inputs keep their exact bits, including signaling NaNs.
+[Pair freeze](SCALAR-PAIR-FREEZE.md) preserves defined fields and independently
+chooses zero for poison fields or a direct pair undef constant.
 
 The mixed entry point shares the integer execution budget, switch comparison
 charges and three owned temporary arrays. It borrows its inputs and frees those

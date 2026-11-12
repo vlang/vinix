@@ -3,7 +3,8 @@
 Both execution APIs accept unflagged `freeze iN` for i1..i64. The mixed scalar
 API additionally accepts half and float. Preflight checks a single operand,
 a result with that exact type, and the decoder's zero opcode. Unsupported types
-and malformed freezes reject even in unvisited blocks. Vectors, aggregates,
+and malformed freezes reject even in unvisited blocks. The mixed API also
+supports [bounded pair freeze](SCALAR-PAIR-FREEZE.md). Vectors, other aggregates,
 pointers, double and integers wider than 64 bits remain outside execution.
 
 For defined operands, freeze copies the raw bits. Signed zeros, infinity and

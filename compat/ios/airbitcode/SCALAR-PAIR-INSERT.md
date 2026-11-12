@@ -6,7 +6,8 @@ for every i1..i64. Exactly one literal index
 selects the arithmetic field (zero) or flag field (one). The inserted scalar
 must have that field's exact type, and source/result pair types must match.
 Preflight checks shape, index, types and source origin in every block.
-Aggregate arguments, returns, other constants, freeze, other layouts and nested
+Pairs also support [element-wise freeze](SCALAR-PAIR-FREEZE.md).
+Aggregate arguments, returns, other constants, other layouts and nested
 field paths remain unsupported. The integer-only API keeps its no-call profile.
 
 Insertion replaces only the chosen field and its poison state. Inserting a

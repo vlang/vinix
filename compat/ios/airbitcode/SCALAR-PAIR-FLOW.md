@@ -7,7 +7,8 @@ Incoming pair types must match the result type exactly. Select requires
 a scalar i1 condition. PHIs retain the usual grouping, incoming-target and
 function-local block checks. Every block is preflighted, including unvisited
 ones. Pairs support [field insertion](SCALAR-PAIR-INSERT.md).
-Aggregate arguments, returns, other constants, freeze and other
+Pairs also support [element-wise freeze](SCALAR-PAIR-FREEZE.md).
+Aggregate arguments, returns, other constants and other
 layouts remain unsupported. The integer-only API keeps its no-call profile.
 
 Select reads only the chosen pair after evaluating the condition. A poison

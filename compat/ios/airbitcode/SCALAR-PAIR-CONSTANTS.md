@@ -8,7 +8,8 @@ module/function scope and rejects arguments, declarations, mismatched types,
 splats and other constant kinds. All blocks are preflighted, including
 unchosen sources. Other parsed constant records, including aggregate
 field-list and undef records, remain unsupported, as do aggregate
-arguments/returns, freeze and other layouts.
+arguments/returns and other layouts. [Pair freeze](SCALAR-PAIR-FREEZE.md)
+additionally accepts a direct undef pair without broadening other consumers.
 The integer-only API retains its scalar profile.
 
 Zero creates two defined zero fields. Poison marks both fields poison.

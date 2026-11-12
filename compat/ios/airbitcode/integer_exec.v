@@ -138,7 +138,12 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				first_operand++ // The validated callee is a declaration, not a scalar value.
 			}
 			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
-			if code == 27 {
+			pair_freeze := code == 58 && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
+			if pair_freeze {
+				if !binary32 { return error('AIR pair: mixed pair freeze required') }
+				p.scalar_pair_freeze(op, s.base_id, pools, scope)!
+				pair_result = true
+			} else if code == 27 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: mixed pair insertion required') }
 				p.scalar_pair_insert(op, s.base_id, pools, scope)!
 				pair_result = true
@@ -363,7 +368,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				}
 				5, 29 { condition := m.read(start + 2)!; result = if condition.poison { IntegerValue{poison: true, aggregate: p.types[op.result_type].kind == .struct_t, flag_poison: p.types[op.result_type].kind == .struct_t} } else { m.read_flow(start + if condition.value & 1 != 0 { 0 } else { 1 })! } }
 				56 { input := m.read(start)!; bits := p.execution_bits(op.result_type, binary32)!; result = IntegerValue{value: input.value ^ (u64(1) << (bits - 1)), poison: input.poison} }
-				58 { result = m.read_frozen(start)! }
+				58 { result = if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
 				10 { value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps} }
 				11 {
 					mut target := 0
