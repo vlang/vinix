@@ -107,16 +107,16 @@ define float @guard_ext_fmf(half %x, half %y, i64 %c) { %r = fpext nnan half %x 
   ret float %r }
 define half @guard_negate_fmf(half %x, half %y, i64 %c) { %r = fneg fast half %x
   ret half %r }
-define i1 @guard_compare(half %x, half %y, i64 %c) { %r = fcmp true half %x, %y
+define i1 @guard_compare_flags(half %x, half %y, i64 %c) { %r = fcmp fast true half %x, %y
   ret i1 %r }
 define i16 @guard_to_integer(half %x, half %y, i64 %c) { %r = fptosi half %x to i16
   ret i16 %r }
 define half @guard_from_integer(i16 %x, i16 %y, i64 %c) { %r = sitofp i16 %x to half
   ret half %r }
-define half @guard_dead_arithmetic(half %x, half %y, i64 %c) {
+define half @guard_dead_precision(half %x, half %y, i64 %c) {
 entry: ret half %x
-dead: %r = fadd half %x, %y
-  ret half %r }
+dead: %r = fpext half %x to double
+  ret half %y }
 define half @guard_freeze(half %x, half %y, i64 %c) { %r = freeze half poison
   ret half %r }
 define float @guard_double(half %x, half %y, i64 %c) { %d = fpext half %x to double
@@ -228,7 +228,7 @@ fn main() {
 	}
 	args := [u64(0x7c01), 0, 0]; defer { unsafe { args.free() } }
 	mut guards := 0
-	for name in ['guard_undef', 'guard_trunc_fmf', 'guard_ext_fmf', 'guard_negate_fmf', 'guard_compare', 'guard_to_integer', 'guard_from_integer', 'guard_dead_arithmetic', 'guard_freeze', 'guard_double', 'guard_bfloat'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported half fixture') }
+	for name in ['guard_undef', 'guard_trunc_fmf', 'guard_ext_fmf', 'guard_negate_fmf', 'guard_compare_flags', 'guard_to_integer', 'guard_from_integer', 'guard_dead_precision', 'guard_freeze', 'guard_double', 'guard_bfloat'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported half fixture') }
 	for name in ['poison_widen', 'poison_narrow', 'poison_negate'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('half poison lost') } }
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != args[0] { panic('half select not lazy') }
 	baseline := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'widen')!, [u64(0x3c00), 0, 0], 64)!; mut controls := 0

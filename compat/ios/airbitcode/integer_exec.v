@@ -131,8 +131,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, bodies IRFunct
 			match code {
 				2, 9, 28 {
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
-					if p.types[p.operands[op.operands_start].type_index].kind == .half_t { return error('AIR scalar: binary16 arithmetic/comparison unsupported') }
-					fp := p.types[p.operands[op.operands_start].type_index].kind == .float_t
+					fp := p.types[p.operands[op.operands_start].type_index].kind in [.float_t, .half_t]!
 					if code == 2 {
 						if (fp && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!fp && op.opcode > 12) { return error('AIR scalar: binary opcode') }
 					} else if (fp && op.opcode > 15) || (!fp && (op.opcode < 32 || op.opcode > 41)) { return error('AIR scalar: predicate') }
@@ -252,14 +251,16 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				2 {
 					a := m.read(start)!; b := m.read(start + 1)!
 					if p.types[op.result_type].kind == .float_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary32_binary(op.opcode, u32(a.value), u32(b.value))!} } }
+					else if p.types[op.result_type].kind == .half_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: binary16_binary(op.opcode, u16(a.value), u16(b.value))!} } }
 					else { result = integer_binary_flags(op.opcode, op.flags, p.integer_bits(op.result_type)!, a, b)! }
 				}
 				9, 28 {
-					fp := p.types[p.operands[start].type_index].kind == .float_t
+					fp := p.types[p.operands[start].type_index].kind in [.float_t, .half_t]!
 					if fp && op.opcode in [u32(0), 15]! { result = IntegerValue{value: u64(op.opcode == 15)} }
 					else {
 						a := m.read(start)!; b := m.read(start + 1)!
-						if fp { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary32_compare(op.opcode, u32(a.value), u32(b.value))!)} } }
+						if p.types[p.operands[start].type_index].kind == .half_t { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary16_compare(op.opcode, u16(a.value), u16(b.value))!)} } }
+						else if fp { result = if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary32_compare(op.opcode, u32(a.value), u32(b.value))!)} } }
 						else { result = integer_compare(op.opcode, p.integer_bits(p.operands[start].type_index)!, a, b)! }
 					}
 				}

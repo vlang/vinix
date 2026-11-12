@@ -335,17 +335,20 @@ fn test_scalar_binary16_conversions_and_profile_guards() {
 	f.refs[0] = 3
 	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(56, [u64(3), 0]); f.add(10, [u64(1)])
 	assert f.scalar([u64(0x7c01), 0], 2)!.value == 0xfc01 // Preserve signaling NaN bits.
-	// Reject half arithmetic throughout the function, even if the result is unused.
+	// Binary arithmetic and comparisons return their declared half/i1 kinds.
 	f.refs[2] = 3; f.arguments[1] = 3
 	for op in [u64(0), 1, 2, 4, 6]! {
-		f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, op]); f.add(10, [u64(3)])
-		if _ := f.scalar([u64(0x3c00), 0x4000], 3) { assert false, 'half arithmetic accepted' }
+		f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(2, [u64(3), 2, op]); f.add(10, [u64(1)])
+		run := f.scalar([u64(0x3c00), 0x4000], 2)!
+		expected := match op { 0 { u64(0x4200) } 1 { u64(0xbc00) } 2 { u64(0x4000) } 4 { u64(0x3800) } else { u64(0x3c00) } }
+		assert run.kind == .binary16 && run.bits == 16 && run.value == expected && !run.poison && run.steps == 2
 	}
 	f.refs[0] = 1
 	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(28, [u64(3), 2, 0]); f.add(10, [u64(1)])
-	if _ := f.scalar([u64(0x3c00), 0x4000], 3) { assert false, 'half comparison accepted' }
+	comparison := f.scalar([u64(0x3c00), 0x4000], 2)!
+	assert comparison.kind == .integer && comparison.bits == 1 && comparison.value == 0 && !comparison.poison
 	f.refs[0] = 3; f.refs[1] = 0; f.arguments[0] = 0
 	f.records.clear(); f.values.clear(); f.header(); f.add(1, [u64(1)]); f.add(3, [u64(3), 3, 7, 2]); f.add(10, [u64(1)])
 	if _ := f.scalar([u64(0), 0], 2) { assert false, 'precision fast math flags' }
-	println('AIR-SCALAR-BINARY16: decoded precision conversions, kind/width/step/masking, poison/undef/constants, exact fneg and arithmetic/comparison/flag/profile/budget guards PASS')
+	println('AIR-SCALAR-BINARY16: decoded precision conversions, arithmetic/comparison, kind/width/step/masking, poison/undef/constants, exact fneg and flag/profile/budget guards PASS')
 }

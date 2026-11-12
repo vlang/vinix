@@ -9,16 +9,7 @@ fn binary16_from_binary32(value u32) u16 {
 	if magnitude == 0x7f800000 { return sign | 0x7c00 }
 	if magnitude == 0 { return sign }
 	finite := binary32_finite(value)
-	mut exponent := finite.exponent
-	distance := 10 + if exponent < -14 { -14 - exponent } else { 0 }
-	significand := binary32_jam(finite.significand, distance)
-	if exponent < -14 { exponent = -14 }
-	mut fraction := significand >> 3; remainder := significand & 7
-	if remainder > 4 || (remainder == 4 && fraction & 1 != 0) { fraction++ }
-	if fraction >= u64(1) << 11 { fraction >>= 1; exponent++ }
-	if exponent > 15 { return sign | 0x7c00 }
-	encoded := if fraction >= u64(1) << 10 { u16(exponent + 15) } else { u16(0) }
-	return sign | (encoded << 10) | u16(fraction & 0x3ff)
+	return binary16_pack(sign, finite.exponent, binary32_jam(finite.significand, 10))
 }
 // Every finite binary16 value has an exact binary32 representation.
 // Conversion NaNs choose the preferred positive quiet NaN, as LLVM permits.
