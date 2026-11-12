@@ -69,6 +69,45 @@ Recording and separate complete verification pass with the same retained
 inventory tool; originals remain required. Scope and toolchain limitations
 above still apply. No production supervisor or kernel fix is claimed.
 
+## Adoption publication coordination, 2026-11-13
+
+The follow-up built from `7b8ed3db9` changes `kernel/userland/exit.v` so that
+the process-table lock covers adopter selection, child PPID updates and child
+list insertion. `claim_teardown` takes this same lock before setting `exiting`;
+a selected live subreaper therefore cannot start teardown in the gap between
+selection and insertion. `find_reaper_locked` borrows table entries while that
+lock is held. The selected adopter is pinned before unlocking, retains that
+pin through notification and releases it at the existing unpin site. Temporary
+ancestor pins are no longer needed. The lock order is table then child list;
+the wait/reap path releases its child-list lock before table operations.
+The global PID-1 fallback and init-death behavior retain their existing scope.
+
+Both kernels build in the isolated sparse worktree
+`/Users/alex/.cache/vinix-adoption-kernel-20261113-01`, with dependency symlinks
+to the original checkout. ARM succeeds in `arm-build-02.log`, x86 in
+`x86-build-03.log`. Earlier missing-linker and sparse-generator dependency
+failures remain retained. The saved kernels are `vinix-aarch64` and
+`vinix-x86_64`; ARM generated C is saved separately before cleaning its objects
+for the x86 build. The worktree retains x86 generated C and the exact patch.
+
+`run-arm-01` and `run-x86-01` pass the unchanged native prerequisite controller
+from the preceding nested-transfer qualification: ordinary non-init adoption,
+busy/released lease, disabled-subreaper refusal and controlled nested transfer
+after adopter signal death. Selected source/tool/kernel hashes and generated
+guest artifacts pass their before/after checks. These are regression checks;
+they do not deterministically force the former selection/publication window.
+No kernel leak, full security/desktop or real Wine requalification is claimed.
+The separate late `CLONE_PARENT` publication finding remains unchanged, so a
+general descendant barrier and production lease supervision remain unqualified.
+
+The complete typed worktree inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/adoption-kernel-20261113-01.inventory.json`,
+SHA-256 `c74b91879a0d9c12ea9e6105b5755cca295206112ef8909850461c2af422bf33`.
+Recording and a separate complete check pass; adjacent logs retain both results.
+This is an in-place integrity seal. Keep the worktree, original linked
+dependencies, selected external compiler and historical namespaces. Link
+targets are recorded; this is not a complete toolchain-content inventory.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

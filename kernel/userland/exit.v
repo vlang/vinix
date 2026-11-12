@@ -259,15 +259,17 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 		}
 	}
 
-	mut adopter := find_reaper(current_process)
+	// claim_teardown uses this same lock. Keep selection and publication
+	// together: a pin alone does not prevent the adopter detaching its list.
+	proc.lock_table()
+	mut adopter := find_reaper_locked(current_process)
+	if adopter != unsafe { nil } { proc.pin_process(adopter) }
 	if adopter != unsafe { nil } && voidptr(adopter) != voidptr(current_process) {
 		mut adopted_zombie := false
 		// Parent identity belongs to the process-table snapshot contract. Publish
 		// it before taking the new child-list lock, preserving table/list ordering.
-		proc.lock_table()
 		for mut child_proc in orphans { child_proc.ppid = adopter.pid }
 		proc.filter_job_orphan_change_locked(mut orphan_change)
-		proc.unlock_table()
 		adopter.children_lock.acquire()
 		for mut child_proc in orphans {
 			adopter.children << child_proc
@@ -276,13 +278,13 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 			}
 		}
 		adopter.children_lock.release()
+		proc.unlock_table()
 		// A child that had already died is the adopter's to reap now; tell it,
 		// as the dead child's own SIGCHLD went to a parent that is gone.
 		if adopted_zombie {
 			notify_process(adopter)
 		}
 	} else {
-		proc.lock_table()
 		proc.filter_job_orphan_change_locked(mut orphan_change)
 		proc.unlock_table()
 	}
@@ -503,17 +505,17 @@ fn wait_for_thread_to_leave(mut process proc.Process, t &proc.Thread) {
 	}
 }
 
-// Returns an owned Process pin for the caller to release.
+// Returns a borrowed Process under the caller's process-table lock.
 // Who adopts the children of `process`: its closest living ancestor that set
 // PR_SET_CHILD_SUBREAPER, or the init of its pid namespace -- a container's,
 // which is what lets tini reap the zombies inside it -- or PID 1.
-fn find_reaper(process &proc.Process) &proc.Process {
+fn find_reaper_locked(process &proc.Process) &proc.Process {
 	mut ppid := process.ppid
 	for _ in 0 .. proc.max_pid {
 		if ppid <= 1 || ppid >= proc.max_pid {
 			break
 		}
-		ancestor := proc.pin_process_at(ppid)
+		ancestor := proc.process_at(ppid)
 		if ancestor == unsafe { nil } {
 			break
 		}
@@ -521,21 +523,19 @@ fn find_reaper(process &proc.Process) &proc.Process {
 			return ancestor
 		}
 		ppid = ancestor.ppid
-		proc.unpin_process(ancestor)
 	}
 	pid_ns := process.numbered_in
 	if proc.numbers_own(pid_ns) && pid_ns.init_pid != process.pid && pid_ns.init_pid > 0
 		&& pid_ns.init_pid < proc.max_pid {
-		namespace_init := proc.pin_process_at(pid_ns.init_pid)
+		namespace_init := proc.process_at(pid_ns.init_pid)
 		if namespace_init != unsafe { nil } && !namespace_init.exiting {
 			return namespace_init
 		}
-		if namespace_init != unsafe { nil } { proc.unpin_process(namespace_init) }
 	}
 	if process.pid == 1 {
 		return unsafe { nil }
 	}
-	return proc.pin_process_at(1)
+	return proc.process_at(1)
 }
 
 fn notify_process(parent &proc.Process) {
