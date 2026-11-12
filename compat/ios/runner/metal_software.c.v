@@ -18,13 +18,28 @@ const software_metal_max_buffer = u64(64 * 1024 * 1024)
 fn sm_buffer_length(h &ObjHeader) u64 { return if h.external_data != 0 { h.external_size } else { u64(h.data.len) } }
 fn sm_buffer_no_copy(device u64, selector &char, bytes u64, length u64, options u64, deallocator u64) u64 {
 	C.ios_objc_initialize_lock()
-	defer { C.ios_objc_initialize_unlock() }
 	sm_check(device, 'VinixSoftwareMTLDevice')
 	page := u64(C.getpagesize())
-	if bytes == 0 || length == 0 || length > software_metal_max_buffer || bytes > ~u64(0) - length || bytes % page != 0 || length % page != 0 || options != 0 || deallocator != 0 { return 0 }
+	if bytes == 0 || length == 0 || length > software_metal_max_buffer || bytes > ~u64(0) - length || bytes % page != 0 || length % page != 0 || options != 0 { C.ios_objc_initialize_unlock(); return 0 }
+	if deallocator != 0 && (!is_block(deallocator) || read64(deallocator + 16) == 0) { C.ios_objc_initialize_unlock(); return 0 }
+	objc_retain(device)
+	C.ios_objc_initialize_unlock()
+	defer { objc_release(device) }
+	// Copy helpers can execute client code before the new object is published.
+	copied := block_copy(deallocator)
+	C.ios_objc_initialize_lock()
 	buffer := sm_new('VinixSoftwareMTLBuffer', device)
 	mut h := obj_header(buffer); h.external_data = bytes; h.external_size = length
-	return buffer // Caller owns the pages; no destructor ever frees this address.
+	h.fields[4] = copied
+	C.ios_objc_initialize_unlock()
+	return buffer
+}
+type SoftwareMetalDeallocator = fn (u64, u64, u64)
+fn sm_buffer_dispose(mut h ObjHeader) {
+	if h.cls != ios_runtime.names['VinixSoftwareMTLBuffer'] || h.fields[4] == 0 { return }
+	block := h.fields[4]; h.fields[4] = 0 // Detach before reentrant client cleanup.
+	unsafe { SoftwareMetalDeallocator(voidptr(read64(block + 16)))(block, h.external_data, h.external_size) }
+	block_release(block)
 }
 fn sm_new(name string, owner u64) u64 {
 	C.ios_objc_initialize_lock()

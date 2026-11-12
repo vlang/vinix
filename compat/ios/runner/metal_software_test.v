@@ -306,6 +306,53 @@ fn test_software_metal_compiled_library_metadata() {
 }
 type SMSurface = fn (u64, &char, u64, u64, u64) u64
 type SMNoCopy = fn (u64, &char, u64, u64, u64, u64) u64
+struct SMDeallocatorProbe {
+	owner u64
+	device u64
+	pointer u64
+	length u64
+	expected u8
+mut:
+	copies int
+	drops int
+	calls int
+}
+fn sm_deallocator_copy(destination u64, source u64) { mut p := unsafe { &SMDeallocatorProbe(read64(source + 32)) }; objc_retain(p.owner); p.copies++ }
+fn sm_deallocator_drop(block u64) { mut p := unsafe { &SMDeallocatorProbe(read64(block + 32)) }; assert p.calls == 1; objc_release(p.owner); p.drops++ }
+fn sm_deallocator_invoke(block u64, pointer u64, length u64) {
+	mut p := unsafe { &SMDeallocatorProbe(read64(block + 32)) }
+	assert p.calls == 0 && p.copies == 1 && p.drops == 0 && pointer == p.pointer && length == p.length
+	assert sm_send(p.device, c'maxBufferLength') == software_metal_max_buffer && obj_header(p.owner).refs > 0
+	assert unsafe { *(&u8(pointer)) } == p.expected
+	p.calls++; assert C.munmap(unsafe { voidptr(pointer) }, usize(length)) == 0
+}
+fn test_software_metal_buffer_deallocators() {
+	$if !ios_metal_software ? { return }
+	for _ in 0 .. 2 {
+		objc_start(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue'); page := u64(C.getpagesize())
+		for mode in 0 .. 4 {
+			memory := C.mmap(unsafe { nil }, usize(page), 3, 0x1002, -1, 0); assert u64(memory) != ~u64(0); C.memset(memory, 0x4b, usize(page))
+			mut p := SMDeallocatorProbe{owner: objc_allocate(ios_runtime.names['NSObject']), device: d, pointer: u64(memory), length: page, expected: if mode == 3 { u8(0x44) } else { u8(0x4b) }}
+			descriptor := [u64(0), u64(sizeof(SMCompletionBlock)), u64(unsafe { voidptr(sm_deallocator_copy) }), u64(unsafe { voidptr(sm_deallocator_drop) })]!
+			block := SMCompletionBlock{isa: block_isa(0), flags: u32(1) << 25, invoke: u64(unsafe { voidptr(sm_deallocator_invoke) }), descriptor: u64(unsafe { &descriptor[0] }), capture: u64(unsafe { &p })}
+			// Invalid layout must not copy the block or take ownership of memory.
+			assert sm_test_no_copy(d, u64(memory), page - 1, 0, u64(unsafe { &block })) == 0 && p.copies == 0 && p.calls == 0
+			bad_block := SMCompletionBlock{...block, invoke: 0}; assert sm_test_no_copy(d, u64(memory), page, 0, u64(unsafe { &bad_block })) == 0
+			pool := objc_pool_push(); b := sm_test_no_copy(d, u64(memory), page, 0, u64(unsafe { &block })); assert b != 0 && p.copies == 1; objc_release(p.owner)
+			if mode == 0 { objc_release(b); assert p.calls == 1 }
+			else if mode == 1 {
+				t := sm_test_buffer_texture_view(b, sm_test_descriptor(80, 2, 2, 0), 0, 256); view := sm_test_view(t, 80); objc_release(b); objc_release(t); assert p.calls == 0; objc_release(view); assert p.calls == 1
+			} else {
+				cmd := sm_send(q, c'commandBuffer'); enc := sm_send(cmd, c'blitCommandEncoder'); sm_test_fill(enc, b, SoftwareMetalRange{length: 1}, 0x44); objc_release(b); sm_call(enc, c'endEncoding')
+				if mode == 3 { sm_call(cmd, c'commit') }; assert p.calls == 0
+			}
+			objc_pool_pop(pool); assert p.calls == 1 && p.drops == 1 && ios_runtime.block_refs.len == 0
+			assert ios_runtime.live == 2
+		}
+		objc_release(q); objc_release(d); assert ios_runtime.live == 0 && ios_runtime.objects.len == 0; objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-DEALLOCATOR: copied block/capture ABI, exact pointer and length, invalid inputs preserve ownership, callback unmaps pages, reentrant device query, direct/view/abandoned/committed final owners, exactly once disposal and two drained runtimes PASS')
+}
 fn sm_test_no_copy(d u64, bytes u64, length u64, options u64, deallocator u64) u64 { return unsafe { SMNoCopy(voidptr(C.ios_objc_msgsend))(d, c'newBufferWithBytesNoCopy:length:options:deallocator:', bytes, length, options, deallocator) } }
 fn test_software_metal_no_copy_buffers() {
 	$if !ios_metal_software ? { return }
@@ -315,7 +362,7 @@ fn test_software_metal_no_copy_buffers() {
 		objc_start(); pool := objc_pool_push(); d := metal_create_system_default_device(); q := sm_send(d, c'newCommandQueue')
 		b := sm_test_no_copy(d, base, 2 * page, 0, 0); alias := sm_test_no_copy(d, base, 2 * page, 0, 0)
 		assert b != 0 && alias != b && sm_send(b, c'contents') == base && sm_send(b, c'length') == 2 * page && sm_send(b, c'device') == d
-		for mode in 0 .. 8 { assert sm_test_no_copy(d, if mode == 0 { u64(0) } else if mode == 1 { base + 1 } else if mode == 2 { ~u64(0) - page + 1 } else { base }, if mode == 3 { u64(0) } else if mode == 4 { page - 1 } else if mode == 5 { software_metal_max_buffer + page } else { page }, if mode == 6 { u64(1) } else { 0 }, if mode == 7 { u64(1) } else { 0 }) == 0 }
+		for mode in 0 .. 8 { assert sm_test_no_copy(d, if mode == 0 { u64(0) } else if mode == 1 { base + 1 } else if mode == 2 { ~u64(0) - page + 1 } else { base }, if mode == 3 { u64(0) } else if mode == 4 { page - 1 } else if mode == 5 { software_metal_max_buffer + page } else { page }, if mode == 6 { u64(1) } else { 0 }, if mode == 7 { d } else { 0 }) == 0 }
 		owned := sm_test_buffer(d, 64, 0); texture := sm_test_buffer_texture_view(b, sm_test_descriptor(80, 2, 2, 0), 256, 256); assert texture != 0
 		mut pixel := [u8(7), 13, 29, 53]!
 		sm_test_put(texture, SoftwareMetalRegion{width: 1, height: 1, depth: 1}, 0, u64(unsafe { &pixel[0] }), 0)

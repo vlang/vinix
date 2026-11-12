@@ -133,12 +133,19 @@ device, queue and buffer creation transfer a reference to the caller.
 
 The no-copy constructor instead borrows caller-owned pages. Pointer and length
 must be aligned to the host page size, length must be positive and at most
-64 MiB, and pointer-plus-length must not overflow. Options and deallocator
-must both be zero; nonnil deallocator blocks are currently unsupported and
-rejected without copying or invoking them. The caller must keep the entire
+64 MiB, and pointer-plus-length must not overflow. Options must be zero.
+A nonnil deallocator must be a runtime block with an invoke function; creation
+copies it, including captures. Invalid input returns nil before copying the
+block or taking ownership. The caller must keep the entire
 region mapped and writable until all buffers, textures, views and encoded
-commands using it have been released. The runtime never frees/unmaps these
-pages. Contents, fills, blits and buffer-backed textures all use the borrowed
+commands using it have been released. At final buffer destruction the copied
+block is detached, invoked once with the original pointer/length, then released.
+The callback owns memory cleanup; a nil deallocator leaves cleanup to the
+caller. The runtime itself never frees/unmaps these pages. Callbacks run on
+the releasing thread and may execute under a recursive runtime lock inherited
+from object cleanup. Same-thread runtime calls are allowed; callbacks must not
+wait for another thread that needs that lock. Contents, fills, blits and
+buffer-backed textures all use the borrowed
 bytes directly. Separately wrapped overlapping memory participates in alias
 checks; nonempty overlapping buffer copies reject, while disjoint copies and
 empty copies are valid. Access through contents still requires synchronization.
