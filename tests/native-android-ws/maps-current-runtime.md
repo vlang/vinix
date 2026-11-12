@@ -1729,3 +1729,76 @@ input, both overloads and null rejection. Snapshot
 `a1273fe6ad7144a6ddb635c5c5dbb57b0e09a7f04e87a0f3216894f8faae7c0b`.
 The fixture bind was released before broker preparation. The actual Maps
 retry remains pending; this API pass does not qualify Maps functionality.
+
+With source `c339f52e0`, r53 reached broker readiness, rendered onboarding and
+Explore, and accepted a typed Louvre query after the search field was visibly
+focused. It returned Louvre Museum/Musée du Louvre,4.7 stars(382,525), opening
+hours and real place photos. Directions accepted Eiffel Tower as origin and
+returned10-minute driving,29-minute transit and46-minute walking estimates.
+Screenshots `search-louvre2.png` and `route-origin.png` are retained privately
+under `maps-current-20261112-r53`. This validates search/details/photos and
+route estimates for that run, not map tiles, route geometry or navigation.
+
+The map background remained blank. Its log reports missing native
+GLES20.glVertexAttribPointerBounds, separately from the eventual exit. After
+selecting Preview, the app exited; complete retained logs identify uncaught
+DeviceConfig class resolution in the GMS platform-configuration update worker
+at eqea.k source10. The exact caller uses getProperty and setProperty, including
+null values and both makeDefault modes; fresh readback is
+`gms-device-config-caller-20261112-r1`. Cronet module linkage errors explicitly
+fall back to Java networking and are not the uncaught exit identified here.
+
+Only verified owned QEMU PID26170 was synced and stopped. Complete log SHA256
+is `419c30f767cb3591193c94bc6b69e9d5793fb112efd6914585c56e3bb833457f`;
+data-image SHA256 is
+`ec42f496cc77f7fd4089f845dc8defc9c9de338fb07a06a1a3f4d170c2c28cad`.
+Snapshot `maps-gles-final-uart-20261112-r1` has full SHA256
+`3dcfaba9354f7cfe3dd5a9141a0cf1fec9b356d5b9e8b8bad385f84628bd0468`.
+The watcher did not complete600 seconds, so this is not a stability pass.
+
+The GLES client-pointer binding now forwards the caller-owned direct address
+plus the typed buffer's byte position to the existing Mesa renderer. Like
+[Android's JNI implementation](https://github.com/aosp-mirror/platform_frameworks_base/blob/master/core/jni/android_opengl_GLES20.cpp),
+it does not retain, pin, copy or free client storage; the application must keep
+it alive through draws. Heap storage is rejected, and Java position/limit stay
+unchanged. The pixel regression retains its buffer through glFinish, mutates
+vertices after pointer registration and checks direct/read-only rendering and
+failed heap-pointer replacement. Existing offset/VBO paths remain exercised.
+
+The first native-builder compilation with available V `0.5.2 8415951` emitted
+an unresolved trim_space_eq helper and failed; its automatic historical fallback
+also failed. No output from that attempt was used. The binding parser now tests
+blank lines with is_blank directly. The current compiler then built the helper
+successfully. Guarded JNI build `current-native-build-20261112-latest-r5` passed
+0/0, complete cleanup,9520ms, RSS412909568, shared growth152965120 bytes. It used
+the graphic-text SDK declarations. ARM execution remains pending.
+
+`framework_device_config.v` exposes the observed property query and write
+signatures for the absent platform configuration datastore: reads return null,
+writes/deletions return false and null namespace/name are rejected. It stores
+no global overrides and claims no successful write. This is the unsupported
+storage outcome described by [Android's DeviceConfig contract](https://android.googlesource.com/platform/packages/modules/ConfigInfrastructure/+/refs/heads/main/framework/java/android/provider/DeviceConfig.java).
+
+SDK `framework-device-config-20261112-r1` passed guarded full assembly and
+selected DEX readback:0/0, complete cleanup,2523ms, RSS459587584, shared growth
+29384704 bytes. Signed fixture r52 passed build/link/sign/verification:0/0,
+complete cleanup,975ms, RSS159252480, shared growth1753088 bytes.
+
+Guest r54 staging failed the unchanged shared disk-growth guard:exit125,
+543596544 bytes growth in8278ms, cleanup timeout reported. A later process
+inspection found no surviving supervised process; the failed root and receipt
+remain retained and were never launched. After read-only free-space checks
+stabilized, fresh r55 staging passed0/0, complete cleanup,4689ms, RSS37535744,
+shared growth143552512 bytes. UUID, read-only e2fsck and initial-image hash
+checks passed before launch. Neither guard limits nor guest resources changed.
+
+The complete signed r52 fixture passed on ARM in r55 as UID/GID10160,
+ready/pass once, drained EOF and exit0. It runs the existing EGL/GLES shader,
+uniform, VBO/EBO, texture and readback checks plus the new client-pointer pixel
+regression and DeviceConfig cases. Snapshot
+`gles-device-config-api-uart-20261112-r1`, plan
+`gles-device-config-api-plan-20261112-r1.json` and strict byte readback with
+zero removals `gles-device-config-api-readback-20261112-r1` retain archive
+SHA256 `164d1fceb234e0bd640dbeed5f9a5b099a829cec95c70ba5dded3c08424a03c6`.
+The fixture bind was released before GMS broker preparation. Actual Maps tile,
+route-preview and login qualification remains pending.

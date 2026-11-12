@@ -48,6 +48,7 @@ fn main() {
 	androidtools.framework_display_sms(root + '/smali')!
 	androidtools.framework_update_policy(root + '/smali')!
 	androidtools.framework_graphic_text(root + '/smali')!
+	androidtools.framework_device_config(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -101,6 +102,7 @@ fn main() {
 	types << 'android/app/admin/DevicePolicyManager'
 	types << 'android/app/admin/SystemUpdatePolicy'
 	types << 'android/text/TextUtils'
+	types << 'android/provider/DeviceConfig'
 	types << r'android/os/StrictMode$VmPolicy'
 	types << r'android/os/StrictMode$VmPolicy$Builder'
 	types << r'android/os/StrictMode$OnVmViolationListener'

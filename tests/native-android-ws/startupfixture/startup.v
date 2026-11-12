@@ -42,6 +42,7 @@ pub fn install(output string, resources string) ! {
  install_gles_uniform_probe(dir)!
  install_gles_vector_probe(dir)!
  install_gles_attribute_probe(dir)!
+ install_gles_client_probe(dir)!
  install_glutils_probe(dir)!
  install_image_filter_probe(dir)!
  install_clock_probe(dir)!

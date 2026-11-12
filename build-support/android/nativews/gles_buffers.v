@@ -38,3 +38,23 @@ fn ws_gl_draw_elements_offset(mode i32, count i32, kind i32, offset i32) {
 fn ws_gl_vertex_pointer_offset(index i32, size i32, kind i32, normalized u8, stride i32, offset i32) {
  unsafe { WsGlesVertexPointer(ws_egl_proc(c'glVertexAttribPointer'))(u32(index), size, u32(kind), normalized, stride, voidptr(isize(offset))) }
 }
+
+// Client arrays outlive this JNI call. Match Android's direct-buffer path:
+// borrow the caller-owned address, never an upload copy or a pinned heap array.
+// The application must keep that buffer alive through all draws using it.
+fn ws_gl_vertex_pointer_buffer(e voidptr, index i32, size i32, kind i32, normalized u8, stride i32, source voidptr) {
+ unsafe {
+  mut pointer := voidptr(nil)
+  if source != nil {
+   address := get_long(e, source, c'java/nio/Buffer', c'address')
+   position := integer(e, source, c'java/nio/Buffer', c'position', c'()I', nil)
+   shift := get_int(e, source, c'java/nio/Buffer', c'_elementSizeShift')
+   if pending(e) { return }
+   if address == 0 || position < 0 || shift < 0 || shift > 3 {
+    ws_egl_java_error(e, c'Must use a native order direct Buffer'); return
+   }
+   pointer = voidptr(address + (i64(position) << shift))
+  }
+  WsGlesVertexPointer(ws_egl_proc(c'glVertexAttribPointer'))(u32(index), size, u32(kind), normalized, stride, pointer)
+ }
+}

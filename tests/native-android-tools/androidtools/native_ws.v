@@ -106,7 +106,7 @@ pub fn native_ws_bindings(spec string, smali string) !string {
 	mut generated := '@[translated]\nmodule atlframework\n'
 	mut count := 0
 	for line in spec.split_into_lines() {
-		if line.trim_space() == '' || line.starts_with('#') { continue }
+		if line.is_blank() || line.starts_with('#') { continue }
 		parts := line.split('|')
 		if parts.len != 3 { return error('invalid native binding: ' + line) }
 		class_name, method_name, body := parts[0], parts[1], parts[2]
