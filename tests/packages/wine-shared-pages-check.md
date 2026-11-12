@@ -96,3 +96,15 @@ before/after inventories, serial output and `result.json`. The original
 `wine-shared-pages-20261112` workspace and archive remain unchanged. This
 continuation measures coherent aliases at host-page boundaries; general
 translated 4 KiB shared mappings and ARM Wine graphical acceptance remain open.
+
+The diagnostic bundle is also retained at
+`/Users/alex/.cache/vinix-wine-shared-alias-20261112` and sealed in
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-shared-alias-20261112-01.tar.gz`.
+It includes the controller executable/generated C and the maintained sources
+from `b84175b66`. Archive SHA-256 is
+`ba3d862659fa9b525ff9ac3c0c9ca2d626ff874e1b5f99b961eeaf0bde444d65`;
+the adjacent `.inventory.txt` SHA-256 is
+`d204ba13c2e6cc96d730bf971a08524a7b274e433eaf700185a030a97533cd37`.
+The adjacent `.audit` verifies complete logical bytes and metadata with
+unchanged before/after inventories. Both originals remain retained; their
+absolute namespaces and original complete dependency bundles are still required.
