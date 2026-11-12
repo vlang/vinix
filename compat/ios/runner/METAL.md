@@ -318,7 +318,7 @@ Zero input returns the width when the flag is false and poison when true;
 freeze can define that result before storing. Calls cost one step and execute
 inside the interpreter. Indirect calls, call-site attributes, tail calls and
 fast-math calls remain unsupported. Admitted intrinsic families are these five
-and the funnel/extrema intrinsics below. Synthetic deferred kernels
+and the funnel/extrema/abs intrinsics below. Synthetic deferred kernels
 combine all five operations and consume zero-poison results through freeze.
 
 Direct LLVM `fshl`/`fshr` calls support three matching i1..i64 operands. Amounts
@@ -335,6 +335,13 @@ the chosen input bits. Both operands are evaluated; poison propagates and
 undef rejects. Calls cost one step and share the existing direct-call checks.
 A synthetic deferred kernel computes all four results and stores them through
 checked GEPs, exercising signed/unsigned differences with the same raw inputs.
+
+Direct LLVM `abs` calls support i1..i64 with a literal defined i1 flag. A false
+flag preserves the signed minimum's raw bits; a true flag makes that input
+poison. Other values yield their absolute-value bits. Poison input propagates
+and undef rejects. Calls cost one step and share scalar validation/evaluation.
+Synthetic deferred kernels check both flags, ordinary negative inputs and
+freezing a poisoned minimum before storing.
 
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not

@@ -71,7 +71,14 @@ Both operands are evaluated; poison propagates and undef rejects. Results
 preserve the chosen input bits. Each call costs one step and reuses the scalar
 intrinsic validator and evaluator.
 
-Only ordinary direct calls to these eleven families' exact declarations are admitted:
+Direct LLVM `abs` supports i1..i64 and requires a literal defined i1
+minimum-poison flag. With that flag false, the signed minimum retains its raw
+bits; with it true, the minimum produces poison. Other defined inputs produce
+their absolute-value bit pattern. Poison input propagates and undef rejects;
+freeze can consume the poisoned minimum. Each call costs one step and shares
+the scalar validator, immediate checks and evaluator.
+
+Only ordinary direct calls to these twelve families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -151,5 +158,7 @@ defined native LLVM execution, with separate zero/poison/undef/call controls.
 rotation/amount boundaries and separate poison/undef/padding-choice controls.
 `tests/ios/air-memory-extrema.v` checks signed/unsigned min/max buffer functions
 against native LLVM, including boundary matrices and separate poison controls.
+`tests/ios/air-memory-abs.v` checks absolute-value buffer functions, defined
+native inputs, minimum-poison flags and per-call flag checks after cache hits.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
