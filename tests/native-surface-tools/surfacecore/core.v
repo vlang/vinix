@@ -11,7 +11,7 @@ import time
 #include <sys/mman.h>
 
 fn C.lseek(i32, i64, i32) i64
-fn C.pread(i32, voidptr, usize, i64) isize
+fn C.pread(i32, voidptr, uint, i64) int
 
 pub struct Mapping {
 pub:
@@ -29,7 +29,7 @@ pub fn map_file(path string, writable bool) !Mapping {
 	length := C.lseek(fd, 0, 2)
 	if length <= 0 { return error('surface file cannot be mapped') }
 	area := unsafe {
-		C.mmap(nil, usize(length), C.PROT_READ | if writable {
+		C.mmap(nil, uint(length), C.PROT_READ | if writable {
 			C.PROT_WRITE
 		} else {
 			0
@@ -42,7 +42,7 @@ pub fn map_file(path string, writable bool) !Mapping {
 
 pub fn (mut mapping Mapping) close() {
 	if mapping.fd < 0 { return }
-	unsafe { C.munmap(mapping.data, usize(mapping.length)) }
+	unsafe { C.munmap(mapping.data, uint(mapping.length)) }
 	C.close(mapping.fd)
 	mapping.fd = -1
 	mapping.data = unsafe { nil }
