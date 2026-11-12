@@ -7,12 +7,12 @@ const subdirs_pattern = '\\bsubdirs\\s*:\\s*\\[([^]]*)\\]'
 const entries_pattern = '[\'"]([^\'"]+)[\'"]'
 
 pub fn staged_source(name string, source string) !json2.Any {
-	if name == 'monitor_linux.v' {
+	if name in ['monitor_linux.v', 'monitor_nix.v'] {
 		// The compositor has fbdev outputs, not an X11 connection. ui2 uses
 		// zero for an unknown refresh rate, including its other headless ports.
 		return json2.Any('module ui2\nfn native_monitor_refresh_rate() f64 { return 0 }\n'.bytes().hex())
 	}
-	if name in ['file_dialog_linux.v', 'message_box_linux.v'] {
+	if name in ['file_dialog_linux.v', 'message_box_linux.v', 'file_dialog_nix.v', 'message_box_nix.v'] {
 		return json2.Any(read(source, '')!.replace('os.execute(command)', "os.exec(['/bin/sh', '-c', command])").bytes().hex())
 	}
 	if name != 'vml_embed.v' { return json2.Null{} }
@@ -51,7 +51,9 @@ pub fn module_subdirs(text string) ![]string {
 pub fn filter_manifest_subdirs(text string) !string {
 	rows := regex(subdirs_pattern, text, 16)!
 	if rows.len == 0 { return text }
-	kept := module_subdirs(text)!.filter(it != 'appkit')
+	// The native Linux embedded host imports sokol/X11 even in headless builds.
+	// Vinix owns its windows and framebuffer; retain only declarative UI code.
+	kept := module_subdirs(text)!.filter(it !in ['appkit', 'linux'])
 	span := rows[0].as_map()['spans']!.as_array()[0].as_array()
 	return text[..span[0].int()] + kept.map("'" + it + "'").join(', ') + text[span[1].int()..]
 }
@@ -72,7 +74,7 @@ pub fn ui_main(arguments []string) ! {
 	assets := join([source, 'assets'])!
 	if test('exists', assets)! { primitive('symlink', [assets, join([output, 'assets'])!])! }
 	for subdir in module_subdirs(manifest_text)! {
-		if subdir == 'appkit' { continue }
+		if subdir in ['appkit', 'linux'] { continue }
 		upstream, staged := join([source, subdir])!, join([output, subdir])!
 		if subdir == 'ui' {
 			symlink_entries(upstream, staged)!

@@ -4,6 +4,7 @@ module workflowbuild
 import os
 import strings
 import hosttest
+import stagehost
 
 pub fn run(program string, args []string) ! {
 	mut p := os.new_process(program)
@@ -54,8 +55,8 @@ pub fn stage(root string, ui string, dest string, cross bool) ! {
 	}
 	os.write_file('${dest}/v.mod', "Module { name: 'desktop_workflows' }\n")!
 	os.mkdir_all('${dest}/modules/ui2')!
-	os.write_file('${dest}/modules/ui2/v.mod', os.read_file('${ui}/v.mod')!.replace("'appkit',", ''))!
-	for directory in ['ui', 'linux', 'uikit', 'windows', 'assets'] {
+	os.write_file('${dest}/modules/ui2/v.mod', stagehost.filter_manifest_subdirs(os.read_file('${ui}/v.mod')!)!)!
+	for directory in ['ui', 'uikit', 'windows', 'assets'] {
 		os.cp_all('${ui}/${directory}', '${dest}/modules/ui2/${directory}', true)!
 		for name in os.ls('${dest}/modules/ui2/${directory}')! {
 			if name.ends_with('_tmp.v') { os.rm('${dest}/modules/ui2/${directory}/${name}')! }
@@ -71,7 +72,7 @@ pub fn stage(root string, ui string, dest string, cross bool) ! {
 		os.write_file(vml, source)!
 	}
 	for directory in ['ui', 'linux'] {
-		for name in ['file_dialog_linux.v', 'message_box_linux.v'] {
+		for name in ['file_dialog_linux.v', 'message_box_linux.v', 'file_dialog_nix.v', 'message_box_nix.v'] {
 			path := '${dest}/modules/ui2/${directory}/${name}'
 			if os.exists(path) { os.write_file(path, os.read_file(path)!.replace('os.execute(command)', "os.exec(['/bin/sh', '-c', command])"))! }
 		}
