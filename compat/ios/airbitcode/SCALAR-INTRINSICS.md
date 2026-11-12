@@ -15,6 +15,7 @@ these LLVM declarations for scalar half (`.f16`) and float (`.f32`):
 | `llvm.minimumnum` / `llvm.maximumnum` | Select the numeric operand if exactly one input is NaN, otherwise the lesser / greater value, ordering -0 below +0. |
 | `llvm.sqrt` | Correctly rounded square root, nearest/ties to even; retain negative zero and choose a quiet NaN for negative nonzero inputs. |
 | `llvm.fma` | Fused multiply-add with one nearest/ties-to-even rounding after the exact product and addition. |
+| `llvm.fmuladd` | Optional-fusion multiply-add; this interpreter consistently chooses fused evaluation. |
 | `llvm.ldexp` | Scale half/float by a signed i32 power of two, with one final nearest/ties-to-even round. |
 
 Results keep the floating-point type. `scalar_intrinsics.v` manipulates integer
@@ -52,7 +53,7 @@ Declaration attributes admit only function-level `nounwind`, `readnone`,
 `nocreateundeforpoison` and `memory(none)` (bitcode memory versions 0/1/2).
 Return/parameter, string/type, `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A thirty-two-entry fixed stack cache validates each admitted
+validation budget. A thirty-four-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -62,7 +63,8 @@ The integer-only entry point still rejects floating point and all calls.
 
 [Scalar FMA](SCALAR-FMA.md) adds a ternary call with exact fixed-stack integer
 accumulation, gradual underflow and rounding after cancellation. Its separate
-maintained checker compares 1,505,792 native LLVM results across both precisions.
+maintained checker compares 1,980,544 results across both precisions, including
+`fmuladd` against the permitted fused result and separate native-choice diagnostics.
 [Power-of-two scaling](SCALAR-LDEXP.md) admits the exact `.f16.i32` and `.f32.i32`
 names, with a floating first argument/result and a signed i32 second argument.
 

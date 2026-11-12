@@ -36,9 +36,12 @@ fn test_scalar_fma_exact_values_and_single_rounding() {
 		}
 		name := 'llvm.fma.f${bits}'; defer { unsafe { name.free() } }
 		assert scalar_intrinsic_arity(scalar_intrinsic_name(name)!) == 3
+		optional_name := 'llvm.fmuladd.f${bits}'; defer { unsafe { optional_name.free() } }
+		assert scalar_intrinsic_arity(scalar_intrinsic_name(optional_name)!) == 3
 	}
 	if _ := scalar_fma(64, 0, 0, 0) { assert false, 'unsupported FMA precision' }
 	if _ := scalar_intrinsic_value(.fma, 32, 0, 0) { assert false, 'binary evaluator accepted ternary operation' }
-	for name in ['llvm.fma.f64', 'llvm.fma.v2f32', 'llvm.fmuladd.f32', 'air.fma.f32'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported FMA name' } }
+	if _ := scalar_intrinsic_value(.fmuladd, 32, 0, 0) { assert false, 'binary evaluator accepted optional ternary operation' }
+	for name in ['llvm.fma.f64', 'llvm.fma.v2f32', 'llvm.fmuladd.f64', 'llvm.fmuladd.v2f32', 'air.fma.f32'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported FMA name' } }
 	println('AIR-SCALAR-FMA: ${count} exact cancellation/overflow/underflow/zero/infinity/NaN results, six distinguishing unfused controls and arity/name/precision guards PASS')
 }

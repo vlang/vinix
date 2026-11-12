@@ -23,7 +23,7 @@ There is no host FP, libm, LLVM dependency or allocation in evaluation.
 
 Poison in either operand propagates, even for special floating values; selected
 undef errors. Each intrinsic CALL costs one instruction. The declaration cache
-is thirty-two fixed stack entries; existing three owned execution arrays and
+is thirty-four fixed stack entries; existing three owned execution arrays and
 cleanup remain unchanged. The integer-only API rejects these floating calls.
 Fast-math, constrained/dynamic FP environments, exception flags, errno and
 general calls remain outside this profile. Valid LLVM IR and matching immutable

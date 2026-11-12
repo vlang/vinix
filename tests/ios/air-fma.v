@@ -44,20 +44,25 @@ fn fixture(mut source strings.Builder) []FmaCase {
 	for bits in [u32(16), 32]! {
 		typ := if bits == 16 { 'half' } else { 'float' }
 		decl := 'declare ${typ} @llvm.fma.f${bits}(${typ}, ${typ}, ${typ})\n'; source.write_string(decl); unsafe { decl.free() }
-		for op in ['fma', 'swapped', 'chain', 'loop'] {
+		optional_decl := 'declare ${typ} @llvm.fmuladd.f${bits}(${typ}, ${typ}, ${typ})\n'; source.write_string(optional_decl); unsafe { optional_decl.free() }
+		for op in ['fma', 'swapped', 'chain', 'loop', 'fmuladd'] {
 			name := '${op}_${bits}'; entry := FmaCase{name, bits, if op == 'chain' { 3 } else if op == 'loop' { 26 } else { 2 }}; unsafe { cases.push_many(&entry, 1) }
 			mut body := '  %r = call ${typ} @llvm.fma.f${bits}(${typ} %a, ${typ} %b, ${typ} %c)\n  ret ${typ} %r\n'
+			if op == 'fmuladd' { unsafe { body.free() }; body = '  %r = call ${typ} @llvm.fmuladd.f${bits}(${typ} %a, ${typ} %b, ${typ} %c)\n  ret ${typ} %r\n' }
 			if op == 'swapped' { unsafe { body.free() }; body = '  %r = call ${typ} @llvm.fma.f${bits}(${typ} %b, ${typ} %a, ${typ} %c)\n  ret ${typ} %r\n' }
 			if op == 'chain' { unsafe { body.free() }; body = '  %first = call ${typ} @llvm.fma.f${bits}(${typ} %a, ${typ} %b, ${typ} %c)\n  %r = call ${typ} @llvm.fma.f${bits}(${typ} %first, ${typ} %b, ${typ} %c)\n  ret ${typ} %r\n' }
 			if op == 'loop' { unsafe { body.free() }; body = 'entry: br label %loop\nloop: %acc = phi ${typ} [ %a, %entry ], [ %r, %loop ]\n  %i = phi i64 [ 0, %entry ], [ %inc, %loop ]\n  %r = call ${typ} @llvm.fma.f${bits}(${typ} %acc, ${typ} %b, ${typ} %c)\n  %inc = add i64 %i, 1\n  %again = icmp ult i64 %inc, 4\n  br i1 %again, label %loop, label %exit\nexit: ret ${typ} %r\n' }
 			text := 'define ${typ} @${name}(${typ} %a, ${typ} %b, ${typ} %c) {\n${body}}\n'; source.write_string(text); unsafe { body.free(); text.free() }
 			wrapper := 'define i64 @reference_${name}(i64 %ai, i64 %bi, i64 %ci) {\n  %ax = trunc i64 %ai to i${bits}\n  %bx = trunc i64 %bi to i${bits}\n  %cx = trunc i64 %ci to i${bits}\n  %a = bitcast i${bits} %ax to ${typ}\n  %b = bitcast i${bits} %bx to ${typ}\n  %c = bitcast i${bits} %cx to ${typ}\n  %r = call ${typ} @${name}(${typ} %a, ${typ} %b, ${typ} %c)\n  %out = bitcast ${typ} %r to i${bits}\n  %wide = zext i${bits} %out to i64\n  ret i64 %wide\n}\n'; source.write_string(wrapper); unsafe { wrapper.free() }
 		}
+		for family in ['fma', 'fmuladd'] {
+		prefix := if family == 'fma' { '' } else { 'optional_' }
 		for side in 0 .. 3 {
 			for state in ['poison', 'undef'] {
 				left := if side == 0 { state } else { '%a' }; right := if side == 1 { state } else { '%b' }; third := if side == 2 { state } else { '%c' }
-				text := 'define ${typ} @${state}_${side}_${bits}(${typ} %a, ${typ} %b, ${typ} %c) {\n  %r = call ${typ} @llvm.fma.f${bits}(${typ} ${left}, ${typ} ${right}, ${typ} ${third})\n  ret ${typ} %r\n}\n'; source.write_string(text); unsafe { text.free() }
+				text := 'define ${typ} @${prefix}${state}_${side}_${bits}(${typ} %a, ${typ} %b, ${typ} %c) {\n  %r = call ${typ} @llvm.${family}.f${bits}(${typ} ${left}, ${typ} ${right}, ${typ} ${third})\n  ret ${typ} %r\n}\n'; source.write_string(text); unsafe { text.free() }
 			}
+		}
 		}
 		for op in ['product', 'unfused'] {
 			ending := if op == 'product' { '  %out = bitcast ${typ} %p to i${bits}\n' } else { '  %r = fadd ${typ} %p, %c\n  %out = bitcast ${typ} %r to i${bits}\n' }
@@ -75,6 +80,10 @@ fn compare(actual airbitcode.IRScalarRun, reference u64, c FmaCase) !bool {
 	if actual.value != reference { return error('FMA bits differ from native LLVM') }; return false
 }
 fn native(engine voidptr, name string) !NativeBits { address := C.LLVMGetFunctionAddress(engine, name.str); if address == 0 { return error('missing native FMA reference') }; return unsafe { NativeBits(voidptr(address)) } }
+fn same_value(a u64, b u64, bits u32) bool {
+	mask := if bits == 16 { u64(0x7fff) } else { u64(0x7fffffff) }; inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
+	return a == b || (a & mask > inf && b & mask > inf)
+}
 fn main() {
 	if os.args.len != 4 || os.args[1] != 'self-test' { panic('usage: air-fma self-test LLVM_AS FRESH_EXTERNAL_DIR') }
 	out := os.args[3]; if os.exists(out) || os.is_link(out) || os.abs_path(out).starts_with(os.getwd() + '/') { panic('requires fresh external output') }; os.mkdir_all(out)!
@@ -93,8 +102,12 @@ fn main() {
 	identity := 'triple=${unsafe { cstring_to_vstring(triple) }}\ndata_layout=${unsafe { cstring_to_vstring(C.LLVMGetDataLayoutStr(module_ptr)) }}\nreference_fenv=FE_DFL_ENV,FE_TONEAREST\n'; defer { unsafe { identity.free() } }; os.write_file(out + '/jit-target.txt', identity)!
 	mut results := os.create(out + '/comparisons.tsv')!; defer { results.close() }; results.writeln('function\ta\tb\tc\tvinix\tllvm\tnan_class_only\tsteps')!
 	mut comparisons := 0; mut nan_cases := 0; mut differences := 0
+	mut optional_results := os.create(out + '/native-optional.tsv')!; defer { optional_results.close() }; optional_results.writeln('function\ta\tb\tc\tnative_fmuladd\tfused\tunfused')!
+	mut optional_choices := 0
 	for c in cases {
-		index := function_index(ir, c.name)!; ref_name := 'reference_${c.name}'; defer { unsafe { ref_name.free() } }; reference := native(engine, ref_name)!
+		optional := c.name.starts_with('fmuladd_')
+		index := function_index(ir, c.name)!; ref_name := if optional { 'reference_fma_${c.bits}' } else { 'reference_${c.name}' }; defer { unsafe { ref_name.free() } }; reference := native(engine, ref_name)!
+		diagnostic_name := 'reference_${c.name}'; diagnostic_separate_name := 'unfused_${c.bits}'; defer { unsafe { diagnostic_name.free(); diagnostic_separate_name.free() } }; diagnostic := native(engine, diagnostic_name)!; separate_reference := native(engine, diagnostic_separate_name)!
 		// Exhaust twenty-value boundary triples before random coverage.
 		edges := if c.bits == 16 { [u64(0), 0x8000, 1, 0x8001, 0x03ff, 0x0400, 0x3800, 0x3c00, 0xbc00, 0x3c01, 0x3e00, 0x4000, 0x7bff, 0xfbff, 0x7c00, 0xfc00, 0x7c01, 0xfc01, 0x7e55, 0xfe55] } else { [u64(0), 0x80000000, 1, 0x80000001, 0x007fffff, 0x00800000, 0x3f000000, 0x3f800000, 0xbf800000, 0x3f800001, 0x3fc00000, 0x40000000, 0x7f7fffff, 0xff7fffff, 0x7f800000, 0xff800000, 0x7f800001, 0xff800001, 0x7fc12345, 0xffc12345] }; defer { unsafe { edges.free() } }
 		for sample in 0 .. 8000 + if c.bits == 16 { 196608 } else { 131072 } {
@@ -107,27 +120,38 @@ fn main() {
 				for side in 0 .. 3 { args[side] |= u64(side + 1) << 40 }
 			}
 			actual := p.run_scalar_function(ir, stream, pools, bodies, index, args, 256)!; expected := reference(args[0], args[1], args[2])
+			if optional {
+				observed := diagnostic(args[0], args[1], args[2]); separate := separate_reference(args[0], args[1], args[2])
+				if !same_value(observed, expected, c.bits) && !same_value(observed, separate, c.bits) { panic('native optional result outside fused/unfused choices') }
+				row := '${c.name}\t${args[0]}\t${args[1]}\t${args[2]}\t${observed}\t${expected}\t${separate}'; optional_results.writeln(row)!; unsafe { row.free() }; optional_choices++
+			}
 			nan_class := compare(actual, expected, c) or { row := 'FAIL ${c.name} ${args} got=${actual.value} expected=${expected}'; results.writeln(row)!; panic(row) }
 			row := '${c.name}\t${args[0]}\t${args[1]}\t${args[2]}\t${actual.value}\t${expected}\t${nan_class}\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }; comparisons++; if nan_class { nan_cases++ }
 		}
-		if !c.name.starts_with('fma_') { continue }
+		if !c.name.starts_with('fma_') && !optional { continue }
 		product_name := 'product_${c.bits}'; separate_name := 'unfused_${c.bits}'; defer { unsafe { product_name.free(); separate_name.free() } }; product := native(engine, product_name)!; separate := native(engine, separate_name)!
 		one := if c.bits == 16 { u64(0x3c00) } else { u64(0x3f800000) }; mask := if c.bits == 16 { u64(0x3ff) } else { u64(0x7fffff) }; sign := u64(1) << (c.bits - 1)
 		for sample in 0 .. 65536 {
 			a := one | (u64(pattern(sample, 0xabcdef)) & mask); b := one | (u64(pattern(sample, 0xfedcba)) & mask); third := product(a, b, 0) | sign
 			args := [a, b, third]; defer { unsafe { args.free() } }; actual := p.run_scalar_function(ir, stream, pools, bodies, index, args, 256)!; expected := reference(a, b, third)
 			if compare(actual, expected, c)! { panic('finite cancellation produced NaN') }; if separate(a, b, third) != expected { differences++ }
-			row := 'cancel_${c.bits}\t${a}\t${b}\t${third}\t${actual.value}\t${expected}\tfalse\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }; comparisons++
+			if optional {
+				observed := diagnostic(a, b, third); unfused := separate(a, b, third)
+				if !same_value(observed, expected, c.bits) && !same_value(observed, unfused, c.bits) { panic('native optional cancellation outside choices') }
+				row := '${c.name}\t${a}\t${b}\t${third}\t${observed}\t${expected}\t${unfused}'; optional_results.writeln(row)!; unsafe { row.free() }; optional_choices++
+			}
+			row := 'cancel_${c.name}\t${a}\t${b}\t${third}\t${actual.value}\t${expected}\tfalse\t${actual.steps}'; results.writeln(row)!; unsafe { row.free() }; comparisons++
 		}
 	}
 	if differences < 100000 { panic('unfused controls did not distinguish fusion') }
 	mut poison_controls := 0; mut undef_controls := 0
 	args := [u64(0x3f800000), 0x3f800000, 0]; defer { unsafe { args.free() } }
-	for bits in [16, 32]! { for side in 0 .. 3 {
-		poison_name := 'poison_${side}_${bits}'; undef_name := 'undef_${side}_${bits}'; defer { unsafe { poison_name.free(); undef_name.free() } }
+	for prefix in ['', 'optional_'] { for bits in [16, 32]! { for side in 0 .. 3 {
+		poison_name := '${prefix}poison_${side}_${bits}'; undef_name := '${prefix}undef_${side}_${bits}'; defer { unsafe { poison_name.free(); undef_name.free() } }
 		if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, poison_name)!, args, 64)!.poison { panic('FMA poison lost') }; poison_controls++
 		p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, undef_name)!, args, 64) or { undef_controls++; continue }; panic('FMA undef accepted')
-	} }
+	} } }
+	optional_index := function_index(ir, 'fmuladd_32')!; if _ := p.run_scalar_function(ir, stream, pools, bodies, optional_index, args, 1) { panic('optional budget accepted') }; if _ := p.run_integer_function(ir, stream, pools, bodies, optional_index, args, 64) { panic('integer API accepted optional multiply-add') }
 	index := function_index(ir, 'fma_32')!; if _ := p.run_scalar_function(ir, stream, pools, bodies, index, args, 1) { panic('FMA budget accepted') }; if _ := p.run_integer_function(ir, stream, pools, bodies, index, args, 64) { panic('integer API accepted FMA') }
 	slot := bodies.scopes[index + 1].instructions_start; original := p.instructions[slot]; mut metadata_controls := 0
 	for changed in [airbitcode.IRTypedInstruction{...original, operands_count: 3}, airbitcode.IRTypedInstruction{...original, operands_count: 2}, airbitcode.IRTypedInstruction{...original, fast_math_flags: 1}, airbitcode.IRTypedInstruction{...original, attribute_set: 1}] {
@@ -146,13 +170,14 @@ fn main() {
 	mut rounding_controls := 0
 	for mode in [C.FE_UPWARD, C.FE_DOWNWARD]! {
 		if C.fesetround(mode) != 0 { panic('cannot set rounding control') }
-		for bits in [16, 32]! {
-			name := 'fma_${bits}'; defer { unsafe { name.free() } }; one := if bits == 16 { u64(0x3c00) } else { u64(0x3f800000) }
+		for family in ['fma', 'fmuladd'] { for bits in [16, 32]! {
+			name := '${family}_${bits}'; defer { unsafe { name.free() } }; one := if bits == 16 { u64(0x3c00) } else { u64(0x3f800000) }
 			// Half an ULP above even/odd values distinguishes both modes.
 			a := one + u64(mode == C.FE_DOWNWARD); half_ulp := if bits == 16 { u64(0x1000) } else { u64(0x33800000) }; rounding_args := [a, one, half_ulp]; defer { unsafe { rounding_args.free() } }
 			expected := one + if mode == C.FE_UPWARD { u64(0) } else { u64(2) }
 			if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, rounding_args, 64)!.value != expected { panic('FMA used host rounding mode') }; rounding_controls++
 		}
+		}
 	}
-	println('LLVM-FMA: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} NaN-class cases), ${differences} distinguishing unfused cancellations; ${poison_controls} poison/${undef_controls} undef/${metadata_controls} metadata/${result_controls} result/${rounding_controls} rounding controls and budget/integer isolation PASS; no AIR shader or iOS app executed')
+	println('LLVM-FMA: ${cases.len} functions, ${comparisons} comparisons (${nan_cases} NaN-class cases), ${optional_choices} native optional-choice checks, ${differences} distinguishing unfused cancellations; ${poison_controls} poison/${undef_controls} undef/${metadata_controls} metadata/${result_controls} result/${rounding_controls} rounding controls and budget/integer isolation PASS; production optional calls use fused semantics; no AIR shader or iOS app executed')
 }
