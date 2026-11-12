@@ -63,3 +63,18 @@ The diagnostic result SHA-256 is
 `0d8ce26f721653573279b0a9232392e79d1e849f1d2ca57023926d0be49f4640`;
 the verified selected-input inventory SHA-256 is
 `3f6d91fb98aea2407acc39db3d227ad3ec93d694e475c631a5629425c7af9cfa`.
+
+The complete original workspace is also preserved in
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-shared-pages-20261112-02.tar.gz`:
+
+- Archive SHA-256: `e734b49b44a986372ceb37563c733c47f8f6146f38e7c83bc4b73201c3b33985`.
+- Adjacent `.inventory.txt` SHA-256: `9932f9ee4b704a24d2d185ee0a762a29307ebc50d366c6ffea54f62a983c526c`.
+
+The probe/controller checkpoint is `df4e6cfd9`; archive verification uses
+`32460200e`. The adjacent `.audit` records complete archive/original agreement
+for logical bytes, sizes, types, modes and link targets, with unchanged
+before/after source and tool inventories. The original workspace remains
+retained. The earlier `-01` archive attempt remains failed and preserved:
+mtree conversion hashed sparse disk-image extents rather than logical holes.
+The corrected reader hashes every logical byte, including zero-filled holes;
+it does not exempt disk images or change historical launch qualification.
