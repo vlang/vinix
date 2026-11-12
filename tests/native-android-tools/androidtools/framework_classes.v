@@ -180,6 +180,7 @@ pub fn write_framework_classes(smali string) ! {
  framework_user_parcel(smali)!
  framework_system_boolean(smali)!
  framework_shortcut_query(smali)!
+ framework_stable_density(smali)!
  framework_peripheral_types(smali)!
  framework_voice_capability(smali)!
  framework_intent_mime(smali)!

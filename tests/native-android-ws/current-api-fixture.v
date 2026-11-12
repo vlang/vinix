@@ -5,6 +5,34 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static stableDensity()V
+.locals 5
+sget v0, Landroid/util/DisplayMetrics;->DENSITY_DEVICE:I
+sget v1, Landroid/util/DisplayMetrics;->DENSITY_DEVICE_STABLE:I
+const/16 v2, 160
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:density_start
+const/16 v2, 240
+sput v2, Landroid/util/DisplayMetrics;->DENSITY_DEVICE:I
+new-instance v3, Landroid/util/DisplayMetrics;
+invoke-direct {v3}, Landroid/util/DisplayMetrics;-><init>()V
+iget v4, v3, Landroid/util/DisplayMetrics;->densityDpi:I
+invoke-static {v4, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget v4, Landroid/util/DisplayMetrics;->DENSITY_DEVICE_STABLE:I
+invoke-static {v4, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const/16 v2, 320
+iput v2, v3, Landroid/util/DisplayMetrics;->densityDpi:I
+sget v4, Landroid/util/DisplayMetrics;->DENSITY_DEVICE_STABLE:I
+invoke-static {v4, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:density_end
+sput v0, Landroid/util/DisplayMetrics;->DENSITY_DEVICE:I
+return-void
+:density_failed
+move-exception v1
+sput v0, Landroid/util/DisplayMetrics;->DENSITY_DEVICE:I
+throw v1
+.catchall {:density_start .. :density_end} :density_failed
+.end method
 .method public static restrictions(Landroid/content/Context;)V
 .locals 6
 const-string v0, "restrictions"
@@ -472,6 +500,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->properties()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->stableDensity()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V

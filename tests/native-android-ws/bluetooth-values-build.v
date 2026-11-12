@@ -22,6 +22,7 @@ fn main() {
 	androidtools.framework_subscription_listener(root + '/smali')!
 	androidtools.framework_shortcut_query(root + '/smali')!
 	androidtools.framework_restrictions_service(root + '/smali')!
+	androidtools.framework_stable_density(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -42,6 +43,7 @@ fn main() {
 	types << 'android/content/pm/ShortcutManager'
 	types << 'android/content/RestrictionsManager'
 	types << 'android/app/ContextImpl'
+	types << 'android/util/DisplayMetrics'
 	types << 'android/telephony/VinixSubscriptionFailure'
 	types << r'android/telephony/SubscriptionManager$OnSubscriptionsChangedListener'
 	types << r'android/os/UserHandle$VinixCreator'

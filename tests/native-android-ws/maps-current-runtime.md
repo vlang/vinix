@@ -410,3 +410,34 @@ plan `restrictions-api-plan-20261112-r1.json` and independent readback
 `668fa4c92ba3b383cb36db0351668201a20f5d92444849aaab88287f75b7487a`.
 The test mount was released before the next broker/Maps attempt. This
 successor uses `f99306da1` plus this commit's source changes.
+
+Guest r17 passed the restrictions dependency and exited later in Play Store
+ContentFiltersService startup: `NoSuchFieldError` for
+`DisplayMetrics.DENSITY_DEVICE_STABLE` from `uud.j` source1. Complete log
+delimiters are `RESTRICTIONS-MAPS-LOG-BEGIN` / `RESTRICTIONS-MAPS-LOG-END`;
+snapshot `maps-restrictions-uart-20261112-r1` has SHA256
+`359ed4fecf16435d56d8fd5b4e72b99c8dba63394b8953f6a43195b2bf843284`.
+
+`framework_stable_density.v` adds the public static final field and captures
+the existing `getDeviceDensity()` result during class initialization. This
+matches the [stable-density contract](https://developer.android.com/reference/android/util/DisplayMetrics#DENSITY_DEVICE_STABLE):
+the value stays fixed while current display metrics may change. The backend's
+configured density remains 160; no physical-DPI measurement or display-mode
+change is claimed. SDK `framework-stable-density-20261112-r1` passed guarded
+assembly/readback in 4,905 ms, RSS 472,088,576, growth 29,085,696,
+guard/child0/0 with complete cleanup.
+
+Signed fixture `current-api-fixture-20261112-r13` passed on ARM in guest r18,
+including all earlier checks and a runtime field read (not a compiled literal).
+It verifies stable 160, changes the deprecated mutable device density to 240,
+observes 240 in a fresh metrics object, changes that object's density to 320,
+and verifies the stable field remains unchanged throughout. A catch-all
+restores the original mutable field on either success or failure. Runner
+readiness/pass, EOF drain and exit0 were observed. Snapshot
+`stable-density-api-uart-20261112-r1`, plan
+`stable-density-api-plan-20261112-r1.json` and readback
+`stable-density-api-readback-20261112-r1` preserve its two-entry export,
+archive checksum
+`3388790193da65a6561f289ebaf12c5cf7ec6abb4833442f87fe00f548a50fd9`.
+The test mount was released before the next broker/Maps attempt. This
+successor uses `f6d35f515` plus this commit's source changes.
