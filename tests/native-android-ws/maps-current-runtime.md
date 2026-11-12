@@ -16,6 +16,8 @@ passed disk write/readback and the unprivileged SQLite regression on a
 separate app-data disk under the unchanged guest memory budget.
 Maps rendered onboarding in r31, then exited after Skip on Play Store code
 passing the null system shared-library catalog into Arrays.asList.
+Guest r32 passed that regression and advanced to a missing staged-install
+session query, with missing job-property getters also logged.
 
 Current V is `/Users/alex/code/v/v` (initially `0.5.2 f2edf66`, then
 `0.5.2 596e18d` for the SystemProperties successor). Builds use the available
@@ -868,3 +870,50 @@ Snapshot `shared-library-api-uart-20261112-r1`, plan
 SHA256 `e4858cc2d9345d59859d469830712e80fabea3aafef026ca59963ff85c6a4a84`.
 The fixture bind was released before broker startup. Actual Maps qualification
 continues with this SDK; no map-rendering claim follows from the fixture.
+
+Guest r32 rendered onboarding, then exited10 after Skip on
+PackageInstaller.getStagedSessions, called by `aukd.e` through an API outline.
+The prior null-library-catalog exception is absent. It also logged missing
+JobInfo.getMinLatencyMillis in `assk.b` source193. Caller inspection shows the
+same sequential path immediately reading maximum execution delay, charging,
+idle and network type; the successor supplies all five metadata getters.
+Readback is at `vending-job-stage-caller-20261112-r1/classes.dex/assk.smali`
+and `classes4.dex/aukd.smali`. An earlier disassembly invocation selected
+mistyped class names and supplies no caller evidence.
+
+The complete log is between SHARED-CATALOG-MAPS-LOG-BEGIN/END in immutable
+snapshot `maps-shared-catalog-final-uart-20261112-r1`, SHA256
+`e145dc4b3f3f08a6956e088dddcf9369b137112738e4e9c9a3f22af95fb1b280`.
+The read-only observer sampled minimum disk availability7952793600 bytes and
+MemFree33680KiB before verified shutdown at roughly473 seconds. No complete
+600-second observation is claimed. The synced, stopped data image has SHA256
+`f7c88391f680cab40c5f37eb410f5075e9719ed269c6f52cb3ef641b7dccf3b3`.
+
+`framework_job_install_queries.v` returns a fresh empty staged-session list
+for the deployment with no installer session service. It adds no install
+operation. This matches the non-null query shape in the
+[PackageInstaller reference](https://developer.android.com/reference/android/content/pm/PackageInstaller#getStagedSessions()).
+JobInfo.getMinLatencyMillis reads existing builder storage. The four adjacent
+getters retain the values passed to the corresponding existing builder setters
+instead of fixed answers. Zero/false defaults follow the
+[JobInfo builder fields](https://android.googlesource.com/platform/frameworks/base/+/4123f9587dc6eb4dfadc7d9910d822afced1c13e/core/java/android/app/job/JobInfo.java).
+These are metadata reads, not qualification of scheduler constraint enforcement,
+periodic validation, parcels or builder snapshot immutability.
+
+The narrower SDK r1 and fixture r26 built but were not run on ARM. SDK
+`framework-job-install-20261112-r2` adds the full observed getter sequence and
+passed full SDK assembly/selected DEX readback under the original caps:
+guard/child0/0, complete cleanup,5088ms, RSS514752512, growth60370944 bytes.
+Signed fixture r27 checks empty-session mutation isolation, zero defaults,
+64-bit latency/deadline values, distinct builder values and boolean/network
+updates. Its build/sign/verify passed guard/child0/0, complete cleanup,
+1208ms, RSS142213120 and growth286720 bytes. Guest r33 stages that final pair,
+with the unchanged native/core, volume probe and VM resource budget.
+
+The complete signed r27 fixture passed on ARM in r33 as UID/GID10160 with
+private disk-backed data, readiness/pass once, drained EOF and exit0.
+Snapshot `job-install-api-uart-20261112-r1`, plan
+`job-install-api-plan-20261112-r1.json` and strict independent readback
+`job-install-api-readback-20261112-r1` retain its two-entry export, archive
+SHA256 `154ef88682a03c9d6c802c3e42aaf7f9cd2025200034387407b79119824171c5`.
+The fixture bind was released before broker startup and the next Maps retry.

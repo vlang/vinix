@@ -32,6 +32,7 @@ fn main() {
 	androidtools.framework_build_base(root + '/smali')!
 	androidtools.framework_package_observers(root + '/smali')!
 	androidtools.framework_shared_library_catalog(root + '/smali')!
+	androidtools.framework_job_install_queries(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -58,6 +59,9 @@ fn main() {
 	types << 'android/os/UserManager'
 	types << 'android/content/pm/ApplicationInfo'
 	types << 'android/content/pm/PackageManager'
+	types << 'android/content/pm/PackageInstaller'
+	types << 'android/app/job/JobInfo'
+	types << r'android/app/job/JobInfo$Builder'
 	types << 'android/content/pm/PackageParser'
 	types << 'android/content/pm/IPackageDeleteObserver'
 	types << 'android/content/pm/IPackageDataObserver'

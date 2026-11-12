@@ -5,6 +5,120 @@ import json2
 import crypto.sha256
 
 const subscription_source = r'
+.method public static jobInstallQueries(Landroid/content/Context;)V
+.locals 8
+invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
+move-result-object v0
+invoke-virtual {v0}, Landroid/content/pm/PackageManager;->getPackageInstaller()Landroid/content/pm/PackageInstaller;
+move-result-object v0
+invoke-virtual {v0}, Landroid/content/pm/PackageInstaller;->getStagedSessions()Ljava/util/List;
+move-result-object v1
+invoke-interface {v1}, Ljava/util/List;->size()I
+move-result v2
+const/4 v3, 0
+invoke-static {v2, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-string v2, "caller-local mutation"
+invoke-interface {v1, v2}, Ljava/util/List;->add(Ljava/lang/Object;)Z
+invoke-virtual {v0}, Landroid/content/pm/PackageInstaller;->getStagedSessions()Ljava/util/List;
+move-result-object v1
+invoke-interface {v1}, Ljava/util/List;->size()I
+move-result v2
+invoke-static {v2, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Landroid/content/ComponentName;
+const-string v1, "org.vinix.bootstrap"
+const-string v2, "org.vinix.bootstrap.MetadataOnlyJob"
+invoke-direct {v0, v1, v2}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+new-instance v1, Landroid/app/job/JobInfo$Builder;
+const/4 v2, 1
+invoke-direct {v1, v2, v0}, Landroid/app/job/JobInfo$Builder;-><init>(ILandroid/content/ComponentName;)V
+invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
+move-result-object v4
+invoke-virtual {v4}, Landroid/app/job/JobInfo;->getMinLatencyMillis()J
+move-result-wide v4
+const-wide/16 v6, 0
+cmp-long v3, v4, v6
+const/4 v2, 0
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
+move-result-object v0
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->isRequireCharging()Z
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->isRequireDeviceIdle()Z
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->getNetworkType()I
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->getMaxExecutionDelayMillis()J
+move-result-wide v4
+const-wide/16 v6, 0
+cmp-long v3, v4, v6
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-wide v6, 0x200000023L
+invoke-virtual {v1, v6, v7}, Landroid/app/job/JobInfo$Builder;->setOverrideDeadline(J)Landroid/app/job/JobInfo$Builder;
+const/4 v3, 1
+invoke-virtual {v1, v3}, Landroid/app/job/JobInfo$Builder;->setRequiresCharging(Z)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1, v3}, Landroid/app/job/JobInfo$Builder;->setRequiresDeviceIdle(Z)Landroid/app/job/JobInfo$Builder;
+const/4 v3, 2
+invoke-virtual {v1, v3}, Landroid/app/job/JobInfo$Builder;->setRequiredNetworkType(I)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
+move-result-object v0
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->getMaxExecutionDelayMillis()J
+move-result-wide v4
+cmp-long v3, v4, v6
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->isRequireCharging()Z
+move-result v3
+const/4 v2, 1
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->isRequireDeviceIdle()Z
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->getNetworkType()I
+move-result v3
+const/4 v2, 2
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const/4 v2, 0
+invoke-virtual {v1, v2}, Landroid/app/job/JobInfo$Builder;->setRequiresCharging(Z)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1, v2}, Landroid/app/job/JobInfo$Builder;->setRequiresDeviceIdle(Z)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1, v2}, Landroid/app/job/JobInfo$Builder;->setRequiredNetworkType(I)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
+move-result-object v0
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->isRequireCharging()Z
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->isRequireDeviceIdle()Z
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->getNetworkType()I
+move-result v3
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+const-wide v6, 0x100000011L
+invoke-virtual {v1, v6, v7}, Landroid/app/job/JobInfo$Builder;->setMinimumLatency(J)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
+move-result-object v4
+invoke-virtual {v4}, Landroid/app/job/JobInfo;->getMinLatencyMillis()J
+move-result-wide v4
+cmp-long v3, v4, v6
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+new-instance v0, Landroid/content/ComponentName;
+const-string v3, "org.vinix.bootstrap"
+const-string v4, "org.vinix.bootstrap.MetadataOnlyJob"
+invoke-direct {v0, v3, v4}, Landroid/content/ComponentName;-><init>(Ljava/lang/String;Ljava/lang/String;)V
+new-instance v1, Landroid/app/job/JobInfo$Builder;
+const/4 v3, 2
+invoke-direct {v1, v3, v0}, Landroid/app/job/JobInfo$Builder;-><init>(ILandroid/content/ComponentName;)V
+const-wide/16 v6, 37
+invoke-virtual {v1, v6, v7}, Landroid/app/job/JobInfo$Builder;->setMinimumLatency(J)Landroid/app/job/JobInfo$Builder;
+invoke-virtual {v1}, Landroid/app/job/JobInfo$Builder;->build()Landroid/app/job/JobInfo;
+move-result-object v0
+invoke-virtual {v0}, Landroid/app/job/JobInfo;->getMinLatencyMillis()J
+move-result-wide v4
+cmp-long v3, v4, v6
+invoke-static {v3, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+return-void
+.end method
 .method public static sharedLibraryCatalog(Landroid/content/Context;)V
 .locals 4
 invoke-virtual {p0}, Landroid/content/Context;->getPackageManager()Landroid/content/pm/PackageManager;
@@ -1041,6 +1155,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sandboxMetadata(Landroid/content
 invoke-static {}, Lorg/vinix/bootstrap/Main;->buildAndObserver()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->storageDatabase(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->sharedLibraryCatalog(Landroid/content/Context;)V
+invoke-static {p0}, Lorg/vinix/bootstrap/Main;->jobInstallQueries(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
