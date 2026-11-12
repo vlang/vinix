@@ -280,3 +280,41 @@ two entries each, archive SHA256 respectively
 `ab7f0b8afb487f4221ae895cfdb7f34e8ce8533969c1c400f0623a570c27cf12`
 and `9c1ee1e275610614f1d8539c94fdff6188ec6afde37dcae69d02c9bcb9cc8e86`.
 The fixture mount was released before the next broker/Maps attempt.
+
+Guest r13 advanced to a main-looper `NoClassDefFoundError` for
+`SubscriptionManager.OnSubscriptionsChangedListener` during
+`EsimModuleInitIntentOperation.f` source29. The full Maps log is retained
+between `DELEGATE-MAPS-LOG-BEGIN` and `DELEGATE-MAPS-LOG-END`; snapshot
+`maps-delegate-uart-20261112-r1` has SHA256
+`cfd873d9e3457df86ef5d0b0e6ee1b0ef15140eb1d309f8dc40fef85307eaf9e`.
+The retained caller is `maps-esim-caller-20261112-r1`.
+
+`framework_subscription_listener.v` supplies the listener's default and
+Looper constructors, virtual callbacks and both registration forms. Following
+the [API30 absent-registry implementation](https://android.googlesource.com/platform/frameworks/base/+/refs/tags/android-11.0.0_r1/telephony/java/android/telephony/SubscriptionManager.java),
+registration reports `onAddListenerFailed` through the listener's Handler or
+supplied Executor. It emits no subscription snapshot and retains no successful
+registration; removal is harmless when no telephony registry exists. Existing
+subscription queries and zero-modem reporting remain unchanged. Normal SDK
+generation applies this after the earlier subscription-service adapter.
+
+Final SDK `framework-subscription-listener-20261112-r2` passed full guarded
+assembly/readback in4,176 ms, RSS467,107,840, growth63,881,216,
+guard/child0/0 and complete cleanup. Initial r1 had no failure callback and
+was superseded before guest use. Signed fixture
+`current-api-fixture-20261112-r9` passed on ARM in guest r14, including every
+earlier API check, both listener constructors, subclass callback dispatch,
+both registration forms, duplicate registration/removal, legacy null listener,
+Executor null-argument rejection and absent-registry failure delivery.
+The pass marker now comes from a queued main-looper fence after validating
+two Handler callbacks and one Executor callback. Subscription-change count
+stays zero until the test explicitly invokes the virtual callback; it remains
+one at the fence, proving registration invented no change event. The runner
+observed readiness/pass once, drained EOF and exited0. Broader executor
+rejection and missing-Looper construction paths are not separately exercised.
+Snapshot `subscription-api-uart-20261112-r1`, plan
+`subscription-api-plan-20261112-r1.json` and readback
+`subscription-api-readback-20261112-r1` preserve its unmodified two-entry
+export, archive checksum
+`cf63ba65dc6ec3caaeeb18526f5eb4fd92c6562d440dfd80741a606670ebf5e2`.
+The test mount was released before the next broker/Maps attempt.

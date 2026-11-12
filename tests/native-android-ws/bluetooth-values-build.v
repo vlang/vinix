@@ -19,6 +19,7 @@ fn main() {
 	androidtools.framework_tethering(root + '/smali')!
 	androidtools.framework_user_parcel(root + '/smali')!
 	androidtools.framework_system_boolean(root + '/smali')!
+	androidtools.framework_subscription_listener(root + '/smali')!
 	os.cp(base + '/api-impl.jar', root + '/api-impl.jar')!
 	java := '/opt/homebrew/opt/openjdk@25/bin/java'
 	cp := '/Users/alex/code/vinix/build/android-framework/tools/*'
@@ -35,6 +36,9 @@ fn main() {
 	types << 'android/net/ConnectivityManager'
 	types << 'android/os/UserHandle'
 	types << 'android/os/SystemProperties'
+	types << 'android/telephony/SubscriptionManager'
+	types << 'android/telephony/VinixSubscriptionFailure'
+	types << r'android/telephony/SubscriptionManager$OnSubscriptionsChangedListener'
 	types << r'android/os/UserHandle$VinixCreator'
 	for args in [[java, '-Xmx256m', '-cp', cp, 'org.jf.smali.Main', 'assemble', '--api', '28', '--jobs', '2', root + '/smali', '-o', root + '/classes.dex'],
 		['/usr/bin/zip', '-q', '-j', root + '/api-impl.jar', root + '/classes.dex'],

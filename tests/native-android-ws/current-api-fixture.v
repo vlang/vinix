@@ -4,6 +4,138 @@ import os
 import json2
 import crypto.sha256
 
+const subscription_source = r'
+.method public static subscriptions()V
+.locals 6
+new-instance v0, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;
+invoke-direct {v0}, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;-><init>()V
+invoke-virtual {v0}, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;->onSubscriptionsChanged()V
+invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+move-result-object v0
+new-instance v1, Lorg/vinix/bootstrap/TestSubscriptions;
+invoke-direct {v1, v0}, Lorg/vinix/bootstrap/TestSubscriptions;-><init>(Landroid/os/Looper;)V
+new-instance v0, Landroid/telephony/SubscriptionManager;
+invoke-direct {v0}, Landroid/telephony/SubscriptionManager;-><init>()V
+invoke-virtual {v0, v1}, Landroid/telephony/SubscriptionManager;->addOnSubscriptionsChangedListener(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+invoke-virtual {v0, v1}, Landroid/telephony/SubscriptionManager;->addOnSubscriptionsChangedListener(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+new-instance v2, Lorg/vinix/bootstrap/TestSubscriptionExecutor;
+invoke-direct {v2}, Lorg/vinix/bootstrap/TestSubscriptionExecutor;-><init>()V
+invoke-virtual {v0, v2, v1}, Landroid/telephony/SubscriptionManager;->addOnSubscriptionsChangedListener(Ljava/util/concurrent/Executor;Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+invoke-virtual {v0, v1}, Landroid/telephony/SubscriptionManager;->removeOnSubscriptionsChangedListener(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+invoke-virtual {v0, v1}, Landroid/telephony/SubscriptionManager;->removeOnSubscriptionsChangedListener(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+const/4 v3, 0
+invoke-virtual {v0, v3}, Landroid/telephony/SubscriptionManager;->addOnSubscriptionsChangedListener(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+invoke-virtual {v0, v3}, Landroid/telephony/SubscriptionManager;->removeOnSubscriptionsChangedListener(Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+iget v4, v1, Lorg/vinix/bootstrap/TestSubscriptions;->calls:I
+invoke-static {v4, v3}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v4, v2, Lorg/vinix/bootstrap/TestSubscriptionExecutor;->calls:I
+const/4 v5, 1
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v4, v1, Lorg/vinix/bootstrap/TestSubscriptions;->failures:I
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+invoke-virtual {v1}, Lorg/vinix/bootstrap/TestSubscriptions;->onSubscriptionsChanged()V
+iget v4, v1, Lorg/vinix/bootstrap/TestSubscriptions;->calls:I
+const/4 v5, 1
+invoke-static {v4, v5}, Lorg/vinix/bootstrap/Main;->expect(II)V
+:null_executor_start
+invoke-virtual {v0, v3, v1}, Landroid/telephony/SubscriptionManager;->addOnSubscriptionsChangedListener(Ljava/util/concurrent/Executor;Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+:null_executor_end
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+:null_executor
+move-exception v4
+:null_listener_start
+invoke-virtual {v0, v2, v3}, Landroid/telephony/SubscriptionManager;->addOnSubscriptionsChangedListener(Ljava/util/concurrent/Executor;Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;)V
+:null_listener_end
+new-instance v4, Ljava/lang/AssertionError;
+invoke-direct {v4}, Ljava/lang/AssertionError;-><init>()V
+throw v4
+:null_listener
+move-exception v4
+new-instance v0, Landroid/os/Handler;
+invoke-static {}, Landroid/os/Looper;->getMainLooper()Landroid/os/Looper;
+move-result-object v2
+invoke-direct {v0, v2}, Landroid/os/Handler;-><init>(Landroid/os/Looper;)V
+new-instance v2, Lorg/vinix/bootstrap/TestSubscriptionFence;
+invoke-direct {v2, v1}, Lorg/vinix/bootstrap/TestSubscriptionFence;-><init>(Lorg/vinix/bootstrap/TestSubscriptions;)V
+invoke-virtual {v0, v2}, Landroid/os/Handler;->post(Ljava/lang/Runnable;)Z
+return-void
+.catch Ljava/lang/NullPointerException; {:null_executor_start .. :null_executor_end} :null_executor
+.catch Ljava/lang/NullPointerException; {:null_listener_start .. :null_listener_end} :null_listener
+.end method
+'
+
+fn subscription_fixture(root string) ! {
+	os.write_file(root + '/smali/TestSubscriptionFence.smali', r'.class public Lorg/vinix/bootstrap/TestSubscriptionFence;
+.super Ljava/lang/Object;
+.implements Ljava/lang/Runnable;
+.field private final listener:Lorg/vinix/bootstrap/TestSubscriptions;
+.method public constructor <init>(Lorg/vinix/bootstrap/TestSubscriptions;)V
+.locals 0
+invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+iput-object p1, p0, Lorg/vinix/bootstrap/TestSubscriptionFence;->listener:Lorg/vinix/bootstrap/TestSubscriptions;
+return-void
+.end method
+.method public run()V
+.locals 3
+iget-object v0, p0, Lorg/vinix/bootstrap/TestSubscriptionFence;->listener:Lorg/vinix/bootstrap/TestSubscriptions;
+iget v1, v0, Lorg/vinix/bootstrap/TestSubscriptions;->failures:I
+const/4 v2, 3
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+iget v1, v0, Lorg/vinix/bootstrap/TestSubscriptions;->calls:I
+const/4 v2, 1
+invoke-static {v1, v2}, Lorg/vinix/bootstrap/Main;->expect(II)V
+sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
+const-string v1, "CURRENT-API-PASS"
+invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
+return-void
+.end method
+')!
+	os.write_file(root + '/smali/TestSubscriptions.smali', r'.class public Lorg/vinix/bootstrap/TestSubscriptions;
+.super Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;
+.field public calls:I
+.field public failures:I
+.method public constructor <init>(Landroid/os/Looper;)V
+.locals 0
+invoke-direct {p0, p1}, Landroid/telephony/SubscriptionManager$OnSubscriptionsChangedListener;-><init>(Landroid/os/Looper;)V
+return-void
+.end method
+.method public onSubscriptionsChanged()V
+.locals 1
+iget v0, p0, Lorg/vinix/bootstrap/TestSubscriptions;->calls:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestSubscriptions;->calls:I
+return-void
+.end method
+.method public onAddListenerFailed()V
+.locals 1
+iget v0, p0, Lorg/vinix/bootstrap/TestSubscriptions;->failures:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestSubscriptions;->failures:I
+return-void
+.end method
+')!
+	os.write_file(root + '/smali/TestSubscriptionExecutor.smali', r'.class public Lorg/vinix/bootstrap/TestSubscriptionExecutor;
+.super Ljava/lang/Object;
+.implements Ljava/util/concurrent/Executor;
+.field public calls:I
+.method public constructor <init>()V
+.locals 0
+invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+return-void
+.end method
+.method public execute(Ljava/lang/Runnable;)V
+.locals 1
+iget v0, p0, Lorg/vinix/bootstrap/TestSubscriptionExecutor;->calls:I
+add-int/lit8 v0, v0, 1
+iput v0, p0, Lorg/vinix/bootstrap/TestSubscriptionExecutor;->calls:I
+invoke-interface {p1}, Ljava/lang/Runnable;->run()V
+return-void
+.end method
+')!
+}
+
 fn boolean_source() string {
 	// Reflect only to seed this isolated test process's existing property map;
 	// do not expose a pretend system-wide property setter in the framework.
@@ -231,6 +363,7 @@ invoke-static {}, Lorg/vinix/bootstrap/Main;->accounts()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->intent()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->users()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->properties()V
+invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 new-instance v0, Landroid/telephony/TelephonyManager;
 invoke-direct {v0}, Landroid/telephony/TelephonyManager;-><init>()V
 invoke-virtual {v0}, Landroid/telephony/TelephonyManager;->isVoiceCapable()Z
@@ -242,9 +375,6 @@ invoke-direct {v0}, Landroid/net/ConnectivityManager;-><init>()V
 invoke-virtual {v0}, Landroid/net/ConnectivityManager;->isTetheringSupported()Z
 move-result v0
 invoke-static {v0, v1}, Lorg/vinix/bootstrap/Main;->expect(II)V
-sget-object v0, Ljava/lang/System;->out:Ljava/io/PrintStream;
-const-string v1, "CURRENT-API-PASS"
-invoke-virtual {v0, v1}, Ljava/io/PrintStream;->println(Ljava/lang/String;)V
 return-void
 .end method
 .method public static expect(II)V
@@ -463,7 +593,8 @@ fn main() {
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
-	os.write_file(root + '/smali/Main.smali', main_source + intent_source + user_source + boolean_source())!
+	os.write_file(root + '/smali/Main.smali', main_source + intent_source + user_source + boolean_source() + subscription_source)!
+	subscription_fixture(root)!
 	os.write_file(root + '/smali/TestAccounts.smali', r'.class public Lorg/vinix/bootstrap/TestAccounts;
 .super Landroid/accounts/AccountManager;
 .field public snapshot:[Landroid/accounts/Account;
