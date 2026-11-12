@@ -12,6 +12,7 @@ these LLVM declarations for scalar half (`.f16`) and float (`.f32`):
 | `llvm.round` | Round to nearest integer, ties away from zero. |
 | `llvm.roundeven` / `llvm.rint` / `llvm.nearbyint` | Round to nearest integer, ties to even in LLVM's default environment. |
 | `llvm.minimum` / `llvm.maximum` | Select the lesser / greater operand, propagate NaNs, and order -0 below +0. |
+| `llvm.minimumnum` / `llvm.maximumnum` | Select the numeric operand if exactly one input is NaN, otherwise the lesser / greater value, ordering -0 below +0. |
 | `llvm.sqrt` | Correctly rounded square root, nearest/ties to even; retain negative zero and choose a quiet NaN for negative nonzero inputs. |
 | `llvm.fma` | Fused multiply-add with one nearest/ties-to-even rounding after the exact product and addition. |
 | `llvm.ldexp` | Scale half/float by a signed i32 power of two, with one final nearest/ties-to-even round. |
@@ -51,7 +52,7 @@ Declaration attributes admit only function-level `nounwind`, `readnone`,
 `nocreateundeforpoison` and `memory(none)` (bitcode memory versions 0/1/2).
 Return/parameter, string/type, `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A twenty-eight-entry fixed stack cache validates each admitted
+validation budget. A thirty-two-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -68,16 +69,17 @@ names, with a floating first argument/result and a signed i32 second argument.
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting
 memory/strictfp/string/return/parameter/missing/budget cases.
-An additional 88 exact extrema results check both precisions and argument
+An additional 176 exact extrema results check all four extrema operations, both precisions and argument
 orders, including signed zeros, subnormals, infinities and quiet/signaling NaNs.
-`minnum`/`maxnum`, `minimumnum`/`maximumnum` and AIR aliases remain unsupported;
-their different NaN rules are not inferred from these two names.
+`minimumnum`/`maximumnum` suppress either quiet or signaling NaN when the other
+operand is numeric, preserving that numeric operand's exact bits. Two NaNs
+choose the preferred quiet NaN. `minnum`/`maxnum` and AIR aliases remain unsupported.
 Square-root units check 32 exact values, unary/name/width guards and 327,680
 independent multiplication inequalities for root/remainder results, including
 exact squares and neighbors near the 54-bit bound.
 
 `tests/ios/air-scalar-intrinsics.v self-test LLVM_AS FRESH_EXTERNAL_DIR` generates
-36 functions: thirteen primitives, three chains and two bounded loops for each
+40 functions: fifteen primitives, three chains and two bounded loops for each
 precision. Half inputs cover all 65,536 encodings in every case. Float inputs
 cover 32 fixed edges, 65,536 mixed-bit inputs and 65,536 signed midpoint/neighbor
 inputs across exponents 0..22. Extrema additionally exhaust every half encoding
@@ -85,13 +87,13 @@ against sixteen boundary peers in both argument orders, and all 32-by-32 float
 edge pairs. Square root also receives 196,608 neighbors of squared exact
 float-root midpoints, formed independently using u64 products and shifts across
 the normal exponent range. Scaling adds 2,097,152 boundary pairs against sixteen
-signed exponent values. It compares **10,029,632 results**: 8,604,902 bit-exact
-results and 1,424,730 rounding/arithmetic NaN-class cases. Non-math
+signed exponent values. It compares **14,619,264 results**: 13,161,614 bit-exact
+results and 1,457,650 rounding/arithmetic NaN-class cases. Non-math
 operations preserve NaN bits exactly. Primitive CALL/return results cost two
 instructions; the sign/rounding chain costs four and the extrema/square-root
 chains three. The square-root loop feeds back its result through a PHI.
 Scaling wrappers also cost three instructions, including their exponent cast.
-Nine rejecting fixtures, three poison results, sixteen extrema poison/undef
+Nine rejecting fixtures, three poison results, thirty-two extrema poison/undef
 controls, four square-root poison/undef controls, lazy select, budget/integer
 isolation, eight call-metadata corruptions,
 two declaration-attribute corruptions, five result corruptions and six
@@ -106,7 +108,7 @@ The host LLVM backend's half `copysign` quiets signaling NaNs: input `0x7c01`
 with a negative sign produces `0xfe01` where the contract requires `0xfc01`.
 The native observation and initial failing corpus are retained. This one case
 uses a defined native LLVM integer bit-operation reference for all 65,536
-inputs; the remaining 9,964,096 comparisons use native floating-point wrappers.
+inputs; the remaining 14,553,728 comparisons use native floating-point wrappers.
 The reference does not relax payload checks or change production semantics.
 IR/bitcode, every comparison, native diagnostic, assembler/JIT/fenv identities
 and logs are preserved outside Git. The tool executes only its own fixture.
@@ -119,6 +121,8 @@ References: [LLVM fabs](https://llvm.org/docs/LangRef.html#llvm-fabs-intrinsic),
 [rounding](https://llvm.org/docs/LangRef.html#llvm-roundeven-intrinsic),
 [minimum](https://llvm.org/docs/LangRef.html#llvm-minimum-intrinsic),
 [maximum](https://llvm.org/docs/LangRef.html#llvm-maximum-intrinsic),
+[minimumNumber](https://llvm.org/docs/LangRef.html#llvm-minimumnum-intrinsic),
+[maximumNumber](https://llvm.org/docs/LangRef.html#llvm-maximumnum-intrinsic),
 [square root](https://llvm.org/docs/LangRef.html#llvm-sqrt-intrinsic),
 [default environment](https://llvm.org/docs/LangRef.html#floating-point-environment),
 [memory attribute decoding](https://github.com/llvm/llvm-project/blob/main/llvm/lib/Bitcode/Reader/BitcodeReader.cpp).

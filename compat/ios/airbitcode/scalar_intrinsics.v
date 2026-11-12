@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if id == .fma { return 3 }
-	return if id in [.copysign, .minimum, .maximum, .ldexp]! { 2 } else { 1 }
+	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
@@ -22,6 +22,8 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.sqrt.f16', 'llvm.sqrt.f32' { ScalarIntrinsic.sqrt }
 		'llvm.fma.f16', 'llvm.fma.f32' { ScalarIntrinsic.fma }
 		'llvm.ldexp.f16.i32', 'llvm.ldexp.f32.i32' { ScalarIntrinsic.ldexp }
+		'llvm.minimumnum.f16', 'llvm.minimumnum.f32' { ScalarIntrinsic.minimumnum }
+		'llvm.maximumnum.f16', 'llvm.maximumnum.f32' { ScalarIntrinsic.maximumnum }
 		else { return error('AIR intrinsic: unsupported callee') }
 	}
 }
@@ -97,14 +99,19 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if id == .copysign { return abs | (b & sign_mask) }
 	if id == .sqrt { return scalar_intrinsic_sqrt(bits, a) }
 	if id == .ldexp { return scalar_intrinsic_ldexp(bits, a, b) }
-	if id in [.minimum, .maximum]! {
+	if id in [.minimum, .maximum, .minimumnum, .maximumnum]! {
 		infinity := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
 		other := b & (sign_mask - 1)
+		if id in [.minimumnum, .maximumnum]! {
+			if abs > infinity && other <= infinity { return b }
+			if other > infinity && abs <= infinity { return a }
+		}
 		if abs > infinity || other > infinity { return if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) } }
+		minimum := id in [.minimum, .minimumnum]!
 		// IEEE minimum/maximum order -0 below +0 in either argument order.
-		if abs == 0 && other == 0 { return if id == .minimum { (a | b) & sign_mask } else { (a & b) & sign_mask } }
+		if abs == 0 && other == 0 { return if minimum { (a | b) & sign_mask } else { (a & b) & sign_mask } }
 		less := if (a ^ b) & sign_mask != 0 { sign != 0 } else if sign == 0 { abs < other } else { abs > other }
-		return if less == (id == .minimum) { a } else { b }
+		return if less == minimum { a } else { b }
 	}
 	fraction_bits := if bits == 16 { 10 } else { 23 }; bias := if bits == 16 { 15 } else { 127 }
 	infinity := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }

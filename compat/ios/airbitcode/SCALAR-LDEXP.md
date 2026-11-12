@@ -23,7 +23,7 @@ There is no host FP, libm, LLVM dependency or allocation in evaluation.
 
 Poison in either operand propagates, even for special floating values; selected
 undef errors. Each intrinsic CALL costs one instruction. The declaration cache
-is twenty-eight fixed stack entries; existing three owned execution arrays and
+is thirty-two fixed stack entries; existing three owned execution arrays and
 cleanup remain unchanged. The integer-only API rejects these floating calls.
 Fast-math, constrained/dynamic FP environments, exception flags, errno and
 general calls remain outside this profile. Valid LLVM IR and matching immutable
@@ -33,14 +33,14 @@ indexes are preconditions; admission is not a full verifier.
 subnormal normalization, underflow ties, zero/infinity/NaN, INT_MIN/MAX and i32
 masking, plus name/arity guards.
 
-The maintained `tests/ios/air-scalar-intrinsics.v` checker now generates 36
+The maintained `tests/ios/air-scalar-intrinsics.v` checker now generates 40
 functions. The two new scaling wrappers truncate their i64 input to i32, call
 the intrinsic and return, with exact three-step accounting. In addition to the
 usual exhaustive half and mixed-bit/midpoint float coverage, it checks every
 half encoding and 65,536 float patterns against sixteen signed exponent values
 covering boundaries and INT_MIN/MAX: 2,097,152 scaling boundary pairs.
 
-The complete suite compares 10,029,632 results: 8,604,902 exact and 1,424,730
+The complete suite compares 14,619,264 results: 13,161,614 exact and 1,457,650
 NaN-class cases, checking Vinix's exact preferred representation for native
 math NaNs. Eight new poison/undef controls, two exponent-type corruptions and
 four distinguishing host-rounding controls pass. The latter scale one or three

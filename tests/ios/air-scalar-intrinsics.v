@@ -51,9 +51,9 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 				control := 'define ${typ} @ldexp_${state}_${side}_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.ldexp.f${bits}.i32(${typ} ${left}, i32 ${right})\n  ret ${typ} %r\n}\n'; source.write_string(control); unsafe { control.free() }
 			}
 		}
-		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum', 'sqrt'] {
+		for op in ['fabs', 'copysign', 'floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint', 'minimum', 'maximum', 'sqrt', 'minimumnum', 'maximumnum'] {
 			name := '${op}_${bits}'; entry := IntrinsicCase{name, bits, op !in ['fabs', 'copysign'], 2}; unsafe { cases.push_many(&entry, 1) }
-			binary := op in ['copysign', 'minimum', 'maximum']
+			binary := op in ['copysign', 'minimum', 'maximum', 'minimumnum', 'maximumnum']
 			args := if binary { '${typ} %x, ${typ} %y' } else { '${typ} %x' }
 			params := if binary { '${typ}, ${typ}' } else { typ }
 			text := 'declare ${typ} @llvm.${op}.f${bits}(${params})\ndefine ${typ} @${name}(${typ} %x, ${typ} %y, i64 %c) {\n  %r = call ${typ} @llvm.${op}.f${bits}(${args})\n  ret ${typ} %r\n}\n'; source.write_string(text); unsafe { args.free(); if binary { params.free() }; text.free() }
@@ -67,7 +67,7 @@ fn fixture(mut source strings.Builder) []IntrinsicCase {
 		}
 		chain_entry := IntrinsicCase{'extrema_chain_${bits}', bits, true, 3}; unsafe { cases.push_many(&chain_entry, 1) }
 		chain := 'define ${typ} @extrema_chain_${bits}(${typ} %x, ${typ} %y, i64 %c) {\n  %a = call ${typ} @llvm.minimum.f${bits}(${typ} %x, ${typ} %y)\n  %r = call ${typ} @llvm.maximum.f${bits}(${typ} %a, ${typ} %x)\n  ret ${typ} %r\n}\n'; source.write_string(chain); unsafe { chain.free() }
-		for op in ['minimum', 'maximum'] {
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] {
 			for state in ['poison', 'undef'] {
 				for side in 0 .. 2 {
 					left := if side == 0 { state } else { '%x' }; right := if side == 1 { state } else { '%y' }
@@ -209,7 +209,7 @@ fn main() {
 	half_edges := [u32(0), 0x8000, 1, 0x8001, 0x03ff, 0x0400, 0x3c00, 0xbc00, 0x7bff, 0xfbff, 0x7c00, 0xfc00, 0x7c01, 0xfc01, 0x7e55, 0xfe55]!
 	mut extrema_pairs := 0
 	for c in cases {
-		if !c.name.starts_with('minimum_') && !c.name.starts_with('maximum_') { continue }
+		if !c.name.starts_with('minimum') && !c.name.starts_with('maximum') { continue }
 		index := function_index(ir, c.name)!; reference_name := 'reference_${c.name}'; defer { unsafe { reference_name.free() } }
 		address := C.LLVMGetFunctionAddress(engine, reference_name.str); if address == 0 { panic('missing extrema reference') }; reference := unsafe { NativeBits(voidptr(address)) }
 		for sample in 0 .. if c.bits == 16 { 65536 * 16 * 2 } else { 32 * 32 } {
@@ -264,7 +264,7 @@ fn main() {
 	for name in ['poison_unary', 'poison_left', 'poison_right'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('intrinsic poison lost') } }
 	mut extrema_controls := 0
 	for bits in [16, 32]! {
-		for op in ['minimum', 'maximum'] {
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] {
 			for side in 0 .. 2 {
 				poison_name := '${op}_poison_${side}_${bits}'; undef_name := '${op}_undef_${side}_${bits}'
 				defer { unsafe { poison_name.free(); undef_name.free() } }

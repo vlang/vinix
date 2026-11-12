@@ -95,9 +95,12 @@ fn test_scalar_intrinsic_minimum_maximum() {
 				a := row[int(swapped)]; b := row[int(!swapped)]
 				assert scalar_intrinsic_value(.minimum, bits, a, b)! == row[2]
 				assert scalar_intrinsic_value(.maximum, bits, a, b)! == row[3]
+				numeric := if a & (sign - 1) > inf && b & (sign - 1) <= inf { b } else if b & (sign - 1) > inf && a & (sign - 1) <= inf { a } else { qn }
+				assert scalar_intrinsic_value(.minimumnum, bits, a, b)! == if a & (sign - 1) > inf || b & (sign - 1) > inf { numeric } else { row[2] }
+				assert scalar_intrinsic_value(.maximumnum, bits, a, b)! == if a & (sign - 1) > inf || b & (sign - 1) > inf { numeric } else { row[3] }
 			}
 		}
-		for op in ['minimum', 'maximum'] {
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] {
 			name := 'llvm.${op}.f${bits}'; defer { unsafe { name.free() } }
 			assert scalar_intrinsic_arity(scalar_intrinsic_name(name)!) == 2
 		}
@@ -105,5 +108,5 @@ fn test_scalar_intrinsic_minimum_maximum() {
 	for name in ['llvm.minnum.f32', 'llvm.maxnum.f16', 'llvm.minimum.f64', 'llvm.maximum.v2f32', 'air.minimum.f32'] {
 		if _ := scalar_intrinsic_name(name) { assert false, 'unsupported extremum name' }
 	}
-	println('AIR-SCALAR-EXTREMA: 88 exact results across both precisions/orders, binary arity and unsupported names PASS')
+	println('AIR-SCALAR-EXTREMA: 176 exact results across four operations, both precisions/orders, binary arity and unsupported names PASS')
 }
