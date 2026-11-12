@@ -1188,6 +1188,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now passes native ARM/x86 lifecycle, caller-death, resource-refusal and
     signal-window controls. It remains disconnected from package launches;
     foreground Wine server ownership and production integration remain open.
+    An [owned prefix launch guard](tests/packages/wine-lease-supervision-plan.md#standalone-prefix-launch-guard-2026-11-13)
+    now passes ARM/x86 contention, close-on-exec, replacement and descriptor
+    checks, plus host heap/sanitizer controls. Managed Wine server admission
+    and generation lease integration remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

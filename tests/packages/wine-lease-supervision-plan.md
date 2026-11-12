@@ -296,6 +296,49 @@ Keep the original workspace and input namespaces. This is local primitive
 qualification, not a complete C toolchain inventory, hermetic build, leak
 measurement, package sandbox acceptance or real Wine supervision qualification.
 
+## Standalone prefix launch guard, 2026-11-13
+
+Source `49015cd1c` adds `Prefix.acquire_launch(data)` and the owned
+`wineadapter.LaunchGuard` primitive. It duplicates captured data/prefix directory
+descriptors with CLOEXEC, opens `.vinix-managed-launch` without following links,
+requires an empty ordinary single-link file owned by the effective UID/GID with
+mode 0600, and takes a nonblocking exclusive flock. Unsupported locking and
+contention refuse. Every partial acquisition closes its owned descriptors.
+The guard survives `Prefix.close`, supports idempotent close, and leaves the
+coordination file in place. Removing a live flock file could split ownership.
+
+`recheck` reopens the canonical data path and compares directory and guard-file
+identities and policy with the held descriptors. This coordinates cooperating
+managed launchers; arbitrary same-account programs can still replace paths or
+bypass advisory locking. Rechecks detect replacements at their boundaries,
+not continuously. The primitive neither authenticates a Wine server nor changes
+`wine-runner`, nested aliases or the generation lease holder.
+
+The shared maintained V fixture runs under an ordinary macOS account and as
+uid/gid 1000 in native ARM64/x86_64 guests. Final `arm-05` and `x86-05` pass
+independent-open and child-process contention, independent guard ownership,
+close/reacquire, retained coordination file, 1,000 repeated acquisitions and
+refusals, malformed modes/content/hardlinks/symlinks/FIFO/directory refusal,
+data/prefix/guard replacement, permission changes and restoration/retry.
+Native exec checks find no descriptors above standard streams within the
+process descriptor limit. Descriptor counts remain flat after the repeated
+operations and refusal paths. Host normal/production heap controls retain zero
+V bytes across the repeated operations; address/undefined sanitizers and the
+existing prefix regression also pass. This does not measure kernel allocations.
+
+The controller uses the preceding gate's unchanged production kernels, admits
+actual parsed guest sources, and verifies selected source/tool/kernel/firmware
+and generated artifact hashes before/after boot. Commands, generated C, serial
+logs, earlier failures, final source copies and ownership self-review remain at
+`/Users/alex/.cache/vwg-20261113-01`. The complete typed in-place inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-launch-guard-20261113-01.inventory.json`,
+SHA-256 `af38424d5581714d17ae3d58a626347631cee7c6bc832d308f46b4bfc3004f23`.
+Recording and separate complete verification pass with adjacent logs. Preserve
+the original workspace and historical input namespaces. This is selected-input
+primitive qualification; complete toolchain inventory, sandbox acceptance,
+authenticated foreground server startup/socket handoff, production Wine lease
+coverage and retention across holder death remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
