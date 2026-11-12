@@ -40,6 +40,19 @@ and rechecks the full original inventory and archive checksum afterward. It
 retains originals and avoids another expanded copy. This does not authorize
 retiring expanded evidence or substitute for launch auditors or restoration
 requirements before deletion.
+
+For a retained workspace containing symlinks when another compressed copy will
+not fit, the same V tool supports `record-inventory SOURCE FRESH_EXTERNAL_JSON`
+and `check-inventory SOURCE JSON`. The receipt covers every logical file byte,
+size, mode, directory/root mode and link target, and records source/tool hashes.
+Recording compares two complete inventories before publishing the receipt;
+checking compares the retained workspace again. Keep the canonical original
+workspace and pin the receipt checksum in the report. This records integrity
+without creating an archive and does not qualify a launch, replace a historical
+auditor or authorize removing originals. Its selftest also refuses changed
+bytes, links, file/root permissions, hidden additions, missing files, overwrite
+and a receipt inside the source workspace.
+
 An optional trailing `--fast` selects gzip level 1 for large workspaces; the
 literal compression command is retained. This trades compressed size for CPU
 time and preserves the same complete logical-content and metadata checks.

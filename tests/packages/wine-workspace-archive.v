@@ -44,6 +44,39 @@ fn tree(root string, top string) ![]string {
 	return entries
 }
 
+struct WorkspaceInventory {
+	format int = 1
+	source string
+	entries []string
+	producer_sha256 string
+	source_sha256 string
+}
+
+fn inventory_receipt(source string, receipt string, check bool) ! {
+	repo := os.real_path(os.dir(@FILE) + '/../..')
+	canonical_receipt := os.real_path(os.dir(receipt)) + '/' + os.base(receipt)
+	if !os.is_dir(source) || os.is_link(source) || os.real_path(source) != source
+		|| source == repo || source.starts_with(repo + '/')
+		|| canonical_receipt == source || canonical_receipt.starts_with(source + '/')
+		|| canonical_receipt == repo || canonical_receipt.starts_with(repo + '/')
+		|| os.is_link(receipt) { return error('inventory requires an external canonical workspace and separate receipt') }
+	if check {
+		proof := json2.decode[WorkspaceInventory](os.read_file(receipt)!)!
+		if proof.format != 1 || proof.source != source || proof.producer_sha256.len != 64
+			|| proof.source_sha256.len != 64 || proof.entries != tree(os.dir(source), os.base(source))! {
+			return error('complete workspace inventory differs')
+		}
+	} else {
+		if os.exists(receipt) { return error('inventory receipt must be fresh') }
+		before := tree(os.dir(source), os.base(source))!
+		producer := digest(os.executable())!
+		code := digest(@FILE)!
+		if before != tree(os.dir(source), os.base(source))!
+			|| producer != digest(os.executable())! || code != digest(@FILE)! { return error('workspace or inventory tool changed') }
+		os.write_file(receipt, json2.encode(WorkspaceInventory{source: source, entries: before, producer_sha256: producer, source_sha256: code}))!
+	}
+}
+
 fn invoke(args []string, log string) ! {
 	os.write_file(log + '.argv.json', json2.encode(args))!
 	result := os.exec(args)
@@ -85,10 +118,44 @@ fn selftest(root string, checker string) ! {
 		if name == 'changed-link' { os.rm(root + '/input/link')!; os.symlink('nested/payload', root + '/input/link')! }
 	}
 	println('Workspace archive: fresh/fast/existing sparse baseline and ' + refused.str() + ' refusal controls PASS')
+	proof := root + '/typed-inventory.json'
+	invoke([os.executable(), 'record-inventory', root + '/input', proof], root + '/inventory-record.log')!
+	invoke([os.executable(), 'check-inventory', root + '/input', proof], root + '/inventory-check.log')!
+	payload_mode := int(os.lstat(root + '/input/nested/payload')!.mode) & 0o7777
+	root_mode := int(os.lstat(root + '/input')!.mode) & 0o7777
+	mut inventory_refusals := 0
+	for name in ['changed-byte', 'changed-link', 'changed-mode', 'changed-root', 'added-hidden', 'missing-file', 'overwrite', 'inside-source'] {
+		if name == 'changed-byte' { os.write_file(root + '/input/nested/payload', 'changed')! }
+		if name == 'changed-link' { os.rm(root + '/input/link')!; os.symlink('sparse', root + '/input/link')! }
+		if name == 'changed-mode' { os.chmod(root + '/input/nested/payload', payload_mode ^ 0o010)! }
+		if name == 'changed-root' { os.chmod(root + '/input', root_mode ^ 0o010)! }
+		if name == 'added-hidden' { os.write_file(root + '/input/.hidden', 'added')! }
+		if name == 'missing-file' { os.rm(root + '/input/nested/payload')! }
+		command := if name == 'overwrite' { [os.executable(), 'record-inventory', root + '/input', proof] }
+			else if name == 'inside-source' { [os.executable(), 'record-inventory', root + '/input', root + '/input/receipt.json'] }
+			else { [os.executable(), 'check-inventory', root + '/input', proof] }
+		answer := os.exec(command)
+		os.write_file(root + '/inventory-' + name + '.log', answer.output)!
+		if answer.exit_code == 0 { return error('inventory accepted ' + name) }
+		inventory_refusals++
+		if name == 'changed-byte' || name == 'missing-file' { os.write_file(root + '/input/nested/payload', 'payload')!; os.chmod(root + '/input/nested/payload', payload_mode)! }
+		if name == 'changed-link' { os.rm(root + '/input/link')!; os.symlink('nested/payload', root + '/input/link')! }
+		if name == 'changed-mode' { os.chmod(root + '/input/nested/payload', payload_mode)! }
+		if name == 'changed-root' { os.chmod(root + '/input', root_mode)! }
+		if name == 'added-hidden' { os.rm(root + '/input/.hidden')! }
+	}
+	invoke([os.executable(), 'check-inventory', root + '/input', proof], root + '/inventory-restored.log')!
+	println('Workspace typed inventory: restored baseline and ' + inventory_refusals.str() + ' refusal controls PASS')
 }
 
 fn run() ! {
 	$if prod {} $else { return error('compile workspace archive with -prod') }
+	if digest(@FILE)! != sha256.hexhash($embed_file('wine-workspace-archive.v').to_string()) { return error('compiled workspace archive source differs') }
+	if os.args.len == 4 && os.args[1] in ['record-inventory', 'check-inventory'] {
+		inventory_receipt(os.abs_path(os.args[2]), os.abs_path(os.args[3]), os.args[1] == 'check-inventory')!
+		println('WINE WORKSPACE INVENTORY PASS complete bytes, sizes, types, modes and link targets; receipt SHA256=' + digest(os.args[3])!)
+		return
+	}
 	if os.args.len == 4 && os.args[1] == 'selftest' {
 		root := os.abs_path(os.args[2])
 		repo := os.real_path(os.dir(@FILE) + '/../..')
