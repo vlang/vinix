@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if id in [.fma, .fmuladd]! { return 3 }
 	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass]! { 2 } else { 1 }
@@ -28,7 +28,7 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.minnum.f16', 'llvm.minnum.f32' { ScalarIntrinsic.minnum }
 		'llvm.maxnum.f16', 'llvm.maxnum.f32' { ScalarIntrinsic.maxnum }
 		'llvm.is.fpclass.f16', 'llvm.is.fpclass.f32' { ScalarIntrinsic.is_fpclass }
-		else { return error('AIR intrinsic: unsupported callee') }
+		else { scalar_integer_intrinsic_name(name)! }
 	}
 }
 // Return the declaration's attribute-list ID after checking direct identity,
@@ -50,7 +50,10 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	input := if id == .is_fpclass { ir.references[signature.refs_start + 1] } else { result }
 	bits := p.execution_bits(input, true)!
 	half := f.name.ends_with('.f16') || (id == .ldexp && f.name.ends_with('.f16.i32'))
-	if p.types[input].kind !in [.float_t, .half_t]! || bits != if half { u32(16) } else { u32(32) } { return error('AIR intrinsic: name/type mismatch') }
+	integer := scalar_integer_intrinsic(id)
+	if integer {
+		if p.integer_bits(input)! != scalar_integer_intrinsic_width(f.name, id)! { return error('AIR intrinsic: integer name/type mismatch') }
+	} else if p.types[input].kind !in [.float_t, .half_t]! || bits != if half { u32(16) } else { u32(32) } { return error('AIR intrinsic: name/type mismatch') }
 	if id == .is_fpclass && p.integer_bits(result)! != 1 { return error('AIR intrinsic: classification returns i1') }
 	for i in 0 .. arity {
 		argument := ir.references[signature.refs_start + i + 1]
@@ -71,7 +74,8 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
-	return int(id) * 2 + int(bits == 16), ir_values(stream, raw)[6]
+	key := if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
+	return key, ir_values(stream, raw)[6]
 }
 // Accept only harmless function-level properties inherent in these intrinsics.
 // Return/parameter, string, type, strictfp and other attributes reject, except
@@ -125,6 +129,7 @@ fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, class_
 	return work
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
+	if scalar_integer_intrinsic(id) { return scalar_integer_intrinsic_value(id, bits, a)! }
 	if bits !in [u32(16), 32]! { return error('AIR intrinsic: floating width') }
 	if id in [.fma, .fmuladd]! { return error('AIR intrinsic: three multiply-add arguments required') }
 	if id == .is_fpclass {

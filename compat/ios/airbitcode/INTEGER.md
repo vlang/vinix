@@ -27,6 +27,9 @@ Floating point, vectors, pointers, memory operations, calls and freeze are
 outside this profile.
 The separate [mixed scalar entry point](BINARY32.md) adds software binary32
 execution while preserving this integer-only API.
+That mixed entry point also accepts the bounded unary
+[integer bit intrinsics](SCALAR-INTEGER-INTRINSICS.md); this entry point retains
+its no-call profile.
 
 Arithmetic uses explicit unsigned bit patterns to avoid host signed-overflow
 behavior. Flag-free arithmetic wraps at its declared width. `nuw`/`nsw` overflow

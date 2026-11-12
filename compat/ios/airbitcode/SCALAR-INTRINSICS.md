@@ -58,7 +58,7 @@ Declaration attributes admit only function-level `nounwind`, `readnone`,
 Except classification's mask `immarg`, return/parameter, string/type,
 `strictfp`, other memory effects and unknown
 attributes reject. Attribute-list/group scans share a 1,000,000 record/attribute
-validation budget. A forty-entry fixed stack cache validates each admitted
+validation budget. A 232-entry fixed stack cache validates each admitted
 declaration once per run and rejects duplicate reserved declarations. There
 are no new owned execution arrays; the existing three temporary arrays and
 their cleanup remain unchanged. Each intrinsic CALL costs one executed
@@ -75,6 +75,10 @@ names, with a floating first argument/result and a signed i32 second argument.
 [Floating classification](SCALAR-FPCLASS.md) returns i1 from a half/float input
 and an immediate i32 mask. Only this intrinsic admits the exact parameter-two
 `immarg` declaration attribute; the mask is independently checked at every call.
+[Integer bit operations](SCALAR-INTEGER-INTRINSICS.md) add unary `ctpop` and
+`bitreverse` at i1..i64 and `bswap` at i16/i32/i48/i64, also through the mixed
+scalar entry point. Their cache keys reserve three independent 64-width ranges
+after the forty floating-overload slots. Unsupported byte-swap widths reject.
 
 `scalar_intrinsics_test.v` checks 28 exact bit/rounding/special-value patterns,
 unsupported names/widths, canonical attributes, memory versions, and rejecting
