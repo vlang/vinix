@@ -205,7 +205,9 @@ fn keyboard_handler(vect u8) {
 		// The byte the interrupt announced may be gone: whoever set the
 		// controller up again after a sleep emptied its buffer. Waiting for
 		// one that is not coming would hold this CPU until the next key.
-		if kio.port_in[u8](0x64) & 1 == 0 {
+		// A delayed keyboard IRQ may now find a mouse byte in the shared
+		// output buffer. Leave it for IRQ12's handler.
+		if kio.port_in[u8](0x64) & 0x21 != 0x01 {
 			continue
 		}
 		input_byte := kio.port_in[u8](0x60)

@@ -89,6 +89,8 @@ fn new_calculator_app() &CalculatorApp {
 		keys << CalculatorKey{ text: text, row: index / 4, column: index % 4 }
 	}
 	mut app := &CalculatorApp{ calculator: Calculator{ keys: keys } }
+	// The placeholder is never rendered; the first build replaces it.
+	free_frame_stylesheet(&app.layout)
 	unsafe { app.history.flags |= .noslices }
 	unsafe { app.integer.history.flags |= .noslices }
 	return app
@@ -159,6 +161,7 @@ fn calculator_layout_with_display(element ui2.Element, display string) ui2.Eleme
 	if element.id == 'display' {
 		return ui2.Element{
 			...element
+			key:        frame_borrowed_stylesheet_key
 			text:       display
 			text_style: ui2.TextStyle{
 				...element.text_style
@@ -167,7 +170,7 @@ fn calculator_layout_with_display(element ui2.Element, display string) ui2.Eleme
 		}
 	}
 	if element.children.len == 0 {
-		return element
+		return ui2.Element{ ...element, key: frame_borrowed_stylesheet_key }
 	}
 	mut children := []ui2.Element{cap: element.children.len}
 	unsafe { children.flags |= .noslices }
@@ -176,19 +179,15 @@ fn calculator_layout_with_display(element ui2.Element, display string) ui2.Eleme
 	}
 	return ui2.Element{
 		...element
+		key:      frame_borrowed_stylesheet_key
 		children: children
 	}
 }
 
-// The native layout uses literals and owns only its child arrays. The adapted
-// copy above owns its replacement arrays and is released by free_tree.
+// The native layout owns its child arrays and default stylesheet metadata.
+// Adapted frames borrow that metadata and own only their replacement arrays.
 fn release_compiled_calculator_layout(element ui2.Element) {
-	for child in element.children {
-		release_compiled_calculator_layout(child)
-	}
-	if element.children.cap > 0 {
-		unsafe { element.children.free() }
-	}
+	free_tree(element)
 }
 
 fn (mut app CalculatorApp) build(size ui2.Rect) !ui2.Element {

@@ -411,10 +411,14 @@ fn (mut m Manager) prepare_session(user accountcore.User, typed []u8) ?int {
 			C.close(line[1])
 			return none
 		}
-		started := start_fallback(db, user, m.config.desktop, m.config.desktop_fallback, true, int(line[1]), Unlock{
+		// Native application sandboxes cannot shed supplementary groups after
+		// the compositor has become an ordinary user. Drop those memberships
+		// while this child is still privileged; seat access and primary IDs stay
+		// with the account, and administrative actions use the root broker.
+		started := start_profile(db, user, m.config.desktop, m.config.desktop_fallback, true, int(line[1]), Unlock{
 			secret: typed
 			helper: m.config.keyring
-		}) or {
+		}, true) or {
 			report_manager_error(err, 'vinix-session: ')
 			C.close(line[0])
 			C.close(line[1])

@@ -11,3 +11,8 @@ fn test_headless_monitor_has_no_x11_dependency() {
 	assert text.contains('return 0')
 	assert !text.contains('#include')
 }
+
+fn test_headless_manifest_excludes_native_window_hosts() {
+	text := filter_manifest_subdirs("Module { subdirs: ['ui', 'appkit', 'uikit', 'windows', 'linux'] }")!
+	assert module_subdirs(text)! == ['ui', 'uikit', 'windows']
+}
