@@ -25,10 +25,13 @@ fn run() ! {
 	refusal([native, 'aarch64', work + '/arm', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager'], work + '/arm-native.log', 'owned native Wine qualification requires x86_64')!
 	refusal([native, 'aarch64', work + '/arm-collection', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--collection-probe'], work + '/arm-collection.log', 'owned native Wine qualification requires x86_64')!
 	refusal([native, 'x86_64', work + '/unowned-collection', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--collection-probe'], work + '/unowned-collection.log', 'usage: wine-native-check')!
+	refusal([native, 'aarch64', work + '/arm-death', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--caller-death-probe'], work + '/arm-death.log', 'owned native Wine qualification requires x86_64')!
+	refusal([native, 'x86_64', work + '/unowned-death', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--caller-death-probe'], work + '/unowned-death.log', 'usage: wine-native-check')!
+	refusal([native, 'x86_64', work + '/mixed-probes', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--collection-probe', '--caller-death-probe'], work + '/mixed-probes.log', 'usage: wine-native-check')!
 	refusal([native, 'x86_64', work + '/mixed', prepared, '/missing', '/missing', '/missing', '/missing', '/missing'], work + '/mixed.log', 'ownership modes differ')!
 	os.mkdir(work + '/unmarked')!
 	refusal([native, 'x86_64', work + '/unmarked-run', work + '/unmarked', '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager'], work + '/unmarked.log', 'ownership modes differ')!
-	for directory in ['producer', 'arm', 'arm-collection', 'unowned-collection'] {
+	for directory in ['producer', 'arm', 'arm-collection', 'unowned-collection', 'arm-death', 'unowned-death', 'mixed-probes'] {
 		if os.exists(work + '/' + directory) { return error('mode/architecture refusal created workload output') }
 	}
 	for directory in [work + '/mixed', work + '/unmarked-run'] {

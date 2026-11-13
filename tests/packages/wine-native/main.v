@@ -12,6 +12,9 @@ import tools.packages.pkgcore
 #include <sys/wait.h>
 #include <grp.h>
 #include <poll.h>
+#include <signal.h>
+#define wine_fixture_kill kill
+fn C.wine_fixture_kill(i32, i32) i32
 
 struct C.pollfd {
 mut:
@@ -532,6 +535,62 @@ fn collection_live(pid string) ! {
 	return error('collection probe process state missing: ' + pid)
 }
 
+fn collection_field(pid string, field string) !string {
+	status := os.read_file('/proc/' + pid + '/status')!
+	defer { unsafe { status.free() } }
+	lines := status.split_into_lines()
+	defer { unsafe { lines.free() } }
+	for line in lines {
+		if line.starts_with(field + ':') { return line.all_after(':').trim_space().clone() }
+	}
+	return error('collection process field missing: ' + field)
+}
+
+// The non-execing holder inherits the ordinary caller's argv. Distinguish
+// their roles by credentials and the direct parent/child relationship, then
+// independently tie that holder to the authenticated server's SDK parent.
+fn collection_callers(server string, generation string) !(string, string) {
+	names := os.ls('/proc')!
+	defer { unsafe { names.free() } }
+	mut candidates := []string{}
+	defer { unsafe { for pid in candidates { pid.free() }; (&array(&candidates)).free() } }
+	for pid in names {
+		if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
+		line := os.read_file('/proc/' + pid + '/cmdline') or { continue }
+		defer { unsafe { line.free() } }
+		if !line.starts_with('/usr/bin/vinix-package\x00run-args\x00' + application + '\x00')
+			|| !line.contains('\x00--vinix-collection-probe\x00') { continue }
+		uid := collection_field(pid, 'Uid')!
+		defer { unsafe { uid.free() } }
+		fields := uid.fields()
+		defer { unsafe { fields.free() } }
+		if fields.len != 4 { return error('package caller UID fields differ') }
+		if fields[0] != '1000' { continue }
+		collection_live(pid)!
+		candidates << pid.clone()
+	}
+	if candidates.len != 2 { return error('ordinary package caller/holder identities are ambiguous') }
+	for index in 0 .. 2 {
+		holder := candidates[index]
+		caller := candidates[1 - index]
+		if collection_field(holder, 'PPid')! != caller { continue }
+		manager := collection_field(server, 'PPid')!
+		defer { unsafe { manager.free() } }
+		collection_live(manager)!
+		line := os.read_file('/proc/' + manager + '/cmdline')!
+		defer { unsafe { line.free() } }
+		parent := collection_field(manager, 'PPid')!
+		println('HWTEST INFO Wine caller=' + caller + ' holder=' + holder + ' manager=' + manager + ' manager-parent=' + parent + ' manager-argv=' + line.replace('\x00', ' '))
+		if parent != holder
+			|| !line.contains(generation + '/apps/org.vinix.wine-runtime/bin/wine-runner\x00') {
+			return error('package holder is not the owned SDK manager parent')
+		}
+		println('HWTEST INFO Wine caller=' + caller + ' holder=' + holder + ' manager=' + manager + ' server=' + server)
+		return caller.clone(), holder.clone()
+	}
+	return error('ordinary package caller/holder parent relationship missing')
+}
+
 fn collection_run(generation string, architecture string) ! {
 	println('HWTEST INFO Wine collection launch begin')
 	mut child := os.new_process('/usr/bin/vinix-package')
@@ -562,6 +621,10 @@ fn collection_run(generation string, architecture string) ! {
 	mut server := ''
 	mut descendant := ''
 	defer { unsafe { initial.free(); server.free(); descendant.free() } }
+	mut caller := ''
+	mut holder := ''
+	defer { unsafe { caller.free(); holder.free() } }
+	mut holder_reaped := false
 	mut collected := false
 	mut polls := 0
 	deadline := time.sys_mono_now() + 480 * time.second
@@ -619,6 +682,21 @@ fn collection_run(generation string, architecture string) ! {
 			}
 			if descendant == '' || descendant == initial { return error('collection probe descendant was not observed') }
 			collection_live(descendant)!
+			$if wine_caller_death_probe ? {
+				found_caller, found_holder := collection_callers(server, generation)!
+				caller = found_caller
+				holder = found_holder
+				if C.wine_fixture_kill(i32(caller.int()), C.SIGKILL) != 0 { return error('cannot kill ordinary package caller') }
+				gone := time.sys_mono_now() + 10 * time.second
+				for os.exists('/proc/' + caller) || child.is_alive() {
+					if time.sys_mono_now() > gone { return error('ordinary package caller or outer CLI survived SIGKILL') }
+					time.sleep(10 * time.millisecond)
+				}
+				if child.code != 137 { return error('outer package CLI did not report caller SIGKILL: ' + child.code.str()) }
+				collection_live(holder)!
+				if collection_field(holder, 'PPid')! != '1' { return error('surviving holder was not adopted by fixture PID1') }
+				println('HWTEST INFO Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS')
+			}
 			// Two real administrative transitions make the running generation
 			// neither active nor rollback. No state/lease files are synthesized.
 			command(['/usr/bin/vinix-package', 'remove', application], '')!
@@ -637,11 +715,17 @@ fn collection_run(generation string, architecture string) ! {
 				command(['/usr/bin/vinix-package', 'gc'], '')!
 				if !os.is_dir(generation) || sha256.hexhash(os.read_file(image)!) != before
 					|| os.exists('/proc/' + initial) || !os.exists('/proc/' + server)
-					|| !os.exists('/proc/' + descendant) || !child.is_alive() {
+					|| !os.exists('/proc/' + descendant) {
 					return error('collection probe lost live obsolete generation or detached interval')
 				}
 				collection_live(server)!
 				collection_live(descendant)!
+				$if wine_caller_death_probe ? {
+					if os.exists('/proc/' + caller) || child.is_alive() { return error('dead package caller returned during collection') }
+					collection_live(holder)!
+				} $else {
+					if !child.is_alive() { return error('package CLI returned during collection') }
+				}
 			}
 			println('HWTEST INFO Wine initial-client-gone server-live obsolete-generation collection-retained PASS')
 			collected = true
@@ -650,7 +734,19 @@ fn collection_run(generation string, architecture string) ! {
 			os.chown(release, 1000, 1000)!
 			os.chmod(release, 0o600)!
 		}
-		if !child.is_alive() { break }
+		$if wine_caller_death_probe ? {
+			if collected && !holder_reaped {
+				mut status := i32(0)
+				waited := C.waitpid(holder.int(), &status, C.WNOHANG)
+				if waited == holder.int() {
+					if status & 0x7f != 0 || (status >> 8) & 0xff != 37 { return error('adopted lease holder lost original application status') }
+					holder_reaped = true
+				} else if waited < 0 && C.errno != C.EINTR { return error('cannot collect adopted lease holder') }
+			}
+			if holder_reaped && !os.exists('/proc/' + server) && !os.exists('/proc/' + descendant) { break }
+		} $else {
+			if !child.is_alive() { break }
+		}
 		if time.sys_mono_now() > deadline { return error('collection probe timed out:\n' + text) }
 		time.sleep(20 * time.millisecond)
 	}
@@ -663,10 +759,14 @@ fn collection_run(generation string, architecture string) ! {
 	}
 	text := unsafe { tos(bytes.data, bytes.len) }
 	println(text)
-	if !collected || child.code != 37 || text.count('VINIX COLLECTION INITIAL READY\n') != 1
+	expected_status := $if wine_caller_death_probe ? { 137 } $else { 37 }
+	if !collected || child.code != expected_status || text.count('VINIX COLLECTION INITIAL READY\n') != 1
 		|| text.count('VINIX COLLECTION CHILD READY\n') != 1 || text.count('VINIX COLLECTION CHILD RETIRED\n') != 1
 		|| os.exists('/proc/' + initial) || os.exists('/proc/' + server) || os.exists('/proc/' + descendant) {
 		return error('collection probe retirement or saved initial status differs: ' + child.code.str())
+	}
+	$if wine_caller_death_probe ? {
+		if !holder_reaped || os.exists('/proc/' + caller) || os.exists('/proc/' + holder) { return error('caller/holder retirement differs') }
 	}
 	command(['/usr/bin/vinix-package', 'gc'], '')!
 	if os.exists(generation) { return error('obsolete Wine generation remained after natural retirement') }
@@ -675,7 +775,11 @@ fn collection_run(generation string, architecture string) ! {
 	if retained.previous == 0 || !os.is_dir('/var/lib/vinix-packages/generations/' + retained.previous.str()) {
 		return error('collection removed the retained rollback generation')
 	}
-	println('HWTEST INFO Wine signed detached-client collection lease status37 natural-retirement PASS')
+	$if wine_caller_death_probe ? {
+		println('HWTEST INFO Wine signed caller-SIGKILL holder-survived collection-retained natural-retirement PASS')
+	} $else {
+		println('HWTEST INFO Wine signed detached-client collection lease status37 natural-retirement PASS')
+	}
 	println('HWTEST PASS packaged-Wine')
 }
 
