@@ -1617,6 +1617,36 @@ entire frozen workspace and referenced original kernel/input bundles.
 Holder/SDK death, session teardown, ARM owned Wine, fresh owned GUI, default
 activation and broader topology/heap/hermetic gates remain open.
 
+## Closed standard streams, 2026-11-13
+
+Source `ed6f1e2b9` adds controller outcome `closed-stdio`. The caller closes
+descriptors 0/1/2 immediately before `launchhold.run`, requires `EBADF` for all
+three, then requires them still closed at return. This exercises the holder's
+existing status-pipe relocation out of standard descriptor slots. The existing
+lifetime fixture requires a busy lease after initial-client exit with a live
+detached worker, original status 37 after natural retirement, a released lease,
+unchanged caller mask, unrelated-child status 97 and no remaining children.
+The host requires the closed-stdio completion marker.
+
+Final `x86-02` passes in 5.686 seconds and `arm-02` in 5.584, both uninterrupted
+with parsed-source, selected-input and generated-output checks. Evidence,
+generated artifacts, final source copies and complete native input byte
+snapshots are frozen at `/Users/alex/.cache/vwstdio-20261113-01`. Earlier positive
+runs precede the explicit before/after EBADF assertions and remain preserved.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/holder-closed-stdio-20261113-01.inventory.json`,
+SHA-256 `dfe4032d975e5c0c2aa162ad08a7bed7381de77fe99b81203f22febce74a870a`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original kernel/input bundles.
+
+Production holder/kernel/Wine code is unchanged. Preserve the original kernel
+qualification bundle and namespaces; historical audits remain required. This
+qualifies native successful-launch pipe relocation, not signed Wine with
+closed stdio or setup-failure reporting in this mode. Holder/SDK death, session
+teardown, ARM owned Wine, fresh owned GUI, default activation and broader
+topology/heap/hermetic gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
