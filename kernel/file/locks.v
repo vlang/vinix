@@ -181,7 +181,7 @@ fn notify_lock_waiters() {
 
 fn set_record_lock(mut handle Handle, mut flock Flock, blocking bool, ofd bool, range LockRange) ? {
 	resource_id := lock_resource_id(handle.resource)
-	owner := if ofd { u64(handle) } else { u64(proc.current_thread().process.pid) }
+	owner := if ofd { u64(voidptr(handle)) } else { u64(proc.current_thread().process.pid) }
 	class := if ofd { lock_class_ofd } else { lock_class_posix }
 	pid := if ofd { -1 } else { int(owner) }
 	if flock.l_type == f_unlck {
