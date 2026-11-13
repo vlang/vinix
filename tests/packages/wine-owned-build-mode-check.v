@@ -23,10 +23,14 @@ fn run() ! {
 	for path in [@FILE, os.executable(), builder, native, prepared + '/owned-manager.json', prepared + '/outputs.json'] { inputs[path] = wineoverlay.digest(path)! }
 	refusal([builder, 'aarch64', '/missing', work + '/producer', '/missing', '/missing', '/missing', '/missing', '/missing', '--local-qualification-only', '/missing', '--owned-manager'], work + '/arm-producer.log', 'owned Wine producer is qualified only for x86_64')!
 	refusal([native, 'aarch64', work + '/arm', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager'], work + '/arm-native.log', 'owned native Wine qualification requires x86_64')!
+	refusal([native, 'aarch64', work + '/arm-collection', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--collection-probe'], work + '/arm-collection.log', 'owned native Wine qualification requires x86_64')!
+	refusal([native, 'x86_64', work + '/unowned-collection', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--collection-probe'], work + '/unowned-collection.log', 'usage: wine-native-check')!
 	refusal([native, 'x86_64', work + '/mixed', prepared, '/missing', '/missing', '/missing', '/missing', '/missing'], work + '/mixed.log', 'ownership modes differ')!
 	os.mkdir(work + '/unmarked')!
 	refusal([native, 'x86_64', work + '/unmarked-run', work + '/unmarked', '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager'], work + '/unmarked.log', 'ownership modes differ')!
-	if os.exists(work + '/producer') || os.exists(work + '/arm') { return error('architecture refusal created workload output') }
+	for directory in ['producer', 'arm', 'arm-collection', 'unowned-collection'] {
+		if os.exists(work + '/' + directory) { return error('mode/architecture refusal created workload output') }
+	}
 	for directory in [work + '/mixed', work + '/unmarked-run'] {
 		if os.exists(directory) && os.ls(directory)!.len != 0 { return error('mode refusal created signing/build output') }
 	}

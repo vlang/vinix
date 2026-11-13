@@ -3,6 +3,7 @@
 module main
 
 import os
+import crypto.sha256
 import time
 import tools.packages.pkgcore
 
@@ -10,6 +11,15 @@ import tools.packages.pkgcore
 #include <sys/file.h>
 #include <sys/wait.h>
 #include <grp.h>
+#include <poll.h>
+
+struct C.pollfd {
+mut:
+	fd int
+	events i16
+	revents i16
+}
+fn C.poll(&C.pollfd, u64, int) int
 
 fn C.dup2(int, int) int
 fn C.flock(int, int) int
@@ -194,6 +204,7 @@ fn translator_smoke(generation string) ! {
 }
 
 fn command(arguments []string, input string) !string {
+	$if wine_collection_probe ? { return collection_command(arguments, input) }
 	mut child := os.new_process(arguments[0])
 	defer { child.close() }
 	child.set_args(arguments[1..])
@@ -205,6 +216,49 @@ fn command(arguments []string, input string) !string {
 	output := child.stdout_slurp()
 	child.wait()
 	if child.code != 0 { return error('Wine qualification command failed: ' + output) }
+	return output
+}
+
+fn collection_command(arguments []string, input string) !string {
+	println('HWTEST INFO Wine collection command begin ' + arguments[1])
+	mut child := os.new_process(arguments[0])
+	defer {
+		if child.is_alive() { child.signal_kill(); child.wait() }
+		child.close()
+	}
+	child.set_args(arguments[1..])
+	child.set_redirect_stdio_merged()
+	child.run()
+	if input != '' { child.stdin_write(input) }
+	C.close(child.stdio_fd[0])
+	child.stdio_fd[0] = -1
+	fd := child.stdio_fd[1]
+	nonblocking(fd)!
+	mut bytes := []u8{cap: 65536}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	mut buffer := [4096]u8{}
+	deadline := time.sys_mono_now() + 180 * time.second
+	for {
+		count := C.read(fd, &buffer[0], uint(buffer.len))
+		if count > 0 {
+			if bytes.len + count > 1024 * 1024 { return error('collection command output exceeded bound') }
+			for index in 0 .. int(count) { bytes << buffer[index] }
+		}
+		if !child.is_alive() { break }
+		if time.sys_mono_now() > deadline { return error('collection command timed out: ' + arguments[1] + '\n' + unsafe { tos(bytes.data, bytes.len) }) }
+		time.sleep(10 * time.millisecond)
+	}
+	child.wait()
+	for {
+		count := C.read(fd, &buffer[0], uint(buffer.len))
+		if count <= 0 { break }
+		if bytes.len + count > 1024 * 1024 { return error('collection command output exceeded bound') }
+		for index in 0 .. int(count) { bytes << buffer[index] }
+	}
+	output := bytes.bytestr()
+	if child.code != 0 { return error('collection command refused: ' + output) }
+	println('HWTEST INFO Wine collection command complete ' + arguments[1])
 	return output
 }
 
@@ -464,6 +518,167 @@ fn failure_diagnostics(state pkgcore.State, generation string) ! {
 	}
 }
 
+fn collection_live(pid string) ! {
+	ordinary_status(pid)!
+	status := os.read_file('/proc/' + pid + '/status')!
+	defer { unsafe { status.free() } }
+	for line in status.split_into_lines() {
+		if line.starts_with('State:') {
+			value := line.all_after(':').trim_space()
+			if value == '' || value[0] in [`Z`, `X`] { return error('collection probe observed a retired Wine process: ' + pid) }
+			return
+		}
+	}
+	return error('collection probe process state missing: ' + pid)
+}
+
+fn collection_run(generation string, architecture string) ! {
+	println('HWTEST INFO Wine collection launch begin')
+	mut child := os.new_process('/usr/bin/vinix-package')
+	defer {
+		println('HWTEST INFO Wine collection launch cleanup')
+		if child.is_alive() {
+			child.signal_kill()
+			for _ in 0 .. 100 {
+				if !child.is_alive() { break }
+				time.sleep(10 * time.millisecond)
+			}
+		}
+		child.close()
+	}
+	child.set_args(['run-args', application, '--', '--vinix-collection-probe'])
+	child.set_redirect_stdio_merged()
+	child.run()
+	C.close(child.stdio_fd[0])
+	child.stdio_fd[0] = -1
+	fd := child.stdio_fd[1]
+	nonblocking(fd)!
+	mut bytes := []u8{cap: 32768}
+	unsafe { bytes.flags |= .noslices }
+	defer { unsafe { bytes.free() } }
+	defer { println('HWTEST INFO Wine collection captured output:\n' + unsafe { tos(bytes.data, bytes.len) }) }
+	mut buffer := [4096]u8{}
+	mut initial := ''
+	mut server := ''
+	mut descendant := ''
+	defer { unsafe { initial.free(); server.free(); descendant.free() } }
+	mut collected := false
+	mut polls := 0
+	deadline := time.sys_mono_now() + 480 * time.second
+	image := generation + '/apps/' + application + '/bin/program.exe'
+	before := sha256.hexhash(os.read_file(image)!)
+	for {
+		mut ready := C.pollfd{fd: fd, events: C.POLLIN}
+		if C.poll(&ready, 1, 0) < 0 && C.errno != C.EINTR { return error('collection pipe readiness failed') }
+		count := if ready.revents & (C.POLLIN | C.POLLHUP) != 0 { C.read(fd, &buffer[0], uint(buffer.len)) } else { 0 }
+		if count > 0 {
+			if bytes.len + count > 1024 * 1024 { return error('collection probe output exceeded bound') }
+			for index in 0 .. int(count) { bytes << buffer[index] }
+			chunk := unsafe { tos(&buffer[0], int(count)) }
+			if chunk.contains('VINIX COLLECTION') { println(chunk) }
+		}
+		text := unsafe { tos(bytes.data, bytes.len) }
+		polls++
+		if polls % 500 == 0 { println('HWTEST INFO Wine collection waiting child-ready=' + text.contains('VINIX COLLECTION CHILD READY\n').str()) }
+		if initial == '' && text.contains('VINIX COLLECTION INITIAL READY\n') {
+			println('HWTEST INFO Wine collection initial readiness observed')
+			pids := observe(generation)!
+			println('HWTEST INFO Wine collection initial process inventory complete')
+			defer { unsafe { for pid in pids { pid.free() }; (&array(&pids)).free() } }
+			for pid in pids {
+				line := os.read_file('/proc/' + pid + '/cmdline')!
+				defer { unsafe { line.free() } }
+				println('HWTEST INFO Wine collection process ' + pid + ' argv=' + line.replace('\x00', ' '))
+				if line.contains('/usr/libexec/vinix-wine/wine\x00') && line.contains('--vinix-collection-probe') {
+					if initial != '' { return error('collection probe initial client identity is ambiguous') }
+					initial = pid.clone()
+				}
+				if line.contains('/usr/libexec/vinix-wine/wineserver\x00') {
+					if server != '' { return error('collection probe server identity is ambiguous') }
+					server = pid.clone()
+				}
+			}
+			if initial == '' || server == '' { return error('collection probe process identities missing') }
+			println('HWTEST INFO Wine collection initial and server identified')
+			socket_check()!
+			println('HWTEST INFO Wine collection socket checked')
+		}
+		if !collected && initial != '' && text.contains('VINIX COLLECTION CHILD READY\n') && !os.exists('/proc/' + initial) {
+			println('HWTEST INFO Wine collection detached interval observed')
+			if !child.is_alive() || !os.exists('/proc/' + server) { return error('owned Wine returned before detached lifetime observation') }
+			collection_live(server)!
+			pids := observe(generation)!
+			defer { unsafe { for pid in pids { pid.free() }; (&array(&pids)).free() } }
+			for pid in pids {
+				line := os.read_file('/proc/' + pid + '/cmdline')!
+				defer { unsafe { line.free() } }
+				if line.contains('/usr/libexec/vinix-wine/wine\x00') && line.contains('--vinix-collection-child') {
+					if descendant != '' { return error('collection probe descendant identity is ambiguous') }
+					descendant = pid.clone()
+				}
+			}
+			if descendant == '' || descendant == initial { return error('collection probe descendant was not observed') }
+			collection_live(descendant)!
+			// Two real administrative transitions make the running generation
+			// neither active nor rollback. No state/lease files are synthesized.
+			command(['/usr/bin/vinix-package', 'remove', application], '')!
+			command(['/usr/bin/vinix-package', 'rollback'], '')!
+			mut current := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
+			defer { current.close() }
+			old := os.file_name(generation).u64()
+			if current.generation == old || current.previous == old { return error('collection probe generation is still protected as active or rollback') }
+			for _ in 0 .. 3 {
+				lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+				if lease < 0 { return error('collection probe lost generation lease') }
+				result := C.flock(lease, C.LOCK_EX | C.LOCK_NB)
+				code := C.errno
+				C.close(lease)
+				if result == 0 || code !in [C.EWOULDBLOCK, C.EAGAIN] { return error('collection probe generation lease is not busy') }
+				command(['/usr/bin/vinix-package', 'gc'], '')!
+				if !os.is_dir(generation) || sha256.hexhash(os.read_file(image)!) != before
+					|| os.exists('/proc/' + initial) || !os.exists('/proc/' + server)
+					|| !os.exists('/proc/' + descendant) || !child.is_alive() {
+					return error('collection probe lost live obsolete generation or detached interval')
+				}
+				collection_live(server)!
+				collection_live(descendant)!
+			}
+			println('HWTEST INFO Wine initial-client-gone server-live obsolete-generation collection-retained PASS')
+			collected = true
+			release := data + '/wine/drive_c/users/vinix/Temp/collection-release'
+			os.write_file(release, '')!
+			os.chown(release, 1000, 1000)!
+			os.chmod(release, 0o600)!
+		}
+		if !child.is_alive() { break }
+		if time.sys_mono_now() > deadline { return error('collection probe timed out:\n' + text) }
+		time.sleep(20 * time.millisecond)
+	}
+	child.wait()
+	for {
+		count := C.read(fd, &buffer[0], uint(buffer.len))
+		if count <= 0 { break }
+		if bytes.len + count > 1024 * 1024 { return error('collection probe output exceeded bound') }
+		for index in 0 .. int(count) { bytes << buffer[index] }
+	}
+	text := unsafe { tos(bytes.data, bytes.len) }
+	println(text)
+	if !collected || child.code != 37 || text.count('VINIX COLLECTION INITIAL READY\n') != 1
+		|| text.count('VINIX COLLECTION CHILD READY\n') != 1 || text.count('VINIX COLLECTION CHILD RETIRED\n') != 1
+		|| os.exists('/proc/' + initial) || os.exists('/proc/' + server) || os.exists('/proc/' + descendant) {
+		return error('collection probe retirement or saved initial status differs: ' + child.code.str())
+	}
+	command(['/usr/bin/vinix-package', 'gc'], '')!
+	if os.exists(generation) { return error('obsolete Wine generation remained after natural retirement') }
+	mut retained := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
+	defer { retained.close() }
+	if retained.previous == 0 || !os.is_dir('/var/lib/vinix-packages/generations/' + retained.previous.str()) {
+		return error('collection removed the retained rollback generation')
+	}
+	println('HWTEST INFO Wine signed detached-client collection lease status37 natural-retirement PASS')
+	println('HWTEST PASS packaged-Wine')
+}
+
 fn run() ! {
 	os.setenv('PATH', '/usr/sbin:/usr/bin:/sbin:/bin', true)
 	os.setenv('HOME', '/root', true)
@@ -486,6 +701,10 @@ fn run() ! {
 	}
 	generation := '/var/lib/vinix-packages/generations/' + state.generation.str()
 	defer { unsafe { generation.free() } }
+	$if wine_collection_probe ? {
+		collection_run(generation, architecture)!
+		return
+	}
 	$if arm64 {
 		translator_smoke(generation)!
 	}

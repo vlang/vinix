@@ -327,11 +327,55 @@ fn write(handle voidptr, text string) bool {
 	return C.WriteFile(handle, text.str, u32(text.len), voidptr(&count), unsafe { nil }) != 0 && count == u32(text.len)
 }
 
+// Explicit local lifetime probe; ordinary Win64 qualification stays unchanged.
+fn collection_probe(child bool) bool {
+	output := C.GetStdHandle(u32(0xfffffff5))
+	if child {
+		if !write(output, 'VINIX COLLECTION CHILD READY\n') { return false }
+		for _ in 0 .. 30000 {
+			if C.GetFileAttributesA(c'C:\\users\\vinix\\Temp\\collection-release') != u32(0xffffffff) {
+				return write(output, 'VINIX COLLECTION CHILD RETIRED\n')
+			}
+			C.Sleep(10)
+		}
+		return false
+	}
+	if !write(output, 'VINIX COLLECTION INITIAL READY\n') { return false }
+	// Give the native observer a bounded initial-client identity window.
+	C.Sleep(3000)
+	mut path := [4096]u8{}
+	length := C.GetEnvironmentVariableA(c'VINIX_APP_DIR', &char(&path[0]), u32(path.len))
+	if length == 0 || length >= u32(path.len) { return false }
+	directory := unsafe { tos(&path[0], int(length)) }
+	if !directory.starts_with('/') || directory.contains('"') || directory.contains('\\') { return false }
+	name := 'Z:' + directory.replace('/', '\\') + '\\bin\\program.exe'
+	command := '"' + name + '" --vinix-collection-child'
+	defer { unsafe { name.free(); command.free() } }
+	mut startup := C.STARTUPINFOA{cb: u32(sizeof(C.STARTUPINFOA))}
+	mut process := C.PROCESS_INFORMATION{}
+	if C.CreateProcessA(name.str, command.str, unsafe { nil }, unsafe { nil }, 1, 0,
+		unsafe { nil }, unsafe { nil }, &startup, &process) == 0 { return false }
+	C.CloseHandle(process.hThread)
+	C.CloseHandle(process.hProcess)
+	return true
+}
+
 fn main() {
 	if !variable(c'VINIX_APP_ID', 'org.vinix.wine-win64-probe') || !variable(c'VINIX_APP_KIND', 'windows') ||
 		!variable(c'VINIX_APP_RUNTIME_ID', 'org.vinix.wine-runtime') || !variable(c'USER', 'vinix') ||
 		!variable(c'WINEARCH', 'win64') { exit(21) }
 	command_line := C.GetCommandLineA()
+	if command_line != unsafe { nil } {
+		line := unsafe { cstring_to_vstring(command_line) }
+		if line.ends_with(' --vinix-collection-child') {
+			if !collection_probe(true) { exit(39) }
+			exit(0)
+		}
+		if line.ends_with(' --vinix-collection-probe') {
+			if !collection_probe(false) { exit(38) }
+			exit(37)
+		}
+	}
 	if command_line != unsafe { nil } && unsafe { cstring_to_vstring(command_line) }.ends_with(' --vinix-dispatch-child') {
 		if !dispatcher_child() { exit(34) }
 		exit(0)
