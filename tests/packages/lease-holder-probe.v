@@ -39,6 +39,8 @@ fn C.syscall(i64, ...) i64
 
 fn fork_callback() { C._exit(97) }
 fn unexpected_signal(_ i32) { C._exit(99) }
+fn caught_interrupt(_ i32) {}
+fn C.siginterrupt(i32, i32) i32
 
 struct ProbeLimit { current u64 maximum u64 }
 fn limit_read(resource i32) !ProbeLimit {
@@ -139,6 +141,11 @@ fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high
 	caller := C.fork()
 	if caller < 0 { return error('fixture caller fork failed') }
 	if caller == 0 {
+		$if lease_holder_caller_interrupt ? {
+			// No SA_RESTART: interrupt the caller's real wait4 syscall.
+			C.signal(C.SIGUSR1, voidptr(caught_interrupt))
+			if C.siginterrupt(C.SIGUSR1, 1) != 0 { C._exit(90) }
+		}
 		if C.pthread_atfork(unsafe { nil }, unsafe { nil }, voidptr(fork_callback)) != 0 { C._exit(94) }
 		mut unrelated_child := i32(-1)
 		if !kill_caller {
@@ -165,6 +172,14 @@ fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high
 	mut status := i32(0)
 	if C.waitpid(caller, &status, C.WNOHANG) != 0 { return error('holder returned before descendant retirement') }
 	lock_busy(root + '/lease', true)!
+	$if lease_holder_caller_interrupt ? {
+		for _ in 0 .. 16 {
+			if C.kill(caller, C.SIGUSR1) != 0 { return error('cannot interrupt holder caller') }
+			time.sleep(5 * time.millisecond)
+		}
+		lock_busy(root + '/lease', true)!
+		if C.waitpid(caller, &status, C.WNOHANG) != 0 { return error('interrupted caller returned before worker retirement') }
+	}
 	if cancel_holder {
 		if C.kill(holder, C.SIGTERM) != 0 { return error('cannot signal holder') }
 		time.sleep(30 * time.millisecond)
@@ -342,6 +357,11 @@ fn suite() ! {
 	$if lease_holder_wait_interrupt ? {
 		lifetime('/tmp/holder-interrupt', '37', true, false, false, false)!
 		println('LEASE HOLDER INTERRUPT PASS retry EINTR; caller death; lease busy; original37; no children')
+		return
+	}
+	$if lease_holder_caller_interrupt ? {
+		lifetime('/tmp/caller-interrupt', '37', false, false, false, false)!
+		println('LEASE HOLDER CALLER INTERRUPT PASS real wait EINTR; busy lease; original37; no children')
 		return
 	}
 	for mode in ['37', '126', '127', 'signal']! { lifetime('/tmp/holder-' + mode, mode, false, false, false, false)! }

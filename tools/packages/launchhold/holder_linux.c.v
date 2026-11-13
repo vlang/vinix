@@ -184,7 +184,12 @@ fn run_linux(command Command, lease i32) !int {
 	for {
 		answer := raw_wait(pid, unsafe { &status })
 		if answer == pid { break }
-		if answer < 0 && C.errno == C.EINTR { continue }
+		if answer < 0 && C.errno == C.EINTR {
+			$if lease_holder_fixture ? { $if lease_holder_caller_interrupt ? {
+				C.vinix_launchhold_syscall(C.SYS_write, i32(2), c'LEASE HOLDER caller wait EINTR\n', u64(31))
+			} }
+			continue
+		}
 		return error('cannot collect generation lease holder; holder may still retain its lease')
 	}
 	if mask_result != 0 { return error('cannot restore caller signal mask after holder fork') }
