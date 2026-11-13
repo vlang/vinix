@@ -966,6 +966,48 @@ wiring, ARM acceptance or a general path/recovery guarantee. Holder SIGKILL
 retention, broader mappings and complete C environment/heap qualification
 remain open.
 
+## Prefix contention and post-manager relaunch, 2026-11-13
+
+Source `7cdb6b63d` adds `lease-recovery`. `check-01/recovery-01` passes a
+controlled sequence with the real retained x86 Wine/app closure. A file barrier
+pauses the manager after server authentication while it holds the prefix guard;
+the observer must fail guard acquisition at `already has a managed launch`
+before allowing client execution. After Win64 client zero and deliberate
+manager exit 37, the observer confirms the live server was adopted by the
+holder. It can now acquire the guard, but server-directory admission must
+refuse at `Wine server lock already has an owner`. It neither connects to nor
+signals/reaps that foreign server. Its proc entry and busy lease remain.
+
+Caller SIGTERM and exact collection again leave the lease busy until holder
+and Wine retirement. The adopted holder returns saved manager status 37; the
+lease becomes free and the original server proc entry disappears. A second
+direct diagnostic manager then reuses the existing prefix path without fixture
+cleanup of Wine's namespace. Idle admission, fresh owned authentication, real
+Win64 execution and exact client/server zero pass. This second launch is not
+leased; it checks prefix reuse, not another generation collection boundary.
+The diagnostic's temporary directory creation is idempotent for reuse.
+
+`sandbox-cwd-01` also passes the retained sandbox policy, unveil/pledge refusals
+and Windows relative-file/child-inheritance checks. Both boots use the actually
+embedded retained production x86 kernel and preserve original runtime/app/
+sandbox contents through the verified rebase and fixed-init overlay. Parsed V
+source, selected input hashes and complete image/padding verification pass.
+
+Complete builds, source views, generated C/binaries, commands, images and logs:
+`/Users/alex/.cache/vwrecover-20261113-01` (frozen). Complete typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-recovery-20261113-01.inventory.json`,
+SHA-256 `6c498d1d2808a65f513d17f2a4064e4464b484e0ccbc0365462341d179df0658`.
+Recording and independent verification pass with adjacent logs. The unchanged
+unsigned cwd PE remains in the prior frozen `vwcwd-20261113-01/pe-02` bundle;
+preserve both complete workspaces and original historical namespaces.
+
+These are controlled contention and post-manager checks. They do not retain
+the prefix guard after manager death, delete stale sockets, attach to/kill a
+surviving foreign server, qualify arbitrary namespace races, or enable
+production recovery/lease wiring. Fresh signing/current-launcher admission,
+ARM Wine and holder SIGKILL retention remain open. No new kernel, full C
+environment, heap-retention or reproducibility guarantee is added.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

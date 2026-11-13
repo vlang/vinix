@@ -1235,8 +1235,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [owned Wine sandbox diagnostic](tests/packages/wine-lease-supervision-plan.md#owned-wine-under-package-sandbox-policy-2026-11-13)
     now passes foreground startup and the Win64 cwd probe under the current
     Windows process promises and grant classes, with unveil and pledge refusal
-    controls. Fresh signing/current-launcher acceptance, ARM Wine, broader path
-    mappings and production lease wiring remain open.
+    controls. [Real Wine prefix relaunch checks](tests/packages/wine-lease-supervision-plan.md#prefix-contention-and-post-manager-relaunch-2026-11-13)
+    now refuse a competing guard and a surviving server after manager death,
+    then pass a same-prefix launch after retirement. Fresh signing/current-launcher
+    acceptance, ARM Wine, broader path mappings and production lease wiring
+    remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
