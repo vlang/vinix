@@ -42,9 +42,12 @@ jobs:
 
     steps:
       - name: Check out Vinix
+        id: check_out_vinix
         uses: actions/checkout@v6
 
       - name: Build pinned V compiler and ui2
+        id: build_pinned_v_compiler_and_ui2
+        if: ${{ success() && !cancelled() && steps.check_out_vinix.outcome == 'success' }}
         run: |
           set -euo pipefail
           git clone https://github.com/vlang/v "$RUNNER_TEMP/v"
@@ -54,6 +57,8 @@ jobs:
           git -C third_party/ui2 checkout "$UI2_COMMIT"
 
       - name: Test and build the installer app
+        id: test_and_build_the_installer_app
+        if: ${{ success() && !cancelled() && steps.build_pinned_v_compiler_and_ui2.outcome == 'success' }}
         env:
           V: ${{ runner.temp }}/v/v
         run: |
@@ -67,6 +72,8 @@ jobs:
           test ! -e "build/vinix-installer/Vinix Installer.app/Contents/Resources/vinix_auto.py"
 
       - name: Create compressed DMG and checksum
+        id: create_compressed_dmg_and_checksum
+        if: ${{ success() && !cancelled() && steps.test_and_build_the_installer_app.outcome == 'success' }}
         run: |
           set -euo pipefail
           mkdir -p dist/dmg-root
