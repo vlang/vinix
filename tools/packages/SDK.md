@@ -1890,6 +1890,20 @@ execution, fresh owned graphics, broader lifetime/refusal controls and holder
 SIGKILL retention remain open. See the [owned launch qualification](../../tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13)
 and [collection qualification](../../tests/packages/wine-lease-supervision-plan.md#collection-after-initial-client-exit-2026-11-13).
 
+`wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
+ownership receipt admission before the full controller creates build/signing
+output. It checks the current runner-source hash, separate compiler ownership
+flag, marker/output binding and actual runner digest. Receipt files and their
+parent directories are opened from a captured prepared-directory descriptor
+without following symlinks. Mode JSON is capped at 8 KiB, outputs JSON at 1 MiB,
+compiler argv at 64 KiB/512 elements, and the ordinary runner file at 32 MiB.
+Only the producer's three mode fields are accepted. This checks ownership
+bindings; complete payload, producer, signing and guest checks remain required.
+The [receipt controls](../../tests/packages/wine-owned-receipt-check.v) take
+`FRESH_OUTPUT CONTROLLER V OWNED_PREPARED`, generate stale/non-production
+controller variants, and require exact exits and messages for refusals. See the
+[preflight report](../../tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13).
+
 `pkgprotocol.decode_local_source_offer()` and
 `wineadapter.admit_local_source_offer()` support only format-1
 `local-qualification-only` evidence with `source_closure_complete: false`.

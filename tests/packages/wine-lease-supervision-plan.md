@@ -1248,6 +1248,65 @@ holder SIGKILL/kernel-owned retention or arbitrary-descendant/refusal guarantee.
 Kernel, sandbox and account/session helpers are retained selected inputs;
 complete C environment, kernel/V heap and hermetic/reproducible gates remain open.
 
+## Owned build receipt preflight, 2026-11-13
+
+Source `c620354d3` adds `--check-owned-build x86_64 PREPARED_BUILD` to the host
+controller, sharing ownership receipt admission with normal owned launches.
+Production and embedded-source checks still run first. Captured directory/file
+opens reject symlinks at every receipt path component; final files must be
+bounded and regular, with nonblocking opens preventing FIFO hangs. Marker,
+output manifest and compiler argv bounds are 8 KiB, 1 MiB and 64 KiB; argv has
+2–512 elements and the runner is bounded to 32 MiB. Exact marker fields, current
+source hash, separate ownership flag and marker/runner output digests bind the
+selected inputs. Default mode now rejects directory, FIFO and broken-link
+ownership markers instead of treating them as absent.
+
+`controls-03` passes two positive reads of the retained real producer receipt
+and 32 mutations through both preflight and actual controller startup: 64
+receipt refusals before signing/build output. These cover wrong/missing schema
+fields and digests, changed runner bytes, absent/misjoined flags, empty/excessive
+argv, malformed/oversized JSON, missing files, symlink files and parents,
+directory substitution and a FIFO. Mutated marker hashes are updated where
+needed to isolate field checks. Stale-source, non-production and ARM preflight
+controls plus three default-mode nonregular-marker controls pass as well.
+The V checker builds its own controller variants and preserves their source,
+compiler commands and logs. Refinement `a5bbeb901` records every checked exit:
+positive reads require 0, refusals require 1 and the expected message; timeouts,
+interruptions, signals and lost waits cannot satisfy the refusal gate. Original
+receipt/runner and selected source/tool hashes are unchanged afterward.
+
+`legacy-modes-01` retains the prior six mode/architecture refusals. `native-01`
+freshly signs/publishes/installs the retained owned runtime and application
+through the hardened controller, rebuilding the current guest and package CLI.
+Real Win64 API/W^X, image, exception/read-fault, shared/private-dispatch, private
+prefix/socket, outside-write refusal and generation-lease checks pass. Status 0
+and readiness are observed, and tracked Wine PIDs are absent before PID1
+assistance. Result: `passed=true`, `interrupted=false`, 31.729 seconds. Parsed
+source, complete selected-input and generated-output rechecks pass. This uses
+the unchanged prior prepared runtime/PE, with their complete producer evidence
+retained in the preceding frozen bundles; it does not rebuild those artifacts.
+
+Current sources, generated C/binaries, mutation candidates, exact command/log/
+exit records and the guest bundle are frozen at
+`/Users/alex/.cache/vwreceipts-20261113-01`. `selected-inputs-01` preserves all
+selected native input file bytes before documentation edits. FIFO controls are
+retired only after execution with metadata retained; all other candidates and
+intermediate diagnostic attempts remain. Preserve the prior complete bundles
+and original namespaces too; snapshots do not waive historical auditors.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-owned-receipt-20261113-01.inventory.json`,
+SHA-256 `d1c696da16ca6b0e7b61108360a89af9d47dc77f8b982b6e50e7f372523e3098`.
+Recording and independent verification pass with adjacent logs. Keep the entire
+frozen workspace and the referenced original producer/input bundles.
+
+Preflight qualifies ownership bindings and bounded artifact reads, not complete
+payload admission, compiler authenticity, concurrent-write immutability or
+signing/guest success. The real signed regression is separate. Broader runtime
+refusals, default activation, ARM ownership, fresh owned GUI, idle server and
+caller death cases, holder SIGKILL/kernel-owned retention, full C environment/heap and
+hermetic/reproducible qualification remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
