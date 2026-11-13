@@ -65,6 +65,16 @@ Poison propagates and undef rejects, including in the sign donor. Each call
 costs one step and shares scalar validation/evaluation. No floating arithmetic
 or host rounding mode participates in these operations.
 
+Direct LLVM `floor`/`ceil`/`trunc`/`round`/`roundeven` support matching half/float
+operands and results. They round to integral floating values toward negative
+infinity, positive infinity, zero, nearest with ties away from zero, and
+nearest with ties to even, respectively. Zero results preserve the input sign;
+infinities and already integral finite values are unchanged. NaNs use the
+scalar evaluator's preferred quiet NaN choice. Poison propagates and undef
+rejects. Each call costs one step and shares scalar validation/evaluation,
+independent of host rounding mode. `rint` and `nearbyint` remain unsupported
+by this buffer profile.
+
 Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
 the result type. The amount is reduced modulo the width, so equal operands
 produce rotations and oversized amounts are defined. A zero amount selects
@@ -108,7 +118,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these twenty-two families' exact declarations are admitted:
+Only ordinary direct calls to these twenty-seven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -202,5 +212,10 @@ native LLVM and independent bit masks, including every half encoding, float
 class/payload boundaries, cached-declaration chains and poison/undef controls.
 Its native JIT uses the host CPU target to avoid generic ARM64 half-to-float
 promotion quieting signaling NaNs; target receipts are saved with results.
+`tests/ios/air-memory-rounding.v` compares all five rounding operations with
+native LLVM, including every half encoding, float class/tie/precision limits,
+cached idempotent chains, host rounding modes and poison/undef controls.
+Arithmetic NaNs compare by class; the interpreter's preferred choice is
+checked separately. Other results compare exact raw bits, including zero signs.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
