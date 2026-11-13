@@ -113,6 +113,16 @@ propagates and undef rejects, including with a zero product. Calls cost one
 step and share scalar validation/evaluation. Optional-fusion `fmuladd` and
 constrained floating operations remain unsupported by this buffer profile.
 
+Direct LLVM `ldexp` supports a half/float value, a signed i32 exponent and a
+matching floating result. Scaling by a power of two uses the scalar integer
+unpack/pack evaluator with nearest-even rounding, independent of host rounding
+mode. Overflow becomes signed infinity; underflow rounds through subnormals
+to signed zero. Zeros and infinities preserve their bits even at INT_MIN/MAX
+exponents; NaNs use the preferred quiet choice. Both operands are evaluated,
+so poison/undef in the exponent is not bypassed for a zero value. Calls cost
+one step and share scalar validation/evaluation. The exponent must be i32,
+not the floating input's type or another integer width.
+
 Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
 the result type. The amount is reduced modulo the width, so equal operands
 produce rotations and oversized amounts are defined. A zero amount selects
@@ -156,7 +166,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these thirty-two families' exact declarations are admitted:
+Only ordinary direct calls to these thirty-three families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -269,5 +279,8 @@ validation, poison/undef and rounding/exception behavior.
 against native LLVM, exhausts half inputs in two cancellation/scaling patterns,
 checks boundary triples, and distinguishes fused results from separate
 multiply/add for cancellation, overflow and underflow in both precisions.
+`tests/ios/air-memory-ldexp.v` compares scaling and zero-scale chains against
+native LLVM, exhausts half inputs under signed scales, checks exponent limits
+and subnormal ties, and rejects malformed later cached calls before stores.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
