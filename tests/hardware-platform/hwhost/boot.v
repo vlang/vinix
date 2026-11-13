@@ -140,7 +140,7 @@ fn boot_media_aarch64(host Host, kernel string, initramfs string, cmdline string
 	// The firmware writes its variables: each boot gets its own copy, so one
 	// boot's leftovers are not the next one's boot order.
 	variables := os.join_path(state, 'vars.fd')
-	os.cp(host.firmware_vars, variables)!
+	copy_firmware_variables(host.firmware_vars, variables)!
 	return ['-drive', 'if=pflash,format=raw,readonly=on,file=' + host.firmware, '-drive',
 		'if=pflash,format=raw,file=' + variables, '-drive', 'format=raw,file=' + image]
 }
