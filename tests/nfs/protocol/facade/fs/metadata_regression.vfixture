@@ -1,0 +1,233 @@
+module fs
+
+import errno
+import fs.nfs
+import heapcheck
+import resource
+import stat
+import time
+
+// Model the server's SETATTR permissions and chown side effects, rather than
+// asserting only the client's in-memory result. Requests use the production
+// VFS helpers, resource dispatcher, NFS facade and XDR encoder.
+struct MetadataWire {
+mut:
+	tx [nfs.capacity + 4]u8
+	rx [nfs.capacity]u8
+	reply [512]u8
+	length int
+	at int
+	sends int
+	setattrs int
+	uid u32 = 1000
+	gid u32 = 1000
+	mode u32 = 0o6755
+	size u64 = 42
+	getattr_status u32
+	atime nfs.Stamp = nfs.Stamp{10, 1}
+	mtime nfs.Stamp = nfs.Stamp{20, 2}
+	last_mode bool
+	last_uid bool
+	last_gid bool
+	last_atime u32
+	last_mtime u32
+	reject bool
+}
+
+fn metadata_attributes(mut w nfs.Xdr, rig &MetadataWire) {
+	w.put32(1); w.put32(rig.mode); w.put32(1); w.put32(rig.uid); w.put32(rig.gid)
+	w.put64(rig.size); w.put64(512); w.put32(0); w.put32(0); w.put64(7); w.put64(9)
+	w.put32(rig.atime.sec); w.put32(rig.atime.nsec)
+	w.put32(rig.mtime.sec); w.put32(rig.mtime.nsec)
+	w.put32(700); w.put32(0)
+}
+
+fn metadata_transfer(context voidptr, p &u8, count int, sending bool) bool {
+	mut rig := unsafe { &MetadataWire(context) }
+	if !sending {
+		if !nfs.span(rig.length, rig.at, count) { return false }
+		nfs.copy_bytes(p, unsafe { &rig.reply[0] + rig.at }, count)
+		rig.at += count
+		return true
+	}
+	rig.sends++
+	mut req := nfs.Xdr{p: unsafe { p }, n: count}
+	req.u32(); xid := req.u32()
+	assert req.u32() == 0 && req.u32() == 2
+	assert req.u32() == 100003 && req.u32() == 3
+	procedure := req.u32()
+	assert req.u32() == 1
+	credential := req.opaque(400)
+	mut auth := nfs.Xdr{p: credential.str, n: credential.len}
+	auth.u32(); auth.opaque(255)
+	caller := auth.u32()
+	assert req.u32() == 0 && req.u32() == 0
+	mut handle := nfs.FileHandle{}
+	req.handle(unsafe { &handle })
+	assert handle.len == 1 && handle.bytes[0] == 42
+	mut result := u32(0)
+	if procedure == 2 {
+		rig.setattrs++
+		rig.last_mode = req.boolean()
+		mode := if rig.last_mode { req.u32() } else { rig.mode }
+		rig.last_uid = req.boolean()
+		uid := if rig.last_uid { req.u32() } else { rig.uid }
+		rig.last_gid = req.boolean()
+		gid := if rig.last_gid { req.u32() } else { rig.gid }
+		assert !req.boolean() // no size mutation in metadata operations
+		rig.last_atime = req.u32()
+		atime := if rig.last_atime == 2 { req.stamp() } else { nfs.Stamp{700, 0} }
+		rig.last_mtime = req.u32()
+		mtime := if rig.last_mtime == 2 { req.stamp() } else { nfs.Stamp{700, 0} }
+		assert rig.last_atime <= 2 && rig.last_mtime <= 2 && !req.boolean() && req.finished()
+		if rig.reject { result = 13 }
+		else if caller != 0 && caller != rig.uid {
+			// Non-owner writers can request server time, but cannot chmod,
+			// chown or set a caller-supplied timestamp.
+			if rig.last_mode || rig.last_uid || rig.last_gid || rig.last_atime == 2 || rig.last_mtime == 2 {
+				result = 1
+			} else if rig.mode & 0o2 == 0 { result = 13 }
+		}
+		if result == 0 {
+			rig.mode = mode; rig.uid = uid; rig.gid = gid
+			if rig.last_uid || rig.last_gid { rig.mode &= ~u32(0o6000) }
+			if rig.last_atime != 0 { rig.atime = atime }
+			if rig.last_mtime != 0 { rig.mtime = mtime }
+		}
+	} else { assert procedure == 1 && req.finished(); result = rig.getattr_status }
+	mut w := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 512}
+	w.put32(0); w.put32(xid); w.put32(1); w.put32(0); w.put32(0); w.put32(0); w.put32(0)
+	w.put32(result)
+	if procedure == 1 { if result == 0 { metadata_attributes(mut w, rig) } }
+	else { w.put32(0); w.put32(0) }
+	assert !w.bad
+	mut marker := nfs.Xdr{p: unsafe { &rig.reply[0] }, n: 4}
+	marker.put32(0x80000000 | u32(w.at - 4))
+	rig.length = w.at; rig.at = 0
+	return true
+}
+
+struct LegacyMetadataResource {
+	PlainResource
+mut:
+	calls int
+	reject bool
+	change_unselected_owner bool
+}
+
+fn (mut r LegacyMetadataResource) persist_metadata() ? {
+	r.calls++
+	if r.reject {
+		if r.change_unselected_owner { r.stat.uid = 7777 }
+		errno.set(errno.eacces)
+		return none
+	}
+}
+
+fn metadata_regressions() {
+	mut rig := &MetadataWire{}
+	mut b := &NFSFS{}
+	b.client = nfs.Client{context: rig, transfer: metadata_transfer, tx: unsafe { &rig.tx[0] }, rx: unsafe { &rig.rx[0] }, uid: 1000, gid: 1000}
+	mut h := nfs.FileHandle{len: 1}; h.bytes[0] = 42
+	mut r := &NfsResource{backend: b, handle: h}
+	r.stat = stat.Stat{mode: stat.ifreg | rig.mode, uid: rig.uid, gid: rig.gid}
+	mut res := resource.Resource(r)
+	local_now := time.TimeSpec{123, 456}
+	// Owner timestamp-only change preserves both privilege bits. The cached
+	// omitted time is deliberately stale and must never be sent to the server.
+	r.stat.mtim = time.TimeSpec{1, 0}
+	apply_file_times(mut res, [time.TimeSpec{100, 5}, time.TimeSpec{0, utime_omit}]!, local_now) or { panic('owner timestamp update') }
+	assert rig.mode == 0o6755 && !rig.last_mode && !rig.last_uid && !rig.last_gid
+	assert rig.last_atime == 2 && rig.last_mtime == 0
+	assert r.stat.atim.tv_sec == 100 && r.stat.atim.tv_nsec == 5 && r.stat.mtim.tv_sec == 20
+	// The non-owner writable-file case allowed by set_file_times must use
+	// SET_TO_SERVER_TIME and must not carry any ownership or mode fields.
+	b.client.uid = 2000; rig.mode = 0o666
+	apply_file_times(mut res, [time.TimeSpec{0, utime_now}, time.TimeSpec{0, utime_now}]!, local_now) or { panic('non-owner UTIME_NOW') }
+	assert !rig.last_mode && !rig.last_uid && !rig.last_gid
+	assert rig.last_atime == 1 && rig.last_mtime == 1
+	assert r.stat.atim.tv_sec == 700 && r.stat.mtim.tv_sec == 700 && r.stat.uid == 1000
+	// The same caller still cannot set an explicit timestamp. Failed remote
+	// updates never publish the requested values into the cached Stat.
+	mut rejected := false
+	apply_file_times(mut res, [time.TimeSpec{42, 0}, time.TimeSpec{0, utime_omit}]!, local_now) or { rejected = true }
+	assert rejected && errno.get() == errno.eperm && r.stat.atim.tv_sec == 700
+	// Chown sends the selected owner only, clears privilege bits and leaves
+	// both remote timestamps alone. -1/-1 does not issue a request at all.
+	b.client.uid = 0; rig.mode = 0o6755; rig.mtime = nfs.Stamp{800, 9}
+	change_owner(mut res, u32(0xffffffff), 3000) or { panic('chown') }
+	assert !rig.last_uid && rig.last_gid && rig.last_atime == 0 && rig.last_mtime == 0
+	assert r.stat.uid == 1000 && r.stat.gid == 3000 && r.stat.mode & 0o6000 == 0
+	assert r.stat.mtim.tv_sec == 800 && r.stat.mtim.tv_nsec == 9
+	sends := rig.sends
+	change_owner(mut res, u32(0xffffffff), u32(0xffffffff)) or { panic('no-op chown') }
+	assert rig.sends == sends
+	// Creation's mode-only update must not be reinterpreted as an ownership
+	// operation, including when the requested final mode carries privilege bits.
+	mode := resource.MetadataUpdate{mode_set: true, mode: stat.ifreg | 0o6755}
+	resource.update_metadata(mut res, unsafe { &mode }) or { panic('creation mode') }
+	assert rig.mode == 0o6755 && rig.last_mode && !rig.last_uid && !rig.last_gid
+	// Full copy-up intentionally selects everything. Linux strips setid when
+	// receiving ownership, so the final mode has to be a separate operation.
+	r.stat.mode = stat.ifreg | 0o6755; r.stat.uid = 4000; r.stat.gid = 5000
+	r.stat.atim = time.TimeSpec{11, 12}; r.stat.mtim = time.TimeSpec{13, 14}
+	before := rig.setattrs
+	r.persist_metadata() or { panic('full metadata copy') }
+	assert rig.setattrs == before + 2 && rig.mode == 0o6755 && rig.uid == 4000 && rig.gid == 5000
+	assert rig.last_mode && !rig.last_uid && !rig.last_gid && rig.last_atime == 0 && rig.last_mtime == 0
+	assert r.stat.atim.tv_sec == 11 && r.stat.mtim.tv_nsec == 14
+	rig.reject = true
+	rejected = false
+	resource.update_metadata(mut res, unsafe { &mode }) or { rejected = true }
+	assert rejected && errno.get() == errno.eacces && r.stat.mode == stat.ifreg | 0o6755
+	// fstat on a retained descriptor must refresh remotely even when no path
+	// traversal/read has occurred since another client changed the file.
+	rig.size = 123456; rig.mtime = nfs.Stamp{900, 7}
+	fresh := r.snapshot_stat() or { panic('fresh stat') }
+	assert fresh.size == 123456 && fresh.mtim.tv_sec == 900 && fresh.mtim.tv_nsec == 7
+	rig.getattr_status = 13
+	rejected = false
+	r.snapshot_stat() or { rejected = true }
+	assert rejected && errno.get() == errno.eacces
+	legacy_metadata_regressions()
+	println('NFS metadata: selected fields, owner mode preservation, non-owner server-time, UTIME_OMIT, chown, creation mode, full copy-up and legacy rollback PASS')
+}
+
+fn legacy_metadata_regressions() {
+	mut legacy := &LegacyMetadataResource{}
+	legacy.stat = stat.Stat{mode: stat.ifreg | 0o6755, uid: 1000, gid: 1000, atim: time.TimeSpec{10, 1}, mtim: time.TimeSpec{20, 2}, ctim: time.TimeSpec{30, 3}}
+	mut res := resource.Resource(legacy)
+	local_now := time.TimeSpec{123, 456}
+	apply_file_times(mut res, [time.TimeSpec{0, utime_now}, time.TimeSpec{0, utime_omit}]!, local_now) or { panic('legacy times') }
+	assert legacy.calls == 1 && legacy.stat.mode == stat.ifreg | 0o6755
+	assert legacy.stat.atim.tv_sec == 123 && legacy.stat.atim.tv_nsec == 456 && legacy.stat.mtim.tv_sec == 20
+	assert legacy.stat.ctim.tv_sec == 123
+	legacy.reject = true
+	mut rejected := false
+	change_owner(mut res, 4000, 5000) or { rejected = true }
+	assert rejected && legacy.stat.uid == 1000 && legacy.stat.gid == 1000 && legacy.stat.mode == stat.ifreg | 0o6755
+	rejected = false
+	apply_file_times(mut res, [time.TimeSpec{90, 0}, time.TimeSpec{91, 0}]!, local_now) or { rejected = true }
+	assert rejected && legacy.stat.atim.tv_sec == 123 && legacy.stat.mtim.tv_sec == 20 && legacy.stat.ctim.tv_sec == 123
+	// Failed timestamp persistence may refresh unrelated ownership. Rollback
+	// restores selected times without overwriting that independent update.
+	legacy.change_unselected_owner = true
+	rejected = false
+	apply_file_times(mut res, [time.TimeSpec{90, 0}, time.TimeSpec{0, utime_omit}]!, local_now) or { rejected = true }
+	assert rejected && legacy.stat.uid == 7777 && legacy.stat.atim.tv_sec == 123 && legacy.stat.mtim.tv_sec == 20
+	legacy.change_unselected_owner = false
+	legacy.reject = false
+	change_owner(mut res, u32(0xffffffff), 3000) or { panic('legacy chown') }
+	assert legacy.stat.uid == 7777 && legacy.stat.gid == 3000 && legacy.stat.mode & 0o6000 == 0
+	mut plain := &PlainResource{}
+	mut plain_res := resource.Resource(plain)
+	update := resource.MetadataUpdate{mode_set: true, mode: stat.ifreg | 0o644, uid_set: true, uid: 1000}
+	heapcheck.start_accounting()
+	for _ in 0 .. 200 {
+		resource.update_metadata(mut res, unsafe { &update }) or { panic('legacy update') }
+		resource.update_metadata(mut plain_res, unsafe { &update }) or { panic('default update') }
+	}
+	objects, bytes := heapcheck.stop_accounting()
+	assert objects == 0 && bytes == 0
+	assert plain.stat.mode == stat.ifreg | 0o644 && plain.stat.uid == 1000
+}

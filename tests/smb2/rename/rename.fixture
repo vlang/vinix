@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import fs.smb2
+
+#flag -pthread
+#include <pthread.h>
+#define vinix_stack_alloc __builtin_alloca
+
+@[typedef]
+struct C.pthread_t {}
+
+@[typedef]
+struct C.pthread_attr_t {}
+
+fn C.vinix_stack_alloc(usize) voidptr
+fn C.pthread_attr_init(&C.pthread_attr_t) int
+fn C.pthread_attr_setstacksize(&C.pthread_attr_t, usize) int
+fn C.pthread_attr_destroy(&C.pthread_attr_t) int
+fn C.pthread_create(&C.pthread_t, &C.pthread_attr_t, fn (voidptr) voidptr, voidptr) int
+fn C.pthread_join(C.pthread_t, &voidptr) int
+
+// The update touches only these fields. The runner copies the complete
+// production helper and production byte-copy implementation, without stubs.
+struct SMB2FS {
+mut:
+	resources [smb2.max_nodes]&SMB2Resource
+	count int
+}
+
+struct SMB2Resource {
+mut:
+	path [smb2.max_path]u8
+	length int
+}
+
+fn node(path string) &SMB2Resource {
+	mut r := &SMB2Resource{length: path.len}
+	smb2.move(unsafe { &r.path[0] }, path.str, path.len)
+	return r
+}
+
+fn path_of(r &SMB2Resource) string {
+	return unsafe { tos(&r.path[0], r.length) }
+}
+
+fn rename_on_small_stack(context voidptr) voidptr {
+	mut b := unsafe { &SMB2FS(context) }
+	mut r := b.resources[1]
+	longer := 'renamed-directory'
+	b.rebase_cached_paths(mut r, longer.str, longer.len)
+	shorter := 'b'
+	b.rebase_cached_paths(mut r, shorter.str, shorter.len)
+	return unsafe { nil }
+}
+
+fn main() {
+	mut b := &SMB2FS{count: smb2.max_nodes}
+	b.resources[0] = node('')
+	b.resources[1] = node('a')
+	for i in 2 .. smb2.max_nodes - 1 {
+		b.resources[i] = node('a\\file-${i}')
+	}
+	// A component prefix is not a descendant and must remain unchanged.
+	b.resources[smb2.max_nodes - 1] = node('also\\file')
+	mut attributes := C.pthread_attr_t{}
+	assert C.pthread_attr_init(unsafe { &attributes }) == 0
+	defer { C.pthread_attr_destroy(unsafe { &attributes }) }
+	assert C.pthread_attr_setstacksize(unsafe { &attributes }, 64 * 1024) == 0
+	mut worker := C.pthread_t{}
+	assert C.pthread_create(unsafe { &worker }, unsafe { &attributes }, rename_on_small_stack, b) == 0
+	assert C.pthread_join(worker, unsafe { nil }) == 0
+	assert path_of(b.resources[0]) == ''
+	assert path_of(b.resources[1]) == 'b'
+	for i in 2 .. smb2.max_nodes - 1 {
+		assert path_of(b.resources[i]) == 'b\\file-${i}'
+	}
+	assert path_of(b.resources[smb2.max_nodes - 1]) == 'also\\file'
+	println('SMB2 production rename: 509 cached descendants, growth and shrink, 64 KiB stack PASS')
+}

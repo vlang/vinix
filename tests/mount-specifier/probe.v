@@ -16,7 +16,8 @@ fn checked(args []string) ! {
 
 fn main() {
 	root := if os.args.len > 1 { os.abs_path(os.args[1]) } else { os.getwd() }
-	work := os.join_path(os.temp_dir(), 'vinix-mount-specifier-${os.getpid()}')
+	scratch := os.getenv_opt('TMPDIR') or { os.temp_dir() }
+	work := os.join_path(scratch, 'vinix-mount-specifier-${os.getpid()}')
 	os.mkdir_all(work + '/errno')!
 	defer { os.rmdir_all(work) or {} }
 	os.write_file(work + '/v.mod', "Module { name: 'mount_specifier_probe' }")!
@@ -41,7 +42,8 @@ pub fn get() int { return current }
 	// A running V tool inherits VEXE; keep an override's library root paired
 	// with its compiler rather than the compiler that built this runner.
 	os.setenv('VEXE', compiler, true)
-	flags := ['-nocache', '-cc', 'clang', '-enable-globals', '-gc', 'none', '-manualfree']
+	cc := os.getenv_opt('CC') or { 'clang' }
+	flags := ['-nocache', '-cc', cc, '-enable-globals', '-gc', 'none', '-manualfree']
 	checked([compiler, ...flags, '-o', work + '/probe', work])!
 	checked([work + '/probe'])!
 	checked([compiler, ...flags, '-o', work + '/probe.c', work])!

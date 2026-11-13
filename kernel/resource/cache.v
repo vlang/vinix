@@ -195,6 +195,18 @@ mut:
 	resource FileSystemStatResource
 }
 
+// Network filesystems can fail even on an already open descriptor. Keep the
+// infallible capability for providers whose statistics are entirely local.
+pub interface FallibleFileSystemStatResource {
+mut:
+	try_filesystem_stat() ?FileSystemStat
+}
+
+struct FallibleFileSystemStatCall {
+mut:
+	resource FallibleFileSystemStatResource
+}
+
 pub fn sync_resource(mut res Resource, handle voidptr) ? {
 	if mut res is SyncableResource {
 		mut syncable := SyncableResource(res)
@@ -326,7 +338,13 @@ pub fn add_seals(mut res Resource, seals u32) ? {
 	return none
 }
 
-pub fn filesystem_stat(mut res Resource) FileSystemStat {
+pub fn filesystem_stat(mut res Resource) ?FileSystemStat {
+	if mut res is FallibleFileSystemStatResource {
+		mut call := unsafe { &FallibleFileSystemStatCall(C.vinix_stack_alloc(sizeof(FallibleFileSystemStatCall))) }
+		unsafe { call.resource = FallibleFileSystemStatResource(res) }
+		mut backend := unsafe { &call.resource }
+		return backend.try_filesystem_stat()
+	}
 	if mut res is FileSystemStatResource {
 		// The synchronous callback borrows the backend; narrowed-interface
 		// dispatch would allocate an unfreed wrapper on every statfs call.

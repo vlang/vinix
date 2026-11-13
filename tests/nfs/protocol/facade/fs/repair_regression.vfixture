@@ -1,0 +1,264 @@
+module fs
+
+import fs.nfs
+import resource
+import errno
+import heapcheck
+import file
+import usercopy
+
+fn contract_attr(mut w nfs.Xdr, kind u32, ino u64) {
+	w.put32(kind); w.put32(0o666); w.put32(1); w.put32(0); w.put32(0)
+	w.put64(42); w.put64(512); w.put32(0); w.put32(0)
+	w.put64(7); w.put64(ino)
+	for _ in 0 .. 3 { w.put32(1); w.put32(0) }
+}
+
+fn cleanup_regression() {
+	mut template := NFSFS{}
+	mut h := nfs.FileHandle{len: 1}; h.bytes[0] = 1
+	for _ in 0 .. 8 {
+		heapcheck.start_accounting()
+		mut iface := template.instantiate()
+		assert iface != unsafe { nil }
+		if mut iface is NFSFS {
+			mut root := iface.make_node(unsafe { nil }, 'borrowed-root', h, h, nfs.Attr{kind: 2}, true) or { panic('root') }
+			iface.root = root
+			root.create_dotentries(root)
+			for i in 1 .. nfs_nodes {
+				mut text := [u8(`n`), u8(`0` + i / 100), u8(`0` + i / 10 % 10), u8(`0` + i % 10)]!
+				name := unsafe { tos(&text[0], 4) }
+				child := iface.make_node(root, name, h, h, nfs.Attr{kind: if i % 64 == 0 { u32(2) } else { u32(1) }}, false) or { panic('child') }
+				publish_child(root, child.name, child)
+			}
+			iface.make_node(root, 'over-cap', h, h, nfs.Attr{kind: 1}, false) or {}
+			assert errno.get() == errno.enospc
+			iface.destroy_failed()
+		}
+		objects, bytes := heapcheck.stop_accounting()
+		if objects != 0 || bytes != 0 { println('NFS failed cleanup retained objects=${objects} bytes=${bytes}') }
+		assert objects == 0 && bytes == 0
+		assert errno.get() == errno.enospc
+	}
+	println('NFS failed cleanup: 8 populated over-cap instances, 512 identities each, real dot nodes; measured live V allocations=0 bytes=0 after each destroy')
+}
+
+struct RenameSchedule {
+mut:
+	backend &NFSFS
+	old_parent &VFSNode
+	new_parent &VFSNode
+	runs int
+}
+
+// The fixture lock runs a queued refresher at the first unlock. This is a
+// deterministic source-interleaving regression, not a real scheduler/lock test.
+fn refresh_at_unlock(context voidptr) {
+	mut schedule := unsafe { &RenameSchedule(context) }
+	schedule.runs++
+	schedule.backend.populate(schedule.old_parent)
+	if voidptr(schedule.old_parent) != voidptr(schedule.new_parent) {
+		schedule.backend.populate(schedule.new_parent)
+	}
+}
+
+fn rename_regressions() {
+	for caller in ['normal', 'overlay', 'whiteout', 'created'] {
+		for cross in [false, true] {
+			for directory in [false, true] {
+				mut rig := &ContractWire{kind: if directory { u32(2) } else { u32(1) }}
+				mut b := &NFSFS{}
+				b.box = &FileSystem(b)
+				b.client = nfs.Client{context: rig, transfer: nfs_contract_transfer, tx: unsafe { &rig.tx[0] }, rx: unsafe { &rig.rx[0] }}
+				b.listing = unsafe { malloc(nfs.capacity) }; b.cookies = unsafe { &u64(malloc(nfs.max_entries * int(sizeof(u64)))) }
+				mut h := nfs.FileHandle{len: 1}; h.bytes[0] = 1
+				mut p := b.make_node(unsafe { nil }, 'p', h, h, nfs.Attr{kind: 2, fileid: 1}, true) or { panic('p') }
+				h.bytes[0] = 2
+				mut q := if cross { b.make_node(unsafe { nil }, 'q', h, h, nfs.Attr{kind: 2, fileid: 2}, true) or { panic('q') } } else { p }
+				h.bytes[0] = 42
+				mut original := b.make_node(p, 'before', h, nfs_res(p).handle, nfs.Attr{kind: rig.kind, fileid: 9}, false) or { panic('source') }
+				publish_child(p, original.name, original)
+				// Exercise replacing a destination as well as inserting a new key.
+				mut destination := &VFSNode(unsafe { nil })
+				if directory {
+					h.bytes[0] = 43
+					destination = b.make_node(q, 'after', h, nfs_res(q).handle, nfs.Attr{kind: rig.kind, fileid: 10}, false) or { panic('destination') }
+					publish_child(q, destination.name, destination)
+				}
+				before := b.node_count
+				mut schedule := &RenameSchedule{backend: b, old_parent: p, new_parent: q}
+				b.lock.context = schedule; b.lock.after_release = refresh_at_unlock
+				match caller {
+					'normal' { fixture_normal(mut p, 'before', mut original, mut q, 'after', destination) or { panic('rename') } }
+					'overlay' {
+						mut merged_p := create_node(b.box, unsafe { nil }, 'merged-p', true)
+						mut merged_q := create_node(b.box, unsafe { nil }, 'merged-q', true)
+						mut alias := create_node(b.box, merged_p, 'before'.clone(), directory); alias.resource = original.resource
+						publish_child(merged_p, 'before', alias)
+						mut no_whiteout := &VFSNode(unsafe { nil })
+						fixture_overlay(mut p, 'before', mut original, mut q, 'after', destination, mut merged_p, mut alias, mut merged_q, unsafe { nil }, mut no_whiteout) or { panic('overlay rename') }
+					}
+					'whiteout' {
+						mut dir := create_node(b.box, unsafe { nil }, 'merged', true)
+						mut alias := create_node(b.box, dir, 'after', false)
+						alias.overlay = &OverlayEntry{upper: destination}
+						fixture_whiteout(mut p, mut original, mut q, 'after', mut alias, mut dir) or { panic('whiteout rename') }
+					}
+					else {
+						alias := create_node(b.box, q, 'after', false)
+						// This production callsite updates a pre-reserved map slot.
+						if destination == unsafe { nil } { publish_child(q, 'after', alias) }
+						fixture_created(mut p, mut original, mut q, alias) or { panic('created rename') }
+					}
+				}
+				assert schedule.runs == 1 && !b.lock.held && !children_lock.held
+				r := nfs_res(original)
+				assert !r.removed && !original.removed && b.node_count == before
+				assert voidptr(lookup_child(q, 'after')) == voidptr(original)
+				assert lookup_child(p, 'before') == unsafe { nil }
+				assert voidptr(original.parent) == voidptr(q) && original.name == 'after'
+				if directory { assert voidptr(lookup_child(original, '..').redir) == voidptr(q) }
+				mut live := nfs_res(original)
+				live.unlink(unsafe { nil }) or { panic('unlink/rmdir after refresh') }
+				assert rig.procedure == if directory { u32(13) } else { u32(12) }
+				assert live.removed
+			}
+		}
+	}
+	rename_rejection_regressions()
+	local_rename_regressions()
+	println('NFS rename: deterministic refresh at unlock across 4 publication callers, same/cross directory, file/directory, live identity and subsequent REMOVE/RMDIR')
+}
+
+fn statfs_pair(mut res resource.Resource, expected_errno u64, expected_type u64) {
+	mut node := create_node(unsafe { nil }, unsafe { nil }, 'statfs', false); node.resource = unsafe { &res }
+	statfs_node = node
+	mut handle := &file.Handle{resource: unsafe { &res }, node: node}
+	fd := &file.FD{handle: handle}; file.set_test_fd(fd)
+	mut buffer := [15]u64{init: u64(0xfeed)}
+	for by_fd in [false, true] {
+		before := usercopy.count()
+		rc, code := if by_fd { syscall_fstatfs(unsafe { nil }, 3, u64(&buffer[0])) } else { syscall_statfs(unsafe { nil }, c'/statfs', u64(&buffer[0])) }
+		if expected_errno != 0 {
+			assert rc == errno.err && code == expected_errno
+			assert usercopy.count() == before
+		} else {
+			assert rc == 0 && code == 0 && buffer[0] == expected_type
+			assert usercopy.count() == before + 1
+		}
+	}
+}
+
+fn statfs_regressions() {
+	mut rig := &ContractWire{}
+	mut b := &NFSFS{}
+	b.client = nfs.Client{context: rig, transfer: nfs_contract_transfer, tx: unsafe { &rig.tx[0] }, rx: unsafe { &rig.rx[0] }}
+	mut h := nfs.FileHandle{len: 1}; h.bytes[0] = 42
+	mut r := &NfsResource{backend: b, handle: h}
+	mut res := resource.Resource(r)
+	statfs_pair(mut res, 0, 0x6969)
+	rig.fsstat_status = 13
+	statfs_pair(mut res, errno.eacces, 0)
+	assert !b.client.dead
+	rig.fsstat_status = 0
+	usercopy.reject(true)
+	statfs_pair(mut res, errno.efault, 0)
+	usercopy.reject(false)
+	rig.fail_transport = true
+	statfs_pair(mut res, errno.etimedout, 0)
+	assert b.client.dead
+	sends := rig.sends
+	statfs_pair(mut res, errno.etimedout, 0)
+	assert rig.sends == sends
+	mut local := &LocalStatResource{}
+	mut local_res := resource.Resource(local)
+	statfs_pair(mut local_res, 0, 0xef53)
+	mut plain := &PlainResource{}
+	mut plain_res := resource.Resource(plain)
+	statfs_pair(mut plain_res, 0, 0)
+	heapcheck.start_accounting()
+	for _ in 0 .. 200 {
+		resource.filesystem_stat(mut local_res) or { panic('local stat') }
+		resource.filesystem_stat(mut plain_res) or { panic('default stat') }
+	}
+	objects, bytes := heapcheck.stop_accounting()
+	assert objects == 0 && bytes == 0
+	println('NFS statfs/fstatfs: real syscall bodies propagate denied FSSTAT, transport/dead-session errors and EFAULT; NFS success, local provider and default provider preserved')
+}
+
+fn rename_rejection_regressions() {
+	mut rig := &ContractWire{}
+	mut b := &NFSFS{}; b.box = &FileSystem(b)
+	b.client = nfs.Client{context: rig, transfer: nfs_contract_transfer, tx: unsafe { &rig.tx[0] }, rx: unsafe { &rig.rx[0] }}
+	mut h := nfs.FileHandle{len: 1}; h.bytes[0] = 1
+	mut p := b.make_node(unsafe { nil }, 'p', h, h, nfs.Attr{kind: 2}, true) or { panic('p') }
+	h.bytes[0] = 42
+	mut source := b.make_node(p, 'before', h, h, nfs.Attr{kind: 1}, false) or { panic('source') }
+	mut dest := b.make_node(p, 'after', h, h, nfs.Attr{kind: 1}, false) or { panic('dest') }
+	publish_child(p, 'before', source); publish_child(p, 'after', dest)
+	// NFS continues to reject exchange, and every error releases the guard.
+	fixture_exchange(mut p, 'before', mut source, mut p, 'after', mut dest, 2) or {}
+	assert errno.get() == errno.eopnotsupp && !b.lock.held && rig.sends == 0
+	// Source/destination identity changed after validation: do not send RENAME.
+	guarded := rename_before_publish(mut p.filesystem, p, 'before', dest, p, 'after', dest, 0) or { false }
+	assert !guarded && errno.get() == errno.enoent && !b.lock.held && rig.sends == 0
+	missing := &VFSNode(unsafe { nil })
+	changed := rename_before_publish(mut p.filesystem, p, 'before', source, p, 'after', missing, 0) or { false }
+	assert !changed && errno.get() == errno.eagain && !b.lock.held && rig.sends == 0
+	b.client.dead = true; b.client.fault = 110
+	failed := rename_before_publish(mut p.filesystem, p, 'before', source, p, 'after', dest, 0) or { false }
+	assert !failed && errno.get() == errno.etimedout && !b.lock.held && rig.sends == 0
+}
+
+struct LocalFS { mut: calls int reject bool }
+fn (mut f LocalFS) instantiate() &FileSystem { return unsafe { nil } }
+fn (mut f LocalFS) populate(_ &VFSNode) {}
+fn (mut f LocalFS) mount(_ &VFSNode, _ string, _ &VFSNode) ?&VFSNode { return none }
+fn (mut f LocalFS) create(_ &VFSNode, _ string, _ u32) &VFSNode { return unsafe { nil } }
+fn (mut f LocalFS) symlink(_ &VFSNode, _ string, _ string) &VFSNode { return unsafe { nil } }
+fn (mut f LocalFS) link(_ &VFSNode, _ string, mut _ VFSNode) ?&VFSNode { return none }
+fn (mut f LocalFS) rename(_ &VFSNode, _ string, _ &VFSNode, _ string, _ int) ? {
+	f.calls++
+	if f.reject { errno.set(errno.eacces); return none }
+}
+
+struct AtomicLocalFS { LocalFS }
+fn (mut f AtomicLocalFS) rename_whiteout(_ &VFSNode, _ string, _ &VFSNode, _ string, _ &VFSNode) ? {
+	f.calls++
+	if f.reject { errno.set(errno.eacces); return none }
+}
+
+fn local_rename_regressions() {
+	mut local := &LocalFS{}
+	mut iface := &FileSystem(local)
+	mut p := create_node(iface, unsafe { nil }, 'p', true)
+	mut q := create_node(iface, unsafe { nil }, 'q', true)
+	mut r := &PlainResource{}
+	mut source := create_node(iface, p, 'before'.clone(), false); source.resource = &resource.Resource(r)
+	mut dest := create_node(iface, q, 'after'.clone(), false); dest.resource = source.resource
+	publish_child(p, 'before', source); publish_child(q, 'after', dest)
+	fixture_exchange(mut p, 'before', mut source, mut q, 'after', mut dest, 2) or { panic('local exchange') }
+	assert local.calls == 1 && voidptr(lookup_child(p, 'before')) == voidptr(dest)
+	assert voidptr(lookup_child(q, 'after')) == voidptr(source)
+	local.reject = true
+	fixture_normal(mut q, 'after', mut source, mut p, 'before', dest) or {}
+	assert local.calls == 2 && errno.get() == errno.eacces
+	assert voidptr(lookup_child(q, 'after')) == voidptr(source)
+	local.reject = false
+	fixture_normal(mut q, 'after', mut source, mut p, 'before', dest) or { panic('local replace') }
+	assert local.calls == 3 && voidptr(lookup_child(p, 'before')) == voidptr(source)
+	assert lookup_child(q, 'after') == unsafe { nil }
+	// Overlay's whiteout-storage branch must not claim a guard it did not
+	// acquire, and an unsupported atomic whiteout remains an explicit error.
+	mut staged := create_node(iface, q, 'stage', false)
+	result := overlay_storage_rename(mut iface, p, 'before', source, q, 'after', unsafe { nil }, staged) or { false }
+	assert !result && errno.get() == errno.enotsup && local.calls == 3
+	mut persistent_fs := &AtomicLocalFS{}
+	mut atomic_iface := &FileSystem(persistent_fs)
+	atomic_result := overlay_storage_rename(mut atomic_iface, p, 'before', source, q, 'after', unsafe { nil }, staged) or { panic('atomic whiteout') }
+	assert !atomic_result && persistent_fs.calls == 1
+	rename_after_publish(mut atomic_iface, atomic_result)
+	persistent_fs.reject = true
+	overlay_storage_rename(mut atomic_iface, p, 'before', source, q, 'after', unsafe { nil }, staged) or {}
+	assert persistent_fs.calls == 2 && errno.get() == errno.eacces
+}
