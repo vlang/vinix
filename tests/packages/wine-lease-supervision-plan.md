@@ -1519,6 +1519,35 @@ SHA-256 `e74660ec8b3aeeb31e89a28cba33875f591466ae3f6fdfff249751c277b98d67`.
 Recording and independent verification pass with adjacent logs. Preserve the
 entire frozen workspace and referenced original kernel/input bundles.
 
+## Native descendant burst, 2026-11-13
+
+Source `53657660a` adds a bounded 64-descendant burst after initial-client
+exit. The detached worker forks without reaping its children, then exits.
+Its final child waits until adopted by the holder and blocks for explicit
+release. The observer requires the complete creation marker, adoption marker,
+busy lease and caller still waiting. After release it requires original status
+37, free lease and no remaining children. The controller requires the churn
+marker in addition to the existing standard-suite markers.
+
+Complete standard suites pass on retained production kernels: x86_64 23.404
+seconds, AArch64 7.358 seconds, neither interrupted. Parsed-source, selected-input
+and generated-output checks pass. Evidence, sources, C/binaries, media and
+native input byte snapshots are frozen at `/Users/alex/.cache/vwchurn-20261113-01`.
+Successful runs are `x86-02`/`arm-02`; initial launcher attempts ran before the
+controller build completed and exited 127 without creating guests.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/holder-churn-20261113-01.inventory.json`,
+SHA-256 `dcdd1d53fe0e88f8d58a65860f738aae8e0abebdbbdbd8796ae92f374e731a68`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original kernel/input bundles.
+
+Production holder/kernel code is unchanged. Preserve the original kernel
+qualification bundle and namespaces; historical audit requirements still
+apply. This is a native bounded burst, not arbitrary topology, signed Wine
+churn or a memory-leak measurement. Holder/SDK death, session teardown, ARM
+owned Wine, fresh owned GUI and default activation remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
