@@ -1675,6 +1675,42 @@ qualifies native failure reporting, not signed Wine closed-stdio acceptance.
 Holder/SDK death, session teardown, ARM owned Wine, fresh owned GUI, default
 activation and broader topology/heap/hermetic gates remain open.
 
+## Complete native matrix runner, 2026-11-13
+
+Source `891c77caf` adds [`lease-holder-matrix.v`](lease-holder-matrix.v), which
+runs all seven controller modes sequentially on both architectures. Build it
+with the same V and repository/hardware-platform module paths as the controller,
+then invoke the two compiled tools with reviewed inputs:
+
+```text
+MATRIX NEW_OUTPUT CHECK X86_KERNEL ARM_KERNEL X86_SYSROOT ARM_SYSROOT X86_GCC ARM_GCC CLANG V
+```
+
+The output must be new. Modes are `standard`, `fault`, `signal`,
+`signal-refused`, `interrupt`, `caller-interrupt` and `closed-stdio`. Each child
+must exit successfully with its exact controller completion marker; the unsafe
+signal-handler control must still fail in the guest at its intended gate.
+The matrix compares selected-input sets/hashes across modes within each
+architecture and rechecks driver/controller/kernel/compiler pins after every
+case. Children retain their existing parsed-source/input/generated checks.
+Only a complete run publishes `completed.json` and the final input receipt.
+
+`run-01` passes all fourteen controller-qualified cases. Complete driver,
+commands, logs, C/binaries, guest media/results and native input byte snapshots
+are frozen at `/Users/alex/.cache/vwmatrix-20261113-01`.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/holder-matrix-20261113-01.inventory.json`,
+SHA-256 `8b5f56d132639b0f1160426275a270770527b1e50c7973e04c4fc3eb93b7a08c`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original controller/kernel/input bundles.
+
+Retain the original controller/kernel qualification bundles and namespaces;
+historical audits remain required. This automates native qualification, with
+no production changes. Signed Wine, holder/SDK death, session teardown, ARM
+owned Wine, fresh owned GUI, default activation and broader environment/heap/
+hermetic gates remain separate.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
