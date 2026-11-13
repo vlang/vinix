@@ -4,7 +4,7 @@ module console
 import sched
 import aarch64.uart
 import aarch64.virtio_input
-import aarch64.virtio_net
+import dev.virtio_net
 import dev.e1000
 import socket.inet
 import apple.wifi
