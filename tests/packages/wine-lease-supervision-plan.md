@@ -533,6 +533,62 @@ foreground spawning, actual client descriptor inheritance and Wine bootstrap,
 sandbox qualification, generation lease integration and holder-death recovery
 remain open; the runner and holder are unchanged.
 
+## Owned server child primitive, 2026-11-13
+
+Source `9c9fce18b` adds `ServerDirectory.start_child` and `ServerChild` for Linux
+AMD64/AArch64. Idle namespace admission precedes a direct `_Fork`; the child
+starts in the held prefix directory and closes descriptors above stdio except
+its CLOEXEC exec-report pipe. Arguments and environment are borrowed/inherited;
+the caller still admits the executable/environment and supplies foreground
+arguments. No implicit daemonization, signed-binary claim or readiness claim
+is made. Exec-report EOF can also result from pre-exec signal death: live
+child/lock/peer authentication remains necessary.
+
+The owner preserves default waitable SIGCHLD, excludes other waiters, copying
+and asynchronous cancellation, and collects or explicitly terminates the child.
+Nonblocking report/collection calls retain ownership on error. Termination
+checks direct unreaped ownership with WNOWAIT, signals only that PID and waits
+exactly it; its wait is unbounded and does not collect descendants. Parent mask
+restoration failure returns an owned child with a pending saved mask rather
+than losing the PID. Call `exec_ready` immediately on the spawning thread to
+restore/check it; collection/termination also retry restoration. Cleanup of a
+cancelled owner outside these calls remains the caller's responsibility.
+
+Final `check-05` passes eight native runs with unchanged production kernels:
+`arm-05`/`x86-05`, plus `signal-`, `close-` and `mask-` controls on each arch.
+Ordinary uid/gid 1000 executes 100 spawn/exec/collect cycles with zero retained
+V bytes and flat descriptors in both standard and mask-recovery runs. Execed
+children check literal/empty arguments, prefix cwd, account, descriptor isolation
+and inherited signal policy. Forbidden atfork callbacks never run. Natural
+exit 37, repeatable exec failure/exit 126, owned termination 137 and pre-exec
+SIGTERM/143 preserve exact status; an unrelated child remains alive. The signal
+control verifies caught handlers reset before unmasking; the close control
+injects isolation refusal before close_range; the mask control skips the first
+parent restore and exercises recovery. Generated C confirms the injected mask
+branch and allocation-free child path; raw report read/wait/close avoid libc
+cancellation points. The host check covers macOS refusal/empty PID only.
+
+An execed V server takes the Wine lock and serves a retained authenticated
+connection using the owned PID, then retires naturally. Existing lock/endpoint,
+invalid arguments, ignored SIGCHLD and NOCLDWAIT refuse without replacing a
+foreign entry. PID1 observes exact suite status zero before its final marker;
+the harness stops QEMU afterward. This is a protocol fixture, not signed Wine.
+
+The controller admits actual parsed V sources and heap-tracker header, and
+checks selected tools/kernel/firmware and generated artifacts before/after boot.
+Complete attempts, final sources and ownership self-review are retained at
+`/Users/alex/.cache/vsc-20261113-01`; complete typed inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-server-child-20261113-01.inventory.json`,
+SHA-256 `0c89a54afde5854497d6f728fd6459928a14e2b391f643548b22a13acb189046`.
+Recording and separate verification pass with adjacent logs. Byte-verified
+sparse media and APFS kernel clones preserve logical contents and original
+paths; historical bundles remain intact. Full C toolchain inventory, kernel
+heap retention, resource exhaustion, sustained mask-restore failure and arbitrary
+signal/namespace/wait races remain unqualified. Signed Wine foreground startup,
+translator/sandbox acceptance, client socket inheritance/bootstrap, generation
+lease integration and holder-death recovery remain open. Runner/holder wiring
+is unchanged.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

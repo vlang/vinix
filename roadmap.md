@@ -1206,6 +1206,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now pass native long-path, forced path-replacement, foreign-peer, backlog
     timeout and protocol/descriptor checks. Signed foreground startup, actual
     client handoff and production lease integration remain open.
+    An [owned server child primitive](tests/packages/wine-lease-supervision-plan.md#owned-server-child-primitive-2026-11-13)
+    now passes ARM/x86 exec reporting, exact wait/termination, descriptor and
+    signal controls, and connects an execed fixture through the authenticated
+    socket path. Signed Wine foreground startup and production wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
