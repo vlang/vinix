@@ -18,6 +18,10 @@ import tools.packages.launchhold
 #include <signal.h>
 #define owned_wine_open open
 #define owned_wine_waitpid waitpid
+#include <sys/syscall.h>
+#include <sys/socket.h>
+#define owned_wine_socket socket
+fn C.owned_wine_socket(i32, i32, i32) i32
 fn C.owned_wine_open(&char, i32) i32
 fn C.owned_wine_waitpid(i32, &i32, i32) i32
 fn C.dup2(i32, i32) i32
@@ -48,7 +52,7 @@ fn install(entry string) ! {
 fn suite() ! {
 	C.alarm(150)
 	data := '/tmp/vinix-owned-wine/data'
-	os.mkdir('/tmp/vinix-owned-wine')!; os.mkdir(data)!; os.chmod(data, 0o700)!
+	os.mkdir_all(data)!; os.chmod(data, 0o700)!
 	os.mkdir(data + '/tmp')!
 	generation := '/var/lib/vinix-packages/generations/1/apps'
 	runtime := generation + '/org.vinix.wine-runtime'
@@ -250,7 +254,53 @@ fn lease_suite() ! {
 	need(!os.exists(server_status), 'Wine server still present after holder return')!
 	println('WINE OWNED LEASE PASS manager=37; descendants retired; lease free')
 }
+fn sandbox_stage() ! {
+	data := '/tmp/vinix-owned-wine/data'
+	os.mkdir_all(data)!; os.chmod(data, 0o700)!
+	os.write_file('/tmp/vinix-owned-sandbox-denied', 'outside diagnostic sandbox')!
+	generation := '/var/lib/vinix-packages/generations/1/apps'
+	// Match the current Windows + process launch-plan promises and path grants.
+	// The retained sandbox additionally unveils the selected program itself rx.
+	command := ['/usr/bin/vinix-sandbox', '--uid', '1000', '--gid', '1000',
+		'--promises', 'stdio rpath wpath cpath flock exec prot_exec fattr sendfd recvfd proc unix',
+		'--unveil', generation + '/org.vinix.wine-win64-probe', 'rx',
+		'--unveil', generation + '/org.vinix.wine-runtime', 'rx',
+		'--unveil', data, 'rwc', '--', '/sbin/init', '--sandbox-manager']
+	mut pointers := []&char{cap: command.len + 1}
+	defer { unsafe { pointers.free() } }
+	for entry in command { pointers << entry.str }
+	pointers << &char(unsafe { nil })
+	C.execv(command[0].str, unsafe { &&char(pointers.data) })
+	return error('cannot execute retained sandbox')
+}
+
 fn main() {
+	$if wine_owned_sandbox ? {
+		if os.args.len == 2 && os.args[1] == '--sandbox-manager' {
+			need(os.getuid() == 1000 && os.geteuid() == 1000, 'sandbox manager requires ordinary account') or { C._exit(94) }
+			fd := C.owned_wine_open(c'/tmp/vinix-owned-sandbox-denied', C.O_RDONLY | C.O_CLOEXEC)
+			if fd >= 0 || C.errno !in [C.EACCES, C.ENOENT]! { eprintln('HWTEST FAIL owned sandbox: outside file was not denied'); C._exit(95) }
+			println('WINE OWNED SANDBOX DENIAL PASS outside file inaccessible')
+			C.alarm(15)
+			control := C.fork()
+			if control == 0 {
+				C.owned_wine_socket(C.AF_INET, C.SOCK_STREAM, 0)
+				C._exit(97) // Even an ordinary socket error is not pledge proof.
+			}
+			mut status := i32(0)
+			mut waited := i32(-1)
+			for {
+				waited = if control > 0 { C.owned_wine_waitpid(control, &status, 0) } else { i32(-1) }
+				if waited < 0 && control > 0 && C.errno == C.EINTR { continue }
+				break
+			}
+			C.alarm(0)
+			if control <= 0 || waited != control || status & 0x7f != C.SIGABRT { eprintln('HWTEST FAIL owned sandbox: internet socket did not trigger pledge SIGABRT'); C._exit(98) }
+			println('WINE OWNED SANDBOX PLEDGE PASS internet socket killed with SIGABRT')
+			suite() or { eprintln('HWTEST FAIL owned sandbox manager: ' + err.msg()); C._exit(96) }
+			C._exit(0)
+		}
+	}
 	$if wine_owned_lease ? {
 		if os.args.len == 2 && os.args[1] == '--lease-manager' {
 			need(os.getuid() == 1000 && os.geteuid() == 1000, 'Wine manager requires ordinary account') or { C._exit(94) }
@@ -265,7 +315,10 @@ fn main() {
 	pid := C.fork()
 	if pid == 0 {
 		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
-		$if wine_owned_lease ? {
+		$if wine_owned_sandbox ? {
+			sandbox_stage() or { eprintln('HWTEST FAIL owned sandbox setup: ' + err.msg()); C._exit(91) }
+			C._exit(92)
+		} $else $if wine_owned_lease ? {
 			lease_suite() or { eprintln('HWTEST FAIL owned Wine lease: ' + err.msg()); C._exit(91) }
 		} $else {
 			suite() or { eprintln('HWTEST FAIL owned Wine: ' + err.msg()); C._exit(91) }
