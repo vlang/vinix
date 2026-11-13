@@ -1231,8 +1231,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Win64 cwd API diagnostic](tests/packages/wine-lease-supervision-plan.md#windows-relative-file-apis-2026-11-13)
     now passes current-directory, relative read/write and child-inheritance
     checks through owned x86 Wine, including space-containing paths and an
-    incorrect-directory control. Fresh signed/sandbox startup, ARM Wine,
-    broader path mappings and production lease wiring remain open.
+    incorrect-directory control. An
+    [owned Wine sandbox diagnostic](tests/packages/wine-lease-supervision-plan.md#owned-wine-under-package-sandbox-policy-2026-11-13)
+    now passes foreground startup and the Win64 cwd probe under the current
+    Windows process promises and grant classes, with unveil and pledge refusal
+    controls. Fresh signing/current-launcher acceptance, ARM Wine, broader path
+    mappings and production lease wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

@@ -917,6 +917,55 @@ encodings/mappings, broader bootstrap and ARM Wine remain unqualified, as do
 production runner/lease/recovery wiring and holder SIGKILL retention. No heap,
 complete Linux C environment or reproducibility guarantee is added.
 
+## Owned Wine under package sandbox policy, 2026-11-13
+
+Source `a4d2c5344` adds `sandbox` and `sandbox-cwd` diagnostic modes. They execute
+the current owned manager through the retained `/usr/bin/vinix-sandbox`. The manually supplied
+policy matches current Windows + process promises in `pkgcore/launch.v`:
+`stdio rpath wpath cpath flock exec prot_exec fattr sendfd recvfd proc unix`.
+Grant classes remain application/runtime `rx` and private data `rwc`; sandbox
+automatically unveils the diagnostic `/sbin/init` itself `rx`. The current
+launch-plan source is hash-bound as an input, not executed to generate this
+policy. No additional promises, `/proc` grant or blanket `/tmp` grant is used.
+
+An ordinary uid/gid 1000 stage prepares data and an existing readable file
+outside the grants, then execs the retained sandbox and fresh manager. Inside,
+opening that file must fail with EACCES/ENOENT. A disposable fork attempts an
+AF_INET stream socket and must die with SIGABRT; an ordinary socket error or
+success followed by exit 97 cannot satisfy the check. Only then does the
+manager prepare the prefix, start/authenticate its owned foreground server and
+transfer the connection to Wine. Both the retained Win64 application and the
+separate cwd/read/write/child-inheritance diagnostic pass, followed by exact
+client/server zero and PID1 suite-zero collection.
+
+The retained production x86 kernel is actually embedded using the previously
+verified ISO rebase; all retained sandbox/runtime/app file contents remain
+unchanged. Fresh init/source/PE hashes, parsed V closure and complete image
+delta/padding checks are verified. Default startup and caller-death lease
+regressions also pass. Earlier runs and source views are preserved, including
+a stopped attempt that unnecessarily required a kernel pledge report on the
+serial port; this x86 setup exposes the exact SIGABRT status there, not that
+kernel text. Final `check-04` passes `sandbox-03` and `cwd-03`, requiring the
+file-denial and signal-status markers plus complete Wine/client/retirement
+markers. `check-03` also passes `owned-01` and `death-01`; its source view
+predates only the correction to the sandbox serial-text requirement.
+
+Complete source views, builds, binaries, commands, images, results and logs:
+`/Users/alex/.cache/vwsbox-20261113-01` (frozen). Complete typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-owned-sandbox-20261113-01.inventory.json`,
+SHA-256 `97c0c4b8d70932e6ffb7f5a31a228f72076cd222dc58496c3a43601655e97f3b`.
+Recording and independent verification pass with adjacent logs. The unchanged
+cwd PE and its producer proof remain in the earlier frozen
+`/Users/alex/.cache/vwcwd-20261113-01/pe-02` bundle. Preserve both complete
+workspaces and original historical namespaces.
+
+This exercises the retained sandbox binary with a supplied matching policy
+and explicitly constructed SDK context. It is not fresh package/signature
+admission, a rebuild of the current sandbox, production Wine-runner or lease
+wiring, ARM acceptance or a general path/recovery guarantee. Holder SIGKILL
+retention, broader mappings and complete C environment/heap qualification
+remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
