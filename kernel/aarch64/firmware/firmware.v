@@ -31,10 +31,6 @@ const madt_gicr = u8(0xe)
 const madt_gicc = u8(0xb)
 const madt_its = u8(0xf)
 
-// SPCR interface types that are a PL011 register-wise.
-const spcr_pl011 = u8(3)
-const spcr_sbsa = u8(0xe)
-
 pub struct Gic {
 pub:
 	// Physical addresses. `redist` is the start of the redistributor frames,
@@ -77,7 +73,11 @@ fn read_u64(base u64, offset u64) u64 {
 // Limine reports the RSDP by the address the firmware used and the tables by
 // physical address; which one arrives depends on its revision.
 fn table_virt(address u64) u64 {
-	offset := memory.get_hhdm_offset()
+	// Console discovery also runs before pmm_init copies Limine's offset.
+	mut offset := memory.get_hhdm_offset()
+	if offset == 0 {
+		offset = memory.bootloader_hhdm_offset()
+	}
 	if address >= offset {
 		return address
 	}
@@ -242,7 +242,8 @@ pub fn console_uart() ?u64 {
 		return none
 	}
 	kind := read_u8(spcr, 36)
-	if kind != spcr_pl011 && kind != spcr_sbsa {
+	// Literals are intentional: V constants are not ready before _vinit.
+	if kind != 3 && kind != 0xe {
 		return none
 	}
 	// A Generic Address Structure: space, width, offset, access size, address.
@@ -254,6 +255,21 @@ pub fn console_uart() ?u64 {
 		return none
 	}
 	return address
+}
+
+// Allocation-free early console discovery. Only an identified/explicit QEMU
+// platform may use its fixed address; absent ACPI on Apple is not evidence.
+pub fn boot_console_uart(qemu_fallback bool) ?u64 {
+	if address := console_uart() {
+		return address
+	}
+	if address := dsdt_pl011() {
+		return address
+	}
+	if qemu_fallback {
+		return u64(0x09000000)
+	}
+	return none
 }
 
 // The DSDT, through the FADT.

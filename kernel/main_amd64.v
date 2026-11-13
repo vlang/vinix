@@ -246,6 +246,9 @@ fn kmain() {
 		for {}
 	}
 
+	// Polled COM1 needs neither the allocator, V constants nor a lock.
+	serial.early_initialise()
+
 	// Initialize the memory allocator.
 	memory.pmm_init()
 	// Before anything allocates: the pages under 1 MiB that a processor
@@ -267,7 +270,6 @@ fn kmain() {
 
 	// Init terminal
 	term.initialise()
-	serial.early_initialise()
 	security.initialise_boot_policy()
 
 	// a dummy call to avoid V warning about an unused `stubs` module
