@@ -42,6 +42,13 @@ fn unexpected_signal(_ i32) { C._exit(99) }
 fn caught_interrupt(_ i32) {}
 fn C.siginterrupt(i32, i32) i32
 
+fn standard_streams_closed() bool {
+	for fd in 0 .. 3 {
+		if C.fcntl(i32(fd), C.F_GETFD) >= 0 || C.errno != C.EBADF { return false }
+	}
+	return true
+}
+
 struct ProbeLimit { current u64 maximum u64 }
 fn limit_read(resource i32) !ProbeLimit {
 	mut value := ProbeLimit{}
@@ -158,7 +165,12 @@ fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high
 		if C.syscall(C.SYS_rt_sigprocmask, C.SIG_SETMASK, voidptr(0), &before_mask, u64(8)) != 0 { C._exit(93) }
 		mut reaper := i32(-1)
 		if C.prctl(37, &reaper, voidptr(0), voidptr(0), voidptr(0)) != 0 || reaper != 0 { C._exit(84) }
+		$if lease_holder_closed_stdio ? {
+			C.close(0); C.close(1); C.close(2)
+			if !standard_streams_closed() { C._exit(88) }
+		}
 		code := launchhold.run(launchhold.Command{program: '/sbin/init', directory: '/tmp', arguments: ['client', root, mode, lease.str()]}, lease) or { eprintln(err); C._exit(85); return }
+		$if lease_holder_closed_stdio ? { if !standard_streams_closed() { C._exit(89) } }
 		mut after_mask := u64(0)
 		if C.syscall(C.SYS_rt_sigprocmask, C.SIG_SETMASK, voidptr(0), &after_mask, u64(8)) != 0 || before_mask != after_mask { C._exit(92) }
 		if unrelated_child > 0 { wait_exit(unrelated_child, 97 << 8) or { C._exit(91) } }
@@ -362,6 +374,11 @@ fn suite() ! {
 	$if lease_holder_caller_interrupt ? {
 		lifetime('/tmp/caller-interrupt', '37', false, false, false, false)!
 		println('LEASE HOLDER CALLER INTERRUPT PASS real wait EINTR; busy lease; original37; no children')
+		return
+	}
+	$if lease_holder_closed_stdio ? {
+		lifetime('/tmp/holder-closed-stdio', '37', false, false, false, false)!
+		println('LEASE HOLDER CLOSED STDIO PASS relocated status pipe; busy lease; original37; no children')
 		return
 	}
 	for mode in ['37', '126', '127', 'signal']! { lifetime('/tmp/holder-' + mode, mode, false, false, false, false)! }
