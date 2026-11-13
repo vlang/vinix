@@ -151,13 +151,8 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				if !binary32 { return error('AIR overflow: mixed pair control flow required') }
 				p.scalar_pair_flow(op, s.base_id, code != 16, pools, scope)!
 			} else if code == 26 {
-				if !binary32 || !inst.has_result || op.operands_count != 1 || op.opcode != 0 || op.targets_count != 0 || op.indices_count != 1 || op.indices_start < 0 || op.indices_start >= p.indices.len { return error('AIR overflow: extract shape/index') }
-				operand := p.operands[first_operand]
-				element := p.scalar_overflow_element(operand.type_index)!
-				field := p.indices[op.indices_start]
-				if op.source_type != operand.type_index || field > 1 || op.result_type != p.references[p.types[operand.type_index].refs_start + int(field)] { return error('AIR overflow: extract source/field/type') }
-				p.scalar_pair_source(pools, scope, s.base_id, operand, op.source_type)!
-				p.integer_bits(element)!
+				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
+				p.scalar_pair_extract(op, s.base_id, pools, scope)!
 			} else {
 				for operand in p.operands[first_operand..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
 			}
@@ -325,10 +320,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			mut result := IntegerValue{}
 			match code {
 				34 { result = m.intrinsic_value(ir, op)! }
-				26 {
-					pair := m.read_overflow(start)!
-					result = IntegerValue{value: if p.indices[op.indices_start] == 0 { pair.value } else { u64(pair.overflow) }, poison: if p.indices[op.indices_start] == 0 { pair.poison } else { pair.flag_poison }}
-				}
+				26 { result = m.extract_pair_value(op)! }
 				27 {
 					pair := m.read_overflow(start)!; inserted := m.read(start + 1)!
 					bits := p.integer_bits(p.scalar_overflow_element(op.result_type)!)!

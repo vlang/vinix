@@ -16,6 +16,23 @@ fn (p IRTypedProgram) scalar_overflow_element(index int) !int {
 	return element
 }
 
+// A scalar field from a supported literal overflow pair. Callers validate the
+// instruction's result slot/flags before executing this shared profile.
+fn (p IRTypedProgram) scalar_pair_extract(op IRTypedInstruction, base_id u32, pools IRConstantPools, scope int) ! {
+	if op.operands_count != 1 || op.opcode != 0 || op.targets_count != 0 || op.indices_count != 1 || op.indices_start < 0 || op.indices_start >= p.indices.len || op.operands_start < 0 || op.operands_start >= p.operands.len { return error('AIR overflow: extract shape/index') }
+	operand := p.operands[op.operands_start]
+	element := p.scalar_overflow_element(operand.type_index)!
+	field := p.indices[op.indices_start]
+	if op.source_type != operand.type_index || field > 1 || op.result_type != p.references[p.types[operand.type_index].refs_start + int(field)] { return error('AIR overflow: extract source/field/type') }
+	p.scalar_pair_source(pools, scope, base_id, operand, op.source_type)!
+	p.integer_bits(element)!
+}
+
+fn (m &IntegerMachine) extract_pair_value(op IRTypedInstruction) !IntegerValue {
+	pair := m.read_overflow(op.operands_start)!
+	return IntegerValue{value: if m.p.indices[op.indices_start] == 0 { pair.value } else { u64(pair.overflow) }, poison: if m.p.indices[op.indices_start] == 0 { pair.poison } else { pair.flag_poison }}
+}
+
 // Pair control flow borrows typed result slots or zero/poison constants.
 fn (p IRTypedProgram) scalar_pair_flow(op IRTypedInstruction, base_id u32, select_value bool, pools IRConstantPools, scope int) ! {
 	p.scalar_overflow_element(op.result_type)!

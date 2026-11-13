@@ -67,7 +67,8 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 }
 // Narrow execution profile: an ordinary void function, pointer arguments, one
 // block, scalar loads/stores, forward literal GEPs, scalar binary operations,
-// comparisons, scalar select/casts/freeze, floating fneg and final ret void.
+// comparisons, scalar select/casts/freeze, floating fneg, checked overflow
+// pairs with scalar field extraction and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -101,7 +102,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	defer { unsafe { pointers.free() } }
 	mut layouts := IRTypeLayouts{}
 	defer { layouts.free() }
-	mut intrinsic_declarations := [1384]int{} // Forty FP slots + twenty-one integer families.
+	mut intrinsic_declarations := [1768]int{} // Forty FP slots + twenty-seven integer families.
 	mut intrinsic_work := 0
 	for index in block.first .. block.first + block.count {
 		inst := bodies.instructions[index]; op := p.instructions[index]
@@ -115,12 +116,17 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: intrinsic result') }
 			key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
 			id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
-			if id !in [.fabs, .copysign, .floor, .ceil, .trunc, .round, .roundeven, .rint, .nearbyint, .sqrt, .minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .fma, .fmuladd, .ldexp, .ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { return error('AIR memory execution: unsupported intrinsic') }
+			if id !in [.fabs, .copysign, .floor, .ceil, .trunc, .round, .roundeven, .rint, .nearbyint, .sqrt, .minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .fma, .fmuladd, .ldexp, .ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul, .sadd_overflow, .uadd_overflow, .ssub_overflow, .usub_overflow, .smul_overflow, .umul_overflow]! { return error('AIR memory execution: unsupported intrinsic') }
 			if key < 0 || key >= intrinsic_declarations.len || (intrinsic_declarations[key] != 0 && intrinsic_declarations[key] != op.callee_function + 1) { return error('AIR memory execution: duplicate intrinsic declaration') }
 			if intrinsic_declarations[key] == 0 {
 				intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, second_immarg)!
 				intrinsic_declarations[key] = op.callee_function + 1
 			}
+			continue
+		}
+		if code == 26 {
+			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: extract result') }
+			p.scalar_pair_extract(op, s.base_id, pools, scope)!
 			continue
 		}
 		if gep {
@@ -199,6 +205,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
 		if code == 10 { return IRVoidRun{steps: m.steps} }
 		if code == 34 { value := m.intrinsic_value(ir, op)!; m.put(inst, value); continue }
+		if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }
 		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
 		if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
 		if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }

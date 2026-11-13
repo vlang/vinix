@@ -202,7 +202,18 @@ evaluated; poison propagates even with a zero multiplier and undef rejects.
 Each call costs one step and shares scalar validation/evaluation. The fixed
 declaration cache reserves all 64 widths alongside the existing families.
 
-Only ordinary direct calls to these forty-one families' exact declarations are admitted:
+Direct LLVM signed/unsigned add/subtract/multiply `*.with.overflow` calls
+support i1..i64 inputs and literal unpacked `{iN, i1}` results. The shared
+scalar evaluator retains the wrapped value and a separate overflow flag;
+overflow keeps both fields defined. Input poison propagates to both fields
+and undef rejects, including with a zero multiplier. `extractvalue` reads
+field 0 or 1 after checking the complete pair shape, source type, result type
+and field index. Each call and extraction costs one step. Extracted values
+can feed scalar operations, freeze/select and scalar stores. Zero/poison pair
+constants are admitted; other pair constants reject. General aggregate memory,
+arguments, returns, insertion, freeze and select remain unsupported here.
+
+Only ordinary direct calls to these forty-seven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -328,3 +339,7 @@ compute pipeline. General shader execution and GPU dispatch remain pending.
 `tests/ios/air-memory-clmul.v` compares all i1..i64 widths against native LLVM
 and independent polynomial convolution, exhausts i1..i8 pairs, checks cached
 distributive identities and rejects malformed later calls before stores.
+`tests/ios/air-memory-overflow.v` compares all six overflow families at i1..i64
+against native LLVM, exhausts i1..i8 pairs with independent widened arithmetic,
+checks both extracted fields and rejects malformed extraction/cached calls
+before earlier stores, alongside poison, constants and aggregate exclusions.

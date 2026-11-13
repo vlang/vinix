@@ -476,6 +476,18 @@ step and shares scalar validation/evaluation. Seven deferred dispatches check
 i32/i64 products, high-bit truncation and distributive identities through
 cached calls, distinct offsets and exact u64 output words.
 
+Direct signed/unsigned add/subtract/multiply `*.with.overflow` intrinsics
+support i1..i64 inputs and literal unpacked `{iN, i1}` results. Overflow leaves
+both the wrapped value and flag defined; input poison propagates to both fields
+and undef rejects. `extractvalue` checks pair shape, source/result types and a
+single field index 0 or 1; extracted scalars can feed arithmetic, freeze/select
+and stores. Calls/extractions each cost one step and share scalar validation
+and evaluation. Zero/poison pair constants are supported, while general
+aggregate memory/arguments/returns/insertion/freeze/select remain unsupported.
+Seven deferred dispatches check all six i32 operations plus i64 unsigned
+multiplication, keeping separate flags and wrapped values through exact u64
+output words. Bad extraction and cached-call metadata reject before stores.
+
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not
 retain the client pointer. Each dispatch retains its own buffer reference, so
