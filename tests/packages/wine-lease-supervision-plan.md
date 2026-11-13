@@ -1182,6 +1182,72 @@ new refusal matrix and holder SIGKILL/kernel-owned retention remain open.
 Sandbox/account helpers and the production kernel are retained selected
 inputs; this run adds no complete C environment or kernel/V heap guarantee.
 
+## Collection after initial client exit, 2026-11-13
+
+Source `d15403c58` adds explicit `--owned-manager --collection-probe` to the
+native controller. A fresh signed x86 console application starts another real
+Windows process and exits 37. The fixture identifies the initial Unix client,
+foreground server and child, verifies ordinary credentials/private socket,
+then observes the initial client absent with the server and child non-zombie.
+The current CLI, verified generation lease/private holder, retained sandbox
+and current owned SDK path remain connected throughout this check.
+
+`native-08` passes real CLI removal and rollback into generations 2 and 3;
+running generation 1 is explicitly neither active nor rollback. Three actual
+CLI `gc` calls retain that generation and its unchanged PE while exclusive
+nonblocking flock refuses with EAGAIN/EWOULDBLOCK. Initial-client absence,
+server/child liveness and the waiting CLI are checked through the interval.
+Only afterward does a private release file let the Windows child exit.
+Natural retirement returns the original client status 37, with all three
+observed Unix PIDs absent before any PID1 assistance. A fourth `gc` removes
+generation 1 while active state and rollback remain. The result is
+`passed=true`, `interrupted=false`, 104.291 seconds. This fixture uses 3 GiB
+to stage the additional full runtime in guest tmpfs; it synthesizes no
+generation or lease metadata.
+
+`pe-05`/`prepared-03` freshly build the final probe and owned runtime.
+`native-09` passes the separate ordinary signed Win64 API/W^X, private-prefix,
+socket, outside-write refusal and strict observed-process retirement gate
+with that same build: status 0, readiness observed, 56.692 seconds. Both
+controllers pass input/generated-output rechecks; their complete input maps
+are byte-identical. `modes-04` passes six early mode/architecture refusals,
+including collection without owned mode and ARM collection, before signing
+or workload creation. It does not qualify the full new refusal matrix.
+
+Captured source/input bytes, generated C/binaries, images, logs and
+successful/refused/interrupted attempts are frozen at
+`/Users/alex/.cache/vwcollect-20261113-01`. `selected-inputs-01` preserves the
+selected native and typed PE input bytes, covering both final native runs;
+the earlier timed source view is preserved separately. Source/compiler
+namespaces and complete historical bundles remain required by their auditors;
+snapshots do not relocate or waive those checks. The distribution remains the
+retained fresh stage from the preceding qualification, with an incomplete,
+local-only source offer.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-collection-after-client-20261113-01.inventory.json`,
+SHA-256 `80df5bc61627972ff191be9ab85b7de97e870f237130c4fa3d0e9160c146a2b4`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace, selected snapshots and original historical namespaces.
+
+Early interrupted runs exposed a new fixture double free: explicit PID-string
+cleanup followed by the selected compiler's deep string-array free. The final
+code frees elements once and then the raw array header; generated C confirms
+that ownership. A genuine 30-second rollback timeout and a full-volume PE link
+failure are retained. Final rollback has a bounded 180-second deadline and the
+worker waits for explicit release with a watchdog. Storage helper `4a80789fe`
+verifies independent APFS replacements of 20,281 duplicate artifact files,
+preserving bytes, modes, owners and paths with a complete replacement report;
+earlier frozen bundles are untouched. Only unbound QMP sockets from stopped
+interrupted guests were removed, with metadata recorded. No checker was weakened.
+
+This qualifies local x86 console collection with a surviving Windows child
+and server after initial-client exit. It adds no pure-idle-server collection,
+signed caller-death, ARM owned execution, fresh owned GUI, default activation,
+holder SIGKILL/kernel-owned retention or arbitrary-descendant/refusal guarantee.
+Kernel, sandbox and account/session helpers are retained selected inputs;
+complete C environment, kernel/V heap and hermetic/reproducible gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

@@ -1879,10 +1879,16 @@ Both components remain opt-in. Local x86 qualification can pass
 records the build mode and the controller refuses mismatched/unmarked runtime
 inputs before signing. This rebuilds and locally signs the runtime/application
 and exercises the current owned package-to-SDK path. Pin the same V compiler
-with `V` for the native controller. Default enablement, active collection during
-detached workload lifetime, ARM owned execution and holder SIGKILL retention
-remain separate gates; see the
-[owned launch qualification](../../tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13).
+with `V` for the native controller. Append `--collection-probe` after
+`--owned-manager` on `wine-native-check` for the separate local console lifetime
+check: an initial Windows client exits 37 while its child/server survive, real
+remove/rollback makes its installed generation obsolete, and three `gc` calls
+retain it until natural retirement. A fourth collection removes it afterward.
+This check uses 3 GiB to stage another complete runtime generation in tmpfs;
+the ordinary Win64 API check remains separate. Default enablement, ARM owned
+execution, fresh owned graphics, broader lifetime/refusal controls and holder
+SIGKILL retention remain open. See the [owned launch qualification](../../tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13)
+and [collection qualification](../../tests/packages/wine-lease-supervision-plan.md#collection-after-initial-client-exit-2026-11-13).
 
 `pkgprotocol.decode_local_source_offer()` and
 `wineadapter.admit_local_source_offer()` support only format-1

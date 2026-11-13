@@ -1249,9 +1249,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     to the workload. A [fresh locally signed x86 console launch](tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13)
     now passes publishing, installation and the current CLI-to-owned-SDK path,
     with a busy generation lease at readiness and observed Wine processes gone
-    at CLI return. Default activation, ARM owned Wine, fresh owned graphical
-    acceptance, collection after client exit with a live server, broader mappings
-    and holder-death retention remain open.
+    at CLI return. [Installed-generation collection](tests/packages/wine-lease-supervision-plan.md#collection-after-initial-client-exit-2026-11-13)
+    now retains an obsolete generation through three collection attempts after
+    the initial client exits with a live Windows child/server, then removes it
+    after natural retirement while preserving initial status 37. This is a local
+    x86 console check. Default activation, ARM owned Wine, fresh owned graphical
+    acceptance, broader lifetime/mapping controls and holder-death retention
+    remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
