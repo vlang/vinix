@@ -318,8 +318,17 @@ Zero input returns the width when the flag is false and poison when true;
 freeze can define that result before storing. Calls cost one step and execute
 inside the interpreter. Indirect calls, call-site attributes, tail calls and
 fast-math calls remain unsupported. Admitted intrinsic families are these five
-and the funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
+and the float-sign/funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
 combine all five operations and consume zero-poison results through freeze.
+
+Direct LLVM `fabs`/`copysign` support matching half/float values and results.
+Absolute value clears the sign bit; copy-sign replaces it from the second
+operand. NaN payloads, quiet/signaling bits, zeros, subnormals and all other
+magnitude bits are preserved. Both copy-sign operands are evaluated; poison
+propagates and undef rejects. Each call costs one step and shares scalar
+validation/evaluation. Synthetic deferred dispatches check half/float NaNs and
+signed zero with input changes after encoding and pipeline release before
+commit, storing exact representations through bitcasts and checked GEPs.
 
 Direct LLVM `fshl`/`fshr` calls support three matching i1..i64 operands. Amounts
 are reduced modulo the width; equal inputs produce rotations. Zero amount

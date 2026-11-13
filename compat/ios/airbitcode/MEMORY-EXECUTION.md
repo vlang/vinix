@@ -57,6 +57,14 @@ zero-poison flag. With that flag false, zero returns the width; with it true,
 zero produces poison. Poison input propagates, undef input rejects, and
 freeze may consume a poison result. Each call costs one step.
 
+Direct LLVM `fabs`/`copysign` support half and float. Absolute value clears
+the sign bit; copy-sign replaces the first operand's sign with the second's.
+All other bits, including NaN payload and quiet/signaling bits, are preserved.
+Copy-sign requires matching operand/result types and evaluates both operands.
+Poison propagates and undef rejects, including in the sign donor. Each call
+costs one step and shares scalar validation/evaluation. No floating arithmetic
+or host rounding mode participates in these operations.
+
 Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
 the result type. The amount is reduced modulo the width, so equal operands
 produce rotations and oversized amounts are defined. A zero amount selects
@@ -100,7 +108,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these twenty families' exact declarations are admitted:
+Only ordinary direct calls to these twenty-two families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -189,5 +197,10 @@ and interpreter-only loaded/constant overshifts, zero overshifts and selection.
 `tests/ios/air-memory-bit-permutation.v` compares extraction/deposition and both
 round-trip chains against native LLVM, checks independent masked identities,
 and exercises poison/undef, freeze/select, budgets and call-metadata controls.
+`tests/ios/air-memory-float-sign.v` checks absolute value and copy-sign against
+native LLVM and independent bit masks, including every half encoding, float
+class/payload boundaries, cached-declaration chains and poison/undef controls.
+Its native JIT uses the host CPU target to avoid generic ARM64 half-to-float
+promotion quieting signaling NaNs; target receipts are saved with results.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
