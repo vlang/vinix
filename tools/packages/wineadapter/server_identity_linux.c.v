@@ -48,8 +48,8 @@ fn live_server_child(child i32) ! {
 	if info.si_pid != 0 { return error('Wine server child has already exited') }
 }
 
-fn verify_server_linux(socket_fd i32, lock_fd i32, child i32) ! {
-	if socket_fd < 3 || lock_fd < 3 || socket_fd == lock_fd || child <= 0
+fn verify_server_owner(lock_fd i32, child i32) ! {
+	if lock_fd < 3 || child <= 0
 		|| child == os.getpid() || C.geteuid() == 0 || os.getegid() == 0 {
 		return error('Wine server identity requires private descriptors and an ordinary-account child')
 	}
@@ -68,6 +68,11 @@ fn verify_server_linux(socket_fd i32, lock_fd i32, child i32) ! {
 		|| owner.l_whence != C.SEEK_SET || owner.l_start != 0 || owner.l_len != 1 || owner.l_pid != child {
 		return error('Wine server lock does not identify the owned child')
 	}
+}
+
+fn verify_server_linux(socket_fd i32, lock_fd i32, child i32) ! {
+	if socket_fd < 3 || socket_fd == lock_fd { return error('Wine server identity requires private descriptors and an ordinary-account child') }
+	verify_server_owner(lock_fd, child)!
 	flags := C.vinix_wine_peer_fcntl(socket_fd, C.F_GETFD)
 	if flags < 0 || flags & C.FD_CLOEXEC == 0 { return error('Wine server socket must be close-on-exec') }
 	mut kind := i32(0)
