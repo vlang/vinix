@@ -5,6 +5,7 @@ module main
 import os
 import crypto.sha256
 import time
+import tests.packages.wineproc
 import tools.packages.pkgcore
 
 #include <fcntl.h>
@@ -556,7 +557,7 @@ fn collection_callers(server string, generation string) !(string, string) {
 	defer { unsafe { for pid in candidates { pid.free() }; (&array(&candidates)).free() } }
 	for pid in names {
 		if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
-		line := os.read_file('/proc/' + pid + '/cmdline') or { continue }
+		line := wineproc.command_line('/proc/' + pid)!
 		defer { unsafe { line.free() } }
 		if !line.starts_with('/usr/bin/vinix-package\x00run-args\x00' + application + '\x00')
 			|| !line.contains('\x00--vinix-collection-probe\x00') { continue }
@@ -617,7 +618,7 @@ fn collection_clients(generation string, expected string) !int {
 	mut found := expected == ''
 	for pid in names {
 		if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
-		line := os.read_file('/proc/' + pid + '/cmdline') or { continue }
+		line := wineproc.command_line('/proc/' + pid)!
 		defer { unsafe { line.free() } }
 		if !line.contains(generation + '/apps/org.vinix.wine-runtime/root/usr/libexec/vinix-wine/wine\x00') { continue }
 		if !collection_retired(pid)! {
