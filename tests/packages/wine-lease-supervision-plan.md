@@ -872,6 +872,51 @@ retention and a kernel-owned workload reference remain open. No new kernel
 publication/barrier, full C environment, reproducibility or heap-retention
 guarantee follows from this diagnostic.
 
+## Windows relative file APIs, 2026-11-13
+
+Source `9fa3075a4` adds the standalone unsigned Win64 program
+`wine-cwd-program.v` and `cwd`/`cwd-wrong` controller modes. The existing
+`wine-pe-check` producer builds a real AMD64 PE32+ executable with verified
+before/after inventories of its selected V vlib/thirdparty, MinGW and explicit
+producer/compiler/source inputs. The diagnostic controller embeds the supplied
+PE in a generated guest source, binding the original template, generated V,
+actual parsed source closure and PE/copy hashes. It accepts an explicit PE;
+it does not independently admit the complete producer proof or a package.
+
+Final `check-02` passes `cwd-02`: ordinary uid/gid 1000 uses the owned foreground
+server and authenticated socket handoff to start the PE in a captured writable
+directory containing a space. Windows `GetCurrentDirectoryA` matches the exact
+requested Z: path; relative `CreateFileA`/`ReadFile` read known input bytes.
+The parent writes a relative output and `CreateProcessA` launches the same
+relative executable, also containing a space, with quoted argv0 and NULL cwd.
+The child repeats the cwd/read checks and writes a separate output. Child,
+client and direct foreground server all exit zero. The native manager checks
+both output files' exact contents and their absence from the prefix, where a
+different input decoy was installed. PID1 collects manager zero before PASS.
+
+`wrong-01` supplies a wrong expected cwd and requires exact Windows exit 41;
+other statuses refuse. `owned-01` and `death-01` preserve original startup and
+caller-death lease-retention regressions. Cwd modes use the actually embedded
+retained production kernel and verified ISO rebase described above. The
+historical init slot is unchanged: stripping the new diagnostic ELF's symbols
+fits its embedded PE while retaining generated C and build commands. Initial
+DWORD ABI and oversized-guest failures remain preserved with source views.
+
+Complete producer, guest builds, sources, binaries, commands, images and logs:
+`/Users/alex/.cache/vwcwd-20261113-01` (frozen). Complete typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-windows-cwd-20261113-01.inventory.json`,
+SHA-256 `cc9a246b349d49a84dfb4bc005609031b651f14023aee5042d28a2182a797f20`.
+Recording and independent verification pass with adjacent logs. PE SHA-256 is
+`fbc7514123ab98fba5f83add3ca716b875f941d2000b5b41e6d5ca118e80cdd7`;
+its separate producer receipt remains in `pe-02/proof.json`. Original images
+and historical evidence remain intact and required by their own auditors.
+
+This covers these Windows APIs on retained x86 Wine outside the sandbox with
+an unsigned scratch payload. Fresh signed/published startup, arbitrary path
+encodings/mappings, broader bootstrap and ARM Wine remain unqualified, as do
+production runner/lease/recovery wiring and holder SIGKILL retention. No heap,
+complete Linux C environment or reproducibility guarantee is added.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

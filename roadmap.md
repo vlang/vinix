@@ -1227,9 +1227,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [real Wine lease diagnostic](tests/packages/wine-lease-supervision-plan.md#real-wine-lease-composition-2026-11-13)
     now keeps a diagnostic lease busy after manager and caller death while
     the adopted x86 Wine server lives, then releases it after retirement.
-    The unheld control detects early release. Fresh
-    signed/sandbox startup, ARM Wine, Windows relative data-file semantics and
-    production lease wiring remain open.
+    The unheld control detects early release. A standalone
+    [Win64 cwd API diagnostic](tests/packages/wine-lease-supervision-plan.md#windows-relative-file-apis-2026-11-13)
+    now passes current-directory, relative read/write and child-inheritance
+    checks through owned x86 Wine, including space-containing paths and an
+    incorrect-directory control. Fresh signed/sandbox startup, ARM Wine,
+    broader path mappings and production lease wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
