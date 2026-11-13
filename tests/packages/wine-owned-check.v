@@ -8,6 +8,26 @@ import os
 import tests.packages.wineoverlay
 import tests.packages.winesource
 import crypto.sha256
+import compress.zlib
+
+fn build_owned_runner(root string, work string, v string, cc string, sysroot string, gcc string, mut inputs map[string]string) ! {
+	source := root + '/tools/packages/wine-runner.v'
+	if wineoverlay.digest(source)! != sha256.hexhash($embed_file('../../tools/packages/wine-runner.v').to_string()) { return error('embedded runner source differs') }
+	mut command := [v, '-d', 'wine_owned_manager', '-backend', 'c', '-prod', '-os', 'linux', '-arch', 'amd64', '-gc', 'none', '-manualfree',
+		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path', '@vlib|' + root + '/tools/packages|' + root + '|@vmodules', '-o', work + '/runner.c', source]
+	mut discovery := command.clone(); discovery.insert(1, ['-print-watched-files', '-dump-files', work + '/runner-sources-before.txt'])
+	invoke(discovery, work + '/runner-discover.log')!
+	winesource.capture(work + '/runner-sources-before.txt', mut inputs)!
+	command.insert(1, ['-dump-files', work + '/runner-sources-built.txt']); invoke(command, work + '/runner-v.log')!
+	winesource.admit(work + '/runner-sources-before.txt', work + '/runner-sources-built.txt', inputs)!
+	invoke([cc, '--target=x86_64-linux-musl', '--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-fuse-ld=lld', '-static', '-s',
+		'-O2', '-w', '-D_GNU_SOURCE', '-fno-stack-protector', work + '/runner.c', '-lm', '-lpthread', '-o', work + '/runner'], work + '/runner-cc.log')!
+	bytes := os.read_bytes(work + '/runner')!; defer { unsafe { bytes.free() } }
+	compressed := zlib.compress(bytes)!; defer { unsafe { compressed.free() } }
+	os.write_file_array(work + '/runner.z', compressed)!
+	inputs[work + '/runner'] = wineoverlay.digest(work + '/runner')!
+	inputs[work + '/runner.z'] = wineoverlay.digest(work + '/runner.z')!
+}
 
 // Pins from the workspace inventory recorded in wine-shared-user-check.md:
 // 66e7a8785e1d6885e20db49e3b5d598ed6e1fda29bff201379d6fda1b4641200.
@@ -93,11 +113,11 @@ fn build_overlay() ! {
 	if wineoverlay.digest(baseline)! != baseline_hash { return error('original image changed during overlay') }
 }
 fn run() ! {
-	if os.args.len !in [6, 7, 8] { return error('usage: CHECK FRESH_OUTPUT SYSROOT GCC_INSTALL CLANG V [owned|lease|lease-caller-death|lease-unheld|lease-recovery|cwd|cwd-wrong|sandbox|sandbox-cwd] [CWD_PE]') }
+	if os.args.len !in [6, 7, 8] { return error('usage: CHECK FRESH_OUTPUT SYSROOT GCC_INSTALL CLANG V [owned|lease|lease-caller-death|lease-unheld|lease-recovery|cwd|cwd-wrong|sandbox|sandbox-cwd|runner|runner-refused] [CWD_PE]') }
 	mode := if os.args.len >= 7 { os.args[6] } else { 'owned' }
-	if mode !in ['owned', 'lease', 'lease-caller-death', 'lease-unheld', 'lease-recovery', 'cwd', 'cwd-wrong', 'sandbox', 'sandbox-cwd'] { return error('unknown Wine diagnostic mode') }
+	if mode !in ['owned', 'lease', 'lease-caller-death', 'lease-unheld', 'lease-recovery', 'cwd', 'cwd-wrong', 'sandbox', 'sandbox-cwd', 'runner', 'runner-refused'] { return error('unknown Wine diagnostic mode') }
 	cwd := mode in ['cwd', 'cwd-wrong', 'sandbox-cwd']
-	sandbox := mode in ['sandbox', 'sandbox-cwd']
+	sandbox := mode in ['sandbox', 'sandbox-cwd', 'runner', 'runner-refused']
 	if (cwd && os.args.len != 8) || (!cwd && os.args.len == 8) { return error('only cwd diagnostics require an explicit Win64 payload') }
 	leasing := mode in ['lease', 'lease-caller-death', 'lease-unheld', 'lease-recovery']
 	rebasing := mode != 'owned'
@@ -125,6 +145,12 @@ fn run() ! {
 	if rebasing { image, tar = rebase_kernel(work)! }
 	image_hash := wineoverlay.digest(image)!
 	mut compiled_probe := probe
+	if mode in ['runner', 'runner-refused'] {
+		build_owned_runner(root, work, v, cc, os.args[2], os.args[3], mut inputs)!
+		compiled_probe = work + '/guest.v'
+		os.write_file(compiled_probe, os.read_file(probe)! + '\nconst runner_program = $embed_file("runner.z")\n')!
+		inputs[compiled_probe] = wineoverlay.digest(compiled_probe)!
+	}
 	if cwd {
 		pe := os.real_path(os.args[7])
 		inputs[pe] = wineoverlay.digest(pe)!
@@ -144,6 +170,8 @@ fn run() ! {
 	if cwd { command.insert(1, ['-d', 'wine_owned_cwd']) }
 	if mode == 'cwd-wrong' { command.insert(1, ['-d', 'wine_owned_cwd_wrong']) }
 	if sandbox { command.insert(1, ['-d', 'wine_owned_sandbox']) }
+	if mode in ['runner', 'runner-refused'] { command.insert(1, ['-d', 'wine_owned_runner']) }
+	if mode == 'runner-refused' { command.insert(1, ['-d', 'wine_owned_runner_refused']) }
 	mut discovery := command.clone(); discovery.insert(1, ['-print-watched-files', '-dump-files', work + '/sources-before.txt'])
 	invoke(discovery, work + '/discover.log')!
 	winesource.capture(work + '/sources-before.txt', mut inputs)!
@@ -154,7 +182,7 @@ fn run() ! {
 		'-O2', '-w', '-D_GNU_SOURCE', '-fno-stack-protector', work + '/guest.c', '-lm', '-lpthread', '-o', work + '/guest']
 	// Preserve generated C; strip only the embedded-payload diagnostic's ELF
 	// symbols so it fits the fixed historical init slot without changing TAR.
-	if cwd { cc_command.insert(1, '-s') }
+	if cwd || mode in ['runner', 'runner-refused'] { cc_command.insert(1, '-s') }
 	invoke(cc_command, work + '/cc.log')!
 	guest_hash := wineoverlay.digest(work + '/guest')!
 	os.mkdir_all(work + '/builder/build-support')!
@@ -184,6 +212,8 @@ fn run() ! {
 		required << 'WINE OWNED SANDBOX DENIAL PASS outside file inaccessible'
 		required << 'WINE OWNED SANDBOX PLEDGE PASS internet socket killed with SIGABRT'
 	}
+	if mode == 'runner' { required = ['VINIX SIGNED REAL WIN64 PASS', 'WINE CURRENT OWNED RUNNER PASS', 'HWTEST PASS owned Wine diagnostic'] }
+	if mode == 'runner-refused' { required = ['Wine entrypoint must name its signed application', 'WINE CURRENT OWNED RUNNER REFUSAL PASS', 'HWTEST PASS owned Wine diagnostic'] }
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'owned-Wine-diagnostic', arches: ['x86_64'], ending: .running,
 		required: required,
 		forbidden: ['HWTEST FAIL', 'Kernel panic']}, hwhost.Run{kernel: selected_kernel, guest: work + '/guest', state: work + '/boot', timeout: 180, keep: true})

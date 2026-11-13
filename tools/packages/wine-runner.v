@@ -4,14 +4,58 @@ module main
 
 import appsdk
 import os
+import time
 import wineadapter
 
 #include <unistd.h>
 fn C.execv(&char, &&char) int
+#include <fcntl.h>
+#define wine_runner_open open
+fn C.wine_runner_open(&char, i32) i32
 
 struct WineVariable { name string; value string }
 
-fn run_wine() ! {
+// Opt-in staging path. The outer launcher must still retain its generation
+// lease through a qualified descendant barrier. This waits only its two direct
+// children; unexpected manager death relies on idle/foreign-server admission
+// for later launches, not on retaining the prefix guard after death.
+fn owned_wine(prefix &wineadapter.Prefix, data string, client_command []string, server_command []string) !int {
+	cwd := C.wine_runner_open(c'.', C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
+	if cwd < 0 { return error('cannot capture Wine application working directory') }
+	defer { C.close(cwd) }
+	mut guard := prefix.acquire_launch(data)!
+	defer { guard.close() }
+	mut directory := guard.prepare_server_directory(data)!
+	defer { directory.close() }
+	mut server := directory.start_child(&guard, data, wineadapter.ServerCommand{program: server_command[0], arguments: server_command[1..]})!
+	defer { if server.process_id() > 0 { server.terminate() or { eprintln(err) } } }
+	mut connection := server.await_connection(&directory, &guard, data, 5000)!
+	defer { connection.close() }
+	// Snapshot before fork, after override removal and canonical Wine setup.
+	mut inherited := os.environ()
+	defer { unsafe { for _, value in inherited { value.free() }; inherited.free() } }
+	mut environment := []string{cap: inherited.len}
+	defer { appsdk.free_values(mut environment) }
+	for key, value in inherited { environment << key + '=' + value }
+	mut client := connection.start_client_in(&directory, &guard, data, wineadapter.ServerCommand{program: client_command[0], arguments: client_command[1..]}, environment, cwd)!
+	defer { if client.process_id() > 0 { client.terminate() or { eprintln(err) } } }
+	mut result := 126
+	for {
+		client.exec_ready()!
+		status := client.collect()!
+		if status.collected { result = status.code; break }
+		time.sleep(10 * time.millisecond)
+	}
+	// Preserve the application's result independently of server retirement.
+	for {
+		status := server.collect()!
+		if status.collected { break }
+		time.sleep(10 * time.millisecond)
+	}
+	return result
+}
+
+fn run_wine() !int {
 	mut context := appsdk.load()!
 	defer { context.close() }
 	if context.kind != 'windows' || context.runtime_id == '' || !context.declares('process') {
@@ -65,6 +109,17 @@ fn run_wine() ! {
 	}
 	for argument in [loader, '--library-path', libraries, '--argv0', identity, '--', program]! { command << argument }
 	for index in 1 .. os.args.len { command << os.args[index] }
+	$if wine_owned_manager ? {
+		if name == 'wine-runner' {
+			$if amd64 {
+				foreground := root + '/usr/libexec/vinix-wine/wineserver'
+				defer { unsafe { foreground.free() } }
+				server_command := [loader, '--library-path', libraries, '--argv0', wine_server, '--', foreground, '--foreground']
+				defer { unsafe { (&array(&server_command)).free() } }
+				return owned_wine(&prefix, context.data_directory, command, server_command)
+			} $else { return error('owned Wine entrypoint is qualified only for x86_64') }
+		}
+	}
 	mut pointers := []&char{cap: command.len + 1}
 	defer { unsafe { pointers.free() } }
 	for argument in command { pointers << &char(argument.str) }
@@ -74,4 +129,4 @@ fn run_wine() ! {
 	return error('packaged Wine runtime could not be executed')
 }
 
-fn main() { run_wine() or { eprintln(err); exit(126) } }
+fn main() { code := run_wine() or { eprintln(err); exit(126) }; exit(code) }

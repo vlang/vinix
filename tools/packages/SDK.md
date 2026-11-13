@@ -1859,6 +1859,19 @@ separate writable/executable translation mappings. Wrong, altered, duplicate or
 already-patched inputs refuse; no W+X exception is granted. Normal, tracked and
 sanitizer checks cover these helpers only, without Wine execution qualification.
 
+The SDK `wine-runner` has an opt-in `-d wine_owned_manager` staging build for
+the x86_64 top-level entrypoint. It captures the application's initial working
+directory, holds a private prefix launch guard, refuses existing servers,
+starts/authenticates a direct foreground server and transfers its connected
+socket to the client with an explicit environment snapshot. It returns the
+initial client's status after direct server retirement. Nested aliases remain
+exec bridges; an enabled top-level entry on other architectures refuses.
+Default builds retain the existing bridge. This mode alone does not retain a
+generation lease or establish descendant retirement: an outer qualified holder
+is still required. It is not enabled by the package builder pending production
+lease wiring and fresh signed-launch acceptance; see the
+[entrypoint qualification](../../tests/packages/wine-lease-supervision-plan.md#opt-in-owned-sdk-entrypoint-2026-11-13).
+
 `pkgprotocol.decode_local_source_offer()` and
 `wineadapter.admit_local_source_offer()` support only format-1
 `local-qualification-only` evidence with `source_closure_complete: false`.

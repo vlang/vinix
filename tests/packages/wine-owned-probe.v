@@ -8,6 +8,7 @@ import time
 import tools.packages.appsdk
 import tools.packages.wineadapter
 import tools.packages.launchhold
+import compress.zlib
 
 #include <unistd.h>
 #include <fcntl.h>
@@ -330,11 +331,30 @@ fn sandbox_stage() ! {
 	generation := '/var/lib/vinix-packages/generations/1/apps'
 	// Match the current Windows + process launch-plan promises and path grants.
 	// The retained sandbox additionally unveils the selected program itself rx.
-	command := ['/usr/bin/vinix-sandbox', '--uid', '1000', '--gid', '1000',
+	mut command := ['/usr/bin/vinix-sandbox', '--uid', '1000', '--gid', '1000',
 		'--promises', 'stdio rpath wpath cpath flock exec prot_exec fattr sendfd recvfd proc unix',
 		'--unveil', generation + '/org.vinix.wine-win64-probe', 'rx',
 		'--unveil', generation + '/org.vinix.wine-runtime', 'rx',
 		'--unveil', data, 'rwc', '--', '/sbin/init', '--sandbox-manager']
+	$if wine_owned_runner ? {
+		program := zlib.decompress(runner_program.to_bytes())!
+		defer { unsafe { program.free() } }
+		runner := data + '/wine-runner'
+		os.write_file_array(runner, program)!; os.chmod(runner, 0o700)!
+		app := generation + '/org.vinix.wine-win64-probe'
+		runtime := generation + '/org.vinix.wine-runtime'
+		context := appsdk.Context{id: 'org.vinix.wine-win64-probe', version: '1.0.0', architecture: 'x86_64', kind: 'windows',
+			generation: 1, repository: 'wine-fixture', public_key: 'b3cb7bb471c40c9afcef3250eb4595bf8fd71e0d21315300340a64ddad14c48a', sequence: 1,
+			app_directory: app, data_directory: data, runtime_id: 'org.vinix.wine-runtime', runtime_version: '9.17.1', runtime_directory: runtime, permissions: ['process']}
+		mut environment := context.environment()!
+		defer { appsdk.free_values(mut environment) }
+		for entry in ['HOME=' + data, 'TMPDIR=' + data + '/tmp', 'PATH=' + runtime + '/bin', 'LANG=C.UTF-8'] { environment << entry }
+		command.trim(command.len - 3)
+		for entry in environment { command << '--env'; command << entry }
+		command << '--'; command << runner; command << app + '/bin/program.exe'
+		$if wine_owned_runner_refused ? { command[command.len - 1] = app + '/bin/refused.exe' }
+		os.chdir(app)!
+	}
 	mut pointers := []&char{cap: command.len + 1}
 	defer { unsafe { pointers.free() } }
 	for entry in command { pointers << entry.str }
@@ -398,9 +418,15 @@ fn main() {
 		C._exit(0)
 	}
 	mut status := i32(0)
-	if pid <= 0 || C.owned_wine_waitpid(pid, &status, 0) != pid || status != 0 {
-		eprintln('HWTEST FAIL owned Wine suite'); for { time.sleep(time.second) }
+	mut expected := i32(0)
+	$if wine_owned_runner_refused ? { expected = 126 << 8 }
+	if pid <= 0 || C.owned_wine_waitpid(pid, &status, 0) != pid || status != expected {
+		eprintln('HWTEST FAIL owned Wine suite status=' + status.str()); for { time.sleep(time.second) }
 	}
 	println('HWTEST PASS owned Wine diagnostic')
+	$if wine_owned_runner ? {
+		$if wine_owned_runner_refused ? { println('WINE CURRENT OWNED RUNNER REFUSAL PASS') }
+		$else { println('WINE CURRENT OWNED RUNNER PASS') }
+	}
 	for { time.sleep(time.second) }
 }
