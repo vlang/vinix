@@ -1581,6 +1581,42 @@ or a real kernel wait returning EINTR. No kernel or Wine runtime changes were
 made. Holder/SDK death, session teardown, ARM owned Wine, fresh owned GUI,
 default activation and broader topology/heap/hermetic gates remain open.
 
+## Real caller-wait interruption, 2026-11-13
+
+Source `4f64ce5f9` adds controller outcome `caller-interrupt`. An empty
+SIGUSR1 handler is installed through libc, with automatic syscall restart
+disabled. With a detached worker live, the observer sends sixteen signals.
+A fixture-only diagnostic in the existing retry branch records actual
+`wait4` returns of `-1/EINTR`; no wait result is injected in this case.
+The observer requires a busy lease before/after signals and a caller still
+waiting. Natural worker retirement must then return original status 37,
+release the lease and leave no children. The host requires at least one real
+interruption marker and zero synthetic injections or unexpected-wait errors.
+
+Final `caller-interrupt-05` passes on x86_64 (8.725 seconds, fifteen observed
+interruptions) and AArch64 (6.740 seconds, sixteen). Final `standard-05`
+regressions pass on x86_64 (10.386) and AArch64 (6.507), with zero interruption
+markers. All four are uninterrupted and pass parsed-source, selected-input
+and generated-output rechecks. Per-architecture final input maps match across
+modes. This qualifies actual caller wait interruption; the private holder
+blocks signals and its earlier descendant-wait test remains synthetic.
+
+Evidence and complete selected native input byte snapshots are frozen at
+`/Users/alex/.cache/vwrealintr-20261113-01`. Earlier compile errors, storage-cap
+failures and the x86 raw-sigaction fixture failure are retained. Final fixtures
+use libc to supply the architecture signal return trampoline. No old frozen
+bundle was deleted or modified; original kernel qualification and namespaces
+remain required. There are no kernel or Wine runtime changes.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/holder-real-eintr-20261113-01.inventory.json`,
+SHA-256 `7273be946b52420c1f2417cebae3c3bd11c5c9f8af6a64893e709833ae98d5a9`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original kernel/input bundles.
+
+Holder/SDK death, session teardown, ARM owned Wine, fresh owned GUI, default
+activation and broader topology/heap/hermetic gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
