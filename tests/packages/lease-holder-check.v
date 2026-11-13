@@ -72,6 +72,9 @@ fn run() ! {
 	if wanted_outcome == 'standard' && !serial.contains('LEASE HOLDER CONCURRENT PASS independent leases and statuses; unrelated child waitable') {
 		return error('concurrent holder qualification missing')
 	}
+	if wanted_outcome == 'standard' && !serial.contains('LEASE HOLDER CONCURRENT DEATH PASS caller SIGKILL; adopted holder37; independent caller126; unrelated child97') {
+		return error('concurrent caller-death qualification missing')
+	}
 	if serial.count('Generation lease holder cannot collect children; retaining lease and retrying.') != if wanted_outcome == 'fault' { 1 } else { 0 } { return error('unexpected wait-failure diagnostic count') }
 	println('LEASE HOLDER CHECK PASS ' + arch + ' ' + wanted_outcome)
 }

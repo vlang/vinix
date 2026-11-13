@@ -182,10 +182,11 @@ fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high
 	no_children()!
 }
 
-fn concurrent_holders() ! {
+fn concurrent_holders(kill_first bool) ! {
+	base := if kill_first { '/tmp/concurrent-orphan-' } else { '/tmp/concurrent-holder-' }
 	mut callers := [i32(0), i32(0)]!
 	for index in 0 .. 2 {
-		root := '/tmp/concurrent-holder-' + index.str()
+		root := base + index.str()
 		os.mkdir(root)!
 		os.write_file(root + '/lease', '')!
 		lease := C.open((root + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
@@ -206,24 +207,38 @@ fn concurrent_holders() ! {
 	if outsider < 0 { return error('unrelated child fork failed') }
 	if outsider == 0 { C._exit(97) }
 	for index in 0 .. 2 {
-		root := '/tmp/concurrent-holder-' + index.str()
+		root := base + index.str()
 		await_file(root + '/ready')!
 		await_file(root + '/client-gone')!
 		lock_busy(root + '/lease', true)!
 		mut status := i32(0)
 		if C.waitpid(callers[index], &status, C.WNOHANG) != 0 { return error('concurrent holder retired early') }
 	}
+	mut first_owner := callers[0]
+	if kill_first {
+		await_file(base + '0/holder')!
+		first_owner = i32(os.read_file(base + '0/holder')!.int())
+		if first_owner <= 1 || first_owner == callers[0] { return error('invalid concurrent holder identity') }
+		if C.kill(callers[0], C.SIGKILL) != 0 { return error('cannot kill concurrent caller') }
+		wait_exit(callers[0], C.SIGKILL)!
+		lock_busy(base + '0/lease', true)!
+		lock_busy(base + '1/lease', true)!
+	}
 	// Retire in reverse order, requiring the other holder's lock to survive.
-	os.write_file('/tmp/concurrent-holder-1/release', '')!
+	os.write_file(base + '1/release', '')!
 	wait_exit(callers[1], 126 << 8)!
-	lock_busy('/tmp/concurrent-holder-1/lease', false)!
-	lock_busy('/tmp/concurrent-holder-0/lease', true)!
+	lock_busy(base + '1/lease', false)!
+	lock_busy(base + '0/lease', true)!
 	wait_exit(outsider, 97 << 8)!
-	os.write_file('/tmp/concurrent-holder-0/release', '')!
-	wait_exit(callers[0], 37 << 8)!
-	lock_busy('/tmp/concurrent-holder-0/lease', false)!
+	os.write_file(base + '0/release', '')!
+	wait_exit(first_owner, 37 << 8)!
+	lock_busy(base + '0/lease', false)!
 	no_children()!
-	println('LEASE HOLDER CONCURRENT PASS independent leases and statuses; unrelated child waitable')
+	if kill_first {
+		println('LEASE HOLDER CONCURRENT DEATH PASS caller SIGKILL; adopted holder37; independent caller126; unrelated child97')
+	} else {
+		println('LEASE HOLDER CONCURRENT PASS independent leases and statuses; unrelated child waitable')
+	}
 }
 
 fn refusals() ! {
@@ -304,7 +319,8 @@ fn suite() ! {
 	lifetime('/tmp/holder-caller-death', '37', true, false, false, false)!
 	lifetime('/tmp/holder-cancellation', '37', false, true, true, false)!
 	refusals()!
-	concurrent_holders()!
+	concurrent_holders(false)!
+	concurrent_holders(true)!
 	println('LEASE HOLDER PASS statuses 37/126/127/143; double-fork setsid; caller death; cancellation; descriptor isolation; setup refusals')
 }
 fn main() {
