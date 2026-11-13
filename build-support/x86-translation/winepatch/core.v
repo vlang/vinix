@@ -11,7 +11,8 @@ import os
 #include <unistd.h>
 
 fn C.mkstemp(&u8) int
-fn C.write(int, voidptr, usize) isize
+#define wine_patch_write write
+fn C.wine_patch_write(i32, voidptr, u64) i64
 fn C.close(int) int
 fn C.rename(&char, &char) int
 
@@ -184,7 +185,7 @@ fn replace_file(path string, data []u8, mode int) ! {
 	}
 	mut written := 0
 	for written < data.len {
-		count := unsafe { C.write(fd, &data[written], usize(data.len - written)) }
+		count := unsafe { C.wine_patch_write(i32(fd), &data[written], u64(data.len - written)) }
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count <= 0 { return error('cannot write temporary Wine image') }
 		written += int(count)
