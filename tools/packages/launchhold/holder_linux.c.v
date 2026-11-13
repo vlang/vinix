@@ -20,7 +20,8 @@ fn C.execv(&char, &&char) i32
 fn C.chdir(&char) i32
 fn C._exit(i32)
 fn C.prctl(i32, ...voidptr) i32
-fn C.read(i32, voidptr, u64) i64
+#define vinix_launchhold_read read
+fn C.vinix_launchhold_read(i32, voidptr, u64) i64
 fn C.syscall(i64, ...) i64
 
 fn set_mask(mask &u64, previous &u64) i32 {
@@ -178,7 +179,7 @@ fn run_linux(command Command, lease i32) !int {
 	mut record := [2]i32{}
 	mut count := i64(0)
 	for {
-		count = C.read(fds[0], unsafe { &record[0] }, 8)
+		count = C.vinix_launchhold_read(fds[0], unsafe { &record[0] }, 8)
 		if count < 0 && C.errno == C.EINTR { continue }
 		break
 	}
