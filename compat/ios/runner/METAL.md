@@ -318,7 +318,7 @@ Zero input returns the width when the flag is false and poison when true;
 freeze can define that result before storing. Calls cost one step and execute
 inside the interpreter. Indirect calls, call-site attributes, tail calls and
 fast-math calls remain unsupported. Admitted intrinsic families are these five
-and the float-sign/rounding/sqrt/floating-extrema/funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
+and the float-sign/rounding/sqrt/floating-extrema/classification/funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
 combine all five operations and consume zero-poison results through freeze.
 
 Direct LLVM `fabs`/`copysign` support matching half/float values and results.
@@ -358,6 +358,16 @@ validation/evaluation. Synthetic deferred dispatches check both zero orders,
 NaNs in either operand and infinity ordering in both precisions, across five
 input/output offset snapshots. Number-preferring and legacy variants remain
 unsupported by the buffer profile.
+
+Direct LLVM `is.fpclass` accepts half/float and a literal defined i32 mask in
+0..1023, returning i1. It distinguishes ten raw-bit classes: signaling/quiet
+NaNs and both signs of infinity, normal, subnormal and zero. Empty/full masks
+select none/all defined inputs. Poison still propagates and undef rejects.
+Calls cost one step, share scalar validation/evaluation, and admit parameter
+two's exact immarg. Each call's mask is validated even with a cached declaration.
+Synthetic deferred dispatches classify all ten classes in both precisions,
+checking NaNs, finite values and signaling NaNs, i1-to-i32 casts and integer
+selection, across ten input/output offset snapshots.
 
 Direct LLVM `fshl`/`fshr` calls support three matching i1..i64 operands. Amounts
 are reduced modulo the width; equal inputs produce rotations. Zero amount

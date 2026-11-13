@@ -91,6 +91,18 @@ are evaluated; poison propagates and undef rejects. Each call costs one step
 and shares scalar validation/evaluation. Number-preferring and legacy
 `minimumnum`/`maximumnum`/`minnum`/`maxnum` remain outside this buffer profile.
 
+Direct LLVM `is.fpclass` accepts a half/float input and a literal defined i32
+mask from 0 through 1023, returning scalar i1. Bits 0..9 select signaling NaN,
+quiet NaN, negative infinity/normal/subnormal/zero, positive zero/subnormal/
+normal/infinity, respectively. Mask zero selects nothing; 1023 selects all
+defined inputs. Classification reads raw bits, distinguishing signaling and
+quiet NaNs without floating arithmetic or exceptions. Poison propagates even
+with zero/full masks; undef rejects. Calls cost one step and share scalar
+validation/evaluation. Parameter two's exact immarg is admitted; every call's
+mask is checked even after its declaration is cached. Invalid masks reject
+in preflight before earlier stores. The i1 result can feed select, casts and
+stores; its byte store has zero high padding bits.
+
 Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
 the result type. The amount is reduced modulo the width, so equal operands
 produce rotations and oversized amounts are defined. A zero amount selects
@@ -134,7 +146,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these thirty families' exact declarations are admitted:
+Only ordinary direct calls to these thirty-one families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -239,5 +251,9 @@ the normal exponent range, domain/NaN cases and host rounding independence.
 `tests/ios/air-memory-float-extrema.v` compares minimum/maximum and mixed cached
 chains with native LLVM, including every half encoding with zero/unit anchors,
 both precisions' class/NaN/zero-order matrices and independent chain identities.
+`tests/ios/air-memory-fpclass.v` checks all 1024 masks against native LLVM and
+independently labeled class boundaries, exhaustive half encodings under each
+individual class and empty/full masks, i1 padding, cached-call immediate
+validation, poison/undef and rounding/exception behavior.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
