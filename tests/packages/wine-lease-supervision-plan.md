@@ -1647,6 +1647,34 @@ closed stdio or setup-failure reporting in this mode. Holder/SDK death, session
 teardown, ARM owned Wine, fresh owned GUI, default activation and broader
 topology/heap/hermetic gates remain open.
 
+## Closed-stdio setup failures, 2026-11-13
+
+Source `4ad960376` extends `closed-stdio` with independent cwd/exec refusal
+callers. With descriptors 0/1/2 verified closed, the actual relocated status
+pipe must report exact stage 7/`ENOENT` for missing cwd and stage 8/`ENOENT`
+for missing executable. On return all standard descriptors stay closed, the
+borrowed lease descriptor is intact, its lock remains busy, and the caller
+has no children. After that caller closes its lease and exits zero, the
+observer requires a free lock and no children. The controller requires the
+new failure marker alongside the existing successful lifetime marker.
+
+`x86-01` passes in 4.891 seconds and `arm-01` in 5.522, both uninterrupted
+with parsed-source, selected-input and generated-output rechecks. Sources,
+generated artifacts, media, commands, logs and complete native input byte
+snapshots are frozen at `/Users/alex/.cache/vwstdio-failure-20261113-01`.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/holder-closed-stdio-failure-20261113-01.inventory.json`,
+SHA-256 `c74416caf93d88444d83383fcc96f21d79f482be7549e9aaa3cfa9494dac987b`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original kernel/input bundles.
+
+Production holder/kernel/Wine code is unchanged. Original kernel qualification
+and namespaces remain required; historical audit contracts still apply. This
+qualifies native failure reporting, not signed Wine closed-stdio acceptance.
+Holder/SDK death, session teardown, ARM owned Wine, fresh owned GUI, default
+activation and broader topology/heap/hermetic gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
