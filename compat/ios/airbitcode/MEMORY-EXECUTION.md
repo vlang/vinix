@@ -83,9 +83,17 @@ scalar i1..i64 operands and results. Signed variants clamp to the signed
 minimum/maximum; unsigned variants clamp to zero/unsigned maximum. Defined
 arithmetic overflow saturates instead of producing poison. Poison operands
 still propagate and undef rejects. Each call costs one step and reuses the
-scalar validator and evaluator. Saturating shifts remain unsupported here.
+scalar validator and evaluator.
 
-Only ordinary direct calls to these sixteen families' exact declarations are admitted:
+Direct LLVM `sshl.sat`/`ushl.sat` support matching scalar i1..i64 values,
+amounts and results. Valid amounts below the width shift left and clamp to
+signed/unsigned bounds. Amounts are interpreted as unsigned width-masked words;
+amounts at or above the width produce poison, even for zero input. Amounts do
+not reduce modulo the width. Poison operands propagate and undef rejects.
+Freeze or select may consume/discard computed overshift poison. Each call
+costs one step and shares scalar validation/evaluation.
+
+Only ordinary direct calls to these eighteen families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -169,5 +177,7 @@ against native LLVM, including boundary matrices and separate poison controls.
 native inputs, minimum-poison flags and per-call flag checks after cache hits.
 `tests/ios/air-memory-saturating.v` checks saturating add/sub buffer functions
 against defined native LLVM, boundary matrices and separate poison controls.
+`tests/ios/air-memory-saturating-shift.v` checks valid native saturating shifts
+and interpreter-only loaded/constant overshifts, zero overshifts and selection.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
