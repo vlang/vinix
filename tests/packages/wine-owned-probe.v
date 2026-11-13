@@ -77,8 +77,14 @@ fn suite() ! {
 	mut connection := server.await_connection(&directory, &guard, data, 5000)!
 	defer { connection.close() }
 	println('WINE OWNED SERVER CONNECT PASS')
-	mut client := connection.start_client(&directory, &guard, data, wineadapter.ServerCommand{program: loader, arguments:
-		['--library-path', libraries, '--argv0', root + '/usr/bin/wine', '--', root + '/usr/libexec/vinix-wine/wine', app + '/bin/program.exe']}, environment)!
+	// Admit this exact application directory from the retained image separately.
+	// Launch relative to it, so success also proves Wine resolves the client's
+	// initial relative application path outside the prefix.
+	app_fd := C.owned_wine_open(app.str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
+	need(app_fd >= 3, 'cannot capture retained application directory')!
+	defer { C.close(app_fd) }
+	mut client := connection.start_client_in(&directory, &guard, data, wineadapter.ServerCommand{program: loader, arguments:
+		['--library-path', libraries, '--argv0', root + '/usr/bin/wine', '--', root + '/usr/libexec/vinix-wine/wine', 'bin/program.exe']}, environment, app_fd)!
 	defer { if client.process_id() > 0 { client.terminate() or { eprintln('HWTEST FAIL owned client cleanup: ' + err.msg()) } } }
 	deadline := time.sys_mono_now() + 90 * time.second
 	for {
@@ -102,6 +108,7 @@ fn suite() ! {
 		time.sleep(10 * time.millisecond)
 	}
 	println('WINE OWNED CLIENT EXEC PASS')
+	println('WINE OWNED RELATIVE APPLICATION PASS')
 }
 fn main() {
 	if C.getpid() != 1 { eprintln('requires fixture PID1'); exit(2) }

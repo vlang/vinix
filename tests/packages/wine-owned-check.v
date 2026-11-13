@@ -74,7 +74,7 @@ fn run() ! {
 	os.setenv('VINIX_WINE_OWNED_GUEST_SHA256', guest_hash, true)
 	boot_host := hwhost.Host{...host, root: work + '/builder'}
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'owned-Wine-diagnostic', arches: ['x86_64'], ending: .running,
-		required: ['WINE OWNED SERVER CONNECT PASS', 'VINIX SIGNED REAL WIN64 PASS', 'WINE OWNED CLIENT EXEC PASS', 'HWTEST PASS owned Wine diagnostic'],
+		required: ['WINE OWNED SERVER CONNECT PASS', 'VINIX SIGNED REAL WIN64 PASS', 'WINE OWNED CLIENT EXEC PASS', 'WINE OWNED RELATIVE APPLICATION PASS', 'HWTEST PASS owned Wine diagnostic'],
 		forbidden: ['HWTEST FAIL', 'Kernel panic']}, hwhost.Run{kernel: kernel, guest: work + '/guest', state: work + '/boot', timeout: 180, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	for path, expected in inputs { if wineoverlay.digest(path)! != expected { return error('diagnostic input changed: ' + path) } }

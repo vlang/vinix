@@ -189,8 +189,15 @@ fn client_fixture() !int {
   unsafe { unexpected.free() }; return error('client inherited parent environment')
  }
  cwd := os.getwd()
- need(cwd == '/tmp/wine-client-handoff/data/wine', 'client cwd differs')!
+ expected_cwd := os.getenv_opt('EXPECTED_CWD') or { '/tmp/wine-client-handoff/data/wine'.clone() }
+ need(cwd == expected_cwd, 'client cwd differs')!
+ unsafe { expected_cwd.free() }
  unsafe { cwd.free() }
+ if os.getenv('RELATIVE_CONTROL') == '1' {
+  contents := os.read_file('relative.txt')!
+  need(contents == 'captured directory', 'client resolved cwd replacement instead of captured directory')!
+  unsafe { contents.free() }
+ }
  need(mask()! == u64(1) << (C.SIGUSR2 - 1), 'client signal mask differs')!
  mut action := FixtureAction{}
  need(signal_action(C.SIGUSR1, unsafe { nil }, unsafe { &action }) == 0 && action.handler == 1, 'ignored client signal changed')!
@@ -252,11 +259,38 @@ fn suite() ! {
  client_command := wineadapter.ServerCommand{program: '/sbin/init', arguments: ['fixture-client', 'literal $; argument', '']}
  environment := ['WINESERVERSOCKET=0', 'LITERAL=space $; literal\nnext', 'WINESERVERSOCKET=999999999']
  defer { unsafe { (&array(&server_command.arguments)).free(); (&array(&client_command.arguments)).free(); environment.free() } }
+ cwd_path := root + '/cwd'; held_path := root + '/cwd-held'
+ defer { unsafe { cwd_path.free(); held_path.free() } }
+ os.mkdir(cwd_path)!
+ os.write_file(cwd_path + '/relative.txt', 'captured directory')!
+ cwd_fd := C.child_fixture_open(cwd_path.str, C.O_RDONLY | C.O_DIRECTORY | C.O_CLOEXEC)
+ need(cwd_fd >= 3, 'cannot capture client cwd control')!
+ defer { C.close(cwd_fd) }
+ // Pin the directory, then replace its old name with a decoy.
+ os.rename(cwd_path, held_path)!; os.mkdir(cwd_path)!
+ os.write_file(cwd_path + '/relative.txt', 'replacement directory')!
+ mut cwd_environment := environment.clone()
+ expected_entry := 'EXPECTED_CWD=' + held_path
+ defer { unsafe { expected_entry.free(); cwd_environment.free() } }
+ cwd_environment << expected_entry; cwd_environment << 'RELATIVE_CONTROL=1'
+ parent_cwd := os.getwd()
+ defer { unsafe { parent_cwd.free() } }
  mut server := directory.start_child(&guard, data, server_command)!
  defer { cleanup(mut server) }
  mut connection := server.await_connection(&directory, &guard, data, 1000)!
  defer { connection.close() }
  greeted(marker)!
+ refusal_fds := descriptors()!
+ for invalid in [i32(-1), leak]! {
+  original := connection.descriptor()
+  mut unexpected := connection.start_client_in(&directory, &guard, data, client_command, environment, invalid) or {
+   unsafe { err.free() }
+   need(connection.descriptor() == original && descriptors()! == refusal_fds, 'cwd refusal consumed connection or retained descriptors')!
+   continue
+  }
+  client_cleanup(mut unexpected)
+  return error('invalid cwd descriptor accepted')
+ }
  rejected(mut connection, &directory, &guard, data, wineadapter.ServerCommand{program: 'relative'}, environment, 'absolute executable')!
  rejected(mut connection, &directory, &guard, data, wineadapter.ServerCommand{program: '/sbin/init', arguments: ['bad\x00argument']}, environment, 'argument contains NUL')!
  for bad in ['NO_EQUALS', '=empty-name', 'NAME=value\x00bad']! {
@@ -276,22 +310,25 @@ fn suite() ! {
  client_ready(mut client)!
  $if wine_client_signal_window ? {
   client_collect(mut client, 143)!; collect(mut server, 37)!
-  need(mask()! == blocked && descriptors()! == baseline, 'signal refusal changed parent resources')!
+  need(mask()! == blocked && descriptors()! == baseline + 1, 'signal refusal changed parent resources')!
   println('WINE CLIENT HANDOFF SIGNAL PASS')
   return
  }
  client_collect(mut client, 42)!; collect(mut server, 37)!
- need(descriptors()! == baseline, 'handoff retained parent descriptors')!
+ need(descriptors()! == baseline + 1, 'handoff retained parent descriptors')!
  $if track_heap ? { C.vinix_heap_begin() }
  for _ in 0 .. 100 {
   server = directory.start_child(&guard, data, server_command)!
   connection = server.await_connection(&directory, &guard, data, 1000)!
   greeted(marker)!
-  client = connection.start_client(&directory, &guard, data, client_command, environment)!
+  client = connection.start_client_in(&directory, &guard, data, client_command, cwd_environment, cwd_fd)!
   client_ready(mut client)!; client_collect(mut client, 42)!; collect(mut server, 37)!
  }
  $if track_heap ? { need(C.vinix_heap_end() == 0, 'client handoff retained V bytes')! }
- need(descriptors()! == baseline && mask()! == blocked, 'client handoff changed descriptors/mask')!
+ need(descriptors()! == baseline + 1 && mask()! == blocked, 'client handoff changed descriptors/mask')!
+ current_cwd := os.getwd()
+ need(current_cwd == parent_cwd && C.handoff_fixture_fcntl(cwd_fd, C.F_GETFD) >= 0, 'client changed parent cwd or closed borrowed directory')!
+ unsafe { current_cwd.free() }
  // Exec failure still consumes the connection and returns exact owned status.
  server = directory.start_child(&guard, data, server_command)!
  connection = server.await_connection(&directory, &guard, data, 1000)!
@@ -302,13 +339,27 @@ fn suite() ! {
  client_ready(mut client) or { failed = err.msg().contains('setup stage 4'); unsafe { err.free() } }
  need(failed, 'client exec failure was not reported')!
  client_collect(mut client, 126)!; collect(mut server, 37)!
- need(descriptors()! == baseline, 'exec failure retained descriptors')!
+ need(descriptors()! == baseline + 1, 'exec failure retained descriptors')!
+ // Search permission changes are an owned post-fork setup failure, not exec.
+ server = directory.start_child(&guard, data, server_command)!
+ connection = server.await_connection(&directory, &guard, data, 1000)!
+ greeted(marker)!
+ os.chmod(held_path, 0o000)!
+ client = connection.start_client_in(&directory, &guard, data, client_command, cwd_environment, cwd_fd)!
+ need(connection.descriptor() == -1, 'cwd setup failure did not transfer connection')!
+ mut cwd_failed := false
+ client_ready(mut client) or { cwd_failed = err.msg().contains('setup stage 1'); unsafe { err.free() } }
+ os.chmod(held_path, 0o700)!
+ need(cwd_failed, 'client cwd failure was not reported')!
+ client_collect(mut client, 126)!; collect(mut server, 37)!
+ need(descriptors()! == baseline + 1, 'cwd setup failure retained descriptors')!
  parent_value := os.getenv('WINESERVERSOCKET')
  need(parent_value == 'parent-sentinel', 'handoff changed parent environment')!
  unsafe { parent_value.free() }
  need(C.handoff_fixture_fcntl(leak, C.F_GETFD) >= 0, 'handoff closed unrelated parent descriptor')!
  directory.close(); guard.close(); prefix.close()
- need(descriptors()! == initial + 1, 'closed handoff fixture retained descriptors')!
+ need(descriptors()! == initial + 2, 'closed handoff fixture retained descriptors')!
+ println('WINE CLIENT CWD PASS captured directory; relative access; replacement; invalid descriptors; parent isolation; 100 cycles')
  println('WINE CLIENT HANDOFF PASS consumed socket; explicit environment; protocol preserved; exec failure; 100 cycles')
 }
 

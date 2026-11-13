@@ -55,10 +55,19 @@ fn client_command(command ServerCommand, environment []string) ! {
 	if size > 1024 * 1024 { return error('Wine client command exceeds byte bound') }
 }
 
-fn (mut connection ServerConnection) start_client_linux(server &ServerDirectory, guard &LaunchGuard, data string, command ServerCommand, environment []string) !ClientChild {
+fn (mut connection ServerConnection) start_client_linux(server &ServerDirectory, guard &LaunchGuard, data string, command ServerCommand, environment []string, working_directory i32) !ClientChild {
 	client_command(command, environment)!
 	child_signal_policy()!
 	connection.recheck(server, guard, data)!
+	// Capture before fork. Never close the caller's descriptor, even on refusal.
+	// F_DUPFD_CLOEXEC also accepts O_PATH directory descriptors on Linux.
+	cwd := C.vinix_wine_guard_fcntl(working_directory, C.F_DUPFD_CLOEXEC, 3)
+	if cwd < 0 { return error('cannot capture Wine client working directory') }
+	defer { child_close_descriptor(cwd) }
+	mut cwd_info := C.stat{}
+	if C.fstat(cwd, unsafe { &cwd_info }) != 0 || u32(cwd_info.st_mode) & 0o170000 != 0o040000 {
+		return error('Wine client working directory must be a directory descriptor')
+	}
 	status := C.vinix_wine_guard_fcntl(connection.fd, C.F_GETFL)
 	if status < 0 || status & C.O_NONBLOCK != 0 { return error('Wine client handoff requires a blocking socket') }
 	mut argv := []&char{cap: command.arguments.len + 2}
@@ -95,7 +104,7 @@ fn (mut connection ServerConnection) start_client_linux(server &ServerDirectory,
 	if child_mask(unsafe { &blocked }, unsafe { &inherited }) != 0 { return error('cannot protect Wine client fork signal mask') }
 	pid := C.vinix_wine_spawn_fork()
 	if pid == 0 {
-		client_exec(program, unsafe { &&char(argv.data) }, unsafe { &&char(envp.data) }, guard.directory, socket, fds[1], unsafe { &inherited })
+		client_exec(program, unsafe { &&char(argv.data) }, unsafe { &&char(envp.data) }, cwd, socket, fds[1], unsafe { &inherited })
 		C._exit(126)
 	}
 	if pid > 0 {

@@ -56,8 +56,10 @@ fn run() ! {
 	boot_host := if arch == 'x86_64' { hwhost.Host{ ...host, root: plainiso.prepare(root, work)! } } else { host }
 	marker := if mode == 'signal' { 'WINE CLIENT HANDOFF SIGNAL PASS' }
 		else { 'WINE CLIENT HANDOFF PASS consumed socket; explicit environment; protocol preserved; exec failure; 100 cycles' }
+	mut required := [marker, 'HWTEST PASS wine-client-handoff fixture']
+	if mode == 'standard' { required << 'WINE CLIENT CWD PASS captured directory; relative access; replacement; invalid descriptors; parent isolation; 100 cycles' }
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-client-handoff', arches: [arch], ending: .running,
-		required: [marker, 'HWTEST PASS wine-client-handoff fixture'],
+		required: required,
 		forbidden: ['HWTEST FAIL', 'Kernel panic']},
 		hwhost.Run{kernel: os.args[3], guest: work + '/probe', state: work + '/boot', timeout: 90, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
