@@ -88,8 +88,15 @@ They propagate a NaN from either input, using the scalar evaluator's preferred
 quiet NaN representation. Other results preserve the selected input bits;
 negative zero sorts below positive zero in either operand order. Both operands
 are evaluated; poison propagates and undef rejects. Each call costs one step
-and shares scalar validation/evaluation. Number-preferring and legacy
-`minimumnum`/`maximumnum`/`minnum`/`maxnum` remain outside this buffer profile.
+and shares scalar validation/evaluation.
+
+Direct LLVM `minimumnum`/`maximumnum` also support matching half/float
+operands/results. A single NaN of either class selects the numeric operand's
+exact bits; two NaNs produce the preferred quiet NaN. Negative zero sorts
+below positive zero in either operand order. Both operands are evaluated;
+poison propagates and undef rejects even with a NaN counterpart. Each call
+costs one step and shares scalar validation/evaluation. Legacy
+`minnum`/`maxnum` remain outside this buffer profile.
 
 Direct LLVM `is.fpclass` accepts a half/float input and a literal defined i32
 mask from 0 through 1023, returning scalar i1. Bits 0..9 select signaling NaN,
@@ -166,7 +173,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these thirty-three families' exact declarations are admitted:
+Only ordinary direct calls to these thirty-five families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each

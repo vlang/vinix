@@ -65,17 +65,19 @@ fn main() {
 	mut source := strings.new_builder(32768); mut cases := []ExtremaCase{}
 	for bits in [16, 32]! {
 		typ := if bits == 16 { 'half' } else { 'float' }
-		for op in ['minimum', 'maximum'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ}, ${typ})\n') }
-		for op in ['minimum', 'maximum'] {
-			name := '${op}_${bits}'; cases << ExtremaCase{name, bits}; second := if op == 'minimum' { 'maximum' } else { 'minimum' }
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ}, ${typ})\n') }
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] {
+			name := '${op}_${bits}'; cases << ExtremaCase{name, bits}; second := match op { 'minimum' { 'maximum' } 'maximum' { 'minimum' } 'minimumnum' { 'maximumnum' } else { 'minimumnum' } }
 			source.write_string('define void @${name}(ptr %a, ptr %b, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %y = load ${typ}, ptr %b, align 1\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %x, ${typ} %y)\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
 			// Repeated declaration followed by the other family; without NaNs,
 			// max(min(min(x,y),y),x) and its dual must return the exact x bits.
 			source.write_string('define void @chain_${name}(ptr %a, ptr %b, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %y = load ${typ}, ptr %b, align 1\n %first = call ${typ} @llvm.${op}.f${bits}(${typ} %x, ${typ} %y)\n %again = call ${typ} @llvm.${op}.f${bits}(${typ} %first, ${typ} %y)\n %v = call ${typ} @llvm.${second}.f${bits}(${typ} %again, ${typ} %x)\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
-			for state in ['poison', 'undef'] { for side in 0 .. 2 {
-				a := if side == 0 { state } else { '0.0' }; b := if side == 1 { state } else { '0.0' }
-				source.write_string('define void @guard_${state}_${side}_${name}(ptr %dst) { %v = call ${typ} @llvm.${op}.f${bits}(${typ} ${a}, ${typ} ${b})\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
-			} }
+			source.write_string('define void @cached_${name}(ptr %a, ptr %b, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %y = load ${typ}, ptr %b, align 1\n %first = call ${typ} @llvm.${op}.f${bits}(${typ} %x, ${typ} %y)\n store ${typ} %first, ptr %dst, align 1\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %first, ${typ} %y)\n ret void }\n')
+			for state in ['poison', 'undef'] { for side in 0 .. 2 { for other in 0 .. 2 {
+				constant := if other == 0 { '0.0' } else if bits == 16 { '0xH7E55' } else { '0x7FF8000000000000' }
+				a := if side == 0 { state } else { constant }; b := if side == 1 { state } else { constant }
+				source.write_string('define void @guard_${state}_${side}_${other}_${name}(ptr %dst) { %v = call ${typ} @llvm.${op}.f${bits}(${typ} ${a}, ${typ} ${b})\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
+			} } }
 			for mode in ['freeze', 'select'] {
 				choice := if mode == 'freeze' { 'freeze ${typ} %bad' } else { 'select i1 false, ${typ} %bad, ${typ} 1.0' }
 				source.write_string('define void @${mode}_${name}(ptr %dst) { %bad = call ${typ} @llvm.${op}.f${bits}(${typ} poison, ${typ} 0.0)\n %v = ${choice}\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
@@ -100,7 +102,7 @@ fn main() {
 	C.LLVMDisposeMessage(cpu); C.LLVMDisposeMessage(features)
 	mut options := C.LLVMMCJITCompilerOptions{}; C.LLVMInitializeMCJITCompilerOptions(&options, sizeof(C.LLVMMCJITCompilerOptions)); options.OptLevel = 2; options.EnableFastISel = 0
 	mut engine := unsafe { nil }; assert C.LLVMCreateMCJITCompilerForModule(&engine, module_ptr, &options, sizeof(C.LLVMMCJITCompilerOptions), &message) == 0; defer { C.LLVMDisposeExecutionEngine(engine) }
-	mut comparisons := 0; mut boundaries := 0; mut nan_cases := 0; mut chains := 0
+	mut comparisons := 0; mut boundaries := 0; mut nan_cases := 0; mut chains := 0; mut cached_metadata := 0
 	for c in cases {
 		function := find_function(ir, c.name); address := C.LLVMGetFunctionAddress(engine, c.name.str); assert address != 0
 		chain_name := 'chain_' + c.name; chain := find_function(ir, chain_name); chain_address := C.LLVMGetFunctionAddress(engine, chain_name.str); assert chain_address != 0
@@ -115,7 +117,8 @@ fn main() {
 			mut a := if c.bits == 16 { u64(sample / 4) } else { u64(u32(sample) * u32(0x9e3779b9)) }
 			mut b := if c.bits == 16 { [u64(0), sign, one, sign | one]![sample % 4] } else { u64(u32(sample) * u32(0x85ebca6b) ^ u32(0xa5a5a5a5)) }
 			if sample >= samples { a = edges[(sample - samples) / 24]; b = edges[(sample - samples) % 24]; boundaries++ }
-			nan := a & (sign - 1) > inf || b & (sign - 1) > inf
+			left_nan := a & (sign - 1) > inf; right_nan := b & (sign - 1) > inf
+			nan := if c.name.starts_with('minimumnum_') || c.name.starts_with('maximumnum_') { left_nan && right_nan } else { left_nan || right_nan }
 			for j in 0 .. count { left[1 + j] = u8(a >> u32(8 * j)); right[2 + j] = u8(b >> u32(8 * j)) }; for j in 0 .. 16 { actual[j] = 0xcc; expected[j] = 0xcc }
 			assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 5)!.steps == 5
 			unsafe { NativeExtrema(voidptr(address))(&left[1], &right[2], &expected[4]) }; compare(actual, expected, c.bits, nan)
@@ -125,8 +128,16 @@ fn main() {
 			}
 			assert p.run_memory_function(ir, stream, pools, bodies, chain, mut bindings, 7)!.steps == 7
 			unsafe { NativeExtrema(voidptr(chain_address))(&left[1], &right[2], &expected[4]) }; compare(actual, expected, c.bits, nan)
-			if !nan { assert read_word(actual, count) == a, 'mixed chain must restore exact first input' }; chains++; comparisons++
+			if !nan { assert read_word(actual, count) == if left_nan { b } else { a }, 'mixed chain must restore exact first numeric input' }; chains++; comparisons++
 		}
+		// A repeated declaration must still validate the later call before a store.
+		cached := find_function(ir, 'cached_' + c.name); slot := bodies.scopes[cached + 1].instructions_start + 4; saved := p.instructions[slot]
+		for j in 0 .. 16 { actual[j] = 0xcc }
+		for changed in [airbitcode.IRTypedInstruction{...saved, flags: 0}, airbitcode.IRTypedInstruction{...saved, flags: 32769}, airbitcode.IRTypedInstruction{...saved, calling_convention: 8}, airbitcode.IRTypedInstruction{...saved, attribute_set: 1}, airbitcode.IRTypedInstruction{...saved, fast_math_flags: 1}, airbitcode.IRTypedInstruction{...saved, operands_count: 2}, airbitcode.IRTypedInstruction{...saved, result_type: -1}, airbitcode.IRTypedInstruction{...saved, callee_function: -1}, airbitcode.IRTypedInstruction{...saved, call_signature: -1}] {
+			p.instructions[slot] = changed; if _ := p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 6) { panic('cached metadata accepted') }; for byte in actual { assert byte == 0xcc }; cached_metadata++
+		}; p.instructions[slot] = saved
+		assert p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 6)!.steps == 6
+		unsafe { NativeExtrema(voidptr(address))(&left[1], &right[2], &expected[4]) }; compare(actual, expected, c.bits, false)
 		unsafe { bindings.free(); left.free(); right.free(); actual.free(); expected.free() }
 	}
 	mut guards := 0; mut choices := 0
@@ -149,7 +160,7 @@ fn main() {
 		p.instructions[slot] = changed; if _ := p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3) { panic('metadata accepted') }; for byte in bytes { assert byte == 0xcc }; metadata++
 	}; p.instructions[slot] = saved
 	assert p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3)!.steps == 3 && bytes[0] == 17
-	assert cases.len == 4 && comparisons == 657664 && boundaries == 2304 && chains == 657664 && guards == 16 && choices == 8 && metadata == 9
-	result := 'AIR-MEMORY-FLOAT-EXTREMA: ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} boundary pairs), all half encodings with four anchors, half/float minimum/maximum, ${chains} native/identity mixed cached chains, sentinels/budgets, ${guards} poison/undef guards, ${choices} freeze/lazy choices and ${metadata} metadata controls PASS\n'
+	assert cases.len == 8 && comparisons == 1315328 && boundaries == 4608 && chains == 1315328 && guards == 64 && choices == 16 && metadata == 9 && cached_metadata == 72
+	result := 'AIR-MEMORY-FLOAT-EXTREMA: ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} boundary pairs), all half encodings with four anchors, half/float minimum/maximum/minimumnum/maximumnum, ${chains} native/identity mixed cached chains, sentinels/budgets, ${guards} poison/undef guards with zero/NaN counterparts, ${choices} freeze/lazy choices and ${metadata}/${cached_metadata} initial/cached metadata controls PASS\n'
 	os.write_file(out + '/result.txt', result)!; print(result)
 }

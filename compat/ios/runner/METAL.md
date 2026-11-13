@@ -356,8 +356,16 @@ positive zero in both argument orders. Both operands are evaluated; poison
 propagates and undef rejects. Each call costs one step and shares scalar
 validation/evaluation. Synthetic deferred dispatches check both zero orders,
 NaNs in either operand and infinity ordering in both precisions, across five
-input/output offset snapshots. Number-preferring and legacy variants remain
-unsupported by the buffer profile.
+input/output offset snapshots.
+
+Direct LLVM `minimumnum`/`maximumnum` support matching half/float operands and
+results, preferring the exact numeric operand over either NaN class. Two NaNs
+produce the preferred quiet NaN; negative zero sorts below positive zero in
+both orders. Both operands are evaluated, so poison propagates and undef
+rejects even with a NaN counterpart. Each call costs one step and shares scalar
+validation/evaluation. Seven deferred dispatches check both zero orders, single
+and paired NaNs, infinity ordering and signed subnormals in both precisions.
+Legacy `minnum`/`maxnum` remain unsupported by the buffer profile.
 
 Direct LLVM `is.fpclass` accepts half/float and a literal defined i32 mask in
 0..1023, returning i1. It distinguishes ten raw-bit classes: signaling/quiet
