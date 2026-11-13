@@ -14,9 +14,9 @@ fn invoke(args []string, log string) ! {
 }
 
 fn run() ! {
-	if os.args.len != 9 { return error('usage: CHECK OUTPUT ARCH KERNEL SYSROOT GCC_INSTALL CLANG V standard|fault|signal|signal-refused') }
+	if os.args.len != 9 { return error('usage: CHECK OUTPUT ARCH KERNEL SYSROOT GCC_INSTALL CLANG V standard|fault|signal|signal-refused|interrupt') }
 	wanted_outcome := os.args[8]
-	if wanted_outcome !in ['standard', 'fault', 'signal', 'signal-refused'] { return error('unknown outcome requirement') }
+	if wanted_outcome !in ['standard', 'fault', 'signal', 'signal-refused', 'interrupt'] { return error('unknown outcome requirement') }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh output and supported architecture required') }
 	root := os.real_path(os.dir(@FILE) + '/../..')
@@ -39,6 +39,7 @@ fn run() ! {
 	mut command := [os.args[7], '-backend', 'c', '-prod', '-os', 'linux', '-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' },
 		'-path', '@vlib|' + root + '|@vmodules', '-gc', 'none', '-manualfree', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-o', work + '/probe.c', probe]
 	if wanted_outcome == 'fault' { command.insert(1, ['-d', 'lease_holder_fixture', '-d', 'lease_holder_wait_fault']) }
+	if wanted_outcome == 'interrupt' { command.insert(1, ['-d', 'lease_holder_fixture', '-d', 'lease_holder_wait_interrupt']) }
 	if wanted_outcome in ['signal', 'signal-refused'] { command.insert(1, ['-d', 'lease_holder_fixture', '-d', 'lease_holder_signal_window']) }
 	if wanted_outcome == 'signal-refused' { command.insert(1, ['-d', 'lease_holder_keep_handlers']) }
 	mut discovery := command.clone(); discovery.insert(1, ['-print-watched-files', '-dump-files', work + '/sources-before.txt'])
@@ -54,7 +55,8 @@ fn run() ! {
 	os.write_file(work + '/generated-before-boot.json', json2.encode(generated))!
 	for path, expected in inputs { if winesource.file_digest(path)! != expected { return error('input changed before boot') } }
 	boot_host := if arch == 'x86_64' { hwhost.Host{ ...host, root: plainiso.prepare(root, work)! } } else { host }
-	marker := if wanted_outcome == 'standard' { 'LEASE HOLDER PASS statuses 37/126/127/143; double-fork setsid; caller death; cancellation; descriptor isolation; setup refusals' }
+	marker := if wanted_outcome == 'interrupt' { 'LEASE HOLDER INTERRUPT PASS retry EINTR; caller death; lease busy; original37; no children' }
+		else if wanted_outcome == 'standard' { 'LEASE HOLDER PASS statuses 37/126/127/143; double-fork setsid; caller death; cancellation; descriptor isolation; setup refusals' }
 		else if wanted_outcome == 'fault' { 'LEASE HOLDER FAULT PASS retained lease after wait error and caller death; SIGKILL limitation explicit' }
 		else { 'LEASE HOLDER SIGNAL PASS caught handler reset before unmask; pending signal preserves default status' }
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'lease-holder', arches: [arch], ending: .running,
@@ -69,6 +71,7 @@ fn run() ! {
 		if outcome.passed || !outcome.reason.contains('HWTEST FAIL lease-holder: inherited handler ran before exec') { return error('signal control failed at wrong gate: ' + outcome.reason) }
 	} else if !outcome.passed { return error('lease holder check failed: ' + outcome.reason) }
 	serial := os.read_file(work + '/boot/serial.log')!
+	if serial.count('LEASE HOLDER injected EINTR') != if wanted_outcome == 'interrupt' { 1 } else { 0 } { return error('unexpected EINTR injection count') }
 	if wanted_outcome == 'standard' && !serial.contains('LEASE HOLDER CHURN PASS 64 descendants; final adopted survivor retains lease; original37; no children') {
 		return error('descendant churn qualification missing')
 	}

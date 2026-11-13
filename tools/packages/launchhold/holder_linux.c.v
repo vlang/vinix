@@ -97,8 +97,19 @@ fn holder(program &char, directory &char, argv &&char, lease i32, report i32, in
 		wait_fault(unsafe { &notified })
 	}
 	saved := if status & 0x7f == 0 { (status >> 8) & 0xff } else { 128 + (status & 0x7f) }
+	mut interrupted := false
 	for {
-		answer := descendant_wait(unsafe { &status })
+		mut answer := i32(0)
+		$if lease_holder_fixture ? {
+			$if lease_holder_wait_interrupt ? {
+				if !interrupted {
+					interrupted = true
+					C.vinix_launchhold_syscall(C.SYS_write, i32(2), c'LEASE HOLDER injected EINTR\n', u64(28))
+					C.errno = C.EINTR
+					answer = -1
+				} else { answer = descendant_wait(unsafe { &status }) }
+			} $else { answer = descendant_wait(unsafe { &status }) }
+		} $else { answer = descendant_wait(unsafe { &status }) }
 		if answer > 0 || (answer < 0 && C.errno == C.EINTR) { continue }
 		if answer < 0 && C.errno == C.ECHILD { break }
 		wait_fault(unsafe { &notified })

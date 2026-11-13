@@ -339,6 +339,11 @@ fn suite() ! {
 		println('LEASE HOLDER FAULT PASS retained lease after wait error and caller death; SIGKILL limitation explicit')
 		return
 	}
+	$if lease_holder_wait_interrupt ? {
+		lifetime('/tmp/holder-interrupt', '37', true, false, false, false)!
+		println('LEASE HOLDER INTERRUPT PASS retry EINTR; caller death; lease busy; original37; no children')
+		return
+	}
 	for mode in ['37', '126', '127', 'signal']! { lifetime('/tmp/holder-' + mode, mode, false, false, false, false)! }
 	lifetime('/tmp/holder-caller-death', '37', true, false, false, false)!
 	lifetime('/tmp/holder-cancellation', '37', false, true, true, false)!
