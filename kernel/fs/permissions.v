@@ -158,11 +158,16 @@ fn apply_creation_identity(mut node VFSNode, parent &VFSNode) ? {
 		&& node.resource.stat.mode == desired_mode {
 		return
 	}
-	node.resource.stat.uid = process.euid
-	node.resource.stat.gid = desired_gid
-	node.resource.stat.mode = desired_mode
 	mut res := node.resource
-	resource.persist_metadata(mut res)?
+	update := resource.MetadataUpdate{
+		uid_set: res.stat.uid != process.euid
+		uid: process.euid
+		gid_set: res.stat.gid != desired_gid
+		gid: desired_gid
+		mode_set: res.stat.mode != desired_mode
+		mode: desired_mode
+	}
+	resource.update_metadata(mut res, unsafe { &update })?
 }
 
 pub fn syscall_umask(_ voidptr, mask u32) (u64, u64) {

@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module fs
+
+interface FileSystem { kind() int }
+struct VFSNode { filesystem &FileSystem = unsafe { nil } }
+struct Ordinary {}
+fn (_ &Ordinary) kind() int { return 0 }
+struct Private {}
+fn (_ &Private) kind() int { return 1 }
+fn (_ &Private) mount_options_private() bool { return true }
+struct Public {}
+fn (_ &Public) kind() int { return 2 }
+fn (_ &Public) mount_options_private() bool { return false }
+
+fn test_only_opted_in_mounts_omit_private_options() {
+	ordinary := VFSNode{ filesystem: &FileSystem(&Ordinary{}) }
+	private := VFSNode{ filesystem: &FileSystem(&Private{}) }
+	public := VFSNode{ filesystem: &FileSystem(&Public{}) }
+	assert public_mount_options(&ordinary, 'mode=1777') == 'mode=1777'
+	assert public_mount_options(&public, 'size=4096') == 'size=4096'
+	assert public_mount_options(&private, 'user=test,password=disposable') == ''
+	assert public_mount_options(&private, 'bind') == 'bind'
+	assert public_mount_options(unsafe { nil }, 'legacy') == 'legacy'
+}
+fn test_scratch_erasure() {
+	mut bytes := [u8(0xaa), 0xbb, 0xcc]!
+	erase_mount_scratch(unsafe { &bytes[0] }, 3)
+	for byte in bytes { assert byte == 0 }
+	erase_mount_scratch(unsafe { nil }, 0)
+}

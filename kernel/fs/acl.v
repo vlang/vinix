@@ -31,7 +31,8 @@ fn apply_creation_acl(mut node VFSNode, mode u32, defaults []u8, access []u8) ? 
 		resource.set_xattr(mut res, posix_acl.default_name, defaults, 0)?
 	}
 	if access.len != 0 { resource.set_xattr(mut res, posix_acl.access_name, access, 0)? }
-	resource.persist_metadata(mut res)?
+	update := resource.MetadataUpdate{mode_set: true, mode: res.stat.mode}
+	resource.update_metadata(mut res, unsafe { &update })?
 }
 
 // Called before the new node is entered into its parent map. Failed I/O may
