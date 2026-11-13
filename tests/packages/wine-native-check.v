@@ -109,7 +109,7 @@ fn invoke(arguments []string, log string) ! {
 	if child.code != 0 { return error('Wine qualification producer failed: ' + log) }
 }
 
-fn v_program(v string, source string, arch string, cfile string, owned bool, collection bool, caller_death bool) ![]string {
+fn v_program(v string, source string, arch string, cfile string, owned bool, collection bool, caller_death bool, idle_server bool) ![]string {
 	root := hwhost.find_root(@FILE)!
 	mut command := [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree',
@@ -118,22 +118,23 @@ fn v_program(v string, source string, arch string, cfile string, owned bool, col
 	if owned { command.insert(1, ['-d', 'wine_owned_manager']) }
 	if collection { command.insert(1, ['-d', 'wine_collection_probe']) }
 	if caller_death { command.insert(1, ['-d', 'wine_caller_death_probe']) }
+	if idle_server { command.insert(1, ['-d', 'wine_idle_server_probe']) }
 	return command
 }
 
-fn discover_program(v string, source string, arch string, work string, name string, owned bool, collection bool, caller_death bool, mut inputs map[string]string) ! {
+fn discover_program(v string, source string, arch string, work string, name string, owned bool, collection bool, caller_death bool, idle_server bool, mut inputs map[string]string) ! {
 	directory := work + '/build-' + name
 	os.mkdir_all(directory)!
-	mut command := v_program(v, source, arch, directory + '/' + name + '.c', owned, collection, caller_death)!
+	mut command := v_program(v, source, arch, directory + '/' + name + '.c', owned, collection, caller_death, idle_server)!
 	command.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
 	invoke(command, directory + '/discover.log')!
 	winesource.capture(directory + '/sources-before.txt', mut inputs)!
 }
 
-fn build_program(v string, sysroot string, gcc string, source string, arch string, work string, name string, owned bool, collection bool, caller_death bool, inputs map[string]string) !string {
+fn build_program(v string, sysroot string, gcc string, source string, arch string, work string, name string, owned bool, collection bool, caller_death bool, idle_server bool, inputs map[string]string) !string {
 	directory := work + '/build-' + name
 	cfile := directory + '/' + name + '.c'
-	mut command := v_program(v, source, arch, cfile, owned, collection, caller_death)!
+	mut command := v_program(v, source, arch, cfile, owned, collection, caller_death, idle_server)!
 	command.insert(1, ['-dump-files', directory + '/sources-built.txt'])
 	invoke(command, directory + '/v.log')!
 	winesource.admit(directory + '/sources-before.txt', directory + '/sources-built.txt', inputs)!
@@ -170,12 +171,13 @@ fn check() ! {
 		return
 	}
 	if os.args.len !in [9, 10, 11] || (os.args.len >= 10 && os.args[9] != '--owned-manager')
-		|| (os.args.len == 11 && os.args[10] !in ['--collection-probe', '--caller-death-probe']) {
-		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager [--collection-probe|--caller-death-probe]]')
+		|| (os.args.len == 11 && os.args[10] !in ['--collection-probe', '--caller-death-probe', '--idle-server-probe']) {
+		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager [--collection-probe|--caller-death-probe|--idle-server-probe]]')
 	}
 	owned := os.args.len >= 10
 	collection := os.args.len == 11
-	caller_death := collection && os.args[10] == '--caller-death-probe'
+	caller_death := collection && os.args[10] in ['--caller-death-probe', '--idle-server-probe']
+	idle_server := collection && os.args[10] == '--idle-server-probe'
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('invalid Wine guest architecture') }
 	if owned && arch != 'x86_64' { return error('owned native Wine qualification requires x86_64') }
@@ -247,13 +249,13 @@ fn check() ! {
 	for name in ['usr/sbin/vinix-account', 'usr/sbin/vinix-session'] {
 		inputs[stage + '/' + name] = digest(stage + '/' + name)!
 	}
-	discover_program(host.v, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', owned, collection, caller_death, mut inputs)!
-	discover_program(host.v, root + '/tools/packages/main.v', arch, work, 'package', owned, false, false, mut inputs)!
+	discover_program(host.v, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', owned, collection, caller_death, idle_server, mut inputs)!
+	discover_program(host.v, root + '/tools/packages/main.v', arch, work, 'package', owned, false, false, false, mut inputs)!
 	os.write_file(work + '/inputs-before-build.json', json2.encode(inputs))!
-	guest := build_program(host.v, sysroot, gcc, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', owned, collection, caller_death, inputs)!
+	guest := build_program(host.v, sysroot, gcc, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', owned, collection, caller_death, idle_server, inputs)!
 	// Rebuild the package CLI from the captured tree. The archived account tools
 	// are separate inputs; their stage's package CLI may predate runtime policy.
-	package_cli := build_program(host.v, sysroot, gcc, root + '/tools/packages/main.v', arch, work, 'package', owned, false, false, inputs)!
+	package_cli := build_program(host.v, sysroot, gcc, root + '/tools/packages/main.v', arch, work, 'package', owned, false, false, false, inputs)!
 	// An owned local test key signs the real runtime. It is never copied into
 	// the guest image or printed. This does not enroll a production publisher.
 	publisher := work + '/publisher'
@@ -338,16 +340,19 @@ fn check() ! {
 		'translator_original': translator_original
 		'translator_busybox':  translator_busybox
 	}))!
+	mut required := [
+		if idle_server { 'Wine signed idle-server zero-live-clients collection-retained natural-retirement PASS' }
+		else if caller_death { 'Wine signed caller-SIGKILL holder-survived collection-retained natural-retirement PASS' }
+		else if collection { 'Wine signed detached-client collection lease status37 natural-retirement PASS' }
+		else { 'Wine signed-real-Win64 ordinary-private-prefix socket lease Windows-API outside-write-refused natural-exit PASS' },
+		'HWTEST PASS packaged-Wine',
+	]
+	if caller_death { required << 'Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS' }
 	scenario := hwhost.Scenario{
 		name:        'packaged-Wine'
 		arches:      [arch]
 		qemu_x86_64: ['-cpu', 'max']
-		required:    [
-			if caller_death { 'Wine signed caller-SIGKILL holder-survived collection-retained natural-retirement PASS' }
-			else if collection { 'Wine signed detached-client collection lease status37 natural-retirement PASS' }
-			else { 'Wine signed-real-Win64 ordinary-private-prefix socket lease Windows-API outside-write-refused natural-exit PASS' },
-			'HWTEST PASS packaged-Wine',
-		]
+		required:    required
 		forbidden:   ['HWTEST FAIL', 'Kernel panic', 'KERNEL PANIC', 'FATAL EXCEPTION']
 		ending:      .running
 	}

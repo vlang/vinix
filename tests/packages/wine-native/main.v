@@ -591,6 +591,44 @@ fn collection_callers(server string, generation string) !(string, string) {
 	return error('ordinary package caller/holder parent relationship missing')
 }
 
+fn collection_lease_busy(generation string) ! {
+	lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+	if lease < 0 { return error('collection probe lost generation lease') }
+	defer { C.close(lease) }
+	result := C.flock(lease, C.LOCK_EX | C.LOCK_NB)
+	code := C.errno
+	if result == 0 || code !in [C.EWOULDBLOCK, C.EAGAIN] { return error('collection probe generation lease is not busy') }
+}
+
+fn collection_retired(pid string) !bool {
+	if !os.exists('/proc/' + pid) { return true }
+	state := collection_field(pid, 'State') or {
+		if !os.exists('/proc/' + pid) { return true }
+		return err
+	}
+	defer { unsafe { state.free() } }
+	return state.starts_with('Z') || state.starts_with('X')
+}
+
+fn collection_clients(generation string, expected string) !int {
+	names := os.ls('/proc')!
+	defer { unsafe { names.free() } }
+	mut live := 0
+	mut found := expected == ''
+	for pid in names {
+		if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
+		line := os.read_file('/proc/' + pid + '/cmdline') or { continue }
+		defer { unsafe { line.free() } }
+		if !line.contains(generation + '/apps/org.vinix.wine-runtime/root/usr/libexec/vinix-wine/wine\x00') { continue }
+		if !collection_retired(pid)! {
+			live++
+			if pid == expected { found = true }
+		}
+	}
+	if !found { return error('Wine live-client matcher missed the known Windows child') }
+	return live
+}
+
 fn collection_run(generation string, architecture string) ! {
 	println('HWTEST INFO Wine collection launch begin')
 	mut child := os.new_process('/usr/bin/vinix-package')
@@ -625,6 +663,8 @@ fn collection_run(generation string, architecture string) ! {
 	mut holder := ''
 	defer { unsafe { caller.free(); holder.free() } }
 	mut holder_reaped := false
+	mut idle_checked := false
+	mut last_clients := -1
 	mut collected := false
 	mut polls := 0
 	deadline := time.sys_mono_now() + 480 * time.second
@@ -705,13 +745,11 @@ fn collection_run(generation string, architecture string) ! {
 			defer { current.close() }
 			old := os.file_name(generation).u64()
 			if current.generation == old || current.previous == old { return error('collection probe generation is still protected as active or rollback') }
+			$if wine_idle_server_probe ? {
+				println('HWTEST INFO Wine known-live-child matcher count=' + collection_clients(generation, descendant)!.str() + ' PASS')
+			}
 			for _ in 0 .. 3 {
-				lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
-				if lease < 0 { return error('collection probe lost generation lease') }
-				result := C.flock(lease, C.LOCK_EX | C.LOCK_NB)
-				code := C.errno
-				C.close(lease)
-				if result == 0 || code !in [C.EWOULDBLOCK, C.EAGAIN] { return error('collection probe generation lease is not busy') }
+				collection_lease_busy(generation)!
 				command(['/usr/bin/vinix-package', 'gc'], '')!
 				if !os.is_dir(generation) || sha256.hexhash(os.read_file(image)!) != before
 					|| os.exists('/proc/' + initial) || !os.exists('/proc/' + server)
@@ -733,6 +771,34 @@ fn collection_run(generation string, architecture string) ! {
 			os.write_file(release, '')!
 			os.chown(release, 1000, 1000)!
 			os.chmod(release, 0o600)!
+		}
+		$if wine_idle_server_probe ? {
+			if collected && !idle_checked && collection_retired(descendant)! {
+				clients := collection_clients(generation, '')!
+				if clients != last_clients {
+					println('HWTEST INFO Wine idle remaining-live-clients=' + clients.str())
+					last_clients = clients
+				}
+				caller_ok := $if wine_caller_death_probe ? { !child.is_alive() && !os.exists('/proc/' + caller) } $else { child.is_alive() }
+				if clients == 0 && caller_ok {
+					collection_live(server)!
+					$if wine_caller_death_probe ? { collection_live(holder)! }
+					collection_lease_busy(generation)!
+					started := time.sys_mono_now()
+					command(['/usr/bin/vinix-package', 'gc'], '')!
+					caller_ok_after := $if wine_caller_death_probe ? { !child.is_alive() && !os.exists('/proc/' + caller) } $else { child.is_alive() }
+					if !caller_ok_after || !collection_retired(initial)! || !collection_retired(descendant)!
+						|| collection_clients(generation, '')! != 0 || !os.is_dir(generation)
+						|| sha256.hexhash(os.read_file(image)!) != before {
+						return error('Wine idle-server interval or obsolete generation was lost during collection')
+					}
+					collection_live(server)!
+					$if wine_caller_death_probe ? { collection_live(holder)! }
+					collection_lease_busy(generation)!
+					println('HWTEST INFO Wine zero-live-clients server-live gc-ns=' + (time.sys_mono_now() - started).str() + ' PASS')
+					idle_checked = true
+				}
+			}
 		}
 		$if wine_caller_death_probe ? {
 			if collected && !holder_reaped {
@@ -765,6 +831,9 @@ fn collection_run(generation string, architecture string) ! {
 		|| os.exists('/proc/' + initial) || os.exists('/proc/' + server) || os.exists('/proc/' + descendant) {
 		return error('collection probe retirement or saved initial status differs: ' + child.code.str())
 	}
+	$if wine_idle_server_probe ? {
+		if !idle_checked { return error('Wine retired without a qualified client-free server collection interval') }
+	}
 	$if wine_caller_death_probe ? {
 		if !holder_reaped || os.exists('/proc/' + caller) || os.exists('/proc/' + holder) { return error('caller/holder retirement differs') }
 	}
@@ -775,7 +844,9 @@ fn collection_run(generation string, architecture string) ! {
 	if retained.previous == 0 || !os.is_dir('/var/lib/vinix-packages/generations/' + retained.previous.str()) {
 		return error('collection removed the retained rollback generation')
 	}
-	$if wine_caller_death_probe ? {
+	$if wine_idle_server_probe ? {
+		println('HWTEST INFO Wine signed idle-server zero-live-clients collection-retained natural-retirement PASS')
+	} $else $if wine_caller_death_probe ? {
 		println('HWTEST INFO Wine signed caller-SIGKILL holder-survived collection-retained natural-retirement PASS')
 	} $else {
 		println('HWTEST INFO Wine signed detached-client collection lease status37 natural-retirement PASS')
