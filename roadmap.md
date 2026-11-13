@@ -1215,7 +1215,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     allocations or descriptors. The [bridge environment boundary](tests/packages/wine-lease-supervision-plan.md#bridge-environment-boundary-2026-11-13)
     now clears inherited server-socket overrides at top-level entry while
     preserving nested alias handoff; host sanitizer checks and both runner
-    target builds pass. Signed Wine startup and production wiring remain open.
+    target builds pass. [Authenticated client descriptor handoff](tests/packages/wine-lease-supervision-plan.md#authenticated-client-descriptor-handoff-2026-11-13)
+    now passes real client exec, explicit environment, parent-copy closure,
+    failure/status and signal controls on both native architectures. Actual
+    Wine bootstrap, signed startup and production lease wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

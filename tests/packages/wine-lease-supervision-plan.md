@@ -673,6 +673,63 @@ inherited state first, then install its owned authenticated socket only in the
 initial client's handoff environment. Signed foreground startup, actual socket
 inheritance/bootstrap, generation leases and holder-death recovery remain open.
 
+## Authenticated client descriptor handoff, 2026-11-13
+
+Source `3e5d64d34` adds `ServerConnection.start_client` and owned `ClientChild`.
+It rechecks connection/namespace/server identity, prebuilds argv and explicit
+envp, replaces all supplied `WINESERVERSOCKET` entries with the owned FD, then
+forks a direct client. The child starts in the captured prefix and retains only
+stdio, protocol socket and CLOEXEC report; only its socket clears CLOEXEC before
+execve. The manager raw-closes its socket and both metadata references before
+unmasking, leaving the original connection closed. Pre-fork errors preserve it;
+after successful fork, even exec failure returns an owned, waitable client.
+Other command/environment admission remains the caller's responsibility. This
+API does not provide descendant retirement or generation leases.
+
+Final `check-01` passes `arm-01`, `x86-01`, `signal-arm-01` and `signal-x86-01`
+with unchanged production kernels and ordinary uid/gid 1000. Normal runs each
+complete 100 server/connect/client-exec/collect cycles with zero retained V
+bytes and flat parent descriptors. The client receives exactly one descriptor
+above stdio, reads the untouched queued greeting and exits 42; server EOF and
+status 37 establish that no manager transport copy remains. The client restores
+CLOEXEC after consumption, checking the intended Wine-style FD step only.
+Literal/empty arguments and explicit environment survive; stale duplicate socket
+entries disappear and parent-only variables are absent. Parent environment,
+configured mask and unrelated non-CLOEXEC descriptor remain intact.
+
+Invalid command/environment and nonblocking sockets refuse before fork without
+consumption. Missing client exec reports stage 4/status 126 and releases the
+transport. Pending caught SIGTERM before child setup produces default status
+143, not the old handler's 89, while server status remains 37. Forbidden atfork
+callbacks never run. Exec-report EOF alone still proves neither exec nor
+liveness. Exclusive waits, default SIGCHLD, single ownership and cancellation
+contracts apply. Generated C confirms stack ABI records, allocation-free child
+setup, prebuilt pointer buffers and parent cleanup; all post-fork parent closes
+use raw syscalls. The host test covers macOS refusal only.
+
+Source `5f8a5f071` also makes the macOS ARM harness clone fresh firmware-variable
+stores with copy-on-write where available, retaining ordinary-copy fallback for
+unsupported/cross-volume cases. A production host test checks separate identities,
+bidirectional write isolation and existing/symlink target refusal. Both ARM runs
+boot through this path and preserve the original firmware hashes. The initial
+ENOSPC host build is retained as a failure; fallback is not forced in this gate.
+
+Complete attempts, sources and ownership notes: `/Users/alex/.cache/vch-20261113-01`.
+Complete typed inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-client-handoff-20261113-01.inventory.json`,
+SHA-256 `10d50d5375195a9d93cb7117d56e859fb557bdd2c68c6c05bc144683c5be6ab5`.
+Recording and separate verification pass with adjacent logs. Controllers admit
+actual parsed V sources/heap tracker and verify selected tool/kernel/firmware
+and generated-artifact hashes before/after boot. PID1 collects exact suite status
+zero before the harness stops QEMU. Byte-verified filesystem compression and
+APFS staging clones preserve logical contents and artifact paths; all historical
+bundles remain intact. Full C toolchain inventory, kernel heap retention,
+resource exhaustion, injected fork/close/mask failures and arbitrary namespace
+mutation remain unqualified. These are execed V protocol fixtures. Real Wine
+cwd/config bootstrap, credentials/SCM acceptance, signed runtime/translator and
+sandbox startup still need qualification before production wiring. Generation
+lease integration and holder-death retention remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
