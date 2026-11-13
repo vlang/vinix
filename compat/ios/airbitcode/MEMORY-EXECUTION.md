@@ -95,8 +95,15 @@ operands/results. A single NaN of either class selects the numeric operand's
 exact bits; two NaNs produce the preferred quiet NaN. Negative zero sorts
 below positive zero in either operand order. Both operands are evaluated;
 poison propagates and undef rejects even with a NaN counterpart. Each call
-costs one step and shares scalar validation/evaluation. Legacy
-`minnum`/`maxnum` remain outside this buffer profile.
+costs one step and shares scalar validation/evaluation.
+
+Direct LLVM `minnum`/`maxnum` use the scalar evaluator's permitted
+`minimumnum`/`maximumnum` refinement consistently: prefer the exact numeric
+operand over either NaN class, use the preferred quiet NaN for two NaNs and
+order negative zero below positive zero. Both operands are evaluated; poison
+propagates and undef rejects even with a NaN counterpart. Each call costs one
+step and shares scalar validation/evaluation. Legacy and modern declarations
+keep distinct cache identities and may be mixed in one kernel.
 
 Direct LLVM `is.fpclass` accepts a half/float input and a literal defined i32
 mask from 0 through 1023, returning scalar i1. Bits 0..9 select signaling NaN,
@@ -173,7 +180,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these thirty-five families' exact declarations are admitted:
+Only ordinary direct calls to these thirty-seven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each

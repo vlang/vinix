@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1150,7 +1150,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 		source.write_string('declare ${typ} @llvm.fma.f${bits}(${typ}, ${typ}, ${typ})\n')
 		source.write_string('declare ${typ} @llvm.ldexp.f${bits}.i32(${typ}, i32)\n')
 		source.write_string('declare i1 @llvm.is.fpclass.f${bits}(${typ}, i32 immarg)\n')
-		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ}, ${typ})\n') }
+		for op in ['minimum', 'maximum', 'minimumnum', 'maximumnum', 'minnum', 'maxnum'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ}, ${typ})\n') }
 		for op in ['floor', 'ceil', 'trunc', 'round', 'roundeven'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ})\n') }
 	}
 	for name in names {
@@ -1165,8 +1165,8 @@ fn sm_test_compute_library(label string) ![]u8 {
 			for i in 0 .. 4 { source.write_string('%d${i} = getelementptr i32, ptr addrspace(1) %out, i64 ${i}\n store i32 %v${i}, ptr addrspace(1) %d${i}, align 4\n') }
 			source.write_string('ret void }\n'); continue
 		}
-		if name in ['floating_extrema', 'number_extrema'] {
-			minop := if name == 'number_extrema' { 'minimumnum' } else { 'minimum' }; maxop := if name == 'number_extrema' { 'maximumnum' } else { 'maximum' }
+		if name in ['floating_extrema', 'number_extrema', 'legacy_extrema'] {
+			minop := match name { 'number_extrema' { 'minimumnum' } 'legacy_extrema' { 'minnum' } else { 'minimum' } }; maxop := match name { 'number_extrema' { 'maximumnum' } 'legacy_extrema' { 'maxnum' } else { 'maximum' } }
 			source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load float, ptr addrspace(2) %a, align 4\n %y = load float, ptr addrspace(2) %b, align 4\n %ha = getelementptr i8, ptr addrspace(2) %a, i64 4\n %hb = getelementptr i8, ptr addrspace(2) %b, i64 4\n %hx = load half, ptr addrspace(2) %ha, align 2\n %hy = load half, ptr addrspace(2) %hb, align 2\n %f0 = call float @llvm.${minop}.f32(float %x, float %y)\n %f1 = call float @llvm.${maxop}.f32(float %x, float %y)\n %h0 = call half @llvm.${minop}.f16(half %hx, half %hy)\n %h1 = call half @llvm.${maxop}.f16(half %hx, half %hy)\n %v0 = bitcast float %f0 to i32\n %v1 = bitcast float %f1 to i32\n %i0 = bitcast half %h0 to i16\n %i1 = bitcast half %h1 to i16\n %v2 = zext i16 %i0 to i32\n %v3 = zext i16 %i1 to i32\n')
 			for i in 0 .. 4 { source.write_string('%d${i} = getelementptr i32, ptr addrspace(1) %out, i64 ${i}\n store i32 %v${i}, ptr addrspace(1) %d${i}, align 4\n') }
 			source.write_string('ret void }\n'); continue
@@ -1247,8 +1247,8 @@ fn sm_test_compute_library(label string) ![]u8 {
 		compute := if name in ['max', 'float_max'] { '%c = ${cmp} ${typ} %x, %y\n %v = select i1 %c, ${typ} %x, ${typ} %y\n' } else if name == 'frozen_sum' { '%bad = ${op} i32 %x, %y\n %v = freeze i32 %bad\n' } else { '%v = ${op} ${typ} %x, %y\n' }
 		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n ${gep}%x = load ${typ}, ptr addrspace(2) ${a}, align 4\n %y = load ${typ}, ptr addrspace(2) ${b}, align 4\n ${prior}${compute}store ${typ} %v, ptr addrspace(1) ${dst}, align 4\n ret void\n}\n')
 	}
-	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340}\n')
-	for i, name in names[..35] {
+	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340, !350}\n')
+	for i, name in names[..36] {
 		n := i * 10
 		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n!${n + 1} = !{}\n')
 		if name == 'empty' { source.write_string('!${n + 2} = !{}\n'); continue }
@@ -1553,22 +1553,24 @@ fn test_software_metal_compute() {
 		for i in 0 .. 80 { assert unsafe { *(&u8(extp + u64(i))) } == 0xcc }
 		sm_call(ext_command, c'commit'); assert sm_send(ext_command, c'status') == 4
 		for i, expected in [u32(0x80000000), 0, 0x8000, 0, 0x80000000, 0, 0x8000, 0, 0x7fc00000, 0x7fc00000, 0x7e00, 0x7e00, 0x7fc00000, 0x7fc00000, 0x7e00, 0x7e00, 0xff800000, 0x7f800000, 0xfc00, 0x7c00]! { assert unsafe { *(&u32(extp + u64(i * 4))) } == expected }
-		num_left := sm_test_buffer(d, 56, 0); num_right := sm_test_buffer(d, 56, 0); num_output := sm_test_buffer(d, 112, 0)
-		numap := sm_send(num_left, c'contents'); numbp := sm_send(num_right, c'contents'); nump := sm_send(num_output, c'contents')
-		unsafe { C.memset(voidptr(nump), 0xcc, 112) }
-		num_command := sm_send(queue, c'commandBuffer'); num_encoder := sm_send(num_command, c'computeCommandEncoder')
-		num_pipeline := sm_test_compute_pipeline(d, library, 'number_extrema', unsafe { nil }); assert num_pipeline != 0
-		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(num_encoder, c'setComputePipelineState:', num_pipeline) }
-		for i in 0 .. 7 {
-			sm_test_compute_buffer(num_encoder, num_left, u64(i * 8), 0); sm_test_compute_buffer(num_encoder, num_right, u64(i * 8), 3); sm_test_compute_buffer(num_encoder, num_output, u64(i * 16), 7)
-			sm_test_compute_dispatch(num_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+		for kernel_name in ['number_extrema', 'legacy_extrema'] {
+			num_left := sm_test_buffer(d, 56, 0); num_right := sm_test_buffer(d, 56, 0); num_output := sm_test_buffer(d, 112, 0)
+			numap := sm_send(num_left, c'contents'); numbp := sm_send(num_right, c'contents'); nump := sm_send(num_output, c'contents')
+			unsafe { C.memset(voidptr(nump), 0xcc, 112) }
+			num_command := sm_send(queue, c'commandBuffer'); num_encoder := sm_send(num_command, c'computeCommandEncoder')
+			num_pipeline := sm_test_compute_pipeline(d, library, kernel_name, unsafe { nil }); assert num_pipeline != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(num_encoder, c'setComputePipelineState:', num_pipeline) }
+			for i in 0 .. 7 {
+				sm_test_compute_buffer(num_encoder, num_left, u64(i * 8), 0); sm_test_compute_buffer(num_encoder, num_right, u64(i * 8), 3); sm_test_compute_buffer(num_encoder, num_output, u64(i * 16), 7)
+				sm_test_compute_dispatch(num_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+			}
+			sm_call(num_encoder, c'endEncoding'); objc_release(num_pipeline); objc_release(num_left); objc_release(num_right); objc_release(num_output)
+			for i, value in [u32(0), 0, 0x80000000, 0x8000, 0xff812345, 0xfc01, 0x3f800000, 0x3c00, 0x7f800001, 0x7c01, 0xff800000, 0xfc00, 1, 1]! { unsafe { *(&u32(numap + u64(i * 4))) = value } }
+			for i, value in [u32(0x80000000), 0x8000, 0, 0, 0x3f800000, 0x3c00, 0x7fc12345, 0x7e55, 0xffc00001, 0xfe01, 0x7f800000, 0x7c00, 0x80000001, 0x8001]! { unsafe { *(&u32(numbp + u64(i * 4))) = value } }
+			for i in 0 .. 112 { assert unsafe { *(&u8(nump + u64(i))) } == 0xcc }
+			sm_call(num_command, c'commit'); assert sm_send(num_command, c'status') == 4
+			for i, expected in [u32(0x80000000), 0, 0x8000, 0, 0x80000000, 0, 0x8000, 0, 0x3f800000, 0x3f800000, 0x3c00, 0x3c00, 0x3f800000, 0x3f800000, 0x3c00, 0x3c00, 0x7fc00000, 0x7fc00000, 0x7e00, 0x7e00, 0xff800000, 0x7f800000, 0xfc00, 0x7c00, 0x80000001, 1, 0x8001, 1]! { assert unsafe { *(&u32(nump + u64(i * 4))) } == expected }
 		}
-		sm_call(num_encoder, c'endEncoding'); objc_release(num_pipeline); objc_release(num_left); objc_release(num_right); objc_release(num_output)
-		for i, value in [u32(0), 0, 0x80000000, 0x8000, 0xff812345, 0xfc01, 0x3f800000, 0x3c00, 0x7f800001, 0x7c01, 0xff800000, 0xfc00, 1, 1]! { unsafe { *(&u32(numap + u64(i * 4))) = value } }
-		for i, value in [u32(0x80000000), 0x8000, 0, 0, 0x3f800000, 0x3c00, 0x7fc12345, 0x7e55, 0xffc00001, 0xfe01, 0x7f800000, 0x7c00, 0x80000001, 0x8001]! { unsafe { *(&u32(numbp + u64(i * 4))) = value } }
-		for i in 0 .. 112 { assert unsafe { *(&u8(nump + u64(i))) } == 0xcc }
-		sm_call(num_command, c'commit'); assert sm_send(num_command, c'status') == 4
-		for i, expected in [u32(0x80000000), 0, 0x8000, 0, 0x80000000, 0, 0x8000, 0, 0x3f800000, 0x3f800000, 0x3c00, 0x3c00, 0x3f800000, 0x3f800000, 0x3c00, 0x3c00, 0x7fc00000, 0x7fc00000, 0x7e00, 0x7e00, 0xff800000, 0x7f800000, 0xfc00, 0x7c00, 0x80000001, 1, 0x8001, 1]! { assert unsafe { *(&u32(nump + u64(i * 4))) } == expected }
 		class_input := sm_test_buffer(d, 80, 0); class_output := sm_test_buffer(d, 160, 0)
 		classap := sm_send(class_input, c'contents'); classp := sm_send(class_output, c'contents')
 		unsafe { C.memset(voidptr(classp), 0xcc, 160) }
@@ -1648,7 +1650,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/float-sign/rounding/sqrt/floating-extrema/number-extrema/classification/fma/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/float-sign/rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {

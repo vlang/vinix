@@ -365,7 +365,15 @@ both orders. Both operands are evaluated, so poison propagates and undef
 rejects even with a NaN counterpart. Each call costs one step and shares scalar
 validation/evaluation. Seven deferred dispatches check both zero orders, single
 and paired NaNs, infinity ordering and signed subnormals in both precisions.
-Legacy `minnum`/`maxnum` remain unsupported by the buffer profile.
+
+Direct LLVM `minnum`/`maxnum` use the scalar evaluator's permitted
+`minimumnum`/`maximumnum` refinement, including when an input is a signaling
+NaN. A single NaN selects the exact numeric operand, two NaNs produce the
+preferred quiet NaN and negative zero sorts below positive zero. Both operands
+are evaluated; poison propagates and undef rejects. Calls cost one step and
+share scalar validation/evaluation, with distinct legacy/modern declaration
+cache identities. Seven deferred legacy dispatches repeat the modern extrema
+checks, preserving exact bits through half/float loads, calls and stores.
 
 Direct LLVM `is.fpclass` accepts half/float and a literal defined i32 mask in
 0..1023, returning i1. It distinguishes ten raw-bit classes: signaling/quiet
