@@ -75,6 +75,9 @@ fn run() ! {
 		if outcome.passed || !outcome.reason.contains('HWTEST FAIL lease-holder: inherited handler ran before exec') { return error('signal control failed at wrong gate: ' + outcome.reason) }
 	} else if !outcome.passed { return error('lease holder check failed: ' + outcome.reason) }
 	serial := os.read_file(work + '/boot/serial.log')!
+	if wanted_outcome == 'closed-stdio' && !serial.contains('LEASE HOLDER CLOSED STDIO FAILURE PASS cwd7 exec8 ENOENT; borrowed lease intact; no children') {
+		return error('closed-stdio setup failure qualification missing')
+	}
 	actual_interrupts := serial.count('LEASE HOLDER caller wait EINTR')
 	if (wanted_outcome == 'caller-interrupt' && actual_interrupts < 1)
 		|| (wanted_outcome != 'caller-interrupt' && actual_interrupts != 0) { return error('real caller wait interruption count differs') }

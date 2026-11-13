@@ -292,6 +292,41 @@ fn concurrent_holders(kill_first bool) ! {
 	}
 }
 
+fn closed_stdio_failures() ! {
+	for stage in [7, 8]! {
+		path := '/tmp/closed-stdio-refusal-' + stage.str()
+		os.write_file(path, '')!
+		lease := C.open(path.str, C.O_RDONLY | C.O_CLOEXEC)
+		if lease < 3 || C.flock(lease, C.LOCK_SH | C.LOCK_NB) != 0 { return error('closed-stdio refusal lease setup failed') }
+		caller := C.fork()
+		if caller < 0 { return error('closed-stdio refusal caller fork failed') }
+		if caller == 0 {
+			C.close(0); C.close(1); C.close(2)
+			if !standard_streams_closed() { C._exit(88) }
+			command := launchhold.Command{
+				program: if stage == 7 { '/sbin/init' } else { '/missing-closed-stdio-program' }
+				directory: if stage == 7 { '/missing-closed-stdio-directory' } else { '/tmp' }
+			}
+			mut correct := false
+			if _ := launchhold.run(command, lease) {} else {
+				correct = err.msg() == 'generation lease holder setup stage ' + stage.str() + ' failed (errno ' + i32(C.ENOENT).str() + ')'
+				unsafe { err.free() }
+			}
+			if !correct || !standard_streams_closed() || C.fcntl(lease, C.F_GETFD) < 0 { C._exit(89) }
+			no_children() or { C._exit(90) }
+			lock_busy(path, true) or { C._exit(91) }
+			if !standard_streams_closed() { C._exit(92) }
+			C.close(lease)
+			C._exit(0)
+		}
+		C.close(lease)
+		wait_exit(caller, 0)!
+		lock_busy(path, false)!
+		no_children()!
+	}
+	println('LEASE HOLDER CLOSED STDIO FAILURE PASS cwd7 exec8 ENOENT; borrowed lease intact; no children')
+}
+
 fn refusals() ! {
 	os.write_file('/tmp/refusal-lease', '')!
 	lease := C.open(c'/tmp/refusal-lease', C.O_RDONLY | C.O_CLOEXEC)
@@ -378,6 +413,7 @@ fn suite() ! {
 	}
 	$if lease_holder_closed_stdio ? {
 		lifetime('/tmp/holder-closed-stdio', '37', false, false, false, false)!
+		closed_stdio_failures()!
 		println('LEASE HOLDER CLOSED STDIO PASS relocated status pipe; busy lease; original37; no children')
 		return
 	}
