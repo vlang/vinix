@@ -1218,7 +1218,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     target builds pass. [Authenticated client descriptor handoff](tests/packages/wine-lease-supervision-plan.md#authenticated-client-descriptor-handoff-2026-11-13)
     now passes real client exec, explicit environment, parent-copy closure,
     failure/status and signal controls on both native architectures. Actual
-    Wine bootstrap, signed startup and production lease wiring remain open.
+    Wine bootstrap through this path now passes a
+    [retained x86 Wine diagnostic](tests/packages/wine-lease-supervision-plan.md#retained-x86-wine-startup-diagnostic-2026-11-13):
+    the owned foreground server, authenticated handoff and real Win64 probe
+    complete successfully. Fresh signed/sandbox startup, ARM, application
+    working-directory semantics and production lease wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

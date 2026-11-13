@@ -730,6 +730,53 @@ cwd/config bootstrap, credentials/SCM acceptance, signed runtime/translator and
 sandbox startup still need qualification before production wiring. Generation
 lease integration and holder-death retention remain open.
 
+## Retained x86 Wine startup diagnostic, 2026-11-13
+
+Source `57596fcd7` adds `wine-owned-check.v`, `wine-owned-probe.v` and the
+`wineoverlay` module. Two fresh x86_64 builds/boots pass as ordinary uid/gid
+1000: the manager starts real Wine 9.17 with `--foreground`, authenticates its
+lock owner and socket against the owned unreaped child, and transfers that
+connection to the actual Wine client using `start_client` and an explicit
+environment. The retained Win64 application reports image protection, W^X,
+exception/read-fault recovery, shared-data and private-dispatch-child success.
+Client and foreground server both retire naturally with exact status zero.
+PID1 collects the suite's zero status before its final marker and harness stop.
+
+Each run uses a fresh private APFS clone of the pinned `native-x86-09` ISO from
+the [shared-user baseline](wine-shared-user-check.md). The private builder
+replaces only the fixed ordinary USTAR `/sbin/init` payload with the new guest
+ELF and a zero tail. Streaming verification compares every other ISO byte and
+the complete replacement/padding before and after boot. The original kernel,
+runtime, application, catalog and signatures remain unchanged; `overlay.json`
+binds image/guest/payload hashes and bounds. The harness's separately generated
+small rootfs/initramfs are retained but are not the complete guest filesystem.
+The retained kernel is not a qualification of the current production kernel.
+
+Production and ASan/UBSan host overlay checks pass, including ten refusals for
+outside-slot mutation, wrong original payload, oversized replacement, corrupted
+padding/payload, duplicate or linked init, invalid extent, bad checksum and
+missing end marker. The overlay requires stopped trusted host writers; it is
+not an archive extractor or a hostile namespace-race boundary. The controller
+admits actual parsed guest V sources and verifies selected tool, firmware,
+source and baseline hashes. No historical auditor was weakened.
+
+Complete attempts, source views, generated C, binaries, commands, logs and both
+diagnostic images: `/Users/alex/.cache/vwo-20261113-01` (frozen).
+Complete typed inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-owned-20261113-01.inventory.json`,
+SHA-256 `2e44d89a0183dd296adef9e70152e8a564fd61a04425cb26430a6f111005e19b`.
+Recording and independent verification pass with adjacent logs. Final
+`run-02` uses the complete current sources; `run-01` preserves its earlier
+overlay-test source view. Original audit bundles remain intact and required.
+
+This is a direct ordinary-account diagnostic with explicitly supplied SDK
+context from the retained baseline. Fresh package/signature admission,
+sandbox startup, ARM/translator and production-runner wiring remain open.
+The client starts in the prefix, leaving application cwd/relative-path
+semantics unqualified. No generation lease or descendant barrier is installed;
+holder-death retention remains open. Full C toolchain/environment inventory and
+kernel/V heap retention are not established by this check.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
