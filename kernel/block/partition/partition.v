@@ -11,6 +11,15 @@ import errno
 
 const gpt_signature = u64(0x5452415020494645)
 
+// The scan reads the entry array into one buffer before parsing it, so what
+// the header claims is capped: the UEFI minimum table is 128 entries of 128
+// bytes, and a table past this bound is malformed whatever the disk size.
+const gpt_max_table_bytes = u64(1024 * 1024)
+
+// LBA 0 holds the protective MBR and LBA 1 the header, so a primary entry
+// array starts at LBA 2 at the earliest.
+const gpt_min_table_lba = u64(2)
+
 struct Partition {
 pub mut:
 	stat     stat.Stat
@@ -150,9 +159,14 @@ fn partition_name(prefix string, index int) string {
 
 pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 	parent_identity := resource.block_identity(mut parent_device)
-	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
+	blksize := u64(parent_device.stat.blksize)
+	if blksize < 512 || blksize > 65536 || (blksize & (blksize - 1)) != 0 {
+		print('block: invalid sector size\n')
+		return -1
+	}
+	lba_buffer := memory.malloc(blksize)
 
-	parent_device.read(0, lba_buffer, u64(parent_device.stat.blksize), u64(parent_device.stat.blksize)) or {
+	parent_device.read(0, lba_buffer, blksize, blksize) or {
 		print('block: unable to read from device\n')
 		return -1
 	}
@@ -160,27 +174,58 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 	gpt_hdr := unsafe { *&GPTPartitionTableHDR(lba_buffer) }
 
 	if gpt_hdr.identifier == gpt_signature {
-		entry_list_lba := gpt_hdr.partition_array_lba
-		entry_cnt := gpt_hdr.partition_entry_cnt
-		entry_list_size := lib.align_up(sizeof(GPTPartitionEntry) * entry_cnt, u64(parent_device.stat.blksize))
+		// Every field below comes from the disk, and memory.malloc is
+		// infallible: an allocation sized from an unvalidated header
+		// turns a malformed disk into a kernel panic instead of an
+		// unpartitioned device. Validate everything before allocating.
+		disk_sectors := u64(parent_device.stat.size) / blksize
 
-		if gpt_hdr.partition_entry_size != sizeof(GPTPartitionEntry) {
-			print('gpt: fatal parsing error\n')
+		entry_size := u64(gpt_hdr.partition_entry_size)
+		// UEFI requires SizeOfPartitionEntry to be 128 * 2^n.
+		if entry_size < u64(sizeof(GPTPartitionEntry)) || (entry_size & (entry_size - 1)) != 0 {
+			print('gpt: invalid partition entry size\n')
+			return -1
+		}
+		entry_cnt := u64(gpt_hdr.partition_entry_cnt)
+		if entry_cnt == 0 {
+			print('gpt: invalid partition entry count\n')
+			return -1
+		}
+		// Both fields are 32-bit, so their product cannot wrap; refuse
+		// any table beyond a small absolute bound whatever it claims.
+		table_bytes := entry_cnt * entry_size
+		if table_bytes > gpt_max_table_bytes {
+			print('gpt: partition table too large\n')
+			return -1
+		}
+		table_sectors := (table_bytes + blksize - 1) / blksize
+		entry_list_lba := gpt_hdr.partition_array_lba
+		// The array must sit between the header and the header's first
+		// usable block, and inside the disk. Once these bounds hold the
+		// subtractions cannot wrap, and neither can the byte offsets
+		// computed from them below.
+		if gpt_hdr.first_block < gpt_min_table_lba || gpt_hdr.first_block > disk_sectors
+			|| entry_list_lba < gpt_min_table_lba || entry_list_lba >= gpt_hdr.first_block
+			|| table_sectors > gpt_hdr.first_block - entry_list_lba {
+			print('gpt: partition table extent out of range\n')
 			return -1
 		}
 
+		entry_list_size := table_sectors * blksize
 		partition_entry_buffer := memory.malloc(entry_list_size)
 
-		parent_device.read(0, partition_entry_buffer, u64(entry_list_lba * parent_device.stat.blksize),
-			entry_list_size) or {
+		parent_device.read(0, partition_entry_buffer, entry_list_lba * blksize, entry_list_size) or {
 			print('block: unable to read from device\n')
 			return -1
 		}
 
 		partition_entry_list := unsafe { &GPTPartitionEntry(partition_entry_buffer) }
 
-		for i := 0; i < entry_cnt; i++ {
-			partition_entry := unsafe { &GPTPartitionEntry(&partition_entry_list[i]) }
+		for i := 0; u64(i) < entry_cnt; i++ {
+			// Entries may be spaced wider than the parsed 128 bytes.
+			partition_entry := unsafe {
+				&GPTPartitionEntry(u64(partition_entry_list) + u64(i) * entry_size)
+			}
 
 			if partition_entry.partition_type_guid[0] == 0
 				&& partition_entry.partition_type_guid[1] == 0 {
