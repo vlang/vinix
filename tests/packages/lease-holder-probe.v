@@ -182,6 +182,50 @@ fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high
 	no_children()!
 }
 
+fn concurrent_holders() ! {
+	mut callers := [i32(0), i32(0)]!
+	for index in 0 .. 2 {
+		root := '/tmp/concurrent-holder-' + index.str()
+		os.mkdir(root)!
+		os.write_file(root + '/lease', '')!
+		lease := C.open((root + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+		if lease < 3 || C.flock(lease, C.LOCK_SH | C.LOCK_NB) != 0 { return error('concurrent lease setup failed') }
+		caller := C.fork()
+		if caller < 0 { return error('concurrent caller fork failed') }
+		if caller == 0 {
+			C.signal(C.SIGUSR2, C.SIG_IGN)
+			code := launchhold.run(launchhold.Command{program: '/sbin/init', directory: '/tmp',
+				arguments: ['client', root, if index == 0 { '37' } else { '126' }, lease.str()]}, lease) or { C._exit(85); return }
+			C.close(lease)
+			C._exit(i32(code))
+		}
+		C.close(lease)
+		callers[index] = caller
+	}
+	outsider := C.fork()
+	if outsider < 0 { return error('unrelated child fork failed') }
+	if outsider == 0 { C._exit(97) }
+	for index in 0 .. 2 {
+		root := '/tmp/concurrent-holder-' + index.str()
+		await_file(root + '/ready')!
+		await_file(root + '/client-gone')!
+		lock_busy(root + '/lease', true)!
+		mut status := i32(0)
+		if C.waitpid(callers[index], &status, C.WNOHANG) != 0 { return error('concurrent holder retired early') }
+	}
+	// Retire in reverse order, requiring the other holder's lock to survive.
+	os.write_file('/tmp/concurrent-holder-1/release', '')!
+	wait_exit(callers[1], 126 << 8)!
+	lock_busy('/tmp/concurrent-holder-1/lease', false)!
+	lock_busy('/tmp/concurrent-holder-0/lease', true)!
+	wait_exit(outsider, 97 << 8)!
+	os.write_file('/tmp/concurrent-holder-0/release', '')!
+	wait_exit(callers[0], 37 << 8)!
+	lock_busy('/tmp/concurrent-holder-0/lease', false)!
+	no_children()!
+	println('LEASE HOLDER CONCURRENT PASS independent leases and statuses; unrelated child waitable')
+}
+
 fn refusals() ! {
 	os.write_file('/tmp/refusal-lease', '')!
 	lease := C.open(c'/tmp/refusal-lease', C.O_RDONLY | C.O_CLOEXEC)
@@ -260,6 +304,7 @@ fn suite() ! {
 	lifetime('/tmp/holder-caller-death', '37', true, false, false, false)!
 	lifetime('/tmp/holder-cancellation', '37', false, true, true, false)!
 	refusals()!
+	concurrent_holders()!
 	println('LEASE HOLDER PASS statuses 37/126/127/143; double-fork setsid; caller death; cancellation; descriptor isolation; setup refusals')
 }
 fn main() {
