@@ -29,7 +29,7 @@ fn run_wine() ! {
 	defer { prefix.close() }
 	name := os.base(os.args[0])
 	defer { unsafe { name.free() } }
-	if name !in ['wine-runner', 'wine', 'wine64', 'wineserver'] { return error('unknown Wine adapter mode') }
+	wineadapter.clear_bridge_overrides(name)!
 	if name == 'wine-runner' {
 		program := context.app_directory + '/bin/program.exe'
 		defer { unsafe { program.free() } }
@@ -45,7 +45,6 @@ fn run_wine() ! {
 	fonts := root + '/etc/fonts'
 	font_file := fonts + '/fonts.conf'
 	defer { unsafe { program.free(); identity.free(); loader.free(); libraries.free(); dlls.free(); wine_loader.free(); wine_server.free(); fonts.free(); font_file.free() } }
-	for key in ['LD_LIBRARY_PATH', 'LD_PRELOAD', 'QEMU_LD_PREFIX', 'QEMU_SET_ENV', 'QEMU_UNSET_ENV', 'VINIX_ALLOW_WX', 'WINEDLLOVERRIDES', 'WINEDEBUG']! { os.unsetenv(key) }
 	for variable in [WineVariable{'WINEARCH', 'win64'}, WineVariable{'WINEPREFIX', prefix.path}, WineVariable{'WINEDLLPATH', dlls},
 		WineVariable{'WINELOADERNOEXEC', '1'}, WineVariable{'WINELOADER', wine_loader}, WineVariable{'WINESERVER', wine_server},
 		WineVariable{'USER', 'vinix'}, WineVariable{'LOGNAME', 'vinix'}, WineVariable{'USERNAME', 'vinix'},
