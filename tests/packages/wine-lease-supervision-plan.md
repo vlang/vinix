@@ -1307,6 +1307,68 @@ refusals, default activation, ARM ownership, fresh owned GUI, idle server and
 caller death cases, holder SIGKILL/kernel-owned retention, full C environment/heap and
 hermetic/reproducible qualification remain open.
 
+## Signed caller death, 2026-11-13
+
+Source `5d1c3c8af` adds explicit `--owned-manager --caller-death-probe` to the
+host controller. The new define applies only to the guest observer; the actual
+package CLI uses the existing owned production path. ARM, missing owned mode
+and simultaneous lifetime probes refuse before signing/workload setup. The
+expanded mode controls pass nine refusals, preserving prior mode behavior.
+
+`native-02` freshly signs/publishes/installs the retained prepared runtime/PE
+and rebuilds the current guest and package CLI. After the initial Win64 client
+exits with a live Windows child/server, the fixture identifies exactly two
+ordinary UID/GID 1000 package processes with the launch argv. Their direct
+parent/child relationship distinguishes the non-execing holder from its caller.
+An independent parent-chain check ties that holder to the actual runtime SDK
+bridge and observed foreground server. Ambiguous or inconsistent roles refuse
+before targeting the caller. It kills the ordinary caller with SIGKILL, observes its
+absence and outer CLI status 137, and confirms the holder survives under PID1.
+The original lease owner dies here; killing only the root wrapper would not
+establish this case.
+
+Real remove/rollback transactions make running generation 1 neither active
+nor rollback. Three `gc` calls retain it and its unchanged PE while exclusive
+nonblocking flock refuses EAGAIN/EWOULDBLOCK. The caller/outer CLI remain gone;
+holder, server and Windows child remain live and non-zombie. Only afterward
+is the child released. Wine retires naturally, and a targeted wait for the
+adopted holder requires its saved status 37. Fixture PID1 collects that holder,
+with no Wine-process rescue reaping. The initial client, caller, holder, server
+and child are absent at completion. A fourth collection removes generation 1
+while active state and rollback remain. Result: `passed=true`,
+`interrupted=false`, 129.575 seconds.
+
+`native-03` passes the existing live-caller collection case on the same input
+bytes, preserving ordinary status 37 and natural/post-retirement cleanup:
+`passed=true`, `interrupted=false`, 116.728 seconds. Both runs pass parsed-source,
+selected-input and generated-output rechecks; complete input maps are
+byte-identical. The first failed fixture attempt expected the SDK entrypoint
+under the application instead of the runtime directory. That assertion was
+corrected from the existing launch implementation; original source, generated
+C, logs and failed result remain. That attempt never reached the caller-kill
+step; its normal failure cleanup stopped the outer CLI and guest.
+
+Sources, native input snapshots, C/binaries, boot media, literal commands,
+logs and all attempts are frozen at `/Users/alex/.cache/vwdeath-20261113-01`.
+`selected-inputs-01` preserves the complete selected native file bytes before
+documentation edits. The prior prepared runtime/PE and original producer
+bundles remain separate required inputs. No historical checker or previous
+frozen bundle was modified; snapshots do not waive original namespaces.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-caller-death-20261113-01.inventory.json`,
+SHA-256 `abd0a5e4f68381b2aa3cd67b534614d49ab6e5cd893e13d161e04b6ad80da867`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and the referenced original producer/input bundles.
+
+This qualifies local signed x86 package-caller SIGKILL while the private
+holder, SDK manager, server and Windows child survive. It does not qualify
+holder or SDK-manager death, whole-session/logout teardown, pure idle-server
+collection, ARM ownership, fresh owned GUI, default activation, arbitrary
+descendant/refusal cases or kernel-owned lease retention. Kernel, sandbox and
+account/session helpers are retained selected inputs; full C environment,
+heap and hermetic/reproducible gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

@@ -1890,6 +1890,18 @@ execution, fresh owned graphics, broader lifetime/refusal controls and holder
 SIGKILL retention remain open. See the [owned launch qualification](../../tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13)
 and [collection qualification](../../tests/packages/wine-lease-supervision-plan.md#collection-after-initial-client-exit-2026-11-13).
 
+`--owned-manager --caller-death-probe` on `wine-native-check` selects the local
+signed x86 caller-death check. It identifies the ordinary package caller and
+private holder by credentials, argv and parent relationships, then ties the
+holder to the actual SDK manager/server chain before killing the caller.
+Collection must retain the obsolete generation while that holder and Wine
+survive. After natural retirement, fixture PID1 collects only the adopted
+holder and requires its saved status 37; the outer caller reports SIGKILL (137).
+This uses the same 3 GiB fixture and is mutually exclusive with
+`--collection-probe`. The [caller-death report](../../tests/packages/wine-lease-supervision-plan.md#signed-caller-death-2026-11-13)
+records its scope; holder SIGKILL, full session teardown and broader lifetime
+guarantees remain open.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership

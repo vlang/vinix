@@ -1253,7 +1253,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now retains an obsolete generation through three collection attempts after
     the initial client exits with a live Windows child/server, then removes it
     after natural retirement while preserving initial status 37. This is a local
-    x86 console check. [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
+    x86 console check. A [signed caller-death case](tests/packages/wine-lease-supervision-plan.md#signed-caller-death-2026-11-13)
+    now kills the ordinary package caller while its private holder and Wine
+    workload survive, retains the obsolete generation through collection, then
+    collects the holder's original status 37 and retires the generation after
+    natural workload exit. Holder death remains a separate gate.
+    [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.
     Default activation, ARM owned Wine, fresh owned graphical
