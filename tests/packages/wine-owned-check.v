@@ -93,13 +93,13 @@ fn build_overlay() ! {
 	if wineoverlay.digest(baseline)! != baseline_hash { return error('original image changed during overlay') }
 }
 fn run() ! {
-	if os.args.len !in [6, 7, 8] { return error('usage: CHECK FRESH_OUTPUT SYSROOT GCC_INSTALL CLANG V [owned|lease|lease-caller-death|lease-unheld|cwd|cwd-wrong|sandbox|sandbox-cwd] [CWD_PE]') }
+	if os.args.len !in [6, 7, 8] { return error('usage: CHECK FRESH_OUTPUT SYSROOT GCC_INSTALL CLANG V [owned|lease|lease-caller-death|lease-unheld|lease-recovery|cwd|cwd-wrong|sandbox|sandbox-cwd] [CWD_PE]') }
 	mode := if os.args.len >= 7 { os.args[6] } else { 'owned' }
-	if mode !in ['owned', 'lease', 'lease-caller-death', 'lease-unheld', 'cwd', 'cwd-wrong', 'sandbox', 'sandbox-cwd'] { return error('unknown Wine diagnostic mode') }
+	if mode !in ['owned', 'lease', 'lease-caller-death', 'lease-unheld', 'lease-recovery', 'cwd', 'cwd-wrong', 'sandbox', 'sandbox-cwd'] { return error('unknown Wine diagnostic mode') }
 	cwd := mode in ['cwd', 'cwd-wrong', 'sandbox-cwd']
 	sandbox := mode in ['sandbox', 'sandbox-cwd']
 	if (cwd && os.args.len != 8) || (!cwd && os.args.len == 8) { return error('only cwd diagnostics require an explicit Win64 payload') }
-	leasing := mode in ['lease', 'lease-caller-death', 'lease-unheld']
+	leasing := mode in ['lease', 'lease-caller-death', 'lease-unheld', 'lease-recovery']
 	rebasing := mode != 'owned'
 	selected_kernel := if rebasing { lease_kernel } else { kernel }
 	selected_hash := if rebasing { lease_kernel_hash } else { kernel_hash }
@@ -139,7 +139,8 @@ fn run() ! {
 		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path', '@vlib|' + root + '|@vmodules', '-o', work + '/guest.c', compiled_probe]
 	if leasing { command.insert(1, ['-d', 'wine_owned_lease']) }
 	if mode == 'lease-unheld' { command.insert(1, ['-d', 'wine_owned_lease_unheld']) }
-	if mode == 'lease-caller-death' { command.insert(1, ['-d', 'wine_owned_lease_caller_death']) }
+	if mode in ['lease-caller-death', 'lease-recovery'] { command.insert(1, ['-d', 'wine_owned_lease_caller_death']) }
+	if mode == 'lease-recovery' { command.insert(1, ['-d', 'wine_owned_recovery']) }
 	if cwd { command.insert(1, ['-d', 'wine_owned_cwd']) }
 	if mode == 'cwd-wrong' { command.insert(1, ['-d', 'wine_owned_cwd_wrong']) }
 	if sandbox { command.insert(1, ['-d', 'wine_owned_sandbox']) }
@@ -168,7 +169,13 @@ fn run() ! {
 	boot_host := hwhost.Host{...host, root: work + '/builder'}
 	mut required := if leasing { ['WINE OWNED SERVER CONNECT PASS', 'VINIX SIGNED REAL WIN64 PASS', 'WINE OWNED LEASE MANAGER PASS', 'WINE OWNED LEASE BUSY PASS', 'WINE OWNED LEASE PASS manager=37; descendants retired; lease free', 'HWTEST PASS owned Wine diagnostic'] }
 		else { ['WINE OWNED SERVER CONNECT PASS', 'VINIX SIGNED REAL WIN64 PASS', 'WINE OWNED CLIENT EXEC PASS', 'WINE OWNED RELATIVE APPLICATION PASS', 'HWTEST PASS owned Wine diagnostic'] }
-	if mode == 'lease-caller-death' { required << 'WINE OWNED LEASE CALLER DEATH PASS lease remains busy' }
+	if mode in ['lease-caller-death', 'lease-recovery'] { required << 'WINE OWNED LEASE CALLER DEATH PASS lease remains busy' }
+	if mode == 'lease-recovery' {
+		required << 'WINE OWNED RECOVERY GUARD PASS competing launch refused'
+		required << 'WINE OWNED RECOVERY SERVER PASS surviving server refused'
+		required << 'WINE OWNED RECOVERY PASS same prefix relaunched after retirement'
+		required << 'WINE OWNED CLIENT EXEC PASS'
+	}
 	if cwd {
 		required = ['WINE OWNED SERVER CONNECT PASS', 'WINE OWNED CLIENT EXEC PASS', 'WINE WINDOWS CWD HOST CHECK PASS', 'HWTEST PASS owned Wine diagnostic']
 		required << if mode != 'cwd-wrong' { 'WINE WINDOWS CWD PASS current directory; relative read/write; child inheritance' } else { 'WINE WINDOWS CWD CONTROL PASS incorrect expected directory detected' }

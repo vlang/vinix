@@ -53,7 +53,7 @@ fn suite() ! {
 	C.alarm(150)
 	data := '/tmp/vinix-owned-wine/data'
 	os.mkdir_all(data)!; os.chmod(data, 0o700)!
-	os.mkdir(data + '/tmp')!
+	os.mkdir_all(data + '/tmp')!
 	generation := '/var/lib/vinix-packages/generations/1/apps'
 	runtime := generation + '/org.vinix.wine-runtime'
 	app := generation + '/org.vinix.wine-win64-probe'
@@ -105,6 +105,16 @@ fn suite() ! {
 	mut connection := server.await_connection(&directory, &guard, data, 5000)!
 	defer { connection.close() }
 	println('WINE OWNED SERVER CONNECT PASS')
+	$if wine_owned_recovery ? {
+		if os.args.len == 2 && os.args[1] == '--lease-manager' {
+			os.write_file('/tmp/vinix-owned-lease/server-ready', 'ready')!
+			deadline := time.sys_mono_now() + 10 * time.second
+			for !os.exists('/tmp/vinix-owned-lease/continue-client') {
+				need(time.sys_mono_now() < deadline, 'managed prefix contention check timed out')!
+				time.sleep(time.millisecond)
+			}
+		}
+	}
 	// Admit this exact application directory from the retained image separately.
 	// Launch relative to it, so success also proves Wine resolves the client's
 	// initial relative application path outside the prefix.
@@ -134,6 +144,7 @@ fn suite() ! {
 		time.sleep(10 * time.millisecond)
 	}
 	$if wine_owned_lease ? {
+		if os.args.len == 2 && os.args[1] == '--lease-manager' {
 		need(!server.collect()!.collected, 'persistent Wine server retired before manager')!
 		os.write_file('/tmp/vinix-owned-lease/client-complete.tmp', server.process_id().str() + '\n' + C.getppid().str())!
 		os.rename('/tmp/vinix-owned-lease/client-complete.tmp', '/tmp/vinix-owned-lease/client-complete')!
@@ -141,6 +152,7 @@ fn suite() ! {
 		// Deliberate manager retirement without running its cleanup defers. The
 		// non-execing holder must adopt and wait for the still-live Wine server.
 		C._exit(37)
+		}
 	}
 	server_deadline := time.sys_mono_now() + 30 * time.second
 	for {
@@ -168,6 +180,31 @@ fn lease_busy(path string, wanted bool) ! {
 	result := C.flock(fd, C.LOCK_EX | C.LOCK_NB)
 	if wanted { need(result != 0 && C.errno == C.EAGAIN, 'live Wine lease was not busy')! }
 	else { need(result == 0, 'retired Wine lease remained busy')! }
+}
+
+fn recovery_admission(busy_guard bool) ! {
+	data := '/tmp/vinix-owned-wine/data'
+	builtins := '/var/lib/vinix-packages/generations/1/apps/org.vinix.wine-runtime/root/usr/lib/wine/x86_64-windows'
+	mut prefix := wineadapter.prepare_prefix(data, builtins)!
+	defer { prefix.close() }
+	mut guard := prefix.acquire_launch(data) or {
+		matched := busy_guard && err.msg().contains('already has a managed launch')
+		unsafe { err.free() }
+		need(matched, 'competing Wine prefix failed at wrong guard gate')!
+		println('WINE OWNED RECOVERY GUARD PASS competing launch refused')
+		return
+	}
+	defer { guard.close() }
+	need(!busy_guard, 'competing Wine prefix acquired live manager guard')!
+	mut directory := guard.prepare_server_directory(data) or {
+		matched := err.msg().contains('Wine server lock already has an owner')
+		unsafe { err.free() }
+		need(matched, 'surviving Wine server failed at wrong admission gate')!
+		println('WINE OWNED RECOVERY SERVER PASS surviving server refused')
+		return
+	}
+	directory.close()
+	return error('surviving Wine server was admitted as idle')
 }
 
 fn lease_suite() ! {
@@ -199,6 +236,15 @@ fn lease_suite() ! {
 	}
 	C.close(lease)
 	need(caller > 0, 'cannot fork Wine diagnostic caller')!
+	$if wine_owned_recovery ? {
+		deadline := time.sys_mono_now() + 60 * time.second
+		for !os.exists(root + '/server-ready') {
+			need(time.sys_mono_now() < deadline, 'owned server readiness marker timed out')!
+			time.sleep(time.millisecond)
+		}
+		recovery_admission(true)!
+		os.write_file(root + '/continue-client', 'continue')!
+	}
 	marker := root + '/client-complete'
 	deadline := time.sys_mono_now() + 100 * time.second
 	for !os.exists(marker) {
@@ -228,6 +274,11 @@ fn lease_suite() ! {
 	need(C.owned_wine_waitpid(caller, &status, C.WNOHANG) == 0, 'Wine holder returned with live adopted server')!
 	lease_busy(lease_path, true)!
 	println('WINE OWNED LEASE BUSY PASS client gone; live server adopted')
+	$if wine_owned_recovery ? {
+		recovery_admission(false)!
+		need(os.exists(server_status), 'admission refusal removed surviving Wine server')!
+		lease_busy(lease_path, true)!
+	}
 	mut awaited := caller
 	$if wine_owned_lease_caller_death ? {
 		need(C.kill(caller, C.SIGTERM) == 0, 'cannot terminate Wine lease caller')!
@@ -253,6 +304,24 @@ fn lease_suite() ! {
 	lease_busy(lease_path, false)!
 	need(!os.exists(server_status), 'Wine server still present after holder return')!
 	println('WINE OWNED LEASE PASS manager=37; descendants retired; lease free')
+	$if wine_owned_recovery ? {
+		// Reuse the same private prefix and original signed-baseline executable.
+		// Successful startup also requires an idle lock and absent stale socket.
+		child := C.fork()
+		if child == 0 {
+			argv := [c'/sbin/init', c'--recovery-manager', &char(unsafe { nil })]!
+			C.execv(c'/sbin/init', unsafe { &&char(&argv[0]) }); C._exit(99)
+		}
+		need(child > 0, 'cannot fork Wine recovery manager')!
+		for {
+			waited := C.owned_wine_waitpid(child, &status, 0)
+			if waited < 0 && C.errno == C.EINTR { continue }
+			need(waited == child && status == 0, 'Wine same-prefix relaunch failed')!
+			break
+		}
+		lease_busy(lease_path, false)!
+		println('WINE OWNED RECOVERY PASS same prefix relaunched after retirement')
+	}
 }
 fn sandbox_stage() ! {
 	data := '/tmp/vinix-owned-wine/data'
@@ -302,9 +371,12 @@ fn main() {
 		}
 	}
 	$if wine_owned_lease ? {
-		if os.args.len == 2 && os.args[1] == '--lease-manager' {
+		if os.args.len == 2 && os.args[1] in ['--lease-manager', '--recovery-manager'] {
 			need(os.getuid() == 1000 && os.geteuid() == 1000, 'Wine manager requires ordinary account') or { C._exit(94) }
 			suite() or { eprintln('HWTEST FAIL Wine lease manager: ' + err.msg()); C._exit(95) }
+			$if wine_owned_recovery ? {
+				if os.args[1] == '--recovery-manager' { C._exit(0) }
+			}
 			C._exit(96)
 		}
 	}
