@@ -83,6 +83,14 @@ infinity remains positive infinity. Negative nonzero inputs and NaNs produce
 the evaluator's preferred quiet NaN. Poison propagates and undef rejects.
 Each call costs one step and shares scalar validation/evaluation.
 
+Direct LLVM `minimum`/`maximum` support matching half/float operands and results.
+They propagate a NaN from either input, using the scalar evaluator's preferred
+quiet NaN representation. Other results preserve the selected input bits;
+negative zero sorts below positive zero in either operand order. Both operands
+are evaluated; poison propagates and undef rejects. Each call costs one step
+and shares scalar validation/evaluation. Number-preferring and legacy
+`minimumnum`/`maximumnum`/`minnum`/`maxnum` remain outside this buffer profile.
+
 Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
 the result type. The amount is reduced modulo the width, so equal operands
 produce rotations and oversized amounts are defined. A zero amount selects
@@ -126,7 +134,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these twenty-eight families' exact declarations are admitted:
+Only ordinary direct calls to these thirty families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -228,5 +236,8 @@ checked separately. Other results compare exact raw bits, including zero signs.
 With a trailing `sqrt` argument, the same checker tests square root and
 `sqrt(fabs(x))`, every half encoding, float midpoint-square neighbors across
 the normal exponent range, domain/NaN cases and host rounding independence.
+`tests/ios/air-memory-float-extrema.v` compares minimum/maximum and mixed cached
+chains with native LLVM, including every half encoding with zero/unit anchors,
+both precisions' class/NaN/zero-order matrices and independent chain identities.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
