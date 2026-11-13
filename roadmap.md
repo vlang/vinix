@@ -1246,7 +1246,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     launches into the private holder for Windows. Native adoption/lifetime,
     status and missing-lease controls pass. [Concurrent native holders](tests/packages/wine-lease-supervision-plan.md#concurrent-native-holders-2026-11-13)
     now preserve independent leases and exit statuses on both architectures
-    while an unrelated fixture child remains waitable.
+    while an unrelated fixture child remains waitable. A [concurrent caller-death case](tests/packages/wine-lease-supervision-plan.md#concurrent-native-caller-death-2026-11-13)
+    also retains the orphaned holder's lease through the other launch's
+    retirement and preserves both original statuses.
     [Low-descriptor handling](tests/packages/wine-lease-supervision-plan.md#low-numbered-generation-leases-2026-11-13)
     now preserves a verified lease occupying a stdio slot without passing it
     to the workload. A [fresh locally signed x86 console launch](tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13)

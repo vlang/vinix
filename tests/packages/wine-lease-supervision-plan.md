@@ -1488,6 +1488,37 @@ SHA-256 `be9d40f0fd6b8ca1ca43cc6b612caecb7f94327eb0a6a1aa692b364e4ef7bd70`.
 Recording and independent verification pass with adjacent logs. Preserve the
 entire frozen workspace and referenced original kernel/input bundles.
 
+## Concurrent native caller death, 2026-11-13
+
+Source `095428cd4` adds a separate concurrent-holder case to the standard
+native suite. After both initial clients exit with detached workers live,
+caller 0 receives SIGKILL and its exact signal status is collected. Both
+leases must remain busy. Caller 1 then retires naturally with status 126;
+its lease becomes free while the orphaned holder's lease stays busy. The
+unrelated fixture child remains waitable with status 97. Releasing worker 0
+allows targeted collection of the adopted holder with original status 37;
+its lease becomes free and no children remain. The host requires this new
+marker as well as the preceding natural concurrent-retirement marker.
+
+The complete standard suites pass on retained production kernels: x86_64
+13.793 seconds, AArch64 6.836 seconds, both `passed=true` and uninterrupted.
+Parsed-source, selected-input and generated-output checks pass. Production
+holder/kernel code is unchanged. This qualifies independent native callers,
+not same-caller threaded invocation or concurrent signed Wine workloads.
+Holder death, SDK-manager death and whole-session teardown remain separate.
+
+Complete evidence and native input byte snapshots are frozen at
+`/Users/alex/.cache/vwconcurrent-death-20261113-01`. Preserve the original
+kernel qualification bundle and namespaces; historical audit contracts still
+apply. ARM owned Wine, fresh owned GUI, default activation and broader
+topology/heap/hermetic gates remain open.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/concurrent-holder-death-20261113-01.inventory.json`,
+SHA-256 `e74660ec8b3aeeb31e89a28cba33875f591466ae3f6fdfff249751c277b98d67`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original kernel/input bundles.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
