@@ -1237,9 +1237,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     Windows process promises and grant classes, with unveil and pledge refusal
     controls. [Real Wine prefix relaunch checks](tests/packages/wine-lease-supervision-plan.md#prefix-contention-and-post-manager-relaunch-2026-11-13)
     now refuse a competing guard and a surviving server after manager death,
-    then pass a same-prefix launch after retirement. Fresh signing/current-launcher
-    acceptance, ARM Wine, broader path mappings and production lease wiring
-    remain open.
+    then pass a same-prefix launch after retirement. The SDK entrypoint now has
+    an [opt-in owned x86 mode](tests/packages/wine-lease-supervision-plan.md#opt-in-owned-sdk-entrypoint-2026-11-13)
+    that passes actual SDK loading, real Win64 execution through the retained
+    sandbox and application-path refusal. Default ARM/x86 builds still pass;
+    default activation, fresh signing/current package-launch acceptance, ARM
+    owned Wine, broader mappings and production lease wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

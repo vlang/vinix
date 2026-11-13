@@ -1008,6 +1008,50 @@ production recovery/lease wiring. Fresh signing/current-launcher admission,
 ARM Wine and holder SIGKILL retention remain open. No new kernel, full C
 environment, heap-retention or reproducibility guarantee is added.
 
+## Opt-in owned SDK entrypoint, 2026-11-13
+
+Source `564c23f44` adds `-d wine_owned_manager` to the SDK's actual
+`wine-runner.v`. Only the x86_64 top-level entry uses owned prefix/server
+admission and authenticated client handoff. It captures the initial cwd,
+snapshots the canonical environment before fork, collects the client result
+and returns it after direct server retirement. Still-owned direct children are
+cleaned up on errors. Existing SDK/process/architecture/application-argument
+checks run first; nested aliases remain exec bridges. Default builds keep the
+bridge and enabled top-level entries on other architectures refuse.
+
+Final `check-04/runner-03` compiles this actual source with the flag and admits
+its parsed V closure, embeds a compressed fresh ELF in the diagnostic init,
+then executes it through the retained sandbox with the supplied SDK environment
+and current Windows process policy. The runner itself calls `appsdk.load()`.
+The unchanged retained Win64 application passes; PID1 collects the actual
+runner's exact zero result. `refused-01` changes argv[1] and requires the exact
+application-path admission error and exit 126. `recovery-01` preserves the
+earlier diagnostic's guard/server refusal and post-caller-death relaunch checks.
+Default ARM and x86 runner builds also compile/link; those are smoke checks,
+not fresh native runtime qualifications.
+
+An initial run reached Win64 PASS but failed cleanup. Generated C exposed a
+typed array free retiring borrowed command strings; the final code frees only
+that buffer. The failed run, earlier source views and successful correction
+remain retained. Both runner and guest parsed sources, selected input hashes,
+compressed/raw ELF and complete ISO payload/padding verification are checked.
+The existing verified rebase embeds the retained production x86 kernel while
+preserving runtime/app/sandbox bytes. No historical auditor was weakened.
+
+Complete sources, failed/successful builds, generated C, binaries, commands,
+images and logs: `/Users/alex/.cache/vwentry-20261113-01` (frozen). Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-sdk-entry-20261113-01.inventory.json`,
+SHA-256 `57a8123d0eee6746b50741c14b34a8b2fa37af12d030878dbd59b488e7d2978f`.
+Recording and independent verification pass with adjacent logs. Keep the
+complete workspace and original input/historical evidence namespaces.
+
+This stages the real SDK entrypoint, not the default package launch path. The
+outer generation lease/descendant holder is still required: waiting for the
+direct server alone is insufficient. Package-builder enablement, fresh signed
+package/CLI acceptance, current sandbox rebuild, ARM owned execution, broader
+SDK-level fault/status coverage and holder SIGKILL retention remain open.
+No full C environment, reproducibility or heap-retention guarantee is added.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
