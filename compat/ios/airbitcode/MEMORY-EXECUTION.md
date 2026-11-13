@@ -93,7 +93,14 @@ not reduce modulo the width. Poison operands propagate and undef rejects.
 Freeze or select may consume/discard computed overshift poison. Each call
 costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these eighteen families' exact declarations are admitted:
+Direct LLVM `pext`/`pdep` support matching scalar i1..i64 operands and results.
+In low-to-high bit order, extraction packs the input bits selected by the mask
+into low positions; deposition scatters low input bits to the mask's selected
+positions. A zero mask yields zero and a full mask preserves the input.
+Both operands are evaluated; poison propagates even with a zero mask or value,
+and undef rejects. Each call costs one step and shares scalar validation/evaluation.
+
+Only ordinary direct calls to these twenty families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -179,5 +186,8 @@ native inputs, minimum-poison flags and per-call flag checks after cache hits.
 against defined native LLVM, boundary matrices and separate poison controls.
 `tests/ios/air-memory-saturating-shift.v` checks valid native saturating shifts
 and interpreter-only loaded/constant overshifts, zero overshifts and selection.
+`tests/ios/air-memory-bit-permutation.v` compares extraction/deposition and both
+round-trip chains against native LLVM, checks independent masked identities,
+and exercises poison/undef, freeze/select, budgets and call-metadata controls.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
