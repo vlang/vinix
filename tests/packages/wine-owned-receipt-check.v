@@ -6,6 +6,7 @@ import crypto.sha256
 import hwhost
 import json2
 import os
+import time
 import tests.packages.wineoverlay
 
 #include <sys/stat.h>
@@ -17,9 +18,17 @@ const receipt_files = ['owned-manager.json', 'outputs.json', 'logs/v.log.argv.js
 
 fn invoke(argv []string, log string, pass bool, wanted string) ! {
 	os.write_file(log + '.argv.json', json2.encode(argv))!
-	mut accepted := true
-	hwhost.run_tool(argv, map[string]string{}, log, 10) or { accepted = false }
-	if accepted != pass || !os.read_file(log)!.contains(wanted) {
+	mut child := hwhost.start_child(argv, map[string]string{}, log)!
+	defer { child.stop() }
+	deadline := hwhost.now_ms() + 10000
+	for !child.poll() {
+		if hwhost.interrupted() { return hwhost.Interrupted{} }
+		if hwhost.now_ms() >= deadline { return error('receipt control timed out: ' + log) }
+		time.sleep(10 * time.millisecond)
+	}
+	code := child.exit_code()
+	os.write_file(log + '.exit.json', json2.encode({'exit_code': code}))!
+	if code != (if pass { 0 } else { 1 }) || !os.read_file(log)!.contains(wanted) {
 		return error('receipt control reached wrong gate: ' + log)
 	}
 }
@@ -176,4 +185,7 @@ fn run() ! {
 	println('WINE OWNED RECEIPT PASS ' + count.str() + ' mutations through preflight and actual controller, source/build/architecture and nonregular default-mode controls')
 }
 
-fn main() { run() or { eprintln(err); exit(1) } }
+fn main() {
+	hwhost.watch_interrupts()
+	run() or { eprintln(err); exit(1) }
+}
