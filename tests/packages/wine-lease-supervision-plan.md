@@ -589,6 +589,53 @@ translator/sandbox acceptance, client socket inheritance/bootstrap, generation
 lease integration and holder-death recovery remain open. Runner/holder wiring
 is unchanged.
 
+## Bounded server readiness, 2026-11-13
+
+Source `3f4d42bbd` adds `ServerChild.await_connection`. It polls exec status,
+unreaped child liveness, namespace continuity and the Wine lock, then captures
+and authenticates the endpoint with the existing retained connector. Foreign
+lock owners refuse even before a socket appears; an endpoint without the owned
+lock refuses too. Ownership is re-read when a socket appears, allowing the
+child's legitimate acquire/bind transition between observations. A single
+1–5000 ms budget covers polling/connect waits, excluding filesystem latency and
+scheduling guarantees. Global deadline overrun closes a newly returned socket.
+Every outcome preserves caller ownership of the child; the operation neither
+signals nor collects it. Existing exclusive-wait/SIGCHLD/cleanup contracts apply.
+
+Final controller `check-02` passes native `arm-03` and `x86-02` with unchanged
+production kernels and ordinary uid/gid 1000. Each runs 100 complete
+spawn/await/greeting/close/collect cycles and 100 pending timeouts with zero
+retained V bytes and flat descriptors. A 20 ms timeout takes at least 20 ms
+and less than five seconds, preserving the live PID; that same child can then
+start and authenticate successfully. The returned socket is blocking/CLOEXEC
+and preserves the greeting. Foreign entry/lock, unsafe mode and replaced prefix
+refuse while children remain live. Retired/failed children refuse without
+consuming exact statuses 37/126. Invalid budgets refuse. Caller cwd, configured
+signal mask and descriptor counts remain intact. PID1 collects suite status
+zero before its final marker; the harness then stops QEMU. The macOS host
+check covers unsupported refusal only.
+
+Generated-C review found fallible-scalar escape boxing in the first readiness
+frame. A void exec-check helper keeps owner/stat/endpoint/connection values on
+the stack; the final native allocation checks pass. Fixture cleanup now frees
+only borrowed argument-array buffers. The initial failed run and a separate
+ENOSPC preboot attempt are retained. Reconstructed initial sources match their
+original input pins; final sources and ownership notes are also retained.
+
+Complete workspace: `/Users/alex/.cache/vsr-20261113-01`; typed inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-server-readiness-20261113-01.inventory.json`,
+SHA-256 `36d6048c9e7bb6d85ef7496a3480cd7a3b926c33035cdf2da146c2208530c716`.
+Recording and separate complete verification pass with adjacent logs. Actual
+parsed V sources and heap tracker are admitted; selected tool/kernel/firmware
+and generated artifacts are checked before/after boot. Byte-verified sparse,
+cloned and filesystem-compressed own artifacts retain their logical contents;
+keep all originals and historical namespaces. Full C toolchain inventory,
+kernel heap retention, injected syscall failures and deterministic internal
+lock/bind or arbitrary namespace interleavings remain unqualified. These are V
+protocol fixtures. Signed Wine/translator/sandbox startup, actual client socket
+inheritance/bootstrap, generation leases and holder-death recovery remain open;
+the production runner and holder are unchanged.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
