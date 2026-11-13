@@ -1246,9 +1246,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     launches into the private holder for Windows. Native adoption/lifetime,
     status and missing-lease controls pass. [Low-descriptor handling](tests/packages/wine-lease-supervision-plan.md#low-numbered-generation-leases-2026-11-13)
     now preserves a verified lease occupying a stdio slot without passing it
-    to the workload. Default activation, full fresh
-    signed package-to-SDK acceptance, ARM owned Wine, broader mappings and
-    holder-death retention remain open.
+    to the workload. A [fresh locally signed x86 console launch](tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13)
+    now passes publishing, installation and the current CLI-to-owned-SDK path,
+    with a busy generation lease at readiness and observed Wine processes gone
+    at CLI return. Default activation, ARM owned Wine, fresh owned graphical
+    acceptance, collection after client exit with a live server, broader mappings
+    and holder-death retention remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

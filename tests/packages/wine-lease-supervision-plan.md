@@ -1129,6 +1129,59 @@ installed collection or package/CLI/signature acceptance. Default enablement,
 ARM owned execution, holder SIGKILL retention and broader resource/heap/C
 environment qualification remain open.
 
+## Fresh signed owned x86 launch, 2026-11-13
+
+Source `557448492`, with patch-writer prerequisite `62ef8d012`, connects the
+fresh signed console package to the owned Wine path. The producer and native
+controller accept explicit x86-only `--owned-manager`; the controller builds
+both the current guest and package CLI with `-d wine_owned_manager`. Before
+signing it checks the runtime mode/source receipt, actual compiler arguments
+and runner output digest. Four controls pass: ARM producer/controller refusal
+and both directions of controller/runtime mode mismatch. Default activation
+remains unchanged; these controls are not a full receipt-mutation matrix.
+
+`native-02` passes fresh local publisher key generation, runtime/application
+signing, publishing, catalog verification and installation of generation 1.
+The current CLI runs through the verified generation lease, private holder,
+retained sandbox and actual current `appsdk.load`/owned foreground server with
+authenticated socket handoff. The freshly compiled original Win64 probe passes
+image, W/X, exception, read-fault, shared-data and private-dispatch checks;
+outside-write refusal passes. CLI status is 0, readiness is observed, and the
+real generation lease is busy at readiness and free after return. Every
+observed Wine PID is absent when the CLI returns, checked before PID1's old
+assistance loop can reap anything. This does not prove an arbitrary-descendant
+barrier. The result is `passed=true`, `interrupted=false`, 31.636 seconds;
+the harness subsequently stops QEMU, without qualifying guest shutdown.
+
+Historical distribution staging is missing and the first producer attempt
+correctly refuses it. A fresh stage reconstructed from retained APKs, the four
+existing V Wine patches and retained font configuration matches all 1,020
+selected historical input file hashes, with zero differences. It does not
+restore the old namespace or waive historical audits. The source offer remains
+local-qualification-only and incomplete for redistribution. The first native
+attempt retains a compiler-selection link refusal; explicitly selecting the
+producer's cached V for the controller resolves it without a shim or relaxed
+admission. Focused atomic patch-write tests pass; the existing full patch test
+build remains blocked by deprecated integer types in its hosttest dependency.
+
+Complete successful and refused attempts, commands, generated C/binaries,
+selected source/tool snapshots and logs are frozen at
+`/Users/alex/.cache/vwfull-20261113-01`. Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-fresh-owned-20261113-01.inventory.json`,
+SHA-256 `5f618c2c8c96ccf03927ee09376e473004067b44e83571c2b13810855f43e15b`.
+Recording and independent verification pass with adjacent logs. Snapshots
+preserve the exact selected pre-documentation source and tool bytes, including
+compiler, MinGW, sysroot and APK inputs. Original namespaces and complete
+historical bundles remain required by their auditors. Snapshot copying does
+not change the ISO clone refusal or establish hermetic/reproducible builds.
+
+This closes the fresh locally signed x86 console integration gate. Default
+enablement, ARM owned execution, fresh owned graphical acceptance, active
+generation collection after initial-client exit with a live server, the full
+new refusal matrix and holder SIGKILL/kernel-owned retention remain open.
+Sandbox/account helpers and the production kernel are retained selected
+inputs; this run adds no complete C environment or kernel/V heap guarantee.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
