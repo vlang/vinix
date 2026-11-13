@@ -1871,6 +1871,9 @@ generation lease or establish descendant retirement: an outer qualified holder
 is still required. Package core built with the same flag passes its verified
 Windows generation lease to that holder from both ordinary and prepared-service
 launches. Missing leases refuse; non-Windows dispatch keeps its existing path.
+If a verified close-on-exec lease occupies FD 0–2, package dispatch retains a
+private close-on-exec duplicate above stdio for the holder; the caller's
+descriptor and lock stay intact. An inheritable low descriptor still refuses.
 Both components remain opt-in and the package builder does not enable them
 pending complete fresh signed-launch acceptance; see the
 [entrypoint qualification](../../tests/packages/wine-lease-supervision-plan.md#opt-in-owned-sdk-entrypoint-2026-11-13).

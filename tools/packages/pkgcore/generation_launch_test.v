@@ -26,18 +26,34 @@ fn generation_lock(path string, busy bool) ! {
 	generation_need(if busy { result != 0 && C.errno == C.EAGAIN } else { result == 0 }, 'generation lock lifetime differs')!
 }
 
-fn generation_fixture() ! {
+fn generation_fixture(low bool) ! {
 	C.alarm(30)
-	root := '/tmp/pkg-generation-launch'
+	root := if low { '/tmp/pkg-generation-launch-low' } else { '/tmp/pkg-generation-launch' }
 	os.mkdir(root)!
 	os.write_file(root + '/lease', '')!
 	lease := C.open((root + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
 	generation_need(lease >= 3 && C.flock(lease, C.LOCK_SH | C.LOCK_NB) == 0, 'cannot acquire fixture generation lease')!
 	caller := C.fork()
 	if caller == 0 {
+		mut borrowed := lease
+		if low {
+			C.close(0)
+			borrowed = C.fcntl(lease, C.F_DUPFD_CLOEXEC, 0)
+			if borrowed != 0 { C._exit(87) }
+			C.close(lease)
+		}
 		launch := Launch{program: '/sbin/init', directory: '/tmp', arguments: ['--generation-client', root]}
-		code := run_generation_launch(launch, true, lease) or { eprintln('HWTEST FAIL generation dispatch: ' + err.msg()); C._exit(81); return }
-		C.close(lease); C._exit(code)
+		if low {
+			if C.fcntl(borrowed, C.F_SETFD, 0) != 0 { C._exit(91) }
+			mut refused := false
+			run_generation_launch(launch, true, borrowed) or { refused = err.msg().contains('must be close-on-exec'); unsafe { err.free() } }
+			if !refused || C.fcntl(borrowed, C.F_GETFD) != 0 || C.fcntl(borrowed, C.F_SETFD, C.FD_CLOEXEC) != 0 { C._exit(92) }
+		}
+		code := run_generation_launch(launch, true, borrowed) or { eprintln('HWTEST FAIL generation dispatch: ' + err.msg()); C._exit(81); return }
+		flags := C.fcntl(borrowed, C.F_GETFD)
+		if flags < 0 || flags & C.FD_CLOEXEC == 0 { C._exit(88) }
+		generation_lock(root + '/lease', true) or { C._exit(89) }
+		C.close(borrowed); C._exit(code)
 	}
 	C.close(lease)
 	generation_need(caller > 0, 'cannot fork generation caller')!
@@ -70,6 +86,7 @@ fn testsuite_begin() {
 	$if generation_launch_fixture ? {
 		if os.args.len == 3 && os.args[1] == '--generation-client' {
 			root := os.args[2]
+			if root.ends_with('-low') && C.fcntl(0, C.F_GETFD) >= 0 { C._exit(90) }
 			owner := C.getppid()
 			middle := C.fork()
 			if middle == 0 {
@@ -97,14 +114,15 @@ fn test_generation_launch_dispatch() {
 		pid := C.fork()
 		if pid == 0 {
 			if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(85) }
-			generation_fixture() or { eprintln('HWTEST FAIL generation launch: ' + err.msg()); C._exit(86) }
+			generation_fixture(false) or { eprintln('HWTEST FAIL generation launch: ' + err.msg()); C._exit(86) }
+			generation_fixture(true) or { eprintln('HWTEST FAIL generation launch: ' + err.msg()); C._exit(86) }
 			C._exit(0)
 		}
 		mut status := i32(0)
 		if pid <= 0 || C.generation_test_wait(pid, &status, 0) != pid || status != 0 {
 			eprintln('HWTEST FAIL generation launch fixture'); for { time.sleep(time.second) }
 		}
-		println('HWTEST PASS generation launch: holder adoption; lease lifetime; status37; missing lease; non-Windows dispatch')
+		println('HWTEST PASS generation launch: holder adoption; lease lifetime; status37; missing lease; non-Windows dispatch; low descriptor isolation')
 		for { time.sleep(time.second) }
 	}
 }

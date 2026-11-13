@@ -41,7 +41,7 @@ fn run() ! {
 	os.write_file(work + '/generated-before-boot.json', json2.encode(generated))!
 	boot_host := hwhost.Host{...host, root: plainiso.prepare(root, work)!}
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'generation-launch', arches: ['x86_64'], ending: .running,
-		required: ['HWTEST PASS generation launch: holder adoption; lease lifetime; status37; missing lease; non-Windows dispatch'], forbidden: ['HWTEST FAIL', 'Kernel panic']},
+		required: ['HWTEST PASS generation launch: holder adoption; lease lifetime; status37; missing lease; non-Windows dispatch; low descriptor isolation'], forbidden: ['HWTEST FAIL', 'Kernel panic']},
 		hwhost.Run{kernel: os.args[2], guest: work + '/probe', state: work + '/boot', timeout: 60, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	for path, hash in inputs { if winesource.file_digest(path)! != hash { return error('generation check input changed') } }
