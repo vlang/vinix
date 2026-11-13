@@ -1369,6 +1369,63 @@ descendant/refusal cases or kernel-owned lease retention. Kernel, sandbox and
 account/session helpers are retained selected inputs; full C environment,
 heap and hermetic/reproducible gates remain open.
 
+## Idle server after client retirement, 2026-11-13
+
+Source `65c21e51c` adds `--owned-manager --idle-server-probe` to the signed x86
+controller. It combines collection, caller-death and idle observation only in
+the guest fixture. The actual package CLI retains its existing owned path;
+runtime, kernel, Wine startup arguments and persistence remain unchanged.
+Twelve architecture/mode refusal controls pass, including ARM, missing owned
+mode and combined lifetime flags, before workload/signing output is created.
+
+Final-source `native-04` freshly signs/publishes/installs the retained prepared
+runtime/PE and rebuilds the current guest and package CLI. Credential, argv and
+parent checks identify the ordinary caller/private holder, independently tied
+to the SDK manager and actual server. Killing the ordinary caller removes the
+original lease owner; the outer CLI reports 137 and the holder survives under
+PID1. Remove/rollback makes generation 1 neither active nor rollback. Three
+actual collections preserve its directory and PE while the Windows worker is
+live and exclusive nonblocking flock reports busy.
+
+A positive control matches the known live worker among two Wine clients.
+After release, observed live client counts decrease through one to zero. The
+matcher uses the selected runtime's exact Wine argv and process status; Z/X
+processes count as retired. Retired zombies may still await their owner.
+With zero live clients, the fourth collection and recheck take 183036000 ns while
+server/holder remain live and non-zombie, caller/outer CLI remain gone, the
+lease stays busy before and after, and generation/PE bytes survive. There is
+no server pause or persistence extension. This qualifies an observed local
+interval, not arbitrary idle duration or performance on other machines.
+
+Wine/SDK retire naturally; fixture PID1 targeted-reaps only the adopted
+holder and requires saved status 37, without Wine-process rescue reaping.
+Initial client, caller, holder, server and worker are absent at completion.
+A fifth collection removes generation 1 and preserves active/rollback.
+Result: `passed=true`, `interrupted=false`, 87.561 seconds. Final-source
+caller-death regression `native-05` also passes, 89.994 seconds, preserving
+caller 137, holder 37 and its existing fourth post-retirement collection.
+Both runs pass parsed-source, selected-input and generated-output rechecks;
+their complete native input maps are byte-identical. `modes-02` passes all
+twelve refusals with prepared receipt hashes unchanged.
+
+Sources, input snapshots, generated C/binaries, boot media, commands, logs
+and all intermediate positive attempts are frozen at
+`/Users/alex/.cache/vwidle-20261113-01`. `selected-inputs-01` preserves all
+selected native file bytes before documentation edits. The prior prepared
+runtime/PE and full producer bundles remain separate required inputs;
+original namespaces and historical audit requirements remain unchanged.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-idle-server-20261113-01.inventory.json`.
+SHA-256 `98e0fa00f433c3e12c070cadfffb5b30faa17ed14dc8f64da92471bfd13f0144`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original producer/input bundles.
+
+Default activation, ARM ownership, fresh owned GUI, holder or SDK-manager
+death, whole-session/logout teardown, arbitrary descendants/refusals and
+kernel-owned retention remain open. Full C environment/heap and
+hermetic/reproducible qualification also remain open; section 14 is incomplete.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

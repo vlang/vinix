@@ -1902,6 +1902,18 @@ This uses the same 3 GiB fixture and is mutually exclusive with
 records its scope; holder SIGKILL, full session teardown and broader lifetime
 guarantees remain open.
 
+`--owned-manager --idle-server-probe` extends the signed x86 caller-death
+case through zero live Wine clients. A positive control first matches the
+known live worker. After release, the observer excludes retired Z/X processes
+and requires zero live clients, a live server/holder, the caller gone, and a
+busy lease before and after another actual collection. Generation bytes must
+survive; after natural retirement, holder status 37 and final removal are
+required. Retired zombies can still await their owner during the idle check.
+The runtime's server command is unchanged, with no persistence extension or
+pause. All three lifetime probe flags are mutually exclusive and require owned
+mode; this case also uses 3 GiB. See the [idle-server qualification](../../tests/packages/wine-lease-supervision-plan.md#idle-server-after-client-retirement-2026-11-13)
+for the bounded local result and remaining lifetime gates.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership

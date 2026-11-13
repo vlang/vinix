@@ -1257,7 +1257,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now kills the ordinary package caller while its private holder and Wine
     workload survive, retains the obsolete generation through collection, then
     collects the holder's original status 37 and retires the generation after
-    natural workload exit. Holder death remains a separate gate.
+    natural workload exit. A [zero-live-client idle-server case](tests/packages/wine-lease-supervision-plan.md#idle-server-after-client-retirement-2026-11-13)
+    also retains that generation through collection after caller death and
+    client retirement, while the server and holder remain live, then removes
+    it after natural retirement. Holder death remains a separate gate.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.
