@@ -1244,7 +1244,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Opt-in package dispatch](tests/packages/wine-lease-supervision-plan.md#opt-in-generation-lease-dispatch-2026-11-13)
     now threads verified generation leases from ordinary and prepared-service
     launches into the private holder for Windows. Native adoption/lifetime,
-    status and missing-lease controls pass. [Low-descriptor handling](tests/packages/wine-lease-supervision-plan.md#low-numbered-generation-leases-2026-11-13)
+    status and missing-lease controls pass. [Concurrent native holders](tests/packages/wine-lease-supervision-plan.md#concurrent-native-holders-2026-11-13)
+    now preserve independent leases and exit statuses on both architectures
+    while an unrelated fixture child remains waitable.
+    [Low-descriptor handling](tests/packages/wine-lease-supervision-plan.md#low-numbered-generation-leases-2026-11-13)
     now preserves a verified lease occupying a stdio slot without passing it
     to the workload. A [fresh locally signed x86 console launch](tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13)
     now passes publishing, installation and the current CLI-to-owned-SDK path,

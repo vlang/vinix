@@ -1457,6 +1457,37 @@ SHA-256 `a6d52989a98a129eb744552163620ce946e44247499e354c6409cc30980bedcd`.
 Recording and independent verification pass with adjacent logs; preserve the
 entire frozen workspace and referenced original producer/input bundles.
 
+## Concurrent native holders, 2026-11-13
+
+Source `3f7cd42d9` extends the standard native holder suite on both
+architectures. Two simultaneous callers under the fixture ancestor each run
+an independent holder, initial client and detached double-fork/setsid worker.
+Both leases must be busy after readiness and initial-client exit. Releasing
+the second worker first returns status 126 and frees only its lease; the first
+lease must stay busy. The first then returns 37 and releases its lease.
+An unrelated fixture child remains waitable with status 97, and the final
+child inventory is empty. The existing single-caller unrelated-child test
+also runs. This does not test threaded calls to two holders within one caller.
+
+The host controller requires the new concurrent marker as well as the existing
+standard suite marker. x86_64 passes in 7.141 seconds; AArch64 in 5.867 seconds,
+both `passed=true`, `interrupted=false`, with parsed-source, selected-input and
+generated-output rechecks. Production holder and kernel code are unchanged.
+This qualifies the native primitive; signed concurrent Wine remains separate.
+
+Complete commands, logs, source copies, generated C/binaries, media and selected
+input byte snapshots are frozen at `/Users/alex/.cache/vwconcurrent-20261113-01`.
+The original kernel qualification bundle and namespaces remain required;
+snapshots do not replace historical audit contracts. Holder/SDK death, default
+activation, ARM owned Wine, fresh owned GUI, whole-session teardown and broader
+topology/heap/hermetic gates remain open.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/concurrent-holders-20261113-01.inventory.json`,
+SHA-256 `be9d40f0fd6b8ca1ca43cc6b612caecb7f94327eb0a6a1aa692b364e4ef7bd70`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original kernel/input bundles.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
