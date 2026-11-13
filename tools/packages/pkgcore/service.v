@@ -224,5 +224,5 @@ fn (service Service) run_mode(id string, input LaunchInput) !int {
 		// parent's lock while waiting for the child or its generation lease.
 		return run_in_session_request(prepared.config, id, input)
 	}
-	return run_leased_mode(prepared.config, prepared.directory, prepared.state, id, input)
+	return run_leased_mode_with_lease(prepared.config, prepared.directory, prepared.state, id, input, prepared.lease)
 }

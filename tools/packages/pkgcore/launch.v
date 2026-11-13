@@ -235,7 +235,7 @@ pub fn run_application(config Config, directory string, id string, documents []s
 	}
 	guard.release()
 	defer { C.close(lease); close_decoded_state(state) }
-	return run_leased_application(config, directory, state, id, documents)
+	return run_leased_application(config, directory, state, id, documents, lease)
 }
 
 // The caller holds the package reader lock until this lease has been acquired.
@@ -261,11 +261,17 @@ fn generation_lease(directory string, architecture string, id string) !(State, i
 	return state, lease
 }
 
-fn run_leased_application(config Config, directory string, state State, id string, documents []string) !int {
-	return run_leased_mode(config, directory, state, id, LaunchInput{ documents: documents })
+fn run_leased_application(config Config, directory string, state State, id string, documents []string, lease int) !int {
+	return run_leased_mode_with_lease(config, directory, state, id, LaunchInput{ documents: documents }, lease)
 }
 
 fn run_leased_mode(config Config, directory string, state State, id string, input LaunchInput) !int {
+	return run_leased_mode_with_lease(config, directory, state, id, input, -1)
+}
+
+// The outer owner retains and closes this borrowed, already-verified shared
+// generation lease. It must not unlock/reuse it during synchronous execution.
+fn run_leased_mode_with_lease(config Config, directory string, state State, id string, input LaunchInput, lease int) !int {
 	uid := int(C.geteuid())
 	gid := int(C.getegid())
 	if uid == 0 || gid == 0 { return error('run applications from an ordinary user session') }
@@ -279,7 +285,8 @@ fn run_leased_mode(config Config, directory string, state State, id string, inpu
 	defer { launch.close() }
 	verify_launch_payloads(config, directory, state, id)!
 	prepare_launch_data(home, id, u32(uid))!
-	return run_launch_process(launch)
+	windows := state.packages.any(it.package.id == id && it.package.kind == 'windows')
+	return run_generation_launch(launch, windows, lease)
 }
 
 // Shared by actual execution and the pre-isolation audio admission. Holding

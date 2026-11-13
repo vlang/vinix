@@ -1868,8 +1868,11 @@ initial client's status after direct server retirement. Nested aliases remain
 exec bridges; an enabled top-level entry on other architectures refuses.
 Default builds retain the existing bridge. This mode alone does not retain a
 generation lease or establish descendant retirement: an outer qualified holder
-is still required. It is not enabled by the package builder pending production
-lease wiring and fresh signed-launch acceptance; see the
+is still required. Package core built with the same flag passes its verified
+Windows generation lease to that holder from both ordinary and prepared-service
+launches. Missing leases refuse; non-Windows dispatch keeps its existing path.
+Both components remain opt-in and the package builder does not enable them
+pending complete fresh signed-launch acceptance; see the
 [entrypoint qualification](../../tests/packages/wine-lease-supervision-plan.md#opt-in-owned-sdk-entrypoint-2026-11-13).
 
 `pkgprotocol.decode_local_source_offer()` and

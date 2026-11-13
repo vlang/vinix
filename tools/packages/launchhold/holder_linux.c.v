@@ -22,21 +22,22 @@ fn C._exit(i32)
 fn C.prctl(i32, ...voidptr) i32
 #define vinix_launchhold_read read
 fn C.vinix_launchhold_read(i32, voidptr, u64) i64
-fn C.syscall(i64, ...) i64
+#define vinix_launchhold_syscall syscall
+fn C.vinix_launchhold_syscall(i64, ...) i64
 
 fn set_mask(mask &u64, previous &u64) i32 {
-	return i32(C.syscall(C.SYS_rt_sigprocmask, C.SIG_SETMASK, mask, previous, u64(8)))
+	return i32(C.vinix_launchhold_syscall(C.SYS_rt_sigprocmask, C.SIG_SETMASK, mask, previous, u64(8)))
 }
 fn action(signal i32, replacement &SignalAction, previous &SignalAction) i32 {
-	return i32(C.syscall(C.SYS_rt_sigaction, signal, replacement, previous, u64(8)))
+	return i32(C.vinix_launchhold_syscall(C.SYS_rt_sigaction, signal, replacement, previous, u64(8)))
 }
-fn raw_wait(pid i32, status &i32) i32 { return i32(C.syscall(C.SYS_wait4, pid, status, i32(0), voidptr(0))) }
-fn child_close(fd i32) { C.syscall(C.SYS_close, fd) }
+fn raw_wait(pid i32, status &i32) i32 { return i32(C.vinix_launchhold_syscall(C.SYS_wait4, pid, status, i32(0), voidptr(0))) }
+fn child_close(fd i32) { C.vinix_launchhold_syscall(C.SYS_close, fd) }
 
 fn fail(fd i32, stage i32) {
 	record := [stage, i32(C.errno)]!
 	for {
-		count := C.syscall(C.SYS_write, fd, unsafe { &record[0] }, u64(8))
+		count := C.vinix_launchhold_syscall(C.SYS_write, fd, unsafe { &record[0] }, u64(8))
 		if count < 0 && C.errno == C.EINTR { continue }
 		break
 	}
@@ -46,7 +47,7 @@ fn fail(fd i32, stage i32) {
 fn close_interval(first u32, last u32) bool {
 	if first > last { return true }
 	// Both supported Linux architectures use syscall 436 for close_range.
-	return C.syscall(436, first, last, u32(0)) == 0
+	return C.vinix_launchhold_syscall(436, first, last, u32(0)) == 0
 }
 
 // No V allocation, formatting, environment lookup or Process object after
@@ -70,7 +71,7 @@ fn holder(program &char, directory &char, argv &&char, lease i32, report i32, in
 		if action(C.SIGCHLD, unsafe { &inherited_action }, unsafe { nil }) != 0 { fail(report, 6) }
 		$if lease_holder_fixture ? {
 			$if lease_holder_signal_window ? {
-				if C.syscall(C.SYS_kill, C.syscall(C.SYS_getpid), C.SIGUSR1) != 0 { fail(report, 6) }
+				if C.vinix_launchhold_syscall(C.SYS_kill, C.vinix_launchhold_syscall(C.SYS_getpid), C.SIGUSR1) != 0 { fail(report, 6) }
 			}
 		}
 		// Match exec's disposition transition before unmasking: no inherited
@@ -114,11 +115,11 @@ fn descendant_wait(status &i32) i32 {
 
 fn wait_fault(notified &bool) {
 	if !unsafe { *notified } {
-		C.syscall(C.SYS_write, i32(2), wait_message.str, u64(wait_message.len))
+		C.vinix_launchhold_syscall(C.SYS_write, i32(2), wait_message.str, u64(wait_message.len))
 		unsafe { *notified = true }
 	}
 	delay := [i64(0), 100000000]!
-	C.syscall(C.SYS_ppoll, voidptr(0), u64(0), unsafe { &delay[0] }, voidptr(0), u64(8))
+	C.vinix_launchhold_syscall(C.SYS_ppoll, voidptr(0), u64(0), unsafe { &delay[0] }, voidptr(0), u64(8))
 }
 
 fn run_linux(command Command, lease i32) !int {
@@ -158,7 +159,7 @@ fn run_linux(command Command, lease i32) !int {
 		child_close(fds[0])
 		$if lease_holder_fixture ? {
 			$if lease_holder_signal_window ? {
-				if C.syscall(C.SYS_kill, C.syscall(C.SYS_getpid), C.SIGUSR1) != 0 { fail(fds[1], 1) }
+				if C.vinix_launchhold_syscall(C.SYS_kill, C.vinix_launchhold_syscall(C.SYS_getpid), C.SIGUSR1) != 0 { fail(fds[1], 1) }
 			}
 		}
 		holder(program, directory, unsafe { &&char(argv.data) }, lease, fds[1], unsafe { &inherited })
