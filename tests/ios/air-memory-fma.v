@@ -65,20 +65,22 @@ fn main() {
 	out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
 	saved_mode := C.fegetround(); assert saved_mode >= 0; defer { assert C.fesetround(saved_mode) == 0 }; assert C.fesetround(C.FE_TONEAREST) == 0
 	mut source := strings.new_builder(32768)
-	for bits in [16, 32]! {
+	for fixture in ['fma_16', 'fmuladd_16', 'fma_32', 'fmuladd_32'] {
+		bits := fixture.all_after_last('_').int(); op := fixture.all_before('_'); other := if op == 'fma' { 'fmuladd' } else { 'fma' }
 		typ := if bits == 16 { 'half' } else { 'float' }
-		source.write_string('declare ${typ} @llvm.fma.f${bits}(${typ}, ${typ}, ${typ})\n')
-		for mode in ['fma', 'chain', 'unfused'] {
-			body := if mode == 'chain' { '%first = call ${typ} @llvm.fma.f${bits}(${typ} %x, ${typ} %y, ${typ} %z)\n %v = call ${typ} @llvm.fma.f${bits}(${typ} %first, ${typ} %y, ${typ} %z)\n' } else if mode == 'unfused' { '%product = fmul ${typ} %x, %y\n %v = fadd ${typ} %product, %z\n' } else { '%v = call ${typ} @llvm.fma.f${bits}(${typ} %x, ${typ} %y, ${typ} %z)\n' }
-			source.write_string('define void @${mode}_${bits}(ptr %a, ptr %b, ptr %c, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %y = load ${typ}, ptr %b, align 1\n %z = load ${typ}, ptr %c, align 1\n ${body}store ${typ} %v, ptr %dst, align 1\n ret void }\n')
+		source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ}, ${typ}, ${typ})\n')
+		for mode in ['primitive', 'chain', 'mixed', 'unfused', 'cached'] {
+			second := if mode == 'mixed' { other } else { op }
+			body := if mode in ['chain', 'mixed'] { '%first = call ${typ} @llvm.${op}.f${bits}(${typ} %x, ${typ} %y, ${typ} %z)\n %v = call ${typ} @llvm.${second}.f${bits}(${typ} %first, ${typ} %y, ${typ} %z)\n store ${typ} %v, ptr %dst, align 1\n' } else if mode == 'cached' { '%first = call ${typ} @llvm.${op}.f${bits}(${typ} %x, ${typ} %y, ${typ} %z)\n store ${typ} %first, ptr %dst, align 1\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %first, ${typ} %y, ${typ} %z)\n' } else if mode == 'unfused' { '%product = fmul ${typ} %x, %y\n %v = fadd ${typ} %product, %z\n store ${typ} %v, ptr %dst, align 1\n' } else { '%v = call ${typ} @llvm.${op}.f${bits}(${typ} %x, ${typ} %y, ${typ} %z)\n store ${typ} %v, ptr %dst, align 1\n' }
+			source.write_string('define void @${mode}_${fixture}(ptr %a, ptr %b, ptr %c, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %y = load ${typ}, ptr %b, align 1\n %z = load ${typ}, ptr %c, align 1\n ${body}ret void }\n')
 		}
 		for state in ['poison', 'undef'] { for side in 0 .. 3 {
 			a := if side == 0 { state } else { '0.0' }; b := if side == 1 { state } else { '0.0' }; c := if side == 2 { state } else { '0.0' }
-			source.write_string('define void @guard_${state}_${side}_${bits}(ptr %dst) { %v = call ${typ} @llvm.fma.f${bits}(${typ} ${a}, ${typ} ${b}, ${typ} ${c})\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
+			source.write_string('define void @guard_${state}_${side}_${fixture}(ptr %dst) { %v = call ${typ} @llvm.${op}.f${bits}(${typ} ${a}, ${typ} ${b}, ${typ} ${c})\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
 		} }
 		for mode in ['freeze', 'select'] {
 			choice := if mode == 'freeze' { 'freeze ${typ} %bad' } else { 'select i1 false, ${typ} %bad, ${typ} 1.0' }
-			source.write_string('define void @${mode}_${bits}(ptr %dst) { %bad = call ${typ} @llvm.fma.f${bits}(${typ} poison, ${typ} 0.0, ${typ} 0.0)\n %v = ${choice}\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
+			source.write_string('define void @${mode}_${fixture}(ptr %dst) { %bad = call ${typ} @llvm.${op}.f${bits}(${typ} poison, ${typ} 0.0, ${typ} 0.0)\n %v = ${choice}\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
 		}
 	}
 	source.write_string('define void @preflight(ptr %dst) { store i32 17, ptr %dst, align 1\n %v = call float @llvm.fma.f32(float 1.0, float 2.0, float 3.0)\n ret void }\n')
@@ -98,10 +100,15 @@ fn main() {
 	C.LLVMDisposeMessage(cpu); C.LLVMDisposeMessage(features)
 	mut options := C.LLVMMCJITCompilerOptions{}; C.LLVMInitializeMCJITCompilerOptions(&options, sizeof(C.LLVMMCJITCompilerOptions)); options.OptLevel = 2; options.EnableFastISel = 0
 	mut engine := unsafe { nil }; assert C.LLVMCreateMCJITCompilerForModule(&engine, module_ptr, &options, sizeof(C.LLVMMCJITCompilerOptions), &message) == 0; defer { C.LLVMDisposeExecutionEngine(engine) }
-	mut comparisons := 0; mut boundaries := 0; mut chains := 0; mut nan_cases := 0; mut distinctions := 0; mut modes := 0
-	for bits in [16, 32]! {
-		function := find_function(ir, 'fma_${bits}'); chain := find_function(ir, 'chain_${bits}'); unfused := find_function(ir, 'unfused_${bits}')
-		address := C.LLVMGetFunctionAddress(engine, 'fma_${bits}'.str); chain_address := C.LLVMGetFunctionAddress(engine, 'chain_${bits}'.str); unfused_address := C.LLVMGetFunctionAddress(engine, 'unfused_${bits}'.str); assert address != 0 && chain_address != 0 && unfused_address != 0
+	mut comparisons := 0; mut boundaries := 0; mut chains := 0; mut nan_cases := 0; mut distinctions := 0; mut modes := 0; mut cached_metadata := 0; mut types := 0
+	mut diagnostics := os.create(out + '/native-optional.tsv')!; defer { diagnostics.close() }; diagnostics.writeln('function\tx\ty\tz\toptional\tfused\tseparate\tmatches_fused\tmatches_separate')!
+	mut optional_cases := 0; mut fused_only := 0; mut separate_only := 0; mut both := 0
+	for fixture in ['fma_16', 'fmuladd_16', 'fma_32', 'fmuladd_32'] {
+		bits := fixture.all_after_last('_').int(); optional := fixture.starts_with('fmuladd_')
+		function := find_function(ir, 'primitive_' + fixture); chain := find_function(ir, 'chain_' + fixture); mixed := find_function(ir, 'mixed_' + fixture); unfused := find_function(ir, 'unfused_' + fixture); cached := find_function(ir, 'cached_' + fixture)
+		// Optional fusion consistently chooses the fused refinement. Its oracle
+		// always uses native fma; native optional choices remain diagnostic only.
+		address := C.LLVMGetFunctionAddress(engine, 'primitive_fma_${bits}'.str); chain_address := C.LLVMGetFunctionAddress(engine, 'chain_fma_${bits}'.str); unfused_address := C.LLVMGetFunctionAddress(engine, 'unfused_fma_${bits}'.str); optional_address := C.LLVMGetFunctionAddress(engine, 'primitive_fmuladd_${bits}'.str); assert address != 0 && chain_address != 0 && unfused_address != 0 && optional_address != 0
 		count := bits / 8; sign := u64(1) << u32(bits - 1); one := if bits == 16 { u64(0x3c00) } else { u64(0x3f800000) }; inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
 		half := if bits == 16 { u64(0x3800) } else { u64(0x3f000000) }; normal := if bits == 16 { u64(0x400) } else { u64(0x800000) }; quiet := if bits == 16 { u64(0x7e55) } else { u64(0x7fc12345) }
 		edges := [u64(0), sign, 1, sign | 1, normal - 1, normal, half, one, sign | one, one + 1, one - 2, inf - 1, sign | (inf - 1), inf, sign | inf, inf + 1, sign | (inf + 1), quiet]!
@@ -115,10 +122,22 @@ fn main() {
 			for j in 0 .. count { a[1 + j] = u8(x >> u32(8 * j)); b[2 + j] = u8(y >> u32(8 * j)); c[3 + j] = u8(z >> u32(8 * j)) }; for j in 0 .. 16 { actual[j] = 0xcc; expected[j] = 0xcc }
 			assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 6)!.steps == 6
 			unsafe { NativeFma(voidptr(address))(&a[1], &b[2], &c[3], &expected[4]) }; if compare(actual, expected, bits) { nan_cases++ }
+			if optional && (sample < 128 || sample >= samples) {
+				mut native := []u8{len: 16, init: 0xcc}; mut separate := native.clone()
+				unsafe { NativeFma(voidptr(optional_address))(&a[1], &b[2], &c[3], &native[4]); NativeFma(voidptr(unfused_address))(&a[1], &b[2], &c[3], &separate[4]) }
+				n := word(native, count); f := word(expected, count); s := word(separate, count)
+				mf := same_class_or_bits(n, f, sign, inf); ms := same_class_or_bits(n, s, sign, inf); assert mf || ms, 'native optional result is neither fused nor separate'
+				for j in 0 .. 16 { if j < 4 || j >= 4 + count { assert native[j] == 0xcc && separate[j] == 0xcc } }
+				row := '${fixture}\t${x}\t${y}\t${z}\t${n}\t${f}\t${s}\t${mf}\t${ms}'; diagnostics.writeln(row)!
+				if mf && ms { both++ } else if mf { fused_only++ } else { separate_only++ }; optional_cases++
+				unsafe { native.free(); separate.free(); row.free() }
+			}
 			if sample < 2 || sample >= samples { for j in 0 .. 16 { actual[j] = 0xcc }; if _ := p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 5) { panic('budget accepted') }; for byte in actual { assert byte == 0xcc } }
 			if sample < 128 || sample >= samples {
-				assert p.run_memory_function(ir, stream, pools, bodies, chain, mut bindings, 7)!.steps == 7
-				unsafe { NativeFma(voidptr(chain_address))(&a[1], &b[2], &c[3], &expected[4]) }; compare(actual, expected, bits); chains++
+				for chained in [chain, mixed]! {
+					assert p.run_memory_function(ir, stream, pools, bodies, chained, mut bindings, 7)!.steps == 7
+					unsafe { NativeFma(voidptr(chain_address))(&a[1], &b[2], &c[3], &expected[4]) }; compare(actual, expected, bits); chains++
+				}
 			}; comparisons++
 		}
 		// Independent exact cases that distinguish fused from two-round arithmetic.
@@ -133,6 +152,17 @@ fn main() {
 				assert C.fesetround(mode) == 0; assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 6)!.steps == 6 && word(actual, count) == row[3]; modes++
 			}; assert C.fesetround(C.FE_TONEAREST) == 0
 		}
+		// Every later call is validated before an earlier store, even with the
+		// declaration already cached. All three floating arguments must match.
+		slot := bodies.scopes[cached + 1].instructions_start + 5; saved := p.instructions[slot]
+		for j in 0 .. 16 { actual[j] = 0xcc }
+		for changed in [airbitcode.IRTypedInstruction{...saved, flags: 0}, airbitcode.IRTypedInstruction{...saved, flags: 32769}, airbitcode.IRTypedInstruction{...saved, calling_convention: 8}, airbitcode.IRTypedInstruction{...saved, attribute_set: 1}, airbitcode.IRTypedInstruction{...saved, fast_math_flags: 1}, airbitcode.IRTypedInstruction{...saved, operands_count: 3}, airbitcode.IRTypedInstruction{...saved, result_type: -1}, airbitcode.IRTypedInstruction{...saved, callee_function: -1}, airbitcode.IRTypedInstruction{...saved, call_signature: -1}] {
+			p.instructions[slot] = changed; if _ := p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 7) { panic('cached metadata accepted') }; for byte in actual { assert byte == 0xcc }; cached_metadata++
+		}; p.instructions[slot] = saved
+		mut wrong := -1; for i, typ in p.types { if typ.kind == .integer_t && typ.bits == 32 { wrong = i; break } }; assert wrong >= 0
+		for side in 1 .. 4 { operand_slot := saved.operands_start + side; operand := p.operands[operand_slot]; p.operands[operand_slot] = airbitcode.IRTypedOperand{...operand, type_index: wrong}; if _ := p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 7) { panic('operand type accepted') }; for byte in actual { assert byte == 0xcc }; p.operands[operand_slot] = operand; types++ }
+		assert p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 7)!.steps == 7
+		unsafe { NativeFma(voidptr(address))(&a[1], &b[2], &c[3], &expected[4]) }; compare(actual, expected, bits)
 		unsafe { a.free(); b.free(); c.free(); actual.free(); expected.free(); bindings.free() }
 	}
 	mut guards := 0; mut choices := 0
@@ -153,7 +183,10 @@ fn main() {
 		p.instructions[slot] = changed; if _ := p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3) { panic('metadata accepted') }; for byte in bytes { assert byte == 0xcc }; metadata++
 	}; p.instructions[slot] = saved
 	assert p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3)!.steps == 3 && bytes[0] == 17
-	assert comparisons == 339344 && boundaries == 11664 && chains == 11920 && distinctions == 6 && modes == 24 && guards == 12 && choices == 4 && metadata == 9
-	result := 'AIR-MEMORY-FMA: ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} boundary triples), exhaustive half/sampled float cancellation/scaling, ${chains} cached native chains, ${distinctions} independent fused/unfused distinctions, ${modes} rounding controls, sentinels/budgets, ${guards} poison/undef guards, ${choices} freeze/lazy choices and ${metadata} metadata controls PASS\n'
+	assert comparisons == 678688 && boundaries == 23328 && chains == 47680 && distinctions == 12 && modes == 48 && guards == 24 && choices == 8 && metadata == 9 && cached_metadata == 36 && types == 12 && optional_cases == 11920 && fused_only + separate_only + both == optional_cases
+	result := 'AIR-MEMORY-FMA: ${comparisons} native fused-oracle comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} boundary triples), half/float fma/fmuladd, exhaustive half/sampled float cancellation/scaling, ${chains} repeated/mixed cached chains, ${distinctions} independent fused/unfused distinctions, ${modes} rounding controls, ${optional_cases} native optional diagnostics (${fused_only} fused-only/${separate_only} separate-only/${both} both), sentinels/budgets, ${guards} poison/undef guards, ${choices} freeze/lazy choices and ${metadata}/${cached_metadata} initial/cached metadata plus ${types} operand-type controls PASS\n'
 	os.write_file(out + '/result.txt', result)!; print(result)
+}
+fn same_class_or_bits(a u64, b u64, sign u64, inf u64) bool {
+	return a == b || (a & (sign - 1) > inf && b & (sign - 1) > inf)
 }

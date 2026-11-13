@@ -124,8 +124,15 @@ mode. Finite cancellation, overflow avoidance and subnormal ties therefore
 retain fused semantics. Defined zero/infinity/NaN cases use the scalar FMA
 rules and preferred quiet NaN choice. All three operands are evaluated; poison
 propagates and undef rejects, including with a zero product. Calls cost one
-step and share scalar validation/evaluation. Optional-fusion `fmuladd` and
-constrained floating operations remain unsupported by this buffer profile.
+step and share scalar validation/evaluation.
+
+Direct LLVM `fmuladd` supports the same three matching half/float operands
+and result, consistently choosing the permitted fused evaluation through the
+scalar FMA evaluator. It retains one nearest-even round and all FMA value,
+poison/undef and budget rules; it does not reproduce another backend's choice
+between fused and separate rounding. FMA and fmuladd declarations keep distinct
+cache identities and may be mixed in one kernel. Constrained floating
+operations remain unsupported by this buffer profile.
 
 Direct LLVM `ldexp` supports a half/float value, a signed i32 exponent and a
 matching floating result. Scaling by a power of two uses the scalar integer
@@ -187,7 +194,7 @@ evaluated; poison propagates even with a zero multiplier and undef rejects.
 Each call costs one step and shares scalar validation/evaluation. The fixed
 declaration cache reserves all 64 widths alongside the existing families.
 
-Only ordinary direct calls to these thirty-eight families' exact declarations are admitted:
+Only ordinary direct calls to these thirty-nine families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -300,6 +307,8 @@ validation, poison/undef and rounding/exception behavior.
 against native LLVM, exhausts half inputs in two cancellation/scaling patterns,
 checks boundary triples, and distinguishes fused results from separate
 multiply/add for cancellation, overflow and underflow in both precisions.
+It qualifies `fmuladd` against native FMA for the chosen fused refinement,
+retains native optional-fusion diagnostics, and mixes both declaration names.
 `tests/ios/air-memory-ldexp.v` compares scaling and zero-scale chains against
 native LLVM, exhausts half inputs under signed scales, checks exponent limits
 and subnormal ties, and rejects malformed later cached calls before stores.
