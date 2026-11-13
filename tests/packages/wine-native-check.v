@@ -32,27 +32,29 @@ fn invoke(arguments []string, log string) ! {
 	if child.code != 0 { return error('Wine qualification producer failed: ' + log) }
 }
 
-fn v_program(v string, source string, arch string, cfile string) ![]string {
+fn v_program(v string, source string, arch string, cfile string, owned bool) ![]string {
 	root := hwhost.find_root(@FILE)!
-	return [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
+	mut command := [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree',
 		'-enable-globals', '-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path',
 		'@vlib|' + root + '|' + root + '/tools/accounts|@vmodules', '-o', cfile, source]
+	if owned { command.insert(1, ['-d', 'wine_owned_manager']) }
+	return command
 }
 
-fn discover_program(v string, source string, arch string, work string, name string, mut inputs map[string]string) ! {
+fn discover_program(v string, source string, arch string, work string, name string, owned bool, mut inputs map[string]string) ! {
 	directory := work + '/build-' + name
 	os.mkdir_all(directory)!
-	mut command := v_program(v, source, arch, directory + '/' + name + '.c')!
+	mut command := v_program(v, source, arch, directory + '/' + name + '.c', owned)!
 	command.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
 	invoke(command, directory + '/discover.log')!
 	winesource.capture(directory + '/sources-before.txt', mut inputs)!
 }
 
-fn build_program(v string, sysroot string, gcc string, source string, arch string, work string, name string, inputs map[string]string) !string {
+fn build_program(v string, sysroot string, gcc string, source string, arch string, work string, name string, owned bool, inputs map[string]string) !string {
 	directory := work + '/build-' + name
 	cfile := directory + '/' + name + '.c'
-	mut command := v_program(v, source, arch, cfile)!
+	mut command := v_program(v, source, arch, cfile, owned)!
 	command.insert(1, ['-dump-files', directory + '/sources-built.txt'])
 	invoke(command, directory + '/v.log')!
 	winesource.admit(directory + '/sources-before.txt', directory + '/sources-built.txt', inputs)!
@@ -83,11 +85,13 @@ fn check() ! {
 	if digest(os.dir(@FILE) + '/winesource/closure.v')! != sha256.hexhash($embed_file('winesource/closure.v').to_string()) {
 		return error('compiled Wine source closure admission differs')
 	}
-	if os.args.len != 9 {
-		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX')
+	if os.args.len !in [9, 10] || (os.args.len == 10 && os.args[9] != '--owned-manager') {
+		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager]')
 	}
+	owned := os.args.len == 10
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('invalid Wine guest architecture') }
+	if owned && arch != 'x86_64' { return error('owned native Wine qualification requires x86_64') }
 	work := os.abs_path(os.args[2])
 	prepared := os.real_path(os.args[3])
 	kernel := os.real_path(os.args[4])
@@ -98,6 +102,21 @@ fn check() ! {
 	if os.exists(work) { return error('Wine native output already exists') }
 	os.mkdir_all(work)!
 	root := hwhost.find_root(@FILE)!
+	mode_file := prepared + '/owned-manager.json'
+	if owned != os.is_file(mode_file) { return error('Wine prepared runtime and native controller ownership modes differ') }
+	if owned {
+		mode := json2.decode[map[string]string](os.read_file(mode_file)!)!
+		outputs := json2.decode[map[string]string](os.read_file(prepared + '/outputs.json')!)!
+		argv := json2.decode[[]string](os.read_file(prepared + '/logs/v.log.argv.json')!)!
+		mut flag := false
+		for index in 0 .. argv.len - 1 { if argv[index] == '-d' && argv[index + 1] == 'wine_owned_manager' { flag = true } }
+		if mode['architecture'] != arch || mode['mode'] != 'wine_owned_manager' || !flag
+			|| mode['runner_source_sha256'] != digest(root + '/tools/packages/wine-runner.v')!
+			|| outputs['owned-manager.json'] != digest(mode_file)!
+			|| outputs['prepared/' + arch + '/runtime/bin/wine-runner'] != digest(prepared + '/prepared/' + arch + '/runtime/bin/wine-runner')! {
+			return error('owned Wine runtime build receipt differs')
+		}
+	}
 	host := hwhost.find_host(root, arch, '')!
 	mut inputs := map[string]string{}
 	image_inputs := if arch == 'x86_64' { plainiso.inputs(root)! } else { map[string]string{} }
@@ -150,13 +169,13 @@ fn check() ! {
 	for name in ['usr/sbin/vinix-account', 'usr/sbin/vinix-session'] {
 		inputs[stage + '/' + name] = digest(stage + '/' + name)!
 	}
-	discover_program(host.v, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', mut inputs)!
-	discover_program(host.v, root + '/tools/packages/main.v', arch, work, 'package', mut inputs)!
+	discover_program(host.v, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', owned, mut inputs)!
+	discover_program(host.v, root + '/tools/packages/main.v', arch, work, 'package', owned, mut inputs)!
 	os.write_file(work + '/inputs-before-build.json', json2.encode(inputs))!
-	guest := build_program(host.v, sysroot, gcc, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', inputs)!
+	guest := build_program(host.v, sysroot, gcc, root + '/tests/packages/wine-native/main.v', arch, work, 'guest', owned, inputs)!
 	// Rebuild the package CLI from the captured tree. The archived account tools
 	// are separate inputs; their stage's package CLI may predate runtime policy.
-	package_cli := build_program(host.v, sysroot, gcc, root + '/tools/packages/main.v', arch, work, 'package', inputs)!
+	package_cli := build_program(host.v, sysroot, gcc, root + '/tools/packages/main.v', arch, work, 'package', owned, inputs)!
 	// An owned local test key signs the real runtime. It is never copied into
 	// the guest image or printed. This does not enroll a production publisher.
 	publisher := work + '/publisher'

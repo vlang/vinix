@@ -151,16 +151,19 @@ fn admit_translator(staging string, base string) !Translator {
 
 fn build() ! {
 	verify_sources()!
-	if os.args.len !in [10, 11] || os.args[9] != '--local-qualification-only' {
-		return error('usage: wine-build ARCH TRANSLATION_STAGE OUTPUT V MUSL_SYSROOT GCC_RUNTIME NOTICES PE_PRODUCER --local-qualification-only [TRANSLATOR_STAGE]')
+	owned := os.args.len > 1 && os.args.last() == '--owned-manager'
+	count := os.args.len - if owned { 1 } else { 0 }
+	if count !in [10, 11] || os.args[9] != '--local-qualification-only' {
+		return error('usage: wine-build ARCH TRANSLATION_STAGE OUTPUT V MUSL_SYSROOT GCC_RUNTIME NOTICES PE_PRODUCER --local-qualification-only [TRANSLATOR_STAGE] [--owned-manager]')
 	}
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] {
 		return error('Wine producer architecture must be aarch64 or x86_64')
 	}
+	if owned && arch != 'x86_64' { return error('owned Wine producer is qualified only for x86_64') }
 	// AArch64 runs x86 code through the source-built translator from
 	// build-support/dota2/qemu-stage; x86_64 runs it natively.
-	if (arch == 'aarch64') != (os.args.len == 11) {
+	if (arch == 'aarch64') != (count == 11) {
 		return error('TRANSLATOR_STAGE is required for aarch64 and refused for x86_64')
 	}
 	stage := os.real_path(os.args[2])
@@ -315,10 +318,13 @@ fn build() ! {
 	}
 	os.write_file(output + '/inputs-before-build.json', json2.encode(inputs) + '\n')!
 	generated := output + '/build/wine-runner.c'
-	invoke([v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
+	mut runner_command := [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree', '-d',
 		'no_backtrace', '-d', 'no_segfault_handler', '-o', generated,
-		base + '/tools/packages/wine-runner.v'], output + '/logs/v.log')!
+		base + '/tools/packages/wine-runner.v']
+	if owned { runner_command.insert(1, ['-d', 'wine_owned_manager']) }
+	invoke(runner_command, output + '/logs/v.log')!
+	if owned { os.write_file(output + '/owned-manager.json', json2.encode({'architecture': arch, 'mode': 'wine_owned_manager', 'runner_source_sha256': inputs[base + '/tools/packages/wine-runner.v']}))! }
 	runtime_c := output + '/build/runtime.c'
 	os.write_file(runtime_c, '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
 		os.dir(v) + '/vlib/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + os.dir(v) + '/vlib/sync/thread_helper.h"\n')!

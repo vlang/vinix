@@ -569,6 +569,9 @@ fn run() ! {
 	}
 	retire := time.sys_mono_now() + 20 * time.second
 	for pid in pids {
+		$if wine_owned_manager ? {
+			if os.exists('/proc/' + pid) { return error('owned Wine descendant remained after package CLI return: ' + pid) }
+		}
 		for os.exists('/proc/' + pid) {
 			// Wine's detached server may be adopted by this fixture PID1. The
 			// package CLI already waited for its own child before this reap.

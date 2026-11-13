@@ -1874,9 +1874,15 @@ launches. Missing leases refuse; non-Windows dispatch keeps its existing path.
 If a verified close-on-exec lease occupies FD 0–2, package dispatch retains a
 private close-on-exec duplicate above stdio for the holder; the caller's
 descriptor and lock stay intact. An inheritable low descriptor still refuses.
-Both components remain opt-in and the package builder does not enable them
-pending complete fresh signed-launch acceptance; see the
-[entrypoint qualification](../../tests/packages/wine-lease-supervision-plan.md#opt-in-owned-sdk-entrypoint-2026-11-13).
+Both components remain opt-in. Local x86 qualification can pass
+`--owned-manager` to both `wine-build` and `wine-native-check`; the producer
+records the build mode and the controller refuses mismatched/unmarked runtime
+inputs before signing. This rebuilds and locally signs the runtime/application
+and exercises the current owned package-to-SDK path. Pin the same V compiler
+with `V` for the native controller. Default enablement, active collection during
+detached workload lifetime, ARM owned execution and holder SIGKILL retention
+remain separate gates; see the
+[owned launch qualification](../../tests/packages/wine-lease-supervision-plan.md#fresh-signed-owned-x86-launch-2026-11-13).
 
 `pkgprotocol.decode_local_source_offer()` and
 `wineadapter.admit_local_source_offer()` support only format-1
