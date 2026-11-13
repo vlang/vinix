@@ -72,8 +72,16 @@ nearest with ties to even, respectively. Zero results preserve the input sign;
 infinities and already integral finite values are unchanged. NaNs use the
 scalar evaluator's preferred quiet NaN choice. Poison propagates and undef
 rejects. Each call costs one step and shares scalar validation/evaluation,
-independent of host rounding mode. `rint` and `nearbyint` remain unsupported
-by this buffer profile.
+independent of host rounding mode.
+
+Direct LLVM `rint`/`nearbyint` also support matching half/float operands and
+results, rounding to nearest integral values with ties to even in LLVM's
+default environment. They reuse scalar integer bit evaluation, preserving
+zero signs and choosing the preferred quiet NaN. Poison propagates and undef
+rejects. Each call costs one step. Host rounding modes and exception flags
+do not participate; dynamic/constrained environments and exception modeling
+remain outside this profile. Their declarations retain distinct cache slots
+from each other and from `roundeven`.
 
 Direct LLVM `sqrt` supports matching half/float operands and results. It uses
 the scalar evaluator's integer root/remainder algorithm and rounds to nearest
@@ -194,7 +202,7 @@ evaluated; poison propagates even with a zero multiplier and undef rejects.
 Each call costs one step and shares scalar validation/evaluation. The fixed
 declaration cache reserves all 64 widths alongside the existing families.
 
-Only ordinary direct calls to these thirty-nine families' exact declarations are admitted:
+Only ordinary direct calls to these forty-one families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -288,9 +296,11 @@ native LLVM and independent bit masks, including every half encoding, float
 class/payload boundaries, cached-declaration chains and poison/undef controls.
 Its native JIT uses the host CPU target to avoid generic ARM64 half-to-float
 promotion quieting signaling NaNs; target receipts are saved with results.
-`tests/ios/air-memory-rounding.v` compares all five rounding operations with
+`tests/ios/air-memory-rounding.v` compares all seven rounding operations with
 native LLVM, including every half encoding, float class/tie/precision limits,
-cached idempotent chains, host rounding modes and poison/undef controls.
+cached idempotent chains, host rounding modes and poison/undef controls. It
+checks exact default-environment results and unchanged host exception flags
+for rint/nearbyint, plus metadata/type rejection after cached calls and stores.
 Arithmetic NaNs compare by class; the interpreter's preferred choice is
 checked separately. Other results compare exact raw bits, including zero signs.
 With a trailing `sqrt` argument, the same checker tests square root and

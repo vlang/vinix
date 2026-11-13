@@ -38,6 +38,9 @@ fn C.LLVMDisposeExecutionEngine(voidptr)
 fn C.LLVMGetFunctionAddress(voidptr, &char) u64
 fn C.fegetround() int
 fn C.fesetround(int) int
+fn C.feclearexcept(int) int
+fn C.fetestexcept(int) int
+fn C.feraiseexcept(int) int
 struct C.LLVMMCJITCompilerOptions {
 mut:
 	OptLevel u32
@@ -66,16 +69,19 @@ fn main() {
 	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] == 'sqrt')
 	square_root := os.args.len == 4
 	out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
-	saved_rounding := C.fegetround(); assert saved_rounding >= 0; defer { assert C.fesetround(saved_rounding) == 0 }; assert C.fesetround(C.FE_TONEAREST) == 0
+	saved_rounding := C.fegetround(); saved_flags := C.fetestexcept(C.FE_ALL_EXCEPT); assert saved_rounding >= 0
+	defer { assert C.fesetround(saved_rounding) == 0; assert C.feclearexcept(C.FE_ALL_EXCEPT) == 0; if saved_flags != 0 { assert C.feraiseexcept(saved_flags) == 0 } }
+	assert C.fesetround(C.FE_TONEAREST) == 0
 	mut source := strings.new_builder(32768); mut cases := []RoundCase{}
 	for bits in [16, 32]! {
 		typ := if bits == 16 { 'half' } else { 'float' }
 		if square_root { source.write_string('declare ${typ} @llvm.fabs.f${bits}(${typ})\n') }
-		for op in if square_root { ['sqrt'] } else { ['floor', 'ceil', 'trunc', 'round', 'roundeven'] } {
+		for op in if square_root { ['sqrt'] } else { ['floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint'] } {
 			name := '${op}_${bits}'; cases << RoundCase{name, bits}
 			source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ})\ndefine void @${name}(ptr %a, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %x)\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
 			first := if square_root { 'fabs' } else { op }
 			source.write_string('define void @chain_${name}(ptr %a, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %first = call ${typ} @llvm.${first}.f${bits}(${typ} %x)\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %first)\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
+			source.write_string('define void @cached_${name}(ptr %a, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %first = call ${typ} @llvm.${op}.f${bits}(${typ} %x)\n store ${typ} %first, ptr %dst, align 1\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %first)\n ret void }\n')
 			for state in ['poison', 'undef'] { source.write_string('define void @guard_${state}_${name}(ptr %dst) { %v = call ${typ} @llvm.${op}.f${bits}(${typ} ${state})\n store ${typ} %v, ptr %dst, align 1\n ret void }\n') }
 			for mode in ['freeze', 'select'] {
 				choice := if mode == 'freeze' { 'freeze ${typ} %bad' } else { 'select i1 false, ${typ} %bad, ${typ} 1.0' }
@@ -105,7 +111,7 @@ fn main() {
 	// Both signs of zero/subnormal/infinity/NaNs, neighbors of half ties, and
 	// the last fractional and first integral-only binades, expanded to both signs.
 	edges := [u32(0), 1, 0x007fffff, 0x00800000, 0x3effffff, 0x3f000000, 0x3f000001, 0x3f7fffff, 0x3f800000, 0x3f800001, 0x3fbfffff, 0x3fc00000, 0x3fc00001, 0x3fffffff, 0x40000000, 0x40000001, 0x401fffff, 0x40200000, 0x40200001, 0x405fffff, 0x40600000, 0x40600001, 0x4affffff, 0x4b000000, 0x4b000001, 0x4b7fffff, 0x7f7fffff, 0x7f800000, 0x7f800001, 0x7fc00000, 0x7fc12345, 0x7fffffff]!
-	mut comparisons := 0; mut boundaries := 0; mut nan_cases := 0; mut chains := 0; mut mode_controls := 0
+	mut comparisons := 0; mut boundaries := 0; mut nan_cases := 0; mut chains := 0; mut mode_controls := 0; mut environments := 0; mut cached_metadata := 0; mut types := 0
 	for c in cases {
 		function := find_function(ir, c.name); address := C.LLVMGetFunctionAddress(engine, c.name.str); assert address != 0
 		chain_name := 'chain_' + c.name; chain := find_function(ir, chain_name); chain_address := C.LLVMGetFunctionAddress(engine, chain_name.str); assert chain_address != 0
@@ -151,6 +157,33 @@ fn main() {
 				assert C.fesetround(mode) == 0; assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 4)!.steps == 4; assert read_word(actual, 3, count) == baseline; mode_controls++
 			}; assert C.fesetround(C.FE_TONEAREST) == 0
 		}
+		if c.name.starts_with('rint_') || c.name.starts_with('nearbyint_') {
+			// Exact ties, zero signs, NaNs and tiny inputs under every host mode.
+			// The default LLVM environment is simulated without touching host flags.
+			inputs := if c.bits == 16 { [u64(0x4100), 0xc100, 0x3800, 0xb800, 0xfc01, 1] } else { [u64(0x40200000), 0xc0200000, 0x3f000000, 0xbf000000, 0xff800001, 1] }
+			values := if c.bits == 16 { [u64(0x4000), 0xc000, 0, 0x8000, 0x7e00, 0] } else { [u64(0x40000000), 0xc0000000, 0, 0x80000000, 0x7fc00000, 0] }
+			for mode in [C.FE_TONEAREST, C.FE_DOWNWARD, C.FE_UPWARD, C.FE_TOWARDZERO]! { for i, raw in inputs { for seeded in [false, true]! {
+				for j in 0 .. count { left[1 + j] = u8(raw >> u32(8 * j)) }
+				assert C.fesetround(mode) == 0 && C.feclearexcept(C.FE_ALL_EXCEPT) == 0
+				if seeded { assert C.feraiseexcept(C.FE_DIVBYZERO) == 0 }; flags := C.fetestexcept(C.FE_ALL_EXCEPT)
+				assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 4)!.steps == 4 && read_word(actual, 3, count) == values[i]
+				assert C.fegetround() == mode && C.fetestexcept(C.FE_ALL_EXCEPT) == flags; environments++
+			} } }; assert C.fesetround(C.FE_TONEAREST) == 0
+		}
+		// Reject malformed later calls before their preceding store, even when
+		// the exact declaration has already been validated and cached.
+		cached := find_function(ir, 'cached_' + c.name); slot := bodies.scopes[cached + 1].instructions_start + 3; saved := p.instructions[slot]
+		for j in 0 .. 16 { actual[j] = 0xcc }
+		for changed in [airbitcode.IRTypedInstruction{...saved, flags: 0}, airbitcode.IRTypedInstruction{...saved, flags: 32769}, airbitcode.IRTypedInstruction{...saved, calling_convention: 8}, airbitcode.IRTypedInstruction{...saved, attribute_set: 1}, airbitcode.IRTypedInstruction{...saved, fast_math_flags: 1}, airbitcode.IRTypedInstruction{...saved, operands_count: 3}, airbitcode.IRTypedInstruction{...saved, result_type: -1}, airbitcode.IRTypedInstruction{...saved, callee_function: -1}, airbitcode.IRTypedInstruction{...saved, call_signature: -1}] {
+			p.instructions[slot] = changed; if _ := p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 5) { panic('cached metadata accepted') }; for byte in actual { assert byte == 0xcc }; cached_metadata++
+		}; p.instructions[slot] = saved
+		mut wrong := -1; for i, typ in p.types { if typ.kind == .integer_t && typ.bits == 32 { wrong = i; break } }; assert wrong >= 0
+		operand_slot := saved.operands_start + 1; operand := p.operands[operand_slot]; p.operands[operand_slot] = airbitcode.IRTypedOperand{...operand, type_index: wrong}
+		if _ := p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 5) { panic('operand type accepted') }; for byte in actual { assert byte == 0xcc }; p.operands[operand_slot] = operand; types++
+		assert p.run_memory_function(ir, stream, pools, bodies, cached, mut bindings, 5)!.steps == 5
+		unsafe { NativeRound(voidptr(address))(&left[1], &expected[3]) }; compare(actual, expected, c.bits)
+		assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 4)!.steps == 4
+		compare(actual, expected, c.bits)
 		unsafe { bindings.free(); left.free(); actual.free(); expected.free() }
 	}
 	mut guards := 0; mut choices := 0
@@ -173,10 +206,10 @@ fn main() {
 		p.instructions[slot] = changed; if _ := p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3) { panic('metadata accepted') }; for byte in bytes { assert byte == 0xcc }; metadata++
 	}; p.instructions[slot] = saved
 	assert p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3)!.steps == 3 && bytes[0] == 17
-	if square_root { assert cases.len == 2 && comparisons == 327744 && boundaries == 196672 && chains == 327744 && mode_controls == 32 && guards == 4 && choices == 4 && metadata == 9 }
-	else { assert cases.len == 10 && comparisons == 655680 && boundaries == 320 && chains == 1600 && mode_controls == 160 && guards == 20 && choices == 20 && metadata == 9 }
+	if square_root { assert cases.len == 2 && comparisons == 327744 && boundaries == 196672 && chains == 327744 && mode_controls == 32 && guards == 4 && choices == 4 && metadata == 9 && cached_metadata == 18 && types == 2 && environments == 0 }
+	else { assert cases.len == 14 && comparisons == 917952 && boundaries == 448 && chains == 2240 && mode_controls == 224 && guards == 28 && choices == 28 && metadata == 9 && cached_metadata == 126 && types == 14 && environments == 192 }
 	label := if square_root { 'AIR-MEMORY-SQRT' } else { 'AIR-MEMORY-ROUNDING' }
 	composition := if square_root { 'sqrt/fabs compositions' } else { 'cached/idempotent chains' }
-	result := '${label}: ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} float boundaries), half/float and all half encodings, ${chains} ${composition}, ${mode_controls} host-rounding controls, sentinels/budgets, ${guards} poison/undef guards, ${choices} freeze/lazy choices and ${metadata} metadata controls PASS\n'
+	result := '${label}: ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} float boundaries), half/float and all half encodings, ${chains} ${composition}, ${mode_controls} host-rounding/${environments} exact default-environment and exception controls, sentinels/budgets, ${guards} poison/undef guards, ${choices} freeze/lazy choices and ${metadata}/${cached_metadata} initial/cached metadata plus ${types} operand-type controls PASS\n'
 	os.write_file(out + '/result.txt', result)!; print(result)
 }

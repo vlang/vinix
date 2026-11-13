@@ -338,7 +338,16 @@ the scalar evaluator's preferred quiet choice. Poison propagates and undef
 rejects. Each call costs one step and shares scalar validation/evaluation
 without consulting host rounding mode. Synthetic deferred dispatches check
 both signs of 2.5 and 0.5 in both precisions, exact zero signs and the differing
-tie rules, across four offset snapshots. `rint`/`nearbyint` remain unsupported.
+tie rules, across four offset snapshots.
+
+Direct LLVM `rint`/`nearbyint` support matching half/float operands/results,
+rounding to nearest integral values with ties to even in LLVM's default
+environment. Scalar integer bit evaluation preserves zero signs and chooses
+the preferred quiet NaN. Poison propagates and undef rejects; each call costs
+one step. Host rounding modes and exception flags do not participate; dynamic
+or constrained FP environments and exception modeling remain unsupported.
+Eight deferred dispatches mix rint/nearbyint/roundeven in both precisions,
+checking both tie signs, signed zero, signaling NaNs, infinities and subnormals.
 
 Direct LLVM `sqrt` supports matching half/float operands/results. Scalar
 integer root/remainder evaluation produces roots rounded to nearest with
