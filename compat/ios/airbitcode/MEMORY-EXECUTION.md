@@ -180,7 +180,14 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these thirty-seven families' exact declarations are admitted:
+Direct LLVM `clmul` supports matching scalar i1..i64 operands and results.
+It multiplies binary polynomials over GF(2), using XOR rather than carries,
+and retains only the low result-width coefficients. Both operands are
+evaluated; poison propagates even with a zero multiplier and undef rejects.
+Each call costs one step and shares scalar validation/evaluation. The fixed
+declaration cache reserves all 64 widths alongside the existing families.
+
+Only ordinary direct calls to these thirty-eight families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -298,3 +305,7 @@ native LLVM, exhausts half inputs under signed scales, checks exponent limits
 and subnormal ties, and rejects malformed later cached calls before stores.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
+
+`tests/ios/air-memory-clmul.v` compares all i1..i64 widths against native LLVM
+and independent polynomial convolution, exhausts i1..i8 pairs, checks cached
+distributive identities and rejects malformed later calls before stores.

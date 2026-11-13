@@ -451,6 +451,14 @@ scalar validation/evaluation. A synthetic deferred kernel executes both
 primitives and round-trip chains, checking independent masked identities with
 inputs changed after encoding and the pipeline released before commit.
 
+Direct LLVM `clmul` supports matching scalar i1..i64 operands/results. It
+multiplies binary polynomials over GF(2), using XOR instead of carries and
+truncating to the low result-width coefficients. Both operands are evaluated;
+poison propagates even with zero input and undef rejects. Each call costs one
+step and shares scalar validation/evaluation. Seven deferred dispatches check
+i32/i64 products, high-bit truncation and distributive identities through
+cached calls, distinct offsets and exact u64 output words.
+
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not
 retain the client pointer. Each dispatch retains its own buffer reference, so

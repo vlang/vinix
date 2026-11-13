@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1144,6 +1144,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	for op in ['sadd', 'uadd', 'ssub', 'usub'] { source.write_string('declare i32 @llvm.${op}.sat.i32(i32, i32)\n') }
 	for op in ['sshl', 'ushl'] { source.write_string('declare i32 @llvm.${op}.sat.i32(i32, i32)\n') }
 	for op in ['pext', 'pdep'] { source.write_string('declare i32 @llvm.${op}.i32(i32, i32)\n') }
+	for bits in [32, 64]! { source.write_string('declare i${bits} @llvm.clmul.i${bits}(i${bits}, i${bits})\n') }
 	for typ, bits in {'half': 16, 'float': 32} {
 		source.write_string('declare ${typ} @llvm.fabs.f${bits}(${typ})\ndeclare ${typ} @llvm.copysign.f${bits}(${typ}, ${typ})\n')
 		source.write_string('declare ${typ} @llvm.sqrt.f${bits}(${typ})\n')
@@ -1154,6 +1155,15 @@ fn sm_test_compute_library(label string) ![]u8 {
 		for op in ['floor', 'ceil', 'trunc', 'round', 'roundeven'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ})\n') }
 	}
 	for name in names {
+		if name == 'polynomial' {
+			source.write_string('define void @polynomial(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x64 = load i64, ptr addrspace(2) %a, align 8\n %y64 = load i64, ptr addrspace(2) %b, align 8\n %x32 = trunc i64 %x64 to i32\n %y32 = trunc i64 %y64 to i32\n')
+			for i, bits in [32, 64]! {
+				source.write_string('%p${bits} = call i${bits} @llvm.clmul.i${bits}(i${bits} %x${bits}, i${bits} %y${bits})\n %y1${bits} = xor i${bits} %y${bits}, 1\n %q${bits} = call i${bits} @llvm.clmul.i${bits}(i${bits} %x${bits}, i${bits} %y1${bits})\n %r${bits} = xor i${bits} %p${bits}, %q${bits}\n')
+				if bits == 32 { source.write_string('%v0 = zext i32 %p32 to i64\n %v1 = zext i32 %r32 to i64\n') } else { source.write_string('%v2 = or i64 %p64, 0\n %v3 = or i64 %r64, 0\n') }
+				for j in 0 .. 2 { source.write_string('%d${i * 2 + j} = getelementptr i64, ptr addrspace(1) %out, i64 ${i * 2 + j}\n store i64 %v${i * 2 + j}, ptr addrspace(1) %d${i * 2 + j}, align 8\n') }
+			}
+			source.write_string('ret void }\n'); continue
+		}
 		if name == 'scaling' {
 			source.write_string('define void @scaling(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load float, ptr addrspace(2) %a, align 4\n %e = load i32, ptr addrspace(2) %b, align 4\n %ha = getelementptr i8, ptr addrspace(2) %a, i64 4\n %hx = load half, ptr addrspace(2) %ha, align 2\n %f = call float @llvm.ldexp.f32.i32(float %x, i32 %e)\n %h = call half @llvm.ldexp.f16.i32(half %hx, i32 %e)\n %v0 = bitcast float %f to i32\n %i = bitcast half %h to i16\n %v1 = zext i16 %i to i32\n store i32 %v0, ptr addrspace(1) %out, align 4\n %d = getelementptr i32, ptr addrspace(1) %out, i64 1\n store i32 %v1, ptr addrspace(1) %d, align 4\n ret void }\n'); continue
 		}
@@ -1247,8 +1257,8 @@ fn sm_test_compute_library(label string) ![]u8 {
 		compute := if name in ['max', 'float_max'] { '%c = ${cmp} ${typ} %x, %y\n %v = select i1 %c, ${typ} %x, ${typ} %y\n' } else if name == 'frozen_sum' { '%bad = ${op} i32 %x, %y\n %v = freeze i32 %bad\n' } else { '%v = ${op} ${typ} %x, %y\n' }
 		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n ${gep}%x = load ${typ}, ptr addrspace(2) ${a}, align 4\n %y = load ${typ}, ptr addrspace(2) ${b}, align 4\n ${prior}${compute}store ${typ} %v, ptr addrspace(1) ${dst}, align 4\n ret void\n}\n')
 	}
-	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340, !350}\n')
-	for i, name in names[..36] {
+	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340, !350, !360}\n')
+	for i, name in names[..37] {
 		n := i * 10
 		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n!${n + 1} = !{}\n')
 		if name == 'empty' { source.write_string('!${n + 2} = !{}\n'); continue }
@@ -1496,6 +1506,22 @@ fn test_software_metal_compute() {
 		sm_call(permutation, c'commit'); assert sm_send(permutation, c'status') == 4
 		for i, expected in [u32(0x0e), 0x14, 0x54, 6]! { assert unsafe { *(&u32(outp + 16 + u64(i * 4))) } == expected }
 		unsafe { C.memset(voidptr(outp), 0xcc, 32) }
+		poly_left := sm_test_buffer(d, 56, 0); poly_right := sm_test_buffer(d, 56, 0); poly_output := sm_test_buffer(d, 224, 0)
+		polyap := sm_send(poly_left, c'contents'); polybp := sm_send(poly_right, c'contents'); polyp := sm_send(poly_output, c'contents')
+		unsafe { C.memset(voidptr(polyp), 0xcc, 224) }
+		poly_command := sm_send(queue, c'commandBuffer'); poly_encoder := sm_send(poly_command, c'computeCommandEncoder')
+		poly_pipeline := sm_test_compute_pipeline(d, library, 'polynomial', unsafe { nil }); assert poly_pipeline != 0
+		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(poly_encoder, c'setComputePipelineState:', poly_pipeline) }
+		for i in 0 .. 7 {
+			sm_test_compute_buffer(poly_encoder, poly_left, u64(i * 8), 0); sm_test_compute_buffer(poly_encoder, poly_right, u64(i * 8), 3); sm_test_compute_buffer(poly_encoder, poly_output, u64(i * 32), 7)
+			sm_test_compute_dispatch(poly_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+		}
+		sm_call(poly_encoder, c'endEncoding'); objc_release(poly_pipeline); objc_release(poly_left); objc_release(poly_right); objc_release(poly_output)
+		for i, value in [u64(3), 0xffffffffffffffff, 0x8000000000000000, 0x80000000, 0x0123456789abcdef, 0, 1]! { unsafe { *(&u64(polyap + u64(i * 8))) = value } }
+		for i, value in [u64(3), 0xffffffffffffffff, 2, 2, 1, 0xffffffffffffffff, 0x8000000000000000]! { unsafe { *(&u64(polybp + u64(i * 8))) = value } }
+		for i in 0 .. 224 { assert unsafe { *(&u8(polyp + u64(i))) } == 0xcc }
+		sm_call(poly_command, c'commit'); assert sm_send(poly_command, c'status') == 4
+		for i, expected in [u64(5), 3, 5, 3, 0x55555555, 0xffffffff, 0x5555555555555555, 0xffffffffffffffff, 0, 0, 0, 0x8000000000000000, 0, 0x80000000, 0x100000000, 0x80000000, 0x89abcdef, 0x89abcdef, 0x0123456789abcdef, 0x0123456789abcdef, 0, 0, 0, 0, 0, 1, 0x8000000000000000, 1]! { assert unsafe { *(&u64(polyp + u64(i * 8))) } == expected }
 		sign_command := sm_send(queue, c'commandBuffer'); sign_encoder := sm_send(sign_command, c'computeCommandEncoder')
 		sign_pipeline := sm_test_compute_pipeline(d, library, 'float_sign', unsafe { nil }); assert sign_pipeline != 0
 		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(sign_encoder, c'setComputePipelineState:', sign_pipeline) }
@@ -1650,7 +1676,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/float-sign/rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/float-sign/rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {
