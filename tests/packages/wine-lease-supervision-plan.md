@@ -817,6 +817,61 @@ SHA-256 `24bc547b141a3229e84222e15516dad5d94ba02ca57a75e5bf4a917a82fcd158`.
 Recording and independent verification pass with adjacent logs. Historical
 originals and prior frozen workspaces remain intact and required.
 
+## Real Wine lease composition, 2026-11-13
+
+Source `d1f087db7` composes the standalone holder with the owned Wine manager
+in a diagnostic; production launch paths remain unchanged. It also privately
+names the holder's C `read` binding, fixing an incompatible global declaration
+when `appsdk` and `launchhold` are imported together. ARM/x86 standard holder
+regressions pass with that binding change.
+
+Final `check-03` passes `lease-03` and `death-01`: ordinary uid/gid 1000 runs
+the retained real Wine/app closure, authenticates its foreground server and
+hands its socket to the real Win64 client. After collecting client status zero,
+the manager deliberately exits 37 without cleanup while a `--persistent=20`
+server is still alive. The observer requires non-zombie server PPid equal to
+the holder and an independently opened exclusive lease attempt to remain busy.
+The holder returns saved manager status 37 only after descendant retirement;
+the observer then requires a free lease and absent server proc entry. This
+does not establish the individual server's final status.
+
+In `death-01`, the observer enables/read-checks subreaping, kills and reaps the
+original caller with SIGTERM, and checks the lease remains busy. The observer
+already closed its shared copy, so the waiting original caller cannot supply
+this protection. It then collects the adopted holder by exact PID/status 37.
+`unheld-02` closes the lease and bypasses the holder: real Win64 execution
+still passes, but the guest refuses exactly at `live Wine lease was not busy`.
+Its `passed=false` result is the required negative control, accepted only at
+that gate. `owned-01` also passes the original startup/natural-retirement mode.
+
+Leased modes actually embed the retained production x86 kernel from
+`/Users/alex/.cache/vpr-20261113-01/x86-production-01`, SHA-256
+`ed5a26544945c8c599c0adc05efcbace8dae10e058f8fb66131f04caa8292fa7`.
+The controller rebuilds a private ISO and checks regular-file membership and
+contents against the original, replacing the kernel and permitting only BIOS
+boot-info-table regeneration (unused in this baseline). The retained entire
+initramfs is identical before the existing fixed-init overlay. Full-byte
+comparison against the new kernel baseline then permits only the diagnostic
+ELF plus zero tail in the init slot. Selected tool/input and generated image
+hashes pass before/after boot. Original image and historical auditors remain
+unchanged. An initial combined-build refusal and earlier successful runs are
+retained with their source views.
+
+Complete sources, generated C, binaries, literal commands, images and logs:
+`/Users/alex/.cache/vwlease-20261113-01` (frozen). Complete typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-real-lease-20261113-01.inventory.json`,
+SHA-256 `2b7e4be2c1233b9960e9a3d9242fcea59fa226446f49af55d1e5383e39a64b7e`.
+Recording and independent verification pass with adjacent logs; an initial
+verification attempted before recording finished is also preserved.
+
+This uses a synthetic flock lease, not production generation collection or
+fresh signed/sandbox acceptance. Manager exit deliberately releases the prefix
+guard while Wine lives; concurrent launch/recovery policy is not qualified.
+ARM Wine, Windows relative data-file APIs, production wiring, holder SIGKILL
+retention and a kernel-owned workload reference remain open. No new kernel
+publication/barrier, full C environment, reproducibility or heap-retention
+guarantee follows from this diagnostic.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

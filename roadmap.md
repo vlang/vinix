@@ -1223,7 +1223,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     the owned foreground server, authenticated handoff and real Win64 probe
     complete successfully. [Captured client working directories](tests/packages/wine-lease-supervision-plan.md#captured-client-working-directory-2026-11-13)
     now pass native relative-file and replacement controls on both architectures,
-    plus real Wine relative executable startup on retained x86. Fresh
+    plus real Wine relative executable startup on retained x86. A
+    [real Wine lease diagnostic](tests/packages/wine-lease-supervision-plan.md#real-wine-lease-composition-2026-11-13)
+    now keeps a diagnostic lease busy after manager and caller death while
+    the adopted x86 Wine server lives, then releases it after retirement.
+    The unheld control detects early release. Fresh
     signed/sandbox startup, ARM Wine, Windows relative data-file semantics and
     production lease wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
