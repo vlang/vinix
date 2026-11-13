@@ -1212,7 +1212,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     socket path. A [bounded readiness wait](tests/packages/wine-lease-supervision-plan.md#bounded-server-readiness-2026-11-13)
     now joins exec, namespace, lock and peer checks while preserving child
     ownership on timeout/refusal. Native success and timeout loops retain no V
-    allocations or descriptors. Signed Wine startup and production wiring remain open.
+    allocations or descriptors. The [bridge environment boundary](tests/packages/wine-lease-supervision-plan.md#bridge-environment-boundary-2026-11-13)
+    now clears inherited server-socket overrides at top-level entry while
+    preserving nested alias handoff; host sanitizer checks and both runner
+    target builds pass. Signed Wine startup and production wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

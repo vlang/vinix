@@ -636,6 +636,43 @@ protocol fixtures. Signed Wine/translator/sandbox startup, actual client socket
 inheritance/bootstrap, generation leases and holder-death recovery remain open;
 the production runner and holder are unchanged.
 
+## Bridge environment boundary, 2026-11-13
+
+Source `3f0b67a8d` changes the production runner to call
+`wineadapter.clear_bridge_overrides` before setting its canonical runtime
+environment. Top-level `wine-runner` removes inherited `WINESERVERSOCKET` so
+inherited state cannot select its server connection. Nested `wine`, `wine64`
+and `wineserver` aliases preserve Wine's handoff value exactly, including absence
+and empty values. The helper never parses or closes a descriptor named by that
+variable. Existing loader/translator/Wine overrides still clear for all roles;
+unsetenv failures now stop launch. Unknown roles refuse before any mutation.
+Call only in the launching process without concurrent environment mutation.
+
+Final `controller-02`/`matrix-01` passes normal, production and ASan/UBSan host
+checks with zero retained tracked V bytes across 1,000 preserve/clear cycles.
+Cases cover empty, numeric, opaque and oversized top-level values; byte-exact
+nested handoff; all eight override variables; unrelated SDK identity; unknown
+role refusal; and borrowed descriptor liveness/CLOEXEC flags. Fixture environment
+values are restored, including absence/empty distinctions. Explicit panic guards
+remain active under `-prod`. Both actual Linux production runner targets build
+as static ARM64/x86_64 ELFs; generated C contains the new helper call. These
+binaries were not booted, packaged or signed. Existing signed packages keep
+their original runner until rebuilt.
+
+The controller admits actual parsed V sources, binds embedded test/helper/runner
+sources, and verifies selected compiler/header and generated output hashes.
+Commands, generated C, executables, logs, receipts and final sources remain at
+`/Users/alex/.cache/vbe-20261113-01`; complete typed inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-bridge-environment-20261113-01.inventory.json`,
+SHA-256 `f89f8a33cfb43381ad90deae1f39752a4e5f0ac4acef435d588bae456829ce46`.
+Recording and separate verification pass with adjacent logs. Preserve the
+complete workspace and historical bundles. Full C toolchain/compiler-environment
+inventory, libc environment allocation retention, injected unsetenv failure and
+Linux/Wine execution are outside this gate. Future managed launch must clear
+inherited state first, then install its owned authenticated socket only in the
+initial client's handoff environment. Signed foreground startup, actual socket
+inheritance/bootstrap, generation leases and holder-death recovery remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
