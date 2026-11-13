@@ -1097,6 +1097,38 @@ default enablement, ARM owned Wine and holder SIGKILL/kernel-owned retention
 remain open. Synthetic-lock tests and separate component runs do not establish
 these remaining gates or full C environment/heap/reproducibility guarantees.
 
+## Low-numbered generation leases, 2026-11-13
+
+Source `9c877b770` fixes an opt-in dispatch edge case: opening a verified lease
+after closing stdio can yield FD 0–2, while the holder requires FD >=3. The
+package dispatcher checks CLOEXEC and retains a private F_DUPFD_CLOEXEC copy
+above stdio, sharing the same open description/lock. It closes only that copy
+after holder completion/error; it never moves, unlocks or reopens the caller's
+descriptor. Default/non-Windows dispatch and the holder itself are unchanged.
+
+`check-02/held-01` passes normal and FD0 launches in the native pkgcore fixture.
+The workload sees FD0 closed; session adoption, busy lease until release,
+saved status 37 and final free lease pass. Before closing its own FD, the
+caller verifies it remains live/CLOEXEC and still holds the lock. An inheritable
+FD0 refuses before launch without changing it; restoring CLOEXEC permits retry.
+Missing leases and non-Windows exec errors remain checked. `unheld-01` still
+detects lost adoption at the required readiness-timeout gate. Parsed source,
+selected input and generated artifact hashes pass before/after boot. Generated
+C confirms cleanup closes only the private duplicate after the synchronous call.
+
+Complete builds, sources, C/binaries, commands, images and logs:
+`/Users/alex/.cache/vwlowfd-20261113-01` (frozen). Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-generation-lowfd-20261113-01.inventory.json`,
+SHA-256 `89141ac3b9d634d39cfa13c0ed5fd1e9447c248fb0a5e9b4d109e01364380d2d`.
+Recording and independent verification pass with adjacent logs. Keep the
+complete workspace and original input/historical namespaces.
+
+FD0 is the tested low-slot representative; FD1/2 share its code path but are
+not individually exercised. These are synthetic-file native checks, not fresh
+installed collection or package/CLI/signature acceptance. Default enablement,
+ARM owned execution, holder SIGKILL retention and broader resource/heap/C
+environment qualification remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

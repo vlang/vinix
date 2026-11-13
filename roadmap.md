@@ -1244,7 +1244,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Opt-in package dispatch](tests/packages/wine-lease-supervision-plan.md#opt-in-generation-lease-dispatch-2026-11-13)
     now threads verified generation leases from ordinary and prepared-service
     launches into the private holder for Windows. Native adoption/lifetime,
-    status and missing-lease controls pass. Default activation, full fresh
+    status and missing-lease controls pass. [Low-descriptor handling](tests/packages/wine-lease-supervision-plan.md#low-numbered-generation-leases-2026-11-13)
+    now preserves a verified lease occupying a stdio slot without passing it
+    to the workload. Default activation, full fresh
     signed package-to-SDK acceptance, ARM owned Wine, broader mappings and
     holder-death retention remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
