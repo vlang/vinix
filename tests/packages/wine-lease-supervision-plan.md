@@ -1426,6 +1426,37 @@ death, whole-session/logout teardown, arbitrary descendants/refusals and
 kernel-owned retention remain open. Full C environment/heap and
 hermetic/reproducible qualification also remain open; section 14 is incomplete.
 
+## Process scan uncertainty, 2026-11-13
+
+Source `ebee5d384` closes an observation gap in caller discovery and idle
+client counting: a failed `/proc/<pid>/cmdline` read is accepted only if the
+process directory has disappeared. An unreadable surviving entry refuses
+instead of silently contributing to a possible zero-client result. Readable
+empty command lines remain valid. Focused host controls cover disappearance,
+unreadable surviving entries, empty reads and NUL-separated argv preservation.
+
+Signed x86 `native-02` passes the caller-death/idle-server gate with the current
+guest and package CLI: `passed=true`, `interrupted=false`, 89.28 seconds;
+zero-client collection/recheck is 157573000 ns. Caller 137, holder 37, natural
+retirement and final obsolete-generation collection pass, as do parsed-source,
+selected-input and generated-output rechecks. The prepared runtime/PE are
+retained inputs, freshly signed/published/installed, with their prior complete
+producer evidence still required. Kernel/runtime/holder code is unchanged.
+
+Evidence is frozen at `/Users/alex/.cache/vwproc-20261113-01`, including native
+input snapshots, generated artifacts, source copies and logs. `native-01`
+correctly refused a source edit during capture before boot. The cached V test
+subcommand could not find its source tree; direct compilation and execution of
+the same `_test.v` with that V passed. Original namespaces and historical audit
+requirements remain unchanged. This hardens the observer; the preceding
+default, ARM, GUI, holder-death and broader lifetime gates remain open.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-proc-scan-20261113-01.inventory.json`,
+SHA-256 `a6d52989a98a129eb744552163620ce946e44247499e354c6409cc30980bedcd`.
+Recording and independent verification pass with adjacent logs; preserve the
+entire frozen workspace and referenced original producer/input bundles.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
