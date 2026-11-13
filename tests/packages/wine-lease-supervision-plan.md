@@ -1548,6 +1548,39 @@ apply. This is a native bounded burst, not arbitrary topology, signed Wine
 churn or a memory-leak measurement. Holder/SDK death, session teardown, ARM
 owned Wine, fresh owned GUI and default activation remain open.
 
+## Injected descendant-wait interruption, 2026-11-13
+
+Source `7676db6df` adds controller outcome `interrupt`. Both
+`lease_holder_fixture` and `lease_holder_wait_interrupt` are needed to inject
+one synthetic `-1/EINTR` result before the ordinary descendant-wait retry
+branch. A raw diagnostic precedes setting errno. The fixture then uses the
+existing caller-death lifetime case: busy lease after initial-client exit and
+caller death, adopted holder status 37 after natural worker retirement, free
+lease and no remaining children. The host requires exactly one injection and
+zero unexpected-wait diagnostics. Ordinary outcomes require zero injections.
+
+Final `interrupt-02` cases pass on x86_64 (8.012 seconds) and AArch64 (6.144).
+Final `standard-02` regressions pass on x86_64 (10.387) and AArch64 (6.392).
+All are uninterrupted and pass parsed-source, selected-input and generated
+output checks. Per-architecture final input maps are byte-identical across
+modes. Initial injection builds hit a V conditional-scope error before boot;
+the corrected final runs and earlier diagnostics remain preserved.
+
+Evidence and complete selected native input byte snapshots are frozen at
+`/Users/alex/.cache/vwintr-20261113-01`. Retain the original kernel qualification
+bundle and namespaces; historical audit requirements remain unchanged.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/holder-eintr-20261113-01.inventory.json`,
+SHA-256 `96be40d8c26154f3b69d1cc437d294a377fbf27fd3363e021d5fea51951350fe`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original kernel/input bundles.
+
+This qualifies the retry branch with a synthetic result, not signal delivery
+or a real kernel wait returning EINTR. No kernel or Wine runtime changes were
+made. Holder/SDK death, session teardown, ARM owned Wine, fresh owned GUI,
+default activation and broader topology/heap/hermetic gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
