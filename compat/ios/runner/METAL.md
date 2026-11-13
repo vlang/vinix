@@ -318,7 +318,7 @@ Zero input returns the width when the flag is false and poison when true;
 freeze can define that result before storing. Calls cost one step and execute
 inside the interpreter. Indirect calls, call-site attributes, tail calls and
 fast-math calls remain unsupported. Admitted intrinsic families are these five
-and the float-sign/rounding/sqrt/floating-extrema/classification/funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
+and the float-sign/rounding/sqrt/floating-extrema/classification/fma/funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
 combine all five operations and consume zero-poison results through freeze.
 
 Direct LLVM `fabs`/`copysign` support matching half/float values and results.
@@ -368,6 +368,15 @@ two's exact immarg. Each call's mask is validated even with a cached declaration
 Synthetic deferred dispatches classify all ten classes in both precisions,
 checking NaNs, finite values and signaling NaNs, i1-to-i32 casts and integer
 selection, across ten input/output offset snapshots.
+
+Direct LLVM `fma` supports three matching half/float operands and result, using
+the scalar evaluator's exact integer product-plus-addend and a single rounding
+to nearest with ties to even. Host rounding mode does not participate. All
+operands are evaluated; poison propagates and undef rejects. Each call costs
+one step and shares scalar validation/evaluation. Synthetic deferred kernels
+check cancellation, overflow avoidance and a subnormal tie that differ from
+separate multiply/add, plus negative zero and invalid infinity multiplication,
+in both precisions across five snapshots. `fmuladd` remains unsupported.
 
 Direct LLVM `fshl`/`fshr` calls support three matching i1..i64 operands. Amounts
 are reduced modulo the width; equal inputs produce rotations. Zero amount

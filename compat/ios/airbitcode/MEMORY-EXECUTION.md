@@ -103,6 +103,16 @@ mask is checked even after its declaration is cached. Invalid masks reject
 in preflight before earlier stores. The i1 result can feed select, casts and
 stores; its byte store has zero high padding bits.
 
+Direct LLVM `fma` accepts three matching half/float operands and result. The
+scalar evaluator forms the exact product-plus-addend on fixed integer limbs
+and rounds once to nearest with ties to even, independently of host rounding
+mode. Finite cancellation, overflow avoidance and subnormal ties therefore
+retain fused semantics. Defined zero/infinity/NaN cases use the scalar FMA
+rules and preferred quiet NaN choice. All three operands are evaluated; poison
+propagates and undef rejects, including with a zero product. Calls cost one
+step and share scalar validation/evaluation. Optional-fusion `fmuladd` and
+constrained floating operations remain unsupported by this buffer profile.
+
 Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
 the result type. The amount is reduced modulo the width, so equal operands
 produce rotations and oversized amounts are defined. A zero amount selects
@@ -146,7 +156,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these thirty-one families' exact declarations are admitted:
+Only ordinary direct calls to these thirty-two families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -255,5 +265,9 @@ both precisions' class/NaN/zero-order matrices and independent chain identities.
 independently labeled class boundaries, exhaustive half encodings under each
 individual class and empty/full masks, i1 padding, cached-call immediate
 validation, poison/undef and rounding/exception behavior.
+`tests/ios/air-memory-fma.v` compares fused results and cached-call chains
+against native LLVM, exhausts half inputs in two cancellation/scaling patterns,
+checks boundary triples, and distinguishes fused results from separate
+multiply/add for cancellation, overflow and underflow in both precisions.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.
