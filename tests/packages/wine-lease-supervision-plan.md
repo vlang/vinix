@@ -777,6 +777,46 @@ semantics unqualified. No generation lease or descendant barrier is installed;
 holder-death retention remains open. Full C toolchain/environment inventory and
 kernel/V heap retention are not established by this check.
 
+## Captured client working directory, 2026-11-13
+
+Source `60464316d` adds `ServerConnection.start_client_in`, borrowing a
+caller-admitted directory FD instead of always starting in the prefix. It
+captures a CLOEXEC duplicate and checks directory type before fork; the child
+uses the existing async-safe fchdir/close/signal/exec path. The duplicate is
+closed in the parent on every return and does not survive child exec. Existing
+`start_client` retains its prefix default. Directory package identity/access
+policy and exclusive descriptor lifetime until return remain caller duties.
+
+Final `check-02` passes `arm-02`, `x86-02`, `signal-arm-01` and `signal-x86-01`
+on the unchanged production kernels from `/Users/alex/.cache/vpr-20261113-01`.
+Each standard run completes 100 cycles with zero retained parent V bytes and
+flat descriptors. The client reads a relative file from the captured directory
+after its old pathname is replaced by a decoy; parent cwd, environment, mask,
+borrowed FD and unrelated FD remain intact. Invalid/non-directory descriptors
+refuse before fork without consuming the socket. Permission-denied fchdir
+reports stage 1/status 126; missing exec remains stage 4/status 126. Both
+preserve owned collection and server EOF/status 37. Signal controls still
+return 143 and preserve parent resources. Host unsupported-platform checks
+pass. Generated C confirms stack stat storage and unchanged child setup calls.
+
+`wine-01` also passes using the unchanged retained x86 image/kernel described
+above: real Wine starts `bin/program.exe` relative to the captured application
+directory, completes the Win64 checks, and both client and foreground server
+exit zero. The controller requires the relative-startup marker and verifies
+the complete image delta, padding and selected input hashes. This establishes
+initial relative executable resolution, not Windows relative data-file APIs
+or every Wine cwd/config bootstrap branch. Fresh signed/sandbox startup, ARM
+Wine, production runner/lease wiring and descendant/holder-death retention
+remain open. Full C environment and kernel heap retention remain unqualified.
+
+Complete sources, commands, generated C, binaries, results and boot evidence:
+`/Users/alex/.cache/vcwd-20261113-01` (frozen). Initial `check-01` ARM/x86 runs
+also pass; its original source is retained separately. Complete typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-client-cwd-20261113-01.inventory.json`,
+SHA-256 `24bc547b141a3229e84222e15516dad5d94ba02ca57a75e5bf4a917a82fcd158`.
+Recording and independent verification pass with adjacent logs. Historical
+originals and prior frozen workspaces remain intact and required.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

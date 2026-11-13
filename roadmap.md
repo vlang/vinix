@@ -1221,8 +1221,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     Wine bootstrap through this path now passes a
     [retained x86 Wine diagnostic](tests/packages/wine-lease-supervision-plan.md#retained-x86-wine-startup-diagnostic-2026-11-13):
     the owned foreground server, authenticated handoff and real Win64 probe
-    complete successfully. Fresh signed/sandbox startup, ARM, application
-    working-directory semantics and production lease wiring remain open.
+    complete successfully. [Captured client working directories](tests/packages/wine-lease-supervision-plan.md#captured-client-working-directory-2026-11-13)
+    now pass native relative-file and replacement controls on both architectures,
+    plus real Wine relative executable startup on retained x86. Fresh
+    signed/sandbox startup, ARM Wine, Windows relative data-file semantics and
+    production lease wiring remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
