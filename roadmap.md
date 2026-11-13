@@ -1240,9 +1240,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     then pass a same-prefix launch after retirement. The SDK entrypoint now has
     an [opt-in owned x86 mode](tests/packages/wine-lease-supervision-plan.md#opt-in-owned-sdk-entrypoint-2026-11-13)
     that passes actual SDK loading, real Win64 execution through the retained
-    sandbox and application-path refusal. Default ARM/x86 builds still pass;
-    default activation, fresh signing/current package-launch acceptance, ARM
-    owned Wine, broader mappings and production lease wiring remain open.
+    sandbox and application-path refusal. Default ARM/x86 builds still pass.
+    [Opt-in package dispatch](tests/packages/wine-lease-supervision-plan.md#opt-in-generation-lease-dispatch-2026-11-13)
+    now threads verified generation leases from ordinary and prepared-service
+    launches into the private holder for Windows. Native adoption/lifetime,
+    status and missing-lease controls pass. Default activation, full fresh
+    signed package-to-SDK acceptance, ARM owned Wine, broader mappings and
+    holder-death retention remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

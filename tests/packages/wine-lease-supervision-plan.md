@@ -1052,6 +1052,51 @@ package/CLI acceptance, current sandbox rebuild, ARM owned execution, broader
 SDK-level fault/status coverage and holder SIGKILL retention remain open.
 No full C environment, reproducibility or heap-retention guarantee is added.
 
+## Opt-in generation lease dispatch, 2026-11-13
+
+Source `3b9310aea` threads the already verified generation lease from both
+`run_application` and prepared `Service` launches into a shared leased-mode
+implementation. Plan/payload/data admission still precedes execution. With
+`wine_owned_manager`, x86 Windows launches use `run_generation_launch` to pass
+the borrowed FD and complete plan to `launchhold.run`. Shared callers retain
+their original lease/state ownership and exact-holder wait; subreaping and
+arbitrary descendant reaping stay in the private holder. Default/non-Windows
+dispatch uses the original launcher. Missing leases and other enabled target
+architectures refuse. The builder does not activate this flag by default.
+
+`generation-launch-check.v` passes `held-01` on the unchanged production x86
+kernel, calling the actual private pkgcore dispatcher. Ordinary uid/gid 1000
+creates a synthetic shared lease; an execed client double-forks a session
+worker. The worker must confirm holder PPid before readiness. An independent
+exclusive lease attempt stays busy until release; exact client status 37 is
+preserved across worker status 23, then the lease is free. Missing-lease
+refusal and the non-Windows original exec-error path pass too. `unheld-01`
+compiles without the flag and must refuse at worker readiness timeout, exposing
+lost holder adoption. Its failed guest result is the expected control.
+
+The holder's raw syscall declaration is privately named to avoid pkgcore's
+incompatible global declaration, with unchanged syscall arguments/policy.
+ARM/x86 standard holder regressions and a separate real current SDK-entrypoint
+run pass. Full package CLI default and opt-in builds generate C and link with
+the established V-library pointer compatibility option. Those CLI builds are
+smoke checks, not complete native CLI/signature admission. Native fixture
+controllers admit parsed sources and verify selected input/generated hashes;
+PID1 collects the positive fixture's exact zero before PASS.
+
+Complete builds, source views, generated C/binaries, commands, images and logs:
+`/Users/alex/.cache/vwdispatch-20261113-01` (frozen). Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-generation-dispatch-20261113-01.inventory.json`,
+SHA-256 `3f7ad14a39a24f072f32d11297d477e8a142ffdec6b83ea2d3781df0b5f473cf`.
+Recording and independent verification pass with adjacent logs. Preserve this
+complete workspace and the original checker/input/historical namespaces.
+
+This connects the real package dispatcher but does not qualify the complete
+installed-generation collection/CLI/signature-to-owned-SDK pipeline. Both
+package core and SDK must use the flag. Fresh signed runtime/app rebuilding,
+default enablement, ARM owned Wine and holder SIGKILL/kernel-owned retention
+remain open. Synthetic-lock tests and separate component runs do not establish
+these remaining gates or full C environment/heap/reproducibility guarantees.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
