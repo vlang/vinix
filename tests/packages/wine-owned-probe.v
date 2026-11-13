@@ -75,6 +75,20 @@ fn suite() ! {
 		unsafe { environment.push_many(&entry, 1) }
 	}
 	for entry in environment { install(entry)! }
+	mut client_directory := app
+	mut application := 'bin/program.exe'
+	$if wine_owned_cwd ? {
+		client_directory = data + '/cwd space'
+		application = 'cwd program.exe'
+		os.mkdir(client_directory)!
+		os.write_file_array(client_directory + '/' + application, cwd_program.to_bytes())!
+		os.write_file(client_directory + '/input space.txt', 'captured Windows cwd\n')!
+		// A decoy in the prefix detects accidental prefix-relative access.
+		os.write_file(prefix.path + '/input space.txt', 'wrong prefix directory\n')!
+		mut expected := 'VINIX_CWD_EXPECTED=Z:\\tmp\\vinix-owned-wine\\data\\cwd space'
+		$if wine_owned_cwd_wrong ? { expected = 'VINIX_CWD_EXPECTED=Z:\\wrong directory' }
+		environment << expected.clone()
+	}
 	mut guard := prefix.acquire_launch(data)!
 	defer { guard.close() }
 	mut directory := guard.prepare_server_directory(data)!
@@ -90,11 +104,11 @@ fn suite() ! {
 	// Admit this exact application directory from the retained image separately.
 	// Launch relative to it, so success also proves Wine resolves the client's
 	// initial relative application path outside the prefix.
-	app_fd := C.owned_wine_open(app.str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
+	app_fd := C.owned_wine_open(client_directory.str, C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
 	need(app_fd >= 3, 'cannot capture retained application directory')!
 	defer { C.close(app_fd) }
 	mut client := connection.start_client_in(&directory, &guard, data, wineadapter.ServerCommand{program: loader, arguments:
-		['--library-path', libraries, '--argv0', root + '/usr/bin/wine', '--', root + '/usr/libexec/vinix-wine/wine', 'bin/program.exe']}, environment, app_fd)!
+		['--library-path', libraries, '--argv0', root + '/usr/bin/wine', '--', root + '/usr/libexec/vinix-wine/wine', application]}, environment, app_fd)!
 	defer { if client.process_id() > 0 { client.terminate() or { eprintln('HWTEST FAIL owned client cleanup: ' + err.msg()) } } }
 	deadline := time.sys_mono_now() + 90 * time.second
 	for {
@@ -104,7 +118,12 @@ fn suite() ! {
 			number := status.code.str()
 			println('WINE OWNED DIAGNOSTIC client status=' + number)
 			unsafe { number.free() }
+			$if wine_owned_cwd_wrong ? {
+				need(status.code == 41, 'cwd control failed at wrong Windows API gate')!
+				println('WINE WINDOWS CWD CONTROL PASS incorrect expected directory detected')
+			} $else {
 			need(status.code == 0, 'retained Wine client failed')!
+			}
 			break
 		}
 		need(time.sys_mono_now() < deadline, 'retained Wine client timed out')!
@@ -128,6 +147,14 @@ fn suite() ! {
 	}
 	println('WINE OWNED CLIENT EXEC PASS')
 	println('WINE OWNED RELATIVE APPLICATION PASS')
+	$if wine_owned_cwd ? {
+		$if !wine_owned_cwd_wrong ? {
+			need(os.read_file(client_directory + '/parent output.txt')! == 'parent relative write\n', 'parent relative Windows write differs')!
+			need(os.read_file(client_directory + '/child output.txt')! == 'child relative write\n', 'child relative Windows write differs')!
+		}
+		need(!os.exists(prefix.path + '/parent output.txt') && !os.exists(prefix.path + '/child output.txt'), 'Windows output escaped to prefix cwd')!
+		println('WINE WINDOWS CWD HOST CHECK PASS outputs confined to requested cwd')
+	}
 }
 
 fn lease_busy(path string, wanted bool) ! {

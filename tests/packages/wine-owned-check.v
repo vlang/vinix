@@ -93,12 +93,15 @@ fn build_overlay() ! {
 	if wineoverlay.digest(baseline)! != baseline_hash { return error('original image changed during overlay') }
 }
 fn run() ! {
-	if os.args.len !in [6, 7] { return error('usage: CHECK FRESH_OUTPUT SYSROOT GCC_INSTALL CLANG V [owned|lease|lease-caller-death|lease-unheld]') }
-	mode := if os.args.len == 7 { os.args[6] } else { 'owned' }
-	if mode !in ['owned', 'lease', 'lease-caller-death', 'lease-unheld'] { return error('unknown Wine diagnostic mode') }
-	leasing := mode != 'owned'
-	selected_kernel := if leasing { lease_kernel } else { kernel }
-	selected_hash := if leasing { lease_kernel_hash } else { kernel_hash }
+	if os.args.len !in [6, 7, 8] { return error('usage: CHECK FRESH_OUTPUT SYSROOT GCC_INSTALL CLANG V [owned|lease|lease-caller-death|lease-unheld|cwd|cwd-wrong] [CWD_PE]') }
+	mode := if os.args.len >= 7 { os.args[6] } else { 'owned' }
+	if mode !in ['owned', 'lease', 'lease-caller-death', 'lease-unheld', 'cwd', 'cwd-wrong'] { return error('unknown Wine diagnostic mode') }
+	cwd := mode in ['cwd', 'cwd-wrong']
+	if (cwd && os.args.len != 8) || (!cwd && os.args.len == 8) { return error('only cwd diagnostics require an explicit Win64 payload') }
+	leasing := mode in ['lease', 'lease-caller-death', 'lease-unheld']
+	rebasing := mode != 'owned'
+	selected_kernel := if rebasing { lease_kernel } else { kernel }
+	selected_hash := if rebasing { lease_kernel_hash } else { kernel_hash }
 	root := os.real_path(os.dir(@FILE) + '/../..')
 	work := os.abs_path(os.args[1]); cc := os.args[4]; v := os.args[5]
 	if os.exists(work) || os.is_link(work) { return error('fresh diagnostic output required') }
@@ -110,33 +113,50 @@ fn run() ! {
 	mut inputs := map[string]string{}
 	for path in [@FILE, probe, os.executable(), v, cc, host.qemu, host.firmware] { inputs[path] = winesource.file_digest(path)! }
 	inputs[baseline] = baseline_hash; inputs[selected_kernel] = selected_hash
-	if leasing { inputs['/opt/homebrew/bin/xorriso'] = wineoverlay.digest('/opt/homebrew/bin/xorriso')! }
+	if rebasing { inputs['/opt/homebrew/bin/xorriso'] = wineoverlay.digest('/opt/homebrew/bin/xorriso')! }
 	for directory in [root + '/tests/packages/wineoverlay', root + '/tests/hardware-platform/hwhost'] {
 		for path in os.walk_ext(directory, '.v') { inputs[path] = winesource.file_digest(path)! }
 	}
 	os.mkdir_all(work)!
 	mut image := baseline
 	mut tar := tar_extent
-	if leasing { image, tar = rebase_kernel(work)! }
+	if rebasing { image, tar = rebase_kernel(work)! }
 	image_hash := wineoverlay.digest(image)!
+	mut compiled_probe := probe
+	if cwd {
+		pe := os.real_path(os.args[7])
+		inputs[pe] = wineoverlay.digest(pe)!
+		inputs[root + '/tests/packages/wine-cwd-program.v'] = wineoverlay.digest(root + '/tests/packages/wine-cwd-program.v')!
+		os.cp(pe, work + '/cwd.exe')!
+		compiled_probe = work + '/guest.v'
+		os.write_file(compiled_probe, os.read_file(probe)! + '\nconst cwd_program = $embed_file("cwd.exe")\n')!
+		inputs[compiled_probe] = wineoverlay.digest(compiled_probe)!
+		inputs[work + '/cwd.exe'] = inputs[pe]
+	}
 	mut command := [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch', 'amd64', '-gc', 'none', '-manualfree',
-		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path', '@vlib|' + root + '|@vmodules', '-o', work + '/guest.c', probe]
+		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path', '@vlib|' + root + '|@vmodules', '-o', work + '/guest.c', compiled_probe]
 	if leasing { command.insert(1, ['-d', 'wine_owned_lease']) }
 	if mode == 'lease-unheld' { command.insert(1, ['-d', 'wine_owned_lease_unheld']) }
 	if mode == 'lease-caller-death' { command.insert(1, ['-d', 'wine_owned_lease_caller_death']) }
+	if cwd { command.insert(1, ['-d', 'wine_owned_cwd']) }
+	if mode == 'cwd-wrong' { command.insert(1, ['-d', 'wine_owned_cwd_wrong']) }
 	mut discovery := command.clone(); discovery.insert(1, ['-print-watched-files', '-dump-files', work + '/sources-before.txt'])
 	invoke(discovery, work + '/discover.log')!
 	winesource.capture(work + '/sources-before.txt', mut inputs)!
 	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	command.insert(1, ['-dump-files', work + '/sources-built.txt']); invoke(command, work + '/v.log')!
 	winesource.admit(work + '/sources-before.txt', work + '/sources-built.txt', inputs)!
-	invoke([cc, '--target=x86_64-linux-musl', '--sysroot=' + os.args[2], '--gcc-install-dir=' + os.args[3], '-fuse-ld=lld', '-static',
-		'-O2', '-w', '-D_GNU_SOURCE', '-fno-stack-protector', work + '/guest.c', '-lm', '-lpthread', '-o', work + '/guest'], work + '/cc.log')!
+	mut cc_command := [cc, '--target=x86_64-linux-musl', '--sysroot=' + os.args[2], '--gcc-install-dir=' + os.args[3], '-fuse-ld=lld', '-static',
+		'-O2', '-w', '-D_GNU_SOURCE', '-fno-stack-protector', work + '/guest.c', '-lm', '-lpthread', '-o', work + '/guest']
+	// Preserve generated C; strip only the embedded-payload diagnostic's ELF
+	// symbols so it fits the fixed historical init slot without changing TAR.
+	if cwd { cc_command.insert(1, '-s') }
+	invoke(cc_command, work + '/cc.log')!
 	guest_hash := wineoverlay.digest(work + '/guest')!
 	os.mkdir_all(work + '/builder/build-support')!
 	os.symlink(os.executable(), work + '/builder/build-support/build-amd64-iso.sh')!
 	os.setenv('VINIX_WINE_OWNED_BUILDER', '1', true)
-	os.setenv('VINIX_WINE_OWNED_LEASE', if leasing { '1' } else { '0' }, true)
+	os.setenv('VINIX_WINE_OWNED_LEASE', if rebasing { '1' } else { '0' }, true)
 	os.setenv('VINIX_WINE_OWNED_BASELINE', image, true)
 	os.setenv('VINIX_WINE_OWNED_BASELINE_SHA256', image_hash, true)
 	os.setenv('VINIX_WINE_OWNED_TAR_OFFSET', tar.offset.str(), true)
@@ -146,6 +166,10 @@ fn run() ! {
 	mut required := if leasing { ['WINE OWNED SERVER CONNECT PASS', 'VINIX SIGNED REAL WIN64 PASS', 'WINE OWNED LEASE MANAGER PASS', 'WINE OWNED LEASE BUSY PASS', 'WINE OWNED LEASE PASS manager=37; descendants retired; lease free', 'HWTEST PASS owned Wine diagnostic'] }
 		else { ['WINE OWNED SERVER CONNECT PASS', 'VINIX SIGNED REAL WIN64 PASS', 'WINE OWNED CLIENT EXEC PASS', 'WINE OWNED RELATIVE APPLICATION PASS', 'HWTEST PASS owned Wine diagnostic'] }
 	if mode == 'lease-caller-death' { required << 'WINE OWNED LEASE CALLER DEATH PASS lease remains busy' }
+	if cwd {
+		required = ['WINE OWNED SERVER CONNECT PASS', 'WINE OWNED CLIENT EXEC PASS', 'WINE WINDOWS CWD HOST CHECK PASS', 'HWTEST PASS owned Wine diagnostic']
+		required << if mode == 'cwd' { 'WINE WINDOWS CWD PASS current directory; relative read/write; child inheritance' } else { 'WINE WINDOWS CWD CONTROL PASS incorrect expected directory detected' }
+	}
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'owned-Wine-diagnostic', arches: ['x86_64'], ending: .running,
 		required: required,
 		forbidden: ['HWTEST FAIL', 'Kernel panic']}, hwhost.Run{kernel: selected_kernel, guest: work + '/guest', state: work + '/boot', timeout: 180, keep: true})
