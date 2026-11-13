@@ -484,6 +484,55 @@ gate. Signed foreground startup, bounded authenticated connect and retained
 socket handoff, generation lease integration and holder-death recovery remain
 open. Neither the runner nor holder is enabled or changed by this prerequisite.
 
+## Authenticated retained connection, 2026-11-13
+
+Source `25084430a` adds `ServerEndpoint.connect` and owned `ServerConnection`
+for Linux AMD64/AArch64. It checks the expected direct unreaped child and lock
+owner before contact, duplicates the endpoint metadata, and connects through
+the retained O_PATH descriptor's `/proc/self/fd` link. It does not fall back to
+the canonical pathname or change the launcher's cwd. Authorized procfs descriptor
+links are a prerequisite; sandbox access has not yet been qualified. After
+connecting it rechecks namespace, child, lock and peer identity. The returned
+protocol socket is blocking with CLOEXEC, and its independent metadata survives
+closing the original endpoint capture. Close releases three owned descriptors
+without signalling or reaping the server. The caller must retain exclusive wait
+ownership and default waitable SIGCHLD; explicit client inheritance is separate.
+
+The socket retry/poll budget is 1–5000 ms, excluding filesystem latency.
+Final `arm-02` and `x86-02` pass under ordinary uid/gid 1000 with the unchanged
+production kernels. A relative-binding child serves beneath a pathname longer
+than 108 bytes; parent cwd remains unchanged. A forced replacement control
+connects to the original held inode while its old pathname names a foreign
+listener. The connector refuses the stale capture and independently rejects
+the newly captured foreign listener's peer, despite the expected child still
+holding the lock. The refused foreign fixture remains responsive and drains
+the connection without receiving client protocol bytes.
+
+Both 1,000 connect/recheck/greeting/close/drain cycles and 1,000 unlocked-owner
+refusals retain zero V bytes. Descriptor counts remain flat through success,
+foreign-peer and backlog-timeout paths, then return to their initial count.
+Five queued clients fill the configured backlog; a sixth with a 50 ms budget
+must time out after at least 50 ms and before five seconds. Invalid budgets,
+closed objects and retired children refuse; original child status 37 remains
+collectible. The retained socket keeps CLOEXEC and restores blocking mode.
+The existing peer suite also passes final `identity-arm-02`/`identity-x86-02`
+after the shared owner-check refactor. The macOS host check covers unsupported
+platform refusal only. This is a V protocol fixture, not real Wine handoff.
+
+The controllers admit actual parsed V sources and the repository heap tracker,
+and verify selected tools/kernel/firmware and generated artifacts before/after
+boot. Complete attempts, final sources and generated-C ownership self-review
+remain at `/Users/alex/.cache/vwc-20261113-01`; typed inventory:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-server-connection-20261113-01.inventory.json`,
+SHA-256 `1761a6733bbb88b8bd44cccf6e16ed1ba5c10d62a95c519518c34e91d78cce9e`.
+Recording and separate complete verification pass with adjacent logs. Preserve
+original bundles and historical namespaces. Full C toolchain inventory, kernel
+heap retention, injected pending-connect/poll/signal failures, descriptor
+exhaustion and arbitrary concurrent mutation remain outside this gate. Signed
+foreground spawning, actual client descriptor inheritance and Wine bootstrap,
+sandbox qualification, generation lease integration and holder-death recovery
+remain open; the runner and holder are unchanged.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

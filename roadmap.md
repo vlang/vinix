@@ -1201,8 +1201,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Endpoint metadata capture](tests/packages/wine-lease-supervision-plan.md#endpoint-metadata-capture-2026-11-13)
     now retains socket/parent identities in both native guests, rejects
     replacements and leaves live/retired listener behavior intact across
-    metadata closure/retention. Foreground startup, authenticated socket handoff
-    and production lease integration remain open.
+    metadata closure/retention.
+    [Authenticated retained connections](tests/packages/wine-lease-supervision-plan.md#authenticated-retained-connection-2026-11-13)
+    now pass native long-path, forced path-replacement, foreign-peer, backlog
+    timeout and protocol/descriptor checks. Signed foreground startup, actual
+    client handoff and production lease integration remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
