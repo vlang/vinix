@@ -24,7 +24,13 @@ The [job network/key authentication metadata repair](maps-job-network-keygen-run
 passed the signed ARM regression in r75. Maps then returned real Louvre details
 and photos and an Eiffel Tower-to-Louvre route/turn preview without the previous
 main-looper failure. Tiles and route geometry remained blank. No account has
-authenticated; renderer-state investigation continues.
+authenticated. The [protected renderer capture](maps-renderer-fields-20261113.md)
+in r76 observed valid camera/viewport state followed by a bad EGL surface;
+sign-in reached a server communication error page and the main looper later
+failed during notification cancellation. Bounded
+[EGL/notification diagnostics and a signed cancellation regression](maps-egl-notification-diagnostics-20261113.md)
+have passed build checks. Their ARM retry is blocked by host disk space below
+the retained reserve; no test VM from this continuation remains running.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

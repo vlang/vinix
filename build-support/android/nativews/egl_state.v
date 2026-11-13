@@ -71,7 +71,9 @@ pub fn ws_egl_get_error() i32 {
 		code := i32(usize(C.pthread_getspecific(ws_egl_error_key)))
 		C.pthread_setspecific(ws_egl_error_key, nil)
 		provider_code := WsEglGetError(ws_egl_symbol(c'eglGetError'))()
-		return if code != 0 { code } else { provider_code }
+		result := if code != 0 { code } else { provider_code }
+		ws_trace_egl_error(result, code, provider_code)
+		return result
 	}
 }
 

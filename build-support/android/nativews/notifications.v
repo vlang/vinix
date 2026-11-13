@@ -52,7 +52,10 @@ fn ws_notice_request(payload &u8, length usize) WsNoticeResult {
 	unsafe {
 		if length == 0 || length > 8192 { return .failed }
 		fd := C.socket(1, 1 | 0x800 | 0x80000, 0)
-		if fd < 0 { return .failed }
+		if fd < 0 {
+			ws_trace_notification_failure(c'socket', *C.__errno_location())
+			return .failed
+		}
 		defer { C.close(fd) }
 		address := &WsNoticeAddress(C.alloca(sizeof(WsNoticeAddress)))
 		C.memset(address, 0, sizeof(WsNoticeAddress))
@@ -64,26 +67,40 @@ fn ws_notice_request(payload &u8, length usize) WsNoticeResult {
 		if C.connect(fd, voidptr(address), u32(sizeof(WsNoticeAddress))) != 0 {
 			code := *C.__errno_location()
 			if code == C.ENOENT || code == C.ECONNREFUSED { return .unavailable }
-			if code != C.EINPROGRESS { return .failed }
+			if code != C.EINPROGRESS {
+				ws_trace_notification_failure(c'connect', code)
+				return .failed
+			}
 			mut ready := WsPoll{ fd: fd, events: 4 }
 			mut error := i32(0)
 			mut size := u32(sizeof(i32))
 			if C.poll(voidptr(&ready), 1, 1000) <= 0 || C.getsockopt(fd, 1, 4, &error, &size) != 0 {
+				ws_trace_notification_failure(c'connect.wait', -1)
 				return .failed
 			}
 			if error == C.ENOENT || error == C.ECONNREFUSED { return .unavailable }
-			if error != 0 { return .failed }
+			if error != 0 {
+				ws_trace_notification_failure(c'connect.SO_ERROR', error)
+				return .failed
+			}
 		}
 		header := &u8(C.alloca(4))
 		for i := 0; i < 4; i++ { header[i] = u8(length >> (i * 8)) }
 		if !ws_notice_transfer(fd, header, 4, true) || !ws_notice_transfer(fd, payload, length, true)
 			|| !ws_notice_transfer(fd, header, 4, false) {
+			ws_trace_notification_failure(c'request.transfer', -1)
 			return .failed
 		}
 		response_length := u32(header[0]) | (u32(header[1]) << 8) | (u32(header[2]) << 16) | (u32(header[3]) << 24)
-		if response_length == 0 || response_length > 512 { return .failed }
+		if response_length == 0 || response_length > 512 {
+			ws_trace_notification_failure(c'response.length', -1)
+			return .failed
+		}
 		response := &u8(C.alloca(513))
-		if !ws_notice_transfer(fd, response, response_length, false) { return .failed }
+		if !ws_notice_transfer(fd, response, response_length, false) {
+			ws_trace_notification_failure(c'response.transfer', -1)
+			return .failed
+		}
 		response[response_length] = 0
 		if C.strcmp(&char(response), c'ok') != 0 {
 			C.printf(c'ANDROID-WS-NOTIFICATION-SERVICE %s\n', response)

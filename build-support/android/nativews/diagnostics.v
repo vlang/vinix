@@ -20,6 +20,33 @@ __global ws_cancel_trace WsFrameTrace
 __global ws_accepted_trace WsFrameTrace
 __global ws_exception_trace WsFrameTrace
 __global ws_publication_trace WsFrameTrace
+__global ws_egl_error_trace_count i32
+__global ws_notification_failure_trace_count i32
+
+fn ws_trace_budget(counter &i32, limit i32) bool {
+	unsafe {
+		if C.__atomic_load_n(&u32(counter), 0) >= u32(limit) { return false }
+		return C.__atomic_add_fetch(counter, 1, 0) <= limit
+	}
+}
+
+fn ws_trace_notification_failure(stage &char, code i32) {
+	unsafe {
+		if ws_trace_budget(&ws_notification_failure_trace_count, 16) {
+			C.printf(c'ANDROID-WS-NOTIFICATION-FAIL stage=%s errno=%d\n', stage, code)
+		}
+	}
+}
+
+// Observe the error already consumed by the caller. Never issue another EGL
+// query or change its return value. The atomic gate caps output across threads.
+fn ws_trace_egl_error(result i32, adapter i32, provider i32) {
+	unsafe {
+		if result == 0x3000 || C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
+		if !ws_trace_budget(&ws_egl_error_trace_count, 32) { return }
+		C.printf(c'ANDROID-WS-EGL-ERROR returned=0x%x adapter=0x%x provider=0x%x\n', result, adapter, provider)
+	}
+}
 
 struct WsFrameTrace {
 mut:
