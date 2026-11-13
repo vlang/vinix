@@ -63,16 +63,19 @@ fn compare(actual []u8, expected []u8, bits int) bool {
 	for j in 0 .. 16 { if j < 3 || j >= 3 + count { assert actual[j] == 0xcc && expected[j] == 0xcc } }; return nan
 }
 fn main() {
-	assert os.args.len == 3
+	assert os.args.len == 3 || (os.args.len == 4 && os.args[3] == 'sqrt')
+	square_root := os.args.len == 4
 	out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
 	saved_rounding := C.fegetround(); assert saved_rounding >= 0; defer { assert C.fesetround(saved_rounding) == 0 }; assert C.fesetround(C.FE_TONEAREST) == 0
 	mut source := strings.new_builder(32768); mut cases := []RoundCase{}
 	for bits in [16, 32]! {
 		typ := if bits == 16 { 'half' } else { 'float' }
-		for op in ['floor', 'ceil', 'trunc', 'round', 'roundeven'] {
+		if square_root { source.write_string('declare ${typ} @llvm.fabs.f${bits}(${typ})\n') }
+		for op in if square_root { ['sqrt'] } else { ['floor', 'ceil', 'trunc', 'round', 'roundeven'] } {
 			name := '${op}_${bits}'; cases << RoundCase{name, bits}
 			source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ})\ndefine void @${name}(ptr %a, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %x)\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
-			source.write_string('define void @chain_${name}(ptr %a, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %first = call ${typ} @llvm.${op}.f${bits}(${typ} %x)\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %first)\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
+			first := if square_root { 'fabs' } else { op }
+			source.write_string('define void @chain_${name}(ptr %a, ptr %dst) { %x = load ${typ}, ptr %a, align 1\n %first = call ${typ} @llvm.${first}.f${bits}(${typ} %x)\n %v = call ${typ} @llvm.${op}.f${bits}(${typ} %first)\n store ${typ} %v, ptr %dst, align 1\n ret void }\n')
 			for state in ['poison', 'undef'] { source.write_string('define void @guard_${state}_${name}(ptr %dst) { %v = call ${typ} @llvm.${op}.f${bits}(${typ} ${state})\n store ${typ} %v, ptr %dst, align 1\n ret void }\n') }
 			for mode in ['freeze', 'select'] {
 				choice := if mode == 'freeze' { 'freeze ${typ} %bad' } else { 'select i1 false, ${typ} %bad, ${typ} 1.0' }
@@ -80,7 +83,8 @@ fn main() {
 			}
 		}
 	}
-	source.write_string('define void @preflight(ptr %dst) { store i32 17, ptr %dst, align 1\n %v = call float @llvm.floor.f32(float 1.0)\n ret void }\n')
+	preflight_op := if square_root { 'sqrt' } else { 'floor' }
+	source.write_string('define void @preflight(ptr %dst) { store i32 17, ptr %dst, align 1\n %v = call float @llvm.${preflight_op}.f32(float 1.0)\n ret void }\n')
 	os.write_file(out + '/input.ll', source.str())!
 	mut proc := os.new_process(os.args[1]); proc.set_args([out + '/input.ll', '-o', out + '/input.bc']); proc.set_redirect_stdio_merged(); proc.run()
 	log := proc.stdout_slurp(); proc.wait(); code := proc.code; proc.close(); os.write_file(out + '/assemble.log', log)!; assert code == 0, log
@@ -105,22 +109,38 @@ fn main() {
 	for c in cases {
 		function := find_function(ir, c.name); address := C.LLVMGetFunctionAddress(engine, c.name.str); assert address != 0
 		chain_name := 'chain_' + c.name; chain := find_function(ir, chain_name); chain_address := C.LLVMGetFunctionAddress(engine, chain_name.str); assert chain_address != 0
-		count := c.bits / 8; extra := if c.bits == 32 { 64 } else { 0 }
+		count := c.bits / 8; extra := if c.bits == 32 { if square_root { 196672 } else { 64 } } else { 0 }
 		mut left := []u8{len: 16}; mut actual := []u8{len: 16, init: 0xcc}; mut expected := actual.clone()
 		mut bindings := [airbitcode.IRMemoryBinding{data: left, offset: 1}, airbitcode.IRMemoryBinding{data: actual, offset: 3, writable: true}]
 		for sample in 0 .. 65536 + extra {
 			mut a := if c.bits == 16 { u64(sample) } else { u64(u32(sample) * u32(0x9e3779b9)) }
-			if sample >= 65536 { a = u64(edges[(sample - 65536) / 2]) | if sample % 2 != 0 { u64(0x80000000) } else { u64(0) }; boundaries++ }
+			if sample >= 65536 {
+				if sample < 65600 { a = u64(edges[(sample - 65536) / 2]) | if sample % 2 != 0 { u64(0x80000000) } else { u64(0) } }
+				else {
+					// Square a midpoint between neighboring float roots using only
+					// integer products/shifts, then test the input below/at/above it.
+					// Even input exponents span the entire normal range.
+					index := (sample - 65600) / 3
+					midpoint := (u64(1) << 24) | ((u64(index) * 0x9e3779b9 & 0x7fffff) << 1) | 1
+					square := midpoint * midpoint; wide := int(square >= u64(1) << 49)
+					exponent := 127 + 2 * (index % 127 - 63) + wide
+					floor_bits := (u32(exponent) << 23) | (u32(square >> (25 + wide)) & 0x7fffff)
+					a = u64(i64(floor_bits) + (sample - 65600) % 3 - 1)
+				}; boundaries++
+			}
 			for j in 0 .. count { left[1 + j] = u8(a >> u32(8 * j)) }; for j in 0 .. 16 { actual[j] = 0xcc; expected[j] = 0xcc }
 			assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 4)!.steps == 4
 			unsafe { NativeRound(voidptr(address))(&left[1], &expected[3]) }; if compare(actual, expected, c.bits) { nan_cases++ }
 			if sample < 2 || sample >= 65536 {
 				for j in 0 .. 16 { actual[j] = 0xcc }; if _ := p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 3) { panic('budget accepted') }; for byte in actual { assert byte == 0xcc }
 			}
-			if sample < 128 || sample >= 65536 {
+			if square_root || sample < 128 || sample >= 65536 {
 				assert p.run_memory_function(ir, stream, pools, bodies, chain, mut bindings, 5)!.steps == 5
 				unsafe { NativeRound(voidptr(chain_address))(&left[1], &expected[3]) }; compare(actual, expected, c.bits)
-				assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 4)!.steps == 4; compare(actual, expected, c.bits); chains++
+				if square_root {
+					// fabs makes every defined non-NaN argument nonnegative.
+					assert read_word(actual, 3, count) & (u64(1) << u32(c.bits - 1)) == 0
+				} else { assert p.run_memory_function(ir, stream, pools, bodies, function, mut bindings, 4)!.steps == 4; compare(actual, expected, c.bits) }; chains++
 			}
 			comparisons++
 		}
@@ -153,7 +173,10 @@ fn main() {
 		p.instructions[slot] = changed; if _ := p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3) { panic('metadata accepted') }; for byte in bytes { assert byte == 0xcc }; metadata++
 	}; p.instructions[slot] = saved
 	assert p.run_memory_function(ir, stream, pools, bodies, anchor, mut bindings, 3)!.steps == 3 && bytes[0] == 17
-	assert cases.len == 10 && comparisons == 655680 && boundaries == 320 && chains == 1600 && mode_controls == 160 && guards == 20 && choices == 20 && metadata == 9
-	result := 'AIR-MEMORY-ROUNDING: ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} float boundaries), five operations at half/float, all half encodings, ${chains} cached/idempotent chains, ${mode_controls} host-rounding controls, sentinels/budgets, ${guards} poison/undef guards, ${choices} freeze/lazy choices and ${metadata} metadata controls PASS\n'
+	if square_root { assert cases.len == 2 && comparisons == 327744 && boundaries == 196672 && chains == 327744 && mode_controls == 32 && guards == 4 && choices == 4 && metadata == 9 }
+	else { assert cases.len == 10 && comparisons == 655680 && boundaries == 320 && chains == 1600 && mode_controls == 160 && guards == 20 && choices == 20 && metadata == 9 }
+	label := if square_root { 'AIR-MEMORY-SQRT' } else { 'AIR-MEMORY-ROUNDING' }
+	composition := if square_root { 'sqrt/fabs compositions' } else { 'cached/idempotent chains' }
+	result := '${label}: ${comparisons} native comparisons (${nan_cases} arithmetic NaN-class cases, ${boundaries} float boundaries), half/float and all half encodings, ${chains} ${composition}, ${mode_controls} host-rounding controls, sentinels/budgets, ${guards} poison/undef guards, ${choices} freeze/lazy choices and ${metadata} metadata controls PASS\n'
 	os.write_file(out + '/result.txt', result)!; print(result)
 }

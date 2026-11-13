@@ -75,6 +75,14 @@ rejects. Each call costs one step and shares scalar validation/evaluation,
 independent of host rounding mode. `rint` and `nearbyint` remain unsupported
 by this buffer profile.
 
+Direct LLVM `sqrt` supports matching half/float operands and results. It uses
+the scalar evaluator's integer root/remainder algorithm and rounds to nearest
+with ties to even, independent of host rounding mode. Positive finite values
+produce correctly rounded roots, signed zero retains its sign, and positive
+infinity remains positive infinity. Negative nonzero inputs and NaNs produce
+the evaluator's preferred quiet NaN. Poison propagates and undef rejects.
+Each call costs one step and shares scalar validation/evaluation.
+
 Direct LLVM `fshl`/`fshr` also support i1..i64. All three operands must match
 the result type. The amount is reduced modulo the width, so equal operands
 produce rotations and oversized amounts are defined. A zero amount selects
@@ -118,7 +126,7 @@ positions. A zero mask yields zero and a full mask preserves the input.
 Both operands are evaluated; poison propagates even with a zero mask or value,
 and undef rejects. Each call costs one step and shares scalar validation/evaluation.
 
-Only ordinary direct calls to these twenty-seven families' exact declarations are admitted:
+Only ordinary direct calls to these twenty-eight families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
 intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
@@ -217,5 +225,8 @@ native LLVM, including every half encoding, float class/tie/precision limits,
 cached idempotent chains, host rounding modes and poison/undef controls.
 Arithmetic NaNs compare by class; the interpreter's preferred choice is
 checked separately. Other results compare exact raw bits, including zero signs.
+With a trailing `sqrt` argument, the same checker tests square root and
+`sqrt(fabs(x))`, every half encoding, float midpoint-square neighbors across
+the normal exponent range, domain/NaN cases and host rounding independence.
 The opt-in software Metal runner uses this profile for its bounded single-thread
 compute pipeline. General shader execution and GPU dispatch remain pending.

@@ -318,7 +318,7 @@ Zero input returns the width when the flag is false and poison when true;
 freeze can define that result before storing. Calls cost one step and execute
 inside the interpreter. Indirect calls, call-site attributes, tail calls and
 fast-math calls remain unsupported. Admitted intrinsic families are these five
-and the float-sign/rounding/funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
+and the float-sign/rounding/sqrt/funnel/extrema/abs/saturating/shift/bit-permutation intrinsics below. Synthetic deferred kernels
 combine all five operations and consume zero-poison results through freeze.
 
 Direct LLVM `fabs`/`copysign` support matching half/float values and results.
@@ -339,6 +339,15 @@ rejects. Each call costs one step and shares scalar validation/evaluation
 without consulting host rounding mode. Synthetic deferred dispatches check
 both signs of 2.5 and 0.5 in both precisions, exact zero signs and the differing
 tie rules, across four offset snapshots. `rint`/`nearbyint` remain unsupported.
+
+Direct LLVM `sqrt` supports matching half/float operands/results. Scalar
+integer root/remainder evaluation produces roots rounded to nearest with
+ties to even, independent of host rounding mode. Signed zero is preserved;
+positive infinity remains unchanged. Negative nonzero inputs and NaNs use
+the preferred quiet NaN choice. Poison propagates and undef rejects. Each
+call costs one step. Synthetic deferred dispatches check sqrt and
+sqrt-of-absolute-value for 2, -4, negative zero and the minimum positive
+subnormal in both precisions, across four input/output offset snapshots.
 
 Direct LLVM `fshl`/`fshr` calls support three matching i1..i64 operands. Amounts
 are reduced modulo the width; equal inputs produce rotations. Zero amount
