@@ -101,12 +101,28 @@ fn client() ! {
 		}
 		os.write_file(root + '/ready', C.getpid().str()) or { C._exit(83) }
 		for !os.exists(root + '/release') { time.sleep(time.millisecond) }
+		if mode == 'churn' {
+			for index in 0 .. 64 {
+				leaf := C.fork()
+				if leaf < 0 { C._exit(84) }
+				if leaf == 0 {
+					if index == 63 {
+						C.alarm(15)
+						for C.getppid() != owner { time.sleep(time.millisecond) }
+						os.write_file(root + '/churn-adopted', 'ready') or { C._exit(85) }
+						for !os.exists(root + '/churn-release') { time.sleep(time.millisecond) }
+					}
+					C._exit(24)
+				}
+			}
+			os.write_file(root + '/churn-created', '64') or { C._exit(86) }
+		}
 		C._exit(23)
 	}
 	wait_exit(middle, 0)!
 	os.write_file(root + '/client-gone', 'ready')!
 	if mode == 'signal' { C.raise(C.SIGTERM); C._exit(99) }
-	C._exit(i32(mode.int()))
+	C._exit(if mode == 'churn' { i32(37) } else { i32(mode.int()) })
 }
 
 fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high_fd bool, fault bool) ! {
@@ -161,6 +177,14 @@ fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high
 		lock_busy(root + '/unrelated', false)!
 	}
 	os.write_file(root + '/release', 'release')!
+	if mode == 'churn' {
+		await_file(root + '/churn-created')!
+		await_file(root + '/churn-adopted')!
+		if os.read_file(root + '/churn-created')! != '64' { return error('descendant burst incomplete') }
+		lock_busy(root + '/lease', true)!
+		if C.waitpid(caller, &status, C.WNOHANG) != 0 { return error('holder retired during descendant burst') }
+		os.write_file(root + '/churn-release', 'release')!
+	}
 	if fault {
 		time.sleep(100 * time.millisecond)
 		lock_busy(root + '/lease', true)!
@@ -172,10 +196,10 @@ fn lifetime(root string, mode string, kill_caller bool, cancel_holder bool, high
 		worker := i32(os.read_file(root + '/ready')!.int())
 		wait_exit(worker, 23 << 8)!
 	} else if kill_caller {
-		wanted := if mode == 'signal' { i32(143) } else { i32(mode.int()) }
+		wanted := if mode == 'signal' { i32(143) } else if mode == 'churn' { i32(37) } else { i32(mode.int()) }
 		wait_exit(holder, wanted << 8)!
 	} else {
-		wanted := if mode == 'signal' { i32(143) } else { i32(mode.int()) }
+		wanted := if mode == 'signal' { i32(143) } else if mode == 'churn' { i32(37) } else { i32(mode.int()) }
 		wait_exit(caller, wanted << 8)!
 	}
 	lock_busy(root + '/lease', false)!
@@ -321,6 +345,8 @@ fn suite() ! {
 	refusals()!
 	concurrent_holders(false)!
 	concurrent_holders(true)!
+	lifetime('/tmp/holder-churn', 'churn', false, false, false, false)!
+	println('LEASE HOLDER CHURN PASS 64 descendants; final adopted survivor retains lease; original37; no children')
 	println('LEASE HOLDER PASS statuses 37/126/127/143; double-fork setsid; caller death; cancellation; descriptor isolation; setup refusals')
 }
 fn main() {

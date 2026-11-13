@@ -69,6 +69,9 @@ fn run() ! {
 		if outcome.passed || !outcome.reason.contains('HWTEST FAIL lease-holder: inherited handler ran before exec') { return error('signal control failed at wrong gate: ' + outcome.reason) }
 	} else if !outcome.passed { return error('lease holder check failed: ' + outcome.reason) }
 	serial := os.read_file(work + '/boot/serial.log')!
+	if wanted_outcome == 'standard' && !serial.contains('LEASE HOLDER CHURN PASS 64 descendants; final adopted survivor retains lease; original37; no children') {
+		return error('descendant churn qualification missing')
+	}
 	if wanted_outcome == 'standard' && !serial.contains('LEASE HOLDER CONCURRENT PASS independent leases and statuses; unrelated child waitable') {
 		return error('concurrent holder qualification missing')
 	}
