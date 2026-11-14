@@ -38,7 +38,10 @@ fn sealed_key_file(input &char, password &char, destination &char, seal bool) i3
 	} else if !load_sealed_key(input, password, mut *work) { return 1 }
 	if !open_plan_destination(destination, mut work.edit, true) { return 1 }
 	if !publish_recovery(&work.edit, if seal { &work.envelope[0] } else { &work.request.key[0] }, if seal { sealed_bytes } else { 64 }) { return 1 }
-	return finish_bundle_report(C.printf(if seal { c'sealed key published\n' } else { c'private key unsealed\n' }) >= 0)
+	if seal {
+		return finish_bundle_report(C.printf(c'sealed key published\n') >= 0)
+	}
+	return finish_bundle_report(C.printf(c'private key unsealed\n') >= 0)
 }
 
 @[direct_array_access]
