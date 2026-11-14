@@ -173,6 +173,9 @@ pub fn initialise() {
 	filesystems['procfs'] = &ProcFS{}
 	filesystems['sysfs'] = &SysFS{}
 	filesystems['cgroup2'] = &CGroupFS{}
+	filesystems['9p'] = &NinePFS{}
+	filesystems['smb2'] = &SMB2FS{}
+	filesystems['nfs'] = &NFSFS{}
 	init_mount_tables()
 }
 
@@ -1384,10 +1387,8 @@ fn stat_anonymous_descriptor(descriptor AnonymousDescriptor, statbuf &stat.Stat)
 	mut fd := anonymous_descriptor_fd(descriptor) or { return errno.err, errno.get() }
 	defer { fd.unref() }
 	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
-	unsafe {
-		*statbuf = fd.handle.resource.stat
-	}
-	return 0, 0
+	mut res := fd.handle.resource
+	return stat_resource(mut res, statbuf)
 }
 
 pub fn syscall_read(_ voidptr, fdnum int, buf voidptr, count u64) (u64, u64) {
@@ -1729,7 +1730,7 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		unsafe { path.free() }
 	}
 
-	mut statsrc := &stat.Stat(unsafe { nil })
+	mut statsrc := &resource.Resource(unsafe { nil })
 
 	if path.len == 0 {
 		if flags & at_empty_path == 0 {
@@ -1739,18 +1740,16 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 		if is_fdcwd(dirfd) {
 			node := unsafe { &VFSNode(proc.current_directory_of(current_process)) }
 			mac_node(node, proc.mac_inspect) or { return errno.err, errno.get() }
-			statsrc = &node.resource.stat
+			statsrc = node.resource
 		} else {
 			// The lookup holds the descriptor, which has to be given back.
 			mut fd := file.fd_from_fdnum(current_process, dirfd) or {
 				return errno.err, errno.get()
 			}
-			fd.handle.mac_check(proc.mac_inspect) or { fd.unref(); return errno.err, errno.get() }
-			unsafe {
-				*statbuf = fd.handle.resource.stat
-			}
-			fd.unref()
-			return 0, 0
+			defer { fd.unref() }
+			fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
+			mut res := fd.handle.resource
+			return stat_resource(mut res, statbuf)
 		}
 	} else {
 		parent := get_parent_dir(dirfd, path) or { return errno.err, errno.get() }
@@ -1767,13 +1766,10 @@ pub fn syscall_fstatat(_ voidptr, dirfd int, _path charptr, statbuf &stat.Stat, 
 			}
 		}
 
-		statsrc = &node.resource.stat
+		statsrc = node.resource
 	}
 
-	unsafe {
-		*statbuf = *statsrc
-	}
-	return 0, 0
+	return stat_path_resource(mut statsrc, statbuf)
 }
 
 pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
@@ -1791,10 +1787,8 @@ pub fn syscall_fstat(_ voidptr, fdnum int, statbuf &stat.Stat) (u64, u64) {
 	}
 	fd.handle.mac_check(proc.mac_inspect) or { return errno.err, errno.get() }
 
-	unsafe {
-		*statbuf = fd.handle.resource.stat
-	}
-	return 0, 0
+	mut res := fd.handle.resource
+	return stat_resource(mut res, statbuf)
 }
 
 pub fn syscall_linkat(_ voidptr, olddirfd int, _oldpath charptr, newdirfd int, _newpath charptr, flags int) (u64, u64) {
@@ -2338,8 +2332,8 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 			errno.set(errno.exdev)
 			return none
 		}
-		old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
-			new_basename, flags)?
+		guarded := rename_before_publish(mut old_parent_of.filesystem, old_parent_of,
+			old_basename, old_node, new_parent_of, new_basename, new_node, flags)?
 
 		children_lock.acquire()
 		unsafe {
@@ -2349,6 +2343,7 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 		children_lock.release()
 		adopt(mut old_node, mut new_parent_of, new_basename.clone())
 		adopt(mut new_node, mut old_parent_of, old_basename.clone())
+		rename_after_publish(mut old_parent_of.filesystem, guarded)
 		first_cookie := inotify_next_cookie()
 		old_dir_flag := if stat.isdir(old_node.resource.stat.mode) { in_isdir } else { u32(0) }
 		new_dir_flag := if stat.isdir(new_node.resource.stat.mode) { in_isdir } else { u32(0) }
@@ -2414,8 +2409,8 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 
 	// Give an on-disk filesystem the complete validated operation before the
 	// in-memory namespace changes. RAM filesystems use a no-op implementation.
-	old_parent_of.filesystem.rename(old_parent_of, old_basename, new_parent_of,
-		new_basename, flags)?
+	guarded := rename_before_publish(mut old_parent_of.filesystem, old_parent_of,
+		old_basename, old_node, new_parent_of, new_basename, new_node, flags)?
 
 	// Publish the replacement before retiring its old node, without deleting
 	// the destination key. Keep source deletion under the same map lock: its
@@ -2436,6 +2431,7 @@ fn rename_on_mount(oldparent &VFSNode, oldpath string, newparent &VFSNode, newpa
 	old_parent_of.children.delete(old_basename)
 	children_lock.release()
 	adopt(mut old_node, mut new_parent_of, new_basename.clone())
+	rename_after_publish(mut old_parent_of.filesystem, guarded)
 
 	if unsafe { new_node != 0 } {
 		// The filesystem rename hook already removed the destination name. Drop
@@ -2620,35 +2616,6 @@ pub fn syscall_truncate(_ voidptr, _path charptr, length i64) (u64, u64) {
 	return 0, 0
 }
 
-// fchownat / fchown. Ownership is recorded and nothing consults it yet, but a
-// caller that sets it and reads it back should see what it wrote rather than be
-// told the call worked and find nothing changed.
-fn set_owner(mut res resource.Resource, uid u32, gid u32) {
-	// -1 means "leave this one alone", as it does for chown(2) everywhere.
-	if uid != u32(0xffffffff) {
-		res.stat.uid = uid
-	}
-	if gid != u32(0xffffffff) {
-		res.stat.gid = gid
-	}
-	if uid != u32(0xffffffff) || gid != u32(0xffffffff) {
-		res.stat.mode &= ~u32(0o6000)
-	}
-}
-
-fn change_owner(mut res resource.Resource, uid u32, gid u32) ? {
-	old_uid := res.stat.uid
-	old_gid := res.stat.gid
-	old_mode := res.stat.mode
-	set_owner(mut res, uid, gid)
-	resource.persist_metadata(mut res) or {
-		res.stat.uid = old_uid
-		res.stat.gid = old_gid
-		res.stat.mode = old_mode
-		return none
-	}
-}
-
 pub fn syscall_fchownat(_ voidptr, dirfd int, _path charptr, uid u32, gid u32, flags int) (u64, u64) {
 	path := user_path(_path) or { return errno.err, errno.get() }
 	defer {
@@ -2757,7 +2724,7 @@ pub fn syscall_statfs(_ voidptr, _path charptr, buf u64) (u64, u64) {
 
 	mut res := node.resource
 	if !fill_statfs_resource(mut res, buf, statfs_flags(mount_flags(identity), node.read_only)) {
-		return errno.err, errno.efault
+		return errno.err, errno.get()
 	}
 
 	return 0, 0
@@ -2774,7 +2741,7 @@ pub fn syscall_fstatfs(_ voidptr, fdnum int, buf u64) (u64, u64) {
 	node := unsafe { &VFSNode(fd.handle.node) }
 	backend_readonly := node != unsafe { nil } && node.read_only
 	if !fill_statfs_resource(mut res, buf, statfs_flags(raw_mount_flags(&fd.handle.mount), backend_readonly)) {
-		return errno.err, errno.efault
+		return errno.err, errno.get()
 	}
 	return 0, 0
 }
@@ -2789,7 +2756,7 @@ fn statfs_flags(policy u64, backend_readonly bool) u64 {
 }
 
 fn fill_statfs_resource(mut res resource.Resource, buf u64, flags u64) bool {
-	info := resource.filesystem_stat(mut res)
+	info := resource.filesystem_stat(mut res) or { return false }
 	mut raw := [15]u64{}
 	raw[0] = info.@type
 	raw[1] = info.bsize
@@ -2802,7 +2769,11 @@ fn fill_statfs_resource(mut res resource.Resource, buf u64, flags u64) bool {
 	raw[9] = info.frsize
 	raw[10] = info.flags | flags
 
-	return usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15)
+	if !usercopy.copy_to_user(buf, voidptr(&raw[0]), sizeof(u64) * 15) {
+		errno.set(errno.efault)
+		return false
+	}
+	return true
 }
 
 pub const utime_now = i64(0x3fffffff)
@@ -2910,20 +2881,7 @@ pub fn set_file_times(dirfd int, _path charptr, requested [2]time.TimeSpec, flag
 	}
 
 	res = handle_resource_to_change(voidptr(node), res) or { return errno.err, errno.get() }
-	old_atim := res.stat.atim
-	old_mtim := res.stat.mtim
-	old_ctim := res.stat.ctim
-	if requested[0].tv_nsec != utime_omit {
-		res.stat.atim = if requested[0].tv_nsec == utime_now { now } else { requested[0] }
-	}
-	if requested[1].tv_nsec != utime_omit {
-		res.stat.mtim = if requested[1].tv_nsec == utime_now { now } else { requested[1] }
-	}
-	res.stat.ctim = now
-	resource.persist_metadata(mut res) or {
-		res.stat.atim = old_atim
-		res.stat.mtim = old_mtim
-		res.stat.ctim = old_ctim
+	apply_file_times(mut res, requested, now) or {
 		return errno.err, errno.get()
 	}
 	if node != unsafe { nil } {

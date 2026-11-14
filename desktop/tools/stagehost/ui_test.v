@@ -19,3 +19,8 @@ fn test_headless_manifest_excludes_native_window_backends() {
 	staged := filter_manifest_subdirs(manifest)!
 	assert module_subdirs(staged)! == ['ui', 'uikit', 'windows']
 }
+
+fn test_headless_manifest_excludes_native_window_hosts() {
+	text := filter_manifest_subdirs("Module { subdirs: ['ui', 'appkit', 'uikit', 'windows', 'linux'] }")!
+	assert module_subdirs(text)! == ['ui', 'uikit', 'windows']
+}

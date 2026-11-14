@@ -7,6 +7,10 @@ const subdirs_pattern = '\\bsubdirs\\s*:\\s*\\[([^]]*)\\]'
 const entries_pattern = '[\'"]([^\'"]+)[\'"]'
 
 pub fn staged_source(name string, source string) !json2.Any {
+	if name == 'stylesheet_query.v' {
+		// Vinix owns the framebuffer; there is no native host-window safe area.
+		return json2.Any(read(source, '')!.replace('native_safe_insets()', 'none').bytes().hex())
+	}
 	if name in ['monitor_linux.v', 'monitor_nix.v'] {
 		// The compositor has fbdev outputs, not an X11 connection. ui2 uses
 		// zero for an unknown refresh rate, including its other headless ports.

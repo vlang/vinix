@@ -99,6 +99,9 @@ const office2013_tab_color = u32(0x303030)
 // literals or model-owned caches.
 const frame_owned_text_id = '__vinix.frame.owned_text'
 
+// Calculator's adapted frames borrow the cached declaration's stylesheet.
+const frame_borrowed_stylesheet_key = '__vinix.frame.borrowed_stylesheet'
+
 // The largest builders today are bounded by the battery-history capacity.
 // Keep enough power-of-two buckets for those arrays (up to 1024 elements), so
 // an unusually tall window cannot outgrow the last slot and allocate while it
@@ -213,7 +216,7 @@ fn (d &Desktop) face_for(style ui2.TextStyle) &FontFace {
 	return &d.fonts[best]
 }
 
-// free_tree releases the arrays a frame's element tree was built out of.
+// free_tree releases a frame's child arrays and default stylesheet metadata.
 // There is no garbage collector on this target, so a tree rebuilt whenever the
 // screen changes would otherwise grow the process without bound. Only the
 // strings copied from a remote application are frame-owned; local strings are
@@ -253,6 +256,32 @@ fn free_tree(el ui2.Element) {
 	}
 	if el.children.cap > 0 {
 		unsafe { el.children.free() }
+	}
+	free_frame_stylesheet(el)
+}
+
+// UI2 added an empty stylesheet to every Element. Its six maps allocate
+// metadata even without any rules, and must follow the declaration's lifetime.
+// Nonempty sheets belong to their model; this renderer does not apply VSS.
+// Reflection keeps the renderer compatible with UI2 versions before VSS.
+fn free_frame_stylesheet(el &ui2.Element) {
+	if el.key == frame_borrowed_stylesheet_key { return }
+	$for field in ui2.Element.fields {
+		$if field.name == 'stylesheet' {
+			sheet := &el.$(field.name)
+			if sheet.rules.len != 0 || sheet.variables.len != 0 || sheet.light_vars.len != 0
+				|| sheet.dark_vars.len != 0 || sheet.imports.len != 0
+				|| sheet.rule_index.by_kind.len != 0 || sheet.rule_index.by_id.len != 0
+				|| sheet.rule_index.by_class.len != 0 { return }
+			unsafe {
+				sheet.variables.free()
+				sheet.light_vars.free()
+				sheet.dark_vars.free()
+				sheet.rule_index.by_kind.free()
+				sheet.rule_index.by_id.free()
+				sheet.rule_index.by_class.free()
+			}
+		}
 	}
 }
 

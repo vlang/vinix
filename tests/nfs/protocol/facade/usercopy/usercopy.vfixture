@@ -1,0 +1,11 @@
+module usercopy
+fn C.memcpy(voidptr, voidptr, usize) voidptr
+__global ( copies int fail_copy bool )
+pub fn count() int { return copies }
+pub fn reject(value bool) { fail_copy = value }
+pub fn copy_to_user(destination u64, source voidptr, length u64) bool {
+	if fail_copy { return false }
+	copies++
+	unsafe { C.memcpy(voidptr(destination), source, usize(length)) }
+	return true
+}

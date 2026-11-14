@@ -505,8 +505,7 @@ fn (mut d Desktop) window_actions_element() ?ui2.Element {
 		d.close_window_actions()
 		return none
 	}
-	mut panel := ui2.Element{}
-	if d.window_actions.mode != .menu {
+	panel := if d.window_actions.mode != .menu {
 		width := if d.canvas.width - 16 < 660 { d.canvas.width - 16 } else { 660 }
 		if width <= 0 { return none }
 		mut children := frame_elements(2)
@@ -523,7 +522,7 @@ fn (mut d Desktop) window_actions_element() ?ui2.Element {
 			'window.actions.resize_hint'
 		}),
 			ui2.rect(12, 34, f64(width - 24), 40), ui2.TextStyle{ color: body_muted, size: 11, lines: 2 })
-		panel = ui2.clickable_view(window_actions_panel,
+		ui2.clickable_view(window_actions_panel,
 			ui2.rect(f64((d.canvas.width - width) / 2), 8, f64(width), 80),
 			ui2.BoxStyle{ bg: body_panel, radius: 8 }, children)
 	} else {
@@ -555,7 +554,7 @@ fn (mut d Desktop) window_actions_element() ?ui2.Element {
 				ui2.rect(window_actions_padding + 100, f64(footer_y), 94, 22),
 				ui2.BoxStyle{ bg: quick_launch_hover, radius: 4 }, ui2.TextStyle{ color: body_text, size: 11 })
 		}
-		panel = ui2.clickable_view(window_actions_panel,
+		ui2.clickable_view(window_actions_panel,
 			ui2.rect(f64(bounds.x), f64(bounds.y), f64(bounds.width), f64(bounds.height)),
 			ui2.BoxStyle{ bg: body_panel, radius: 8 }, children)
 	}

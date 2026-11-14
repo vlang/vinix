@@ -624,9 +624,6 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	} else {
 		'builtin:close'
 	}
-	mut close := ui2.Element{}
-	mut maximize := ui2.Element{}
-	mut minimize := ui2.Element{}
 	// Windows 7's three buttons are one group hanging from the frame's top
 	// line, six pixels in from its outer edge. A maximized window has neither
 	// the line nor the edge, and the group moves up and out to the screen's.
@@ -637,29 +634,26 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	} else {
 		window.width - caption_inset - aero_caption_width
 	}
-	if aero {
-		// Minimise, maximise, close, with close outermost at either end.
-		if buttons_left {
-			close = aero_caption_button(window.id_close, close_glyph, caption_x, aero_caption_close_width,
-				caption_top)
-			maximize = aero_caption_button(window.id_maximize, maximize_glyph, caption_x +
-				aero_caption_close_width, aero_caption_maximize_width, caption_top)
-			minimize = aero_caption_button(window.id_minimize, 'builtin:minimize', caption_x +
-				aero_caption_close_width + aero_caption_maximize_width, aero_caption_minimize_width,
-				caption_top)
-		} else {
-			minimize = aero_caption_button(window.id_minimize, 'builtin:minimize', caption_x,
-				aero_caption_minimize_width, caption_top)
-			maximize = aero_caption_button(window.id_maximize, maximize_glyph, caption_x +
-				aero_caption_minimize_width, aero_caption_maximize_width, caption_top)
-			close = aero_caption_button(window.id_close, close_glyph, caption_x +
-				aero_caption_minimize_width + aero_caption_maximize_width, aero_caption_close_width,
-				caption_top)
-		}
+	close := if aero {
+		aero_caption_button(window.id_close, close_glyph,
+			caption_x + if buttons_left { 0 } else { aero_caption_minimize_width + aero_caption_maximize_width },
+			aero_caption_close_width, caption_top)
 	} else {
-		close = d.title_button(window.id_close, close_glyph, close_x, active, set_hovered)
-		maximize = d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
-		minimize = d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
+		d.title_button(window.id_close, close_glyph, close_x, active, set_hovered)
+	}
+	maximize := if aero {
+		aero_caption_button(window.id_maximize, maximize_glyph,
+			caption_x + if buttons_left { aero_caption_close_width } else { aero_caption_minimize_width },
+			aero_caption_maximize_width, caption_top)
+	} else {
+		d.title_button(middle, middle_glyph, middle_x, active, set_hovered)
+	}
+	minimize := if aero {
+		aero_caption_button(window.id_minimize, 'builtin:minimize',
+			caption_x + if buttons_left { aero_caption_close_width + aero_caption_maximize_width } else { 0 },
+			aero_caption_minimize_width, caption_top)
+	} else {
+		d.title_button(inner, inner_glyph, inner_x, active, set_hovered)
 	}
 
 	background, mut contents := d.window_contents(window_index, body_width, body_height)
@@ -668,11 +662,12 @@ fn (mut d Desktop) window_element(window_index int) ui2.Element {
 	// asks for both by leading with an app_toolbar_id view: it moves here, out
 	// of the body, so each of its elements is in the tree -- and freed -- once.
 	// The body keeps its place, and the application its coordinates.
-	mut toolbar := ui2.Element{}
+	has_toolbar := d.settings.theme == .macos && contents.len > 0 && contents[0].id == app_toolbar_id
+		&& contents[0].frame.height >= 1 && int(contents[0].frame.height) < body_height
+	toolbar := if has_toolbar { ui2.Element{ ...contents[0] } } else { ui2.Element{} }
+	defer { if !has_toolbar { free_tree(toolbar) } }
 	mut toolbar_height := 0
-	if d.settings.theme == .macos && contents.len > 0 && contents[0].id == app_toolbar_id
-		&& contents[0].frame.height >= 1 && int(contents[0].frame.height) < body_height {
-		toolbar = contents[0]
+	if has_toolbar {
 		toolbar_height = int(toolbar.frame.height)
 		for index in 1 .. contents.len {
 			contents[index - 1] = contents[index]
@@ -893,6 +888,9 @@ fn (mut d Desktop) window_contents(window_index int, body_width int, body_height
 		d.windows[window_index].recovery = true
 		return d.theme().window_body, d.session_recovery_contents(window_index, body_width)
 	}
+	// Only the children enter the frame tree; release the discarded wrapper's
+	// metadata here. Calculator's cached root remains borrowed.
+	free_frame_stylesheet(root)
 	return root.box.bg, root.children
 }
 

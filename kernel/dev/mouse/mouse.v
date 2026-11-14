@@ -13,56 +13,58 @@ import errno
 import wakesrc
 import devcore
 import dev.console
+import dev.mouse.packet as ps2packet
 import x86.kio
 import x86.apic
 import x86.idt
 
 @[inline]
-fn wait(t int) {
+fn wait(t int) bool {
 	mut timeout := 100000
 	if t == 0 {
 		for ; timeout != 0; timeout-- {
-			if kio.port_in[u8](0x64) & (1 << 0) != 0 {
-				return
+			status := kio.port_in[u8](0x64)
+			if status != 0xff && status & 0x21 == 0x21 {
+				return true
 			}
 		}
 	} else {
 		for ; timeout != 0; timeout-- {
 			if kio.port_in[u8](0x64) & (1 << 1) == 0 {
-				return
+				return true
 			}
 		}
 	}
+	return false
 }
 
 @[inline]
-fn write(val u8) {
-	wait(1)
+fn write(val u8) bool {
+	if !wait(1) { return false }
 	kio.port_out[u8](0x64, 0xd4)
-	wait(1)
+	if !wait(1) { return false }
 	kio.port_out[u8](0x60, val)
+	return true
 }
 
 @[inline]
-fn read() u8 {
-	wait(0)
+fn read() ?u8 {
+	if !wait(0) { return none }
 	return kio.port_in[u8](0x60)
 }
 
-fn set_sample_rate(rate u8) bool {
-	write(0xf3)
-	if read() != 0xfa {
-		return false
-	}
-	write(rate)
-	return read() == 0xfa
+fn command(value u8) bool {
+	if !write(value) { return false }
+	ack := read() or { return false }
+	return ack == 0xfa
 }
 
-fn device_id() u8 {
-	write(0xf2)
-	if read() != 0xfa {
-		return 0
-	}
+fn set_sample_rate(rate u8) bool {
+	return command(0xf3) && command(rate)
+}
+
+fn device_id() ?u8 {
+	if !command(0xf2) { return none }
 	return read()
 }
 
@@ -122,8 +124,7 @@ pub mut:
 	pointer_buttons  u32
 	pointer_pressed  u32
 	pointer_released u32
-	// Wheel movement since /dev/pointer was last read; only a USB pointer
-	// reports any.
+	// Wheel movement since /dev/pointer was last read.
 	pointer_scroll   int
 	packet_bytes     int
 	five_buttons     bool
@@ -269,68 +270,25 @@ fn clamp_pointer_axis(value int, maximum int) int {
 }
 
 fn handler() {
-	mut handler_cycle := 0
-	mut current_packet := MousePacket{}
-	mut discard_packet := false
-	mut extra := u8(0)
+	mut decoder := ps2packet.Decoder{}
 
 	for {
 		event.await_one(mut int_events[ps2_mouse_vector], true) or {}
-		// A pointer ends a sleep, if it is allowed to.
-		wakesrc.report(.pointer)
-
-		// we will get some spurious packets at the beginning and they will screw
-		// up the alignment of the handler cycle so just ignore everything in
-		// the first 250 milliseconds after boot
-		if monotonic_clock.tv_sec == 0 && monotonic_clock.tv_nsec < 250000000 {
-			kio.port_in[u8](0x60)
-		}
 		if katomic.cas(mut &ps2_mouse_restart, u32(1), u32(0)) {
-			handler_cycle = 0
-			discard_packet = false
+			decoder = ps2packet.Decoder{}
 		}
-
-		match handler_cycle {
-			0 {
-				current_packet.flags = read()
-				handler_cycle++
-				if current_packet.flags & (1 << 6) != 0 || current_packet.flags & (1 << 7) != 0 {
-					discard_packet = true
-				}
-				if current_packet.flags & (1 << 3) == 0 {
-					discard_packet = true
-				}
-				continue
-			}
-			1 {
-				current_packet.x_mov = read()
-				handler_cycle++
-				continue
-			}
-			2 {
-				current_packet.y_mov = read()
-				if mouse_res.packet_bytes == 4 {
-					handler_cycle = 3
-					continue
-				}
-				handler_cycle = 0
-			}
-			3 {
-				extra = read()
-				handler_cycle = 0
-			}
-			else {}
-		}
-		if discard_packet {
-			discard_packet = false
+		// IRQs can be stale after setup/resume. Never wait for another byte
+		// here or consume a keyboard byte from the shared controller.
+		if kio.port_in[u8](0x64) & 0x21 != 0x21 {
 			continue
 		}
-
-		if current_packet.flags & (1 << 4) != 0 {
-			current_packet.x_mov = u32(i8(u8(current_packet.x_mov)))
-		}
-		if current_packet.flags & (1 << 5) != 0 {
-			current_packet.y_mov = u32(i8(u8(current_packet.y_mov)))
+		report := decoder.push(kio.port_in[u8](0x60), mouse_res.packet_bytes,
+			mouse_res.five_buttons) or { continue }
+		wakesrc.report(.pointer)
+		current_packet := MousePacket{
+			flags: report.flags
+			x_mov: u32(report.x)
+			y_mov: u32(report.y)
 		}
 
 		mouse_res.l.acquire()
@@ -344,14 +302,11 @@ fn handler() {
 		delta_y := int(i32(current_packet.y_mov))
 		mouse_res.pointer_x = clamp_pointer_axis(mouse_res.pointer_x + delta_x, mouse_res.pointer_max_x)
 		mouse_res.pointer_y = clamp_pointer_axis(mouse_res.pointer_y - delta_y, mouse_res.pointer_max_y)
-		mut buttons := u32(current_packet.flags & 0x07)
-		if mouse_res.five_buttons && extra & 0xc0 != 0x40 && extra & 0xc0 != 0x80 {
-			// Explorer packets put Back and Forward in bits 4 and 5 of byte 4.
-			buttons |= u32((extra >> 4) & 0x03) << 3
-		}
+		buttons := report.buttons
 		mouse_res.pointer_pressed |= buttons & ~mouse_res.pointer_buttons
 		mouse_res.pointer_released |= mouse_res.pointer_buttons & ~buttons
 		mouse_res.pointer_buttons = buttons
+		mouse_res.pointer_scroll += int(report.scroll)
 		mouse_res.l.release()
 
 		mouse_res.status |= file.pollin
@@ -377,7 +332,6 @@ pub fn initialise() {
 	mouse_res.pointer_y = 383
 	mouse_res.pointer_max_x = 1023
 	mouse_res.pointer_max_y = 767
-	negotiate()
 
 	mouse_res.stat.size = 0
 	mouse_res.stat.blocks = 0
@@ -399,9 +353,16 @@ pub fn initialise() {
 	pointer_res.status |= file.pollout
 	fs.devtmpfs_add_device(&pointer_res, 'pointer')
 
+	// Keep /dev/pointer available for USB even on a machine without i8042.
+	// Command replies must be consumed here, with IRQ12 held off.
+	if !console.pointer_interrupt(false) || !negotiate() {
+		C.kprintf(c'mouse: PS/2 mouse unavailable\n')
+		return
+	}
 	ps2_mouse_vector = idt.allocate_vector()
 	apic.io_apic_set_irq_redirect(cpu_locals[0].lapic_id, ps2_mouse_vector, 12, true)
 	console.pointer_interrupt(true)
+	C.kprintf(c'mouse: PS/2 mouse ready (%d-byte packets)\n', mouse_res.packet_bytes)
 
 	// Resumed with the other devices, after the keyboard controller it is
 	// reached through: that one is registered first.
@@ -420,32 +381,27 @@ pub fn initialise() {
 
 // Tell the mouse what it is to be: defaults, the packet format it can do, and
 // to start reporting. At boot, and again when it has been without power.
-fn negotiate() {
+fn negotiate() bool {
 	mouse_res.packet_bytes = 3
 	mouse_res.five_buttons = false
 
-	write(0xf6)
-	read()
+	if !command(0xf5) || !command(0xf6) { return false }
 	// PS/2 Explorer mice expose side buttons only after switching to the
 	// four-byte IntelliMouse protocol. An ordinary three-button mouse keeps
 	// its original packet format.
-	if set_sample_rate(200) && set_sample_rate(100) && set_sample_rate(80) {
-		id := device_id()
-		if id == 3 || id == 4 {
-			mouse_res.packet_bytes = 4
-		}
-		if set_sample_rate(200) && set_sample_rate(200) && set_sample_rate(80) {
-			mouse_res.five_buttons = device_id() == 4
-		} else if id == 4 {
-			mouse_res.five_buttons = true
-		}
-		if mouse_res.five_buttons {
-			mouse_res.packet_bytes = 4
-		}
+	if !set_sample_rate(200) || !set_sample_rate(100) || !set_sample_rate(80) {
+		return false
 	}
-
-	write(0xf4)
-	read()
+	mut id := device_id() or { return false }
+	if id == 3 {
+		if !set_sample_rate(200) || !set_sample_rate(200) || !set_sample_rate(80) {
+			return false
+		}
+		id = device_id() or { return false }
+	}
+	mouse_res.five_buttons = id == 4
+	mouse_res.packet_bytes = if id == 3 || id == 4 { 4 } else { 3 }
+	return command(0xf4)
 }
 
 fn mouse_suspend(mut _ devcore.Device) bool {
@@ -467,10 +423,9 @@ fn mouse_resume(mut _ devcore.Device) bool {
 		return true
 	}
 	// Off already if the keyboard controller was resumed first, as it is.
-	console.pointer_interrupt(false)
-	negotiate()
+	if !console.pointer_interrupt(false) || !negotiate() { return false }
 	for _ in 0 .. 64 {
-		if kio.port_in[u8](0x64) & 1 == 0 {
+		if kio.port_in[u8](0x64) & 0x21 != 0x21 {
 			break
 		}
 		kio.port_in[u8](0x60)

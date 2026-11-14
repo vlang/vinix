@@ -532,3 +532,37 @@ fn element_exists(root ui2.Element, id string) bool {
 	}
 	return false
 }
+
+fn test_desktop_redraw_releases_default_stylesheets() {
+	mut desktop := Desktop{canvas: new_canvas(1024, 768)}
+	desktop.spawn('System', .system, 580, 60, 372, 232)
+	for _ in 0 .. 3 { free_tree(desktop.build_tree()) }
+	C.vinix_heap_begin()
+	for frame in 0 .. 40 {
+		desktop.hover = app_shortcut_actions[frame % available_apps.len]
+		free_tree(desktop.build_tree())
+	}
+	live := C.vinix_heap_end()
+	assert live == 0, 'desktop redraws retained ${live} bytes in ${C.vinix_heap_count()} allocations'
+}
+
+fn test_calculator_frames_borrow_cached_stylesheets() {
+	mut app := new_calculator_app()
+	free_tree(app.build(ui2.rect(0, 0, 320, 420))!)
+	C.vinix_heap_begin()
+	for _ in 0 .. 40 {
+		free_tree(app.build(ui2.rect(0, 0, 320, 420))!)
+		assert app.layout.children.len > 0
+	}
+	live := C.vinix_heap_end()
+	app.close_app()
+	assert live == 0, 'Calculator frames retained ${live} bytes'
+}
+
+fn test_unused_calculator_releases_placeholder_stylesheet() {
+	C.vinix_heap_begin()
+	mut app := new_calculator_app()
+	app.close_app()
+	unsafe { free(app) }
+	assert C.vinix_heap_end() == 0
+}

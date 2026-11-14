@@ -73,7 +73,7 @@ fn probe_greeter() int {
 fn probe_desktop() int {
 	user := os.getenv('USER')
 	os.write_file('/tmp/desktop-${user}.pid', os.getpid().str()) or {}
-	note('desktop ${user}: start uid=${C.getuid()} ${whoami()}')
+	note('desktop ${user}: start uid=${C.getuid()} groups=${C.getgroups(0, unsafe { nil })} ${whoami()}')
 	for {
 		step := next_step('/etc/desktop-plan-${user}', os.getenv('HOME') + '/.plan-step').split(' ')
 		match step[0] {
@@ -199,11 +199,13 @@ fn scenario_sessions(mut t Test) {
 
 	sam_start := log_line('desktop sam: start')
 	sam_login := field(sam_start, 'login')
+	t.check(field(sam_start, 'groups') == '0', 'graphical session retained supplementary groups: ${sam_start}')
 	t.check(sam_start.contains(' uid=${sam.uid} ') && sam_login.starts_with('${sam.uid}/')
 		&& field(sam_start, 'seat') == sam_login.all_after('/') && field(sam_start, 'fb') == 'ok'
 		&& sam_start.ends_with('active=${sam.uid}'), 'sam\'s session started as: ${sam_start}')
 	alex_start := log_line('desktop alex: start')
 	alex_login := field(alex_start, 'login')
+	t.check(field(alex_start, 'groups') == '0', 'administrator desktop retained supplementary groups: ${alex_start}')
 	t.check(alex_login.starts_with('${alex.uid}/') && alex_login.all_after('/') != sam_login.all_after('/')
 		&& field(alex_start, 'seat') == alex_login.all_after('/') && field(alex_start, 'fb') == 'ok'
 		&& alex_start.ends_with('active=${alex.uid}'), 'alex\'s session started as: ${alex_start}')

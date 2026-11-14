@@ -1,0 +1,90 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module main
+
+import errno
+import event.eventstruct
+import klock
+import resource
+import stat
+
+struct LocalResource {
+mut:
+	stat stat.Stat
+	refcount int = 1
+	l klock.Lock
+	event eventstruct.Event
+	status int
+	can_mmap bool
+	releases int
+}
+
+fn (mut r LocalResource) grow(_ voidptr, _ u64) ? {}
+fn (mut r LocalResource) read(_ voidptr, _ voidptr, _ u64, _ u64) ?i64 { return 0 }
+fn (mut r LocalResource) write(_ voidptr, _ voidptr, _ u64, _ u64) ?i64 { return 0 }
+fn (mut r LocalResource) ioctl(_ voidptr, _ u64, _ voidptr) ?int { return 0 }
+fn (mut r LocalResource) unref(_ voidptr) ? { r.refcount--; r.releases++ }
+fn (mut r LocalResource) link(_ voidptr) ? {}
+fn (mut r LocalResource) unlink(_ voidptr) ? {}
+fn (mut r LocalResource) mmap(_ voidptr, _ u64, _ int) voidptr { return unsafe { nil } }
+
+struct RemoteResource {
+	LocalResource
+mut:
+	server stat.Stat
+	calls int
+	fault u64
+	seen_refs int
+}
+
+fn (mut r RemoteResource) snapshot_stat() ?stat.Stat {
+	r.calls++
+	r.seen_refs = r.refcount
+	if r.fault != 0 { errno.set(r.fault); return none }
+	r.stat = r.server
+	return r.stat
+}
+
+// Dynamic device retirement is outside this fixture. The production path
+// helper calls the existing VFS retain gate; these ordinary test inodes use
+// its normal reference increment branch.
+fn retain_open_origin(mut res resource.Resource) ? { resource.retain_resource(mut res) }
+
+fn main() {
+	mut local := &LocalResource{stat: stat.Stat{ino: 7, size: 23, uid: 1000}}
+	mut local_box := &resource.Resource(local)
+	mut out := stat.Stat{}
+	result, code := stat_resource(mut local_box, unsafe { &out })
+	assert result == 0 && code == 0
+	assert out.ino == 7 && out.size == 23 && out.uid == 1000
+	assert local.refcount == 1
+	local_result, local_code := stat_path_resource(mut local_box, unsafe { &out })
+	assert local_result == 0 && local_code == 0
+	assert local.refcount == 1 && local.releases == 0
+	mut remote := &RemoteResource{server: stat.Stat{ino: 8, size: 41, uid: 1001}}
+	mut remote_box := &resource.Resource(remote)
+	first, first_code := stat_resource(mut remote_box, unsafe { &out })
+	assert first == 0 && first_code == 0 && remote.calls == 1
+	assert out.ino == 8 && out.size == 41 && out.uid == 1001
+	remote.server.size = 91
+	remote.server.nlink = 0
+	second, second_code := stat_resource(mut remote_box, unsafe { &out })
+	assert second == 0 && second_code == 0 && remote.calls == 2
+	assert out.size == 91 && out.nlink == 0
+	// A failed remote refresh must leave the caller's output intact and expose
+	// the server error; returning success with the old cache hides disconnects.
+	remote.fault = 116
+	failed, failure := stat_resource(mut remote_box, unsafe { &out })
+	assert failed == errno.err && failure == 116 && remote.calls == 3
+	assert out.size == 91 && out.ino == 8 && out.nlink == 0
+	assert remote.refcount == 1
+	path_failed, path_failure := stat_path_resource(mut remote_box, unsafe { &out })
+	assert path_failed == errno.err && path_failure == 116
+	assert remote.seen_refs == 2 && remote.refcount == 1 && remote.releases == 1
+	assert out.size == 91 && out.ino == 8
+	remote.fault = 0
+	remote.server.size = 123
+	path_result, path_code := stat_path_resource(mut remote_box, unsafe { &out })
+	assert path_result == 0 && path_code == 0 && out.size == 123
+	assert remote.seen_refs == 2 && remote.refcount == 1 && remote.releases == 2
+	println('Stat snapshot probes: PASS (legacy fallback without close side effects, live refresh, unlinked attributes, server errors, unchanged output on failure, path pins released on success and failure)')
+}
