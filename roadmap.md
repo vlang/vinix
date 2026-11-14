@@ -1338,6 +1338,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     allocations. [Unchanged final x86 binaries now also pass](tests/packages/wine-lease-supervision-plan.md#unchanged-final-x86-service-probe-requalification-2026-11-14)
     the paced 741-row and 100-cycle two-row checks within their original bounds.
     Unpaced ARM owner-budget refusals and earlier x86 timeouts remain retained.
+    [Reported directory-sync failure recovery](tests/packages/wine-lease-supervision-plan.md#reported-directory-sync-failure-recovery-2026-11-14)
+    now passes eight migration and one additions `EIO` boundary cases in both
+    native guests, requiring exact partial state and fresh-capture recovery;
+    host ASan and a missing-interception control also pass.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

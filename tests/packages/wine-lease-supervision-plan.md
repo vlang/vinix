@@ -3262,6 +3262,47 @@ New typed receipt:
 SHA-256 `a059e11d5f744c4f2bfaf273866e1b5f208842f0cc6717f0ad0df53cd3de96b3`.
 Recording and independent comparison pass.
 
+## Reported directory sync failure recovery, 2026-11-14
+
+Source `d1d11ad6d` adds a standalone V adapter fixture and native controller for
+reported `fsync` errors. Test-only `-Dfsync=vinix_wine_probe_fsync` intercepts
+one armed call with `EIO`; all other calls use the actual `SYS_fsync` syscall.
+No production hook, behavior or resource-budget change is introduced. A build
+without interception must fail its first injection assertion; that control
+returns exit 1 as expected.
+
+Eight migration cases cover the stage/rename directory-sync boundaries around
+two replacements, the added-link sync and final guard sync. A ninth case
+injects failure in direct additions. Each requires the synchronization refusal,
+exactly one hit and no later sync call. Before closing the failed owner, the
+fixture checks every old/new/absent binding, the exact retained or absent stage
+and private sentinel contents. Fresh capture must then migrate twice, recheck
+three current `keep` rows with prior generation zero, preserve the sentinel
+and leave no stage. Fresh admission also requires the failed owner's prefix
+guard to have been released.
+
+Both ordinary-account native guests pass all nine cases and required final
+markers within 120 seconds: x86 in 10.626 seconds and ARM in 6.098 seconds.
+Selected input hashes match before/after. Host normal and AddressSanitizer runs
+also pass all nine; ASan uses `detect_leaks=0:halt_on_error=1`, excluding leak
+freedom. The source and SDK document host/guest builds and the required alias
+at the final C compile. Existing V/LLVM-musl flags and the pointer-compatibility
+exception remain; strict ABI and hermetic closure remain open.
+
+Evidence is retained at `/Users/alex/.cache/vwsyncfault-20261114-01`, with isolated
+base `75745c51b` plus `source.patch`, matching V files, generated guest C,
+source lists, binaries, kernels, host fixtures, control and run logs. Original
+namespaces and complete prior audit bundles remain required. These are
+reconstructed adapter states after explicit reported I/O errors. Guest prefixes
+use tmpfs; this does not establish persistent-storage or power-loss recovery,
+signed service/public-command admission, actual Wine execution, measured heap,
+complete descriptor accounting, whole-launch lifetime or GUI/version compatibility.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-sync-fault-20261114-01.inventory.json`,
+SHA-256 `1e4a9484346d95345d2478adb925929069dfea3253d95890bc317d2b51294686`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
