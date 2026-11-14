@@ -22,12 +22,14 @@ fn tool(command []string, log string) ! {
 }
 
 fn run() ! {
-	if os.args.len !in [5, 6, 7] || (os.args.len >= 6 && os.args[5] != '--vjfs')
-		|| (os.args.len == 7 && os.args[6] != '--service') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service]]')
+	if os.args.len !in [5, 6, 7, 9] || (os.args.len >= 6 && os.args[5] != '--vjfs')
+		|| (os.args.len >= 7 && os.args[6] != '--service') || (os.args.len == 9 && os.args[7] != '--cli') {
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]]')
 	}
+	if os.args.len == 9 && os.args[8] == '' { return error('nonempty compiled CLI path required') }
 	journaled := os.args.len >= 6
-	service := os.args.len == 7
+	service := os.args.len >= 7
+	cli := if os.args.len == 9 { os.args[8] } else { '' }
 	image_helper := if journaled { os.getenv_opt('VINIX_WINE_IMAGE_HELPER') or { return error('VJFS requires VINIX_WINE_IMAGE_HELPER') } } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh work and supported architecture required') }
@@ -43,6 +45,7 @@ fn run() ! {
 		if path != '' { inputs[path] = winesource.file_digest(path)! }
 	}
 	if journaled { inputs[image_helper] = winesource.file_digest(image_helper)! }
+	if cli != '' { inputs[cli] = winesource.file_digest(cli)! }
 	if arch == 'x86_64' {
 		for _, path in plainiso.inputs(root)! { inputs[path] = winesource.file_digest(path)! }
 	} else {
@@ -69,6 +72,12 @@ fn run() ! {
 		os.mkdir_all(os.dir(config))!
 		os.write_file(config, point.str())!
 		inputs[config] = winesource.file_digest(config)!
+		if cli != '' {
+			staged := work + '/extras-' + point.str() + '/usr/bin/vinix-package'
+			os.mkdir_all(os.dir(staged))!
+			os.cp(cli, staged)!; os.chmod(staged, 0o755)!
+			inputs[staged] = winesource.file_digest(staged)!
+		}
 	}
 	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
@@ -84,6 +93,10 @@ fn run() ! {
 			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=false generation=2 signed-root'
 			required << 'WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=3'
 			required << 'WINE SERVICE POWER CUT PASS point=${point} signed-generation=2 lease-free reader-lock-free'
+		}
+		if cli != '' {
+			required << 'WINE CLI POWER CUT EXEC point=${point} command=wine-prefix-migrate'
+			required << 'WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json'
 		}
 		outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-prefix-powercut', arches: [arch], ending: .poweroff,
 			cmdline: if arch == 'aarch64' { 'vinix.qemu_persist=1' } else { '' },

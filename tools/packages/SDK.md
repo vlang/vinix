@@ -2226,11 +2226,32 @@ The controller requires both fresh/cold signed-store markers and signed-service
 completion; an adapter-only guest cannot satisfy that mode. The packages contain
 marker bytes, so this does not execute Wine or establish Wine-version compatibility.
 
+For public-command recovery, run `wine-prefix-cli-cut-build.v ORIGINAL_MAIN.v
+FRESH_CLI_SOURCE` with `tools/packages/main.v` as the original. It copies that
+entry point byte-for-byte beside a test-only hook and records source hashes;
+existing build directories are refused. Compile the copied directory for the
+guest architecture with `-enable-globals` and the normal manual-free profile,
+using `-Dfsync=vinix_wine_cli_cut_fsync` at the final C compile. The dispatcher
+source remains unchanged; the resulting CLI is a test build with interception.
+Compile the guest with both `wine_cut_cli` and `wine_cut_service`, retaining
+its separate `vinix_wine_cut_fsync` alias, then append
+`--vjfs --service --cli COMPILED_CLI` to the controller arguments.
+
+The interrupted ordinary child closes its preliminary owner and execs the
+actual `wine-prefix-migrate` command. A tmpfs arm file activates the CLI hook
+only in that boot; the hook waits for a migration stage before counting syncs.
+After reboot, migration, repeated migration and public review must return exit
+zero and JSON with generation 2, prior generation zero, runtime `wine` and all
+three exact current `keep` targets. Replies are retained in serial output.
+Independent service admission, lease/reader probes and filesystem inspection
+still follow. CLI-specific markers reject a service-only guest, while a CLI
+compiled without interception is rejected for ending before the requested cut.
+
 These tests qualify selected acknowledged-sync boundaries on journaled VJFS
 with QEMU writeback caching. Host storage caches survive the VM kill. They do
-not establish physical power-loss/torn-write handling, every interruption point,
-public-command recovery or actual Wine execution compatibility. Signed-service
-admission is covered only by the explicit service mode described above.
+not establish physical power-loss/torn-write handling, every interruption point
+or actual Wine execution compatibility. Signed-service and CLI admission are
+covered only by their explicit modes described above.
 
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command

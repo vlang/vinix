@@ -113,6 +113,12 @@ fn ordinary(root string, point int, fresh bool) ! {
 				|| owner.review.review.bindings.len != 3 { return error('signed service cut admission differs') }
 			println('WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=3')
 		}
+		$if wine_cut_cli ? {
+			owner.close()
+			println('WINE CLI POWER CUT EXEC point=${point} command=wine-prefix-migrate')
+			winecutservice.exec_cut(data, point)!
+			return error('public migration exec returned unexpectedly')
+		}
 		cut_point = point; cut_calls = 0
 		owner.migrate_bindings()!
 		return error('migration returned without the selected power cut')
@@ -134,6 +140,12 @@ fn ordinary(root string, point int, fresh bool) ! {
 		}
 	} else if os.readlink(system + '/a.dll')! != selected + '/a.dll' { return error('reboot lost the synced first replacement') }
 	println('WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings')
+	$if wine_cut_cli ? {
+		for command in ['wine-prefix-migrate', 'wine-prefix-migrate', 'wine-prefix-review']! {
+			winecutservice.reply(command, data)!
+		}
+		println('WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json')
+	}
 	mut resumed := $if wine_cut_service ? { (pkgcore.Service{}).wine_prefix_review('app', data)! } $else {
 		wineadapter.capture_idle_binding_review(data, selected, store)!
 	}
@@ -193,6 +205,9 @@ fn run() ! {
 }
 
 fn main() {
+	$if wine_cut_cli ? {
+		$if wine_cut_service ? {} $else { eprintln('CLI power-cut mode requires service mode'); exit(2) }
+	}
 	if C.getpid() != 1 { eprintln('requires guest PID 1'); exit(2) }
 	console := $if arm64 { '/dev/console' } $else { '/dev/com1' }
 	fd := C.open(console.str, C.O_WRONLY)
