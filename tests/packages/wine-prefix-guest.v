@@ -27,13 +27,18 @@ fn C.alarm(u32) u32
 fn C.kill(i32, i32) i32
 fn C.flock(i32, i32) i32
 
-fn cli_status(command string, expected i32) ! {
+fn exec_cli(command string) {
 	args := ['/usr/bin/vinix-package', command, 'app', '/tmp/private']
 	mut pointers := []&char{cap: args.len + 1}
 	for arg in args { pointers << arg.str }
 	pointers << &char(unsafe { nil })
+	C.execv(args[0].str, pointers.data)
+	C._exit(127)
+}
+
+fn cli_status(command string, expected i32) ! {
 	pid := C.fork()
-	if pid == 0 { C.execv(args[0].str, pointers.data); C._exit(127) }
+	if pid == 0 { exec_cli(command) }
 	mut status := i32(0)
 	if pid <= 0 || C.waitpid(pid, &status, 0) != pid || status != (expected << 8) { return error('public prefix command status differs: ' + command) }
 }
@@ -78,10 +83,7 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	println('WINE PREFIX UPGRADE PASS signed generation change; review; retarget refusal; old links and private data preserved')
 	writer := C.fork()
 	if writer == 0 {
-		mut migration := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { C._exit(92); return }
-		migration.migrate_bindings() or { C._exit(93); return }
-		migration.close()
-		C._exit(0)
+		exec_cli('wine-prefix-migrate')
 	}
 	if writer < 0 { return error('cannot fork migration owner') }
 	mut reaped := false
@@ -117,10 +119,10 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	reaped = true
 	if C.flock(lease, C.LOCK_EX | C.LOCK_NB) != 0 { return error('dead migration owner retained generation lease') }
 	if C.flock(lease, C.LOCK_UN) != 0 { return error('cannot retire generation lease probe') }
+	cli('wine-prefix-migrate')!
+	cli('wine-prefix-migrate')!
 	mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private')!
 	defer { owner.close() }
-	owner.migrate_bindings()!
-	owner.migrate_bindings()!
 	owner.recheck()!
 	if owner.review.review.prior_generation != 0 || !owner.review.review.bindings.all(it.operation == .keep) {
 		return error('migration did not complete the selected generation')
@@ -140,6 +142,7 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('migration changed private data') }
 	println('WINE PREFIX MIGRATION PASS signed runtime retarget; added link; repeat; public review; private data')
 	println('WINE PREFIX OWNER DEATH PASS partial retarget; live lease and guard; SIGKILL release; admitted resume')
+	println('WINE PREFIX MIGRATE CLI PASS public writer SIGKILL; public resume; repeat; admitted verification')
 }
 
 fn run() ! {

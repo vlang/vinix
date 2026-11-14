@@ -17,7 +17,7 @@ fn refused(cli string, args []string, message string) ! {
 fn run() ! {
 	if os.args.len != 2 { return error('usage: wine-prefix-cli-check COMPILED_VINIX_PACKAGE') }
 	cli := os.args[1]
-	for command in ['wine-prefix-review', 'wine-prefix-additions'] {
+	for command in ['wine-prefix-review', 'wine-prefix-additions', 'wine-prefix-migrate'] {
 		refused(cli, [command], 'requires an installed application ID')!
 		refused(cli, [command, 'app', '/tmp/private', 'extra'], 'requires an installed application ID')!
 		refused(cli, ['--root', '/tmp/alternate', command, 'app', '/tmp/private'], 'requires the real root')!

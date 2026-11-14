@@ -2070,7 +2070,7 @@ pending stage; unknown stage files/targets are preserved and refused. Repeated
 completed calls are supported. This library operation requires cooperating
 prefix writers to honor the guard: it cannot make check-and-rename atomic
 against arbitrary same-account writes. It is not atomic across all bindings.
-No retargeting CLI or automatic launch migration is enabled. Host tests cover
+Automatic launch migration remains disabled. Host tests cover
 signed upgrade, simulated staged recovery and actual adapter-writer SIGKILL
 with partial retargets. Signed marker-runtime migrations also pass under ordinary
 real-root service admission in x86_64 and AArch64 guests, including subsequent
@@ -2078,6 +2078,14 @@ public review and prefix preparation. Both guests also pass migration-owner
 SIGKILL recovery: the live owner retains its prefix guard and generation lease,
 death releases both, and fresh admitted migration resumes partial work. Actual
 Wine execution and power-loss qualification remain required.
+
+`vinix-package wine-prefix-migrate ID PRIVATE_DATA` explicitly invokes staged
+retargeting and additions under fresh real-root service admission. It shares
+the review command's ordinary-account, path and option restrictions and prints
+the completed JSON report. Interrupted work is resumed by invoking the command
+again against the same selected runtime; unknown staging data is preserved and
+refused. Cooperating prefix writers must honor the guard throughout migration.
+This is not an atomic multi-link transaction or a power-loss durability claim.
 
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing

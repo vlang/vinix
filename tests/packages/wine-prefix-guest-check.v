@@ -22,6 +22,7 @@ fn run() ! {
 			'WINE PREFIX UPGRADE PASS signed generation change; review; retarget refusal; old links and private data preserved',
 			'WINE PREFIX MIGRATION PASS signed runtime retarget; added link; repeat; public review; private data',
 			'WINE PREFIX OWNER DEATH PASS partial retarget; live lease and guard; SIGKILL release; admitted resume',
+			'WINE PREFIX MIGRATE CLI PASS public writer SIGKILL; public resume; repeat; admitted verification',
 			'WINE PREFIX CLI PASS ordinary signed installed review; exclusive addition; repeat; private data', 'HWTEST PASS wine-prefix-cli fixture'],
 		forbidden: ['HWTEST FAIL', 'Kernel panic']}, hwhost.Run{kernel: os.args[3], guest: os.args[5],
 		extras: work + '/extras', state: work + '/boot', timeout: 120, keep: true})

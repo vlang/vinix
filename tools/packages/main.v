@@ -30,6 +30,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  wine-prefix-review ID PRIVATE_DATA (JSON review; may create coordination files)\n' +
 	'  wine-prefix-additions ID PRIVATE_DATA (create missing builtin links; never retarget)\n' +
+	'  wine-prefix-migrate ID PRIVATE_DATA (explicit staged builtin retarget and additions)\n' +
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
 	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
@@ -140,7 +141,7 @@ fn checked(arguments []string) !int {
 		return admin_authorize()
 	}
 	match command {
-		'wine-prefix-review', 'wine-prefix-additions' {
+		'wine-prefix-review', 'wine-prefix-additions', 'wine-prefix-migrate' {
 			if names.len != 2 { return error('${command} requires an installed application ID and absolute private data directory') }
 			if root_option || offline { return error('${command} requires the real root without offline options') }
 			if !pkgcore.identifier(names[0]) || !os.is_abs_path(names[1]) || names[1].contains('\x00') {
@@ -150,6 +151,7 @@ fn checked(arguments []string) !int {
 			defer { owner.close() }
 			owner.recheck()!
 			if command == 'wine-prefix-additions' { owner.complete_additions()! }
+			if command == 'wine-prefix-migrate' { owner.migrate_bindings()! }
 			println(json2.encode(owner.review.review))
 			return 0
 		}
