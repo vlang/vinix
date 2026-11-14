@@ -256,6 +256,78 @@ fn test_staged_builtin_migration_resumes_and_preserves_unknown_stage() {
 	assert !os.is_link(stage) && !os.exists(stage)
 }
 
+fn test_builtin_retargeting_resumes_after_sigkill() {
+	root := os.real_path(os.temp_dir()) + '/wine-retarget-kill-' + os.getpid().str()
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	store := root + '/store'
+	old := store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
+	new := store + '/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows'
+	data := root + '/data'
+	os.mkdir_all(old)!; os.mkdir_all(new)!; os.mkdir(data)!; os.chmod(data, 0o700)!
+	os.chown(data, int(C.geteuid()), os.getegid())!
+	for index in 0 .. 64 {
+		name := '/old-' + index.str() + '.dll'
+		os.write_file(old + name, 'old')!; os.write_file(new + name, 'new')!
+	}
+	mut prefix := prepare_prefix(data, old)!
+	defer { prefix.close() }
+	system := data + '/wine/drive_c/windows/system32'
+	os.write_file(system + '/personal.txt', 'preserve private data')!
+	pid := C.wine_binding_test_fork()
+	assert pid >= 0
+	if pid == 0 {
+		mut capture := capture_idle_binding_review(data, new, store) or { C._exit(2); return }
+		capture.migrate_bindings() or { C._exit(3); return }
+		capture.close()
+		C._exit(0)
+	}
+	mut reaped := false
+	defer {
+		if !reaped {
+			C.wine_binding_test_kill(pid, C.SIGKILL)
+			mut status := 0
+			C.wine_binding_test_waitpid(pid, &status, 0)
+		}
+	}
+	deadline := time.now().unix_milli() + 10000
+	for os.readlink(system + '/old-0.dll')! != new + '/old-0.dll' && time.now().unix_milli() < deadline {
+		time.sleep(time.millisecond)
+	}
+	assert os.readlink(system + '/old-0.dll')! == new + '/old-0.dll'
+	assert C.wine_binding_test_kill(pid, C.SIGSTOP) == 0
+	mut status := 0
+	assert C.wine_binding_test_waitpid(pid, &status, C.WUNTRACED) == pid && status & 0xff == 0x7f
+	mut replaced := 0
+	for index in 0 .. 64 {
+		name := '/old-' + index.str() + '.dll'
+		observed := os.readlink(system + name)!
+		assert observed == old + name || observed == new + name
+		if observed == new + name { replaced++ }
+	}
+	assert replaced > 0 && replaced < 64
+	if mut competitor := prefix.acquire_launch(data) {
+		competitor.close(); assert false, 'stopped migration lost prefix guard'
+	} else { assert err.msg().contains('already has a managed launch') }
+	assert C.wine_binding_test_kill(pid, C.SIGKILL) == 0
+	assert C.wine_binding_test_waitpid(pid, &status, 0) == pid && status & 0x7f == C.SIGKILL
+	reaped = true
+	mut resumed := capture_idle_binding_review(data, new, store)!
+	defer { resumed.close() }
+	assert resumed.review.prior_generation == 1
+	assert resumed.review.bindings.filter(it.operation == .replace).len == 64 - replaced
+	resumed.migrate_bindings()!
+	resumed.migrate_bindings()!
+	assert resumed.review.prior_generation == 0 && resumed.review.bindings.all(it.operation == .keep)
+	for index in 0 .. 64 {
+		name := '/old-' + index.str() + '.dll'
+		assert os.readlink(system + name)! == new + name
+	}
+	assert !os.is_link(data + '/wine/' + builtin_stage_name)
+	assert os.read_file(system + '/personal.txt')! == 'preserve private data'
+	println('Wine retarget SIGKILL partial=' + replaced.str() + '/64; atomic old/new targets; fresh capture resumed PASS')
+}
+
 fn expected_inventory_refused(capture &IdleBindingReview, runtime string, generation u64, expected []BuiltinExpectation) {
 	capture.require_builtin_inventory(runtime, generation, expected) or { assert err.msg().contains('differs'); return }
 	assert false, 'mismatched expected inventory accepted'
