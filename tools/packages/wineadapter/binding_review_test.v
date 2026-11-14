@@ -16,6 +16,17 @@ fn binding_refused(data string, builtins string, store string, message string) !
 	binding_snapshot(data, mut before)!
 	mut review := review_prefix_bindings(data, builtins, store) or {
 		assert err.msg().contains(message), err.msg()
+		cli := os.getenv('VINIX_WINE_PREFIX_REVIEW')
+		if cli != '' {
+			mut child := os.new_process(cli)
+			defer { child.close() }
+			child.set_args([store, data, builtins])
+			child.set_redirect_stdio_merged()
+			child.run()
+			output := child.stdout_slurp()
+			child.wait()
+			assert child.code == 1 && output.contains(message), output
+		}
 		mut after := map[string]string{}
 		binding_snapshot(data, mut after)!
 		assert before == after
@@ -73,6 +84,21 @@ fn test_binding_review_is_read_only_and_refuses_foreign_or_mixed_links() {
 	binding_snapshot(data, mut after)!
 	assert before == after
 	system := data + '/wine/drive_c/windows/system32'
+	// Inventory shrinkage must not hide a stale packaged DLL, even when its
+	// old generation has already been collected. User-owned additions survive.
+	os.write_file(system + '/personal.dll', 'private contents')!
+	os.symlink('/private/user-library.dll', system + '/personal-link.dll')!
+	mut personal := review_prefix_bindings(data, new, store)!
+	assert personal.bindings.len == 2
+	personal.close()
+	for target in [old + '/retired.dll', new + '/retired.dll', store + '/generations/invalid/apps/foreign/retired.dll'] {
+		os.symlink(target, system + '/retired.dll')!
+		binding_refused(data, new, store, 'absent from the selected builtin inventory')!
+		assert os.readlink(system + '/retired.dll')! == target
+		os.rm(system + '/retired.dll')!
+	}
+	assert os.read_file(system + '/personal.dll')! == 'private contents'
+	assert os.readlink(system + '/personal-link.dll')! == '/private/user-library.dll'
 	for name in ['kernel32.dll', 'ntdll.dll'] {
 		os.rm(system + '/' + name)!; os.symlink(new + '/' + name, system + '/' + name)!
 	}

@@ -135,6 +135,31 @@ pub fn review_prefix_bindings(data string, builtins string, store string) !Bindi
 		review.bindings << BuiltinBinding{name: name.clone(), observed: observed, replacement: builtins + suffix}
 		retained = true
 	}
+	// A removed builtin is absent from the new inventory. Do not silently
+	// approve a review which would leave its generation link behind. Personal
+	// files and links outside the package generation namespace remain private.
+	system_path := data + '/wine/drive_c/windows/system32'
+	defer { unsafe { system_path.free() } }
+	mut existing := os.ls(system_path)!
+	defer { unsafe { existing.free() } }
+	if existing.len > 4096 { return error('Wine binding review prefix inventory is too large') }
+	existing.sort()
+	generations := store + '/generations/'
+	defer { unsafe { generations.free() } }
+	for name in existing {
+		if name in names { continue }
+		mut buffer := [4097]u8{}
+		length := C.readlinkat(system, name.str, &char(&buffer[0]), 4096)
+		if length < 0 {
+			if C.errno == C.EINVAL { continue }
+			return error('Wine binding review cannot inspect extra prefix entry')
+		}
+		if length < 1 || length >= 4096 { return error('Wine binding review extra link is not bounded') }
+		observed := unsafe { tos(&buffer[0], int(length)) }
+		if observed.starts_with(generations) {
+			return error('Wine prefix has a package-generation link absent from the selected builtin inventory')
+		}
+	}
 	prefix.recheck(data)!
 	review_same_child(prefix.directory, 'drive_c', drive)!
 	review_same_child(drive, 'windows', windows)!
