@@ -68,7 +68,7 @@ fn main() {
   source.write_string('define void @guard_extent_${bits}(ptr %src, ptr %out) { store i8 17, ptr %out, align 1\n %p = getelementptr i8, ptr %out, i64 67108864\n call void @llvm.memset.p0.i${bits}(ptr %p, i8 0, i${bits} 1, i1 false)\n ret void }\n')
   source.write_string('define void @guard_readonly_${bits}(ptr %src, ptr %out, ptr addrspace(2) %constant) { store i8 17, ptr %out, align 1\n call void @llvm.memset.p2.i${bits}(ptr addrspace(2) %constant, i8 0, i${bits} 1, i1 false)\n ret void }\n')
  }
- for label, call in {'align': 'call void @llvm.memset.p0.i64(ptr align 8 %out, i8 0, i64 1, i1 false)', 'noundef': 'call void @llvm.memset.p0.i64(ptr %out, i8 noundef 0, i64 1, i1 false)', 'tail': 'tail call void @llvm.memset.p0.i64(ptr %out, i8 0, i64 1, i1 false)', 'user': 'call void @user_memset(ptr %out, i8 0, i64 1, i1 false)', 'inline': 'call void @llvm.memset.inline.p0.i64(ptr %out, i8 0, i64 1, i1 false)'} {
+ for label, call in {'align': 'call void @llvm.memset.p0.i64(ptr align 8 noundef %out, i8 0, i64 1, i1 false)', 'noundef': 'call void @llvm.memset.p0.i64(ptr %out, i8 noundef 0, i64 1, i1 false)', 'tail': 'tail call void @llvm.memset.p0.i64(ptr %out, i8 0, i64 1, i1 false)', 'user': 'call void @user_memset(ptr %out, i8 0, i64 1, i1 false)', 'inline': 'call void @llvm.memset.inline.p0.i64(ptr %out, i8 0, i64 1, i1 false)'} {
   source.write_string('define void @guard_${label}(ptr %src, ptr %out) { store i8 17, ptr %out, align 1\n ${call}\n ret void }\n')
  }
  for value in ['poison', 'undef'] { for early in [false, true] {

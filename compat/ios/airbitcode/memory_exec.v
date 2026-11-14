@@ -147,6 +147,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	mut intrinsic_declarations := [1768]int{} // Forty FP slots + twenty-seven integer families.
 	mut intrinsic_work := 0
 	mut memory_declarations := [42]int{}
+	mut call_alignments := [16]MemoryCallAlignmentCache{}
 	mut memory_steps := 0
 	mut move_bytes := 0
 	for index in s.instructions_start .. s.instructions_start + s.instructions_count {
@@ -192,7 +193,20 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 					intrinsic_work += intrinsic_declaration_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work, 4, if key >= 24 { .copy } else if moving { .read_write } else { .write })!
 					memory_declarations[key] = op.callee_function + 1
 				}
+				mut alignment := IRMemoryCallAlignment{}
+				if op.attribute_set != 0 {
+					slot := int(op.attribute_set % u64(call_alignments.len))
+					if call_alignments[slot].set == op.attribute_set { alignment = call_alignments[slot].alignment }
+					else {
+						decoded, used := memory_call_alignment(stream, op.attribute_set, max_integer_execution_steps - intrinsic_work)!
+						intrinsic_work += used; alignment = decoded
+						call_alignments[slot] = MemoryCallAlignmentCache{set: op.attribute_set, alignment: decoded}
+					}
+				}
+				if !moving && alignment.source_set { return error('AIR memory execution: memset source alignment') }
 				access := p.memory_pointer(pools, bodies, scope, op.operands_start + 1, count, pointers)!
+				if access.offset % alignment.destination != 0 { return error('AIR memory execution: destination call alignment') }
+				if alignment.destination > arguments[access.argument].alignment { arguments[access.argument].alignment = alignment.destination }
 				if length > 0 {
 					if arguments[access.argument].address_space == 2 || length > u64(64 * 1024 * 1024) - access.offset { return error('AIR memory execution: memory destination space/extent') }
 					if access.offset + length > arguments[access.argument].minimum_size { arguments[access.argument].minimum_size = access.offset + length }
@@ -200,6 +214,8 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 				}
 				if moving {
 					source := p.memory_pointer(pools, bodies, scope, op.operands_start + 2, count, pointers)!
+					if source.offset % alignment.source != 0 { return error('AIR memory execution: source call alignment') }
+					if alignment.source > arguments[source.argument].alignment { arguments[source.argument].alignment = alignment.source }
 					if length > 0 {
 						if length > u64(64 * 1024 * 1024) - source.offset { return error('AIR memory execution: memmove source extent') }
 						if source.offset + length > arguments[source.argument].minimum_size { arguments[source.argument].minimum_size = source.offset + length }

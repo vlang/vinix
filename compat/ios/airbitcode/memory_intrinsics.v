@@ -1,6 +1,55 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
+struct IRMemoryCallAlignment {
+	destination u64 = 1
+	source u64 = 1
+	source_set bool
+}
+struct MemoryCallAlignmentCache {
+	set u64
+	alignment IRMemoryCallAlignment
+}
+
+// Only pointer argument alignment is interpreted at memory-intrinsic call
+// sites. Scan work shares the declaration budget; no attributes are ignored.
+fn memory_call_alignment(stream Stream, set u64, limit int) !(IRMemoryCallAlignment, int) {
+	if set == 0 { return IRMemoryCallAlignment{}, 0 }
+	mut work := 0; mut number := u64(0); mut groups := [2]u64{}; mut count := 0
+	for record in stream.records {
+		work++; if work > limit { return error('AIR memory intrinsic: call attribute work limit') }
+		if stream.blocks[record.block].id != 9 { continue }
+		if record.code != 2 { return error('AIR memory intrinsic: call attribute list encoding') }
+		number++
+		if number != set { continue }
+		if record.values_count < 1 || record.values_count > 2 { return error('AIR memory intrinsic: call attribute slots') }
+		count = record.values_count
+		for i in 0 .. count { groups[i] = ir_values(stream, record)[i]; if groups[i] == 0 { return error('AIR memory intrinsic: zero call attribute group') } }
+		break
+	}
+	if count == 0 { return error('AIR memory intrinsic: missing call attributes') }
+	mut destination := u64(1); mut source := u64(1); mut destination_seen := false; mut source_seen := false
+	for i in 0 .. count {
+		mut found := false
+		for record in stream.records {
+			work++; if work > limit { return error('AIR memory intrinsic: call attribute work limit') }
+			if stream.blocks[record.block].id != 10 || record.code != 3 { continue }
+			values := ir_values(stream, record)
+			if values.len < 1 || values[0] != groups[i] { continue }
+			found = true
+			if values.len != 5 || values[1] !in [u64(1), 2]! || values[2] != 1 || values[3] != 1 || values[4] == 0 || values[4] > 64 * 1024 * 1024 || values[4] & (values[4] - 1) != 0 { return error('AIR memory intrinsic: pointer alignment attribute required') }
+			if values[1] == 1 {
+				if destination_seen { return error('AIR memory intrinsic: duplicate destination alignment') }; destination_seen = true; destination = values[4]
+			} else {
+				if source_seen { return error('AIR memory intrinsic: duplicate source alignment') }; source_seen = true; source = values[4]
+			}
+			break
+		}
+		if !found { return error('AIR memory intrinsic: missing call attribute group') }
+	}
+	return IRMemoryCallAlignment{destination: destination, source: source, source_set: source_seen}, work
+}
+
 fn (p IRTypedProgram) memory_literal(pools IRConstantPools, scope int, operand int) !u64 {
 	o := p.operands[operand]
 	value := pools.lookup(scope, o.number)!
@@ -13,7 +62,7 @@ fn (p IRTypedProgram) memory_literal(pools IRConstantPools, scope int, operand i
 // Void direct memory intrinsics, exact overload and literal length. Pointers
 // resolve separately. Keys 0..5 are fills, 6..23 moves, 24..41 disjoint copies.
 fn (p IRTypedProgram) memory_intrinsic_call(ir IRModule, stream Stream, pools IRConstantPools, op IRTypedInstruction, scope int) !(u64, u64, int) {
-	if op.flags != 32768 || op.calling_convention != 0 || op.fast_math_flags != 0 || op.attribute_set != 0 || op.opcode != 0 || op.indices_count != 0 || op.result_type != -1 || op.operands_count != 5 || op.callee_function < 0 || op.callee_function >= ir.functions.len { return error('AIR memory intrinsic: ordinary void direct call required') }
+	if op.flags != 32768 || op.calling_convention != 0 || op.fast_math_flags != 0 || op.opcode != 0 || op.indices_count != 0 || op.result_type != -1 || op.operands_count != 5 || op.callee_function < 0 || op.callee_function >= ir.functions.len { return error('AIR memory intrinsic: ordinary void direct call required') }
 	f := ir.functions[op.callee_function]
 	if !f.declaration || f.calling_convention != 0 || f.linkage != 0 || f.signature != op.call_signature || f.signature < 0 || f.signature >= ir.types.len || f.record < 0 || f.record >= stream.records.len { return error('AIR memory intrinsic: declaration signature/header') }
 	callee := p.operands[op.operands_start]

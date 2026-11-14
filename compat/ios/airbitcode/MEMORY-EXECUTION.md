@@ -319,7 +319,8 @@ i8 byte, defined literal i32/i64 length, and literal false i1 volatility flag.
 The destination uses the existing resolved pointer sources. Nonempty calls
 derive their full extent before execution and require write permission;
 address space 2 rejects writes. Unannotated destinations use byte alignment.
-Call-site attributes, tail calls, volatile fills, dynamic/poison/undef lengths,
+Except for pointer alignment described below, call-site attributes reject.
+Tail calls, volatile fills, dynamic/poison/undef lengths,
 literal pointer destinations, inline/atomic variants and general calls reject.
 
 Declaration attributes admit the existing harmless function properties except
@@ -376,6 +377,20 @@ identities differ. Address bits never enter AIR value slots or become accepted
 numeric pointer inputs. Copies still use indexed reads/writes and the existing
 scratch storage, with no host memcpy call. Callers must keep bindings and data
 stable throughout execution, as for all memory operations.
+
+Memory-intrinsic call sites admit only `align N` on the destination and, for
+memmove/memcpy, source pointer arguments. N must be a power of two from 1
+through 64 MiB. Each binding's required alignment combines the largest
+requirement across all calls and ordinary accesses. The declared virtual base
+alignment and binding offset must meet that combined requirement. Each derived
+pointer offset must independently meet its own access requirement; a binding
+offset cannot compensate for an unaligned derived pointer.
+Zero-length calls still impose alignment, including in inactive blocks, while
+adding no read/write usage. Other call attributes, including properties combined
+with alignment, reject. Alignment-list scans share the cumulative declaration
+work budget. A fixed sixteen-slot stack cache reuses decoded lists by their full
+set identity; collisions revalidate the list. No owned profile array is added.
+Software Metal retains its separate 256-byte virtual base-alignment limit.
 
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
@@ -590,6 +605,14 @@ rejects overlaps through direct bindings and borrowed slices before stores.
 It covers adjacent ranges, zero length, pointer-control chains, scratch reuse
 with shifted source data, exact costs/bounds, late and inactive overlapping
 copies, excluded shapes/attributes/lengths and cumulative/mixed budgets.
+
+`tests/ios/air-memory-alignment.v` compares aligned memset/memmove/memcpy
+calls with native LLVM for both length widths, destination spaces 0/1 and
+source space 2. Physically aligned backing views and shifted bindings exercise
+destination alignments 1..64, independent source requirements, mixed calls and
+cache collisions. Controls check weak base alignment, unaligned binding/derived
+offsets, compensating offsets, inactive calls, unsupported combined attributes,
+exact budgets and aligned empty readonly zero-length calls in spaces 0/1/2.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

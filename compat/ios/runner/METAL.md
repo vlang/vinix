@@ -315,7 +315,8 @@ all blocks/calls count toward the million-step limit. Poison/undef byte values
 error before that fill writes, retaining earlier stores. Zero-length calls skip
 the byte and need no write permission, including for empty readonly space-2
 bindings. Pointer literals, volatile/dynamic-length fills, inline/atomic
-variants, tail calls and call-site attributes reject. Exact declarations admit
+variants, tail calls and call-site attributes other than pointer alignment
+reject. Exact declarations admit
 canonical writeonly/captures(none), fourth immarg and memory(argmem: write)
 properties with bounded validation. Deferred fills check byte ranges, untouched
 prefixes and input changes after encoding.
@@ -331,7 +332,8 @@ sized for the largest move and freed on exit, snapshots source bytes before
 writing; subsequent moves see earlier writes. Exact declarations admit source
 readonly/captures(none), destination writeonly/captures(none), fourth immarg
 and memory(argmem: readwrite) properties. Literal pointers, volatile/dynamic
-lengths, call-site attributes and inline/atomic variants reject.
+lengths, call-site attributes other than pointer alignment and inline/atomic
+variants reject.
 Deferred dispatches exercise both overlap directions, identical/disjoint
 ranges, different bindings to one buffer, repeated moves and preserved bytes.
 
@@ -345,6 +347,15 @@ comparisons stay private to the guard and never expose addresses as AIR values.
 Deferred copies cover separate buffers, disjoint aliases, adjacent ranges and
 input changes after encoding; overlapping/equal ranges produce failed command
 completion with the kernel's earlier marker store untouched.
+
+Memory-intrinsic call sites accept only `align N` on their pointer arguments.
+Destination and source requirements combine with ordinary accesses and must
+fit the virtual buffer's 256-byte base alignment. Binding offsets and derived
+pointer offsets must independently satisfy alignment, including zero-length
+and inactive calls. Combined properties such as `align 8 noundef` still reject.
+Alignment scans share the bounded declaration-work budget and a fixed stack
+cache; the cached profile owns no additional allocation. Deferred fill, move
+and copy checks exercise aligned calls through the same pipeline path.
 
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct

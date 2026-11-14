@@ -97,3 +97,55 @@ fn test_memcpy_declaration_attributes() {
 	if _ := intrinsic_declaration_attributes(stream, 1, 1, 4, .copy) { assert false, 'attribute work budget' }
 	println('AIR-MEMCPY-ATTRIBUTES: canonical noalias/read/write/captures(none), argmem versions 0/1/2, parameter group order and duplicate/property/budget exclusions; memmove noalias exclusion PASS')
 }
+
+fn test_memory_call_alignment_attributes() {
+	blocks := [Block{parent: -1}, Block{id: 9, parent: 0}, Block{id: 10, parent: 0}]
+	records := [Record{block: 1, code: 2, values_count: 2}, Record{block: 2, code: 3, values_start: 2, values_count: 5}, Record{block: 2, code: 3, values_start: 7, values_count: 5}]
+	mut values := [u64(7), 8, 7, 1, 1, 1, 16, 8, 2, 1, 1, 32]
+	defer { unsafe { blocks.free(); records.free(); values.free() } }
+	stream := Stream{blocks: blocks, records: records, values: values}
+	default_alignment, default_work := memory_call_alignment(stream, 0, 0)!
+	assert default_alignment.destination == 1 && default_alignment.source == 1 && !default_alignment.source_set && default_work == 0
+	for shift in 0 .. 27 {
+		values[6] = u64(1) << shift; values[11] = u64(1) << ((shift + 5) % 27)
+		alignment, work := memory_call_alignment(stream, 1, 64)!
+		assert alignment.destination == values[6] && alignment.source == values[11] && alignment.source_set && work > 0
+	}
+	values[6] = 16; values[11] = 32
+	for slot in [6, 11] { for bad in [u64(0), 3, 5, 67108865, 134217728, u64(1) << 63]! {
+		values[slot] = bad
+		if _, _ := memory_call_alignment(stream, 1, 64) { assert false, 'alignment bound/power' }
+	}; values[slot] = if slot == 6 { u64(16) } else { u64(32) } }
+	for slot in [3, 8] { saved := values[slot]; for bad in [u64(0), 3, 4, 0xffffffff]! {
+		values[slot] = bad
+		if _, _ := memory_call_alignment(stream, 1, 64) { assert false, 'non-pointer call attribute slot' }
+	}; values[slot] = saved }
+	values[8] = 1
+	if _, _ := memory_call_alignment(stream, 1, 64) { assert false, 'duplicate destination slot' }
+	values[8] = 2; values[0] = 8
+	if _, _ := memory_call_alignment(stream, 1, 64) { assert false, 'duplicate source group' }
+	values[0] = 7
+	for slot in [4, 5, 9, 10] { values[slot] = 68
+		if _, _ := memory_call_alignment(stream, 1, 64) { assert false, 'attribute kind/id' }
+		values[slot] = 1
+	}
+	values[0] = 999
+	if _, _ := memory_call_alignment(stream, 1, 64) { assert false, 'missing group' }
+	values[0] = 7
+	if _, _ := memory_call_alignment(stream, 2, 64) { assert false, 'missing list' }
+	if _, _ := memory_call_alignment(stream, 1, 1) { assert false, 'scan budget' }
+	single_records := [Record{block: 1, code: 2, values_count: 1}, records[1], records[2]]
+	defer { unsafe { single_records.free() } }
+	single := Stream{blocks: blocks, records: single_records, values: values}
+	destination, _ := memory_call_alignment(single, 1, 64)!
+	assert destination.destination == 16 && destination.source == 1 && !destination.source_set
+	values[0] = 8
+	source, _ := memory_call_alignment(single, 1, 64)!
+	assert source.destination == 1 && source.source == 32 && source.source_set
+	values[0] = 7; values[1] = 7; values[3] = 2; values[8] = 1
+	if _, _ := memory_call_alignment(stream, 1, 64) { assert false, 'repeated valid group' }
+	values[0] = 8; values[1] = 7; values[3] = 1; values[8] = 2
+	ordered, _ := memory_call_alignment(stream, 1, 64)!
+	assert ordered.destination == 16 && ordered.source == 32 && ordered.source_set
+	println('AIR-MEMORY-CALL-ALIGNMENT: default/destination/source attributes, all powers through 64 MiB and bound/power/slot/kind/missing/duplicate/budget exclusions PASS')
+}
