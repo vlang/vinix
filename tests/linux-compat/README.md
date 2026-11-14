@@ -78,6 +78,11 @@ sizes and timeout/mask/count/buffer error order, guarded outputs and flat cleanu
 `ppollargs-reference.v` runs the same ELF on Linux; `ppollargs-evidence.v` audits
 the complete bundle. See [receipts and limits](../../docs/linux-ppoll-arguments.md).
 
+`--arch x86_64 --cases pollcount` explicitly selects raw poll unsigned32 count
+register tests, guarded arrays and repeated cleanup. Both fixture sources are
+frozen. `pollcount-reference.v` and `pollcount-evidence.v` retain Linux comparisons
+and original failures. See [receipts and limits](../../docs/linux-poll-count.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

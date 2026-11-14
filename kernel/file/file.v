@@ -422,7 +422,9 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds_word u64, user_timeout u64, u
 
 // poll(2), which x86-64 Linux programs call rather than ppoll: musl's DNS
 // resolver among them. The timeout is in milliseconds, and negative for none.
-pub fn syscall_poll(_ voidptr, user_fds u64, nfds u64, timeout_ms u64) (u64, u64) {
+pub fn syscall_poll(_ voidptr, user_fds u64, nfds_word u64, timeout_ms u64) (u64, u64) {
+	// Linux's native entrypoint declares nfds as unsigned int.
+	nfds := u64(u32(nfds_word))
 	if nfds > 4096 {
 		return errno.err, errno.einval
 	}

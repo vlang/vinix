@@ -2365,6 +2365,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   unchanged production kernels. Earlier strict refusals remain archived. See
   [the clock-bound qualification](docs/linux-select-time-bounds.md).
 
+- [x] Decode native x86-64 poll counts as unsigned32 before validation. Identical
+  native/Linux ELFs pass 350 guarded count-register checks; the original kernel
+  fails 84. Both credential cohorts retain flat repeated cleanup. See
+  [the poll count qualification](docs/linux-poll-count.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
