@@ -6,6 +6,12 @@ public discard methods, completion callbacks, reapers and firmware-stopped
 cleanup. It uses the real event manager. UAT invalidation, driver allocations,
 ring retirement and shared-buffer backing are injected host services.
 
+Scene tests execute the production TVB lease and GrowTVB owner selector.
+They cover pool exhaustion, overlapping completion, final-owner release,
+unchanged and displaced slot hints, oldest-free selection, canceled first bindings, and stale or
+mismatched growth ownership. The firmware GrowTVB ACK transport itself is
+covered separately by the failure fixture; these checks execute no GPU work.
+
 Sanitizer checks cover caller-owned prepared jobs, cancellation failure and
 retry, per-job retirement on a shared stamp, callback ownership and shutdown.
 The event fixture separately covers publication order, cancellation rollback,

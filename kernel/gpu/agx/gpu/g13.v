@@ -146,6 +146,10 @@ mut:
 	context       &mmu.UatContext = unsafe { nil }
 	slot          u32
 	slot_reserved bool
+	slot_token_valid bool
+	active_scenes u32
+	needs_bind    bool
+	bound_blocks  u32
 	info          SharedBuffer
 	block_control SharedBuffer
 	counter       SharedBuffer
@@ -245,6 +249,7 @@ pub mut:
 	context                 &mmu.UatContext = unsafe { nil }
 	vertex_event_reserved   bool
 	fragment_event_reserved bool
+	scene_reserved          bool
 	mappings_published      bool
 	quarantined             bool
 	submitted               bool
@@ -277,7 +282,6 @@ mut:
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
 	quarantined        bool
-	render_job_active  bool
 	released           bool
 }
 
@@ -449,17 +453,61 @@ fn g13_tile_info(width u32, height u32, layers u32, utile_width u32,
 }
 
 fn (mut mgr GpuManager) reserve_g13_tvb_slot() ?u32 {
+	mut selected := fw.g13_tvb_slot_count
+	mut oldest_age := u64(0)
 	for slot := u32(0); slot < fw.g13_tvb_slot_count; slot++ {
 		if !mgr.g13_tvb_slots[slot] {
-			mgr.g13_tvb_slots[slot] = true
-			return slot
+			age := mgr.g13_tvb_release_clock - mgr.g13_tvb_free_order[slot]
+			if selected == fw.g13_tvb_slot_count || age > oldest_age {
+				selected = slot
+				oldest_age = age
+			}
 		}
 	}
-	return none
+	if selected == fw.g13_tvb_slot_count { return none }
+	mgr.g13_tvb_slots[selected] = true
+	return selected
+}
+
+// Caller holds mgr.lock. Buffer::new_scene/Scene::drop retain one shared
+// slot across overlapping scenes, and give it back after the last scene.
+fn (mut mgr GpuManager) retain_g13_scene_slot_locked(mut buffer G13RenderBufferResources) bool {
+	if buffer.active_scenes == ~u32(0) { return false }
+	if buffer.active_scenes == 0 {
+		if buffer.slot_reserved { return false }
+		if buffer.slot_token_valid && buffer.slot < fw.g13_tvb_slot_count && !mgr.g13_tvb_slots[buffer.slot]
+			&& mgr.g13_tvb_owners[buffer.slot] == buffer.info.va {
+			mgr.g13_tvb_slots[buffer.slot] = true
+		} else {
+			buffer.slot = mgr.reserve_g13_tvb_slot() or { return false }
+		}
+		if !buffer.slot_token_valid || mgr.g13_tvb_owners[buffer.slot] != buffer.info.va {
+			buffer.needs_bind = true
+		}
+		mgr.g13_tvb_owners[buffer.slot] = buffer.info.va
+		buffer.slot_token_valid = true
+		buffer.slot_reserved = true
+	} else if !buffer.slot_reserved || buffer.slot >= fw.g13_tvb_slot_count
+		|| !mgr.g13_tvb_slots[buffer.slot] { return false }
+	buffer.active_scenes++
+	return true
+}
+
+fn (mut mgr GpuManager) release_g13_scene_slot_locked(mut buffer G13RenderBufferResources) {
+	assert buffer.active_scenes != 0 && buffer.slot_reserved
+	buffer.active_scenes--
+	if buffer.active_scenes == 0 {
+		assert buffer.slot < fw.g13_tvb_slot_count
+		mgr.g13_tvb_slots[buffer.slot] = false
+		mgr.g13_tvb_release_clock++
+		mgr.g13_tvb_free_order[buffer.slot] = mgr.g13_tvb_release_clock
+		buffer.slot_reserved = false
+	}
 }
 
 // Caller holds mgr.lock. No submitted job may still reference this buffer.
 fn (mut mgr GpuManager) free_g13_render_buffer_locked(mut buffer G13RenderBufferResources) {
+	assert buffer.active_scenes == 0
 	if !buffer.initialized && !buffer.slot_reserved && buffer.info.va == 0
 		&& buffer.page_list == unsafe { nil } {
 		return
@@ -498,8 +546,6 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 	buffer.context = unsafe { ctx }
 	// Nothing slices the block list, so growing it can free the old buffer.
 	buffer.blocks.flags |= .noslices
-	buffer.slot = mgr.reserve_g13_tvb_slot() or { return false }
-	buffer.slot_reserved = true
 	mut complete := false
 	defer {
 		if !complete {
@@ -623,7 +669,7 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 // Asahi Buffer::auto_grow reserves headroom from firmware's previous high
 // water mark: grow when twice the usage no longer fits, and target three
 // times usage. Only the non-memoryless portion participates in this policy.
-// Caller holds mgr.lock and the queue has no active render scene.
+// Caller holds mgr.lock. Existing scenes retain firmware ownership of Info.
 fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(mut buffer G13RenderBufferResources) bool {
 	if !buffer.initialized || buffer.stats.phys == 0
 		|| buffer.stats.size < sizeof(fw.G13BufferStats) {
@@ -641,7 +687,20 @@ fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(mut buffer G13RenderBufferResou
 	}
 	wanted := (used_pages * 3 + pages_per_block - 1) / pages_per_block
 	want_blocks := if wanted < limit { wanted } else { limit }
-	return mgr.ensure_g13_tvb_blocks(mut buffer, u32(want_blocks), false)
+	return mgr.ensure_g13_tvb_blocks(mut buffer, u32(want_blocks), buffer.active_scenes != 0)
+}
+
+// Caller holds mgr.lock. Idle queues and old slot associations cannot own a
+// firmware growth request, even when their last slot number matches.
+fn (mgr &GpuManager) g13_tvb_owner_locked(vm_slot u32, buffer_slot u32) ?&G13RenderBufferResources {
+	if vm_slot == 0 || buffer_slot >= fw.g13_tvb_slot_count || !mgr.g13_tvb_slots[buffer_slot] { return none }
+	for resources in mgr.g13_queues {
+		if resources.released || resources.vm == unsafe { nil } || resources.vm.id != vm_slot
+			|| !resources.render_buffer.initialized || !resources.render_buffer.slot_reserved
+			|| resources.render_buffer.active_scenes == 0 || resources.render_buffer.slot != buffer_slot { continue }
+		return unsafe { &resources.render_buffer }
+	}
+	return none
 }
 
 // Service firmware's synchronous tiled-buffer growth request. The ACK is
@@ -661,25 +720,17 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
 
 	mut found := false
 	mut grew := false
-	if event_msg.buffer_slot < fw.g13_tvb_slot_count && event_msg.vm_slot != 0 {
-		for resources in mgr.g13_queues {
-			if resources.released || resources.vm == unsafe { nil }
-				|| resources.vm.id != event_msg.vm_slot || !resources.render_buffer.initialized
-				|| resources.render_buffer.slot != event_msg.buffer_slot {
-				continue
-			}
-			found = true
-			mut buffer := unsafe { &resources.render_buffer }
-			current := u32(buffer.blocks.len)
-			target := if current > g13_tvb_max_blocks - u32(10) {
-				g13_tvb_max_blocks
-			} else {
-				current + u32(10)
-			}
-			if target > current {
-				grew = mgr.ensure_g13_tvb_blocks(mut buffer, target, true)
-			}
-			break
+	if owner := mgr.g13_tvb_owner_locked(event_msg.vm_slot, event_msg.buffer_slot) {
+		found = true
+		mut buffer := unsafe { owner }
+		current := u32(buffer.blocks.len)
+		target := if current > g13_tvb_max_blocks - u32(10) {
+			g13_tvb_max_blocks
+		} else {
+			current + u32(10)
+		}
+		if target > current {
+			grew = mgr.ensure_g13_tvb_blocks(mut buffer, target, true)
 		}
 	}
 	if !found {
@@ -1052,7 +1103,7 @@ fn (mut mgr GpuManager) allocate_g13_render_scene_locked(resources &G13QueueReso
 	}
 	mut buffer := unsafe { &resources.render_buffer }
 	if !mgr.auto_grow_g13_tvb_locked(mut buffer)
-		|| !mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, false) {
+		|| !mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, buffer.active_scenes != 0) {
 		return none
 	}
 	ctx := resources.vm
@@ -1084,6 +1135,7 @@ fn (mut mgr GpuManager) allocate_g13_render_scene_locked(resources &G13QueueReso
 		mgr.hw_config.firmware_abi, scene.user_buffer.va, resources.render_buffer.stats.va) {
 		return none
 	}
+	if !mgr.retain_g13_scene_slot_locked(mut buffer) { return none }
 	complete = true
 	return scene
 }
@@ -1142,9 +1194,10 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 		mgr.free_shared_buffer(mut job.vertex_microsequence)
 	}
 	mgr.release_g13_render_scene_backing_locked(mut job.scene, job.context, invalidate)
-	if job.queue != unsafe { nil } {
+	if job.scene_reserved {
 		mut queue := unsafe { job.queue }
-		queue.render_job_active = false
+		mgr.release_g13_scene_slot_locked(mut queue.render_buffer)
+		job.scene_reserved = false
 	}
 	mgr.g13_gpu_readonly.gc()
 	mgr.g13_private.gc()
@@ -1185,12 +1238,10 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		mgr.lock.release()
 	}
 	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13
-		|| mgr.g13_channels == unsafe { nil } || resources.released
-		|| resources.render_job_active {
+		|| mgr.g13_channels == unsafe { nil } || resources.released {
 		return none
 	}
 	mut queue := unsafe { resources }
-	queue.render_job_active = true
 	mut job := &G13RenderJobResources{
 		queue: unsafe { resources }
 		context: unsafe { resources.vm }
@@ -1217,6 +1268,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	job.vertex_event_sequence = vertex_event.sequence
 	job.fragment_event_sequence = fragment_event.sequence
 	job.scene = mgr.allocate_g13_render_scene_locked(resources, &tile) or { return none }
+	job.scene_reserved = true
 	job.tvb_size_bytes = u64(resources.render_buffer.blocks.len) * fw.g13_tvb_block_size
 	v13_5 := mgr.hw_config.firmware_abi == .v13_5_partial
 	vertex_size := fw.g13_vertex_active_size(mgr.hw_config.firmware_abi) or { return none }
@@ -1772,6 +1824,9 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 	fragment_outer.lock.acquire()
 
 	mut owned_queue := unsafe { queue }
+	block_count := u32(job.tvb_size_bytes / fw.g13_tvb_block_size)
+	include_init := owned_queue.render_buffer.needs_bind || owned_queue.render_buffer.bound_blocks < block_count
+	vertex_count := if include_init { u32(2) } else { u32(1) }
 	mut vertex_queue := &owned_queue.subqueues[0]
 	mut fragment_queue := &owned_queue.subqueues[1]
 	vertex_queue.lock.acquire()
@@ -1837,9 +1892,9 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		} else {
 			vertex_used := (vertex_inner_wp + fw.g13_workqueue_entries - vertex_done) % fw.g13_workqueue_entries
 			fragment_used := (fragment_inner_wp + fw.g13_workqueue_entries - fragment_done) % fw.g13_workqueue_entries
-			valid = fw.g13_workqueue_entries - vertex_used - 1 >= 2
+			valid = fw.g13_workqueue_entries - vertex_used - 1 >= vertex_count
 				&& fw.g13_workqueue_entries - fragment_used - 1 >= 2
-			vertex_inner_next = (vertex_inner_wp + 2) % fw.g13_workqueue_entries
+			vertex_inner_next = (vertex_inner_wp + vertex_count) % fw.g13_workqueue_entries
 			fragment_inner_next = (fragment_inner_wp + 2) % fw.g13_workqueue_entries
 		}
 	}
@@ -1851,7 +1906,7 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		return false
 	}
 
-	vertex_queue.command_sequence += 2
+	vertex_queue.command_sequence += vertex_count
 	fragment_queue.command_sequence += 2
 	vertex_queue.last_command_slot = (vertex_inner_next + fw.g13_workqueue_entries - 1) % fw.g13_workqueue_entries
 	fragment_queue.last_command_slot = (fragment_inner_next + fw.g13_workqueue_entries - 1) % fw.g13_workqueue_entries
@@ -1866,9 +1921,11 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		*fragment_entry_0 = job.barrier.va
 		*fragment_entry_1 = job.fragment.va
 		mut vertex_entry_0 := &u64(vertex_queue.ring.phys + higher_half + u64(vertex_inner_wp) * sizeof(u64))
-		mut vertex_entry_1 := &u64(vertex_queue.ring.phys + higher_half + u64((vertex_inner_wp + 1) % fw.g13_workqueue_entries) * sizeof(u64))
-		*vertex_entry_0 = job.init_buffer.va
-		*vertex_entry_1 = job.vertex.va
+		if include_init {
+			mut vertex_entry_1 := &u64(vertex_queue.ring.phys + higher_half + u64((vertex_inner_wp + 1) % fw.g13_workqueue_entries) * sizeof(u64))
+			*vertex_entry_0 = job.init_buffer.va
+			*vertex_entry_1 = job.vertex.va
+		} else { *vertex_entry_0 = job.vertex.va }
 	}
 	mut fragment_state := unsafe {
 		&fw.G13WorkQueueRingState(fragment_queue.state.cpu_address())
@@ -1877,6 +1934,10 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 	katomic.sync()
 	katomic.store(mut &fragment_state.cpu_wptr, fragment_inner_next)
 	katomic.store(mut &vertex_state.cpu_wptr, vertex_inner_next)
+	if include_init {
+		owned_queue.render_buffer.bound_blocks = block_count
+		owned_queue.render_buffer.needs_bind = false
+	}
 
 	fragment_message := fw.FwRunWorkQueueMsg{
 		pipe_type: 1

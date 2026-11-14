@@ -240,10 +240,10 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 	require_order(local_policy, ['katomic.load(&stats.max_pages)', 'katomic.store(mut &stats.reset, u32(1))',
 		'u64(g13_tvb_max_blocks_nomemless)', 'used_pages * 2', 'needed < limit',
 		'need_blocks <= u64(buffer.blocks.len)', 'used_pages * 3', 'wanted < limit',
-		'mgr.ensure_g13_tvb_blocks(mut buffer, u32(want_blocks), false)'], 'Vinix TVB feedback')!
+		'mgr.ensure_g13_tvb_blocks(mut buffer, u32(want_blocks), buffer.active_scenes != 0)'], 'Vinix TVB feedback')!
 	scene := section(local, 'fn (mut mgr GpuManager) allocate_g13_render_scene_locked(', 'fn (mut mgr GpuManager) free_g13_render_job_locked(', 'Vinix scene allocation')!
 	require_order(scene, ['mgr.auto_grow_g13_tvb_locked(mut buffer)',
-		'mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, false)',
+		'mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, buffer.active_scenes != 0)',
 		'scene.user_buffer ='], 'Vinix TVB feedback before scene allocation')!
 	growth := section(reference, '    pub(crate) fn ensure_blocks(', '    /// Create a new', 'Asahi TVB extension')!
 	require_order(growth, ['let mut new_blocks', 'ualloc.array_gpuonly(BLOCK_SIZE)',
@@ -254,7 +254,36 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 		'staged << block', 'mgr.flush_g13_uat_range', 'for index := u32(old_count)',
 		'buffer.blocks = staged', 'katomic.store(mut &control.total',
 		'katomic.store(mut &control.wptr', 'if !firmware_active'], 'Vinix staged TVB extension')!
+	reference_scene := section(reference, '    pub(crate) fn new_scene(', '    /// Increment the buffer', 'Asahi scene lifetime')!
+	require_order(reference_scene, ['if inner.active_slot.is_none()', 'inner.active_slot = Some(slot)',
+		'inner.active_scenes += 1'], 'Asahi scene slot retention')!
+	drop_scene := section(reference, 'impl Drop for Scene::ver', '/// Inner data for a single TVB', 'Asahi scene release')!
+	require_order(drop_scene, ['inner.active_scenes -= 1', 'if inner.active_scenes == 0',
+		'inner.active_slot = None'], 'Asahi last-scene slot release')!
+	local_scene := section(local, 'fn (mut mgr GpuManager) retain_g13_scene_slot_locked(', '// Caller holds mgr.lock. No submitted job', 'Vinix scene lifetime')!
+	require_order(local_scene, ['if buffer.active_scenes == 0', 'mgr.reserve_g13_tvb_slot()',
+		'buffer.active_scenes++', 'buffer.active_scenes--', 'if buffer.active_scenes == 0',
+		'mgr.g13_tvb_slots[buffer.slot] = false'], 'Vinix scene slot retention and release')!
+	slots := read(os.join_path(base, 'slotalloc.rs'))!
+	require_order(slots, ['if count == token.time', 'changed: false',
+		'if slot.drop_time < oldest_time'], 'Asahi unchanged-token and oldest-free policy')!
+	require_order(local_scene, ['mgr.g13_tvb_owners[buffer.slot] == buffer.info.va',
+		'mgr.reserve_g13_tvb_slot()'], 'Vinix unchanged-token preference')!
+	selection := section(local, 'fn (mut mgr GpuManager) reserve_g13_tvb_slot()', '// Caller holds mgr.lock. Buffer::new_scene', 'Vinix oldest-free policy')!
+	require_order(selection, ['mgr.g13_tvb_release_clock - mgr.g13_tvb_free_order[slot]',
+		'age > oldest_age', 'mgr.g13_tvb_slots[selected] = true'], 'Vinix oldest-free selection')!
+	require_order(scene, ['fw.initialize_g13_buffer_scene',
+		'mgr.retain_g13_scene_slot_locked(mut buffer)', 'complete = true'], 'Vinix scene lease after allocation')!
+	render := read(os.join_path(base, 'queue/render.rs'))!
+	require_order(render, ['if scene.rebind() || tvb_grown || tvb_autogrown',
+		'vtx_job.add(bind_buffer'], 'Asahi conditional TVB binding')!
+	publisher := section(local, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(', '// Transfer a prepared render pass', 'Vinix conditional TVB binding')!
+	require_order(publisher, ['include_init :=', 'vertex_count :=', 'if include_init',
+		'katomic.store(mut &vertex_state.cpu_wptr', 'owned_queue.render_buffer.needs_bind = false'], 'Vinix conditional TVB binding')!
 	return ['TVB page-use feedback, two/three-times headroom and non-memoryless cap',
 		'TVB feedback before minimum-dimension growth and scene allocation',
-		'TVB complete allocation before table and counter publication']
+		'TVB complete allocation before table and counter publication',
+		'TVB slot retained across active scenes and released by the final scene',
+		'TVB unchanged-token preference and oldest-free selection',
+		'TVB binding on slot acquisition or heap growth']
 }

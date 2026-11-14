@@ -106,6 +106,9 @@ mut:
 	g13_compute_jobs  []&G13ComputeJobResources
 	g13_render_jobs   []&G13RenderJobResources
 	g13_tvb_slots     [fw.g13_tvb_slot_count]bool
+	g13_tvb_owners    [fw.g13_tvb_slot_count]u64 // last BufferInfo identity, retained while idle
+	g13_tvb_free_order [fw.g13_tvb_slot_count]u64
+	g13_tvb_release_clock u64
 	g17_graph         &G17FirmwareGraph = unsafe { nil }
 	g17_queues        []&G17QueueResources
 	fwctl_lock        klock.Lock

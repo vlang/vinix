@@ -34,24 +34,42 @@ mut:
 
 struct G13QueueResources {
 mut:
-	subqueues         [3]G13SubQueueResources
-	render_job_active bool
+	subqueues     [3]G13SubQueueResources
+	render_buffer G13RenderBufferResources
+	vm            &mmu.UatContext = unsafe { nil }
+	released      bool
+}
+
+struct G13RenderBufferResources {
+mut:
+	info             SharedBuffer
+	initialized      bool = true
+	slot             u32
+	slot_reserved    bool
+	slot_token_valid bool
+	active_scenes    u32
+	needs_bind       bool
 }
 
 struct GpuManager {
 mut:
-	lock               klock.Lock
-	state              State = .running
-	g13_compute_jobs   []&G13ComputeJobResources
-	g13_render_jobs    []&G13RenderJobResources
-	g13_gpu_readonly   Collector
-	g13_private        Collector
-	g13_shared         Collector
-	invalidation_fails bool
-	retirement_fails   bool
-	retirements        int
-	freed_buffers      int
-	pending            int
+	lock                  klock.Lock
+	state                 State = .running
+	g13_compute_jobs      []&G13ComputeJobResources
+	g13_render_jobs       []&G13RenderJobResources
+	g13_gpu_readonly      Collector
+	g13_private           Collector
+	g13_shared            Collector
+	invalidation_fails    bool
+	retirement_fails      bool
+	retirements           int
+	freed_buffers         int
+	pending               int
+	g13_tvb_slots         [127]bool
+	g13_tvb_owners        [127]u64
+	g13_tvb_free_order    [127]u64
+	g13_tvb_release_clock u64
+	g13_queues            []&G13QueueResources
 }
 
 fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext, buffer &mmu.UatBuffer) bool {
@@ -135,7 +153,7 @@ fn (mut mgr GpuManager) compute_job(mut queue G13QueueResources, context &mmu.Ua
 fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.UatContext, completion &Completion) &G13RenderJobResources {
 	v := queue.subqueues[0].events.retain() or { panic('vertex event') }
 	f := queue.subqueues[1].events.retain() or { panic('fragment event') }
-	queue.render_job_active = true
+	assert mgr.retain_g13_scene_slot_locked(mut queue.render_buffer)
 	mut job := &G13RenderJobResources{
 		queue:                   unsafe { &queue }
 		context:                 unsafe { context }
@@ -145,6 +163,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 		fragment_stamp_value:    f.value
 		vertex_event_reserved:   true
 		fragment_event_reserved: true
+		scene_reserved:          true
 		vertex:                  SharedBuffer{ phys: 1 }
 		fragment:                SharedBuffer{ phys: 2 }
 		mappings_published:      true
@@ -156,6 +175,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_scene_slots()
 	mut stamps := [128]u32{}
 	mut firmware := [128]u32{}
 	assert event.configure_event_manager(0x10000, unsafe { u64(&stamps) }, 0x20000, unsafe { u64(&firmware) })
@@ -218,6 +238,31 @@ pub fn run_checks() {
 	stamps[render_complete.fragment_event_slot] = render_complete.fragment_stamp_value
 	mgr.reap_g13_render_jobs()
 	assert completion.calls == 1 && completion.ok && mgr.g13_render_jobs.len == 0 && mgr.pending == 0
+	// Overlapping scenes hold the same TVB lease. Completing one does not
+	// return the slot or either shared event until the other completes.
+	completion = Completion{}
+	second_completion = Completion{}
+	mut render_a := mgr.render_job(mut queue, &context, &completion)
+	mut render_b := mgr.render_job(mut queue, &context, &second_completion)
+	mut scenes := [render_a, render_b]!
+	for mut job in scenes {
+		assert queue.subqueues[0].events.publish(job.vertex_event_slot, job.vertex_stamp_value)
+		assert queue.subqueues[1].events.publish(job.fragment_event_slot, job.fragment_stamp_value)
+		job.submitted = true
+		job.vertex_retirement_sequence = 1
+		job.fragment_retirement_sequence = 1
+	}
+	assert queue.render_buffer.active_scenes == 2 && queue.render_buffer.slot_reserved
+	stamps[render_a.vertex_event_slot] = render_a.vertex_stamp_value
+	stamps[render_a.fragment_event_slot] = render_a.fragment_stamp_value
+	mgr.reap_g13_render_jobs()
+	assert completion.calls == 1 && second_completion.calls == 0
+	assert queue.render_buffer.active_scenes == 1 && queue.render_buffer.slot_reserved
+	stamps[render_b.vertex_event_slot] = render_b.vertex_stamp_value
+	stamps[render_b.fragment_event_slot] = render_b.fragment_stamp_value
+	mgr.reap_g13_render_jobs()
+	assert second_completion.calls == 1 && queue.render_buffer.active_scenes == 0
+	assert !queue.render_buffer.slot_reserved && !mgr.g13_tvb_slots[queue.render_buffer.slot]
 	// Shutdown releases backing of a caller-owned prepared job, but leaves
 	// the object valid for the caller's eventual discard.
 	completion = Completion{}
@@ -246,7 +291,7 @@ pub fn run_checks() {
 	assert completion.calls == 1 && mgr.g13_render_jobs.len == 1
 	mgr.invalidation_fails = false
 	mgr.reap_g13_render_jobs()
-	assert mgr.g13_render_jobs.len == 0 && !queue.render_job_active
+	assert mgr.g13_render_jobs.len == 0 && queue.render_buffer.active_scenes == 0
 	assert !queue.subqueues[0].events.busy() && !queue.subqueues[1].events.busy()
 	completion = Completion{}
 	_ = mgr.render_job(mut queue, &context, &completion)
@@ -254,8 +299,64 @@ pub fn run_checks() {
 	mgr.state = .stopped
 	mgr.release_all_g13_render_jobs()
 	assert completion.calls == 1 && mgr.g13_render_jobs.len == 0
-	assert !queue.render_job_active
+	assert queue.render_buffer.active_scenes == 0
 	assert !queue.subqueues[0].events.busy() && !queue.subqueues[1].events.busy()
 	event.reset_event_manager()
 	println('AGX job lifetimes: prepared ownership, shared-stamp retirement, failed invalidation, discard retry and firmware-stopped cleanup passed')
+}
+
+fn check_scene_slots() {
+	mut mgr := GpuManager{}
+	mut buffers := [128]G13RenderBufferResources{}
+	assert mgr.g13_tvb_slots.all(!it), 'idle queues must not reserve TVB slots'
+	for i in 0 .. 127 {
+		buffers[i].info.va = u64(i + 1) * 0x1000
+		assert mgr.retain_g13_scene_slot_locked(mut buffers[i])
+		assert buffers[i].slot == u32(i) && buffers[i].active_scenes == 1
+	}
+	assert !mgr.retain_g13_scene_slot_locked(mut buffers[127])
+	assert buffers[127].active_scenes == 0 && !buffers[127].slot_reserved
+	buffers[127].info.va = 0x80000
+	assert mgr.retain_g13_scene_slot_locked(mut buffers[0])
+	assert buffers[0].active_scenes == 2
+	mgr.release_g13_scene_slot_locked(mut buffers[0])
+	assert buffers[0].active_scenes == 1 && mgr.g13_tvb_slots[0]
+	mgr.release_g13_scene_slot_locked(mut buffers[0])
+	assert !mgr.g13_tvb_slots[0]
+	assert mgr.retain_g13_scene_slot_locked(mut buffers[127])
+	assert buffers[127].slot == 0
+	for i in 1 .. 128 { mgr.release_g13_scene_slot_locked(mut buffers[i]) }
+	assert mgr.g13_tvb_slots.all(!it)
+	// The hint is reused without rebinding only when no intervening owner
+	// used the slot, and an unpublished binding remains required.
+	buffers[0].needs_bind = false
+	assert mgr.retain_g13_scene_slot_locked(mut buffers[0])
+	assert buffers[0].needs_bind, 'another buffer used the previous slot'
+	assert buffers[0].slot == 1, 'a changed token must select the oldest free slot'
+	buffers[0].needs_bind = false
+	mgr.release_g13_scene_slot_locked(mut buffers[0])
+	assert mgr.retain_g13_scene_slot_locked(mut buffers[0])
+	assert !buffers[0].needs_bind, 'an unchanged token retains its firmware binding'
+	mgr.release_g13_scene_slot_locked(mut buffers[0])
+	buffers[0].needs_bind = true
+	assert mgr.retain_g13_scene_slot_locked(mut buffers[0])
+	mgr.release_g13_scene_slot_locked(mut buffers[0])
+	assert mgr.retain_g13_scene_slot_locked(mut buffers[0])
+	assert buffers[0].needs_bind, 'canceled first bind must not be mistaken for a published bind'
+	mgr.release_g13_scene_slot_locked(mut buffers[0])
+	mut vm := mmu.UatContext{}
+	mut stale := G13QueueResources{ vm: &vm }
+	mut live := G13QueueResources{ vm: &vm }
+	mgr.g13_queues = [&stale, &live]
+	assert mgr.retain_g13_scene_slot_locked(mut stale.render_buffer)
+	mgr.release_g13_scene_slot_locked(mut stale.render_buffer)
+	assert mgr.g13_tvb_owner_locked(vm.id, stale.render_buffer.slot) == none
+	assert mgr.retain_g13_scene_slot_locked(mut live.render_buffer)
+	stale.render_buffer.slot = live.render_buffer.slot
+	owner := mgr.g13_tvb_owner_locked(vm.id, live.render_buffer.slot) or { panic('live scene owner') }
+	assert owner == &live.render_buffer
+	assert mgr.g13_tvb_owner_locked(vm.id + 1, live.render_buffer.slot) == none
+	live.released = true
+	assert mgr.g13_tvb_owner_locked(vm.id, live.render_buffer.slot) == none
+	mgr.release_g13_scene_slot_locked(mut live.render_buffer)
 }

@@ -109,6 +109,7 @@ mut:
 	priority     u32
 	channel_mask u32 = 7
 	subqueues    [3]G13Subqueue
+	render_buffer G13RenderBufferResources
 }
 
 struct Context {
@@ -121,13 +122,16 @@ mut:
 	initialized bool = true
 	stats SharedBuffer
 	blocks []u8
+	active_scenes u32
+	needs_bind bool = true
+	bound_blocks u32
 }
 
 // Allocation is the injected service here; the production feedback policy
 // must request the correct target and reset statistics before calling it.
 fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResources,
 	minimum u32, firmware_active bool) bool {
-	assert !firmware_active
+	assert firmware_active == (buffer.active_scenes != 0)
 	assert unsafe { &fw.G13BufferStats(buffer.stats.cpu_address()) }.reset == 1
 	mgr.tvb_calls++
 	mgr.tvb_target = minimum
@@ -155,6 +159,7 @@ mut:
 	released bool
 	vertex_stamp_value u32
 	fragment_stamp_value u32
+	tvb_size_bytes u64
 }
 
 struct G13ComputeJobResources {
@@ -346,6 +351,14 @@ fn check_tvb_feedback() {
 	mgr.tvb_grow_fails = true
 	assert !mgr.auto_grow_g13_tvb_locked(mut failing)
 	assert mgr.tvb_calls == 1 && failing.blocks.len == 10
+	mut active_stats := fw.G13BufferStats{max_pages: 43}
+	mut active := G13RenderBufferResources{
+		stats: SharedBuffer{phys: u64(&active_stats), size: sizeof(fw.G13BufferStats)}
+		blocks: []u8{len: 10}
+		active_scenes: 2
+	}
+	mgr.tvb_grow_fails = false
+	assert mgr.auto_grow_g13_tvb_locked(mut active)
 	println('G13 TVB feedback: threshold, rounding, reset, cap and allocation failure passed')
 }
 
@@ -527,6 +540,7 @@ fn check_publishers() {
 			fragment:    SharedBuffer{ va: 22 }
 			init_buffer: SharedBuffer{ va: 33 }
 			vertex:      SharedBuffer{ va: 44 }
+			tvb_size_bytes: 8 * fw.g13_tvb_block_size
 		}
 		before := katomic.barriers()
 		published := mgr.publish_g13_render_job_locked(mut job)
@@ -537,11 +551,26 @@ fn check_publishers() {
 			assert vertex_outer.write_ptr == 1 && fragment_outer.write_ptr == 1
 			assert job.vertex_ring_slot == 1 && job.fragment_ring_slot == 1
 			assert job.vertex_retirement_sequence == 2 && job.fragment_retirement_sequence == 2
+			assert resources.render_buffer.bound_blocks == 8 && !resources.render_buffer.needs_bind
+			job.vertex.va = 55
+			job.init_buffer.va = 66
+			assert mgr.publish_g13_render_job_locked(mut job)
+			assert vertex_ring[2] == 55 && vertex_ring[3] == 0, 'unchanged TVB must not be rebound between overlapping scenes'
+			assert vertex_state.cpu_wptr == 3 && job.vertex_retirement_sequence == 3
+			assert fragment_state.cpu_wptr == 4 && job.fragment_retirement_sequence == 4
+			job.tvb_size_bytes = 16 * fw.g13_tvb_block_size
+			job.vertex.va = 88
+			job.init_buffer.va = 77
+			assert mgr.publish_g13_render_job_locked(mut job)
+			assert vertex_ring[3] == 77 && vertex_ring[4] == 88
+			assert resources.render_buffer.bound_blocks == 16 && vertex_state.cpu_wptr == 5
+			assert job.vertex_retirement_sequence == 5 && job.fragment_retirement_sequence == 6
 		} else {
 			assert !published && mgr.state == .error && mgr.rings == 0
 			assert katomic.barriers() == before
 			assert vertex_ring == [1280]u64{} && fragment_ring == [1280]u64{}
 			assert vertex_messages[0].work_queue_addr == 0 && fragment_messages[0].work_queue_addr == 0
+			assert resources.render_buffer.needs_bind && resources.render_buffer.bound_blocks == 0
 		}
 		// Every failure path must have released the locks it reserved.
 		mgr.channels.pipes[0].lock.acquire()

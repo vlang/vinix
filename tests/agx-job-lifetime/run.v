@@ -27,6 +27,8 @@ fn main() {
 	production += section(source, 'struct G13SubQueueResources {', 'struct G13RenderBufferResources {')!
 	production += section(source, 'pub struct G13ComputeJobResources {', 'pub struct G13QueueResources {')!
 	for pair in [
+		['fn (mut mgr GpuManager) reserve_g13_tvb_slot()', '// Caller holds mgr.lock. No submitted job'],
+		['fn (mgr &GpuManager) g13_tvb_owner_locked(', '// Service firmware'],
 		['fn (mut mgr GpuManager) release_g13_render_scene_backing_locked(',
 			'fn (mut mgr GpuManager) free_g13_render_scene_locked('],
 		['fn (mut mgr GpuManager) free_g13_render_job_locked(', '// Construct the complete paired'],

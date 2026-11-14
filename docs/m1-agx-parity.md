@@ -109,8 +109,8 @@ These are implementation gaps, not items certified by a passing source gate.
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
 | Submission scheduling | Vinix accepts at most two commands in the compute-then-render form and waits on dependencies in the ioctl. The reference accepts general batches through DRM scheduling, with multiple in-flight jobs and per-subqueue barriers. |
-| Render scenes | Vinix retains one active render scene per queue. The reference manages scene slots and shared TVB lifetime across overlapping work. |
-| TVB ownership and growth | Complete staged heap extension is implemented below. Vinix still retains its slot for the queue's lifetime; the reference uses scene-bound slot ownership. |
+| Render scenes | The backend supports overlapping scene ownership and conditional buffer binding as described below. The active userspace submission path still serializes work. |
+| TVB ownership and growth | Complete staged extension and scene-bound slot ownership are implemented below. The reference also shares and caches tail-pointer backing across scenes; Vinix still allocates it per scene. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
 | Timestamp UAPI | The reference's per-command timestamp objects and current compact command fields are not wired through Vinix's legacy command interface. |
@@ -204,6 +204,36 @@ The sibling inventory SHA-256 is
 `6f8dd754bed0e2a6b6d22139e501e7472dc1540bcb9919bd5e1427aa2b98c4f7`;
 the linked kernel SHA-256 is
 `960fe9df419d8af974fc0ea3c1ac52bb23fa435d81b64db67efdc3f186d887bc`.
+Use the retained checker with `check-inventory BUNDLE RECEIPT`.
+
+### Scene-bound TVB ownership and binding
+
+The backend now acquires a slot after complete scene allocation, shares it
+across overlapping scenes, and releases it after the last scene's backing
+retires. An unchanged idle token preserves its binding; displaced tokens
+select the oldest free slot. Vertex publication includes InitBuffer when a
+binding or heap extension requires it. Canceling the first unpublished scene
+does not lose the surviving scene's required bind. GrowTVB selects only a
+live, reserved scene owner matching the firmware's VM and slot.
+
+Sanitizer fixtures cover slot exhaustion, overlap, cancellation, final release,
+binding reuse/growth, oldest-free selection and stale ownership. The actual
+owner selector is executed; GrowTVB ACK transport is checked separately. The
+reference contract/unit checks, lifetime review and isolated ARM build passed.
+The build uses `bbcd8e85a` plus the retained `g13.v` and `gpu.v`. The active
+legacy userspace path still serializes submissions. TPC reuse and complete
+scheduler backpressure remain gaps.
+
+Fresh package HEAD `1438c19ff34c53704ad8cf295dedb8ae47936a59` retains kernel
+pin `bed544bdf93a496ebf70ba180923bab12b6e01cf` and Mesa pin
+`b7b03c5b3b8abe1e040d6056dc62c01b02d3639c`. The refreshed audit remains
+`not_equivalent`; no hardware was accessed. Sources, audit output, tests and
+kernel are retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-scene-ownership-20261114/bundle/`.
+The sibling inventory SHA-256 is
+`6185bd5331cceb589c3429697777a231f8da3c0b8836d1d59aaaa1bc75f5cc75`;
+the linked kernel SHA-256 is
+`ec48ec1c51dea4063b75ae89265815c82a6b7fe6a6a4eb92fea47c7425db2513`.
 Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 
 ## Validation and continuation
