@@ -45,6 +45,22 @@ fn set_bit(mut set [fd_set_words]u64, fd int) {
 	set[fd / 64] |= u64(1) << u64(fd % 64)
 }
 
+// Select rejects closed slots before polling any resource or publishing any
+// output. Borrow only the table's slot values under its lock; ppoll retains
+// its own references afterwards. An open O_PATH slot is valid at this stage.
+fn select_fds_open(process &proc.Process, polls []PollFD) bool {
+	mut target := unsafe { process }
+	target.fds_lock.acquire()
+	defer { target.fds_lock.release() }
+	for poll in polls {
+		if poll.fd < 0 || int(poll.fd) >= target.fds.len
+			|| target.fds[int(poll.fd)] == unsafe { nil } {
+			return false
+		}
+	}
+	return true
+}
+
 // pselect6(nfds, readfds, writefds, exceptfds, timeout, sigmask).
 //
 // The descriptors are gathered into the same PollFD list ppoll() works on, so
@@ -158,6 +174,10 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 		indexes << fd
 	}
 
+	if polls.len != 0 && !select_fds_open(current_thread.process, polls) {
+		return errno.err, errno.ebadf
+	}
+
 	if polls.len == 0 {
 		// Nothing to watch: this is select() being used purely as a sleep.
 		if !timed {
@@ -197,21 +217,23 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 
 	// Linux counts ready bits across all three sets, including when one
 	// descriptor appears in more than one returned set.
+	// An open O_PATH handle, or a close after slot validation, can produce
+	// POLLNVAL from ppoll. Linux select reports it in every requested set.
 	for i := 0; i < polls.len; i++ {
 		revents := polls[i].revents
 		fd := indexes[i]
 
 		// An error or a hangup makes a descriptor readable as far as select is
 		// concerned, so that the caller goes and finds out what happened.
-		if revents & i16(pollin | pollhup | pollerr) != 0 && is_set(want_read, fd) {
+		if revents & i16(pollin | pollhup | pollerr | pollnval) != 0 && is_set(want_read, fd) {
 			set_bit(mut got_read, fd)
 			count++
 		}
-		if revents & i16(pollout | pollerr) != 0 && is_set(want_write, fd) {
+		if revents & i16(pollout | pollerr | pollnval) != 0 && is_set(want_write, fd) {
 			set_bit(mut got_write, fd)
 			count++
 		}
-		if revents & i16(pollpri) != 0 && is_set(want_except, fd) {
+		if revents & i16(pollpri | pollnval) != 0 && is_set(want_except, fd) {
 			set_bit(mut got_except, fd)
 			count++
 		}

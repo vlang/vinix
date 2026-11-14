@@ -30,6 +30,13 @@ aliases, multiple descriptors, raw/musl APIs, guards and repeated cleanup.
 The socket count fix is qualified separately; the retained regular-file
 readiness failure remains a failing result. See [results and limits](../../docs/linux-select-ready-counts.md).
 
+`--cases selectfds,selectbad` checks closed-descriptor EBADF before output,
+read-only error bitmaps, open O_PATH readiness across all requested sets,
+regular-file controls and flat repeated cleanup. The registered fixtures pass
+on both native architectures. `selectfds-reference.v` boots the unchanged
+probe ELF on Linux, and `selectfds-evidence.v` audits the complete retained
+bundle and generated-C scope. See [results and limits](../../docs/linux-select-descriptors.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

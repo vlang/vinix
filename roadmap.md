@@ -2273,6 +2273,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and independent lifetime review pass; the unchanged global allocation-policy
   failures remain visible. See [the exec ownership qualification](docs/linux-exec-ownership.md).
 
+- [x] Reject selected closed native select/pselect6 descriptors with EBADF before
+  output, and preserve Linux O_PATH readiness in every requested set. Identical
+  native/Linux ELFs pass 54,252 AArch64 / 72,336 x86-64 checks, including readonly
+  error buffers and restored masks. Both 200-cycle credential cohorts retain
+  flat storage; nine selected regression cases pass per architecture. See
+  [the descriptor qualification](docs/linux-select-descriptors.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
