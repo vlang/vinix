@@ -2108,9 +2108,14 @@ the compiler's `-d track_heap` hooks. Build with `-gc none -manualfree
 -enable-globals -prod`, then run `HEAP FRESH_ROOT [ROWS]` (1–900 rows). Its fixed
 tracker checks allocation/free hooks, 100 structural reviews, 100 idle rechecks,
 100 capture/idempotent-migration/close cycles and one complete retarget/close.
-Each measured phase requires zero retained objects and bytes. This single-thread
-host probe excludes fixture setup, libc allocations, package-service admission
-and kernel memory. It does not establish whole-launch leak freedom.
+It also checks 100 refusals each for personal DLLs, empty assets, competing
+captures and personal stage files, releasing each returned error. These phases
+require zero retained objects/bytes, unchanged descriptor availability under a
+verified process-local 32-FD soft limit, preserved personal contents and a
+successful fresh capture afterward. A held-descriptor control calibrates the
+descriptor counter. This single-thread host probe excludes fixture setup, libc
+allocations, package-service admission and kernel memory. It does not establish
+whole-launch leak freedom or cover every error path.
 
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command

@@ -5,6 +5,16 @@ module main
 import os
 import tools.packages.wineadapter
 
+#include <sys/resource.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <errno.h>
+struct C.rlimit { mut: rlim_cur u64 rlim_max u64 }
+fn C.getrlimit(i32, &C.rlimit) i32
+fn C.setrlimit(i32, &C.rlimit) i32
+fn C.open(&char, i32, ...i32) i32
+fn C.close(i32) i32
+
 struct HeapSlot { mut: pointer u64 bytes u64 }
 __global (
 	heap_slots [65536]HeapSlot
@@ -95,6 +105,104 @@ fn sample(data string, builtins string, store string, cycles int) ! {
 	require_empty('capture-repeat-close', cycles)!
 }
 
+fn refused_capture(data string, builtins string, store string, expected string) ! {
+	if mut unexpected := wineadapter.capture_idle_binding_review(data, builtins, store) {
+		unexpected.close()
+		return error('unsafe capture unexpectedly succeeded')
+	} else {
+		matches := err.msg().contains(expected)
+		unsafe { err.free() }
+		if !matches { return error('capture refusal reason differs') }
+	}
+}
+
+// Count available descriptors without /proc or allocation. The process has a
+// verified soft limit of 32. Always close only the descriptors opened here.
+fn spare_descriptors() !int {
+	mut fds := [32]i32{}
+	mut count := 0
+	defer { for index in 0 .. count { C.close(fds[index]) } }
+	for count < fds.len {
+		fd := C.open(c'/dev/null', C.O_RDONLY | C.O_CLOEXEC)
+		if fd < 0 {
+			if C.errno != C.EMFILE { return error('descriptor probe failed before the soft limit') }
+			return count
+		}
+		fds[count] = fd
+		count++
+	}
+	return error('descriptor probe did not reach the soft limit')
+}
+
+fn require_descriptors(expected int) ! {
+	if spare_descriptors()! != expected { return error('refusal phase retained descriptors') }
+}
+
+fn verify_descriptor_probe() ! {
+	before := spare_descriptors()!
+	fd := C.open(c'/dev/null', C.O_RDONLY | C.O_CLOEXEC)
+	if fd < 0 { return error('cannot create descriptor control') }
+	defer { C.close(fd) }
+	require_descriptors(before - 1)!
+}
+
+fn sample_refusals(data string, builtins string, store string, cycles int) ! {
+	link := data + '/wine/drive_c/windows/system32/0.dll'
+	os.rm(link)!
+	os.write_file(link, 'personal DLL')!
+	initial_fds := spare_descriptors()!
+	heap_enabled = true
+	for _ in 0 .. cycles {
+		refused_capture(data, builtins, store, 'requires existing bounded symlinks') or { heap_enabled = false; return err }
+	}
+	require_empty('personal-file-refusal', cycles)!
+	require_descriptors(initial_fds)!
+	if os.read_file(link)! != 'personal DLL' { return error('refusal changed personal DLL') }
+	os.rm(link)!; os.symlink(builtins + '/0.dll', link)!
+	os.write_file(builtins + '/0.dll', '')!
+	heap_enabled = true
+	for _ in 0 .. cycles {
+		refused_capture(data, builtins, store, 'between 1 byte and 64 MiB') or { heap_enabled = false; return err }
+	}
+	require_empty('empty-asset-refusal', cycles)!
+	require_descriptors(initial_fds)!
+	if os.file_size(builtins + '/0.dll') != 0 || os.readlink(link)! != builtins + '/0.dll' {
+		return error('refusal changed empty asset or prefix link')
+	}
+	os.write_file(builtins + '/0.dll', 'marker')!
+	mut owner := wineadapter.capture_idle_binding_review(data, builtins, store)!
+	defer { owner.close() }
+	held_fds := spare_descriptors()!
+	heap_enabled = true
+	for _ in 0 .. cycles {
+		refused_capture(data, builtins, store, 'already has a managed launch') or { heap_enabled = false; return err }
+	}
+	require_empty('competing-capture-refusal', cycles)!
+	require_descriptors(held_fds)!
+	owner.recheck()!
+	stage := data + '/wine/.vinix-builtin-next'
+	os.write_file(stage, 'personal stage')!
+	heap_enabled = true
+	for _ in 0 .. cycles {
+		mut refused := false
+		owner.migrate_bindings() or {
+			refused = err.msg().contains('stage must be a bounded symlink')
+			unsafe { err.free() }
+		}
+		if !refused { heap_enabled = false; return error('personal stage migration refusal differs') }
+	}
+	require_empty('personal-stage-refusal', cycles)!
+	require_descriptors(held_fds)!
+	if os.read_file(stage)! != 'personal stage' { return error('refusal changed personal stage') }
+	os.rm(stage)!
+	owner.close()
+	mut recovered := wineadapter.capture_idle_binding_review(data, builtins, store)!
+	recovered.migrate_bindings() or { recovered.close(); return err }
+	recovered.close()
+	require_descriptors(initial_fds)!
+	println('WINE BINDING REFUSALS PASS four phases; heap and descriptor release; preserved personal data; recapture')
+}
+
 fn run() ! {
 	$if track_heap ? {} $else { return error('compile with -d track_heap -gc none -manualfree -enable-globals') }
 	verify_hooks()!
@@ -103,6 +211,18 @@ fn run() ! {
 	if rows < 1 || rows > 900 { return error('row count must be between 1 and 900') }
 	root := os.abs_path(os.args[1])
 	if os.exists(root) || os.is_link(root) { return error('fresh fixture required') }
+	mut original_limit := C.rlimit{}
+	if C.getrlimit(C.RLIMIT_NOFILE, unsafe { &original_limit }) != 0 || original_limit.rlim_cur < 32 {
+		return error('descriptor probe requires an available 32-FD soft limit')
+	}
+	limited := C.rlimit{rlim_cur: 32, rlim_max: original_limit.rlim_max}
+	if C.setrlimit(C.RLIMIT_NOFILE, unsafe { &limited }) != 0 { return error('cannot set descriptor probe soft limit') }
+	defer { C.setrlimit(C.RLIMIT_NOFILE, unsafe { &original_limit }) }
+	mut current_limit := C.rlimit{}
+	if C.getrlimit(C.RLIMIT_NOFILE, unsafe { &current_limit }) != 0 || current_limit.rlim_cur != 32 {
+		return error('descriptor probe soft limit differs')
+	}
+	verify_descriptor_probe()!
 	store := root + '/store'
 	builtins := store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
 	data := root + '/data'
@@ -111,6 +231,7 @@ fn run() ! {
 	mut prefix := wineadapter.prepare_prefix(data, builtins)!
 	prefix.close()
 	sample(data, builtins, store, 100)!
+	sample_refusals(data, builtins, store, 100)!
 	selected := store + '/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows'
 	os.mkdir_all(selected)!
 	for index in 0 .. rows { os.write_file(selected + '/' + index.str() + '.dll', 'new marker')! }
