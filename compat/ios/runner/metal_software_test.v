@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'looping', 'switching', 'oversized_switch', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1291,15 +1291,15 @@ fn sm_test_compute_library(label string) ![]u8 {
 		typ := if name in ['float_sum', 'float_max', 'bad_flags'] { 'float' } else { 'i32' }
 		op := if name == 'float_sum' { 'fadd' } else if name == 'divide' { 'udiv' } else if name == 'bad_flags' { 'fadd nnan' } else if name in ['flagged_sum', 'frozen_sum'] { 'add nuw nsw' } else { 'add' }
 		prior := if name == 'divide' { 'store i32 17, ptr addrspace(1) %out, align 4\n' } else { '' }
-		indexed := name == 'indexed_sum'
-		gep := if indexed { '%ai = getelementptr inbounds i32, ptr addrspace(2) %a, i64 2\n %bi = getelementptr inbounds i32, ptr addrspace(2) %b, i64 1\n %di = getelementptr inbounds i32, ptr addrspace(1) %out, i64 3\n' } else { '' }
+		indexed := name in ['indexed_sum', 'backward_sum']
+		gep := if name == 'backward_sum' { '%ab = getelementptr inbounds i32, ptr addrspace(2) %a, i64 4\n %bb = getelementptr inbounds i32, ptr addrspace(2) %b, i64 3\n %db = getelementptr inbounds i32, ptr addrspace(1) %out, i64 5\n %ai = getelementptr inbounds i32, ptr addrspace(2) %ab, i64 -2\n %bi = getelementptr nusw i32, ptr addrspace(2) %bb, i8 -2\n %di = getelementptr i32, ptr addrspace(1) %db, i16 -2\n' } else if indexed { '%ai = getelementptr inbounds i32, ptr addrspace(2) %a, i64 2\n %bi = getelementptr inbounds i32, ptr addrspace(2) %b, i64 1\n %di = getelementptr inbounds i32, ptr addrspace(1) %out, i64 3\n' } else { '' }
 		a := if indexed { '%ai' } else { '%a' }; b := if indexed { '%bi' } else { '%b' }; dst := if indexed { '%di' } else { '%out' }
 		cmp := if name == 'max' { 'icmp sgt' } else { 'fcmp ogt' }
 		compute := if name in ['max', 'float_max'] { '%c = ${cmp} ${typ} %x, %y\n %v = select i1 %c, ${typ} %x, ${typ} %y\n' } else if name == 'frozen_sum' { '%bad = ${op} i32 %x, %y\n %v = freeze i32 %bad\n' } else { '%v = ${op} ${typ} %x, %y\n' }
 		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n ${gep}%x = load ${typ}, ptr addrspace(2) ${a}, align 4\n %y = load ${typ}, ptr addrspace(2) ${b}, align 4\n ${prior}${compute}store ${typ} %v, ptr addrspace(1) ${dst}, align 4\n ret void\n}\n')
 	}
-	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340, !350, !360, !370, !380, !390, !400, !410, !420, !430, !440, !450, !460, !470}\n')
-	for i, name in names[..48] {
+	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340, !350, !360, !370, !380, !390, !400, !410, !420, !430, !440, !450, !460, !470, !480}\n')
+	for i, name in names[..49] {
 		n := i * 10
 		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n!${n + 1} = !{}\n')
 		if name == 'empty' { source.write_string('!${n + 2} = !{}\n'); continue }
@@ -1389,23 +1389,27 @@ fn test_software_metal_compute() {
 		assert unsafe { *(&u32(outp + 12)) } == 42 && unsafe { *(&u32(cp + 16)) } == 42 && unsafe { *(&u32(cp)) } == 0
 		for i in 0 .. 32 { if i < 12 || i >= 16 { assert unsafe { *(&u8(outp + u64(i))) } == 0xcc } }
 		objc_release(command)
-		indexed_command := sm_send(queue, c'commandBuffer'); ie := sm_send(indexed_command, c'computeCommandEncoder')
-		ip := sm_test_compute_pipeline(d, library, 'indexed_sum', unsafe { nil }); assert ip != 0
-		unsafe { SMSet(voidptr(C.ios_objc_msgsend))(ie, c'setComputePipelineState:', ip) }
-		sm_test_compute_buffer(ie, a, 4, 0); sm_test_compute_buffer(ie, b, 8, 3); sm_test_compute_buffer(ie, output, 4, 7)
-		// Derived extents must reject before recording, including when a
-		// binding's base offset alone fits the buffer.
-		child := C.fork(); assert child >= 0
-		if child == 0 {
-			C.close(1); C.close(2)
-			sm_test_compute_buffer(ie, output, 20, 7)
-			sm_test_compute_dispatch(ie, c'dispatchThreads:threadsPerThreadgroup:', 1); C._exit(0)
+		for indexed_kernel in ['indexed_sum', 'backward_sum'] {
+			unsafe { *(&u32(outp + 16)) = 0xcccccccc }
+			indexed_command := sm_send(queue, c'commandBuffer'); ie := sm_send(indexed_command, c'computeCommandEncoder')
+			ip := sm_test_compute_pipeline(d, library, indexed_kernel, unsafe { nil }); assert ip != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(ie, c'setComputePipelineState:', ip) }
+			sm_test_compute_buffer(ie, a, 4, 0); sm_test_compute_buffer(ie, b, 8, 3); sm_test_compute_buffer(ie, output, 4, 7)
+			// Derived extents must reject before recording, including when a
+			// binding's base offset alone fits the buffer.
+			child := C.fork(); assert child >= 0
+			if child == 0 {
+				C.close(1); C.close(2)
+				sm_test_compute_buffer(ie, output, 20, 7)
+				sm_test_compute_dispatch(ie, c'dispatchThreads:threadsPerThreadgroup:', 1); C._exit(0)
+			}
+			mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
+			sm_test_compute_dispatch(ie, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(ie, c'endEncoding'); objc_release(ip)
+			unsafe { *(&u32(ap + 12)) = 101; *(&u32(bp + 12)) = 203 }
+			assert unsafe { *(&u32(outp + 16)) } == u32(0xcccccccc)
+			sm_call(indexed_command, c'commit'); assert sm_send(indexed_command, c'status') == 4
+			assert unsafe { *(&u32(outp + 16)) } == 304 && unsafe { *(&u32(outp + 12)) } == 42
 		}
-		mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 256
-		sm_test_compute_dispatch(ie, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(ie, c'endEncoding'); objc_release(ip)
-		unsafe { *(&u32(ap + 12)) = 101; *(&u32(bp + 12)) = 203 }
-		sm_call(indexed_command, c'commit'); assert sm_send(indexed_command, c'status') == 4
-		assert unsafe { *(&u32(outp + 16)) } == 304 && unsafe { *(&u32(outp + 12)) } == 42
 		maximum := sm_send(queue, c'commandBuffer'); me := sm_send(maximum, c'computeCommandEncoder')
 		for i, name in ['max', 'float_max'] {
 			mp := sm_test_compute_pipeline(d, library, name, unsafe { nil }); assert mp != 0
@@ -1788,7 +1792,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/backward-gep/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {

@@ -47,8 +47,8 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	op := p.instructions[index]
 	plan := p.gep_offset_plan(stream, pools, bodies, layouts, index)!
 	defer { plan.free() }
-	// Forward offsets under the buffer limit cannot wrap or change the high
-	// pointer bits. This deliberately excludes negative/truncated/wide indexes.
+	// Keep every address within the argument's extent without index-width wrap.
+	// Negative indexes are limited to a single scalar-element subtraction.
 	if plan.pointer_bits != 64 || plan.index_bits != 64 || gep_fixed(layouts, op.source_type)!.alloc_size > 64 * 1024 * 1024 { return error('AIR memory execution: GEP layout profile') }
 	mut offset := base.offset
 	if plan.constant_offset > u64(64 * 1024 * 1024) - offset { return error('AIR memory execution: GEP offset limit') }
@@ -60,7 +60,14 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 		constant := pools.constants[value.constant_index]
 		if constant.kind !in [.zero, .integer]! || constant.splat { return error('AIR memory execution: defined GEP index required') }
 		bits := pools.scalar_bits(value.constant_index)! & constant_mask(term.bits)
-		if bits & (u64(1) << (term.bits - 1)) != 0 { return error('AIR memory execution: forward GEP index required') }
+		if bits & (u64(1) << (term.bits - 1)) != 0 {
+			if op.operands_count != 2 || plan.terms.len != 1 || plan.constant_offset != 0 || op.flags & 4 != 0 { return error('AIR memory execution: backward scalar GEP profile') }
+			p.execution_bits(op.source_type, true)!
+			magnitude := (u64(0) - bits) & constant_mask(term.bits)
+			if term.stride != 0 && magnitude > offset / term.stride { return error('AIR memory execution: backward GEP underflow') }
+			offset -= magnitude * term.stride
+			continue
+		}
 		if term.stride != 0 && bits > (u64(64 * 1024 * 1024) - offset) / term.stride { return error('AIR memory execution: GEP offset limit') }
 		offset += bits * term.stride
 	}
@@ -153,7 +160,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			base := p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
 			pointer := p.memory_gep(stream, pools, bodies, layouts, index, base)!
 			pointers[int(inst.next_value - s.base_id)] = pointer
-			// All GEP intermediates are forward within this extent. This also
+			// All GEP intermediates stay within this extent. This also
 			// proves inbounds for unused pointers, including a one-past result.
 			if pointer.offset > arguments[pointer.argument].minimum_size { arguments[pointer.argument].minimum_size = pointer.offset }
 			continue
