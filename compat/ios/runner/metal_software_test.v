@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'disjoint', 'disjoint_frozen', 'samesign', 'samesign_frozen', 'cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_convert', 'saturating_convert_frozen', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'disjoint', 'disjoint_frozen', 'samesign', 'samesign_frozen', 'cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen', 'constant_lane', 'constant_lane_frozen', 'bad_lane_count', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_convert', 'saturating_convert_frozen', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1164,6 +1164,13 @@ fn sm_test_compute_library(label string) ![]u8 {
 	}
 	for bits in [16, 32] { for op in ['fptosi', 'fptoui'] { typ := if bits == 16 { 'half' } else { 'float' }; source.write_string('declare i32 @llvm.${op}.sat.i32.f${bits}(${typ})\n') } }
 	for name in names {
+		if name == 'bad_lane_count' {
+			source.write_string('define void @bad_lane_count(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { store i32 17, ptr addrspace(1) %out, align 4\n %v = extractelement <17 x i32> zeroinitializer, i32 0\n ret void }\n'); continue
+		}
+		if name in ['constant_lane', 'constant_lane_frozen'] {
+			choice := if name.ends_with('_frozen') { '%i = freeze i32 %bi\n %f = freeze float %bf\n %h = freeze half %bh' } else { '%i = add i32 %bi, 0\n %f = select i1 true, float %bf, float 0.0\n %h = select i1 true, half %bh, half 0.0' }
+			source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %index = load i32, ptr addrspace(2) %a, align 4\n %bi = extractelement <4 x i32> <i32 7, i32 11, i32 13, i32 17>, i32 %index\n %bf = extractelement <4 x float> <float 1.5, float -0.0, float bitcast (i32 2139095041 to float), float bitcast (i32 2143363909 to float)>, i32 %index\n %bh = extractelement <4 x half> <half 0xH3E00, half 0xH8000, half 0xH7C01, half 0xH7E55>, i32 %index\n ${choice}\n %fb = bitcast float %f to i32\n %hb = bitcast half %h to i16\n %hw = zext i16 %hb to i32\n store i32 %i, ptr addrspace(1) %out, align 4\n %d1 = getelementptr i32, ptr addrspace(1) %out, i64 1\n store i32 %fb, ptr addrspace(1) %d1, align 4\n %d2 = getelementptr i32, ptr addrspace(1) %out, i64 2\n store i32 %hw, ptr addrspace(1) %d2, align 4\n ret void }\n'); continue
+		}
 		if name in ['disjoint', 'disjoint_frozen', 'samesign', 'samesign_frozen'] {
 			comparison := name.starts_with('samesign'); typ := if comparison { 'i1' } else { 'i32' }
 			op := if comparison { 'icmp samesign ult' } else { 'or disjoint' }
@@ -1383,7 +1390,7 @@ fn test_software_metal_compute() {
 		pipeline := sm_test_compute_pipeline(d, library, 'sum', &error_slot)
 		assert pipeline != 0 && error_slot == 0x1234
 		assert sm_send(pipeline, c'device') == d && sm_send(pipeline, c'threadExecutionWidth') == 1 && sm_send(pipeline, c'maxTotalThreadsPerThreadgroup') == 1 && sm_send(pipeline, c'staticThreadgroupMemoryLength') == 0
-		for name in ['bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'looping', 'oversized_switch', 'cast_constant_store', 'cast_constant_view_store', 'no_metadata', 'missing'] {
+		for name in ['bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'looping', 'oversized_switch', 'cast_constant_store', 'cast_constant_view_store', 'bad_lane_count', 'no_metadata', 'missing'] {
 			error_slot = 0
 			assert sm_test_compute_pipeline(d, library, name, &error_slot) == 0
 			sm_library_check_error(error_slot, if name == 'missing' { i64(1) } else { i64(3) })
@@ -1570,6 +1577,27 @@ fn test_software_metal_compute() {
 			sm_call(sat_command, c'commit'); assert sm_send(sat_command, c'status') == 4
 			expected := [[u32(0x7fffffff), 0xffffffff, 0x80000000, 0]!, [u32(0x80000000), 0, 0x7fffffff, 0xffffffff]!, [u32(0), 0, 0, 0]!, [u32(0xffffffff), 0, 0xfffffffe, 0]!, [u32(1), 1, 2, 2]!, [u32(0), 0, 0, 0]!]![sample]
 			for i in 0 .. 4 { assert unsafe { *(&u32(outp + u64(16 + i * 4))) } == expected[i] }
+		}
+		for lane in 0 .. 5 {
+			lane_name := if lane == 4 { 'constant_lane_frozen' } else { 'constant_lane' }
+			lane_command := sm_send(queue, c'commandBuffer'); lane_encoder := sm_send(lane_command, c'computeCommandEncoder')
+			lane_pipeline := sm_test_compute_pipeline(d, library, lane_name, unsafe { nil }); assert lane_pipeline != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(lane_encoder, c'setComputePipelineState:', lane_pipeline) }
+			sm_test_compute_buffer(lane_encoder, a, 0, 0); sm_test_compute_buffer(lane_encoder, b, 0, 3); sm_test_compute_buffer(lane_encoder, output, 16, 7)
+			sm_test_compute_dispatch(lane_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(lane_encoder, c'endEncoding'); objc_release(lane_pipeline)
+			unsafe { *(&u32(ap)) = u32(lane) }; sm_call(lane_command, c'commit'); assert sm_send(lane_command, c'status') == 4
+			assert unsafe { *(&u32(outp + 16)) } == [u32(7), 11, 13, 17, 0]![lane]
+			assert unsafe { *(&u32(outp + 20)) } == [u32(0x3fc00000), 0x80000000, 0x7f800001, 0x7fc12345, 0]![lane]
+			assert unsafe { *(&u32(outp + 24)) } == [u32(0x3e00), 0x8000, 0x7c01, 0x7e55, 0]![lane]
+		}
+		for index in [u32(4), 0xffffffff]! {
+			lane_failed := sm_send(queue, c'commandBuffer'); lane_failed_encoder := sm_send(lane_failed, c'computeCommandEncoder')
+			lane_failed_pipeline := sm_test_compute_pipeline(d, library, 'constant_lane', unsafe { nil }); assert lane_failed_pipeline != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(lane_failed_encoder, c'setComputePipelineState:', lane_failed_pipeline) }
+			sm_test_compute_buffer(lane_failed_encoder, a, 0, 0); sm_test_compute_buffer(lane_failed_encoder, b, 0, 3); sm_test_compute_buffer(lane_failed_encoder, output, 16, 7)
+			sm_test_compute_dispatch(lane_failed_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(lane_failed_encoder, c'endEncoding'); objc_release(lane_failed_pipeline)
+			unsafe { *(&u32(ap)) = index }; sm_call(lane_failed, c'commit'); assert sm_send(lane_failed, c'status') == 5 && sm_send(lane_failed, c'error') != 0
+			for offset in [u64(16), 20, 24]! { assert unsafe { *(&u32(outp + offset)) } == 0 }
 		}
 		bits_command := sm_send(queue, c'commandBuffer'); bits_encoder := sm_send(bits_command, c'computeCommandEncoder')
 		for i, name in ['bits', 'bits_frozen'] {
@@ -1970,7 +1998,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/disjoint/samesign/cast-flags/bit-intrinsic/funnel/extrema/abs/saturating/saturating-convert/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/address-space-cast/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/disjoint/samesign/cast-flags/constant-vector-extract/bit-intrinsic/funnel/extrema/abs/saturating/saturating-convert/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/address-space-cast/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {

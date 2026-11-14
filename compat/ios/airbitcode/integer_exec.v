@@ -116,6 +116,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	mut max_phis := 0
 	mut intrinsic_declarations := [scalar_intrinsic_cache_slots]int{} // Existing FP/integer identities, then two-width conversions.
 	mut intrinsic_work := 0
+	mut vector_work := 0
 	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
 		block := bodies.blocks[block_index]
 		if block.scope != scope || block.first < s.instructions_start || block.count < 1 || block.first > s.instructions_start + s.instructions_count || block.count > s.instructions_start + s.instructions_count - block.first { return error('AIR integer: block range') }
@@ -151,6 +152,9 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			} else if pair_flow {
 				if !binary32 { return error('AIR overflow: mixed pair control flow required') }
 				p.scalar_pair_flow(op, s.base_id, code != 16, pools, scope)!
+			} else if code == 6 {
+				if !inst.has_result { return error('AIR vector: extract result required') }
+				vector_work += p.constant_extract_profile(stream, pools, bodies, scope, op, binary32, max_integer_execution_steps - vector_work)!
 			} else if code == 26 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
 				p.scalar_pair_extract(op, s.base_id, pools, scope)!
@@ -164,7 +168,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
 				34 {} // Checked direct intrinsic, including its attributes, above.
-				26, 27 {} // Checked overflow pair extraction/insertion, validated above.
+				6, 26, 27 {} // Checked constant-vector extraction or overflow pair access above.
 				2, 9, 28 {
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
 					fp := p.types[p.operands[op.operands_start].type_index].kind in [.float_t, .half_t]!
@@ -320,6 +324,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			start := op.operands_start
 			mut result := IntegerValue{}
 			match code {
+				6 { result = m.extract_constant_lane(stream, op)! }
 				34 { result = m.intrinsic_value(ir, op)! }
 				26 { result = m.extract_pair_value(op)! }
 				27 { result = m.insert_pair_value(op)! }

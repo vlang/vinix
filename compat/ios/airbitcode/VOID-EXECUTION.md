@@ -14,6 +14,14 @@ does not add memory instructions, pointer arguments, kernel ABI binding,
 pipeline construction or dispatch. Discarded poison arithmetic has no returned
 value; poison consumed as a branch condition still rejects.
 
+Literal fixed-vector lane extraction follows the shared scalar/memory rules:
+1..16 i1..i64/half/float lanes, scalar unsigned indices, preflight of every
+lane and a bounded per-function lane-work budget. A discarded poison result is
+permitted; selected undef still errors at extraction even when its result is
+unused. Vector arguments and computed/loaded vectors remain unsupported.
+`tests/ios/air-constant-extract.v` checks successful discards, indeterminate
+lanes and the whole-function work limit through this API.
+
 The maintained serialized-bitcode check is `tests/ios/air-void-execute.v`.
 Build it with the repository's V module path, then run its executable with
 `LLVM_AS FRESH_EXTERNAL_DIR`. It assembles fixtures with llvm-as, parses them

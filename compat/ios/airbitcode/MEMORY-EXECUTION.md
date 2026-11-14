@@ -5,6 +5,8 @@ arguments, forward control flow, scalar loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, bounded constant GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
+Scalar `extractelement` may also read supported fixed constant vectors;
+vector memory accesses remain unsupported.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
 Nonvolatile constant-length memset, memmove and disjoint memcpy also operate on
@@ -92,6 +94,25 @@ bounded profile requires a defined condition at that instruction: poison/undef
 reject immediately, including for unused results, and prior stores remain
 visible. Untaken blocks do not evaluate their selects. Scalar freeze may make
 the condition defined. No runtime pointer poison tracking is provided.
+
+`extractelement` supports literal fixed vectors of 1..16 i1..i64/half/float
+lanes and scalar i1..i64 indices, interpreted as unsigned after width masking.
+Materialized data, scalar splats, aggregate lane constants, zero, poison and
+undef vectors are admitted. Every lane is checked in preflight, including
+unselected lanes and inactive blocks; unsupported expressions reject before
+stores. A separate per-function budget admits at most 1,000,000 constant lanes
+across all extractions, charging each vector's full count. Each executed
+extraction itself costs one step and adds no buffer access requirement.
+
+Execution reads only the indexed lane. An out-of-range or poison index yields
+poison; an undef index errors. Selected poison propagates and selected undef
+errors; other poison/undef lanes do not affect a defined selection. An
+out-of-range index yields poison even for a whole undef vector. Extracted
+scalar bits feed existing arithmetic, casts, select/freeze, PHIs and stores.
+Integer, mixed scalar and void APIs share validation/evaluation; the integer
+API admits integer lanes only. Vector arguments, computed/loaded vectors,
+vector arithmetic/storage, scalable vectors, other lane formats and vectors
+larger than sixteen lanes remain unsupported.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -560,6 +581,11 @@ and after subtraction, exact prefix extents, aliases, field-prefix bounds and
 underflow that a later field offset would otherwise hide.
 `tests/ios/air-memory-casts.v` checks load/cast/store bodies against defined
 native LLVM conversions, with separate poison and unsupported-input controls.
+`tests/ios/air-constant-extract.v` compares literal vector extractions with
+defined native LLVM across integer/half/float lanes, several vector/index
+widths and constant forms. Independent lane expectations cover poison/undef,
+index masking, padding, prior stores, budgets and preflight guards. Whole
+functions test both memory and scalar lane-work limits before execution.
 `tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
 extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native

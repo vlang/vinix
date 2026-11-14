@@ -451,6 +451,16 @@ The 256 overloads have separate cache identities. Deferred dispatch checks mix
 all four signed/unsigned half/float variants in a kernel and cover infinities,
 NaNs, fractions and frozen poison results.
 
+Scalar `extractelement` can select an i1..i64/half/float lane from a fixed
+constant vector of 1..16 lanes using a runtime i1..i64 unsigned index. All
+lanes are checked before dispatch, with a per-function million-lane validation
+budget. Only the chosen lane is evaluated: poison propagates, selected undef
+errors and out-of-range indices produce poison. Extractions cost one instruction;
+computed/loaded vectors, vector arguments/storage and scalable vectors remain
+unsupported. Deferred kernels select integer/half/float representations,
+preserve NaN payloads and signed zeros, freeze out-of-range poison, fail poison
+stores and reject an oversized-vector pipeline.
+
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and
 chooses a fixed zero for poison/undef. Both cost one step and require no flags.
