@@ -181,7 +181,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
 				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
-				56, 58 { if !inst.has_result { return error('AIR scalar: unary result required') }; p.scalar_unary_profile(op, code == 58, binary32)! }
+				56, 58 { if !inst.has_result { return error('AIR scalar: unary result required') }; if !pair_freeze { p.scalar_unary_profile(op, code == 58, binary32)! } }
 				else { return error('AIR integer: instruction outside execution profile') }
 			}
 		}

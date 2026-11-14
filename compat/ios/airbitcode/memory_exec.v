@@ -156,7 +156,9 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		}
 		if code in [u64(56), 58]! {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: unary result') }
-			p.scalar_unary_profile(op, code == 58, true)!
+			if code == 58 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t {
+				p.scalar_pair_freeze(op, s.base_id, pools, scope)!
+			} else { p.scalar_unary_profile(op, code == 58, true)! }
 			continue
 		}
 		if code in [u64(9), 28, 5, 29]! {
@@ -209,7 +211,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
 		if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
 		if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }
-		if code == 58 { value := m.read_frozen(op.operands_start)!; m.put(inst, value); continue }
+		if code == 58 { value := if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(op.operands_start)! } else { m.read_frozen(op.operands_start)! }; m.put(inst, value); continue }
 		if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
 		if code in [u64(5), 29]! { value := m.select_value(op)!; m.put(inst, value); continue }
 		if code in [u64(4), 30, 43]! { continue }

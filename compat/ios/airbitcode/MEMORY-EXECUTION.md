@@ -47,7 +47,8 @@ rejects. Scalar `freeze` preserves defined i1..i64/half/float bits and makes a
 fixed zero choice for poison or undef. Every use of its SSA result sees that
 same choice. It does not prevent an earlier instruction from rejecting undef
 or another dynamic error. Both operations require zero flags and cost one
-step. Pointer/vector/aggregate freezes remain unsupported by this API.
+step. Pointer/vector and general aggregate freezes remain unsupported by this
+API; the checked overflow-pair exception is described below.
 
 Direct LLVM integer bit intrinsics `ctpop`, `bitreverse`, `bswap`, `ctlz` and
 `cttz` are supported using the scalar executor's declaration/signature,
@@ -211,7 +212,15 @@ field 0 or 1 after checking the complete pair shape, source type, result type
 and field index. Each call and extraction costs one step. Extracted values
 can feed scalar operations, freeze/select and scalar stores. Zero/poison pair
 constants are admitted; other pair constants reject. General aggregate memory,
-arguments, returns, insertion, freeze and select remain unsupported here.
+arguments, returns, insertion and select remain unsupported here.
+
+`freeze` also accepts these literal unpacked overflow pairs. Defined fields
+preserve their bits; each poison field independently chooses zero. A direct
+undef pair chooses two zero fields, but an earlier undef scalar computation
+still rejects. Both poison tags clear while the aggregate tag survives, and
+the stored result slot keeps repeated uses consistent. Each freeze costs one
+step and shares scalar validation/evaluation. Other pair constants, layouts,
+field types and aggregate operations retain their existing restrictions.
 
 Only ordinary direct calls to these forty-seven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
