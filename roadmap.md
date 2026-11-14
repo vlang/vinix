@@ -1319,6 +1319,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     also passes 100 attempts per selected error path with zero retained V heap
     allocations and unchanged descriptor availability under a 32-FD host limit,
     including the full 741-row AddressSanitizer probe.
+    [Public service heap cleanup](tests/packages/wine-lease-supervision-plan.md#public-service-review-heap-and-decoded-state-cleanup-2026-11-14)
+    now eliminates measured service-owner/decoder retention: both signed marker
+    guests complete 100 ordinary-account review/recheck/close cycles with zero
+    retained V allocations and correct generation-lease release. Host truncated-
+    input cleanup and both migration/recovery suites also pass.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

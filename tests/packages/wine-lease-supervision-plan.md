@@ -3017,6 +3017,61 @@ Typed receipt:
 SHA-256 `9a6f3d22dafc38e6fbe309f55f86df08016bd8aa7da337ad5952e139925cba48`.
 Recording and independent comparison pass.
 
+## Public service review heap and decoded-state cleanup, 2026-11-14
+
+Source `29022ca88` extends measurement through the actual public real-root
+service. The new PID1 guest publishes and installs signed marker packages,
+enters UID/GID 1000 and repeats `wine_prefix_review`, explicit recheck and close
+100 times after warmup. The original x86 run retains 6,100 V allocations and
+824,800 bytes. Generated C and size diagnostics identify a heap-promoted service
+owner shell and temporary decoded records promoted by address-taking, deferred
+field cleanup and policy-permission replacement.
+
+The service owner now keeps its temporary shell on the stack. Repository,
+dependency, payload and installed-record arrays append decoder return values
+directly, transferring their owned fields without address-taking temporaries or
+the deep copies made by appending a named record. Small owned-value cleanup
+helpers retire failed records and string arrays without promoting local cells.
+Replacing legacy policy permissions retires only that old owned list. Stored
+schema, field validation, limits, returned ownership and public admission rules
+remain unchanged.
+
+Final `service-x86` passes in 20.526 seconds and `service-arm` in 6.652 seconds:
+100 cycles retain zero measured V objects and bytes. A separate live-owner
+check requires exclusive generation-lease acquisition to fail with
+`EAGAIN`/`EWOULDBLOCK`, then succeed after close. The controller requires the
+100-cycle marker, retains its 120-second bound and rechecks source, executable,
+kernel, QEMU/firmware and loader/image input hashes. Host PID1 refusal and
+controller usage/architecture/missing-input controls also pass before setup.
+
+Assertion-enabled ASan host checks pass all five stored-decoder tests and four
+signed-review/lease tests. The decoder suite initially exposed another 24,120
+bytes retained on truncated string-array cleanup; its final full truncation and
+1,000 late-refusal cohorts retain zero bytes. Normal 1,000-cycle state/config
+decoding, Unicode/default/u64 and inclusive metadata/count bounds also pass.
+Rebuilt production CLI/guest migration suites pass in 24.929 seconds on x86
+and 8.133 seconds on ARM, requiring every existing staging, SIGKILL/resume,
+repetition and removed-builtin rollback marker. Kernel, Wine bytes, sandbox,
+budgets and guest bounds remain unchanged. The C pointer-compatibility compiler
+exception remains; strict ABI qualification is separate.
+
+Complete evidence is preserved at `/Users/alex/.cache/vwserviceheap-20261114-01`.
+It includes the failed baseline, shell-only diagnostic, unsuccessful named-record
+append rewrite, truncated-input failure, shortened diagnostic and all final
+results. The one-cycle diagnostic reaches zero but correctly fails the
+controller's 100-cycle requirement; it does not count as acceptance. Final
+generated C/binaries, parsed-source lists, host sanitizer logs and isolated
+source at base `dedc34384` plus `source.patch` are retained. All six changed V
+files match the feature commit. Original complete input bundles and namespaces
+remain required. The measurement excludes fixture setup, cold startup, libc
+and kernel heap, unselected service failures, actual Wine execution and full
+launch lifetime. This is local selected-case acceptance, not a hermetic waiver.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-service-heap-20261114-01.inventory.json`,
+SHA-256 `93bb7fbcdd1101e0eb6a03a812ba03754a4bc494aae647a2dd417078bca4231d`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
