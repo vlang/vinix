@@ -70,6 +70,12 @@ addresses the observed compiler launches without a loaded boot image. Its V
 transformation and zero-fuzz patch checks pass. It is not deployed: a matching
 native ARM64 musl ART build and ARM qualification remain required. The local
 retained source is only a six-file audit selection, with no reusable objects.
+The [builder recovery and dependency transport checks](maps-art-builder-20261114.md)
+now provide an isolated native ARM64 Linux/Alpine builder and the full original
+source archive. Latest-V fetcher integrity tests and Alpine signature verification
+passed. Complete dependency provisioning remains blocked by shared disk growth;
+the upstream Python generators also need V replacements. The source candidate
+has not been built or deployed, and Google sign-in remains unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.
