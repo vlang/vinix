@@ -2248,6 +2248,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   failure in the complete probes and keep broad compatibility gates open.
   See [the ready-bit qualification](docs/linux-select-ready-counts.md).
 
+- [x] Resolve the recorded native JIT exec double-free and the subsequent
+  error-cleanup interface-box leak. The original failing JIT ELFs and all nine
+  selected maintained suites pass on both architectures. Native exec/script
+  checks pass against identical Linux ELFs; both 200-cycle privilege cohorts
+  retain every slab class and large-page count flat. Complete generated-C scope
+  and independent lifetime review pass; the unchanged global allocation-policy
+  failures remain visible. See [the exec ownership qualification](docs/linux-exec-ownership.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

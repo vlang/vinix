@@ -39,8 +39,13 @@ maskwait, resethand, sigmaskcopy, altstackrestore, sigwaitorder, seccomp and
 runtime. The JIT policy fixture panics with `Slab: double free`. Its identical
 ELF reproduces that panic on both original kernels as well as the corrected
 kernels; all four controls and the original failed suite results are retained.
-That baseline failure remains unresolved. Vinix AArch64 uses four virtual CPUs and 16 KiB pages;
+That baseline failure was unresolved in this qualification. Vinix AArch64 uses four virtual CPUs and 16 KiB pages;
 Vinix x86-64 and both Linux references use two virtual CPUs and 4 KiB pages.
+
+Follow-up: the [exec ownership qualification](linux-exec-ownership.md) resolves
+the JIT double-free and verifies the identical failed ELFs on both corrected
+architectures, with 9/9 maintained cases passing. The 8/9 results and baseline
+panic controls above remain the historical results for this empty-wait bundle.
 
 The isolated build base is `94f80b38ef5487959e9a1124d85cf8ecae602a15`.
 Both original and corrected architectures build with V `b25b2d9`, PROD=true,

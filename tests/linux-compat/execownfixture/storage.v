@@ -1,6 +1,28 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module execownfixture
 
+fn C.fdopen(i32, &char) voidptr
+fn C.fgets(&char, i32, voidptr) &char
+fn C.ferror(voidptr) i32
+fn C.fclose(voidptr) i32
+
+// Optional ALLOC_TRACK diagnostics name retained allocations without changing
+// the strict before/after storage verdict on ordinary production kernels.
+fn storage_allocsites() bool {
+	unsafe {
+		fd := C.open(c'/proc/allocsites', C.O_RDONLY)
+		if fd < 0 { return false }
+		stream := C.fdopen(fd, c'r')
+		if stream == nil { C.close(fd); return false }
+		mut line := [2048]char{}
+		for C.fgets(&line[0], i32(sizeof(line)), stream) != nil {
+			C.printf(c'PERF-SITE program=execown uid=%u %s', C.getuid(), &line[0])
+		}
+		good := C.ferror(stream) == 0
+		return C.fclose(stream) == 0 && good
+	}
+}
+
 struct Slabs {
 mut:
 	sizes   [32]u64
@@ -55,6 +77,8 @@ fn storage() bool {
 		fd := C.open(c'/proc/slabinfo', C.O_RDONLY)
 		if fd < 0 { return false }
 		defer { C.close(fd) }
+		tracker := C.open(c'/proc/allocstart', C.O_RDONLY)
+		defer { if tracker >= 0 { C.close(tracker) } }
 		for _ in 0 .. 64 {
 			if !failure_cycle() { return false }
 		}
@@ -62,6 +86,10 @@ fn storage() bool {
 		before := &Slabs(C.alloca(usize(sizeof(Slabs))))
 		after := &Slabs(C.alloca(usize(sizeof(Slabs))))
 		if !snapshot(fd, before) { return false }
+		if tracker >= 0 {
+			mut reset := [16]char{}
+			if C.pread(tracker, &reset[0], sizeof(reset), 0) <= 0 { return false }
+		}
 		mut completed := 0
 		for _ in 0 .. 200 {
 			if !failure_cycle() { return false }
@@ -81,6 +109,7 @@ fn storage() bool {
 		C.printf(c'LINUX EXECOWN STORAGE: uid=%u cycles=%d big_pages=%lu/%lu tainted=%lu/%lu %s\n',
 			C.getuid(), completed, before.large, after.large, before.tainted, after.tainted,
 			if good { &char(c'PASS') } else { &char(c'FAIL') })
+		if !good && tracker >= 0 && !storage_allocsites() { return false }
 		C.alarm(0)
 		return good
 	}

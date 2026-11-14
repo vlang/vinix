@@ -35,6 +35,14 @@ fn body(source string, name string) !string {
 
 fn generated(source string, arch string) ! {
 	require(arch in ['aarch64', 'x86_64'], 'Unsupported architecture')!
+	consumer := body(source, 'userland__exec_format_error')!
+	require(consumer.contains('userland__ExecErrorScratch*')
+		&& consumer.contains('vinix_stack_alloc(sizeof(userland__ExecErrorScratch))')
+		&& consumer.contains('owned->value = err;')
+		&& consumer.contains('IError__free(&owned->value);'), 'Error consumer must borrow a concrete stack wrapper')!
+	for allocation in ['memdup(', 'malloc(', 'v_malloc(', 'calloc('] {
+		require(!consumer.contains(allocation), 'Error consumer allocates a wrapper: ' + allocation)!
+	}
 	importer := body(source, 'userland__exec_strings_from_user')!
 	require(importer.count('string__clone(text)') == 1, 'Imported string is not explicitly cloned once')!
 	clone_at := importer.index(' = string__clone(text);') or { return error('Missing compact clone assignment') }
@@ -64,6 +72,21 @@ fn generated(source string, arch string) ! {
 			require(!loader.contains('string__free(&' + name + ')'), 'Premature translated string release')!
 		}
 	}
+}
+
+fn generated_delta(before string, after string) ! {
+	old := body(before, 'userland__exec_format_error')!
+	current := body(after, 'userland__exec_format_error')!
+	require(old.count('memdup(') == 2 && old.count('IError__free(owned);') == 1,
+		'Original boxed error cleanup differs')!
+	require(!current.contains('memdup(') && current.count('IError__free(&owned->value);') == 1,
+		'Candidate error cleanup differs')!
+	declaration := 'typedef struct userland__ExecErrorScratch userland__ExecErrorScratch;\n'
+	definition := 'struct userland__ExecErrorScratch {\n\tIError value;\n};\n\n'
+	require(!before.contains('userland__ExecErrorScratch') && after.count(declaration) == 2
+		&& after.count(definition) == 1, 'Concrete scratch declarations differ')!
+	require(before.replace(old, current) == after.replace(declaration, '').replace(definition, ''),
+		'Generated C changed outside error cleanup and its concrete wrapper')!
 }
 
 fn pin(inputs map[string]string, suffix string, expected string) ! {
@@ -148,6 +171,24 @@ fn check(root string) ! {
 		compiled := json2.decode[map[string]string](json2.encode(compilation['outputs']!))!
 		pin(compiled, '/probe', probe)!
 		pin(compiled, '/reference-init', digest(compile + '/reference-init')!)!
+		baseline := root + '/baseline-' + suffix
+		original_build := root + '/original-build-' + suffix
+		require(os.read_file(original_build + '/build.log.status')!.trim_space() == '0', 'Original build failed')!
+		original_outputs := json2.decode[map[string]string](os.read_file(original_build + '/outputs.json')!)!
+		pin(original_outputs, '/kernel/bin/vinix', digest(original_build + '/kernel/bin/vinix')!)!
+		pin(original_outputs, '/blob.c', digest(original_build + '/blob.c')!)!
+		generated_delta(os.read_file(original_build + '/blob.c')!, os.read_file(build + '/blob.c')!)!
+		execowncheck.verify_retained(os.read_file(baseline + '/serial.log')!, arch)!
+		original := object(baseline + '/receipt.json')!
+		require(original['architecture']!.str() == arch && !original['passed']!.bool()
+			&& original['finished']!.bool() && original['status']!.int() == 0,
+			'Original retention result differs')!
+		require(original['probe_sha256']!.str() == probe && digest(baseline + '/init')! == probe
+			&& digest(baseline + '/rootfs/sbin/init')! == probe, 'Different original probe')!
+		require(original['kernel_sha256']!.str() == digest(baseline + '/kernel/bin/vinix')!
+			&& original['kernel_sha256']!.str() == digest(original_build + '/kernel/bin/vinix')!
+			&& original['kernel_sha256']!.str() != kernel
+			&& original['serial_sha256']!.str() == digest(baseline + '/serial.log')!, 'Different original artifacts')!
 		native := root + '/native-' + suffix
 		session(native, arch, kernel, probe, 'execown')!
 		execowncheck.verify(os.read_file(native + '/serial.log')!, arch, false)!
@@ -178,7 +219,7 @@ fn check(root string) ! {
 			state := maintained + '/' + name
 			init := digest(state + '/init')!
 			require(item['exit_code']!.int() == 0 && item['init_sha256']!.str() == init
-				&& item['iso_sha256']!.str() == digest(state + '/test.iso')!, 'Different/failed maintained artifacts')!
+				&& item['iso_sha256']!.str() == digest(state + '/test.iso')!, 'Different/failed maintained artifacts: ' + arch + '/' + name)!
 			session(state, arch, kernel, init, name)!
 			log := os.read_file(state + '/serial.log')!
 			require(log.contains('LINUX ' + name.to_upper() + ': PASS')
@@ -197,8 +238,27 @@ fn check(root string) ! {
 		names.sort()
 		require(names == ['altstackrestore', 'jit', 'maskwait', 'resethand', 'runtime', 'seccomp',
 			'selectempty', 'sigmaskcopy', 'sigwaitorder'], 'Missing maintained cases')!
+		registered := root + '/registered-' + suffix
+		registration := object(registered + '/receipt.json')!
+		require(registration['architecture']!.str() == arch && registration['kernel_sha256']!.str() == kernel
+			&& digest(registered + '/kernel/bin/vinix')! == kernel, 'Different registered-runner kernel')!
+		rows := registration['results']!.as_array()
+		require(rows.len == 1, 'Registered runner must select only execown')!
+		row := rows[0].as_map()
+		require(row['name']!.str() == 'execown' && row['exit_code']!.int() == 0,
+			'Registered execown case did not pass')!
+		require(row['init_sha256']!.str() == digest(registered + '/execown/init')!
+			&& row['iso_sha256']!.str() == digest(registered + '/execown/test.iso')!, 'Changed registered artifacts')!
+		frozen_inputs := json2.decode[map[string]string](json2.encode(row['source_inputs']!))!
+		require(frozen_inputs.len == 2, 'Registered execown must freeze both fixture sources')!
+		for name in ['core.v', 'storage.v'] {
+			expected := digest(root + '/source/tests/linux-compat/execownfixture/' + name)!
+			pin(frozen_inputs, '/execownfixture/' + name, expected)!
+			require(digest(registered + '/sources/execownfixture/' + name)! == expected, 'Different frozen execown source')!
+		}
+		execowncheck.verify(os.read_file(registered + '/execown/serial.log')!, arch, false)!
 	}
-	println('Exec ownership evidence: PASS (' + manifest.len.str() + ' files; candidate functional/cleanup checks, Linux comparisons and 9/9 maintained cases per architecture)')
+	println('Exec ownership evidence: PASS (' + manifest.len.str() + ' files; original retention, candidate functional/cleanup checks, Linux comparisons, registered runner and 9/9 maintained cases per architecture)')
 }
 
 fn self_test() ! {
@@ -211,10 +271,13 @@ fn self_test() ! {
 			+ '\tstring__free(&text);\n}\n'
 			+ 'int userland__load_program_image(void) {\n\tfinal_argv.flags |= 1;\n'
 			+ '\tstring__clone(*real_path);\n\tstring__clone(*arg);\n'
-			+ if arch == 'aarch64' {
+			+ (if arch == 'aarch64' {
 				'\tstring__clone(guest_root);\n\tstring__clone(environment_entry);\n}\n' +
 				'int userland__load_native_program_image(void) {\n\tstring__clone(entry);\n}\n'
-			} else { '}\n' }
+			} else { '}\n' })
+			+ 'int userland__exec_format_error(IError err) {\n'
+			+ '\tuserland__ExecErrorScratch* owned = (userland__ExecErrorScratch*)vinix_stack_alloc(sizeof(userland__ExecErrorScratch));\n'
+			+ '\towned->value = err;\n\tIError__free(&owned->value);\n}\n'
 		generated(good, arch)!
 		mut variants := [good.replace('string__clone(text)', 'text'),
 			good.replace('array_push(&strings, &owned);', 'array_push(&strings, &text);'),
@@ -223,7 +286,13 @@ fn self_test() ! {
 			good.replace('string__clone(*arg)', '*arg'),
 			good.replace('final_argv.flags |= 1;', ''),
 			good.replace('\tarray_push(&strings, &owned);\n\tstring__free(&text);',
-				'\tstring__free(&text);\n\tarray_push(&strings, &owned);')]
+				'\tstring__free(&text);\n\tarray_push(&strings, &owned);'),
+			good.replace('IError__free(&owned->value);', ''),
+			good.replace('owned->value = err;', ''),
+			good.replace('sizeof(userland__ExecErrorScratch)', 'sizeof(IError)')]
+		for allocation in ['memdup(', 'malloc(', 'v_malloc(', 'calloc('] {
+			variants << good.replace('owned->value = err;', 'owned->value = err;\n\t' + allocation + '0);')
+		}
 		if arch == 'aarch64' {
 			for token in ['string__clone(guest_root)', 'string__clone(environment_entry)', 'string__clone(entry)'] {
 				variants << good.replace(token, '')
@@ -238,10 +307,32 @@ fn self_test() ! {
 		}
 	}
 	println('Exec ownership generated-C controls: PASS (2 positive, ' + generated_negatives.str() + ' negative controls)')
+	old := 'int userland__exec_format_error(IError err) {\n\tmemdup(memdup(0));\n\tIError__free(owned);\n}\n'
+	new := 'typedef struct userland__ExecErrorScratch userland__ExecErrorScratch;\n'.repeat(2)
+		+ 'struct userland__ExecErrorScratch {\n\tIError value;\n};\n\n'
+		+ 'int userland__exec_format_error(IError err) {\n\tIError__free(&owned->value);\n}\n'
+	generated_delta(old, new)!
+	mut scope_negatives := 0
+	for bad in [new + 'void unrelated(void) {}\n', new.replace('IError value;', 'IError value;\n\tu64 extra;'),
+		new.replace('IError__free(&owned->value);', 'memdup(0);\n\tIError__free(&owned->value);'),
+		new.replace('IError__free(&owned->value);', ''),
+		new.replace('typedef struct userland__ExecErrorScratch userland__ExecErrorScratch;\n', '')] {
+		generated_delta(old, bad) or { scope_negatives++; continue }
+		return error('Invalid generated-C scope accepted')
+	}
+	println('Exec error generated-C scope: PASS (1 positive, ' + scope_negatives.str() + ' negative controls)')
 }
 
 fn main() {
 	if os.args.len == 2 && os.args[1] == 'self-test' { self_test() or { panic(err) }; return }
+	if os.args.len == 4 && os.args[1] == 'retained' {
+		execowncheck.verify_retained(os.read_file(os.args[3])!, os.args[2]) or { panic(err) }
+		println('Exec original retention: reproduced'); return
+	}
+	if os.args.len == 4 && os.args[1] == 'delta' {
+		generated_delta(os.read_file(os.args[2])!, os.read_file(os.args[3])!) or { panic(err) }
+		println('Exec error generated-C scope: PASS'); return
+	}
 	if os.args.len == 5 && os.args[1] == 'serial' {
 		require(os.args[3] in ['native', 'reference'], 'Invalid serial context')!
 		execowncheck.verify(os.read_file(os.args[4])!, os.args[2], os.args[3] == 'reference') or { panic(err) }
@@ -252,7 +343,7 @@ fn main() {
 		println('Exec ownership generated C: PASS'); return
 	}
 	if os.args.len != 3 || os.args[1] != 'check' {
-		eprintln('Usage: execown-evidence self-test | serial ARCH native|reference LOG | generated ARCH BLOB-C | check BUNDLE')
+		eprintln('Usage: execown-evidence self-test | retained ARCH LOG | delta BEFORE-C AFTER-C | serial ARCH native|reference LOG | generated ARCH BLOB-C | check BUNDLE')
 		exit(2)
 	}
 	check(os.real_path(os.args[2])) or { panic(err) }

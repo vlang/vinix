@@ -112,7 +112,7 @@ fn run() ! {
 	os.write_file(work + '/inputs.json', json2.encode(inputs, prettify: true) + '\n')!
 	os.write_file(work + '/command.json', json2.encode(command, prettify: true) + '\n')!
 	result := guesthost.boot_session(command, os.environ(), work, guesthost.SessionPolicy{
-		pass:     'LINUX EXECOWN: PASS'
+		pass:     'LINUX EXECOWN REFERENCE: PASS'
 		failures: [
 			'LINUX EXECOWN FAIL',
 			'LINUX EXECOWN: FAIL',

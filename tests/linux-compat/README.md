@@ -2736,3 +2736,26 @@ original kernels fail 84 on AArch64 and 30 on x86-64.
 controls. Compile `resethand-evidence.v` without `-prod`, run `self-test`
 (eleven positive and 429 negative controls), then `check` on the complete
 bundle in [the qualification](../../docs/linux-signal-one-shot.md).
+
+The `execown` case checks native ELF/script argument and environment ownership,
+interpreter recursion, exec refusals and 200-cycle root/UID1000 cleanup cohorts.
+It freezes both `execownfixture/core.v` and `storage.v`; its default timeout is
+300 seconds. Run it through `run.v --cases execown` with the usual architecture,
+kernel and fresh state arguments. Optional `ALLOC_TRACK=1` kernels print retained
+allocation call chains when cleanup fails.
+
+`execown-reference.v` accepts `--arch`, `--kernel`, `--init`, `--launcher` and
+`--state-dir` like the other Linux reference controllers. It runs the identical
+probe ELF and explicitly skips Vinix heap inspection. Compile
+`execown-evidence.v` without `-prod` (use `-cflags -O2` for inventory hashing),
+run `self-test`, then `check` on the complete bundle described in
+[the exec ownership qualification](../../docs/linux-exec-ownership.md). The
+separate `retained ARCH LOG` mode requires the exact original two-object leak;
+candidate `serial ARCH native LOG` requires every storage class to stay flat.
+
+The companion macOS `execown-perf-evidence.v` audits the dated operation,
+churn and desktop guard workspace, including retained failed preparations.
+Compile with `-cc cc -cflags '-O2 -include stdlib.h'` and module path
+`tests/desktop-perf|@vlib`. `record WORKSPACE` validates observations and writes
+fresh typed inventories; `check WORKSPACE` verifies the complete retained
+inventories, kernel identities, measurement contracts and live ARM client names.

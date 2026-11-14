@@ -36,14 +36,22 @@ fn free_exec_arguments(path string, argv []string, envp []string) {
 // an earlier call had left -- ENOENT once, EPERM after -- for a program it
 // could not read. Only a segment that could not be mapped keeps the errno
 // the mapping set.
+struct ExecErrorScratch {
+mut:
+	value IError
+}
+
 fn exec_format_error(err IError) ?&proc.Process {
 	if !err.msg().starts_with('elf: unable to map') {
 		errno.set(errno.enoexec)
 	}
 	// ELF error messages are borrowed literals; the returned interface box
 	// belongs to this final consumer.
-	owned := unsafe { &IError(C.vinix_stack_alloc(sizeof(IError))) }
-	unsafe { *owned = err; owned.free() }
+	// Casting an allocation directly to &IError boxes the pointer itself,
+	// retaining that box and its interface header. Cast the concrete wrapper
+	// instead, then borrow its stack-resident interface to release the error.
+	mut owned := unsafe { &ExecErrorScratch(C.vinix_stack_alloc(sizeof(ExecErrorScratch))) }
+	unsafe { owned.value = err; owned.value.free() }
 	return none
 }
 
