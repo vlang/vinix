@@ -7,9 +7,11 @@ The session was stopped and its private evidence synced to the checked data
 volume before stopping QEMU. The [headless EGL repair](maps-headless-egl-provider-20261114.md)
 in 75d0067fe also passed the signed ARM suite. Real Google services then reached
 authenticator readiness and exited on the missing
-[UserHandle UID conversion](maps-user-uid-20261114.md). That next adapter,
-SDK/native build and signed fixture are ready; ARM execution awaits a quieter
-host and more disk space. All test guests are stopped. Imagery, sustained
+[UserHandle UID conversion](maps-user-uid-20261114.md). That adapter in
+6672e3774 now passes the full signed ARM suite in r96-api, including 13 UID
+vectors and parcel round trips. This API-only run omitted the account-data
+disk; a full Google services/account retry still awaits a quieter host and
+more disk space. The owned test guests are stopped. Imagery, sustained
 responsiveness and Google authentication remain unqualified.
 
 Earlier continuation, 2026-11-13: real search, Louvre details and photos were

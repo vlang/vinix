@@ -38,11 +38,47 @@ exit/child 0/0 and cleanup_complete true.
 | user-uid-native-20261114-r1/native/libvinix-android-native.so | 501814d6fe6c2f6aa9ac1d1bb35b4a6328c3640290e56fb9ef8b91207775af14 |
 | current-api-user-uid-20261114-r1/probe.apk | e29b7a679cda3137a36c0983c76a431cd849f10d69af7aa4d257d50d2475a248 |
 
-The signed UID cases have not executed on ARM. The next fresh guest is r96;
-use these three candidate artifacts together. Existing broker/controller,
+Use these three artifacts together. Existing broker/controller,
 ART, core/TLS jars, data-volume probe, observer and API runner selections are
 unchanged from r95. No historical compiler is required. Full Maps, imagery,
 sustained responsiveness and Google authentication remain unqualified.
+
+## Signed ARM qualification in r96-api
+
+The full signed API suite passed with source change 6672e3774 in fresh
+`maps-current-20261114-r96-api`. The runner observed child exit 0 and closed
+input after readiness/pass. The retained child log contains USER-UID-PASS,
+BITMAP-BUFFER-PASS, EGL-SHARED-DISPLAY-PASS and CURRENT-API-PASS. All 13 UID
+vectors, parcel round trips and the unchanged-process-UID assertion executed
+on ARM. Deployed native library, SDK DEX and signed APK hashes match the table
+above.
+
+This was an API-only guest with VINIX_CURRENT_APP_DATA_DISK=0: no 8-GiB
+account-data disk was created and no broker/account session was started.
+The existing initial automatic Maps launch was refused for its single-link
+preflight, and its failed window was closed before the API run. Persistent
+volume/account guards were unchanged. Guest resources remained 12 GiB / four
+CPUs with HVF. Staging passed under the original guard: 7941 ms, sampled RSS
+36388864, observed disk growth 120819712 bytes, exit/child 0/0 and complete
+cleanup.
+
+The complete signed API export reconstructed without removals: 22695 bytes,
+45 chunks. Snapshot, plan, reconstruction and child extraction passed their
+600-MiB / 300-second / 1-GiB reserve / 64-MiB growth / 4-MiB output guards.
+The complete archive, exported receipt and child log were verified on the host
+before stopping owned QEMU43097. PID absence and no open boot/firmware handles
+were then verified. The stopped boot image hash also passed its guard.
+
+| ARM evidence under the external state root | SHA256 |
+| --- | --- |
+| maps-user-uid-api-uart-20261114-r1/full.log | 0c00d3c2f6ac0017be43be94c333964f326db04c284aab2cb1ec5a0dd5e7dc64 |
+| maps-user-uid-api-readback-20261114-r1/archive.json | ceb518a3415558c14e8018fa65d7605aed02f30f08acb44dbc98cd1fa0738a74 |
+| Same API readback/exported-receipt.json | e249140b887199dc620e11066fc9a9442cf47466ad56a71979a7aedee153c08a |
+| maps-user-uid-api-child-20261114-r1/child.log | f4536b87bf357360741cf6b970febf63800dce2f54ef8954ff0a3edb18b40e2e |
+| maps-current-20261114-r96-api/boot.img | ff9c3845c57fc98d35e7f8a18ec5067f8861415b71c41a66c383f22a8f459f2b |
+
+The next full Google services/account retry remains pending; the API-only
+pass does not establish Google authentication or complete Maps support.
 
 ## r95 evidence and cleanup
 
@@ -81,5 +117,8 @@ shared-growth limit, stopped on growth after 3069/4942/4148 ms. Observed growth
 was 200224768/92749824/67637248 bytes respectively. Their receipts are
 headless-egl-host-quiet-20261114-r1/r2/r3.guard.json. These are quiet-window
 checks, not failed original-profile SDK builds; the original-profile builds
-above passed. Free host space fluctuates around 11-13 GiB. A quieter host and
-roughly 20 GiB free are needed for the next bounded VM/account attempt.
+above passed. At that handoff free host space fluctuated around 11-13 GiB.
+During r96-api it fell from about 11 GiB to about 9.5 GiB. The API-only run
+could proceed without the large account-data image; a quieter host and roughly
+20 GiB free are still needed for the full bounded VM/account attempt. The
+owned test guests, including r96-api, are stopped.
