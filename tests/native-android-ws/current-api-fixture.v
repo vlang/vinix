@@ -1645,7 +1645,8 @@ fn main() {
 	}
 	network := os.args.len == 4 && os.args[3] == '--certificate-network'
 	tls_lifetime := os.args.len == 4 && os.args[3] == '--tls-lifetime'
-	if os.args.len != 3 && !network && !tls_lifetime { panic('usage: current-api-fixture TEMPLATE_FIXTURE FRESH_OUTPUT [--certificate-network|--tls-lifetime]') }
+	shared_display := os.args.len == 4 && os.args[3] == '--shared-display'
+	if os.args.len != 3 && !network && !tls_lifetime && !shared_display { panic('usage: current-api-fixture TEMPLATE_FIXTURE FRESH_OUTPUT [--certificate-network|--tls-lifetime|--shared-display]') }
 	base, root := os.abs_path(os.args[1]), os.abs_path(os.args[2])
 	if os.exists(root) { panic('fresh output required') }
 	os.mkdir_all(root + '/smali')!
@@ -1658,6 +1659,7 @@ fn main() {
 	updatepolicyprobe.install(root)!
 	graphictextprobe.install(root)!
 	startupfixture.install_gles_client_regression(root)!
+	if shared_display { startupfixture.install_shared_display_regression(root)! }
 	deviceconfigprobe.install(root)!
 	statslogprobe.install(root)!
 	keygenprobe.install(root)!

@@ -35,6 +35,30 @@ __global ws_egl_binding_key u32
 __global ws_egl_provider voidptr
 __global ws_egl_mutex C.pthread_mutex_t
 
+struct WsEglDisplayLease {
+mut:
+	display voidptr
+	references u32
+	major i32
+	minor i32
+}
+
+// Android counts successful eglInitialize calls across clients of a display.
+// All access uses ws_egl_mutex. Static bounded storage needs no allocation and
+// final termination makes the slot reusable.
+__global ws_egl_display_leases [16]WsEglDisplayLease
+
+fn ws_egl_display_lease(display voidptr) &WsEglDisplayLease {
+	unsafe {
+		for i := 0; i < 16; i++ {
+			if ws_egl_display_leases[i].references != 0 && ws_egl_display_leases[i].display == display {
+				return &ws_egl_display_leases[i]
+			}
+		}
+		return nil
+	}
+}
+
 fn ws_egl_symbol(name &char) voidptr {
 	unsafe { return C.dlsym(ws_egl_provider, name) }
 }
@@ -109,7 +133,40 @@ pub fn ws_egl_display(native_display voidptr) voidptr {
 @[export: 'eglInitialize']
 pub fn ws_egl_initialize(display voidptr, major &i32, minor &i32) u32 {
 	unsafe {
-		result := WsEglInitialize(ws_egl_symbol(c'eglInitialize'))(display, major, minor)
+		C.pthread_mutex_lock(&ws_egl_mutex)
+		defer { C.pthread_mutex_unlock(&ws_egl_mutex) }
+		lease := ws_egl_display_lease(display)
+		if lease != nil {
+			if lease.references == u32(0xffffffff) {
+				ws_egl_error(0x3003)
+				ws_trace_egl_state(c'initialize', display, nil, nil, nil, 0)
+				return 0
+			}
+			lease.references++
+			if major != nil { *major = lease.major }
+			if minor != nil { *minor = lease.minor }
+			ws_trace_egl_state(c'initialize', display, nil, nil, nil, 1)
+			return 1
+		}
+		mut available := &WsEglDisplayLease(nil)
+		for i := 0; i < 16; i++ {
+			if ws_egl_display_leases[i].references == 0 {
+				available = &ws_egl_display_leases[i]
+				break
+			}
+		}
+		if available == nil {
+			ws_egl_error(0x3003)
+			ws_trace_egl_state(c'initialize', display, nil, nil, nil, 0)
+			return 0
+		}
+		mut actual_major, mut actual_minor := i32(0), i32(0)
+		result := WsEglInitialize(ws_egl_symbol(c'eglInitialize'))(display, &actual_major, &actual_minor)
+		if result != 0 {
+			*available = WsEglDisplayLease{ display: display, references: 1, major: actual_major, minor: actual_minor }
+			if major != nil { *major = actual_major }
+			if minor != nil { *minor = actual_minor }
+		}
 		ws_trace_egl_state(c'initialize', display, nil, nil, nil, result)
 		return result
 	}

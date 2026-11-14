@@ -44,7 +44,10 @@ passed the full signed ARM regression in r80. Maps then returned Louvre details,
 photos and a route/turn preview without r79's fatal job API error. Geometry
 remained blank; the selected trace shows other-thread display termination before
 the renderer loses its current context/surface. An isolated lifetime regression
-is the next check. Google sign-in remains unqualified.
+is the next check. The [shared-display regression](maps-egl-display-leases-20261114.md)
+then failed on the original adapter and passed the full signed ARM regression
+with display ownership repaired. Actual Maps rendering and Google sign-in remain
+unqualified.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

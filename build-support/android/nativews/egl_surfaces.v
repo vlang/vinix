@@ -160,9 +160,16 @@ pub fn ws_egl_terminate(display voidptr) u32 {
 	unsafe {
 		C.pthread_mutex_lock(&ws_egl_mutex)
 		defer { C.pthread_mutex_unlock(&ws_egl_mutex) }
+		lease := ws_egl_display_lease(display)
+		if lease != nil && lease.references > 1 {
+			lease.references--
+			ws_trace_egl_state(c'terminate', display, nil, nil, nil, 1)
+			return 1
+		}
 		result := WsEglDisplayCall(ws_egl_symbol(c'eglTerminate'))(display)
 		ws_trace_egl_state(c'terminate', display, nil, nil, nil, result)
 		if result != 0 {
+			if lease != nil { *lease = WsEglDisplayLease{} }
 			mut item := ws_egl_windows
 			for item != nil {
 				next := item.next
