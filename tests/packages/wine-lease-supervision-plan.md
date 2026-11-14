@@ -2206,6 +2206,25 @@ No successful real-root CLI admission, cross-build, guest/Wine execution,
 complete source closure or measured heap qualification is claimed. Migration
 application/recovery and the remaining section 14 gates remain open.
 
+## Same-generation metadata freshness, 2026-11-14
+
+Source `dbabc6dbe` compares canonical encodings of decoded active state and the
+retained admission state under the package reader lock. A matching generation
+number alone no longer permits changed manifests/provenance. Signed host fixture
+tests pass for same-generation runtime version change refusal, whitespace-only
+JSON acceptance, restoration/retry and changed organization allowlist refusal,
+alongside preceding review/collection controls. Tests use the retained V compiler
+with `-backend c -gc none -manualfree` and repository module path.
+
+Evidence is frozen at `/Users/alex/.cache/vwmetareview-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-metadata-review-20261114-01.inventory.json`
+has SHA-256 `a63788b9a7aef91b75a6711689878b3dd5752c5bc14756012fdc83a1ebff53a6`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Source copies, generated host C/binary and logs are retained. No
+new production CLI build, cross-build, real-root admission, guest/Wine execution,
+complete source closure or measured heap qualification is claimed. Migration
+application/recovery and remaining section 14 gates stay open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
