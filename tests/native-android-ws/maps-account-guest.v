@@ -1813,7 +1813,51 @@ fn track_maps_launch(mut owned map[int]Identity, desktop DesktopIdentity) ! {
 	}
 }
 
+struct SelectedDataVolume {
+	uuid_hex string
+	volume_probe_sha256 string
+}
+
+fn data_volume_pass(status int, output string, uuid string) ! {
+	mut passes := 0
+	lines := output.split_into_lines()
+	for line in lines {
+		if !line.starts_with('MAPS-DATA-VOLUME-PASS ') { continue }
+		if !line.contains(' mount=/var/lib/vinix/apps uuid=' + uuid + ' ')
+			|| !line.ends_with(' write_sync_rename_readback=1') {
+			return error('selected data-volume proof differs')
+		}
+		passes++
+	}
+	if status != 0 || passes != 1 {
+		return error('selected Maps data volume is not verified; run /opt/current-api/data-volume --mount before broker startup')
+	}
+}
+
+fn require_selected_data_volume() ! {
+	metadata := '/opt/current-api/data-image.json'
+	if !os.exists(metadata) && !os.is_link(metadata) { return }
+	deployment_input(metadata)!
+	if os.lstat(metadata)!.size > 65536 { return error('data-volume metadata exceeds bound') }
+	selected := json2.decode[SelectedDataVolume](os.read_file(metadata)!)!
+	if !valid_pin(selected.volume_probe_sha256) || selected.uuid_hex.len != 32
+		|| !selected.uuid_hex.bytes().all((it >= `0` && it <= `9`) || (it >= `a` && it <= `f`)) {
+		return error('selected data-volume identity differs')
+	}
+	probe := '/opt/current-api/data-volume'
+	deployment_input(probe)!
+	if os.lstat(probe)!.size > 16 * 1024 * 1024 || hash(probe)! != selected.volume_probe_sha256 {
+		return error('selected data-volume probe differs')
+	}
+	checked := os.exec([probe, '--check'])
+	data_volume_pass(checked.exit_code, checked.output, selected.uuid_hex)!
+	println('MAPS-ACCOUNT-DATA-VOLUME-VERIFIED uuid=' + selected.uuid_hex)
+}
+
 fn broker_session(mut receipt Receipt) ! {
+	// Validate an explicitly selected persistent volume before provisioning can
+	// write app data into the RAM-backed fallback mountpoint.
+	require_selected_data_volume()!
 	dealias_sqlite()!
 	build := build_inputs(true)!
 	receipt.build_sha256 = hash(bundle_root + '/build.json')!
@@ -2829,6 +2873,17 @@ fn broker_drain_self_test() ! {
 }
 
 fn self_test() ! {
+	uuid := '0123456789abcdef0123456789abcdef'
+	volume_proof := 'MAPS-DATA-VOLUME-PASS device=/dev/vdb mount=/var/lib/vinix/apps uuid=' +
+		uuid + ' total_bytes=8589934592 available_bytes=8000000000 write_sync_rename_readback=1\n'
+	data_volume_pass(0, volume_proof, uuid)!
+	for invalid in ['', volume_proof + volume_proof,
+		volume_proof.replace(uuid, 'ffffffffffffffffffffffffffffffff'),
+		volume_proof.replace('mount=/var/lib/vinix/apps', 'mount=/tmp'),
+		volume_proof.replace('write_sync_rename_readback=1', 'write_sync_rename_readback=0')] {
+		if _ := data_volume_pass(0, invalid, uuid) { return error('unverified data-volume proof accepted') }
+	}
+	if _ := data_volume_pass(1, volume_proof, uuid) { return error('failed data-volume check accepted') }
 	onboarding_trace_self_test()!
 	poll_memory_self_test(256)!
 	auth_init_self_test()!

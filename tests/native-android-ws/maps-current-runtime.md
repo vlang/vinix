@@ -87,8 +87,11 @@ complete source and checks all 18 modified files against audited expectations.
 It fixes a measured assembly-generator allocation problem and adds checked
 remote cancellation. The incremental native build now links libart.so; its
 ELF shape and symbol-name comparisons pass. Fresh r86 stages that candidate
-with the complete runtime closure. Signed ARM/API and real Maps qualification
-remain pending; Google sign-in is unresolved.
+with the complete runtime closure. The [signed ARM API regression passed](maps-art-imageless-runtime-20261114.md).
+Actual Maps then exited after Add account. That retry missed mounting its data
+disk, losing private logs at shutdown; its exit cause remains unqualified.
+A new controller preflight checks the selected volume before provisioning.
+A correctly mounted retry and Google sign-in remain unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.
