@@ -471,14 +471,16 @@ fn poll_user_fds(pagemap &memory.Pagemap, user_fds u64, mut pollfds []PollFD, nf
 		fds_ptr = unsafe { &pollfds[0] }
 	}
 	ret, err := ppoll(fds_ptr, nfds, timeout_ptr, sigmask_ptr)
-	if err != 0 {
+	// Linux publishes revents even when a handled signal interrupts the wait.
+	// Copyout failure still takes precedence over the interrupted result.
+	if err != 0 && err != errno.eintr {
 		return ret, err
 	}
 	if nfds != 0
 		&& !usercopy.copy_to_pagemap(pagemap, user_fds, unsafe { voidptr(&pollfds[0]) }, nfds * sizeof(PollFD)) {
 		return errno.err, errno.efault
 	}
-	return ret, 0
+	return ret, err
 }
 
 // Streams synchronize their own queues and may sleep without the shared offset lock.

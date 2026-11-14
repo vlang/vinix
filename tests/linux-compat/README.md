@@ -89,6 +89,12 @@ It freezes three fixture sources and measures repeated cleanup.
 `ppolltime-reference.v` and `ppolltime-evidence.v` retain same-ELF Linux comparisons,
 original failures and complete artifact checks. See [receipts and limits](../../docs/linux-ppoll-timeout.md).
 
+`--cases ppollsignal` checks EINTR poll output, handler-visible ppoll timeouts,
+temporary masks, pending/observed signals and SA_RESTART with raw/libc calls.
+All three inputs are frozen and its budget is 600 seconds. `ppollsignal-host.v`,
+`ppollsignal-reference.v` and `ppollsignal-evidence.v` retain original failures,
+same-ELF comparisons and earlier refusals. See [receipts and limits](../../docs/linux-poll-signal-output.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

@@ -2380,6 +2380,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Both credential cohorts retain flat cleanup. See
   [the ppoll timeout qualification](docs/linux-ppoll-timeout.md).
 
+- [x] Publish native poll/ppoll revents after handled-signal interruption and
+  qualify ppoll handler-visible timeout output, temporary masks, pending and
+  observed waits, read-only timeouts and SA_RESTART. Identical native/Linux
+  ELFs pass 672 checks per architecture; originals fail twenty each. Earlier
+  Linux-oracle and memory-guard refusals remain retained. See
+  [the interrupted-poll qualification](docs/linux-poll-signal-output.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
