@@ -1,8 +1,70 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module wineadapter
 
-import os
 import strconv
+
+#include <dirent.h>
+fn C.fdopendir(int) voidptr
+
+// Read from the captured directory, never a recaptured path. Preallocate the
+// bounded list so manual-free array growth cannot retain old buffers. readdir
+// errors must not masquerade as EOF and authorize a partial inventory.
+fn review_names(parent int, limit int) ![]string {
+	fd := C.openat(parent, c'.', C.O_RDONLY | C.O_DIRECTORY | C.O_NOFOLLOW | C.O_CLOEXEC)
+	if fd < 0 { return error('cannot open Wine binding review directory') }
+	stream := C.fdopendir(fd)
+	if stream == unsafe { nil } { C.close(fd); return error('cannot enumerate Wine binding review directory') }
+	defer { C.closedir(stream) }
+	mut names := []string{cap: limit + 1}
+	mut accepted := false
+	defer { if !accepted { unsafe { names.free() } } }
+	for {
+		C.errno = 0
+		entry := C.readdir(stream)
+		if entry == unsafe { nil } {
+			if C.errno != 0 { return error('Wine binding review directory enumeration failed') }
+			break
+		}
+		name := unsafe { cstring_to_vstring(&entry.d_name[0]) }
+		if name == '.' || name == '..' { unsafe { name.free() }; continue }
+		names << name
+		if names.len > limit { break }
+	}
+	accepted = true
+	return names
+}
+
+fn binding_name_known(bindings []BuiltinBinding, name string) bool {
+	mut low := 0
+	mut high := bindings.len
+	for low < high {
+		middle := low + (high - low) / 2
+		if bindings[middle].name == name { return true }
+		if bindings[middle].name < name { low = middle + 1 } else { high = middle }
+	}
+	return false
+}
+
+fn review_extra_bindings(system int, store string, bindings []BuiltinBinding) ! {
+	names := review_names(system, 4096)!
+	defer { unsafe { names.free() } }
+	if names.len > 4096 { return error('Wine binding review prefix inventory is too large') }
+	generations := store + '/generations/'
+	defer { unsafe { generations.free() } }
+	mut buffer := [4097]u8{}
+	for name in names {
+		if binding_name_known(bindings, name) { continue }
+		length := C.readlinkat(system, name.str, &char(&buffer[0]), 4096)
+		if length < 0 {
+			if C.errno == C.EINVAL { continue }
+			return error('Wine binding review cannot inspect extra prefix entry')
+		}
+		if length < 1 || length >= 4096 { return error('Wine binding review extra link is not bounded') }
+		if unsafe { tos(&buffer[0], int(length)) }.starts_with(generations) {
+			return error('Wine prefix has a package-generation link absent from the selected builtin inventory')
+		}
+	}
+}
 
 pub enum BindingOperation {
 	keep
@@ -104,7 +166,7 @@ pub fn review_prefix_bindings(data string, builtins string, store string) !Bindi
 	defer { C.close(system) }
 	assets := absolute_directory(builtins)!
 	defer { C.close(assets) }
-	mut names := os.ls(builtins)!
+	mut names := review_names(assets, 900)!
 	defer { unsafe { names.free() } }
 	if names.len < 1 || names.len > 900 { return error('Wine binding review inventory is empty or too large') }
 	names.sort()
@@ -151,28 +213,7 @@ pub fn review_prefix_bindings(data string, builtins string, store string) !Bindi
 	// A removed builtin is absent from the new inventory. Do not silently
 	// approve a review which would leave its generation link behind. Personal
 	// files and links outside the package generation namespace remain private.
-	system_path := data + '/wine/drive_c/windows/system32'
-	defer { unsafe { system_path.free() } }
-	mut existing := os.ls(system_path)!
-	defer { unsafe { existing.free() } }
-	if existing.len > 4096 { return error('Wine binding review prefix inventory is too large') }
-	existing.sort()
-	generations := store + '/generations/'
-	defer { unsafe { generations.free() } }
-	for name in existing {
-		if name in names { continue }
-		mut buffer := [4097]u8{}
-		length := C.readlinkat(system, name.str, &char(&buffer[0]), 4096)
-		if length < 0 {
-			if C.errno == C.EINVAL { continue }
-			return error('Wine binding review cannot inspect extra prefix entry')
-		}
-		if length < 1 || length >= 4096 { return error('Wine binding review extra link is not bounded') }
-		observed := unsafe { tos(&buffer[0], int(length)) }
-		if observed.starts_with(generations) {
-			return error('Wine prefix has a package-generation link absent from the selected builtin inventory')
-		}
-	}
+	review_extra_bindings(system, store, review.bindings)!
 	prefix.recheck(data)!
 	review_same_child(prefix.directory, 'drive_c', drive)!
 	review_same_child(drive, 'windows', windows)!

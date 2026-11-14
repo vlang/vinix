@@ -60,7 +60,9 @@ fn run() ! {
 		return err
 	}
 	elapsed := time.sys_mono_now() - started
+	$if wine_scale_guest ? { println(os.read_file('/proc/kernel-resources') or { 'kernel resource counters unavailable' }) }
 	capture.migrate_bindings()!
+	$if wine_scale_guest ? { println(os.read_file('/proc/kernel-resources') or { 'kernel resource counters unavailable' }) }
 	if capture.review.prior_generation != 0 || !capture.review.bindings.all(it.operation == .keep) { return error('scale migration incomplete') }
 	for index in 0 .. rows {
 		name := '/' + index.str() + '.dll'

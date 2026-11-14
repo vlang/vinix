@@ -53,7 +53,7 @@ fn idle_review_foreign_owner(capture &IdleBindingReview) ! {
 	mut readable := C.pollfd{fd: ready[0], events: i16(C.POLLIN)}
 	assert C.poll(&readable, 1, 5000) == 1 && readable.revents & C.POLLIN != 0
 	assert C.read(ready[0], &signal, 1) == 1 && signal == 1
-	idle_review_refused(capture, 'lock already has an owner')
+	idle_target_refused(capture, 'lock already has an owner')
 	assert C.write(release[1], &signal, 1) == 1
 	mut status := 0
 	assert C.wine_binding_test_waitpid(pid, &status, 0) == pid && status == 0
@@ -105,10 +105,35 @@ fn test_builtin_generation_paths_are_canonical() {
 	assert runtime == 'org.vinix.wine'
 }
 
+fn test_captured_binding_directory_enumeration_is_bounded() {
+	root := os.real_path(os.temp_dir()) + '/wine-review-names-' + os.getpid().str()
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	os.write_file(root + '/a.dll', 'a')!
+	os.write_file(root + '/.private', 'private')!
+	os.symlink('/missing', root + '/b.dll')!
+	fd := absolute_directory(root)!
+	defer { C.close(fd) }
+	mut names := review_names(fd, 3)!
+	defer { unsafe { names.free() } }
+	names.sort()
+	assert names == ['.private', 'a.dll', 'b.dll']
+	bounded := review_names(fd, 1)!
+	defer { unsafe { bounded.free() } }
+	assert bounded.len == 2
+	if unexpected := review_names(-1, 3) {
+		unsafe { unexpected.free() }
+		assert false, 'invalid captured directory accepted'
+	}
+}
+
 fn idle_review_refused(capture &IdleBindingReview, message string) {
-	mut refused := false
-	capture.recheck() or { assert err.msg().contains(message), err.msg(); refused = true }
-	assert refused, 'changed idle review accepted'
+	capture.recheck() or { assert err.msg().contains(message), err.msg(); return }
+	assert false, 'changed idle review accepted'
+}
+
+fn idle_target_refused(capture &IdleBindingReview, message string) {
+	idle_review_refused(capture, message)
 	capture.recheck_migration_binding(0) or { assert err.msg().contains(message), err.msg(); return }
 	assert false, 'changed migration write admission accepted'
 }
@@ -401,7 +426,7 @@ fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
 	// An endpoint appearing after capture must refuse even if its bytes are
 	// not a socket. Never remove it as part of admission or cleanup.
 	os.write_file(capture.server.path + '/socket', 'foreign endpoint')!
-	idle_review_refused(&capture, 'socket entry already exists')
+	idle_target_refused(&capture, 'socket entry already exists')
 	assert os.read_file(capture.server.path + '/socket')! == 'foreign endpoint'
 	os.rm(capture.server.path + '/socket')!
 	idle_review_foreign_owner(&capture)!
@@ -409,28 +434,41 @@ fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
 	os.mv(lock_path, lock_path + '.saved')!
 	os.write_file(lock_path, '')!; os.chmod(lock_path, 0o600)!
 	os.chown(lock_path, int(C.geteuid()), os.getegid())!
-	idle_review_refused(&capture, 'lock identity changed')
+	idle_target_refused(&capture, 'lock identity changed')
 	os.rm(lock_path)!; os.mv(lock_path + '.saved', lock_path)!
 	os.write_file(new + '/added.dll', 'new asset')!
 	idle_review_refused(&capture, 'review changed')
+	// Unrelated inventory changes are rejected by full admission/final review;
+	// the write-loop check is intentionally scoped to the current target.
+	capture.recheck_migration_binding(0)!
 	os.rm(new + '/added.dll')!
 	os.write_file(new + '/kernel32.dll', 'NEW')!
-	idle_review_refused(&capture, 'asset bytes changed')
+	idle_target_refused(&capture, 'asset bytes changed')
 	os.write_file(new + '/kernel32.dll', 'new')!
+	capture.recheck()!
+	os.rm(new + '/kernel32.dll')!
+	os.symlink('/dev/null', new + '/kernel32.dll')!
+	idle_target_refused(&capture, 'asset is linked or unavailable')
+	os.rm(new + '/kernel32.dll')!
+	os.write_file(new + '/kernel32.dll', 'new')!
+	os.symlink(old + '/retired.dll', system + '/retired.dll')!
+	idle_review_refused(&capture, 'absent from the selected builtin inventory')
+	capture.recheck_migration_binding(0)!
+	os.rm(system + '/retired.dll')!
 	capture.recheck()!
 	// Equal names and link text must not disguise replacement directories.
 	os.mv(new, new + '.saved')!
 	os.mkdir(new)!; os.write_file(new + '/kernel32.dll', 'new')!
-	idle_review_refused(&capture, 'captured directory identity changed')
+	idle_target_refused(&capture, 'captured directory identity changed')
 	os.rmdir_all(new)!; os.mv(new + '.saved', new)!
 	os.mv(system, system + '.saved')!
 	os.mkdir(system)!; os.chmod(system, 0o700)!
 	os.chown(system, int(C.geteuid()), os.getegid())!
 	os.symlink(old + '/kernel32.dll', system + '/kernel32.dll')!
-	idle_review_refused(&capture, 'captured directory identity changed')
+	idle_target_refused(&capture, 'captured directory identity changed')
 	os.rmdir_all(system)!; os.mv(system + '.saved', system)!
 	os.rm(system + '/kernel32.dll')!; os.symlink(new + '/kernel32.dll', system + '/kernel32.dll')!
-	idle_review_refused(&capture, 'review changed')
+	idle_target_refused(&capture, 'review changed')
 	os.rm(system + '/kernel32.dll')!; os.symlink(old + '/kernel32.dll', system + '/kernel32.dll')!
 	capture.recheck()!
 	mut after := map[string]string{}
@@ -440,7 +478,7 @@ fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
 	closed_fd := C.open(c'/dev/null', C.O_RDONLY | C.O_CLOEXEC)
 	assert closed_fd == baseline
 	C.close(closed_fd)
-	idle_review_refused(&capture, 'canonical absolute data path')
+	idle_target_refused(&capture, 'canonical absolute data path')
 	mut released := prefix.acquire_launch(data)!
 	released.close()
 	if cli != '' {

@@ -166,12 +166,23 @@ fn (capture &IdleBindingReview) recheck_structure() ! {
 	}
 }
 
-// Retargeting retains full structural checks before each write, but hashes only
-// that write's target. Full payload checks bracket the complete operation;
-// unrelated payload changes can therefore refuse after recoverable progress.
+// Full structural/payload checks bracket migration. Within its single-owner
+// write loop, recheck the held namespace, exact old link and authenticated
+// target before each rename. Unrelated changes refuse at the final full check;
+// partial progress is recoverable. Cooperating writers must honor the guard.
 fn (capture &IdleBindingReview) recheck_migration_binding(index int) ! {
-	capture.recheck_structure()!
+	capture.recheck_namespace()!
 	binding := capture.review.bindings[index]
+	mut buffer := [4097]u8{}
+	length := C.readlinkat(capture.system_fd, binding.name.str, &char(&buffer[0]), 4096)
+	if length < 1 || length >= 4096
+		|| unsafe { tos(&buffer[0], int(length)) } != binding.observed { return error('Wine binding review changed while captured') }
+	mut info := C.stat{}
+	if C.vinix_wine_directory_fstatat(capture.assets_fd, binding.name.str,
+		unsafe { &info }, C.AT_SYMLINK_NOFOLLOW) != 0 || u32(info.st_mode) & 0o170000 == 0o120000 {
+		return error('Wine binding review asset is linked or unavailable')
+	}
+	if u32(info.st_mode) & 0o170000 != 0o100000 { return error('Wine binding review asset is not ordinary') }
 	digest, size := binding_asset_digest(capture.assets_fd, binding.name)!
 	defer { unsafe { digest.free() } }
 	if digest != capture.digests[index] || size != capture.sizes[index] {

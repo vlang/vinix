@@ -2070,18 +2070,22 @@ pending stage; unknown stage files/targets are preserved and refused. Repeated
 completed calls are supported. This library operation requires cooperating
 prefix writers to honor the guard: it cannot make check-and-rename atomic
 against arbitrary same-account writes. It is not atomic across all bindings.
-Full payload checks bracket migration. Before each replacement, all binding
-rows and captured directory identities are rechecked and that replacement's
-target is rehashed. Unrelated payload-byte changes are detected by the final
-full check and may therefore refuse after recoverable partial progress.
+Full structural and payload checks bracket migration. Before each replacement,
+the exact old link, captured directory identities, idle-server admission and
+that replacement's target bytes are rechecked. Unrelated inventory, binding or
+payload changes are detected by the final full check and may therefore refuse
+after recoverable partial progress. Cooperating writers must honor the retained
+prefix guard throughout.
 Automatic launch migration remains disabled. Host tests cover
 signed upgrade, simulated staged recovery and actual adapter-writer SIGKILL
 with partial retargets. Signed marker-runtime migrations also pass under ordinary
 real-root service admission in x86_64 and AArch64 guests, including subsequent
 public review and prefix preparation. Both guests also pass migration-owner
 SIGKILL recovery: the live owner retains its prefix guard and generation lease,
-death releases both, and fresh admitted migration resumes partial work. Actual
-Wine execution and power-loss qualification remain required.
+death releases both, and fresh admitted migration resumes partial work. A local
+owned x86 Wine console check also passes generation-path relocation and Win64
+relaunch. Broader Wine version-upgrade/GUI and power-loss qualification remain
+required.
 
 `vinix-package wine-prefix-migrate ID PRIVATE_DATA` explicitly invokes staged
 retargeting and additions under fresh real-root service admission. It shares
@@ -2095,13 +2099,16 @@ The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.
 This is a generation-path relocation check, not a Wine version-upgrade check.
-It currently refuses during migration on the retained test kernel; the relaunch
-acceptance marker is not reached. The smaller `wine-prefix-migration-scale.v`
+The local x86 case passes migration of 741 builtin links, Win64 status 37,
+private-data preservation, process retirement and generation-lease release.
+The smaller `wine-prefix-migration-scale.v`
 probe can be built with `-d wine_scale_guest` for x86 PID1 execution and run with
 `wine-prefix-scale-check FRESH_WORK X86_KERNEL COMPILED_GUEST`. It drops to
 UID/GID 1000, migrates 741 one-byte assets and records resource-budget counters
-on refusal. Both runners continue to require successful migration; a diagnostic
-failure is not a passing qualification. See the [refusal checkpoint](../../tests/packages/wine-lease-supervision-plan.md#real-wine-migration-budget-refusal-2026-11-14).
+on refusal. Its 741-link migration and repetition now pass without budget
+denials in the retained 1 GiB guest. Both runners require actual completion;
+see the [acceptance report](../../tests/packages/wine-lease-supervision-plan.md#resource-bounded-migration-and-real-wine-relaunch-2026-11-14)
+and [earlier refusal checkpoint](../../tests/packages/wine-lease-supervision-plan.md#real-wine-migration-budget-refusal-2026-11-14).
 
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
