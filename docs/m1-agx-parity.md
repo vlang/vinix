@@ -124,6 +124,33 @@ This inventory does not certify unchecked behavior as equivalent. Closing the
 ABI and scheduler rows is a substantial remaining port, not a rename or a
 package-selection change.
 
+### Packaged wire protocol components
+
+The first ABI migration component derives all 28 wire records from the
+packaged `asahi_drm.h` at Linux-Aurora
+`bed544bdf93a496ebf70ba180923bab12b6e01cf`. The native C oracle checks every
+record size and field offset, the twelve request numbers, and command,
+permission and render flag constants. An allocation-free flat-packet reader
+handles 64 hardware commands, synthetic attachment state, independent
+subqueue barriers, short records and unsupported tails. Generic DRM framing
+can select a negotiated ABI and apply extensible request copying.
+
+These components are not yet registered by the native Asahi driver. Its
+active Mesa 25 ABI and two-command scheduler therefore remain gaps. The
+protocol fixtures exercise the production reader and request-copy routines
+under address/undefined-behavior sanitizers; they do not execute GPU work.
+Generator unit tests and both kernel builds passed. Kernel builds use
+`c6cf347718176e0a9da776a0b645792d9c9dce23` plus the retained DRM source.
+
+The immutable bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-abi-port-20261114/bundle/`.
+Its sibling `inventory.json` has SHA-256
+`374939ce981051c8f511c80e31af864c0e9de9ea7dfd495dc1dda37de3d52773`.
+The retained checker supports `check-inventory BUNDLE RECEIPT`. Linked kernel
+SHA-256 values are `ac2218487f5e7baab4d4a2aa7204022ef1ab7f45e809057dcba0f8485e64af9d`
+(AArch64) and `4c0c5ff068f72f9ae4ef785de0ea07bd3b71acaf6397b442d07b24fd862b58c2`
+(x86_64). No hardware reboot was performed.
+
 ## Validation and continuation
 
 The host fixtures execute production page-table, publication, retirement and

@@ -33,6 +33,8 @@ pub:
 	direction u32
 	handler   fn (&DrmDevice, voidptr, voidptr) int = unsafe { nil }
 	flags     u32
+	abi       u32 // zero: shared; otherwise selected by the driver's file ABI
+	extensible bool // zero-extend short input and validate unknown input tails
 }
 
 pub struct DrmDriver {
@@ -44,6 +46,7 @@ pub mut:
 	patchlevel     int
 	features       u32
 	ioctls         []DrmIoctl
+	ioctl_abi      fn (&DrmDevice, voidptr) u32 = unsafe { nil }
 	file_close     fn (&DrmDevice, voidptr) = unsafe { nil }
 	gem_close      fn (&DrmDevice, voidptr, u32) int = unsafe { nil }
 	gem_export     fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
@@ -239,12 +242,16 @@ struct DrmIoctlLayout {
 pub:
 	size      u32
 	direction u32
+	driver_index int = -1
+	extensible bool
+	flags u32
 }
 
 // Linux ioctl direction bits describe userspace's view: WRITE copies the
 // request into the kernel and READ copies the result back to userspace.
 pub const ioctl_write = u32(1)
 pub const ioctl_read = u32(2)
+pub const ioctl_no_activity = u32(1) << 31
 const ioctl_size_shift = u32(16)
 const ioctl_size_mask = u32(0x3fff)
 const ioctl_direction_shift = u32(30)
@@ -451,18 +458,61 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 // reuse the same numbers across drivers. Prefer layout metadata from the
 // device's own table so, for example, Asahi 0x41 is never decoded as VirtIO's
 // unrelated 0x41 request.
-fn ioctl_layout(dev &DrmDevice, cmd u32) ?DrmIoctlLayout {
+fn ioctl_layout(dev &DrmDevice, cmd u32, request_size u32, direction u32, abi u32) ?DrmIoctlLayout {
 	if dev.driver != unsafe { nil } {
-		for entry in dev.driver.ioctls {
-			if entry.cmd == cmd && entry.size != 0 && entry.direction != 0 {
+		mut private_command := false
+		for index, entry in dev.driver.ioctls {
+			if entry.cmd != cmd { continue }
+			if entry.size == 0 || entry.direction == 0 { continue }
+			private_command = true
+			if entry.size != 0 && entry.direction == direction
+				&& (abi == 0 || entry.abi == 0 || entry.abi == abi)
+				&& (entry.extensible || entry.size == request_size) {
 				return DrmIoctlLayout{
 					size: entry.size
 					direction: entry.direction
+					driver_index: index
+					extensible: entry.extensible
+					flags: entry.flags
 				}
 			}
 		}
+		if private_command { return none }
 	}
 	return common_ioctl_layout(cmd)
+}
+
+// Extensible DRM requests follow copy_struct_from_user semantics: fields an
+// older caller omitted start at zero, and unknown nonzero input is rejected.
+// The two bounded tail loops never allocate a second, user-sized buffer.
+fn copy_ioctl_input(buffer voidptr, size u32, user u64, user_size u32) int {
+	unsafe { C.memset(buffer, 0, size) }
+	if user_size != 0 && u64(user_size - 1) > ~user { return -14 }
+	copy_size := if user_size < size { user_size } else { size }
+	if copy_size != 0 && !usercopy.copy_from_user(buffer, user, u64(copy_size)) { return -14 }
+	mut tail := [64]u8{}
+	mut offset := size
+	for offset < user_size {
+		count := if user_size - offset < 64 { user_size - offset } else { u32(64) }
+		if !usercopy.copy_from_user(unsafe { &tail[0] }, user + offset, u64(count)) { return -14 }
+		for i := u32(0); i < count; i++ { if tail[i] != 0 { return -22 } }
+		offset += count
+	}
+	return 0
+}
+
+fn copy_ioctl_output(user u64, buffer voidptr, size u32, user_size u32) bool {
+	if user_size != 0 && u64(user_size - 1) > ~user { return false }
+	copy_size := if user_size < size { user_size } else { size }
+	if copy_size != 0 && !usercopy.copy_to_user(user, buffer, u64(copy_size)) { return false }
+	mut zeros := [64]u8{}
+	mut offset := size
+	for offset < user_size {
+		count := if user_size - offset < 64 { user_size - offset } else { u32(64) }
+		if !usercopy.copy_to_user(user + offset, unsafe { &zeros[0] }, u64(count)) { return false }
+		offset += count
+	}
+	return true
 }
 
 // The node is /dev/dri/<prefix><number>.
@@ -542,14 +592,19 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	}
 
 	raw := u32(request & 0xffffffff)
-	layout := ioctl_layout(this.dev, cmd) or {
+	request_size := (raw >> ioctl_size_shift) & ioctl_size_mask
+	request_direction := (raw >> ioctl_direction_shift) & ioctl_direction_mask
+	if this.dev == unsafe { nil } || this.dev.driver == unsafe { nil } || !this.dev.registered {
+		errno.set(errno.enodev)
+		return none
+	}
+	abi := if this.dev.driver.ioctl_abi != unsafe { nil } { this.dev.driver.ioctl_abi(this.dev, handle) } else { u32(0) }
+	layout := ioctl_layout(this.dev, cmd, request_size, request_direction, abi) or {
 		errno.set(errno.einval)
 		return none
 	}
-	request_size := (raw >> ioctl_size_shift) & ioctl_size_mask
-	request_direction := (raw >> ioctl_direction_shift) & ioctl_direction_mask
-	if request_size != layout.size || request_direction != layout.direction
-		|| argp == unsafe { nil } {
+	if (!layout.extensible && request_size != layout.size) || request_direction != layout.direction
+		|| (request_size != 0 && argp == unsafe { nil }) {
 		errno.set(errno.einval)
 		return none
 	}
@@ -562,22 +617,26 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 		memory.free(buffer)
 	}
 	if layout.direction & ioctl_write != 0 {
-		if !usercopy.copy_from_user(buffer, u64(argp), u64(layout.size)) {
-			errno.set(errno.efault)
+		copy_result := copy_ioctl_input(buffer, layout.size, u64(argp), request_size)
+		if copy_result < 0 {
+			errno.set(u64(-copy_result))
 			return none
 		}
 	} else {
 		unsafe { C.memset(buffer, 0, layout.size) }
 	}
 
-	ret := drm_ioctl(this.dev, cmd, buffer, handle)
+	ret := if layout.driver_index >= 0 {
+		entry := this.dev.driver.ioctls[layout.driver_index]
+		if entry.handler == unsafe { nil } { -22 } else { entry.handler(this.dev, handle, buffer) }
+	} else { drm_ioctl(this.dev, cmd, buffer, handle) }
 	if ret < 0 {
 		errno.set(u64(-ret))
 		return none
 	}
-	account_activity(this.dev, cmd)
+	if layout.flags & ioctl_no_activity == 0 { account_activity(this.dev, cmd) }
 	if layout.direction & ioctl_read != 0
-		&& !usercopy.copy_to_user(u64(argp), buffer, u64(layout.size)) {
+		&& !copy_ioctl_output(u64(argp), buffer, layout.size, request_size) {
 		errno.set(errno.efault)
 		return none
 	}
