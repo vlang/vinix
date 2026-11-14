@@ -121,6 +121,9 @@ dead: %r = fpext half %x to double
 define half @guard_freeze(half %x, half %y, i64 %c) { %r = freeze <2 x half> poison
   %element = extractelement <2 x half> %r, i32 0
   ret half %element }
+define half @guard_wide_freeze(half %x, half %y, i64 %c) { %r = freeze <17 x half> poison
+  %element = extractelement <17 x half> %r, i32 0
+  ret half %element }
 define float @guard_double(half %x, half %y, i64 %c) { %d = fpext half %x to double
   %r = fptrunc double %d to float
   ret float %r }
@@ -230,7 +233,9 @@ fn main() {
 	}
 	args := [u64(0x7c01), 0, 0]; defer { unsafe { args.free() } }
 	mut guards := 0
-	for name in ['guard_undef', 'guard_trunc_fmf', 'guard_ext_fmf', 'guard_negate_fmf', 'guard_compare_flags', 'guard_to_integer_flags', 'guard_from_integer_flags', 'guard_dead_precision', 'guard_freeze', 'guard_double', 'guard_bfloat'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported half fixture') }
+	for name in ['guard_undef', 'guard_trunc_fmf', 'guard_ext_fmf', 'guard_negate_fmf', 'guard_compare_flags', 'guard_to_integer_flags', 'guard_from_integer_flags', 'guard_dead_precision', 'guard_wide_freeze', 'guard_double', 'guard_bfloat'] { p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64) or { guards++; continue }; panic('accepted unsupported half fixture: ' + name) }
+	frozen := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'guard_freeze')!, args, 3)!
+	if frozen.poison || frozen.bits != 16 || frozen.value != 0 || frozen.steps != 3 { panic('supported half vector freeze failed') }
 	for name in ['poison_widen', 'poison_narrow', 'poison_negate'] { if !p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, name)!, args, 64)!.poison { panic('half poison lost') } }
 	if p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'lazy_select')!, args, 64)!.value != args[0] { panic('half select not lazy') }
 	baseline := p.run_scalar_function(ir, stream, pools, bodies, function_index(ir, 'widen')!, [u64(0x3c00), 0, 0], 64)!; mut controls := 0
