@@ -320,6 +320,21 @@ canonical writeonly/captures(none), fourth immarg and memory(argmem: write)
 properties with bounded validation. Deferred fills check byte ranges, untouched
 prefixes and input changes after encoding.
 
+Nonvolatile `llvm.memmove` accepts literal i32/i64 lengths and resolved source
+and destination pointers, including overlap and aliases through different
+bindings. Nonempty destinations require space 0/1 and write permission; sources
+may use space 2 and require read access. Full extents are derived before stores.
+Zero length adds no access requirement, including for empty readonly bindings.
+Each move costs its instruction plus two steps per byte and shares the same
+million-step budget with fills and scalar operations. One per-run scratch array,
+sized for the largest move and freed on exit, snapshots source bytes before
+writing; subsequent moves see earlier writes. Exact declarations admit source
+readonly/captures(none), destination writeonly/captures(none), fourth immarg
+and memory(argmem: readwrite) properties. Literal pointers, volatile/dynamic
+lengths, call-site attributes, memcpy and inline/atomic variants reject.
+Deferred dispatches exercise both overlap directions, identical/disjoint
+ranges, different bindings to one buffer, repeated moves and preserved bytes.
+
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct
 forward blocks. Each tested case costs one additional step; default paths test

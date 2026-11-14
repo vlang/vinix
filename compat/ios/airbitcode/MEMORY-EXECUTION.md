@@ -7,8 +7,9 @@ checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
-Nonvolatile constant-length `llvm.memset` calls also initialize byte ranges,
-as described below. Fast-math flags, alloca, integer-pointer/address-space casts,
+Nonvolatile constant-length `llvm.memset` and `llvm.memmove` also operate on
+byte ranges, as described below. Fast-math flags, alloca,
+integer-pointer/address-space casts,
 loops, atomics, volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
@@ -39,7 +40,8 @@ conditions retain the scalar reader's error behavior.
 Buffer extents, alignments and permissions combine every block's requirements,
 including inactive paths. `IRMemoryProfile.steps` is the conservative total
 instruction count across all blocks plus the maximum case comparisons for
-every switch and every memset byte; callers must supply at least that budget
+every switch, every memset byte and twice every memmove byte;
+callers must supply at least that budget
 before any execution. `IRVoidRun.steps` counts the executed path, charging each
 branch, PHI and return once. Poison branch conditions error; undef conditions
 retain the scalar reader's error behavior. Dynamic errors leave earlier stores
@@ -337,6 +339,28 @@ bindings, including address space 2. Existing GEP extents and earlier executed
 instructions still apply. Execution uses indexed byte writes without calling
 host memset, exposing host addresses or allocating a fill buffer.
 
+Nonvolatile `llvm.memmove.pD.pS.i32/i64` calls use the same exact void call,
+constant-length and literal-false volatility checks. Destination spaces D=0/1
+and source spaces S=0/1/2 support nonempty moves; D=2 only permits zero length.
+Both pointers use the existing resolved sources, with full source read and
+destination write extents checked before stores. Source readability and
+destination writability combine normally when both name one binding.
+Zero length adds neither read/write usage nor extent; existing GEP requirements
+remain. Literal null/poison/undef pointers reject on either side even at zero
+length. Memcpy, inline/atomic variants and general calls remain unsupported.
+
+Move declarations admit source readonly and nocapture/captures(none) as well
+as the destination properties and fourth immarg; their canonical memory effect
+is memory(argmem: readwrite), versions 0/1/2. Other attributes reject. Each
+move costs one instruction plus two steps per byte (read and write), sharing
+the cumulative million-step limit with fills, switches and ordinary instructions.
+One scratch byte array per run is sized for the largest admitted move and freed
+on every exit. Every move snapshots all source bytes before its first write,
+including when distinct bindings or borrowed slices alias. Later moves see
+earlier writes and reuse that scratch storage. No host address comparison or
+host memmove call is used. The profile records only the scratch size, with no
+new owned array in the cached profile.
+
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
 address spaces, minimum extents, alignment and read/write usage; release it
@@ -535,6 +559,15 @@ across i32/i64 lengths, direct/derived destinations, pointer control chains,
 aliases and zero-length indeterminate bytes. It checks exact extents, costs,
 permissions, malformed call/type metadata, literal/volatile/length exclusions,
 dynamic byte errors, frozen/untaken fills and cumulative/million-step budgets.
+
+`tests/ios/air-memory-memmove.v` compares i32/i64 moves with native LLVM,
+including both overlap directions, identical/disjoint ranges, cross-binding
+aliases and overlapping borrowed slices, pointer-control chains and repeated
+moves of different lengths. It checks empty readonly bindings, exact extents
+and costs, malformed metadata/types, forbidden pointers/attributes/lengths,
+condition errors and cumulative/mixed/million-step budgets. Rejection-only
+bodies remain in the interpreter fixture but are excluded from native
+compilation; the verified native input is saved separately.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including
