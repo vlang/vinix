@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'disjoint', 'disjoint_frozen', 'samesign', 'samesign_frozen', 'cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen', 'constant_lane', 'constant_lane_frozen', 'vector_update', 'vector_update_undef', 'vector_update_frozen', 'vector_shuffle', 'vector_shuffle_undef', 'vector_shuffle_frozen', 'vector_freeze', 'vector_freeze_undef_index', 'vector_freeze_old_undef', 'vector_freeze_old_poison', 'vector_select', 'vector_select_poison', 'vector_select_frozen_condition', 'vector_select_undef_condition', 'vector_select_old', 'vector_lane_select', 'vector_lane_select_poison', 'vector_lane_select_undef', 'vector_lane_select_frozen', 'vector_lane_select_old', 'vector_lane_select_all_poison', 'vector_compare', 'vector_compare_poison', 'vector_compare_undef', 'vector_compare_frozen', 'vector_compare_old', 'vector_compare_samesign', 'vector_compare_constant', 'vector_binary_0_0', 'vector_binary_0_1', 'vector_binary_0_2', 'vector_binary_0_3', 'vector_binary_1_0', 'vector_binary_1_1', 'vector_binary_1_2', 'vector_binary_1_3', 'vector_binary_2_0', 'vector_binary_2_1', 'vector_binary_2_2', 'vector_binary_2_3', 'vector_binary_3_0', 'vector_binary_3_1', 'vector_binary_4_0', 'vector_binary_4_1', 'vector_binary_5_0', 'vector_binary_6_0', 'vector_binary_7_0', 'vector_binary_7_1', 'vector_binary_7_2', 'vector_binary_7_3', 'vector_binary_8_0', 'vector_binary_8_1', 'vector_binary_9_0', 'vector_binary_9_1', 'vector_binary_10_0', 'vector_binary_11_0', 'vector_binary_11_1', 'vector_binary_12_0', 'vector_binary_poison', 'vector_binary_undef', 'vector_binary_frozen', 'vector_binary_sources', 'vector_binary_divide', 'vector_binary_signed_divide', 'vector_binary_signed_rem', 'vector_binary_overshift', 'vector_binary_chain', 'bad_vector_binary', 'bad_vector_compare', 'bad_wide_vector_condition', 'bad_vector_freeze', 'bad_shuffle_count', 'bad_lane_count', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_convert', 'saturating_convert_frozen', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'disjoint', 'disjoint_frozen', 'samesign', 'samesign_frozen', 'cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen', 'constant_lane', 'constant_lane_frozen', 'vector_update', 'vector_update_undef', 'vector_update_frozen', 'vector_shuffle', 'vector_shuffle_undef', 'vector_shuffle_frozen', 'vector_freeze', 'vector_freeze_undef_index', 'vector_freeze_old_undef', 'vector_freeze_old_poison', 'vector_select', 'vector_select_poison', 'vector_select_frozen_condition', 'vector_select_undef_condition', 'vector_select_old', 'vector_lane_select', 'vector_lane_select_poison', 'vector_lane_select_undef', 'vector_lane_select_frozen', 'vector_lane_select_old', 'vector_lane_select_all_poison', 'vector_compare', 'vector_compare_poison', 'vector_compare_undef', 'vector_compare_frozen', 'vector_compare_old', 'vector_compare_samesign', 'vector_compare_constant', 'vector_binary_0_0', 'vector_binary_0_1', 'vector_binary_0_2', 'vector_binary_0_3', 'vector_binary_1_0', 'vector_binary_1_1', 'vector_binary_1_2', 'vector_binary_1_3', 'vector_binary_2_0', 'vector_binary_2_1', 'vector_binary_2_2', 'vector_binary_2_3', 'vector_binary_3_0', 'vector_binary_3_1', 'vector_binary_4_0', 'vector_binary_4_1', 'vector_binary_5_0', 'vector_binary_6_0', 'vector_binary_7_0', 'vector_binary_7_1', 'vector_binary_7_2', 'vector_binary_7_3', 'vector_binary_8_0', 'vector_binary_8_1', 'vector_binary_9_0', 'vector_binary_9_1', 'vector_binary_10_0', 'vector_binary_11_0', 'vector_binary_11_1', 'vector_binary_12_0', 'vector_binary_poison', 'vector_binary_undef', 'vector_binary_frozen', 'vector_binary_sources', 'vector_binary_divide', 'vector_binary_signed_divide', 'vector_binary_signed_rem', 'vector_binary_overshift', 'vector_binary_chain', 'vector_fneg_half_raw', 'vector_fneg_half_poison', 'vector_fneg_half_undef', 'vector_fneg_half_source', 'vector_fneg_half_result', 'vector_fneg_half_old', 'vector_fneg_half_double', 'vector_fneg_half_chain', 'vector_fneg_float_raw', 'vector_fneg_float_poison', 'vector_fneg_float_undef', 'vector_fneg_float_source', 'vector_fneg_float_result', 'vector_fneg_float_old', 'vector_fneg_float_double', 'vector_fneg_float_chain', 'bad_vector_fneg', 'bad_vector_binary', 'bad_vector_compare', 'bad_wide_vector_condition', 'bad_vector_freeze', 'bad_shuffle_count', 'bad_lane_count', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_convert', 'saturating_convert_frozen', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1188,6 +1188,10 @@ fn sm_test_compute_library(label string) ![]u8 {
 
 
 
+		if name == 'bad_vector_fneg' {
+			source.write_string('define void @bad_vector_fneg(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %v = fneg nnan <2 x float> zeroinitializer\n ret void }\n'); continue
+		}
+		if name.starts_with('vector_fneg_') { sm_vector_fneg_fixture(mut source, name); continue }
 		if name == 'bad_vector_binary' {
 			source.write_string('define void @bad_vector_binary(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { store i32 17, ptr addrspace(1) %out\n %v = fadd <2 x float> zeroinitializer, zeroinitializer\n ret void }\n'); continue
 		}
@@ -1516,7 +1520,7 @@ fn test_software_metal_compute() {
 		pipeline := sm_test_compute_pipeline(d, library, 'sum', &error_slot)
 		assert pipeline != 0 && error_slot == 0x1234
 		assert sm_send(pipeline, c'device') == d && sm_send(pipeline, c'threadExecutionWidth') == 1 && sm_send(pipeline, c'maxTotalThreadsPerThreadgroup') == 1 && sm_send(pipeline, c'staticThreadgroupMemoryLength') == 0
-		for name in ['bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'looping', 'oversized_switch', 'cast_constant_store', 'cast_constant_view_store', 'bad_lane_count', 'bad_shuffle_count', 'bad_vector_freeze', 'bad_wide_vector_condition', 'bad_vector_compare', 'bad_vector_binary', 'no_metadata', 'missing'] {
+		for name in ['bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'looping', 'oversized_switch', 'cast_constant_store', 'cast_constant_view_store', 'bad_lane_count', 'bad_shuffle_count', 'bad_vector_freeze', 'bad_wide_vector_condition', 'bad_vector_compare', 'bad_vector_binary', 'bad_vector_fneg', 'no_metadata', 'missing'] {
 			error_slot = 0
 			assert sm_test_compute_pipeline(d, library, name, &error_slot) == 0
 			sm_library_check_error(error_slot, if name == 'missing' { i64(1) } else { i64(3) })
@@ -1864,6 +1868,7 @@ fn test_software_metal_compute() {
 			}
 		}
 		sm_test_vector_binary_dispatches(d, library, queue, a, b, output, ap, bp, outp)
+		sm_test_vector_fneg_dispatches(d, library, queue, a, b, output, ap, bp, outp)
 		for i in 0 .. 8 { unsafe { *(&u32(outp + u64(i * 4))) = vector_saved[i] } }
 		bits_command := sm_send(queue, c'commandBuffer'); bits_encoder := sm_send(bits_command, c'computeCommandEncoder')
 		for i, name in ['bits', 'bits_frozen'] {
@@ -2558,4 +2563,51 @@ fn sm_test_vector_binary_dispatches(device u64, library u64, queue u64, a u64, b
 		}
 	}
 	assert completed == 61 && failed == 39
+}
+
+fn sm_vector_fneg_fixture(mut source strings.Builder, name string) {
+	parts := name.split('_'); t := parts[2]; mode := parts[3]; bits := if t == 'half' { 16 } else { 32 }
+	other := if mode in ['undef', 'source'] { 'undef' } else if mode in ['poison', 'result'] { 'poison' } else { 'bitcast (i${bits} ${u64(1) << u32(bits - 1)} to ${t})' }
+	source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load ${t}, ptr addrspace(2) %a, align 1\n %r = load i32, ptr addrspace(2) %b, align 4\n store i32 17, ptr addrspace(1) %out, align 4\n %a0 = insertelement <2 x ${t}> <${t} zeroinitializer, ${t} ${other}>, ${t} %x, i32 0\n')
+	if mode == 'source' { source.write_string('%src = freeze <2 x ${t}> %a0\n') }
+	source.write_string('%n = fneg <2 x ${t}> ${if mode == 'source' { '%src' } else { '%a0' }}\n %f = freeze <2 x ${t}> %n\n')
+	if mode == 'old' { source.write_string('%changed = insertelement <2 x ${t}> %n, ${t} zeroinitializer, i32 0\n') }
+	if mode in ['double', 'chain'] { source.write_string('%doubled = fneg <2 x ${t}> %n\n') }
+	if mode == 'chain' { source.write_string('%c = fcmp uno <2 x ${t}> %n, %n\n %s = select <2 x i1> %c, <2 x ${t}> %n, <2 x ${t}> %doubled\n %shuffled = shufflevector <2 x ${t}> %s, <2 x ${t}> %n, <2 x i32> <i32 1, i32 2>\n') }
+	selected := match mode { 'result' { '%f' } 'old' { '%changed' } 'double' { '%doubled' } 'chain' { '%shuffled' } else { '%n' } }
+	source.write_string('%old = extractelement <2 x ${t}> %f, i32 %r\n %new = extractelement <2 x ${t}> ${selected}, i32 ${if mode == 'chain' { '1' } else { '%r' }}\n')
+	for i, value in ['old', 'new'] {
+		source.write_string('%raw${i} = bitcast ${t} %${value} to i${bits}\n')
+		if bits == 16 { source.write_string('%word${i} = zext i16 %raw${i} to i32\n') }
+		source.write_string('%dst${i} = getelementptr i32, ptr addrspace(1) %out, i64 ${i + 1}\n store i32 %${if bits == 16 { 'word' } else { 'raw' }}${i}, ptr addrspace(1) %dst${i}, align 4\n')
+	}
+	source.write_string('ret void }\n')
+}
+fn sm_test_vector_fneg_dispatches(device u64, library u64, queue u64, a u64, b u64, output u64, ap u64, bp u64, outp u64) {
+	mut completed := 0; mut failed := 0
+	for format in ['half', 'float'] {
+		bits := if format == 'half' { 16 } else { 32 }; sign := u32(1) << u32(bits - 1)
+		words := if bits == 16 { [u32(0), 0x8000, 1, 0x8001, 0x3ff, 0x400, 0x7bff, 0xfbff, 0x7c00, 0xfc00, 0x7c01, 0xfc01, 0x7e55, 0xfe55, 0x3e00, 0xbe00] } else { [u32(0), 0x80000000, 1, 0x80000001, 0x7fffff, 0x800000, 0x7f7fffff, 0xff7fffff, 0x7f800000, 0xff800000, 0x7f800001, 0xff800001, 0x7fc12345, 0xffc12345, 0x3fc00000, 0xbfc00000] }
+		for mode in ['raw', 'poison', 'undef', 'source', 'result', 'old', 'double', 'chain'] { for sample in 0 .. if mode == 'raw' { 16 } else { 1 } {
+			command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+			pipeline := sm_test_compute_pipeline(device, library, 'vector_fneg_${format}_${mode}', unsafe { nil }); assert pipeline != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+			sm_test_compute_buffer(encoder, a, 0, 0); sm_test_compute_buffer(encoder, b, 0, 3); sm_test_compute_buffer(encoder, output, 4, 7)
+			sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(encoder, c'endEncoding'); objc_release(pipeline)
+			// The deferred command must see these writes made after encoding.
+			x := words[sample]; index := if mode in ['poison', 'source', 'result'] { u32(1) } else { u32(0) }
+			unsafe { C.memset(voidptr(outp + 4), 0xcc, 24); *(&u32(ap)) = x; *(&u32(bp)) = index }
+			sm_call(command, c'commit'); bad := mode in ['poison', 'undef']
+			assert sm_send(command, c'status') == if bad { u64(5) } else { u64(4) }
+			if bad { assert sm_send(command, c'error') != 0; failed++ } else { completed++ }
+			negated := if x < sign { x + sign } else { x - sign }
+			first := if mode in ['poison', 'result'] { u32(0) } else if mode == 'source' { sign } else { negated }
+			second := if mode == 'old' || mode == 'result' { u32(0) } else if mode == 'double' { x } else { first }
+			for i in 0 .. 6 {
+				expected := if i == 0 { u32(17) } else if i == 1 && mode != 'undef' { first } else if i == 2 && !bad { second } else { u32(0xcccccccc) }
+				assert unsafe { *(&u32(outp + u64(4 + i * 4))) } == expected, '${format} ${mode} sample=${sample} word=${i}'
+			}
+		} }
+	}
+	assert completed == 42 && failed == 4
 }

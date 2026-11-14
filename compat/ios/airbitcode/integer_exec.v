@@ -160,7 +160,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 			} else if vector_result {
 				if !inst.has_result || vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				vector_work += if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
+				vector_work += if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 56 { p.vector_fneg_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
 				vector_results++
 			} else if code == 26 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
@@ -344,7 +344,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				9, 28 { result = if p.types[op.result_type].kind == .vector_t { m.compare_vector_value(stream, inst, op)! } else { m.compare_value(op)! } }
 				3 { result = m.cast_value(op)! }
 				5, 29 { result = if p.types[op.result_type].kind == .vector_t { m.select_vector_value(stream, inst, op)! } else { m.select_value(op)! } }
-				56 { result = m.fneg_value(op)! }
+				56 { result = if p.vector_construction(code, op) { m.fneg_vector_value(stream, inst, op)! } else { m.fneg_value(op)! } }
 				58 { result = if p.types[op.result_type].kind == .vector_t { m.freeze_vector_value(stream, inst, op)! } else if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
 				10 {
 					if profile.return_bits == 0 { return IRIntegerRun{steps: m.steps} }

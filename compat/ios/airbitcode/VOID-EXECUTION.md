@@ -52,7 +52,25 @@ Poison division/remainder, zero divisors and signed-minimum/-1 reject the whole
 executed instruction under the existing scalar policy. Freezing the result
 does not suppress those errors. One executed step, both source counts plus
 result lane work, and the existing construction array are shared with the
-other vector operations. Floating vector arithmetic remains unsupported.
+other vector operations. Floating vector binary arithmetic remains unsupported.
+
+Fixed 1..16-lane half/float vectors support unflagged `fneg`, from literals
+or earlier supported constructions. It flips only the sign bit, including
+signed zeros, preserving NaN quiet/signaling bits and payloads. Poison is local to
+each lane; any undef source lane rejects at evaluation, including discarded
+results. Freezing a source repairs indeterminate lanes before negation;
+freezing a result does not suppress an earlier undef error. New results
+retain independent snapshots and feed further negation, insertion, shuffle,
+freeze, comparison, select or extraction. Each executed negation costs one
+step. The source and result lane counts charge the shared 1,000,000-unit
+validation budget, and results share the existing 4,096 static construction
+slots and execution-owned allocation. Preflight validates complete sources
+and inactive blocks. Fast-math flags, other lane formats, scalable vectors,
+vector arguments/returns, vector PHIs and vector loads/stores remain outside
+this bounded profile. `tests/ios/air-vector-fneg.v` checks exact LLVM values,
+poison/undef policy, source/result freezing, snapshots, loop slot reuse,
+composition, rejected profiles and exact/exceeded storage/work limits.
+
 `tests/ios/air-constant-extract.v` checks successful discards, indeterminate
 lanes and the whole-function work limit through this API.
 `tests/ios/air-vector-insert.v` also checks the whole-function insertion storage

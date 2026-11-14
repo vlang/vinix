@@ -540,7 +540,24 @@ and shares bounded construction storage. Results may feed comparisons,
 selections, later arithmetic, insertion, shuffle, freeze and extraction while
 older snapshots retain their state. Deferred kernels cover thirty flag variants,
 local poison, strict division, frozen sources/results, chained updates and
-partial-write failures. Floating vector arithmetic remains unsupported.
+partial-write failures. Floating vector binary arithmetic remains unsupported.
+
+Fixed 1..16-lane half/float vectors support unflagged `fneg`, from literals
+or earlier supported constructions. It flips only the sign bit, including
+signed zeros, preserving NaN quiet/signaling bits and payloads. Poison is local to
+each lane; any undef source lane rejects at evaluation, including discarded
+results. Freezing a source repairs indeterminate lanes before negation;
+freezing a result does not suppress an earlier undef error. New results
+retain independent snapshots and feed further negation, insertion, shuffle,
+freeze, comparison, select or extraction. Each executed negation costs one
+step. The source and result lane counts charge the shared 1,000,000-unit
+validation budget, and results share the existing 4,096 static construction
+slots and execution-owned allocation. Preflight validates complete sources
+and inactive blocks. Fast-math flags, other lane formats, scalable vectors,
+vector arguments/returns, vector PHIs and vector loads/stores remain outside
+this bounded profile. `tests/ios/air-vector-fneg.v` checks exact LLVM values,
+poison/undef policy, source/result freezing, snapshots, loop slot reuse,
+composition, rejected profiles and exact/exceeded storage/work limits.
 
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and

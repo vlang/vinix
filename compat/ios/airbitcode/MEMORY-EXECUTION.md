@@ -125,7 +125,7 @@ caps all supported vector construction results together at 4,096
 per function, including inactive blocks.
 One execution-owned array holds those fixed-size snapshots and is freed on
 every exit; loop visits reuse each instruction's slot. Vector PHIs,
-arguments, loads/stores and floating arithmetic, scalable vectors, other lane
+arguments, loads/stores and floating binary arithmetic, scalable vectors, other lane
 formats and vectors larger than sixteen lanes remain unsupported.
 
 `shufflevector` combines lanes from two supported constant or earlier
@@ -189,7 +189,7 @@ Results may feed comparisons, per-lane select, freeze, insertion, shuffle and
 extraction, preserving older snapshots. Comparison costs one executed step;
 validation charges both source counts plus the result count, and results share
 the existing construction storage. Floating/pointer comparison flags, vector
-pointer comparisons and floating vector arithmetic remain unsupported.
+pointer comparisons and floating vector binary arithmetic remain unsupported.
 
 Vector integer binary operations accept matching fixed 1..16-lane i1..i64
 vectors. All thirteen scalar opcodes apply independently per lane: add, subtract,
@@ -209,6 +209,23 @@ the instruction. Earlier stores remain visible after dynamic failures.
 Each binary instruction costs one step, charges both source counts plus result
 count against lane work, and shares the existing bounded snapshot array.
 Floating vector binary operations remain unsupported.
+
+Fixed 1..16-lane half/float vectors support unflagged `fneg`, from literals
+or earlier supported constructions. It flips only the sign bit, including
+signed zeros, preserving NaN quiet/signaling bits and payloads. Poison is local to
+each lane; any undef source lane rejects at evaluation, including discarded
+results. Freezing a source repairs indeterminate lanes before negation;
+freezing a result does not suppress an earlier undef error. New results
+retain independent snapshots and feed further negation, insertion, shuffle,
+freeze, comparison, select or extraction. Each executed negation costs one
+step. The source and result lane counts charge the shared 1,000,000-unit
+validation budget, and results share the existing 4,096 static construction
+slots and execution-owned allocation. Preflight validates complete sources
+and inactive blocks. Fast-math flags, other lane formats, scalable vectors,
+vector arguments/returns, vector PHIs and vector loads/stores remain outside
+this bounded profile. `tests/ios/air-vector-fneg.v` checks exact LLVM values,
+poison/undef policy, source/result freezing, snapshots, loop slot reuse,
+composition, rejected profiles and exact/exceeded storage/work limits.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
