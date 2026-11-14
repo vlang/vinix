@@ -83,6 +83,12 @@ register tests, guarded arrays and repeated cleanup. Both fixture sources are
 frozen. `pollcount-reference.v` and `pollcount-evidence.v` retain Linux comparisons
 and original failures. See [receipts and limits](../../docs/linux-poll-count.md).
 
+`--cases ppolltime` checks raw ppoll remaining time, libc input preservation,
+read-only timeouts, core errors and mask-error precedence on both architectures.
+It freezes three fixture sources and measures repeated cleanup.
+`ppolltime-reference.v` and `ppolltime-evidence.v` retain same-ELF Linux comparisons,
+original failures and complete artifact checks. See [receipts and limits](../../docs/linux-ppoll-timeout.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

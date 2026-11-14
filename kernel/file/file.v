@@ -386,6 +386,7 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds_word u64, user_timeout u64, u
 	// these explicit caller-stack slots remain live across its sleep.
 	timeout_storage := unsafe { &time.TimeSpec(C.vinix_stack_alloc(sizeof(time.TimeSpec))) }
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
+	mut deadline := time.TimeSpec{}
 	if user_timeout != 0 {
 		if !usercopy.copy_from_user(voidptr(timeout_storage), user_timeout, sizeof(time.TimeSpec)) {
 			return errno.err, errno.efault
@@ -395,6 +396,7 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds_word u64, user_timeout u64, u
 			return errno.err, errno.einval
 		}
 		timeout_ptr = timeout_storage
+		deadline = select_deadline(unsafe { *timeout_storage })
 	}
 
 	sigmask_storage := unsafe { &u64(C.vinix_stack_alloc(sizeof(u64))) }
@@ -406,6 +408,10 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds_word u64, user_timeout u64, u
 		mut masked_thread := proc.current_thread()
 		proc.begin_wait_mask(mut masked_thread, unsafe { *sigmask_storage })
 	}
+	// Mask import errors leave the timeout untouched. Once core polling starts,
+	// Linux returns remaining time even for count/array errors and ignores a
+	// refused timeout copyout. Finish before syscall-exit signal delivery.
+	defer { select_finish_timeout(user_timeout, deadline, false) }
 	if nfds > 4096 { return errno.err, errno.einval }
 	pagemap := proc.current_thread().process.pagemap
 	scratch := proc.reserve_kernel(.scratch, nfds * 128 + 256) or { return errno.err, errno.get() }
@@ -416,6 +422,7 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds_word u64, user_timeout u64, u
 		&& !usercopy.copy_from_user(unsafe { voidptr(&pollfds[0]) }, user_fds, nfds * sizeof(PollFD)) {
 		return errno.err, errno.efault
 	}
+	if user_timeout != 0 { unsafe { *timeout_storage = select_remaining(deadline) } }
 	ret, err := poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, unsafe { nil })
 	return ret, err
 }

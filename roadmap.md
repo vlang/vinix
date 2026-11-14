@@ -2370,6 +2370,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   fails 84. Both credential cohorts retain flat repeated cleanup. See
   [the poll count qualification](docs/linux-poll-count.md).
 
+- [x] Return remaining time from native raw ppoll after expiry and core poll
+  errors, preserving libc inputs and results with read-only timeouts. Identical
+  native/Linux ELFs pass 360 checks per architecture; originals fail ten each.
+  Both credential cohorts retain flat cleanup. See
+  [the ppoll timeout qualification](docs/linux-ppoll-timeout.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
