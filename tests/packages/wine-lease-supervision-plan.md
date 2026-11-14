@@ -2523,6 +2523,33 @@ compatibility is not exercised. Cooperating prefix writers remain an assumption.
 Guest service-owner death and power-loss recovery, public retarget command
 qualification and remaining section 14 gates stay open.
 
+## Migration-owner death in both guests, 2026-11-14
+
+Source `6e5616895` expands the signed real-root migration probe with 32 additional
+old bindings. An ordinary child obtains full service admission and migrates;
+its parent observes the first retarget, stops it and requires remaining old rows
+with every sampled link either old or selected. A competing public additions
+command must refuse. A separately opened generation lease must refuse exclusive
+flock while the owner lives. After SIGKILL and exact reap, exclusive lease
+acquisition must succeed, then release so fresh service admission can resume.
+The resumed owner migrates twice, checks every target and private sentinel, and
+passes public review/additions and prefix preparation. The runner requires an
+exact owner-death success marker as well as all preceding markers.
+
+x86_64 passes in 12.287 s and AArch64 in 6.686 s. Evidence is frozen at
+`/Users/alex/.cache/vwownerkill-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-owner-death-guests-20261114-01.inventory.json`
+has SHA-256 `959056128e084b9c2951392264cc18af343e37adb0bccfe628e2cf9e9fc98e39`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Both result/serial/QEMU bundles, compiled probes, source copies,
+copied kernels and reused unchanged CLI binaries are retained. Builds use the
+same retained V/LLVM-musl profiles and documented pointer-type compatibility
+exception as preceding guest checks. No strict-build, complete source closure
+or measured heap qualification is claimed. This proves process-death recovery
+in these marker fixtures, not power loss, actual Wine/translation/GUI execution
+or arbitrary same-account writer exclusion. No retargeting CLI or automatic
+migration is enabled; those acceptance gates and other section 14 work stay open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

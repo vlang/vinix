@@ -1286,8 +1286,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     exclusive missing-link additions, competing-launch and personal-file refusals,
     and repetition in guests. [Staged runtime migration](tests/packages/wine-lease-supervision-plan.md#staged-migration-in-both-guests-2026-11-14)
     now retargets signed marker-runtime links and adds missing links under
-    real-root admission in both guests. Service-owner death/power-loss recovery
-    and actual Wine compatibility remain open; ARM Wine execution is not qualified.
+    real-root admission in both guests. [Migration-owner SIGKILL recovery](tests/packages/wine-lease-supervision-plan.md#migration-owner-death-in-both-guests-2026-11-14)
+    retains the live owner's guard/lease, releases both on death and resumes via
+    fresh admission in both guests. Power-loss recovery and actual Wine
+    compatibility remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.
