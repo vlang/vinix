@@ -109,6 +109,11 @@ fn idle_review_refused(capture &IdleBindingReview, message string) {
 	assert false, 'changed idle review accepted'
 }
 
+fn expected_inventory_refused(capture &IdleBindingReview, runtime string, generation u64, expected []BuiltinExpectation) {
+	capture.require_builtin_inventory(runtime, generation, expected) or { assert err.msg().contains('differs'); return }
+	assert false, 'mismatched expected inventory accepted'
+}
+
 fn test_binding_digest_streams_across_buffer_boundary() {
 	root := os.real_path(os.temp_dir()) + '/wine-binding-digest-' + os.getpid().str()
 	os.mkdir(root)!
@@ -146,6 +151,19 @@ fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
 	defer { capture.close() }
 	assert capture.review.prior_generation == 1
 	capture.recheck()!
+	expected := [BuiltinExpectation{name: 'kernel32.dll', sha256: local_source_digest('new'), bytes: 3}]
+	capture.require_builtin_inventory('org.vinix.wine', 2, expected)!
+	for entry in [BuiltinExpectation{name: 'kernel32.dll', sha256: local_source_digest('NEW'), bytes: 3},
+		BuiltinExpectation{name: 'kernel32.dll', sha256: expected[0].sha256, bytes: 4},
+		BuiltinExpectation{name: 'foreign.dll', sha256: expected[0].sha256, bytes: 3}] {
+		capture.require_builtin_inventory('org.vinix.wine', 2, [entry]) or {
+			assert err.msg().contains('differs'); continue
+		}
+		assert false, 'mismatched expectations accepted'
+	}
+	expected_inventory_refused(&capture, 'foreign', 2, expected)
+	expected_inventory_refused(&capture, 'org.vinix.wine', 3, expected)
+	expected_inventory_refused(&capture, 'org.vinix.wine', 2, [])
 	if mut competitor := prefix.acquire_launch(data) {
 		competitor.close(); assert false, 'review failed to exclude competing launch'
 	} else { assert err.msg().contains('already has a managed launch') }

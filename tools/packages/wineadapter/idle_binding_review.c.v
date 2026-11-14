@@ -52,6 +52,7 @@ mut:
 	system_fd int = -1
 	assets_fd int = -1
 	digests []string
+	sizes []u64
 }
 
 pub fn (mut capture IdleBindingReview) close() {
@@ -61,6 +62,7 @@ pub fn (mut capture IdleBindingReview) close() {
 	if capture.system_fd >= 0 { C.close(capture.system_fd) }
 	if capture.assets_fd >= 0 { C.close(capture.assets_fd) }
 	unsafe { for digest in capture.digests { digest.free() }; (&array(&capture.digests)).free() }
+	unsafe { capture.sizes.free() }
 	unsafe { capture.data.free(); capture.builtins.free(); capture.store.free() }
 	capture = IdleBindingReview{}
 }
@@ -84,16 +86,53 @@ pub fn capture_idle_binding_review(data string, builtins string, store string) !
 	capture.assets_fd = absolute_directory(builtins)!
 	capture.review = review_prefix_bindings(data, builtins, store)!
 	capture.digests = []string{cap: capture.review.bindings.len}
+	capture.sizes = []u64{cap: capture.review.bindings.len}
 	mut total := u64(0)
 	for binding in capture.review.bindings {
 		digest, size := binding_asset_digest(capture.assets_fd, binding.name)!
 		total += size
 		capture.digests << digest
+		capture.sizes << size
 		if total > 1024 * 1024 * 1024 { return error('Wine binding review assets exceed 1 GiB') }
 	}
 	capture.recheck()!
 	accepted = true
 	return capture
+}
+
+pub struct BuiltinExpectation {
+pub:
+	name string
+	sha256 string
+	bytes u64
+}
+
+// Compare borrowed expectations, without retaining them or establishing their
+// provenance. Caller must authenticate the source inventory and retain the
+// selected generation lease. Success is not migration authorization.
+pub fn (capture &IdleBindingReview) require_builtin_inventory(runtime string, generation u64, expected []BuiltinExpectation) ! {
+	capture.recheck()!
+	if runtime != capture.review.runtime_id || generation != capture.review.generation {
+		return error('Wine expected builtin runtime or generation differs')
+	}
+	if expected.len != capture.review.bindings.len || capture.sizes.len != expected.len {
+		return error('Wine expected builtin inventory length differs')
+	}
+	mut seen := map[string]bool{}
+	defer { unsafe { seen.free() } }
+	for entry in expected {
+		if entry.name in seen { return error('Wine expected builtin inventory repeats a name') }
+		seen[entry.name] = true
+		mut found := false
+		for index, binding in capture.review.bindings {
+			if binding.name != entry.name { continue }
+			found = true
+			if entry.sha256 != capture.digests[index] || entry.bytes != capture.sizes[index] {
+				return error('Wine expected builtin digest or size differs')
+			}
+		}
+		if !found { return error('Wine expected builtin name differs') }
+	}
 }
 
 fn binding_directory_unchanged(held int, path string, private bool) ! {
