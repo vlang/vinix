@@ -2161,6 +2161,28 @@ guest/cross-architecture behavior, complete source closure and measured heap
 qualification remain unproven here. The public alternate-root refusal is intact;
 migration application/recovery and other section 14 gates remain open.
 
+## Fresh service review admission, 2026-11-14
+
+Source `549d27d83` adds `WinePrefixReview.recheck()`. It reloads configuration
+under the package reader lock, requires the retained generation to remain
+active, repeats launch payload/publisher/policy verification against the retained
+state and rechecks adapter continuity. Construction performs this before return.
+This differs from the adapter-only `owner.review.recheck()`, which cannot refresh
+package trust or activation. Neither call authorizes a subsequent unguarded write.
+
+The signed install/upgrade host fixture passes fresh recheck, publisher-key
+revocation refusal, active-generation change refusal, restoration/retry and
+closed-owner refusal, alongside prior bridge and collection tests. It uses the
+retained V compiler with `-backend c -gc none -manualfree` and repository module
+path. Evidence is frozen at `/Users/alex/.cache/vwfreshreview-20261114-01`;
+receipt `/Users/alex/Library/Caches/vinix-codex/section14/wine-fresh-prefix-review-20261114-01.inventory.json`
+has SHA-256 `87a26d1d8b6fb84696122a9f354f74eca04c7e6999a40202d7aa82cc2f1b1bb6`.
+Record and independent check pass complete bytes, sizes, types, modes and link
+targets. New source copies, generated host C/binaries and logs are retained.
+Public real-root admission, actual Wine/guest execution, cross-builds, complete
+source closure and measured heap qualification are not claimed. Migration
+application/recovery and the remaining section 14 gates stay open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
