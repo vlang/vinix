@@ -2188,6 +2188,35 @@ case markers, input hash rechecks and completion within 120 seconds. The
 uninstrumented fixture must fail its injection assertion. These reconstructed
 adapter cases do not exercise signed service admission or actual power loss.
 
+`tests/packages/wine-prefix-powercut.v` instead runs across two VM boots on a
+prepared disk. Compile with `-enable-globals` and the test-only
+`-Dfsync=vinix_wine_cut_fsync` alias at the final C compile. The wrapper pauses
+after a real successful sync at the first stage, destination-after-rename or
+source-directory boundary. The controller kills QEMU with `SIGKILL`, reboots
+the same image, and requires ordinary-account inspection, fresh capture,
+idempotent completion, private-data preservation and final guest poweroff.
+Recovery includes a six-second deferred-unlink grace before final sync/shutdown;
+the interrupted boot never performs that grace or an orderly shutdown.
+
+Build `tests/native-disk-tools/wine-prefix-image.v` with the native-disk-tools
+directory on the module path for the established journal formatter and clean
+inspection exporter. Set `VINIX_WINE_IMAGE_HELPER` to that binary, then invoke
+`wine-prefix-powercut-check.v FRESH_WORK ARCH KERNEL POWERCUT_GUEST --vjfs`.
+It runs three fresh-disk cases with 120 seconds per two-boot case, verifies
+selected input hashes, exports recovered VJFS to a separate inspection image
+only when its commit marker is clear, and requires read-only `e2fsck -f -n`
+to exit zero. `VINIX_MKE2FS` and `VINIX_E2FSCK` select the host utilities.
+Without `--vjfs`, it runs the plain-ext2 comparison: observed post-rename cuts
+leave allocated orphan inodes/blocks and fail the same strict filesystem check.
+No disk repair is performed. A guest compiled without interception must fail
+before its requested cut. Image creation refuses an existing output; export
+refuses source/destination identity aliases.
+
+These tests qualify selected acknowledged-sync boundaries on journaled VJFS
+with QEMU writeback caching. Host storage caches survive the VM kill. They do
+not establish physical power-loss/torn-write handling, every interruption point,
+signed service/public-command recovery or actual Wine execution compatibility.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.
