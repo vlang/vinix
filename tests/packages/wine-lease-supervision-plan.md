@@ -2948,6 +2948,41 @@ Typed receipt:
 SHA-256 `dbb05fd4c1dcea6b478b5cb9072fbc2d4b30bb79e6316c5fb62de030a8adfe45`.
 Recording and independent comparison pass.
 
+## Binding capture descriptor exhaustion, 2026-11-14
+
+Source `4b54ff8c5` extends the heap probe from ordinary refusals to capture under
+actual descriptor exhaustion. Under its verified 32-FD process limit, it sweeps
+every initially available descriptor headroom, including zero, by holding only
+test-owned `/dev/null` descriptors. The final small, 741-row production and
+741-row AddressSanitizer runs all pass: headroom 0–18 refuses with `EMFILE` and
+19–22 succeeds. Both outcomes are required; the threshold is not hard-coded.
+The probe clears `errno` before capture, preventing the counter's own `EMFILE`
+from masquerading as an operation failure, and saves it before releasing errors.
+
+Each attempt retains zero measured V-managed objects/bytes and leaves exactly
+the pre-call descriptor availability. After pressure descriptors close, a
+fresh same-prefix capture must succeed with no prior generation and all `keep`
+rows; closing that owner must also restore descriptor availability. This checks
+cleanup and guard release at each selected failure level. All earlier positive,
+ordinary-refusal and actual-retarget phases still pass, including under ASan.
+Preliminary successful runs before the explicit errno reset remain retained.
+
+This is a single-thread macOS host headroom sweep, not injection at every open
+or allocation call. Production code is unchanged. Libc/kernel heap, fixture
+setup, package-service admission, cold startup, concurrent races and whole-launch
+lifetime/mapping qualification remain outside its scope.
+
+Evidence is preserved at `/Users/alex/.cache/vwbindingpressure-20261114-01`,
+including generated final C, parsed-source list, executables, complete logs and
+the isolated source at base `c6cf34771` plus `source.patch`. Changed probe bytes
+match `4b54ff8c5`. Original complete input bundles and namespaces remain required;
+this is local acceptance without a hermetic-build or strict-ABI waiver.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-binding-exhaustion-20261114-01.inventory.json`,
+SHA-256 `82c17920581ccbdbb2393906a56064440c07496aa530a7d798857c27ab188369`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
