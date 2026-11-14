@@ -347,7 +347,10 @@ fn check() ! {
 		else { 'Wine signed-real-Win64 ordinary-private-prefix socket lease Windows-API outside-write-refused natural-exit PASS' },
 		'HWTEST PASS packaged-Wine',
 	]
-	if caller_death { required << 'Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS' }
+	if caller_death {
+		required << 'Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS'
+		required << 'Wine signed competing-prefix refusal126 after caller death original-workload-live lease-busy PASS'
+	}
 	scenario := hwhost.Scenario{
 		name:        'packaged-Wine'
 		arches:      [arch]

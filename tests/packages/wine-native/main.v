@@ -224,6 +224,10 @@ fn command(arguments []string, input string) !string {
 }
 
 fn collection_command(arguments []string, input string) !string {
+	return collection_command_status(arguments, input, 0)
+}
+
+fn collection_command_status(arguments []string, input string, expected int) !string {
 	println('HWTEST INFO Wine collection command begin ' + arguments[1])
 	mut child := os.new_process(arguments[0])
 	defer {
@@ -242,7 +246,7 @@ fn collection_command(arguments []string, input string) !string {
 	unsafe { bytes.flags |= .noslices }
 	defer { unsafe { bytes.free() } }
 	mut buffer := [4096]u8{}
-	deadline := time.sys_mono_now() + 180 * time.second
+	deadline := time.sys_mono_now() + if expected == 0 { 180 * time.second } else { 15 * time.second }
 	for {
 		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count > 0 {
@@ -261,7 +265,7 @@ fn collection_command(arguments []string, input string) !string {
 		for index in 0 .. int(count) { bytes << buffer[index] }
 	}
 	output := bytes.bytestr()
-	if child.code != 0 { return error('collection command refused: ' + output) }
+	if child.code != expected { return error('collection command exit ' + child.code.str() + ' differs from ' + expected.str() + ': ' + output) }
 	println('HWTEST INFO Wine collection command complete ' + arguments[1])
 	return output
 }
@@ -737,6 +741,17 @@ fn collection_run(generation string, architecture string) ! {
 				collection_live(holder)!
 				if collection_field(holder, 'PPid')! != '1' { return error('surviving holder was not adopted by fixture PID1') }
 				println('HWTEST INFO Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS')
+				collection_lease_busy(generation)!
+				refusal := collection_command_status(['/usr/bin/vinix-package', 'run-args', application, '--', '--vinix-collection-probe'], '', 126)!
+				defer { unsafe { refusal.free() } }
+				if !refusal.contains('Wine prefix already has a managed launch') { return error('competing signed launch refused at wrong gate: ' + refusal) }
+				if os.exists('/proc/' + caller) || child.is_alive() { return error('original caller returned during competing launch') }
+				collection_live(holder)!
+				collection_live(server)!
+				collection_live(descendant)!
+				collection_lease_busy(generation)!
+				if !os.is_dir(generation) || sha256.hexhash(os.read_file(image)!) != before { return error('competing launch damaged original generation') }
+				println('HWTEST INFO Wine signed competing-prefix refusal126 after caller death original-workload-live lease-busy PASS')
 			}
 			// Two real administrative transitions make the running generation
 			// neither active nor rollback. No state/lease files are synthesized.
