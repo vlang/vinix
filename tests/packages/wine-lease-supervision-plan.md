@@ -3362,6 +3362,65 @@ Typed receipt:
 SHA-256 `f282a424fe58fa845957f265e9727d326489f1ed293f0f3e5032100714f616bc`.
 Recording and independent comparison pass.
 
+## Signed real-root service recovery across VJFS VM cuts, 2026-11-14
+
+Source `62d110613` adds `-d wine_cut_service` and controller `--vjfs --service`.
+Root preparation locally signs, installs and upgrades two marker packages,
+seeding the old prefix as UID 1000. Package configuration, catalog/trust data,
+both generations and private data persist on VJFS. Every boot bind-mounts the
+administrative trees at the real package paths. Configuration, current state
+and private sentinel must share the persistent volume's device identity.
+Cold setup verifies persisted generation 2 without reinstalling it.
+
+The ordinary child enters `Service.wine_prefix_review('app', data)` before
+the selected cut and reacquires it after reboot. The initial review must see
+generation 2, prior generation 1 and three rows. The existing three real-fsync
+acknowledgement points, QEMU SIGKILL/signal-9 requirement, same-disk reboot,
+partial-state inspection, repeated migration, private data and strict filesystem
+checks remain. Recovered admission must hold a busy generation lease while
+live, release temporary store reader coordination between operations, and free
+both probes after close. No alternate service root or adapter-only admission
+is used in this mode.
+
+All six signed-service cases pass within the unchanged 120-second case bound:
+
+| Cut point | x86 seconds | ARM seconds |
+| --- | ---: | ---: |
+| Stage sync | 20.255 | 18.073 |
+| Destination sync after rename | 18.937 | 17.583 |
+| Source-directory sync | 22.475 | 18.184 |
+
+Fresh/cold signed-store and service admission/coordination markers are required.
+Selected input hashes match before/after, clean export requires a cleared
+journal commit marker, and read-only `e2fsck -f -n` exits zero for all six images.
+The six-second cleanup grace is only after recovery, before final sync/poweroff.
+Final-source x86 adapter regression also passes all three points in
+18.890/17.752/19.635 seconds. An adapter-only guest paired with service mode
+is rejected at all three points for missing service markers; `--service`
+without `--vjfs` refuses before work creation.
+
+Evidence is retained at `/Users/alex/.cache/vwwineservicecut-20261114-01`, with
+isolated base `c5e88c2f3` plus `source.patch`, matching V files, generated C,
+parsed-source lists, binaries, kernel copies, raw/inspection images, source
+snapshots, control and build/run logs. Builds retain the previous production
+V/manual-free guest/controller profiles and LLVM/musl pointer-type exception.
+The unchanged image-helper bytes and complete prerequisite bundle at
+`/Users/alex/.cache/vwwinecut-20261114-01` remain required. Product service,
+adapter, kernel, budgets and default activation are unchanged.
+
+Coverage is three acknowledged-sync VM-cut boundaries in a locally signed
+three-row marker fixture with public service admission. The packages never
+execute Wine. Public CLI execution, real Wine version/GUI compatibility, physical
+power loss, torn writes, host cache loss, arbitrary interruption points,
+plain-ext2 safety, 741-row cuts, measured heap, complete descriptor accounting,
+whole-launch lifetime and strict ABI/hermetic closure remain separate gates.
+Original namespaces and complete prior audit bundles remain required.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-service-powercut-20261114-01.inventory.json`,
+SHA-256 `4f8eee15c0b883bf82060bb29c28f774b02e8b7178b82d27077ac22802602d9e`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

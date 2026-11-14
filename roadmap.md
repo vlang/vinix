@@ -1342,7 +1342,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now passes eight migration and one additions `EIO` boundary cases in both
     native guests, requiring exact partial state and fresh-capture recovery;
     host ASan and a missing-interception control also pass.
-    Power-loss recovery and broader Wine version-upgrade/GUI compatibility
+    [VJFS acknowledged-sync VM-cut recovery](tests/packages/wine-lease-supervision-plan.md#vjfs-prefix-recovery-across-acknowledged-sync-vm-cuts-2026-11-14)
+    now passes three adapter cut points in both guests with clean filesystem
+    inspection; plain-ext2 post-rename allocation failures remain retained.
+    [Signed real-root service recovery](tests/packages/wine-lease-supervision-plan.md#signed-real-root-service-recovery-across-vjfs-vm-cuts-2026-11-14)
+    also passes those cuts on both architectures with persistent signed state,
+    fresh public admission and generation/store coordination release.
+    Broader power-loss recovery and Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
