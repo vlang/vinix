@@ -112,6 +112,64 @@ art-builder-stopped-probe-20261114-r1, art-builder-stopped-hashes-20261114-r1
 art-builder-stopped-work-hash-20261114-r2. Root-disk hashing does not establish
 a new root-filesystem fsck result. The work disk's read-only fsck is current.
 
+## Latest continuation: r9
+
+Using the same available V 0.5.2 7d74206, the remote runner was rebuilt in
+art-resume-controller-20261114-r1: guard/child 0/0, complete cleanup, 3500 ms,
+sampled RSS 312279040 bytes. The owned builder restarted as QEMU98364 with the
+same 6-GiB/four-CPU configuration and original work disk. A new native r4
+applied-input check again passed all 18 complete source-file comparisons.
+
+Incremental native build r9 reached runtime_options.cc before the host guard
+stopped it after 27677 ms: 571211776 bytes of host disk growth against the
+536870912-byte ceiling. Guest growth was only 253952 bytes; native sampled
+peak RSS was 376520704 bytes. The checked cancellation stopped one matching
+guest group and both cleanup receipts passed. No linked libart.so exists and
+no new runtime was deployed or tested with Maps. The retained input gate,
+build limits and account/session authority were not relaxed.
+
+The new V host-write-sample tool reads Darwin process I/O counters and names,
+without reading process arguments/files or interrupting jobs. It requires its
+own telemetry to be present, matches process start times to reject PID reuse,
+and excludes counter resets. Its fixture check and actual 10-second observation
+passed under the original caps. The sample saw 726/719 readable processes,
+345/344 unavailable processes and 41959424 bytes of filesystem growth. Python,
+Brave and FuseCode were among the observed writers, but process byte counters
+are not filesystem free-space changes; inaccessible and short-lived processes
+prevent complete attribution of the earlier burst. No sampled process was
+started, stopped or otherwise controlled by this tool.
+
+Initial telemetry r1 failed its own-process check because the native PID list
+used V int. The corrected tool uses explicit 32-bit Darwin PID storage; final
+r2 compilation, fixture check and live sampling all passed 0/0 with complete
+cleanup. Failed evidence remains retained. Source SHA256 is
+`34337af0569dcc640cf4d812570db7af3884dcbecb0e2214e7452b4fb5aef474`;
+qualified binary SHA256 is
+`57e6c80de3c29fcf70a8a69f3c1aab97b459d733e819caa01f10c3985ec0bd76`.
+Evidence roots are host-write-tools-20261114-r2,
+host-write-checks-20261114-r2 and host-write-observation-20261114-r2.
+The observation log SHA256 is
+`c5829271e427115de158363a3ef3941db0c62ed37e716ec4e11077f0a6028b95`.
+
+The r9/input-check addon archive was exported under the original guards, with
+matching host/guest SHA256:
+art-builder-guest-20261114-r6/native-evidence-r2.tar,
+`0e2d57042398de7c764191df49e7929fe5cc1ded6c213747b139513d852095a4`.
+The builder was synced and powered off; PID/open-disk checks and UART Power
+down confirmed it stopped before offline access. Current read-only work-disk
+fsck passed all five phases. Stopped-disk V hashes and fsck passed 0/0 with
+complete cleanup in art-builder-stopped-{root,work}-hash-20261114-r3 and
+art-builder-work-fsck-20261114-r2. These new hashes supersede the earlier
+checkpoint identities above; root filesystem fsck was not repeated:
+
+| Disk | Current stopped SHA256 |
+| --- | --- |
+| /Users/alex/.lima/vinix-art-20261114/disk | ce5db9199f724e4863c29050def3f3245e4080a273edfcfb4c2e9d9d2cc78d5a |
+| art-builder-work-disk-20261114-r1/work.img | 855f2c2d6c781f0b40d9dc08187f4a967ba6cb7a83498cc6420d73a69ffcbc03 |
+
+Repeated host-growth guard failures remain the build blocker. A quiet host
+write window is required before another guarded compilation attempt.
+
 Resource caps remain RSS 629145600 bytes, reserve 1073741824, growth 536870912,
 output 4194304 and host wall 300000 ms. The guest uses the stricter 290000-ms
 wall limit to leave cleanup time. Make uses -j1. The source is ART
