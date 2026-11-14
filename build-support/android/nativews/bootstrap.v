@@ -68,7 +68,7 @@ fn ws_bootstrap(root &char, apk &char, display bool) voidptr {
 		options[3] = WsOption{&buffer[24576], nil}
 		options[4] = WsOption{c'-Xcheck:jni', nil}
 		options[5] = WsOption{c'-Xnoimage-dex2oat', nil}
-		options[6] = WsOption{c'-Xusejit:false', nil}
+		options[6] = WsOption{c'-Xusejit:true', nil}
 		// ART's upstream ANDROID_ROOT fallback concatenates "dex2oat"
 		// directly to the root. Use the executable in our private runtime.
 		C.snprintf(&buffer[32768], 8192, c'-Xcompiler:%s/usr/bin/dex2oat', root)

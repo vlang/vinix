@@ -53,6 +53,11 @@ and Google sign-in remain unqualified. Fresh r83 reproduced map rendering but
 had severe input latency under heavy concurrent host load; its fixed deadline
 ended before an observed Louvre result. The cause of that latency remains
 unproven. Both VMs are stopped; complete evidence and checksums are retained.
+The [JIT retry with the repaired SDK, r84](maps-jit-route-runtime-20261114.md),
+passed the full signed ARM regression and rendered the actual route overview
+and mapped turn preview. JIT is enabled; responsive use and Google sign-in
+remain unqualified. Closing Maps caused the existing ancestry guard to end
+that session, and relaunch was refused. The failed receipt remains retained.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.
