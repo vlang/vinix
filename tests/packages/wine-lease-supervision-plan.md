@@ -3628,6 +3628,83 @@ SHA-256 `0085159c59536e0638ff5b5cf90dee1b015078560f5e3d1cb8774fd34a2c9a5e`.
 Recording and independent comparison pass for complete bytes, sizes, types,
 modes and link targets.
 
+## Selected 741-row signed-service VM cuts, 2026-11-14
+
+Source `fab0bdc7e` uses the same 740-old/741-selected canonical
+builtin inventory as the scaled adapter. `wine_cut_service` plus
+`wine_cut_scaled`, with controller `--vjfs --service --scaled`, signs, installs
+and upgrades the marker packages at the real public paths. Each boot requires
+the persistent signed generation-2 store; warm admission requires prior
+generation 1 and exactly 741 bindings. No alternate service root is used.
+
+The four sampled cuts still require exact cold states before fresh service
+capture: 371 replacements at 1112; 740 at 2219/2221/2222; the addition only at
+2221/2222; no pending stage. Successful recovery must retain all 741 exact
+current targets and private data, pass migration/repetition/recheck, retain a
+busy generation lease while live and release coordination on close. Actual
+QEMU SIGKILL, selected input hashes, clean VJFS export and strict read-only
+`e2fsck -f -n` exit zero remain mandatory. The 32 MiB home, 4 MiB journal and
+120-second two-boot cap remain unchanged, as do all product code and limits.
+
+All four ARM cases pass in 64.858/65.929/101.652/60.018 seconds. Initial x86
+completion cuts 2221/2222 pass in 118.832/105.035 seconds. Point 1112 times out
+at 120.643 seconds in boot 2 after exact cold inspection; 2219 times out at
+120.912 seconds in boot 1 after signed admission and before its requested cut.
+Both failed results and disks remain retained; 2219 is not an observed cut.
+The unchanged original-mode x86 rerun also remains failed: 1112 hits the cap
+after service/coordination completion but before cleanup-grace markers; 2221 hits it
+before the requested cut. Its 2219/2222 cases pass in 96.127/111.216 seconds.
+
+Explicit optional `--prepared` separates fixture installation from migration
+timing. One preparation boot, separately capped at 120 seconds, installs both
+signed generations, seeds the old prefix as the ordinary account, verifies the
+signed store and volume identity, waits the six-second cleanup grace and powers
+off. Clean export and strict filesystem inspection must pass before each cut
+case clones its disk. Both warm/cold template-reuse markers, full store verify,
+public admission, exact recovery, coordination and template/input hashes remain
+required. Each cut still has its original 120-second two-boot cap. Preparation
+is additional work; this does not qualify installation plus recovery in one cap.
+
+Initial prepared baselines pass in 63.804 seconds on x86 and 39.863 on ARM.
+All four prepared ARM cases pass in 26.776/26.836/26.008/26.361 seconds. The
+first prepared x86 run passes 1112/2219/2221 in 60.732/56.053/54.200 seconds;
+2222 reaches service recovery/coordination completion but times out at 120.531
+seconds before cleanup/final markers. That failed run remains retained.
+The final unchanged prepared x86 run, after this session's companion VMs finished,
+also fails: 1112/2219 pass in 116.023/70.184 seconds, but 2221/2222 time out in
+boot 2 at 120.947/120.741 seconds after exact cold inspection and before service
+recovery/coordination completion. There is **no passing full x86 matrix** in
+either mode; combining passing cases from separate runs is not qualification.
+
+Default three-row service ARM and CLI x86 regressions pass all six cases,
+without creating point 4. The identical scaled ARM guest C compiled without
+interception rejects all four cuts for returning without the requested cut.
+Scaled CLI mode and mixed/duplicate selectors reject before work creation.
+The dispatcher and CLI hook are unchanged.
+Final prepared-mode no-interception control passes its signed preparation boot,
+then rejects all four cuts. Unsupported prepared adapter/small-service/CLI modes
+and duplicate preparation flags reject before work creation. Final-source
+default service ARM and CLI x86 smoke checks also pass all six cases.
+
+Evidence is retained at `/Users/alex/.cache/vwwinescaledservice-20261114-01`,
+isolated base `2c6ec38f5` plus `source.patch` for initial scaling and
+`prepared-source.patch` for the final prepared workflow, including matching source,
+compiler/source lists, generated C, kernels, executables, raw/inspection disks,
+serial/QMP logs, controls and validation notes. Small CLI regression uses the
+unchanged `vwwineallcuts-20261114-01` CLI, with byte-identical dispatcher/hook
+source checks and copied identity. Complete prior bundles remain required.
+
+This samples four signed-service boundaries over marker bytes. All 2222 syncs,
+scaled CLI recovery, actual Wine payload/version/GUI/ARM execution, physical
+power/host-cache loss, torn writes, plain-ext2 safety, whole-launch lifetime and
+strict ABI/hermetic closure remain separate gates.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-scaled-service-syncs-20261114-01.inventory.json`,
+SHA-256 `a1835721a68582412013c447270e329adbbaefc49f736da9ea695c8d76537e6d`.
+Recording and independent comparison pass for complete bytes, sizes, types,
+modes and link targets. This verifies evidence integrity, not a passing x86 matrix.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
