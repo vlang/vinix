@@ -428,7 +428,7 @@ integer↔half/float conversions, half↔float precision changes and raw bitcast
 between i16/half or i32/float. Casts have one-step cost. Integer `trunc` accepts
 `nuw`/`nsw` (separately or together); `zext` accepts `nneg`. Violating these
 promises produces poison. Other cast flags remain unsupported.
-Integer-pointer, vector, aggregate, double and bfloat conversions
+Integer-pointer, floating-vector, aggregate, double and bfloat conversions
 remain unsupported. Invalid
 float-to-integer inputs yield poison; storing it follows failed-command
 completion, while an unchosen select operand may discard it. Synthetic kernels
@@ -541,6 +541,25 @@ selections, later arithmetic, insertion, shuffle, freeze and extraction while
 older snapshots retain their state. Deferred kernels cover thirty flag variants,
 local poison, strict division, frozen sources/results, chained updates and
 partial-write failures.
+
+Fixed integer vectors support `trunc`, `zext` and `sext` across i1..i64
+with unchanged lane count (1..16). Truncation requires a narrower destination;
+extensions require a wider one. Truncation `nuw`/`nsw` and zero-extension
+`nneg` follow the scalar promise rules, producing poison only in affected
+lanes. Complete literal/earlier-construction sources are checked, including
+inactive blocks. Any undef source lane rejects at the cast, even for discarded
+results. Freezing a source repairs indeterminate lanes; freezing a result does
+not suppress earlier evaluation errors. Results retain independent snapshots
+and feed other supported vector operations, including another integer cast.
+Each cast costs one executed step and charges source plus result count to
+shared lane work. Results share the existing 4,096 static construction slots
+and execution-owned allocation. Integer, mixed, void and memory APIs use the
+same integer-vector rules. Vector floating conversions/bitcasts, reshaping,
+pointer casts, arguments/returns, PHIs, loads/stores, scalable vectors and
+widths beyond i64 remain unsupported. `tests/ios/air-vector-integer-cast.v`
+checks every width pair and flag variant against native LLVM, explicit freeze
+choices and poison failures, plus source/result freezing, composition, loop
+reuse, unsupported profiles and exact shared storage/work limits.
 
 Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
 `fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane

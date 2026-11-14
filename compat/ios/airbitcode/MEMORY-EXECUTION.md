@@ -209,6 +209,25 @@ the instruction. Earlier stores remain visible after dynamic failures.
 Each binary instruction costs one step, charges both source counts plus result
 count against lane work, and shares the existing bounded snapshot array.
 
+Fixed integer vectors support `trunc`, `zext` and `sext` across i1..i64
+with unchanged lane count (1..16). Truncation requires a narrower destination;
+extensions require a wider one. Truncation `nuw`/`nsw` and zero-extension
+`nneg` follow the scalar promise rules, producing poison only in affected
+lanes. Complete literal/earlier-construction sources are checked, including
+inactive blocks. Any undef source lane rejects at the cast, even for discarded
+results. Freezing a source repairs indeterminate lanes; freezing a result does
+not suppress earlier evaluation errors. Results retain independent snapshots
+and feed other supported vector operations, including another integer cast.
+Each cast costs one executed step and charges source plus result count to
+shared lane work. Results share the existing 4,096 static construction slots
+and execution-owned allocation. Integer, mixed, void and memory APIs use the
+same integer-vector rules. Vector floating conversions/bitcasts, reshaping,
+pointer casts, arguments/returns, PHIs, loads/stores, scalable vectors and
+widths beyond i64 remain unsupported. `tests/ios/air-vector-integer-cast.v`
+checks every width pair and flag variant against native LLVM, explicit freeze
+choices and poison failures, plus source/result freezing, composition, loop
+reuse, unsupported profiles and exact shared storage/work limits.
+
 Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
 `fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane
 precision. Rounding is nearest/ties-to-even with gradual underflow. Signed
@@ -256,7 +275,7 @@ accepts `nuw`, `nsw` or both: unsigned/signed preservation of the source value
 is required respectively, or the result is poison. `zext nneg` produces poison
 for negative sources (including i1 true). These promises apply in the integer,
 mixed scalar, void and memory profiles and add no execution steps. Other cast
-flags, integer-pointer casts, vector/aggregate casts, double and bfloat remain
+flags, integer-pointer casts, aggregate/floating-vector casts, double and bfloat remain
 unsupported. Pointer bitcasts and bounded address-space casts are described below.
 Float-to-integer conversion truncates toward zero; NaN, infinity and values
 whose truncated result is outside the destination range produce poison.

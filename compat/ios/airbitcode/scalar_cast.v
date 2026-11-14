@@ -27,8 +27,8 @@ fn scalar_integer_cast(opcode u32, flags u64, source_bits u32, dest_bits u32, in
 	return IntegerValue{value: value & dest_mask}
 }
 
-// Shared by scalar and memory profiles. General pointer/vector casts remain
-// outside this execution profile even if the typed decoder understands them.
+// Scalar lane rules shared by scalar and memory execution. Fixed-vector integer
+// casts validate their lane shapes separately.
 fn (p IRTypedProgram) scalar_cast_profile(op IRTypedInstruction, mixed bool) ! {
 	if op.flags & ~scalar_cast_flag_mask(op.opcode) != 0 || op.operands_count != 1 || op.operands_start < 0 || op.operands_start >= p.operands.len { return error('AIR scalar: cast arity/flags') }
 	source := p.operands[op.operands_start].type_index
