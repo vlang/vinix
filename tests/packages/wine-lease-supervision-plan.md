@@ -2250,6 +2250,35 @@ No guest execution, real-root admission, complete source closure or measured
 heap qualification is claimed. Migration application/recovery and the other
 section 14 gates remain open.
 
+## Exclusive builtin additions, 2026-11-14
+
+Source `e8041305b` adds explicit library `complete_additions()` methods on the
+adapter capture and service owner. The service retains a package reader lock
+through fresh admission and writes; the adapter retains prefix coordination,
+refuses any replacement row before writing, creates links using exclusive
+symlinkat and captured system32, updates its report, rechecks and synchronizes
+the directory. No existing entry is overwritten or deleted. Partial progress
+can be resumed through fresh capture, where matching links become keep rows.
+This is not atomic across links and supplies no existing-link retarget operation
+or CLI write command. Low-level callers still authenticate inputs and hold leases.
+
+Host adapter tests pass for simulated interruption after one creation, resumption,
+repeat calls and preservation of a personal-file collision appearing after
+capture. Signed install/upgrade service tests pass for replacement-row refusal
+without addition, explicit fixture preparation of the additions-only state,
+creation and repeated calls. The fixture itself retargets the old link; the API
+does not. Both test binaries pass with the retained V compiler, `-backend c
+-gc none -manualfree` and repository module path. No actual SIGKILL/power-loss,
+guest execution, cross-build or measured heap qualification is claimed here.
+
+Evidence is frozen at `/Users/alex/.cache/vwadditions-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-builtin-additions-20261114-01.inventory.json`
+has SHA-256 `53dd6bd9bc535a083552ab5105fc64fde2c93ae8a8129c0daa29d75614abf81c`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. New source copies, generated host C/binaries and logs are retained;
+complete source closure is not claimed. Existing-link migration/recovery,
+real-root/guest qualification and the other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
