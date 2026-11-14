@@ -2113,6 +2113,28 @@ execution, cross-builds, guest behavior, complete source closure or measured
 heap flatness. Signed service qualification, migration application/recovery and
 the other section 14 gates remain open.
 
+## Launch verification before prefix review, 2026-11-14
+
+Source `e1c735889` materializes the persisted fixture's declared application and
+runtime closure plus canonical desktop registration, then invokes the same
+`verify_launch_payloads()` used by service admission. Positive verification,
+revoked publisher-key refusal, undeclared runtime-entry refusal, changed
+registration refusal and same-size DLL tamper refusal pass. Restored payloads
+verify before the combined review, retained lease and actual collection tests.
+The complete host bridge tests pass using the retained V compiler with
+`-backend c -gc none -manualfree` and repository module path.
+
+Evidence is frozen at `/Users/alex/.cache/vwverifybridge-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-launch-verification-20261114-01.inventory.json`
+has SHA-256 `03294574b04c0717be66888a27de93702134f330ff058cfe3b84c4e0ebf23cc6`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets; new source copies, generated host C/binaries and logs are retained.
+Provenance is locally constructed fixture metadata, not signed repository
+publication/install or successful real-root service admission. No cross-build,
+guest execution, complete source closure or measured heap qualification is
+claimed. Signed service qualification, migration application/recovery and the
+other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
