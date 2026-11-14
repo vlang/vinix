@@ -9,10 +9,10 @@ import plainiso
 import tests.packages.winesource
 
 fn run() ! {
-	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] != '--refusals') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL COMPILED_GUEST [--refusals]')
+	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] !in ['--refusals', '--writes']) {
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL COMPILED_GUEST [--refusals|--writes]')
 	}
-	refusals := os.args.len == 6
+	mode := if os.args.len == 6 { os.args[5] } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh work and supported architecture required') }
 	if winesource.file_digest(@FILE)! != sha256.hexhash($embed_file('wine-service-heap-check.v').to_string()) {
@@ -33,7 +33,12 @@ fn run() ! {
 	os.mkdir_all(work)!
 	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
-	required := if refusals { [
+	required := if mode == '--writes' { [
+		'WINE SERVICE WRITE phase=migration-repeat cycles=100 live_objects=0 live_bytes=0',
+		'WINE SERVICE WRITE phase=additions cycles=100 live_objects=0 live_bytes=0',
+		'WINE SERVICE WRITES PASS phases=2 cycles=100 signed-links private-data lease-free reader-lock-free',
+		'HWTEST PASS wine-service-heap',
+	] } else if mode == '--refusals' { [
 		'WINE SERVICE REFUSAL phase=missing-app cycles=100 live_objects=0 live_bytes=0',
 		'WINE SERVICE REFUSAL phase=runtime-kind cycles=100 live_objects=0 live_bytes=0',
 		'WINE SERVICE REFUSAL phase=personal-dll cycles=100 live_objects=0 live_bytes=0',

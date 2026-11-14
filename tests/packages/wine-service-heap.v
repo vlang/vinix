@@ -181,6 +181,60 @@ fn refusals(generation string, builtins string, cycles int) ! {
 	println('WINE SERVICE REFUSALS PASS phases=4 cycles=${cycles} lease-free guard-recovered personal-data-preserved')
 }
 
+fn writes(generation string, builtins string, cycles int) ! {
+	lease_path := generation + '/lease'
+	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if lease < 0 { return error('cannot capture write lease probe') }
+	defer { C.close(lease) }
+	store_lock := C.open(c'/var/lib/vinix-packages/lock', C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if store_lock < 0 { return error('cannot capture write reader-lock probe') }
+	defer { C.close(store_lock) }
+	os.write_file('/tmp/private/sentinel', 'private contents')!
+	for additions in [false, true]! {
+		for _ in 0 .. cycles {
+			if additions {
+				for name in ['base.dll', 'extra.dll']! {
+					path := '/tmp/private/wine/drive_c/windows/system32/' + name
+					os.rm(path) or { unsafe { path.free() }; return err }
+					unsafe { path.free() }
+				}
+			}
+			tracking = true
+			mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { tracking = false; return err }
+			if additions {
+				owner.complete_additions() or { owner.close(); tracking = false; return err }
+			} else {
+				owner.migrate_bindings() or { owner.close(); tracking = false; return err }
+			}
+			owner.recheck() or { owner.close(); tracking = false; return err }
+			valid := owner.review.review.prior_generation == 0 && owner.review.review.bindings.len == 2
+				&& owner.review.review.bindings.all(it.operation == .keep)
+			owner.close()
+			tracking = false
+			if !valid { return error('service write did not complete its signed inventory') }
+			require_free(lease)!; require_free(store_lock)!
+			for name in ['base.dll', 'extra.dll']! {
+				path := '/tmp/private/wine/drive_c/windows/system32/' + name
+				observed := os.readlink(path) or { unsafe { path.free() }; return err }
+				expected := builtins + '/' + name
+				matches := observed == expected
+				unsafe { path.free(); observed.free(); expected.free() }
+				if !matches {
+					return error('service write selected a different builtin target')
+				}
+			}
+		}
+		phase := if additions { 'additions' } else { 'migration-repeat' }
+		println('WINE SERVICE WRITE phase=${phase} cycles=${cycles} live_objects=${live_objects} live_bytes=${live_bytes}')
+		if invalid || live_objects != 0 || live_bytes != 0 { return error('service write retained V allocations') }
+	}
+	if os.read_file('/tmp/private/sentinel')! != 'private contents'
+		|| os.exists('/tmp/private/wine/.vinix-builtin-next') || os.is_link('/tmp/private/wine/.vinix-builtin-next') {
+		return error('service write changed private data or left staging')
+	}
+	println('WINE SERVICE WRITES PASS phases=2 cycles=${cycles} signed-links private-data lease-free reader-lock-free')
+}
+
 fn run() ! {
 	$if track_heap ? {} $else { return error('service heap probe requires -d track_heap') }
 	generation := setup()!
@@ -200,6 +254,7 @@ fn run() ! {
 	mut warm := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private')!; warm.close()
 	cycles := $if wine_service_heap_diagnostic ? { 1 } $else { 100 }
 	$if wine_service_heap_refusals ? { refusals(generation, builtins, cycles)!; return }
+	$if wine_service_heap_writes ? { writes(generation, builtins, cycles)!; return }
 	tracking = true
 	for _ in 0 .. cycles {
 		mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { tracking = false; return err }
@@ -230,6 +285,9 @@ fn run() ! {
 }
 
 fn main() {
+	$if wine_service_heap_refusals ? {
+		$if wine_service_heap_writes ? { eprintln('select only one service heap mode'); exit(2) }
+	}
 	if C.getpid() != 1 { eprintln('requires guest PID 1'); exit(2) }
 	console := $if arm64 { '/dev/console' } $else { '/dev/com1' }
 	fd := C.open(console.str, C.O_WRONLY)

@@ -2147,8 +2147,17 @@ personal DLL collisions and personal stage migration refusal. Each phase must
 retain zero measured V allocations. Coordination probes require temporary store
 reader locks and failed-admission leases to be released, while failed migration
 keeps the live owner's lease and guard. Explicit fixture cleanup must permit
-retry and fresh capture; personal contents must survive. Both modes keep the
+retry and fresh capture; personal contents must survive. All modes keep the
 120-second bound and their own required completion markers.
+
+For successful writes, build with `-d wine_service_heap_writes` and run the
+controller with `--writes`. It requires 100 idempotent public migration cycles
+and 100 additions cycles that recreate two fixture-owned missing links. Every
+cycle must produce the selected signed targets, pass full recheck and release
+the generation lease and store reader lock after owner close. Both phases must
+retain zero measured V allocations, preserve a private sentinel and leave no
+stage. Write/refusal guest modes and controller options are mutually exclusive;
+the write mode also keeps the 120-second bound.
 
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
