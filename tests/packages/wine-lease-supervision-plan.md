@@ -2580,6 +2580,37 @@ complete source closure or measured heap qualification. Marker runtimes are not
 Wine execution. Actual Wine/translation/GUI compatibility, power-loss recovery
 and remaining section 14 work stay open.
 
+## Public migration staging controls, 2026-11-14
+
+Source `23fc6ecef` extends the public-command guest fixture with retained-stage
+controls. An ordinary account puts a personal file, a nonempty directory and
+a foreign symlink at `wine/.vinix-builtin-next` in turn. Each invocation of
+`wine-prefix-migrate` refuses and preserves that entry, all 34 old builtin
+links and private data, without creating the selected runtime's extra link.
+The fixture then constructs a stage pointing at the authenticated selected
+`new.dll`, whose row sorts after `base.dll`. When the public writer has
+retargeted `base.dll`, `new.dll` must already be retargeted, demonstrating that
+the retained stage was consumed first. The existing public-writer SIGKILL,
+live guard/lease, fresh-admission resume and repetition checks still pass,
+and no staging entry remains after completion.
+
+Both guests pass the new exact marker and all earlier required markers:
+x86_64 in 10.927 seconds and AArch64 in 6.419 seconds. The complete retained
+bundle is `/Users/alex/.cache/vwstagecli-20261114-01`. Its typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-public-stage-20261114-01.inventory.json`,
+SHA-256 `40db0c44083a946ce045956df3e442faac15de5ffa04f293c321df9986b553f4`;
+recording and an independent comparison pass. Guest sources, generated C,
+executables, runner, kernel inputs, build logs and boot evidence are retained.
+The CLI executables are byte-identical copies from the preceding public
+migration bundle (source `1be68013f`); only the fixture and checker changed.
+Build flags and input identities are recorded in the bundle's build notes.
+
+This checks reconstructed staging states through the real public command and
+signed marker-package admission, not a power-loss event. Marker payloads never
+execute Wine. The retained pointer-compatibility build exception remains;
+strict compilation, complete build-input closure, measured heap behavior,
+actual Wine compatibility and the other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

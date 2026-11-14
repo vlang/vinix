@@ -1290,6 +1290,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     retains the live owner's guard/lease, releases both on death and resumes via
     fresh admission in both guests. The explicit [public migration command](tests/packages/wine-lease-supervision-plan.md#public-migration-command-2026-11-14)
     also passes CLI-owner SIGKILL/resume and repetition in both guests.
+    [Public staging controls](tests/packages/wine-lease-supervision-plan.md#public-migration-staging-controls-2026-11-14)
+    preserve unknown files, directories and links at the staging path and
+    resume a valid retained stage first in both guests.
     Power-loss recovery and actual Wine
     compatibility remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
