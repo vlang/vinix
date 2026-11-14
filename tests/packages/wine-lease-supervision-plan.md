@@ -2354,6 +2354,42 @@ complete source closure and measured heap qualification are not claimed.
 Retargeting/recovery, real-root/guest acceptance and other section 14 gates stay
 open.
 
+## ARM real-root prefix commands, 2026-11-14
+
+Source `ebc9312be` adds the PID-1 guest probe and a runner taking
+`NEW_WORK ARCH KERNEL COMPILED_CLI COMPILED_GUEST`. The probe generates a key,
+packs marker Windows/runtime packages, signs and installs them at the guest's
+actual root, then sheds groups and switches to UID/GID 1000. The ordinary child
+prepares a prefix, removes one builtin link, and executes the public review,
+additions, repeated additions and final review commands. Review must leave the
+link missing, additions must create its exact signed target, and private sentinel
+data must survive. Both exact success markers pass in the AArch64 VM in 5.827 s.
+This exercises successful public real-root admission and fsync-backed additions,
+not just the private alternate-root host components. Marker binaries are never
+executed; no Wine/translation or graphical acceptance is established.
+
+Evidence is frozen at `/Users/alex/.cache/vwguestprefix-20261114-01`; successful
+result/serial/QEMU evidence is under `run-02`. The first boot's signing-seed
+parent refusal remains under `run-01`; the corrected seed is in a mode-0700
+root-owned directory. An initial host runner module-path build failure is also
+retained. Receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-arm-guest-20261114-01.inventory.json`
+has SHA-256 `ff220821a49c19eacd0d9ff64b67c5104d34ade57905664bd6b4641145ee2776`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets, including source copies, generated C, binaries, kernel copy and
+boot artifacts. The retained kernel input is
+`/Users/alex/.cache/vinix-wine-shared-pages-20261112/kernel-aarch64`.
+
+CLI/probe C generation uses the retained V compiler, `-prod -gc none -manualfree`,
+Linux standalone defines, ARM64 and repository/account module paths. LLVM links
+against the repository AArch64 musl sysroot and GCC 14.2.0 runtime, with
+`-Wno-error=incompatible-pointer-types` for the previously documented retained-V
+waitpid boundary, plus execute_capture_nix.c. This is not strict-build, complete
+source-closure, general ABI or measured-heap qualification. The runner accepts
+precompiled inputs and is not a hermetic source admission checker. x86 guest
+coverage, existing-link migration/recovery, power-loss durability and the other
+section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
