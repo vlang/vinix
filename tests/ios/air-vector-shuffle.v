@@ -112,14 +112,14 @@ fn run_batch(assembler_path string, out string, element int) !Counts {
   s.write_string('define void @${mode}(ptr %out) { store i8 17, ptr %out, align 1\n %a = shufflevector <2 x ${t}> ${left}, <2 x ${t}> zeroinitializer, <3 x i32> ${mask_text}\n %v = extractelement <3 x ${t}> %a, i32 0\n ${stores} ret void }\n')
  }
  s.write_string('define i32 @loop(i32 %n) { entry: br label %body\n body: %i = phi i32 [0, %entry], [%next, %body]\n %sum = phi i32 [0, %entry], [%added, %body]\n %a = insertelement <2 x i32> zeroinitializer, i32 %i, i32 0\n %v = shufflevector <2 x i32> %a, <2 x i32> poison, <2 x i32> zeroinitializer\n %w = shufflevector <2 x i32> %v, <2 x i32> %v, <3 x i32> <i32 1, i32 2, i32 0>\n %x = extractelement <3 x i32> %w, i32 2\n %added = add i32 %sum, %x\n %next = add i32 %i, 1\n %cond = icmp ult i32 %next, %n\n br i1 %cond, label %body, label %done\n done: ret i32 %added }\n')
- guards := ['argument', 'load', 'freeze_lane_select', 'lane_select', 'phi', 'inputwide', 'outputwide', 'coldwide', 'opaque']
+ guards := ['argument', 'load', 'freeze_wide_select', 'wide_select', 'phi', 'inputwide', 'outputwide', 'coldwide', 'opaque']
  for guard in guards {
   signature := if guard == 'argument' { '<2 x ${t}> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
    'load' { '%v = load <2 x ${t}>, ptr %src, align 1\n %z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
-   'freeze_lane_select' { '%selected = select <2 x i1> zeroinitializer, <2 x ${t}> zeroinitializer, <2 x ${t}> poison\n %v = freeze <2 x ${t}> %selected\n %z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
-   'lane_select' { '%v = select <2 x i1> zeroinitializer, <2 x ${t}> zeroinitializer, <2 x ${t}> poison\n %z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
+   'freeze_wide_select' { '%selected = select <17 x i1> zeroinitializer, <17 x ${t}> zeroinitializer, <17 x ${t}> poison\n %v = freeze <17 x ${t}> %selected\n %z = shufflevector <17 x ${t}> %v, <17 x ${t}> poison, <1 x i32> zeroinitializer' }
+   'wide_select' { '%v = select <17 x i1> zeroinitializer, <17 x ${t}> zeroinitializer, <17 x ${t}> poison\n %z = shufflevector <17 x ${t}> %v, <17 x ${t}> poison, <1 x i32> zeroinitializer' }
    'phi' { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
    'inputwide' { '%z = shufflevector <17 x ${t}> zeroinitializer, <17 x ${t}> poison, <1 x i32> zeroinitializer' }
    'outputwide', 'coldwide' { '${if guard == 'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold:' } else { '' }} %z = shufflevector <2 x ${t}> zeroinitializer, <2 x ${t}> poison, <17 x i32> zeroinitializer' }

@@ -457,7 +457,7 @@ i1..i64 unsigned index. All lanes are checked before dispatch, with a
 per-function million-lane validation budget shared by insertions, shuffles, freezes, selects and
 extractions. Only the chosen lane is evaluated: poison propagates, selected
 undef errors and out-of-range indices produce poison. Extractions cost one
-instruction; vector PHIs and per-lane selects, loaded vectors, vector
+instruction; vector PHIs, loaded vectors, vector
 arguments/storage and scalable vectors remain unsupported.
 Deferred kernels select integer/half/float representations,
 preserve NaN payloads and signed zeros, freeze out-of-range poison, fail poison
@@ -500,7 +500,20 @@ policy. Unchosen poison/undef lanes do not affect a defined arm. Select costs
 one executed step, charges both arm counts plus the result count, and shares
 construction storage. Deferred integer/half/float kernels check both arms,
 condition masking, freezing, updates, snapshot preservation and failed-command
-write ordering. Per-lane conditions and select fast-math flags remain unsupported.
+write ordering. Select fast-math flags remain unsupported.
+
+Per-lane vector `select` uses a matching fixed i1 vector condition. Each defined
+condition lane chooses the corresponding arm lane; poison conditions affect
+only their own lanes, and unchosen lane poison/undef does not taint the result.
+Any undef condition lane rejects at select under the bounded execution policy;
+freezing the condition first chooses zero for its indeterminate lanes. Supported
+literal or earlier constructed conditions receive complete preflight validation,
+as do both arms. Validation work also charges the condition's lane count.
+Execution reads an arm only when some defined condition lane chooses it.
+The result shares existing snapshot storage and costs one executed step.
+Deferred integer/half/float kernels check independent lane choices, poisoned
+and frozen conditions, old snapshots, exact NaN/zero bits and partial-write
+failures. Seventeen-lane condition pipelines reject.
 
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and
