@@ -37,11 +37,17 @@ fn run() ! {
 	refusal([native, 'aarch64', work + '/arm-relaunch', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--relaunch-probe'], work + '/arm-relaunch.log', 'owned native Wine qualification requires x86_64')!
 	refusal([native, 'x86_64', work + '/unowned-relaunch', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--relaunch-probe'], work + '/unowned-relaunch.log', 'usage: wine-native-check')!
 	refusal([native, 'x86_64', work + '/mixed-relaunch', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--relaunch-probe', '--manager-death-probe'], work + '/mixed-relaunch.log', 'usage: wine-native-check')!
+	refusal([native, 'aarch64', work + '/arm-migration', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--migration-probe'], work + '/arm-migration.log', 'owned native Wine qualification requires x86_64')!
+	refusal([native, 'x86_64', work + '/unowned-migration', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--migration-probe'], work + '/unowned-migration.log', 'usage: wine-native-check')!
+	refusal([native, 'x86_64', work + '/mixed-migration', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--migration-probe', '--relaunch-probe'], work + '/mixed-migration.log', 'usage: wine-native-check')!
 	refusal([native, 'x86_64', work + '/mixed', prepared, '/missing', '/missing', '/missing', '/missing', '/missing'], work + '/mixed.log', 'ownership modes differ')!
 	os.mkdir(work + '/unmarked')!
 	refusal([native, 'x86_64', work + '/unmarked-run', work + '/unmarked', '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager'], work + '/unmarked.log', 'ownership modes differ')!
 	for directory in ['producer', 'arm', 'arm-collection', 'unowned-collection', 'arm-death', 'unowned-death', 'mixed-probes', 'arm-idle', 'unowned-idle', 'mixed-idle', 'arm-manager', 'unowned-manager', 'mixed-manager', 'arm-relaunch', 'unowned-relaunch', 'mixed-relaunch'] {
 		if os.exists(work + '/' + directory) { return error('mode/architecture refusal created workload output') }
+	}
+	for directory in ['arm-migration', 'unowned-migration', 'mixed-migration'] {
+		if os.exists(work + '/' + directory) { return error('migration mode refusal created workload output') }
 	}
 	for directory in [work + '/mixed', work + '/unmarked-run'] {
 		if os.exists(directory) && os.ls(directory)!.len != 0 { return error('mode refusal created signing/build output') }

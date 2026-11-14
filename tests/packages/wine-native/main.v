@@ -3,10 +3,12 @@
 module main
 
 import os
+import json2
 import crypto.sha256
 import time
 import tests.packages.wineproc
 import tools.packages.pkgcore
+import tools.packages.wineadapter
 
 #include <fcntl.h>
 #include <sys/file.h>
@@ -34,6 +36,22 @@ fn C.execv(&char, &&char) int
 
 const application = 'org.vinix.wine-win64-probe'
 const data = '/home/alex/.local/share/vinix-apps/' + application
+
+fn prefix_command_child() {
+	if os.args.len != 3 || os.args[2] !in ['wine-prefix-review', 'wine-prefix-migrate'] { exit(125) }
+	if C.setgroups(0, unsafe { nil }) != 0 || C.setresgid(1000, 1000, 1000) != 0 || C.setresuid(1000, 1000, 1000) != 0 { exit(124) }
+	args := ['/usr/bin/vinix-package', os.args[2], application, data]!
+	mut pointers := unsafe { [5]&char{} }
+	for index, argument in args { pointers[index] = argument.str }
+	C.execv(args[0].str, &pointers[0])
+	exit(127)
+}
+
+fn migration_review(command string) !wineadapter.BindingReview {
+	output := collection_command_status([os.executable(), '--prefix-command', command], '', 0)!
+	defer { unsafe { output.free() } }
+	return json2.decode[wineadapter.BindingReview](output)
+}
 
 fn nonblocking(fd int) ! {
 	flags := C.fcntl(fd, C.F_GETFL)
@@ -916,6 +934,45 @@ fn collection_run(generation string, architecture string) ! {
 		os.write_file(sentinel, 'same private prefix\n')!
 		os.chown(sentinel, 1000, 1000)!
 		os.chmod(sentinel, 0o600)!
+		mut relaunched_generation := generation.clone()
+		defer { unsafe { relaunched_generation.free() } }
+		$if wine_migration_probe ? {
+			// Reinstall the signed closure in a new generation without altering
+			// Wine bytes. This qualifies path relocation, not a Wine version upgrade.
+			command(['/usr/bin/vinix-package', 'remove', application], '')!
+			command(['/usr/bin/vinix-package', 'install', application], '')!
+			mut selected := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
+			defer { selected.close() }
+			if selected.generation == os.file_name(generation).u64() { return error('migration did not select a new generation') }
+			unsafe { relaunched_generation.free() }
+			relaunched_generation = '/var/lib/vinix-packages/generations/' + selected.generation.str()
+			mut before_migration := migration_review('wine-prefix-review')!
+			defer { before_migration.close() }
+			if before_migration.generation != selected.generation || before_migration.prior_generation != os.file_name(generation).u64()
+				|| !before_migration.bindings.any(it.operation == .replace) { return error('real Wine prior-generation review differs') }
+			println('HWTEST INFO Wine migration selected links=' + before_migration.bindings.len.str())
+			mut migrated := migration_review('wine-prefix-migrate') or {
+				mut replaced := 0
+				for entry in before_migration.bindings {
+					observed := os.readlink(data + '/wine/drive_c/windows/system32/' + entry.name) or { '' }
+					if observed == entry.replacement { replaced++ }
+				}
+				println('HWTEST INFO Wine failed migration retargeted=' + replaced.str())
+				println(os.read_file('/proc/meminfo') or { 'meminfo unavailable' })
+				assets := relaunched_generation + '/apps/org.vinix.wine-runtime/root/usr/lib/wine/x86_64-windows'
+				names := os.ls(assets) or { []string{} }
+				println('HWTEST INFO Wine failed migration selected directory entries=' + names.len.str())
+				return err
+			}
+			defer { migrated.close() }
+			if migrated.generation != selected.generation || migrated.prior_generation != 0 || !migrated.bindings.all(it.operation == .keep) {
+				return error('real Wine migration report incomplete')
+			}
+			for entry in migrated.bindings {
+				if os.readlink(data + '/wine/drive_c/windows/system32/' + entry.name)! != entry.replacement { return error('real Wine migrated target differs') }
+			}
+			println('HWTEST INFO Wine public signed-generation migration complete links=' + migrated.bindings.len.str() + ' PASS')
+		}
 		again := collection_command_status(['/usr/bin/vinix-package', 'run-args', application, '--', '--vinix-collection-probe'], '', 37)!
 		defer { unsafe { again.free() } }
 		if again.count('VINIX COLLECTION INITIAL READY\n') != 1 || again.count('VINIX COLLECTION CHILD READY\n') != 1
@@ -928,9 +985,9 @@ fn collection_run(generation string, architecture string) ! {
 			if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
 			line := wineproc.command_line('/proc/' + pid)!
 			defer { unsafe { line.free() } }
-			if line.contains(generation + '/apps/org.vinix.wine-runtime/') { return error('relaunch left a runtime process: ' + pid) }
+			if line.contains(generation + '/apps/org.vinix.wine-runtime/') || line.contains(relaunched_generation + '/apps/org.vinix.wine-runtime/') { return error('relaunch left a runtime process: ' + pid) }
 		}
-		retired_lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+		retired_lease := C.open((relaunched_generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
 		if retired_lease < 0 { return error('relaunch lost generation lease file') }
 		if C.flock(retired_lease, C.LOCK_EX | C.LOCK_NB) != 0 { C.close(retired_lease); return error('relaunch retained generation lease after return') }
 		C.close(retired_lease)
@@ -944,7 +1001,9 @@ fn collection_run(generation string, architecture string) ! {
 	if retained.previous == 0 || !os.is_dir('/var/lib/vinix-packages/generations/' + retained.previous.str()) {
 		return error('collection removed the retained rollback generation')
 	}
-	$if wine_relaunch_probe ? {
+	$if wine_migration_probe ? {
+		println('HWTEST INFO Wine signed migrated-generation prefix relaunch status37 private-data lease-free PASS')
+	} $else $if wine_relaunch_probe ? {
 		println('HWTEST INFO Wine signed same-generation prefix relaunch after manager death status37 PASS')
 	} $else $if wine_manager_death_probe ? {
 		println('HWTEST INFO Wine signed manager-SIGKILL foreign-server-refused holder-status137 collection-retained PASS')
@@ -1096,6 +1155,7 @@ fn run() ! {
 }
 
 fn main() {
+	if os.args.len > 1 && os.args[1] == '--prefix-command' { prefix_command_child(); return }
 	if os.args.len > 1 && os.args[1] == '--translator-smoke' {
 		smoke_child()
 		return
