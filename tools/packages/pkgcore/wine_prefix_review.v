@@ -48,6 +48,17 @@ pub fn (owner &WinePrefixReview) recheck() ! {
 	owner.review.recheck()!
 }
 
+// Keep package transactions excluded throughout fresh admission and exclusive
+// additions. Retargeting is refused; partial progress resumes via fresh review.
+pub fn (mut owner WinePrefixReview) complete_additions() ! {
+	if owner.admission.prepared.lease < 0 { return error('Wine prefix review is closed') }
+	guard := acquire_reader(owner.admission.prepared.directory)!
+	defer { guard.release() }
+	owner.recheck()!
+	owner.review.complete_additions()!
+	owner.recheck()!
+}
+
 fn wine_builtin_expectations(runtime Package) ![]wineadapter.BuiltinExpectation {
 	prefix := 'root/usr/lib/wine/x86_64-windows/'
 	mut expected := []wineadapter.BuiltinExpectation{cap: runtime.files.len}

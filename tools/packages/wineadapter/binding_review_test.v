@@ -109,6 +109,40 @@ fn idle_review_refused(capture &IdleBindingReview, message string) {
 	assert false, 'changed idle review accepted'
 }
 
+fn test_exclusive_builtin_additions_resume_without_replacing_files() {
+	root := os.real_path(os.temp_dir()) + '/wine-additions-' + os.getpid().str()
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	store := root + '/store'
+	builtins := store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
+	data := root + '/data'
+	os.mkdir_all(builtins)!; os.mkdir(data)!; os.chmod(data, 0o700)!
+	os.chown(data, int(C.geteuid()), os.getegid())!
+	os.write_file(builtins + '/base.dll', 'base')!
+	mut prefix := prepare_prefix(data, builtins)!
+	defer { prefix.close() }
+	os.write_file(builtins + '/a.dll', 'a')!; os.write_file(builtins + '/b.dll', 'b')!
+	system := data + '/wine/drive_c/windows/system32'
+	// Simulate interruption after one exclusive creation, before recapture.
+	os.symlink(builtins + '/a.dll', system + '/a.dll')!
+	mut capture := capture_idle_binding_review(data, builtins, store)!
+	defer { capture.close() }
+	assert capture.review.bindings[0].operation == .keep
+	assert capture.review.bindings[1].operation == .create
+	capture.complete_additions()!
+	capture.complete_additions()!
+	assert capture.review.bindings.all(it.operation == .keep)
+	assert os.readlink(system + '/b.dll')! == builtins + '/b.dll'
+	capture.close()
+	os.rm(system + '/b.dll')!
+	mut collision := capture_idle_binding_review(data, builtins, store)!
+	defer { collision.close() }
+	os.write_file(system + '/b.dll', 'personal contents')!
+	mut refused := false
+	collision.complete_additions() or { refused = true }
+	assert refused && os.read_file(system + '/b.dll')! == 'personal contents'
+}
+
 fn expected_inventory_refused(capture &IdleBindingReview, runtime string, generation u64, expected []BuiltinExpectation) {
 	capture.require_builtin_inventory(runtime, generation, expected) or { assert err.msg().contains('differs'); return }
 	assert false, 'mismatched expected inventory accepted'

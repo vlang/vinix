@@ -2037,6 +2037,17 @@ and server coordination files/directories, but changes no builtin links and
 starts no Wine process. Exit releases the generation lease and prefix guard;
 the JSON report carries no retained admission for a later command.
 
+`WinePrefixReview.complete_additions()` is an explicit library write operation
+for additions-only captures. It retains package reader/lease and prefix guards,
+rechecks service admission, refuses any existing link needing replacement, and
+creates missing symlinks exclusively through the captured system32 descriptor.
+It never overwrites or deletes an entry. The directory is synchronized before
+success. A failure or interruption may leave a subset created; a fresh review
+recognizes matching links as `keep` and can finish the remainder. This is not an
+atomic multi-link transaction. The lower-level adapter method requires the
+caller to authenticate its inventory and retain the generation lease. No CLI
+write command or existing-link retargeting is enabled by this API.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership
