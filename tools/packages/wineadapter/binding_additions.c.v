@@ -12,10 +12,22 @@ pub fn (mut capture IdleBindingReview) complete_additions() ! {
 	if capture.review.bindings.any(it.operation == .replace) {
 		return error('Wine builtin additions require all existing links to select the current runtime')
 	}
+	system_path := capture.data + '/wine/drive_c/windows/system32'
+	defer { unsafe { system_path.free() } }
 	for index in 0 .. capture.review.bindings.len {
 		if capture.review.bindings[index].operation != .create { continue }
-		capture.recheck()!
+		// Full inventory checks bracket the operation. Per-link admission
+		// checks the held namespace and target, avoiding a full payload rehash
+		// for every missing link. Other concurrent changes refuse at the final
+		// full recheck; partial progress remains recoverable via fresh capture.
+		capture.server.require_idle(&capture.guard, capture.data)!
+		binding_directory_unchanged(capture.system_fd, system_path, true)!
+		binding_directory_unchanged(capture.assets_fd, capture.builtins, false)!
 		entry := capture.review.bindings[index]
+		digest, _ := binding_asset_digest(capture.assets_fd, entry.name)!
+		matches := digest == capture.digests[index]
+		unsafe { digest.free() }
+		if !matches { return error('Wine builtin addition target bytes changed') }
 		if C.symlinkat(entry.replacement.str, capture.system_fd, entry.name.str) != 0 {
 			return error('cannot exclusively create Wine builtin addition; recapture before retrying')
 		}

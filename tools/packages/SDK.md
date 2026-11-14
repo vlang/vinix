@@ -2047,6 +2047,10 @@ recognizes matching links as `keep` and can finish the remainder. This is not an
 atomic multi-link transaction. The lower-level adapter method requires the
 caller to authenticate its inventory and retain the generation lease. No CLI
 write command or existing-link retargeting is enabled by this API.
+Full inventory checks bracket creation and synchronization. Before each link,
+the operation checks idle/namespace continuity and that target's digest rather
+than rehashing the whole inventory. Changes to other entries during creation
+may be detected at the final full check, leaving resumable partial additions.
 
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing

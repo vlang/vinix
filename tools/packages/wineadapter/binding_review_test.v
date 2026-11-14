@@ -142,6 +142,14 @@ fn test_exclusive_builtin_additions_resume_without_replacing_files() {
 	mut refused := false
 	collision.complete_additions() or { refused = true }
 	assert refused && os.read_file(system + '/b.dll')! == 'personal contents'
+	collision.close()
+	os.rm(system + '/b.dll')!
+	mut changed := capture_idle_binding_review(data, builtins, store)!
+	defer { changed.close() }
+	os.write_file(builtins + '/b.dll', 'changed')!
+	mut target_refused := false
+	changed.complete_additions() or { target_refused = err.msg().contains('asset bytes changed') }
+	assert target_refused && !os.exists(system + '/b.dll')
 }
 
 fn test_builtin_additions_resume_after_sigkill() {
@@ -196,6 +204,7 @@ fn test_builtin_additions_resume_after_sigkill() {
 	mut resumed := capture_idle_binding_review(data, builtins, store)!
 	defer { resumed.close() }
 	assert resumed.review.bindings.filter(it.operation == .create).len == 128 - installed
+	started := time.now().unix_milli()
 	resumed.complete_additions()!
 	assert resumed.review.bindings.all(it.operation == .keep)
 	for index in 0 .. 128 {
@@ -203,7 +212,7 @@ fn test_builtin_additions_resume_after_sigkill() {
 		assert os.readlink(system + name)! == builtins + name
 	}
 	assert os.read_file(system + '/personal.txt')! == 'preserve private data'
-	println('Wine additions SIGKILL partial=' + installed.str() + '/128; fresh capture completed remaining links PASS')
+	println('Wine additions SIGKILL partial=' + installed.str() + '/128; fresh capture completed remaining links in ' + (time.now().unix_milli() - started).str() + ' ms PASS')
 }
 
 fn expected_inventory_refused(capture &IdleBindingReview, runtime string, generation u64, expected []BuiltinExpectation) {
