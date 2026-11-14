@@ -60,6 +60,58 @@ cleanup. This failed attempt is retained. Host and guest growth measurements
 cover different filesystems and do not identify the source of all host growth.
 There is no successful complete libart.so build at this checkpoint.
 
+After source/tooling commit 20e7670c1, incremental attempts retained further
+objects without changing the checked inputs. Each failure remains a failure:
+
+| Attempt | Stop | Elapsed ms | Guest peak RSS bytes | Host growth bytes | Guest growth bytes |
+| --- | --- | ---: | ---: | ---: | ---: |
+| r6 | Host disk growth | 201619 | 531025920 | 590249984 | 8835072 |
+| r7 | Guest wall limit | 290058 | 494010368 | 377974784 | 11210752 |
+| r8 | Host disk growth | 104136 | 527372288 | 601542656 | 3371008 |
+
+All native and host cleanup receipts passed. Host-triggered r6/r8 cancellation
+each stopped exactly one matching guest group; r7's native guard had already
+stopped its group. The changed oat_file_assistant.cc compiled to a 79184-byte
+object, but compilation has not reached a linked libart.so. Incremental objects
+are retained for continuation; these attempts do not establish a fresh bounded
+full-build pass or a usable replacement runtime.
+
+The native evidence archive was exported and its SHA256 matched on both hosts:
+`art-builder-guest-20261114-r5/native-evidence-r1.tar`,
+`7b1c53c76783666b9e34bbe4a57d09e413f14dcbc71b7e2d78891e5b28d10cd5`.
+It includes native logs/receipts through r8, the applied-input manifest, actual
+ARM generator/control binaries and installed APK database. Native archive
+creation and guarded host transfer both passed 0/0 with complete cleanup.
+
+The owned builder QEMU19729 was synced and powered off through systemd. UART
+records Power down; PID and open-disk checks confirmed it stopped before any
+offline access. Read-only work-disk e2fsck passed all five phases, 0/0 and
+complete cleanup. A subsequent 20-second host probe with the builder stopped
+observed 83849216 bytes of disk growth without exceeding its cap. This shows
+host writes continued with this VM off, but does not attribute every byte of
+the earlier build-time growth. A read-only shasum attempt then exceeded the
+host growth cap with the VM still stopped: 552665088 bytes in 48355 ms,
+guard 125/child 137 and complete cleanup. Its failed receipt remains retained.
+The existing V/CommonCrypto hash tool subsequently completed both stopped-disk
+hashes under the same caps (5451/17786 ms), with complete cleanup. This reuses
+a verification tool; it does not select a historical V compiler for any build.
+The host has roughly 21 GiB free; repeated growth-limit failures remain the
+immediate build blocker. No Maps VM is running.
+
+The stopped disks retain the source tree, exact dependency/header inputs,
+partial outputs and installed toolchain:
+
+| Disk | SHA256 |
+| --- | --- |
+| /Users/alex/.lima/vinix-art-20261114/disk | db1f08c8d25b71b1b4ed31de554e195b220f3edd9463f9a3e31af71e7ad80946 |
+| art-builder-work-disk-20261114-r1/work.img | ba74ff92d887aeb459c6bf6ef66534569fa02beb4bad46cfbedf04be5aa40e4a |
+
+Final host receipts are art-builder-work-fsck-20261114-r1,
+art-builder-stopped-probe-20261114-r1, art-builder-stopped-hashes-20261114-r1
+(failed), art-builder-stopped-root-hash-20261114-r2 and
+art-builder-stopped-work-hash-20261114-r2. Root-disk hashing does not establish
+a new root-filesystem fsck result. The work disk's read-only fsck is current.
+
 Resource caps remain RSS 629145600 bytes, reserve 1073741824, growth 536870912,
 output 4194304 and host wall 300000 ms. The guest uses the stricter 290000-ms
 wall limit to leave cleanup time. Make uses -j1. The source is ART
