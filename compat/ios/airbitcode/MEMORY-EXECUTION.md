@@ -116,16 +116,16 @@ Integer, mixed scalar and void APIs share validation/evaluation; the integer
 API admits integer lanes only.
 
 `insertelement` creates a new vector snapshot from a supported literal or an
-earlier insertion/shuffle/freeze/select/comparison result of the same type. It replaces one lane
+earlier supported vector result of the same type. It replaces one lane
 with a scalar value, poison or literal undef; other lanes retain their state.
 Extraction may read either snapshot. A poison or out-of-range insertion index poisons the
 whole new vector; an undef index errors. A later valid insertion can repair
 one lane of poison/undef. Each insertion costs one executed step. Preflight
-caps static insertion, shuffle, vector freeze, select and comparison results together at 4,096
+caps all supported vector construction results together at 4,096
 per function, including inactive blocks.
 One execution-owned array holds those fixed-size snapshots and is freed on
 every exit; loop visits reuse each instruction's slot. Vector PHIs,
-arguments, loads/stores and arithmetic, scalable vectors, other lane
+arguments, loads/stores and floating arithmetic, scalable vectors, other lane
 formats and vectors larger than sixteen lanes remain unsupported.
 
 `shufflevector` combines lanes from two supported constant or earlier
@@ -189,7 +189,26 @@ Results may feed comparisons, per-lane select, freeze, insertion, shuffle and
 extraction, preserving older snapshots. Comparison costs one executed step;
 validation charges both source counts plus the result count, and results share
 the existing construction storage. Floating/pointer comparison flags, vector
-pointer comparisons and vector arithmetic remain unsupported.
+pointer comparisons and floating vector arithmetic remain unsupported.
+
+Vector integer binary operations accept matching fixed 1..16-lane i1..i64
+vectors. All thirteen scalar opcodes apply independently per lane: add, subtract,
+multiply, signed/unsigned division/remainder, shifts, AND, OR and XOR.
+`nuw`/`nsw`, `exact` and OR `disjoint` follow the scalar flag rules and produce
+poison only in affected lanes. Out-of-range shift amounts also poison only
+their own lanes. Sources use the same supported constant/earlier-construction
+rules, and both complete sources are checked before execution. The result
+preserves earlier snapshots and may feed any supported vector operation.
+Any undef operand lane rejects at the binary instruction, including discarded
+results or extraction of a different lane. Division/remainder with poison,
+zero divisors or signed-minimum/-1 rejects the whole executed instruction,
+following the existing bounded scalar policy; this includes signed remainder.
+Freezing sources first can repair poison/undef, but a frozen zero divisor still
+rejects. Freezing a result does not suppress errors that occur while evaluating
+the instruction. Earlier stores remain visible after dynamic failures.
+Each binary instruction costs one step, charges both source counts plus result
+count against lane work, and shares the existing bounded snapshot array.
+Floating vector binary operations remain unsupported.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -694,6 +713,12 @@ integer `samesign`, fixed counts, boolean masks feeding selections, native
 defined values, frozen mask choices, poison stores, undef rejection, source
 and result snapshots, constant FP predicates, metadata/source/shape guards,
 step budgets and shared storage/work boundaries through memory and void APIs.
+`tests/ios/air-vector-binary.v` covers i1..i64, all thirteen integer opcodes and
+thirty flag variants, raw/frozen/compared/selected results, defined native LLVM
+values, independent poison and division guards, source/result freezing, old
+snapshots, undef/poison discards, full-buffer write ordering, metadata/source/
+shape guards, budgets and exact/exceeded shared construction/work limits.
+Invalid native division and poison-valued native selections are never executed.
 `tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
 extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native

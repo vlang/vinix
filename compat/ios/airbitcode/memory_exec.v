@@ -159,13 +159,13 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		code := stream.records[inst.record].code
 		if op.targets_count != 0 && code !in [u64(11), 12, 16]! { return error('AIR memory execution: unexpected targets') }
 		gep := code in [u64(4), 30, 43]!
-		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code in [u64(9), 28]! { if p.vector_construction(code, op) { p.vector_compare_flag_mask(op) } else { p.integer_compare_flag_mask(op) } } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code in [u64(9), 28]! { if p.vector_construction(code, op) { p.vector_compare_flag_mask(op) } else { p.integer_compare_flag_mask(op) } } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind in [.integer_t, .vector_t]! { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 		if op.flags & ~allowed_flags != 0 { return error('AIR memory execution: unsupported flags') }
 		if code == 6 || p.vector_construction(code, op) {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR vector: extract result slot') }
 			if code != 6 {
 				if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				vector_work += if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
+				vector_work += if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
 				vector_results++
 			} else { vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
 			continue
@@ -454,7 +454,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 			}
 			if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }
 			if code == 27 { value := m.insert_pair_value(op)!; m.put(inst, value); continue }
-			if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
+			if code == 2 { value := if p.types[op.result_type].kind == .vector_t { m.binary_vector_value(stream, inst, op)! } else { m.binary_value(op)! }; m.put(inst, value); continue }
 			if code == 6 { value := m.extract_constant_lane(stream, op)!; m.put(inst, value); continue }
 			if code == 7 { value := m.insert_vector_value(stream, inst, op)!; m.put(inst, value); continue }
 			if code == 8 { value := m.shuffle_vector_value(stream, inst, op)!; m.put(inst, value); continue }

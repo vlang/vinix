@@ -452,9 +452,9 @@ all four signed/unsigned half/float variants in a kernel and cover infinities,
 NaNs, fractions and frozen poison results.
 
 Scalar `extractelement` can select an i1..i64/half/float lane from a fixed
-constant vector or earlier insertion/shuffle/freeze/select/comparison result of 1..16 lanes using a runtime
+constant vector or earlier supported vector result of 1..16 lanes using a runtime
 i1..i64 unsigned index. All lanes are checked before dispatch, with a
-per-function million-lane validation budget shared by insertions, shuffles, freezes, selects and
+per-function million-lane validation budget shared by vector operations and
 extractions. Only the chosen lane is evaluated: poison propagates, selected
 undef errors and out-of-range indices produce poison. Extractions cost one
 instruction; vector PHIs, loaded vectors, vector
@@ -466,7 +466,7 @@ stores and reject an oversized-vector pipeline.
 `insertelement` replaces one scalar lane while preserving older snapshots and
 other lanes' poison/undef state. Invalid or poison indices poison the new
 vector; undef indices error. Later insertions can repair individual lanes.
-Each insertion costs one step. Up to 4,096 static insertion/shuffle/freeze/select/comparison results use one
+Each insertion costs one step. Up to 4,096 static vector construction results use one
 execution-owned array freed on every exit, with slots reused on loop visits.
 Deferred integer/half/float kernels exercise snapshots, repairs, raw NaN/zero
 bits, frozen invalid indices and poison-store command failures.
@@ -483,7 +483,7 @@ raw half/float bits, command failures and oversized-pipeline rejection.
 
 Vector `freeze` preserves defined lane bits and independently chooses a fixed
 zero for each poison/undef lane. Sources may be supported literals or earlier
-insertion/shuffle/freeze/select/comparison results of the same fixed type. Its independent
+supported vector results of the same fixed type. Its independent
 snapshot may feed any supported vector operation; repeated uses agree and
 repeated freezes are idempotent. It costs one executed step, charges the full
 lane count and shares construction storage. Deferred integer/half/float
@@ -527,6 +527,20 @@ Each comparison costs one step, charges both source counts plus result count,
 and shares bounded construction storage. Deferred integer/half/float kernels
 check masks selecting data, frozen poison, old snapshots, NaN/zero behavior and
 failed-command write ordering. Floating comparison flags reject at pipeline creation.
+
+Vector integer arithmetic and bitwise operations support all thirteen scalar
+opcodes at i1..i64 with matching fixed counts 1..16. Overflow/exact/disjoint
+flags and oversized shifts poison only affected lanes. Both complete sources
+receive preflight validation; undef lanes reject during execution. Poison
+division/remainder, zero divisors and signed-minimum/-1 reject the whole
+instruction under the scalar policy. Freezing sources can repair indeterminate
+lanes; freezing the result does not suppress earlier evaluation errors.
+Each operation costs one step, charges both source counts plus result count,
+and shares bounded construction storage. Results may feed comparisons,
+selections, later arithmetic, insertion, shuffle, freeze and extraction while
+older snapshots retain their state. Deferred kernels cover thirty flag variants,
+local poison, strict division, frozen sources/results, chained updates and
+partial-write failures. Floating vector arithmetic remains unsupported.
 
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and
