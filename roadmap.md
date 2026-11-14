@@ -1315,6 +1315,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     741-row host review/recheck/capture/migration phases now retain zero
     V-managed allocations; both guest regression suites pass. Whole-launch and
     broader kernel/mapping lifetime qualification remain open.
+    [Measured refusal cleanup](tests/packages/wine-lease-supervision-plan.md#measured-binding-refusal-cleanup-2026-11-14)
+    also passes 100 attempts per selected error path with zero retained V heap
+    allocations and unchanged descriptor availability under a 32-FD host limit,
+    including the full 741-row AddressSanitizer probe.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

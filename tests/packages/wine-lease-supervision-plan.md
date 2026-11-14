@@ -2908,6 +2908,46 @@ Typed receipt:
 SHA-256 `acabe34ee1ae78a1c11aab2d9a7ac193e1e51278b05cf3087bd10d0e0d0f64eb`.
 Recording and independent comparison pass.
 
+## Measured binding refusal cleanup, 2026-11-14
+
+Source `77ff61ed5` extends the V heap probe through 100 attempts each of four
+refusals: a personal DLL collision, an empty runtime asset after guard acquisition,
+a competing capture and a personal staging file during migration. Each must
+return its specific expected error, which the probe caller releases. Every
+phase retains zero V-managed objects and bytes. Personal DLL/stage contents and
+the empty asset/prefix link are preserved. The held owner still rechecks after
+competing-capture refusals; after closing it, fresh capture and migration succeed.
+
+The probe verifies a process-local 32-FD soft limit, preserving the original hard
+limit. It counts available descriptors with a fixed stack buffer, opening
+`/dev/null` to `EMFILE` and closing only its own descriptors. Holding one extra
+descriptor must reduce the counter by one. Descriptor availability stays equal
+to each refusal phase's baseline, and returns to the initial value after owner
+retirement and fresh capture/close. The earlier heap-hook positive control and
+overflow/duplicate checks remain. This measures release under the bounded limit;
+it does not inject failures at every descriptor allocation.
+
+Final production probes pass with both 2 and 741 rows. The complete final
+741-row AddressSanitizer run passes without reports, including the retarget and
+all four refusal phases. The earlier positive review/recheck/capture/migration
+phases also remain required and retain zero measured allocations. Preliminary
+successful iterations are retained separately. Production adapter code is
+unchanged; this adds measured refusal-path coverage with callers freeing errors.
+Fixture setup, libc, package-service admission, kernel heap, cold startup and
+unselected error paths remain outside the host measurement. Whole-launch heap
+and broader Wine/lifetime/mapping gates remain open.
+
+Complete evidence is preserved at `/Users/alex/.cache/vwbindingrefusal-20261114-01`,
+including final generated C, parsed-source list, binaries, all probe/build logs
+and the isolated source tree at base `ac0273eb2` plus `source.patch`. The changed
+probe matches `77ff61ed5`. Original complete input bundles and namespaces remain
+required; this local macOS check does not qualify a hermetic build or ARM Wine.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-binding-refusal-20261114-01.inventory.json`,
+SHA-256 `dbb05fd4c1dcea6b478b5cb9072fbc2d4b30bb79e6316c5fb62de030a8adfe45`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
