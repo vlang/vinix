@@ -2,7 +2,7 @@
 
 `run_memory_function` executes a defined ordinary void function with pointer
 arguments, forward control flow, scalar loads/stores, scalar binary operations,
-comparisons, scalar select/casts/freeze, floating negation, forward constant GEPs,
+comparisons, scalar select/casts/freeze, floating negation, bounded constant GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
@@ -285,16 +285,23 @@ is rejected when building the profile.
 
 GEPs resolve to a binding identity and a byte offset, using the existing ABI
 layout/offset planner. They require an explicit little-endian data layout,
-64-bit pointer/index widths and literal, defined nonnegative i1..i64 indexes.
-Arrays, structures (including packed fields), byte-addressable fixed vector
-elements and chains of earlier GEPs are supported. Every offset/stride/source
+64-bit pointer/index widths. Literal, defined nonnegative i1..i64 indexes may
+select arrays, structures (including packed fields), byte-addressable fixed
+vector elements and chains of earlier GEPs. Every offset/stride/source
 allocation size stays within 64 MiB; multiplication and addition are checked
-before computing an offset. Negative, dynamic, poison/undef and wider indexes
+before computing an offset. A negative index is supported only as a single
+scalar-element index (i1..i64, half or float), subtracting from an earlier GEP's
+proven byte offset without going below the binding's logical base. Its magnitude
+and scaled subtraction are checked before multiplication, including the signed
+minimum index. The binding's own offset supplies no extra headroom. Negative
+aggregate or multi-index paths, dynamic, poison/undef and wider indexes
 reject. Constant-expression pointers, casts and numerical pointer inputs reject.
 
-Known GEP inbounds/nusw/nuw flags are accepted only within this forward,
-nonwrapping profile; unknown bits reject. All intermediate forward offsets
-and unused GEP results must fit the binding's extent. A one-past result is
+Known GEP inbounds/nusw/nuw flags are accepted within the forward,
+nonwrapping profile. Backward scalar GEPs accept plain, nusw and inbounds
+(including historical inbounds encoding), but any nuw bit rejects. Unknown
+bits reject. All intermediate offsets and unused GEP results must fit the
+binding's extent. A one-past result is
 allowed; dereferencing it needs additional bytes and rejects. Profiles retain
 an owned per-instruction access table, released by `profile.free()`. GEPs cost
 one step but never construct host pointers or enter the scalar value slots.
@@ -336,6 +343,11 @@ also checked against native LLVM by `tests/ios/air-memory-arithmetic.v` for
 load/compute/store bodies, including poison consumption and budget guards.
 `tests/ios/air-memory-gep.v` compares indexed loads/stores with native LLVM,
 including narrow padding, layouts, GEP flags, chains and preflight failures.
+`tests/ios/air-memory-backward-gep.v` compares bounded backward scalar loads and
+stores with native LLVM, including every scalar width and every index width,
+aliased buffers, exact one-past intermediate extents and historical inbounds.
+It checks budgets, permissions, intermediate bounds and rejected negative
+profiles/flags before an earlier store.
 `tests/ios/air-memory-casts.v` checks load/cast/store bodies against defined
 native LLVM conversions, with separate poison and unsupported-input controls.
 `tests/ios/air-memory-unary.v` checks fneg/freeze against native LLVM and exact

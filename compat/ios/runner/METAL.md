@@ -284,7 +284,7 @@ a 65-case pipeline rejects. Loops and dynamic buffer indexes remain excluded.
 Both compute dispatch selectors require grid and threadgroup dimensions
 exactly `(1, 1, 1)`. The reported thread execution width and maximum group size
 are one; static threadgroup memory is zero. There are no thread IDs, loops,
-dynamic/negative GEP indexes, vector values, texture access, barriers or
+dynamic GEP indexes, vector values, texture access, barriers or
 threadgroup memory in this profile.
 Setting a buffer accepts nil to clear a slot; dispatch requires every argument
 to have an in-bounds, aligned binding from the queue's device. Encoding checks
@@ -561,6 +561,12 @@ Forward constant GEPs may select scalar array/structure/vector elements and
 chain from earlier GEPs. They require explicit little-endian layouts with
 64-bit pointer/index widths and defined nonnegative i1..i64 literals. Known
 inbounds/nusw/nuw flags use the executor's checked, nonwrapping offset profile.
+One negative scalar-element index (i1..i64, half or float) may step backward
+from an earlier GEP, provided its scaled subtraction stays at or above the
+binding's logical base. The binding offset supplies no extra headroom. Plain,
+nusw and inbounds forms are supported; nuw, negative aggregate/multi-index paths
+and dynamic/poison/undef/wide indexes reject before stores. Earlier forward
+intermediates still require their full extent even if the final pointer is lower.
 Pipeline buffer extents include every derived/unused pointer and accessed byte;
 dispatch validates the combined extent plus the binding offset before recording.
 Derived access offsets must independently satisfy alignment. Runtime loads and
