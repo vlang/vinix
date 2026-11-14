@@ -202,8 +202,43 @@ The new runner compiled under the old limits in
 art-shared-host-controller-20261114-r1: 0/0, complete cleanup, 3353 ms,
 sampled RSS 313147392 bytes. Its cancellation fixture r3 passed under the
 unchanged stricter fixture limits: one owned guest group stopped, native
-child 137, no native guard violation and complete cleanup. Native compilation
-under the new shared-host profile is pending.
+child 137, no native guard violation and complete cleanup.
+
+Under the new profile, r13 successfully compiled method_verifier.cc and
+progressed through register-type verification into quick_fillarray_entrypoints.cc.
+It still failed: the host guard's disk probe exceeded its one-second deadline
+after 115716 ms. Its last sampled free space was 13502820352 bytes and observed
+growth 2153525248 bytes. A subsequent df showed only about 5.2 GiB free, later
+falling below 5 GiB. The guard failed closed and cancelled one matching native
+group; both cleanup receipts passed. Native peak RSS was 415645696 bytes and
+growth 3403776 bytes. No linked libart.so or ARM/Maps qualification is claimed.
+
+The host now has less than the new 8-GiB reserve, so another build cannot be
+admitted. Admission also accounts for the 4-GiB growth allowance: restore more
+than 12 GiB free and a stable write window before retrying. The reserve and
+probe deadline were not lowered after this failure.
+
+QEMU52868 was synced and powered down normally. UART Power down, PID and
+open-disk checks confirmed shutdown before offline access. Native evidence
+through r13, input-check r5 and cancellation fixture r3 was exported under the
+old audit caps, with matching native/host SHA256:
+art-builder-guest-20261114-r7/native-evidence-r3.tar,
+`82c8274581ce6aaa517355c6ed0689309369544811d7ced281c393750f3e2a77`.
+Host/native r13 receipt hashes are respectively
+`fd3748778f87f131a3484a580ac934d940a52d3e2cc6c9b9bb58876316896303`
+and `4cdef8d6c4e41886ffe0d3f5d6eb8ab0a02d01a1c4d9fb47a6084b6832708a11`.
+
+Current read-only work-disk fsck passed all five phases in
+art-builder-work-fsck-20261114-r3. Work-disk hashing passed in
+art-builder-stopped-work-hash-20261114-r4: current SHA256
+`1b5ee5fe8181310ab92a6927148a08eef17cba9dcb0c28e678c499fd828eeafd`.
+Both returned 0/0 with complete cleanup. The simultaneous root-disk hash
+attempt art-builder-stopped-root-hash-20261114-r4 failed on host growth:
+562454528 bytes in 7333 ms, 125/137, complete cleanup. It produced no digest;
+the earlier root-disk hashes are historical and do not identify this current
+root image. No current root-disk seal or root-filesystem fsck is claimed.
+The full source, generated inputs, dependency files and incremental objects
+remain on the stopped work disk. No test VM is left running.
 
 The original profile used RSS 629145600 bytes, reserve 1073741824, growth 536870912,
 output 4194304 and host wall 300000 ms. The guest uses the stricter 290000-ms
