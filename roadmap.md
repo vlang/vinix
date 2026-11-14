@@ -2280,6 +2280,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   flat storage; nine selected regression cases pass per architecture. See
   [the descriptor qualification](docs/linux-select-descriptors.md).
 
+- [x] Decode native select/pselect6 nfds as signed32 and publish empty result
+  words, including ignored bits in the last word and read-only output errors.
+  Identical native/Linux ELFs pass 45,780 AArch64 / 91,560 x86-64 checks;
+  originals fail 9,612 / 19,224. Both credential cohorts retain flat storage,
+  with generated-C scope and independent lifetime review. See
+  [the nfds/output qualification](docs/linux-select-nfds.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

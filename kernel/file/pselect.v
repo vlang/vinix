@@ -66,7 +66,9 @@ fn select_fds_open(process &proc.Process, polls []PollFD) bool {
 // The descriptors are gathered into the same PollFD list ppoll() works on, so
 // there is one readiness path rather than two. Unlike select(2), the timeout is
 // not written back: pselect6 leaves it alone, and musl's select() copies it.
-pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfds u64, timeout u64, sigmask u64) (u64, u64) {
+pub fn syscall_pselect6(_ voidptr, nfds_word int, readfds u64, writefds u64, exceptfds u64, timeout u64, sigmask u64) (u64, u64) {
+	// Linux declares nfds as signed int; the upper register word is ignored.
+	nfds := int(i32(nfds_word))
 	if nfds < 0 || nfds > fd_set_bits {
 		return errno.err, errno.einval
 	}
@@ -87,7 +89,8 @@ pub fn syscall_pselect6(_ voidptr, nfds int, readfds u64, writefds u64, exceptfd
 // select(nfds, readfds, writefds, exceptfds, timeout), the x86-64 call: the
 // same as pselect6 with a struct timeval for the timeout and no signal mask.
 // The time left is not written back; musl hands the kernel a copy anyway.
-pub fn syscall_select(_ voidptr, nfds int, readfds u64, writefds u64, exceptfds u64, timeout u64) (u64, u64) {
+pub fn syscall_select(_ voidptr, nfds_word int, readfds u64, writefds u64, exceptfds u64, timeout u64) (u64, u64) {
+	nfds := int(i32(nfds_word))
 	if nfds < 0 || nfds > fd_set_bits {
 		return errno.err, errno.einval
 	}
@@ -192,6 +195,18 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 				unsafe { free(timer) }
 			}
 			event.await_one(mut timer.event, true) or { return errno.err, errno.eintr }
+		}
+		// The imported last word can contain bits beyond nfds. A successful
+		// empty wait still publishes zero words, including those ignored bits.
+		mut empty_result := [fd_set_words]u64{}
+		if readfds != 0 && !usercopy.copy_to_user(readfds, voidptr(&empty_result[0]), words * sizeof(u64)) {
+			return errno.err, errno.efault
+		}
+		if writefds != 0 && !usercopy.copy_to_user(writefds, voidptr(&empty_result[0]), words * sizeof(u64)) {
+			return errno.err, errno.efault
+		}
+		if exceptfds != 0 && !usercopy.copy_to_user(exceptfds, voidptr(&empty_result[0]), words * sizeof(u64)) {
+			return errno.err, errno.efault
 		}
 		return 0, 0
 	}

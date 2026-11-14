@@ -37,6 +37,12 @@ on both native architectures. `selectfds-reference.v` boots the unchanged
 probe ELF on Linux, and `selectfds-evidence.v` audits the complete retained
 bundle and generated-C scope. See [results and limits](../../docs/linux-select-descriptors.md).
 
+`--cases selectword` checks signed32 nfds decoding with nonzero upper register
+words, guarded empty/ready/closed/O_PATH bitmaps, read-only empty output faults,
+restored masks and flat cleanup. `selectword-reference.v` runs the unchanged
+ELF on Linux; `selectword-evidence.v` audits the complete external bundle.
+See [results, reproduction and limits](../../docs/linux-select-nfds.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion
