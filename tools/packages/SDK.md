@@ -1902,6 +1902,13 @@ This uses the same 3 GiB fixture and is mutually exclusive with
 records its scope; holder SIGKILL, full session teardown and broader lifetime
 guarantees remain open.
 
+Both signed caller-death modes also attempt a second actual package launch
+before remove/rollback. It must return 126 within fifteen seconds at the
+managed-prefix guard while the original caller stays gone, holder/server/worker
+remain live, generation bytes survive and the lease stays busy. See the
+[signed contention check](../../tests/packages/wine-lease-supervision-plan.md#signed-prefix-contention-after-caller-death-2026-11-14).
+Foreign-server admission after manager death remains a separate gate.
+
 `--owned-manager --idle-server-probe` extends the signed x86 caller-death
 case through zero live Wine clients. A positive control first matches the
 known live worker. After release, the observer excludes retired Z/X processes

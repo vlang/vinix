@@ -1711,6 +1711,44 @@ no production changes. Signed Wine, holder/SDK death, session teardown, ARM
 owned Wine, fresh owned GUI, default activation and broader environment/heap/
 hermetic gates remain separate.
 
+## Signed prefix contention after caller death, 2026-11-14
+
+Source `86a76aaf6` extends both signed x86 caller-death observer modes. After
+the ordinary caller dies with SIGKILL and the outer CLI reports 137, a second
+actual package launch targets the same active generation/application before
+remove/rollback. It must return 126 within fifteen seconds and report
+`Wine prefix already has a managed launch`. The original caller stays gone;
+holder, server and Windows worker remain live. The generation directory and
+PE bytes survive, with exclusive flock busy before and after refusal. The host
+controller requires this marker alongside the existing final lifetime markers.
+
+`native-01` passes the idle extension in 96.964 seconds, including three
+worker-live collections, the zero-live-client collection/recheck interval
+177791000 ns, and fifth post-retirement collection. `native-02` passes the
+caller-death regression in 92.201 seconds, including its fourth collection
+after retirement. Both are uninterrupted, preserve holder status 37 and natural
+retirement without Wine-process rescue reaping, and pass parsed-source,
+selected-input and generated-output rechecks. Complete native input maps match.
+The guest and actual CLI were rebuilt; the retained runtime/PE were freshly
+signed/published/installed with prior complete producer evidence still required.
+
+Evidence, final source copies, commands, C/binaries, media and complete native
+input byte snapshots are frozen at `/Users/alex/.cache/vwcompete-20261113-01`.
+There are no failed guest attempts in this bundle. Preserve the original
+producer/kernel bundles and namespaces; historical audits remain required.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-competing-prefix-20261113-01.inventory.json`,
+SHA-256 `cceeae6cac37ebff6084971505505a4b28ebfc020eecd0f32dd3c83121c8487a`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace and referenced original producer/kernel/input bundles.
+
+This qualifies managed-prefix contention while the original manager survives.
+Foreign-server refusal after manager death, concurrent Wine execution, holder/
+SDK death, session teardown, ARM ownership, fresh owned GUI, default activation
+and broad topology/heap/hermetic gates remain open. Production runtime, kernel
+and sandbox permissions are unchanged.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
