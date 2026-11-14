@@ -3,7 +3,7 @@ CFLAGS := -O2 -Wall -Wextra -Werror
 BUILD := build
 V_ARCH ?= $(if $(filter arm64,$(shell uname -m)),arm64,amd64)
 
-.PHONY: report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout check-g13-reference recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test test-trace-v trace trace-resources trace-depth-resources trace-stencil-resources clean
+.PHONY: audit-m1-parity report-g13-initdata-layout all firmware pmp-firmware inspect kernel-kexts recover-t6050-power recover-t8103-adt g13g-kexts generate-g13-initdata-layout check-g13-initdata-layout check-g13-reference recover-g17-abi generate-g17-power-model check-g17-power-model generate-fake-g17-encoder check-fake-g17-encoder layout test test-trace-v trace trace-resources trace-depth-resources trace-stencil-resources clean
 all: $(BUILD)/agx_trace.dylib $(BUILD)/metal_triangle $(BUILD)/objc_layout
 
 test-trace-v:
@@ -76,6 +76,11 @@ check-g13-initdata-layout:
 # reverse-engineered m1n1 source. Set ASAHI_LINUX to include its MMU ordering.
 check-g13-reference: check-g13-initdata-layout
 	./check_g13_reference_contract $(if $(ASAHI_LINUX),--asahi-linux "$(ASAHI_LINUX)")
+
+# Diagnostic parity gate: matching selected contracts never certifies the
+# complete port. Returns nonzero for differences or unreviewed scope; no GPU access.
+audit-m1-parity:
+	../../build-support/run-v-tool.sh audit_m1_parity.v $(if $(ASAHI_LINUX),--asahi-linux "$(ASAHI_LINUX)") $(if $(OMARCHY_PACKAGES),--packages "$(OMARCHY_PACKAGES)") $(if $(OMARCHY_REPO),--omarchy "$(OMARCHY_REPO)") $(if $(AUDIT_OUTPUT),--output "$(AUDIT_OUTPUT)")
 
 report-g13-initdata-layout:
 	./generate_g13_initdata_layout --report

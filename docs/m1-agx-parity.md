@@ -6,6 +6,60 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+## Offline sign-off audit, 2026-11-14
+
+Result: **not equivalent; no 100% parity sign-off**. This conclusion is available
+without a hardware boot. Fresh checkouts of Omarchy
+`663aff7b9943aeff67809d106399fb406410798c` and omarchy-pkgs
+`88d516f3e3b7ce66b02e613f04b89152473a25e3` still select the same Linux-Aurora
+kernel pin above. The Mesa package selects 26.3.0 development source
+`b7b03c5b3b8abe1e040d6056dc62c01b02d3639c`.
+
+The new [offline source audit](../tools/agx-re/m1parity/README.md) compares
+actual declarations from both trees. It found 16 differing selected facts,
+including:
+
+| Contract | Vinix | Packaged Asahi reference |
+| --- | --- | --- |
+| `GET_PARAMS` request | 32 bytes; pointer at offset 16 | 24 bytes; pointer at offset 8 |
+| `SUBMIT` request | 56 bytes; separate sync arrays and command descriptors | 40 bytes; combined sync array and flat command buffer |
+| VM binding request | 48 bytes; one operation | 24 bytes; pointer/stride/count for a batch |
+| No-barrier sentinel | `0xffffffff` | `0xffff` |
+| VM read/write permission bits | `1` / `2` | `2` / `4` |
+| Maximum hardware commands per submit | 2 | 64 |
+| DRM command numbers, including base `0x40` | `GET_TIME=0x49`, `SUBMIT=0x48` | `GET_TIME=0x41`, `SUBMIT=0x4a` |
+
+The command numbers in this table omit the full ioctl's size/direction encoding.
+These are concrete incompatibilities, not an exhaustive count or a coverage
+percentage. Changing the constants alone would break the existing Mesa-facing
+contract; the kernel ABI, submission handling and matched userspace need to
+migrate together. The broader source gaps remain listed below.
+
+The audit checks the immutable package pin, clean reference inputs, source
+hashes and selected firmware contracts. Unknown or missing declarations fail
+the audit. Matching selected facts alone yields `unverified`, never full
+equivalence. Its current result exits 1; provenance or source-gate failures exit
+2. The Make entry point also propagates the nonzero result. No hardware access,
+SSH, guest boot or reboot was performed.
+
+Validation passed: audit/contract/layout unit tests; event, TLB and recovery/TVB
+sanitizer fixtures; G13 ABI translation, work-command layouts, t8103 OPP and the
+pure VM request tests. The ABI/layout/OPP probes initially hit a host V module
+cache failure while compiling unused privileged routines. Their uncached
+monolithic builds passed; both attempts are retained. This audit changes host
+tooling and documentation, and claims no new kernel build or GPU execution.
+
+The retained source baseline is Vinix
+`76567c7aa424a1d26f2b5336035583c158d1957f` plus the audit tooling, bound by
+individual source hashes. Sources, reports, native probes and validation logs
+are retained in
+`/Users/alex/.local/state/vinix/omarchy-m1-offline-audit-20261114/evidence/`.
+The sibling `inventory.json` has SHA-256
+`dfc33f94c655d9fba1e4ec529302bd2757ff266fe6ac97107ba51c9170692f50`.
+The retained `validation/evidence-checker.v` checks the complete named bundle
+using `check-inventory EVIDENCE INVENTORY`. This protects evidence integrity;
+it does not certify full driver equivalence.
+
 ## Additional logic implemented
 
 - **Page and range TLBI.** Ported the reference's 16 KiB operand encoding,
