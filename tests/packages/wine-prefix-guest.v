@@ -11,6 +11,7 @@ import tools.packages.wineadapter
 #include <fcntl.h>
 #include <grp.h>
 #include <sys/wait.h>
+#include <signal.h>
 fn C.getpid() i32
 fn C.open(&char, i32, ...i32) i32
 fn C.dup2(i32, i32) i32
@@ -23,6 +24,8 @@ fn C.setuid(u32) i32
 fn C.execv(&char, &&char) i32
 fn C._exit(i32)
 fn C.alarm(u32) u32
+fn C.kill(i32, i32) i32
+fn C.flock(i32, i32) i32
 
 fn cli_status(command string, expected i32) ! {
 	args := ['/usr/bin/vinix-package', command, 'app', '/tmp/private']
@@ -73,6 +76,47 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	if os.exists(system + '/extra.dll') { return error('upgrade refusal created an addition before retargeting') }
 	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('upgrade refusal changed private data') }
 	println('WINE PREFIX UPGRADE PASS signed generation change; review; retarget refusal; old links and private data preserved')
+	writer := C.fork()
+	if writer == 0 {
+		mut migration := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { C._exit(92); return }
+		migration.migrate_bindings() or { C._exit(93); return }
+		migration.close()
+		C._exit(0)
+	}
+	if writer < 0 { return error('cannot fork migration owner') }
+	mut reaped := false
+	defer {
+		if !reaped { C.kill(writer, C.SIGKILL); mut ignored := i32(0); C.waitpid(writer, &ignored, 0) }
+	}
+	deadline := time.now().unix_milli() + 10000
+	for os.readlink(system + '/base.dll')! != selected_builtins + '/base.dll' && time.now().unix_milli() < deadline {
+		time.sleep(time.millisecond)
+	}
+	if os.readlink(system + '/base.dll')! != selected_builtins + '/base.dll' { return error('migration owner did not reach first retarget') }
+	if C.kill(writer, C.SIGSTOP) != 0 { return error('cannot stop migration owner') }
+	mut status := i32(0)
+	if C.waitpid(writer, &status, C.WUNTRACED) != writer || status & 0xff != 0x7f { return error('migration owner did not stop during partial progress') }
+	mut remaining := 0
+	for index in 0 .. 32 {
+		name := '/retarget-' + index.str() + '.dll'
+		observed := os.readlink(system + name)!
+		if observed == old_builtins + name { remaining++ }
+		else if observed != selected_builtins + name { return error('partial migration link is neither old nor selected') }
+	}
+	if remaining == 0 { return error('migration completed before interruption') }
+	cli_status('wine-prefix-additions', 1)!
+	suffix := '/apps/wine/root/usr/lib/wine/x86_64-windows'
+	lease_path := selected_builtins[..selected_builtins.len - suffix.len] + '/lease'
+	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
+	if lease < 0 { return error('cannot capture generation lease probe') }
+	defer { C.close(lease) }
+	if C.flock(lease, C.LOCK_EX | C.LOCK_NB) == 0 { return error('live migration owner lost generation lease') }
+	if C.kill(writer, C.SIGKILL) != 0 || C.waitpid(writer, &status, 0) != writer || status & 0x7f != C.SIGKILL {
+		return error('migration owner SIGKILL was not collected')
+	}
+	reaped = true
+	if C.flock(lease, C.LOCK_EX | C.LOCK_NB) != 0 { return error('dead migration owner retained generation lease') }
+	if C.flock(lease, C.LOCK_UN) != 0 { return error('cannot retire generation lease probe') }
 	mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private')!
 	defer { owner.close() }
 	owner.migrate_bindings()!
@@ -85,12 +129,17 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	for name in ['base.dll', 'new.dll', 'extra.dll'] {
 		if os.readlink(system + '/' + name)! != selected_builtins + '/' + name { return error('migrated builtin target differs') }
 	}
+	for index in 0 .. 32 {
+		name := '/retarget-' + index.str() + '.dll'
+		if os.readlink(system + name)! != selected_builtins + name { return error('resumed migration target differs') }
+	}
 	cli('wine-prefix-review')!
 	cli('wine-prefix-additions')!
 	mut prepared := wineadapter.prepare_prefix('/tmp/private', selected_builtins)!
 	prepared.close()
 	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('migration changed private data') }
 	println('WINE PREFIX MIGRATION PASS signed runtime retarget; added link; repeat; public review; private data')
+	println('WINE PREFIX OWNER DEATH PASS partial retarget; live lease and guard; SIGKILL release; admitted resume')
 }
 
 fn run() ! {
@@ -101,6 +150,7 @@ fn run() ! {
 	os.write_file('/tmp/app/bin/program.exe', 'marker application, never executed')!; os.chmod('/tmp/app/bin/program.exe', 0o755)!
 	os.write_file('/tmp/runtime/bin/wine', 'marker runtime, never executed')!; os.chmod('/tmp/runtime/bin/wine', 0o755)!
 	for name in ['base.dll', 'new.dll'] { os.write_file('/tmp/runtime/root/usr/lib/wine/x86_64-windows/' + name, 'marker builtin')! }
+	for index in 0 .. 32 { os.write_file('/tmp/runtime/root/usr/lib/wine/x86_64-windows/retarget-' + index.str() + '.dll', 'marker retarget')! }
 	arch := $if arm64 { 'aarch64' } $else { 'x86_64' }
 	os.mkdir_all('/root/prefix-fixture')!; os.chmod('/root/prefix-fixture', 0o700)!
 	key := pkgcore.keygen('/root/prefix-fixture/seed')!
