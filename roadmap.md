@@ -1310,6 +1310,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now pass in both signed marker guests: all public prefix commands preserve
     obsolete links on refusal; explicit fixture-owner cleanup permits migration
     to the restored inventory. Actual Wine-version compatibility remains open.
+    [Measured adapter allocation cleanup](tests/packages/wine-lease-supervision-plan.md#measured-binding-adapter-allocation-cleanup-2026-11-14)
+    releases filename/digest temporaries and the captured-owner shell. Selected
+    741-row host review/recheck/capture/migration phases now retain zero
+    V-managed allocations; both guest regression suites pass. Whole-launch and
+    broader kernel/mapping lifetime qualification remain open.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

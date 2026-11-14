@@ -2855,6 +2855,59 @@ Typed receipt:
 SHA-256 `0d0036600142bce65248918b1b03df93200b5e8926ef2a415b205c238d294759`.
 Recording and independent inventory comparison pass.
 
+## Measured binding adapter allocation cleanup, 2026-11-14
+
+Source `d82e13537` fixes three measured manual-memory leaks. Directory enumeration
+appended an implicit copy of each filename without freeing the temporary.
+Capture did the same for digest strings. The compiler also heap-promoted the
+temporary `IdleBindingReview` shell, then returned a value copy without freeing
+that shell. Enumeration and digest insertion now use explicit copies and release
+the temporaries. Capture uses a stack value with a locally borrowed pointer;
+the returned owner retains its separate strings, arrays and descriptors.
+Generated C confirms the stack shell and the released insertion temporaries.
+
+The new V-only `wine-binding-heap.v` probe uses the selected compiler's
+`-d track_heap` allocation/free hooks with a fixed 65,536-slot table, explicit
+overflow/duplicate refusal and a known 37-byte allocation/free control. Before
+the fix, 100 two-row numeric-name reviews retain 400 objects/2,400 bytes.
+After fixing enumeration alone, 100 capture/migration/close cycles still retain
+300 objects/55,400 bytes: the 424-byte shell and two digest temporaries per
+capture. These failed diagnostic results and intermediate sources remain visible.
+
+The final production probe passes with both 2 and 741 rows: zero retained
+V-managed objects and bytes after each of 100 structural reviews, 100 idle
+rechecks, 100 capture/idempotent-migration/close cycles and one complete
+retarget/close. Every migrated link is checked. AddressSanitizer also passes
+the earlier three-phase 741-row lifecycle probe; the final additional retarget
+phase is measured by the production non-ASan probe. Fixture setup, libc, kernel
+memory, cold/error paths and full package-service admission are outside these
+measurements. Broader mapping/lifetime and whole-launch heap gates remain open.
+
+The assertion-enabled host suite passes all nine tests with 397 assertions,
+including SIGKILL/resume and mutation refusals. Earlier `-prod` host attempts
+execute zero assertions with this compiler, skipping signal calls embedded in
+assertions and failing with managed-launch collisions; those attempts are not
+accepted as validation. The checked host suite uses `-g -stats` without `-prod`.
+The heap probe and guest fixtures use explicit failure checks in production.
+New production CLI/guest builds pass all required signed marker upgrade,
+staging, owner-death, migration and removed-builtin rollback markers on ARM
+in 7.763 seconds and x86 in 20.960 seconds. Kernel, sandbox, runtime bytes,
+budgets and the 120-second guest bound are unchanged. The existing C pointer
+compatibility exception remains.
+
+Complete evidence is retained at `/Users/alex/.cache/vwbindingheap-20261114-01`:
+baseline/intermediate/final generated C and executables, all diagnostic results,
+ASan and checked-test logs, both guest runs and isolated before/after trees.
+Candidate source is base `5ee08cdc2` plus `source.patch` and the retained new
+probe; changed V files match `d82e13537`. Original compiler/producer/kernel
+bundles and namespaces remain required. This is selected-input local acceptance,
+not strict ABI or hermetic build qualification.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-binding-heap-20261114-01.inventory.json`,
+SHA-256 `acabe34ee1ae78a1c11aab2d9a7ac193e1e51278b05cf3087bd10d0e0d0f64eb`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
