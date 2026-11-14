@@ -35,6 +35,11 @@ its two uniform EGL frames produced no error code. It does not resolve r76's
 later failures. Host capacity has recovered, but a newer-V controller build
 was stopped on observed shared disk growth. No test VM from this continuation
 remains running.
+The next [latest-V controller retry, r79](maps-egl-binding-runtime-20261114.md),
+passed ARM self-tests and reached Explore. It captured the adapter's
+EGL_BAD_SURFACE with Mesa reporting success, then exited on missing
+JobInfo.Builder.setImportantWhileForeground. The binding guard remains intact;
+the next SDK repair and state trace are being qualified separately.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

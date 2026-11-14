@@ -67,5 +67,7 @@ stopped for shared growth of 550887424 and 625938432 bytes respectively.
 Native link r4 lacked the signal-stack runtime, which the successful final
 link includes. None of these is counted as a qualification pass.
 
-The next Maps retry must use the paced runner and wait for broker readiness
-explicitly. These host checks do not qualify map tiles, routes or sign-in.
+[r79](maps-egl-binding-runtime-20261114.md) subsequently used the paced runner
+and waited explicitly for broker readiness. Terminal setup/log commands arrived
+intact, and the actual guest log exposed the EGL error and subsequent job API
+failure. This does not qualify map tiles, routes or sign-in.
