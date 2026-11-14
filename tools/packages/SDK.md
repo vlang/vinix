@@ -1917,7 +1917,7 @@ busy lease before and after another actual collection. Generation bytes must
 survive; after natural retirement, holder status 37 and final removal are
 required. Retired zombies can still await their owner during the idle check.
 The runtime's server command is unchanged, with no persistence extension or
-pause. All four lifetime probe flags are mutually exclusive and require owned
+pause. All five lifetime probe flags are mutually exclusive and require owned
 mode; this case also uses 3 GiB. See the [idle-server qualification](../../tests/packages/wine-lease-supervision-plan.md#idle-server-after-client-retirement-2026-11-13)
 for the bounded local result and remaining lifetime gates.
 
@@ -1931,6 +1931,15 @@ generation until natural Wine retirement; the holder then returns the killed
 manager's status 137. This case does not preserve initial application status 37
 across manager death. See the [manager-death qualification](../../tests/packages/wine-lease-supervision-plan.md#signed-sdk-manager-death-2026-11-14)
 for exact inputs, earlier failed attempts and remaining lifetime gates.
+
+`--owned-manager --relaunch-probe` separately qualifies same-generation prefix
+reuse after the killed manager's surviving workload retires. It requires the
+old holder's status 137 and released lease, then a fresh real package launch
+returning 37 with private sentinel data preserved, no runtime processes left
+and the lease free again. Generation 1 remains active until both launches
+retire; remove/rollback and final collection follow. This case uses 3 GiB and
+a 180-second positive-launch bound. See the [signed relaunch report](../../tests/packages/wine-lease-supervision-plan.md#signed-prefix-relaunch-2026-11-14).
+Runtime-generation builtin-link migration remains a separate open gate.
 
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing

@@ -1273,7 +1273,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     lease. A separate [signed SDK-manager death case](tests/packages/wine-lease-supervision-plan.md#signed-sdk-manager-death-2026-11-14)
     now retains the generation through manager SIGKILL, server adoption and
     foreign-server refusal, then collects the holder with manager status 137
-    after natural Wine retirement. Holder death remains a separate gate.
+    after natural Wine retirement. A [same-generation signed relaunch](tests/packages/wine-lease-supervision-plan.md#signed-prefix-relaunch-2026-11-14)
+    now reuses the private prefix after that retirement, preserving private
+    data, returning 37 and releasing the new lease. Runtime-generation prefix
+    migration and holder death remain separate gates.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.

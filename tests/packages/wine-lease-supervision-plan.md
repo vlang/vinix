@@ -1796,6 +1796,49 @@ This qualifies one SDK-manager SIGKILL with a surviving holder. Holder death/
 kernel-owned retention, full session teardown, ARM ownership, fresh owned GUI,
 default activation and broader failure/topology/heap/hermetic gates remain open.
 
+## Signed prefix relaunch, 2026-11-14
+
+Source `c0d3fd3cf` adds `--owned-manager --relaunch-probe` for signed x86
+same-generation recovery. It first exercises caller/SDK SIGKILL, server
+adoption and foreign-owner refusal using the prior observer checks. Generation
+1 stays active in this mode. After releasing the old worker, Wine retires
+naturally, the fixture targeted-reaps the holder with status 137, all tracked
+old processes disappear, and an exclusive lease probe succeeds.
+
+The fixture writes a private-prefix sentinel, then invokes the real package
+CLI again on the same active generation. The retained release marker lets the
+fresh worker retire. The second launch must return 37 with exactly one initial
+readiness, worker readiness and worker retirement marker, preserving sentinel
+bytes. A fail-closed process scan must find no generation-runtime command line,
+and the exclusive generation lease must again be free. Only afterward do real
+remove/rollback transactions make generation 1 obsolete; collection removes it
+while retaining rollback. This mode does not claim live obsolete-generation
+collection; the separate manager-death mode continues to qualify that case.
+
+`native-01` passes uninterrupted in 229.799 seconds with parsed-source,
+selected-input and generated-output rechecks. All eighteen architecture/mode
+refusal controls pass. The positive relaunch command has a 180-second bound;
+existing refusal bounds remain unchanged. No runtime, kernel or sandbox policy
+was changed. The guest and actual CLI were rebuilt; prepared runtime/PE inputs
+were reused and freshly signed/published/installed.
+
+Complete evidence is frozen at `/Users/alex/.cache/vwrelaunch-20261114-01`,
+including isolated source base `2143d1fb8` plus `probe.patch`, generated artifacts
+and complete native input byte snapshots. The three changed files match the
+root commit. There are no failed attempts in this bundle. Original producer/
+kernel bundles and namespaces remain required; historical audits are unchanged.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-relaunch-20261114-01.inventory.json`,
+SHA-256 `b4ff0c2786ed73ee9360634395297cc5e347772e8e07b03754e38f38c15602a8`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace, isolated tree and referenced original input bundles.
+
+This qualifies same-generation prefix reuse. Migration of absolute builtin
+links between runtime generations remains open, along with holder death,
+session teardown, ARM ownership, fresh owned GUI, default activation and broad
+failure/topology/heap/hermetic gates.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
