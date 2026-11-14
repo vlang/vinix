@@ -29,6 +29,7 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  wine-prefix-review ID PRIVATE_DATA (JSON review; may create coordination files)\n' +
+	'  wine-prefix-additions ID PRIVATE_DATA (create missing builtin links; never retarget)\n' +
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
 	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
@@ -139,15 +140,16 @@ fn checked(arguments []string) !int {
 		return admin_authorize()
 	}
 	match command {
-		'wine-prefix-review' {
-			if names.len != 2 { return error('wine-prefix-review requires an installed application ID and absolute private data directory') }
-			if root_option || offline { return error('wine-prefix-review requires the real root without offline options') }
+		'wine-prefix-review', 'wine-prefix-additions' {
+			if names.len != 2 { return error('${command} requires an installed application ID and absolute private data directory') }
+			if root_option || offline { return error('${command} requires the real root without offline options') }
 			if !pkgcore.identifier(names[0]) || !os.is_abs_path(names[1]) || names[1].contains('\x00') {
-				return error('wine-prefix-review requires a valid application ID and absolute private data directory')
+				return error('${command} requires a valid application ID and absolute private data directory')
 			}
 			mut owner := (pkgcore.Service{}).wine_prefix_review(names[0], names[1])!
 			defer { owner.close() }
 			owner.recheck()!
+			if command == 'wine-prefix-additions' { owner.complete_additions()! }
 			println(json2.encode(owner.review.review))
 			return 0
 		}

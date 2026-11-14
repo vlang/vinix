@@ -17,14 +17,16 @@ fn refused(cli string, args []string, message string) ! {
 fn run() ! {
 	if os.args.len != 2 { return error('usage: wine-prefix-cli-check COMPILED_VINIX_PACKAGE') }
 	cli := os.args[1]
-	refused(cli, ['wine-prefix-review'], 'requires an installed application ID')!
-	refused(cli, ['wine-prefix-review', 'app', '/tmp/private', 'extra'], 'requires an installed application ID')!
-	refused(cli, ['--root', '/tmp/alternate', 'wine-prefix-review', 'app', '/tmp/private'], 'requires the real root')!
-	refused(cli, ['--root', '/', 'wine-prefix-review', 'app', '/tmp/private'], 'requires the real root')!
-	refused(cli, ['--offline', 'wine-prefix-review', 'app', '/tmp/private'], 'requires the real root')!
-	refused(cli, ['wine-prefix-review', '../app', '/tmp/private'], 'requires a valid application ID')!
-	refused(cli, ['wine-prefix-review', 'app', 'relative'], 'requires a valid application ID')!
-	refused(cli, ['--progress', 'wine-prefix-review', 'app', '/tmp/private'], '--progress supports')!
+	for command in ['wine-prefix-review', 'wine-prefix-additions'] {
+		refused(cli, [command], 'requires an installed application ID')!
+		refused(cli, [command, 'app', '/tmp/private', 'extra'], 'requires an installed application ID')!
+		refused(cli, ['--root', '/tmp/alternate', command, 'app', '/tmp/private'], 'requires the real root')!
+		refused(cli, ['--root', '/', command, 'app', '/tmp/private'], 'requires the real root')!
+		refused(cli, ['--offline', command, 'app', '/tmp/private'], 'requires the real root')!
+		refused(cli, [command, '../app', '/tmp/private'], 'requires a valid application ID')!
+		refused(cli, [command, 'app', 'relative'], 'requires a valid application ID')!
+		refused(cli, ['--progress', command, 'app', '/tmp/private'], '--progress supports')!
+	}
 	println('Wine installed-prefix CLI refusal controls PASS (no installed-state success claimed)')
 }
 
