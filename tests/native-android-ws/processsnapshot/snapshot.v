@@ -2,8 +2,72 @@
 module processsnapshot
 
 import os
+import json2
+
+#include <unistd.h>
+fn C.readlink(&char, &char, uint) i32
 
 const total_limit = 64 * 1024 * 1024
+
+struct Descriptor {
+	fd u64
+	available bool
+	target string
+}
+
+// Private, one-shot descriptor inventory. The kernel may close/reuse an fd
+// while it is read; retain failures and bracket the inventory with process
+// start times instead of presenting it as an atomic snapshot.
+pub fn capture_descriptors(pid string, root string) ! {
+	descriptors_from('/proc', pid, root)!
+}
+
+fn descriptors_from(proc_root string, pid string, root string) ! {
+	value := decimal(pid, 0, pid.len)!
+	if value == 0 || value > 2147483647 || value.str() != pid {
+		return error('canonical positive PID required')
+	}
+	if os.exists(root) || os.is_link(root) { return error('fresh descriptor directory required') }
+	os.mkdir_all(root, mode: 0o700)!
+	proc := proc_root + '/' + pid
+	before := read_bounded(proc + '/stat', 65536)!
+	started := start_time(before)!
+	os.write_file(root + '/stat-before', before)!
+	for name in ['status', 'limits'] {
+		content := read_bounded(proc + '/' + name, 65536)!
+		os.write_file(root + '/' + name, content)!
+	}
+	mut names := os.ls(proc + '/fd')!
+	if names.len > 4096 { return error('descriptor count exceeds bound') }
+	names.sort()
+	mut entries := []Descriptor{cap: names.len}
+	mut bytes := 0
+	mut unavailable := 0
+	for name in names {
+		fd := decimal(name, 0, name.len)!
+		if fd > 1048575 || fd.str() != name { return error('invalid descriptor name') }
+		path := proc + '/fd/' + name
+		mut buffer := [4096]u8{}
+		length := C.readlink(&char(path.str), &char(&buffer[0]), 4096)
+		if length < 0 {
+			unavailable++
+			entries << Descriptor{fd: fd}
+			continue
+		}
+		if length == 0 || length >= 4096 { return error('descriptor target exceeds bound') }
+		target := buffer[..int(length)].bytestr()
+		bytes += target.len
+		if bytes > 4 * 1024 * 1024 { return error('descriptor target inventory exceeds bound') }
+		entries << Descriptor{fd, true, target}
+	}
+	os.write_file(root + '/descriptors.json', json2.encode(entries, prettify: true))!
+	after := read_bounded(proc + '/stat', 65536)!
+	os.write_file(root + '/stat-after', after)!
+	after_started := start_time(after)!
+	os.write_file(root + '/identity', 'pid=${pid} start=${started} after_start=${after_started} stable=${started == after_started}\n')!
+	if started != after_started { return error('process identity changed during descriptor capture') }
+	println('MAPS-DESCRIPTOR-SNAPSHOT-END pid=${pid} count=${entries.len} unavailable=${unavailable} non_atomic=true')
+}
 
 struct Budget {
 mut:
@@ -189,4 +253,25 @@ pub fn self_test() ! {
 	assert os.read_file(root + '/capture/7-identity')! == 'start=123 after_start=123 stable=true\n'
 	assert os.read_file(root + '/capture/7-smaps')! == 'Rss: 64 kB\n'
 	if _ := capture_from(root + '/proc', root + '/capture') { return error('existing snapshot overwritten') }
+	// Real readlink behavior, duplicate open targets, a disappearing/non-link
+	// entry, JSON escaping and private output permissions on the host filesystem.
+	os.mkdir(root + '/proc/7/fd')!
+	os.symlink('/apk/framework-res.apk', root + '/proc/7/fd/3')!
+	os.symlink('/apk/framework-res.apk', root + '/proc/7/fd/4')!
+	os.symlink('/private/a"b.apk', root + '/proc/7/fd/5')!
+	os.write_file(root + '/proc/7/fd/6', '')!
+	os.write_file(root + '/proc/7/limits', 'Max open files 1024 1048576 files\n')!
+	descriptors_from(root + '/proc', '7', root + '/descriptors')!
+	entries := json2.decode[[]Descriptor](os.read_file(root + '/descriptors/descriptors.json')!)!
+	assert entries.len == 4 && entries[0].target == entries[1].target
+	assert entries[2].target == '/private/a"b.apk' && !entries[3].available
+	assert os.stat(root + '/descriptors')!.mode & 0o777 == 0o700
+	if _ := descriptors_from(root + '/proc', '7', root + '/descriptors') {
+		return error('existing descriptor inventory overwritten')
+	}
+	for pid in ['0', '07', '-1', '7/../7', '2147483648'] {
+		if _ := descriptors_from(root + '/proc', pid, root + '/invalid-descriptors') {
+			return error('invalid descriptor PID accepted')
+		}
+	}
 }

@@ -49,6 +49,12 @@ fn observe() ! {
 }
 
 fn main() {
+	if os.args.len == 4 && os.args[1] == '--descriptor-snapshot' {
+		processsnapshot.capture_descriptors(os.args[2], os.args[3]) or {
+			eprintln('MAPS-DESCRIPTOR-SNAPSHOT-FAILED ' + err.msg()); exit(1)
+		}
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--memory-snapshot' {
 		processsnapshot.capture(os.args[2]) or { eprintln('MAPS-MEMORY-SNAPSHOT-FAILED ' + err.msg()); exit(1) }
 		return
@@ -62,6 +68,6 @@ fn main() {
 		println('MAPS-STORAGE-WATCH-SELFTEST-PASS')
 		return
 	}
-	if os.args.len != 1 { eprintln('usage: maps-storage-watch [--selftest | --memory-snapshot FRESH_OUTPUT]'); exit(2) }
+	if os.args.len != 1 { eprintln('usage: maps-storage-watch [--selftest | --memory-snapshot FRESH_OUTPUT | --descriptor-snapshot PID FRESH_OUTPUT]'); exit(2) }
 	observe() or { eprintln('MAPS-STORAGE-WATCH-FAILED ' + err.msg()); exit(1) }
 }

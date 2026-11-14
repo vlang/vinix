@@ -91,7 +91,11 @@ with the complete runtime closure. The [signed ARM API regression passed](maps-a
 Actual Maps then exited after Add account. That retry missed mounting its data
 disk, losing private logs at shutdown; its exit cause remains unqualified.
 A new controller preflight checks the selected volume before provisioning.
-A correctly mounted retry and Google sign-in remain unresolved.
+The correctly mounted r87/r88 retries retain private diagnostics and pass that
+preflight on ARM. r88's [descriptor exhaustion](maps-descriptor-exhaustion-20261114.md)
+precedes another account connection failure; a bounded V descriptor inventory
+is ready to measure handle ownership. No lifetime repair or Google authentication
+is claimed.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

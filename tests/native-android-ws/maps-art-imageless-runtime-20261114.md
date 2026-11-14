@@ -151,5 +151,30 @@ account-query-native-build-20261114-r2: 15860 ms, sampled RSS 579026944 bytes,
 shared growth 111251456 bytes, under the original caps. Its DSO SHA256 is
 29fbace1c1f5f91c3a74281edc2094c6c75bab7eb200448ef8d6c925be331553.
 The first build's signed-char warning remains retained; explicit &char casts
-fixed the emitted C without disabling -Werror. This diagnostic adapter has
-not yet executed in guest ART. No compiler version was rolled back or pinned.
+fixed the emitted C without disabling -Werror. No compiler version was rolled
+back or pinned. Guest qualification follows below.
+
+The stopped r87 data image subsequently passed a second read-only fsck under
+the original 512-MiB shared-growth cap: maps-r87-fsck-20261114-r2, 0/0,
+complete cleanup, 144 ms, RSS 6258688 bytes, growth 4096 bytes. The failed
+64-MiB attempt remains retained.
+
+Fresh r88 then passed the full signed ARM API regression with the diagnostic
+adapter, exact-once readiness/pass, stdin closure, EOF drain and clean exit.
+Its selected ART library was separately read back as d33dfac4 above. Evidence
+under the same external state root:
+
+| Artifact | SHA256 |
+| --- | --- |
+| maps-query-api-uart-20261114-r1/full.log | ad9368f6896cd8425961b47aeabc446188d401fedd464091e38b7029d18867a4 |
+| maps-query-api-readback-20261114-r1/archive.json | 937b26722b2099c211399f1e1faf52ce96a26e3a17c3dad2946959534b782181 |
+| Same readback directory, exported-receipt.json | edd0a3a51e267ef4df5384c827bb8cf40f4cbb3a1bfc5586d17afa5b3a4dc4fd |
+| maps-query-api-child-20261114-r1/child.log | 2477849036e9a3e776d46b66f33321d94e0678531b818bf340bc027ebc292c62 |
+
+Snapshot, empty-removal plan, diagnostic reconstruction and independent child
+readback guards all passed. No bytes were removed or repaired. The selected
+data disk was mounted and verified from both guest terminals before the actual
+Maps launch; broker preflight matched UUID d28b112e9bd247c083cb872bc0b7133c.
+The actual Maps attempt, descriptor exhaustion, complete private/public
+evidence and stopped-VM checks are in the
+[r88 descriptor report](maps-descriptor-exhaustion-20261114.md).
