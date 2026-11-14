@@ -428,6 +428,21 @@ the linked kernel SHA-256 is
 `3400890dd542e690b63a9654513714f62de6ea1e64401c30ceb849e92b7b5203`.
 Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 
+### Final package freshness check
+
+The final remote check found package HEAD
+`aeb60b5e8dbf2974b8a8a8da6893030eb25b2c19`. A fresh clone's kernel and Mesa
+PKGBUILDs are byte-identical to `1438c19f`; the pinned driver and userspace
+revisions above remain current. Omarchy HEAD remains `663aff7b`. A fresh audit
+of Vinix `49c3af756bab2bba31d47a8ec3b4c35abfbc844d` against these references
+passes the selected gates and retains the `not_equivalent` verdict.
+
+Its complete source/audit bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-command-counters-20261114/freshness-audit/`.
+The sibling `freshness-inventory.json` SHA-256 is
+`3ec287c00de04872522bb7385a1bac41b1eec523806bb1fa03d6672fb5d6d532`.
+The original sealed feature bundles and receipts were preserved.
+
 ## Earlier artifact retention incident
 
 The continuation initially reused the earlier `omarchy-m1-20261114/kernel-build`
