@@ -95,6 +95,12 @@ All three inputs are frozen and its budget is 600 seconds. `ppollsignal-host.v`,
 `ppollsignal-reference.v` and `ppollsignal-evidence.v` retain original failures,
 same-ELF comparisons and earlier refusals. See [receipts and limits](../../docs/linux-poll-signal-output.md).
 
+The signal fixture explicitly warms the futex table before measurement.
+`ppollsignal-alloc-trace.v`, `ppollsignal-slab-trace.v` and
+`ppollsignal-alloc-delta.v` provide separate diagnostic experiments;
+`ppollsignal-alloc-check.v` and `ppollsignal-warm-evidence.v` enforce controls
+and both complete evidence bundles. See [the warmup attribution](../../docs/linux-poll-signal-warmup.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

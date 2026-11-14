@@ -170,6 +170,21 @@ struct C.pollfd {}
 fn C.ppoll(&C.pollfd,u64,&C.timespec,&C.sigset_t) i32
 fn C.poll(&C.pollfd,u64,i32) i32
 fn included(api int, mode int, ro int) bool { return api != 2 || (mode != 0 && ro == 0) }
+// pthread_join may finish without entering FUTEX_WAIT during the warmup
+// cycles. Initialize its kernel table explicitly so first contention cannot
+// appear as retained poll storage. The temporary futex itself is released.
+fn warm_join_futex() {
+ unsafe {
+ word := &i32(C.alloca(usize(sizeof(i32))))
+ duration := &C.timespec(C.alloca(usize(sizeof(C.timespec))))
+ *word = 0
+ *duration = C.timespec{tv_nsec:1}
+ // FUTEX_WAIT | FUTEX_PRIVATE_FLAG, with a positive relative timeout.
+ result := C.syscall(isize(C.SYS_futex),word,isize(128),u32(0),duration,nil,u32(0))
+ code := *C.__errno_location()
+ if result != -1 || code != C.ETIMEDOUT || *word != 0 { fatal(37) }
+ }
+}
 fn probe(t &Targets, api int, mode int, ro int, restart int, report bool) Totals {
  unsafe {
  mut s := t.scratch
@@ -253,6 +268,7 @@ pub fn run(argc i32, argv &&char) i32 {
 				// Entry-frame state outlives handlers, observer joins and reporting.
 				scratch := &State(C.alloca(usize(sizeof(State))))
 				t := targets(scratch)
+				warm_join_futex()
 				sum := qualify(&t,apis)
 				good := if reference { C.printf(c'LINUX PPOLLSIGNAL STORAGE: uid=%u SKIP reference\n',C.getuid()); true } else { storage(&t,apis) }
 				mut answer := [3]int{}

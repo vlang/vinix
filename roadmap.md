@@ -2387,6 +2387,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   Linux-oracle and memory-guard refusals remain retained. See
   [the interrupted-poll qualification](docs/linux-poll-signal-output.md).
 
+- [x] Attribute the reproduced 320-byte ARM signal-fixture guard growth to
+  initial futex-table capacity and warm it explicitly before measurement.
+  Exact-ELF kernel tracing names both size-64 buffers and size-192 metadata;
+  warmed native/Linux probes retain all 672 checks and flat strict cohorts.
+  The older additional size-64 object remains unattributed. See
+  [the warmup qualification](docs/linux-poll-signal-warmup.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
