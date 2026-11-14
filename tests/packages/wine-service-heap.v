@@ -64,14 +64,22 @@ fn heap_free(pointer voidptr) {
 	}
 }
 
-fn setup() !string {
+fn builtin_names() []string {
+	mut names := ['base.dll', 'extra.dll']
+	$if wine_service_heap_scaled ? {
+		for index in 2 .. 741 { names << 'builtin-${index}.dll' }
+	}
+	return names
+}
+
+fn setup(names []string) !string {
 	os.mkdir_all('/tmp')!; os.chmod('/tmp', 0o1777)!
 	os.mkdir_all('/root/service-heap')!
 	os.mkdir_all('/tmp/app/bin')!; os.mkdir_all('/tmp/wine/bin')!
 	os.mkdir_all('/tmp/wine/root/usr/lib/wine/x86_64-windows')!
 	os.write_file('/tmp/app/bin/program.exe', 'marker app')!; os.chmod('/tmp/app/bin/program.exe', 0o755)!
 	os.write_file('/tmp/wine/bin/wine', 'marker runtime')!; os.chmod('/tmp/wine/bin/wine', 0o755)!
-	for name in ['base.dll', 'extra.dll'] {
+	for name in names {
 		os.write_file('/tmp/wine/root/usr/lib/wine/x86_64-windows/' + name, 'marker builtin')!
 	}
 	arch := $if arm64 { 'aarch64' } $else { 'x86_64' }
@@ -181,10 +189,10 @@ fn refusals(generation string, builtins string, cycles int) ! {
 	println('WINE SERVICE REFUSALS PASS phases=4 cycles=${cycles} lease-free guard-recovered personal-data-preserved')
 }
 
-fn upgrade_runtime() !string {
+fn upgrade_runtime(names []string) !string {
 	arch := $if arm64 { 'aarch64' } $else { 'x86_64' }
 	// A distinct signed payload makes stale and selected targets distinguishable.
-	for name in ['base.dll', 'extra.dll']! {
+	for name in names {
 		os.write_file('/tmp/wine/root/usr/lib/wine/x86_64-windows/' + name, 'updated marker builtin')!
 	}
 	os.write_file('/tmp/manifest.json', json2.encode(pkgcore.Package{id: 'wine', name: 'Heap runtime fixture',
@@ -197,7 +205,14 @@ fn upgrade_runtime() !string {
 	return '/var/lib/vinix-packages/generations/' + state.generation.str()
 }
 
-fn writes(generation string, builtins string, previous string, prior u64, cycles int) ! {
+fn write_failure(phase string, cycle int, step string, failure_errno int) {
+	eprintln('WINE SERVICE WRITE REFUSED phase=${phase} cycle=${cycle} step=${step} errno=${failure_errno}')
+	resources := os.read_file('/proc/kernel-resources') or { return }
+	eprintln(resources)
+	unsafe { resources.free() }
+}
+
+fn writes(generation string, builtins string, previous string, prior u64, names []string, cycles int) ! {
 	lease_path := generation + '/lease'
 	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if lease < 0 { return error('cannot capture write lease probe') }
@@ -206,10 +221,11 @@ fn writes(generation string, builtins string, previous string, prior u64, cycles
 	if store_lock < 0 { return error('cannot capture write reader-lock probe') }
 	defer { C.close(store_lock) }
 	os.write_file('/tmp/private/sentinel', 'private contents')!
+	$if wine_service_heap_scaled ? { println('WINE SERVICE SCALE bindings=741 fixture-reset-grace-seconds=6') }
 	for phase in ['migration-repeat', 'additions', 'retarget']! {
-		for _ in 0 .. cycles {
+		for cycle in 0 .. cycles {
 			if phase != 'migration-repeat' {
-				for name in ['base.dll', 'extra.dll']! {
+				for name in names {
 					path := '/tmp/private/wine/drive_c/windows/system32/' + name
 					os.rm(path) or { unsafe { path.free() }; return err }
 					if phase == 'retarget' {
@@ -219,27 +235,45 @@ fn writes(generation string, builtins string, previous string, prior u64, cycles
 					}
 					unsafe { path.free() }
 				}
+				// This paced row-count probe excludes fixture-reset grace time
+				// from the measured public operation. Keep burst pressure evidence
+				// separately; do not raise the guest's kernel resource budget.
+				$if wine_service_heap_scaled ? { time.sleep(6 * time.second) }
 			}
 			tracking = true
-			mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { tracking = false; return err }
+			mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or {
+				tracking = false
+				write_failure(phase, cycle, 'capture', C.errno)
+				return err
+			}
 			if phase == 'retarget' && (owner.review.review.prior_generation != prior
-				|| owner.review.review.bindings.len != 2 || !owner.review.review.bindings.all(it.operation == .replace)) {
+				|| owner.review.review.bindings.len != names.len || !owner.review.review.bindings.all(it.operation == .replace)) {
 				owner.close(); tracking = false
-				return error('service retarget fixture did not capture two prior-generation bindings')
+				return error('service retarget fixture did not capture the prior-generation bindings')
 			}
 			if phase == 'additions' {
-				owner.complete_additions() or { owner.close(); tracking = false; return err }
+				owner.complete_additions() or {
+					failure_errno := C.errno
+					owner.close(); tracking = false
+					write_failure(phase, cycle, 'write', failure_errno)
+					return err
+				}
 			} else {
-				owner.migrate_bindings() or { owner.close(); tracking = false; return err }
+				owner.migrate_bindings() or {
+					failure_errno := C.errno
+					owner.close(); tracking = false
+					write_failure(phase, cycle, 'write', failure_errno)
+					return err
+				}
 			}
 			owner.recheck() or { owner.close(); tracking = false; return err }
-			valid := owner.review.review.prior_generation == 0 && owner.review.review.bindings.len == 2
+			valid := owner.review.review.prior_generation == 0 && owner.review.review.bindings.len == names.len
 				&& owner.review.review.bindings.all(it.operation == .keep)
 			owner.close()
 			tracking = false
 			if !valid { return error('service write did not complete its signed inventory') }
 			require_free(lease)!; require_free(store_lock)!
-			for name in ['base.dll', 'extra.dll']! {
+			for name in names {
 				path := '/tmp/private/wine/drive_c/windows/system32/' + name
 				observed := os.readlink(path) or { unsafe { path.free() }; return err }
 				expected := builtins + '/' + name
@@ -266,13 +300,14 @@ fn writes(generation string, builtins string, previous string, prior u64, cycles
 		|| os.exists('/tmp/private/wine/.vinix-builtin-next') || os.is_link('/tmp/private/wine/.vinix-builtin-next') {
 		return error('service write changed private data or left staging')
 	}
-	println('WINE SERVICE WRITES PASS phases=3 cycles=${cycles} signed-links private-data lease-free reader-lock-free')
+	println('WINE SERVICE WRITES PASS phases=3 cycles=${cycles} bindings=${names.len} signed-links private-data lease-free reader-lock-free')
 }
 
 fn run() ! {
 	$if track_heap ? {} $else { return error('service heap probe requires -d track_heap') }
-	previous_generation := setup()!
-	generation := $if wine_service_heap_writes ? { upgrade_runtime()! } $else { previous_generation }
+	names := builtin_names()
+	previous_generation := setup(names)!
+	generation := $if wine_service_heap_writes ? { upgrade_runtime(names)! } $else { previous_generation }
 	previous := previous_generation + '/apps/wine/root/usr/lib/wine/x86_64-windows'
 	prior := previous_generation.all_after_last('/').u64()
 	$if wine_service_heap_writes ? {
@@ -292,9 +327,9 @@ fn run() ! {
 	if !allocated || live_objects != 0 || live_bytes != 0 || invalid { return error('heap hook control failed') }
 	// Warm setup is outside the measured repeated-operation lifetime.
 	mut warm := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private')!; warm.close()
-	cycles := $if wine_service_heap_diagnostic ? { 1 } $else { 100 }
+	cycles := $if wine_service_heap_diagnostic ? { 1 } $else { $if wine_service_heap_scaled ? { 10 } $else { 100 } }
 	$if wine_service_heap_refusals ? { refusals(generation, builtins, cycles)!; return }
-	$if wine_service_heap_writes ? { writes(generation, builtins, previous, prior, cycles)!; return }
+	$if wine_service_heap_writes ? { writes(generation, builtins, previous, prior, names, cycles)!; return }
 	tracking = true
 	for _ in 0 .. cycles {
 		mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { tracking = false; return err }
@@ -325,6 +360,9 @@ fn run() ! {
 }
 
 fn main() {
+	$if wine_service_heap_scaled ? {
+		$if wine_service_heap_writes ? {} $else { eprintln('scaled service heap mode requires writes'); exit(2) }
+	}
 	$if wine_service_heap_refusals ? {
 		$if wine_service_heap_writes ? { eprintln('select only one service heap mode'); exit(2) }
 	}

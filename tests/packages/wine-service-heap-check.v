@@ -9,8 +9,8 @@ import plainiso
 import tests.packages.winesource
 
 fn run() ! {
-	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] !in ['--refusals', '--writes']) {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL COMPILED_GUEST [--refusals|--writes]')
+	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] !in ['--refusals', '--writes', '--scaled-writes']) {
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL COMPILED_GUEST [--refusals|--writes|--scaled-writes]')
 	}
 	mode := if os.args.len == 6 { os.args[5] } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
@@ -33,11 +33,18 @@ fn run() ! {
 	os.mkdir_all(work)!
 	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
-	required := if mode == '--writes' { [
+	required := if mode == '--scaled-writes' { [
+		'WINE SERVICE SCALE bindings=741 fixture-reset-grace-seconds=6',
+		'WINE SERVICE WRITE phase=migration-repeat cycles=10 live_objects=0 live_bytes=0',
+		'WINE SERVICE WRITE phase=additions cycles=10 live_objects=0 live_bytes=0',
+		'WINE SERVICE WRITE phase=retarget cycles=10 live_objects=0 live_bytes=0',
+		'WINE SERVICE WRITES PASS phases=3 cycles=10 bindings=741 signed-links private-data lease-free reader-lock-free',
+		'HWTEST PASS wine-service-heap',
+	] } else if mode == '--writes' { [
 		'WINE SERVICE WRITE phase=migration-repeat cycles=100 live_objects=0 live_bytes=0',
 		'WINE SERVICE WRITE phase=additions cycles=100 live_objects=0 live_bytes=0',
 		'WINE SERVICE WRITE phase=retarget cycles=100 live_objects=0 live_bytes=0',
-		'WINE SERVICE WRITES PASS phases=3 cycles=100 signed-links private-data lease-free reader-lock-free',
+		'WINE SERVICE WRITES PASS phases=3 cycles=100 bindings=2 signed-links private-data lease-free reader-lock-free',
 		'HWTEST PASS wine-service-heap',
 	] } else if mode == '--refusals' { [
 		'WINE SERVICE REFUSAL phase=missing-app cycles=100 live_objects=0 live_bytes=0',
@@ -51,7 +58,7 @@ fn run() ! {
 			'HWTEST PASS wine-service-heap'] }
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-service-heap', arches: [arch], ending: .running,
 		required: required, forbidden: ['HWTEST FAIL', 'Kernel panic']},
-		hwhost.Run{kernel: os.args[3], guest: os.args[4], state: work + '/boot', timeout: 120, keep: true})
+		hwhost.Run{kernel: os.args[3], guest: os.args[4], state: work + '/boot', timeout: if mode == '--scaled-writes' { 600 } else { 120 }, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	for path, expected in inputs { if winesource.file_digest(path)! != expected { return error('service heap input changed') } }
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!

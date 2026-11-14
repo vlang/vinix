@@ -2163,6 +2163,18 @@ phases must retain zero measured V allocations, preserve a private sentinel and 
 stage. Write/refusal guest modes and controller options are mutually exclusive;
 the write mode also keeps the 120-second bound.
 
+For a 741-row public-service workload, also build with
+`-d wine_service_heap_scaled` and select `--scaled-writes`. This separate mode
+requires 10 cycles per write phase, all 741 bindings on each cycle, and zero
+retained tracked V allocations. After each fixture reset it waits six seconds
+outside the measured operation for deferred kernel reclamation. This is a
+paced row-count probe; unpaced ARM resets can exhaust the unchanged owner
+budget. Its explicit bound is 600 seconds; two-row modes retain their 100-cycle
+requirements and 120-second bound. The scaled
+define requires write mode. Both inventories contain signed marker bytes;
+this measures row-count scaling and does not execute Wine or model its full
+payload size.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.
