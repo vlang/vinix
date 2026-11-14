@@ -1947,7 +1947,11 @@ targets. Build its source at `tools/packages/wine-prefix-review.v` with the
 repository module path. The selected builtin directory must use the canonical
 package-store generation/runtime layout. A review accepts selected-generation
 links plus at most one prior generation of the same runtime; `prior_generation`
-is zero when every link already selects the requested generation. Linked
+is zero when no existing reviewed link selects a prior generation. Each row's
+`operation` is `keep` for the selected generation, `replace` for a prior
+generation, or `create` for an absent prefix entry. A `create` row has empty
+`observed` text and the proposed `replacement`; review does not create it.
+Zero `prior_generation` can therefore accompany pending additions. Linked
 directory components, linked new assets, ordinary files replacing prefix links,
 foreign stores/runtimes and inconsistent target basenames are refused.
 The prefix's system32 inventory is bounded to 4096 entries. Extra absolute

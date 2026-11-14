@@ -4,8 +4,15 @@ module wineadapter
 import os
 import strconv
 
+pub enum BindingOperation {
+	keep
+	replace
+	create
+}
+
 pub struct BuiltinBinding {
 pub:
+	operation BindingOperation
 	name string
 	observed string
 	replacement string
@@ -116,6 +123,12 @@ pub fn review_prefix_bindings(data string, builtins string, store string) !Bindi
 		if !ordinary { return error('Wine binding review asset is not ordinary') }
 		mut buffer := [4097]u8{}
 		length := C.readlinkat(system, name.str, &char(&buffer[0]), 4096)
+		if length < 0 && C.errno == C.ENOENT {
+			// A new builtin needs a link, but review must never create it.
+			// EINVAL (an existing ordinary entry) and other errors still refuse.
+			review.bindings << BuiltinBinding{operation: .create, name: name.clone(), replacement: builtins + '/' + name}
+			continue
+		}
 		if length < 1 || length >= 4096 { return error('Wine binding review requires existing bounded symlinks') }
 		observed := unsafe { tos(&buffer[0], int(length)) }.clone()
 		mut retained := false
@@ -132,7 +145,7 @@ pub fn review_prefix_bindings(data string, builtins string, store string) !Bindi
 			if review.prior_generation != 0 && review.prior_generation != old { return error('Wine builtin links span multiple prior generations') }
 			review.prior_generation = old
 		}
-		review.bindings << BuiltinBinding{name: name.clone(), observed: observed, replacement: builtins + suffix}
+		review.bindings << BuiltinBinding{operation: if old == generation { .keep } else { .replace }, name: name.clone(), observed: observed, replacement: builtins + suffix}
 		retained = true
 	}
 	// A removed builtin is absent from the new inventory. Do not silently

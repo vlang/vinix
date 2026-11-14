@@ -67,6 +67,7 @@ fn test_binding_review_is_read_only_and_refuses_foreign_or_mixed_links() {
 	assert review.runtime_id == 'org.vinix.wine' && review.bindings.len == 2
 	assert review.bindings[0].observed == old + '/kernel32.dll'
 	assert review.bindings[0].replacement == new + '/kernel32.dll'
+	assert review.bindings[0].operation == .replace
 	review.close(); review.close()
 	cli := os.getenv('VINIX_WINE_PREFIX_REVIEW')
 	if cli != '' {
@@ -104,7 +105,54 @@ fn test_binding_review_is_read_only_and_refuses_foreign_or_mixed_links() {
 	}
 	mut current := review_prefix_bindings(data, new, store)!
 	assert current.prior_generation == 0 && current.bindings.len == 2
+	assert current.bindings[0].operation == .keep && current.bindings[1].operation == .keep
 	current.close()
+	// An upgrade may add a DLL. Distinguish absent entries from user files or
+	// directories; keep review read-only even when a link would be created.
+	os.write_file(new + '/new.dll', 'new builtin')!
+	mut additions_before := map[string]string{}
+	binding_snapshot(data, mut additions_before)!
+	mut additions := review_prefix_bindings(data, new, store)!
+	assert additions.prior_generation == 0 && additions.bindings.len == 3
+	assert additions.bindings[1].name == 'new.dll'
+	assert additions.bindings[1].operation == .create && additions.bindings[1].observed == ''
+	assert additions.bindings[1].replacement == new + '/new.dll'
+	additions.close(); additions.close()
+	if cli != '' {
+		mut child := os.new_process(cli)
+		defer { child.close() }
+		child.set_args([store, data, new])
+		child.set_redirect_stdio_merged()
+		child.run()
+		output := child.stdout_slurp()
+		child.wait()
+		assert child.code == 0, output
+		assert output.contains('"operation":"create"') && output.contains('"observed":""'), output
+	}
+	mut additions_after := map[string]string{}
+	binding_snapshot(data, mut additions_after)!
+	assert additions_before == additions_after
+	assert !os.exists(system + '/new.dll')
+	os.rm(system + '/kernel32.dll')!
+	os.symlink(old + '/kernel32.dll', system + '/kernel32.dll')!
+	mut mixed := review_prefix_bindings(data, new, store)!
+	assert mixed.prior_generation == 1 && mixed.bindings.len == 3
+	assert mixed.bindings[0].operation == .replace
+	assert mixed.bindings[1].operation == .create
+	assert mixed.bindings[2].operation == .keep
+	mixed.close()
+	os.rm(system + '/kernel32.dll')!
+	os.symlink(new + '/kernel32.dll', system + '/kernel32.dll')!
+	os.write_file(system + '/new.dll', 'personal file')!
+	binding_refused(data, new, store, 'symlinks')!
+	os.rm(system + '/new.dll')!
+	os.mkdir(system + '/new.dll')!
+	binding_refused(data, new, store, 'symlinks')!
+	os.rmdir(system + '/new.dll')!
+	os.symlink('/missing/personal-new.dll', system + '/new.dll')!
+	binding_refused(data, new, store, 'basename')!
+	os.rm(system + '/new.dll')!
+	os.rm(new + '/new.dll')!
 	for name in ['kernel32.dll', 'ntdll.dll'] {
 		os.rm(system + '/' + name)!; os.symlink(old + '/' + name, system + '/' + name)!
 	}
