@@ -325,6 +325,7 @@ android/graphics/Bitmap|getTexture|return ws_bitmap_texture(e,this)
 android/graphics/Bitmap|eraseColor|ws_bitmap_clear(e,this,u32(p0))
 android/graphics/Bitmap|native_get_pixels|ws_bitmap_pixels(e,p0,p1,p2,p3,p4,p5,p6,p7,false)
 android/graphics/Bitmap|native_set_pixels|ws_bitmap_pixels(e,p0,p1,p2,p3,p4,p5,p6,p7,true)
+android/graphics/Bitmap|native_copy_to_buffer|ws_bitmap_copy_to_buffer(e,p0,p1,p2,p3)
 android/graphics/drawable/NinePatchDrawable|nativeCreate([BJ)J|return ws_bitmap_ref(p1)
 android/graphics/drawable/NinePatchDrawable|nativeCreate(Ljava/lang/String;)J|return ws_bitmap_file(e,p0)
 android/graphics/drawable/NinePatchDrawable|nativeGetIntrinsicWidth|return if p0 == 0 { -1 } else { (&WsBitmap(p0)).width }
