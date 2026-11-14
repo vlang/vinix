@@ -52,7 +52,7 @@ pub fn check_mterp(root string) ! {
 	second := root + '/b.S'
 	os.write_file(first, common)!
 	os.write_file(second, functions.join('\n') + '\n')!
-	opcodes := table.join('\n') + '\n'
+	opcodes := table.join('\n') + '\n  V(kFormat)\n  V(other, arguments, ignored)\n'
 	wanted := expected.join('\n') + '\n'
 	actual := mterp(opcodes, [second, first])!
 	os.write_file(root + '/expected.S', wanted)!

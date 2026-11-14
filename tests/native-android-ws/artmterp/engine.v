@@ -272,7 +272,9 @@ pub fn mterp(opcode_input string, templates []string) !string {
 		line := raw.trim_left(' \t')
 		if !line.starts_with('V(') { continue }
 		fields := line[2..].split(', ')
-		if fields.len < 2 || fields[0].len != 4 || !word(fields[1]) { return error('invalid packed opcode declaration') }
+		// The header also has unrelated one-argument V(format) lists. The
+		// original opcode regex only selects V(...., WORD, ...) entries.
+		if fields.len < 3 || fields[0].len != 4 || !word(fields[1]) { continue }
 		expected := '0x' + hex_byte(opcodes.len)
 		if fields[0].to_upper() != expected.to_upper() { return error('packed opcodes out of sequence') }
 		opcodes << 'op_' + fields[1].to_lower()

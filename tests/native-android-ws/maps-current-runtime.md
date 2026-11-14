@@ -76,9 +76,10 @@ source archive. Latest-V fetcher integrity tests and Alpine signature verificati
 passed. Complete dependency provisioning remains blocked by shared disk growth;
 the [first three V build helpers](maps-art-generators-20261114.md) now pass
 focused checks and all 50 original enum-header inputs. The
-[interpreter port checkpoint](maps-art-mterp-20261114.md) has written fixtures,
-but its build was refused before launch with less than 1 GiB free. Its
-compilation, tests and build integration remain required. The source candidate
+[V interpreter generator](maps-art-mterp-20261114.md) subsequently passed its
+full synthetic fixture and generated all 256 handlers from the eight original
+ARM64 templates. Native build integration and runtime qualification remain
+required. The imageless-compilation source candidate
 has not been built or deployed, and Google sign-in remains unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
