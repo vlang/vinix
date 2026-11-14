@@ -165,7 +165,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR vector: extract result slot') }
 			if code != 6 {
 				if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				vector_work += if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
+				vector_work += if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
 				vector_results++
 			} else { vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
 			continue
@@ -471,6 +471,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 				m.put(inst, value); continue
 			}
 			if code in [u64(5), 29]! {
+				if p.types[op.result_type].kind == .vector_t { value := m.select_vector_value(stream, inst, op)!; m.put(inst, value); continue }
 				if p.types[op.result_type].kind == .pointer_t {
 					condition := m.read(op.operands_start + 2)!
 					if condition.poison { return error('AIR memory execution: poison pointer select condition') }

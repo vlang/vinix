@@ -118,13 +118,13 @@ fn run_batch(assembler_path string, out string, element int) !Counts {
   s.write_string('define void @${mode}(ptr %out) { store i8 17, ptr %out, align 1\n ${pre}${insertion}${frozen}${extraction}${store} ret void }\n')
  }
  s.write_string('define i32 @loop(i32 %n) { entry: br label %body\n body: %i = phi i32 [0, %entry], [%next, %body]\n %sum = phi i32 [0, %entry], [%added, %body]\n %a = insertelement <2 x i32> poison, i32 %i, i32 0\n %s = shufflevector <2 x i32> %a, <2 x i32> undef, <2 x i32> <i32 0, i32 poison>\n %f = freeze <2 x i32> %s\n %g = freeze <2 x i32> %f\n %x = extractelement <2 x i32> %g, i32 0\n %y = extractelement <2 x i32> %f, i32 1\n %v = add i32 %x, %y\n %added = add i32 %sum, %v\n %next = add i32 %i, 1\n %cond = icmp ult i32 %next, %n\n br i1 %cond, label %body, label %done\n done: ret i32 %added }\n')
- guards := ['argument', 'load', 'select', 'phi', 'wide', 'coldwide', 'scalable', 'double', 'opaque']
+ guards := ['argument', 'load', 'lane_select', 'phi', 'wide', 'coldwide', 'scalable', 'double', 'opaque']
  for guard in guards {
   signature := if guard == 'argument' { '<2 x ${t}> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%f = freeze <2 x ${t}> %v' }
    'load' { '%v = load <2 x ${t}>, ptr %src, align 1\n %f = freeze <2 x ${t}> %v' }
-   'select' { '%v = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> poison\n %f = freeze <2 x ${t}> %v' }
+   'lane_select' { '%v = select <2 x i1> zeroinitializer, <2 x ${t}> zeroinitializer, <2 x ${t}> poison\n %f = freeze <2 x ${t}> %v' }
    'phi' { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %f = freeze <2 x ${t}> %v' }
    'wide', 'coldwide' { '${if guard == 'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold:' } else { '' }} %f = freeze <17 x ${t}> poison' }
    'scalable' { '%f = freeze <vscale x 2 x i32> poison' }

@@ -14,18 +14,21 @@ does not add memory instructions, pointer arguments, kernel ABI binding,
 pipeline construction or dispatch. Discarded poison arithmetic has no returned
 value; poison consumed as a branch condition still rejects.
 
-Fixed-vector insertion, shuffling, freeze and lane extraction follow the shared
+Fixed-vector insertion, shuffling, freeze, scalar-conditioned select and lane extraction follow the shared
 scalar/memory rules:
 1..16 i1..i64/half/float lanes, scalar unsigned indices, preflight of every
 lane and a bounded per-function lane-work budget. A discarded poison result is
 permitted; selected undef still errors at extraction even when its result is
 unused. Insertions preserve earlier snapshots and per-lane poison/undef;
 invalid indices poison the new vector and a later insertion may repair a lane.
-At most 4,096 static insertion/shuffle/freeze results share one execution-owned
+At most 4,096 static insertion/shuffle/freeze/select results share one execution-owned
 storage array.
 Vector freeze preserves defined lanes and independently chooses zero for
 poison/undef lanes. Earlier snapshots retain their state. Vector arguments,
-PHIs, selects and loaded vectors remain unsupported.
+PHIs, per-lane selects and loaded vectors remain unsupported. Whole-vector
+select copies the chosen arm's lane states; poison conditions poison the whole
+result and undef conditions reject. Discarding a selected undef vector is
+permitted until an instruction attempts to extract an undef lane.
 `tests/ios/air-constant-extract.v` checks successful discards, indeterminate
 lanes and the whole-function work limit through this API.
 `tests/ios/air-vector-insert.v` also checks the whole-function insertion storage
@@ -34,6 +37,8 @@ and shared insertion/extraction work limits before execution.
 construction/storage and lane-work limits, including successful void execution.
 `tests/ios/air-vector-freeze.v` checks successful discarded vector freezes and
 the combined construction/storage and lane-work boundaries through this API.
+`tests/ios/air-vector-select.v` also checks combined construction/storage and
+lane-work boundaries through this API, with selects among the constructions.
 
 The maintained serialized-bitcode check is `tests/ios/air-void-execute.v`.
 Build it with the repository's V module path, then run its executable with

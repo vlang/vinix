@@ -72,7 +72,7 @@ Select reads its condition and only the chosen value. Unselected poison/undef
 constants do not reject; selected undef errors, and poison conditions/chosen
 values propagate to a rejected poison store. Selection does not skip earlier
 instructions. Same-binding pointer equality and unsigned ordering are described
-below. Vector comparisons and vector selects, aggregate comparisons,
+below. Vector comparisons and per-lane vector selects, aggregate comparisons,
 general aggregate selects and select flags remain unsupported;
 the overflow-pair select exception is described below.
 
@@ -101,9 +101,10 @@ Materialized data, scalar splats, aggregate lane constants, zero, poison and
 undef vectors are admitted. Every lane is checked in preflight, including
 unselected lanes and inactive blocks; unsupported expressions reject before
 stores. A separate per-function budget admits at most 1,000,000 lanes
-across extractions, insertions, shuffles and vector freezes. Extractions,
+across extractions, insertions, shuffles, vector freezes and vector selects. Extractions,
 insertions and freezes charge their vector's full count; shuffles charge both
-input counts and the output count.
+input counts and the output count, as do whole-vector selects for their two arms
+and result.
 Each executed extraction costs one step and adds no buffer access requirement.
 
 Execution reads only the indexed lane. An out-of-range or poison index yields
@@ -115,15 +116,15 @@ Integer, mixed scalar and void APIs share validation/evaluation; the integer
 API admits integer lanes only.
 
 `insertelement` creates a new vector snapshot from a supported literal or an
-earlier insertion/shuffle/freeze result of the same type. It replaces one lane
+earlier insertion/shuffle/freeze/select result of the same type. It replaces one lane
 with a scalar value, poison or literal undef; other lanes retain their state.
 Extraction may read either snapshot. A poison or out-of-range insertion index poisons the
 whole new vector; an undef index errors. A later valid insertion can repair
 one lane of poison/undef. Each insertion costs one executed step. Preflight
-caps static insertion, shuffle and vector freeze results together at 4,096
+caps static insertion, shuffle, vector freeze and vector select results together at 4,096
 per function, including inactive blocks.
 One execution-owned array holds those fixed-size snapshots and is freed on
-every exit; loop visits reuse each instruction's slot. Vector PHIs, selects,
+every exit; loop visits reuse each instruction's slot. Vector PHIs, per-lane selects,
 arguments, loads/stores and arithmetic, scalable vectors, other lane
 formats and vectors larger than sixteen lanes remain unsupported.
 
@@ -146,6 +147,18 @@ their state. Frozen vectors may feed insertions, shuffles, freezes and scalar
 extractions. Freeze costs one executed step and shares construction storage
 and lane-work limits. It does not suppress errors that occur while evaluating
 its source, or poison introduced by subsequent operations.
+
+Whole-vector `select` accepts a scalar i1 condition and two supported sources
+of exactly the result type. Both complete arms are checked in preflight,
+including unchosen constants and inactive blocks. At execution only the
+selected arm is read; its scalar bits and per-lane poison/undef tags are
+copied into an independent snapshot. A poison condition produces poison in
+every result lane; an undef condition rejects at select, following the existing
+scalar execution policy. An unselected undef/poison arm does not taint the
+chosen result. Earlier source-evaluation errors still stop execution.
+Selections may feed any supported vector operation. Each select costs one
+executed step and shares construction/storage and lane-work limits. Vector
+conditions, fast-math flags and vector PHIs remain unsupported.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -635,6 +648,11 @@ LLVM and separately checks the permitted fixed-zero choices for indeterminate
 lanes. Literal/computed/repeated/inserted/shuffled snapshots, original source
 states, errors before freeze, poison after freeze, repeated uses, discard,
 loop slot reuse, metadata rejection and exact/exceeded limits are covered.
+`tests/ios/air-vector-select.v` checks both scalar condition values, chosen and
+unchosen arm states, poison/undef conditions, condition masking, nested selects,
+freeze/insertion/shuffle chains, snapshots, prior writes, void discards, loops,
+metadata rejection and exact/exceeded limits. Only defined selections compare
+with native LLVM; frozen choices and indeterminate failures use explicit oracles.
 `tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
 extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native
