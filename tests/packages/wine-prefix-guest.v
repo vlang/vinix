@@ -63,6 +63,18 @@ fn ordinary(builtins string) ! {
 	println('WINE PREFIX CLI PASS ordinary signed installed review; exclusive addition; repeat; private data')
 }
 
+fn ordinary_upgrade(old_builtins string) ! {
+	cli('wine-prefix-review')!
+	cli_status('wine-prefix-additions', 1)!
+	system := '/tmp/private/wine/drive_c/windows/system32'
+	for name in ['base.dll', 'new.dll'] {
+		if os.readlink(system + '/' + name)! != old_builtins + '/' + name { return error('upgrade refusal changed existing link') }
+	}
+	if os.exists(system + '/extra.dll') { return error('upgrade refusal created an addition before retargeting') }
+	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('upgrade refusal changed private data') }
+	println('WINE PREFIX UPGRADE PASS signed generation change; review; retarget refusal; old links and private data preserved')
+}
+
 fn run() ! {
 	os.mkdir_all('/tmp')!; os.chmod('/tmp', 0o1777)!
 	os.mkdir_all('/etc/vinix-packages')!
@@ -98,6 +110,24 @@ fn run() ! {
 	}
 	mut status := i32(0)
 	if pid <= 0 || C.waitpid(pid, &status, 0) != pid || status != 0 { return error('ordinary prefix fixture failed') }
+	os.write_file('/tmp/runtime/root/usr/lib/wine/x86_64-windows/base.dll', 'upgraded marker builtin')!
+	os.write_file('/tmp/runtime/root/usr/lib/wine/x86_64-windows/extra.dll', 'added upgraded marker')!
+	os.write_file('/tmp/manifest.json', json2.encode(pkgcore.Package{id: 'wine', name: 'Guest runtime fixture',
+		version: '2.0.0', architecture: arch, license: 'MIT', kind: 'runtime', entrypoint: 'bin/wine'}))!
+	pkgcore.pack('/tmp/manifest.json', '/tmp/runtime', '/tmp/repository')!
+	pkgcore.publish('/tmp/repository', 'fixture', '/root/prefix-fixture/seed', 2, time.now().unix() + 3600)!
+	mut refreshed := (pkgcore.Service{}).refresh()!; refreshed.close()
+	mut upgraded := (pkgcore.Service{}).transact('upgrade', [], pkgcore.TransactionOptions{})!
+	defer { upgraded.close() }
+	if upgraded.generation == state.generation { return error('runtime upgrade did not change generation') }
+	upgrade_child := C.fork()
+	if upgrade_child == 0 {
+		C.alarm(90)
+		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
+		ordinary_upgrade(builtins) or { eprintln('HWTEST FAIL wine-prefix-cli: ' + err.msg()); C._exit(91) }
+		C._exit(0)
+	}
+	if upgrade_child <= 0 || C.waitpid(upgrade_child, &status, 0) != upgrade_child || status != 0 { return error('ordinary upgrade fixture failed') }
 }
 
 fn main() {
