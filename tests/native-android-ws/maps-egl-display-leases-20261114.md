@@ -78,5 +78,33 @@ RSS 38846464 bytes, growth 220319744 bytes, exit 0/0, cleanup complete. Both
 guests retain 12 GiB/four CPUs. r82 uses the unchanged job-importance SDK,
 latest qualified controller and paired protocol/core/TLS artifacts from r80.
 
-Actual Maps rendering with the repaired lifetime is pending. The isolated and
-full API passes do not establish map tiles, route geometry or Google sign-in.
+Actual Maps r82, with source fix 760972921, now renders map geometry. Explore
+showed North America, water, coastlines and labels; searching Louvre returned a
+detailed map with museum buildings, streets and labels, alongside real place
+details, reviews and photos. Screenshots explore-wait.png (08:42:56 UTC) and
+resume-current.png (08:49:21 UTC) retain these observations. No rejected EGL
+binding, EGL error, missing-method exception, notification failure or numeric
+auth-pump failure marker was found in the retained Maps/broker logs. The bounded
+session ended at 08:49:49 before the Directions interaction completed. Route
+geometry and Google sign-in remain unqualified; this run made no sign-in attempt.
+
+The complete UART export has matching BEGIN/END SHA256
+6b7fd7626a436f84883ecb1e46e39f53b194fa183c224fe9431a24f5e7879775,
+1428267 bytes and 2790 chunks. The 600150-ms storage watch retained at least
+7245754368 guest disk bytes and 4630128 KiB available memory. After export,
+sync returned to the actual guest prompt; owned QEMU PID 46599 was stopped and
+verified absent before offline extraction. The receipt records the normal
+bounded-session end, no authentication claim and two cleanup survivors, all
+terminated with the owned VM. Complete evidence remains in
+maps-current-20261114-r82, including retained.sha256:
+
+| r82 runtime artifact | SHA256 |
+| --- | --- |
+| maps.retained.log | 818e1f11cdf9b32376c44dd49e11250a2b426f0d79805afa276c99a630f190a2 |
+| broker.retained.log | 8060d3132ecd74fba1c013c7ff181be6d646bcdf1ed8d6afab7f73fc12eadb2c |
+| receipt.retained.json | 13acb9afc5aa0a70c0623a8a9b551ad8ce6baf2dc88a38b1eb8b75c583d7d246 |
+| maps-launch.retained.json | 75f9c1f9c6d8bbe5a2f9676e31f8f97937c6296a3a62ac49a16598e0680cc4e6 |
+| final serial.log | f2b46cd971902488a7a77840ab83b6651ab082c357e33bf88b375ed8166070bb |
+| final app-data.ext2 | 480356691d2bbfe6fe02a2441829b3f46810a10f4676bd33438a22e0cd97e55b |
+| explore-wait.png | 2d48c1d44e8f8cf541b558d8cd3d90a20dc859cddd53b5d16210940a170e20dd |
+| resume-current.png | 9937151cdd46c462183c14770a8a15923849410fdb7c5772c872e3aa953bdca5 |
