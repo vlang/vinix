@@ -2550,6 +2550,36 @@ in these marker fixtures, not power loss, actual Wine/translation/GUI execution
 or arbitrary same-account writer exclusion. No retargeting CLI or automatic
 migration is enabled; those acceptance gates and other section 14 work stay open.
 
+## Public migration command, 2026-11-14
+
+Source `1be68013f` exposes `vinix-package wine-prefix-migrate ID PRIVATE_DATA`.
+It shares review/additions argument, real-root and ordinary-account admission,
+then explicitly invokes staged migration and emits the completed JSON report.
+Automatic migration remains disabled. Cooperating-writer assumptions and
+non-atomic multi-link/resumable semantics are unchanged.
+
+The guest probe execs the CLI directly in the writer PID. It stops that actual
+command after partial retargeting, checks its live prefix guard and shared
+generation lease, kills/reaps it, verifies lease release, then resumes and repeats
+through fresh public CLI invocations. Fresh service review verifies completion;
+all targets, private data and normal prefix preparation pass. x86_64 completes
+in 9.947 s and AArch64 in 6.351 s with all earlier markers plus a new exact CLI
+recovery marker. The production host build and 24 executable refusal checks
+across review/additions/migrate also pass.
+
+Evidence is frozen at `/Users/alex/.cache/vwmigratecli-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-public-migration-20261114-01.inventory.json`
+has SHA-256 `e018a742784cd12bbd4c9e761167a703265c4c44f498ec42e79dd2eebde7c63a`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. New host/target CLIs, probes, generated C, source/kernel copies and
+separate guest result/serial/QEMU artifacts are retained. Builds use retained V,
+`-prod -gc none -manualfree`, repository/account module paths, Linux standalone
+defines and LLVM/musl targets with the documented pointer-type compatibility
+exception; host CLI uses the existing no-LTO flags. This is not strict-build,
+complete source closure or measured heap qualification. Marker runtimes are not
+Wine execution. Actual Wine/translation/GUI compatibility, power-loss recovery
+and remaining section 14 work stay open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
