@@ -1333,6 +1333,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     and prior-generation retargeting in both signed marker guests, with distinct
     signed payload bytes, zero retained tracked V allocations and released
     generation leases/store reader locks after close.
+    A [paced 741-row service probe](tests/packages/wine-lease-supervision-plan.md#paced-741-row-public-service-probe-and-x86-checkpoint-2026-11-14)
+    passes 10 cycles per write phase on ARM with zero retained tracked V
+    allocations. Unpaced ARM owner-budget refusals and final x86 timeouts are
+    retained; final scaled x86 qualification remains open.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

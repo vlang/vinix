@@ -3181,6 +3181,52 @@ remain required. Typed receipt:
 SHA-256 `110801a27537732241c0bc3871dc866dbf838d4ab59040496a58624046356da9`.
 Recording and independent comparison pass.
 
+## Paced 741-row public service probe and x86 checkpoint, 2026-11-14
+
+Source `62c4453f5` adds `-d wine_service_heap_scaled` with write mode and
+controller `--scaled-writes`. It requires 10 cycles per phase over 741 signed
+marker rows: idempotent migration, missing-link additions and prior-generation
+retargeting. Every cycle checks the complete inventory, exact signed targets,
+distinct old/new marker bytes and generation/store coordination release after
+close. Each phase requires zero retained tracked V objects/bytes. The controller
+also requires an explicit pacing marker and keeps a 600-second cap. Existing
+two-row modes keep 100 cycles and their 120-second cap.
+
+Unpaced ARM additions refused during the second cycle with `ENOMEM`. Kernel
+telemetry records an owner-budget refusal: limit 60,816,384 bytes, owner usage
+60,274,762 and requested file metadata 1,557,328 bytes. Budgets remain unchanged.
+The paced fixture waits six seconds after link resets, outside measured public
+operations, to allow deferred reclamation. Final paced ARM passes all three
+phases in 218.423 seconds, preserving private sentinel contents and leaving no
+stage. This qualifies a paced row-count workload, excluding burst throughput
+and kernel-wide leak freedom.
+
+Final paced x86 times out at 600.611 seconds after its zero-allocation first
+phase; additions/retarget completion remains unqualified. An earlier unpaced
+x86 exploratory build passed in 246.053 seconds. Fresh final-source x86 default
+positive/refusal guests pass in 59.718/50.968 seconds, while final two-row write
+runs time out at 120.688/121.002 seconds. The latter retry reaches its first
+phase marker. All failures are retained. Shared host load averages reached
+80.74 during concurrent compiler work; contention may affect timing but does
+not establish the cause or turn these failures into acceptance. Final x86
+qualification remains open. Invalid scaled-only guest flags refuse with exit 2;
+mixed controller options refuse with exit 1 before creating work.
+
+Evidence is preserved at `/Users/alex/.cache/vwservicescale-20261114-01`, including
+the isolated base `1195c42ec` plus final `source.patch`, generated C, binaries,
+parsed-source lists, kernel copies, logs and validation notes. Both final changed
+V files match the source commit. Exploratory builds precede that patch and
+supply no final-source acceptance. Complete prior bundles/original namespaces
+remain required. Marker bytes do not model real Wine payload sizes or execute
+Wine. Cold startup, libc/kernel heap, complete descriptor accounting, actual
+Wine-version/GUI compatibility, whole-launch lifetime, power loss, strict ABI
+and hermetic closure remain open. This checkpoint does not complete section 14.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-service-scale-20261114-01.inventory.json`,
+SHA-256 `3bc80e3a38b176642cd4886c61115ab312c0ef63f33d25dfeb4fedc81facb877`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
