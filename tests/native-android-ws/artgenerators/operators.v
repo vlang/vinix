@@ -1,0 +1,169 @@
+// SPDX-License-Identifier: Apache-2.0
+// V replacement for AOSP art/tools/generate_operator_out.py.
+// Original algorithm: Copyright (C) 2012 The Android Open Source Project.
+module artgenerators
+
+import os
+
+struct EnumValue {
+	name string
+	text string
+}
+
+struct EnumOutput {
+	name string
+	namespaces []string
+	scoped bool
+mut:
+	values []EnumValue
+}
+
+// Keep the upstream generator's intentionally narrow, line-oriented grammar.
+// This is not a C++ parser. Unsupported enum expressions fail before output.
+fn enum_start(raw string) ?string {
+	mut from := 0
+	for from < raw.len {
+		index := raw[from..].index('enum') or { return none }
+		at := from + index
+		end := at + 4
+		if (at == 0 || !(raw[at - 1].is_alnum() || raw[at - 1] == `_`))
+			&& end < raw.len && raw[end].is_space() && raw[end..].contains('{') {
+			declaration := raw[end..].trim_space()
+			// Anonymous enums do not acquire an operator in the upstream regex.
+			if declaration.starts_with('{') { return none }
+			return declaration
+		}
+		from = end
+	}
+	return none
+}
+
+fn enum_value(raw string, prefix string) ![]EnumValue {
+	line := raw.all_before('//').trim_space()
+	if line == '' { return []EnumValue{} }
+	mut end := 0
+	for end < line.len && (line[end].is_alnum() || line[end] == `_`) { end++ }
+	if end == 0 { return error('invalid enum value: ' + raw) }
+	name := line[..end]
+	mut rest := line[end..].trim_space()
+	if rest.starts_with('= k') { return []EnumValue{} }
+	if rest.starts_with('= ') {
+		literal := rest[2..]
+		mut n := 0
+		if literal.starts_with('0x') {
+			n = 2
+			for n < literal.len && (literal[n].is_digit() || literal[n] >= `a` && literal[n] <= `f`) { n++ }
+			if n == 2 { return error('empty hexadecimal enum literal') }
+		} else if literal.len >= 3 && literal[0] == `'` && literal[2] == `'` {
+			n = 3
+		} else {
+			if literal.starts_with('-') { n++ }
+			begin := n
+			for n < literal.len && literal[n].is_digit() { n++ }
+			if n == begin { return error('unsupported enum expression: ' + raw) }
+		}
+		rest = literal[n..]
+	}
+	if rest.starts_with(',') { rest = rest[1..] }
+	if rest.trim_space() != '' { return error('unsupported enum remainder: ' + raw) }
+	mut text := name.trim_string_left('k')
+	if raw.contains('// <<') {
+		tail := raw.all_after('// <<')
+		if tail.contains('>>') { text = tail.all_before('>>') }
+	}
+	return [EnumValue{prefix + name, text}]
+}
+
+fn process_enums(input string, mut enums map[string]EnumOutput, mut order []string) ! {
+	mut namespaces := []string{}
+	mut classes := []string{}
+	mut active := ''
+	mut inside := false
+	mut private_enum := false
+	lines := input.split('\n')
+	for raw in lines {
+		if inside {
+			if raw.trim_space() == '};' { inside = false; continue }
+			if private_enum { continue }
+			item := enums[active]
+			prefix := if item.scoped { active + '::' } else if classes.len > 0 { classes.join('::') + '::' } else { '' }
+			values := enum_value(raw, prefix)!
+			if values.len > 0 {
+				mut updated := item
+				updated.values << values[0]
+				enums[active] = updated
+			}
+			continue
+		}
+		if declaration := enum_start(raw) {
+			private_enum = raw.all_after('{').trim_left(' \t').starts_with('// private')
+			inside = true
+			if private_enum { continue }
+			fields := declaration.fields()
+			scoped := fields[0] == 'class'
+			at := if scoped { 1 } else { 0 }
+			if fields.len <= at || !word(fields[at]) { return error('unsupported enum declaration: ' + raw) }
+			active = if classes.len > 0 { classes.join('::') + '::' + fields[at] } else { fields[at] }
+			if active !in enums { order << active }
+			enums[active] = EnumOutput{name: active, namespaces: namespaces.clone(), scoped: scoped}
+			continue
+		}
+		if raw.starts_with('namespace ') && raw.contains(' {') {
+			fields := raw.fields()
+			namespaces << fields[1]
+			continue
+		}
+		if raw.starts_with('}') && raw[1..].trim_left(' \t').starts_with('// namespace') {
+			if namespaces.len > 0 { namespaces.delete_last() }
+			continue
+		}
+		trimmed := raw.trim_left(' \t')
+		if (trimmed.starts_with('class ') || trimmed.starts_with('struct ')) && trimmed.contains(' {') {
+			fields := trimmed.fields()
+			mut at := 1
+			if fields[at] == 'MANAGED' { at++ }
+			if at >= fields.len { return error('unsupported enclosing class') }
+			if fields[at].starts_with('PACKED(') { at++ }
+			if at >= fields.len { return error('unsupported enclosing class') }
+			classes << fields[at]
+			continue
+		}
+		if trimmed.starts_with('}') && trimmed.contains(';')
+			&& !trimmed[1..].trim_left(' \t').starts_with('while') && classes.len > 0 {
+			classes.delete_last()
+		}
+	}
+	if inside { return error('unterminated enum') }
+}
+
+pub fn operators(local string, headers []string) !string {
+	mut enums := map[string]EnumOutput{}
+	mut order := []string{}
+	mut output := ['#include <iostream>', '']
+	for path in headers {
+		process_enums(os.read_file(path)!, mut enums, mut order)!
+		output << '#include "' + path.replace(local + '/', '') + '"'
+	}
+	output << ''
+	for name in order {
+		item := enums[name]
+		output << '// Generated by art-source-generators operators; do not edit.'
+		// An empty namespace in upstream emits an anonymous namespace.
+		namespaces := if item.namespaces.len == 0 { [''] } else { item.namespaces }
+		for namespace in namespaces { output << 'namespace ${namespace} {' }
+		output << 'std::ostream& operator<<(std::ostream& os, const ${name}& rhs) {'
+		output << '  switch (rhs) {'
+		for value in item.values {
+			output << '    case ${value.name}: os << "${value.text}"; break;'
+		}
+		if !item.scoped {
+			output << '    default: os << "${name}[" << static_cast<int>(rhs) << "]"; break;'
+		}
+		output << ['  }', '  return os;', '}']
+		for i := namespaces.len - 1; i >= 0; i-- {
+			output << '}  // namespace ' + namespaces[i]
+		}
+		output << ''
+	}
+	return output.join('\n') + '\n'
+}

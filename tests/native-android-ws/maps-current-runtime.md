@@ -74,7 +74,9 @@ The [builder recovery and dependency transport checks](maps-art-builder-20261114
 now provide an isolated native ARM64 Linux/Alpine builder and the full original
 source archive. Latest-V fetcher integrity tests and Alpine signature verification
 passed. Complete dependency provisioning remains blocked by shared disk growth;
-the upstream Python generators also need V replacements. The source candidate
+the [first three V build helpers](maps-art-generators-20261114.md) now pass
+focused checks and all 50 original enum-header inputs. The interpreter generator
+and build integration remain required. The source candidate
 has not been built or deployed, and Google sign-in remains unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
