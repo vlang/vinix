@@ -143,7 +143,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			}
 			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
 			pair_freeze := code == 58 && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
-			vector_result := code in [u64(7), 8]!
+			vector_result := p.vector_construction(code, op)
 			if pair_freeze {
 				if !binary32 { return error('AIR pair: mixed pair freeze required') }
 				p.scalar_pair_freeze(op, s.base_id, pools, scope)!
@@ -160,7 +160,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 			} else if vector_result {
 				if !inst.has_result || vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				vector_work += if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
+				vector_work += if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
 				vector_results++
 			} else if code == 26 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
@@ -193,7 +193,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				11 { if !((op.operands_count == 0 && op.targets_count == 1) || (op.operands_count == 1 && op.targets_count == 2)) { return error('AIR integer: branch arity') } }
 				12 { if op.operands_count < 1 || op.targets_count != op.operands_count { return error('AIR integer: switch arity') } }
 				15 { if op.operands_count != 0 { return error('AIR integer: unreachable arity') } }
-				56, 58 { if !inst.has_result { return error('AIR scalar: unary result required') }; if !pair_freeze { p.scalar_unary_profile(op, code == 58, binary32)! } }
+				56, 58 { if !inst.has_result { return error('AIR scalar: unary result required') }; if !pair_freeze && !vector_result { p.scalar_unary_profile(op, code == 58, binary32)! } }
 				else { return error('AIR integer: instruction outside execution profile') }
 			}
 		}
@@ -344,7 +344,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				3 { result = m.cast_value(op)! }
 				5, 29 { result = m.select_value(op)! }
 				56 { result = m.fneg_value(op)! }
-				58 { result = if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
+				58 { result = if p.types[op.result_type].kind == .vector_t { m.freeze_vector_value(stream, inst, op)! } else if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }
 				10 {
 					if profile.return_bits == 0 { return IRIntegerRun{steps: m.steps} }
 					value := m.read(start)!; return IRIntegerRun{profile.return_bits, value.value & constant_mask(profile.return_bits), value.poison, m.steps}

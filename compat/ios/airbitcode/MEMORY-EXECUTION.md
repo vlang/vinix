@@ -101,9 +101,9 @@ Materialized data, scalar splats, aggregate lane constants, zero, poison and
 undef vectors are admitted. Every lane is checked in preflight, including
 unselected lanes and inactive blocks; unsupported expressions reject before
 stores. A separate per-function budget admits at most 1,000,000 lanes
-across extractions, insertions and shuffles. Extractions and insertions charge
-their vector's full count; shuffles charge both input counts and the output
-count.
+across extractions, insertions, shuffles and vector freezes. Extractions,
+insertions and freezes charge their vector's full count; shuffles charge both
+input counts and the output count.
 Each executed extraction costs one step and adds no buffer access requirement.
 
 Execution reads only the indexed lane. An out-of-range or poison index yields
@@ -115,16 +115,16 @@ Integer, mixed scalar and void APIs share validation/evaluation; the integer
 API admits integer lanes only.
 
 `insertelement` creates a new vector snapshot from a supported literal or an
-earlier insertion/shuffle result of the same type. It replaces one lane with
-a scalar value, poison or literal undef; other lanes retain their state. Extraction may
-read either snapshot. A poison or out-of-range insertion index poisons the
+earlier insertion/shuffle/freeze result of the same type. It replaces one lane
+with a scalar value, poison or literal undef; other lanes retain their state.
+Extraction may read either snapshot. A poison or out-of-range insertion index poisons the
 whole new vector; an undef index errors. A later valid insertion can repair
 one lane of poison/undef. Each insertion costs one executed step. Preflight
-caps static insertion and shuffle results together at 4,096 per function,
-including inactive blocks.
+caps static insertion, shuffle and vector freeze results together at 4,096
+per function, including inactive blocks.
 One execution-owned array holds those fixed-size snapshots and is freed on
 every exit; loop visits reuse each instruction's slot. Vector PHIs, selects,
-freezes, arguments, loads/stores and arithmetic, scalable vectors, other lane
+arguments, loads/stores and arithmetic, scalable vectors, other lane
 formats and vectors larger than sixteen lanes remain unsupported.
 
 `shufflevector` combines lanes from two supported constant or earlier
@@ -136,6 +136,16 @@ extracted. Other lane states and scalar bits are copied exactly. Preflight
 checks both complete sources and matches the normalized mask against its
 original constant, including unselected lanes and inactive blocks. A shuffle
 costs one executed step and uses the same bounded snapshot storage as insertion.
+
+Vector `freeze` accepts the same fixed scalar-lane types and supported literal
+or earlier constructed sources. Each defined lane retains its exact bits;
+each poison/undef lane becomes a fixed zero independently. The new snapshot
+has no indeterminate lanes, and repeated freezes are idempotent. All uses of
+one dynamic result read the same stored snapshot. Earlier vectors retain
+their state. Frozen vectors may feed insertions, shuffles, freezes and scalar
+extractions. Freeze costs one executed step and shares construction storage
+and lane-work limits. It does not suppress errors that occur while evaluating
+its source, or poison introduced by subsequent operations.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -172,7 +182,7 @@ rejects. Scalar `freeze` preserves defined i1..i64/half/float bits and makes a
 fixed zero choice for poison or undef. Every use of its SSA result sees that
 same choice. It does not prevent an earlier instruction from rejecting undef
 or another dynamic error. Both operations require zero flags and cost one
-step. Vector and general aggregate freezes remain unsupported by this API;
+step. General aggregate freezes remain unsupported by this API;
 the checked overflow-pair exception is described below.
 
 Pointer `freeze` preserves an already resolved virtual pointer and requires
@@ -620,6 +630,11 @@ shuffle/insertion chains and immutable snapshots against defined native LLVM
 and independent state expectations. Metadata, mask identity, unsupported
 profiles, loops, void discards, budgets and exact/over-limit storage/work
 boundaries are checked separately.
+`tests/ios/air-vector-freeze.v` compares unchanged defined lanes with native
+LLVM and separately checks the permitted fixed-zero choices for indeterminate
+lanes. Literal/computed/repeated/inserted/shuffled snapshots, original source
+states, errors before freeze, poison after freeze, repeated uses, discard,
+loop slot reuse, metadata rejection and exact/exceeded limits are covered.
 `tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
 extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native
