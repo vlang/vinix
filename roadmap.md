@@ -2339,6 +2339,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   lifetime/arithmetic audits pass. See
   [the timeval qualification](docs/linux-select-timeval.md).
 
+- [x] Match native raw ppoll unsigned32 counts, full-width mask sizes and
+  timeout/mask/count/buffer validation order. Identical native/Linux ELFs
+  pass 19,600 checks per architecture, including high register words,
+  guarded/refused output and restored masks; originals fail 1,004 each.
+  Both credential cohorts retain flat 200-cycle storage; generated-C and
+  independent lifetime/ABI audits pass. See
+  [the ppoll argument qualification](docs/linux-ppoll-arguments.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

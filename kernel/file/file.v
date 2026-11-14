@@ -377,23 +377,10 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 // timeout and signal mask in kernel memory across that wait: dereferencing the
 // caller's virtual addresses after the scheduler has run can fault in EL1, and
 // malformed userspace pointers must return EFAULT rather than crash the kernel.
-pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_sigmask u64) (u64, u64) {
-	if nfds > 4096 {
-		return errno.err, errno.einval
-	}
-	pagemap := proc.current_thread().process.pagemap
-
-	scratch := proc.reserve_kernel(.scratch, nfds * 128 + 256) or { return errno.err, errno.get() }
-	defer { kbudget.release(scratch) }
-	mut pollfds := []PollFD{len: int(nfds)} @[freed]
-	defer {
-		unsafe { pollfds.free() }
-	}
-	if nfds != 0
-		&& !usercopy.copy_from_user(unsafe { voidptr(&pollfds[0]) }, user_fds, nfds * sizeof(PollFD)) {
-		return errno.err, errno.efault
-	}
-
+pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds_word u64, user_timeout u64, user_sigmask u64, sigset_size u64) (u64, u64) {
+	// Linux imports/validates the timeout, then the mask, before the poll
+	// array. nfds is unsigned int, whereas sigset_size uses the full ABI word.
+	nfds := u64(u32(nfds_word))
 	// Fixed-array locals escape to the heap when their elements' addresses
 	// reach another function, even through unsafe. The wait is synchronous;
 	// these explicit caller-stack slots remain live across its sleep.
@@ -403,18 +390,33 @@ pub fn syscall_ppoll(_ voidptr, user_fds u64, nfds u64, user_timeout u64, user_s
 		if !usercopy.copy_from_user(voidptr(timeout_storage), user_timeout, sizeof(time.TimeSpec)) {
 			return errno.err, errno.efault
 		}
+		if timeout_storage.tv_sec < 0 || timeout_storage.tv_nsec < 0
+			|| timeout_storage.tv_nsec >= 1000000000 {
+			return errno.err, errno.einval
+		}
 		timeout_ptr = timeout_storage
 	}
 
 	sigmask_storage := unsafe { &u64(C.vinix_stack_alloc(sizeof(u64))) }
-	mut sigmask_ptr := &u64(unsafe { nil })
 	if user_sigmask != 0 {
+		if sigset_size != sizeof(u64) { return errno.err, errno.einval }
 		if !usercopy.copy_from_user(voidptr(sigmask_storage), user_sigmask, sizeof(u64)) {
 			return errno.err, errno.efault
 		}
-		sigmask_ptr = sigmask_storage
+		mut masked_thread := proc.current_thread()
+		proc.begin_wait_mask(mut masked_thread, unsafe { *sigmask_storage })
 	}
-	ret, err := poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, sigmask_ptr)
+	if nfds > 4096 { return errno.err, errno.einval }
+	pagemap := proc.current_thread().process.pagemap
+	scratch := proc.reserve_kernel(.scratch, nfds * 128 + 256) or { return errno.err, errno.get() }
+	defer { kbudget.release(scratch) }
+	mut pollfds := []PollFD{len: int(nfds)} @[freed]
+	defer { unsafe { pollfds.free() } }
+	if nfds != 0
+		&& !usercopy.copy_from_user(unsafe { voidptr(&pollfds[0]) }, user_fds, nfds * sizeof(PollFD)) {
+		return errno.err, errno.efault
+	}
+	ret, err := poll_user_fds(pagemap, user_fds, mut pollfds, nfds, timeout_ptr, unsafe { nil })
 	return ret, err
 }
 

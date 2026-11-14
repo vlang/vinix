@@ -67,6 +67,11 @@ controls on both architectures and repeated cleanup. `selecttimeval-reference.v`
 runs the same ELF on Linux; `selecttimeval-evidence.v` audits the complete bundle.
 See [receipts and limits](../../docs/linux-select-timeval.md).
 
+`--cases ppollargs` checks native raw ppoll unsigned32 counts, full-width mask
+sizes and timeout/mask/count/buffer error order, guarded outputs and flat cleanup.
+`ppollargs-reference.v` runs the same ELF on Linux; `ppollargs-evidence.v` audits
+the complete bundle. See [receipts and limits](../../docs/linux-ppoll-arguments.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion
