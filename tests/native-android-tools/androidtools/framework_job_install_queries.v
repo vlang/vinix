@@ -54,4 +54,5 @@ return-wide v0
 	os.write_file(installer, new_installer)!
 	os.write_file(job, new_job)!
 	os.write_file(builder, new_builder)!
+	framework_job_important(smali)!
 }

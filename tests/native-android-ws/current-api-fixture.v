@@ -22,6 +22,7 @@ import windowdecorprobe
 import networkactiveprobe
 import networkvalidationprobe
 import notificationcancelprobe
+import jobimportantprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1405,6 +1406,7 @@ invoke-static {p0}, Lorg/vinix/bootstrap/WindowDecorProbe;->check(Landroid/conte
 invoke-static {}, Lorg/vinix/bootstrap/NetworkActiveProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/NetworkValidationProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/NotificationCancelProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/JobImportantProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1665,6 +1667,7 @@ fn main() {
 	networkactiveprobe.install(root)!
 	networkvalidationprobe.install(root)!
 	notificationcancelprobe.install(root)!
+	jobimportantprobe.install(root)!
 	if tls_lifetime { tlslifetimeprobe.install(root)! }
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;

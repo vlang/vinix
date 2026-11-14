@@ -39,7 +39,8 @@ The next [latest-V controller retry, r79](maps-egl-binding-runtime-20261114.md),
 passed ARM self-tests and reached Explore. It captured the adapter's
 EGL_BAD_SURFACE with Mesa reporting success, then exited on missing
 JobInfo.Builder.setImportantWhileForeground. The binding guard remains intact;
-the next SDK repair and state trace are being qualified separately.
+the [job metadata repair and bounded state trace](maps-job-important-runtime-20261114.md)
+passed the full signed ARM regression in r80. Its actual Maps retry is pending.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

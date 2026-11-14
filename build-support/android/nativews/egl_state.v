@@ -108,7 +108,11 @@ pub fn ws_egl_display(native_display voidptr) voidptr {
 }
 @[export: 'eglInitialize']
 pub fn ws_egl_initialize(display voidptr, major &i32, minor &i32) u32 {
-	unsafe { return WsEglInitialize(ws_egl_symbol(c'eglInitialize'))(display, major, minor) }
+	unsafe {
+		result := WsEglInitialize(ws_egl_symbol(c'eglInitialize'))(display, major, minor)
+		ws_trace_egl_state(c'initialize', display, nil, nil, nil, result)
+		return result
+	}
 }
 @[export: 'eglChooseConfig']
 pub fn ws_egl_choose(display voidptr, attributes &i32, configs &voidptr, capacity i32, count &i32) u32 {

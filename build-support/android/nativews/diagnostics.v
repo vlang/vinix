@@ -21,6 +21,8 @@ __global ws_accepted_trace WsFrameTrace
 __global ws_exception_trace WsFrameTrace
 __global ws_publication_trace WsFrameTrace
 __global ws_egl_error_trace_count i32
+__global ws_egl_state_trace_count i32
+__global ws_egl_binding_trace_count i32
 __global ws_notification_failure_trace_count i32
 
 fn ws_trace_budget(counter &i32, limit i32) bool {
@@ -45,6 +47,27 @@ fn ws_trace_egl_error(result i32, adapter i32, provider i32) {
 		if result == 0x3000 || C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
 		if !ws_trace_budget(&ws_egl_error_trace_count, 32) { return }
 		C.printf(c'ANDROID-WS-EGL-ERROR returned=0x%x adapter=0x%x provider=0x%x\n', result, adapter, provider)
+	}
+}
+
+// Record existing lifecycle arguments/results without consuming EGL errors.
+fn ws_trace_egl_state(operation &char, display voidptr, draw voidptr, read voidptr, context voidptr, result u32) {
+	unsafe {
+		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
+		if !ws_trace_budget(&ws_egl_state_trace_count, 64) { return }
+		C.printf(c'ANDROID-WS-EGL-STATE op=%s thread=%lu display=%p draw=%p read=%p context=%p result=%u\n',
+			operation, usize(C.pthread_self()), display, draw, read, context, result)
+	}
+}
+
+fn ws_trace_egl_binding_failure(display voidptr, surface voidptr) {
+	unsafe {
+		if C.getenv(c'VINIX_ANDROID_TRACE_TREE') == nil { return }
+		if !ws_trace_budget(&ws_egl_binding_trace_count, 16) { return }
+		// These current-state queries do not clear the caller's EGL error state.
+		C.printf(c'ANDROID-WS-EGL-BINDING-FAIL thread=%lu display=%p surface=%p current_display=%p current_draw=%p current_context=%p\n',
+			usize(C.pthread_self()), display, surface, ws_egl_current_display(),
+			ws_egl_current_surface(0x3059), ws_egl_current_context())
 	}
 }
 

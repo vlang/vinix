@@ -144,6 +144,7 @@ pub fn ws_egl_make_current(display voidptr, draw voidptr, read voidptr, context 
 		C.pthread_mutex_lock(&ws_egl_mutex)
 		defer { C.pthread_mutex_unlock(&ws_egl_mutex) }
 		result := WsEglMakeCurrent(ws_egl_symbol(c'eglMakeCurrent'))(display, draw, read, context)
+		ws_trace_egl_state(c'make-current', display, draw, read, context, result)
 		if result == 0 { return 0 }
 		new_draw, new_read := ws_egl_find(draw), ws_egl_find(read)
 		if new_draw != nil { new_draw.bindings++ }
@@ -160,6 +161,7 @@ pub fn ws_egl_terminate(display voidptr) u32 {
 		C.pthread_mutex_lock(&ws_egl_mutex)
 		defer { C.pthread_mutex_unlock(&ws_egl_mutex) }
 		result := WsEglDisplayCall(ws_egl_symbol(c'eglTerminate'))(display)
+		ws_trace_egl_state(c'terminate', display, nil, nil, nil, result)
 		if result != 0 {
 			mut item := ws_egl_windows
 			for item != nil {
@@ -178,6 +180,7 @@ pub fn ws_egl_terminate(display voidptr) u32 {
 pub fn ws_egl_release_thread() u32 {
 	unsafe {
 		result := WsEglNoArgs(ws_egl_symbol(c'eglReleaseThread'))()
+		ws_trace_egl_state(c'release-thread', nil, nil, nil, nil, result)
 		if result != 0 {
 			binding := C.pthread_getspecific(ws_egl_binding_key)
 			C.pthread_setspecific(ws_egl_binding_key, nil)
@@ -252,6 +255,7 @@ pub fn ws_egl_swap(display voidptr, surface voidptr) u32 {
 		defer { C.pthread_mutex_unlock(&ws_egl_mutex) }
 		item := ws_egl_find(surface)
 		if item != nil && (ws_egl_current_display() != display || ws_egl_current_surface(0x3059) != surface) {
+			ws_trace_egl_binding_failure(display, surface)
 			ws_egl_error(0x300d); return 0
 		}
 		result := WsEglPair(ws_egl_symbol(c'eglSwapBuffers'))(display, surface)
