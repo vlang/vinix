@@ -267,7 +267,7 @@ fn collection_command_status(arguments []string, input string, expected int) !st
 	// Manager recovery includes the ordinary package CLI's full admission path.
 	// Keep the existing managed-prefix refusal deadline in all other modes.
 	refusal_limit := $if wine_manager_death_probe ? { 60 * time.second } $else { 15 * time.second }
-	deadline := time.sys_mono_now() + if expected == 0 { 180 * time.second } else { refusal_limit }
+	deadline := time.sys_mono_now() + if expected in [0, 37] { 180 * time.second } else { refusal_limit }
 	for {
 		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count > 0 {
@@ -806,6 +806,7 @@ fn collection_run(generation string, architecture string) ! {
 			}
 			// Two real administrative transitions make the running generation
 			// neither active nor rollback. No state/lease files are synthesized.
+			$if !wine_relaunch_probe ? {
 			command(['/usr/bin/vinix-package', 'remove', application], '')!
 			command(['/usr/bin/vinix-package', 'rollback'], '')!
 			mut current := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
@@ -833,6 +834,7 @@ fn collection_run(generation string, architecture string) ! {
 				}
 			}
 			println('HWTEST INFO Wine initial-client-gone server-live obsolete-generation collection-retained PASS')
+			}
 			collected = true
 			release := data + '/wine/drive_c/users/vinix/Temp/collection-release'
 			os.write_file(release, '')!
@@ -905,6 +907,36 @@ fn collection_run(generation string, architecture string) ! {
 	$if wine_caller_death_probe ? {
 		if !holder_reaped || os.exists('/proc/' + caller) || os.exists('/proc/' + holder) { return error('caller/holder retirement differs') }
 	}
+	$if wine_relaunch_probe ? {
+		lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+		if lease < 0 { return error('relaunch lost generation lease file') }
+		if C.flock(lease, C.LOCK_EX | C.LOCK_NB) != 0 { C.close(lease); return error('retired holder still retains generation lease') }
+		C.close(lease)
+		sentinel := data + '/wine/drive_c/users/vinix/Temp/relaunch-sentinel'
+		os.write_file(sentinel, 'same private prefix\n')!
+		os.chown(sentinel, 1000, 1000)!
+		os.chmod(sentinel, 0o600)!
+		again := collection_command_status(['/usr/bin/vinix-package', 'run-args', application, '--', '--vinix-collection-probe'], '', 37)!
+		defer { unsafe { again.free() } }
+		if again.count('VINIX COLLECTION INITIAL READY\n') != 1 || again.count('VINIX COLLECTION CHILD READY\n') != 1
+			|| again.count('VINIX COLLECTION CHILD RETIRED\n') != 1 || os.read_file(sentinel)! != 'same private prefix\n' {
+			return error('same-generation relaunch output or private data differs')
+		}
+		names := os.ls('/proc')!
+		defer { unsafe { names.free() } }
+		for pid in names {
+			if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
+			line := wineproc.command_line('/proc/' + pid)!
+			defer { unsafe { line.free() } }
+			if line.contains(generation + '/apps/org.vinix.wine-runtime/') { return error('relaunch left a runtime process: ' + pid) }
+		}
+		retired_lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+		if retired_lease < 0 { return error('relaunch lost generation lease file') }
+		if C.flock(retired_lease, C.LOCK_EX | C.LOCK_NB) != 0 { C.close(retired_lease); return error('relaunch retained generation lease after return') }
+		C.close(retired_lease)
+		command(['/usr/bin/vinix-package', 'remove', application], '')!
+		command(['/usr/bin/vinix-package', 'rollback'], '')!
+	}
 	command(['/usr/bin/vinix-package', 'gc'], '')!
 	if os.exists(generation) { return error('obsolete Wine generation remained after natural retirement') }
 	mut retained := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
@@ -912,7 +944,9 @@ fn collection_run(generation string, architecture string) ! {
 	if retained.previous == 0 || !os.is_dir('/var/lib/vinix-packages/generations/' + retained.previous.str()) {
 		return error('collection removed the retained rollback generation')
 	}
-	$if wine_manager_death_probe ? {
+	$if wine_relaunch_probe ? {
+		println('HWTEST INFO Wine signed same-generation prefix relaunch after manager death status37 PASS')
+	} $else $if wine_manager_death_probe ? {
 		println('HWTEST INFO Wine signed manager-SIGKILL foreign-server-refused holder-status137 collection-retained PASS')
 	} $else $if wine_idle_server_probe ? {
 		println('HWTEST INFO Wine signed idle-server zero-live-clients collection-retained natural-retirement PASS')

@@ -34,10 +34,13 @@ fn run() ! {
 	refusal([native, 'aarch64', work + '/arm-manager', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--manager-death-probe'], work + '/arm-manager.log', 'owned native Wine qualification requires x86_64')!
 	refusal([native, 'x86_64', work + '/unowned-manager', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--manager-death-probe'], work + '/unowned-manager.log', 'usage: wine-native-check')!
 	refusal([native, 'x86_64', work + '/mixed-manager', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--manager-death-probe', '--caller-death-probe'], work + '/mixed-manager.log', 'usage: wine-native-check')!
+	refusal([native, 'aarch64', work + '/arm-relaunch', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--relaunch-probe'], work + '/arm-relaunch.log', 'owned native Wine qualification requires x86_64')!
+	refusal([native, 'x86_64', work + '/unowned-relaunch', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--relaunch-probe'], work + '/unowned-relaunch.log', 'usage: wine-native-check')!
+	refusal([native, 'x86_64', work + '/mixed-relaunch', prepared, '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager', '--relaunch-probe', '--manager-death-probe'], work + '/mixed-relaunch.log', 'usage: wine-native-check')!
 	refusal([native, 'x86_64', work + '/mixed', prepared, '/missing', '/missing', '/missing', '/missing', '/missing'], work + '/mixed.log', 'ownership modes differ')!
 	os.mkdir(work + '/unmarked')!
 	refusal([native, 'x86_64', work + '/unmarked-run', work + '/unmarked', '/missing', '/missing', '/missing', '/missing', '/missing', '--owned-manager'], work + '/unmarked.log', 'ownership modes differ')!
-	for directory in ['producer', 'arm', 'arm-collection', 'unowned-collection', 'arm-death', 'unowned-death', 'mixed-probes', 'arm-idle', 'unowned-idle', 'mixed-idle', 'arm-manager', 'unowned-manager', 'mixed-manager'] {
+	for directory in ['producer', 'arm', 'arm-collection', 'unowned-collection', 'arm-death', 'unowned-death', 'mixed-probes', 'arm-idle', 'unowned-idle', 'mixed-idle', 'arm-manager', 'unowned-manager', 'mixed-manager', 'arm-relaunch', 'unowned-relaunch', 'mixed-relaunch'] {
 		if os.exists(work + '/' + directory) { return error('mode/architecture refusal created workload output') }
 	}
 	for directory in [work + '/mixed', work + '/unmarked-run'] {

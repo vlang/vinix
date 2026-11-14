@@ -118,7 +118,8 @@ fn v_program(v string, source string, arch string, cfile string, owned bool, col
 	if owned { command.insert(1, ['-d', 'wine_owned_manager']) }
 	if collection { command.insert(1, ['-d', 'wine_collection_probe']) }
 	if caller_death { command.insert(1, ['-d', 'wine_caller_death_probe']) }
-	if caller_death && os.args[10] == '--manager-death-probe' { command.insert(1, ['-d', 'wine_manager_death_probe']) }
+	if caller_death && os.args[10] in ['--manager-death-probe', '--relaunch-probe'] { command.insert(1, ['-d', 'wine_manager_death_probe']) }
+	if caller_death && os.args[10] == '--relaunch-probe' { command.insert(1, ['-d', 'wine_relaunch_probe']) }
 	if idle_server { command.insert(1, ['-d', 'wine_idle_server_probe']) }
 	return command
 }
@@ -172,12 +173,12 @@ fn check() ! {
 		return
 	}
 	if os.args.len !in [9, 10, 11] || (os.args.len >= 10 && os.args[9] != '--owned-manager')
-		|| (os.args.len == 11 && os.args[10] !in ['--collection-probe', '--caller-death-probe', '--idle-server-probe', '--manager-death-probe']) {
-		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager [--collection-probe|--caller-death-probe|--idle-server-probe|--manager-death-probe]]')
+		|| (os.args.len == 11 && os.args[10] !in ['--collection-probe', '--caller-death-probe', '--idle-server-probe', '--manager-death-probe', '--relaunch-probe']) {
+		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager [--collection-probe|--caller-death-probe|--idle-server-probe|--manager-death-probe|--relaunch-probe]]')
 	}
 	owned := os.args.len >= 10
 	collection := os.args.len == 11
-	caller_death := collection && os.args[10] in ['--caller-death-probe', '--idle-server-probe', '--manager-death-probe']
+	caller_death := collection && os.args[10] in ['--caller-death-probe', '--idle-server-probe', '--manager-death-probe', '--relaunch-probe']
 	idle_server := collection && os.args[10] == '--idle-server-probe'
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('invalid Wine guest architecture') }
@@ -342,7 +343,8 @@ fn check() ! {
 		'translator_busybox':  translator_busybox
 	}))!
 	mut required := [
-		if caller_death && os.args[10] == '--manager-death-probe' { 'Wine signed manager-SIGKILL foreign-server-refused holder-status137 collection-retained PASS' }
+		if caller_death && os.args[10] == '--relaunch-probe' { 'Wine signed same-generation prefix relaunch after manager death status37 PASS' }
+		else if caller_death && os.args[10] == '--manager-death-probe' { 'Wine signed manager-SIGKILL foreign-server-refused holder-status137 collection-retained PASS' }
 		else if idle_server { 'Wine signed idle-server zero-live-clients collection-retained natural-retirement PASS' }
 		else if caller_death { 'Wine signed caller-SIGKILL holder-survived collection-retained natural-retirement PASS' }
 		else if collection { 'Wine signed detached-client collection lease status37 natural-retirement PASS' }
@@ -351,7 +353,7 @@ fn check() ! {
 	]
 	if caller_death {
 		required << 'Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS'
-		if os.args[10] == '--manager-death-probe' {
+		if os.args[10] in ['--manager-death-probe', '--relaunch-probe'] {
 			required << 'Wine manager-SIGKILL adopted-server foreign-refusal126 lease-busy PASS'
 		} else { required << 'Wine signed competing-prefix refusal126 after caller death original-workload-live lease-busy PASS' }
 	}
