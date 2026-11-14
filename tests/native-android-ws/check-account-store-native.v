@@ -77,7 +77,7 @@ fn main() {
 		dir := work + '/case-' + i.str()
 		os.mkdir(dir)!
 		os.write_file(dir + '/main.v', model + adapt(variant) + cases)!
-		build := os.exec([compiler, '-w', '-n', '-enable-globals', '-cc', 'cc', '-o', dir + '/check', dir + '/main.v'])
+		build := os.exec([compiler, '-new-compiler', '-no-parallel', '-nocache', '-w', '-enable-globals', '-cc', 'cc', '-o', dir + '/check', dir + '/main.v'])
 		os.write_file(dir + '/build.log', build.output)!
 		assert build.exit_code == 0, names[i] + ': ' + build.output
 		run := os.exec([dir + '/check'])
@@ -141,6 +141,7 @@ __global ws_account_sequence u64
 __global objects []ProbeObject
 __global held bool
 __global exception string
+__global exception_message string
 __global java_calls int
 __global type_environment &char
 __global env_reads int
@@ -204,7 +205,7 @@ fn ws_auth_worker_active_locked(id u64) bool { assert held; return true }
 fn ws_auth_worker_shutdown(e voidptr) { assert !held }
 fn java() { assert !held; java_calls++ }
 fn pending(e voidptr) bool { return exception != "" }
-fn throw(e voidptr, kind &char, message &char) { java(); assert exception == ""; exception = text(kind) }
+fn throw(e voidptr, kind &char, message &char) { java(); assert exception == ""; exception = text(kind); exception_message = text(message) }
 fn environment(name &char) &char {
  if text(name) == "VINIX_ANDROID_AUTHENTICATOR_TYPE" { env_reads++; return type_environment }
  assert text(name) == "VINIX_ANDROID_ACCOUNT_SOCKET"; return c"/selected/accounts.sock"
@@ -342,6 +343,7 @@ fn ws_account_read(client voidptr, kind &u16, id &u64, timeout i32) i32 {
  unsafe {
   *id = if transport_mode == 1 { u64(902) } else { u64(901) }
   *kind = if transport_mode == 3 || (transport_mode == 5 && transport_reads == 2) { u16(5) }
+    else if transport_mode == 7 { u16(2) } else if transport_mode == 8 { u16(6) }
     else if transport_mode == 6 { u16(3) } else if transport_request == 5 { u16(1) } else { u16(3) }
  }
  return if transport_mode == 2 { i32(-1) } else if transport_mode == 4 || (transport_mode == 5 && transport_reads == 1) { i32(0) } else { i32(1) }
@@ -470,11 +472,21 @@ fn main() {
  // Application queries use the broker identity, never the owner snapshot.
  reset(); ws.service = false; app_accounts := query(e)
  assert object(app_accounts).items.len == 2 && snapshots == 0 && transport_submits == 1 && transport_closes == 1
- for mode in 1 .. 5 {
+ for mode in [1,2,3,4,7,8] {
   reset(); ws.service = false; transport_mode = mode
   assert query(e) == nilp() && snapshots == 0 && transport_closes == 1
+  expected := match mode {
+   1 { "account query response identity mismatch" }
+   2 { "account query transport failed" }
+   7 { "account query rejected by broker" }
+   8 { "account query unexpected response kind" }
+   else { "account query deadline expired" }
+  }
+  assert exception_message == expected
   expect_exception("UnsupportedOperationException")
  }
+ reset(); ws.service = false; transport_mode = 5
+ assert object(query(e)).items.len == 2 && exception == "" && transport_reads == 3 && transport_closes == 1
  reset(); ws.service = false; ws_account_closing = true
  assert query(e) == nilp() && transport_submits == 0; expect_exception("UnsupportedOperationException")
  // A nullable SQL value has a non-null cell; a missing cell is an error.

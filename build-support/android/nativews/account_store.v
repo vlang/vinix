@@ -277,17 +277,23 @@ fn ws_store_accounts(e voidptr, manager voidptr, account_type voidptr, target_pa
 		if client == nil { throw(e,c'java/lang/UnsupportedOperationException',c'account broker connection failed'); return nil }
 		defer { ws_account_close(client) }
 		deadline := ws_millis() + 5000
+		// Keep transport/protocol rejection distinct from a silent deadline.
+		// These fixed messages expose no account, request or broker payload.
+		mut failure := &char(c'account query deadline expired')
 		for ws_millis() < deadline {
 			mut response_kind := u16(0)
 			mut response_id := u64(0)
 			status := ws_account_read(client,&response_kind,&response_id,100)
 			if status == 0 { continue }
-			if status != 1 || response_id != id { break }
+			if status != 1 { failure = &char(c'account query transport failed'); break }
+			if response_id != id { failure = &char(c'account query response identity mismatch'); break }
 			if response_kind == 5 { continue }
 			if response_kind == 3 { return ws_store_array(e,client,i32(count_fn(client)),name_fn,type_fn) }
+			failure = if response_kind == 2 { &char(c'account query rejected by broker') }
+				else { &char(c'account query unexpected response kind') }
 			break
 		}
-		throw(e,c'java/lang/UnsupportedOperationException',c'account query failed or timed out')
+		throw(e,c'java/lang/UnsupportedOperationException',failure)
 		return nil
 	}
 }
