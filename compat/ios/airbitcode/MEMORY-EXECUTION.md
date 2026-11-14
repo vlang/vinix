@@ -2,8 +2,8 @@
 
 `run_memory_function` executes a defined ordinary void function with pointer
 arguments, one basic block, scalar loads/stores, scalar binary operations,
-comparisons, scalar select/casts/freeze, floating negation, forward constant GEPs
-and a final ret void.
+comparisons, scalar select/casts/freeze, floating negation, forward constant GEPs,
+checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
@@ -27,8 +27,9 @@ helpers, including constant true/false FP predicates and poison propagation.
 Select reads its condition and only the chosen value. Unselected poison/undef
 constants do not reject; selected undef errors, and poison conditions/chosen
 values propagate to a rejected poison store. Selection does not skip earlier
-instructions. Pointer, vector and aggregate comparisons/selects and all
-comparison/select flags remain unsupported.
+instructions. Pointer/vector comparisons and selects, aggregate comparisons,
+general aggregate selects and all comparison/select flags remain unsupported;
+the overflow-pair select exception is described below.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -212,7 +213,7 @@ field 0 or 1 after checking the complete pair shape, source type, result type
 and field index. Each call and extraction costs one step. Extracted values
 can feed scalar operations, freeze/select and scalar stores. Zero/poison pair
 constants are admitted; other pair constants reject. General aggregate memory,
-arguments, returns, insertion and select remain unsupported here.
+arguments, returns and insertion remain unsupported here.
 
 `freeze` also accepts these literal unpacked overflow pairs. Defined fields
 preserve their bits; each poison field independently chooses zero. A direct
@@ -221,6 +222,14 @@ still rejects. Both poison tags clear while the aggregate tag survives, and
 the stored result slot keeps repeated uses consistent. Each freeze costs one
 step and shares scalar validation/evaluation. Other pair constants, layouts,
 field types and aggregate operations retain their existing restrictions.
+
+Unflagged `select` also accepts these overflow pairs, with exactly matching
+arm/result types and a scalar i1 condition. Only the chosen pair is read;
+zero/poison pair constants are allowed, while undef pair constants reject
+during preflight even in an unchosen arm. A poison condition makes both fields
+poison and a later pair freeze chooses zero for each. Undef conditions and
+earlier dynamic errors still reject. Selection copies both fields and poison
+tags into the result slot and costs one step, using the scalar evaluator.
 
 Only ordinary direct calls to these forty-seven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other

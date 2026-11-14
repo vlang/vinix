@@ -68,7 +68,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 // Narrow execution profile: an ordinary void function, pointer arguments, one
 // block, scalar loads/stores, forward literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, checked overflow
-// pairs with scalar field extraction and final ret void.
+// pairs with field extraction/freeze/select and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -163,6 +163,11 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		}
 		if code in [u64(9), 28, 5, 29]! {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: comparison/select result') }
+			if code in [u64(5), 29]! && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t {
+				if op.indices_count != 0 { return error('AIR memory execution: pair select indices') }
+				p.scalar_pair_flow(op, s.base_id, true, pools, scope)!
+				continue
+			}
 			p.execution_bits(op.result_type, true)!
 			for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, true)! }
 			start := op.operands_start
