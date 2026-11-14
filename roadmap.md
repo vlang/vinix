@@ -1306,6 +1306,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     also passes a second 741-link migration, real Win64 relaunch and full public
     prefix review after collection in a fresh signed-package x86 run. The Wine
     payload remains unchanged across these generation transitions.
+    [Removed-builtin rollback controls](tests/packages/wine-lease-supervision-plan.md#removed-builtin-rollback-refusal-and-recovery-2026-11-14)
+    now pass in both signed marker guests: all public prefix commands preserve
+    obsolete links on refusal; explicit fixture-owner cleanup permits migration
+    to the restored inventory. Actual Wine-version compatibility remains open.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

@@ -2814,6 +2814,47 @@ Wine engine-version upgrade/rollback, ARM Wine execution, fresh GUI, power-loss,
 measured heap, strict ABI and default activation gates remain open. This local
 console acceptance does not establish a hermetic build closure.
 
+## Removed-builtin rollback refusal and recovery, 2026-11-14
+
+Source `a1c088685` extends the signed marker-runtime guest fixture beyond its
+upgrade/migration with a real package rollback. Version 2 changes `base.dll`
+bytes and adds `extra.dll`; rollback creates a fresh generation containing the
+original bytes and no `extra.dll`. The prefix still has the version-2 link.
+Read-only service admission must refuse with the specific absent-inventory
+error. All three public commands, run as UID/GID 1000, must fail while preserving
+every link target, inventory count and private sentinel, without creating a
+staging entry.
+
+The fixture owner then explicitly removes its own obsolete link. Public review,
+migration and repetition succeed; full service admission reports all 34 rows
+as `keep`, with no prior generation, and every link targets the restored
+generation. Original `base.dll` bytes and private data are verified. The
+controller requires both new markers in addition to every earlier staging,
+competing-launch, SIGKILL/resume and repetition marker. Final AArch64 run passes
+in 7.288 seconds and x86_64 in 16.108 seconds, under the unchanged 120-second
+bound. Preliminary runs before the explicit distinct-payload assertion also
+pass and are retained separately.
+
+This qualifies safe refusal and controlled recovery for signed marker assets.
+Migration still does not automatically delete obsolete links. No marker code
+is executed, and this does not qualify compatibility between actual Wine
+versions, general user-prefix cleanup, ARM Wine, GUI or power-loss recovery.
+Production implementation, kernels, sandbox policy and resource budgets are
+unchanged. The existing C pointer-compatibility exception remains.
+
+Complete evidence is retained at `/Users/alex/.cache/vwremoved-20261114-01`,
+including generated C, binaries, parsed-source lists, complete runs and the
+isolated source tree at base `76567c7aa` plus `source.patch`. Changed V files
+match `a1c088685`. Kernel and CLI copies match the retained original bundles
+byte-for-byte after execution. Original complete compiler/producer/kernel
+bundles and namespaces remain required; this is local guest acceptance rather
+than a hermetic build-input claim.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-removed-builtin-rollback-20261114-01.inventory.json`,
+SHA-256 `0d0036600142bce65248918b1b03df93200b5e8926ef2a415b205c238d294759`.
+Recording and independent inventory comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
