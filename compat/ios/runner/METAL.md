@@ -298,6 +298,15 @@ original binding's bounds, alignment and permissions. Literal null/poison/undef
 pointers, integer-pointer conversions and address-space casts reject. Freeze
 does not bypass an earlier pointer select's defined-condition requirement.
 
+Pointer comparisons support `eq`, `ne`, `ugt`, `uge`, `ult` and `ule` on
+exactly matching pointer types resolved within the same binding. Preflight
+compares their bounded offsets, including one-past addresses, without reading
+the source buffer or exposing host pointer bits. Each executed comparison
+costs one step and produces a scalar i1 usable by branches and selects.
+Cross-binding comparisons reject even for aliased storage; signed ordering
+and literal null/poison/undef pointers reject. Earlier pointer selects still
+evaluate their conditions when executed.
+
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct
 forward blocks. Each tested case costs one additional step; default paths test

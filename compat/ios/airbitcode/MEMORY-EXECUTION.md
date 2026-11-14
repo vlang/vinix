@@ -61,7 +61,8 @@ helpers, including constant true/false FP predicates and poison propagation.
 Select reads its condition and only the chosen value. Unselected poison/undef
 constants do not reject; selected undef errors, and poison conditions/chosen
 values propagate to a rejected poison store. Selection does not skip earlier
-instructions. Pointer/vector comparisons and vector selects, aggregate comparisons,
+instructions. Same-binding pointer equality and unsigned ordering are described
+below. Vector comparisons and vector selects, aggregate comparisons,
 general aggregate selects and all comparison/select flags remain unsupported;
 the overflow-pair select exception is described below.
 
@@ -331,7 +332,7 @@ and scaled subtraction are checked before multiplication, including the signed
 minimum index. The binding's own offset supplies no extra headroom.
 Zero-stride negative indexes, scalable layouts, dynamic, poison/undef and wider
 indexes reject. Constant-expression
-pointers, casts and numerical pointer inputs reject.
+pointers, integer-pointer conversions and numerical pointer inputs reject.
 
 Known GEP inbounds/nusw/nuw flags are accepted within the forward,
 nonwrapping profile. Backward GEPs accept plain, nusw and inbounds
@@ -349,6 +350,14 @@ supported; space 2 requires a readonly binding. Pointer operands must directly
 name arguments, earlier supported GEP results, invariant pointer PHIs/selects
 or supported pointer freezes/bitcasts.
 No host pointers are accepted.
+Pointer comparisons accept `eq`, `ne`, `ugt`, `uge`, `ult` and `ule` for
+exactly matching pointer types resolved to the same binding. Preflight compares
+bounded offsets, including one-past addresses, without adding source reads or
+access extents. Each executed comparison publishes a scalar i1 and costs one
+step. Branches and scalar/pointer selects can consume it. Different bindings
+reject even when their storage aliases, since their bases are unknown; signed
+pointer ordering and literal null/poison/undef pointers also reject. Precomputing
+a comparison does not bypass earlier pointer-select condition evaluation.
 Bindings may share byte storage;
 execution observes earlier stores through aliases. Callers retain ownership
 and must prevent concurrent access/mutation during a run.
@@ -484,6 +493,13 @@ with native LLVM through direct arguments, GEPs, selects, PHIs and nested joins.
 It checks exact costs/extents, aliases, malformed shape/type/address-space
 metadata, literal pointer exclusions and forbidden pointer conversions, and
 verifies that freeze does not suppress earlier pointer-select condition errors.
+
+`tests/ios/air-memory-pointer-compare.v` compares all six supported predicates
+with native LLVM across spaces 0/1/2, direct/derived pointers and
+PHI/select/freeze/bitcast chains. It checks scalar/select/branch consumers,
+one-past extents without source reads, aliases, exact costs, budgets, bindings,
+metadata/types, cross-binding and signed-predicate exclusions, and poison/undef
+select conditions with prior writes, plus frozen and untaken conditions.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

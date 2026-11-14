@@ -29,6 +29,7 @@ pub:
 pub fn (profile &IRMemoryProfile) free() { unsafe { profile.arguments.free(); profile.accesses.free() } }
 struct IRMemoryAccess {
 	argument int = -1
+	comparison u8 // 0: ordinary access; 1/2: precomputed false/true pointer comparison.
 	offset u64
 }
 fn (p IRTypedProgram) memory_pointer(pools IRConstantPools, bodies IRFunctionBodies, scope int, operand int, count int, pointers []IRMemoryAccess) !IRMemoryAccess {
@@ -237,6 +238,18 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		}
 		if code in [u64(9), 28, 5, 29]! {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: comparison/select result') }
+			if code in [u64(9), 28]! && op.operands_count > 0 && p.gep_type(p.operands[op.operands_start].type_index)!.kind == .pointer_t {
+				start := op.operands_start
+				if op.operands_count != 2 || op.indices_count != 0 || p.integer_bits(op.result_type)! != 1 || p.operands[start].type_index != p.operands[start + 1].type_index || op.opcode < 32 || op.opcode > 37 { return error('AIR memory execution: pointer comparison shape/type/predicate') }
+				left := p.memory_pointer(pools, bodies, scope, start, count, pointers)!
+				right := p.memory_pointer(pools, bodies, scope, start + 1, count, pointers)!
+				// Within a binding, bounded nonwrapping offsets preserve unsigned
+				// order. Distinct bindings may alias; signed order needs a base.
+				if left.argument != right.argument { return error('AIR memory execution: same-binding pointer comparison required') }
+				value := integer_compare(op.opcode, 64, IntegerValue{value: left.offset}, IntegerValue{value: right.offset})!
+				accesses[index - s.instructions_start] = IRMemoryAccess{comparison: u8(value.value + 1)}
+				continue
+			}
 			if code in [u64(5), 29]! && p.gep_type(op.result_type)!.kind == .pointer_t {
 				start := op.operands_start
 				if op.operands_count != 3 || op.opcode != 0 || op.indices_count != 0 || p.operands[start].type_index != op.result_type || p.operands[start + 1].type_index != op.result_type || p.integer_bits(p.operands[start + 2].type_index)! != 1 { return error('AIR memory execution: pointer select types/arity') }
@@ -336,7 +349,11 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 				if p.types[op.result_type].kind != .pointer_t { value := if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(op.operands_start)! } else { m.read_frozen(op.operands_start)! }; m.put(inst, value) }
 				continue
 			}
-			if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
+			if code in [u64(9), 28]! {
+				comparison := profile.accesses[index - s.instructions_start].comparison
+				value := if comparison != 0 { IntegerValue{value: u64(comparison - 1)} } else { m.compare_value(op)! }
+				m.put(inst, value); continue
+			}
 			if code in [u64(5), 29]! {
 				if p.types[op.result_type].kind == .pointer_t {
 					condition := m.read(op.operands_start + 2)!
