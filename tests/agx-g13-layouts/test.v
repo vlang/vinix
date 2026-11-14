@@ -168,8 +168,8 @@ fn check_v13_5_command_repacking() {
 		client_sequence: 0x5a
 	}
 	compute.job_params_2.preempt_buf_1 = 0x3132_3334_3536_3738
-	compute_new := fw.make_g13_compute_v13_5(&compute)
-	assert object_u64(voidptr(&compute_new), 0x4) == 0
+	compute_new := fw.make_g13_compute_v13_5(&compute, 0xabcdef0100000002)
+	assert object_u64(voidptr(&compute_new), 0x4) == 0xabcdef0100000002
 	assert object_u64(voidptr(&compute_new), 0x1f0) == compute.microsequence
 	assert object_u32(voidptr(&compute_new), 0x1fc) == 0
 	assert object_u64(voidptr(&compute_new), 0x224) == compute.job_params_2.preempt_buf_1
@@ -189,7 +189,8 @@ fn check_v13_5_command_repacking() {
 		client_sequence: 0xa5
 	}
 	vertex.job_params_2.unk_480[0] = 0xa1a2_a3a4
-	vertex_new := fw.make_g13_vertex_v13_5(&vertex)
+	vertex_new := fw.make_g13_vertex_v13_5(&vertex, 0xabcdef0100000003)
+	assert object_u64(voidptr(&vertex_new), 0x4) == 0xabcdef0100000003
 	assert object_u64(voidptr(&vertex_new), 0x474) == vertex.microsequence
 	assert object_u32(voidptr(&vertex_new), 0x488) == vertex.unk_pointee
 	assert object_u32(voidptr(&vertex_new), 0x48c) == vertex.unk_pad
@@ -199,7 +200,7 @@ fn check_v13_5_command_repacking() {
 	assert object_u64(voidptr(&vertex_new), 0x5c4) == vertex.end_ts
 	assert object_u32(voidptr(&vertex_new), 0x5dc) & 0xff == vertex.client_sequence
 
-	fragment := fw.G13RunFragment{
+	mut fragment := fw.G13RunFragment{
 		tag: 1
 		unk_758_flag: 0xb1b2_b3b4
 		busy_flag: 0xc1c2_c3c4
@@ -210,7 +211,16 @@ fn check_v13_5_command_repacking() {
 		end_ts: 0x2121_2222_2323_2424
 		client_sequence: 0x6b
 	}
-	fragment_new := fw.make_g13_fragment_v13_5(&fragment)
+	fragment.job_params_1.aux_fb_info = fw.G13AuxFramebufferInfo{width: 1920, height: 1080}
+	fragment.job_params_3.aux_fb_info = fw.G13AuxFramebufferInfo{width: 800, height: 600}
+	fragment_new := fw.make_g13_fragment_v13_5(&fragment, 0xabcdef0100000004)
+	assert object_u64(voidptr(&fragment_new), 0x4) == 0xabcdef0100000004
+	assert object_u32(voidptr(&fragment_new), 0xb8) == 1920
+	assert object_u32(voidptr(&fragment_new), 0xbc) == 1080
+	assert object_u64(voidptr(&fragment_new), 0xc0) == 0x100000
+	assert object_u32(voidptr(&fragment_new), 0x6e0) == 800
+	assert object_u32(voidptr(&fragment_new), 0x6e4) == 600
+	assert object_u64(voidptr(&fragment_new), 0x6e8) == 0x100000
 	assert object_u32(voidptr(&fragment_new), 0x770) == fragment.unk_758_flag
 	assert object_u32(voidptr(&fragment_new), 0x888) == fragment.busy_flag
 	assert object_u32(voidptr(&fragment_new), 0x88c) == fragment.tvb_overflow_count

@@ -124,12 +124,13 @@ pub fn g13_compute_end_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
 }
 
 // Repack the fields produced by the 12.3 builder into the 13.5 command. New
-// counters/timestamp scratch fields are intentionally zero, matching m1n1's
-// compute bring-up; ComputeInfo shrank by 0x10 and ComputeInfo2 gained a
+// timestamp scratch fields start at zero. The queue supplies the shared
+// command counter; ComputeInfo shrank by 0x10 and ComputeInfo2 gained a
 // four-byte prefix.
-pub fn make_g13_compute_v13_5(legacy &G13RunCompute) G13RunComputeV135 {
+pub fn make_g13_compute_v13_5(legacy &G13RunCompute, counter u64) G13RunComputeV135 {
 	mut out := G13RunComputeV135{}
 	g13_copy_bytes(voidptr(&out), 0x000, voidptr(legacy), 0x000, 0x004)
+	g13_put_u64(voidptr(&out), 0x004, counter)
 	g13_copy_bytes(voidptr(&out), 0x00c, voidptr(legacy), 0x004, 0x014)
 	g13_copy_bytes(voidptr(&out), 0x020, voidptr(legacy), 0x018, 0x050)
 	g13_copy_bytes(voidptr(&out), 0x070, voidptr(legacy), 0x068, 0x150)

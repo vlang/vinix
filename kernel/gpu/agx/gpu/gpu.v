@@ -103,6 +103,7 @@ mut:
 	g13_channels      &G13ChannelAllocations = unsafe { nil }
 	g13_events        G13EventResources
 	g13_queues        []&G13QueueResources
+	g13_queue_ids     G13QueueIds
 	g13_compute_jobs  []&G13ComputeJobResources
 	g13_render_jobs   []&G13RenderJobResources
 	g13_tvb_slots     [fw.g13_tvb_slot_count]bool

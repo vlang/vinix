@@ -287,13 +287,16 @@ pub fn g13_fragment_end_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
 	return match abi { .v12_3 { 0x914 } .v13_5_partial { 0x928 } else { none } }
 }
 
-pub fn make_g13_fragment_v13_5(legacy &G13RunFragment) G13RunFragmentV135 {
+pub fn make_g13_fragment_v13_5(legacy &G13RunFragment, counter u64) G13RunFragmentV135 {
 	mut out := G13RunFragmentV135{}
 	g13_copy_bytes(voidptr(&out), 0x000, voidptr(legacy), 0x000, 0x004)
+	g13_put_u64(voidptr(&out), 0x004, counter)
 	g13_copy_bytes(voidptr(&out), 0x00c, voidptr(legacy), 0x004, 0x074)
 	// Start3DStruct2's AuxFBInfo gains an eight-byte tail while the opaque
 	// suffix shrinks by the same amount, keeping the enclosing size at 0x348.
 	g13_copy_bytes(voidptr(&out), 0x080, voidptr(legacy), 0x078, 0x040)
+	// Queue::render sets AuxFBInfo::unk3 in both Ventura instances.
+	g13_put_u64(voidptr(&out), 0x0c0, 0x100000)
 	g13_copy_bytes(voidptr(&out), 0x0c8, voidptr(legacy), 0x0b8, 0x128)
 	g13_copy_bytes(voidptr(&out), 0x1f0, voidptr(legacy), 0x1e0, 0x1d8)
 	// Struct1 is 0xe0 at both Ventura and the pinned m1n1 12.3 definition.
@@ -302,6 +305,7 @@ pub fn make_g13_fragment_v13_5(legacy &G13RunFragment) G13RunFragmentV135 {
 	// pointer. Copy its three stable regions around those insertions.
 	g13_copy_bytes(voidptr(&out), 0x4b8, voidptr(legacy), 0x4b0, 0x220)
 	g13_copy_bytes(voidptr(&out), 0x6d8, voidptr(legacy), 0x6d0, 0x010)
+	g13_put_u64(voidptr(&out), 0x6e8, 0x100000)
 	g13_copy_bytes(voidptr(&out), 0x6f0, voidptr(legacy), 0x6e0, 0x080)
 	// The command tail is grouped as flags/busy, Struct6, Struct7, then
 	// timestamps. Struct7 gains a four-byte prefix at 13.5.

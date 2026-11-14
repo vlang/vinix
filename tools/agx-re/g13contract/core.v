@@ -238,10 +238,47 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'pub fn initialize_g13_gpu_context(', 'Vinix queue priority')!
 	require_order(priority_init, ['g13_workqueue_priority(priority)', 'if pipe_type == 2',
 		'value.value_0 = 0', 'value.value_18 = 1'], 'Vinix G13 compute priority')!
+	queue := read(os.join_path(base, 'queue/mod.rs'))!
+	require_order(manager, ['impl Default for ID {', 'Self::new(2)',
+		'let id = self.ids.queue.next()'], 'Asahi global queue identity')!
+	require(queue.contains('generation: AtomicU32::new(id as u32)') &&
+		workqueue.contains('uuid: id as u32'), 'Asahi notifier/workqueue identity changed')!
+	require(local.contains('firmware_id: mgr.g13_queue_ids.allocate()') &&
+		local.contains('priority, u32(resources.firmware_id), resources.context.va') &&
+		local.contains('resources.threshold.va, u32(resources.firmware_id)') &&
+		local.count('client_sequence: u8(resources.firmware_id & 0xff)') == 3 &&
+		local.count('event_generation: u32(resources.firmware_id)') == 3,
+		'Vinix firmware identity must be device-wide on every subqueue')!
+	require(queue.contains('counter: AtomicU64::new(0)'), 'Asahi initial command counter changed')!
+	compute := read(os.join_path(base, 'queue/compute.rs'))!
+	require_order(compute, ['self.counter.fetch_add(1, Ordering::Relaxed)',
+		'counter: U64(count)', 'counter: U64(count)'], 'Asahi compute command/start counter')!
+	render := read(os.join_path(base, 'queue/render.rs'))!
+	require_order(render, ['let aux_fb_info =', 'unk3: U64(0x100000)',
+		'aux_fb_info,', 'aux_fb_info,'], 'Asahi Ventura auxiliary framebuffer defaults')!
+	fragment_wire := read(os.join_path(repo, 'kernel/gpu/agx/fw/fragment.v'))!
+	require_order(fragment_wire, ['g13_put_u64(voidptr(&out), 0x0c0, 0x100000)',
+		'g13_put_u64(voidptr(&out), 0x6e8, 0x100000)'], 'Vinix Ventura auxiliary framebuffer defaults')!
+	require_order(render, ['self.counter.fetch_add(2, Ordering::Relaxed)',
+		'let count_vtx = count_frag + 1', 'counter: U64(count_frag)',
+		'counter: U64(count_frag)', 'counter: U64(count_vtx)', 'counter: U64(count_vtx)'],
+		'Asahi render command/start counters')!
+	require_order(local, ['fragment_counter := queue.command_counter.reserve(2, v13_5)',
+		'vertex_counter := fragment_counter + u64(1)',
+		'fw.make_g13_vertex_v13_5(vertex, vertex_counter)',
+		'fw.make_g13_fragment_v13_5(fragment, fragment_counter)',
+		'v13_5, &vertex_start, vertex_counter,', 'v13_5, &fragment_start, fragment_counter,',
+		'compute_counter := owned_queue.command_counter.reserve(1, v13_5)',
+		'fw.make_g13_compute_v13_5(run, compute_counter)',
+		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
+		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter',
-		'G13 default non-preemptible compute queue priority']
+		'G13 default non-preemptible compute queue priority',
+		'Device-wide firmware queue/notifier identity distinct from userspace handles',
+		'Firmware 13.5 auxiliary framebuffer tail defaults',
+		'Firmware 13.5 shared per-queue command/start counters']
 }
 
 pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {

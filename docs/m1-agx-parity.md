@@ -395,6 +395,39 @@ the linked kernel SHA-256 is
 `69498515b1729c638913630c6a78ae00b51f29f1ac189ec1e4cb45aea2908166`.
 Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 
+### Firmware queue identity, command counters and framebuffer defaults
+
+Firmware identities now come from a device-wide 64-bit sequence starting at
+two, matching Asahi's reserved system IDs. File-local queue handles remain
+independent. Notifiers, workqueue UUIDs, start-operation generations and the
+three command client-sequence bytes use the reference's 32/8-bit projections.
+Previously, two clients could publish the same file-local ID as their firmware
+identity.
+
+Firmware 13.5 also uses one command counter per queue across all subqueues:
+compute reserves one value; render reserves fragment then vertex values.
+The counter now reaches both command headers and their microsequence start
+operations instead of repeatedly emitting the first job's 0/1 values. Failed
+construction may consume values; cancellation does not rewind the sequence.
+Both expanded auxiliary-framebuffer records now set their reference tail
+value to `0x100000` while preserving dimensions.
+
+ASan/UBSan tests cover mixed work, independent queues, canceled gaps, 64-bit
+wrap, command/start agreement, encoded framebuffer tails and byte-exact legacy
+start operations. Reference gates, their unit tests and the isolated ARM build
+passed. The build uses `91f65a71f` plus five retained kernel files, compared
+byte-for-byte before sealing. These value fields add no allocation or lifetime.
+Full ABI/scheduling/VM/Mesa migration and the remaining firmware comparison
+are still incomplete; the audit remains `not_equivalent`. No GPU was accessed.
+
+Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-command-counters-20261114/bundle/`.
+The sibling inventory SHA-256 is
+`efc088248679501ce00869a38585a746169ee32a12ba440829b5f07fed001d6e`;
+the linked kernel SHA-256 is
+`3400890dd542e690b63a9654513714f62de6ea1e64401c30ceb849e92b7b5203`.
+Use the retained checker with `check-inventory BUNDLE RECEIPT`.
+
 ## Earlier artifact retention incident
 
 The continuation initially reused the earlier `omarchy-m1-20261114/kernel-build`

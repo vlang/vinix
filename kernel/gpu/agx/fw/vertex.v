@@ -187,11 +187,11 @@ pub fn g13_vertex_end_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
 	return match abi { .v12_3 { 0x5bc } .v13_5_partial { 0x5c4 } else { none } }
 }
 
-pub fn make_g13_vertex_v13_5(legacy &G13RunVertex) G13RunVertexV135 {
+pub fn make_g13_vertex_v13_5(legacy &G13RunVertex, counter u64) G13RunVertexV135 {
 	mut out := G13RunVertexV135{}
 	// The counter inserted after the tag moves the command prefix and Struct2.
 	g13_copy_bytes(voidptr(&out), 0x000, voidptr(legacy), 0x000, 0x004)
-	g13_put_u64(voidptr(&out), 0x004, 1)
+	g13_put_u64(voidptr(&out), 0x004, counter)
 	g13_copy_bytes(voidptr(&out), 0x00c, voidptr(legacy), 0x004, 0x3b8)
 	// TilingParameters keeps its recovered 0x30-byte prefix; Ventura reserves
 	// 0x60 rather than the 0x70-byte Monterey tail.
