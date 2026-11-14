@@ -1324,6 +1324,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     guests complete 100 ordinary-account review/recheck/close cycles with zero
     retained V allocations and correct generation-lease release. Host truncated-
     input cleanup and both migration/recovery suites also pass.
+    [Public service refusal lifetimes](tests/packages/wine-lease-supervision-plan.md#public-service-refusal-heap-and-coordination-cleanup-2026-11-14)
+    also pass 100 attempts per selected error in both signed marker guests,
+    retaining zero measured V allocations, releasing failed-admission leases
+    and reader locks, and preserving a live migration owner's guard and data.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

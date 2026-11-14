@@ -3072,6 +3072,49 @@ Typed receipt:
 SHA-256 `93bb7fbcdd1101e0eb6a03a812ba03754a4bc494aae647a2dd417078bca4231d`.
 Recording and independent comparison pass.
 
+## Public service refusal heap and coordination cleanup, 2026-11-14
+
+Source `00b2908dd` adds a separate public-service refusal mode, selected by
+`-d wine_service_heap_refusals` in the guest and `--refusals` in the controller.
+Each signed marker guest enters UID/GID 1000 and runs 100 attempts for each of
+four cases: missing application before lease acquisition, installed runtime
+rejected as a Windows application, personal DLL collision after admission, and
+personal stage refusal through a retained owner's public migration method.
+Every refusal must have its expected reason; the caller releases its owned
+message and error interface. Each phase retains zero measured V objects/bytes.
+
+Exclusive coordination probes require both the generation lease and temporary
+store reader locks to be free after failed admissions. Following failed
+migration, the store lock must be free while the live generation lease remains
+busy with `EAGAIN`/`EWOULDBLOCK` and a competing public capture still refuses.
+Personal DLL and stage contents are preserved. Explicit fixture cleanup must
+allow the same owner to recheck/migrate; closing it must release coordination
+and permit fresh public capture/close. This distinguishes retained live-owner
+resources from leaked temporary admission resources.
+
+`run-x86` passes in 14.176 seconds and `run-arm` in 6.326 seconds. The controller
+requires every exact 100-cycle phase marker and final coordination/data/recovery
+marker; both modes retain 120-second bounds and selected input rechecks. Its
+default positive mode passes in 16.695 seconds using the retained immutable
+positive x86 guest from the preceding service-heap bundle. Unknown mode refuses
+before work creation. Production implementation, kernel, runtime payload,
+sandbox and resource budgets are unchanged.
+
+Evidence is preserved at `/Users/alex/.cache/vwservicerefusal-20261114-01`, including
+both guest runs, controller compatibility/refusal logs, generated C, parsed-source
+lists, binaries, kernel copies and isolated source at base `d0c73c0a1` plus
+`source.patch`. Both changed V files match the feature commit. Complete prior
+bundles and original namespaces remain required. This covers selected two-package
+service errors, excluding setup/cold startup, libc/kernel heap, all descriptor
+retention, unselected failures, real Wine execution and whole-launch lifetime.
+The existing pointer-compatibility compiler exception remains; this does not
+establish strict ABI or hermetic build closure.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-service-refusals-20261114-01.inventory.json`,
+SHA-256 `6d7fabedc54a744db8778bf326b9714b52711df564559ccd305075df26bacfe8`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
