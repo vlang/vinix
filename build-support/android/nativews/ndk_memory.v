@@ -4,10 +4,23 @@
 module atlframework
 
 #include <sys/stat.h>
+#include <time.h>
+
+struct C.timespec {
+	tv_sec i64
+	tv_nsec i64
+}
 
 struct C.stat {
+	st_dev u64
+	st_ino u64
+	st_uid u32
 	st_size i64
 	st_mode u32
+	st_mtim C.timespec
+	st_ctim C.timespec
+	st_mtimespec C.timespec
+	st_ctimespec C.timespec
 }
 fn C.memfd_create(&char, u32) i32
 fn C.fstat(i32, &C.stat) i32

@@ -95,7 +95,10 @@ The correctly mounted r87/r88 retries retain private diagnostics and pass that
 preflight on ARM. r88's [descriptor exhaustion](maps-descriptor-exhaustion-20261114.md)
 precedes another account connection failure; a bounded V descriptor inventory
 is ready to measure handle ownership. No lifetime repair or Google authentication
-is claimed.
+is claimed. [r89's measured inventories](maps-framework-apk-cache-20261114.md)
+then found many duplicate framework APK handles while Maps rendered tiles and
+remained below its fd limit. An immutable-framework cache passed focused host
+checks and ARM compilation; guest qualification remains pending.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

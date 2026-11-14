@@ -213,7 +213,7 @@ fn ws_load_apk_asset(e voidptr, path voidptr) voidptr {
 		return if length > 0 && text[length - 1] == `/` {
 			voidptr(C.ApkAssets_loadDir(text))
 		} else {
-			voidptr(C.ApkAssets_load(text, false))
+			ws_load_apk_file(text)
 		}
 	}
 }

@@ -70,3 +70,7 @@ d908359f38fc80e0258d0df88db102ce8bb0d0843617ecae5879154858187d81.
 It has not yet captured descriptors in Vinix. Google authentication, sustained
 responsive Maps and the descriptor lifetime fix remain pending. r87 and r88
 are stopped.
+
+The subsequent [r89 inventories and framework APK cache candidate](maps-framework-apk-cache-20261114.md)
+retain seven stable-process snapshots. Maps rendered tiles and ended at the
+original session deadline; its descriptor exhaustion did not recur in that run.
