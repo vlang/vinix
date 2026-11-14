@@ -297,3 +297,31 @@ pub fn firmware_stamp_address(index u32) u64 {
 pub fn stamp_completed(index u32) bool {
 	return gpu_event_mgr.check_completion(index)
 }
+
+// A workqueue can have many outstanding commands sharing one event. Its
+// newest expectation must not delay retirement of an earlier command.
+pub fn (mut em EventManager) value_completed(index u32, expected u32) bool {
+	if index >= max_stamps { return false }
+	em.lock.acquire()
+	defer { em.lock.release() }
+	if !em.initialized || !em.stamps[index].in_use || !em.stamps[index].armed { return false }
+	current := unsafe { katomic.load(&u32(em.stamp_phys + u64(index) * stamp_size + higher_half)) }
+	return i32(current - expected) >= 0
+}
+
+pub fn stamp_value_completed(index u32, expected u32) bool {
+	return gpu_event_mgr.value_completed(index, expected)
+}
+
+// An unpublished tail command can give its sequence value back. Earlier
+// cancellation leaves a hole; firmware writes explicit values, so later
+// commands can still retire. Never rewind across a newer reservation.
+fn (mut em EventManager) cancel_value(index u32, expected u32) {
+	em.lock.acquire()
+	defer { em.lock.release() }
+	if em.initialized && index < max_stamps && em.stamps[index].in_use
+		&& em.stamps[index].value == expected {
+		em.stamps[index].value -= u32(0x100)
+		em.stamps[index].completed = false
+	}
+}

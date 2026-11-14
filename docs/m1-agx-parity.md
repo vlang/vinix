@@ -151,6 +151,35 @@ SHA-256 values are `ac2218487f5e7baab4d4a2aa7204022ef1ab7f45e809057dcba0f8485e64
 (AArch64) and `4c0c5ff068f72f9ae4ef785de0ea07bd3b71acaf6397b442d07b24fd862b58c2`
 (x86_64). No hardware reboot was performed.
 
+### Workqueue event ownership
+
+Native G13 jobs now share an event per active subqueue, matching the
+reference's lazy workqueue ownership. Retirement and fault attribution use
+each job's expected value, rather than the newest value on the shared slot.
+Publication is ordered, the outstanding window is bounded to 127 values,
+and discarding an unpublished tail rolls back both its stamp and event
+sequence. The final job releases the physical slot without resetting its
+firmware counters.
+
+Prepared jobs are tracked before publication. They pin queue ownership,
+survive cleanup failure, and are included in firmware-stopped teardown.
+Caller-owned prepared objects remain valid for discard after shutdown;
+submitted and abandoned objects are reclaimed by the manager. A separate
+lifetime review found and resolved abandoned-object and publication-order
+hazards. Sanitizer fixtures exercise cancellation, partial completion on a
+shared stamp, quarantine retry, fault isolation and shutdown. The reference
+contract check and AArch64 build passed. The x86 build excludes these GPU
+modules; its preceding wire checkpoint remains applicable.
+
+This does not close the general submission/scheduler or overlapping render
+scene gaps. Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-workqueue-events-20261114/bundle/`,
+built from `62039d407` plus the retained GPU source. The sibling inventory
+SHA-256 is `39a3123870efd6ffd7e42256ec5d5f74b6770502fb34950c141f06300c180549`;
+the linked kernel SHA-256 is
+`df89f6ecae62e577ebdb368f4b9c788d55d6c52d0f7ded64fcb121f513ecf4ee`.
+Use the retained checker with `check-inventory BUNDLE RECEIPT`.
+
 ## Validation and continuation
 
 The host fixtures execute production page-table, publication, retirement and

@@ -127,6 +127,7 @@ mut:
 
 struct G13SubQueueResources {
 mut:
+	events     event.WorkQueueEvents
 	state      SharedBuffer
 	ring       SharedBuffer
 	gpu_buffer SharedBuffer
@@ -271,7 +272,6 @@ mut:
 	threshold          SharedBuffer
 	notifier           SharedBuffer
 	subqueues          [3]G13SubQueueResources
-	event_sequences    [3]u64
 	render_buffer      G13RenderBufferResources
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
@@ -1081,11 +1081,13 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 	}
 	job.released = true
 	if job.vertex_event_reserved {
-		event.release_stamp(job.vertex_event_slot)
+		mut queue := unsafe { job.queue }
+		queue.subqueues[0].events.release(job.vertex_event_slot, job.vertex_stamp_value, job.submitted)
 		job.vertex_event_reserved = false
 	}
 	if job.fragment_event_reserved {
-		event.release_stamp(job.fragment_event_slot)
+		mut queue := unsafe { job.queue }
+		queue.subqueues[1].events.release(job.fragment_event_slot, job.fragment_stamp_value, job.submitted)
 		job.fragment_event_reserved = false
 	}
 	if invalidate {
@@ -1163,19 +1165,21 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 			if !mgr.free_g13_render_job_locked(mut job, job.mappings_published) {
 				job.quarantined = true
 				mgr.g13_render_jobs << job
+			} else {
+				unsafe { free(job) }
 			}
 		}
 	}
-	job.vertex_event_slot = event.reserve_stamp() or { return none }
+	vertex_event := queue.subqueues[0].events.retain() or { return none }
+	job.vertex_event_slot = vertex_event.slot
+	job.vertex_stamp_value = vertex_event.value
 	job.vertex_event_reserved = true
-	job.fragment_event_slot = event.reserve_stamp() or { return none }
+	fragment_event := queue.subqueues[1].events.retain() or { return none }
+	job.fragment_event_slot = fragment_event.slot
+	job.fragment_stamp_value = fragment_event.value
 	job.fragment_event_reserved = true
-	job.vertex_stamp_value = event.advance_stamp(job.vertex_event_slot) or { return none }
-	job.fragment_stamp_value = event.advance_stamp(job.fragment_event_slot) or { return none }
-	job.vertex_event_sequence = queue.event_sequences[0]
-	queue.event_sequences[0]++
-	job.fragment_event_sequence = queue.event_sequences[1]
-	queue.event_sequences[1]++
+	job.vertex_event_sequence = vertex_event.sequence
+	job.fragment_event_sequence = fragment_event.sequence
 	job.scene = mgr.allocate_g13_render_scene_locked(resources, &tile) or { return none }
 	job.tvb_size_bytes = u64(resources.render_buffer.blocks.len) * fw.g13_tvb_block_size
 	v13_5 := mgr.hw_config.firmware_abi == .v13_5_partial
@@ -1667,6 +1671,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		|| !mgr.flush_g13_kernel_buffer(&job.fragment_microsequence) {
 		return none
 	}
+	mgr.g13_render_jobs << job
 	complete = true
 	return job
 }
@@ -1680,13 +1685,12 @@ pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 	if !owned.submitted {
 		complete_g13_render_job(mut owned, false)
 		if mgr.free_g13_render_job_locked(mut owned, owned.mappings_published) {
-			// The caller gives the job up; a quarantined one is still listed.
-			if !owned.quarantined {
-				unsafe { free(owned) }
+			for index, candidate in mgr.g13_render_jobs {
+				if candidate == owned { mgr.g13_render_jobs.delete(index); break }
 			}
-		} else if !owned.quarantined {
+			unsafe { free(owned) }
+		} else {
 			owned.quarantined = true
-			mgr.g13_render_jobs << owned
 		}
 	}
 	mgr.lock.release()
@@ -1904,6 +1908,11 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 		|| owned.queue.threshold.phys == 0 || owned.queue.render_buffer.counter.phys == 0 {
 		return false
 	}
+	mut queue := unsafe { owned.queue }
+	if !queue.subqueues[0].events.can_publish(owned.vertex_event_slot, owned.vertex_stamp_value)
+		|| !queue.subqueues[1].events.can_publish(owned.fragment_event_slot, owned.fragment_stamp_value) {
+		return false
+	}
 	mut threshold := unsafe { &u64(owned.queue.threshold.cpu_address()) }
 	old_threshold := katomic.load(threshold)
 	katomic.store(mut threshold, old_threshold + u64(2))
@@ -1924,7 +1933,10 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 		return false
 	}
 	owned.submitted = true
-	mgr.g13_render_jobs << owned
+	if !queue.subqueues[0].events.publish(owned.vertex_event_slot, owned.vertex_stamp_value)
+		|| !queue.subqueues[1].events.publish(owned.fragment_event_slot, owned.fragment_stamp_value) {
+		mgr.state = .error
+	}
 	return true
 }
 
@@ -1932,8 +1944,21 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 	mgr.lock.acquire()
 	for index := mgr.g13_render_jobs.len - 1; index >= 0; index-- {
 		job := mgr.g13_render_jobs[index]
-		if !job.quarantined && (!event.stamp_completed(job.vertex_event_slot)
-			|| !event.stamp_completed(job.fragment_event_slot)) {
+		if !job.submitted {
+			// No ring ever owned this command. A failed UAT invalidation may
+			// retain it, but must not invent a firmware retirement sequence.
+			if job.quarantined {
+				mut abandoned := unsafe { job }
+				if mgr.free_g13_render_job_locked(mut abandoned, true) {
+					mgr.g13_render_jobs.delete(index)
+					complete_g13_render_job(mut abandoned, false)
+					unsafe { free(abandoned) }
+				}
+			}
+			continue
+		}
+		if !job.quarantined && (!event.stamp_value_completed(job.vertex_event_slot, job.vertex_stamp_value)
+			|| !event.stamp_value_completed(job.fragment_event_slot, job.fragment_stamp_value)) {
 			continue
 		}
 		mut owned := unsafe { job }
@@ -1977,6 +2002,9 @@ fn (mut mgr GpuManager) release_all_g13_render_jobs() {
 		}
 		complete_g13_render_job(mut job, false)
 		mgr.free_g13_render_job_locked(mut job, false)
+		// Prepared jobs remain caller-owned; successful publication transfers
+		// the object to the manager, just as in the normal reaper.
+		if job.submitted || job.quarantined { unsafe { free(job) } }
 	}
 	mgr.g13_render_jobs.clear()
 }
@@ -2037,7 +2065,8 @@ fn (mut mgr GpuManager) free_g13_compute_job_locked(mut job G13ComputeJobResourc
 	}
 	job.released = true
 	if job.event_reserved {
-		event.release_stamp(job.event_slot)
+		mut queue := unsafe { job.queue }
+		queue.subqueues[2].events.release(job.event_slot, job.stamp_value, job.submitted)
 		job.event_reserved = false
 	}
 	if job.context != unsafe { nil } && job.preempt != unsafe { nil } {
@@ -2102,13 +2131,17 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 			if !mgr.free_g13_compute_job_locked(mut job, job.mappings_published) {
 				job.quarantined = true
 				mgr.g13_compute_jobs << job
+			} else {
+				unsafe { free(job) }
 			}
 		}
 	}
 
-	job.event_slot = event.reserve_stamp() or { return none }
+	mut event_queue := unsafe { resources }
+	compute_event := event_queue.subqueues[2].events.retain() or { return none }
+	job.event_slot = compute_event.slot
+	job.stamp_value = compute_event.value
 	job.event_reserved = true
-	job.stamp_value = event.advance_stamp(job.event_slot) or { return none }
 	preempt_size := mgr.hw_config.compute_preempt1_size + u64(32)
 	v13_5 := mgr.hw_config.firmware_abi == .v13_5_partial
 	compute_size := fw.g13_compute_active_size(mgr.hw_config.firmware_abi) or { return none }
@@ -2130,8 +2163,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 	job.timestamps = mgr.alloc_g13_shared_buffer(sizeof(fw.G13JobTimestamps)) or { return none }
 
 	mut owned_queue := unsafe { resources }
-	job.event_sequence = owned_queue.event_sequences[2]
-	owned_queue.event_sequences[2]++
+	job.event_sequence = compute_event.sequence
 	compute_queue := &owned_queue.subqueues[2]
 	stats_compute := mgr.g13_channels.stats_compute.va
 	if compute_queue.info.va == 0 || stats_compute == 0 {
@@ -2276,6 +2308,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 		|| !mgr.flush_g13_kernel_buffer(&job.timestamps) {
 		return none
 	}
+	mgr.g13_compute_jobs << job
 	complete = true
 	return job
 }
@@ -2289,13 +2322,12 @@ pub fn (mut mgr GpuManager) release_g13_compute_job(job &G13ComputeJobResources)
 	if !owned.submitted {
 		complete_g13_compute_job(mut owned, false)
 		if mgr.free_g13_compute_job_locked(mut owned, owned.mappings_published) {
-			// The caller gives the job up; a quarantined one is still listed.
-			if !owned.quarantined {
-				unsafe { free(owned) }
+			for index, candidate in mgr.g13_compute_jobs {
+				if candidate == owned { mgr.g13_compute_jobs.delete(index); break }
 			}
-		} else if !owned.quarantined {
+			unsafe { free(owned) }
+		} else {
 			owned.quarantined = true
-			mgr.g13_compute_jobs << owned
 		}
 	}
 	mgr.lock.release()
@@ -2339,10 +2371,11 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 		|| owned.context == unsafe { nil } || !owned.context.active {
 		return false
 	}
-	queue := owned.queue
+	mut queue := unsafe { owned.queue }
 	if queue.threshold.phys == 0 {
 		return false
 	}
+	if !queue.subqueues[2].events.can_publish(owned.event_slot, owned.stamp_value) { return false }
 	mut threshold := unsafe { &u64(queue.threshold.cpu_address()) }
 	old_threshold := katomic.load(threshold)
 	katomic.store(mut threshold, old_threshold + u64(1))
@@ -2360,7 +2393,7 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 	owned.ring_slot = queue.subqueues[2].last_command_slot
 	owned.retirement_sequence = queue.subqueues[2].command_sequence
 	owned.submitted = true
-	mgr.g13_compute_jobs << owned
+	if !queue.subqueues[2].events.publish(owned.event_slot, owned.stamp_value) { mgr.state = .error }
 	return true
 }
 
@@ -2368,7 +2401,18 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 	mgr.lock.acquire()
 	for index := mgr.g13_compute_jobs.len - 1; index >= 0; index-- {
 		job := mgr.g13_compute_jobs[index]
-		if !job.quarantined && !event.stamp_completed(job.event_slot) {
+		if !job.submitted {
+			if job.quarantined {
+				mut abandoned := unsafe { job }
+				if mgr.free_g13_compute_job_locked(mut abandoned, true) {
+					mgr.g13_compute_jobs.delete(index)
+					complete_g13_compute_job(mut abandoned, false)
+					unsafe { free(abandoned) }
+				}
+			}
+			continue
+		}
+		if !job.quarantined && !event.stamp_value_completed(job.event_slot, job.stamp_value) {
 			continue
 		}
 		mut owned := unsafe { job }
@@ -2411,6 +2455,7 @@ fn (mut mgr GpuManager) release_all_g13_compute_jobs() {
 		}
 		complete_g13_compute_job(mut job, false)
 		mgr.free_g13_compute_job_locked(mut job, false)
+		if job.submitted || job.quarantined { unsafe { free(job) } }
 	}
 	mgr.g13_compute_jobs.clear()
 }

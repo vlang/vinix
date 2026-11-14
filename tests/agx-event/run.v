@@ -2,6 +2,7 @@
 import os
 
 fn main() {
+	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-event-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -12,6 +13,7 @@ fn main() {
 	}
 	os.mkdir_all('${scratch}/gpu/agx/event')!
 	os.cp('${repo}/kernel/gpu/agx/event/event.v', '${scratch}/gpu/agx/event/event.v')!
+	os.cp('${repo}/kernel/gpu/agx/event/workqueue.v', '${scratch}/gpu/agx/event/workqueue.v')!
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\n')!
 	os.cp('${repo}/tests/agx-event/test.v', '${scratch}/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })

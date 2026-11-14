@@ -39,7 +39,7 @@ fn (mut mgr GpuManager) mark_g13_slot_error_locked(slot u32, wait_value u32, fai
 	if slot >= event.max_stamps { return }
 	for job in mgr.g13_compute_jobs {
 		if job.submitted && !job.released && job.event_slot == slot
-			&& g13_error_at_stamp(job.stamp_value, wait_value) && !event.stamp_completed(slot) {
+			&& g13_error_at_stamp(job.stamp_value, wait_value) && !event.stamp_value_completed(slot, job.stamp_value) {
 			mut owned := unsafe { job }
 			owned.error = if failure.status == 4 && owned.context != unsafe { nil }
 				&& owned.context.id != failure.vm_slot { G13JobError{status: 5} } else { failure }
@@ -47,9 +47,10 @@ fn (mut mgr GpuManager) mark_g13_slot_error_locked(slot u32, wait_value u32, fai
 	}
 	for job in mgr.g13_render_jobs {
 		if !job.submitted || job.released { continue }
-		if ((job.vertex_event_slot == slot && g13_error_at_stamp(job.vertex_stamp_value, wait_value))
-			|| (job.fragment_event_slot == slot && g13_error_at_stamp(job.fragment_stamp_value, wait_value)))
-			&& !event.stamp_completed(slot) {
+		if (job.vertex_event_slot == slot && g13_error_at_stamp(job.vertex_stamp_value, wait_value)
+			&& !event.stamp_value_completed(slot, job.vertex_stamp_value))
+			|| (job.fragment_event_slot == slot && g13_error_at_stamp(job.fragment_stamp_value, wait_value)
+				&& !event.stamp_value_completed(slot, job.fragment_stamp_value)) {
 			mut owned := unsafe { job }
 			classified := if failure.status == 4 && owned.context != unsafe { nil }
 				&& owned.context.id != failure.vm_slot { G13JobError{status: 5} } else { failure }

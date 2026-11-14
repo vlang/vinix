@@ -379,6 +379,16 @@ fn check_recovery() {
 		assert status.halted == 0 && status.resume == 1 && mgr.state == .running
 		assert culprit.error.status == 3 && other.error.status == 5
 		assert already_done.error.status == 0 && render.error.status == 5
+		// A later fault on a shared workqueue stamp must preserve earlier
+		// completed work, even while its newer job is still pending.
+		mut prior := G13ComputeJobResources{event_slot: 3, stamp_value: 0x100, submitted: true}
+		mut later := G13ComputeJobResources{event_slot: 3, stamp_value: 0x200, submitted: true}
+		mgr.g13_compute_jobs << &prior
+		mgr.g13_compute_jobs << &later
+		event.set_value(3, 0x100)
+		mgr.mark_g13_slot_error_locked(3, 0x200, G13JobError{status: 3})
+		assert prior.error.status == 0 && later.error.status == 3
+		event.set_completed(3, false)
 		assert mgr.trace.len == 0, 'recovery must retain all command backing'
 		for index := u32(0); index < 5; index++ {
 			assert unsafe { pending[index].info == 0 && pending[index].wait_value == 0 }
