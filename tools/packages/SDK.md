@@ -2151,11 +2151,15 @@ retry and fresh capture; personal contents must survive. All modes keep the
 120-second bound and their own required completion markers.
 
 For successful writes, build with `-d wine_service_heap_writes` and run the
-controller with `--writes`. It requires 100 idempotent public migration cycles
-and 100 additions cycles that recreate two fixture-owned missing links. Every
-cycle must produce the selected signed targets, pass full recheck and release
-the generation lease and store reader lock after owner close. Both phases must
-retain zero measured V allocations, preserve a private sentinel and leave no
+controller with `--writes`. It installs a signed marker-runtime upgrade with
+distinct builtin bytes, then requires 100 idempotent public migration cycles,
+100 additions cycles that recreate two fixture-owned missing links, and 100
+retarget cycles from the retained prior generation. Each retarget capture must
+report two replacements and the exact prior generation; after migration both
+links must select the upgraded signed bytes while prior bytes remain intact.
+Every cycle must produce the selected signed targets, pass full recheck and
+release the generation lease and store reader lock after owner close. All three
+phases must retain zero measured V allocations, preserve a private sentinel and leave no
 stage. Write/refusal guest modes and controller options are mutually exclusive;
 the write mode also keeps the 120-second bound.
 

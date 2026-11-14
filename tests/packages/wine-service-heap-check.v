@@ -36,7 +36,8 @@ fn run() ! {
 	required := if mode == '--writes' { [
 		'WINE SERVICE WRITE phase=migration-repeat cycles=100 live_objects=0 live_bytes=0',
 		'WINE SERVICE WRITE phase=additions cycles=100 live_objects=0 live_bytes=0',
-		'WINE SERVICE WRITES PASS phases=2 cycles=100 signed-links private-data lease-free reader-lock-free',
+		'WINE SERVICE WRITE phase=retarget cycles=100 live_objects=0 live_bytes=0',
+		'WINE SERVICE WRITES PASS phases=3 cycles=100 signed-links private-data lease-free reader-lock-free',
 		'HWTEST PASS wine-service-heap',
 	] } else if mode == '--refusals' { [
 		'WINE SERVICE REFUSAL phase=missing-app cycles=100 live_objects=0 live_bytes=0',

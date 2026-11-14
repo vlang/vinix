@@ -181,7 +181,23 @@ fn refusals(generation string, builtins string, cycles int) ! {
 	println('WINE SERVICE REFUSALS PASS phases=4 cycles=${cycles} lease-free guard-recovered personal-data-preserved')
 }
 
-fn writes(generation string, builtins string, cycles int) ! {
+fn upgrade_runtime() !string {
+	arch := $if arm64 { 'aarch64' } $else { 'x86_64' }
+	// A distinct signed payload makes stale and selected targets distinguishable.
+	for name in ['base.dll', 'extra.dll']! {
+		os.write_file('/tmp/wine/root/usr/lib/wine/x86_64-windows/' + name, 'updated marker builtin')!
+	}
+	os.write_file('/tmp/manifest.json', json2.encode(pkgcore.Package{id: 'wine', name: 'Heap runtime fixture',
+		version: '2.0.0', architecture: arch, license: 'MIT', kind: 'runtime', entrypoint: 'bin/wine'}))!
+	pkgcore.pack('/tmp/manifest.json', '/tmp/wine', '/tmp/repository')!
+	pkgcore.publish('/tmp/repository', 'fixture', '/root/service-heap/seed', 2, time.now().unix() + 3600)!
+	mut catalog := (pkgcore.Service{}).refresh()!; catalog.close()
+	mut state := (pkgcore.Service{}).transact('upgrade', [], pkgcore.TransactionOptions{})!
+	defer { state.close() }
+	return '/var/lib/vinix-packages/generations/' + state.generation.str()
+}
+
+fn writes(generation string, builtins string, previous string, prior u64, cycles int) ! {
 	lease_path := generation + '/lease'
 	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC | C.O_NOFOLLOW)
 	if lease < 0 { return error('cannot capture write lease probe') }
@@ -190,18 +206,28 @@ fn writes(generation string, builtins string, cycles int) ! {
 	if store_lock < 0 { return error('cannot capture write reader-lock probe') }
 	defer { C.close(store_lock) }
 	os.write_file('/tmp/private/sentinel', 'private contents')!
-	for additions in [false, true]! {
+	for phase in ['migration-repeat', 'additions', 'retarget']! {
 		for _ in 0 .. cycles {
-			if additions {
+			if phase != 'migration-repeat' {
 				for name in ['base.dll', 'extra.dll']! {
 					path := '/tmp/private/wine/drive_c/windows/system32/' + name
 					os.rm(path) or { unsafe { path.free() }; return err }
+					if phase == 'retarget' {
+						target := previous + '/' + name
+						os.symlink(target, path) or { unsafe { target.free(); path.free() }; return err }
+						unsafe { target.free() }
+					}
 					unsafe { path.free() }
 				}
 			}
 			tracking = true
 			mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { tracking = false; return err }
-			if additions {
+			if phase == 'retarget' && (owner.review.review.prior_generation != prior
+				|| owner.review.review.bindings.len != 2 || !owner.review.review.bindings.all(it.operation == .replace)) {
+				owner.close(); tracking = false
+				return error('service retarget fixture did not capture two prior-generation bindings')
+			}
+			if phase == 'additions' {
 				owner.complete_additions() or { owner.close(); tracking = false; return err }
 			} else {
 				owner.migrate_bindings() or { owner.close(); tracking = false; return err }
@@ -222,9 +248,17 @@ fn writes(generation string, builtins string, cycles int) ! {
 				if !matches {
 					return error('service write selected a different builtin target')
 				}
+				if phase == 'retarget' {
+					selected := builtins + '/' + name
+					stale := previous + '/' + name
+					current_bytes := os.read_file(selected)!
+					prior_bytes := os.read_file(stale)!
+					distinct := current_bytes == 'updated marker builtin' && prior_bytes == 'marker builtin'
+					unsafe { selected.free(); stale.free(); current_bytes.free(); prior_bytes.free() }
+					if !distinct { return error('service retarget payload bytes differ from signed fixtures') }
+				}
 			}
 		}
-		phase := if additions { 'additions' } else { 'migration-repeat' }
 		println('WINE SERVICE WRITE phase=${phase} cycles=${cycles} live_objects=${live_objects} live_bytes=${live_bytes}')
 		if invalid || live_objects != 0 || live_bytes != 0 { return error('service write retained V allocations') }
 	}
@@ -232,12 +266,18 @@ fn writes(generation string, builtins string, cycles int) ! {
 		|| os.exists('/tmp/private/wine/.vinix-builtin-next') || os.is_link('/tmp/private/wine/.vinix-builtin-next') {
 		return error('service write changed private data or left staging')
 	}
-	println('WINE SERVICE WRITES PASS phases=2 cycles=${cycles} signed-links private-data lease-free reader-lock-free')
+	println('WINE SERVICE WRITES PASS phases=3 cycles=${cycles} signed-links private-data lease-free reader-lock-free')
 }
 
 fn run() ! {
 	$if track_heap ? {} $else { return error('service heap probe requires -d track_heap') }
-	generation := setup()!
+	previous_generation := setup()!
+	generation := $if wine_service_heap_writes ? { upgrade_runtime()! } $else { previous_generation }
+	previous := previous_generation + '/apps/wine/root/usr/lib/wine/x86_64-windows'
+	prior := previous_generation.all_after_last('/').u64()
+	$if wine_service_heap_writes ? {
+		if generation == previous_generation || prior == 0 { return error('write fixture did not upgrade generation') }
+	}
 	os.mkdir('/tmp/private')!; os.chmod('/tmp/private', 0o700)!; os.chown('/tmp/private', 1000, 1000)!
 	if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 {
 		return error('cannot enter ordinary service account')
@@ -254,7 +294,7 @@ fn run() ! {
 	mut warm := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private')!; warm.close()
 	cycles := $if wine_service_heap_diagnostic ? { 1 } $else { 100 }
 	$if wine_service_heap_refusals ? { refusals(generation, builtins, cycles)!; return }
-	$if wine_service_heap_writes ? { writes(generation, builtins, cycles)!; return }
+	$if wine_service_heap_writes ? { writes(generation, builtins, previous, prior, cycles)!; return }
 	tracking = true
 	for _ in 0 .. cycles {
 		mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') or { tracking = false; return err }
