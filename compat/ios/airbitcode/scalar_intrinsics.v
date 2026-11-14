@@ -100,15 +100,16 @@ fn scalar_intrinsic_attributes(stream Stream, set u64, limit int) !int {
 fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second_immarg bool) !int {
 	return intrinsic_declaration_attributes(stream, set, limit, if second_immarg { u64(2) } else { u64(0) }, .none)!
 }
-enum IntrinsicMemoryEffect { none write read_write copy inline_copy }
+enum IntrinsicMemoryEffect { none write read_write copy inline_copy inline_write }
 // Share the bounded attribute scanner with memory intrinsics. They permit a
 // fourth-parameter immarg and canonical pointer parameter properties, with
 // argmem write/read-write effects instead of scalar memory(none). Inline
-// copies additionally allow a length immarg, with a separate duplicate guard.
+// copies/fills additionally allow a length immarg, with a separate duplicate guard.
 fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_slot u64, effect IntrinsicMemoryEffect) !int {
 	memory_none := effect == .none
 	transfers := effect in [.read_write, .copy, .inline_copy]!
 	inline_copy := effect == .inline_copy
+	inline_memory := effect in [.inline_copy, .inline_write]!
 	memory_bits := if transfers { u64(3) } else { u64(2) }
 	if set == 0 { return 0 }
 	mut work := 0; mut number := u64(0); mut groups := [5]u64{}; mut count := 0
@@ -118,7 +119,7 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 		if record.code != 2 { return error('AIR intrinsic: unsupported attribute-list encoding') }
 		number++
 		if number != set { continue }
-		if record.values_count < 1 || record.values_count > if inline_copy { 5 } else if transfers { 4 } else if !memory_none { 3 } else if immarg_slot != 0 { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
+		if record.values_count < 1 || record.values_count > if inline_copy { 5 } else if transfers || effect == .inline_write { 4 } else if !memory_none { 3 } else if immarg_slot != 0 { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
 		count = record.values_count
 		for i in 0 .. count { groups[i] = ir_values(stream, record)[i]; if groups[i] == 0 { return error('AIR intrinsic: zero attribute group') } }
 		break
@@ -133,11 +134,11 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 			values := ir_values(stream, record)
 			if values.len < 2 || values[0] != groups[i] { continue }
 			found = true
-			if (immarg_slot != 0 && values[1] == immarg_slot) || (inline_copy && values[1] == 3) {
+			if (immarg_slot != 0 && values[1] == immarg_slot) || (inline_memory && values[1] == 3) {
 				work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
-				seen := if inline_copy && values[1] == 3 { length_seen } else { mask_seen }
+				seen := if inline_memory && values[1] == 3 { length_seen } else { mask_seen }
 				if seen || values.len != 4 || values[2] != 0 || values[3] != 60 { return error('AIR intrinsic: exact immarg attribute required') }
-				if inline_copy && values[1] == 3 { length_seen = true } else { mask_seen = true }; break
+				if inline_memory && values[1] == 3 { length_seen = true } else { mask_seen = true }; break
 			}
 			if (!memory_none && values[1] == 1) || (transfers && values[1] == 2) {
 				source := values[1] == 2

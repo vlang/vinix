@@ -146,7 +146,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	defer { layouts.free() }
 	mut intrinsic_declarations := [1768]int{} // Forty FP slots + twenty-seven integer families.
 	mut intrinsic_work := 0
-	mut memory_declarations := [60]int{}
+	mut memory_declarations := [66]int{}
 	mut call_alignments := [16]MemoryCallAlignmentCache{}
 	mut memory_steps := 0
 	mut move_bytes := 0
@@ -184,13 +184,13 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		if code == 34 {
 			if !inst.has_result {
 				length, attributes, key := p.memory_intrinsic_call(ir, stream, pools, op, scope)!
-				moving := key >= 6
+				moving := key >= 6 && key < 60
 				work := length * if moving { u64(2) } else { u64(1) }
 				if work > u64(max_integer_execution_steps - s.instructions_count - switch_steps - memory_steps) { return error('AIR memory execution: memory intrinsic execution budget') }
 				memory_steps += int(work)
 				if memory_declarations[key] != 0 && memory_declarations[key] != op.callee_function + 1 { return error('AIR memory execution: duplicate memory declaration') }
 				if memory_declarations[key] == 0 {
-					intrinsic_work += intrinsic_declaration_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work, 4, if key >= 42 { .inline_copy } else if key >= 24 { .copy } else if moving { .read_write } else { .write })!
+					intrinsic_work += intrinsic_declaration_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work, 4, if key >= 60 { .inline_write } else if key >= 42 { .inline_copy } else if key >= 24 { .copy } else if moving { .read_write } else { .write })!
 					memory_declarations[key] = op.callee_function + 1
 				}
 				mut alignment := IRMemoryCallAlignment{}

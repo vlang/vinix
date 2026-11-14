@@ -314,12 +314,20 @@ Each call costs one instruction step plus one step per byte; lengths across
 all blocks/calls count toward the million-step limit. Poison/undef byte values
 error before that fill writes, retaining earlier stores. Zero-length calls skip
 the byte and need no write permission, including for empty readonly space-2
-bindings. Pointer literals, volatile/dynamic-length fills, inline/atomic
+bindings. Pointer literals, volatile/dynamic-length fills, atomic
 variants, tail calls and call-site attributes other than pointer alignment
 reject. Exact declarations admit
 canonical writeonly/captures(none), fourth immarg and memory(argmem: write)
 properties with bounded validation. Deferred fills check byte ranges, untouched
 prefixes and input changes after encoding.
+
+`llvm.memset.inline` uses the same bounded literal i32/i64 fill path, including
+runtime byte evaluation, zero-length poison/undef bytes, alignment, permissions
+and one step per written byte. Its declarations may also mark length immarg.
+Separate declaration slots allow ordinary and inline fills in the same kernel.
+The executor uses indexed byte writes without invoking external declarations
+or host fill routines. Deferred checks exercise both aligned fill variants,
+retained resources, inputs changed after encoding and preserved prefixes.
 
 Nonvolatile `llvm.memmove` accepts literal i32/i64 lengths and resolved source
 and destination pointers, including overlap and aliases through different
@@ -355,8 +363,8 @@ declarations or host copy routines. Its declaration also admits an optional
 length immarg. Distinct declaration-cache slots permit ordinary and inline
 copies in the same kernel. Deferred inline-copy checks cover separate buffers,
 disjoint/adjacent aliases, retained inputs changed after encoding and failed
-overlapping/equal-range commands before the marker store. Inline memset and
-atomic variants remain unsupported.
+overlapping/equal-range commands before the marker store. Atomic variants
+remain unsupported.
 
 Memory-intrinsic call sites accept only `align N` on their pointer arguments.
 Destination and source requirements combine with ordinary accesses and must

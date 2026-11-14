@@ -185,3 +185,32 @@ fn test_inline_memcpy_declaration_attributes() {
 	assert intrinsic_declaration_attributes(short, 1, 128, 4, .copy)! > 0
 	println('AIR-INLINE-MEMCPY-ATTRIBUTES: five groups, optional length immarg, canonical pointer noalias/access/captures(none), argmem versions 0/1/2, order/duplicate/slot/kind/property/exact-budget guards and ordinary-copy exclusion PASS')
 }
+
+fn test_inline_memset_declaration_attributes() {
+	blocks := [Block{parent: -1}, Block{id: 9, parent: 0}, Block{id: 10, parent: 0}]
+	records := [Record{block: 1, code: 2, values_count: 4}, Record{block: 2, code: 3, values_start: 4, values_count: 5}, Record{block: 2, code: 3, values_start: 9, values_count: 7}, Record{block: 2, code: 3, values_start: 16, values_count: 4}, Record{block: 2, code: 3, values_start: 20, values_count: 4}]
+	mut values := [u64(1), 2, 3, 4, 1, 0xffffffff, 1, 86, 2, 2, 1, 0, 52, 1, 102, 0, 3, 3, 0, 60, 4, 4, 0, 60]
+	defer { unsafe { blocks.free(); records.free(); values.free() } }
+	stream := Stream{blocks: blocks, records: records, values: values}
+	for version in u64(0) .. 3 { values[8] = (version << 56) | 2; assert intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write)! > 0 }; values[8] = 2
+	work := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write)!
+	assert intrinsic_declaration_attributes(stream, 1, work, 4, .inline_write)! == work
+	if _ := intrinsic_declaration_attributes(stream, 1, work - 1, 4, .inline_write) { assert false, 'attribute budget' }
+	if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .write) { assert false, 'ordinary fill length immarg excluded' }
+	for slot in [17, 21] { saved := values[slot]
+		for bad in [u64(0), 2, if saved == 3 { u64(4) } else { u64(3) }] { values[slot] = bad; if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write) { assert false, 'return/byte/duplicate immarg slot' } }; values[slot] = saved
+	}
+	for slot in [18, 19, 22, 23] { saved := values[slot]; values[slot] = 68; if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write) { assert false, 'exact immarg kind/property' }; values[slot] = saved }
+	for bad in [u64(9), 21, 68] { values[12] = bad; if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write) { assert false, 'noalias/readonly/noundef destination' } }; values[12] = 52
+	values[10] = 2; if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write) { assert false, 'source attributes on byte argument' }; values[10] = 1
+	values[15] = 1; if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write) { assert false, 'capturing destination' }; values[15] = 0
+	values[3] = 3; if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write) { assert false, 'duplicate length group' }
+	values[0] = 4; values[1] = 3; values[2] = 2; values[3] = 1
+	assert intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_write)! > 0
+	values[0] = 1; values[1] = 2; values[2] = 4
+	short_records := [Record{block: 1, code: 2, values_count: 3}, records[1], records[2], records[3], records[4]]
+	defer { unsafe { short_records.free() } }
+	short := Stream{blocks: blocks, records: short_records, values: values}
+	assert intrinsic_declaration_attributes(short, 1, 128, 4, .inline_write)! > 0 && intrinsic_declaration_attributes(short, 1, 128, 4, .write)! > 0
+	println('AIR-INLINE-MEMSET-ATTRIBUTES: optional length immarg, four groups, destination writeonly/captures(none), argmem versions 0/1/2, independent immarg/byte/source/alias/capture/property/exact-budget guards and ordinary-fill exclusion PASS')
+}

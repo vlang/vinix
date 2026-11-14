@@ -321,7 +321,7 @@ derive their full extent before execution and require write permission;
 address space 2 rejects writes. Unannotated destinations use byte alignment.
 Except for pointer alignment described below, call-site attributes reject.
 Tail calls, volatile fills, dynamic/poison/undef lengths,
-literal pointer destinations, inline/atomic variants and general calls reject.
+literal pointer destinations, atomic variants and general calls reject.
 
 Declaration attributes admit the existing harmless function properties except
 readnone/readonly/speculatable, fourth-parameter immarg, destination writeonly
@@ -339,6 +339,15 @@ requirement, so it permits poison/undef byte operands and empty readonly
 bindings, including address space 2. Existing GEP extents and earlier executed
 instructions still apply. Execution uses indexed byte writes without calling
 host memset, exposing host addresses or allocating a fill buffer.
+
+`llvm.memset.inline.pD.i32/i64` shares this bounded fill path, including the
+runtime byte, literal length, false volatility, full preflight, one step per
+byte and zero-length behavior. Inline fills also admit an optional length
+immarg on their declarations, with independent length/volatile duplicate checks.
+Ordinary and inline fills have separate fixed declaration-cache slots, allowing
+both in one function. Indexed writes invoke no external declaration or host
+fill routine and add no owned profile or execution array. Atomic fills remain
+unsupported.
 
 Nonvolatile `llvm.memmove.pD.pS.i32/i64` calls use the same exact void call,
 constant-length and literal-false volatility checks. Destination spaces D=0/1
@@ -385,8 +394,8 @@ never invokes an external declaration or host copy routine. Its declaration
 may additionally mark parameter three (length) immarg; this does not relax the
 literal check on any call. Both immarg slots have independent duplicate guards.
 Ordinary and inline overloads use distinct fixed declaration-cache slots, so
-both can appear in one function in either order. Inline memset and atomic
-variants remain excluded. No new owned profile or execution array is added.
+both can appear in one function in either order. Atomic variants remain
+excluded. No new owned profile or execution array is added.
 
 Memory-intrinsic call sites admit only `align N` on the destination and, for
 memmove/memcpy, source pointer arguments. N must be a power of two from 1
@@ -600,6 +609,12 @@ across i32/i64 lengths, direct/derived destinations, pointer control chains,
 aliases and zero-length indeterminate bytes. It checks exact extents, costs,
 permissions, malformed call/type metadata, literal/volatile/length exclusions,
 dynamic byte errors, frozen/untaken fills and cumulative/million-step budgets.
+An optional trailing `inline` argument selects inline-fill overloads and adds
+overlapping mixed ordinary/inline fills in both call orders. Invalid lengths
+are also checked by retargeting decoded ordinary guards to matching inline
+declarations. Rejection-only bodies are excluded from native compilation;
+large inline budget bodies remain interpreter-only, and the projected
+`native-input.bc` is saved.
 
 `tests/ios/air-memory-memmove.v` compares i32/i64 moves with native LLVM,
 including both overlap directions, identical/disjoint ranges, cross-binding
@@ -628,8 +643,8 @@ destination alignments 1..64, independent source requirements, mixed calls and
 cache collisions. Controls check weak base alignment, unaligned binding/derived
 offsets, compensating offsets, inactive calls, unsupported combined attributes,
 exact budgets and aligned empty readonly zero-length calls in spaces 0/1/2.
-Its optional trailing `inline` argument substitutes inline copies for ordinary
-copies, including calls without the optional length immarg declaration.
+Its optional trailing `inline` argument substitutes inline fills and copies
+for ordinary ones, including declarations without the optional length immarg.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including
