@@ -2095,6 +2095,14 @@ again against the same selected runtime; unknown staging data is preserved and
 refused. Cooperating prefix writers must honor the guard throughout migration.
 This is not an atomic multi-link transaction or a power-loss durability claim.
 
+If a runtime rollback removes a builtin, its old package-generation link in the
+prefix makes review, additions and migration refuse before changing bindings.
+Migration does not delete that entry automatically. The signed marker fixture
+checks this on both architectures, then explicitly removes its own obsolete
+link and verifies migration to the restored inventory and repetition. This
+tests safe refusal and controlled recovery with marker assets; Wine-version
+compatibility and general cleanup of user prefixes remain separate work.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.

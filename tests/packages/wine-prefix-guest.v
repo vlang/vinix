@@ -184,6 +184,64 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	println('WINE PREFIX STAGE CLI PASS personal file; directory; foreign link preserved; authenticated stage resumed first')
 }
 
+fn ordinary_rollback(previous string, restored string) ! {
+	system := '/tmp/private/wine/drive_c/windows/system32'
+	mut before := map[string]string{}
+	for name in os.ls(system)! { before[name] = os.readlink(system + '/' + name)! }
+	if before.len != 35 || before['extra.dll'] != previous + '/extra.dll' {
+		return error('rollback fixture lacks the added generation binding')
+	}
+	if os.read_file(previous + '/base.dll')! != 'upgraded marker builtin'
+		|| os.read_file(restored + '/base.dll')! != 'marker builtin'
+		|| os.exists(restored + '/extra.dll') || os.is_link(restored + '/extra.dll') {
+		return error('rollback fixture did not restore the distinct older payload')
+	}
+	// Rollback removed extra.dll from the signed inventory. Refuse before any
+	// rewrite, including additions-only, rather than deleting an unknown entry.
+	mut reason := ''
+	if mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private') {
+		owner.close()
+		return error('rollback admitted the obsolete generation link')
+	} else {
+		reason = err.msg()
+	}
+	if !reason.contains('package-generation link absent from the selected builtin inventory') {
+		return error('rollback did not refuse the obsolete generation link: ' + reason)
+	}
+	for command in ['wine-prefix-review', 'wine-prefix-additions', 'wine-prefix-migrate'] {
+		cli_status(command, 1)!
+		if os.ls(system)!.len != before.len { return error('rollback refusal changed inventory') }
+		for name, target in before {
+			if os.readlink(system + '/' + name)! != target { return error('rollback refusal changed binding') }
+		}
+		if os.read_file('/tmp/private/sentinel')! != 'private contents'
+			|| os.exists('/tmp/private/wine/.vinix-builtin-next') || os.is_link('/tmp/private/wine/.vinix-builtin-next') {
+			return error('rollback refusal changed private data or stage')
+		}
+	}
+	println('WINE PREFIX ROLLBACK REFUSAL PASS removed builtin; all public commands; bindings and private data preserved')
+	// Explicit fixture-owner cleanup, not an automatic migration policy.
+	os.rm(system + '/extra.dll')!
+	cli('wine-prefix-review')!
+	cli('wine-prefix-migrate')!
+	cli('wine-prefix-migrate')!
+	mut verified := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private')!
+	defer { verified.close() }
+	verified.recheck()!
+	if verified.review.review.prior_generation != 0 || verified.review.review.bindings.len != 34
+		|| !verified.review.review.bindings.all(it.operation == .keep) {
+		return error('rollback migration did not admit the restored inventory')
+	}
+	for name in os.ls(system)! {
+		if os.readlink(system + '/' + name)! != restored + '/' + name { return error('rollback migration target differs') }
+	}
+	if os.read_file(restored + '/base.dll')! != 'marker builtin'
+		|| os.read_file('/tmp/private/sentinel')! != 'private contents' {
+		return error('rollback did not restore old bytes or preserve private data')
+	}
+	println('WINE PREFIX ROLLBACK RECOVERY PASS explicit obsolete-link cleanup; restored payload; public migration; repeat')
+}
+
 fn run() ! {
 	os.mkdir_all('/tmp')!; os.chmod('/tmp', 0o1777)!
 	os.mkdir_all('/etc/vinix-packages')!
@@ -239,6 +297,20 @@ fn run() ! {
 		C._exit(0)
 	}
 	if upgrade_child <= 0 || C.waitpid(upgrade_child, &status, 0) != upgrade_child || status != 0 { return error('ordinary upgrade fixture failed') }
+	mut rolled := (pkgcore.Service{}).rollback('')!
+	defer { rolled.close() }
+	if rolled.generation == upgraded.generation || rolled.generation == state.generation {
+		return error('rollback did not create a fresh generation')
+	}
+	restored := '/var/lib/vinix-packages/generations/' + rolled.generation.str() + '/apps/wine/root/usr/lib/wine/x86_64-windows'
+	rollback_child := C.fork()
+	if rollback_child == 0 {
+		C.alarm(90)
+		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
+		ordinary_rollback(selected, restored) or { eprintln('HWTEST FAIL wine-prefix-cli: ' + err.msg()); C._exit(91) }
+		C._exit(0)
+	}
+	if rollback_child <= 0 || C.waitpid(rollback_child, &status, 0) != rollback_child || status != 0 { return error('ordinary rollback fixture failed') }
 }
 
 fn main() {
