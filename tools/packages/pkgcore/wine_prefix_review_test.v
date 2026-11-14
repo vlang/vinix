@@ -6,6 +6,12 @@ import json2
 import os
 import tools.packages.wineadapter
 
+fn wine_review_collect(store string) ! {
+	writer := acquire(store)!
+	defer { writer.release() }
+	collect_locked(Config{architecture: 'aarch64'}, store)!
+}
+
 fn test_persisted_generation_lease_survives_combined_prefix_review() {
 	root := os.real_path(os.temp_dir()) + '/wine-review-lease-' + os.getpid().str()
 	os.mkdir(root)!
@@ -50,10 +56,32 @@ fn test_persisted_generation_lease_survives_combined_prefix_review() {
 	assert C.flock(collection.lease, C.LOCK_EX | C.LOCK_NB) != 0
 	owner.review.recheck()!
 	assert C.flock(collection.lease, C.LOCK_EX | C.LOCK_NB) != 0
+	// Move activation beyond the retained generation. Generation 2 is now
+	// obsolete and has no rollback protection; only the review lease saves it.
+	os.mkdir_all(store + '/objects')!
+	os.mkdir(store + '/generations/3')!
+	os.write_file(store + '/generations/3/lease', '')!
+	os.write_file(store + '/generations/3/state.json', json2.encode(State{...fixture, generation: 3}))!
+	activation := acquire(store)!
+	activate(store, 3)!
+	activation.release()
+	for _ in 0 .. 3 {
+		wine_review_collect(store)!
+		assert os.read_file(builtins + '/kernel32.dll')! == 'new'
+		assert os.readlink(store + '/current')! == 'generations/3'
+		owner.review.recheck()!
+	}
 	owner.close(); owner.close()
 	assert C.flock(collection.lease, C.LOCK_EX | C.LOCK_NB) == 0
 	check_collection_lease(collection)!
 	assert C.flock(collection.lease, C.LOCK_UN) == 0
+	wine_review_collect(store)!
+	assert !os.exists(generation)
+	assert os.exists(store + '/generations/3/state.json')
+	assert os.readlink(store + '/current')! == 'generations/3'
+	// Collection does not rewrite private prefix links. Migration remains a
+	// separate operation even after obsolete runtime storage is retired.
+	assert os.readlink(data + '/wine/drive_c/windows/system32/kernel32.dll')! == builtins + '/kernel32.dll'
 	mut released := prefix.acquire_launch(data)!
 	released.close()
 }
