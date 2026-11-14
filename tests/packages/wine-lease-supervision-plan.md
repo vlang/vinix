@@ -2471,6 +2471,30 @@ Actual retarget SIGKILL, guest/cross-build, power-loss durability, complete sour
 closure and measured heap qualification remain unproven. Those migration gates
 and other section 14 requirements remain open.
 
+## Retarget writer SIGKILL, 2026-11-14
+
+Source `47805b6e4` adds actual adapter-process interruption during staged
+retargeting. A child migrates 64 old-generation links; the parent observes the
+first new target within ten seconds, stops the writer and requires strictly
+partial progress. All 64 link texts at that stop must be old or selected targets,
+and competing managed launch must refuse. After SIGKILL and exact child reap,
+fresh capture must report the remaining old rows, finish migration, support a
+repeat call and preserve private data. The run passes at 1/64 completed before
+death, then resumes the remaining 63. All adapter tests pass using the retained
+V compiler with `-backend c -gc none -manualfree` and repository module path.
+The existing additions SIGKILL test also passes; production migration code is
+unchanged by this checkpoint.
+
+Evidence is frozen at `/Users/alex/.cache/vwkillretarget-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-retarget-sigkill-20261114-01.inventory.json`
+has SHA-256 `fa403c2c6c6e3431cd92a03d0d8d9d227c3988d7c2e1dd91511a9c9d41ed7bdb`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets, with source copies, generated host C/binary and logs retained.
+This qualifies adapter host process-death recovery, not service-owner lease
+death, guest behavior, power loss, strict cross-builds, complete source closure
+or measured heap behavior. Retargeting still assumes cooperating writers and
+has no public CLI. Those gates and other section 14 requirements remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
