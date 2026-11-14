@@ -53,6 +53,47 @@ fn migration_review(command string) !wineadapter.BindingReview {
 	return json2.decode[wineadapter.BindingReview](output)
 }
 
+// Diagnostic-only continuation after the real remove/rollback transition.
+// The selected Wine bytes remain unchanged; this checks prefix relocation to
+// the restored deployment rather than compatibility between Wine versions.
+fn rollback_relaunch(previous string, architecture string, sentinel string) ! {
+	mut state := pkgcore.read_state('/var/lib/vinix-packages', architecture)!
+	defer { state.close() }
+	if state.generation == 0 || state.generation == os.file_name(previous).u64() { return error('rollback did not restore a fresh deployment') }
+	current := '/var/lib/vinix-packages/generations/' + state.generation.str()
+	defer { unsafe { current.free() } }
+	mut before := migration_review('wine-prefix-review')!
+	defer { before.close() }
+	if before.generation != state.generation || before.prior_generation != os.file_name(previous).u64()
+		|| !before.bindings.any(it.operation == .replace) { return error('rollback prefix did not retain the prior deployment bindings') }
+	mut migrated := migration_review('wine-prefix-migrate')!
+	defer { migrated.close() }
+	if migrated.generation != state.generation || migrated.prior_generation != 0
+		|| migrated.bindings.len != before.bindings.len || !migrated.bindings.all(it.operation == .keep) { return error('rollback prefix migration incomplete') }
+	for entry in migrated.bindings {
+		if os.readlink(data + '/wine/drive_c/windows/system32/' + entry.name)! != entry.replacement { return error('rollback builtin target differs') }
+	}
+	again := collection_command_status(['/usr/bin/vinix-package', 'run-args', application, '--', '--vinix-collection-probe'], '', 37)!
+	defer { unsafe { again.free() } }
+	if again.count('VINIX COLLECTION INITIAL READY\n') != 1 || again.count('VINIX COLLECTION CHILD READY\n') != 1
+		|| again.count('VINIX COLLECTION CHILD RETIRED\n') != 1 || os.read_file(sentinel)! != 'same private prefix\n' { return error('rollback Win64 relaunch or private data differs') }
+	names := os.ls('/proc')!
+	defer { unsafe { names.free() } }
+	for pid in names {
+		if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
+		line := wineproc.command_line('/proc/' + pid)!
+		defer { unsafe { line.free() } }
+		if line.contains(previous + '/apps/org.vinix.wine-runtime/') || line.contains(current + '/apps/org.vinix.wine-runtime/') { return error('rollback relaunch left a runtime process') }
+	}
+	lease_path := current + '/lease'
+	defer { unsafe { lease_path.free() } }
+	lease := C.open(lease_path.str, C.O_RDONLY | C.O_CLOEXEC)
+	if lease < 0 { return error('rollback generation lease missing') }
+	defer { C.close(lease) }
+	if C.flock(lease, C.LOCK_EX | C.LOCK_NB) != 0 { return error('rollback generation lease remained busy') }
+	println('HWTEST INFO Wine rollback prefix migrated and real Win64 relaunched status37 PASS')
+}
+
 fn nonblocking(fd int) ! {
 	flags := C.fcntl(fd, C.F_GETFL)
 	if flags < 0 { return error('cannot read child pipe flags') }
@@ -993,6 +1034,7 @@ fn collection_run(generation string, architecture string) ! {
 		C.close(retired_lease)
 		command(['/usr/bin/vinix-package', 'remove', application], '')!
 		command(['/usr/bin/vinix-package', 'rollback'], '')!
+		$if wine_rollback_probe ? { rollback_relaunch(relaunched_generation, architecture, sentinel)! }
 	}
 	command(['/usr/bin/vinix-package', 'gc'], '')!
 	if os.exists(generation) { return error('obsolete Wine generation remained after natural retirement') }
@@ -1001,7 +1043,12 @@ fn collection_run(generation string, architecture string) ! {
 	if retained.previous == 0 || !os.is_dir('/var/lib/vinix-packages/generations/' + retained.previous.str()) {
 		return error('collection removed the retained rollback generation')
 	}
-	$if wine_migration_probe ? {
+	$if wine_rollback_probe ? {
+		mut final := migration_review('wine-prefix-review')!
+		defer { final.close() }
+		if final.generation != retained.generation || final.prior_generation != 0 || !final.bindings.all(it.operation == .keep) { return error('collection broke restored prefix bindings') }
+		println('HWTEST INFO Wine rolled-back prefix relaunch status37 private-data lease-free collected PASS')
+	} $else $if wine_migration_probe ? {
 		println('HWTEST INFO Wine signed migrated-generation prefix relaunch status37 private-data lease-free PASS')
 	} $else $if wine_relaunch_probe ? {
 		println('HWTEST INFO Wine signed same-generation prefix relaunch after manager death status37 PASS')
