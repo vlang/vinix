@@ -101,4 +101,49 @@ fn test_real_pre_push_hook_blocks_artifacts_before_local_remote_changes() ! {
 	assert push.exit_code != 0
 	assert push.output.contains('generated test result'), push.output
 	assert git(['--git-dir=' + tmp + '/remote.git', 'rev-parse', 'master'])!.trim_space() == base
+
+	// Another clone can advance the remote without putting its tip in this
+	// clone's object database. The hook must fetch it and still reject deleted
+	// artifacts, leaving tracking refs and FETCH_HEAD untouched on failure.
+	git(['fetch', '-q', 'origin', 'master'])!
+	fetch_head := git(['rev-parse', '--git-path', 'FETCH_HEAD'])!.trim_space()
+	fetch_before := os.read_file(fetch_head)!
+	peer := tmp + '/peer'
+	git(['clone', '-q', '--branch', 'master', tmp + '/remote.git', peer])!
+	git(['-C', peer, 'config', 'user.name', 'Source policy peer'])!
+	git(['-C', peer, 'config', 'user.email', 'source-policy-peer@example.invalid'])!
+	git(['-C', peer, 'config', 'commit.gpgSign', 'false'])!
+	git(['-C', peer, 'config', 'core.hooksPath', '/dev/null'])!
+	os.write_file(peer + '/peer.v', 'module main\n')!
+	git(['-C', peer, 'add', 'peer.v'])!
+	git(['-C', peer, 'commit', '-q', '-m', 'remote source'])!
+	git(['-C', peer, 'push', '-q', 'origin', 'HEAD:master'])!
+	unseen := git(['-C', peer, 'rev-parse', 'HEAD'])!.trim_space()
+	assert os.exec(['git', 'cat-file', '-e', unseen]).exit_code != 0
+	blocked := os.exec(['git', 'push', '--force-with-lease=refs/heads/master:' + unseen,
+		'origin', 'HEAD:master'])
+	assert blocked.exit_code != 0
+	assert blocked.output.contains('fetching missing remote base ' + unseen), blocked.output
+	assert blocked.output.contains('generated test result'), blocked.output
+	git(['cat-file', '-e', unseen])!
+	assert git(['rev-parse', 'origin/master'])!.trim_space() == base
+	assert os.read_file(fetch_head)! == fetch_before
+	assert git(['--git-dir=' + tmp + '/remote.git', 'rev-parse', 'master'])!.trim_space() == unseen
+
+	// A clean update must pass too, including pushes made directly to a URL.
+	git(['reset', '-q', '--hard', base])!
+	os.write_file('fixture.v', 'module main\n// clean change\n')!
+	git(['add', 'fixture.v'])!
+	git(['commit', '-q', '-m', 'clean source'])!
+	os.write_file(peer + '/peer.v', 'module main\n// another remote change\n')!
+	git(['-C', peer, 'commit', '-qam', 'another remote source'])!
+	git(['-C', peer, 'push', '-q', 'origin', 'HEAD:master'])!
+	next_unseen := git(['-C', peer, 'rev-parse', 'HEAD'])!.trim_space()
+	assert os.exec(['git', 'cat-file', '-e', next_unseen]).exit_code != 0
+	clean := git(['push', '--force-with-lease=refs/heads/master:' + next_unseen,
+		tmp + '/remote.git', 'HEAD:master'])!
+	assert clean.contains('fetching missing remote base ' + next_unseen), clean
+	git(['cat-file', '-e', next_unseen])!
+	assert os.read_file(fetch_head)! == fetch_before
+	assert git(['--git-dir=' + tmp + '/remote.git', 'rev-parse', 'master'])!.trim_space() == git(['rev-parse', 'HEAD'])!.trim_space()
 }

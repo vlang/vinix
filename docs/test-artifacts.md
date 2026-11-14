@@ -134,6 +134,10 @@ deliberate fixtures belong with the test that uses them. New remote refs exclude
 history in known remote-tracking refs; with no known remote refs, the entire
 history is checked.
 
+If an existing remote tip is missing locally, the hook fetches that exact object
+from the push destination before checking. This leaves remote-tracking refs and
+`FETCH_HEAD` unchanged. A failed fetch blocks the push.
+
 Removing an artifact in a later commit does not remove it from a push. If it
 has never been published, archive it and rewrite only the unpublished commits.
 Keep the published base unchanged so the cleaned branch remains a fast-forward.
