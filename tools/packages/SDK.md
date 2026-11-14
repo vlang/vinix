@@ -1979,7 +1979,10 @@ when the command exits; printed JSON does not retain admission for a later tool.
 
 Library callers can retain `wineadapter.capture_idle_binding_review()` while
 working, call its `recheck()` to require the same binding rows and an idle,
-unchanged server namespace, then call repeatable `close()`. The capture has one
+unchanged server namespace, then call repeatable `close()`. The capture retains
+system32 and builtin directory descriptors and checks their device/inode
+identities around review, refusing replacement even with identical contents.
+It does not pin individual asset files or authenticate their bytes. The capture has one
 owner: do not copy it, close it concurrently, or transfer its borrowed `review`.
 It excludes cooperating managed launches while held, and does not exclude
 arbitrary same-account writers or establish runtime authenticity. As with server

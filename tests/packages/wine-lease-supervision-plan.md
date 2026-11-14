@@ -1965,6 +1965,25 @@ alongside the other section 14 gates. Arbitrary same-account writes remain
 possible; callers must hold no POSIX locks on the server lock file, because
 F_GETLK does not report the caller's own locks.
 
+## Binding directory continuity, 2026-11-14
+
+Source `052d2aa08` retains system32 and builtin directory descriptors throughout
+an idle review capture, comparing device/inode identities before and after
+fresh structural review. Capture now performs that recheck before returning.
+Host library/CLI tests pass, including replacement directories with identical
+contents, restoration, descriptor cleanup and previous idle controls. Both
+Linux architecture static cross-builds pass; no guest execution is claimed.
+
+Evidence is frozen at `/Users/alex/.cache/vwidlebind-20261114-02`; its receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-idle-binding-review-20261114-02.inventory.json`,
+SHA-256 `f8ef83e5736631f861f8d61a19f00a05d87836553e0a7fe50d312144aca90c1a`.
+Record and independent check pass complete bytes, sizes, types, modes and link
+targets, with adjacent logs. Final source copies and generated C/binaries are
+included; the compiler binary remains in the preceding `-01` bundle. Complete
+hermetic closure and measured heap flatness are not claimed. Directory continuity
+does not pin individual assets or authenticate runtime bytes. Migration
+application, recovery and the other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
