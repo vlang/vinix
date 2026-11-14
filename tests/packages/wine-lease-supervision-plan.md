@@ -1904,6 +1904,32 @@ SHA-256 `883a2d92f84d75a2d936cb4df8292abb25a6db2505ffa33e0158406399ad06af`.
 Recording and independent checking pass complete bytes, sizes, types, modes and
 link targets, with adjacent record/check logs. The preceding bundle is intact.
 
+## Added builtin bindings, 2026-11-14
+
+Source `1f8845883` extends the structural review to runtime inventories which
+add DLLs. Each binding now has an operation: `keep` for a selected-generation
+link, `replace` for a prior-generation link, and `create` for a missing entry.
+Only `readlinkat` failure with ENOENT permits `create`; it records empty observed
+text and a proposed target without creating a link. Existing files, directories
+and unrelated dangling links at selected names remain refused. Prior generation
+zero means no observed prior-generation bindings, and can accompany additions.
+
+Host library/CLI tests pass, including JSON operation encoding, empty observed
+text, unchanged prefix snapshots, repeatable cleanup, mixed create/replace/keep
+rows and all three collision refusals through both interfaces. Linux x86_64 and
+AArch64 static cross-builds pass; they were not guest-executed. The production
+launch path is unchanged. Authentication, serialized migration application,
+interruption recovery and the other section 14 gates remain open.
+
+Evidence is frozen at `/Users/alex/.cache/vwbindreview-20261114-03`, with final
+sources, generated C, binaries and build/test logs. The compiler binary remains
+in the preceding `-01` bundle; complete hermetic closure and measured heap
+flatness are not claimed. The typed receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-binding-review-20261114-03.inventory.json`,
+SHA-256 `a1fd18fdb955bba277c02dce2226935351261b22fb780d7297283cc173502bd9`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets; adjacent logs retain both results. Earlier bundles remain intact.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
