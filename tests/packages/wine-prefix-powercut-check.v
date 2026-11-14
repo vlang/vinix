@@ -22,16 +22,17 @@ fn tool(command []string, log string) ! {
 }
 
 fn run() ! {
-	if os.args.len !in [5, 6, 7, 9, 10] || (os.args.len >= 6 && os.args[5] != '--vjfs')
-		|| (os.args.len >= 7 && os.args[6] != '--service') || (os.args.len >= 9 && os.args[7] != '--cli')
-		|| (os.args.len == 10 && os.args[9] != '--all-syncs') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI [--all-syncs]]]]')
+	all_syncs := os.args.len > 1 && os.args.last() == '--all-syncs'
+	args := if all_syncs { os.args[..os.args.len - 1] } else { os.args }
+	if args.len !in [5, 6, 7, 9] || (args.len >= 6 && args[5] != '--vjfs')
+		|| (args.len >= 7 && args[6] != '--service') || (args.len >= 9 && args[7] != '--cli') {
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs]')
 	}
-	if os.args.len >= 9 && os.args[8] == '' { return error('nonempty compiled CLI path required') }
-	journaled := os.args.len >= 6
-	service := os.args.len >= 7
-	cli := if os.args.len >= 9 { os.args[8] } else { '' }
-	end := if os.args.len == 10 { 9 } else { 4 }
+	if args.len >= 9 && args[8] == '' { return error('nonempty compiled CLI path required') }
+	journaled := args.len >= 6
+	service := args.len >= 7
+	cli := if args.len >= 9 { args[8] } else { '' }
+	end := if all_syncs { 9 } else { 4 }
 	image_helper := if journaled { os.getenv_opt('VINIX_WINE_IMAGE_HELPER') or { return error('VJFS requires VINIX_WINE_IMAGE_HELPER') } } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh work and supported architecture required') }
