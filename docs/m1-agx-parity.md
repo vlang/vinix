@@ -30,6 +30,11 @@ meaningful requirement for a V kernel with different memory and scheduler APIs.
   no-device and unknown errors. Shutdown retains stop-before-free ordering.
 - **Generated offsets.** Pending-submission and pending-stamp offsets now
   come from the existing V layout generator at both firmware ABIs.
+- **Event slot reuse.** Driver stamps start at `slot << 24`, as in the
+  reference. Releasing and reacquiring a slot preserves both firmware counters;
+  the next command advances from the last observed driver value. An explicit
+  armed state distinguishes a newly owned slot from a command whose counter
+  wrapped to zero.
 
 Corrupt ring indices, failed recovery acknowledgments and unexplained halts
 remain fatal. The worker drains a queued fault notification before treating
@@ -88,6 +93,25 @@ The configured hardware endpoint `sergey@macbook-air-sergej.local` failed DNS
 resolution during the read-only SSH check. A reachable M1 and a way to boot
 Vinix are needed to validate the new recovery/retirement foundation before
 queue concurrency and ABI migration can be qualified.
+
+### Event counter continuation
+
+The event change was built separately from
+`7442c64d0d78f3d1353ef4b8b6ed2d85fe48121d`, with only
+`kernel/gpu/agx/event/event.v` changed in its isolated kernel worktree.
+`v run tests/agx-event/run.v --sanitize` passed initialization of all 128
+slots, 300 slot reuses, stale completion isolation, wrap through zero and
+exactly-once fence signaling. The AArch64 kernel built successfully; its
+SHA-256 is `c71cdeb14a19dcbc9ddfcc307616dc1c15dcef48ba50d2657c9ed27bc495ae46`.
+The x86 kernel excludes the GPU modules and is unchanged by this continuation.
+
+Sources, the reference `event.rs`, the kernel delta, native executable, ELF
+and build/test logs are retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-event-20261114/bundle/`.
+The sibling `inventory.json` pins the complete bundle and has SHA-256
+`0e151a6fc637d12e4f7f806b1d82057b4f2f1af7a1ec62114b38e8d29fad2022`.
+Verify with `v run tests/ios/evidence-delta-archive.v check-inventory BUNDLE RECEIPT`.
+This integrity receipt does not certify native GPU execution or full parity.
 
 ## Earlier artifact retention incident
 

@@ -22,6 +22,7 @@ pub mut:
 	fence     &syncobj.DmaFence = unsafe { nil }
 	in_use    bool
 	completed bool
+	armed     bool
 }
 
 pub struct EventManager {
@@ -45,8 +46,13 @@ pub fn configure_event_manager(stamp_va u64, stamp_phys u64, fw_stamp_va u64,
 		return false
 	}
 	unsafe {
-		C.memset(voidptr(stamp_phys + higher_half), 0, u64(max_stamps) * stamp_size)
 		C.memset(voidptr(fw_stamp_phys + higher_half), 0, u64(max_stamps) * stamp_size)
+		// Match EventManager::new: each driver's initial counter identifies
+		// its slot; firmware-private counters start at zero.
+		for i := u32(0); i < max_stamps; i++ {
+			mut stamp := &u32(stamp_phys + u64(i) * stamp_size + higher_half)
+			katomic.store(mut stamp, i << 24)
+		}
 	}
 	gpu_event_mgr = EventManager{
 		stamp_base: stamp_va
@@ -90,15 +96,15 @@ pub fn (mut em EventManager) alloc_stamp() ?u32 {
 	for i := u32(0); i < max_stamps; i++ {
 		if !em.stamps[i].in_use {
 			em.stamps[i].in_use = true
-			em.stamps[i].value = 0
+			// Slot release changes ownership, not the firmware counters. Start
+			// from the last observed stamp so an old event cannot match the
+			// next owner's first command. Asahi EventInner::current does this.
+			em.stamps[i].value = unsafe {
+				katomic.load(&u32(em.stamp_phys + u64(i) * stamp_size + higher_half))
+			}
 			em.stamps[i].fence = unsafe { nil }
 			em.stamps[i].completed = false
-			unsafe {
-				mut stamp := &u32(em.stamp_phys + u64(i) * stamp_size + higher_half)
-				mut fw_stamp := &u32(em.fw_stamp_phys + u64(i) * stamp_size + higher_half)
-				katomic.store(mut stamp, u32(0))
-				katomic.store(mut fw_stamp, u32(0))
-			}
+			em.stamps[i].armed = false
 			return i
 		}
 	}
@@ -121,6 +127,7 @@ pub fn (mut em EventManager) free_stamp(index u32) {
 	em.stamps[index].fence = unsafe { nil }
 	em.stamps[index].value = 0
 	em.stamps[index].completed = false
+	em.stamps[index].armed = false
 }
 
 // Return the GPU virtual address of a stamp slot.
@@ -165,6 +172,8 @@ pub fn (mut em EventManager) set_expected(index u32, value u32) {
 	}
 
 	em.stamps[index].value = value
+	em.stamps[index].completed = false
+	em.stamps[index].armed = true
 }
 
 // Check whether a stamp slot has been completed by the GPU.
@@ -179,7 +188,7 @@ pub fn (mut em EventManager) check_completion(index u32) bool {
 	defer {
 		em.lock.release()
 	}
-	if !em.stamps[index].in_use {
+	if !em.stamps[index].in_use || !em.stamps[index].armed {
 		return false
 	}
 	if em.stamps[index].completed {
@@ -191,10 +200,6 @@ pub fn (mut em EventManager) check_completion(index u32) bool {
 	current_value := unsafe { katomic.load(&u32(stamp_phys_addr + higher_half)) }
 
 	expected := em.stamps[index].value
-	if expected == 0 {
-		return false
-	}
-
 	if i32(current_value - expected) >= 0 {
 		// Stamp completed -- signal the fence
 		if em.stamps[index].fence != unsafe { nil } {
@@ -216,9 +221,12 @@ pub fn (mut em EventManager) next_stamp_value(index u32) ?u32 {
 	defer {
 		em.lock.release()
 	}
+	if !em.stamps[index].in_use { return none }
 
 	value := em.stamps[index].value + u32(0x100)
 	em.stamps[index].value = value
+	em.stamps[index].completed = false
+	em.stamps[index].armed = true
 	return value
 }
 
@@ -242,7 +250,7 @@ pub fn (mut em EventManager) scan_completions() {
 			continue
 		}
 
-		if em.stamps[i].value == 0 {
+		if !em.stamps[i].armed {
 			continue
 		}
 
