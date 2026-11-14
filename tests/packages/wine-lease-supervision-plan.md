@@ -2327,6 +2327,33 @@ cross-build, guest execution, power-loss durability, complete source closure or
 measured heap qualification is claimed. Retargeting/recovery and other section
 14 gates remain open.
 
+## Explicit additions command, 2026-11-14
+
+Source `e25d945c1` exposes `vinix-package wine-prefix-additions ID PRIVATE_DATA`
+through the existing service owner. It performs real-root admission and fresh
+recheck, invokes the guarded additions-only method and prints resulting JSON.
+The review command still performs no builtin writes. Existing-link retargeting
+remains refused; interrupted additions use fresh review and explicit retry.
+
+The production host CLI and V refusal runner build successfully. All sixteen
+executable controls pass across review/additions commands: argument counts,
+alternate roots including explicit slash, offline/progress flags, invalid IDs
+and relative paths. Builds use the retained V compiler with `-backend c -gc
+none -manualfree`, repository/account module paths; CLI also uses `-prod
+-cflags -fno-lto -ldflags -fno-lto`. This checkpoint does not claim successful
+real-root CLI execution, new service tests, guest execution or cross-builds.
+Previously recorded signed service/additions and host SIGKILL controls remain
+bounded evidence for the underlying method, not this CLI's installed success.
+
+Evidence is frozen at `/Users/alex/.cache/vwaddcli-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-additions-cli-20261114-01.inventory.json`
+has SHA-256 `95c8d5b2720d9d94b61350846b708f4ed4d15d5c43cc77f3db4ae615924cdfb7`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. New sources, generated host C/binaries and logs are retained;
+complete source closure and measured heap qualification are not claimed.
+Retargeting/recovery, real-root/guest acceptance and other section 14 gates stay
+open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
