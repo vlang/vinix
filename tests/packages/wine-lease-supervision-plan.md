@@ -3149,6 +3149,38 @@ Typed receipt:
 SHA-256 `316bb4ff5cc23f0b976303e73f077ec3a34a1b6921d8d4ad634038e20e7d27cb`.
 Recording and independent comparison pass.
 
+## Public service generation retarget heap cleanup, 2026-11-14
+
+Source `17eb66cf7` extends write mode with a third 100-cycle phase. Setup
+publishes and installs a signed marker-runtime update with distinct builtin
+bytes. The ordinary-account fixture restores two prior-generation links before
+each measured capture. Capture must report the exact prior generation and two
+replacements; public migration and full recheck must finish with no prior
+generation and two `keep` bindings. Each cycle checks exact selected targets,
+unchanged old payload bytes, upgraded payload bytes and free generation/store
+coordination after owner close. All three phases retain zero tracked V
+objects/bytes, preserve private sentinel contents and leave no stage.
+
+Final x86 and ARM write guests pass in 48.591 and 8.388 seconds respectively.
+Fresh x86 positive and refusal guests built from the updated source also pass
+in 12.915 and 10.88 seconds. The controller requires all three exact 100-cycle
+zero-allocation markers and retains its 120-second limit and input rechecks.
+Production code is unchanged. Setup and fixture link resets are outside the
+measured public-operation lifetime. These two-row marker cases exclude full
+payload-scale lifetime, setup/cold startup, libc/kernel allocations, complete
+descriptor accounting, real Wine execution/version compatibility, whole-launch
+lifetime and power loss. ARM marker programs never execute; strict ABI and
+hermetic build closure remain open.
+
+Evidence is preserved at `/Users/alex/.cache/vwserviceretarget-20261114-01`, with
+isolated source base `27733163c` plus `source.patch`, binaries, generated C,
+parsed-source lists, kernel copies, run logs and validation notes. Both changed
+V files match the feature commit. Complete prior bundles and original namespaces
+remain required. Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-service-retarget-20261114-01.inventory.json`,
+SHA-256 `110801a27537732241c0bc3871dc866dbf838d4ab59040496a58624046356da9`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

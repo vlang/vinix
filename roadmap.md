@@ -1328,6 +1328,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     also pass 100 attempts per selected error in both signed marker guests,
     retaining zero measured V allocations, releasing failed-admission leases
     and reader locks, and preserving a live migration owner's guard and data.
+    [Public service write lifetimes](tests/packages/wine-lease-supervision-plan.md#public-service-generation-retarget-heap-cleanup-2026-11-14)
+    now pass 100 cycles each of idempotent migration, missing-link additions
+    and prior-generation retargeting in both signed marker guests, with distinct
+    signed payload bytes, zero retained tracked V allocations and released
+    generation leases/store reader locks after close.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
