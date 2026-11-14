@@ -1352,6 +1352,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now passes those three points on both architectures using a byte-identical
     dispatcher entrypoint with test-only sync interception, cold public-command
     migration/repetition/review JSON checks and clean filesystem inspection.
+    The [full small-fixture sync matrices](tests/packages/wine-lease-supervision-plan.md#all-mode-small-fixture-sync-boundary-matrices-2026-11-14)
+    extend coverage to all eight boundaries through direct adapter, signed-service
+    and public CLI entrypoints, including completed writes before return;
+    exact cold namespace checks precede idempotent recovery.
     Broader power-loss recovery and Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

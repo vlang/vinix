@@ -3524,6 +3524,51 @@ Typed receipt:
 SHA-256 `e56e3408db785ce9ac4a7fb63d8d76cd6192527658fbee33b6533ba5c470a65e`.
 Recording and independent comparison pass.
 
+## All-mode small-fixture sync-boundary matrices, 2026-11-14
+
+Source `a96a7349f` accepts trailing `--all-syncs` with direct adapter and
+signed-service modes as well as the public CLI. All eight boundaries pass
+through each of the two newly enabled modes on both architectures: 32 new
+two-boot cases. The exact cold namespace matrix documented above remains
+mandatory, including staged second replacements and completed additions before
+the interrupted migration returns. No adapter, dispatcher, kernel, sync-hook,
+resource-budget or timeout policy changes are needed.
+
+Each accepted case verifies QEMU SIGKILL, cold namespace inspection before
+recovery, fresh capture and repeat, private data and selected input hashes,
+final poweroff, clear VJFS commit marker and strict read-only `e2fsck -f -n`
+exit zero on a separate clean export. Signed-service cases also require both
+boot identities, signed real-root admission, a busy live generation lease and
+released coordination after close. All cases retain the 120-second cap.
+Adapter cases take 23.218–28.665 seconds on x86 and 17.943–19.192 on ARM;
+signed-service cases take 24.075–31.769 and 18.486–21.144 respectively.
+All eight x86 public CLI regression cases also pass (23.139–34.014 seconds).
+
+The default ARM signed-service mode still passes only three cases
+(19.597/19.558/20.491 seconds), without creating point 4. Removing fsync
+interception from identical generated adapter C rejects all eight points for
+returning without the requested cut. Duplicate, misplaced and unknown options,
+and empty CLI paths, reject before creating a work directory.
+
+Evidence is retained at `/Users/alex/.cache/vwwineserviceallcuts-20261114-01`,
+isolated base `d6917628b` plus `source.patch`, with compiler/source lists,
+generated C, binaries, kernels, raw/inspection images, serial/QMP logs,
+negative controls and validation notes. The CLI regression reuses the exact
+guest/CLI binaries from the preceding immutable all-syncs bundle, whose
+guest, dispatcher and hook sources compare byte-identical with this base.
+That complete prerequisite bundle and its receipt remain required.
+
+These are three-row marker packages, not Wine executions. Physical power/host
+cache loss, torn writes, other cut points, plain-ext2 safety, 741-row migration,
+Wine-version/GUI/ARM execution, whole-launch lifetime and strict ABI/hermetic
+closure remain open. The default still runs three points.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-all-mode-syncs-20261114-01.inventory.json`,
+SHA-256 `8999625d25477d4c0d265d1ee5d4e28240c190d3cb9da523786cd9b4ebcbe983`.
+Recording and independent comparison pass for complete bytes, sizes, types,
+modes and link targets.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
