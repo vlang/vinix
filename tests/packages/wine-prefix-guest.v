@@ -45,6 +45,22 @@ fn cli_status(command string, expected i32) ! {
 
 fn cli(command string) ! { cli_status(command, 0)! }
 
+fn unchanged_upgrade(system string, old_builtins string) ! {
+	names := os.ls(system)!
+	if names.len != 34 { return error('stage refusal changed the builtin inventory') }
+	for name in names {
+		if os.readlink(system + '/' + name)! != old_builtins + '/' + name {
+			return error('stage refusal changed an existing builtin')
+		}
+	}
+	if os.exists(system + '/extra.dll') || os.is_link(system + '/extra.dll') {
+		return error('stage refusal created an addition')
+	}
+	if os.read_file('/tmp/private/sentinel')! != 'private contents' {
+		return error('stage refusal changed private data')
+	}
+}
+
 fn ordinary(builtins string) ! {
 	mut prefix := wineadapter.prepare_prefix('/tmp/private', builtins)!
 	defer { prefix.close() }
@@ -81,6 +97,26 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	if os.exists(system + '/extra.dll') { return error('upgrade refusal created an addition before retargeting') }
 	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('upgrade refusal changed private data') }
 	println('WINE PREFIX UPGRADE PASS signed generation change; review; retarget refusal; old links and private data preserved')
+	stage := '/tmp/private/wine/.vinix-builtin-next'
+	os.write_file(stage, 'personal stage contents')!
+	cli_status('wine-prefix-migrate', 1)!
+	if os.is_link(stage) || os.read_file(stage)! != 'personal stage contents' { return error('migration changed personal stage') }
+	unchanged_upgrade(system, old_builtins)!
+	os.rm(stage)!
+	os.mkdir(stage)!
+	os.write_file(stage + '/sentinel', 'personal directory contents')!
+	cli_status('wine-prefix-migrate', 1)!
+	if !os.is_dir(stage) || os.read_file(stage + '/sentinel')! != 'personal directory contents' { return error('migration changed stage directory') }
+	unchanged_upgrade(system, old_builtins)!
+	os.rmdir_all(stage)!
+	os.symlink('/tmp/private/sentinel', stage)!
+	cli_status('wine-prefix-migrate', 1)!
+	if os.readlink(stage)! != '/tmp/private/sentinel' { return error('migration changed foreign stage link') }
+	unchanged_upgrade(system, old_builtins)!
+	os.rm(stage)!
+	// Reconstruct an interrupted, authenticated stage whose row sorts after base.
+	// The public writer must consume this row before staging any other binding.
+	os.symlink(selected_builtins + '/new.dll', stage)!
 	writer := C.fork()
 	if writer == 0 {
 		exec_cli('wine-prefix-migrate')
@@ -98,6 +134,7 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	if C.kill(writer, C.SIGSTOP) != 0 { return error('cannot stop migration owner') }
 	mut status := i32(0)
 	if C.waitpid(writer, &status, C.WUNTRACED) != writer || status & 0xff != 0x7f { return error('migration owner did not stop during partial progress') }
+	if os.readlink(system + '/new.dll')! != selected_builtins + '/new.dll' { return error('public migration did not prioritize the retained stage') }
 	mut remaining := 0
 	for index in 0 .. 32 {
 		name := '/retarget-' + index.str() + '.dll'
@@ -140,9 +177,11 @@ fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	mut prepared := wineadapter.prepare_prefix('/tmp/private', selected_builtins)!
 	prepared.close()
 	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('migration changed private data') }
+	if os.exists(stage) || os.is_link(stage) { return error('migration left a staging entry') }
 	println('WINE PREFIX MIGRATION PASS signed runtime retarget; added link; repeat; public review; private data')
 	println('WINE PREFIX OWNER DEATH PASS partial retarget; live lease and guard; SIGKILL release; admitted resume')
 	println('WINE PREFIX MIGRATE CLI PASS public writer SIGKILL; public resume; repeat; admitted verification')
+	println('WINE PREFIX STAGE CLI PASS personal file; directory; foreign link preserved; authenticated stage resumed first')
 }
 
 fn run() ! {
