@@ -221,12 +221,30 @@ and feed other supported vector operations, including another integer cast.
 Each cast costs one executed step and charges source plus result count to
 shared lane work. Results share the existing 4,096 static construction slots
 and execution-owned allocation. Integer, mixed, void and memory APIs use the
-same integer-vector rules. Vector floating conversions/bitcasts, reshaping,
+same integer-vector rules. Vector numeric floating conversions, reshaping,
 pointer casts, arguments/returns, PHIs, loads/stores, scalable vectors and
 widths beyond i64 remain unsupported. `tests/ios/air-vector-integer-cast.v`
 checks every width pair and flag variant against native LLVM, explicit freeze
 choices and poison failures, plus source/result freezing, composition, loop
 reuse, unsupported profiles and exact shared storage/work limits.
+
+Fixed vectors support raw `bitcast` between i16/half and i32/float
+with unchanged lane count (1..16), in either direction. Every bit is preserved,
+including signed zero, NaN signs/payloads and signaling NaNs; no floating
+arithmetic or NaN quieting occurs. Complete literal/earlier-construction
+sources are validated, including inactive blocks. Poison remains local to
+each lane; any undef source lane rejects at the cast, even for discarded
+results. Source freezes repair indeterminate lanes; result freezes do not
+suppress earlier errors. Independent snapshots compose with supported casts,
+arithmetic, comparisons, selects, shuffles and extraction. Each cast costs
+one executed step and source plus result lane work, sharing the existing
+4,096 construction slots and execution-owned array. Mixed, void and memory
+execution support these casts; the integer-only API rejects floating lanes.
+Numeric floating conversions, other lane formats, vector reshaping, scalar/
+vector casts, pointer casts, scalable vectors, vector arguments/returns,
+PHIs and loads/stores remain unsupported. `tests/ios/air-vector-bitcast.v`
+checks exact native LLVM bits, complete half encodings, raw float patterns,
+poison/undef, freezing, composition, snapshots, loops and shared limits.
 
 Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
 `fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane
