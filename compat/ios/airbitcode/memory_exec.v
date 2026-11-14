@@ -100,8 +100,9 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 }
 // Narrow execution profile: an ordinary void function, pointer arguments,
 // forward branches/switches/PHIs, scalar loads/stores, literal GEPs, scalar binary operations,
-// comparisons, scalar select/casts/freeze, floating fneg, checked overflow
-// pairs with field extraction/insertion/freeze/select and final ret void.
+// comparisons, scalar select/casts/freeze, floating fneg, resolved pointer
+// PHIs/selects/freezes/bitcasts, checked overflow pairs with field
+// extraction/insertion/freeze/select and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -212,11 +213,23 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		}
 		if code == 3 {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: cast result') }
+			if p.gep_type(op.result_type)!.kind == .pointer_t {
+				if op.opcode != 11 || op.operands_count != 1 || op.indices_count != 0 { return error('AIR memory execution: pointer bitcast shape') }
+				source := p.gep_type(p.operands[op.operands_start].type_index)!
+				if source.kind != .pointer_t || source.address_space != p.types[op.result_type].address_space { return error('AIR memory execution: pointer bitcast address space') }
+				pointers[int(inst.next_value - s.base_id)] = p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
+				continue
+			}
 			p.scalar_cast_profile(op, true)!
 			continue
 		}
 		if code in [u64(56), 58]! {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: unary result') }
+			if code == 58 && p.gep_type(op.result_type)!.kind == .pointer_t {
+				if op.opcode != 0 || op.operands_count != 1 || op.indices_count != 0 || p.operands[op.operands_start].type_index != op.result_type { return error('AIR memory execution: pointer freeze shape/type') }
+				pointers[int(inst.next_value - s.base_id)] = p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
+				continue
+			}
 			if code == 58 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t {
 				p.scalar_pair_freeze(op, s.base_id, pools, scope)!
 			} else { p.scalar_unary_profile(op, code == 58, true)! }
@@ -317,9 +330,12 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 			if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }
 			if code == 27 { value := m.insert_pair_value(op)!; m.put(inst, value); continue }
 			if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
-			if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
+			if code == 3 { if p.types[op.result_type].kind != .pointer_t { value := m.cast_value(op)!; m.put(inst, value) }; continue }
 			if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }
-			if code == 58 { value := if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(op.operands_start)! } else { m.read_frozen(op.operands_start)! }; m.put(inst, value); continue }
+			if code == 58 {
+				if p.types[op.result_type].kind != .pointer_t { value := if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(op.operands_start)! } else { m.read_frozen(op.operands_start)! }; m.put(inst, value) }
+				continue
+			}
 			if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
 			if code in [u64(5), 29]! {
 				if p.types[op.result_type].kind == .pointer_t {

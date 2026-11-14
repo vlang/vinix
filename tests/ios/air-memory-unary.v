@@ -66,7 +66,7 @@ fn main() {
 	source.write_string('define void @negated_poison(ptr %dst) { %bad = fneg float poison\n %v = freeze float %bad\n store float %v, ptr %dst, align 1\n ret void }\n')
 	source.write_string('define void @guard_poison(ptr %dst) { %v = fneg half poison\n store half %v, ptr %dst, align 1\n ret void }\n')
 	source.write_string('define void @guard_undef(ptr %dst) { %bad = fneg float undef\n %v = freeze float %bad\n store float %v, ptr %dst, align 1\n ret void }\n')
-	for name, expr in {'flags': 'fneg nnan float 1.0', 'double': 'fneg double 1.0', 'vector': 'freeze <2 x i32> poison', 'pointer': 'freeze ptr poison', 'aggregate': 'freeze { i32, i1 } poison'} {
+	for name, expr in {'flags': 'fneg nnan float 1.0', 'double': 'fneg double 1.0', 'vector': 'freeze <2 x i32> poison', 'pointer': 'freeze ptr poison', 'aggregate': 'freeze { i32, i1, i1 } poison'} {
 		source.write_string('define void @guard_${name}(ptr %dst) { store i32 17, ptr %dst, align 1\n %v = ${expr}\n ret void }\n')
 	}
 	os.write_file(out + '/input.ll', source.str())!

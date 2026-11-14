@@ -289,6 +289,15 @@ immediately, including for unused results, retaining prior writes. Untaken
 selects do not read their conditions, and scalar freeze may define a condition.
 This bounded profile has no runtime pointer poison tracking.
 
+Pointer `freeze` and same-address-space pointer `bitcast` preserve an existing
+virtual buffer address. Freeze requires matching operand/result types; bitcast
+requires scalar pointer types in the same address space. Arguments, GEPs,
+invariant PHIs/selects and earlier pointer freezes/bitcasts may feed each other.
+Each costs one executed step and resolves during preflight, preserving the
+original binding's bounds, alignment and permissions. Literal null/poison/undef
+pointers, integer-pointer conversions and address-space casts reject. Freeze
+does not bypass an earlier pointer select's defined-condition requirement.
+
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct
 forward blocks. Each tested case costs one additional step; default paths test
@@ -328,8 +337,9 @@ exercise this path through pipeline creation and deferred dispatch.
 
 Buffer kernels also support scalar integer width casts, signed/unsigned
 integer↔half/float conversions, half↔float precision changes and raw bitcasts
-between i16/half or i32/float. Casts have one-step cost and no flags. Pointer,
-vector, aggregate, double and bfloat conversions remain unsupported. Invalid
+between i16/half or i32/float. Casts have one-step cost and no flags.
+Integer-pointer, address-space, vector, aggregate, double and bfloat conversions
+remain unsupported. Invalid
 float-to-integer inputs yield poison; storing it follows failed-command
 completion, while an unchosen select operand may discard it. Synthetic kernels
 combine signed conversion with floating addition in both directions.

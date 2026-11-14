@@ -7,7 +7,7 @@ checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
-Fast-math flags, alloca, pointer casts, loops, atomics,
+Fast-math flags, alloca, integer-pointer/address-space casts, loops, atomics,
 volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
@@ -82,7 +82,8 @@ integer truncation/zero extension/sign extension across i1..i64, signed and
 unsigned conversions between those integers and half/float, float-to-half
 truncation, half-to-float extension, and same-width integer/floating bitcasts
 at 16/32 bits. Integer width changes require the correct direction. Flags,
-pointer casts, vector/aggregate casts, double and bfloat remain unsupported.
+integer-pointer/address-space casts, vector/aggregate casts, double and bfloat
+remain unsupported. The pointer bitcast exception is described below.
 Float-to-integer conversion truncates toward zero; NaN, infinity and values
 whose truncated result is outside the destination range produce poison.
 Poison inputs propagate. Selected undef still errors. Storing a poisoned cast
@@ -94,8 +95,19 @@ rejects. Scalar `freeze` preserves defined i1..i64/half/float bits and makes a
 fixed zero choice for poison or undef. Every use of its SSA result sees that
 same choice. It does not prevent an earlier instruction from rejecting undef
 or another dynamic error. Both operations require zero flags and cost one
-step. Pointer/vector and general aggregate freezes remain unsupported by this
-API; the checked overflow-pair exception is described below.
+step. Vector and general aggregate freezes remain unsupported by this API;
+the checked overflow-pair exception is described below.
+
+Pointer `freeze` preserves an already resolved virtual pointer and requires
+exactly matching operand/result types. Pointer `bitcast` preserves that address
+when both types are scalar pointers in the same address space. Both accept
+arguments, GEPs, invariant PHIs/selects and earlier pointer identity operations.
+Their results resolve during preflight and cost one executed step without
+entering scalar value slots. Bounds, alignment and permissions stay attached
+to the original argument and byte offset. Literal null, poison and undef
+pointers reject during preflight. Freezing a pointer select does not bypass
+its defined-condition requirement. Pointer-integer and address-space casts
+remain unsupported.
 
 Direct LLVM integer bit intrinsics `ctpop`, `bitreverse`, `bswap`, `ctlz` and
 `cttz` are supported using the scalar executor's declaration/signature,
@@ -334,7 +346,8 @@ Each pointer argument binds to an IRMemoryBinding with borrowed mutable data,
 a byte offset, declared virtual base alignment and write permission. At most
 64 bindings of at most 64 MiB each are accepted. Address spaces 0 and 1 are
 supported; space 2 requires a readonly binding. Pointer operands must directly
-name arguments, earlier supported GEP results, invariant pointer PHIs or selects.
+name arguments, earlier supported GEP results, invariant pointer PHIs/selects
+or supported pointer freezes/bitcasts.
 No host pointers are accepted.
 Bindings may share byte storage;
 execution observes earlier stores through aliases. Callers retain ownership
@@ -465,6 +478,12 @@ native LLVM across every supported scalar width, select/GEP/PHI chains, nested
 joins and aliases. It checks metadata/types, budgets, bindings, unequal or
 invalid arms, poison/undef conditions with used/unused results and prior writes,
 and defined frozen conditions and untaken poison selects.
+
+`tests/ios/air-memory-pointer-identity.v` compares pointer freeze/bitcast chains
+with native LLVM through direct arguments, GEPs, selects, PHIs and nested joins.
+It checks exact costs/extents, aliases, malformed shape/type/address-space
+metadata, literal pointer exclusions and forbidden pointer conversions, and
+verifies that freeze does not suppress earlier pointer-select condition errors.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including
