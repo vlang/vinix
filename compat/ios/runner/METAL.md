@@ -244,7 +244,7 @@ error slot untouched. No library is cached, so subsequent calls reread the
 file. Neither entry point requires dispatch initialization.
 
 Compute pipeline creation parses the selected module and requires a matching
-classic `air.kernel` entry. It accepts only the ordinary void, one-block
+classic `air.kernel` entry. It accepts only the ordinary void, forward-control
 [scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
 scalar binary arithmetic/comparisons/select/casts/fneg/freeze, pointer arguments with
 supported constant GEPs,
@@ -260,6 +260,17 @@ minimum buffer extents are combined; alignment must not exceed the virtual
 buffer base alignment of 256 bytes. Pipeline creation returns an owned state
 retaining its function/library/device, leaves a success error slot untouched,
 and uses the library NSError path for unsupported/invalid input.
+
+Forward-only branches and matching scalar/overflow-pair PHIs are supported.
+Conditional branches require scalar i1 and distinct destinations; all targets
+must be later blocks in function order. PHIs require exactly the actual
+predecessors and read only the executed incoming values. Every block is checked
+before pipeline creation or execution, and buffer requirements combine all
+paths. The pipeline budget conservatively includes every static instruction;
+execution charges only the taken path. Poison/undef branch conditions error
+and earlier writes remain visible. Pointer PHIs, switches, backward edges and
+loops reject. Deferred dispatches exercise both paths, scalar/pair PHIs, mixed
+incoming values and preserved overflow flags; a loop pipeline rejects.
 
 Both compute dispatch selectors require grid and threadgroup dimensions
 exactly `(1, 1, 1)`. The reported thread execution width and maximum group size

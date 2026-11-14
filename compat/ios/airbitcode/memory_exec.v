@@ -21,8 +21,9 @@ pub mut:
 }
 pub struct IRMemoryProfile {
 	accesses []IRMemoryAccess
+	max_phis int
 pub:
-	steps int
+	steps int // Conservative upper bound: every instruction in every block.
 	arguments []IRMemoryArgument
 }
 pub fn (profile &IRMemoryProfile) free() { unsafe { profile.arguments.free(); profile.accesses.free() } }
@@ -65,8 +66,8 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	}
 	return IRMemoryAccess{argument: base.argument, offset: offset}
 }
-// Narrow execution profile: an ordinary void function, pointer arguments, one
-// block, scalar loads/stores, forward literal GEPs, scalar binary operations,
+// Narrow execution profile: an ordinary void function, pointer arguments,
+// forward branches/PHIs, scalar loads/stores, forward literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, checked overflow
 // pairs with field extraction/insertion/freeze/select and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
@@ -93,10 +94,9 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 || ir_values(stream, raw)[6] != 0 { return error('AIR memory execution: function attributes') }
-	if s.blocks_count != 1 || s.blocks_start < 0 || s.blocks_start >= bodies.blocks.len || s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR memory execution: single block required') }
-	block := bodies.blocks[s.blocks_start]
-	if block.scope != scope || block.first != s.instructions_start || block.count != s.instructions_count || block.count > max_integer_execution_steps { return error('AIR memory execution: block/budget') }
-	mut accesses := []IRMemoryAccess{len: block.count}
+	if s.blocks_count < 1 || s.blocks_start < 0 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_count > max_integer_execution_steps || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR memory execution: body ranges/budget') }
+	max_phis := p.memory_control_profile(stream, bodies, scope)!
+	mut accesses := []IRMemoryAccess{len: s.instructions_count}
 	defer { if !keep { unsafe { accesses.free() } } }
 	mut pointers := []IRMemoryAccess{len: s.results_count}
 	defer { unsafe { pointers.free() } }
@@ -104,14 +104,25 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	defer { layouts.free() }
 	mut intrinsic_declarations := [1768]int{} // Forty FP slots + twenty-seven integer families.
 	mut intrinsic_work := 0
-	for index in block.first .. block.first + block.count {
+	for index in s.instructions_start .. s.instructions_start + s.instructions_count {
 		inst := bodies.instructions[index]; op := p.instructions[index]
-		if inst.scope != scope || inst.block != s.blocks_start || inst.record < 0 || inst.record >= stream.records.len || op.status != .decoded || op.is_volatile || op.targets_count != 0 || op.operands_start < 0 || op.operands_count < 0 || op.operands_start > p.operands.len || op.operands_count > p.operands.len - op.operands_start { return error('AIR memory execution: decoded access required') }
+		if op.is_volatile { return error('AIR memory execution: decoded access required') }
 		code := stream.records[inst.record].code
+		if op.targets_count != 0 && code !in [u64(11), 16]! { return error('AIR memory execution: unexpected targets') }
 		gep := code in [u64(4), 30, 43]!
 		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 		if op.flags & ~allowed_flags != 0 { return error('AIR memory execution: unsupported flags') }
-		if index == block.first + block.count - 1 { if code != 10 || inst.has_result || op.operands_count != 0 { return error('AIR memory execution: ret void required') }; continue }
+		if code in [u64(10), 11]! { continue } // Checked by control preflight.
+		if code == 16 {
+			if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: PHI result') }
+			if op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t {
+				p.scalar_pair_flow(op, s.base_id, false, pools, scope)!
+			} else {
+				p.execution_bits(op.result_type, true)!
+				for operand in p.operands[op.operands_start..op.operands_start + op.operands_count] { if operand.type_index != op.result_type { return error('AIR memory execution: scalar PHI type') } }
+			}
+			continue
+		}
 		if code == 34 {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: intrinsic result') }
 			key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
@@ -187,7 +198,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		}
 		if code !in [u64(20), 24, 44]! || op.operands_count != (if code == 20 { 1 } else { 2 }) || inst.has_result != (code == 20) { return error('AIR memory execution: scalar load/store required') }
 		access := p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
-		accesses[index - block.first] = access
+		accesses[index - s.instructions_start] = access
 		binding := access.argument
 		bits := p.execution_bits(op.source_type, true)!; bytes := u64((bits + 7) / 8)
 		if op.alignment == 0 || op.alignment & (op.alignment - 1) != 0 || access.offset % op.alignment != 0 || bytes > u64(64 * 1024 * 1024) - access.offset || (code != 20 && arguments[binding].address_space == 2) { return error('AIR memory execution: alignment/address space/extent') }
@@ -199,7 +210,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		} else if p.operands[op.operands_start + 1].type_index != op.source_type { return error('AIR memory execution: store type') }
 	}
 	keep = true
-	return IRMemoryProfile{accesses: accesses, steps: block.count, arguments: arguments}
+	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, steps: s.instructions_count, arguments: arguments}
 }
 pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
@@ -210,31 +221,53 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		a := profile.arguments[i]
 		if b.data.len > 64 * 1024 * 1024 || b.offset > u64(b.data.len) || b.base_alignment == 0 || b.base_alignment & (b.base_alignment - 1) != 0 || b.base_alignment < a.alignment || b.offset % a.alignment != 0 || a.minimum_size > u64(b.data.len) - b.offset || (a.writable && !b.writable) || (a.address_space == 2 && b.writable) { return error('AIR memory execution: bounds/alignment/permission') }
 	}
-	scope := function + 1; s := bodies.scopes[scope]; block := bodies.blocks[s.blocks_start]
+	scope := function + 1; s := bodies.scopes[scope]
 	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: scope, binary32: true, limit: step_limit, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}}
-	defer { unsafe { m.values.free(); m.known.free() } }
-	for index in block.first .. block.first + block.count {
-		m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
-		if code == 10 { return IRVoidRun{steps: m.steps} }
-		if code == 34 { value := m.intrinsic_value(ir, op)!; m.put(inst, value); continue }
-		if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }
-		if code == 27 { value := m.insert_pair_value(op)!; m.put(inst, value); continue }
-		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
-		if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
-		if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }
-		if code == 58 { value := if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(op.operands_start)! } else { m.read_frozen(op.operands_start)! }; m.put(inst, value); continue }
-		if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
-		if code in [u64(5), 29]! { value := m.select_value(op)!; m.put(inst, value); continue }
-		if code in [u64(4), 30, 43]! { continue }
-		access := profile.accesses[index - block.first]; binding := access.argument
-		bits := p.execution_bits(op.source_type, true)!; bytes := int((bits + 7) / 8); offset := int(bindings[binding].offset + access.offset)
-		if code == 20 {
-			mut value := u64(0); for i in 0 .. bytes { value |= u64(bindings[binding].data[offset + i]) << u32(i * 8) }
-			m.put(inst, IntegerValue{value: value & constant_mask(bits)})
-		} else {
-			v := m.read(op.operands_start + 1)!; if v.poison { return error('AIR memory execution: poison store') }
-			value := v.value & constant_mask(bits); for i in 0 .. bytes { bindings[binding].data[offset + i] = u8(value >> u32(i * 8)) }
+	mut pending := []IntegerValue{len: profile.max_phis}
+	defer { unsafe { m.values.free(); m.known.free(); pending.free() } }
+	mut block_index := s.blocks_start; mut previous := -1
+	for {
+		block := bodies.blocks[block_index]; mut phis := 0
+		for index in block.first .. block.first + block.count {
+			op := p.instructions[index]
+			if stream.records[bodies.instructions[index].record].code != 16 { break }
+			m.step()!; mut incoming := -1
+			for i in 0 .. op.targets_count { if p.targets[op.targets_start + i] == previous { incoming = op.operands_start + i; break } }
+			if incoming < 0 { return error('AIR memory execution: PHI lacks executed predecessor') }
+			pending[phis] = m.read_flow(incoming)!; phis++
 		}
+		for i in 0 .. phis { m.put(bodies.instructions[block.first + i], pending[i]) }
+		mut next := -1
+		for index in block.first + phis .. block.first + block.count {
+			m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
+			if code == 10 { return IRVoidRun{steps: m.steps} }
+			if code == 11 {
+				mut target := 0
+				if op.operands_count == 1 { condition := m.read(op.operands_start)!; if condition.poison { return error('AIR memory execution: poison branch condition') }; target = if condition.value & 1 != 0 { 0 } else { 1 } }
+				next = p.targets[op.targets_start + target]; break
+			}
+			if code == 34 { value := m.intrinsic_value(ir, op)!; m.put(inst, value); continue }
+			if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }
+			if code == 27 { value := m.insert_pair_value(op)!; m.put(inst, value); continue }
+			if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
+			if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
+			if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }
+			if code == 58 { value := if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(op.operands_start)! } else { m.read_frozen(op.operands_start)! }; m.put(inst, value); continue }
+			if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
+			if code in [u64(5), 29]! { value := m.select_value(op)!; m.put(inst, value); continue }
+			if code in [u64(4), 30, 43]! { continue }
+			access := profile.accesses[index - s.instructions_start]; binding := access.argument
+			bits := p.execution_bits(op.source_type, true)!; bytes := int((bits + 7) / 8); offset := int(bindings[binding].offset + access.offset)
+			if code == 20 {
+				mut value := u64(0); for i in 0 .. bytes { value |= u64(bindings[binding].data[offset + i]) << u32(i * 8) }
+				m.put(inst, IntegerValue{value: value & constant_mask(bits)})
+			} else {
+				v := m.read(op.operands_start + 1)!; if v.poison { return error('AIR memory execution: poison store') }
+				value := v.value & constant_mask(bits); for i in 0 .. bytes { bindings[binding].data[offset + i] = u8(value >> u32(i * 8)) }
+			}
+		}
+		if next < 0 { return error('AIR memory execution: block did not transfer control') }
+		previous = block_index; block_index = next
 	}
 	return error('AIR memory execution: missing return')
 }

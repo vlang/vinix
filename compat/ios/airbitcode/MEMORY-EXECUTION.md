@@ -1,15 +1,32 @@
 # Bounded scalar memory execution
 
 `run_memory_function` executes a defined ordinary void function with pointer
-arguments, one basic block, scalar loads/stores, scalar binary operations,
+arguments, forward control flow, scalar loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, forward constant GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
-Fast-math flags, alloca, pointer casts, branches, atomics,
+Fast-math flags, alloca, pointer casts, loops, switches, atomics,
 volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
+
+Unconditional branches and scalar i1 conditional branches must target strictly
+later blocks in the function's block order; conditional destinations must be
+distinct. All blocks are partitioned and preflighted, including unvisited
+ones. Leading PHIs accept matching i1..i64, half/float or supported overflow
+pairs, with exactly one incoming value for each actual predecessor. They read
+only the executed predecessor, collecting all incoming values before publishing
+results. Pointer/general aggregate PHIs, backward edges and loops reject.
+
+Buffer extents, alignments and permissions combine every block's requirements,
+including inactive paths. `IRMemoryProfile.steps` is the conservative total
+instruction count across all blocks; callers must supply at least that budget
+before any execution. `IRVoidRun.steps` counts the executed path, charging each
+branch, PHI and return once. Poison branch conditions error; undef conditions
+retain the scalar reader's error behavior. Dynamic errors leave earlier stores
+visible. Untaken dynamic errors and unchosen scalar PHI undef values are not
+evaluated; unsupported operations/constants in any block still fail preflight.
 
 Integer add/sub/mul/shl accept `nuw`, `nsw` or both. Integer udiv/sdiv/lshr/ashr
 accept `exact`. Their existing scalar evaluator propagates poison for violated
@@ -371,3 +388,9 @@ distributive identities and rejects malformed later calls before stores.
 against native LLVM, exhausts i1..i8 pairs with independent widened arithmetic,
 checks both extracted fields and rejects malformed extraction/cached calls
 before earlier stores, alongside poison, constants and aggregate exclusions.
+
+`tests/ios/air-memory-control.v` compares forward branch diamonds and nested
+joins against native LLVM across all scalar integer widths, half/float and
+overflow pairs. It checks exact path costs, conservative budgets, PHI
+predecessors, inactive metadata/access requirements, lazy incoming values,
+poison/undef/freeze, early returns and rejection of loops and pointer PHIs.
