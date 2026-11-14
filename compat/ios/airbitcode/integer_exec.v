@@ -143,7 +143,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			}
 			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
 			pair_freeze := code == 58 && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
-			vector_result := code == 7
+			vector_result := code in [u64(7), 8]!
 			if pair_freeze {
 				if !binary32 { return error('AIR pair: mixed pair freeze required') }
 				p.scalar_pair_freeze(op, s.base_id, pools, scope)!
@@ -160,7 +160,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 			} else if vector_result {
 				if !inst.has_result || vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				vector_work += p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
+				vector_work += if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
 				vector_results++
 			} else if code == 26 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
@@ -175,7 +175,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
 				34 {} // Checked direct intrinsic, including its attributes, above.
-				6, 7, 26, 27 {} // Checked vector lane operations or overflow pair access above.
+				6, 7, 8, 26, 27 {} // Checked vector lane operations or overflow pair access above.
 				2, 9, 28 {
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
 					fp := p.types[p.operands[op.operands_start].type_index].kind in [.float_t, .half_t]!
@@ -335,6 +335,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			match code {
 				6 { result = m.extract_constant_lane(stream, op)! }
 				7 { result = m.insert_vector_value(stream, inst, op)! }
+				8 { result = m.shuffle_vector_value(stream, inst, op)! }
 				34 { result = m.intrinsic_value(ir, op)! }
 				26 { result = m.extract_pair_value(op)! }
 				27 { result = m.insert_pair_value(op)! }

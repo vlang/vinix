@@ -14,18 +14,22 @@ does not add memory instructions, pointer arguments, kernel ABI binding,
 pipeline construction or dispatch. Discarded poison arithmetic has no returned
 value; poison consumed as a branch condition still rejects.
 
-Fixed-vector insertion and lane extraction follow the shared scalar/memory rules:
+Fixed-vector insertion, shuffling and lane extraction follow the shared
+scalar/memory rules:
 1..16 i1..i64/half/float lanes, scalar unsigned indices, preflight of every
 lane and a bounded per-function lane-work budget. A discarded poison result is
 permitted; selected undef still errors at extraction even when its result is
 unused. Insertions preserve earlier snapshots and per-lane poison/undef;
 invalid indices poison the new vector and a later insertion may repair a lane.
-At most 4,096 static insertion results share one execution-owned storage array.
+At most 4,096 static insertion/shuffle results share one execution-owned
+storage array.
 Vector arguments, PHIs, selects, freezes and loaded vectors remain unsupported.
 `tests/ios/air-constant-extract.v` checks successful discards, indeterminate
 lanes and the whole-function work limit through this API.
 `tests/ios/air-vector-insert.v` also checks the whole-function insertion storage
 and shared insertion/extraction work limits before execution.
+`tests/ios/air-vector-shuffle.v` also checks exact and exceeded combined
+construction/storage and lane-work limits, including successful void execution.
 
 The maintained serialized-bitcode check is `tests/ios/air-void-execute.v`.
 Build it with the repository's V module path, then run its executable with

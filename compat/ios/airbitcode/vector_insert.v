@@ -18,9 +18,9 @@ fn (p IRTypedProgram) vector_source_profile(stream Stream, pools IRConstantPools
 	slot := u64(source.number) - s.base_id
 	if slot >= u64(s.results_count) || s.results_start < 0 || s.results_start > bodies.results.len || slot >= u64(bodies.results.len - s.results_start) { return error('AIR vector: source result slot') }
 	producer := bodies.results[s.results_start + int(slot)]
-	if producer < s.instructions_start || producer >= index || producer >= p.instructions.len || producer >= bodies.instructions.len { return error('AIR vector: earlier insertion required') }
+	if producer < s.instructions_start || producer >= index || producer >= p.instructions.len || producer >= bodies.instructions.len { return error('AIR vector: earlier construction required') }
 	op := p.instructions[producer]; inst := bodies.instructions[producer]
-	if inst.scope != scope || !inst.has_result || inst.next_value != source.number || op.status != .decoded || op.result_type != source.type_index || inst.record < 0 || inst.record >= stream.records.len || stream.records[inst.record].code != 7 { return error('AIR vector: insertion source required') }
+	if inst.scope != scope || !inst.has_result || inst.next_value != source.number || op.status != .decoded || op.result_type != source.type_index || inst.record < 0 || inst.record >= stream.records.len || stream.records[inst.record].code !in [u64(7), 8]! { return error('AIR vector: construction source required') }
 	return count
 }
 fn (p IRTypedProgram) vector_extract_profile(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, mixed bool, remaining int) !int {
@@ -73,14 +73,14 @@ fn (m &IntegerMachine) read_vector(stream Stream, source IRTypedOperand) !Scalar
 	}
 	return result
 }
-// Static insertion slots are reused on loop visits. Scalars keep their existing
-// result slots; vector storage is allocated only for functions with insertions.
+// Static construction slots are reused on loop visits. Scalars keep their
+// existing result slots; vector storage is allocated only for constructions.
 fn (mut m IntegerMachine) seed_vector_slots(stream Stream) ! {
 	if m.vectors.len == 0 { return }
 	s := m.bodies.scopes[m.scope]; mut next := 0
 	for index in s.instructions_start .. s.instructions_start + s.instructions_count {
 		inst := m.bodies.instructions[index]
-		if stream.records[inst.record].code != 7 { continue }
+		if stream.records[inst.record].code !in [u64(7), 8]! { continue }
 		if next >= m.vectors.len || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(m.values.len) { return error('AIR vector: insertion slot count') }
 		m.values[int(inst.next_value - s.base_id)] = IntegerValue{vector: true, value: u64(next)}; next++
 	}
@@ -95,6 +95,9 @@ fn (mut m IntegerMachine) insert_vector_value(stream Stream, inst IRInstruction,
 	index := m.read(op.operands_start + 2)!
 	count := int(m.p.types[op.result_type].count)
 	result := inserted_vector(source, count, index, lane, undef)!
+	return m.store_vector_value(inst, result)!
+}
+fn (mut m IntegerMachine) store_vector_value(inst IRInstruction, result ScalarVectorValue) !IntegerValue {
 	slot := int(inst.next_value - m.bodies.scopes[m.scope].base_id); tag := m.values[slot]
 	if !tag.vector || tag.value >= u64(m.vectors.len) { return error('AIR vector: insertion storage slot') }
 	m.vectors[int(tag.value)] = result

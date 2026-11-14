@@ -397,7 +397,7 @@ a 65-case pipeline rejects. Loops and dynamic buffer indexes remain excluded.
 Both compute dispatch selectors require grid and threadgroup dimensions
 exactly `(1, 1, 1)`. The reported thread execution width and maximum group size
 are one; static threadgroup memory is zero. There are no thread IDs, loops,
-dynamic GEP indexes, vector values, texture access, barriers or
+dynamic GEP indexes, general vector operations, texture access, barriers or
 threadgroup memory in this profile.
 Setting a buffer accepts nil to clear a slot; dispatch requires every argument
 to have an in-bounds, aligned binding from the queue's device. Encoding checks
@@ -452,9 +452,9 @@ all four signed/unsigned half/float variants in a kernel and cover infinities,
 NaNs, fractions and frozen poison results.
 
 Scalar `extractelement` can select an i1..i64/half/float lane from a fixed
-constant vector or earlier `insertelement` result of 1..16 lanes using a runtime
+constant vector or earlier insertion/shuffle result of 1..16 lanes using a runtime
 i1..i64 unsigned index. All lanes are checked before dispatch, with a
-per-function million-lane validation budget shared by insertions and
+per-function million-lane validation budget shared by insertions, shuffles and
 extractions. Only the chosen lane is evaluated: poison propagates, selected
 undef errors and out-of-range indices produce poison. Extractions cost one
 instruction; vector PHIs/selects/freezes, loaded vectors, vector
@@ -466,10 +466,20 @@ stores and reject an oversized-vector pipeline.
 `insertelement` replaces one scalar lane while preserving older snapshots and
 other lanes' poison/undef state. Invalid or poison indices poison the new
 vector; undef indices error. Later insertions can repair individual lanes.
-Each insertion costs one step. Up to 4,096 static insertion results use one
+Each insertion costs one step. Up to 4,096 static insertion/shuffle results use one
 execution-owned array freed on every exit, with slots reused on loop visits.
 Deferred integer/half/float kernels exercise snapshots, repairs, raw NaN/zero
 bits, frozen invalid indices and poison-store command failures.
+
+`shufflevector` combines two supported vectors of the same type, using a
+constant i32 mask and an independently sized fixed result of 1..16 lanes.
+Poison and legacy undef mask entries produce poison; source undef remains
+undef per lane. Defined bits and older snapshots are preserved. Both inputs
+and the normalized/original mask identity are checked before dispatch; lane
+work charges both input counts and the output count. One executed shuffle
+costs one step and shares insertion storage. Deferred kernels cover chained
+length changes, both sources, poison masks, undef repairs,
+raw half/float bits, command failures and oversized-pipeline rejection.
 
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and

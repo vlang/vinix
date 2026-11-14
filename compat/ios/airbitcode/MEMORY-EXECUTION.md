@@ -5,7 +5,7 @@ arguments, forward control flow, scalar loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, bounded constant GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
-Scalar `extractelement` may also read supported fixed constant/inserted vectors;
+Scalar `extractelement` may also read supported fixed constant/constructed vectors;
 vector memory accesses remain unsupported.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
@@ -101,7 +101,9 @@ Materialized data, scalar splats, aggregate lane constants, zero, poison and
 undef vectors are admitted. Every lane is checked in preflight, including
 unselected lanes and inactive blocks; unsupported expressions reject before
 stores. A separate per-function budget admits at most 1,000,000 lanes
-across all extractions and insertions, charging each vector's full count.
+across extractions, insertions and shuffles. Extractions and insertions charge
+their vector's full count; shuffles charge both input counts and the output
+count.
 Each executed extraction costs one step and adds no buffer access requirement.
 
 Execution reads only the indexed lane. An out-of-range or poison index yields
@@ -113,16 +115,27 @@ Integer, mixed scalar and void APIs share validation/evaluation; the integer
 API admits integer lanes only.
 
 `insertelement` creates a new vector snapshot from a supported literal or an
-earlier insertion result of the same type. It replaces one lane with a scalar
-value, poison or literal undef; other lanes retain their state. Extraction may
+earlier insertion/shuffle result of the same type. It replaces one lane with
+a scalar value, poison or literal undef; other lanes retain their state. Extraction may
 read either snapshot. A poison or out-of-range insertion index poisons the
 whole new vector; an undef index errors. A later valid insertion can repair
 one lane of poison/undef. Each insertion costs one executed step. Preflight
-caps static insertion results at 4,096 per function, including inactive blocks.
+caps static insertion and shuffle results together at 4,096 per function,
+including inactive blocks.
 One execution-owned array holds those fixed-size snapshots and is freed on
 every exit; loop visits reuse each instruction's slot. Vector PHIs, selects,
 freezes, arguments, loads/stores and arithmetic, scalable vectors, other lane
 formats and vectors larger than sixteen lanes remain unsupported.
+
+`shufflevector` combines lanes from two supported constant or earlier
+constructed vectors of the same type. Its fixed output has the same scalar
+element type and may independently contain 1..16 lanes. Constant i32 mask
+entries select across the concatenated inputs; poison and legacy undef mask
+entries produce poison lanes. Selected source undef remains undef until
+extracted. Other lane states and scalar bits are copied exactly. Preflight
+checks both complete sources and matches the normalized mask against its
+original constant, including unselected lanes and inactive blocks. A shuffle
+costs one executed step and uses the same bounded snapshot storage as insertion.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -601,6 +614,12 @@ extractions with defined native LLVM. It checks per-lane poison/undef, repairs,
 all scalar lane formats, index masking, prior stores, metadata rejection,
 scalar/integer APIs, loop slot reuse, step budgets and both public storage/work
 limits. Native execution excludes indeterminate selections.
+`tests/ios/air-vector-shuffle.v` checks both-source permutations, broadcasts,
+duplicates, length changes, poison/legacy-undef masks, source indeterminacy,
+shuffle/insertion chains and immutable snapshots against defined native LLVM
+and independent state expectations. Metadata, mask identity, unsupported
+profiles, loops, void discards, budgets and exact/over-limit storage/work
+boundaries are checked separately.
 `tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
 extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native
