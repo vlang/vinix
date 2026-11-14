@@ -2495,6 +2495,34 @@ death, guest behavior, power loss, strict cross-builds, complete source closure
 or measured heap behavior. Retargeting still assumes cooperating writers and
 has no public CLI. Those gates and other section 14 requirements remain open.
 
+## Staged migration in both guests, 2026-11-14
+
+Source `1d9349204` extends the real-root signed-upgrade probe to acquire
+`Service.wine_prefix_review()` as the ordinary account, call `migrate_bindings()`
+twice, and require all rows current with prior generation zero. Every existing
+and added DLL link must select generation 2. After owner close, public review
+and additions commands plus normal prefix preparation must succeed, and private
+sentinel data must survive. The runner requires an exact migration-success marker
+in addition to the preceding installation/refusal/upgrade markers. x86_64 passes
+in 6.876 s and AArch64 in 5.718 s. Migration executes through the newly compiled
+probe's library API, not a new CLI command; automatic migration remains disabled.
+
+Evidence is frozen at `/Users/alex/.cache/vwmigrateguest-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-migration-dual-guest-20261114-01.inventory.json`
+has SHA-256 `6a30139d8d8a2ffdf8f27b0c61c2e2fd670131498653f07698fed3004003b964`.
+Record and independent check pass complete bytes, sizes, types, modes and link
+targets. Both result/serial/QEMU bundles, generated probes, source copies, copied
+kernel inputs and unchanged reused CLI binaries are retained. Builds use the
+retained V compiler, `-prod -gc none -manualfree`, Linux standalone defines and
+target architectures, then LLVM/musl with the documented pointer-type
+compatibility exception and execute_capture_nix.c. This is not strict-build,
+complete source-closure or measured-heap qualification.
+
+Only marker payloads are installed; actual Wine execution/translation/GUI
+compatibility is not exercised. Cooperating prefix writers remain an assumption.
+Guest service-owner death and power-loss recovery, public retarget command
+qualification and remaining section 14 gates stay open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

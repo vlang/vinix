@@ -1284,8 +1284,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     binding rows. [Both-architecture real-root CLI qualification](tests/packages/wine-lease-supervision-plan.md#both-architecture-prefix-command-refusals-2026-11-14)
     now passes signed marker-package installation, ordinary-account review,
     exclusive missing-link additions, competing-launch and personal-file refusals,
-    and repetition in guests. Existing-link
-    migration and recovery remain open; this does not qualify ARM Wine execution.
+    and repetition in guests. [Staged runtime migration](tests/packages/wine-lease-supervision-plan.md#staged-migration-in-both-guests-2026-11-14)
+    now retargets signed marker-runtime links and adds missing links under
+    real-root admission in both guests. Service-owner death/power-loss recovery
+    and actual Wine compatibility remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.
