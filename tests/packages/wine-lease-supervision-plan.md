@@ -2004,6 +2004,25 @@ in the earlier `-01` bundle. These are continuity checks, not authentication of
 initial runtime bytes or a concurrent-write snapshot. Migration application,
 recovery, measured heap qualification and the other section 14 gates remain open.
 
+## Expected builtin inventory, 2026-11-14
+
+Source `780819bea` adds exact expected-inventory comparison to an idle capture,
+matching runtime ID, generation, unique names, SHA-256 digests and byte counts
+after a fresh capture recheck. Expectations are borrowed, not retained or
+authenticated by this API. Host tests pass for exact input and mismatched hash,
+size, name, runtime, generation and incomplete inventory. Tests use the retained
+V compiler with `-backend c -gc none -manualfree` and repository module path.
+This checkpoint has no new CLI, cross-build, guest or heap measurement claim.
+An initial test syntax compilation failure is retained with final passing logs.
+
+Evidence is frozen at `/Users/alex/.cache/vwinventory-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-expected-inventory-20261114-01.inventory.json`
+has SHA-256 `ee8c88e711d8f400fa9b5821d909b422b0cd9a59b2cf66d3f99a15c19e8cf63e`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Package-service authentication integration, generation lease
+retention, migration application and recovery remain open. Section 14 remains
+incomplete; accepting a caller-supplied inventory alone establishes no trust.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

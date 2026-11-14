@@ -1993,6 +1993,13 @@ startup admission, the caller must hold no POSIX locks on the server lock file;
 F_GETLK cannot report the caller's own locks. This remains a migration prerequisite;
 binding application, fresh authentication and interruption recovery remain open.
 
+`capture.require_builtin_inventory(runtime, generation, expected)` rechecks the
+capture and compares an exact inventory of `BuiltinExpectation{name, sha256,
+bytes}` entries. Names must be unique and match every selected builtin, with
+matching SHA-256 and byte counts. Expectations are borrowed only during the
+call. The caller must authenticate their source and retain the generation lease;
+comparison alone does not establish provenance or authorize migration.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership
