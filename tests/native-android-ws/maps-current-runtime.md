@@ -85,9 +85,10 @@ incremental package-overlay cleanup and the complete source-helper checks.
 The [native build continuation](maps-art-native-build-20261114.md) stages the
 complete source and checks all 18 modified files against audited expectations.
 It fixes a measured assembly-generator allocation problem and adds checked
-remote cancellation. Native compilation has begun, but resource guards have
-stopped the attempts so far. No new ART library has been deployed; ARM runtime
-qualification and Google sign-in remain unresolved.
+remote cancellation. The incremental native build now links libart.so; its
+ELF shape and symbol-name comparisons pass. Fresh r86 stages that candidate
+with the complete runtime closure. Signed ARM/API and real Maps qualification
+remain pending; Google sign-in is unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

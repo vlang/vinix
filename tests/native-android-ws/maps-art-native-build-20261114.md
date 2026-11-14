@@ -285,6 +285,57 @@ baseline legacy-RPATH rejection on the first real-library check, and r4/r2
 compiles stopped by the old filesystem-wide growth limit. They are not passes.
 No retained image or audit bundle was deleted or archived during this work.
 
+## Linked candidate: r14
+
+After host space recovered, input-check r6 again passed all 18 files. The
+incremental r14 build linked libart.so and its companion targets, returning
+host/native 0/0 with complete cleanup. Native elapsed time was 111711 ms,
+sampled RSS 421277696 bytes and growth 49364992 bytes. Host elapsed time was
+111844 ms and shared growth 1819181056 bytes. The shared-host profile above
+was used; this completes the retained incremental build, not a fresh full
+build under the earlier 512-MiB host-growth cap. All prior failures remain.
+
+The exported native-build-r1.tar includes the complete emitted host output
+tree (objects, dependency files, generated headers/assembly and libraries),
+input-check r6 manifest and final native log/receipt. Native and host archive
+SHA256 agree:
+`85c25f4190af7d5017e020e2a39c79de53756c2858392ce1848aa3b4b5bd3adb`.
+The host copy is art-native-libart-20261114-r1/native-build-r1.tar. Guarded
+export, copy, extraction and stripping all passed. Unstripped library SHA256
+is `ccaca41cca6ddff636716080032e73d9e7eb331d88ce65017f545809b34191a8`;
+stripped libart.so is
+`d33dfac4adadddf8642927dd798a94e15e713bd3a63e65bac01b22a830ad7ba7`.
+The applied-input manifest SHA256 is
+`0af4ea1a0b509cbbb60d9842dfa2dc3d9a167563edd9b2da43540787811e15ed`.
+
+ELF inspection confirms ARM64 ET_DYN, libart.so SONAME, private origin RPATH
+and 65536-byte-aligned LOAD segments. Dynamic dependency names match the
+baseline. Defined and undefined dynamic-symbol name lists compare identically.
+Disassembly at 0x49bf64–0x49bf78 shows the new heap/image-space vector check
+branching back to normal cache/fallback selection before compiler setup.
+These are host shape checks, not full ABI or runtime qualification. The
+focused staging suite also passed with this actual new library as its input.
+Comparisons and disassembly remain alongside the exported artifact.
+
+Builder QEMU77116 was synced and powered off, verified absent before offline
+checks. The current work-disk read-only fsck and both stopped-disk hashes
+passed under the shared-host profile. Exact system/compiler/header inputs,
+source tree and generated dependency inputs remain in these retained disks:
+
+| Disk | Current stopped SHA256 |
+| --- | --- |
+| /Users/alex/.lima/vinix-art-20261114/disk | 98f56640d87d029888ff87a921b6c4355b1c651a3bdf464df04646c4c7eac4ed |
+| art-builder-work-disk-20261114-r1/work.img | 61b56f3c26c842aafa13524358c3bd4467791b74cd4f635cc4017534966e37d3 |
+
+Fresh Maps guest r86 stages this library, the existing JIT adapter, signed
+shared-display fixture and complete current core/TLS/protocol closure. Staging
+passed 0/0, complete cleanup, 14375 ms, sampled RSS 40402944 bytes and growth
+109277184 bytes. The deployed ART hash matches the stripped artifact. Initial
+data-disk read-only fsck passed with the stricter 64-MiB read-only growth cap
+and 8-GiB reserve; the earlier build-profile fsck invocation was refused before
+launch and remains failed evidence. r86 is now booted for signed ARM/API
+qualification; no Maps/sign-in result is claimed at this checkpoint.
+
 The original profile used RSS 629145600 bytes, reserve 1073741824, growth 536870912,
 output 4194304 and host wall 300000 ms. The guest uses the stricter 290000-ms
 wall limit to leave cleanup time. Make uses -j1. The source is ART
