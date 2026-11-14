@@ -2225,6 +2225,31 @@ new production CLI build, cross-build, real-root admission, guest/Wine execution
 complete source closure or measured heap qualification is claimed. Migration
 application/recovery and remaining section 14 gates stay open.
 
+## Public Linux cross-build checkpoint, 2026-11-14
+
+At source checkpoint `c8837b1067210017c0ac7dab37828e0856617f82`, the complete
+public `tools/packages/main.v` CLI generates Linux C for AMD64 and ARM64.
+Initial LLVM/musl links fail on the retained V library's `os.Process` waitpid
+call: its zero-initialized status local is emitted as i64 while libc expects
+int*. Compatibility links with `-Wno-error=incompatible-pointer-types` pass on
+both targets, producing static x86-64 and AArch64 ELFs. That flag already appears
+in native compatibility userland tooling. No compiler source or generated C was
+patched. This does not qualify strict builds or runtime correctness of that ABI
+boundary; it is not a clean default staging-build result.
+
+Evidence is frozen at `/Users/alex/.cache/vwlinuxreview-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-public-linux-review-20261114-01.inventory.json`
+has SHA-256 `002ed561cfcaa06d2777683fd089f72b0312ab32fd462f4e6f3de6f95b19239f`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Exact generated C, strict failures, compatibility logs, binaries,
+partial source copies and validation flags are retained. Generation uses the
+retained V compiler with repository/account module paths, `-prod -gc none
+-manualfree`, standalone Linux defines and target architecture. Links use LLVM,
+the repository musl sysroots/GCC 14.2.0 runtime and execute_capture_nix.c.
+No guest execution, real-root admission, complete source closure or measured
+heap qualification is claimed. Migration application/recovery and the other
+section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
