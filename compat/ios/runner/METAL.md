@@ -261,16 +261,25 @@ buffer base alignment of 256 bytes. Pipeline creation returns an owned state
 retaining its function/library/device, leaves a success error slot untouched,
 and uses the library NSError path for unsupported/invalid input.
 
-Forward-only branches and matching scalar/overflow-pair PHIs are supported.
+Forward-only branches/switches and matching scalar/overflow-pair PHIs are supported.
 Conditional branches require scalar i1 and distinct destinations; all targets
 must be later blocks in function order. PHIs require exactly the actual
 predecessors and read only the executed incoming values. Every block is checked
 before pipeline creation or execution, and buffer requirements combine all
-paths. The pipeline budget conservatively includes every static instruction;
+paths. The pipeline budget conservatively includes every static instruction
+and every switch's maximum case comparisons;
 execution charges only the taken path. Poison/undef branch conditions error
-and earlier writes remain visible. Pointer PHIs, switches, backward edges and
+and earlier writes remain visible. Pointer PHIs, backward edges and
 loops reject. Deferred dispatches exercise both paths, scalar/pair PHIs, mixed
 incoming values and preserved overflow flags; a loop pipeline rejects.
+
+Integer switches accept i1..i64 and zero through 64 distinct defined literal
+cases with matching types. Default and case destinations must be distinct
+forward blocks. Each tested case costs one additional step; default paths test
+all cases in encoded order. Empty switches still evaluate poison/undef
+conditions. Literal metadata and duplicate values reject before stores. Deferred
+dispatches check scalar/pair PHIs, case/default tags and overflowing results;
+a 65-case pipeline rejects. Loops and dynamic buffer indexes remain excluded.
 
 Both compute dispatch selectors require grid and threadgroup dimensions
 exactly `(1, 1, 1)`. The reported thread execution width and maximum group size

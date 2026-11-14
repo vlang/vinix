@@ -23,7 +23,7 @@ pub struct IRMemoryProfile {
 	accesses []IRMemoryAccess
 	max_phis int
 pub:
-	steps int // Conservative upper bound: every instruction in every block.
+	steps int // Every static instruction plus all switch case comparisons.
 	arguments []IRMemoryArgument
 }
 pub fn (profile &IRMemoryProfile) free() { unsafe { profile.arguments.free(); profile.accesses.free() } }
@@ -67,7 +67,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	return IRMemoryAccess{argument: base.argument, offset: offset}
 }
 // Narrow execution profile: an ordinary void function, pointer arguments,
-// forward branches/PHIs, scalar loads/stores, forward literal GEPs, scalar binary operations,
+// forward branches/switches/PHIs, scalar loads/stores, literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, checked overflow
 // pairs with field extraction/insertion/freeze/select and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
@@ -95,7 +95,8 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 || ir_values(stream, raw)[6] != 0 { return error('AIR memory execution: function attributes') }
 	if s.blocks_count < 1 || s.blocks_start < 0 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_count > max_integer_execution_steps || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR memory execution: body ranges/budget') }
-	max_phis := p.memory_control_profile(stream, bodies, scope)!
+	max_phis, switch_steps := p.memory_control_profile(stream, pools, bodies, scope)!
+	if switch_steps > max_integer_execution_steps - s.instructions_count { return error('AIR memory execution: switch execution budget') }
 	mut accesses := []IRMemoryAccess{len: s.instructions_count}
 	defer { if !keep { unsafe { accesses.free() } } }
 	mut pointers := []IRMemoryAccess{len: s.results_count}
@@ -108,11 +109,11 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		inst := bodies.instructions[index]; op := p.instructions[index]
 		if op.is_volatile { return error('AIR memory execution: decoded access required') }
 		code := stream.records[inst.record].code
-		if op.targets_count != 0 && code !in [u64(11), 16]! { return error('AIR memory execution: unexpected targets') }
+		if op.targets_count != 0 && code !in [u64(11), 12, 16]! { return error('AIR memory execution: unexpected targets') }
 		gep := code in [u64(4), 30, 43]!
 		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 		if op.flags & ~allowed_flags != 0 { return error('AIR memory execution: unsupported flags') }
-		if code in [u64(10), 11]! { continue } // Checked by control preflight.
+		if code in [u64(10), 11, 12]! { continue } // Checked by control preflight.
 		if code == 16 {
 			if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: PHI result') }
 			if op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t {
@@ -210,7 +211,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		} else if p.operands[op.operands_start + 1].type_index != op.source_type { return error('AIR memory execution: store type') }
 	}
 	keep = true
-	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, steps: s.instructions_count, arguments: arguments}
+	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, steps: s.instructions_count + switch_steps, arguments: arguments}
 }
 pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
@@ -245,6 +246,16 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 				mut target := 0
 				if op.operands_count == 1 { condition := m.read(op.operands_start)!; if condition.poison { return error('AIR memory execution: poison branch condition') }; target = if condition.value & 1 != 0 { 0 } else { 1 } }
 				next = p.targets[op.targets_start + target]; break
+			}
+			if code == 12 {
+				condition := m.read(op.operands_start)!
+				if condition.poison { return error('AIR memory execution: poison switch condition') }
+				next = p.targets[op.targets_start]
+				for i in 1 .. op.operands_count {
+					m.step()!; candidate := m.read(op.operands_start + i)!
+					if condition.value == candidate.value { next = p.targets[op.targets_start + i]; break }
+				}
+				break
 			}
 			if code == 34 { value := m.intrinsic_value(ir, op)!; m.put(inst, value); continue }
 			if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }

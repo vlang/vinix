@@ -7,7 +7,7 @@ checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
-Fast-math flags, alloca, pointer casts, loops, switches, atomics,
+Fast-math flags, alloca, pointer casts, loops, atomics,
 volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
@@ -19,9 +19,19 @@ pairs, with exactly one incoming value for each actual predecessor. They read
 only the executed predecessor, collecting all incoming values before publishing
 results. Pointer/general aggregate PHIs, backward edges and loops reject.
 
+Integer `switch` accepts i1..i64 conditions and zero through 64 distinct
+defined integer literal cases of exactly the condition type. Default and case
+destinations must be distinct and strictly later blocks. Case literals, kinds,
+widths and duplicate values are checked before stores, with bounded validation
+work. Execution tests cases in their encoded order, charging one additional
+step per comparison until a match; default paths compare every case. Empty
+switches still evaluate the condition. Poison conditions error and undef
+conditions retain the scalar reader's error behavior.
+
 Buffer extents, alignments and permissions combine every block's requirements,
 including inactive paths. `IRMemoryProfile.steps` is the conservative total
-instruction count across all blocks; callers must supply at least that budget
+instruction count across all blocks plus the maximum case comparisons for
+every switch; callers must supply at least that budget
 before any execution. `IRVoidRun.steps` counts the executed path, charging each
 branch, PHI and return once. Poison branch conditions error; undef conditions
 retain the scalar reader's error behavior. Dynamic errors leave earlier stores
@@ -394,3 +404,9 @@ joins against native LLVM across all scalar integer widths, half/float and
 overflow pairs. It checks exact path costs, conservative budgets, PHI
 predecessors, inactive metadata/access requirements, lazy incoming values,
 poison/undef/freeze, early returns and rejection of loops and pointer PHIs.
+
+`tests/ios/air-memory-switch.v` compares every case/default path across all
+integer widths and scalar/floating/pair PHIs against native LLVM, including
+empty and 64-case edges and nested switches. It checks exact comparison costs,
+65-case rejection, malformed literals/targets/metadata, inactive default blocks,
+conservative budgets and poison/undef conditions with earlier writes retained.
