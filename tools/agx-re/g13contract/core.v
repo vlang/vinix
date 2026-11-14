@@ -226,3 +226,25 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter']
 }
+
+pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
+	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	reference := read(os.join_path(base, 'buffer.rs'))!
+	policy := section(reference, '    pub(crate) fn auto_grow(', '    /// Synchronously grow', 'Asahi TVB feedback')!
+	require_order(policy, ['raw.max_pages.load', 'raw.reset.store(1, Ordering::Release)',
+		'used_pages * 2', '.div_ceil(PAGES_PER_BLOCK)', '.min(inner.max_blocks_nomemless)',
+		'used_pages * 3', '.div_ceil(PAGES_PER_BLOCK)', '.min(inner.max_blocks_nomemless)',
+		'need_blocks <= cur_count', 'self.ensure_blocks(want_blocks)'], 'Asahi TVB feedback')!
+	local := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	local_policy := section(local, 'fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(', '// Service firmware', 'Vinix TVB feedback')!
+	require_order(local_policy, ['katomic.load(&stats.max_pages)', 'katomic.store(mut &stats.reset, u32(1))',
+		'u64(g13_tvb_max_blocks_nomemless)', 'used_pages * 2', 'needed < limit',
+		'need_blocks <= u64(buffer.blocks.len)', 'used_pages * 3', 'wanted < limit',
+		'mgr.ensure_g13_tvb_blocks(mut buffer, u32(want_blocks), false)'], 'Vinix TVB feedback')!
+	scene := section(local, 'fn (mut mgr GpuManager) allocate_g13_render_scene_locked(', 'fn (mut mgr GpuManager) free_g13_render_job_locked(', 'Vinix scene allocation')!
+	require_order(scene, ['mgr.auto_grow_g13_tvb_locked(mut buffer)',
+		'mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, false)',
+		'scene.user_buffer ='], 'Vinix TVB feedback before scene allocation')!
+	return ['TVB page-use feedback, two/three-times headroom and non-memoryless cap',
+		'TVB feedback before minimum-dimension growth and scene allocation']
+}

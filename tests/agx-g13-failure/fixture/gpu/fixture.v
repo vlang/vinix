@@ -86,6 +86,9 @@ mut:
 	g13_compute_jobs []&G13ComputeJobResources
 	g13_render_jobs []&G13RenderJobResources
 	auto_ack bool
+	tvb_target u32
+	tvb_calls u32
+	tvb_grow_fails bool
 }
 
 struct G13Subqueue {
@@ -111,6 +114,26 @@ mut:
 struct Context {
 	active bool = true
 	id u32
+}
+
+struct G13RenderBufferResources {
+mut:
+	initialized bool = true
+	stats SharedBuffer
+	blocks []u8
+}
+
+// Allocation is the injected service here; the production feedback policy
+// must request the correct target and reset statistics before calling it.
+fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResources,
+	minimum u32, firmware_active bool) bool {
+	assert !firmware_active
+	assert unsafe { &fw.G13BufferStats(buffer.stats.cpu_address()) }.reset == 1
+	mgr.tvb_calls++
+	mgr.tvb_target = minimum
+	if mgr.tvb_grow_fails { return false }
+	buffer.blocks = []u8{len: int(minimum)}
+	return true
 }
 
 struct G13RenderJobResources {
@@ -224,6 +247,7 @@ pub fn run_checks() {
 	check_publishers()
 	check_retirement()
 	check_recovery()
+	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10
 	assert __offsetof(fw.G13FwStatus, halted) == 0x20
@@ -288,6 +312,41 @@ pub fn run_checks() {
 	normal.channels.event = channel.new_rx_channel('event', 1, u64(&normal_state), 1, u64(&normal_ring), 4, 0x38)
 	event_worker(mut normal)
 	assert normal.trace == ['success'] && normal.grows == 1
+}
+
+fn check_tvb_feedback() {
+	// Twenty pages fit in ten blocks with 2x headroom; the next page
+	// requires growth, rounded up to sixteen blocks (3x headroom).
+	for used, target in {u32(0): u32(0), 20: 0, 21: 16, 43: 33, ~u32(0): g13_tvb_max_blocks_nomemless} {
+		mut stats := fw.G13BufferStats{max_pages: used}
+		mut buffer := G13RenderBufferResources{
+			stats: SharedBuffer{phys: u64(&stats), size: sizeof(fw.G13BufferStats)}
+			blocks: []u8{len: 10}
+		}
+		mut mgr := GpuManager{}
+		assert mgr.auto_grow_g13_tvb_locked(mut buffer)
+		assert stats.reset == 1 && stats.max_pages == used
+		assert mgr.tvb_calls == if target == 0 { u32(0) } else { u32(1) }
+		assert mgr.tvb_target == target
+		assert buffer.blocks.len == if target == 0 { 10 } else { int(target) }
+	}
+	mut stats := fw.G13BufferStats{max_pages: ~u32(0)}
+	mut capped := G13RenderBufferResources{
+		stats: SharedBuffer{phys: u64(&stats), size: sizeof(fw.G13BufferStats)}
+		blocks: []u8{len: int(g13_tvb_max_blocks_nomemless)}
+	}
+	mut mgr := GpuManager{}
+	assert mgr.auto_grow_g13_tvb_locked(mut capped) && mgr.tvb_calls == 0
+	mut empty := G13RenderBufferResources{}
+	assert !mgr.auto_grow_g13_tvb_locked(mut empty) && mgr.tvb_calls == 0
+	mut failing := G13RenderBufferResources{
+		stats: SharedBuffer{phys: u64(&stats), size: sizeof(fw.G13BufferStats)}
+		blocks: []u8{len: 10}
+	}
+	mgr.tvb_grow_fails = true
+	assert !mgr.auto_grow_g13_tvb_locked(mut failing)
+	assert mgr.tvb_calls == 1 && failing.blocks.len == 10
+	println('G13 TVB feedback: threshold, rounding, reset, cap and allocation failure passed')
 }
 
 fn check_recovery() {

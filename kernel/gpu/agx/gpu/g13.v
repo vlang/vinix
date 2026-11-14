@@ -584,6 +584,30 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 	return true
 }
 
+// Asahi Buffer::auto_grow reserves headroom from firmware's previous high
+// water mark: grow when twice the usage no longer fits, and target three
+// times usage. Only the non-memoryless portion participates in this policy.
+// Caller holds mgr.lock and the queue has no active render scene.
+fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(mut buffer G13RenderBufferResources) bool {
+	if !buffer.initialized || buffer.stats.phys == 0
+		|| buffer.stats.size < sizeof(fw.G13BufferStats) {
+		return false
+	}
+	mut stats := unsafe { &fw.G13BufferStats(buffer.stats.cpu_address()) }
+	used_pages := u64(katomic.load(&stats.max_pages))
+	katomic.store(mut &stats.reset, u32(1))
+	pages_per_block := u64(fw.g13_tvb_pages_per_block)
+	limit := u64(g13_tvb_max_blocks_nomemless)
+	needed := (used_pages * 2 + pages_per_block - 1) / pages_per_block
+	need_blocks := if needed < limit { needed } else { limit }
+	if need_blocks <= u64(buffer.blocks.len) {
+		return true
+	}
+	wanted := (used_pages * 3 + pages_per_block - 1) / pages_per_block
+	want_blocks := if wanted < limit { wanted } else { limit }
+	return mgr.ensure_g13_tvb_blocks(mut buffer, u32(want_blocks), false)
+}
+
 // Service firmware's synchronous tiled-buffer growth request. The ACK is
 // required even if the slot cannot be grown, otherwise the firmware remains
 // blocked forever waiting for device control.
@@ -991,7 +1015,8 @@ fn (mut mgr GpuManager) allocate_g13_render_scene_locked(resources &G13QueueReso
 		return none
 	}
 	mut buffer := unsafe { &resources.render_buffer }
-	if !mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, false) {
+	if !mgr.auto_grow_g13_tvb_locked(mut buffer)
+		|| !mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, false) {
 		return none
 	}
 	ctx := resources.vm

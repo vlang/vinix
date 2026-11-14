@@ -28,6 +28,12 @@ job backing: the normal completion stamps still govern retirement and teardown.
 Workqueue free pointers retain monotonic logical ordering across ring wrap and
 reverse reaper traversal. TVB growth acknowledgments carry the halt counter.
 
+The production TVB feedback policy is also executed with allocation replaced by
+a recorded request. Tests cover the exact no-growth threshold, rounded 3x
+headroom, resetting firmware statistics, the non-memoryless cap, maximum raw
+page-count arithmetic and allocation failure. They do not exercise real TVB
+allocation or GPU page consumption.
+
 Source-bound Apple instruction checks live in `tools/agx-re/g13failure`;
 `g13contract` independently checks the older FWStatus wire layout against
 m1n1. A native test pass on macOS does not validate Vinix firmware execution.

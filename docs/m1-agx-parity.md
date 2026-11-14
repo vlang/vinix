@@ -35,11 +35,17 @@ meaningful requirement for a V kernel with different memory and scheduler APIs.
   the next command advances from the last observed driver value. An explicit
   armed state distinguishes a newly owned slot from a command whose counter
   wrapped to zero.
+- **TVB feedback growth.** Before allocating a render scene, firmware's
+  recorded maximum page use is sampled and its reset is requested. The
+  reference's policy grows when 2x usage exceeds current capacity and targets
+  rounded-up 3x usage, capped at the non-memoryless block limit. Calculations
+  use 64 bits to handle every raw 32-bit statistics value.
 
 Corrupt ring indices, failed recovery acknowledgments and unexplained halts
 remain fatal. The worker drains a queued fault notification before treating
-its halt as unexplained. No new kernel allocations or object lifetimes were
-introduced by this change.
+its halt as unexplained. Recovery and retirement introduce no new kernel
+allocations. TVB feedback uses the existing growth and cleanup path; these
+changes retain the existing object ownership model.
 
 ## Remaining differences
 
@@ -50,6 +56,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
 | Submission scheduling | Vinix accepts at most two commands in the compute-then-render form and waits on dependencies in the ioctl. The reference accepts general batches through DRM scheduling, with multiple in-flight jobs and per-subqueue barriers. |
 | Render scenes | Vinix retains one active render scene per queue. The reference manages scene slots and shared TVB lifetime across overlapping work. |
+| TVB ownership and growth | Vinix retains its slot for the queue's lifetime and publishes added blocks individually. The reference uses scene-bound slot ownership and stages the complete allocation before committing a heap extension. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
 | Timestamp UAPI | The reference's per-command timestamp objects and current compact command fields are not wired through Vinix's legacy command interface. |
@@ -112,6 +119,27 @@ The sibling `inventory.json` pins the complete bundle and has SHA-256
 `0e151a6fc637d12e4f7f806b1d82057b4f2f1af7a1ec62114b38e8d29fad2022`.
 Verify with `v run tests/ios/evidence-delta-archive.v check-inventory BUNDLE RECEIPT`.
 This integrity receipt does not certify native GPU execution or full parity.
+
+### TVB feedback continuation
+
+The feedback policy was built from
+`a151aabf30fbbc4a5457bb23bfa06ba7adaa5452` with only
+`kernel/gpu/agx/gpu/g13.v` changed in a fresh isolated kernel worktree.
+The production-policy sanitizer fixture, reference unit tests and expanded
+Asahi source gate passed. The AArch64 kernel built successfully; its SHA-256
+is `7a511c8b5762bc6f31b49956cfe8d1c8f75e8a919cc70b5ea56163bb9e7488ba`.
+The x86 kernel excludes this GPU module and is unchanged.
+
+The complete named bundle, including sources, reference policy, kernel delta,
+native executable, ELF and build/test logs, is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-tvb-20261114/bundle/`.
+The sibling `inventory.json` has SHA-256
+`c3101eb209261bc2af516be1b9ce97b5f0f7e8b1da6f795c0d90a80cb15c5541`.
+Its retained `evidence-checker.v` verifies it with
+`v run BUNDLE/evidence-checker.v check-inventory BUNDLE RECEIPT`.
+Allocation itself is replaced by a recorded request in the feedback fixture;
+this validates the policy, not hardware memory consumption. A repeated SSH
+check still failed to resolve the configured M1 hostname.
 
 ## Earlier artifact retention incident
 
