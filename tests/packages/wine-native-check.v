@@ -118,9 +118,10 @@ fn v_program(v string, source string, arch string, cfile string, owned bool, col
 	if owned { command.insert(1, ['-d', 'wine_owned_manager']) }
 	if collection { command.insert(1, ['-d', 'wine_collection_probe']) }
 	if caller_death { command.insert(1, ['-d', 'wine_caller_death_probe']) }
-	if caller_death && os.args[10] in ['--manager-death-probe', '--relaunch-probe', '--migration-probe'] { command.insert(1, ['-d', 'wine_manager_death_probe']) }
-	if caller_death && os.args[10] in ['--relaunch-probe', '--migration-probe'] { command.insert(1, ['-d', 'wine_relaunch_probe']) }
-	if caller_death && os.args[10] == '--migration-probe' { command.insert(1, ['-d', 'wine_migration_probe']) }
+	if caller_death && os.args[10] in ['--manager-death-probe', '--relaunch-probe', '--migration-probe', '--rollback-probe'] { command.insert(1, ['-d', 'wine_manager_death_probe']) }
+	if caller_death && os.args[10] in ['--relaunch-probe', '--migration-probe', '--rollback-probe'] { command.insert(1, ['-d', 'wine_relaunch_probe']) }
+	if caller_death && os.args[10] in ['--migration-probe', '--rollback-probe'] { command.insert(1, ['-d', 'wine_migration_probe']) }
+	if caller_death && os.args[10] == '--rollback-probe' { command.insert(1, ['-d', 'wine_rollback_probe']) }
 	if idle_server { command.insert(1, ['-d', 'wine_idle_server_probe']) }
 	return command
 }
@@ -174,12 +175,12 @@ fn check() ! {
 		return
 	}
 	if os.args.len !in [9, 10, 11] || (os.args.len >= 10 && os.args[9] != '--owned-manager')
-		|| (os.args.len == 11 && os.args[10] !in ['--collection-probe', '--caller-death-probe', '--idle-server-probe', '--manager-death-probe', '--relaunch-probe', '--migration-probe']) {
-		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager [--collection-probe|--caller-death-probe|--idle-server-probe|--manager-death-probe|--relaunch-probe|--migration-probe]]')
+		|| (os.args.len == 11 && os.args[10] !in ['--collection-probe', '--caller-death-probe', '--idle-server-probe', '--manager-death-probe', '--relaunch-probe', '--migration-probe', '--rollback-probe']) {
+		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager [--collection-probe|--caller-death-probe|--idle-server-probe|--manager-death-probe|--relaunch-probe|--migration-probe|--rollback-probe]]')
 	}
 	owned := os.args.len >= 10
 	collection := os.args.len == 11
-	caller_death := collection && os.args[10] in ['--caller-death-probe', '--idle-server-probe', '--manager-death-probe', '--relaunch-probe', '--migration-probe']
+	caller_death := collection && os.args[10] in ['--caller-death-probe', '--idle-server-probe', '--manager-death-probe', '--relaunch-probe', '--migration-probe', '--rollback-probe']
 	idle_server := collection && os.args[10] == '--idle-server-probe'
 	arch := os.args[1]
 	if arch !in ['aarch64', 'x86_64'] { return error('invalid Wine guest architecture') }
@@ -344,7 +345,8 @@ fn check() ! {
 		'translator_busybox':  translator_busybox
 	}))!
 	mut required := [
-		if caller_death && os.args[10] == '--migration-probe' { 'Wine signed migrated-generation prefix relaunch status37 private-data lease-free PASS' }
+		if caller_death && os.args[10] == '--rollback-probe' { 'Wine rolled-back prefix relaunch status37 private-data lease-free collected PASS' }
+		else if caller_death && os.args[10] == '--migration-probe' { 'Wine signed migrated-generation prefix relaunch status37 private-data lease-free PASS' }
 		else if caller_death && os.args[10] == '--relaunch-probe' { 'Wine signed same-generation prefix relaunch after manager death status37 PASS' }
 		else if caller_death && os.args[10] == '--manager-death-probe' { 'Wine signed manager-SIGKILL foreign-server-refused holder-status137 collection-retained PASS' }
 		else if idle_server { 'Wine signed idle-server zero-live-clients collection-retained natural-retirement PASS' }
@@ -355,9 +357,12 @@ fn check() ! {
 	]
 	if caller_death {
 		required << 'Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS'
-		if os.args[10] in ['--manager-death-probe', '--relaunch-probe', '--migration-probe'] {
+		if os.args[10] in ['--manager-death-probe', '--relaunch-probe', '--migration-probe', '--rollback-probe'] {
 			required << 'Wine manager-SIGKILL adopted-server foreign-refusal126 lease-busy PASS'
 		} else { required << 'Wine signed competing-prefix refusal126 after caller death original-workload-live lease-busy PASS' }
+	}
+	if caller_death && os.args[10] == '--rollback-probe' {
+		required << 'Wine rollback prefix migrated and real Win64 relaunched status37 PASS'
 	}
 	scenario := hwhost.Scenario{
 		name:        'packaged-Wine'
@@ -373,7 +378,10 @@ fn check() ! {
 		host
 	}
 	// Collection stages an additional complete runtime generation in guest tmpfs.
-	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{ kernel: kernel, guest: guest, extras: extras, state: work + '/boot', timeout: 600, keep: true, memory_mib: if arch == 'aarch64' || collection { 3072 } else { 1024 } })
+	// Rollback adds another complete migration/relaunch plus post-collection
+	// admission. Keep the established bounds for every existing mode.
+	bound := if caller_death && os.args[10] == '--rollback-probe' { 900 } else { 600 }
+	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{ kernel: kernel, guest: guest, extras: extras, state: work + '/boot', timeout: bound, keep: true, memory_mib: if arch == 'aarch64' || collection { 3072 } else { 1024 } })
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	verify(inputs)!
 	for path, expected in generated {

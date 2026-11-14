@@ -2110,6 +2110,26 @@ denials in the retained 1 GiB guest. Both runners require actual completion;
 see the [acceptance report](../../tests/packages/wine-lease-supervision-plan.md#resource-bounded-migration-and-real-wine-relaunch-2026-11-14)
 and [earlier refusal checkpoint](../../tests/packages/wine-lease-supervision-plan.md#real-wine-migration-budget-refusal-2026-11-14).
 
+`wine-native-check ... --owned-manager --rollback-probe` extends that case through
+a real remove/rollback transition, a second explicit prefix migration and another
+Win64 relaunch. It requires status 37, preserved private data, retired runtime
+processes, a free restored-generation lease and a full public review after
+collection. The Wine payload stays unchanged: this tests package-generation
+rollback rather than compatibility between Wine versions. This longer mode has
+a 900-second guest bound; existing modes and per-command deadlines retain their
+established bounds.
+
+For a local macOS/APFS diagnostic without rebuilding a large signed image,
+`wine-rollback-check FRESH_WORK BASELINE_ISO ISO_SHA256 KERNEL KERNEL_SHA256 SYSROOT GCC_INSTALL`
+builds the same observer and patches only the original init member in a fresh
+copy-on-write image clone. It checks explicit image/kernel pins, the embedded
+kernel, parsed guest sources and complete logical-byte equality outside that
+member before and after execution. It reuses the pinned image's signed package
+state; it does not replace fresh signing/install qualification.
+`wine-rollback-refusal-check FRESH_WORK CONTROLLER [BASELINE_ISO ISO_SHA256]`
+checks early usage/path/pin refusals and, with an image, embedded-kernel mismatch
+before building a guest or changing an image.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership
