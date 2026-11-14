@@ -2302,6 +2302,31 @@ service-owner/guest execution, retargeting, complete source closure or measured
 heap behavior. Existing-link migration/recovery and the other section 14 gates
 remain open.
 
+## Bounded addition rehashing, 2026-11-14
+
+Source `9fd19dad6` removes a full inventory/payload recheck from each creation
+iteration. Full checks still bracket creation and synchronization; each link
+checks idle admission, captured directory identities and its target digest before
+exclusive symlink creation. Payload rereading is a constant number of inventory
+passes plus one read per addition, rather than one inventory pass per addition.
+Non-target concurrent changes can refuse at the final check after partial work;
+this remains an explicitly resumable, non-atomic multi-link operation.
+
+Adapter and signed-service host tests pass, including changed-target refusal
+before creation, personal-file collision preservation and actual SIGKILL
+recovery. The interrupted writer installed 1/128 links; fresh capture completed
+the remainder in 93 ms in this run. This is an observation, not a comparative
+speedup claim. Tests use the retained V compiler with `-backend c -gc none
+-manualfree` and repository module path. Evidence is frozen at
+`/Users/alex/.cache/vwlinearadditions-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-linear-additions-20261114-01.inventory.json`
+has SHA-256 `c68b0f9a84270d9f31c8c8c99160b7349ef761af61fc37b6ae99dac6d2a3994b`.
+Record and independent check pass complete bytes, sizes, types, modes and link
+targets. Source copies, generated host C/binaries and logs are retained. No new
+cross-build, guest execution, power-loss durability, complete source closure or
+measured heap qualification is claimed. Retargeting/recovery and other section
+14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
