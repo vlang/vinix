@@ -1281,9 +1281,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now reports current/prior generation links and refuses structurally unsafe
     inputs. An [idle binding review capture](tests/packages/wine-lease-supervision-plan.md#idle-binding-review-coordination-2026-11-14)
     now retains managed-launch exclusion and rechecks server admission and
-    binding rows. [AArch64 real-root CLI qualification](tests/packages/wine-lease-supervision-plan.md#arm-real-root-prefix-commands-2026-11-14)
+    binding rows. [Both-architecture real-root CLI qualification](tests/packages/wine-lease-supervision-plan.md#both-architecture-prefix-command-refusals-2026-11-14)
     now passes signed marker-package installation, ordinary-account review,
-    exclusive missing-link additions and repetition in a guest. Existing-link
+    exclusive missing-link additions, competing-launch and personal-file refusals,
+    and repetition in guests. Existing-link
     migration and recovery remain open; this does not qualify ARM Wine execution.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both

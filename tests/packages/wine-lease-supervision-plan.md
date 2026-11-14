@@ -2390,6 +2390,31 @@ precompiled inputs and is not a hermetic source admission checker. x86 guest
 coverage, existing-link migration/recovery, power-loss durability and the other
 section 14 gates remain open.
 
+## Both-architecture prefix command refusals, 2026-11-14
+
+Source `65bf2d28f` expands the PID-1 fixture to require public additions exit 1
+while a managed launch guard is held, leave the missing link absent, then refuse
+an ordinary personal DLL at that name without changing its contents. Releasing
+the guard and removing the fixture collision permits successful creation and
+repeat calls. The runner requires an additional exact refusal-success marker.
+The signed-install real-root probe passes on x86_64 in 7.415 s and AArch64 in
+5.734 s, retaining private data in both. Serial output records the managed-launch
+and existing-symlink diagnostics. These are marker packages, not Wine execution.
+
+Evidence is frozen at `/Users/alex/.cache/vwx86prefix-20261114-01`, with separate
+`run-x86`/`run-arm` results, serial logs and QEMU artifacts. Receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-dual-guest-20261114-01.inventory.json`
+has SHA-256 `d91c413c90632a8bcb895803dcfe28441db5e1c09d9a2785a38e0d0b985bc163`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Both kernel inputs are copied into the bundle: x86 uses retained
+`/Users/alex/.cache/vpr-20261113-01/x86-production-01`; ARM uses the preceding
+retained kernel. The ARM CLI is reused unchanged from the previous frozen guest
+bundle; the expanded probes are rebuilt for each target. x86 CLI/probes use the
+same retained V/LLVM-musl build flags and pointer-compatibility exception as the
+preceding ARM report. This is not strict-build, complete source-closure, general
+ABI, power-loss or measured-heap qualification. Existing-link migration/recovery,
+actual Wine/translation acceptance and remaining section 14 gates stay open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
