@@ -75,5 +75,40 @@ unit, without forcing that header into the standalone fixture translation unit.
 
 r80's initial data volume (UUID d9a575f42b0148edacb30ab5c8813db2) passed identity,
 read-only e2fsck and initial hash checks before launch, with 12 GiB/four CPUs.
-The subsequent Maps retry and selected EGL trace are pending. This signed API
-pass alone does not qualify map tiles, route geometry or Google sign-in.
+The subsequent Maps retry reached Explore, returned fresh Louvre details and
+photos (4.7 stars/382644 reviews), an Eiffel Tower-to-Louvre drive estimate of
+eight minutes, and a route preview with the instruction to head toward Pont
+d'Iéna. The map and route geometry remained blank. No sign-in attempt was made.
+Unlike r79, the retained Maps/GMS logs have no NoSuchMethodError, uncaught-handler,
+bounded notification transport failure or numeric auth-pump/service-exit marker
+in the checked patterns. The broker reached its unchanged session deadline;
+this does not qualify Google authentication or the local-expiry crossing fix.
+
+The new selected EGL trace records the renderer initializing the shared display
+and successfully binding its window/context. Another thread then initializes
+that same display, creates/unbinds temporary contexts and successfully terminates
+it. A further thread repeats that sequence. The renderer's rejected swap later
+reports the same current display but null current draw surface and context.
+The complete ordered records are in maps.retained.log (renderer initialization/
+bind near lines 8932/8933, first other-thread termination near 10558, second near
+15704, and the rejected binding later). This supports the shared-display
+lifetime investigation; a separate isolated regression is still required
+before attributing a rendering repair to reference counting.
+
+The 600183 ms watch completed with at least 7243669504 bytes of guest free space
+and 4708880 KiB of available memory. The complete broker UART export BEGIN/END
+digest is 1ea0d00d65cf44ef627072b20df69d9cb3b22a281153c1a338c58bd968c41a65
+(1428271 bytes/2790 chunks). After export finished, sync returned to an actual
+prompt; owned QEMU PID 86198 was stopped and verified absent before offline
+extraction. Complete r80 evidence remains in maps-current-20261114-r80:
+
+| Artifact | SHA256 |
+| --- | --- |
+| maps.retained.log | fe541ed6c2e052f4029cd0627ea829b392a4e9b8d3a66632f3f429324244ed71 |
+| broker.retained.log | 7e3f5408da632f9fc12485b4c6593125d912d2a8dd65dc4909bd62b52a1547f5 |
+| receipt.retained.json | e39838becaa625476b6070cfc9dddd699c25c6ff2fffaa4ebb9bccaef4c426a9 |
+| maps-launch.retained.json | 6c59ae072ec69b8b4a0722887c65595f58dbd6a4eed6bc100a62b31c09ecf7cb |
+| serial.log | 3fc2701edaa6eebffa3f40f3f0666d02e34d8ed97af11f25cde11dd041fdbb3e |
+| final app-data.ext2 | 96dc6295b60f46ae4055ae7c4ff76fd20a1d7c4567d742d3a899db01041a5b30 |
+
+Tiles, route geometry and Google sign-in remain pending.
