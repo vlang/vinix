@@ -302,6 +302,28 @@ loads/stores remain unsupported. `tests/ios/air-vector-float-int.v` uses defined
 native saturation and separate range tags, including truncation before range
 checks, without executing invalid native casts.
 
+Fixed 1..16-lane half/float vectors support direct unflagged calls to
+`llvm.fabs.vNf16`/`vNf32` and `llvm.copysign.vNf16`/`vNf32`. Fabs clears
+the sign bit; copysign copies only the second operand's sign bit. Every other
+bit is preserved, including NaN payloads and signaling bits; no NaN quieting
+occurs. Poison remains local to each lane. Any undef source lane rejects
+at the executed call, even for discarded results. Source freezes repair
+indeterminate inputs; result freezes do not suppress earlier undef errors.
+Both copysign sources must be supported complete literals or earlier
+constructions. Validation includes inactive blocks. Independent results compose
+with existing vector operations and raw bitcasts. Each call costs one step;
+fabs charges two lane counts and copysign three to shared work, reusing the
+existing 4,096 construction slots and execution-owned array. Mixed, void and
+memory APIs support these calls; the integer-only API rejects floating lanes.
+Canonical overload names, exact signatures and direct declaration identity
+are checked. Harmless declaration attributes use the existing bounded scanner
+once per overload, with a separate 64-entry duplicate-declaration cache.
+Fast-math flags, tail calls, call-site attributes, unsupported declaration
+attributes, other vector intrinsics/formats, vector arguments/returns, PHIs
+and loads/stores remain unsupported. `tests/ios/air-vector-sign-intrinsics.v`
+checks exact native LLVM bits, every half encoding, all lane counts, poison/undef,
+freezing, snapshots, composition, malformed calls/declarations and shared limits.
+
 Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
 `fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane
 precision. Rounding is nearest/ties-to-even with gradual underflow. Signed

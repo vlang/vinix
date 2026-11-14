@@ -146,6 +146,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	mut layouts := IRTypeLayouts{}
 	defer { layouts.free() }
 	mut intrinsic_declarations := [scalar_intrinsic_cache_slots]int{} // Existing FP/integer identities, then two-width conversions.
+	mut vector_intrinsic_declarations := [vector_sign_intrinsic_slots]int{}
 	mut intrinsic_work := 0
 	mut vector_work := 0
 	mut vector_results := 0
@@ -165,7 +166,14 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR vector: extract result slot') }
 			if code != 6 {
 				if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				vector_work += if code == 3 { p.vector_cast_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 56 { p.vector_fneg_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
+				if code == 34 {
+					work, key, attributes := p.vector_sign_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)!
+					if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector intrinsic: duplicate reserved declaration') }
+					if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
+					vector_work += work
+				} else {
+					vector_work += if code == 3 { p.vector_cast_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 56 { p.vector_fneg_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
+				}
 				vector_results++
 			} else { vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
 			continue
@@ -449,7 +457,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 						offset := int(bindings[access.argument].offset + access.offset)
 						for i in 0 .. int(access.bytes) { m.step()!; bindings[access.argument].data[offset + i] = u8(value.value) }
 					}
-				} else { value := m.intrinsic_value(ir, op)!; m.put(inst, value) }
+				} else { value := if p.vector_construction(code, op) { m.sign_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! }; m.put(inst, value) }
 				continue
 			}
 			if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }

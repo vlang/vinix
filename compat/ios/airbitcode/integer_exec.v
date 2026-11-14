@@ -116,6 +116,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	if s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.blocks_start < 0 || s.blocks_count < 1 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR integer: body ranges') }
 	mut max_phis := 0
 	mut intrinsic_declarations := [scalar_intrinsic_cache_slots]int{} // Existing FP/integer identities, then two-width conversions.
+	mut vector_intrinsic_declarations := [vector_sign_intrinsic_slots]int{}
 	mut intrinsic_work := 0
 	mut vector_work := 0
 	mut vector_results := 0
@@ -130,7 +131,8 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			code := stream.records[inst.record].code
 			mut first_operand := op.operands_start
 			mut pair_result := false
-			if code == 34 {
+			vector_result := p.vector_construction(code, op)
+			if code == 34 && !vector_result {
 				if !binary32 || !inst.has_result { return error('AIR intrinsic: mixed scalar result required') }
 				key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
 				pair_result = scalar_integer_overflow(scalar_intrinsic_name(ir.functions[op.callee_function].name)!)
@@ -143,7 +145,6 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			}
 			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
 			pair_freeze := code == 58 && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
-			vector_result := p.vector_construction(code, op)
 			if pair_freeze {
 				if !binary32 { return error('AIR pair: mixed pair freeze required') }
 				p.scalar_pair_freeze(op, s.base_id, pools, scope)!
@@ -160,7 +161,14 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 			} else if vector_result {
 				if !inst.has_result || vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				vector_work += if code == 3 { p.vector_cast_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 56 { p.vector_fneg_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
+				if code == 34 {
+					work, key, attributes := p.vector_sign_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
+					if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector intrinsic: duplicate reserved declaration') }
+					if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
+					vector_work += work
+				} else {
+					vector_work += if code == 3 { p.vector_cast_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 56 { p.vector_fneg_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
+				}
 				vector_results++
 			} else if code == 26 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
@@ -337,7 +345,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				6 { result = m.extract_constant_lane(stream, op)! }
 				7 { result = m.insert_vector_value(stream, inst, op)! }
 				8 { result = m.shuffle_vector_value(stream, inst, op)! }
-				34 { result = m.intrinsic_value(ir, op)! }
+				34 { result = if p.vector_construction(code, op) { m.sign_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! } }
 				26 { result = m.extract_pair_value(op)! }
 				27 { result = m.insert_pair_value(op)! }
 				2 { result = if p.types[op.result_type].kind == .vector_t { m.binary_vector_value(stream, inst, op)! } else { m.binary_value(op)! } }
