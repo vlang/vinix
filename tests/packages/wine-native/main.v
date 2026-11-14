@@ -227,6 +227,24 @@ fn collection_command(arguments []string, input string) !string {
 	return collection_command_status(arguments, input, 0)
 }
 
+fn collection_timeout_processes() {
+	names := os.ls('/proc') or { return }
+	defer { unsafe { names.free() } }
+	mut shown := 0
+	for pid in names {
+		if shown >= 64 { break }
+		if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
+		comm := os.read_file('/proc/' + pid + '/comm') or { continue }
+		defer { unsafe { comm.free() } }
+		state := collection_field(pid, 'State') or { continue }
+		defer { unsafe { state.free() } }
+		parent := collection_field(pid, 'PPid') or { continue }
+		defer { unsafe { parent.free() } }
+		println('HWTEST INFO Wine timeout process pid=' + pid + ' parent=' + parent + ' state=' + state + ' comm=' + comm.trim_space())
+		shown++
+	}
+}
+
 fn collection_command_status(arguments []string, input string, expected int) !string {
 	println('HWTEST INFO Wine collection command begin ' + arguments[1])
 	mut child := os.new_process(arguments[0])
@@ -246,7 +264,10 @@ fn collection_command_status(arguments []string, input string, expected int) !st
 	unsafe { bytes.flags |= .noslices }
 	defer { unsafe { bytes.free() } }
 	mut buffer := [4096]u8{}
-	deadline := time.sys_mono_now() + if expected == 0 { 180 * time.second } else { 15 * time.second }
+	// Manager recovery includes the ordinary package CLI's full admission path.
+	// Keep the existing managed-prefix refusal deadline in all other modes.
+	refusal_limit := $if wine_manager_death_probe ? { 60 * time.second } $else { 15 * time.second }
+	deadline := time.sys_mono_now() + if expected == 0 { 180 * time.second } else { refusal_limit }
 	for {
 		count := C.read(fd, &buffer[0], uint(buffer.len))
 		if count > 0 {
@@ -254,7 +275,10 @@ fn collection_command_status(arguments []string, input string, expected int) !st
 			for index in 0 .. int(count) { bytes << buffer[index] }
 		}
 		if !child.is_alive() { break }
-		if time.sys_mono_now() > deadline { return error('collection command timed out: ' + arguments[1] + '\n' + unsafe { tos(bytes.data, bytes.len) }) }
+		if time.sys_mono_now() > deadline {
+			collection_timeout_processes()
+			return error('collection command timed out: ' + arguments[1] + '\n' + unsafe { tos(bytes.data, bytes.len) })
+		}
 		time.sleep(10 * time.millisecond)
 	}
 	child.wait()
@@ -741,6 +765,7 @@ fn collection_run(generation string, architecture string) ! {
 				collection_live(holder)!
 				if collection_field(holder, 'PPid')! != '1' { return error('surviving holder was not adopted by fixture PID1') }
 				println('HWTEST INFO Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS')
+				$if !wine_manager_death_probe ? {
 				collection_lease_busy(generation)!
 				refusal := collection_command_status(['/usr/bin/vinix-package', 'run-args', application, '--', '--vinix-collection-probe'], '', 126)!
 				defer { unsafe { refusal.free() } }
@@ -752,6 +777,32 @@ fn collection_run(generation string, architecture string) ! {
 				collection_lease_busy(generation)!
 				if !os.is_dir(generation) || sha256.hexhash(os.read_file(image)!) != before { return error('competing launch damaged original generation') }
 				println('HWTEST INFO Wine signed competing-prefix refusal126 after caller death original-workload-live lease-busy PASS')
+				}
+				$if wine_manager_death_probe ? {
+					manager := collection_field(server, 'PPid')!
+					defer { unsafe { manager.free() } }
+					collection_live(manager)!
+					manager_line := wineproc.command_line('/proc/' + manager)!
+					defer { unsafe { manager_line.free() } }
+					if manager == holder || collection_field(manager, 'PPid')! != holder
+						|| !manager_line.contains(generation + '/apps/org.vinix.wine-runtime/bin/wine-runner\x00') {
+						return error('SDK manager identity changed before SIGKILL')
+					}
+					if C.wine_fixture_kill(i32(manager.int()), C.SIGKILL) != 0 { return error('cannot kill SDK manager') }
+					adoption_deadline := time.sys_mono_now() + 10 * time.second
+					for os.exists('/proc/' + manager) || collection_field(server, 'PPid')! != holder {
+						if time.sys_mono_now() > adoption_deadline { return error('Wine server not adopted after manager death') }
+						time.sleep(10 * time.millisecond)
+					}
+					foreign := collection_command_status(['/usr/bin/vinix-package', 'run-args', application, '--', '--vinix-collection-probe'], '', 126)!
+					defer { unsafe { foreign.free() } }
+					if !foreign.contains('Wine server lock already has an owner') { return error('surviving server refused at wrong gate: ' + foreign) }
+					collection_live(holder)!
+					collection_live(server)!
+					collection_live(descendant)!
+					collection_lease_busy(generation)!
+					println('HWTEST INFO Wine manager-SIGKILL adopted-server foreign-refusal126 lease-busy PASS')
+				}
 			}
 			// Two real administrative transitions make the running generation
 			// neither active nor rollback. No state/lease files are synthesized.
@@ -821,7 +872,8 @@ fn collection_run(generation string, architecture string) ! {
 				mut status := i32(0)
 				waited := C.waitpid(holder.int(), &status, C.WNOHANG)
 				if waited == holder.int() {
-					if status & 0x7f != 0 || (status >> 8) & 0xff != 37 { return error('adopted lease holder lost original application status') }
+					wanted := $if wine_manager_death_probe ? { 137 } $else { 37 }
+					if status & 0x7f != 0 || (status >> 8) & 0xff != wanted { return error('adopted lease holder status differs') }
 					holder_reaped = true
 				} else if waited < 0 && C.errno != C.EINTR { return error('cannot collect adopted lease holder') }
 			}
@@ -860,7 +912,9 @@ fn collection_run(generation string, architecture string) ! {
 	if retained.previous == 0 || !os.is_dir('/var/lib/vinix-packages/generations/' + retained.previous.str()) {
 		return error('collection removed the retained rollback generation')
 	}
-	$if wine_idle_server_probe ? {
+	$if wine_manager_death_probe ? {
+		println('HWTEST INFO Wine signed manager-SIGKILL foreign-server-refused holder-status137 collection-retained PASS')
+	} $else $if wine_idle_server_probe ? {
 		println('HWTEST INFO Wine signed idle-server zero-live-clients collection-retained natural-retirement PASS')
 	} $else $if wine_caller_death_probe ? {
 		println('HWTEST INFO Wine signed caller-SIGKILL holder-survived collection-retained natural-retirement PASS')
