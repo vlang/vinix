@@ -2440,6 +2440,37 @@ signed upgrade review/refusal, not existing-link migration, actual Wine,
 power-loss durability, strict builds, complete source closure or measured heap
 behavior. Retargeting/recovery and remaining section 14 gates remain open.
 
+## Staged builtin retargeting, 2026-11-14
+
+Source `3dc11504c` adds explicit library `migrate_bindings()` on the adapter
+capture and service owner. The service retains package reader/lease and prefix
+coordination while revalidating admission. Each old binding gets an exclusively
+created selected-runtime stage at `wine/.vinix-builtin-next`, stage-directory
+synchronization, fresh old-binding/stage checks and atomic rename into captured
+system32, followed by synchronization of both directories. Matching staged work
+is resumed first; unknown files or targets are preserved and refused. After
+retargeting, exclusive additions finish the inventory. Repeated calls work.
+
+This requires cooperating prefix writers to honor the guard; check-and-rename
+cannot exclude arbitrary same-account filesystem writes. The operation is not
+atomic across links and does not roll back partial progress. A fresh capture
+can resume the same selected runtime with mixed prior/current links. No
+retargeting CLI or automatic launch migration is enabled.
+
+Final host adapter and signed service tests pass for real runtime-upgrade
+retarget/addition, repeated calls, unknown-stage preservation, foreign-stage
+refusal and simulated interruption after staging. The prior fixture's manual
+retarget is replaced by the actual service method. Builds use the retained V
+compiler with `-backend c -gc none -manualfree` and repository module path.
+Evidence is frozen at `/Users/alex/.cache/vwretarget-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-staged-retarget-20261114-01.inventory.json`
+has SHA-256 `1aee6acc7888728ce1d0303e9c65c8f65c5bbafca70ecc24c4d6b1705ee75ae3`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets, with source copies, generated host C/binaries and logs retained.
+Actual retarget SIGKILL, guest/cross-build, power-loss durability, complete source
+closure and measured heap qualification remain unproven. Those migration gates
+and other section 14 requirements remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
