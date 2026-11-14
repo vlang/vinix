@@ -69,8 +69,11 @@ fn select_fds_open(process &proc.Process, polls []PollFD) bool {
 pub fn syscall_pselect6(_ voidptr, nfds_word int, readfds u64, writefds u64, exceptfds u64, timeout u64, sigmask u64) (u64, u64) {
 	// Linux declares nfds as signed int; the upper register word is ignored.
 	nfds := int(i32(nfds_word))
-	if nfds < 0 || nfds > fd_set_bits {
-		return errno.err, errno.einval
+	// Import the pselect argument pack before the timeout. Validate its mask
+	// after the timeout, but before nfds and the descriptor bitmaps.
+	mut arg := SigmaskArg{}
+	if sigmask != 0 && !usercopy.copy_from_user(voidptr(&arg), sigmask, sizeof(SigmaskArg)) {
+		return errno.err, errno.efault
 	}
 	mut deadline := time.TimeSpec{}
 	mut timed := false
@@ -83,7 +86,18 @@ pub fn syscall_pselect6(_ voidptr, nfds_word int, readfds u64, writefds u64, exc
 		}
 		timed = true
 	}
-	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline, sigmask)
+	if arg.mask != 0 {
+		if arg.size != sizeof(u64) {
+			return errno.err, errno.einval
+		}
+		mut wanted := u64(0)
+		if !usercopy.copy_from_user(voidptr(&wanted), arg.mask, sizeof(u64)) {
+			return errno.err, errno.efault
+		}
+		mut masked_thread := proc.current_thread()
+		proc.begin_wait_mask(mut masked_thread, wanted)
+	}
+	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline)
 }
 
 // select(nfds, readfds, writefds, exceptfds, timeout), the x86-64 call: the
@@ -91,9 +105,6 @@ pub fn syscall_pselect6(_ voidptr, nfds_word int, readfds u64, writefds u64, exc
 // The time left is not written back; musl hands the kernel a copy anyway.
 pub fn syscall_select(_ voidptr, nfds_word int, readfds u64, writefds u64, exceptfds u64, timeout u64) (u64, u64) {
 	nfds := int(i32(nfds_word))
-	if nfds < 0 || nfds > fd_set_bits {
-		return errno.err, errno.einval
-	}
 	mut deadline := time.TimeSpec{}
 	mut timed := false
 	if timeout != 0 {
@@ -108,10 +119,10 @@ pub fn syscall_select(_ voidptr, nfds_word int, readfds u64, writefds u64, excep
 		deadline = time.TimeSpec{tv[0], tv[1] * 1000}
 		timed = true
 	}
-	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline, 0)
+	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline)
 }
 
-fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, deadline time.TimeSpec, sigmask u64) (u64, u64) {
+fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, deadline time.TimeSpec) (u64, u64) {
 	mut current_thread := proc.current_thread()
 
 	if nfds < 0 || nfds > fd_set_bits {
@@ -123,25 +134,6 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 	mut want_read := read_fd_set(readfds, words) or { return errno.err, errno.get() }
 	mut want_write := read_fd_set(writefds, words) or { return errno.err, errno.get() }
 	mut want_except := read_fd_set(exceptfds, words) or { return errno.err, errno.get() }
-
-	// pselect6 swaps in a signal mask for the duration of the wait, the same
-	// way ppoll does.
-	if sigmask != 0 {
-		mut arg := SigmaskArg{}
-		if !usercopy.copy_from_user(voidptr(&arg), sigmask, sizeof(SigmaskArg)) {
-			return errno.err, errno.efault
-		}
-		if arg.mask != 0 {
-			if arg.size != sizeof(u64) {
-				return errno.err, errno.einval
-			}
-			mut wanted := u64(0)
-			if !usercopy.copy_from_user(voidptr(&wanted), arg.mask, sizeof(u64)) {
-				return errno.err, errno.efault
-			}
-			proc.begin_wait_mask(mut current_thread, wanted)
-		}
-	}
 
 	mut polls := []PollFD{}
 	mut indexes := []int{}

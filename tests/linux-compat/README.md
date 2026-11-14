@@ -49,6 +49,12 @@ heap-copy helpers. `waitfixture-evidence.v` audits their reproduced build
 failures, fresh native/Linux ELFs, unchanged checks and measured cleanup.
 See [fresh-build qualification](../../docs/linux-wait-fixture-builds.md).
 
+`--cases selectorder` compares argument-pack, timeout, mask, count and bitmap
+error order across raw pselect6 and x86-64 select. It checks exact errno,
+untouched buffers/headers/queues, restored masks and flat repeated cleanup.
+`selectorder-reference.v` runs the same ELF on Linux; `selectorder-evidence.v`
+audits the complete bundle. See [receipts and limits](../../docs/linux-select-argument-order.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

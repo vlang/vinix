@@ -2302,6 +2302,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and independent lifetime review. Historical compiler failures remain
   archived. See [the fresh-build qualification](docs/linux-wait-fixture-builds.md).
 
+- [x] Match native pselect6 argument-pack/timeout/mask/count/bitmap error order
+  and raw x86-64 select timeout-before-count errors. Identical native/Linux
+  ELFs pass 9,720 AArch64 / 11,340 x86-64 checks; originals fail 210 / 222.
+  Both credential cohorts retain flat storage; fresh wait/descriptor
+  regressions, generated-C scope and lifetime review pass. See
+  [the argument-order qualification](docs/linux-select-argument-order.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
