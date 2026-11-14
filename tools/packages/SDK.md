@@ -2021,7 +2021,9 @@ migration application and interruption recovery remain required.
 Call `WinePrefixReview.recheck()` for service-level freshness: under a package
 reader lock it reloads configuration, requires the retained generation to remain
 active, repeats launch payload/publisher/policy verification, and rechecks prefix
-continuity. Construction performs this check before returning. Calling only
+continuity. Canonical encodings of decoded active and retained state must match,
+so same-generation metadata changes refuse while JSON whitespace is immaterial.
+Construction performs this check before returning. Calling only
 `owner.review.recheck()` checks the adapter capture and does not refresh package
 trust or activation. Successful recheck supplies no authority for a later write;
 application and interruption recovery remain separate requirements.

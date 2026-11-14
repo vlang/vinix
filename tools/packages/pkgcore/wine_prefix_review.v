@@ -39,6 +39,11 @@ pub fn (owner &WinePrefixReview) recheck() ! {
 	current := read_state(directory, config.architecture)!
 	defer { if current.generation != 0 { close_decoded_state(current) } }
 	if current.generation != owner.admission.generation { return error('Wine prefix review active generation changed') }
+	current_metadata := encode_generation_state(current)!
+	defer { unsafe { current_metadata.free() } }
+	retained_metadata := encode_generation_state(owner.admission.prepared.state)!
+	defer { unsafe { retained_metadata.free() } }
+	if current_metadata != retained_metadata { return error('Wine prefix review active generation metadata changed') }
 	verify_launch_payloads(config, directory, owner.admission.prepared.state, owner.application)!
 	owner.review.recheck()!
 }

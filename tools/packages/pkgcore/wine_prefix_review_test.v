@@ -103,6 +103,26 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	assert revoked
 	os.write_file(configuration_path, original_config)!
 	next_owner.recheck()!
+	state_path := next_owner.admission.prepared.directory + '/generations/' + upgraded.generation.str() + '/state.json'
+	original_state := os.read_file(state_path)!
+	os.write_file(state_path, '\n' + original_state + '\n')!
+	next_owner.recheck()!
+	changed_state := original_state.replace('"version":"2.0.0"', '"version":"2.0.1"')
+	assert changed_state != original_state
+	os.write_file(state_path, changed_state)!
+	mut metadata_changed := false
+	next_owner.recheck() or { metadata_changed = err.msg().contains('active generation metadata changed') }
+	assert metadata_changed
+	os.write_file(state_path, original_state)!
+	next_owner.recheck()!
+	os.write_file(configuration_path, json2.encode(Config{architecture: 'aarch64',
+		repositories: [Repository{id: 'fixture', url: 'file://' + repository, public_key: key}],
+		policy: Policy{allowed: ['other'], reserve_bytes: 0}}))!
+	mut blocked := false
+	next_owner.recheck() or { blocked = err.msg().contains('blocked by organization allowlist') }
+	assert blocked
+	os.write_file(configuration_path, original_config)!
+	next_owner.recheck()!
 	activation := acquire(next_owner.admission.prepared.directory)!
 	activate(next_owner.admission.prepared.directory, installed.generation)!
 	activation.release()
