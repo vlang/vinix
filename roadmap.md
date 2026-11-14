@@ -1296,6 +1296,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Bounded migration payload hashing](tests/packages/wine-lease-supervision-plan.md#bounded-migration-payload-hashing-2026-11-14)
     now avoids full-payload rehashing for every link while retaining per-write
     structural and target checks; host scaling and both guest suites pass.
+    A [real Wine migration probe](tests/packages/wine-lease-supervision-plan.md#real-wine-migration-budget-refusal-2026-11-14)
+    now reproduces a resource-budget refusal after 128 of 741 links;
+    post-migration Win64 relaunch has not yet been reached.
     Power-loss recovery and actual Wine
     compatibility remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

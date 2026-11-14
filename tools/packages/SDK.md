@@ -2091,6 +2091,18 @@ again against the same selected runtime; unknown staging data is preserved and
 refused. Cooperating prefix writers must honor the guard throughout migration.
 This is not an atomic multi-link transaction or a power-loss durability claim.
 
+The experimental `wine-native-check ... --owned-manager --migration-probe`
+requires x86_64 and attempts a real Win64 relaunch after explicit public-command
+migration to a newly installed generation of the same signed Wine payload.
+This is a generation-path relocation check, not a Wine version-upgrade check.
+It currently refuses during migration on the retained test kernel; the relaunch
+acceptance marker is not reached. The smaller `wine-prefix-migration-scale.v`
+probe can be built with `-d wine_scale_guest` for x86 PID1 execution and run with
+`wine-prefix-scale-check FRESH_WORK X86_KERNEL COMPILED_GUEST`. It drops to
+UID/GID 1000, migrates 741 one-byte assets and records resource-budget counters
+on refusal. Both runners continue to require successful migration; a diagnostic
+failure is not a passing qualification. See the [refusal checkpoint](../../tests/packages/wine-lease-supervision-plan.md#real-wine-migration-budget-refusal-2026-11-14).
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership

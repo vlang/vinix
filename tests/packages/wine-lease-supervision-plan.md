@@ -2651,6 +2651,58 @@ Recording and independent comparison pass. Initial build/test-driver failures
 and subsequent successful direct test builds are retained and explained in the
 bundle's build notes. No historical bundle or auditor was changed.
 
+## Real Wine migration budget refusal, 2026-11-14
+
+Source `9b81e5657` adds experimental `--owned-manager --migration-probe`
+qualification and a smaller standalone guest reproducer. The native mode
+retains the caller/SDK death and foreign-server checks, waits for natural Wine
+retirement, reinstalls the same signed closure in a new generation, reviews and
+migrates the real prefix through public commands as UID/GID 1000, then requires
+Win64 status 37, unchanged private data, no runtime processes and a free lease.
+This tests generation-path relocation, not a Wine version upgrade. All 21
+architecture/ownership/mixed-mode refusals pass for both controller builds.
+
+The positive native test does **not** pass. An initial setup attempt lacked the
+isolated boot-loader link and stopped before signing/building. After adding the
+link, `native-02` fails at 277.185 seconds during migration. The separately
+retained diagnostic tree's `native-03` fails at 212.035 seconds: prior-generation
+review authenticates 741 builtin files, migration retargets 128 links, then a
+directory scan reports an empty/oversized inventory. The parent still lists all
+741 selected files afterward; MemFree is 2331520 kB, Slab 9800 kB and reported
+memory pressure is zero. The post-migration Win64 relaunch is never reached.
+Parsed-source, selected-input and generated-output rechecks complete, and both
+result files remain failed. No acceptance marker or refusal was weakened.
+
+`wine-prefix-migration-scale.v`, built with `-d wine_scale_guest`, supplies an x86 PID1 probe
+which drops supplemental groups and switches to UID/GID 1000, creates 741
+one-byte assets and attempts migration without executing Wine. The committed
+`wine-prefix-scale-check.v` still requires actual completion. Both synthetic
+runs stop after 22 links. The final run captures `ENOMEM` (errno 12) and an
+owner-budget denial: owner limit 61595904 bytes, charged bytes rising from
+31418680 to 60003328, and mapping metadata from 2878976 to 31251200 bytes
+(252 to 2738 objects). The denied file request is 1557328 bytes against owner
+usage 60047618. MemFree remains 704952 kB. This establishes a resource-budget
+refusal in the retained environment, not its cause, a leak or a kernel defect.
+The next investigation is the repeated allocation/mapping behavior; no resource
+limit, inventory cap or migration safety check has been relaxed.
+
+The standalone build also exposed a missing `renameat` header dependency.
+Commit `a8d841d69` adds the explicit `<stdio.h>` include. Final standalone Linux
+x86_64/AArch64 static links, focused host adapter tests and a 32-row host scale
+check pass. The retained C pointer-compatibility exception remains. No kernel,
+Wine payload or sandbox policy was changed; strict builds, measured heap,
+power-loss, ARM Wine and real migration/relaunch acceptance remain open.
+
+Complete evidence is frozen at `/Users/alex/.cache/vwrealmigration-20261114-01`,
+including both isolated trees and patches, all failed attempts, final sources,
+native input-byte snapshots, generated programs and full boot evidence.
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-real-migration-refusal-20261114-01.inventory.json`,
+SHA-256 `c05d4534bcee4d40b4acdd8b32bd56b9fdcda1c8cf689bfe47b73da482ca77ac`.
+Recording and independent comparison pass. Preserve the full bundle and original
+producer/kernel/tool namespaces; this receipt is integrity evidence, not launch
+qualification or a hermetic input-closure waiver.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
