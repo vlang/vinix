@@ -436,6 +436,14 @@ combine signed conversion with floating addition in both directions.
 Deferred dispatch checks also cover flagged truncation and extension, freeze of
 their poison results, and failed-command completion for poison stores.
 
+`llvm.fptosi.sat`/`llvm.fptoui.sat` convert scalar half/float to i1..i64 with
+truncation toward zero, destination-range clamping and NaN-to-zero semantics.
+They use integer arithmetic independent of host rounding and exception flags,
+cost one step and keep poison/undef, declaration attributes and call guards.
+The 256 overloads have separate cache identities. Deferred dispatch checks mix
+all four signed/unsigned half/float variants in a kernel and cover infinities,
+NaNs, fractions and frozen poison results.
+
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and
 chooses a fixed zero for poison/undef. Both cost one step and require no flags.

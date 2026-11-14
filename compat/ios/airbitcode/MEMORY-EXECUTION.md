@@ -97,6 +97,19 @@ whose truncated result is outside the destination range produce poison.
 Poison inputs propagate. Selected undef still errors. Storing a poisoned cast
 rejects; a later select can discard its poison result. All casts cost one step.
 
+Direct `llvm.fptosi.sat`/`llvm.fptoui.sat` accept a scalar half/float input
+and an i1..i64 result, with exact integer/floating overload widths in the name.
+They truncate toward zero and clamp out-of-range values to the signed/unsigned
+destination limits; either NaN class becomes zero. Infinities clamp, negative
+unsigned inputs become zero, and signed i1 has range -1..0. Evaluation uses
+integer arithmetic independently of host rounding modes and exception flags.
+Poison inputs still propagate and selected undef errors; freeze/select and
+poison-store rules remain in force. Calls cost one step, share scalar/void
+validation and retain the existing intrinsic attribute/call restrictions.
+Each signedness/source/result-width overload has a distinct declaration-cache
+identity, separate from previous floating and integer families. Other floating
+formats, vector/aggregate results and malformed overload names reject.
+
 Floating `fneg` toggles only the sign bit of half/float, preserving zeros,
 subnormals, infinities and NaN payload/quiet bits. Poison propagates; undef
 rejects. Scalar `freeze` preserves defined i1..i64/half/float bits and makes a
@@ -540,6 +553,11 @@ extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native
 casts. It also checks integer/mixed/void APIs, prior-write preservation,
 budgets, preflight metadata rejection, and poison/undef/freeze/select chains.
+`tests/ios/air-saturating-cast.v` checks all 256 signed/unsigned half/float to
+i1..i64 saturation overloads against defined native LLVM, with exhaustive half
+inputs at five destination widths, boundary/sample inputs, scalar argument
+masking, poison/undef/choice rules, budgets, cached-call metadata/type guards,
+mixed-family cache identities and host rounding/exception controls.
 `tests/ios/air-memory-unary.v` checks fneg/freeze against native LLVM and exact
 raw-bit expectations, all half encodings, and separate indeterminate choices.
 `tests/ios/air-memory-flags.v` checks integer flags across all widths against a

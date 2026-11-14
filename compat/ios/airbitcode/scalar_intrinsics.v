@@ -1,12 +1,16 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow fptosi_sat fptoui_sat }
 // Validation remains the caller's responsibility. This evaluates only decoded,
 // admitted intrinsics; it never calls the declaration or a host function pointer.
 fn (m &IntegerMachine) intrinsic_value(ir IRModule, op IRTypedInstruction) !IntegerValue {
 	id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
 	start := op.operands_start; a := m.read(start + 1)!
+	if scalar_saturating_cast(id) {
+		if a.poison { return IntegerValue{poison: true} }
+		return IntegerValue{value: scalar_saturating_cast_value(id, m.p.execution_bits(m.p.operands[start + 1].type_index, true)!, m.p.integer_bits(op.result_type)!, a.value)!}
+	}
 	arity := scalar_intrinsic_arity(id)
 	b := if arity >= 2 { m.read(start + 2)! } else { IntegerValue{} }
 	c := if arity == 3 { m.read(start + 3)! } else { IntegerValue{} }
@@ -40,7 +44,13 @@ fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 		'llvm.minnum.f16', 'llvm.minnum.f32' { ScalarIntrinsic.minnum }
 		'llvm.maxnum.f16', 'llvm.maxnum.f32' { ScalarIntrinsic.maxnum }
 		'llvm.is.fpclass.f16', 'llvm.is.fpclass.f32' { ScalarIntrinsic.is_fpclass }
-		else { scalar_integer_intrinsic_name(name)! }
+		else {
+			if name.starts_with('llvm.fptosi.sat.i') || name.starts_with('llvm.fptoui.sat.i') {
+				id := if name.starts_with('llvm.fptosi.') { ScalarIntrinsic.fptosi_sat } else { ScalarIntrinsic.fptoui_sat }
+				scalar_saturating_cast_overload(name, id)!
+				id
+			} else { scalar_integer_intrinsic_name(name)! }
+		}
 	}
 }
 // Return the cache key, attribute-list ID and parameter-two immarg policy after
@@ -59,11 +69,16 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 { return error('AIR intrinsic: fixed signature/arity') }
 	result := ir.references[signature.refs_start]
 	if result != op.result_type { return error('AIR intrinsic: return type') }
-	input := if id == .is_fpclass || scalar_integer_overflow(id) { ir.references[signature.refs_start + 1] } else { result }
+	conversion := scalar_saturating_cast(id)
+	input := if conversion || id == .is_fpclass || scalar_integer_overflow(id) { ir.references[signature.refs_start + 1] } else { result }
 	if scalar_integer_overflow(id) && p.scalar_overflow_element(result)! != input { return error('AIR intrinsic: overflow result element type') }
 	bits := p.execution_bits(input, true)!
 	half := f.name.ends_with('.f16') || (id == .ldexp && f.name.ends_with('.f16.i32'))
 	integer := scalar_integer_intrinsic(id)
+	if conversion {
+		integer_bits, floating_bits := scalar_saturating_cast_overload(f.name, id)!
+		if p.integer_bits(result)! != integer_bits || bits != floating_bits { return error('AIR intrinsic: saturating conversion name/type mismatch') }
+	}
 	if integer {
 		if p.integer_bits(input)! != scalar_integer_intrinsic_width(f.name, id)! { return error('AIR intrinsic: integer name/type mismatch') }
 	} else if p.types[input].kind !in [.float_t, .half_t]! || bits != if half { u32(16) } else { u32(32) } { return error('AIR intrinsic: name/type mismatch') }
@@ -87,7 +102,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
-	key := if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
+	key := if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
 	return key, ir_values(stream, raw)[6], id == .is_fpclass || scalar_integer_poison_flag(id)
 }
 // Accept only harmless function-level properties inherent in these intrinsics.
@@ -174,6 +189,7 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 	return work
 }
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
+	if scalar_saturating_cast(id) { return error('AIR intrinsic: separate conversion widths required') }
 	if scalar_integer_overflow(id) { return error('AIR intrinsic: overflow pair evaluator required') }
 	if id == .clmul { return scalar_integer_clmul(bits, a, b)! }
 	if scalar_integer_bit_permutation(id) { return scalar_integer_bit_permutation_value(id, bits, a, b)! }
