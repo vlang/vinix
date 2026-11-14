@@ -2983,6 +2983,40 @@ Typed receipt:
 SHA-256 `82c17920581ccbdbb2393906a56064440c07496aa530a7d798857c27ab188369`.
 Recording and independent comparison pass.
 
+## Retained binding owner recheck exhaustion, 2026-11-14
+
+Source `4752d2e81` extends the descriptor sweep to an existing live owner. The
+probe retains that owner while rechecking at every available headroom under its
+32-FD process limit. The 2-row, 741-row production and complete 741-row ASan runs
+all pass: headroom 0–8 refuses with `EMFILE`, and 9–14 succeeds. Both outcomes
+are required without hard-coding these thresholds. Each attempt retains zero
+measured V allocations and leaves descriptor availability unchanged.
+
+After pressure is removed at every level, the same owner must recheck
+successfully and still refuse a competing capture for managed-launch ownership.
+Thus failure releases temporary resources while preserving the live guard.
+Closing that owner must restore the original descriptor availability and allow
+fresh capture/close, which must also restore it. All earlier positive, ordinary
+refusal, constructor-exhaustion and final-retarget checks remain required and
+pass. Errors are released after saving errno; the counter's errno is cleared
+before each operation. ASan reports no errors.
+
+This adds local single-thread macOS adapter coverage. Production code is
+unchanged. The sweep does not inject faults at every syscall or qualify cold
+startup, libc/kernel heap, package-service admission, actual Wine, concurrent
+mutation or whole-launch lifetime. Broader section 14 gates remain open.
+
+Evidence is retained at `/Users/alex/.cache/vwbindingrecheck-20261114-01`, including
+generated C, parsed-source list, binaries, complete logs and source at base
+`4699891a7` plus `source.patch`. Changed probe bytes match `4752d2e81`. Original
+complete bundles and namespaces remain required; no hermetic-build or strict-ABI
+waiver is implied.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-binding-recheck-exhaustion-20261114-01.inventory.json`,
+SHA-256 `9a6f3d22dafc38e6fbe309f55f86df08016bd8aa7da337ad5952e139925cba48`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
