@@ -291,14 +291,15 @@ vector elements and chains of earlier GEPs. Every offset/stride/source
 allocation size stays within 64 MiB; multiplication and addition are checked
 before computing an offset. Negative indexes over supported scalars and nonempty
 fixed aggregate paths subtract their layout stride without going below the
-binding's logical base. Negative multi-index paths require all structure field
-offsets to be zero, because the planner groups those offsets separately. Scaled indexes
-are applied in order; each prefix must stay within the binding's extent, even
-when later subtraction lowers the final offset. The negative index magnitude
+binding's logical base. The executor replays the validated type path, applying
+each structure-field offset and scaled index in traversal order. Packed,
+unpacked and nested nonzero field offsets can mix with negative indexes;
+each prefix must stay within the binding's extent, even when later subtraction
+lowers the final offset. The negative index magnitude
 and scaled subtraction are checked before multiplication, including the signed
-minimum index. The binding's own offset supplies no extra headroom. Negative
-paths with nonzero structure offsets, zero-stride negative indexes, scalable
-layouts, dynamic, poison/undef and wider indexes reject. Constant-expression
+minimum index. The binding's own offset supplies no extra headroom.
+Zero-stride negative indexes, scalable layouts, dynamic, poison/undef and wider
+indexes reject. Constant-expression
 pointers, casts and numerical pointer inputs reject.
 
 Known GEP inbounds/nusw/nuw flags are accepted within the forward,
@@ -360,6 +361,10 @@ and rejects empty/oversized layouts and scaled underflow before stores.
 paths and zero-offset structure fields with native LLVM. It checks prefix
 extents independently of the final offset, exact one-past views, aliases,
 flags/budgets and rejection of underflow that a later index would compensate.
+`tests/ios/air-memory-structured-gep.v` compares mixed-sign packed/unpacked
+and nested structure paths with native LLVM. It checks nonzero fields before
+and after subtraction, exact prefix extents, aliases, field-prefix bounds and
+underflow that a later field offset would otherwise hide.
 `tests/ios/air-memory-casts.v` checks load/cast/store bodies against defined
 native LLVM conversions, with separate poison and unsupported-input controls.
 `tests/ios/air-memory-unary.v` checks fneg/freeze against native LLVM and exact

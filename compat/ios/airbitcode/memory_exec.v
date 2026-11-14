@@ -48,13 +48,34 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	plan := p.gep_offset_plan(stream, pools, bodies, layouts, index)!
 	defer { plan.free() }
 	// Keep every address within the argument's extent without index-width wrap.
-	// Negative paths require zero structure offsets, so term order is preserved.
+	// The numeric planner folds structure offsets together. Replay the validated
+	// type path here so each field offset participates in prefix bounds in order.
 	if plan.pointer_bits != 64 || plan.index_bits != 64 || gep_fixed(layouts, op.source_type)!.alloc_size > 64 * 1024 * 1024 { return error('AIR memory execution: GEP layout profile') }
 	mut offset := base.offset
-	if plan.constant_offset > u64(64 * 1024 * 1024) - offset { return error('AIR memory execution: GEP offset limit') }
-	offset += plan.constant_offset
 	mut extent := offset
-	for term in plan.terms {
+	mut element := op.source_type
+	mut term_index := 0
+	for ordinal in 0 .. op.operands_count - 1 {
+		operand_index := op.operands_start + ordinal + 1
+		if ordinal > 0 {
+			node := p.gep_type(element)!
+			if node.kind == .struct_t {
+				value := pools.lookup(bodies.instructions[index].scope, p.operands[operand_index].number)!
+				field := pools.scalar_bits(value.constant_index)!
+				layout := gep_fixed(layouts, element)!
+				// Field kind/range and field_offsets bounds were checked by the planner.
+				addend := layouts.field_offsets[layout.fields_start + int(field)]
+				if addend > u64(64 * 1024 * 1024) - offset { return error('AIR memory execution: GEP field offset limit') }
+				offset += addend
+				if offset > extent { extent = offset }
+				element = p.gep_ref(node, int(field))!
+				continue
+			}
+			element = p.gep_ref(node, 0)!
+		}
+		if term_index >= plan.terms.len || plan.terms[term_index].operand_index != operand_index { return error('AIR memory execution: GEP term order') }
+		term := plan.terms[term_index]
+		term_index++
 		if term.bits == 0 || term.bits > 64 || term.stride > 64 * 1024 * 1024 { return error('AIR memory execution: GEP index/stride profile') }
 		value := pools.lookup(bodies.instructions[index].scope, p.operands[term.operand_index].number)!
 		if value.kind != .constant { return error('AIR memory execution: literal GEP index required') }
@@ -62,7 +83,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 		if constant.kind !in [.zero, .integer]! || constant.splat { return error('AIR memory execution: defined GEP index required') }
 		bits := pools.scalar_bits(value.constant_index)! & constant_mask(term.bits)
 		if bits & (u64(1) << (term.bits - 1)) != 0 {
-			if plan.constant_offset != 0 || op.flags & 4 != 0 { return error('AIR memory execution: backward GEP profile') }
+			if op.flags & 4 != 0 { return error('AIR memory execution: backward GEP profile') }
 			if p.types[op.source_type].kind in [.array_t, .struct_t, .vector_t] {
 				if term.stride == 0 { return error('AIR memory execution: nonempty backward aggregate required') }
 			} else { p.execution_bits(op.source_type, true)! }

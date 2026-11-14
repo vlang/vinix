@@ -564,11 +564,12 @@ inbounds/nusw/nuw flags use the executor's checked, nonwrapping offset profile.
 Negative indexes over supported scalars and nonempty fixed aggregate paths
 may step backward using layout strides. Each scaled-index prefix must stay
 at or above the binding's logical base and within its extent. Negative
-multi-index paths require zero structure field offsets; earlier positive
+multi-index paths may include packed/unpacked/nested nonzero structure fields;
+field offsets and scaled indexes are applied in traversal order. Earlier
 prefixes retain their full extent even if the final pointer is lower.
 The binding offset supplies no extra headroom. Plain, nusw and inbounds forms
-are supported; nuw, negative paths with nonzero structure offsets, zero-stride
-negative indexes, scalable layouts and dynamic/poison/undef/wide indexes reject
+are supported; nuw, zero-stride negative indexes, scalable layouts and
+dynamic/poison/undef/wide indexes reject
 before stores.
 Pipeline buffer extents include every derived/unused pointer and accessed byte;
 dispatch validates the combined extent plus the binding offset before recording.
