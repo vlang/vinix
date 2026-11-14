@@ -1276,7 +1276,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     after natural Wine retirement. A [same-generation signed relaunch](tests/packages/wine-lease-supervision-plan.md#signed-prefix-relaunch-2026-11-14)
     now reuses the private prefix after that retirement, preserving private
     data, returning 37 and releasing the new lease. Runtime-generation prefix
-    migration and holder death remain separate gates.
+    migration and holder death remain separate gates. A [read-only builtin
+    binding review](tests/packages/wine-lease-supervision-plan.md#runtime-binding-review-2026-11-14)
+    now reports current/prior generation links and refuses structurally unsafe
+    inputs; authenticated, serialized migration application remains open.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.

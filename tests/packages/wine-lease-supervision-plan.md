@@ -1839,6 +1839,43 @@ links between runtime generations remains open, along with holder death,
 session teardown, ARM ownership, fresh owned GUI, default activation and broad
 failure/topology/heap/hermetic gates.
 
+## Runtime binding review, 2026-11-14
+
+Source `6560bcd6f` adds `wineadapter.review_prefix_bindings()` and the standalone
+`wine-prefix-review PACKAGE_STORE PRIVATE_DATA NEW_BUILTINS` utility. Run as the
+prefix owner, it reports format-1 structural binding rows with observed and
+replacement paths, selected generation, runtime identity and at most one prior
+generation. Already-current bindings report prior generation zero. It opens
+existing directories without following symlinks and checks prefix ownership,
+directory identities, ordinary new assets, canonical generation paths and exact
+basenames. It refuses foreign stores/runtimes, multiple prior generations,
+linked new assets/directory components and ordinary files replacing prefix links.
+It creates no directories and changes no prefix content or launch behavior.
+
+The host binding tests and actual compiled CLI control pass, including unchanged
+prefix snapshots, repeatable report cleanup, canonical generation/overflow
+controls and the refusal cases above. Existing prefix tests also pass, including
+their 1000-iteration controls; measured heap flatness is not claimed. Static Linux
+x86_64 and AArch64 builds pass. Those binaries were not executed in guests, and
+the signed Wine fixture was not rerun for this read-only utility. Earlier fixture
+ownership, compilation and initial cross-link diagnostics remain in the bundle
+alongside the passing final logs.
+
+Evidence is frozen at `/Users/alex/.cache/vwbindreview-20261114-01`, including
+final sources, copied host compiler, generated C, binaries and logs. This is not
+a complete hermetic compiler/source closure. The typed receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-binding-review-20261114-01.inventory.json`,
+SHA-256 `7232d1f65e3d0551ec1d3c131210ba2aacb15fcdf0e3e42024b834ffba5af22c`.
+Recording and independent checking both pass complete bytes, sizes, types,
+modes and link targets; adjacent record/check logs retain the results.
+
+This review neither authenticates runtimes nor authorizes migration, and is not
+a snapshot against concurrent mutation. Actual migration still needs fresh
+authentication, idle-server admission, lease/launch serialization, rechecks and
+interruption recovery. Migration application, holder-death retention, session
+teardown, ARM owned Wine, fresh owned GUI acceptance and default activation
+remain open; this checkpoint does not complete roadmap section 14.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

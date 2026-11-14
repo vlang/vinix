@@ -1941,6 +1941,25 @@ retire; remove/rollback and final collection follow. This case uses 3 GiB and
 a 180-second positive-launch bound. See the [signed relaunch report](../../tests/packages/wine-lease-supervision-plan.md#signed-prefix-relaunch-2026-11-14).
 Runtime-generation builtin-link migration remains a separate open gate.
 
+`wine-prefix-review PACKAGE_STORE PRIVATE_DATA NEW_BUILTINS` runs as the prefix
+owner and prints format-1 JSON describing existing builtin links and proposed
+targets. Build its source at `tools/packages/wine-prefix-review.v` with the
+repository module path. The selected builtin directory must use the canonical
+package-store generation/runtime layout. A review accepts selected-generation
+links plus at most one prior generation of the same runtime; `prior_generation`
+is zero when every link already selects the requested generation. Linked
+directory components, linked new assets, ordinary files replacing prefix links,
+foreign stores/runtimes and inconsistent target basenames are refused.
+
+This is a read-only structural review: it creates no prefix directories and
+rewrites no bindings. It neither authenticates runtimes nor authorizes migration,
+and provides no snapshot against concurrent mutation. Library callers own the
+`wineadapter.review_prefix_bindings()` result and release it with repeatable
+`close()`. Applying migration still requires authenticated inputs, idle-server
+admission, lease/launch serialization, fresh rechecks and interruption recovery.
+See the [binding review qualification](../../tests/packages/wine-lease-supervision-plan.md#runtime-binding-review-2026-11-14)
+for host controls and cross-build limits.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership
