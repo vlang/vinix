@@ -3303,6 +3303,65 @@ Typed receipt:
 SHA-256 `1e4a9484346d95345d2478adb925929069dfea3253d95890bc317d2b51294686`.
 Recording and independent comparison pass.
 
+## VJFS prefix recovery across acknowledged-sync VM cuts, 2026-11-14
+
+Source `ecfc056b7` adds a guest, controller and thin V disk-image helper. The
+helper reuses the established `diskhost` journal formatter and clean exporter.
+Test-only fsync interception calls the real syscall, then pauses immediately
+after one selected successful sync. The existing hardware harness kills QEMU
+with `SIGKILL`, requires signal 9, and boots the same writeback-cached disk.
+No sync, guest shutdown or orderly QEMU teardown follows the cut marker.
+
+Three fresh VJFS cases per architecture cut after the first staged-link sync,
+after its renamed-link destination sync, and after its source-directory sync.
+On reboot an ordinary-account child requires the persisted stage or selected
+first link, the second old link, absent addition, unchanged runtime bytes and
+private sentinel. Fresh capture must migrate twice, fully recheck three current
+rows and leave no stage. After owner close, a six-second deferred-unlink grace
+precedes final sync and orderly poweroff. This grace is only in the recovered
+boot. Clean inspection export requires a cleared journal commit marker and
+modifies a separate image; read-only `e2fsck -f -n` must return zero.
+
+All six VJFS cases pass, including input hash rechecks and filesystem inspection:
+
+| Cut point | x86 seconds | ARM seconds |
+| --- | ---: | ---: |
+| Stage sync | 18.770 | 17.691 |
+| Destination sync after rename | 19.017 | 17.493 |
+| Source-directory sync | 18.157 | 17.244 |
+
+Each two-boot case retains a 120-second cap. The plain-ext2 ARM comparison
+recovers the visible namespace at all three points, but both post-rename cuts
+leave an allocated orphan inode/block and fail `e2fsck` with exit 4; the overall
+controller rejects them. The first-stage case passes after final cleanup grace.
+No repair or filesystem-check exception is used. A guest without interception
+fails all three requested cuts. Helper overwrite and source/destination identity
+controls also refuse. These controls and earlier bootstrap/mount refusals remain
+in the evidence, including the initial no-grace filesystem failure.
+
+Evidence is retained at `/Users/alex/.cache/vwwinecut-20261114-01`, with isolated
+base `3b7144240` plus `source.patch`, matching V files, generated guest C,
+source lists, kernels, all binaries, raw and inspection images, serial/QMP logs,
+tool output and validation notes. Guest and controller builds retain production
+mode and `-gc none -manualfree`; the image helper omits `-prod` because the retained
+compiler promotes deprecated types in shared dependencies to production errors.
+Those compiler refusals and the combined-import refusal are preserved. The
+existing LLVM pointer-type exception remains; strict ABI/hermetic closure is
+not established. Product adapter, kernel and activation defaults are unchanged.
+
+This qualifies three acknowledged-sync VM-cut boundaries for a small adapter
+marker prefix on VJFS, not plain-ext2 crash safety. Host storage caches survive
+the VM kill. Physical power loss, torn writes, other interruption points,
+741-row cut behavior, signed service/public-command recovery, actual Wine
+execution/version/GUI compatibility, measured heap, complete descriptor
+accounting and whole-launch lifetime remain separate gates. Original namespaces
+and complete prior audit bundles remain required.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-powercut-20261114-01.inventory.json`,
+SHA-256 `f282a424fe58fa845957f265e9727d326489f1ed293f0f3e5032100714f616bc`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
