@@ -1902,12 +1902,12 @@ This uses the same 3 GiB fixture and is mutually exclusive with
 records its scope; holder SIGKILL, full session teardown and broader lifetime
 guarantees remain open.
 
-Both signed caller-death modes also attempt a second actual package launch
-before remove/rollback. It must return 126 within fifteen seconds at the
-managed-prefix guard while the original caller stays gone, holder/server/worker
+The `--caller-death-probe` and `--idle-server-probe` cases also attempt a second
+actual package launch before remove/rollback. It must return 126 within fifteen
+seconds at the managed-prefix guard while the original caller stays gone, holder/server/worker
 remain live, generation bytes survive and the lease stays busy. See the
 [signed contention check](../../tests/packages/wine-lease-supervision-plan.md#signed-prefix-contention-after-caller-death-2026-11-14).
-Foreign-server admission after manager death remains a separate gate.
+The separate manager-death case below covers refusal of a surviving server.
 
 `--owned-manager --idle-server-probe` extends the signed x86 caller-death
 case through zero live Wine clients. A positive control first matches the
@@ -1917,9 +1917,20 @@ busy lease before and after another actual collection. Generation bytes must
 survive; after natural retirement, holder status 37 and final removal are
 required. Retired zombies can still await their owner during the idle check.
 The runtime's server command is unchanged, with no persistence extension or
-pause. All three lifetime probe flags are mutually exclusive and require owned
+pause. All four lifetime probe flags are mutually exclusive and require owned
 mode; this case also uses 3 GiB. See the [idle-server qualification](../../tests/packages/wine-lease-supervision-plan.md#idle-server-after-client-retirement-2026-11-13)
 for the bounded local result and remaining lifetime gates.
+
+`--owned-manager --manager-death-probe` selects a separate signed x86 case:
+after caller SIGKILL it verifies and kills the SDK manager, requires the live
+server adopted by the holder, then requires a second package launch to return
+126 at the surviving server's lock-owner gate. This end-to-end recovery check
+uses a sixty-second refusal bound and the same 3 GiB fixture. Existing prefix
+contention modes retain fifteen seconds. Collection must retain the obsolete
+generation until natural Wine retirement; the holder then returns the killed
+manager's status 137. This case does not preserve initial application status 37
+across manager death. See the [manager-death qualification](../../tests/packages/wine-lease-supervision-plan.md#signed-sdk-manager-death-2026-11-14)
+for exact inputs, earlier failed attempts and remaining lifetime gates.
 
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing

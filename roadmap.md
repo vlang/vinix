@@ -1267,10 +1267,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     natural workload exit. A [zero-live-client idle-server case](tests/packages/wine-lease-supervision-plan.md#idle-server-after-client-retirement-2026-11-13)
     also retains that generation through collection after caller death and
     client retirement, while the server and holder remain live, then removes
-    it after natural retirement. Both signed caller-death modes now require
+    it after natural retirement. The caller-death and idle-server modes require
     [competing-prefix refusal](tests/packages/wine-lease-supervision-plan.md#signed-prefix-contention-after-caller-death-2026-11-14)
     through the actual package CLI, preserving the original live workload and
-    lease. Holder death remains a separate gate.
+    lease. A separate [signed SDK-manager death case](tests/packages/wine-lease-supervision-plan.md#signed-sdk-manager-death-2026-11-14)
+    now retains the generation through manager SIGKILL, server adoption and
+    foreign-server refusal, then collects the holder with manager status 137
+    after natural Wine retirement. Holder death remains a separate gate.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.

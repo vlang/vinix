@@ -1749,6 +1749,53 @@ SDK death, session teardown, ARM ownership, fresh owned GUI, default activation
 and broad topology/heap/hermetic gates remain open. Production runtime, kernel
 and sandbox permissions are unchanged.
 
+## Signed SDK manager death, 2026-11-14
+
+Source `585f95859` adds opt-in `--owned-manager --manager-death-probe` for
+signed x86 console qualification. After ordinary caller SIGKILL/outer status
+137, the observer verifies the SDK manager's parent, credentials and runtime
+argv before targeting it with SIGKILL. It requires the manager gone and live
+Wine server adopted by the private holder. A second actual package launch
+must exit 126 at `Wine server lock already has an owner`; holder, server and
+worker stay live and the generation lease stays busy. Remove/rollback then
+makes generation 1 obsolete. Three real collections preserve its bytes and
+PE; after natural Wine retirement the fixture targeted-reaps only the holder
+and requires status 137, then a fourth collection removes that generation
+while active/rollback remain. This is the killed SDK child's status; the case
+does not claim preservation of initial application status 37 across SDK death.
+
+Final `native-08` passes: `passed=true`, `interrupted=false`, 205.819 seconds,
+with parsed-source, selected-input and generated-output rechecks. Fifteen mode/
+architecture controls pass against the isolated controller. Actual CLI builds
+receive only the existing owned define; the new define is observer-only.
+Runtime/kernel/sandbox policy and Wine persistence are unchanged.
+
+The new end-to-end recovery refusal has a separate sixty-second bound. Earlier
+fifteen-second attempts timed out; the bounded process dump showed the second
+ordinary package CLI still running under `vinix-session`, before SDK creation.
+Existing managed-prefix modes retain fifteen seconds. Earlier source-edit,
+bootloader and timeout failures remain preserved. Shared account-source churn
+caused a correct audit refusal, so final qualification uses isolated tree base
+`63fc675f1` plus archived `final-probe.patch`; the three changed files match the
+root commit. Host compilation retains `-prod -gc none -manualfree`, with host
+LTO disabled. The prepared runtime/PE were reused, freshly signed/published/
+installed; prior complete producer/kernel bundles remain required.
+
+Sources, isolated tree, all attempts, generated artifacts and complete final
+native input byte snapshots are frozen at `/Users/alex/.cache/vwmanager-20261114-01`.
+Use `selected-inputs-05` for the successful case; earlier snapshots correspond
+to failed inputs. Preserve original namespaces and dependency bundles too.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-manager-death-20261114-01.inventory.json`,
+SHA-256 `05da626283782d591e293c9d327fd8b72bc52d1fb469f13a99b1aae35d396268`.
+Recording and independent verification pass with adjacent logs. Preserve the
+entire frozen workspace, isolated tree and referenced original input bundles.
+
+This qualifies one SDK-manager SIGKILL with a surviving holder. Holder death/
+kernel-owned retention, full session teardown, ARM ownership, fresh owned GUI,
+default activation and broader failure/topology/heap/hermetic gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
