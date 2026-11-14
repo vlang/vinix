@@ -89,7 +89,7 @@ fn main() {
 	source.write_string('define void @poison_branch(ptr %out) { entry: store i8 17, ptr %out, align 1\n br i1 poison, label %left, label %right\n left: ret void\n right: ret void }\n')
 	source.write_string('define void @looping(ptr %out) { entry: store i8 17, ptr %out, align 1\n br label %loop\n loop: br label %loop }\n')
 	source.write_string('define void @backwards(ptr %out) { entry: store i8 17, ptr %out, align 1\n br label %later\n earlier: ret void\n later: br label %earlier }\n')
-	source.write_string('define void @pointer_phi(ptr %out) { entry: br i1 true, label %left, label %right\n left: br label %join\n right: br label %join\n join: %p = phi ptr [%out, %left], [%out, %right]\n store i8 17, ptr %p, align 1\n ret void }\n')
+	source.write_string('define void @pointer_phi(ptr %out) { entry: br i1 true, label %left, label %right\n left: br label %join\n right: %q = getelementptr i8, ptr %out, i64 1\n br label %join\n join: %p = phi ptr [%out, %left], [%q, %right]\n store i8 17, ptr %p, align 1\n ret void }\n')
 	source.write_string('define void @dead_bad(ptr %out) { entry: store i8 17, ptr %out, align 1\n br i1 true, label %good, label %bad\n good: ret void\n bad: %p = alloca i32\n ret void }\n')
 	os.write_file(out + '/input.ll', source.str())!
 	mut proc := os.new_process(os.args[1]); proc.set_args([out + '/input.ll', '-o', out + '/input.bc']); proc.set_redirect_stdio_merged(); proc.run(); log := proc.stdout_slurp(); proc.wait(); code := proc.code; proc.close(); os.write_file(out + '/assemble.log', log)!; assert code == 0, log

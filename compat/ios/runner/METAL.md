@@ -269,9 +269,15 @@ before pipeline creation or execution, and buffer requirements combine all
 paths. The pipeline budget conservatively includes every static instruction
 and every switch's maximum case comparisons;
 execution charges only the taken path. Poison/undef branch conditions error
-and earlier writes remain visible. Pointer PHIs, backward edges and
-loops reject. Deferred dispatches exercise both paths, scalar/pair PHIs, mixed
-incoming values and preserved overflow flags; a loop pipeline rejects.
+and earlier writes remain visible. Pointer PHIs resolve during preflight when
+all incoming operands have the same pointer type, argument identity and byte
+offset. Direct arguments, earlier GEPs and invariant pointer PHIs may converge;
+different arguments/offsets or invalid incoming pointers reject, including on
+inactive paths. Aliased bindings retain distinct argument identities. Pointer
+PHIs cost one executed step and may interleave with scalar/pair PHIs. Backward
+edges and loops reject. Deferred dispatches exercise both paths, scalar/pair/
+pointer PHIs, mixed incoming values and preserved overflow flags; a loop
+pipeline rejects.
 
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct

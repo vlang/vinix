@@ -17,7 +17,14 @@ distinct. All blocks are partitioned and preflighted, including unvisited
 ones. Leading PHIs accept matching i1..i64, half/float or supported overflow
 pairs, with exactly one incoming value for each actual predecessor. They read
 only the executed predecessor, collecting all incoming values before publishing
-results. Pointer/general aggregate PHIs, backward edges and loops reject.
+results. Pointer PHIs are supported when every incoming operand has the same
+pointer type and resolves to the same argument identity and byte offset.
+Incoming arguments, earlier GEPs and earlier invariant pointer PHIs may use
+different SSA names. All incoming pointers must be supported and equivalent,
+including on inactive paths; different arguments reject even if their buffers
+alias. These PHIs resolve during preflight and never enter scalar value slots.
+They still cost one executed step and may mix with scalar/pair PHIs in any
+order. General aggregate PHIs, backward edges and loops reject.
 
 Integer `switch` accepts i1..i64 conditions and zero through 64 distinct
 defined integer literal cases of exactly the condition type. Default and case
@@ -315,7 +322,8 @@ Each pointer argument binds to an IRMemoryBinding with borrowed mutable data,
 a byte offset, declared virtual base alignment and write permission. At most
 64 bindings of at most 64 MiB each are accepted. Address spaces 0 and 1 are
 supported; space 2 requires a readonly binding. Pointer operands must directly
-name arguments or earlier supported GEP results. No host pointers are accepted.
+name arguments, earlier supported GEP results or invariant pointer PHIs.
+No host pointers are accepted.
 Bindings may share byte storage;
 execution observes earlier stores through aliases. Callers retain ownership
 and must prevent concurrent access/mutation during a run.
@@ -432,7 +440,13 @@ before earlier stores, alongside poison, constants and aggregate exclusions.
 joins against native LLVM across all scalar integer widths, half/float and
 overflow pairs. It checks exact path costs, conservative budgets, PHI
 predecessors, inactive metadata/access requirements, lazy incoming values,
-poison/undef/freeze, early returns and rejection of loops and pointer PHIs.
+poison/undef/freeze, early returns and rejection of loops and varying pointer PHIs.
+
+`tests/ios/air-memory-pointer-phi.v` compares invariant pointer PHIs with native
+LLVM across all scalar widths, branch/switch/nested joins, mixed PHI orders,
+direct/derived incoming pointers and aliases. It checks executed path costs,
+budgets, bindings, malformed metadata/types/predecessors, unequal or invalid
+incoming pointers and poison/undef branch conditions with earlier writes.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

@@ -148,6 +148,18 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		if code in [u64(10), 11, 12]! { continue } // Checked by control preflight.
 		if code == 16 {
 			if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: PHI result') }
+			if p.gep_type(op.result_type)!.kind == .pointer_t {
+				mut resolved := IRMemoryAccess{}
+				for i in 0 .. op.operands_count {
+					operand := op.operands_start + i
+					if p.operands[operand].type_index != op.result_type { return error('AIR memory execution: pointer PHI type') }
+					candidate := p.memory_pointer(pools, bodies, scope, operand, count, pointers)!
+					if i == 0 { resolved = candidate }
+					else if candidate.argument != resolved.argument || candidate.offset != resolved.offset { return error('AIR memory execution: invariant pointer PHI required') }
+				}
+				pointers[int(inst.next_value - s.base_id)] = resolved
+				continue
+			}
 			if op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t {
 				p.scalar_pair_flow(op, s.base_id, false, pools, scope)!
 			} else {
@@ -267,9 +279,12 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 			m.step()!; mut incoming := -1
 			for i in 0 .. op.targets_count { if p.targets[op.targets_start + i] == previous { incoming = op.operands_start + i; break } }
 			if incoming < 0 { return error('AIR memory execution: PHI lacks executed predecessor') }
-			pending[phis] = m.read_flow(incoming)!; phis++
+			if p.types[op.result_type].kind != .pointer_t { pending[phis] = m.read_flow(incoming)! }
+			phis++
 		}
-		for i in 0 .. phis { m.put(bodies.instructions[block.first + i], pending[i]) }
+		for i in 0 .. phis {
+			if p.types[p.instructions[block.first + i].result_type].kind != .pointer_t { m.put(bodies.instructions[block.first + i], pending[i]) }
+		}
 		mut next := -1
 		for index in block.first + phis .. block.first + block.count {
 			m.step()!; inst := bodies.instructions[index]; op := p.instructions[index]; code := stream.records[inst.record].code
