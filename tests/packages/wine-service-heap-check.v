@@ -9,7 +9,10 @@ import plainiso
 import tests.packages.winesource
 
 fn run() ! {
-	if os.args.len != 5 { return error('usage: CHECK FRESH_WORK ARCH KERNEL COMPILED_GUEST') }
+	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] != '--refusals') {
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL COMPILED_GUEST [--refusals]')
+	}
+	refusals := os.args.len == 6
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh work and supported architecture required') }
 	if winesource.file_digest(@FILE)! != sha256.hexhash($embed_file('wine-service-heap-check.v').to_string()) {
@@ -30,10 +33,18 @@ fn run() ! {
 	os.mkdir_all(work)!
 	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
-	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-service-heap', arches: [arch], ending: .running,
-		required: ['WINE SERVICE HEAP cycles=100 live_objects=0 live_bytes=0',
+	required := if refusals { [
+		'WINE SERVICE REFUSAL phase=missing-app cycles=100 live_objects=0 live_bytes=0',
+		'WINE SERVICE REFUSAL phase=runtime-kind cycles=100 live_objects=0 live_bytes=0',
+		'WINE SERVICE REFUSAL phase=personal-dll cycles=100 live_objects=0 live_bytes=0',
+		'WINE SERVICE REFUSAL phase=personal-stage cycles=100 live_objects=0 live_bytes=0',
+		'WINE SERVICE REFUSALS PASS phases=4 cycles=100 lease-free guard-recovered personal-data-preserved',
+		'HWTEST PASS wine-service-heap',
+	] } else { ['WINE SERVICE HEAP cycles=100 live_objects=0 live_bytes=0',
 			'WINE SERVICE HEAP PASS signed installed ordinary-account review/recheck/close; lease released',
-			'HWTEST PASS wine-service-heap'], forbidden: ['HWTEST FAIL', 'Kernel panic']},
+			'HWTEST PASS wine-service-heap'] }
+	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-service-heap', arches: [arch], ending: .running,
+		required: required, forbidden: ['HWTEST FAIL', 'Kernel panic']},
 		hwhost.Run{kernel: os.args[3], guest: os.args[4], state: work + '/boot', timeout: 120, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
 	for path, expected in inputs { if winesource.file_digest(path)! != expected { return error('service heap input changed') } }

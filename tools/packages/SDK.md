@@ -2140,6 +2140,16 @@ one-cycle diagnostic build cannot satisfy its required 100-cycle marker. Marker
 code is never executed; setup, cold startup, libc/kernel heap and Wine execution
 remain outside this measurement.
 
+For refused operations, add `-d wine_service_heap_refusals` to the guest build
+and `--refusals` to the controller invocation. This separate mode requires 100
+attempts each for missing applications, runtime/application kind mismatch,
+personal DLL collisions and personal stage migration refusal. Each phase must
+retain zero measured V allocations. Coordination probes require temporary store
+reader locks and failed-admission leases to be released, while failed migration
+keeps the live owner's lease and guard. Explicit fixture cleanup must permit
+retry and fresh capture; personal contents must survive. Both modes keep the
+120-second bound and their own required completion markers.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.
