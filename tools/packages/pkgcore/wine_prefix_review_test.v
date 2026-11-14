@@ -83,7 +83,7 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	mut next_admission := WineAdmission{generation: next.state.generation, runtime: next.state.packages[next_index].package, prepared: next}
 	next = PreparedLaunch{}
 	defer { next_admission.close() }
-	mut next_owner := WinePrefixReview{admission: next_admission, review: next_admission.capture_prefix(data)!}
+	mut next_owner := WinePrefixReview{admission: next_admission, review: next_admission.capture_prefix(data)!, root: root.clone(), application: 'app'}
 	next_admission = WineAdmission{}
 	defer { next_owner.close() }
 	assert next_owner.review.review.generation == upgraded.generation
@@ -94,6 +94,29 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	assert os.readlink(data + '/wine/drive_c/windows/system32/kernel32.dll')! == builtins + '/kernel32.dll'
 	assert !os.exists(data + '/wine/drive_c/windows/system32/new.dll')
 	next_owner.review.recheck()!
+	next_owner.recheck()!
+	configuration_path := root + '/etc/vinix-packages/config.json'
+	original_config := os.read_file(configuration_path)!
+	os.write_file(configuration_path, json2.encode(Config{architecture: 'aarch64', policy: Policy{reserve_bytes: 0}}))!
+	mut revoked := false
+	next_owner.recheck() or { revoked = err.msg().contains('publisher key has been revoked') }
+	assert revoked
+	os.write_file(configuration_path, original_config)!
+	next_owner.recheck()!
+	activation := acquire(next_owner.admission.prepared.directory)!
+	activate(next_owner.admission.prepared.directory, installed.generation)!
+	activation.release()
+	mut changed := false
+	next_owner.recheck() or { changed = err.msg().contains('active generation changed') }
+	assert changed
+	restore := acquire(next_owner.admission.prepared.directory)!
+	activate(next_owner.admission.prepared.directory, upgraded.generation)!
+	restore.release()
+	next_owner.recheck()!
+	next_owner.close()
+	mut closed := false
+	next_owner.recheck() or { closed = err.msg().contains('closed or lacks service admission') }
+	assert closed
 }
 
 fn wine_review_collect(store string) ! {

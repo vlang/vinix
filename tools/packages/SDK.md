@@ -2018,6 +2018,14 @@ releases prefix coordination before admission. Its `review` is borrowed until
 close. This API changes no links; signed installed-state qualification,
 migration application and interruption recovery remain required.
 
+Call `WinePrefixReview.recheck()` for service-level freshness: under a package
+reader lock it reloads configuration, requires the retained generation to remain
+active, repeats launch payload/publisher/policy verification, and rechecks prefix
+continuity. Construction performs this check before returning. Calling only
+`owner.review.recheck()` checks the adapter capture and does not refresh package
+trust or activation. Successful recheck supplies no authority for a later write;
+application and interruption recovery remain separate requirements.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership

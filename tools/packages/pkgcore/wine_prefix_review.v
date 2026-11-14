@@ -10,12 +10,37 @@ pub mut:
 	review wineadapter.IdleBindingReview
 mut:
 	admission WineAdmission
+	root string
+	application string
 }
 
 pub fn (mut owner WinePrefixReview) close() {
 	owner.review.close()
 	owner.admission.close()
+	unsafe { owner.root.free(); owner.application.free() }
 	owner = WinePrefixReview{}
+}
+
+// Refresh trust/policy and require the admitted generation to remain active.
+// Hold the package reader lock while checking payloads and prefix continuity.
+// This is admission at the time of the call, not authority for a later write.
+pub fn (owner &WinePrefixReview) recheck() ! {
+	if owner.admission.prepared.lease < 0 || !identifier(owner.application) {
+		return error('Wine prefix review is closed or lacks service admission')
+	}
+	service := Service{root: owner.root}
+	directory := service.directory()!
+	defer { unsafe { directory.free() } }
+	if directory != owner.admission.prepared.directory { return error('Wine prefix review package store differs') }
+	guard := acquire_reader(directory)!
+	defer { guard.release() }
+	config := service.configuration()!
+	defer { close_decoded_configuration(config) }
+	current := read_state(directory, config.architecture)!
+	defer { if current.generation != 0 { close_decoded_state(current) } }
+	if current.generation != owner.admission.generation { return error('Wine prefix review active generation changed') }
+	verify_launch_payloads(config, directory, owner.admission.prepared.state, owner.application)!
+	owner.review.recheck()!
 }
 
 fn wine_builtin_expectations(runtime Package) ![]wineadapter.BuiltinExpectation {
@@ -62,11 +87,12 @@ fn (admission &WineAdmission) capture_prefix(data string) !wineadapter.IdleBindi
 // Admission uses current launch verification. Review never changes builtin
 // links. Future application must recheck at use and provide crash recovery.
 pub fn (service Service) wine_prefix_review(id string, data string) !WinePrefixReview {
-	mut owner := WinePrefixReview{}
+	mut owner := WinePrefixReview{root: service.root.clone(), application: id.clone()}
 	mut accepted := false
 	defer { if !accepted { owner.close() } }
 	owner.admission = service.wine_admission(id)!
 	owner.review = owner.admission.capture_prefix(data)!
+	owner.recheck()!
 	accepted = true
 	return owner
 }
