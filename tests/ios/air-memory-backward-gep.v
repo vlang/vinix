@@ -65,7 +65,7 @@ fn main() {
 	for name, index in {'underflow': 'i64 -17', 'minimum': 'i64 -9223372036854775808', 'poison': 'i64 poison', 'undef': 'i64 undef', 'wide': 'i128 -1', 'dynamic': 'i8 %v'} {
 		source.write_string('define void @guard_${name}(ptr %dst) { %v = load i8, ptr %dst, align 1\n store i8 17, ptr %dst, align 1\n %b = getelementptr i8, ptr %dst, i64 16\n %p = getelementptr i8, ptr %b, ${index}\n ret void }\n')
 	}
-	for name, typ in {'array': '[2 x i8]', 'struct': '{i8, i8}', 'vector': '<2 x i8>', 'scalar128': 'i128'} {
+	for name, typ in {'array': '[0 x i8]', 'struct': '{}', 'vector': '<134217728 x i8>', 'scalar128': 'i128'} {
 		source.write_string('define void @guard_${name}(ptr %dst) { store i8 17, ptr %dst, align 1\n %b = getelementptr i8, ptr %dst, i64 16\n %p = getelementptr ${typ}, ptr %b, i64 -1\n ret void }\n')
 	}
 	source.write_string('define void @guard_multi(ptr %dst) { store i8 17, ptr %dst, align 1\n %b = getelementptr i8, ptr %dst, i64 16\n %p = getelementptr [2 x i8], ptr %b, i64 0, i64 -1\n ret void }\ndefine void @guard_direct(ptr %dst) { store i8 17, ptr %dst, align 1\n %p = getelementptr i8, ptr %dst, i64 -1\n ret void }\ndefine void @guard_alignment(ptr %dst) { store i8 17, ptr %dst, align 1\n %b = getelementptr i8, ptr %dst, i64 16\n %p = getelementptr i8, ptr %b, i64 -1\n store i32 1, ptr %p, align 4\n ret void }\ndefine void @guard_dereference(ptr %dst) { store i8 17, ptr %dst, align 1\n %b = getelementptr i8, ptr %dst, i64 65\n %p = getelementptr i8, ptr %b, i64 -1\n store i8 1, ptr %p, align 1\n ret void }\n')

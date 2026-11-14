@@ -561,11 +561,13 @@ Forward constant GEPs may select scalar array/structure/vector elements and
 chain from earlier GEPs. They require explicit little-endian layouts with
 64-bit pointer/index widths and defined nonnegative i1..i64 literals. Known
 inbounds/nusw/nuw flags use the executor's checked, nonwrapping offset profile.
-One negative scalar-element index (i1..i64, half or float) may step backward
+One negative index over a scalar (i1..i64, half or float) or nonempty fixed
+array/structure/vector allocation may step backward by its allocation stride
 from an earlier GEP, provided its scaled subtraction stays at or above the
 binding's logical base. The binding offset supplies no extra headroom. Plain,
-nusw and inbounds forms are supported; nuw, negative aggregate/multi-index paths
-and dynamic/poison/undef/wide indexes reject before stores. Earlier forward
+nusw and inbounds forms are supported; nuw, negative multi-index paths,
+zero-sized/scalable aggregates and dynamic/poison/undef/wide indexes reject
+before stores. Earlier forward
 intermediates still require their full extent even if the final pointer is lower.
 Pipeline buffer extents include every derived/unused pointer and accessed byte;
 dispatch validates the combined extent plus the binding offset before recording.

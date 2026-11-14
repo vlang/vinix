@@ -290,15 +290,17 @@ select arrays, structures (including packed fields), byte-addressable fixed
 vector elements and chains of earlier GEPs. Every offset/stride/source
 allocation size stays within 64 MiB; multiplication and addition are checked
 before computing an offset. A negative index is supported only as a single
-scalar-element index (i1..i64, half or float), subtracting from an earlier GEP's
+index over a scalar (i1..i64, half or float) or nonempty fixed array, structure
+or vector allocation, subtracting its allocation stride from an earlier GEP's
 proven byte offset without going below the binding's logical base. Its magnitude
 and scaled subtraction are checked before multiplication, including the signed
 minimum index. The binding's own offset supplies no extra headroom. Negative
-aggregate or multi-index paths, dynamic, poison/undef and wider indexes
-reject. Constant-expression pointers, casts and numerical pointer inputs reject.
+multi-index paths, zero-sized/scalable aggregates, dynamic, poison/undef and
+wider indexes reject. Constant-expression pointers, casts and numerical pointer
+inputs reject.
 
 Known GEP inbounds/nusw/nuw flags are accepted within the forward,
-nonwrapping profile. Backward scalar GEPs accept plain, nusw and inbounds
+nonwrapping profile. Backward GEPs accept plain, nusw and inbounds
 (including historical inbounds encoding), but any nuw bit rejects. Unknown
 bits reject. All intermediate offsets and unused GEP results must fit the
 binding's extent. A one-past result is
@@ -348,6 +350,10 @@ stores with native LLVM, including every scalar width and every index width,
 aliased buffers, exact one-past intermediate extents and historical inbounds.
 It checks budgets, permissions, intermediate bounds and rejected negative
 profiles/flags before an earlier store.
+`tests/ios/air-memory-backward-aggregate.v` checks negative allocation strides
+for arrays, packed/unpacked structures and fixed vectors with scalar loads and
+stores. It compares native LLVM results, aliases and exact one-past extents,
+and rejects empty/oversized layouts and scaled underflow before stores.
 `tests/ios/air-memory-casts.v` checks load/cast/store bodies against defined
 native LLVM conversions, with separate poison and unsupported-input controls.
 `tests/ios/air-memory-unary.v` checks fneg/freeze against native LLVM and exact

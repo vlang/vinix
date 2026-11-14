@@ -48,7 +48,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	plan := p.gep_offset_plan(stream, pools, bodies, layouts, index)!
 	defer { plan.free() }
 	// Keep every address within the argument's extent without index-width wrap.
-	// Negative indexes are limited to a single scalar-element subtraction.
+	// Negative indexes are limited to one fixed-allocation stride subtraction.
 	if plan.pointer_bits != 64 || plan.index_bits != 64 || gep_fixed(layouts, op.source_type)!.alloc_size > 64 * 1024 * 1024 { return error('AIR memory execution: GEP layout profile') }
 	mut offset := base.offset
 	if plan.constant_offset > u64(64 * 1024 * 1024) - offset { return error('AIR memory execution: GEP offset limit') }
@@ -61,8 +61,10 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 		if constant.kind !in [.zero, .integer]! || constant.splat { return error('AIR memory execution: defined GEP index required') }
 		bits := pools.scalar_bits(value.constant_index)! & constant_mask(term.bits)
 		if bits & (u64(1) << (term.bits - 1)) != 0 {
-			if op.operands_count != 2 || plan.terms.len != 1 || plan.constant_offset != 0 || op.flags & 4 != 0 { return error('AIR memory execution: backward scalar GEP profile') }
-			p.execution_bits(op.source_type, true)!
+			if op.operands_count != 2 || plan.terms.len != 1 || plan.constant_offset != 0 || op.flags & 4 != 0 { return error('AIR memory execution: backward GEP profile') }
+			if p.types[op.source_type].kind in [.array_t, .struct_t, .vector_t] {
+				if term.stride == 0 { return error('AIR memory execution: nonempty backward aggregate required') }
+			} else { p.execution_bits(op.source_type, true)! }
 			magnitude := (u64(0) - bits) & constant_mask(term.bits)
 			if term.stride != 0 && magnitude > offset / term.stride { return error('AIR memory execution: backward GEP underflow') }
 			offset -= magnitude * term.stride
