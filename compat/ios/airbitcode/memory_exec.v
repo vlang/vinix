@@ -224,6 +224,15 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		}
 		if code in [u64(9), 28, 5, 29]! {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: comparison/select result') }
+			if code in [u64(5), 29]! && p.gep_type(op.result_type)!.kind == .pointer_t {
+				start := op.operands_start
+				if op.operands_count != 3 || op.opcode != 0 || op.indices_count != 0 || p.operands[start].type_index != op.result_type || p.operands[start + 1].type_index != op.result_type || p.integer_bits(p.operands[start + 2].type_index)! != 1 { return error('AIR memory execution: pointer select types/arity') }
+				left := p.memory_pointer(pools, bodies, scope, start, count, pointers)!
+				right := p.memory_pointer(pools, bodies, scope, start + 1, count, pointers)!
+				if left.argument != right.argument || left.offset != right.offset { return error('AIR memory execution: invariant pointer select required') }
+				pointers[int(inst.next_value - s.base_id)] = left
+				continue
+			}
 			if code in [u64(5), 29]! && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t {
 				if op.indices_count != 0 { return error('AIR memory execution: pair select indices') }
 				p.scalar_pair_flow(op, s.base_id, true, pools, scope)!
@@ -312,7 +321,13 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 			if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }
 			if code == 58 { value := if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(op.operands_start)! } else { m.read_frozen(op.operands_start)! }; m.put(inst, value); continue }
 			if code in [u64(9), 28]! { value := m.compare_value(op)!; m.put(inst, value); continue }
-			if code in [u64(5), 29]! { value := m.select_value(op)!; m.put(inst, value); continue }
+			if code in [u64(5), 29]! {
+				if p.types[op.result_type].kind == .pointer_t {
+					condition := m.read(op.operands_start + 2)!
+					if condition.poison { return error('AIR memory execution: poison pointer select condition') }
+				} else { value := m.select_value(op)!; m.put(inst, value) }
+				continue
+			}
 			if code in [u64(4), 30, 43]! { continue }
 			access := profile.accesses[index - s.instructions_start]; binding := access.argument
 			bits := p.execution_bits(op.source_type, true)!; bytes := int((bits + 7) / 8); offset := int(bindings[binding].offset + access.offset)

@@ -61,9 +61,21 @@ helpers, including constant true/false FP predicates and poison propagation.
 Select reads its condition and only the chosen value. Unselected poison/undef
 constants do not reject; selected undef errors, and poison conditions/chosen
 values propagate to a rejected poison store. Selection does not skip earlier
-instructions. Pointer/vector comparisons and selects, aggregate comparisons,
+instructions. Pointer/vector comparisons and vector selects, aggregate comparisons,
 general aggregate selects and all comparison/select flags remain unsupported;
 the overflow-pair select exception is described below.
+
+Pointer selects accept a scalar i1 condition and two operands of exactly the
+result pointer type, both resolving to the same argument identity and byte
+offset. Both arms must be supported and equivalent even for a literal condition;
+different arguments reject even if their bound buffers alias. Arguments, GEPs,
+invariant pointer PHIs and earlier invariant selects may feed either arm. The
+result resolves during preflight and may feed GEPs, PHIs, selects and accesses.
+Each executed pointer select reads its condition and costs one step. This
+bounded profile requires a defined condition at that instruction: poison/undef
+reject immediately, including for unused results, and prior stores remain
+visible. Untaken blocks do not evaluate their selects. Scalar freeze may make
+the condition defined. No runtime pointer poison tracking is provided.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -322,7 +334,7 @@ Each pointer argument binds to an IRMemoryBinding with borrowed mutable data,
 a byte offset, declared virtual base alignment and write permission. At most
 64 bindings of at most 64 MiB each are accepted. Address spaces 0 and 1 are
 supported; space 2 requires a readonly binding. Pointer operands must directly
-name arguments, earlier supported GEP results or invariant pointer PHIs.
+name arguments, earlier supported GEP results, invariant pointer PHIs or selects.
 No host pointers are accepted.
 Bindings may share byte storage;
 execution observes earlier stores through aliases. Callers retain ownership
@@ -447,6 +459,12 @@ LLVM across all scalar widths, branch/switch/nested joins, mixed PHI orders,
 direct/derived incoming pointers and aliases. It checks executed path costs,
 budgets, bindings, malformed metadata/types/predecessors, unequal or invalid
 incoming pointers and poison/undef branch conditions with earlier writes.
+
+`tests/ios/air-memory-pointer-select.v` checks invariant pointer selects with
+native LLVM across every supported scalar width, select/GEP/PHI chains, nested
+joins and aliases. It checks metadata/types, budgets, bindings, unequal or
+invalid arms, poison/undef conditions with used/unused results and prior writes,
+and defined frozen conditions and untaken poison selects.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

@@ -279,6 +279,16 @@ edges and loops reject. Deferred dispatches exercise both paths, scalar/pair/
 pointer PHIs, mixed incoming values and preserved overflow flags; a loop
 pipeline rejects.
 
+Invariant pointer selects accept a scalar i1 condition and two pointer operands
+of the result type, resolving to the same argument identity and byte offset. Both arms must
+be supported and equivalent, including for literal conditions; aliased bindings
+retain distinct argument identities. Arguments, GEPs, invariant PHIs and selects
+may feed each other. The result resolves before dispatch. Each executed pointer
+select costs one step and reads its condition; poison/undef conditions error
+immediately, including for unused results, retaining prior writes. Untaken
+selects do not read their conditions, and scalar freeze may define a condition.
+This bounded profile has no runtime pointer poison tracking.
+
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct
 forward blocks. Each tested case costs one additional step; default paths test
