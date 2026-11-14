@@ -2009,6 +2009,15 @@ manifest borrows that state: do not copy the admission or use metadata after
 close. Admission does not lock a prefix, start Wine or authorize migration;
 combining it with idle review and recovery remains required.
 
+`Service.wine_prefix_review(application_id, private_data)` combines runtime
+admission and idle prefix capture in a single-owner `WinePrefixReview`. It
+derives the selected builtin path and exact expectations from the admitted
+runtime manifest, refusing empty/nested inventories and digest mismatches.
+The owner retains the generation lease and prefix guard together; `close()`
+releases prefix coordination before admission. Its `review` is borrowed until
+close. This API changes no links; signed installed-state qualification,
+migration application and interruption recovery remain required.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership

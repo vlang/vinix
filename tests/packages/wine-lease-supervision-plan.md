@@ -2047,6 +2047,28 @@ targets. This bundle contains the new sources, generated host C/binaries and
 logs; complete source closure, cross-builds and measured heap flatness are not
 claimed. Section 14 remains incomplete.
 
+## Manifest-to-prefix bridge, 2026-11-14
+
+Source `d78e07ea0` adds `Service.wine_prefix_review()`: one owner retains runtime
+admission and idle prefix capture, derives builtin paths and expected hashes and
+sizes from the runtime manifest, and compares them before returning. Close
+releases prefix coordination before the generation lease. Host tests pass for a
+synthetic admission, matching manifest, changed DLL refusal, empty/nested
+inventory refusal, alternate-root refusal and descriptor/guard cleanup. Prefix
+links remain unchanged. Tests use the retained V compiler with `-backend c -gc
+none -manualfree` and repository module path. They do not qualify a successful
+signed installed-state admission, collection contention, cross-build or guest
+execution. No production launch integration or migration application is claimed.
+
+Evidence is frozen at `/Users/alex/.cache/vwbridge-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-manifest-bridge-20261114-01.inventory.json`
+has SHA-256 `bff05ef7aece17aa609b72d77650ef869e7e1656e8495c4e28241e69e8a898ae`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. New source copies, generated host C/binaries and logs are retained;
+complete source closure and measured heap flatness are not claimed. Signed
+end-to-end qualification, migration application/recovery and the remaining
+section 14 gates stay open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
