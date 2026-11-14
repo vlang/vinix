@@ -1335,8 +1335,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     generation leases/store reader locks after close.
     A [paced 741-row service probe](tests/packages/wine-lease-supervision-plan.md#paced-741-row-public-service-probe-and-x86-checkpoint-2026-11-14)
     passes 10 cycles per write phase on ARM with zero retained tracked V
-    allocations. Unpaced ARM owner-budget refusals and final x86 timeouts are
-    retained; final scaled x86 qualification remains open.
+    allocations. [Unchanged final x86 binaries now also pass](tests/packages/wine-lease-supervision-plan.md#unchanged-final-x86-service-probe-requalification-2026-11-14)
+    the paced 741-row and 100-cycle two-row checks within their original bounds.
+    Unpaced ARM owner-budget refusals and earlier x86 timeouts remain retained.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

@@ -3227,6 +3227,41 @@ Typed receipt:
 SHA-256 `3bc80e3a38b176642cd4886c61115ab312c0ef63f33d25dfeb4fedc81facb877`.
 Recording and independent comparison pass.
 
+## Unchanged final x86 service probe requalification, 2026-11-14
+
+Sequential replay of the exact final binaries from source `62c4453f5` now
+passes the two-row x86 write mode in 108.626 seconds and the paced 741-row mode
+in 523.343 seconds. Their 120/600-second caps, 100/10 cycles per phase, six-second
+scaled fixture-reset wait, zero-allocation requirements and all completion
+markers are unchanged. No source, compiler, kernel, runtime, sandbox or resource
+budget changes were needed. Both runs verify selected inputs before/after.
+
+All three phases retain zero tracked V objects/bytes. Per-cycle inventory,
+signed target, old/new marker-byte and coordination-release checks pass;
+private sentinel contents survive and no stage remains. This closes the final
+paced x86 checkpoint above, together with its previously retained ARM pass.
+Earlier timeouts and unpaced ARM owner-budget refusals remain evidence.
+Host load declined from about 37 to 14.99 on 18 logical CPUs during this turn.
+That is consistent with contention contributing to earlier timeouts, without
+establishing exclusive causation or a repeatability/performance guarantee.
+
+New evidence is at `/Users/alex/.cache/vwservicex86-20261114-01`, including both
+fresh runs, selected-input verification, host-load observations, unchanged
+binary/kernel copies, generated guest C, original source base/patch and
+validation notes. The complete prerequisite bundle at
+`/Users/alex/.cache/vwservicescale-20261114-01` still passes independent comparison
+against receipt SHA-256
+`3bc80e3a38b176642cd4886c61115ab312c0ef63f33d25dfeb4fedc81facb877`.
+Both complete bundles and original namespaces remain required. This closes a
+paced marker row-count gate, excluding burst throughput, real Wine payload
+sizes/execution/version upgrades, GUI, power loss, whole-launch lifetime,
+libc/kernel heap, complete descriptor accounting, strict ABI and hermetic closure.
+
+New typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-service-x86-20261114-01.inventory.json`,
+SHA-256 `a059e11d5f744c4f2bfaf273866e1b5f208842f0cc6717f0ad0df53cd3de96b3`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
