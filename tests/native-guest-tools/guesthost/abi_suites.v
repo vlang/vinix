@@ -96,6 +96,7 @@ fn abi_spec(family string) !AbiSpec {
 		}
 		'terminal-jobs' {
 			AbiSpec{ family: 'terminal-jobs', module_name: 'guestfixture', features: [
+				'TERMINAL NONROOT PTY',
 				'TERMINAL JOBS PASS: permissions and sessions',
 				'TERMINAL JOBS PASS: stop and foreground signals',
 				'TERMINAL OWNED OPEN rounds=100 errors=0',
