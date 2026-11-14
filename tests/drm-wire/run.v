@@ -15,15 +15,17 @@ fn main() {
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/drm-wire/fixture', scratch, false)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
-	mut production := 'module drm\nimport usercopy\n'
-	production += section(source, 'struct DrmIoctlLayout {', '// Linux ioctl direction bits')!
+	mut production := 'module drm\nimport usercopy\nimport memory\nimport errno\n'
+	production += section(source, 'fn decode_ioctl_cmd(', 'fn common_ioctl_layout(')!
 	production += section(source, 'fn ioctl_layout(', '// The node is /dev/dri/')!
+	production += section(source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!
 	os.write_file('${scratch}/drm/production.v', production)!
 	os.cp('${repo}/tests/drm-wire/test.v', '${scratch}/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
-	build.set_args(['-nocache', '-no-parallel', '-cc', 'cc', '-enable-globals', '-path',
-		'${scratch}|@vlib|@vmodules', '-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer',
-		'-ldflags', '-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v'])
+	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
+		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
+		'-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
+		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v'])
 	build.run()
 	build.wait()
 	if build.code != 0 { exit(build.code) }

@@ -236,6 +236,36 @@ the linked kernel SHA-256 is
 `ec48ec1c51dea4063b75ae89265815c82a6b7fe6a6a4eb92fea47c7425db2513`.
 Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 
+### Linux DRM request transport correction
+
+Direct comparison with the packaged `drivers/gpu/drm/drm_ioctl.c` corrected
+an assumption in the first wire component: unknown ioctl input bytes are
+preserved and echoed by read/write requests, rather than rejected. The
+extensible path now intersects request/driver directions, sizes the complete
+buffer, copies output after handler errors, gives output faults precedence,
+and rejects missing handlers before allocation or user access. Nested Asahi
+command payloads retain their separate unsupported-field validation. Legacy
+requests keep their exact size/direction and error-output rules.
+
+Requests up to 128 bytes use a real stack array, matching Linux DRM's fast
+path; larger buffers use fallible allocation with one deferred release. The
+production node ioctl is executed under sanitizers with allocator/usercopy
+fault injection, live-buffer accounting, short/extended records, unknown-tail
+echo, direction intersections, driver errors, nil handlers and legacy cases.
+Lifetime review and both architecture builds passed. Generated C confirms
+stack storage on both architectures. The x86 blob was forcibly regenerated
+because its make input list excludes imported DRM sources.
+
+Evidence, original reference C, generated C, binaries and logs are retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-copy-20261114/bundle/`, built
+from `2a2e4bc5f` plus the retained DRM source. The sibling inventory SHA-256
+is `eda39f2b3bb61006bbd8542423e89da2c938f06bd1a56269db5d483109f59cf6`.
+Kernel SHA-256 values are
+`d16fc504733630e8d1c32a130c8e7b4c17a77cb64f5c5e9a1581053239ef9040`
+(AArch64) and `727fbc459e66f0ae50d31d1b51d7101504e04a50a74f6d9316b09214901dd1de`
+(x86_64). No hardware execution was performed. The modern Asahi ABI remains
+unregistered; the earlier ABI/scheduler/Mesa gaps are not closed by transport.
+
 ## Validation and continuation
 
 The host fixtures execute production page-table, publication, retirement and
