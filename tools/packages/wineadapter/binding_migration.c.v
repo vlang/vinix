@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module wineadapter
 
+#include <stdio.h>
+
 fn C.renameat(int, &char, int, &char) int
 
 const builtin_stage_name = '.vinix-builtin-next'
