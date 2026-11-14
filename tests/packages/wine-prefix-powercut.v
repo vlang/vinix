@@ -53,7 +53,7 @@ fn cut_fsync(fd i32) i32 {
 
 fn point_from_fixture() !int {
 	text := os.read_file('/etc/wine-cut-point')!
-	if text !in ['1', '2', '3'] { return error('expected cut point 1, 2 or 3') }
+	if text !in ['1', '2', '3', '4', '5', '6', '7', '8'] { return error('expected cut point 1 through 8') }
 	return text.int()
 }
 
@@ -132,13 +132,24 @@ fn ordinary(root string, point int, fresh bool) ! {
 			return error('reboot changed runtime payload bytes')
 		}
 	}
-	if os.exists(system + '/c.dll') || os.is_link(system + '/c.dll') { return error('cut advanced past the first replacement') }
-	if os.readlink(system + '/b.dll')! != old + '/b.dll' { return error('cut advanced into the second replacement') }
-	if point == 1 {
-		if os.readlink(stage)! != selected + '/a.dll' || os.readlink(system + '/a.dll')! != old + '/a.dll' {
-			return error('reboot did not retain the synced pending stage')
+	replaced := if point >= 5 { 2 } else if point >= 2 { 1 } else { 0 }
+	added := point >= 7
+	staged := point in [1, 4]
+	for index, name in ['a.dll', 'b.dll']! {
+		expected := (if index < replaced { selected } else { old }) + '/' + name
+		if os.readlink(system + '/' + name)! != expected { return error('reboot replacement boundary differs') }
+	}
+	if added {
+		if os.readlink(system + '/c.dll')! != selected + '/c.dll' || os.read_file(selected + '/c.dll')! != 'added bytes' {
+			return error('reboot lost the synced addition')
 		}
-	} else if os.readlink(system + '/a.dll')! != selected + '/a.dll' { return error('reboot lost the synced first replacement') }
+	} else if os.exists(system + '/c.dll') || os.is_link(system + '/c.dll') { return error('cut advanced into additions') }
+	if staged {
+		if os.readlink(stage)! != selected + if point == 1 { '/a.dll' } else { '/b.dll' } {
+			return error('reboot did not retain the exact pending stage')
+		}
+	} else if os.exists(stage) || os.is_link(stage) { return error('reboot retained an unexpected stage') }
+	println('WINE POWER CUT STATE point=${point} replaced=${replaced} added=${added} staged=${staged}')
 	println('WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings')
 	$if wine_cut_cli ? {
 		for command in ['wine-prefix-migrate', 'wine-prefix-migrate', 'wine-prefix-review']! {

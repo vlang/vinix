@@ -22,14 +22,16 @@ fn tool(command []string, log string) ! {
 }
 
 fn run() ! {
-	if os.args.len !in [5, 6, 7, 9] || (os.args.len >= 6 && os.args[5] != '--vjfs')
-		|| (os.args.len >= 7 && os.args[6] != '--service') || (os.args.len == 9 && os.args[7] != '--cli') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]]')
+	if os.args.len !in [5, 6, 7, 9, 10] || (os.args.len >= 6 && os.args[5] != '--vjfs')
+		|| (os.args.len >= 7 && os.args[6] != '--service') || (os.args.len >= 9 && os.args[7] != '--cli')
+		|| (os.args.len == 10 && os.args[9] != '--all-syncs') {
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI [--all-syncs]]]]')
 	}
-	if os.args.len == 9 && os.args[8] == '' { return error('nonempty compiled CLI path required') }
+	if os.args.len >= 9 && os.args[8] == '' { return error('nonempty compiled CLI path required') }
 	journaled := os.args.len >= 6
 	service := os.args.len >= 7
-	cli := if os.args.len == 9 { os.args[8] } else { '' }
+	cli := if os.args.len >= 9 { os.args[8] } else { '' }
+	end := if os.args.len == 10 { 9 } else { 4 }
 	image_helper := if journaled { os.getenv_opt('VINIX_WINE_IMAGE_HELPER') or { return error('VJFS requires VINIX_WINE_IMAGE_HELPER') } } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh work and supported architecture required') }
@@ -67,7 +69,7 @@ fn run() ! {
 	os.write_file(work + '/storage.json', json2.encode({'format': if journaled { 'VJFS' } else { 'ext2' },
 		'cache': 'writeback', 'cut': 'QEMU SIGKILL', 'host-cache': 'survives'}))!
 	inputs[seed] = winesource.file_digest(seed)!
-	for point in 1 .. 4 {
+	for point in 1 .. end {
 		config := work + '/extras-' + point.str() + '/etc/wine-cut-point'
 		os.mkdir_all(os.dir(config))!
 		os.write_file(config, point.str())!
@@ -82,12 +84,14 @@ fn run() ! {
 	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
 	mut failures := []string{}
-	for point in 1 .. 4 {
+	for point in 1 .. end {
 		state := work + '/point-' + point.str()
 		marker := 'WINE POWER CUT READY point=${point}'
 		mut required := [marker, 'WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings',
 			'WINE POWER CUT SETTLED point=${point} grace-seconds=6',
 			'WINE POWER CUT RECOVERY PASS point=${point} fresh-capture repeat private-data', 'HWTEST PASS wine-prefix-powercut']
+		replaced := if point >= 5 { 2 } else if point >= 2 { 1 } else { 0 }
+		required << 'WINE POWER CUT STATE point=${point} replaced=${replaced} added=${point >= 7} staged=${point in [1, 4]}'
 		if service {
 			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=true generation=2 signed-root'
 			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=false generation=2 signed-root'

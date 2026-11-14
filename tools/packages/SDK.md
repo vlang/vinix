@@ -2247,6 +2247,16 @@ Independent service admission, lease/reader probes and filesystem inspection
 still follow. CLI-specific markers reject a service-only guest, while a CLI
 compiled without interception is rejected for ending before the requested cut.
 
+Append `--all-syncs` after the CLI binary to run all eight sync boundaries in
+this two-replacement/one-addition fixture. Points 1–3 bracket the first rename,
+4–6 bracket the second, 7 follows the additions sync and 8 follows the final
+prefix-directory sync. The cold guest requires the exact count of replaced
+links, presence or absence of the addition, and exact pending stage or its
+absence before it invokes recovery. Points 7 and 8 cover completed filesystem
+writes whose command has not yet returned; public retry must remain idempotent.
+Each case uses a fresh disk and the same 120-second cap. Omitting this option
+retains the original three-case mode; the option requires the explicit CLI mode.
+
 These tests qualify selected acknowledged-sync boundaries on journaled VJFS
 with QEMU writeback caching. Host storage caches survive the VM kill. They do
 not establish physical power-loss/torn-write handling, every interruption point
