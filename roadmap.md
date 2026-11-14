@@ -1279,7 +1279,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     migration and holder death remain separate gates. A [read-only builtin
     binding review](tests/packages/wine-lease-supervision-plan.md#runtime-binding-review-2026-11-14)
     now reports current/prior generation links and refuses structurally unsafe
-    inputs; authenticated, serialized migration application remains open.
+    inputs. An [idle binding review capture](tests/packages/wine-lease-supervision-plan.md#idle-binding-review-coordination-2026-11-14)
+    now retains managed-launch exclusion and rechecks server admission and
+    binding rows; authenticated migration application and recovery remain open.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.

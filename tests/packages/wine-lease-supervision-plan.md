@@ -1930,6 +1930,41 @@ SHA-256 `a1fd18fdb955bba277c02dce2226935351261b22fb780d7297283cc173502bd9`.
 Recording and independent checking pass complete bytes, sizes, types, modes and
 link targets; adjacent logs retain both results. Earlier bundles remain intact.
 
+## Idle binding review coordination, 2026-11-14
+
+Source `41fabf068` adds `capture_idle_binding_review()` and an opt-in `--idle`
+mode for `wine-prefix-review`. The library capture holds the existing managed
+launch guard, captures the private server namespace and checks idle admission
+around structural review. Its `recheck()` requires identical binding rows and
+an idle, unchanged namespace; repeatable `close()` releases owned descriptors
+and report storage. The capture has one owner and excludes cooperating managed
+launches while held. Unlike default read-only inspection, capture can create
+coordination files/directories inside an existing prefix. It rewrites no builtin
+links and starts no Wine process. CLI exit releases its guard: JSON cannot carry
+idle admission forward to another command.
+
+Host library/CLI tests pass: competing launch refusal, child-owned POSIX lock
+refusal and recovery after retirement, unexpected endpoint refusal without
+deletion, replaced lock identity, changed bindings/inventory, descriptor cleanup,
+failed-capture guard release and the preceding review controls. Builtin snapshots
+stay unchanged. Earlier test compilation and pipe-width handshake diagnostics
+are retained; the corrected fixture uses C-width descriptors and a five-second
+readiness bound. Linux x86_64 and AArch64 static cross-builds pass; no new guest
+execution, signed Wine qualification or measured heap flatness is claimed.
+
+Evidence is frozen at `/Users/alex/.cache/vwidlebind-20261114-01`, including
+source copies, copied compiler, generated C, binaries, logs and earlier diagnostic
+samples. The typed receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-idle-binding-review-20261114-01.inventory.json`,
+SHA-256 `7094c609c7fcafaf8df7d81520a25c6419610738f4a8f9f58fb578e334c236de`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets; adjacent logs retain the results. Complete hermetic source closure
+is not claimed. The production launch path remains unchanged. Runtime
+authentication, migration application and interruption recovery remain open,
+alongside the other section 14 gates. Arbitrary same-account writes remain
+possible; callers must hold no POSIX locks on the server lock file, because
+F_GETLK does not report the caller's own locks.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
