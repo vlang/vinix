@@ -2117,6 +2117,12 @@ descriptor counter. This single-thread host probe excludes fixture setup, libc
 allocations, package-service admission and kernel memory. It does not establish
 whole-launch leak freedom or cover every error path.
 
+The probe also sweeps every initially available descriptor headroom, including
+zero, by retaining its own `/dev/null` descriptors around capture. It clears
+`errno` before each operation and requires `EMFILE` on refusal, zero retained
+V allocations, unchanged descriptor availability and successful fresh capture
+after restoring the budget. Both refusal and success controls must occur.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.

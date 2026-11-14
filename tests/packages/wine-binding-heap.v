@@ -203,6 +203,57 @@ fn sample_refusals(data string, builtins string, store string, cycles int) ! {
 	println('WINE BINDING REFUSALS PASS four phases; heap and descriptor release; preserved personal data; recapture')
 }
 
+fn pressure_capture(data string, builtins string, store string, headroom int) !bool {
+	available := spare_descriptors()!
+	if headroom < 0 || headroom > available { return error('invalid descriptor headroom') }
+	mut held := [32]i32{}
+	mut count := 0
+	defer { for index in 0 .. count { C.close(held[index]) } }
+	for count < available - headroom {
+		fd := C.open(c'/dev/null', C.O_RDONLY | C.O_CLOEXEC)
+		if fd < 0 { return error('cannot establish descriptor pressure') }
+		held[count] = fd
+		count++
+	}
+	require_descriptors(headroom)!
+	mut accepted := false
+	mut saved_errno := i32(0)
+	C.errno = 0
+	heap_enabled = true
+	if mut owner := wineadapter.capture_idle_binding_review(data, builtins, store) {
+		accepted = true
+		owner.close()
+	} else {
+		saved_errno = C.errno
+		unsafe { err.free() }
+	}
+	heap_enabled = false
+	if !accepted && saved_errno != C.EMFILE { return error('pressured capture failed without EMFILE: ' + saved_errno.str()) }
+	require_empty('capture-headroom-' + headroom.str(), 1)!
+	require_descriptors(headroom)!
+	println('WINE BINDING PRESSURE headroom=${headroom} accepted=${accepted}')
+	return accepted
+}
+
+fn sample_descriptor_exhaustion(data string, builtins string, store string) ! {
+	available := spare_descriptors()!
+	mut failures := 0
+	mut successes := 0
+	for headroom in 0 .. available + 1 {
+		if pressure_capture(data, builtins, store, headroom)! { successes++ } else { failures++ }
+		require_descriptors(available)!
+		// Restoring the budget must make the same prefix admissible after every
+		// failed or successful construction, proving guard release too.
+		mut recovered := wineadapter.capture_idle_binding_review(data, builtins, store)!
+		valid := recovered.review.prior_generation == 0 && recovered.review.bindings.all(it.operation == .keep)
+		recovered.close()
+		if !valid { return error('descriptor pressure changed prefix bindings') }
+		require_descriptors(available)!
+	}
+	if failures == 0 || successes == 0 { return error('descriptor sweep requires refusal and success controls') }
+	println('WINE BINDING EXHAUSTION PASS failures=${failures} successes=${successes}; heap and descriptors released; fresh capture')
+}
+
 fn run() ! {
 	$if track_heap ? {} $else { return error('compile with -d track_heap -gc none -manualfree -enable-globals') }
 	verify_hooks()!
@@ -232,6 +283,7 @@ fn run() ! {
 	prefix.close()
 	sample(data, builtins, store, 100)!
 	sample_refusals(data, builtins, store, 100)!
+	sample_descriptor_exhaustion(data, builtins, store)!
 	selected := store + '/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows'
 	os.mkdir_all(selected)!
 	for index in 0 .. rows { os.write_file(selected + '/' + index.str() + '.dll', 'new marker')! }
