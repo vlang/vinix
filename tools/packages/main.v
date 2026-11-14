@@ -149,7 +149,9 @@ fn checked(arguments []string) !int {
 			}
 			mut owner := (pkgcore.Service{}).wine_prefix_review(names[0], names[1])!
 			defer { owner.close() }
-			owner.recheck()!
+			// Write methods recheck admission under their retained reader lock.
+			// Only inspection needs this separate refresh before serialization.
+			if command == 'wine-prefix-review' { owner.recheck()! }
 			if command == 'wine-prefix-additions' { owner.complete_additions()! }
 			if command == 'wine-prefix-migrate' { owner.migrate_bindings()! }
 			println(json2.encode(owner.review.review))
