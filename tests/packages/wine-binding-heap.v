@@ -254,6 +254,59 @@ fn sample_descriptor_exhaustion(data string, builtins string, store string) ! {
 	println('WINE BINDING EXHAUSTION PASS failures=${failures} successes=${successes}; heap and descriptors released; fresh capture')
 }
 
+fn pressure_recheck(owner &wineadapter.IdleBindingReview, headroom int) !bool {
+	available := spare_descriptors()!
+	if headroom < 0 || headroom > available { return error('invalid recheck descriptor headroom') }
+	mut held := [32]i32{}
+	mut count := 0
+	defer { for index in 0 .. count { C.close(held[index]) } }
+	for count < available - headroom {
+		fd := C.open(c'/dev/null', C.O_RDONLY | C.O_CLOEXEC)
+		if fd < 0 { return error('cannot establish recheck descriptor pressure') }
+		held[count] = fd
+		count++
+	}
+	require_descriptors(headroom)!
+	mut accepted := true
+	mut saved_errno := i32(0)
+	C.errno = 0
+	heap_enabled = true
+	owner.recheck() or {
+		accepted = false
+		saved_errno = C.errno
+		unsafe { err.free() }
+	}
+	heap_enabled = false
+	if !accepted && saved_errno != C.EMFILE { return error('pressured recheck failed without EMFILE: ' + saved_errno.str()) }
+	require_empty('recheck-headroom-' + headroom.str(), 1)!
+	require_descriptors(headroom)!
+	println('WINE BINDING RECHECK PRESSURE headroom=${headroom} accepted=${accepted}')
+	return accepted
+}
+
+fn sample_recheck_exhaustion(data string, builtins string, store string) ! {
+	initial := spare_descriptors()!
+	mut owner := wineadapter.capture_idle_binding_review(data, builtins, store)!
+	defer { owner.close() }
+	available := spare_descriptors()!
+	mut failures := 0
+	mut successes := 0
+	for headroom in 0 .. available + 1 {
+		if pressure_recheck(unsafe { &owner }, headroom)! { successes++ } else { failures++ }
+		require_descriptors(available)!
+		owner.recheck()!
+		refused_capture(data, builtins, store, 'already has a managed launch')!
+		require_descriptors(available)!
+	}
+	if failures == 0 || successes == 0 { return error('recheck sweep requires refusal and success controls') }
+	owner.close()
+	require_descriptors(initial)!
+	mut recovered := wineadapter.capture_idle_binding_review(data, builtins, store)!
+	recovered.close()
+	require_descriptors(initial)!
+	println('WINE BINDING RECHECK EXHAUSTION PASS failures=${failures} successes=${successes}; retained owner retryable; guard held; close permits recapture')
+}
+
 fn run() ! {
 	$if track_heap ? {} $else { return error('compile with -d track_heap -gc none -manualfree -enable-globals') }
 	verify_hooks()!
@@ -284,6 +337,7 @@ fn run() ! {
 	sample(data, builtins, store, 100)!
 	sample_refusals(data, builtins, store, 100)!
 	sample_descriptor_exhaustion(data, builtins, store)!
+	sample_recheck_exhaustion(data, builtins, store)!
 	selected := store + '/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows'
 	os.mkdir_all(selected)!
 	for index in 0 .. rows { os.write_file(selected + '/' + index.str() + '.dll', 'new marker')! }

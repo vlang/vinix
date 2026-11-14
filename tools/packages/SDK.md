@@ -2123,6 +2123,12 @@ zero, by retaining its own `/dev/null` descriptors around capture. It clears
 V allocations, unchanged descriptor availability and successful fresh capture
 after restoring the budget. Both refusal and success controls must occur.
 
+A second sweep keeps an existing owner live while rechecking at every available
+headroom. After each attempt it requires a successful retry on that same owner
+and a competing capture refusal. Closing the owner must restore descriptor
+availability and permit fresh capture. Thus a temporary resource refusal must
+preserve the existing guard as well as release temporary allocations and FDs.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.
