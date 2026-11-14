@@ -108,3 +108,43 @@ maps-current-20261114-r82, including retained.sha256:
 | final app-data.ext2 | 480356691d2bbfe6fe02a2441829b3f46810a10f4676bd33438a22e0cd97e55b |
 | explore-wait.png | 2d48c1d44e8f8cf541b558d8cd3d90a20dc859cddd53b5d16210940a170e20dd |
 | resume-current.png | 9937151cdd46c462183c14770a8a15923849410fdb7c5772c872e3aa953bdca5 |
+
+Fresh r83 reused those exact ARM-qualified artifacts, without rerunning the
+unchanged full API fixture. Staging passed the same explicit caps: 17718 ms,
+RSS 38354944 bytes, shared growth 264773632 bytes, exit 0/0 and complete cleanup
+(maps-r83-stage.json/.log outside the generated root). UUID inspection
+34ba186b61704e859fa0e121542d567b, read-only e2fsck and initial image hash passed.
+The available compiler still reported V 0.5.2 9a38ec5; no compiler pin was added.
+
+This retry omitted the optional tree/surface diagnostics. It again rendered
+North America, then focused search. UI input was very slow: an approximately
+70-character root-terminal command delivered at 150 ms per character took more
+than two minutes to appear completely in the guest. Separate host observations
+at 09:03 and 09:07 showed one-minute load averages 97.74 and 133.75; this is
+concurrent contention evidence, not proof of the latency's cause. The Louvre
+query did not produce an observed result before the fixed deadline. The receipt
+records bounded-session-ended-no-authentication-claim at 09:10:55, rather than a
+new runtime failure. No missing-method, fatal native signal, ANDROID-WS-FAIL,
+numeric auth-pump failure or service-exit marker was found in either private log.
+Finalizer lock warnings remain; their connection to input latency is unproven.
+No sign-in was attempted. Route geometry, authentication and responsive use
+remain unqualified. JIT remains disabled; no new JIT improvement is claimed.
+
+The 600543-ms storage watch retained at least 7257001984 guest disk bytes and
+4805552 KiB available memory. Complete UART export BEGIN/END agree on
+886c2a7b9bbb50477e42649117eae0bb48fd3f1f77da162e1df69c4444fa013d,
+1427772 bytes and 2789 chunks. Sync returned to the actual prompt before owned
+PID 30327 was stopped and verified absent. All r82/r83 test VMs are now stopped.
+The complete r83 bundle remains in maps-current-20261114-r83, with checksums
+in retained.sha256 and app-data.final.sha256:
+
+| r83 artifact | SHA256 |
+| --- | --- |
+| maps.retained.log | 84a30c1c6222ba041553d5139f7887eea4b43a67e8f4fd2c09d71c32237ad82e |
+| broker.retained.log | 7a434028425bde3e03f8f3715530f4d960ce5ef1bc1da6100457a85d4086517e |
+| receipt.retained.json | b8c04d1587a26cdc0b4c50bd8a2fbdf965dc904bfef0987de9d1aac4939cbbfb |
+| maps-launch.retained.json | 49a87f4e7d1d0d4fc561161c3e703ece1883bebcdac454d135e28f09ab293c48 |
+| serial.log | 43bec4e7977744f1759c8fcf716f401613a5273fcb2087ec99646b7856031ff2 |
+| final app-data.ext2 | bccbf5b5fde72ad464849b1351fce5454860ba4234ba84ec6a7668fee0c37d6e |
+| skip-last-check.png (rendered map) | 03d65abbbda569ebdf96316c5480f05ef45742835b44a639305b1a62ad2aca1c |
+| search-late.png (focused search) | 282bb5d802af73f24a58bf26f6d377443097e9d6417e34fa80c07d664f082440 |

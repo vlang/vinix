@@ -49,7 +49,10 @@ then failed on the original adapter and passed the full signed ARM regression
 with display ownership repaired. Actual Maps r82 then rendered the world map
 and detailed Louvre buildings, streets and labels alongside place details and
 photos. The complete retained run is recorded in that report. Route geometry
-and Google sign-in remain unqualified.
+and Google sign-in remain unqualified. Fresh r83 reproduced map rendering but
+had severe input latency under heavy concurrent host load; its fixed deadline
+ended before an observed Louvre result. The cause of that latency remains
+unproven. Both VMs are stopped; complete evidence and checksums are retained.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.
