@@ -99,14 +99,11 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	next_owner.complete_additions() or { retarget_refused = err.msg().contains('all existing links') }
 	assert retarget_refused
 	assert !os.exists(data + '/wine/drive_c/windows/system32/new.dll')
-	// Prepare the additions-only case explicitly in the fixture. The API
-	// under test does not perform this existing-link retarget.
-	next_owner.review.close()
 	system := data + '/wine/drive_c/windows/system32'
-	os.rm(system + '/kernel32.dll')!
 	target := next_owner.admission.prepared.directory + '/generations/' + upgraded.generation.str() + '/apps/wine/root/usr/lib/wine/x86_64-windows'
-	os.symlink(target + '/kernel32.dll', system + '/kernel32.dll')!
-	next_owner.review = next_owner.admission.capture_prefix(data)!
+	next_owner.migrate_bindings()!
+	next_owner.migrate_bindings()!
+	assert os.readlink(system + '/kernel32.dll')! == target + '/kernel32.dll'
 	next_owner.complete_additions()!
 	next_owner.complete_additions()!
 	assert os.readlink(system + '/new.dll')! == target + '/new.dll'

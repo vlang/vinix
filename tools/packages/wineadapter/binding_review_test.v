@@ -215,6 +215,47 @@ fn test_builtin_additions_resume_after_sigkill() {
 	println('Wine additions SIGKILL partial=' + installed.str() + '/128; fresh capture completed remaining links in ' + (time.now().unix_milli() - started).str() + ' ms PASS')
 }
 
+fn test_staged_builtin_migration_resumes_and_preserves_unknown_stage() {
+	root := os.real_path(os.temp_dir()) + '/wine-migration-' + os.getpid().str()
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	store := root + '/store'
+	old := store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
+	new := store + '/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows'
+	data := root + '/data'
+	os.mkdir_all(old)!; os.mkdir_all(new)!; os.mkdir(data)!; os.chmod(data, 0o700)!
+	os.chown(data, int(C.geteuid()), os.getegid())!
+	for name in ['a.dll', 'b.dll'] { os.write_file(old + '/' + name, 'old')!; os.write_file(new + '/' + name, 'new')! }
+	os.write_file(new + '/c.dll', 'added')!
+	mut prefix := prepare_prefix(data, old)!
+	defer { prefix.close() }
+	system := data + '/wine/drive_c/windows/system32'
+	stage := data + '/wine/' + builtin_stage_name
+	os.write_file(stage, 'personal stage contents')!
+	mut capture := capture_idle_binding_review(data, new, store)!
+	defer { capture.close() }
+	mut refused := false
+	capture.migrate_bindings() or { refused = err.msg().contains('bounded symlink') }
+	assert refused && os.read_file(stage)! == 'personal stage contents'
+	assert os.readlink(system + '/a.dll')! == old + '/a.dll'
+	os.rm(stage)!; os.symlink('/foreign', stage)!
+	mut foreign := false
+	capture.migrate_bindings() or { foreign = err.msg().contains('does not match a pending binding') }
+	assert foreign && os.readlink(stage)! == '/foreign'
+	os.rm(stage)!
+	capture.close()
+	// Simulate interruption after staging, before rename. Resume the pending
+	// staged row even when it sorts after another old-generation binding.
+	os.symlink(new + '/b.dll', stage)!
+	mut resumed := capture_idle_binding_review(data, new, store)!
+	defer { resumed.close() }
+	resumed.migrate_bindings()!
+	resumed.migrate_bindings()!
+	assert resumed.review.prior_generation == 0 && resumed.review.bindings.all(it.operation == .keep)
+	for name in ['a.dll', 'b.dll', 'c.dll'] { assert os.readlink(system + '/' + name)! == new + '/' + name }
+	assert !os.is_link(stage) && !os.exists(stage)
+}
+
 fn expected_inventory_refused(capture &IdleBindingReview, runtime string, generation u64, expected []BuiltinExpectation) {
 	capture.require_builtin_inventory(runtime, generation, expected) or { assert err.msg().contains('differs'); return }
 	assert false, 'mismatched expected inventory accepted'

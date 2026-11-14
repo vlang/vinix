@@ -2046,7 +2046,7 @@ success. A failure or interruption may leave a subset created; a fresh review
 recognizes matching links as `keep` and can finish the remainder. This is not an
 atomic multi-link transaction. The lower-level adapter method requires the
 caller to authenticate its inventory and retain the generation lease.
-Existing-link retargeting remains unsupported.
+The additions-only operation refuses existing-link retargeting.
 Full inventory checks bracket creation and synchronization. Before each link,
 the operation checks idle/namespace continuity and that target's digest rather
 than rehashing the whole inventory. Changes to other entries during creation
@@ -2059,6 +2059,20 @@ resulting JSON report. Existing links requiring retargeting cause refusal before
 creation. Existing files are never overwritten. On partial failure, inspect a
 fresh `wine-prefix-review` and rerun additions to finish matching missing links.
 The review command continues to perform inspection without creating builtin links.
+
+`WinePrefixReview.migrate_bindings()` explicitly retargets reviewed old-generation
+links, then completes additions. It retains package reader/lease and prefix
+guards and repeats admission. Each replacement stages a selected-runtime symlink
+at `wine/.vinix-builtin-next`, synchronizes it, rechecks the old binding, and
+atomically renames the staged link into captured system32. Both directories are
+synchronized. A fresh capture can resume mixed old/current links and a matching
+pending stage; unknown stage files/targets are preserved and refused. Repeated
+completed calls are supported. This library operation requires cooperating
+prefix writers to honor the guard: it cannot make check-and-rename atomic
+against arbitrary same-account writes. It is not atomic across all bindings.
+No retargeting CLI or automatic launch migration is enabled. Host tests cover
+signed upgrade and simulated staged recovery; actual retarget SIGKILL, guest
+execution and power-loss qualification remain required.
 
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing

@@ -59,6 +59,15 @@ pub fn (mut owner WinePrefixReview) complete_additions() ! {
 	owner.recheck()!
 }
 
+pub fn (mut owner WinePrefixReview) migrate_bindings() ! {
+	if owner.admission.prepared.lease < 0 { return error('Wine prefix review is closed') }
+	guard := acquire_reader(owner.admission.prepared.directory)!
+	defer { guard.release() }
+	owner.recheck()!
+	owner.review.migrate_bindings()!
+	owner.recheck()!
+}
+
 fn wine_builtin_expectations(runtime Package) ![]wineadapter.BuiltinExpectation {
 	prefix := 'root/usr/lib/wine/x86_64-windows/'
 	mut expected := []wineadapter.BuiltinExpectation{cap: runtime.files.len}
