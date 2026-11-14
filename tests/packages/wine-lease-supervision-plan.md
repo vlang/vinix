@@ -3569,6 +3569,65 @@ SHA-256 `8999625d25477d4c0d265d1ee5d4e28240c190d3cb9da523786cd9b4ebcbe983`.
 Recording and independent comparison pass for complete bytes, sizes, types,
 modes and link targets.
 
+## Selected 741-row adapter VM cuts, 2026-11-14
+
+Source `ab603c539` supports `wine_cut_scaled` with controller `--scaled`:
+740 existing builtin links and one missing addition, with 741 selected rows.
+Four sampled boundaries require exact cold namespace inspection before fresh
+capture, migration/repetition and all 741 current targets:
+
+| Cut | Boundary | Replaced links | Addition |
+| --- | --- | ---: | --- |
+| 1112 | Middle replacement destination sync | 371 | absent |
+| 2219 | Last replacement destination sync | 740 | absent |
+| 2221 | Additions sync | 740 | present |
+| 2222 | Final directory sync before return | 740 | present |
+
+Every sampled cold state requires no pending stage, unchanged old/selected
+replacement payloads and private sentinel, plus exact synced addition bytes
+when present. Accepted cases also require actual QEMU SIGKILL,
+two boots, selected-input rechecks, final poweroff, clear VJFS commit marker,
+separate clean export and strict read-only `e2fsck -f -n` exit zero. The 32 MiB
+home, 4 MiB journal and 120-second two-boot cap remain unchanged. No product
+adapter, service, dispatcher, hook, kernel, resource limit or timeout changed.
+
+ARM passes all four in 47.536/56.167/73.365/66.442 seconds. The first x86 run
+passes 1112/2221/2222 in 93.547/108.137/77.324 seconds; 2219 times out at
+120.626 seconds in boot 2, after exact cold inspection and before recovery's
+final markers. Its failed result and disk remain retained. VM runs overlapped;
+this does not establish the timeout's cause.
+After this session's other VMs finished, the unchanged x86 controller, guest,
+kernel and input profile passed all four cases in
+52.273/68.667/58.563/58.427 seconds. The 120-second cap and all input checks
+remain; the first failed run is not overwritten or reclassified.
+
+All 24 small-fixture regression cases pass: all eight cuts through adapter x86,
+signed-service ARM and public CLI x86. Removing interception from identical
+generated scaled-guest C rejects all four cuts for migration returning without
+the requested cut. Scaled service/CLI, mixed/duplicate selectors and a changed
+layout source reject before work creation. The shared layout is embedded and
+hashed before/after runs; host tests cover sorted unique names and replacement,
+addition and final-sync boundaries for both row counts.
+
+Evidence is retained at `/Users/alex/.cache/vwwinescaledcuts-20261114-01`, isolated
+base `60192f9cd` plus `source.patch`, including the new layout/tests, generated C,
+compiler/source lists, kernels, binaries, all raw/inspection disks, serial/QMP
+logs, failed attempts and controls. The unchanged CLI binary comes from the
+preceding complete `vwwineallcuts-20261114-01` bundle; dispatcher/hook source
+comparison passes and copied source identity is retained. Earlier complete
+bundles and receipts remain required.
+
+This samples four adapter boundaries over synthetic marker bytes. All 2222
+syncs, scaled signed-service/CLI recovery, actual Wine payload/version/GUI/ARM
+execution, physical power/host-cache loss, torn writes, plain-ext2 safety,
+whole-launch lifetime and strict ABI/hermetic closure remain separate gates.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-scaled-syncs-20261114-01.inventory.json`,
+SHA-256 `0085159c59536e0638ff5b5cf90dee1b015078560f5e3d1cb8774fd34a2c9a5e`.
+Recording and independent comparison pass for complete bytes, sizes, types,
+modes and link targets.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
