@@ -27,7 +27,10 @@ fn review_names(parent int, limit int) ![]string {
 		}
 		name := unsafe { cstring_to_vstring(&entry.d_name[0]) }
 		if name == '.' || name == '..' { unsafe { name.free() }; continue }
-		names << name
+		// Append an explicit owned copy; V also clones a bare string variable
+		// on append, so the temporary from cstring_to_vstring needs release.
+		names << name.clone()
+		unsafe { name.free() }
 		if names.len > limit { break }
 	}
 	accepted = true

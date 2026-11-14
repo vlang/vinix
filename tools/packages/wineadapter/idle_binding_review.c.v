@@ -75,7 +75,10 @@ pub fn capture_idle_binding_review(data string, builtins string, store string) !
 	prefix.directory = review_child(prefix.data, 'wine')!
 	info := directory(prefix.directory, u32(C.geteuid()), true)!
 	prefix.device = u64(info.st_dev); prefix.inode = u64(info.st_ino)
-	mut capture := IdleBindingReview{data: data.clone(), builtins: builtins.clone(), store: store.clone()}
+	mut value := IdleBindingReview{data: data.clone(), builtins: builtins.clone(), store: store.clone()}
+	// Receiver addresses are borrowed only within this call. Return the owner
+	// by value without promoting its temporary shell to an unowned heap block.
+	mut capture := unsafe { &value }
 	mut accepted := false
 	defer { if !accepted { capture.close() } }
 	capture.guard = prefix.acquire_launch(data)!
@@ -91,13 +94,14 @@ pub fn capture_idle_binding_review(data string, builtins string, store string) !
 	for binding in capture.review.bindings {
 		digest, size := binding_asset_digest(capture.assets_fd, binding.name)!
 		total += size
-		capture.digests << digest
+		capture.digests << digest.clone()
+		unsafe { digest.free() }
 		capture.sizes << size
 		if total > 1024 * 1024 * 1024 { return error('Wine binding review assets exceed 1 GiB') }
 	}
 	capture.recheck()!
 	accepted = true
-	return capture
+	return *capture
 }
 
 pub struct BuiltinExpectation {

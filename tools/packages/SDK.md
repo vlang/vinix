@@ -2103,6 +2103,15 @@ link and verifies migration to the restored inventory and repetition. This
 tests safe refusal and controlled recovery with marker assets; Wine-version
 compatibility and general cleanup of user prefixes remain separate work.
 
+`tests/packages/wine-binding-heap.v` measures V-managed adapter allocations with
+the compiler's `-d track_heap` hooks. Build with `-gc none -manualfree
+-enable-globals -prod`, then run `HEAP FRESH_ROOT [ROWS]` (1–900 rows). Its fixed
+tracker checks allocation/free hooks, 100 structural reviews, 100 idle rechecks,
+100 capture/idempotent-migration/close cycles and one complete retarget/close.
+Each measured phase requires zero retained objects and bytes. This single-thread
+host probe excludes fixture setup, libc allocations, package-service admission
+and kernel memory. It does not establish whole-launch leak freedom.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.
