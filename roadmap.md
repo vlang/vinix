@@ -1302,6 +1302,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now completes all 741 links and passes a real Win64 relaunch from the new
     generation, preserving private data and releasing the lease. Full checks
     bracket migration, with fresh per-link admission before replacement.
+    [Signed generation rollback](tests/packages/wine-lease-supervision-plan.md#signed-generation-rollback-and-post-collection-review-2026-11-14)
+    also passes a second 741-link migration, real Win64 relaunch and full public
+    prefix review after collection in a fresh signed-package x86 run. The Wine
+    payload remains unchanged across these generation transitions.
     Power-loss recovery and broader Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

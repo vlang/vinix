@@ -2764,6 +2764,56 @@ SHA-256 `a66dfb4d75e7a51b2b232b7706c5edd7dd15195622cf815c10ff1e6dfebefe5a`.
 Recording and independent comparison pass. This is local console acceptance
 and evidence integrity, not a hermetic input-closure waiver.
 
+## Signed generation rollback and post-collection review, 2026-11-14
+
+Sources `b5b84d8c9`, `3a7ebb474` and `15eb38374` extend the real owned x86
+fixture through remove/rollback, a second explicit public prefix migration and
+another Win64 execution. Both migrations cover 741 builtin links. The restored
+generation returns status 37 with the expected initial/child/retirement markers,
+preserved private sentinel bytes, no remaining runtime processes and an available
+generation lease. Collection completes; a final full public review accepts every
+active binding afterward. Fresh signed-package run `native-03` passes in
+746.438 seconds, including controller-source, parsed-source, selected-input and
+generated-output rechecks. Wine bytes are unchanged across the generations.
+
+The new `--owned-manager --rollback-probe` mode has a 900-second overall guest
+bound. Existing modes retain 600 seconds; every per-command deadline remains
+180 seconds. Earlier `native-01` exceeded its 600-second overall bound while
+final review was pending (604.079 seconds). `native-02`, before the CLI change,
+exceeded the command deadline during rollback migration (739.495 seconds).
+These failures remain retained and do not count as acceptance; the second
+timeout's cause is unproven. The CLI now omits a duplicate standalone admission
+before write methods: constructor admission and each method's retained-lock
+pre/post admission remain, as does the separate refresh for read-only review.
+
+All 24 host CLI refusal controls and 24 architecture/ownership/mixed-mode
+controls pass. Public marker-prefix recovery passes on ARM in 7.519 seconds and
+x86 in 18.601 seconds, including staged-entry preservation, writer SIGKILL,
+resume and repetition. No kernel, sandbox, runtime bytes or resource limits
+changed. The existing C pointer-compatibility compiler exception remains.
+
+The separate pinned-image diagnostic `run-02` passes in 499.029 seconds. It
+replaces only the init payload in an APFS clone, checks the embedded kernel pin
+and proves complete logical-byte equality outside that payload before and after
+execution. Its nine early path/pin/usage refusals, embedded-kernel mismatch and
+overlay unit checks pass. This reuses previously signed package state; the
+fresh native run above supplies separate signing/install evidence.
+
+Complete evidence, all failed attempts, generated C, binaries, isolated source
+trees and selected native/overlay input snapshots are preserved at
+`/Users/alex/.cache/vwrollback-20261114-01`. Source trees retain base revisions
+and patches; final native test sources match `15eb38374`. Original complete
+producer/compiler/kernel bundles and namespaces remain required by historical
+auditors. Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-rollback-20261114-01.inventory.json`,
+SHA-256 `38440caf72c0e6674e1f54944bc425681a30a3b02cc0ada0ba76b1f692eead77`.
+Recording and independent comparison pass.
+
+This closes the selected same-payload package-generation rollback case.
+Wine engine-version upgrade/rollback, ARM Wine execution, fresh GUI, power-loss,
+measured heap, strict ABI and default activation gates remain open. This local
+console acceptance does not establish a hermetic build closure.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
