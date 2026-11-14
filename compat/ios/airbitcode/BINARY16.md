@@ -49,8 +49,8 @@ shifts for float input and ten shifts for half input. The existing execution
 arrays, their ownership and instruction/loop budgets are unchanged. Matching
 immutable indexes and valid LLVM IR remain preconditions.
 
-`bfloat16`, `double`, vectors, memory and other intrinsics reject, including in
-unvisited blocks. The integer-only entry point
+`bfloat16`, `double`, vector arguments/returns, vector loads/stores and other
+intrinsics reject, including in unvisited blocks. The integer-only entry point
 still rejects all floating-point types.
 
 `binary16_cast_test.v` checks 14 exact widening patterns, 32 exact narrowing
@@ -109,3 +109,6 @@ execute an AIR shader, submit GPU work or qualify an iOS application launch.
 References: [LLVM precision conversions](https://llvm.org/docs/LangRef.html#conversion-operations),
 [NaN behavior](https://llvm.org/docs/LangRef.html#behavior-of-floating-point-nan-values),
 [default environment](https://llvm.org/docs/LangRef.html#floating-point-environment).
+
+Bounded fixed-vector arithmetic and lane operations use the same lane math;
+see the shared [vector execution profile](MEMORY-EXECUTION.md).

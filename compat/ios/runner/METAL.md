@@ -540,7 +540,28 @@ and shares bounded construction storage. Results may feed comparisons,
 selections, later arithmetic, insertion, shuffle, freeze and extraction while
 older snapshots retain their state. Deferred kernels cover thirty flag variants,
 local poison, strict division, frozen sources/results, chained updates and
-partial-write failures. Floating vector binary arithmetic remains unsupported.
+partial-write failures.
+
+Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
+`fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane
+precision. Rounding is nearest/ties-to-even with gradual underflow. Signed
+zeros and infinities retain IEEE results. Zero divisors and invalid FP
+arithmetic yield infinity or the preferred positive quiet NaN, without
+poison or a host trap. Arithmetic NaNs choose `0x7e00` or `0x7fc00000`;
+copying operations retain their bits. Poison propagates per lane, including
+division/remainder. Any undef operand lane rejects at the binary instruction,
+including discarded results; freezing sources first repairs indeterminate
+lanes, while freezing the result cannot suppress prior evaluation errors.
+Both complete sources are checked before execution, including inactive blocks.
+Each operation costs one executed step and charges both source counts plus
+result count to the shared lane-work budget. Results use the existing bounded
+snapshot allocation and may feed any supported vector operation. Fast-math
+flags, other formats, scalable vectors, vector PHIs/arguments/returns and vector
+loads/stores remain unsupported. `tests/ios/air-vector-float-binary.v` checks
+native LLVM values with arithmetic NaNs normalized, exact copied bits,
+poison/undef, freezing, composition, loop reuse, rejected profiles and exact
+shared storage/work boundaries. Its sweep covers every half left encoding,
+permuted right encodings, deterministic float pairs and complete edge grids.
 
 Fixed 1..16-lane half/float vectors support unflagged `fneg`, from literals
 or earlier supported constructions. It flips only the sign bit, including

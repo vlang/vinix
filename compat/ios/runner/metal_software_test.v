@@ -59,6 +59,10 @@ fn sm_sampler_worker(api SMSamplerAPI, device u64, descriptor u64) {
 }
 fn test_software_metal_samplers() {
 	$if !ios_metal_software ? { return }
+	if os.args.len == 3 && os.args[1] == '--software-metal-blit-reject' {
+		mode := os.args[2].int(); assert mode >= 0 && mode < 10
+		objc_start(); sm_test_reject_case(mode); exit(0)
+	}
 	$if macos {
 		metal := C.dlopen(c'/System/Library/Frameworks/Metal.framework/Metal', 2); objc := C.dlopen(c'/usr/lib/libobjc.A.dylib', 2)
 		assert metal != unsafe { nil } && objc != unsafe { nil }
@@ -1133,7 +1137,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'disjoint', 'disjoint_frozen', 'samesign', 'samesign_frozen', 'cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen', 'constant_lane', 'constant_lane_frozen', 'vector_update', 'vector_update_undef', 'vector_update_frozen', 'vector_shuffle', 'vector_shuffle_undef', 'vector_shuffle_frozen', 'vector_freeze', 'vector_freeze_undef_index', 'vector_freeze_old_undef', 'vector_freeze_old_poison', 'vector_select', 'vector_select_poison', 'vector_select_frozen_condition', 'vector_select_undef_condition', 'vector_select_old', 'vector_lane_select', 'vector_lane_select_poison', 'vector_lane_select_undef', 'vector_lane_select_frozen', 'vector_lane_select_old', 'vector_lane_select_all_poison', 'vector_compare', 'vector_compare_poison', 'vector_compare_undef', 'vector_compare_frozen', 'vector_compare_old', 'vector_compare_samesign', 'vector_compare_constant', 'vector_binary_0_0', 'vector_binary_0_1', 'vector_binary_0_2', 'vector_binary_0_3', 'vector_binary_1_0', 'vector_binary_1_1', 'vector_binary_1_2', 'vector_binary_1_3', 'vector_binary_2_0', 'vector_binary_2_1', 'vector_binary_2_2', 'vector_binary_2_3', 'vector_binary_3_0', 'vector_binary_3_1', 'vector_binary_4_0', 'vector_binary_4_1', 'vector_binary_5_0', 'vector_binary_6_0', 'vector_binary_7_0', 'vector_binary_7_1', 'vector_binary_7_2', 'vector_binary_7_3', 'vector_binary_8_0', 'vector_binary_8_1', 'vector_binary_9_0', 'vector_binary_9_1', 'vector_binary_10_0', 'vector_binary_11_0', 'vector_binary_11_1', 'vector_binary_12_0', 'vector_binary_poison', 'vector_binary_undef', 'vector_binary_frozen', 'vector_binary_sources', 'vector_binary_divide', 'vector_binary_signed_divide', 'vector_binary_signed_rem', 'vector_binary_overshift', 'vector_binary_chain', 'vector_fneg_half_raw', 'vector_fneg_half_poison', 'vector_fneg_half_undef', 'vector_fneg_half_source', 'vector_fneg_half_result', 'vector_fneg_half_old', 'vector_fneg_half_double', 'vector_fneg_half_chain', 'vector_fneg_float_raw', 'vector_fneg_float_poison', 'vector_fneg_float_undef', 'vector_fneg_float_source', 'vector_fneg_float_result', 'vector_fneg_float_old', 'vector_fneg_float_double', 'vector_fneg_float_chain', 'bad_vector_fneg', 'bad_vector_binary', 'bad_vector_compare', 'bad_wide_vector_condition', 'bad_vector_freeze', 'bad_shuffle_count', 'bad_lane_count', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_convert', 'saturating_convert_frozen', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'disjoint', 'disjoint_frozen', 'samesign', 'samesign_frozen', 'cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen', 'constant_lane', 'constant_lane_frozen', 'vector_update', 'vector_update_undef', 'vector_update_frozen', 'vector_shuffle', 'vector_shuffle_undef', 'vector_shuffle_frozen', 'vector_freeze', 'vector_freeze_undef_index', 'vector_freeze_old_undef', 'vector_freeze_old_poison', 'vector_select', 'vector_select_poison', 'vector_select_frozen_condition', 'vector_select_undef_condition', 'vector_select_old', 'vector_lane_select', 'vector_lane_select_poison', 'vector_lane_select_undef', 'vector_lane_select_frozen', 'vector_lane_select_old', 'vector_lane_select_all_poison', 'vector_compare', 'vector_compare_poison', 'vector_compare_undef', 'vector_compare_frozen', 'vector_compare_old', 'vector_compare_samesign', 'vector_compare_constant', 'vector_binary_0_0', 'vector_binary_0_1', 'vector_binary_0_2', 'vector_binary_0_3', 'vector_binary_1_0', 'vector_binary_1_1', 'vector_binary_1_2', 'vector_binary_1_3', 'vector_binary_2_0', 'vector_binary_2_1', 'vector_binary_2_2', 'vector_binary_2_3', 'vector_binary_3_0', 'vector_binary_3_1', 'vector_binary_4_0', 'vector_binary_4_1', 'vector_binary_5_0', 'vector_binary_6_0', 'vector_binary_7_0', 'vector_binary_7_1', 'vector_binary_7_2', 'vector_binary_7_3', 'vector_binary_8_0', 'vector_binary_8_1', 'vector_binary_9_0', 'vector_binary_9_1', 'vector_binary_10_0', 'vector_binary_11_0', 'vector_binary_11_1', 'vector_binary_12_0', 'vector_binary_poison', 'vector_binary_undef', 'vector_binary_frozen', 'vector_binary_sources', 'vector_binary_divide', 'vector_binary_signed_divide', 'vector_binary_signed_rem', 'vector_binary_overshift', 'vector_binary_chain', 'vector_fneg_half_raw', 'vector_fneg_half_poison', 'vector_fneg_half_undef', 'vector_fneg_half_source', 'vector_fneg_half_result', 'vector_fneg_half_old', 'vector_fneg_half_double', 'vector_fneg_half_chain', 'vector_fneg_float_raw', 'vector_fneg_float_poison', 'vector_fneg_float_undef', 'vector_fneg_float_source', 'vector_fneg_float_result', 'vector_fneg_float_old', 'vector_fneg_float_double', 'vector_fneg_float_chain', 'vector_fp_half_0_raw', 'vector_fp_half_0_poison', 'vector_fp_half_0_undef', 'vector_fp_half_0_source_left', 'vector_fp_half_0_source_right', 'vector_fp_half_0_result', 'vector_fp_half_0_old', 'vector_fp_half_0_chain', 'vector_fp_half_1_raw', 'vector_fp_half_1_poison', 'vector_fp_half_1_undef', 'vector_fp_half_1_source_left', 'vector_fp_half_1_source_right', 'vector_fp_half_1_result', 'vector_fp_half_1_old', 'vector_fp_half_1_chain', 'vector_fp_half_2_raw', 'vector_fp_half_2_poison', 'vector_fp_half_2_undef', 'vector_fp_half_2_source_left', 'vector_fp_half_2_source_right', 'vector_fp_half_2_result', 'vector_fp_half_2_old', 'vector_fp_half_2_chain', 'vector_fp_half_3_raw', 'vector_fp_half_3_poison', 'vector_fp_half_3_undef', 'vector_fp_half_3_source_left', 'vector_fp_half_3_source_right', 'vector_fp_half_3_result', 'vector_fp_half_3_old', 'vector_fp_half_3_chain', 'vector_fp_half_4_raw', 'vector_fp_half_4_poison', 'vector_fp_half_4_undef', 'vector_fp_half_4_source_left', 'vector_fp_half_4_source_right', 'vector_fp_half_4_result', 'vector_fp_half_4_old', 'vector_fp_half_4_chain', 'vector_fp_float_0_raw', 'vector_fp_float_0_poison', 'vector_fp_float_0_undef', 'vector_fp_float_0_source_left', 'vector_fp_float_0_source_right', 'vector_fp_float_0_result', 'vector_fp_float_0_old', 'vector_fp_float_0_chain', 'vector_fp_float_1_raw', 'vector_fp_float_1_poison', 'vector_fp_float_1_undef', 'vector_fp_float_1_source_left', 'vector_fp_float_1_source_right', 'vector_fp_float_1_result', 'vector_fp_float_1_old', 'vector_fp_float_1_chain', 'vector_fp_float_2_raw', 'vector_fp_float_2_poison', 'vector_fp_float_2_undef', 'vector_fp_float_2_source_left', 'vector_fp_float_2_source_right', 'vector_fp_float_2_result', 'vector_fp_float_2_old', 'vector_fp_float_2_chain', 'vector_fp_float_3_raw', 'vector_fp_float_3_poison', 'vector_fp_float_3_undef', 'vector_fp_float_3_source_left', 'vector_fp_float_3_source_right', 'vector_fp_float_3_result', 'vector_fp_float_3_old', 'vector_fp_float_3_chain', 'vector_fp_float_4_raw', 'vector_fp_float_4_poison', 'vector_fp_float_4_undef', 'vector_fp_float_4_source_left', 'vector_fp_float_4_source_right', 'vector_fp_float_4_result', 'vector_fp_float_4_old', 'vector_fp_float_4_chain', 'bad_vector_fneg', 'bad_vector_binary', 'bad_vector_compare', 'bad_wide_vector_condition', 'bad_vector_freeze', 'bad_shuffle_count', 'bad_lane_count', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_convert', 'saturating_convert_frozen', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1191,9 +1195,10 @@ fn sm_test_compute_library(label string) ![]u8 {
 		if name == 'bad_vector_fneg' {
 			source.write_string('define void @bad_vector_fneg(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %v = fneg nnan <2 x float> zeroinitializer\n ret void }\n'); continue
 		}
+		if name.starts_with('vector_fp_') { sm_vector_float_fixture(mut source, name); continue }
 		if name.starts_with('vector_fneg_') { sm_vector_fneg_fixture(mut source, name); continue }
 		if name == 'bad_vector_binary' {
-			source.write_string('define void @bad_vector_binary(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { store i32 17, ptr addrspace(1) %out\n %v = fadd <2 x float> zeroinitializer, zeroinitializer\n ret void }\n'); continue
+			source.write_string('define void @bad_vector_binary(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { store i32 17, ptr addrspace(1) %out\n %v = fadd nnan <2 x float> zeroinitializer, zeroinitializer\n ret void }\n'); continue
 		}
 		if name.starts_with('vector_binary') {
 			binary_parts := name.split('_'); binary_op := if binary_parts.len == 4 && binary_parts[2][0].is_digit() { binary_parts[2].int() } else if name == 'vector_binary_sources' || name == 'vector_binary_divide' { 3 } else if name == 'vector_binary_signed_divide' { 4 } else if name == 'vector_binary_signed_rem' { 6 } else if name == 'vector_binary_overshift' { 7 } else { 0 }
@@ -1869,6 +1874,7 @@ fn test_software_metal_compute() {
 		}
 		sm_test_vector_binary_dispatches(d, library, queue, a, b, output, ap, bp, outp)
 		sm_test_vector_fneg_dispatches(d, library, queue, a, b, output, ap, bp, outp)
+		sm_test_vector_float_dispatches(d, library, queue, a, b, output, ap, bp, outp)
 		for i in 0 .. 8 { unsafe { *(&u32(outp + u64(i * 4))) = vector_saved[i] } }
 		bits_command := sm_send(queue, c'commandBuffer'); bits_encoder := sm_send(bits_command, c'computeCommandEncoder')
 		for i, name in ['bits', 'bits_frozen'] {
@@ -2269,7 +2275,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/disjoint/samesign/cast-flags/constant-vector-extract/vector-insert/vector-shuffle/vector-freeze/vector-select/vector-lane-select/vector-compare/vector-integer-binary/bit-intrinsic/funnel/extrema/abs/saturating/saturating-convert/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/address-space-cast/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/disjoint/samesign/cast-flags/constant-vector-extract/vector-insert/vector-shuffle/vector-freeze/vector-select/vector-lane-select/vector-compare/vector-integer-binary/vector-floating-binary/bit-intrinsic/funnel/extrema/abs/saturating/saturating-convert/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/address-space-cast/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {
@@ -2420,28 +2426,40 @@ fn test_software_metal_compute_bindings() {
 }
 fn sm_test_buffer(device u64, length u64, options u64) u64 { return unsafe { SMBuffer(voidptr(C.ios_objc_msgsend))(device, c'newBufferWithLength:options:', length, options) } }
 fn sm_test_copy(encoder u64, src u64, a u64, dst u64, b u64, size u64) { unsafe { SMCopy(voidptr(C.ios_objc_msgsend))(encoder, c'copyFromBuffer:sourceOffset:toBuffer:destinationOffset:size:', src, a, dst, b, size) } }
-fn sm_test_reject(mode int) {
-	child := C.fork(); assert child >= 0
-	if child == 0 {
-		C.close(1); C.close(2)
-		device := metal_create_system_default_device(); queue := sm_send(device, c'newCommandQueue'); command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'blitCommandEncoder')
-		a := sm_test_buffer(device, 64, 0); b := sm_test_buffer(device, 64, 0)
-		match mode {
-			0 { sm_call(command, c'commit') }
-			1 { sm_call(command, c'waitUntilCompleted') }
-			2 { sm_test_copy(encoder, a, 63, b, 0, 2) }
-			3 { sm_test_copy(encoder, a, ~u64(0), b, 0, 1) }
-			4 { sm_test_copy(encoder, a, 0, a, 4, 8) }
-			5 { sm_call(encoder, c'endEncoding'); sm_test_copy(encoder, a, 0, b, 0, 1) }
-			6 { sm_call(encoder, c'endEncoding'); sm_call(encoder, c'endEncoding') }
-			7 { sm_call(encoder, c'endEncoding'); sm_call(command, c'commit'); sm_call(command, c'commit') }
-			8 { other := metal_create_system_default_device(); x := sm_test_buffer(other, 64, 0); sm_test_copy(encoder, a, 0, x, 0, 1) }
-			else { sm_send(command, c'blitCommandEncoder') }
-		}
-		C._exit(0)
+fn sm_test_reject_case(mode int) {
+	device := metal_create_system_default_device(); queue := sm_send(device, c'newCommandQueue'); command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'blitCommandEncoder')
+	a := sm_test_buffer(device, 64, 0); b := sm_test_buffer(device, 64, 0)
+	match mode {
+		0 { sm_call(command, c'commit') }
+		1 { sm_call(command, c'waitUntilCompleted') }
+		2 { sm_test_copy(encoder, a, 63, b, 0, 2) }
+		3 { sm_test_copy(encoder, a, ~u64(0), b, 0, 1) }
+		4 { sm_test_copy(encoder, a, 0, a, 4, 8) }
+		5 { sm_call(encoder, c'endEncoding'); sm_test_copy(encoder, a, 0, b, 0, 1) }
+		6 { sm_call(encoder, c'endEncoding'); sm_call(encoder, c'endEncoding') }
+		7 { sm_call(encoder, c'endEncoding'); sm_call(command, c'commit'); sm_call(command, c'commit') }
+		8 { other := metal_create_system_default_device(); x := sm_test_buffer(other, 64, 0); sm_test_copy(encoder, a, 0, x, 0, 1) }
+		else { sm_send(command, c'blitCommandEncoder') }
 	}
-	mut status := 0
-	assert C.waitpid(child, &status, 0) == child && status == 256, 'invalid Metal state/range did not reject cleanly'
+}
+fn sm_test_reject(mode int, cycle int) {
+	// macOS atfork hooks may allocate through ASan before fork returns in the
+	// child. os.exec uses posix_spawn and starts with fresh sanitizer locks.
+	result := os.exec([os.executable(), '--software-metal-blit-reject', mode.str()])
+	expected := [
+		'Metal commit requires ended encoders and an uncommitted buffer',
+		'Metal wait requires a committed buffer',
+		'Metal blit range exceeds buffer', 'Metal blit range exceeds buffer',
+		'overlapping Metal blit ranges', 'Metal encoding has ended',
+		'Metal encoder already ended',
+		'Metal commit requires ended encoders and an uncommitted buffer',
+		'Metal blit resources belong to another device',
+		'Metal encoder requires an uncommitted buffer with no active encoder',
+	][mode]
+	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR'); assert base.len > 0
+	os.write_file('${base}/blit-reject-${os.getpid()}-${cycle}-${mode}.log', result.output) or { panic(err) }
+	assert result.exit_code == 1 && result.output.contains('iOS: ' + expected) && !result.output.contains('ERROR: AddressSanitizer') && !result.output.contains('runtime error:'), 'invalid Metal state/range: mode=${mode} exit=${result.exit_code} output=${result.output}'
+	unsafe { result.output.free() }
 }
 fn sm_test_worker() {
 	pool := objc_pool_push()
@@ -2455,7 +2473,7 @@ fn sm_test_worker() {
 }
 fn test_software_metal_deferred_blit_abi_lifetimes_and_threads() {
 	$if !ios_metal_software ? { return }
-	for _ in 0 .. 2 {
+	for cycle in 0 .. 2 {
 		objc_start()
 		pool := objc_pool_push()
 		address := runtime_symbol('/System/Library/Frameworks/Metal.framework/Metal', '_MTLCreateSystemDefaultDevice') or { panic(err) }
@@ -2489,7 +2507,7 @@ fn test_software_metal_deferred_blit_abi_lifetimes_and_threads() {
 		for i in 0 .. 32 { assert unsafe { *(&u8(sm_send(c, c'contents') + u64(i))) } == bytes[i + 8] }
 		objc_release(b); objc_release(c); objc_pool_pop(pool)
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
-		for mode in 0 .. 10 { sm_test_reject(mode) }
+		for mode in 0 .. 10 { sm_test_reject(mode, cycle) }
 		mut workers := []thread{}
 		for _ in 0 .. 8 { workers << spawn sm_test_worker() }; workers.wait(); unsafe { workers.free() }
 		assert ios_runtime.live == 0 && ios_runtime.objects.len == 0
@@ -2610,4 +2628,69 @@ fn sm_test_vector_fneg_dispatches(device u64, library u64, queue u64, a u64, b u
 		} }
 	}
 	assert completed == 42 && failed == 4
+}
+
+fn sm_float_words(bits int) []u32 {
+	// 0,-0,1,-1,2,-2,3,-3,.5,-.5,inf,-inf,NaN,max,minsub,
+	// 2*minsub,3*minsub,5*minsub,1.5,SNaN,negative QNaN.
+	return if bits == 16 { [u32(0), 0x8000, 0x3c00, 0xbc00, 0x4000, 0xc000, 0x4200, 0xc200, 0x3800, 0xb800, 0x7c00, 0xfc00, 0x7e00, 0x7bff, 1, 2, 3, 5, 0x3e00, 0x7c01, 0xfe55] } else { [u32(0), 0x80000000, 0x3f800000, 0xbf800000, 0x40000000, 0xc0000000, 0x40400000, 0xc0400000, 0x3f000000, 0xbf000000, 0x7f800000, 0xff800000, 0x7fc00000, 0x7f7fffff, 1, 2, 3, 5, 0x3fc00000, 0x7f800001, 0xffc12345] }
+}
+fn sm_vector_float_fixture(mut source strings.Builder, name string) {
+	parts := name.split('_'); t := parts[2]; operation := parts[3].int(); mode := parts[4..].join('_'); bits := if t == 'half' { 16 } else { 32 }
+	seven := if bits == 16 { u32(0x4700) } else { u32(0x40e00000) }; words := sm_float_words(bits)
+	a := if mode in ['poison', 'result'] { 'poison' } else if mode in ['undef', 'source_left'] { 'undef' } else { '<${t} zeroinitializer, ${t} bitcast (i${bits} ${seven} to ${t})>' }
+	b := if mode == 'source_right' { 'undef' } else { '<${t} zeroinitializer, ${t} bitcast (i${bits} ${words[4]} to ${t})>' }
+	source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load ${t}, ptr addrspace(2) %a, align 1\n %y = load ${t}, ptr addrspace(2) %b, align 1\n %rp = getelementptr i8, ptr addrspace(2) %b, i64 4\n %r = load i32, ptr addrspace(2) %rp, align 4\n store i32 17, ptr addrspace(1) %out, align 4\n %a0 = insertelement <2 x ${t}> ${a}, ${t} %x, i32 0\n %b0 = insertelement <2 x ${t}> ${b}, ${t} %y, i32 0\n')
+	if mode == 'source_left' { source.write_string('%src = freeze <2 x ${t}> %a0\n') }
+	if mode == 'source_right' { source.write_string('%src = freeze <2 x ${t}> %b0\n') }
+	binary := ['fadd', 'fsub', 'fmul', 'fdiv', 'frem'][operation]
+	source.write_string('%n = ${binary} <2 x ${t}> ${if mode == 'source_left' { '%src' } else { '%a0' }}, ${if mode == 'source_right' { '%src' } else { '%b0' }}\n %f = freeze <2 x ${t}> %n\n')
+	if mode == 'old' { source.write_string('%changed = insertelement <2 x ${t}> %n, ${t} zeroinitializer, i32 0\n') }
+	if mode == 'chain' { source.write_string('%added = fadd <2 x ${t}> %n, <${t} bitcast (i${bits} ${words[2]} to ${t}), ${t} bitcast (i${bits} ${words[2]} to ${t})>\n %neg = fneg <2 x ${t}> %added\n %c = fcmp oeq <2 x ${t}> %n, %n\n %selected = select <2 x i1> %c, <2 x ${t}> %neg, <2 x ${t}> %n\n %shuffled = shufflevector <2 x ${t}> %selected, <2 x ${t}> %n, <2 x i32> <i32 0, i32 2>\n %chained = fneg <2 x ${t}> %shuffled\n') }
+	selected := if mode == 'result' { '%f' } else if mode == 'old' { '%changed' } else if mode == 'chain' { '%chained' } else { '%n' }
+	for i, vector in ['%f', selected] {
+		source.write_string('%v${i} = extractelement <2 x ${t}> ${vector}, i32 %r\n %raw${i} = bitcast ${t} %v${i} to i${bits}\n')
+		if bits == 16 { source.write_string('%word${i} = zext i16 %raw${i} to i32\n') }
+		source.write_string('%dst${i} = getelementptr i32, ptr addrspace(1) %out, i64 ${i + 1}\n store i32 %${if bits == 16 { 'word' } else { 'raw' }}${i}, ptr addrspace(1) %dst${i}, align 4\n')
+	}
+	source.write_string('ret void }\n')
+}
+fn sm_test_vector_float_dispatches(device u64, library u64, queue u64, a u64, b u64, output u64, ap u64, bp u64, outp u64) {
+	lhs := [2, 2, 3, 0, 1, 10, 11, 10, 10, 2, 3, 13, 14, 16, 19, 20]!
+	rhs := [2, 4, 4, 1, 1, 2, 2, 10, 11, 0, 0, 13, 14, 15, 2, 1]!
+	expected_words := [
+		[4, 6, 2, 0, 1, 10, 11, 10, 12, 2, 3, 10, 15, 17, 12, 12]!,
+		[0, 3, 7, 0, 0, 10, 11, 12, 10, 2, 3, 0, 0, 14, 12, 12]!,
+		[2, 4, 5, 1, 0, 10, 11, 10, 11, 0, 1, 10, 0, 0, 12, 12]!,
+		[2, 8, 9, 12, 12, 10, 11, 12, 12, 10, 11, 2, 2, 18, 12, 12]!,
+		[0, 2, 3, 12, 12, 12, 12, 12, 12, 12, 12, 0, 0, 14, 12, 12]!,
+	]!
+	mut completed := 0; mut failed := 0
+	for format in ['half', 'float'] {
+		bits := if format == 'half' { 16 } else { 32 }; words := sm_float_words(bits)
+		seven := if bits == 16 { u32(0x4700) } else { u32(0x40e00000) }
+		ordinary := if bits == 16 { [u32(0x4880), 0x4500, 0x4b00, 0x4300, 0x3c00]! } else { [u32(0x41100000), 0x40a00000, 0x41600000, 0x40600000, 0x3f800000]! }
+		chained := if bits == 16 { [u32(0x4900), 0x4600, 0x4b80, 0x4480, 0x4000]! } else { [u32(0x41200000), 0x40c00000, 0x41700000, 0x40900000, 0x40000000]! }
+		for operation in 0 .. 5 { for mode in ['raw', 'poison', 'undef', 'source_left', 'source_right', 'result', 'old', 'chain'] { for sample in 0 .. if mode == 'raw' { 16 } else { 1 } {
+			unsafe { *(&u32(ap)) = u32(0xffffffff); *(&u32(bp)) = u32(0xffffffff) }
+			command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+			pipeline := sm_test_compute_pipeline(device, library, 'vector_fp_${format}_${operation}_${mode}', unsafe { nil }); assert pipeline != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+			sm_test_compute_buffer(encoder, a, 0, 0); sm_test_compute_buffer(encoder, b, 0, 3); sm_test_compute_buffer(encoder, output, 4, 7)
+			sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(encoder, c'endEncoding'); objc_release(pipeline)
+			x := if mode == 'raw' { words[lhs[sample]] } else { seven }; y := if mode == 'raw' { words[rhs[sample]] } else { words[4] }
+			index := if mode in ['poison', 'source_left', 'source_right', 'result'] { u32(1) } else { u32(0) }
+			unsafe { C.memset(voidptr(outp + 4), 0xcc, 24); *(&u32(ap)) = x; *(&u32(bp)) = y; *(&u32(bp + 4)) = index }
+			sm_call(command, c'commit'); bad := mode in ['poison', 'undef']
+			assert sm_send(command, c'status') == if bad { u64(5) } else { u64(4) }
+			if bad { assert sm_send(command, c'error') != 0; failed++ } else { completed++ }
+			first := if mode == 'raw' { words[expected_words[operation][sample]] } else if mode in ['poison', 'result'] { u32(0) } else if mode == 'source_left' { words[[4, 5, 0, 0, 0]![operation]] } else if mode == 'source_right' { if operation < 2 { seven } else { words[[0, 0, 0, 10, 12]![operation]] } } else { ordinary[operation] }
+			second := if mode == 'old' { u32(0) } else if mode == 'chain' { chained[operation] } else { first }
+			for i in 0 .. 6 {
+				expected := if i == 0 { u32(17) } else if i == 1 && mode != 'undef' { first } else if i == 2 && !bad { second } else { u32(0xcccccccc) }
+				assert unsafe { *(&u32(outp + u64(4 + i * 4))) } == expected, '${format} op=${operation} ${mode} sample=${sample} word=${i}'
+			}
+		} } }
+	}
+	assert completed == 210 && failed == 20
 }

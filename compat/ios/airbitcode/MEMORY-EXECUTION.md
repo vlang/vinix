@@ -125,7 +125,7 @@ caps all supported vector construction results together at 4,096
 per function, including inactive blocks.
 One execution-owned array holds those fixed-size snapshots and is freed on
 every exit; loop visits reuse each instruction's slot. Vector PHIs,
-arguments, loads/stores and floating binary arithmetic, scalable vectors, other lane
+arguments, loads/stores, scalable vectors, other lane
 formats and vectors larger than sixteen lanes remain unsupported.
 
 `shufflevector` combines lanes from two supported constant or earlier
@@ -189,7 +189,7 @@ Results may feed comparisons, per-lane select, freeze, insertion, shuffle and
 extraction, preserving older snapshots. Comparison costs one executed step;
 validation charges both source counts plus the result count, and results share
 the existing construction storage. Floating/pointer comparison flags, vector
-pointer comparisons and floating vector binary arithmetic remain unsupported.
+pointer comparisons remain unsupported.
 
 Vector integer binary operations accept matching fixed 1..16-lane i1..i64
 vectors. All thirteen scalar opcodes apply independently per lane: add, subtract,
@@ -208,7 +208,27 @@ rejects. Freezing a result does not suppress errors that occur while evaluating
 the instruction. Earlier stores remain visible after dynamic failures.
 Each binary instruction costs one step, charges both source counts plus result
 count against lane work, and shares the existing bounded snapshot array.
-Floating vector binary operations remain unsupported.
+
+Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
+`fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane
+precision. Rounding is nearest/ties-to-even with gradual underflow. Signed
+zeros and infinities retain IEEE results. Zero divisors and invalid FP
+arithmetic yield infinity or the preferred positive quiet NaN, without
+poison or a host trap. Arithmetic NaNs choose `0x7e00` or `0x7fc00000`;
+copying operations retain their bits. Poison propagates per lane, including
+division/remainder. Any undef operand lane rejects at the binary instruction,
+including discarded results; freezing sources first repairs indeterminate
+lanes, while freezing the result cannot suppress prior evaluation errors.
+Both complete sources are checked before execution, including inactive blocks.
+Each operation costs one executed step and charges both source counts plus
+result count to the shared lane-work budget. Results use the existing bounded
+snapshot allocation and may feed any supported vector operation. Fast-math
+flags, other formats, scalable vectors, vector PHIs/arguments/returns and vector
+loads/stores remain unsupported. `tests/ios/air-vector-float-binary.v` checks
+native LLVM values with arithmetic NaNs normalized, exact copied bits,
+poison/undef, freezing, composition, loop reuse, rejected profiles and exact
+shared storage/work boundaries. Its sweep covers every half left encoding,
+permuted right encodings, deterministic float pairs and complete edge grids.
 
 Fixed 1..16-lane half/float vectors support unflagged `fneg`, from literals
 or earlier supported constructions. It flips only the sign bit, including
