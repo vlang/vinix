@@ -187,7 +187,7 @@ fn controls(assembler_path string, out string) ! {
    'scalable' { '%n = zext <vscale x 2 x i8> zeroinitializer to <vscale x 2 x i16>' }
    'wide' { '%n = zext <2 x i64> zeroinitializer to <2 x i65>' }
    'float' { '%n = fptosi <2 x float> zeroinitializer to <2 x i32>' }
-   'float_result' { '%n = uitofp <2 x i32> zeroinitializer to <2 x float>' }
+   'float_result' { '%n = uitofp nneg <2 x i32> zeroinitializer to <2 x float>' }
    'bitcast' { '%n = bitcast <2 x i64> zeroinitializer to <2 x double>' }
    'reshape' { '%n = bitcast <4 x i8> zeroinitializer to <2 x i16>' }
    'scalar_source' { '%n = bitcast i32 0 to <2 x i16>' }

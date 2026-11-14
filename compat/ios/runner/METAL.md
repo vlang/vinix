@@ -428,7 +428,7 @@ integer↔half/float conversions, half↔float precision changes and raw bitcast
 between i16/half or i32/float. Casts have one-step cost. Integer `trunc` accepts
 `nuw`/`nsw` (separately or together); `zext` accepts `nneg`. Violating these
 promises produces poison. Other cast flags remain unsupported.
-Integer-pointer, integer/floating-vector numeric, aggregate, double and bfloat conversions
+Integer-pointer, floating-to-integer-vector numeric, aggregate, double and bfloat conversions
 remain unsupported. Invalid
 float-to-integer inputs yield poison; storing it follows failed-command
 completion, while an unchosen select operand may discard it. Synthetic kernels
@@ -554,7 +554,7 @@ and feed other supported vector operations, including another integer cast.
 Each cast costs one executed step and charges source plus result count to
 shared lane work. Results share the existing 4,096 static construction slots
 and execution-owned allocation. Integer, mixed, void and memory APIs use the
-same integer-vector rules. Vector integer/floating numeric conversions, reshaping,
+same integer-vector rules. Vector floating-to-integer numeric conversions, reshaping,
 pointer casts, arguments/returns, PHIs, loads/stores, scalable vectors and
 widths beyond i64 remain unsupported. `tests/ios/air-vector-integer-cast.v`
 checks every width pair and flag variant against native LLVM, explicit freeze
@@ -573,7 +573,7 @@ arithmetic, comparisons, selects, shuffles and extraction. Each cast costs
 one executed step and source plus result lane work, sharing the existing
 4,096 construction slots and execution-owned array. Mixed, void and memory
 execution support these casts; the integer-only API rejects floating lanes.
-Integer/floating numeric conversions, other lane formats, vector reshaping, scalar/
+Floating-to-integer numeric vector conversions, other lane formats, vector reshaping, scalar/
 vector casts, pointer casts, scalable vectors, vector arguments/returns,
 PHIs and loads/stores remain unsupported. `tests/ios/air-vector-bitcast.v`
 checks exact native LLVM bits, complete half encodings, raw float patterns,
@@ -592,11 +592,30 @@ independent snapshots and compose with other supported vector operations.
 Each cast costs one step and source plus result lane work, sharing the
 existing 4,096 construction slots and execution-owned array. Mixed, void and
 memory APIs support these casts; the integer-only API rejects floating lanes.
-Fast-math flags, other floating formats, integer/floating numeric vector
+Fast-math flags, other floating formats, floating-to-integer numeric vector
 conversions, reshaping, vector arguments/returns, PHIs and loads/stores remain
 unsupported. `tests/ios/air-vector-precision.v` checks all half encodings, both
 signs of every half midpoint and its neighboring float values, deterministic
 float samples, NaN choices, snapshots, composition, guards and shared limits.
+
+Fixed 1..16-lane integer vectors support unflagged `uitofp` and `sitofp`
+to half or float, retaining the lane count. Source widths are i1..i64;
+signed i1 true converts to -1. The existing integer-based scalar converters
+round nearest/ties-to-even, independently of host rounding; half overflow
+produces signed infinity. Poison stays local. Any undef source lane rejects
+at the executed cast, including discarded results. Source freezes repair
+indeterminate lanes; result freezes do not suppress earlier errors. Complete
+supported literal/earlier-construction sources are validated, including
+inactive blocks. Results retain independent snapshots and compose with
+supported vector operations. Each cast costs one step and source plus result
+lane work, sharing the existing 4,096 construction slots and execution-owned
+array. Mixed, void and memory APIs support these conversions; the integer-only
+API rejects floating lanes. Fast-math flags, `uitofp nneg`, floating-to-integer
+vector conversions, other formats, reshaping, vector arguments/returns, PHIs
+and loads/stores remain unsupported. `tests/ios/air-vector-int-float.v`
+compares every source width with native LLVM, exhausts signed/unsigned i1..i16,
+and checks rounding boundaries, poison/undef, freezing, composition, loops,
+unsupported profiles and shared storage/work limits.
 
 Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
 `fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane
