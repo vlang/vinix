@@ -452,14 +452,24 @@ all four signed/unsigned half/float variants in a kernel and cover infinities,
 NaNs, fractions and frozen poison results.
 
 Scalar `extractelement` can select an i1..i64/half/float lane from a fixed
-constant vector of 1..16 lanes using a runtime i1..i64 unsigned index. All
-lanes are checked before dispatch, with a per-function million-lane validation
-budget. Only the chosen lane is evaluated: poison propagates, selected undef
-errors and out-of-range indices produce poison. Extractions cost one instruction;
-computed/loaded vectors, vector arguments/storage and scalable vectors remain
-unsupported. Deferred kernels select integer/half/float representations,
+constant vector or earlier `insertelement` result of 1..16 lanes using a runtime
+i1..i64 unsigned index. All lanes are checked before dispatch, with a
+per-function million-lane validation budget shared by insertions and
+extractions. Only the chosen lane is evaluated: poison propagates, selected
+undef errors and out-of-range indices produce poison. Extractions cost one
+instruction; vector PHIs/selects/freezes, loaded vectors, vector
+arguments/storage and scalable vectors remain unsupported.
+Deferred kernels select integer/half/float representations,
 preserve NaN payloads and signed zeros, freeze out-of-range poison, fail poison
 stores and reject an oversized-vector pipeline.
+
+`insertelement` replaces one scalar lane while preserving older snapshots and
+other lanes' poison/undef state. Invalid or poison indices poison the new
+vector; undef indices error. Later insertions can repair individual lanes.
+Each insertion costs one step. Up to 4,096 static insertion results use one
+execution-owned array freed on every exit, with slots reused on loop visits.
+Deferred integer/half/float kernels exercise snapshots, repairs, raw NaN/zero
+bits, frozen invalid indices and poison-store command failures.
 
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and

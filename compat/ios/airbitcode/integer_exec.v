@@ -9,11 +9,12 @@ pub:
 	poison bool
 	steps int // Visited instructions plus switch case comparisons.
 }
-struct IntegerValue { value u64 poison bool overflow bool aggregate bool flag_poison bool }
+struct IntegerValue { value u64 poison bool overflow bool aggregate bool flag_poison bool vector bool }
 struct IntegerProfile {
 	scope int
 	return_bits u32
 	max_phis int
+	vector_results int
 }
 fn (p IRTypedProgram) integer_bits(index int) !u32 {
 	if index < 0 || index >= p.types.len { return error('AIR integer: type index') }
@@ -117,6 +118,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	mut intrinsic_declarations := [scalar_intrinsic_cache_slots]int{} // Existing FP/integer identities, then two-width conversions.
 	mut intrinsic_work := 0
 	mut vector_work := 0
+	mut vector_results := 0
 	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
 		block := bodies.blocks[block_index]
 		if block.scope != scope || block.first < s.instructions_start || block.count < 1 || block.first > s.instructions_start + s.instructions_count || block.count > s.instructions_start + s.instructions_count - block.first { return error('AIR integer: block range') }
@@ -141,6 +143,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			}
 			pair_flow := code in [u64(5), 29, 16]! && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
 			pair_freeze := code == 58 && inst.has_result && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .struct_t
+			vector_result := code == 7
 			if pair_freeze {
 				if !binary32 { return error('AIR pair: mixed pair freeze required') }
 				p.scalar_pair_freeze(op, s.base_id, pools, scope)!
@@ -154,7 +157,11 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				p.scalar_pair_flow(op, s.base_id, code != 16, pools, scope)!
 			} else if code == 6 {
 				if !inst.has_result { return error('AIR vector: extract result required') }
-				vector_work += p.constant_extract_profile(stream, pools, bodies, scope, op, binary32, max_integer_execution_steps - vector_work)!
+				vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
+			} else if vector_result {
+				if !inst.has_result || vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
+				vector_work += p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
+				vector_results++
 			} else if code == 26 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
 				p.scalar_pair_extract(op, s.base_id, pools, scope)!
@@ -162,13 +169,13 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				for operand in p.operands[first_operand..op.operands_start + op.operands_count] { p.execution_bits(operand.type_index, binary32)! }
 			}
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
-			if inst.has_result { if !pair_result && !pair_flow { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
+			if inst.has_result { if !pair_result && !pair_flow && !vector_result { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			floating_result := inst.has_result && p.types[op.result_type].kind in [.float_t, .half_t]!
 			allowed_flags := if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code in [u64(9), 28]! { p.integer_compare_flag_mask(op) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
 				34 {} // Checked direct intrinsic, including its attributes, above.
-				6, 26, 27 {} // Checked constant-vector extraction or overflow pair access above.
+				6, 7, 26, 27 {} // Checked vector lane operations or overflow pair access above.
 				2, 9, 28 {
 					if op.operands_count != 2 { return error('AIR integer: binary/comparison arity') }
 					fp := p.types[p.operands[op.operands_start].type_index].kind in [.float_t, .half_t]!
@@ -192,7 +199,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 		}
 		if phis > max_phis { max_phis = phis }
 	}
-	return IntegerProfile{scope, return_bits, max_phis}
+	return IntegerProfile{scope, return_bits, max_phis, vector_results}
 }
 struct IntegerMachine {
 	p IRTypedProgram
@@ -205,6 +212,7 @@ struct IntegerMachine {
 mut:
 	values []IntegerValue
 	known []bool
+	vectors []ScalarVectorValue
 	steps int
 }
 fn (mut m IntegerMachine) step() ! {
@@ -219,7 +227,7 @@ fn (m &IntegerMachine) read(operand_index int) !IntegerValue {
 		slot := u64(operand.number) - s.base_id
 		if slot >= u64(m.values.len) || !m.known[int(slot)] { return error('AIR integer: result unavailable on executed path') }
 		value := m.values[int(slot)]
-		if value.aggregate { return error('AIR overflow: aggregate used as scalar') }
+		if value.aggregate || value.vector { return error('AIR overflow: aggregate used as scalar') }
 		return value
 	}
 	value := m.pools.lookup(m.scope, operand.number)!
@@ -298,9 +306,10 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 	s := bodies.scopes[profile.scope]; signature := ir.types[ir.functions[function].signature]
 	if profile.scope >= pools.scopes.len { return error('AIR integer: constant-pool scope') }
 	if arguments.len != signature.refs_count - 1 || pools.scopes[profile.scope].arguments_count != arguments.len { return error('AIR integer: argument count') }
-	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: profile.scope, arguments: arguments, limit: step_limit, binary32: binary32, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}}
+	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: profile.scope, arguments: arguments, limit: step_limit, binary32: binary32, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}, vectors: []ScalarVectorValue{len: profile.vector_results}}
 	mut pending := []IntegerValue{len: profile.max_phis}
-	defer { unsafe { m.values.free(); m.known.free(); pending.free() } }
+	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free() } }
+	m.seed_vector_slots(stream)!
 	mut block_index := s.blocks_start; mut previous := -1
 	for {
 		block := bodies.blocks[block_index]
@@ -325,6 +334,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			mut result := IntegerValue{}
 			match code {
 				6 { result = m.extract_constant_lane(stream, op)! }
+				7 { result = m.insert_vector_value(stream, inst, op)! }
 				34 { result = m.intrinsic_value(ir, op)! }
 				26 { result = m.extract_pair_value(op)! }
 				27 { result = m.insert_pair_value(op)! }

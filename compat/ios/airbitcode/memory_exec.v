@@ -23,6 +23,7 @@ pub struct IRMemoryProfile {
 	accesses []IRMemoryAccess
 	max_phis int
 	move_bytes int // Largest admitted move/copy; one scratch allocation per run.
+	vector_results int
 pub:
 	steps int // Static instructions, switch comparisons and memory-intrinsic bytes.
 	arguments []IRMemoryArgument
@@ -147,6 +148,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	mut intrinsic_declarations := [scalar_intrinsic_cache_slots]int{} // Existing FP/integer identities, then two-width conversions.
 	mut intrinsic_work := 0
 	mut vector_work := 0
+	mut vector_results := 0
 	mut memory_declarations := [66]int{}
 	mut call_alignments := [16]MemoryCallAlignmentCache{}
 	mut memory_steps := 0
@@ -159,9 +161,13 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		gep := code in [u64(4), 30, 43]!
 		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code in [u64(9), 28]! { p.integer_compare_flag_mask(op) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 		if op.flags & ~allowed_flags != 0 { return error('AIR memory execution: unsupported flags') }
-		if code == 6 {
+		if code in [u64(6), 7]! {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR vector: extract result slot') }
-			vector_work += p.constant_extract_profile(stream, pools, bodies, scope, op, true, max_integer_execution_steps - vector_work)!
+			if code == 7 {
+				if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
+				vector_work += p.vector_insert_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)!
+				vector_results++
+			} else { vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)! }
 			continue
 		}
 		if code in [u64(10), 11, 12]! { continue } // Checked by control preflight.
@@ -364,7 +370,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		} else if p.operands[op.operands_start + 1].type_index != op.source_type { return error('AIR memory execution: store type') }
 	}
 	keep = true
-	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
+	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, vector_results: vector_results, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
 }
 pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
@@ -385,10 +391,11 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		if gap < u64(access.bytes) { return error('AIR memory execution: disjoint memcpy ranges required') }
 	}
 	scope := function + 1; s := bodies.scopes[scope]
-	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: scope, binary32: true, limit: step_limit, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}}
+	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: scope, binary32: true, limit: step_limit, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}, vectors: []ScalarVectorValue{len: profile.vector_results}}
 	mut pending := []IntegerValue{len: profile.max_phis}
 	mut move_buffer := []u8{len: profile.move_bytes}
-	defer { unsafe { m.values.free(); m.known.free(); pending.free(); move_buffer.free() } }
+	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free(); move_buffer.free() } }
+	m.seed_vector_slots(stream)!
 	mut block_index := s.blocks_start; mut previous := -1
 	for {
 		block := bodies.blocks[block_index]; mut phis := 0
@@ -449,6 +456,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 			if code == 27 { value := m.insert_pair_value(op)!; m.put(inst, value); continue }
 			if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
 			if code == 6 { value := m.extract_constant_lane(stream, op)!; m.put(inst, value); continue }
+			if code == 7 { value := m.insert_vector_value(stream, inst, op)!; m.put(inst, value); continue }
 			if code == 3 { if p.types[op.result_type].kind != .pointer_t { value := m.cast_value(op)!; m.put(inst, value) }; continue }
 			if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }
 			if code == 58 {

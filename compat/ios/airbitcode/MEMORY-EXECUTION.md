@@ -5,7 +5,7 @@ arguments, forward control flow, scalar loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, bounded constant GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
-Scalar `extractelement` may also read supported fixed constant vectors;
+Scalar `extractelement` may also read supported fixed constant/inserted vectors;
 vector memory accesses remain unsupported.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
@@ -95,14 +95,14 @@ reject immediately, including for unused results, and prior stores remain
 visible. Untaken blocks do not evaluate their selects. Scalar freeze may make
 the condition defined. No runtime pointer poison tracking is provided.
 
-`extractelement` supports literal fixed vectors of 1..16 i1..i64/half/float
+`extractelement` supports fixed vectors of 1..16 i1..i64/half/float
 lanes and scalar i1..i64 indices, interpreted as unsigned after width masking.
 Materialized data, scalar splats, aggregate lane constants, zero, poison and
 undef vectors are admitted. Every lane is checked in preflight, including
 unselected lanes and inactive blocks; unsupported expressions reject before
-stores. A separate per-function budget admits at most 1,000,000 constant lanes
-across all extractions, charging each vector's full count. Each executed
-extraction itself costs one step and adds no buffer access requirement.
+stores. A separate per-function budget admits at most 1,000,000 lanes
+across all extractions and insertions, charging each vector's full count.
+Each executed extraction costs one step and adds no buffer access requirement.
 
 Execution reads only the indexed lane. An out-of-range or poison index yields
 poison; an undef index errors. Selected poison propagates and selected undef
@@ -110,9 +110,19 @@ errors; other poison/undef lanes do not affect a defined selection. An
 out-of-range index yields poison even for a whole undef vector. Extracted
 scalar bits feed existing arithmetic, casts, select/freeze, PHIs and stores.
 Integer, mixed scalar and void APIs share validation/evaluation; the integer
-API admits integer lanes only. Vector arguments, computed/loaded vectors,
-vector arithmetic/storage, scalable vectors, other lane formats and vectors
-larger than sixteen lanes remain unsupported.
+API admits integer lanes only.
+
+`insertelement` creates a new vector snapshot from a supported literal or an
+earlier insertion result of the same type. It replaces one lane with a scalar
+value, poison or literal undef; other lanes retain their state. Extraction may
+read either snapshot. A poison or out-of-range insertion index poisons the
+whole new vector; an undef index errors. A later valid insertion can repair
+one lane of poison/undef. Each insertion costs one executed step. Preflight
+caps static insertion results at 4,096 per function, including inactive blocks.
+One execution-owned array holds those fixed-size snapshots and is freed on
+every exit; loop visits reuse each instruction's slot. Vector PHIs, selects,
+freezes, arguments, loads/stores and arithmetic, scalable vectors, other lane
+formats and vectors larger than sixteen lanes remain unsupported.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -586,6 +596,11 @@ defined native LLVM across integer/half/float lanes, several vector/index
 widths and constant forms. Independent lane expectations cover poison/undef,
 index masking, padding, prior stores, budgets and preflight guards. Whole
 functions test both memory and scalar lane-work limits before execution.
+`tests/ios/air-vector-insert.v` compares chained insertions and old/new snapshot
+extractions with defined native LLVM. It checks per-lane poison/undef, repairs,
+all scalar lane formats, index masking, prior stores, metadata rejection,
+scalar/integer APIs, loop slot reuse, step budgets and both public storage/work
+limits. Native execution excludes indeterminate selections.
 `tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
 extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native
