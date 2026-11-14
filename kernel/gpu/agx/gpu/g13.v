@@ -16,6 +16,7 @@ import gpu.agx.mmu
 import gpu.agx.render as agxrender
 import katomic
 import klock
+import memory
 
 pub const g13_queue_channel_vertex = u32(1) << 0
 pub const g13_queue_channel_fragment = u32(1) << 1
@@ -545,16 +546,52 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 		|| minimum > g13_tvb_max_blocks || u32(buffer.blocks.len) >= minimum {
 		return buffer.initialized && u32(buffer.blocks.len) >= minimum
 	}
+	info_size := fw.g13_buffer_info_active_size(mgr.hw_config.firmware_abi) or { return false }
+	if buffer.info.phys == 0 || buffer.info.size < info_size
+		|| buffer.page_list == unsafe { nil } || buffer.block_list == unsafe { nil }
+		|| buffer.page_list.size < u64(minimum) * fw.g13_tvb_pages_per_block * sizeof(u32)
+		|| buffer.block_list.size < u64(minimum) * 2 * sizeof(u32)
+		|| buffer.block_control.phys == 0 || buffer.block_control.size < sizeof(fw.G13BufferBlockControl) {
+		return false
+	}
 	mut context := unsafe { buffer.context }
-	for u32(buffer.blocks.len) < minimum {
+	old_count := buffer.blocks.len
+	// Reserve a complete replacement pointer table before allocating GPU
+	// blocks. It is an owned, nonsliced V array over fallible raw backing;
+	// no managed-array header or second grow allocation is involved.
+	storage := memory.malloc_packed_fallible(u64(minimum) * sizeof(&mmu.UatBuffer))
+	if storage == unsafe { nil } { return false }
+	mut staged := []&mmu.UatBuffer{}
+	unsafe {
+		staged.data = storage
+		staged.len = old_count
+		staged.cap = int(minimum)
+		staged.flags = .noslices
+		if old_count != 0 { C.memcpy(storage, buffer.blocks.data, u64(old_count) * sizeof(&mmu.UatBuffer)) }
+	}
+	mut committed := false
+	defer {
+		if !committed {
+			for index := staged.len - 1; index >= old_count; index-- {
+				context.release_driver_buffer(staged[index])
+			}
+			unsafe { staged.free() }
+		}
+	}
+	for u32(staged.len) < minimum {
 		block := context.alloc_driver_buffer_aligned(fw.g13_tvb_block_size, false, fw.g13_tvb_page_size) or {
 			return false
 		}
+		staged << block
 		if !mgr.flush_g13_uat_range(context.id, block.va, block.size) {
-			context.release_driver_buffer(block)
 			return false
 		}
-		index := u32(buffer.blocks.len)
+	}
+	// Asahi Buffer::ensure_blocks commits only after the entire extension
+	// exists. Allocation or mapping failure leaves both published tables and
+	// BlockControl unchanged and drops every newly staged block.
+	for index := u32(old_count); index < minimum; index++ {
+		block := staged[index]
 		unsafe {
 			mut pages := &u32(buffer.page_list.cpu_address())
 			mut blocks := &u32(buffer.block_list.cpu_address())
@@ -563,23 +600,22 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 			for page := u32(0); page < fw.g13_tvb_pages_per_block; page++ {
 				pages[index * fw.g13_tvb_pages_per_block + page] = page_number + page
 			}
-			buffer.blocks << block
-			new_count := index + 1
-			page_count := new_count * fw.g13_tvb_pages_per_block
-			// Publishing wptr last makes all newly populated table entries visible
-			// before firmware is allowed to allocate from the added block.
-			mut control := &fw.G13BufferBlockControl(buffer.block_control.cpu_address())
-			katomic.store(mut &control.total, new_count)
-			katomic.store(mut &control.wptr, new_count)
-			// During a GrowTVB request firmware owns the active Info counters. It
-			// learns about added blocks exclusively through BlockControl.
-			if !firmware_active {
-				if !fw.update_g13_buffer_info_counts(buffer.info.cpu_address(),
-					mgr.hw_config.firmware_abi, page_count, new_count, page_count - 1) {
-					return false
-				}
-			}
 		}
+	}
+	unsafe {
+		buffer.blocks.free()
+		buffer.blocks = staged
+	}
+	committed = true
+	mut control := unsafe { &fw.G13BufferBlockControl(buffer.block_control.cpu_address()) }
+	katomic.store(mut &control.total, minimum)
+	katomic.store(mut &control.wptr, minimum)
+	// An active scene gives firmware ownership of Info counters. Added
+	// blocks are visible exclusively through BlockControl in that case.
+	if !firmware_active {
+		page_count := minimum * fw.g13_tvb_pages_per_block
+		return fw.update_g13_buffer_info_counts(buffer.info.cpu_address(),
+			mgr.hw_config.firmware_abi, page_count, minimum, page_count - 1)
 	}
 	return true
 }

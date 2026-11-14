@@ -110,7 +110,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
 | Submission scheduling | Vinix accepts at most two commands in the compute-then-render form and waits on dependencies in the ioctl. The reference accepts general batches through DRM scheduling, with multiple in-flight jobs and per-subqueue barriers. |
 | Render scenes | Vinix retains one active render scene per queue. The reference manages scene slots and shared TVB lifetime across overlapping work. |
-| TVB ownership and growth | Vinix retains its slot for the queue's lifetime and publishes added blocks individually. The reference uses scene-bound slot ownership and stages the complete allocation before committing a heap extension. |
+| TVB ownership and growth | Complete staged heap extension is implemented below. Vinix still retains its slot for the queue's lifetime; the reference uses scene-bound slot ownership. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
 | Timestamp UAPI | The reference's per-command timestamp objects and current compact command fields are not wired through Vinix's legacy command interface. |
@@ -178,6 +178,32 @@ built from `62039d407` plus the retained GPU source. The sibling inventory
 SHA-256 is `39a3123870efd6ffd7e42256ec5d5f74b6770502fb34950c141f06300c180549`;
 the linked kernel SHA-256 is
 `df89f6ecae62e577ebdb368f4b9c788d55d6c52d0f7ded64fcb121f513ecf4ee`.
+Use the retained checker with `check-inventory BUNDLE RECEIPT`.
+
+### Complete TVB extension publication
+
+TVB growth now stages all requested GPU blocks and acknowledged mappings
+before changing either published table or BlockControl. A fallible pointer
+table reservation and reverse cleanup preserve the committed prefix when
+metadata allocation, GPU block allocation or UAT flush fails. One successful
+commit publishes the complete extension. Active firmware retains ownership
+of Info counters. Scene-slot lifetime and overlapping scenes remain separate
+gaps.
+
+The kernel-allocator sanitizer fixture (`-gc none`) covers both firmware ABIs,
+every allocation/flush failure position, metadata exhaustion, an existing
+heap's failed extension and retry, complete publication and active Info
+preservation. The reference gate and unit tests passed, as did the isolated
+AArch64 build from `2bfd32740` plus the retained GPU source. Generated C was
+inspected for the staging allocation and every cleanup exit; a separate
+lifetime review found no blocker. No GPU execution was performed.
+
+Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-tvb-transaction-20261114/bundle/`.
+The sibling inventory SHA-256 is
+`6f8dd754bed0e2a6b6d22139e501e7472dc1540bcb9919bd5e1427aa2b98c4f7`;
+the linked kernel SHA-256 is
+`960fe9df419d8af974fc0ea3c1ac52bb23fa435d81b64db67efdc3f186d887bc`.
 Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 
 ## Validation and continuation

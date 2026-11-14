@@ -245,6 +245,16 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 	require_order(scene, ['mgr.auto_grow_g13_tvb_locked(mut buffer)',
 		'mgr.ensure_g13_tvb_blocks(mut buffer, tile.min_tvb_blocks, false)',
 		'scene.user_buffer ='], 'Vinix TVB feedback before scene allocation')!
+	growth := section(reference, '    pub(crate) fn ensure_blocks(', '    /// Create a new', 'Asahi TVB extension')!
+	require_order(growth, ['let mut new_blocks', 'ualloc.array_gpuonly(BLOCK_SIZE)',
+		'inner.blocks.reserve', 'new_blocks.into_iter()', 'raw.total.store',
+		'raw.wptr.store', 'if inner.active_scenes == 0'], 'Asahi staged TVB extension')!
+	local_growth := section(local, 'fn (mut mgr GpuManager) ensure_g13_tvb_blocks(', '// Asahi Buffer::auto_grow', 'Vinix TVB extension')!
+	require_order(local_growth, ['memory.malloc_packed_fallible', 'for u32(staged.len)',
+		'staged << block', 'mgr.flush_g13_uat_range', 'for index := u32(old_count)',
+		'buffer.blocks = staged', 'katomic.store(mut &control.total',
+		'katomic.store(mut &control.wptr', 'if !firmware_active'], 'Vinix staged TVB extension')!
 	return ['TVB page-use feedback, two/three-times headroom and non-memoryless cap',
-		'TVB feedback before minimum-dimension growth and scene allocation']
+		'TVB feedback before minimum-dimension growth and scene allocation',
+		'TVB complete allocation before table and counter publication']
 }
