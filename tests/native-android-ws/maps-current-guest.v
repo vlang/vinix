@@ -73,6 +73,10 @@ fn stage(parent string, framework string, native string, root string) ! {
 		inputs['/' + relative] = json2.Any(sha256.sum(os.read_bytes(root + '/payload/' + relative)!).hex())
 	}
 	deployment['inputs_sha256'] = json2.Any(inputs)
+	if art := os.getenv_opt('VINIX_CURRENT_ART_LIBRARY') {
+		media.stage_art_library(art, root + '/payload', mut inputs)!
+		deployment['inputs_sha256'] = json2.Any(inputs)
+	}
 	if protocol := os.getenv_opt('VINIX_CURRENT_ACCOUNT_PROTOCOL') {
 		// Cancellation acknowledgements require the broker and service-side
 		// transport together. One build directory selects both, never one half.

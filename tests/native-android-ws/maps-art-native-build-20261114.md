@@ -240,6 +240,51 @@ root image. No current root-disk seal or root-filesystem fsck is claimed.
 The full source, generated inputs, dependency files and incremental objects
 remain on the stopped work disk. No test VM is left running.
 
+## ART library staging preparation
+
+The next continuation adds VINIX_CURRENT_ART_LIBRARY to maps-current-guest.
+It stages the selected libart.so and records its actual SHA256 at the guest
+library path in deployment inputs. Selection is optional, preserving existing
+SDK/native/core/TLS/controller staging. The helper requires a bounded regular
+ARM64 shared object, libart.so SONAME, no interpreter, valid 16-KiB-compatible
+load segments and a private-origin search path. It compares selected/copied
+bytes before publishing the input hash and refuses an existing destination.
+
+The baseline ART uses DT_RPATH=${ORIGIN}, which the general ELF checker
+deliberately rejects. The ART-specific inspection path permits only $ORIGIN
+or ${ORIGIN} legacy RPATH; the general checker still rejects every legacy
+RPATH. Both RPATH and RUNPATH together are rejected. This inspects original
+bytes without rewriting the ELF. Source provenance, companion-library symbol
+compatibility and the signed ARM runtime regression remain separate required
+checks; staging shape alone does not qualify a rebuilt runtime.
+
+The focused ELF suite passes its original mutations and new page alignment,
+executable/SONAME, search-path ambiguity, strict-checker preservation,
+symlink/oversized input, overwrite and input-hash controls. With
+VINIX_ART_TEST_LIBRARY pointing at the existing baseline ARM library, actual
+copy/readback and recorded-hash comparison also pass. The new stager compiled
+with available V 0.5.2 7d74206. No rebuilt ART or new Maps guest is qualified by
+these host checks.
+
+Final compile/test receipts use the shared-host profile (RSS 629145600,
+wall 300000 ms, reserve 8589934592, growth 4294967296, output 4194304),
+all 0/0 with complete cleanup:
+
+| Evidence root | Elapsed ms | Sampled RSS bytes |
+| --- | ---: | ---: |
+| art-library-stage-tests-20261114-r5 | 2844 | 344588288 |
+| art-library-stage-checks-20261114-r3 | 380 | 13959168 |
+| art-library-stage-host-20261114-r3 | 3071 | 368803840 |
+
+Stager SHA256 is
+`ca475ab6e43689d05dd198dbf463b97bfdeb2ad2b9066a71b9bcce6455d9c51b`;
+test executable is
+`5fbcc8e1ef80b03b7be0facdc5c8f99ff05e2690033f45d8ce7612b090dcb864`.
+Earlier failed evidence is retained: missing module search paths on r1,
+baseline legacy-RPATH rejection on the first real-library check, and r4/r2
+compiles stopped by the old filesystem-wide growth limit. They are not passes.
+No retained image or audit bundle was deleted or archived during this work.
+
 The original profile used RSS 629145600 bytes, reserve 1073741824, growth 536870912,
 output 4194304 and host wall 300000 ms. The guest uses the stricter 290000-ms
 wall limit to leave cleanup time. Make uses -j1. The source is ART

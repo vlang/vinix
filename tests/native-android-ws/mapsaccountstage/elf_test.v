@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module mapsaccountstage
 
+import json2
+import os
+
 fn set16(mut bytes []u8, at int, value u16) {
 	for index in 0 .. 2 { bytes[at + index] = u8(value >> (8 * index)) }
 }
@@ -103,4 +106,109 @@ fn test_runpath_is_exposed_for_artifact_policy() {
 	mut bytes := fixture()
 	set64(mut bytes, 240, 29)
 	assert inspect_elf(bytes)!.runpath == 'libsample.so'
+}
+
+fn art_fixture() []u8 {
+	mut bytes := fixture()
+	for index in 394 .. 407 { bytes[index] = 0 }
+	for index, value in 'libart.so'.bytes() { bytes[394 + index] = value }
+	set64(mut bytes, 80, 0x10000)
+	set64(mut bytes, 112, 65536)
+	set64(mut bytes, 136, 0x100c0)
+	set64(mut bytes, 200, 0x10180)
+	return bytes
+}
+
+fn test_art_page_shape_and_private_search_policy() {
+	validate_art_library(art_fixture())!
+	for alignment in [u64(0), 4096, 32769] {
+		mut bytes := art_fixture()
+		set64(mut bytes, 112, alignment)
+		if _ := validate_art_library(bytes) { assert false, 'invalid page alignment accepted' }
+	}
+	mut mismatch := art_fixture()
+	set64(mut mismatch, 112, 131072)
+	if _ := validate_art_library(mismatch) { assert false, 'noncongruent segment accepted' }
+	for wrong in [fixture(), art_fixture()[..63].clone()] {
+		if _ := validate_art_library(wrong) { assert false, 'wrong or truncated ART input accepted' }
+	}
+	mut executable := art_fixture()
+	set16(mut executable, 16, 2)
+	if _ := validate_art_library(executable) { assert false, 'executable accepted as library' }
+	for tag in [u64(15), 29] {
+	for path in ['\$ORIGIN', '\${ORIGIN}', '/usr/lib', '../outside'] {
+		mut search := art_fixture()
+		set64(mut search, 152, 96)
+		set64(mut search, 256, tag)
+		set64(mut search, 264, 48)
+		for index, value in path.bytes() { search[432 + index] = value }
+		if tag == 15 {
+			if _ := inspect_elf(search) { assert false, 'general ELF checker accepted legacy RPATH' }
+		}
+		if path.starts_with('\$') {
+			validate_art_library(search)!
+		} else {
+			if _ := validate_art_library(search) { assert false, 'untrusted search path accepted' }
+		}
+	}
+	}
+	mut both := art_fixture()
+	set64(mut both, 152, 112)
+	set64(mut both, 256, 15)
+	set64(mut both, 264, 48)
+	set64(mut both, 272, 29)
+	set64(mut both, 280, 48)
+	for index, value in '\${ORIGIN}'.bytes() { both[432 + index] = value }
+	if _ := validate_art_library(both) { assert false, 'ambiguous search policy accepted' }
+}
+
+fn test_art_staging_tracks_selected_bytes_and_refuses_overwrite() {
+	root := os.join_path(os.temp_dir(), 'vinix-art-stage-${os.getpid()}')
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	source := root + '/libart.so'
+	os.write_file_array(source, art_fixture())!
+	mut inputs := {'unrelated': json2.Any('retained')}
+	stage_art_library(source, root + '/payload', mut inputs)!
+	assert digest(root + '/payload' + art_library_path)! == digest(source)!
+	assert inputs[art_library_path]!.str() == digest(source)!
+	assert inputs['unrelated']!.str() == 'retained'
+	before := inputs.clone()
+	original := digest(root + '/payload' + art_library_path)!
+	mut replacement := art_fixture()
+	replacement[340] = 99
+	os.write_file_array(source, replacement)!
+	if _ := stage_art_library(source, root + '/payload', mut inputs) {
+		assert false, 'existing ART destination overwritten'
+	}
+	assert digest(root + '/payload' + art_library_path)! == original
+	assert inputs == before
+	os.symlink(source, root + '/alias')!
+	if _ := stage_art_library(root + '/alias', root + '/symlink-rejected', mut inputs) {
+		assert false, 'symlink source accepted'
+	}
+	assert !os.exists(root + '/symlink-rejected')
+	os.write_file(root + '/oversized', '')!
+	os.truncate(root + '/oversized', u64(129) * 1024 * 1024)!
+	if _ := stage_art_library(root + '/oversized', root + '/size-rejected', mut inputs) {
+		assert false, 'oversized source accepted'
+	}
+	assert !os.exists(root + '/size-rejected')
+	os.write_file(source, 'invalid ELF')!
+	if _ := stage_art_library(source, root + '/rejected', mut inputs) {
+		assert false, 'invalid library staged'
+	}
+	assert !os.exists(root + '/rejected')
+	assert inputs == before
+}
+
+fn test_art_supplied_real_library() {
+	source := os.getenv_opt('VINIX_ART_TEST_LIBRARY') or { return }
+	root := os.join_path(os.temp_dir(), 'vinix-art-real-stage-${os.getpid()}')
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	mut inputs := map[string]json2.Any{}
+	stage_art_library(source, root, mut inputs)!
+	assert inputs[art_library_path]!.str() == digest(source)!
+	assert digest(root + art_library_path)! == digest(source)!
 }

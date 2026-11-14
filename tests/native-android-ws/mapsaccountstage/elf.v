@@ -46,6 +46,10 @@ fn cstring(bytes []u8, offset u64) !string {
 }
 
 pub fn inspect_elf(bytes []u8) !Elf {
+	return inspect_elf_policy(bytes, false)
+}
+
+fn inspect_elf_policy(bytes []u8, art_origin_rpath bool) !Elf {
 	if bytes.len < 64 || bytes[..7] != [u8(0x7f), `E`, `L`, `F`, 2, 1, 1]
 		|| u16_at(bytes, 16) !in [u16(2), 3] || u16_at(bytes, 18) != 183
 		|| u32_at(bytes, 20) != 1 || u16_at(bytes, 52) != 64 {
@@ -89,10 +93,10 @@ pub fn inspect_elf(bytes []u8) !Elf {
 		if interpreter != '' { return error('ELF interpreter lacks dynamic segment') }
 		return Elf{}
 	}
-	return parse_dynamic(bytes, segments, dynamic, interpreter)
+	return parse_dynamic(bytes, segments, dynamic, interpreter, art_origin_rpath)
 }
 
-fn parse_dynamic(bytes []u8, segments []Segment, dynamic Segment, interpreter string) !Elf {
+fn parse_dynamic(bytes []u8, segments []Segment, dynamic Segment, interpreter string, art_origin_rpath bool) !Elf {
 	if mapped_offset(segments, dynamic.address, dynamic.size)! != dynamic.offset {
 		return error('ELF dynamic segment file and virtual mappings differ')
 	}
@@ -106,11 +110,11 @@ fn parse_dynamic(bytes []u8, segments []Segment, dynamic Segment, interpreter st
 	for at := int(dynamic.offset); at < int(dynamic.offset + dynamic.size); at += 16 {
 		tag, value := u64_at(bytes, at), u64_at(bytes, at + 8)
 		if tag == 0 { terminated = true break }
-		if tag == 15 { return error('legacy ELF RPATH is forbidden') }
+		if tag == 15 && !art_origin_rpath { return error('legacy ELF RPATH is forbidden') }
 		if tag == 1 {
 			if needed_offsets.len >= 128 { return error('too many ELF dependencies') }
 			needed_offsets << value
-		} else if tag in [u64(5), 10, 14, 29] {
+		} else if tag in [u64(5), 10, 14, 15, 29] {
 			if tag in seen { return error('duplicate ELF string metadata tag') }
 			seen[tag] = true
 			match tag {
@@ -121,6 +125,7 @@ fn parse_dynamic(bytes []u8, segments []Segment, dynamic Segment, interpreter st
 			}
 		}
 	}
+	if 15 in seen && 29 in seen { return error('ambiguous ELF RPATH and RUNPATH') }
 	if !terminated || 5 !in seen || 10 !in seen || strsz == 0 || strsz > 16 * 1024 * 1024 {
 		return error('unterminated ELF dynamic table or missing bounded string table')
 	}
@@ -136,7 +141,11 @@ fn parse_dynamic(bytes []u8, segments []Segment, dynamic Segment, interpreter st
 	}
 	soname := if 14 in seen { cstring(strings, soname_offset)! } else { '' }
 	if soname.contains_any('/\\') || soname in ['.', '..'] { return error('unsafe ELF SONAME') }
-	return Elf{needed, interpreter, soname, if 29 in seen { cstring(strings, runpath_offset)! } else { '' }}
+	search := if 15 in seen || 29 in seen { cstring(strings, runpath_offset)! } else { '' }
+	if 15 in seen && search !in ['\$ORIGIN', '\${ORIGIN}'] {
+		return error('ART legacy RPATH must be its private origin')
+	}
+	return Elf{needed, interpreter, soname, search}
 }
 
 fn mapped_offset(segments []Segment, address u64, size u64) !u64 {
