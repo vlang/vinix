@@ -63,7 +63,7 @@ fn ordinary(builtins string) ! {
 	println('WINE PREFIX CLI PASS ordinary signed installed review; exclusive addition; repeat; private data')
 }
 
-fn ordinary_upgrade(old_builtins string) ! {
+fn ordinary_upgrade(old_builtins string, selected_builtins string) ! {
 	cli('wine-prefix-review')!
 	cli_status('wine-prefix-additions', 1)!
 	system := '/tmp/private/wine/drive_c/windows/system32'
@@ -73,6 +73,24 @@ fn ordinary_upgrade(old_builtins string) ! {
 	if os.exists(system + '/extra.dll') { return error('upgrade refusal created an addition before retargeting') }
 	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('upgrade refusal changed private data') }
 	println('WINE PREFIX UPGRADE PASS signed generation change; review; retarget refusal; old links and private data preserved')
+	mut owner := (pkgcore.Service{}).wine_prefix_review('app', '/tmp/private')!
+	defer { owner.close() }
+	owner.migrate_bindings()!
+	owner.migrate_bindings()!
+	owner.recheck()!
+	if owner.review.review.prior_generation != 0 || !owner.review.review.bindings.all(it.operation == .keep) {
+		return error('migration did not complete the selected generation')
+	}
+	owner.close()
+	for name in ['base.dll', 'new.dll', 'extra.dll'] {
+		if os.readlink(system + '/' + name)! != selected_builtins + '/' + name { return error('migrated builtin target differs') }
+	}
+	cli('wine-prefix-review')!
+	cli('wine-prefix-additions')!
+	mut prepared := wineadapter.prepare_prefix('/tmp/private', selected_builtins)!
+	prepared.close()
+	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('migration changed private data') }
+	println('WINE PREFIX MIGRATION PASS signed runtime retarget; added link; repeat; public review; private data')
 }
 
 fn run() ! {
@@ -120,11 +138,12 @@ fn run() ! {
 	mut upgraded := (pkgcore.Service{}).transact('upgrade', [], pkgcore.TransactionOptions{})!
 	defer { upgraded.close() }
 	if upgraded.generation == state.generation { return error('runtime upgrade did not change generation') }
+	selected := '/var/lib/vinix-packages/generations/' + upgraded.generation.str() + '/apps/wine/root/usr/lib/wine/x86_64-windows'
 	upgrade_child := C.fork()
 	if upgrade_child == 0 {
 		C.alarm(90)
 		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
-		ordinary_upgrade(builtins) or { eprintln('HWTEST FAIL wine-prefix-cli: ' + err.msg()); C._exit(91) }
+		ordinary_upgrade(builtins, selected) or { eprintln('HWTEST FAIL wine-prefix-cli: ' + err.msg()); C._exit(91) }
 		C._exit(0)
 	}
 	if upgrade_child <= 0 || C.waitpid(upgrade_child, &status, 0) != upgrade_child || status != 0 { return error('ordinary upgrade fixture failed') }

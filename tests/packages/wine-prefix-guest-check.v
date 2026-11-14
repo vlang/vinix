@@ -20,6 +20,7 @@ fn run() ! {
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-prefix-cli', arches: [arch], ending: .running,
 		required: ['WINE PREFIX REFUSALS PASS competing managed launch; personal DLL preserved; retry',
 			'WINE PREFIX UPGRADE PASS signed generation change; review; retarget refusal; old links and private data preserved',
+			'WINE PREFIX MIGRATION PASS signed runtime retarget; added link; repeat; public review; private data',
 			'WINE PREFIX CLI PASS ordinary signed installed review; exclusive addition; repeat; private data', 'HWTEST PASS wine-prefix-cli fixture'],
 		forbidden: ['HWTEST FAIL', 'Kernel panic']}, hwhost.Run{kernel: os.args[3], guest: os.args[5],
 		extras: work + '/extras', state: work + '/boot', timeout: 120, keep: true})

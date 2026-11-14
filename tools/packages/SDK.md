@@ -2072,8 +2072,10 @@ prefix writers to honor the guard: it cannot make check-and-rename atomic
 against arbitrary same-account writes. It is not atomic across all bindings.
 No retargeting CLI or automatic launch migration is enabled. Host tests cover
 signed upgrade, simulated staged recovery and actual adapter-writer SIGKILL
-with partial retargets. Service-owner death, guest execution and power-loss
-qualification remain required.
+with partial retargets. Signed marker-runtime migrations also pass under ordinary
+real-root service admission in x86_64 and AArch64 guests, including subsequent
+public review and prefix preparation. Service-owner death, actual Wine execution
+and power-loss qualification remain required.
 
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
