@@ -43,16 +43,17 @@ fn (p IRTypedProgram) memory_pointer(pools IRConstantPools, bodies IRFunctionBod
 	if v.kind != .argument || o.number < pools.module_values || u64(o.number - pools.module_values) >= u64(count) { return error('AIR memory execution: direct pointer argument required') }
 	return IRMemoryAccess{argument: int(o.number - pools.module_values)}
 }
-fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, layouts IRTypeLayouts, index int, base IRMemoryAccess) !IRMemoryAccess {
+fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, layouts IRTypeLayouts, index int, base IRMemoryAccess) !(IRMemoryAccess, u64) {
 	op := p.instructions[index]
 	plan := p.gep_offset_plan(stream, pools, bodies, layouts, index)!
 	defer { plan.free() }
 	// Keep every address within the argument's extent without index-width wrap.
-	// Negative indexes are limited to one fixed-allocation stride subtraction.
+	// Negative paths require zero structure offsets, so term order is preserved.
 	if plan.pointer_bits != 64 || plan.index_bits != 64 || gep_fixed(layouts, op.source_type)!.alloc_size > 64 * 1024 * 1024 { return error('AIR memory execution: GEP layout profile') }
 	mut offset := base.offset
 	if plan.constant_offset > u64(64 * 1024 * 1024) - offset { return error('AIR memory execution: GEP offset limit') }
 	offset += plan.constant_offset
+	mut extent := offset
 	for term in plan.terms {
 		if term.bits == 0 || term.bits > 64 || term.stride > 64 * 1024 * 1024 { return error('AIR memory execution: GEP index/stride profile') }
 		value := pools.lookup(bodies.instructions[index].scope, p.operands[term.operand_index].number)!
@@ -61,7 +62,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 		if constant.kind !in [.zero, .integer]! || constant.splat { return error('AIR memory execution: defined GEP index required') }
 		bits := pools.scalar_bits(value.constant_index)! & constant_mask(term.bits)
 		if bits & (u64(1) << (term.bits - 1)) != 0 {
-			if op.operands_count != 2 || plan.terms.len != 1 || plan.constant_offset != 0 || op.flags & 4 != 0 { return error('AIR memory execution: backward GEP profile') }
+			if plan.constant_offset != 0 || op.flags & 4 != 0 { return error('AIR memory execution: backward GEP profile') }
 			if p.types[op.source_type].kind in [.array_t, .struct_t, .vector_t] {
 				if term.stride == 0 { return error('AIR memory execution: nonempty backward aggregate required') }
 			} else { p.execution_bits(op.source_type, true)! }
@@ -72,8 +73,9 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 		}
 		if term.stride != 0 && bits > (u64(64 * 1024 * 1024) - offset) / term.stride { return error('AIR memory execution: GEP offset limit') }
 		offset += bits * term.stride
+		if offset > extent { extent = offset }
 	}
-	return IRMemoryAccess{argument: base.argument, offset: offset}
+	return IRMemoryAccess{argument: base.argument, offset: offset}, extent
 }
 // Narrow execution profile: an ordinary void function, pointer arguments,
 // forward branches/switches/PHIs, scalar loads/stores, literal GEPs, scalar binary operations,
@@ -160,11 +162,11 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if ir.data_layout.len == 0 { return error('AIR memory execution: explicit GEP data layout required') }
 			if layouts.entries.len == 0 { layouts = p.type_layouts(ir)! }
 			base := p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
-			pointer := p.memory_gep(stream, pools, bodies, layouts, index, base)!
+			pointer, extent := p.memory_gep(stream, pools, bodies, layouts, index, base)!
 			pointers[int(inst.next_value - s.base_id)] = pointer
 			// All GEP intermediates stay within this extent. This also
 			// proves inbounds for unused pointers, including a one-past result.
-			if pointer.offset > arguments[pointer.argument].minimum_size { arguments[pointer.argument].minimum_size = pointer.offset }
+			if extent > arguments[pointer.argument].minimum_size { arguments[pointer.argument].minimum_size = extent }
 			continue
 		}
 		if code == 2 {
