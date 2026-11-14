@@ -7,6 +7,7 @@ import time
 import tools.packages.wineadapter
 import tools.packages.pkgcore
 import tests.packages.winecutservice
+import tests.packages.winecutfixture
 
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -53,7 +54,9 @@ fn cut_fsync(fd i32) i32 {
 
 fn point_from_fixture() !int {
 	text := os.read_file('/etc/wine-cut-point')!
-	if text !in ['1', '2', '3', '4', '5', '6', '7', '8'] { return error('expected cut point 1 through 8') }
+	scaled := $if wine_cut_scaled ? { true } $else { false }
+	point := text.int()
+	if point !in winecutfixture.points(scaled, true) || text != point.str() { return error('unexpected fixture cut point') }
 	return text.int()
 }
 
@@ -81,6 +84,9 @@ fn free_lock(fd i32) ! {
 }
 
 fn ordinary(root string, point int, fresh bool) ! {
+	names := winecutfixture.names($if wine_cut_scaled ? { true } $else { false })
+	old_count := names.len - 1
+	addition := names.last()
 	store := root + '/store'
 	old := $if wine_cut_service ? { '/var/lib/vinix-packages/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows' } $else {
 		store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
@@ -94,11 +100,11 @@ fn ordinary(root string, point int, fresh bool) ! {
 	if fresh {
 		$if wine_cut_service ? {} $else {
 		os.mkdir_all(old)!; os.mkdir_all(selected)!; os.mkdir(data)!; os.chmod(data, 0o700)!
-		for name in ['a.dll', 'b.dll']! {
+		for name in names[..old_count] {
 			os.write_file(old + '/' + name, 'old bytes')!
 			os.write_file(selected + '/' + name, 'selected bytes')!
 		}
-		os.write_file(selected + '/c.dll', 'added bytes')!
+		os.write_file(selected + '/' + addition, 'added bytes')!
 		mut prefix := wineadapter.prepare_prefix(data, old)!; prefix.close()
 		os.write_file(data + '/sentinel', 'private contents')!
 		os.write_file(root + '/armed', point.str())!
@@ -125,27 +131,28 @@ fn ordinary(root string, point int, fresh bool) ! {
 	}
 	if os.read_file(root + '/armed')! != point.str() { return error('reboot cut identity differs') }
 	if os.read_file(data + '/sentinel')! != 'private contents' { return error('reboot lost private data') }
-	for name in ['a.dll', 'b.dll']! {
+	for name in names[..old_count] {
 		target := os.readlink(system + '/' + name)!
 		if target != old + '/' + name && target != selected + '/' + name { return error('reboot binding is neither old nor selected') }
 		if os.read_file(old + '/' + name)! != 'old bytes' || os.read_file(selected + '/' + name)! != 'selected bytes' {
 			return error('reboot changed runtime payload bytes')
 		}
 	}
-	replaced := if point >= 5 { 2 } else if point >= 2 { 1 } else { 0 }
-	added := point >= 7
-	staged := point in [1, 4]
-	for index, name in ['a.dll', 'b.dll']! {
+	boundary := winecutfixture.boundary(point, old_count)!
+	replaced := boundary.replaced
+	added := boundary.added
+	staged := boundary.staged
+	for index, name in names[..old_count] {
 		expected := (if index < replaced { selected } else { old }) + '/' + name
 		if os.readlink(system + '/' + name)! != expected { return error('reboot replacement boundary differs') }
 	}
 	if added {
-		if os.readlink(system + '/c.dll')! != selected + '/c.dll' || os.read_file(selected + '/c.dll')! != 'added bytes' {
+		if os.readlink(system + '/' + addition)! != selected + '/' + addition || os.read_file(selected + '/' + addition)! != 'added bytes' {
 			return error('reboot lost the synced addition')
 		}
-	} else if os.exists(system + '/c.dll') || os.is_link(system + '/c.dll') { return error('cut advanced into additions') }
+	} else if os.exists(system + '/' + addition) || os.is_link(system + '/' + addition) { return error('cut advanced into additions') }
 	if staged {
-		if os.readlink(stage)! != selected + if point == 1 { '/a.dll' } else { '/b.dll' } {
+		if os.readlink(stage)! != selected + '/' + names[point / 3] {
 			return error('reboot did not retain the exact pending stage')
 		}
 	} else if os.exists(stage) || os.is_link(stage) { return error('reboot retained an unexpected stage') }
@@ -163,9 +170,9 @@ fn ordinary(root string, point int, fresh bool) ! {
 	defer { resumed.close() }
 	resumed.migrate_bindings()!; resumed.migrate_bindings()!; resumed.recheck()!
 	review := $if wine_cut_service ? { resumed.review.review } $else { resumed.review }
-	if review.generation != 2 || review.prior_generation != 0 || review.bindings.len != 3
+	if review.generation != 2 || review.prior_generation != 0 || review.bindings.len != names.len
 		|| !review.bindings.all(it.operation == .keep) { return error('reboot recovery inventory differs') }
-	for name in ['a.dll', 'b.dll', 'c.dll']! {
+	for name in names {
 		if os.readlink(system + '/' + name)! != selected + '/' + name { return error('reboot recovery target differs') }
 	}
 	if os.exists(stage) || os.is_link(stage) || os.read_file(data + '/sentinel')! != 'private contents' {
@@ -194,6 +201,7 @@ fn ordinary(root string, point int, fresh bool) ! {
 
 fn run() ! {
 	point := point_from_fixture()!
+	println('WINE POWER CUT PROFILE bindings=' + winecutfixture.names($if wine_cut_scaled ? { true } $else { false }).len.str())
 	os.mkdir_all('/tmp')!; os.chmod('/tmp', 0o1777)!
 	mount := persistent_mount()!
 	root := mount + '/wine-cut'
@@ -216,6 +224,9 @@ fn run() ! {
 }
 
 fn main() {
+	$if wine_cut_scaled ? {
+		$if wine_cut_service ? { eprintln('scaled power-cut fixture requires adapter mode'); exit(2) }
+	}
 	$if wine_cut_cli ? {
 		$if wine_cut_service ? {} $else { eprintln('CLI power-cut mode requires service mode'); exit(2) }
 	}

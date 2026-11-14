@@ -2258,6 +2258,18 @@ Each case uses a fresh disk and the same 120-second cap. Omitting this option
 retains the original three-case mode. This option works with the direct adapter,
 signed-service and public CLI modes; each still requires its matching guest build.
 
+For selected large-prefix cuts, compile the adapter guest with
+`-d wine_cut_scaled` and pass trailing `--scaled` instead of `--all-syncs`.
+This creates 740 old builtin links and one missing addition (741 selected rows),
+then cuts after the middle replacement's destination sync (1112), the last
+replacement's destination sync (2219), the additions sync (2221) and the final
+prefix-directory sync (2222). Cold inspection requires exactly 371 or 740
+replaced links, the expected addition state and no pending stage before fresh
+capture and idempotent recovery. The 32 MiB home, 4 MiB VJFS journal and
+120-second case limit remain unchanged. This is an adapter-only synthetic
+marker fixture; scaled service/CLI modes and mixed selectors are refused.
+It samples four boundaries, not all 2222 syncs or a real Wine payload upgrade.
+
 These tests qualify selected acknowledged-sync boundaries on journaled VJFS
 with QEMU writeback caching. Host storage caches survive the VM kill. They do
 not establish physical power-loss/torn-write handling, every interruption point

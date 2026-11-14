@@ -7,6 +7,7 @@ import json2
 import os
 import plainiso
 import tests.packages.winesource
+import tests.packages.winecutfixture
 
 #include <unistd.h>
 fn C.ftruncate(i32, u64) i32
@@ -23,28 +24,35 @@ fn tool(command []string, log string) ! {
 
 fn run() ! {
 	all_syncs := os.args.len > 1 && os.args.last() == '--all-syncs'
-	args := if all_syncs { os.args[..os.args.len - 1] } else { os.args }
+	scaled := os.args.len > 1 && os.args.last() == '--scaled'
+	args := if all_syncs || scaled { os.args[..os.args.len - 1] } else { os.args }
 	if args.len !in [5, 6, 7, 9] || (args.len >= 6 && args[5] != '--vjfs')
 		|| (args.len >= 7 && args[6] != '--service') || (args.len >= 9 && args[7] != '--cli') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs]')
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs | --scaled]')
 	}
+	if scaled && args.len >= 7 { return error('scaled power-cut fixture requires adapter mode') }
 	if args.len >= 9 && args[8] == '' { return error('nonempty compiled CLI path required') }
 	journaled := args.len >= 6
 	service := args.len >= 7
 	cli := if args.len >= 9 { args[8] } else { '' }
-	end := if all_syncs { 9 } else { 4 }
+	points := winecutfixture.points(scaled, all_syncs)
+	rows := if scaled { 741 } else { 3 }
 	image_helper := if journaled { os.getenv_opt('VINIX_WINE_IMAGE_HELPER') or { return error('VJFS requires VINIX_WINE_IMAGE_HELPER') } } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh work and supported architecture required') }
 	if winesource.file_digest(@FILE)! != sha256.hexhash($embed_file('wine-prefix-powercut-check.v').to_string()) {
 		return error('compiled powercut controller source differs')
 	}
+	layout := os.dir(@FILE) + '/winecutfixture/layout.v'
+	if winesource.file_digest(layout)! != sha256.hexhash($embed_file('winecutfixture/layout.v').to_string()) {
+		return error('compiled powercut fixture layout differs')
+	}
 	root := os.real_path(os.dir(@FILE) + '/../..')
 	host := hwhost.find_host(root, arch, '')!
 	formatter := os.getenv_opt('VINIX_MKE2FS') or { '/opt/homebrew/opt/e2fsprogs/sbin/mke2fs' }
 	checker := os.getenv_opt('VINIX_E2FSCK') or { '/opt/homebrew/opt/e2fsprogs/sbin/e2fsck' }
 	mut inputs := map[string]string{}
-	for path in [@FILE, os.executable(), os.args[3], os.args[4], host.qemu, host.firmware, host.firmware_vars, formatter, checker] {
+	for path in [@FILE, layout, os.executable(), os.args[3], os.args[4], host.qemu, host.firmware, host.firmware_vars, formatter, checker] {
 		if path != '' { inputs[path] = winesource.file_digest(path)! }
 	}
 	if journaled { inputs[image_helper] = winesource.file_digest(image_helper)! }
@@ -70,7 +78,7 @@ fn run() ! {
 	os.write_file(work + '/storage.json', json2.encode({'format': if journaled { 'VJFS' } else { 'ext2' },
 		'cache': 'writeback', 'cut': 'QEMU SIGKILL', 'host-cache': 'survives'}))!
 	inputs[seed] = winesource.file_digest(seed)!
-	for point in 1 .. end {
+	for point in points {
 		config := work + '/extras-' + point.str() + '/etc/wine-cut-point'
 		os.mkdir_all(os.dir(config))!
 		os.write_file(config, point.str())!
@@ -85,14 +93,15 @@ fn run() ! {
 	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
 	mut failures := []string{}
-	for point in 1 .. end {
+	for point in points {
 		state := work + '/point-' + point.str()
 		marker := 'WINE POWER CUT READY point=${point}'
 		mut required := [marker, 'WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings',
+			'WINE POWER CUT PROFILE bindings=${rows}',
 			'WINE POWER CUT SETTLED point=${point} grace-seconds=6',
 			'WINE POWER CUT RECOVERY PASS point=${point} fresh-capture repeat private-data', 'HWTEST PASS wine-prefix-powercut']
-		replaced := if point >= 5 { 2 } else if point >= 2 { 1 } else { 0 }
-		required << 'WINE POWER CUT STATE point=${point} replaced=${replaced} added=${point >= 7} staged=${point in [1, 4]}'
+		boundary := winecutfixture.boundary(point, rows - 1)!
+		required << 'WINE POWER CUT STATE point=${point} replaced=${boundary.replaced} added=${boundary.added} staged=${boundary.staged}'
 		if service {
 			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=true generation=2 signed-root'
 			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=false generation=2 signed-root'
