@@ -2266,8 +2266,19 @@ replacement's destination sync (2219), the additions sync (2221) and the final
 prefix-directory sync (2222). Cold inspection requires exactly 371 or 740
 replaced links, the expected addition state and no pending stage before fresh
 capture and idempotent recovery. The 32 MiB home, 4 MiB VJFS journal and
-120-second case limit remain unchanged. This is an adapter-only synthetic
-marker fixture; scaled service/CLI modes and mixed selectors are refused.
+120-second case limit remain unchanged. For signed-service scale, additionally
+compile with `-d wine_cut_service` and use `--vjfs --service --scaled`. The
+fixture signs, installs and upgrades all marker rows at the real package paths,
+then requires fresh public service admission, exact cold state, recovery and
+lease/reader coordination release. Scaled CLI mode and mixed selectors are refused.
+Optional trailing `--prepared` (`--vjfs --service --scaled --prepared`) installs
+and verifies the signed baseline in one separate boot, capped at 120 seconds,
+then cleanly exports/checks it before cloning its disk for each cut. Each
+writer/recovery case still has its own 120-second two-boot cap and full signed
+admission, exact namespace and coordination checks. The template hash must remain
+unchanged. This separates baseline installation from migration timing; its
+preparation boot is additional work, and the original per-case installation mode
+remains available. It is not a claim that installation plus recovery fits one cap.
 It samples four boundaries, not all 2222 syncs or a real Wine payload upgrade.
 
 These tests qualify selected acknowledged-sync boundaries on journaled VJFS

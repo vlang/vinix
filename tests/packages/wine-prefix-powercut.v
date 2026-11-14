@@ -116,8 +116,8 @@ fn ordinary(root string, point int, fresh bool) ! {
 		defer { owner.close() }
 		$if wine_cut_service ? {
 			if owner.review.review.generation != 2 || owner.review.review.prior_generation != 1
-				|| owner.review.review.bindings.len != 3 { return error('signed service cut admission differs') }
-			println('WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=3')
+				|| owner.review.review.bindings.len != names.len { return error('signed service cut admission differs') }
+			println('WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=${names.len}')
 		}
 		$if wine_cut_cli ? {
 			owner.close()
@@ -201,6 +201,11 @@ fn ordinary(root string, point int, fresh bool) ! {
 
 fn run() ! {
 	point := point_from_fixture()!
+	preparing := os.exists('/etc/wine-cut-prepare')
+	if preparing {
+		$if wine_cut_scaled ? {} $else { return error('preparation requires scaled service mode') }
+		$if wine_cut_service ? {} $else { return error('preparation requires scaled service mode') }
+	}
 	println('WINE POWER CUT PROFILE bindings=' + winecutfixture.names($if wine_cut_scaled ? { true } $else { false }).len.str())
 	os.mkdir_all('/tmp')!; os.chmod('/tmp', 0o1777)!
 	mount := persistent_mount()!
@@ -210,6 +215,10 @@ fn run() ! {
 		$if wine_cut_service ? { os.chmod(root, 0o755)! } $else { os.chown(root, 1000, 1000)!; os.chmod(root, 0o700)! }
 	}
 	fresh := $if wine_cut_service ? { winecutservice.setup(root, point, mount)! } $else { !os.exists(root + '/armed') }
+	if preparing {
+		time.sleep(6 * time.second)
+		println('WINE POWER CUT BASELINE PASS bindings=741')
+	} else {
 	pid := C.fork()
 	if pid == 0 {
 		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
@@ -218,6 +227,7 @@ fn run() ! {
 	}
 	mut status := i32(0)
 	if pid <= 0 || C.waitpid(pid, &status, 0) != pid || status != 0 { return error('ordinary powercut fixture failed') }
+	}
 	println('HWTEST PASS wine-prefix-powercut')
 	C.sync()
 	if C.reboot(C.RB_POWER_OFF) != 0 { return error('cannot power off recovered guest') }
@@ -225,7 +235,7 @@ fn run() ! {
 
 fn main() {
 	$if wine_cut_scaled ? {
-		$if wine_cut_service ? { eprintln('scaled power-cut fixture requires adapter mode'); exit(2) }
+		$if wine_cut_cli ? { eprintln('scaled power-cut fixture does not support CLI mode'); exit(2) }
 	}
 	$if wine_cut_cli ? {
 		$if wine_cut_service ? {} $else { eprintln('CLI power-cut mode requires service mode'); exit(2) }

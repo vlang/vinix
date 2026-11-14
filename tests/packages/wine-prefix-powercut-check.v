@@ -23,14 +23,17 @@ fn tool(command []string, log string) ! {
 }
 
 fn run() ! {
-	all_syncs := os.args.len > 1 && os.args.last() == '--all-syncs'
-	scaled := os.args.len > 1 && os.args.last() == '--scaled'
-	args := if all_syncs || scaled { os.args[..os.args.len - 1] } else { os.args }
+	prepared := os.args.len > 1 && os.args.last() == '--prepared'
+	mode_args := if prepared { os.args[..os.args.len - 1] } else { os.args }
+	all_syncs := mode_args.len > 1 && mode_args.last() == '--all-syncs'
+	scaled := mode_args.len > 1 && mode_args.last() == '--scaled'
+	args := if all_syncs || scaled { mode_args[..mode_args.len - 1] } else { mode_args }
 	if args.len !in [5, 6, 7, 9] || (args.len >= 6 && args[5] != '--vjfs')
 		|| (args.len >= 7 && args[6] != '--service') || (args.len >= 9 && args[7] != '--cli') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs | --scaled]')
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs | --scaled [--prepared]]')
 	}
-	if scaled && args.len >= 7 { return error('scaled power-cut fixture requires adapter mode') }
+	if prepared && (!scaled || args.len != 7) { return error('prepared baseline requires scaled VJFS service mode') }
+	if scaled && args.len >= 9 { return error('scaled power-cut fixture does not support CLI mode') }
 	if args.len >= 9 && args[8] == '' { return error('nonempty compiled CLI path required') }
 	journaled := args.len >= 6
 	service := args.len >= 7
@@ -90,8 +93,37 @@ fn run() ! {
 			inputs[staged] = winesource.file_digest(staged)!
 		}
 	}
-	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
+	base := hwhost.Scenario{name: 'wine-prefix-powercut', arches: [arch], ending: .poweroff,
+		cmdline: if arch == 'aarch64' { 'vinix.qemu_persist=1' } else { '' },
+		disks: [hwhost.Disk{name: 'prefix.ext2', size_mib: if journaled { 36 } else { 32 }, image: seed}],
+		qemu_x86_64: ['-drive',
+			'if=none,id=winecut,format=raw,cache=writeback,file={state}/prefix.ext2', '-device', 'ide-hd,drive=winecut,bus=ide.0'],
+		qemu_aarch64: ['-drive', 'if=none,id=winecut,format=raw,cache=writeback,file={state}/prefix.ext2',
+			'-device', 'virtio-blk-device,drive=winecut'], forbidden: ['HWTEST FAIL', 'Kernel panic']}
+	mut selected_seed := seed
+	if prepared {
+		extras := work + '/prepare-extras'
+		os.mkdir_all(extras + '/etc')!
+		for name, value in {'wine-cut-point': points[0].str(), 'wine-cut-prepare': '741'} {
+			path := extras + '/etc/' + name
+			os.write_file(path, value)!; inputs[path] = winesource.file_digest(path)!
+		}
+		state := work + '/prepare'
+		outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{...base, required: [
+			'WINE POWER CUT PROFILE bindings=741',
+			'WINE SERVICE POWER CUT STORE point=${points[0]} fresh=true generation=2 signed-root',
+			'WINE POWER CUT BASELINE PASS bindings=741', 'HWTEST PASS wine-prefix-powercut']},
+			hwhost.Run{kernel: os.args[3], guest: os.args[4], state: state, extras: extras, timeout: 120, keep: true})
+		os.write_file(state + '/result.json', json2.encode(outcome))!
+		if outcome.interrupted || !outcome.passed { return error('signed baseline preparation failed: ' + outcome.reason) }
+		selected_seed = state + '/prefix.ext2'
+		tool([image_helper, 'export', selected_seed, state + '/inspection.ext2'], state + '/export.log')!
+		tool([checker, '-f', '-n', state + '/inspection.ext2'], state + '/e2fsck.log')!
+		inputs[selected_seed] = winesource.file_digest(selected_seed)!
+		println('WINE POWERCUT BASELINE PASS arch=${arch} separate-boot cap=120 ext2-check')
+	}
+	os.write_file(work + '/inputs-before.json', json2.encode(inputs))!
 	mut failures := []string{}
 	for point in points {
 		state := work + '/point-' + point.str()
@@ -105,23 +137,21 @@ fn run() ! {
 		if service {
 			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=true generation=2 signed-root'
 			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=false generation=2 signed-root'
-			required << 'WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=3'
+			required << 'WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=${rows}'
 			required << 'WINE SERVICE POWER CUT PASS point=${point} signed-generation=2 lease-free reader-lock-free'
+		}
+		if prepared {
+			required << 'WINE SERVICE POWER CUT TEMPLATE point=${point} fresh=true rows=741'
+			required << 'WINE SERVICE POWER CUT TEMPLATE point=${point} fresh=false rows=741'
 		}
 		if cli != '' {
 			required << 'WINE CLI POWER CUT EXEC point=${point} command=wine-prefix-migrate'
 			required << 'WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json'
 		}
-		outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-prefix-powercut', arches: [arch], ending: .poweroff,
-			cmdline: if arch == 'aarch64' { 'vinix.qemu_persist=1' } else { '' },
-			disks: [hwhost.Disk{name: 'prefix.ext2', size_mib: if journaled { 36 } else { 32 }, image: seed}],
-			qemu_x86_64: ['-drive',
-				'if=none,id=winecut,format=raw,cache=writeback,file={state}/prefix.ext2', '-device', 'ide-hd,drive=winecut,bus=ide.0'],
-			qemu_aarch64: ['-drive', 'if=none,id=winecut,format=raw,cache=writeback,file={state}/prefix.ext2',
-				'-device', 'virtio-blk-device,drive=winecut'],
+		outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{...base,
+			disks: [hwhost.Disk{name: 'prefix.ext2', size_mib: if journaled { 36 } else { 32 }, image: selected_seed}],
 			reboots: [hwhost.Reboot{power_cut_after: marker}],
-			required: required,
-			forbidden: ['HWTEST FAIL', 'Kernel panic']},
+			required: required},
 			hwhost.Run{kernel: os.args[3], guest: os.args[4], state: state, extras: work + '/extras-' + point.str(), timeout: 120, keep: true})
 		os.write_file(state + '/result.json', json2.encode(outcome))!
 		if outcome.interrupted { return error('powercut guest interrupted') }

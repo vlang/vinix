@@ -6,6 +6,7 @@ import os
 import time
 import tools.packages.pkgcore
 import tools.packages.wineadapter
+import tests.packages.winecutfixture
 
 #include <sys/mount.h>
 #include <sys/wait.h>
@@ -49,7 +50,13 @@ pub fn setup(root string, point int, volume_path string) !bool {
 		}
 	}
 	fresh := !os.exists(root + '/armed')
-	if fresh {
+	preparing := os.exists('/etc/wine-cut-prepare')
+	prepared := os.exists(root + '/prepared')
+	if prepared && os.read_file(root + '/prepared')! != '741' { return error('prepared signed fixture row count differs') }
+	if preparing && (!fresh || prepared) { return error('fresh signed fixture required for preparation') }
+	if fresh && !prepared {
+		names := winecutfixture.names($if wine_cut_scaled ? { true } $else { false })
+		old_names := names[..names.len - 1]
 		arch := $if arm64 { 'aarch64' } $else { 'x86_64' }
 		app := root + '/app'
 		wine := root + '/runtime'
@@ -58,7 +65,7 @@ pub fn setup(root string, point int, volume_path string) !bool {
 		os.mkdir_all(wine + '/root/usr/lib/wine/x86_64-windows')!
 		os.write_file(app + '/bin/program.exe', 'marker app')!; os.chmod(app + '/bin/program.exe', 0o755)!
 		os.write_file(wine + '/bin/wine', 'marker runtime')!; os.chmod(wine + '/bin/wine', 0o755)!
-		for name in ['a.dll', 'b.dll']! { os.write_file(wine + '/root/usr/lib/wine/x86_64-windows/' + name, 'old bytes')! }
+		for name in old_names { os.write_file(wine + '/root/usr/lib/wine/x86_64-windows/' + name, 'old bytes')! }
 		key := pkgcore.keygen(root + '/seed')!
 		for package in [pkgcore.Package{id: 'app', name: 'Powercut marker app', version: '1.0.0', architecture: arch,
 			license: 'MIT', kind: 'windows', runtime: 'wine', entrypoint: 'bin/wine', arguments: ['bin/program.exe'],
@@ -77,8 +84,8 @@ pub fn setup(root string, point int, volume_path string) !bool {
 		old := '/var/lib/vinix-packages/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
 		os.mkdir(root + '/private')!; os.chown(root + '/private', 1000, 1000)!; os.chmod(root + '/private', 0o700)!
 		seed_prefix(root + '/private', old)!
-		for name in ['a.dll', 'b.dll']! { os.write_file(wine + '/root/usr/lib/wine/x86_64-windows/' + name, 'selected bytes')! }
-		os.write_file(wine + '/root/usr/lib/wine/x86_64-windows/c.dll', 'added bytes')!
+		for name in old_names { os.write_file(wine + '/root/usr/lib/wine/x86_64-windows/' + name, 'selected bytes')! }
+		os.write_file(wine + '/root/usr/lib/wine/x86_64-windows/' + names.last(), 'added bytes')!
 		os.write_file(root + '/manifest.json', json2.encode(runtime(arch, '2.0.0')))!
 		pkgcore.pack(root + '/manifest.json', wine, repository)!
 		pkgcore.publish(repository, 'fixture', root + '/seed', 2, time.now().unix() + 3600)!
@@ -86,10 +93,16 @@ pub fn setup(root string, point int, volume_path string) !bool {
 		mut upgraded := (pkgcore.Service{}).transact('upgrade', [], pkgcore.TransactionOptions{})!
 		if upgraded.generation != 2 { upgraded.close(); return error('upgraded signed generation differs') }
 		upgraded.close()
+	}
+	if preparing {
+		os.write_file(root + '/prepared', '741')!
+	} else if fresh {
 		os.write_file(root + '/armed', point.str())!
+	}
+	if fresh {
 		C.sync()
 	}
-	if os.read_file(root + '/armed')! != point.str() { return error('persistent signed fixture cut differs') }
+	if !preparing && os.read_file(root + '/armed')! != point.str() { return error('persistent signed fixture cut differs') }
 	mut verified := (pkgcore.Service{}).verify()!
 	defer { verified.close() }
 	if verified.generation != 2 || verified.packages.len != 2 { return error('persistent signed state differs') }
@@ -99,6 +112,7 @@ pub fn setup(root string, point int, volume_path string) !bool {
 		mut info := C.stat{}
 		if unsafe { C.stat(path.str, &info) } != 0 || info.st_dev != volume.st_dev { return error('signed fixture inode is not on persistent volume') }
 	}
+	if prepared { println('WINE SERVICE POWER CUT TEMPLATE point=${point} fresh=${fresh} rows=741') }
 	println('WINE SERVICE POWER CUT STORE point=${point} fresh=${fresh} generation=2 signed-root')
 	return fresh
 }
