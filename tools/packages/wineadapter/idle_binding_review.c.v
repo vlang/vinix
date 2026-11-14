@@ -1,6 +1,41 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module wineadapter
 
+import crypto.sha256
+
+fn binding_asset_digest(parent int, name string) !(string, u64) {
+	fd := C.openat(parent, name.str, C.O_RDONLY | C.O_NOFOLLOW | C.O_NONBLOCK | C.O_CLOEXEC)
+	if fd < 0 { return error('cannot read Wine binding review asset') }
+	defer { C.close(fd) }
+	mut before := C.stat{}
+	if C.fstat(fd, unsafe { &before }) != 0 || u32(before.st_mode) & 0o170000 != 0o100000
+		|| before.st_size < 1 || before.st_size > 64 * 1024 * 1024 {
+		return error('Wine binding review asset must be ordinary and between 1 byte and 64 MiB')
+	}
+	mut hash := sha256.new()
+	mut buffer := []u8{len: 65536}
+	mut sum := []u8{len: sha256.size}
+	defer { unsafe { hash.free(); free(hash); buffer.free(); sum.free() } }
+	mut count := u64(0)
+	for count < u64(before.st_size) {
+		remaining := u64(before.st_size) - count
+		limit := if remaining < u64(buffer.len) { int(remaining) } else { buffer.len }
+		n := C.read(fd, buffer.data, uint(limit))
+		if n <= 0 { return error('cannot finish Wine binding review asset') }
+		hash.write(buffer[..int(n)])!
+		count += u64(n)
+	}
+	mut sentinel := u8(0)
+	mut after := C.stat{}
+	if C.read(fd, &sentinel, 1) != 0 || C.fstat(fd, unsafe { &after }) != 0
+		|| before.st_dev != after.st_dev || before.st_ino != after.st_ino || before.st_size != after.st_size
+		|| before.st_mtime != after.st_mtime || before.st_ctime != after.st_ctime {
+		return error('Wine binding review asset changed while reading')
+	}
+	hash.checksum_into(mut sum)
+	return sum.hex(), count
+}
+
 // Single owner. Do not copy, concurrently use/close, or transfer the borrowed
 // review. This excludes cooperating managed launches while live, not arbitrary
 // same-account writers. Requires an existing prefix; capturing may create
@@ -16,6 +51,7 @@ mut:
 	store string
 	system_fd int = -1
 	assets_fd int = -1
+	digests []string
 }
 
 pub fn (mut capture IdleBindingReview) close() {
@@ -24,6 +60,7 @@ pub fn (mut capture IdleBindingReview) close() {
 	capture.guard.close()
 	if capture.system_fd >= 0 { C.close(capture.system_fd) }
 	if capture.assets_fd >= 0 { C.close(capture.assets_fd) }
+	unsafe { for digest in capture.digests { digest.free() }; (&array(&capture.digests)).free() }
 	unsafe { capture.data.free(); capture.builtins.free(); capture.store.free() }
 	capture = IdleBindingReview{}
 }
@@ -46,6 +83,14 @@ pub fn capture_idle_binding_review(data string, builtins string, store string) !
 	capture.system_fd = absolute_directory(system_path)!
 	capture.assets_fd = absolute_directory(builtins)!
 	capture.review = review_prefix_bindings(data, builtins, store)!
+	capture.digests = []string{cap: capture.review.bindings.len}
+	mut total := u64(0)
+	for binding in capture.review.bindings {
+		digest, size := binding_asset_digest(capture.assets_fd, binding.name)!
+		total += size
+		capture.digests << digest
+		if total > 1024 * 1024 * 1024 { return error('Wine binding review assets exceed 1 GiB') }
+	}
 	capture.recheck()!
 	accepted = true
 	return capture
@@ -76,6 +121,15 @@ pub fn (capture &IdleBindingReview) recheck() ! {
 	if current.generation != capture.review.generation || current.prior_generation != capture.review.prior_generation
 		|| current.runtime_id != capture.review.runtime_id || current.bindings != capture.review.bindings {
 		return error('Wine binding review changed while captured')
+	}
+	if capture.digests.len != current.bindings.len { return error('Wine binding review digest inventory differs') }
+	mut total := u64(0)
+	for index, binding in current.bindings {
+		digest, size := binding_asset_digest(capture.assets_fd, binding.name)!
+		defer { unsafe { digest.free() } }
+		total += size
+		if total > 1024 * 1024 * 1024 { return error('Wine binding review assets exceed 1 GiB') }
+		if digest != capture.digests[index] { return error('Wine binding review asset bytes changed') }
 	}
 	capture.server.require_idle(&capture.guard, capture.data)!
 	binding_directory_unchanged(capture.system_fd, system_path, true)!

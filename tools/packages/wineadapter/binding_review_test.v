@@ -109,6 +109,20 @@ fn idle_review_refused(capture &IdleBindingReview, message string) {
 	assert false, 'changed idle review accepted'
 }
 
+fn test_binding_digest_streams_across_buffer_boundary() {
+	root := os.real_path(os.temp_dir()) + '/wine-binding-digest-' + os.getpid().str()
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	text := 'a'.repeat(65537)
+	os.write_file(root + '/large.dll', text)!
+	fd := absolute_directory(root)!
+	defer { C.close(fd) }
+	digest, size := binding_asset_digest(fd, 'large.dll')!
+	assert size == 65537 && digest == local_source_digest(text)
+	os.write_file(root + '/empty.dll', '')!
+	if _, _ := binding_asset_digest(fd, 'empty.dll') { assert false, 'empty DLL accepted' }
+}
+
 fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
 	root := os.real_path(os.temp_dir()) + '/wine-idle-binding-review-' + os.getpid().str()
 	os.mkdir(root)!
@@ -160,6 +174,10 @@ fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
 	os.write_file(new + '/added.dll', 'new asset')!
 	idle_review_refused(&capture, 'review changed')
 	os.rm(new + '/added.dll')!
+	os.write_file(new + '/kernel32.dll', 'NEW')!
+	idle_review_refused(&capture, 'asset bytes changed')
+	os.write_file(new + '/kernel32.dll', 'new')!
+	capture.recheck()!
 	// Equal names and link text must not disguise replacement directories.
 	os.mv(new, new + '.saved')!
 	os.mkdir(new)!; os.write_file(new + '/kernel32.dll', 'new')!
