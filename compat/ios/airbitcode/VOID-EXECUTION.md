@@ -66,8 +66,8 @@ and feed other supported vector operations, including another integer cast.
 Each cast costs one executed step and charges source plus result count to
 shared lane work. Results share the existing 4,096 static construction slots
 and execution-owned allocation. Integer, mixed, void and memory APIs use the
-same integer-vector rules. Vector floating-to-integer numeric conversions, reshaping,
-pointer casts, arguments/returns, PHIs, loads/stores, scalable vectors and
+same integer-vector rules. Vector reshaping, pointer casts, arguments/returns,
+PHIs, loads/stores, scalable vectors and
 widths beyond i64 remain unsupported. `tests/ios/air-vector-integer-cast.v`
 checks every width pair and flag variant against native LLVM, explicit freeze
 choices and poison failures, plus source/result freezing, composition, loop
@@ -85,8 +85,8 @@ arithmetic, comparisons, selects, shuffles and extraction. Each cast costs
 one executed step and source plus result lane work, sharing the existing
 4,096 construction slots and execution-owned array. Mixed, void and memory
 execution support these casts; the integer-only API rejects floating lanes.
-Floating-to-integer numeric vector conversions, other lane formats, vector reshaping, scalar/
-vector casts, pointer casts, scalable vectors, vector arguments/returns,
+Other lane formats, vector reshaping, scalar/vector casts, pointer casts,
+scalable vectors, vector arguments/returns,
 PHIs and loads/stores remain unsupported. `tests/ios/air-vector-bitcast.v`
 checks exact native LLVM bits, complete half encodings, raw float patterns,
 poison/undef, freezing, composition, snapshots, loops and shared limits.
@@ -104,9 +104,8 @@ independent snapshots and compose with other supported vector operations.
 Each cast costs one step and source plus result lane work, sharing the
 existing 4,096 construction slots and execution-owned array. Mixed, void and
 memory APIs support these casts; the integer-only API rejects floating lanes.
-Fast-math flags, other floating formats, floating-to-integer numeric vector
-conversions, reshaping, vector arguments/returns, PHIs and loads/stores remain
-unsupported. `tests/ios/air-vector-precision.v` checks all half encodings, both
+Fast-math flags, other floating formats, reshaping, vector arguments/returns,
+PHIs and loads/stores remain unsupported. `tests/ios/air-vector-precision.v` checks all half encodings, both
 signs of every half midpoint and its neighboring float values, deterministic
 float samples, NaN choices, snapshots, composition, guards and shared limits.
 
@@ -122,12 +121,31 @@ inactive blocks. Results retain independent snapshots and compose with
 supported vector operations. Each cast costs one step and source plus result
 lane work, sharing the existing 4,096 construction slots and execution-owned
 array. Mixed, void and memory APIs support these conversions; the integer-only
-API rejects floating lanes. Fast-math flags, `uitofp nneg`, floating-to-integer
-vector conversions, other formats, reshaping, vector arguments/returns, PHIs
-and loads/stores remain unsupported. `tests/ios/air-vector-int-float.v`
+API rejects floating lanes. Fast-math flags, `uitofp nneg`, other formats,
+reshaping, vector arguments/returns, PHIs and loads/stores remain unsupported. `tests/ios/air-vector-int-float.v`
 compares every source width with native LLVM, exhausts signed/unsigned i1..i16,
 and checks rounding boundaries, poison/undef, freezing, composition, loops,
 unsupported profiles and shared storage/work limits.
+
+Fixed 1..16-lane half/float vectors support unflagged `fptoui` and `fptosi`
+to i1..i64, retaining the lane count. Conversion truncates toward zero,
+independently of host rounding. NaNs, infinities and values whose truncated
+result is outside the integer range produce poison only in affected lanes.
+Negative fractions between -1 and zero convert to unsigned zero; fractional
+values just below a signed minimum remain valid if truncation brings them
+into range. Signed i1 has range -1..0. Any undef source lane rejects at the
+executed cast, even for discarded results. Source freezes repair indeterminate
+inputs, but do not repair numeric invalidity; result freezes repair produced
+poison without suppressing earlier undef errors. Complete supported literals
+and earlier constructions are validated, including inactive blocks. Independent
+snapshots compose with integer operations and existing vector casts. Each cast
+costs one step and source plus result lane work, sharing the existing 4,096
+construction slots and execution-owned array. Mixed, void and memory APIs
+support these conversions; the integer-only API rejects floating sources.
+Nonzero flags, other formats, reshaping, vector arguments/returns, PHIs and
+loads/stores remain unsupported. `tests/ios/air-vector-float-int.v` uses defined
+native saturation and separate range tags, including truncation before range
+checks, without executing invalid native casts.
 
 Fixed 1..16-lane half/float vectors also support unflagged `fadd`, `fsub`,
 `fmul`, `fdiv` and `frem`, using the integer-based scalar math at the lane

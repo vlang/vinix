@@ -182,7 +182,7 @@ fn controls(assembler_path string, out string) ! {
    'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
    'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }
    'pointer' { '%n = ptrtoint <2 x ptr> zeroinitializer to <2 x i64>' }
-   else { '%n = fptosi <2 x float> zeroinitializer to <2 x i32>' }
+   else { '%n = fptosi <2 x double> zeroinitializer to <2 x i32>' }
   }
   s.write_string('define void @guard_${guard}(${signature}) { entry: store i8 17, ptr %out, align 1\n ${body}\n ret void }\n')
  }

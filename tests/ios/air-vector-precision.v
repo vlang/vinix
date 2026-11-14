@@ -218,7 +218,7 @@ fn controls(assembler_path string, out string) ! {
    'bfloat' { '%n = fptrunc <2 x float> zeroinitializer to <2 x bfloat>' }
    'reshape' { '%n = bitcast <2 x float> zeroinitializer to <4 x half>' }
    'intsource' { '%n = uitofp nneg <2 x i32> zeroinitializer to <2 x float>' }
-   else { '%n = fptosi <2 x float> zeroinitializer to <2 x i32>' }
+   else { '%n = fptosi <2 x double> zeroinitializer to <2 x i32>' }
   }
   s.write_string('define void @guard_${guard}(${signature}) { entry: store i8 17, ptr %out, align 1\n ${body}\n ret void }\n')
  }

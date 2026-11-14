@@ -191,8 +191,8 @@ fn controls(assembler_path string, out string) ! {
    'wideint' { '%n = sitofp <2 x i65> zeroinitializer to <2 x float>' }
    'double' { '%n = uitofp <2 x i64> zeroinitializer to <2 x double>' }
    'bfloat' { '%n = sitofp <2 x i16> zeroinitializer to <2 x bfloat>' }
-   'fptosi' { '%n = fptosi <2 x float> zeroinitializer to <2 x i32>' }
-   'fptoui' { '%n = fptoui <2 x half> zeroinitializer to <2 x i64>' }
+   'fptosi' { '%n = fptosi <2 x double> zeroinitializer to <2 x i32>' }
+   'fptoui' { '%n = fptoui <2 x bfloat> zeroinitializer to <2 x i64>' }
    'reshape' { '%n = bitcast <2 x float> zeroinitializer to <4 x half>' }
    'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
    'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }

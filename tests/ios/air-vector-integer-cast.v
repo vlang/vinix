@@ -186,7 +186,7 @@ fn controls(assembler_path string, out string) ! {
    'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold: %n = zext <17 x i8> zeroinitializer to <17 x i16>' }
    'scalable' { '%n = zext <vscale x 2 x i8> zeroinitializer to <vscale x 2 x i16>' }
    'wide' { '%n = zext <2 x i64> zeroinitializer to <2 x i65>' }
-   'float' { '%n = fptosi <2 x float> zeroinitializer to <2 x i32>' }
+   'float' { '%n = fptosi <2 x double> zeroinitializer to <2 x i32>' }
    'float_result' { '%n = uitofp nneg <2 x i32> zeroinitializer to <2 x float>' }
    'bitcast' { '%n = bitcast <2 x i64> zeroinitializer to <2 x double>' }
    'reshape' { '%n = bitcast <4 x i8> zeroinitializer to <2 x i16>' }

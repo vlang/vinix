@@ -2,6 +2,7 @@
 module airbitcode
 
 fn (p IRTypedProgram) vector_cast_profile(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, mixed bool, remaining int) !int {
+	if op.opcode in [u32(3), 4]! { return p.vector_float_int_profile(stream, pools, bodies, scope, index, op, mixed, remaining)! }
 	if op.opcode in [u32(5), 6]! { return p.vector_int_float_profile(stream, pools, bodies, scope, index, op, mixed, remaining)! }
 	if op.opcode in [u32(7), 8]! { return p.vector_precision_cast_profile(stream, pools, bodies, scope, index, op, mixed, remaining)! }
 	if op.opcode != 11 { return p.vector_integer_cast_profile(stream, pools, bodies, scope, index, op, remaining)! }
@@ -27,6 +28,7 @@ fn bitcast_vector(source ScalarVectorValue, bits u32, count int) !ScalarVectorVa
 	return result
 }
 fn (mut m IntegerMachine) cast_vector_value(stream Stream, inst IRInstruction, op IRTypedInstruction) !IntegerValue {
+	if op.opcode in [u32(3), 4]! { return m.float_int_vector_value(stream, inst, op)! }
 	if op.opcode in [u32(5), 6]! { return m.int_float_vector_value(stream, inst, op)! }
 	if op.opcode in [u32(7), 8]! { return m.precision_cast_vector_value(stream, inst, op)! }
 	if op.opcode != 11 { return m.cast_integer_vector_value(stream, inst, op)! }
