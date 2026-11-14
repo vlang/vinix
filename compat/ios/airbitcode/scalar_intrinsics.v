@@ -100,13 +100,14 @@ fn scalar_intrinsic_attributes(stream Stream, set u64, limit int) !int {
 fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second_immarg bool) !int {
 	return intrinsic_declaration_attributes(stream, set, limit, if second_immarg { u64(2) } else { u64(0) }, .none)!
 }
-enum IntrinsicMemoryEffect { none write read_write }
+enum IntrinsicMemoryEffect { none write read_write copy }
 // Share the bounded attribute scanner with memory intrinsics. They permit a
 // fourth-parameter immarg and canonical pointer parameter properties, with
 // argmem write/read-write effects instead of scalar memory(none).
 fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_slot u64, effect IntrinsicMemoryEffect) !int {
 	memory_none := effect == .none
-	memory_bits := if effect == .read_write { u64(3) } else { u64(2) }
+	transfers := effect in [.read_write, .copy]!
+	memory_bits := if transfers { u64(3) } else { u64(2) }
 	if set == 0 { return 0 }
 	mut work := 0; mut number := u64(0); mut groups := [4]u64{}; mut count := 0
 	for record in stream.records {
@@ -115,7 +116,7 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 		if record.code != 2 { return error('AIR intrinsic: unsupported attribute-list encoding') }
 		number++
 		if number != set { continue }
-		if record.values_count < 1 || record.values_count > if effect == .read_write { 4 } else if !memory_none { 3 } else if immarg_slot != 0 { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
+		if record.values_count < 1 || record.values_count > if transfers { 4 } else if !memory_none { 3 } else if immarg_slot != 0 { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
 		count = record.values_count
 		for i in 0 .. count { groups[i] = ir_values(stream, record)[i]; if groups[i] == 0 { return error('AIR intrinsic: zero attribute group') } }
 		break
@@ -135,16 +136,17 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 				if mask_seen || values.len != 4 || values[2] != 0 || values[3] != 60 { return error('AIR intrinsic: mask immarg attribute required') }
 				mask_seen = true; break // Only the admitted parameter's enum immarg.
 			}
-			if (!memory_none && values[1] == 1) || (effect == .read_write && values[1] == 2) {
+			if (!memory_none && values[1] == 1) || (transfers && values[1] == 2) {
 				source := values[1] == 2
 				seen := if source { source_seen } else { destination_seen }
 				access_kind := if source { u64(21) } else { u64(52) }
 				if seen || values.len > 12 { return error('AIR intrinsic: memory parameter attribute group') }
 				if source { source_seen = true } else { destination_seen = true }
-				mut cursor := 2; mut write_seen := false; mut capture_seen := false
+				mut cursor := 2; mut write_seen := false; mut capture_seen := false; mut alias_seen := false
 				for cursor < values.len {
 					work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
 					if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == access_kind && !write_seen { write_seen = true; cursor += 2 }
+					else if effect == .copy && values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == 9 && !alias_seen { alias_seen = true; cursor += 2 }
 					else if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == 11 && !capture_seen { capture_seen = true; cursor += 2 }
 					else if values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 102 && values[cursor + 2] == 0 && !capture_seen { capture_seen = true; cursor += 3 }
 					else { return error('AIR intrinsic: unsupported destination attribute') }

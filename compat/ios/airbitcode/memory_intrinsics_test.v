@@ -72,3 +72,28 @@ fn test_memmove_declaration_attributes() {
 	if _ := intrinsic_declaration_attributes(stream, 1, 96, 4, .write) { assert false, 'memset may not admit memmove source group' }
 	println('AIR-MEMMOVE-ATTRIBUTES: destination writeonly, source readonly, captures(none), fourth immarg, argmem read/write versions 0/1/2, group order and effect/property/duplicate/budget exclusions PASS')
 }
+
+fn test_memcpy_declaration_attributes() {
+	blocks := [Block{parent: -1}, Block{id: 9, parent: 0}, Block{id: 10, parent: 0}]
+	records := [Record{block: 1, code: 2, values_count: 4}, Record{block: 2, code: 3, values_start: 4, values_count: 5}, Record{block: 2, code: 3, values_start: 9, values_count: 9}, Record{block: 2, code: 3, values_start: 18, values_count: 9}, Record{block: 2, code: 3, values_start: 27, values_count: 4}]
+	mut values := [u64(1), 2, 3, 4, 1, 0xffffffff, 1, 86, 3, 2, 1, 0, 9, 0, 52, 1, 102, 0, 3, 2, 0, 9, 0, 21, 1, 102, 0, 4, 4, 0, 60]
+	defer { unsafe { blocks.free(); records.free(); values.free() } }
+	stream := Stream{blocks: blocks, records: records, values: values}
+	for version in u64(0) .. 3 { values[8] = (version << 56) | 3; assert intrinsic_declaration_attributes(stream, 1, 96, 4, .copy)! > 0 }
+	values[8] = 3
+	if _ := intrinsic_declaration_attributes(stream, 1, 96, 4, .read_write) { assert false, 'memmove must not admit noalias' }
+	values[14] = 9
+	if _ := intrinsic_declaration_attributes(stream, 1, 96, 4, .copy) { assert false, 'duplicate destination noalias' }
+	values[14] = 52; values[23] = 9
+	if _ := intrinsic_declaration_attributes(stream, 1, 96, 4, .copy) { assert false, 'duplicate source noalias' }
+	values[23] = 52
+	if _ := intrinsic_declaration_attributes(stream, 1, 96, 4, .copy) { assert false, 'writeonly source' }
+	values[23] = 21; values[26] = 1
+	if _ := intrinsic_declaration_attributes(stream, 1, 96, 4, .copy) { assert false, 'capturing source' }
+	values[26] = 0; values[12] = 68
+	if _ := intrinsic_declaration_attributes(stream, 1, 96, 4, .copy) { assert false, 'noundef destination' }
+	values[12] = 9; values[0] = 4; values[1] = 3; values[2] = 2; values[3] = 1
+	assert intrinsic_declaration_attributes(stream, 1, 96, 4, .copy)! > 0
+	if _ := intrinsic_declaration_attributes(stream, 1, 1, 4, .copy) { assert false, 'attribute work budget' }
+	println('AIR-MEMCPY-ATTRIBUTES: canonical noalias/read/write/captures(none), argmem versions 0/1/2, parameter group order and duplicate/property/budget exclusions; memmove noalias exclusion PASS')
+}

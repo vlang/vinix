@@ -22,7 +22,7 @@ pub mut:
 pub struct IRMemoryProfile {
 	accesses []IRMemoryAccess
 	max_phis int
-	move_bytes int // Largest admitted memmove; one scratch allocation per run.
+	move_bytes int // Largest admitted move/copy; one scratch allocation per run.
 pub:
 	steps int // Static instructions, switch comparisons and memory-intrinsic bytes.
 	arguments []IRMemoryArgument
@@ -31,9 +31,10 @@ pub fn (profile &IRMemoryProfile) free() { unsafe { profile.arguments.free(); pr
 struct IRMemoryAccess {
 	argument int = -1
 	comparison u8 // 0: ordinary access; 1/2: precomputed false/true pointer comparison.
+	disjoint bool // memcpy: actual bound byte ranges must not overlap.
 	bytes u32 // Constant memory-intrinsic length.
 	offset u64
-	source_argument int = -1 // Set only for memmove, including zero length.
+	source_argument int = -1 // Set for memmove/memcpy, including zero length.
 	source_offset u64
 }
 fn (p IRTypedProgram) memory_pointer(pools IRConstantPools, bodies IRFunctionBodies, scope int, operand int, count int, pointers []IRMemoryAccess) !IRMemoryAccess {
@@ -107,11 +108,12 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 // forward branches/switches/PHIs, scalar loads/stores, literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, resolved pointer
 // PHIs/selects/freezes/bitcasts, checked overflow pairs with field
-// extraction/insertion/freeze/select, nonvolatile constant-length memset/memmove
+// extraction/insertion/freeze/select, nonvolatile constant-length memory intrinsics
 // and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
-// earlier stores visible. No host pointer is accepted or constructed.
+// earlier stores visible. No numeric host pointer is accepted or exposed to AIR.
+// Memcpy checks backing-array addresses only to reject overlapping bindings.
 // Validate the complete supported body without accessing any buffer. The owned
 // profile describes minimum extents and access requirements for direct arguments.
 pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int) !IRMemoryProfile {
@@ -144,7 +146,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	defer { layouts.free() }
 	mut intrinsic_declarations := [1768]int{} // Forty FP slots + twenty-seven integer families.
 	mut intrinsic_work := 0
-	mut memory_declarations := [24]int{}
+	mut memory_declarations := [42]int{}
 	mut memory_steps := 0
 	mut move_bytes := 0
 	for index in s.instructions_start .. s.instructions_start + s.instructions_count {
@@ -187,7 +189,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 				memory_steps += int(work)
 				if memory_declarations[key] != 0 && memory_declarations[key] != op.callee_function + 1 { return error('AIR memory execution: duplicate memory declaration') }
 				if memory_declarations[key] == 0 {
-					intrinsic_work += intrinsic_declaration_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work, 4, if moving { .read_write } else { .write })!
+					intrinsic_work += intrinsic_declaration_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work, 4, if key >= 24 { .copy } else if moving { .read_write } else { .write })!
 					memory_declarations[key] = op.callee_function + 1
 				}
 				access := p.memory_pointer(pools, bodies, scope, op.operands_start + 1, count, pointers)!
@@ -204,7 +206,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 						arguments[source.argument].readable = true
 						if int(length) > move_bytes { move_bytes = int(length) }
 					}
-					accesses[index - s.instructions_start] = IRMemoryAccess{argument: access.argument, offset: access.offset, bytes: u32(length), source_argument: source.argument, source_offset: source.offset}
+					accesses[index - s.instructions_start] = IRMemoryAccess{argument: access.argument, offset: access.offset, bytes: u32(length), source_argument: source.argument, source_offset: source.offset, disjoint: key >= 24}
 					continue
 				}
 				accesses[index - s.instructions_start] = IRMemoryAccess{argument: access.argument, offset: access.offset, bytes: u32(length)}
@@ -339,6 +341,15 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 	for i, b in bindings {
 		a := profile.arguments[i]
 		if b.data.len > 64 * 1024 * 1024 || b.offset > u64(b.data.len) || b.base_alignment == 0 || b.base_alignment & (b.base_alignment - 1) != 0 || b.base_alignment < a.alignment || b.offset % a.alignment != 0 || a.minimum_size > u64(b.data.len) - b.offset || (a.writable && !b.writable) || (a.address_space == 2 && b.writable) { return error('AIR memory execution: bounds/alignment/permission') }
+	}
+	// Actual borrowed slices can alias even when their virtual arguments differ.
+	// Check every copy, including inactive blocks, before executing instructions.
+	for access in profile.accesses {
+		if !access.disjoint || access.bytes == 0 { continue }
+		dest := unsafe { u64(bindings[access.argument].data.data) } + bindings[access.argument].offset + access.offset
+		source := unsafe { u64(bindings[access.source_argument].data.data) } + bindings[access.source_argument].offset + access.source_offset
+		gap := if dest <= source { source - dest } else { dest - source }
+		if gap < u64(access.bytes) { return error('AIR memory execution: disjoint memcpy ranges required') }
 	}
 	scope := function + 1; s := bodies.scopes[scope]
 	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: scope, binary32: true, limit: step_limit, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}}

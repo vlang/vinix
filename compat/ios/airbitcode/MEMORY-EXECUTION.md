@@ -7,7 +7,7 @@ checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
-Nonvolatile constant-length `llvm.memset` and `llvm.memmove` also operate on
+Nonvolatile constant-length memset, memmove and disjoint memcpy also operate on
 byte ranges, as described below. Fast-math flags, alloca,
 integer-pointer/address-space casts,
 loops, atomics, volatile accesses, general calls or aggregate loads/stores
@@ -347,7 +347,7 @@ destination write extents checked before stores. Source readability and
 destination writability combine normally when both name one binding.
 Zero length adds neither read/write usage nor extent; existing GEP requirements
 remain. Literal null/poison/undef pointers reject on either side even at zero
-length. Memcpy, inline/atomic variants and general calls remain unsupported.
+length. Inline/atomic variants and general calls remain unsupported.
 
 Move declarations admit source readonly and nocapture/captures(none) as well
 as the destination properties and fourth immarg; their canonical memory effect
@@ -360,6 +360,22 @@ including when distinct bindings or borrowed slices alias. Later moves see
 earlier writes and reuse that scratch storage. No host address comparison or
 host memmove call is used. The profile records only the scratch size, with no
 new owned array in the cached profile.
+
+Nonvolatile `llvm.memcpy.pD.pS.i32/i64` uses the same pointer/length, extent,
+permission and two-steps-per-byte rules, sharing the transfer scratch array.
+Memcpy declarations additionally admit canonical noalias on each pointer
+parameter. Memmove still rejects noalias. This bounded memcpy profile requires
+disjoint actual byte ranges: partial overlap and identical ranges reject before
+any instruction executes. Every copy is checked, including later calls and
+inactive blocks. Zero length skips overlap checks and adds no read/write usage.
+
+The executor compares addresses of the borrowed backing-array views solely for
+this overlap guard, after validating all bindings and budgets. This covers
+different bindings and sliced views that alias even though their virtual
+identities differ. Address bits never enter AIR value slots or become accepted
+numeric pointer inputs. Copies still use indexed reads/writes and the existing
+scratch storage, with no host memcpy call. Callers must keep bindings and data
+stable throughout execution, as for all memory operations.
 
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
@@ -402,7 +418,7 @@ a byte offset, declared virtual base alignment and write permission. At most
 supported; space 2 requires a readonly binding. Pointer operands must directly
 name arguments, earlier supported GEP results, invariant pointer PHIs/selects
 or supported pointer freezes/bitcasts.
-No host pointers are accepted.
+No numerical host pointers are accepted as AIR values.
 Pointer comparisons accept `eq`, `ne`, `ugt`, `uge`, `ult` and `ule` for
 exactly matching pointer types resolved to the same binding. Preflight compares
 bounded offsets, including one-past addresses, without adding source reads or
@@ -568,6 +584,12 @@ and costs, malformed metadata/types, forbidden pointers/attributes/lengths,
 condition errors and cumulative/mixed/million-step budgets. Rejection-only
 bodies remain in the interpreter fixture but are excluded from native
 compilation; the verified native input is saved separately.
+
+`tests/ios/air-memory-memcpy.v` compares disjoint copies with native LLVM and
+rejects overlaps through direct bindings and borrowed slices before stores.
+It covers adjacent ranges, zero length, pointer-control chains, scratch reuse
+with shifted source data, exact costs/bounds, late and inactive overlapping
+copies, excluded shapes/attributes/lengths and cumulative/mixed budgets.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

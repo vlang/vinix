@@ -331,9 +331,20 @@ sized for the largest move and freed on exit, snapshots source bytes before
 writing; subsequent moves see earlier writes. Exact declarations admit source
 readonly/captures(none), destination writeonly/captures(none), fourth immarg
 and memory(argmem: readwrite) properties. Literal pointers, volatile/dynamic
-lengths, call-site attributes, memcpy and inline/atomic variants reject.
+lengths, call-site attributes and inline/atomic variants reject.
 Deferred dispatches exercise both overlap directions, identical/disjoint
 ranges, different bindings to one buffer, repeated moves and preserved bytes.
+
+Nonvolatile constant-length `llvm.memcpy` shares the move overloads, bounds,
+permissions, scratch storage and two-steps-per-byte budget. Its declaration
+attributes also admit canonical pointer noalias. Before executing a dispatch,
+the interpreter checks every memcpy's actual bound byte ranges, including
+inactive blocks: partial overlap and identical ranges reject before any store
+in that kernel invocation. Zero length skips that check. Backing-array address
+comparisons stay private to the guard and never expose addresses as AIR values.
+Deferred copies cover separate buffers, disjoint aliases, adjacent ranges and
+input changes after encoding; overlapping/equal ranges produce failed command
+completion with the kernel's earlier marker store untouched.
 
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct
