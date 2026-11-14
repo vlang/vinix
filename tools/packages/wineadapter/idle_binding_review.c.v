@@ -145,32 +145,54 @@ fn binding_directory_unchanged(held int, path string, private bool) ! {
 	}
 }
 
-// Re-run structural inspection between idle/namespace checks, retaining the
-// guard. This does not authenticate runtime bytes or freeze concurrent writes.
-// Migration application still needs authenticated inputs, fresh checks at use,
-// atomic binding changes and an interruption recovery policy.
-pub fn (capture &IdleBindingReview) recheck() ! {
+fn (capture &IdleBindingReview) recheck_namespace() ! {
 	capture.server.require_idle(&capture.guard, capture.data)!
 	system_path := capture.data + '/wine/drive_c/windows/system32'
 	defer { unsafe { system_path.free() } }
 	binding_directory_unchanged(capture.system_fd, system_path, true)!
 	binding_directory_unchanged(capture.assets_fd, capture.builtins, false)!
+}
+
+fn (capture &IdleBindingReview) recheck_structure() ! {
+	capture.recheck_namespace()!
 	mut current := review_prefix_bindings(capture.data, capture.builtins, capture.store)!
 	defer { current.close() }
 	if current.generation != capture.review.generation || current.prior_generation != capture.review.prior_generation
 		|| current.runtime_id != capture.review.runtime_id || current.bindings != capture.review.bindings {
 		return error('Wine binding review changed while captured')
 	}
-	if capture.digests.len != current.bindings.len { return error('Wine binding review digest inventory differs') }
+	if capture.digests.len != current.bindings.len || capture.sizes.len != current.bindings.len {
+		return error('Wine binding review digest inventory differs')
+	}
+}
+
+// Retargeting retains full structural checks before each write, but hashes only
+// that write's target. Full payload checks bracket the complete operation;
+// unrelated payload changes can therefore refuse after recoverable progress.
+fn (capture &IdleBindingReview) recheck_migration_binding(index int) ! {
+	capture.recheck_structure()!
+	binding := capture.review.bindings[index]
+	digest, size := binding_asset_digest(capture.assets_fd, binding.name)!
+	defer { unsafe { digest.free() } }
+	if digest != capture.digests[index] || size != capture.sizes[index] {
+		return error('Wine binding review asset bytes changed')
+	}
+	capture.recheck_namespace()!
+}
+
+// Re-run structural inspection between idle/namespace checks, retaining the
+// guard. This does not authenticate runtime bytes or freeze concurrent writes.
+// Migration application still needs authenticated inputs, fresh checks at use,
+// atomic binding changes and an interruption recovery policy.
+pub fn (capture &IdleBindingReview) recheck() ! {
+	capture.recheck_structure()!
 	mut total := u64(0)
-	for index, binding in current.bindings {
+	for index, binding in capture.review.bindings {
 		digest, size := binding_asset_digest(capture.assets_fd, binding.name)!
 		defer { unsafe { digest.free() } }
 		total += size
 		if total > 1024 * 1024 * 1024 { return error('Wine binding review assets exceed 1 GiB') }
-		if digest != capture.digests[index] { return error('Wine binding review asset bytes changed') }
+		if digest != capture.digests[index] || size != capture.sizes[index] { return error('Wine binding review asset bytes changed') }
 	}
-	capture.server.require_idle(&capture.guard, capture.data)!
-	binding_directory_unchanged(capture.system_fd, system_path, true)!
-	binding_directory_unchanged(capture.assets_fd, capture.builtins, false)!
+	capture.recheck_namespace()!
 }

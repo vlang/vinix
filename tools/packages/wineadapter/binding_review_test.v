@@ -106,8 +106,11 @@ fn test_builtin_generation_paths_are_canonical() {
 }
 
 fn idle_review_refused(capture &IdleBindingReview, message string) {
-	capture.recheck() or { assert err.msg().contains(message), err.msg(); return }
-	assert false, 'changed idle review accepted'
+	mut refused := false
+	capture.recheck() or { assert err.msg().contains(message), err.msg(); refused = true }
+	assert refused, 'changed idle review accepted'
+	capture.recheck_migration_binding(0) or { assert err.msg().contains(message), err.msg(); return }
+	assert false, 'changed migration write admission accepted'
 }
 
 fn test_exclusive_builtin_additions_resume_without_replacing_files() {

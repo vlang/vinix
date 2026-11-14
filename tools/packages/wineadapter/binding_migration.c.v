@@ -42,7 +42,7 @@ pub fn (mut capture IdleBindingReview) migrate_bindings() ! {
 		if entry.operation == .replace && entry.replacement != staged { pending << index }
 	}
 	for index in pending {
-		capture.recheck()!
+		capture.recheck_migration_binding(index)!
 		entry := capture.review.bindings[index]
 		if C.symlinkat(entry.replacement.str, capture.guard.directory, builtin_stage_name.str) != 0 && C.errno != C.EEXIST {
 			return error('cannot exclusively stage Wine builtin migration')
@@ -51,7 +51,7 @@ pub fn (mut capture IdleBindingReview) migrate_bindings() ! {
 		defer { unsafe { actual_stage.free() } }
 		if actual_stage != entry.replacement { return error('Wine migration stage target differs; preserve it for inspection') }
 		sync_binding_directory(capture.guard.directory)!
-		capture.recheck()!
+		capture.recheck_migration_binding(index)!
 		final_stage := builtin_stage(capture.guard.directory)!
 		defer { unsafe { final_stage.free() } }
 		if final_stage != entry.replacement { return error('Wine migration stage changed before rename; preserve it for inspection') }

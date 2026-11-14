@@ -2070,6 +2070,10 @@ pending stage; unknown stage files/targets are preserved and refused. Repeated
 completed calls are supported. This library operation requires cooperating
 prefix writers to honor the guard: it cannot make check-and-rename atomic
 against arbitrary same-account writes. It is not atomic across all bindings.
+Full payload checks bracket migration. Before each replacement, all binding
+rows and captured directory identities are rechecked and that replacement's
+target is rehashed. Unrelated payload-byte changes are detected by the final
+full check and may therefore refuse after recoverable partial progress.
 Automatic launch migration remains disabled. Host tests cover
 signed upgrade, simulated staged recovery and actual adapter-writer SIGKILL
 with partial retargets. Signed marker-runtime migrations also pass under ordinary
