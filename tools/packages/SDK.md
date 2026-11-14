@@ -2129,6 +2129,17 @@ and a competing capture refusal. Closing the owner must restore descriptor
 availability and permit fresh capture. Thus a temporary resource refusal must
 preserve the existing guard as well as release temporary allocations and FDs.
 
+`tests/packages/wine-service-heap.v` adds a PID1-only guest probe for the public
+real-root service boundary. Built with `-d track_heap -gc none -manualfree -prod
+-enable-globals`, it publishes/installs signed marker packages, enters UID/GID
+1000 and measures 100 review/recheck/close cycles after warmup. Run it with
+`wine-service-heap-check FRESH_WORK ARCH KERNEL COMPILED_GUEST`. The controller
+requires zero retained V objects/bytes and a generation lease that is busy while
+an owner lives and available after close, under a 120-second guest bound. A
+one-cycle diagnostic build cannot satisfy its required 100-cycle marker. Marker
+code is never executed; setup, cold startup, libc/kernel heap and Wine execution
+remain outside this measurement.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.

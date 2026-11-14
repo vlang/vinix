@@ -141,12 +141,16 @@ fn (mut r StoredReader) strings(limit int, maximum int) ![]string {
 	return r.strings_with_limit(limit, maximum, 'package metadata array exceeds its entry limit')
 }
 
+fn close_stored_strings(values []string) {
+	unsafe { for value in values { value.free() }; (&array(&values)).free() }
+}
+
 fn (mut r StoredReader) strings_with_limit(limit int, maximum int, overflow string) ![]string {
 	r.expect(`[` )!
 	mut values := []string{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { value.free() }; (&array(&values)).free() } } }
+	defer { if !accepted { close_stored_strings(values) } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false

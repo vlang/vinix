@@ -112,12 +112,15 @@ fn (admission &WineAdmission) capture_prefix(data string) !wineadapter.IdleBindi
 // Admission uses current launch verification. Review never changes builtin
 // links. Future application must recheck at use and provide crash recovery.
 pub fn (service Service) wine_prefix_review(id string, data string) !WinePrefixReview {
-	mut owner := WinePrefixReview{root: service.root.clone(), application: id.clone()}
+	mut value := WinePrefixReview{root: service.root.clone(), application: id.clone()}
+	// Capture helpers borrow field addresses synchronously. Return the owner
+	// by value while keeping its temporary shell on the stack.
+	mut owner := unsafe { &value }
 	mut accepted := false
 	defer { if !accepted { owner.close() } }
 	owner.admission = service.wine_admission(id)!
 	owner.review = owner.admission.capture_prefix(data)!
 	owner.recheck()!
 	accepted = true
-	return owner
+	return *owner
 }

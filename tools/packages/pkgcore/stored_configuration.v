@@ -5,11 +5,15 @@ const stored_configuration_keys = ['format', 'architecture', 'repositories', 'po
 const stored_repository_keys = ['id', 'url', 'public_key']
 const stored_policy_keys = ['offline', 'allowed', 'pins', 'permissions', 'licenses', 'allow_firmware', 'reserve_bytes']
 
+fn close_stored_repository(value Repository) {
+	unsafe { value.id.free(); value.url.free(); value.public_key.free() }
+}
+
 fn (mut r StoredReader) repository() !Repository {
 	r.expect(`{`)!
 	mut value := Repository{}
 	mut accepted := false
-	defer { if !accepted { unsafe { value.id.free(); value.url.free(); value.public_key.free() } } }
+	defer { if !accepted { close_stored_repository(value) } }
 	mut seen := u32(0); mut first := true
 	for r.next(first, `}`)! {
 		first = false
@@ -31,14 +35,12 @@ fn (mut r StoredReader) repositories() ![]Repository {
 	mut values := []Repository{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { value.id.free(); value.url.free(); value.public_key.free() }; (&array(&values)).free() } } }
+	defer { if !accepted { for value in values { close_stored_repository(value) }; unsafe { (&array(&values)).free() } } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 4096 { return error('stored repository count exceeds its bound') }
-		value := r.repository()!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << r.repository()!
 	}
 	accepted = true
 	return values
@@ -64,7 +66,7 @@ fn (mut r StoredReader) policy_fields(complete bool) !Policy {
 			3 {
 				permissions := r.strings(256, 5)!
 				// Explicit permissions replace the legacy default's owned buffer.
-				unsafe { for permission in value.permissions { permission.free() }; (&array(&value.permissions)).free() }
+				close_owned_policy(Policy{permissions: value.permissions})
 				value = Policy{ ...value, permissions: permissions }
 			}
 			4 { value = Policy{ ...value, licenses: r.strings(256, 4096)! } }

@@ -8,11 +8,19 @@ const stored_package_keys = ['id', 'version', 'architecture', 'name', 'descripti
 	'proprietary', 'firmware', 'kind', 'runtime', 'entrypoint', 'arguments', 'permissions',
 	'associations', 'dependencies', 'files', 'sdk', 'window_protocol']
 
+fn close_stored_dependency(value Dependency) {
+	unsafe { value.id.free(); value.minimum.free(); value.before.free() }
+}
+
+fn close_stored_payload(value Payload) {
+	unsafe { value.path.free(); value.sha256.free() }
+}
+
 fn (mut r StoredReader) dependency(required u32) !Dependency {
 	r.expect(`{`)!
 	mut value := Dependency{}
 	mut accepted := false
-	defer { if !accepted { unsafe { value.id.free(); value.minimum.free(); value.before.free() } } }
+	defer { if !accepted { close_stored_dependency(value) } }
 	mut seen := u32(0); mut first := true
 	for r.next(first, `}`)! {
 		first = false
@@ -38,14 +46,12 @@ fn (mut r StoredReader) dependency_list(maximum int, required u32) ![]Dependency
 	mut values := []Dependency{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { value.id.free(); value.minimum.free(); value.before.free() }; (&array(&values)).free() } } }
+	defer { if !accepted { for value in values { close_stored_dependency(value) }; unsafe { (&array(&values)).free() } } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == maximum { return error('stored dependency count exceeds its bound') }
-		value := r.dependency(required)!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << r.dependency(required)!
 	}
 	accepted = true
 	return values
@@ -55,7 +61,7 @@ fn (mut r StoredReader) payload(complete bool) !Payload {
 	r.expect(`{`)!
 	mut value := Payload{}
 	mut accepted := false
-	defer { if !accepted { unsafe { value.path.free(); value.sha256.free() } } }
+	defer { if !accepted { close_stored_payload(value) } }
 	mut seen := u32(0); mut first := true
 	for r.next(first, `}`)! {
 		first = false
@@ -78,14 +84,12 @@ fn (mut r StoredReader) payloads(complete bool) ![]Payload {
 	mut values := []Payload{cap: 16}
 	unsafe { values.flags |= .noslices }
 	mut accepted := false
-	defer { if !accepted { unsafe { for value in values { value.path.free(); value.sha256.free() }; (&array(&values)).free() } } }
+	defer { if !accepted { for value in values { close_stored_payload(value) }; unsafe { (&array(&values)).free() } } }
 	mut first := true
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == max_files { return error('stored payload count exceeds its bound') }
-		value := r.payload(complete)!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << r.payload(complete)!
 	}
 	accepted = true
 	return values
@@ -170,9 +174,7 @@ fn (mut r StoredReader) installed_packages() ![]Installed {
 	for r.next(first, `]`)! {
 		first = false
 		if values.len == 4096 { return error('stored package count exceeds its bound') }
-		value := r.installed()!
-		pointer := unsafe { &value }
-		unsafe { values.push_many(pointer, 1) }
+		values << r.installed()!
 	}
 	accepted = true
 	return values
