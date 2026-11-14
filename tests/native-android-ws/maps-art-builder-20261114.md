@@ -96,3 +96,55 @@ After confirming that exit, the clone was attached read-only. Final guarded
 `e2fsck -fn` completed all five passes, returned 0/0 with complete cleanup in
 2553 ms, and reported no errors. The attachment was then detached. This final
 check establishes the retained filesystem's consistency, not an ART build pass.
+
+## Complete dependency fetch and signatures after generator qualification
+
+Alongside 456b6da37's fourth V source generator qualification, a quieter interval
+allowed `art-builder-packages-20261114-r6` to fetch all 150 planned packages.
+The passing receipt records 125399 ms, sampled RSS 40812544 bytes, minimum free
+1686155264 bytes and observed shared growth 507719680 bytes. It returned 0/0
+with complete cleanup under the original limits. The output occupies 266 MiB.
+Earlier failed fetch receipts remain unchanged.
+
+The isolated builder was booted again with the same four CPUs/6 GiB, as QEMU
+PID 47071, using fresh `art-builder-guest-20261114-r3` state. Transfer of the
+complete package directory passed the host guard. It is retained in the guest
+at `/var/tmp/vinix-art-inputs-20261114-r1/art-builder-packages-20261114-r6`.
+A read-only bind mount exposed it to the Alpine chroot as `/packages`.
+Native `apk verify /packages/*.apk` then reported exactly 150 `0 - OK` results.
+The native guard recorded 1934 ms, sampled RSS 43892736 bytes and growth 8192
+bytes, returning 0/0 with complete cleanup. A second host guard supervised SSH
+and retained host disk limits as well. No signature/trust option was weakened.
+
+An offline `apk add --simulate --no-network /packages/*.apk` passed both guards;
+its plan totals 681 MiB in 157 packages. This was simulation only. Installation
+was not attempted after host free space again fell to about 1.3 GiB, below the
+guard's reserve-plus-growth preflight requirement. Existing chroot files from
+the earlier interrupted installation do not qualify a complete compiler or
+dependency installation. No ART build or authentication result is claimed.
+
+The VM's exact arguments and serial log are retained in the r3 state. All
+guest guard logs/receipts were exported to `guard-evidence.tar` before normal
+sync/poweroff. PID 47071 exited and the serial log confirms power down. There
+was no offline disk access after this boot, and no new offline filesystem
+readback is claimed. The previously clean r2 filesystem check predates this
+package transfer. The builder and Maps test VMs are stopped.
+
+Additional external artifact SHA256 values:
+
+| Artifact | SHA256 |
+| --- | --- |
+| art-builder-packages-20261114-r6/packages.json | b43903ddefe698e872f0d4c8278c8a39dee46b272ff46f3e9f41f2f3b5456ab8 |
+| art-builder-packages-20261114-r6.json | a1e904f5bb28a14941f25e68ef7f8b57ad0c51acb36195d8f7d2d18c54e8a12a |
+| art-builder-guest-20261114-r3/all-signatures.log | 7413d0cd3e4fc2da8afe8c06255091204e25fff59308c97cb62ba61d02f899fa |
+| art-builder-guest-20261114-r3/all-signatures.json | f03dc3691e1c952a51f45f4ea0628a88c1bcdc78857acb3fd5328297c3b6abaf |
+| art-builder-guest-20261114-r3/guard-evidence.tar | 97423080fb703a3831c49d672f0550e26f60d521613c782d6ffcefeb33ad0104 |
+
+Host transfer, signature and simulation receipts are respectively
+`art-builder-transfer-20261114-r1.json`,
+`art-builder-signatures-20261114-r1.json` and
+`art-builder-install-plan-20261114-r1.json`. Native signature and simulation
+receipts/logs are also preserved inside the exported guest evidence archive.
+The next native build must integrate the four V generators into the original
+Makefiles and retain the complete existing ABI/lifetime patch set, including
+the source changes represented by the runtime manifest and audit selection.

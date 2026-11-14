@@ -72,8 +72,9 @@ native ARM64 musl ART build and ARM qualification remain required. The local
 retained source is only a six-file audit selection, with no reusable objects.
 The [builder recovery and dependency transport checks](maps-art-builder-20261114.md)
 now provide an isolated native ARM64 Linux/Alpine builder and the full original
-source archive. Latest-V fetcher integrity tests and Alpine signature verification
-passed. Complete dependency provisioning remains blocked by shared disk growth;
+source archive. The complete 150-package fetch and every Alpine package
+signature now pass. Offline installation planning passed; installation remains
+blocked by low host space and the retained resource guard. Separately,
 the [first three V build helpers](maps-art-generators-20261114.md) now pass
 focused checks and all 50 original enum-header inputs. The
 [V interpreter generator](maps-art-mterp-20261114.md) subsequently passed its
