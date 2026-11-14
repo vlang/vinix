@@ -100,29 +100,31 @@ fn scalar_intrinsic_attributes(stream Stream, set u64, limit int) !int {
 fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second_immarg bool) !int {
 	return intrinsic_declaration_attributes(stream, set, limit, if second_immarg { u64(2) } else { u64(0) }, .none)!
 }
-enum IntrinsicMemoryEffect { none write read_write copy }
+enum IntrinsicMemoryEffect { none write read_write copy inline_copy }
 // Share the bounded attribute scanner with memory intrinsics. They permit a
 // fourth-parameter immarg and canonical pointer parameter properties, with
-// argmem write/read-write effects instead of scalar memory(none).
+// argmem write/read-write effects instead of scalar memory(none). Inline
+// copies additionally allow a length immarg, with a separate duplicate guard.
 fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_slot u64, effect IntrinsicMemoryEffect) !int {
 	memory_none := effect == .none
-	transfers := effect in [.read_write, .copy]!
+	transfers := effect in [.read_write, .copy, .inline_copy]!
+	inline_copy := effect == .inline_copy
 	memory_bits := if transfers { u64(3) } else { u64(2) }
 	if set == 0 { return 0 }
-	mut work := 0; mut number := u64(0); mut groups := [4]u64{}; mut count := 0
+	mut work := 0; mut number := u64(0); mut groups := [5]u64{}; mut count := 0
 	for record in stream.records {
 		work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
 		if stream.blocks[record.block].id != 9 { continue }
 		if record.code != 2 { return error('AIR intrinsic: unsupported attribute-list encoding') }
 		number++
 		if number != set { continue }
-		if record.values_count < 1 || record.values_count > if transfers { 4 } else if !memory_none { 3 } else if immarg_slot != 0 { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
+		if record.values_count < 1 || record.values_count > if inline_copy { 5 } else if transfers { 4 } else if !memory_none { 3 } else if immarg_slot != 0 { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
 		count = record.values_count
 		for i in 0 .. count { groups[i] = ir_values(stream, record)[i]; if groups[i] == 0 { return error('AIR intrinsic: zero attribute group') } }
 		break
 	}
 	if count == 0 { return error('AIR intrinsic: missing attribute list/group') }
-	mut function_seen := false; mut mask_seen := false; mut destination_seen := false; mut source_seen := false
+	mut function_seen := false; mut mask_seen := false; mut length_seen := false; mut destination_seen := false; mut source_seen := false
 	for i in 0 .. count {
 		mut found := false
 		for record in stream.records {
@@ -131,10 +133,11 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 			values := ir_values(stream, record)
 			if values.len < 2 || values[0] != groups[i] { continue }
 			found = true
-			if immarg_slot != 0 && values[1] == immarg_slot {
+			if (immarg_slot != 0 && values[1] == immarg_slot) || (inline_copy && values[1] == 3) {
 				work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
-				if mask_seen || values.len != 4 || values[2] != 0 || values[3] != 60 { return error('AIR intrinsic: mask immarg attribute required') }
-				mask_seen = true; break // Only the admitted parameter's enum immarg.
+				seen := if inline_copy && values[1] == 3 { length_seen } else { mask_seen }
+				if seen || values.len != 4 || values[2] != 0 || values[3] != 60 { return error('AIR intrinsic: exact immarg attribute required') }
+				if inline_copy && values[1] == 3 { length_seen = true } else { mask_seen = true }; break
 			}
 			if (!memory_none && values[1] == 1) || (transfers && values[1] == 2) {
 				source := values[1] == 2
@@ -146,7 +149,7 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 				for cursor < values.len {
 					work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
 					if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == access_kind && !write_seen { write_seen = true; cursor += 2 }
-					else if effect == .copy && values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == 9 && !alias_seen { alias_seen = true; cursor += 2 }
+					else if effect in [.copy, .inline_copy]! && values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == 9 && !alias_seen { alias_seen = true; cursor += 2 }
 					else if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == 11 && !capture_seen { capture_seen = true; cursor += 2 }
 					else if values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 102 && values[cursor + 2] == 0 && !capture_seen { capture_seen = true; cursor += 3 }
 					else { return error('AIR intrinsic: unsupported destination attribute') }

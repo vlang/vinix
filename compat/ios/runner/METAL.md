@@ -348,6 +348,16 @@ Deferred copies cover separate buffers, disjoint aliases, adjacent ranges and
 input changes after encoding; overlapping/equal ranges produce failed command
 completion with the kernel's earlier marker store untouched.
 
+`llvm.memcpy.inline` supports the same literal i32/i64 lengths, address spaces,
+bounds, alignment, permissions and preflight overlap checks as ordinary copies.
+It reuses indexed byte transfers and scratch storage without invoking external
+declarations or host copy routines. Its declaration also admits an optional
+length immarg. Distinct declaration-cache slots permit ordinary and inline
+copies in the same kernel. Deferred inline-copy checks cover separate buffers,
+disjoint/adjacent aliases, retained inputs changed after encoding and failed
+overlapping/equal-range commands before the marker store. Inline memset and
+atomic variants remain unsupported.
+
 Memory-intrinsic call sites accept only `align N` on their pointer arguments.
 Destination and source requirements combine with ordinary accesses and must
 fit the virtual buffer's 256-byte base alignment. Binding offsets and derived

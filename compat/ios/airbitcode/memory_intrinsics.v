@@ -60,7 +60,8 @@ fn (p IRTypedProgram) memory_literal(pools IRConstantPools, scope int, operand i
 }
 
 // Void direct memory intrinsics, exact overload and literal length. Pointers
-// resolve separately. Keys 0..5 are fills, 6..23 moves, 24..41 disjoint copies.
+// resolve separately. Keys 0..5 are fills, 6..23 moves, 24..41 disjoint copies,
+// and 42..59 inline copies. Distinct declaration slots permit mixed calls.
 fn (p IRTypedProgram) memory_intrinsic_call(ir IRModule, stream Stream, pools IRConstantPools, op IRTypedInstruction, scope int) !(u64, u64, int) {
 	if op.flags != 32768 || op.calling_convention != 0 || op.fast_math_flags != 0 || op.opcode != 0 || op.indices_count != 0 || op.result_type != -1 || op.operands_count != 5 || op.callee_function < 0 || op.callee_function >= ir.functions.len { return error('AIR memory intrinsic: ordinary void direct call required') }
 	f := ir.functions[op.callee_function]
@@ -85,7 +86,10 @@ fn (p IRTypedProgram) memory_intrinsic_call(ir IRModule, stream Stream, pools IR
 		key = 6 + (int(dest.address_space) * 3 + int(source.address_space)) * 2 + int(bits == 64)
 		if f.name.starts_with('llvm.memcpy.') {
 			key += 18
-			if f.name != ['llvm.memcpy.p0.p0.i32', 'llvm.memcpy.p0.p0.i64', 'llvm.memcpy.p0.p1.i32', 'llvm.memcpy.p0.p1.i64', 'llvm.memcpy.p0.p2.i32', 'llvm.memcpy.p0.p2.i64', 'llvm.memcpy.p1.p0.i32', 'llvm.memcpy.p1.p0.i64', 'llvm.memcpy.p1.p1.i32', 'llvm.memcpy.p1.p1.i64', 'llvm.memcpy.p1.p2.i32', 'llvm.memcpy.p1.p2.i64', 'llvm.memcpy.p2.p0.i32', 'llvm.memcpy.p2.p0.i64', 'llvm.memcpy.p2.p1.i32', 'llvm.memcpy.p2.p1.i64', 'llvm.memcpy.p2.p2.i32', 'llvm.memcpy.p2.p2.i64']![key - 24] { return error('AIR memory intrinsic: memcpy name/type') }
+			if f.name.starts_with('llvm.memcpy.inline.') {
+				if f.name != ['llvm.memcpy.inline.p0.p0.i32', 'llvm.memcpy.inline.p0.p0.i64', 'llvm.memcpy.inline.p0.p1.i32', 'llvm.memcpy.inline.p0.p1.i64', 'llvm.memcpy.inline.p0.p2.i32', 'llvm.memcpy.inline.p0.p2.i64', 'llvm.memcpy.inline.p1.p0.i32', 'llvm.memcpy.inline.p1.p0.i64', 'llvm.memcpy.inline.p1.p1.i32', 'llvm.memcpy.inline.p1.p1.i64', 'llvm.memcpy.inline.p1.p2.i32', 'llvm.memcpy.inline.p1.p2.i64', 'llvm.memcpy.inline.p2.p0.i32', 'llvm.memcpy.inline.p2.p0.i64', 'llvm.memcpy.inline.p2.p1.i32', 'llvm.memcpy.inline.p2.p1.i64', 'llvm.memcpy.inline.p2.p2.i32', 'llvm.memcpy.inline.p2.p2.i64']![key - 24] { return error('AIR memory intrinsic: inline memcpy name/type') }
+				key += 18
+			} else if f.name != ['llvm.memcpy.p0.p0.i32', 'llvm.memcpy.p0.p0.i64', 'llvm.memcpy.p0.p1.i32', 'llvm.memcpy.p0.p1.i64', 'llvm.memcpy.p0.p2.i32', 'llvm.memcpy.p0.p2.i64', 'llvm.memcpy.p1.p0.i32', 'llvm.memcpy.p1.p0.i64', 'llvm.memcpy.p1.p1.i32', 'llvm.memcpy.p1.p1.i64', 'llvm.memcpy.p1.p2.i32', 'llvm.memcpy.p1.p2.i64', 'llvm.memcpy.p2.p0.i32', 'llvm.memcpy.p2.p0.i64', 'llvm.memcpy.p2.p1.i32', 'llvm.memcpy.p2.p1.i64', 'llvm.memcpy.p2.p2.i32', 'llvm.memcpy.p2.p2.i64']![key - 24] { return error('AIR memory intrinsic: memcpy name/type') }
 		} else if f.name != ['llvm.memmove.p0.p0.i32', 'llvm.memmove.p0.p0.i64', 'llvm.memmove.p0.p1.i32', 'llvm.memmove.p0.p1.i64', 'llvm.memmove.p0.p2.i32', 'llvm.memmove.p0.p2.i64', 'llvm.memmove.p1.p0.i32', 'llvm.memmove.p1.p0.i64', 'llvm.memmove.p1.p1.i32', 'llvm.memmove.p1.p1.i64', 'llvm.memmove.p1.p2.i32', 'llvm.memmove.p1.p2.i64', 'llvm.memmove.p2.p0.i32', 'llvm.memmove.p2.p0.i64', 'llvm.memmove.p2.p1.i32', 'llvm.memmove.p2.p1.i64', 'llvm.memmove.p2.p2.i32', 'llvm.memmove.p2.p2.i64']![key - 6] { return error('AIR memory intrinsic: memmove name/type') }
 	} else {
 		if p.integer_bits(p.operands[op.operands_start + 2].type_index)! != 8 || f.name != ['llvm.memset.p0.i32', 'llvm.memset.p0.i64', 'llvm.memset.p1.i32', 'llvm.memset.p1.i64', 'llvm.memset.p2.i32', 'llvm.memset.p2.i64']![key] { return error('AIR memory intrinsic: memset name/type') }

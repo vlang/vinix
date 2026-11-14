@@ -378,6 +378,16 @@ numeric pointer inputs. Copies still use indexed reads/writes and the existing
 scratch storage, with no host memcpy call. Callers must keep bindings and data
 stable throughout execution, as for all memory operations.
 
+`llvm.memcpy.inline.pD.pS.i32/i64` uses the same bounded disjoint-copy path,
+including resolved pointers, literal length, false volatility, permissions,
+alignment, overlap preflight, reusable scratch and two steps per byte. It
+never invokes an external declaration or host copy routine. Its declaration
+may additionally mark parameter three (length) immarg; this does not relax the
+literal check on any call. Both immarg slots have independent duplicate guards.
+Ordinary and inline overloads use distinct fixed declaration-cache slots, so
+both can appear in one function in either order. Inline memset and atomic
+variants remain excluded. No new owned profile or execution array is added.
+
 Memory-intrinsic call sites admit only `align N` on the destination and, for
 memmove/memcpy, source pointer arguments. N must be a power of two from 1
 through 64 MiB. Each binding's required alignment combines the largest
@@ -605,6 +615,11 @@ rejects overlaps through direct bindings and borrowed slices before stores.
 It covers adjacent ranges, zero length, pointer-control chains, scratch reuse
 with shifted source data, exact costs/bounds, late and inactive overlapping
 copies, excluded shapes/attributes/lengths and cumulative/mixed budgets.
+An optional trailing `inline` argument selects inline-copy overloads, adds
+mixed ordinary/inline sequences in both orders, and exercises the same copy,
+alias, binding, metadata and budget checks. Large inline budget bodies remain
+in the interpreter module but are omitted from native compilation to avoid
+expanding hundreds of thousands of copy bytes into machine instructions.
 
 `tests/ios/air-memory-alignment.v` compares aligned memset/memmove/memcpy
 calls with native LLVM for both length widths, destination spaces 0/1 and
@@ -613,6 +628,8 @@ destination alignments 1..64, independent source requirements, mixed calls and
 cache collisions. Controls check weak base alignment, unaligned binding/derived
 offsets, compensating offsets, inactive calls, unsupported combined attributes,
 exact budgets and aligned empty readonly zero-length calls in spaces 0/1/2.
+Its optional trailing `inline` argument substitutes inline copies for ordinary
+copies, including calls without the optional length immarg declaration.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

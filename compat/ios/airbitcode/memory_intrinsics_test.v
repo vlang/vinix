@@ -149,3 +149,39 @@ fn test_memory_call_alignment_attributes() {
 	assert ordered.destination == 16 && ordered.source == 32 && ordered.source_set
 	println('AIR-MEMORY-CALL-ALIGNMENT: default/destination/source attributes, all powers through 64 MiB and bound/power/slot/kind/missing/duplicate/budget exclusions PASS')
 }
+
+fn test_inline_memcpy_declaration_attributes() {
+	blocks := [Block{parent: -1}, Block{id: 9, parent: 0}, Block{id: 10, parent: 0}]
+	records := [Record{block: 1, code: 2, values_count: 5}, Record{block: 2, code: 3, values_start: 5, values_count: 5}, Record{block: 2, code: 3, values_start: 10, values_count: 9}, Record{block: 2, code: 3, values_start: 19, values_count: 9}, Record{block: 2, code: 3, values_start: 28, values_count: 4}, Record{block: 2, code: 3, values_start: 32, values_count: 4}]
+	mut values := [u64(1), 2, 3, 4, 5, 1, 0xffffffff, 1, 86, 3, 2, 1, 0, 9, 0, 52, 1, 102, 0, 3, 2, 0, 9, 0, 21, 1, 102, 0, 4, 3, 0, 60, 5, 4, 0, 60]
+	defer { unsafe { blocks.free(); records.free(); values.free() } }
+	stream := Stream{blocks: blocks, records: records, values: values}
+	for version in u64(0) .. 3 { values[9] = (version << 56) | 3; assert intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_copy)! > 0 }
+	values[9] = 3
+	if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .copy) { assert false, 'ordinary copy length immarg excluded' }
+	work := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_copy)!
+	assert intrinsic_declaration_attributes(stream, 1, work, 4, .inline_copy)! == work
+	if _ := intrinsic_declaration_attributes(stream, 1, work - 1, 4, .inline_copy) { assert false, 'attribute budget' }
+	for slot in [29, 33] { saved := values[slot]; values[slot] = if saved == 3 { u64(4) } else { u64(3) }
+		if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_copy) { assert false, 'duplicate length/volatile immarg' }
+		values[slot] = 0
+		if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_copy) { assert false, 'return slot' }
+		values[slot] = saved
+	}
+	for slot in [30, 31, 34, 35] { saved := values[slot]; values[slot] = 68
+		if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_copy) { assert false, 'exact immarg kind/property' }
+		values[slot] = saved
+	}
+	values[4] = 4
+	if _ := intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_copy) { assert false, 'duplicate immarg group' }
+	values[0] = 5; values[1] = 4; values[2] = 3; values[3] = 2; values[4] = 1
+	assert intrinsic_declaration_attributes(stream, 1, 128, 4, .inline_copy)! > 0
+	// The length immarg is optional; a literal is required at every call regardless.
+	values[0] = 1; values[1] = 2; values[2] = 3; values[3] = 5
+	short_records := [Record{block: 1, code: 2, values_count: 4}, records[1], records[2], records[3], records[4], records[5]]
+	defer { unsafe { short_records.free() } }
+	short := Stream{blocks: blocks, records: short_records, values: values}
+	assert intrinsic_declaration_attributes(short, 1, 128, 4, .inline_copy)! > 0
+	assert intrinsic_declaration_attributes(short, 1, 128, 4, .copy)! > 0
+	println('AIR-INLINE-MEMCPY-ATTRIBUTES: five groups, optional length immarg, canonical pointer noalias/access/captures(none), argmem versions 0/1/2, order/duplicate/slot/kind/property/exact-budget guards and ordinary-copy exclusion PASS')
+}
