@@ -4,7 +4,97 @@ module pkgcore
 import crypto.sha256
 import json2
 import os
+import time
 import tools.packages.wineadapter
+
+fn test_signed_repository_install_to_guarded_prefix_review() {
+	work := os.real_path(os.temp_dir()) + '/wine-signed-review-' + os.getpid().str()
+	os.mkdir(work)!
+	defer { os.rmdir_all(work) or {} }
+	repository := work + '/repository'
+	root := work + '/installed'
+	app_source := work + '/app-source'
+	runtime_source := work + '/runtime-source'
+	os.mkdir_all(app_source + '/bin')!
+	os.mkdir_all(runtime_source + '/bin')!
+	os.mkdir_all(runtime_source + '/root/usr/lib/wine/x86_64-windows')!
+	os.write_file(app_source + '/bin/program.exe', 'fixture application, never executed')!
+	os.chmod(app_source + '/bin/program.exe', 0o755)!
+	os.write_file(runtime_source + '/bin/wine', 'fixture runtime, never executed')!
+	os.chmod(runtime_source + '/bin/wine', 0o755)!
+	os.write_file(runtime_source + '/root/usr/lib/wine/x86_64-windows/kernel32.dll', 'signed fixture builtin')!
+	key := keygen(work + '/seed')!
+	for p in [Package{id: 'app', name: 'Windows fixture', version: '1.0.0', architecture: 'aarch64', license: 'MIT',
+		kind: 'windows', runtime: 'wine', entrypoint: 'bin/wine', arguments: ['bin/program.exe'],
+		dependencies: [Dependency{id: 'wine', minimum: '1.0.0'}]},
+		Package{id: 'wine', name: 'Runtime fixture', version: '1.0.0', architecture: 'aarch64', license: 'MIT',
+		kind: 'runtime', entrypoint: 'bin/wine'}] {
+		os.write_file(work + '/manifest.json', json2.encode(p))!
+		pack(work + '/manifest.json', if p.id == 'app' { app_source } else { runtime_source }, repository)!
+	}
+	publish(repository, 'fixture', work + '/seed', 1, time.now().unix() + 3600)!
+	os.mkdir_all(root + '/etc/vinix-packages')!
+	os.write_file(root + '/etc/vinix-packages/config.json', json2.encode(Config{architecture: 'aarch64',
+		repositories: [Repository{id: 'fixture', url: 'file://' + repository, public_key: key}], policy: Policy{reserve_bytes: 0}}))!
+	service := Service{root: root}
+	mut catalog := service.refresh()!
+	catalog.close()
+	mut installed := service.transact('install', ['app'], TransactionOptions{})!
+	defer { installed.close() }
+	// Public Wine admission intentionally refuses alternate roots. This test
+	// uses its private preparation/verification components on a signed install.
+	mut prepared := service.prepare_launch('app')!
+	defer { prepared.close() }
+	assert prepared.lease >= 0 && prepared.state.generation == installed.generation
+	verify_launch_payloads(prepared.config, prepared.directory, prepared.state, 'app')!
+	index := wine_runtime_index(prepared.state, 'app')!
+	mut admission := WineAdmission{generation: prepared.state.generation, runtime: prepared.state.packages[index].package, prepared: prepared}
+	prepared = PreparedLaunch{}
+	defer { admission.close() }
+	data := work + '/data'
+	os.mkdir(data)!; os.chmod(data, 0o700)!; os.chown(data, int(C.geteuid()), os.getegid())!
+	number := admission.generation.str()
+	builtins := admission.prepared.directory + '/generations/' + number + '/apps/wine/root/usr/lib/wine/x86_64-windows'
+	mut prefix := wineadapter.prepare_prefix(data, builtins)!
+	defer { prefix.close() }
+	mut owner := WinePrefixReview{admission: admission, review: admission.capture_prefix(data)!}
+	admission = WineAdmission{}
+	defer { owner.close() }
+	assert owner.review.review.bindings.len == 1 && owner.review.review.bindings[0].operation == .keep
+	owner.review.recheck()!
+	owner.close(); owner.close()
+	mut released := prefix.acquire_launch(data)!
+	released.close()
+	os.write_file(runtime_source + '/root/usr/lib/wine/x86_64-windows/kernel32.dll', 'signed upgraded builtin')!
+	os.write_file(runtime_source + '/root/usr/lib/wine/x86_64-windows/new.dll', 'signed added builtin')!
+	os.write_file(work + '/manifest.json', json2.encode(Package{id: 'wine', name: 'Runtime fixture', version: '2.0.0',
+		architecture: 'aarch64', license: 'MIT', kind: 'runtime', entrypoint: 'bin/wine'}))!
+	pack(work + '/manifest.json', runtime_source, repository)!
+	publish(repository, 'fixture', work + '/seed', 2, time.now().unix() + 3600)!
+	mut refreshed := service.refresh()!
+	refreshed.close()
+	mut upgraded := service.transact('upgrade', [], TransactionOptions{})!
+	defer { upgraded.close() }
+	assert upgraded.generation != installed.generation
+	mut next := service.prepare_launch('app')!
+	defer { next.close() }
+	verify_launch_payloads(next.config, next.directory, next.state, 'app')!
+	next_index := wine_runtime_index(next.state, 'app')!
+	mut next_admission := WineAdmission{generation: next.state.generation, runtime: next.state.packages[next_index].package, prepared: next}
+	next = PreparedLaunch{}
+	defer { next_admission.close() }
+	mut next_owner := WinePrefixReview{admission: next_admission, review: next_admission.capture_prefix(data)!}
+	next_admission = WineAdmission{}
+	defer { next_owner.close() }
+	assert next_owner.review.review.generation == upgraded.generation
+	assert next_owner.review.review.prior_generation == installed.generation
+	assert next_owner.review.review.bindings.len == 2
+	assert next_owner.review.review.bindings[0].operation == .replace
+	assert next_owner.review.review.bindings[1].operation == .create
+	assert os.readlink(data + '/wine/drive_c/windows/system32/kernel32.dll')! == builtins + '/kernel32.dll'
+	assert !os.exists(data + '/wine/drive_c/windows/system32/new.dll')
+	next_owner.review.recheck()!
+}
 
 fn wine_review_collect(store string) ! {
 	writer := acquire(store)!
