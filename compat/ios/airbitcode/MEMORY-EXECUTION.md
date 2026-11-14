@@ -56,6 +56,11 @@ zero, signed division overflow and poison division inputs retain their dynamic
 error behavior. Storing poison rejects; select may discard it and freeze can
 make a defined choice. Flags add no execution steps.
 
+Integer `or disjoint` also supports i1..i64. It produces poison when any bit
+is set in both operands; otherwise it returns ordinary bitwise OR. Operand
+poison propagates and selected undef errors, including when the other operand
+is zero. Integer, mixed scalar, void and memory APIs share this evaluator.
+
 Integer comparisons support all ten signed/unsigned/equality predicates;
 half/float comparisons support all sixteen ordered/unordered predicates.
 Results are scalar i1. Select requires an i1 condition and matching scalar
@@ -66,8 +71,15 @@ constants do not reject; selected undef errors, and poison conditions/chosen
 values propagate to a rejected poison store. Selection does not skip earlier
 instructions. Same-binding pointer equality and unsigned ordering are described
 below. Vector comparisons and vector selects, aggregate comparisons,
-general aggregate selects and all comparison/select flags remain unsupported;
+general aggregate selects and select flags remain unsupported;
 the overflow-pair select exception is described below.
+
+Scalar integer `icmp samesign` supports all ten predicates at i1..i64 and
+produces poison for operands with different sign bits, including i1 0 versus 1.
+Same-sign operands retain the ordinary predicate result. Flags add no steps;
+poison may be stored only after freeze or discarded by a select, and a poisoned
+branch condition errors after earlier writes. Floating/pointer comparison flags
+and unknown integer comparison flag bits still reject during preflight.
 
 Pointer selects accept a scalar i1 condition and two operands of exactly the
 result pointer type, both resolving to the same argument identity and byte
@@ -562,6 +574,11 @@ mixed-family cache identities and host rounding/exception controls.
 raw-bit expectations, all half encodings, and separate indeterminate choices.
 `tests/ios/air-memory-flags.v` checks integer flags across all widths against a
 defined widened LLVM value/poison-tag reference without executing native poison.
+`tests/ios/air-bit-sign-promises.v` covers OR disjoint and all ten ICMP samesign
+predicates across i1..i64. Only defined inputs execute natively; independent
+carry/sign range checks decide poison. Integer/mixed/void APIs, narrow masking,
+stores/branches, freeze/select, prior writes, budgets and unknown/noninteger
+flag preflight controls share the decoded fixtures.
 `tests/ios/air-memory-bits.v` checks bit intrinsic buffer functions against
 defined native LLVM execution, with separate zero/poison/undef/call controls.
 `tests/ios/air-memory-funnel.v` checks three-input funnel buffer functions,

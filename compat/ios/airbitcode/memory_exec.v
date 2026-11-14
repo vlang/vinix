@@ -156,7 +156,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		code := stream.records[inst.record].code
 		if op.targets_count != 0 && code !in [u64(11), 12, 16]! { return error('AIR memory execution: unexpected targets') }
 		gep := code in [u64(4), 30, 43]!
-		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+		allowed_flags := if gep { u64(7) } else if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code in [u64(9), 28]! { p.integer_compare_flag_mask(op) } else if code == 2 && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .integer_t { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 		if op.flags & ~allowed_flags != 0 { return error('AIR memory execution: unsupported flags') }
 		if code in [u64(10), 11, 12]! { continue } // Checked by control preflight.
 		if code == 16 {

@@ -51,8 +51,8 @@ fn integer_binary(op u32, bits u32, a IntegerValue, b IntegerValue) !IntegerValu
 	return IntegerValue{value: result & mask}
 }
 fn integer_binary_flag_mask(op u32) u64 {
-	// Serialized LLVM bitcode bits: NUW=1, NSW=2, EXACT=1 by family.
-	return match op { 0, 1, 2, 7 { u64(3) } 3, 4, 8, 9 { u64(1) } else { u64(0) } }
+	// Serialized LLVM bits: NUW=1, NSW=2, EXACT/DISJOINT=1 by family.
+	return match op { 0, 1, 2, 7 { u64(3) } 3, 4, 8, 9, 11 { u64(1) } else { u64(0) } }
 }
 fn integer_binary_flags(op u32, flags u64, bits u32, a IntegerValue, b IntegerValue) !IntegerValue {
 	if flags & ~integer_binary_flag_mask(op) != 0 { return error('AIR integer: unsupported binary flags') }
@@ -86,6 +86,7 @@ fn integer_binary_flags(op u32, flags u64, bits u32, a IntegerValue, b IntegerVa
 			if magnitude_x % magnitude_y != 0 { return IntegerValue{poison: true} }
 		}
 		8, 9 { if x & ((u64(1) << y) - 1) != 0 { return IntegerValue{poison: true} } }
+		11 { if x & y != 0 { return IntegerValue{poison: true} } }
 		else {}
 	}
 	if (flags & 1 != 0 && unsigned_overflow) || (flags & 2 != 0 && signed_overflow) { return IntegerValue{poison: true} }
@@ -159,7 +160,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
 			if inst.has_result { if !pair_result && !pair_flow { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			floating_result := inst.has_result && p.types[op.result_type].kind in [.float_t, .half_t]!
-			allowed_flags := if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+			allowed_flags := if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code in [u64(9), 28]! { p.integer_compare_flag_mask(op) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
 				34 {} // Checked direct intrinsic, including its attributes, above.
@@ -247,7 +248,7 @@ fn (m &IntegerMachine) compare_value(op IRTypedInstruction) !IntegerValue {
 	a := m.read(start)!; b := m.read(start + 1)!
 	if m.p.types[m.p.operands[start].type_index].kind == .half_t { return if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary16_compare(op.opcode, u16(a.value), u16(b.value))!)} } }
 	if fp { return if a.poison || b.poison { IntegerValue{poison: true} } else { IntegerValue{value: u64(binary32_compare(op.opcode, u32(a.value), u32(b.value))!)} } }
-	return integer_compare(op.opcode, m.p.integer_bits(m.p.operands[start].type_index)!, a, b)!
+	return integer_compare_flags(op.opcode, op.flags, m.p.integer_bits(m.p.operands[start].type_index)!, a, b)!
 }
 fn (m &IntegerMachine) select_value(op IRTypedInstruction) !IntegerValue {
 	condition := m.read(op.operands_start + 2)!

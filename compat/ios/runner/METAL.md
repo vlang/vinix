@@ -436,6 +436,13 @@ combine signed conversion with floating addition in both directions.
 Deferred dispatch checks also cover flagged truncation and extension, freeze of
 their poison results, and failed-command completion for poison stores.
 
+Scalar integer `or disjoint` and `icmp samesign` are admitted across i1..i64.
+Overlapping OR input bits or different comparison input sign bits produce
+poison. Same-sign comparisons support all ten predicates; other comparison
+flags, including floating/pointer flags, reject. Existing freeze/select,
+poison-store and branch-condition rules apply without extra execution steps.
+Deferred kernels check ordinary results, frozen poison and failed commands.
+
 `llvm.fptosi.sat`/`llvm.fptoui.sat` convert scalar half/float to i1..i64 with
 truncation toward zero, destination-range clamping and NaN-to-zero semantics.
 They use integer arithmetic independent of host rounding and exception flags,
