@@ -1984,6 +1984,26 @@ hermetic closure and measured heap flatness are not claimed. Directory continuit
 does not pin individual assets or authenticate runtime bytes. Migration
 application, recovery and the other section 14 gates remain open.
 
+## Builtin byte continuity, 2026-11-14
+
+Source `dc8129f30` records and rechecks SHA-256 digests for selected builtin
+assets through captured-directory, no-follow opens. Reads use 64 KiB buffers,
+require ordinary nonempty files up to 64 MiB each and cap the inventory at 1 GiB.
+Pre/post-read metadata and EOF checks refuse observed read instability. Host
+library/CLI controls pass, including same-size byte edits, restoration, a
+65537-byte streaming comparison, empty-file refusal and previous cleanup checks.
+Both Linux static cross-builds pass; no guest execution is claimed. Initial
+compile and cleanup diagnostics are retained alongside passing corrected results.
+
+Evidence is frozen at `/Users/alex/.cache/vwidlebind-20261114-03`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-idle-binding-review-20261114-03.inventory.json`
+has SHA-256 `00953c9078740656b248d7297496e72fa729a4e937ac664cca9c25bdcd04bacf`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Final outputs use `-fixed` suffixes. The compiler binary remains
+in the earlier `-01` bundle. These are continuity checks, not authentication of
+initial runtime bytes or a concurrent-write snapshot. Migration application,
+recovery, measured heap qualification and the other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
