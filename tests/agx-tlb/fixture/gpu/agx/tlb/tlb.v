@@ -3,11 +3,14 @@ module tlb
 
 pub struct Invalidation {
 pub:
-	all  bool
-	asid u8
-	pte  u64
-	ttb0 u64
-	ttb1 u64
+	all     bool
+	asid    u8
+	pte     u64
+	ttb0    u64
+	ttb1    u64
+	range   bool
+	address u64
+	size    u64
 }
 
 __global invalidations = []Invalidation{}
@@ -36,3 +39,10 @@ fn record(all bool, asid u8) {
 pub fn invalidate_all() { record(true, 0) }
 
 pub fn invalidate_asid(asid u8) { record(false, asid) }
+
+pub fn invalidate_range(asid u8, address u64, size u64) {
+	record(false, asid)
+	last := invalidations.len - 1
+	old := invalidations[last]
+	invalidations[last] = Invalidation{ ...old, range: true, address: address, size: size }
+}

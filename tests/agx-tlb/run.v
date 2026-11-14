@@ -15,6 +15,7 @@ fn main() {
 	os.cp_all('${repo}/tests/agx-tlb/fixture', scratch, false)!
 	os.mkdir_all('${scratch}/gpu/agx/pgtable')!
 	os.cp('${repo}/kernel/gpu/agx/pgtable/pgtable.v', '${scratch}/gpu/agx/pgtable/pgtable.v')!
+	os.cp('${repo}/kernel/gpu/agx/tlb/plan.v', '${scratch}/gpu/agx/tlb/plan.v')!
 	os.write_file('${scratch}/gpu/agx/pgtable/host.v', 'module pgtable\n__global higher_half = u64(0)\n')!
 	// Run the actual root publishers against real host page tables. Replace
 	// privileged instructions and handoff arbitration, not the PTE operations.

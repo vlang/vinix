@@ -8,10 +8,27 @@ import gpu.agx.hw
 // work is outstanding. This is an AtomicU32 in the v12.3 firmware ABI.
 pub fn g13_globals_pending_submissions_offset(abi hw.FirmwareAbi) ?u64 {
 	return match abi {
-		.v12_3 { u64(0x8904) }
-		.v13_5_partial { u64(0x8974) }
+		.v12_3 { g13_v12_3_globals_pending_submissions_offset }
+		.v13_5_partial { g13_v13_5_globals_pending_submissions_offset }
 		else { none }
 	}
+}
+
+pub fn g13_globals_pending_stamps_offset(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { g13_v12_3_globals_pending_stamps_offset }
+		.v13_5_partial { g13_v13_5_globals_pending_stamps_offset }
+		else { none }
+	}
+}
+
+pub const g13_pending_stamp_count = u32(256)
+
+@[packed]
+pub struct G13PendingStamp {
+pub mut:
+	info u32
+	wait_value u32
 }
 
 // macOS 12.3 / G13 global firmware state. Firmware mutates most of this

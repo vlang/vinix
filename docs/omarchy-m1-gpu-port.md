@@ -94,3 +94,8 @@ No Vinix boot, compute execution, rendering, lifecycle stress or performance
 measurement was performed on an M1 for this change. Follow the hardware
 acceptance sequence in [M1 AGX bring-up](m1-agx-bringup.md) before claiming
 working GPU acceleration.
+
+Follow-up work and the remaining parity gaps are tracked in
+[M1 AGX parity](m1-agx-parity.md). That report also records a retention incident:
+the original linked AArch64 kernel was replaced during a later build. Its
+checksum receipt is unchanged, but that historical bundle is now incomplete.

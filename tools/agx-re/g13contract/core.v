@@ -191,6 +191,38 @@ fn check_tlb_instructions(reference string, vinix string) ! {
 	local_all := section(vinix, 'pub fn invalidate_all()', 'pub fn invalidate_asid(', 'Vinix GPU TLBI')!
 	require_order(local_all, ['dsb sy', 'tlbi vmalle1os', 'dsb sy', 'memory'], 'Vinix global GPU TLBI')!
 	local_asid_start := vinix.index('pub fn invalidate_asid(') or { return error('Vinix GPU TLBI: missing ASID invalidation') }
-	require_order(vinix[local_asid_start..], ['u64(asid) << 48', 'dsb sy', 'tlbi aside1os, operand',
+	local_asid_end := vinix.index_after('pub fn invalidate_range(', local_asid_start) or { vinix.len }
+	require_order(vinix[local_asid_start..local_asid_end], ['u64(asid) << 48', 'dsb sy', 'tlbi aside1os, operand',
 		'dsb sy', 'memory'], 'Vinix ASID GPU TLBI')!
+}
+
+pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
+	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	manager := read(os.join_path(base, 'gpu.rs'))!
+	workqueue := read(os.join_path(base, 'workqueue.rs'))!
+	require_order(workqueue, ['let last_wptr = inner.pending[completed_commands - 1].inner.wptr()',
+		'raw.cpu_freeptr.store(last_wptr, Ordering::Release)'], 'Asahi workqueue retirement')!
+	recover := section(manager, '    fn recover(&self)', '    /// Return the packed GPU', 'Asahi recovery')!
+	require_order(recover, ['raw.flags.halted.store(0, Ordering::SeqCst)',
+		'raw.flags.resume.store(1, Ordering::SeqCst)'], 'Asahi halt/resume handshake')!
+	ack := section(manager, '    fn ack_grow(&self, buffer_slot: u32, vm_slot: u32, counter: u32) {',
+		'    fn fwctl(', 'Asahi TVB growth')!
+	require_order(ack, ['raw.flags.halt_count.load', 'DeviceControlMsg::ver::GrowTVBAck',
+		'halt_count: U64(halt_count)'], 'Asahi TVB halt counter')!
+	local := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	retirement := section(local, 'fn (mut mgr GpuManager) retire_g13_subqueue_locked(',
+		'fn build_g13_attachments(', 'Vinix workqueue retirement')!
+	require_order(retirement, ['sequence <= queue.retired_sequence', 'katomic.sync()',
+		'katomic.store(mut &state.cpu_freeptr, slot)', 'queue.retired_sequence = sequence'],
+		'Vinix workqueue retirement')!
+	local_recovery := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_recovery.v'))!
+	require_order(local_recovery, ['fw.g13_pending_stamp_count', 'mgr.mark_g13_slot_error_locked',
+		'katomic.store(mut &pending[index].info', 'katomic.load(&status.halted)',
+		'katomic.store(mut &status.halted, u32(0))', 'katomic.sync()',
+		'katomic.store(mut &status.resume, u32(1))'], 'Vinix recoverable fault protocol')!
+	channels := read(os.join_path(base, 'fw/channels.rs'))!
+	require_order(channels, ['GrowTVBAck {', 'subpipe: u32', 'halt_count: U64'], 'Asahi GrowTVBAck layout')!
+	return ['host workqueue retirement pointer and wrap-safe publication',
+		'pending-stamp fault classification and halt/resume handshake',
+		'TVB growth ACK halt counter']
 }

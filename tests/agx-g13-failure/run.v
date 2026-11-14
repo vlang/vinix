@@ -21,9 +21,12 @@ fn run_checks() int {
 	production += section(source, 'pub fn (mut mgr GpuManager) handle_event()', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) check_g13_firmware_health()', '// Shutdown the GPU') or { panic(err) }
 	production += source.all_after('// Shutdown the GPU\n')
+	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')
+	production = production.replace('import sched\n', 'import sched\nimport aarch64.timer\n')
 	submissions := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v') or { panic(err) }
 	production += section(submissions, 'fn (mut mgr GpuManager) submit_g13_queue_commands(', 'fn (mut mgr GpuManager) submit_g13_queue_command(') or { panic(err) }
 	production += section(submissions, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(', '// Transfer a prepared render pass') or { panic(err) }
+	production += section(submissions, 'fn (mut mgr GpuManager) retire_g13_subqueue_locked(', 'fn build_g13_attachments(') or { panic(err) }
 	os.write_file('${scratch}/gpu/production.v', production) or { panic(err) }
 	os.mkdir_all('${scratch}/gpu/agx/alloc') or { panic(err) }
 	allocator := os.read_file('${repo}/kernel/gpu/agx/alloc/alloc.v') or { panic(err) }

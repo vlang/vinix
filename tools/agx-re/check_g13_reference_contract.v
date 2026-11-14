@@ -62,6 +62,11 @@ fn main() {
 			exit(1)
 		}
 		for result in tlb_results { println('  ok  ${result}') }
+		queue_results := g13contract.check_queue_recovery_reference(asahi, g13layout.repo_root()) or {
+			eprintln('G13 reference contract failed: ${err}')
+			exit(1)
+		}
+		for result in queue_results { println('  ok  ${result}') }
 	} else {
 		println('Asahi Linux: skipped (pass --asahi-linux to check a checkout)')
 	}

@@ -5,6 +5,7 @@ import gpu.agx.channel
 import gpu.agx.fw
 import gpu.agx.hw
 import gpu.agx.alloc
+import gpu.agx.event
 import katomic
 import klock
 
@@ -36,6 +37,7 @@ struct SharedBuffer {
 mut:
 	phys u64
 	va   u64
+	size u64
 }
 
 fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
@@ -43,6 +45,7 @@ fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
 struct G13ChannelAllocations {
 mut:
 	fw_status SharedBuffer
+	globals SharedBuffer
 }
 
 struct FaultInfo {
@@ -51,11 +54,21 @@ struct FaultInfo {
 	unit_code   u32
 	vm_slot     u32
 	reason_code u32
+	sideband u8
+	level u8
+	unknown_5 u8
 }
 
-struct Resources {}
+struct Resources {
+mut:
+	fault_valid bool
+	fault FaultInfo
+}
 
-fn (_ &Resources) get_g13_fault_info() ?FaultInfo { return none }
+fn (res &Resources) get_g13_fault_info() ?FaultInfo {
+	if res.fault_valid { return res.fault }
+	return none
+}
 
 struct GpuManager {
 mut:
@@ -70,6 +83,9 @@ mut:
 	polls          int
 	trace          []string
 	rings          int
+	g13_compute_jobs []&G13ComputeJobResources
+	g13_render_jobs []&G13RenderJobResources
+	auto_ack bool
 }
 
 struct G13Subqueue {
@@ -78,6 +94,9 @@ mut:
 	ring   SharedBuffer
 	info   SharedBuffer
 	is_new bool = true
+	command_sequence u64
+	retired_sequence u64
+	last_command_slot u32
 	lock   klock.Lock
 }
 
@@ -91,6 +110,7 @@ mut:
 
 struct Context {
 	active bool = true
+	id u32
 }
 
 struct G13RenderJobResources {
@@ -103,6 +123,38 @@ mut:
 	vertex              SharedBuffer
 	vertex_event_slot   u32
 	fragment_event_slot u32
+	vertex_ring_slot u32
+	fragment_ring_slot u32
+	vertex_retirement_sequence u64
+	fragment_retirement_sequence u64
+	error G13JobError
+	submitted bool
+	released bool
+	vertex_stamp_value u32
+	fragment_stamp_value u32
+}
+
+struct G13ComputeJobResources {
+mut:
+	context &Context = unsafe { nil }
+	queue &G13QueueResources = unsafe { nil }
+	event_slot u32
+	stamp_value u32
+	submitted bool
+	released bool
+	error G13JobError
+}
+
+fn (mut mgr GpuManager) ring_device_control() bool {
+	mgr.rings++
+	if mgr.auto_ack {
+		unsafe {
+			mut read := &u32(mgr.channels.device_ctrl.state_phys)
+			write := &u32(mgr.channels.device_ctrl.state_phys + 0x20)
+			*read = *write
+		}
+	}
+	return true
 }
 
 fn pipe_index(priority u32, kind u32) u32 { return priority * 3 + kind }
@@ -170,6 +222,8 @@ fn assert_failed(mgr &GpuManager) {
 
 pub fn run_checks() {
 	check_publishers()
+	check_retirement()
+	check_recovery()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10
 	assert __offsetof(fw.G13FwStatus, halted) == 0x20
@@ -236,6 +290,130 @@ pub fn run_checks() {
 	assert normal.trace == ['success'] && normal.grows == 1
 }
 
+fn check_recovery() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial] {
+		mut globals := fw.G13Globals{}
+		mut status := fw.G13FwStatus{halted: 1}
+		mut graph := G13ChannelAllocations{
+			globals: SharedBuffer{phys: u64(&globals), size: sizeof(fw.G13Globals)}
+			fw_status: SharedBuffer{phys: u64(&status)}
+		}
+		mut culprit := G13ComputeJobResources{event_slot: 3, stamp_value: 0x100, submitted: true}
+		mut other := G13ComputeJobResources{event_slot: 4, stamp_value: 0x100, submitted: true}
+		mut already_done := G13ComputeJobResources{event_slot: 5, stamp_value: 0x100, submitted: true}
+		mut render := G13RenderJobResources{vertex_event_slot: 6, fragment_event_slot: 7,
+			vertex_stamp_value: 0x100, fragment_stamp_value: 0x100, submitted: true}
+		mut mgr := GpuManager{
+			hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+			g13_channels: &graph
+			g13_compute_jobs: [&culprit, &other, &already_done]
+			g13_render_jobs: [&render]
+		}
+		offset := fw.g13_globals_pending_stamps_offset(abi) or { panic('pending stamps') }
+		mut pending := unsafe { &fw.G13PendingStamp(u64(&globals) + offset) }
+		shift := if abi == .v12_3 { u32(3) } else { u32(4) }
+		for index := u32(0); index < 5; index++ {
+			unsafe { pending[index] = fw.G13PendingStamp{info: ((index + 3) << shift) | 1, wait_value: 0x100} }
+		}
+		event.set_completed(5, true)
+		assert mgr.recover_g13_fault(3, 3)
+		assert status.halted == 0 && status.resume == 1 && mgr.state == .running
+		assert culprit.error.status == 3 && other.error.status == 5
+		assert already_done.error.status == 0 && render.error.status == 5
+		assert mgr.trace.len == 0, 'recovery must retain all command backing'
+		for index := u32(0); index < 5; index++ {
+			assert unsafe { pending[index].info == 0 && pending[index].wait_value == 0 }
+		}
+		event.set_completed(5, false)
+		// Fault details survive resume and a dependency killed on the other stage.
+		mgr.res.fault_valid = true
+		mgr.res.fault = FaultInfo{address: 0x123400, unit_code: 7, reason_code: 2,
+			sideband: 3, level: 1, unknown_5: 2, read: true}
+		unsafe {
+			pending[0] = fw.G13PendingStamp{info: (u32(6) << shift) | 1, wait_value: 0x100}
+			pending[1] = fw.G13PendingStamp{info: (u32(7) << shift) | 1, wait_value: 0x100}
+		}
+		status.halted = 1
+		status.resume = 0
+		assert mgr.recover_g13_fault(6, 3)
+		assert render.error.status == 4 && render.error.address == 0x123400
+		assert render.error.fault_type == 2 && render.error.is_read == 1
+		assert render.error.fence_error() == -5
+		assert G13JobError{status: 3}.fence_error() == -110
+		assert G13JobError{status: 5}.fence_error() == -125
+		assert G13JobError{status: 6}.fence_error() == -19
+		other_vm := Context{id: 9}
+		culprit.context = &other_vm
+		mgr.mark_g13_slot_error_locked(3, 0x100, G13JobError{status: 4, vm_slot: 8})
+		assert culprit.error.status == 5
+		// The worker's pre-drain health check must let the queued error own
+		// recovery instead of stopping the ASC before handle_event can run.
+		mut error_header := channel.RingHeader{write_ptr: 1}
+		mut error_ring := [4]fw.FwEventMsg{}
+		error_ring[0].tag = fw.fw_event_fault
+		mgr.channels.event = channel.new_rx_channel('event', 1, u64(&error_header), 1, u64(&error_ring), 4, 0x38)
+		status.halted = 1
+		status.resume = 0
+		unsafe { pending[255] = fw.G13PendingStamp{info: (u32(3) << shift) | 1, wait_value: 0x100} }
+		assert mgr.check_g13_firmware_health()
+		mgr.handle_event()
+		assert mgr.state == .running && status.resume == 1 && status.halted == 0
+		assert unsafe { pending[255].info == 0 && pending[255].wait_value == 0 }
+		// An unacknowledged halt may not be resumed; truncated Globals may
+		// not be read at all. Callers fall back to stop-before-free shutdown.
+		status.resume = 0
+		assert !mgr.recover_g13_fault(-1, 2)
+		assert status.resume == 0
+		graph.globals.size = offset
+		status.halted = 1
+		assert !mgr.recover_g13_fault(-1, 2)
+		assert status.halted == 1 && status.resume == 0
+	}
+	mut header := channel.RingHeader{}
+	mut messages := [4]fw.FwRecoverChannel{}
+	mut resources := G13QueueResources{}
+	resources.subqueues[2].info.va = 0x123000
+	mut job := G13ComputeJobResources{queue: &resources, event_slot: 8, stamp_value: 0x100, submitted: true}
+	mut mgr := GpuManager{g13_compute_jobs: [&job], auto_ack: true}
+	mgr.channels.device_ctrl = channel.new_tx_channel('dc', 1, u64(&header), 1, u64(&messages), 4, 0x30)
+	assert mgr.recover_g13_channel(2, 8, 0x100, 1)
+	assert job.error.status == 7 && job.error.extra == 1
+	assert messages[0].tag == 0xe && messages[0].pipe_type == 2
+	assert messages[0].work_queue == 0x123000 && messages[0].event_value == 0x100
+	assert header.read_ptr == header.write_ptr && mgr.trace.len == 0
+	assert !mgr.recover_g13_channel(3, 8, 0x100, 1)
+	assert header.write_ptr == 1
+	assert sizeof(fw.FwRecoverChannel) == 0x30
+	println('G13 recovery: pending stamps, fault isolation, halt/resume, channel ACK and error codes passed')
+}
+
+fn check_retirement() {
+	mut state := fw.G13WorkQueueRingState{ cpu_wptr: 1, gpu_doneptr: 1 }
+	mut resources := G13QueueResources{}
+	resources.subqueues[2] = G13Subqueue{
+		state: SharedBuffer{phys: u64(&state)}
+		command_sequence: 1281
+	}
+	mut mgr := GpuManager{ hw_config: hw.HwConfig{ gpu_gen: .g13 } }
+	before := katomic.barriers()
+	assert mgr.retire_g13_subqueue_locked(&resources, 2, 1281, 0)
+	assert state.cpu_freeptr == 0 && katomic.barriers() == before + 1
+	// Reaping an older job after wrap must not roll the free pointer back.
+	assert mgr.retire_g13_subqueue_locked(&resources, 2, 1280, 1279)
+	assert state.cpu_freeptr == 0 && katomic.barriers() == before + 1
+	assert !mgr.retire_g13_subqueue_locked(&resources, 2, 1282, 1)
+	assert mgr.state == .error
+	mgr.state = .running
+	resources.subqueues[2].retired_sequence = 0
+	state.gpu_doneptr = 1280
+	assert !mgr.retire_g13_subqueue_locked(&resources, 2, 1, 0)
+	assert state.cpu_freeptr == 0 && katomic.barriers() == before + 1
+	ack := fw.make_grow_tvb_ack(2, 3, 4, 0x12345678)
+	assert sizeof(fw.FwGrowTVBAck) == 0x30
+	assert __offsetof(fw.FwGrowTVBAck, halt_count) == 0x18
+	assert ack.halt_count == 0x12345678 && ack.subpipe == 0
+}
+
 fn check_publishers() {
 	for broken in -1 .. 8 {
 		mut vertex_outer := channel.RingHeader{}
@@ -288,6 +466,8 @@ fn check_publishers() {
 			assert vertex_ring[0] == 33 && vertex_ring[1] == 44
 			assert fragment_ring[0] == 11 && fragment_ring[1] == 22
 			assert vertex_outer.write_ptr == 1 && fragment_outer.write_ptr == 1
+			assert job.vertex_ring_slot == 1 && job.fragment_ring_slot == 1
+			assert job.vertex_retirement_sequence == 2 && job.fragment_retirement_sequence == 2
 		} else {
 			assert !published && mgr.state == .error && mgr.rings == 0
 			assert katomic.barriers() == before
@@ -330,6 +510,8 @@ fn check_publishers() {
 			assert published && mgr.rings == 1 && katomic.barriers() == before + 2
 			assert ring[0] == alloc.g13_private_start + 0x4000
 			assert outer.write_ptr == 1 && state.cpu_wptr == 1
+			assert resources.subqueues[2].command_sequence == 1
+			assert resources.subqueues[2].last_command_slot == 0
 		} else {
 			assert !published && mgr.state == .error && mgr.rings == 0
 			assert ring == [1280]u64{} && messages[0].work_queue_addr == 0

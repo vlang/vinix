@@ -52,6 +52,7 @@ pub:
 // G13 v12.3 device-control messages are a 32-bit discriminant followed by a
 // fixed 0x2c-byte payload. Initialize (0x19) carries an all-zero payload.
 pub const device_control_grow_tvb_ack = u32(0x0d)
+pub const device_control_recover_channel = u32(0x0e)
 pub const device_control_initialize_v12_3 = u32(0x19)
 pub const device_control_initialize_v13_5 = u32(0x1a)
 
@@ -71,10 +72,11 @@ pub mut:
 	vm_slot     u32
 	counter     u32
 	subpipe     u32
-	pad_18      [6]u32
+	halt_count  u64
+	pad_20      [4]u32
 }
 
-pub fn make_grow_tvb_ack(buffer_slot u32, vm_slot u32, counter u32) FwGrowTVBAck {
+pub fn make_grow_tvb_ack(buffer_slot u32, vm_slot u32, counter u32, halt_count u32) FwGrowTVBAck {
 	return FwGrowTVBAck{
 		tag: device_control_grow_tvb_ack
 		unk_4: 1
@@ -83,6 +85,7 @@ pub fn make_grow_tvb_ack(buffer_slot u32, vm_slot u32, counter u32) FwGrowTVBAck
 		counter: counter
 		// The reference v12.3 driver uses subpipe zero.
 		subpipe: 0
+		halt_count: u64(halt_count)
 	}
 }
 
@@ -94,6 +97,25 @@ pub fn make_device_control_initialize(abi hw.FirmwareAbi) ?FwDeviceControlMsg {
 	}
 	return FwDeviceControlMsg{
 		tag: tag
+	}
+}
+
+@[packed]
+pub struct FwRecoverChannel {
+pub mut:
+	tag u32
+	pipe_type u32
+	work_queue u64
+	event_value u32
+	pad_14 [7]u32
+}
+
+pub fn make_recover_channel(pipe_type u32, work_queue u64, event_value u32) FwRecoverChannel {
+	return FwRecoverChannel{
+		tag: device_control_recover_channel
+		pipe_type: pipe_type
+		work_queue: work_queue
+		event_value: event_value
 	}
 }
 

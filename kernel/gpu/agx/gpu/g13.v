@@ -133,6 +133,9 @@ mut:
 	info       SharedBuffer
 	pipe_type  u32
 	is_new     bool
+	command_sequence u64
+	retired_sequence u64
+	last_command_slot u32
 	lock       klock.Lock
 }
 
@@ -171,6 +174,7 @@ mut:
 
 pub struct G13ComputeJobResources {
 pub mut:
+	error G13JobError
 	event_slot         u32
 	stamp_value        u32
 	event_sequence     u64
@@ -185,6 +189,9 @@ pub mut:
 	quarantined        bool
 	submitted          bool
 	pending_counted    bool
+	retirement_sequence u64
+	ring_slot u32
+	retirement_published bool
 	released           bool
 	completion         fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
 	completion_data    voidptr
@@ -218,6 +225,7 @@ pub:
 
 pub struct G13RenderJobResources {
 pub mut:
+	error G13JobError
 	vertex_event_slot       u32
 	fragment_event_slot     u32
 	vertex_stamp_value      u32
@@ -239,6 +247,11 @@ pub mut:
 	quarantined             bool
 	submitted               bool
 	pending_counted         bool
+	vertex_retirement_sequence u64
+	fragment_retirement_sequence u64
+	vertex_ring_slot u32
+	fragment_ring_slot u32
+	retirement_published bool
 	released                bool
 	completion              fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
 	completion_data         voidptr
@@ -617,7 +630,13 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
 			u64(event_msg.vm_slot))
 	}
 
-	ack := fw.make_grow_tvb_ack(event_msg.buffer_slot, event_msg.vm_slot, event_msg.counter)
+	if mgr.g13_channels == unsafe { nil } || mgr.g13_channels.fw_status.phys == 0 {
+		mgr.state = .error
+		return
+	}
+	status := unsafe { &fw.G13FwStatus(mgr.g13_channels.fw_status.cpu_address()) }
+	ack := fw.make_grow_tvb_ack(event_msg.buffer_slot, event_msg.vm_slot, event_msg.counter,
+		katomic.load(&status.halt_count))
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&ack)) || !mgr.ring_device_control() {
 		C.kprintf(c'agx: failed to acknowledge GrowTVB slot=%llu vm=%llu\n',
 			u64(event_msg.buffer_slot), u64(event_msg.vm_slot))
@@ -838,6 +857,8 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 		}
 		inner_next = (inner_next + 1) % fw.g13_workqueue_entries
 	}
+	queue.command_sequence += u64(command_vas.len)
+	queue.last_command_slot = (inner_next + fw.g13_workqueue_entries - 1) % fw.g13_workqueue_entries
 	katomic.sync()
 	katomic.store(mut &state.cpu_wptr, inner_next)
 
@@ -880,6 +901,38 @@ fn (mut mgr GpuManager) submit_g13_queue_command(resources &G13QueueResources,
 		command_vas.flags = .nogrow | .nofree
 	}
 	return mgr.submit_g13_queue_commands(resources, pipe_type, command_vas, event_slot)
+}
+
+// Firmware's done pointer and the host's free pointer have different owners.
+// Publish the last completed command's slot, not the next write pointer, as
+// Asahi WorkQueue::signal does. Logical sequences prevent a reverse reaper
+// traversal from moving cpu_freeptr backwards across wrapped ring indices.
+fn (mut mgr GpuManager) retire_g13_subqueue_locked(resources &G13QueueResources,
+	pipe_type u32, sequence u64, slot u32) bool {
+	if resources == unsafe { nil } || resources.released || pipe_type >= 3 {
+		return false
+	}
+	mut owned := unsafe { resources }
+	mut queue := &owned.subqueues[pipe_type]
+	queue.lock.acquire()
+	defer { queue.lock.release() }
+	if sequence == 0 || sequence > queue.command_sequence || slot >= fw.g13_workqueue_entries
+		|| queue.state.phys == 0 {
+		mgr.state = .error
+		return false
+	}
+	if sequence <= queue.retired_sequence { return true }
+	mut state := unsafe { &fw.G13WorkQueueRingState(queue.state.cpu_address()) }
+	if katomic.load(&state.cpu_wptr) >= fw.g13_workqueue_entries
+		|| katomic.load(&state.gpu_doneptr) >= fw.g13_workqueue_entries
+		|| katomic.load(&state.cpu_freeptr) >= fw.g13_workqueue_entries {
+		mgr.state = .error
+		return false
+	}
+	katomic.sync()
+	katomic.store(mut &state.cpu_freeptr, slot)
+	queue.retired_sequence = sequence
+	return true
 }
 
 fn build_g13_attachments(count u32,
@@ -1733,6 +1786,15 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		return false
 	}
 
+	vertex_queue.command_sequence += 2
+	fragment_queue.command_sequence += 2
+	vertex_queue.last_command_slot = (vertex_inner_next + fw.g13_workqueue_entries - 1) % fw.g13_workqueue_entries
+	fragment_queue.last_command_slot = (fragment_inner_next + fw.g13_workqueue_entries - 1) % fw.g13_workqueue_entries
+	job.vertex_ring_slot = vertex_queue.last_command_slot
+	job.fragment_ring_slot = fragment_queue.last_command_slot
+	job.vertex_retirement_sequence = vertex_queue.command_sequence
+	job.fragment_retirement_sequence = fragment_queue.command_sequence
+
 	unsafe {
 		mut fragment_entry_0 := &u64(fragment_queue.ring.phys + higher_half + u64(fragment_inner_wp) * sizeof(u64))
 		mut fragment_entry_1 := &u64(fragment_queue.ring.phys + higher_half + u64((fragment_inner_wp + 1) % fw.g13_workqueue_entries) * sizeof(u64))
@@ -1850,6 +1912,15 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 			continue
 		}
 		mut owned := unsafe { job }
+		if !owned.retirement_published {
+			if !mgr.retire_g13_subqueue_locked(owned.queue, 0, owned.vertex_retirement_sequence, owned.vertex_ring_slot)
+				|| !mgr.retire_g13_subqueue_locked(owned.queue, 1, owned.fragment_retirement_sequence, owned.fragment_ring_slot) {
+				owned.quarantined = true
+				complete_g13_render_job(mut owned, false)
+				continue
+			}
+			owned.retirement_published = true
+		}
 		owned.completion_result = read_g13_render_result(owned)
 		owned.completion_result_ready = true
 		if owned.pending_counted {
@@ -1858,7 +1929,7 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 		}
 		if mgr.free_g13_render_job_locked(mut owned, true) {
 			mgr.g13_render_jobs.delete(index)
-			complete_g13_render_job(mut owned, true)
+			complete_g13_render_job(mut owned, owned.error.status == 0)
 			// The completion was the last user of the job.
 			unsafe { free(owned) }
 		} else {
@@ -1874,6 +1945,7 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 fn (mut mgr GpuManager) release_all_g13_render_jobs() {
 	for index := mgr.g13_render_jobs.len - 1; index >= 0; index-- {
 		mut job := unsafe { mgr.g13_render_jobs[index] }
+		if job.error.status == 0 { job.error = G13JobError{status: 6} }
 		if job.pending_counted {
 			mgr.end_g13_operation_locked()
 			job.pending_counted = false
@@ -2260,6 +2332,8 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 		katomic.store(mut threshold, old_threshold)
 		return false
 	}
+	owned.ring_slot = queue.subqueues[2].last_command_slot
+	owned.retirement_sequence = queue.subqueues[2].command_sequence
 	owned.submitted = true
 	mgr.g13_compute_jobs << owned
 	return true
@@ -2273,6 +2347,14 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 			continue
 		}
 		mut owned := unsafe { job }
+		if !owned.retirement_published {
+			if !mgr.retire_g13_subqueue_locked(owned.queue, 2, owned.retirement_sequence, owned.ring_slot) {
+				owned.quarantined = true
+				complete_g13_compute_job(mut owned, false)
+				continue
+			}
+			owned.retirement_published = true
+		}
 		owned.completion_result = owned.timestamp_values()
 		owned.completion_ready = true
 		if owned.pending_counted {
@@ -2281,7 +2363,7 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 		}
 		if mgr.free_g13_compute_job_locked(mut owned, true) {
 			mgr.g13_compute_jobs.delete(index)
-			complete_g13_compute_job(mut owned, true)
+			complete_g13_compute_job(mut owned, owned.error.status == 0)
 			// The completion was the last user of the job.
 			unsafe { free(owned) }
 		} else {
@@ -2297,6 +2379,7 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 fn (mut mgr GpuManager) release_all_g13_compute_jobs() {
 	for index := mgr.g13_compute_jobs.len - 1; index >= 0; index-- {
 		mut job := unsafe { mgr.g13_compute_jobs[index] }
+		if job.error.status == 0 { job.error = G13JobError{status: 6} }
 		if job.pending_counted {
 			mgr.end_g13_operation_locked()
 			job.pending_counted = false

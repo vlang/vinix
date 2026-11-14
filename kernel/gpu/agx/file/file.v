@@ -920,7 +920,7 @@ fn wait_g13_fence(fence &syncobj.DmaFence) int {
 		sched.yield(false)
 	}
 	if syncobj.get_error(fence) != 0 {
-		return -5
+		return syncobj.get_error(fence)
 	}
 	return 0
 }
@@ -948,11 +948,11 @@ fn discard_g13_completion(mut state G13SubmitCompletion) {
 	}
 }
 
-fn finish_g13_submit(mut state G13SubmitCompletion, successful bool) {
+fn finish_g13_submit(mut state G13SubmitCompletion, successful bool, failure int) {
 	if successful {
 		syncobj.signal(state.fence)
 	} else {
-		syncobj.signal_error(state.fence, -5)
+		syncobj.signal_error(state.fence, failure)
 	}
 	discard_g13_completion(mut state)
 }
@@ -965,11 +965,7 @@ fn g13_render_completed(job &gpu.G13RenderJobResources, successful bool, data vo
 	if state.result != unsafe { nil } {
 		values := job.result_values()
 		mut result := ioctl.DrmAsahiResultRender{}
-		result.info.status = if successful {
-			ioctl.asahi_status_complete
-		} else {
-			ioctl.asahi_status_unknown_error
-		}
+		result.info = g13_result_info(&job.error, successful)
 		if successful {
 			result.vertex_ts_start = values.vertex_start
 			result.vertex_ts_end = values.vertex_end
@@ -986,7 +982,7 @@ fn g13_render_completed(job &gpu.G13RenderJobResources, successful bool, data vo
 			C.memcpy(voidptr(state.result.virt_addr + state.result_offset), voidptr(&result), sizeof(ioctl.DrmAsahiResultRender))
 		}
 	}
-	finish_g13_submit(mut state, successful)
+	finish_g13_submit(mut state, successful, job.error.fence_error())
 }
 
 fn g13_compute_completed(job &gpu.G13ComputeJobResources, successful bool, data voidptr) {
@@ -997,11 +993,7 @@ fn g13_compute_completed(job &gpu.G13ComputeJobResources, successful bool, data 
 	if state.result != unsafe { nil } {
 		values := job.timestamp_values()
 		mut result := ioctl.DrmAsahiResultCompute{}
-		result.info.status = if successful {
-			ioctl.asahi_status_complete
-		} else {
-			ioctl.asahi_status_unknown_error
-		}
+		result.info = g13_result_info(&job.error, successful)
 		if successful {
 			result.ts_start = values.start
 			result.ts_end = values.end
@@ -1010,7 +1002,22 @@ fn g13_compute_completed(job &gpu.G13ComputeJobResources, successful bool, data 
 			C.memcpy(voidptr(state.result.virt_addr + state.result_offset), voidptr(&result), sizeof(ioctl.DrmAsahiResultCompute))
 		}
 	}
-	finish_g13_submit(mut state, successful)
+	finish_g13_submit(mut state, successful, job.error.fence_error())
+}
+
+fn g13_result_info(failure &gpu.G13JobError, successful bool) ioctl.DrmAsahiResultInfo {
+	return ioctl.DrmAsahiResultInfo{
+		status: if successful { ioctl.asahi_status_complete } else if failure.status != 0 {
+			failure.status
+		} else { ioctl.asahi_status_unknown_error }
+		fault_type: failure.fault_type
+		unit: failure.unit
+		sideband: failure.sideband
+		level: failure.level
+		is_read: failure.is_read
+		extra: failure.extra
+		address: failure.address
+	}
 }
 
 // Submit one or two byte-exact v12.3 G13 commands. Mesa emits a

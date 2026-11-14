@@ -129,6 +129,15 @@ fn (pt &UatPgtable) invalidate_tlb_locked() {
 	}
 }
 
+fn (pt &UatPgtable) invalidate_range_locked(address u64, size u64) {
+	if !pt.tlb_bound { return }
+	if pt.non_global {
+		tlb.invalidate_range(pt.tlb_asid, address, size)
+	} else {
+		tlb.invalidate_all()
+	}
+}
+
 // Allocate a single 16KB-aligned page table page.
 // pmm_alloc already zeroes the contiguous, aligned memory.
 pub fn alloc_table_page() ?&u64 {
@@ -320,7 +329,7 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 pub fn (mut pt UatPgtable) map_page(iova u64, phys u64, prot u64) bool {
 	pt.lock.acquire()
 	defer {
-		pt.invalidate_tlb_locked()
+		pt.invalidate_range_locked(iova, uat_pgsz)
 		pt.lock.release()
 	}
 	return pt.map_page_locked(iova, phys, prot)
@@ -353,7 +362,7 @@ pub fn (mut pt UatPgtable) map(iova u64, phys u64, size u64, prot u64) bool {
 	pt.lock.acquire()
 	defer {
 		// Also flush a failed map after its partial mappings are unwound.
-		pt.invalidate_tlb_locked()
+		pt.invalidate_range_locked(iova, size)
 		pt.lock.release()
 	}
 
@@ -402,7 +411,7 @@ pub fn (mut pt UatPgtable) reprotect(iova u64, size u64, prot u64) bool {
 	defer {
 		// A missing later PTE must not leave earlier cache-attribute changes
 		// hidden in the GPU TLB when this operation reports failure.
-		pt.invalidate_tlb_locked()
+		pt.invalidate_range_locked(iova, size)
 		pt.lock.release()
 	}
 	pages := lib.div_roundup(size, uat_pgsz)
@@ -430,7 +439,7 @@ pub fn (mut pt UatPgtable) unmap(iova u64, size u64) {
 	}
 	pt.lock.acquire()
 	defer {
-		pt.invalidate_tlb_locked()
+		pt.invalidate_range_locked(iova, size)
 		pt.lock.release()
 	}
 

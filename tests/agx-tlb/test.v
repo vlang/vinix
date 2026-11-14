@@ -135,9 +135,43 @@ fn test_root_publication_and_reuse() {
 	}
 }
 
+fn test_range_operands() {
+	single := tlb.range_plan(3, 0x4000, 1) or { panic('page plan') }
+	pair := tlb.range_plan(3, 0x4000, 0x8000) or { panic('range plan') }
+	assert (single.operand(0) or { panic('page operand') }) == (u64(3) << 48) | 4
+	assert (pair.operand(0) or { panic('range operand') }) == (u64(3) << 48) | (u64(2) << 46) | 1
+	for pages in [u64(2), 31, 32, 63, 64, 2047, 2048, 65535, 65536, 1048575, 1048576, 1048577,
+		4194305] {
+		plan := tlb.range_plan(63, 0xffffffa000004000, pages * 16384) or { panic('range plan') }
+		mut covered := u64(0)
+		for index := u64(0); index < plan.count; index++ {
+			operand := plan.operand(index) or { panic('range operand') }
+			assert operand >> 48 == 63
+			assert (operand >> 46) & 3 == 2
+			assert operand & ((u64(1) << 37) - 1) == ((u64(0xffffffa000004000) >> 14) + covered) & ((u64(1) << 37) - 1)
+			count := ((operand >> 39) & 31) + 1
+			scale := (operand >> 44) & 3
+			covered += count << (5 * scale + 1)
+		}
+		assert covered >= pages && covered - pages < (u64(2) << (5 * plan.scale))
+		if _ := plan.operand(plan.count) {
+			assert false
+		}
+	}
+	if _ := tlb.range_plan(1, 0x4000, 0) {
+		assert false
+	}
+	if _ := tlb.range_plan(1, ~u64(0) - 3, 5) {
+		assert false
+	}
+	top := tlb.range_plan(1, ~u64(0) - 3, 4) or { panic('top page') }
+	assert top.page
+}
+
 fn main() {
 	test_user_mappings()
 	test_root_publication_and_reuse()
+	test_range_operands()
 	assert memory.live_pages() == 0
 	println('AGX TLB: mapping visibility, cache transitions, rollback, globals and context reuse passed')
 }

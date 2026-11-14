@@ -1190,17 +1190,21 @@ pub fn (mut mgr GpuManager) handle_event() {
 				} else {
 					println('agx: fault event without a valid G13 fault register')
 				}
-				mgr.state = .error
+				if !mgr.recover_g13_fault(-1, 2) { mgr.state = .error }
 				return
 			}
 			fw.fw_event_timeout {
 				println('agx: GPU firmware timeout event')
-				mgr.state = .error
+				slot := unsafe { *&i32(&buf[12]) }
+				if !mgr.recover_g13_fault(slot, 3) { mgr.state = .error }
 				return
 			}
 			fw.fw_event_channel_error {
 				println('agx: GPU firmware channel error event')
-				mgr.state = .error
+				message := unsafe { &fw.FwEventMsg(&buf[0]) }
+				if !mgr.recover_g13_channel(message.payload[1], message.payload[2], message.payload[3], message.payload[0]) {
+					mgr.state = .error
+				}
 				return
 			}
 			fw.fw_event_grow_tvb {
@@ -1264,10 +1268,9 @@ fn (mut mgr GpuManager) drain_auxiliary_channels() {
 	}
 }
 
-// Caller holds mgr.lock (or owns the unpublished manager). A halted firmware
-// CPU need not deliver an event before it stops consuming commands. Do not
-// acknowledge resume: the queues and faulting mappings have not been repaired.
-// The worker's existing shutdown path stops ASC before failing retained jobs.
+// Caller holds mgr.lock. A queued fault/timeout notification owns the recovery
+// handshake and must be drained before treating a halt as unreported. Never
+// resume a corrupted ring or an unexplained halt; stop ASC before freeing work.
 fn (mut mgr GpuManager) check_g13_firmware_health() bool {
 	if mgr.hw_config.gpu_gen != .g13 {
 		return true
@@ -1289,6 +1292,7 @@ fn (mut mgr GpuManager) check_g13_firmware_health() bool {
 	if mgr.g13_channels != unsafe { nil } && mgr.g13_channels.fw_status.phys != 0 {
 		status := unsafe { &fw.G13FwStatus(mgr.g13_channels.fw_status.cpu_address()) }
 		if katomic.load(&status.halted) != 0 {
+			if !mgr.channels.event.is_empty() { return true }
 			C.kprintf(c'agx: GPU firmware halted (count=%llu)\n', u64(katomic.load(&status.halt_count)))
 			mgr.state = .error
 			return false

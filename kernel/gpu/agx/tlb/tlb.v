@@ -16,9 +16,8 @@ pub fn invalidate_all() {
 }
 
 // UAT uses eight-bit ASIDs in TTBR[55:48]. Invalidating the entire ASID also
-// covers intermediate walk caches. This deliberately uses the reference's
-// ASID fallback instead of range instructions whose encoding depends on the
-// CPU page granule. Global firmware mappings require invalidate_all().
+// covers intermediate walk caches. Global firmware mappings require
+// invalidate_all(); edits within one nonglobal mapping use invalidate_range().
 pub fn invalidate_asid(asid u8) {
 	operand := u64(asid) << 48
 	asm volatile aarch64 {
@@ -27,5 +26,35 @@ pub fn invalidate_asid(asid u8) {
 		dsb sy
 		; ; r (operand)
 		; memory
+	}
+}
+
+// Vinix/aarch64 and the G13 UAT both use 16 KiB pages. The reference's 4 KiB
+// CPU adjustment and newer-SoC page-TLBI quirk therefore do not apply here.
+pub fn invalidate_range(asid u8, address u64, size u64) {
+	plan := range_plan(asid, address, size) or { return }
+	asm volatile aarch64 {
+		dsb sy
+		; ; ; memory
+	}
+	for index := u64(0); index < plan.count; index++ {
+		operand := plan.operand(index) or { break }
+		if plan.page {
+			asm volatile aarch64 {
+				tlbi vae1os, operand
+				; ; r (operand)
+				; memory
+			}
+		} else {
+			asm volatile aarch64 {
+				tlbi rvae1os, operand
+				; ; r (operand)
+				; memory
+			}
+		}
+	}
+	asm volatile aarch64 {
+		dsb sy
+		; ; ; memory
 	}
 }

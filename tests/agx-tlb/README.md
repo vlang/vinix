@@ -13,6 +13,8 @@ the PTE and context-table words visible at each invalidation. It checks:
 - each range causes one invalidation, and unpublished tables cause none;
 - root publication, removal and reuse invalidate the correct ASID;
 - global firmware mappings use full invalidation;
+- 16 KiB page/range TLBI operands cover scale boundaries and advance the
+  address between full chunks, including canonical high addresses;
 - all host page-table allocations are released.
 
 The source-reference gate independently checks the actual instructions,
