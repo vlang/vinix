@@ -55,6 +55,12 @@ untouched buffers/headers/queues, restored masks and flat repeated cleanup.
 `selectorder-reference.v` runs the same ELF on Linux; `selectorder-evidence.v`
 audits the complete bundle. See [receipts and limits](../../docs/linux-select-argument-order.md).
 
+`--cases selecttimeout` checks raw select/pselect6 remaining time, libc pselect
+input preservation, read-only timeouts, handled/pending signals and core errors.
+It measures repeated cleanup and checks timeout visibility inside the handler.
+`selecttimeout-reference.v` runs the same ELF on Linux; `selecttimeout-evidence.v`
+audits its complete bundle. See [receipts and limits](../../docs/linux-select-timeout.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

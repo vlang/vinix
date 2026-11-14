@@ -2318,6 +2318,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   regressions, generated-C scope and lifetime review pass. See
   [the argument-order qualification](docs/linux-select-argument-order.md).
 
+- [x] Return Linux remaining time from native raw pselect6/x86-64 select,
+  including expiry, handled signals and core errors; preserve results with
+  read-only timeouts and libc pselect const inputs. Identical native/Linux
+  ELFs pass 1,536 AArch64 / 2,208 x86-64 checks; originals fail 24 / 46.
+  Both credential cohorts retain flat 200-cycle storage; generated-C and
+  independent lifetime audits pass. See
+  [the timeout qualification](docs/linux-select-timeout.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

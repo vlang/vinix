@@ -61,11 +61,38 @@ fn select_fds_open(process &proc.Process, polls []PollFD) bool {
 	return true
 }
 
+// Record the deadline at timeout import, before mask/descriptor validation.
+// Keep seconds separate so a valid long duration cannot overflow nanoseconds.
+fn select_deadline(duration time.TimeSpec) time.TimeSpec {
+	if duration.tv_sec == 0 && duration.tv_nsec == 0 { return duration }
+	now := time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} }
+	nanos := now.tv_nsec + duration.tv_nsec
+	carry := nanos / 1000000000
+	if duration.tv_sec > i64(0x7fffffffffffffff) - now.tv_sec - carry {
+		return time.TimeSpec{i64(0x7fffffffffffffff), 0}
+	}
+	return time.TimeSpec{now.tv_sec + duration.tv_sec + carry, nanos % 1000000000}
+}
+
+fn select_remaining(deadline time.TimeSpec) time.TimeSpec {
+	mut remaining := deadline
+	remaining.sub(time.clock_now(time.clock_type_monotonic) or { time.TimeSpec{} })
+	return remaining
+}
+
+// Both raw Linux ABIs return remaining time, even on core select errors.
+// Libc pselect preserves its const input by passing the kernel a private copy.
+// A read-only timeout must not replace the completed call's result with EFAULT.
+fn select_finish_timeout(address u64, deadline time.TimeSpec, timeval bool) {
+	if address == 0 || (deadline.tv_sec == 0 && deadline.tv_nsec == 0) { return }
+	mut remaining := unsafe { &time.TimeSpec(C.vinix_stack_alloc(sizeof(time.TimeSpec))) }
+	unsafe { *remaining = select_remaining(deadline) }
+	if timeval { remaining.tv_nsec /= 1000 }
+	usercopy.copy_to_user(address, voidptr(remaining), sizeof(time.TimeSpec))
+}
+
 // pselect6(nfds, readfds, writefds, exceptfds, timeout, sigmask).
-//
-// The descriptors are gathered into the same PollFD list ppoll() works on, so
-// there is one readiness path rather than two. Unlike select(2), the timeout is
-// not written back: pselect6 leaves it alone, and musl's select() copies it.
+// The descriptors share ppoll's readiness path.
 pub fn syscall_pselect6(_ voidptr, nfds_word int, readfds u64, writefds u64, exceptfds u64, timeout u64, sigmask u64) (u64, u64) {
 	// Linux declares nfds as signed int; the upper register word is ignored.
 	nfds := int(i32(nfds_word))
@@ -85,6 +112,7 @@ pub fn syscall_pselect6(_ voidptr, nfds_word int, readfds u64, writefds u64, exc
 			return errno.err, errno.einval
 		}
 		timed = true
+		deadline = select_deadline(deadline)
 	}
 	if arg.mask != 0 {
 		if arg.size != sizeof(u64) {
@@ -97,12 +125,13 @@ pub fn syscall_pselect6(_ voidptr, nfds_word int, readfds u64, writefds u64, exc
 		mut masked_thread := proc.current_thread()
 		proc.begin_wait_mask(mut masked_thread, wanted)
 	}
-	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline)
+	result, code := do_select(nfds, readfds, writefds, exceptfds, timed, deadline)
+	select_finish_timeout(timeout, deadline, false)
+	return result, code
 }
 
 // select(nfds, readfds, writefds, exceptfds, timeout), the x86-64 call: the
 // same as pselect6 with a struct timeval for the timeout and no signal mask.
-// The time left is not written back; musl hands the kernel a copy anyway.
 pub fn syscall_select(_ voidptr, nfds_word int, readfds u64, writefds u64, exceptfds u64, timeout u64) (u64, u64) {
 	nfds := int(i32(nfds_word))
 	mut deadline := time.TimeSpec{}
@@ -116,10 +145,12 @@ pub fn syscall_select(_ voidptr, nfds_word int, readfds u64, writefds u64, excep
 		if tv[0] < 0 || tv[1] < 0 || tv[1] >= 1000000 {
 			return errno.err, errno.einval
 		}
-		deadline = time.TimeSpec{tv[0], tv[1] * 1000}
+		deadline = select_deadline(time.TimeSpec{tv[0], tv[1] * 1000})
 		timed = true
 	}
-	return do_select(nfds, readfds, writefds, exceptfds, timed, deadline)
+	result, code := do_select(nfds, readfds, writefds, exceptfds, timed, deadline)
+	select_finish_timeout(timeout, deadline, true)
+	return result, code
 }
 
 fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, deadline time.TimeSpec) (u64, u64) {
@@ -180,8 +211,9 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 			// ppoll's synchronous stack event without replacing a pselect mask.
 			return ppoll(unsafe { nil }, 0, unsafe { nil }, unsafe { nil })
 		}
-		if deadline.tv_sec != 0 || deadline.tv_nsec != 0 {
-			mut timer := time.new_timer(deadline)
+		left := select_remaining(deadline)
+		if left.tv_sec != 0 || left.tv_nsec != 0 {
+			mut timer := time.new_timer(left)
 			defer {
 				timer.disarm()
 				unsafe { free(timer) }
@@ -204,7 +236,7 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 	}
 
 	mut remaining := unsafe { &time.TimeSpec(C.vinix_stack_alloc(sizeof(time.TimeSpec))) }
-	unsafe { *remaining = deadline }
+	unsafe { *remaining = select_remaining(deadline) }
 	mut timeout_ptr := &time.TimeSpec(unsafe { nil })
 	if timed {
 		// ppoll consumes this synchronously. An ordinary local whose address
