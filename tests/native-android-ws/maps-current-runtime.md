@@ -98,7 +98,11 @@ is ready to measure handle ownership. No lifetime repair or Google authenticatio
 is claimed. [r89's measured inventories](maps-framework-apk-cache-20261114.md)
 then found many duplicate framework APK handles while Maps rendered tiles and
 remained below its fd limit. An immutable-framework cache passed focused host
-checks and ARM compilation; guest qualification remains pending.
+checks and ARM compilation. r90 passed the full signed ARM regression and
+recorded actual cache hits with two framework APK descriptors per process.
+Maps returned Louvre details/photos, then its imagery worker exited on the
+missing Bitmap.copyPixelsToBuffer native binding. Routing, responsive use and
+Google authentication remain unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

@@ -91,3 +91,59 @@ resource lock scopes remain unchanged. Early cache attempts retain a model-name
 collision and const-pointer link errors; explicit casts fixed the latter without
 disabling -Werror. Guest cache-hit behavior and the full signed ARM regression
 with this candidate remain pending. Google authentication is not qualified.
+
+## Guest qualification, r90
+
+Fresh r90 selected the committed 0ba9b5238 adapter above. Its full signed ARM
+regression passed as UID/GID 10160: exactly one readiness/pass, stdin closure,
+complete EOF drain, exit zero. The child log contains exactly one real
+ANDROID-FRAMEWORK-APK-CACHE-HIT marker and the existing EGL shared-display,
+HTTPS 204 and job regressions. Snapshot, empty-removal plan, reconstruction
+and independent child readback all passed with their guards.
+
+Actual GMS and Maps also each logged a real cache hit. Four stable-process
+inventories all contain two framework-res.apk descriptors, versus 72–83 in
+r89's initial inventories and 147 after its account window. These are measured
+per-target counts, not a controlled comparison of total process descriptors.
+
+| Process / phase | Listed fds | Unavailable | framework-res.apk targets |
+| --- | ---: | ---: | ---: |
+| GMS 43708 / early | 181 | 0 | 2 |
+| GMS / later | 171 | 0 | 2 |
+| Maps 42317 / onboarding | 194 | 0 | 2 |
+| Maps / search | 286 | 1 | 2 |
+
+Maps rendered real tiles, Louvre place details and photos. During the directions
+attempt at 17:34:59 its imagery worker called Bitmap.copyPixelsToBuffer and
+failed on the missing native_copy_to_buffer(JLjava/nio/Buffer;II)V binding.
+The private log records an uncaught UnsatisfiedLinkError and System.exit(10)
+at 17:35:15. This corrects the live assumption that the session deadline caused
+the observed black map. A route was not validated. No EMFILE text appears in
+the private Maps log. No Google account flow was attempted in this run.
+
+The controller subsequently ended with bounded-session-ended-no-authentication-claim,
+empty controller error and one cleanup survivor. Both terminals had verified
+the selected ext2 volume, UUID 8b557440d858488eb1f3053d66123404. Private results
+were copied there and synced, then the copy terminal's successful mount proof
+was observed again before stopping owned QEMU4259. PID and open-image checks
+confirmed it stopped before read-only extraction. Private log hashes match
+their manifest; private and exported receipts match. Read-only e2fsck passed
+under the original guard. The watch completed 600056 ms, minimum disk bytes
+7952637952 and minimum guest MemFree 3968192 KiB. All VMs from these attempts
+are stopped. The cache is qualified on ARM; the bitmap fault, routing,
+responsive use and Google authentication remain unresolved.
+
+Additional evidence under the same external state root:
+
+| Artifact | SHA256 |
+| --- | --- |
+| maps-apk-cache-api-uart-20261114-r1/full.log | 2eceddfc60135f0e1353152e23b67fc9dd86ae06b4ad43e53bb958dc813ae16e |
+| maps-apk-cache-api-readback-20261114-r1/archive.json | d12c6069d3079984eb74f31d09bbcd947aba2de7333f4bd18a699debb739247a |
+| maps-apk-cache-api-child-20261114-r1/child.log | 87ea4acadb00dd8fa9f7ac0b142cece43591ee7227e002f9e62ac3a54d74b471 |
+| maps-apk-cache-account-uart-20261114-r1/interval.log | 483b9eb02c9e8f090f9bf9e7abadb8729ffb56b7b0e56cf5a84ec4f8aa1e24aa |
+| maps-apk-cache-account-readback-20261114-r1/archive.json | 7c871a08f812857eb54a9d22d5c1ac63bc67cc58b20560f783aac82e2703c4a7 |
+| Same account readback, exported-receipt.json | e8b285790f514749827401fe2a90b6365ea3c015c6994ed921fca46b1e4bf4e3 |
+| maps-current-20261114-r90/private-readback/descriptor-inventories.sha256 | 43ec99ce5076e5568bc42e423c53a6d347f37be039b74db61b249c72e46e2af0 |
+| Same private directory, results/maps.log | 6cebb4d5df3cf851c32e6efbc64ea872d55411bd3645a74295a45fd4976b5f30 |
+| Same private directory, results/broker.log | 504c49b2cb2df22d619d584fe53c85837462597780783904b57cfa55d50ba841 |
+| Same private directory, storage-watch.log | 9be8f0285abf7097bdb8d4fd4788519a9f629b46109070229210974438cc7fa1 |
