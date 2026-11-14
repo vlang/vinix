@@ -2,6 +2,7 @@
 module wineadapter
 
 import os
+import time
 
 #include <sys/wait.h>
 #include <signal.h>
@@ -141,6 +142,68 @@ fn test_exclusive_builtin_additions_resume_without_replacing_files() {
 	mut refused := false
 	collision.complete_additions() or { refused = true }
 	assert refused && os.read_file(system + '/b.dll')! == 'personal contents'
+}
+
+fn test_builtin_additions_resume_after_sigkill() {
+	root := os.real_path(os.temp_dir()) + '/wine-additions-kill-' + os.getpid().str()
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	store := root + '/store'
+	builtins := store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
+	data := root + '/data'
+	os.mkdir_all(builtins)!; os.mkdir(data)!; os.chmod(data, 0o700)!
+	os.chown(data, int(C.geteuid()), os.getegid())!
+	os.write_file(builtins + '/base.dll', 'base')!
+	mut prefix := prepare_prefix(data, builtins)!
+	defer { prefix.close() }
+	for index in 0 .. 128 { os.write_file(builtins + '/add-' + index.str() + '.dll', 'addition')! }
+	system := data + '/wine/drive_c/windows/system32'
+	os.write_file(system + '/personal.txt', 'preserve private data')!
+	pid := C.wine_binding_test_fork()
+	assert pid >= 0
+	if pid == 0 {
+		mut capture := capture_idle_binding_review(data, builtins, store) or { C._exit(2); return }
+		capture.complete_additions() or { C._exit(3); return }
+		capture.close()
+		C._exit(0)
+	}
+	mut reaped := false
+	defer {
+		if !reaped {
+			C.wine_binding_test_kill(pid, C.SIGKILL)
+			mut status := 0
+			C.wine_binding_test_waitpid(pid, &status, 0)
+		}
+	}
+	deadline := time.now().unix_milli() + 10000
+	for !os.is_link(system + '/add-0.dll') && time.now().unix_milli() < deadline {
+		time.sleep(time.millisecond)
+	}
+	assert os.is_link(system + '/add-0.dll'), 'child failed to reach first addition'
+	assert C.wine_binding_test_kill(pid, C.SIGSTOP) == 0
+	mut status := 0
+	assert C.wine_binding_test_waitpid(pid, &status, C.WUNTRACED) == pid
+	assert status & 0xff == 0x7f, 'child completed before interruption'
+	mut installed := 0
+	for index in 0 .. 128 { if os.is_link(system + '/add-' + index.str() + '.dll') { installed++ } }
+	assert installed > 0 && installed < 128
+	if mut competitor := prefix.acquire_launch(data) {
+		competitor.close(); assert false, 'stopped writer lost prefix coordination'
+	} else { assert err.msg().contains('already has a managed launch') }
+	assert C.wine_binding_test_kill(pid, C.SIGKILL) == 0
+	assert C.wine_binding_test_waitpid(pid, &status, 0) == pid && status & 0x7f == C.SIGKILL
+	reaped = true
+	mut resumed := capture_idle_binding_review(data, builtins, store)!
+	defer { resumed.close() }
+	assert resumed.review.bindings.filter(it.operation == .create).len == 128 - installed
+	resumed.complete_additions()!
+	assert resumed.review.bindings.all(it.operation == .keep)
+	for index in 0 .. 128 {
+		name := '/add-' + index.str() + '.dll'
+		assert os.readlink(system + name)! == builtins + name
+	}
+	assert os.read_file(system + '/personal.txt')! == 'preserve private data'
+	println('Wine additions SIGKILL partial=' + installed.str() + '/128; fresh capture completed remaining links PASS')
 }
 
 fn expected_inventory_refused(capture &IdleBindingReview, runtime string, generation u64, expected []BuiltinExpectation) {
