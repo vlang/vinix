@@ -20,6 +20,7 @@ fn main() {
 	os.cp_all('${repo}/tests/agx-event/fixture/drm', '${scratch}/drm', false)!
 	os.mkdir_all('${scratch}/gpu/agx')!
 	os.cp_all('${repo}/kernel/gpu/agx/event', '${scratch}/gpu/agx/event', false)!
+	os.cp('${repo}/kernel/gpu/agx/gpu/g13_tpc.v', '${scratch}/gpu/tpc.v')!
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\n')!
 	os.symlink('${repo}/kernel/gpu/agx/fw', '${scratch}/gpu/agx/fw')!
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
@@ -27,8 +28,10 @@ fn main() {
 	production += section(source, 'struct G13SubQueueResources {', 'struct G13RenderBufferResources {')!
 	production += section(source, 'pub struct G13ComputeJobResources {', 'pub struct G13QueueResources {')!
 	for pair in [
+		['fn (mut mgr GpuManager) free_g13_render_buffer_locked(', 'fn (mut mgr GpuManager) initialize_g13_render_buffer('],
 		['fn (mut mgr GpuManager) reserve_g13_tvb_slot()', '// Caller holds mgr.lock. No submitted job'],
 		['fn (mgr &GpuManager) g13_tvb_owner_locked(', '// Service firmware'],
+		['pub fn (mut mgr GpuManager) release_g13_queue_resources(', '// Vinix currently serializes'],
 		['fn (mut mgr GpuManager) release_g13_render_scene_backing_locked(',
 			'fn (mut mgr GpuManager) free_g13_render_scene_locked('],
 		['fn (mut mgr GpuManager) free_g13_render_job_locked(', '// Construct the complete paired'],
@@ -47,7 +50,7 @@ fn main() {
 	os.write_file('${scratch}/gpu/production.v', production)!
 	os.cp('${repo}/tests/agx-job-lifetime/test.v', '${scratch}/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
-	build.set_args(['-nocache', '-no-parallel', '-cc', 'cc', '-enable-globals', '-path',
+	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals', '-path',
 		'${scratch}|${repo}/kernel|@vlib|@vmodules', '-cflags',
 		'-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
 		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v'])

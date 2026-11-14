@@ -110,7 +110,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
 | Submission scheduling | Vinix accepts at most two commands in the compute-then-render form and waits on dependencies in the ioctl. The reference accepts general batches through DRM scheduling, with multiple in-flight jobs and per-subqueue barriers. |
 | Render scenes | The backend supports overlapping scene ownership and conditional buffer binding as described below. The active userspace submission path still serializes work. |
-| TVB ownership and growth | Complete staged extension and scene-bound slot ownership are implemented below. The reference also shares and caches tail-pointer backing across scenes; Vinix still allocates it per scene. |
+| TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
 | Timestamp UAPI | The reference's per-command timestamp objects and current compact command fields are not wired through Vinix's legacy command interface. |
@@ -221,8 +221,9 @@ binding reuse/growth, oldest-free selection and stale ownership. The actual
 owner selector is executed; GrowTVB ACK transport is checked separately. The
 reference contract/unit checks, lifetime review and isolated ARM build passed.
 The build uses `bbcd8e85a` plus the retained `g13.v` and `gpu.v`. The active
-legacy userspace path still serializes submissions. TPC reuse and complete
-scheduler backpressure remain gaps.
+legacy userspace path still serializes submissions. Shared TPC backing is
+implemented in the later change below; complete scheduler backpressure remains
+a gap.
 
 Fresh package HEAD `1438c19ff34c53704ad8cf295dedb8ae47936a59` retains kernel
 pin `bed544bdf93a496ebf70ba180923bab12b6e01cf` and Mesa pin
@@ -336,6 +337,38 @@ Its retained `evidence-checker.v` verifies it with
 Allocation itself is replaced by a recorded request in the feedback fixture;
 this validates the policy, not hardware memory consumption. A repeated SSH
 check still failed to resolve the configured M1 hostname.
+
+### Shared tail-pointer backing and deferred file cleanup
+
+The native render buffer now caches UAT-page-aligned tail-pointer backing.
+Scenes retain references to it; growth replaces the cached reference after
+successful allocation while older scenes keep their original backing. Only
+the last owner invalidates and releases a buffer. Failed invalidation marks
+it retiring so later scenes cannot reuse a partially unmapped allocation.
+Repeated same-size scenes require no new TPC metadata or backing allocation.
+
+Lifetime review also exposed unsafe file teardown after failed queue release.
+Closing files now retain their complete VM/object graph until all queue
+resources retire. An intrusive list retries cleanup after job completions and
+firmware stop. Registration holds the manager lock to prevent enqueueing after
+the worker's final poll. Quarantine prevents new preparation/submission while
+allowing idempotent teardown retries. Callbacks run outside the manager lock.
+
+ASan/UBSan fixtures execute the production helpers and check 500 cache reuses,
+growth with live older scenes, allocation/invalidation failure, final release,
+partial queue cleanup, bounded multi-file retries and the shutdown-registration
+race. Reference gates, their unit tests, lifetime review and an isolated ARM
+kernel build passed. The build uses `f7607385b` plus the six retained kernel
+files; source hashes were compared with that worktree before sealing.
+The refreshed audit remains `not_equivalent`; no hardware was accessed.
+
+Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-tpc-20261114/bundle/`.
+The sibling inventory SHA-256 is
+`af0c7e783a3e4266921555b38a6c47d4293136f8c203ccc62c2f75c0c2832751`;
+the linked kernel SHA-256 is
+`94ec13891e6cc95edb907ead7f2f4565911a125c5f02bc2f0e64f5413541c629`.
+Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 
 ## Earlier artifact retention incident
 

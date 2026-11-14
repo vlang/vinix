@@ -114,6 +114,31 @@ mut:
 	fwctl_lock        klock.Lock
 	rtkit_buffer_lock klock.Lock
 	rtkit_buffers     []SharedBuffer
+	file_reaper       fn () = unsafe { nil }
+}
+
+pub fn (mut mgr GpuManager) set_file_reaper(callback fn ()) {
+	mgr.lock.acquire()
+	mgr.file_reaper = callback
+	mgr.lock.release()
+}
+
+// Serialize retirement registration with shutdown's stopped transition.
+// False means shutdown has completed under this lock: the caller can close
+// synchronously instead of enqueueing work for an exited GPU worker.
+pub fn (mut mgr GpuManager) queue_file_retirement(enqueue fn (voidptr), data voidptr) bool {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	if mgr.state == .stopped { return false }
+	enqueue(data)
+	return true
+}
+
+fn (mut mgr GpuManager) reap_file_resources() {
+	mgr.lock.acquire()
+	callback := mgr.file_reaper
+	mgr.lock.release()
+	if callback != unsafe { nil } { callback() }
 }
 
 __global (
@@ -1331,6 +1356,7 @@ fn event_worker(mut mgr GpuManager) {
 		event.scan_all_completions()
 		mgr.reap_g13_render_jobs()
 		mgr.reap_g13_compute_jobs()
+		mgr.reap_file_resources()
 		sched.yield(false)
 	}
 	if mgr.state == .error {
@@ -1338,6 +1364,7 @@ fn event_worker(mut mgr GpuManager) {
 		// mappings. shutdown() then signals all retained jobs as failed.
 		mgr.shutdown()
 	}
+	mgr.reap_file_resources()
 }
 
 // Shutdown the GPU

@@ -5,6 +5,7 @@ import gpu.agx.event
 import gpu.agx.fw
 import gpu.agx.mmu
 import klock
+import memory
 
 #include <stdio.h>
 #define kprintf printf
@@ -38,10 +39,14 @@ mut:
 	render_buffer G13RenderBufferResources
 	vm            &mmu.UatContext = unsafe { nil }
 	released      bool
+	quarantined bool
+	mappings_published bool
 }
 
 struct G13RenderBufferResources {
 mut:
+	context &mmu.UatContext = unsafe { nil }
+	tail_pointer_cache &G13TailPointerCache = unsafe { nil }
 	info             SharedBuffer
 	initialized      bool = true
 	slot             u32
@@ -49,6 +54,13 @@ mut:
 	slot_token_valid bool
 	active_scenes    u32
 	needs_bind       bool
+	blocks []&mmu.UatBuffer
+	block_list &mmu.UatBuffer = unsafe { nil }
+	page_list &mmu.UatBuffer = unsafe { nil }
+	kernel_buffer SharedBuffer
+	stats SharedBuffer
+	counter SharedBuffer
+	block_control SharedBuffer
 }
 
 struct GpuManager {
@@ -64,6 +76,7 @@ mut:
 	retirement_fails      bool
 	retirements           int
 	freed_buffers         int
+	driver_invalidations int
 	pending               int
 	g13_tvb_slots         [127]bool
 	g13_tvb_owners        [127]u64
@@ -73,6 +86,7 @@ mut:
 }
 
 fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext, buffer &mmu.UatBuffer) bool {
+	if buffer != unsafe { nil } { mgr.driver_invalidations++ }
 	return !mgr.invalidation_fails
 }
 
@@ -89,6 +103,13 @@ fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {
 
 fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 	mgr.release_shared_buffer_backing(mut buffer)
+}
+
+fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut queue G13QueueResources, invalidate bool) bool {
+	if invalidate && mgr.invalidation_fails { return false }
+	mgr.free_g13_render_buffer_locked(mut queue.render_buffer)
+	queue.released = true
+	return true
 }
 
 fn (mut mgr GpuManager) end_g13_operation_locked() bool {
@@ -176,6 +197,8 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 
 pub fn run_checks() {
 	check_scene_slots()
+	check_tail_pointer_cache()
+	check_queue_cleanup_retry()
 	mut stamps := [128]u32{}
 	mut firmware := [128]u32{}
 	assert event.configure_event_manager(0x10000, unsafe { u64(&stamps) }, 0x20000, unsafe { u64(&firmware) })
@@ -305,6 +328,19 @@ pub fn run_checks() {
 	println('AGX job lifetimes: prepared ownership, shared-stamp retirement, failed invalidation, discard retry and firmware-stopped cleanup passed')
 }
 
+fn check_queue_cleanup_retry() {
+	mut mgr := GpuManager{}
+	mut queue := G13QueueResources{mappings_published: true}
+	mgr.g13_queues << &queue
+	mgr.invalidation_fails = true
+	assert !mgr.release_g13_queue_resources(&queue)
+	assert queue.quarantined && !queue.released && mgr.g13_queues.len == 1
+	mgr.invalidation_fails = false
+	assert mgr.release_g13_queue_resources(&queue), 'quarantine must block new work while allowing cleanup retry'
+	assert queue.released && mgr.g13_queues.len == 0
+	assert mgr.release_g13_queue_resources(&queue)
+}
+
 fn check_scene_slots() {
 	mut mgr := GpuManager{}
 	mut buffers := [128]G13RenderBufferResources{}
@@ -359,4 +395,69 @@ fn check_scene_slots() {
 	live.released = true
 	assert mgr.g13_tvb_owner_locked(vm.id, live.render_buffer.slot) == none
 	mgr.release_g13_scene_slot_locked(mut live.render_buffer)
+}
+
+fn check_tail_pointer_cache() {
+	mut context := mmu.UatContext{}
+	mut owner := G13RenderBufferResources{context: &context}
+	mut mgr := GpuManager{}
+	first := mgr.retain_g13_tpc_locked(mut owner, 1) or { panic('initial TPC') }
+	assert first.buffer.size == 0x4000 && first.references == 2 && context.allocations == 1
+	for _ in 0 .. 500 {
+		cached := mgr.retain_g13_tpc_locked(mut owner, 0x4000) or { panic('reused TPC') }
+		assert voidptr(cached) == voidptr(first) && cached.references == 3
+		assert mgr.invalidate_g13_tpc_locked(mut context, cached)
+		mgr.release_g13_tpc_locked(mut context, cached)
+	}
+	assert context.allocations == 1 && context.releases == 0 && memory.outstanding() == 1
+	assert mgr.driver_invalidations == 0, 'shared backing must not be unmapped by a retiring scene'
+	mgr.release_g13_tpc_locked(mut context, first)
+	assert owner.tail_pointer_cache.references == 1
+	second := mgr.retain_g13_tpc_locked(mut owner, 0x4001) or { panic('grown TPC') }
+	assert second.buffer.size == 0x8000 && context.pool[0].released
+	assert context.releases == 1 && memory.outstanding() == 1 && mgr.driver_invalidations == 1
+	third := mgr.retain_g13_tpc_locked(mut owner, 0x8001) or { panic('overlapping growth') }
+	assert voidptr(third) != voidptr(second) && !second.buffer.released && second.references == 1
+	assert memory.outstanding() == 2 && context.releases == 1
+	assert mgr.invalidate_g13_tpc_locked(mut context, second)
+	mgr.release_g13_tpc_locked(mut context, second)
+	assert context.pool[1].released && context.releases == 2 && memory.outstanding() == 1
+	assert mgr.invalidate_g13_tpc_locked(mut context, third)
+	mgr.release_g13_tpc_locked(mut context, third)
+	assert owner.tail_pointer_cache.references == 1 && !owner.tail_pointer_cache.retiring
+	count := context.allocations
+	memory.fail_next(true)
+	assert mgr.retain_g13_tpc_locked(mut owner, 0x30000) == none
+	memory.fail_next(false)
+	assert context.allocations == count && memory.outstanding() == 1
+	context.fail_allocation = true
+	assert mgr.retain_g13_tpc_locked(mut owner, 0x30000) == none
+	context.fail_allocation = false
+	assert context.allocations == count && memory.outstanding() == 1
+	// An interrupted UAT teardown cannot make a partially unmapped cache
+	// reusable. It stays owned until a successful retry or firmware stop.
+	mgr.invalidation_fails = true
+	old := owner.tail_pointer_cache
+	assert mgr.retain_g13_tpc_locked(mut owner, 0x30000) == none
+	assert voidptr(old) == voidptr(owner.tail_pointer_cache) && old.retiring && !old.buffer.released
+	assert memory.outstanding() == 1 && context.pool[count].released
+	mgr.invalidation_fails = false
+	old_identity := voidptr(old)
+	recovered := mgr.retain_g13_tpc_locked(mut owner, 1) or { panic('retirement retry') }
+	assert voidptr(recovered) != old_identity && context.pool[2].released && !recovered.retiring
+	mgr.release_g13_tpc_locked(mut context, recovered)
+	assert mgr.invalidate_g13_tpc_locked(mut context, owner.tail_pointer_cache)
+	mgr.free_g13_render_buffer_locked(mut owner)
+	assert context.allocations == context.releases && memory.outstanding() == 0
+	// On shutdown, stopped firmware removes the need for a live handshake.
+	mgr.state = .running
+	owner = G13RenderBufferResources{context: &context}
+	a := mgr.retain_g13_tpc_locked(mut owner, 1) or { panic('shutdown cache a') }
+	b := mgr.retain_g13_tpc_locked(mut owner, 0x10000) or { panic('shutdown cache b') }
+	mgr.state = .stopped
+	mgr.release_g13_tpc_locked(mut context, a)
+	mgr.release_g13_tpc_locked(mut context, b)
+	mgr.free_g13_render_buffer_locked(mut owner)
+	assert context.allocations == context.releases && memory.outstanding() == 0
+	println('AGX TPC: 500 reuses, page rounding, overlapping growth, final-owner invalidation, allocation/flush failure, retry and shutdown passed')
 }

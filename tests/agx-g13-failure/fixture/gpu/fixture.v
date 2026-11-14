@@ -89,6 +89,19 @@ mut:
 	tvb_target u32
 	tvb_calls u32
 	tvb_grow_fails bool
+	file_reaper fn () = unsafe { nil }
+}
+
+__global maintenance_owner &GpuManager = unsafe { nil }
+__global maintenance_calls = 0
+__global maintenance_stopped = false
+
+fn maintain_files() {
+	// The callback can take the manager lock only if dispatch released it.
+	maintenance_owner.lock.acquire()
+	maintenance_calls++
+	maintenance_stopped = maintenance_owner.state == .stopped
+	maintenance_owner.lock.release()
 }
 
 struct G13Subqueue {
@@ -106,6 +119,7 @@ mut:
 struct G13QueueResources {
 mut:
 	released     bool
+	quarantined bool
 	priority     u32
 	channel_mask u32 = 7
 	subqueues    [3]G13Subqueue
@@ -249,6 +263,16 @@ fn assert_failed(mgr &GpuManager) {
 }
 
 pub fn run_checks() {
+	mut maintenance := GpuManager{}
+	maintenance_owner = &maintenance
+	maintenance.set_file_reaper(maintain_files)
+	maintenance.reap_file_resources()
+	assert maintenance_calls == 1
+	mut stopped_maintenance := GpuManager{state: .error}
+	maintenance_owner = &stopped_maintenance
+	stopped_maintenance.set_file_reaper(maintain_files)
+	event_worker(mut stopped_maintenance)
+	assert maintenance_calls == 2 && maintenance_stopped
 	check_publishers()
 	check_retirement()
 	check_recovery()

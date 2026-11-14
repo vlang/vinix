@@ -150,6 +150,7 @@ mut:
 	active_scenes u32
 	needs_bind    bool
 	bound_blocks  u32
+	tail_pointer_cache &G13TailPointerCache = unsafe { nil }
 	info          SharedBuffer
 	block_control SharedBuffer
 	counter       SharedBuffer
@@ -212,7 +213,7 @@ mut:
 	user_buffer        &mmu.UatBuffer = unsafe { nil }
 	heapmeta           &mmu.UatBuffer = unsafe { nil }
 	tilemap            &mmu.UatBuffer = unsafe { nil }
-	tail_pointer_cache &mmu.UatBuffer = unsafe { nil }
+	tail_pointer_cache &G13TailPointerCache = unsafe { nil }
 	preempt            &mmu.UatBuffer = unsafe { nil }
 	aux_framebuffer    &mmu.UatBuffer = unsafe { nil }
 }
@@ -514,6 +515,9 @@ fn (mut mgr GpuManager) free_g13_render_buffer_locked(mut buffer G13RenderBuffer
 	}
 	if buffer.context != unsafe { nil } {
 		mut context := unsafe { buffer.context }
+		if buffer.tail_pointer_cache != unsafe { nil } { assert buffer.tail_pointer_cache.references == 1 }
+		mgr.release_g13_tpc_locked(mut context, buffer.tail_pointer_cache)
+		buffer.tail_pointer_cache = unsafe { nil }
 		for index := buffer.blocks.len - 1; index >= 0; index-- {
 			context.release_driver_buffer(buffer.blocks[index])
 		}
@@ -830,6 +834,7 @@ fn (mut mgr GpuManager) invalidate_g13_queue_mappings_locked(mut resources G13Qu
 	mut context := unsafe { resources.vm }
 	mut buffer := &resources.render_buffer
 	if buffer.initialized {
+		if !mgr.invalidate_g13_tpc_locked(mut context, buffer.tail_pointer_cache) { return false }
 		for block in buffer.blocks {
 			if !mgr.invalidate_g13_driver_buffer(mut context, block) {
 				return false
@@ -1074,7 +1079,7 @@ fn (mut mgr GpuManager) release_g13_render_scene_backing_locked(mut scene G13Ren
 		mut context := unsafe { ctx }
 		context.release_driver_buffer(scene.aux_framebuffer)
 		context.release_driver_buffer(scene.preempt)
-		context.release_driver_buffer(scene.tail_pointer_cache)
+		mgr.release_g13_tpc_locked(mut context, scene.tail_pointer_cache)
 		context.release_driver_buffer(scene.tilemap)
 		context.release_driver_buffer(scene.heapmeta)
 		context.release_driver_buffer(scene.user_buffer)
@@ -1120,7 +1125,7 @@ fn (mut mgr GpuManager) allocate_g13_render_scene_locked(resources &G13QueueReso
 		return none
 	}
 	scene.tilemap = context.alloc_driver_buffer_aligned(tile.tilemap_size, false, fw.g13_tvb_page_size) or { return none }
-	scene.tail_pointer_cache = context.alloc_driver_buffer_aligned(tile.tail_pointer_size, true, fw.g13_tvb_page_size) or {
+	scene.tail_pointer_cache = mgr.retain_g13_tpc_locked(mut buffer, tile.tail_pointer_size) or {
 		return none
 	}
 	preempt_size := mgr.hw_config.preempt1_size + mgr.hw_config.preempt2_size + mgr.hw_config.preempt3_size
@@ -1152,7 +1157,7 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 		mut context := unsafe { job.context }
 		if !mgr.invalidate_g13_driver_buffer(mut context, job.scene.aux_framebuffer)
 			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.preempt)
-			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.tail_pointer_cache)
+			|| !mgr.invalidate_g13_tpc_locked(mut context, job.scene.tail_pointer_cache)
 			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.tilemap)
 			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.heapmeta)
 			|| !mgr.invalidate_g13_driver_buffer(mut context, job.scene.user_buffer)
@@ -1221,7 +1226,7 @@ fn complete_g13_render_job(mut job G13RenderJobResources, successful bool) {
 // submit_g13_render_job() transfers both queue batches to firmware.
 pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	input &agxrender.Command) ?&G13RenderJobResources {
-	if resources == unsafe { nil } || resources.released || resources.vm == unsafe { nil }
+	if resources == unsafe { nil } || resources.released || resources.quarantined || resources.vm == unsafe { nil }
 		|| !resources.vm.active || resources.channel_mask & g13_queue_channel_vertex == 0
 		|| resources.channel_mask & g13_queue_channel_fragment == 0
 		|| input.flags & ~agxrender.supported_flags != 0 || mgr.hw_config.num_clusters != 1
@@ -1238,7 +1243,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		mgr.lock.release()
 	}
 	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13
-		|| mgr.g13_channels == unsafe { nil } || resources.released {
+		|| mgr.g13_channels == unsafe { nil } || resources.released || resources.quarantined {
 		return none
 	}
 	mut queue := unsafe { resources }
@@ -1363,7 +1368,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				unk_8: 0x1e3ce508
 				unk_c: 0x1e3ce508
 				tvb_tilemap: job.scene.tilemap.va
-				tail_pointer_cache: job.scene.tail_pointer_cache.va
+				tail_pointer_cache: job.scene.tail_pointer_cache.buffer.va
 				tvb_heapmeta: job.scene.heapmeta.va | u64(0x8000000000000000)
 				iogpu_unk_54: 0x3a0012006b0003
 				iogpu_unk_56: 1
@@ -1384,7 +1389,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				unk_118: 0x1c
 			}
 			tiling_params: tile.params
-			tail_pointer_cache: job.scene.tail_pointer_cache.va
+				tail_pointer_cache: job.scene.tail_pointer_cache.buffer.va
 			tail_pointer_size: tile.tail_pointer_size
 			microsequence: job.vertex_microsequence.va
 			microsequence_size: u32(vertex_microsequence_size)
@@ -1746,7 +1751,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	if !mgr.flush_g13_uat_range(ctx.id, job.scene.user_buffer.va, job.scene.user_buffer.size)
 		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.heapmeta.va, job.scene.heapmeta.size)
 		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.tilemap.va, job.scene.tilemap.size)
-		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.tail_pointer_cache.va, job.scene.tail_pointer_cache.size)
+		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.tail_pointer_cache.buffer.va, job.scene.tail_pointer_cache.buffer.size)
 		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.preempt.va, job.scene.preempt.size)
 		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.aux_framebuffer.va, job.scene.aux_framebuffer.size)
 		|| !mgr.flush_g13_kernel_buffer(&job.scene.scene)
@@ -1811,7 +1816,7 @@ pub fn (mut mgr GpuManager) set_g13_render_completion(job &G13RenderJobResources
 // ordering; its barrier keeps it asleep until the vertex stamp retires.
 fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResources) bool {
 	if job.queue == unsafe { nil } || job.context == unsafe { nil } || !job.context.active
-		|| job.queue.released || job.queue.priority >= 4 || mgr.state != .running
+		|| job.queue.released || job.queue.quarantined || job.queue.priority >= 4 || mgr.state != .running
 		|| mgr.g13_channels == unsafe { nil } {
 		return false
 	}
@@ -2001,7 +2006,7 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 	if owned.released || owned.submitted || owned.quarantined
 		|| !owned.vertex_event_reserved
 		|| !owned.fragment_event_reserved || owned.queue == unsafe { nil }
-		|| owned.queue.released || owned.context == unsafe { nil } || !owned.context.active
+		|| owned.queue.released || owned.queue.quarantined || owned.context == unsafe { nil } || !owned.context.active
 		|| owned.queue.threshold.phys == 0 || owned.queue.render_buffer.counter.phys == 0 {
 		return false
 	}
@@ -2201,7 +2206,7 @@ fn complete_g13_compute_job(mut job G13ComputeJobResources, successful bool) {
 // completion and explicitly publish it with submit_g13_compute_job().
 pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources,
 	ctx &mmu.UatContext, input &agxcompute.Command) ?&G13ComputeJobResources {
-	if resources == unsafe { nil } || resources.released || ctx == unsafe { nil }
+	if resources == unsafe { nil } || resources.released || resources.quarantined || ctx == unsafe { nil }
 		|| !ctx.active || ctx.id == 0 || input.flags & ~agxcompute.supported_flags != 0
 		|| resources.channel_mask & g13_queue_channel_compute == 0
 		|| mgr.hw_config.compute_preempt1_size == 0 || !fw.validate_g13_compute_layouts()
@@ -2215,7 +2220,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 		mgr.lock.release()
 	}
 	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13
-		|| mgr.g13_channels == unsafe { nil } || resources.released {
+		|| mgr.g13_channels == unsafe { nil } || resources.released || resources.quarantined {
 		return none
 	}
 	mut job := &G13ComputeJobResources{
@@ -2464,7 +2469,7 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 	}
 	mut owned := unsafe { job }
 	if owned.released || owned.submitted || owned.quarantined || !owned.event_reserved
-		|| owned.queue == unsafe { nil } || owned.queue.released
+		|| owned.queue == unsafe { nil } || owned.queue.released || owned.queue.quarantined
 		|| owned.context == unsafe { nil } || !owned.context.active {
 		return false
 	}
@@ -2662,9 +2667,8 @@ pub fn (mut mgr GpuManager) release_g13_queue_resources(resources &G13QueueResou
 	if owned.released {
 		return true
 	}
-	if owned.quarantined {
-		return false
-	}
+	// Quarantine blocks preparation/publication, but idempotent teardown
+	// may retry after an interrupted UAT invalidation.
 	for job in mgr.g13_render_jobs {
 		if !job.released && voidptr(job.queue) == voidptr(resources) {
 			return false

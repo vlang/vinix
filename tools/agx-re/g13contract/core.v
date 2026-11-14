@@ -274,6 +274,15 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 		'age > oldest_age', 'mgr.g13_tvb_slots[selected] = true'], 'Vinix oldest-free selection')!
 	require_order(scene, ['fw.initialize_g13_buffer_scene',
 		'mgr.retain_g13_scene_slot_locked(mut buffer)', 'complete = true'], 'Vinix scene lease after allocation')!
+	require_order(reference_scene, ['let tpc = match inner.tpc.as_ref()',
+		'Some(buf) if buf.len() >= tpc_size => buf.clone()',
+		'(tpc_size + mmu::UAT_PGMSK) & !mmu::UAT_PGMSK',
+		'inner.tpc = Some(buf.clone())'], 'Asahi shared tail-pointer cache')!
+	tpc := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_tpc.v'))!
+	require_order(tpc, ['!old.retiring && old.buffer.size >= size', 'cached.references++',
+		'memory.malloc_packed_fallible', 'context.alloc_driver_buffer_aligned(size, true, pgtable.uat_pgsz)',
+		'mgr.invalidate_g13_tpc_locked(mut context, old)', 'owner.tail_pointer_cache = next',
+		'mgr.release_g13_tpc_locked(mut context, old)', 'next.references++'], 'Vinix shared tail-pointer cache')!
 	render := read(os.join_path(base, 'queue/render.rs'))!
 	require_order(render, ['if scene.rebind() || tvb_grown || tvb_autogrown',
 		'vtx_job.add(bind_buffer'], 'Asahi conditional TVB binding')!
@@ -285,5 +294,6 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 		'TVB complete allocation before table and counter publication',
 		'TVB slot retained across active scenes and released by the final scene',
 		'TVB unchanged-token preference and oldest-free selection',
+		'TVB tail-pointer cache reuse and retained scene ownership on growth',
 		'TVB binding on slot acquisition or heap growth']
 }

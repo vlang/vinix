@@ -226,7 +226,7 @@ pub fn audit(inputs Inputs) !Report {
 			'Complete ABI migration and matched Mesa integration',
 			'Asynchronous dependency scheduling, general batches and concurrency',
 			'VM replacement/splitting, reservation fences and object memory accounting',
-			'TVB tail-pointer-cache reuse and full render object defaults',
+			'Complete render object defaults and scheduler backpressure',
 			'Every remaining firmware field, initialization default and error path',
 			'M1 Pro/Max/Ultra topology and multi-die operation',
 			'Power management, reset, suspend/resume and complete telemetry',

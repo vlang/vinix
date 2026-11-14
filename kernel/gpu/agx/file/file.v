@@ -80,6 +80,8 @@ pub mut:
 	owner_key         u64
 	inflight_by_vm    [mmu.uat_num_contexts]u64
 	lock              klock.Lock
+	closing_next      &GpuFile = unsafe { nil }
+	closing_queued    bool
 }
 
 __global (
@@ -127,7 +129,7 @@ pub fn release_handle(_dev &drm.DrmDevice, handle voidptr) {
 	mut ff := unsafe { f }
 	if ff.close() {
 		unsafe { free(voidptr(ff)) }
-	}
+	} else { retire_closing_file(ff) }
 }
 
 pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
@@ -166,20 +168,28 @@ pub fn (mut f GpuFile) close() bool {
 	f.lock.acquire()
 	for vm_id := u32(1); vm_id < mmu.uat_num_contexts; vm_id++ {
 		if katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
-			// No G13 kill protocol is implemented yet. Retaining the complete
-			// file graph is safer than tearing live UAT mappings out from under
-			// firmware. A normal Mesa close waits its output fence first.
-			C.printf(c'agx: retaining closing DRM file with live VM %u jobs\n', vm_id)
+			// Completion callbacks still own this file. The worker retries its
+			// close after their final reference is gone.
 			f.lock.release()
 			return false
 		}
 	}
-	for mut q in f.queues {
-		q.destroy()
+	manager := gpu.get_global_manager() or { unsafe { nil } }
+	if manager != unsafe { nil } {
+		mut gpu_manager := unsafe { manager }
+		for ownership in f.g13_queues {
+			if !gpu_manager.release_g13_queue_resources(ownership.resources) {
+				// Failed invalidation retains backing in the manager. Keep the
+				// VM and every userspace mapping alive until cleanup succeeds or
+				// stopped firmware makes the retained queue safe to release.
+				f.lock.release()
+				return false
+			}
+		}
 	}
+	for mut q in f.queues { q.destroy() }
 	unsafe { f.queues.free() }
 	f.queues = []&workqueue.WorkQueue{}
-	manager := gpu.get_global_manager() or { unsafe { nil } }
 	if manager != unsafe { nil } {
 		mut gpu_manager := unsafe { manager }
 		for ownership in f.g17_queues {
@@ -188,12 +198,6 @@ pub fn (mut f GpuFile) close() bool {
 	}
 	unsafe { f.g17_queues.free() }
 	f.g17_queues = []G17QueueOwnership{}
-	if manager != unsafe { nil } {
-		mut gpu_manager := unsafe { manager }
-		for ownership in f.g13_queues {
-			gpu_manager.release_g13_queue_resources(ownership.resources)
-		}
-	}
 	unsafe { f.g13_queues.free() }
 	f.g13_queues = []G13QueueOwnership{}
 	if manager != unsafe { nil } {
