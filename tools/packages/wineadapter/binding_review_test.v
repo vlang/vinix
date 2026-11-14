@@ -160,6 +160,17 @@ fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
 	os.write_file(new + '/added.dll', 'new asset')!
 	idle_review_refused(&capture, 'review changed')
 	os.rm(new + '/added.dll')!
+	// Equal names and link text must not disguise replacement directories.
+	os.mv(new, new + '.saved')!
+	os.mkdir(new)!; os.write_file(new + '/kernel32.dll', 'new')!
+	idle_review_refused(&capture, 'captured directory identity changed')
+	os.rmdir_all(new)!; os.mv(new + '.saved', new)!
+	os.mv(system, system + '.saved')!
+	os.mkdir(system)!; os.chmod(system, 0o700)!
+	os.chown(system, int(C.geteuid()), os.getegid())!
+	os.symlink(old + '/kernel32.dll', system + '/kernel32.dll')!
+	idle_review_refused(&capture, 'captured directory identity changed')
+	os.rmdir_all(system)!; os.mv(system + '.saved', system)!
 	os.rm(system + '/kernel32.dll')!; os.symlink(new + '/kernel32.dll', system + '/kernel32.dll')!
 	idle_review_refused(&capture, 'review changed')
 	os.rm(system + '/kernel32.dll')!; os.symlink(old + '/kernel32.dll', system + '/kernel32.dll')!
