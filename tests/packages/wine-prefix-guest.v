@@ -24,7 +24,7 @@ fn C.execv(&char, &&char) i32
 fn C._exit(i32)
 fn C.alarm(u32) u32
 
-fn cli(command string) ! {
+fn cli_status(command string, expected i32) ! {
 	args := ['/usr/bin/vinix-package', command, 'app', '/tmp/private']
 	mut pointers := []&char{cap: args.len + 1}
 	for arg in args { pointers << arg.str }
@@ -32,22 +32,34 @@ fn cli(command string) ! {
 	pid := C.fork()
 	if pid == 0 { C.execv(args[0].str, pointers.data); C._exit(127) }
 	mut status := i32(0)
-	if pid <= 0 || C.waitpid(pid, &status, 0) != pid || status != 0 { return error('public prefix command failed: ' + command) }
+	if pid <= 0 || C.waitpid(pid, &status, 0) != pid || status != (expected << 8) { return error('public prefix command status differs: ' + command) }
 }
+
+fn cli(command string) ! { cli_status(command, 0)! }
 
 fn ordinary(builtins string) ! {
 	mut prefix := wineadapter.prepare_prefix('/tmp/private', builtins)!
-	prefix.close()
+	defer { prefix.close() }
 	system := '/tmp/private/wine/drive_c/windows/system32'
 	os.rm(system + '/new.dll')!
 	os.write_file('/tmp/private/sentinel', 'private contents')!
 	cli('wine-prefix-review')!
 	if os.exists(system + '/new.dll') { return error('review created a builtin') }
+	mut guard := prefix.acquire_launch('/tmp/private')!
+	defer { guard.close() }
+	cli_status('wine-prefix-additions', 1)!
+	guard.close()
+	if os.exists(system + '/new.dll') { return error('competing additions changed prefix') }
+	os.write_file(system + '/new.dll', 'personal DLL contents')!
+	cli_status('wine-prefix-additions', 1)!
+	if os.read_file(system + '/new.dll')! != 'personal DLL contents' { return error('collision replaced personal file') }
+	os.rm(system + '/new.dll')!
 	cli('wine-prefix-additions')!
 	if os.readlink(system + '/new.dll')! != builtins + '/new.dll' { return error('addition target differs') }
 	cli('wine-prefix-additions')!
 	cli('wine-prefix-review')!
 	if os.read_file('/tmp/private/sentinel')! != 'private contents' { return error('private data changed') }
+	println('WINE PREFIX REFUSALS PASS competing managed launch; personal DLL preserved; retry')
 	println('WINE PREFIX CLI PASS ordinary signed installed review; exclusive addition; repeat; private data')
 }
 

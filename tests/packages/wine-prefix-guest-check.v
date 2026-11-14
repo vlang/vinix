@@ -18,7 +18,8 @@ fn run() ! {
 	os.chmod(work + '/extras/usr/bin/vinix-package', 0o755)!
 	boot_host := if arch == 'x86_64' { hwhost.Host{...host, root: plainiso.prepare(root, work)!} } else { host }
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-prefix-cli', arches: [arch], ending: .running,
-		required: ['WINE PREFIX CLI PASS ordinary signed installed review; exclusive addition; repeat; private data', 'HWTEST PASS wine-prefix-cli fixture'],
+		required: ['WINE PREFIX REFUSALS PASS competing managed launch; personal DLL preserved; retry',
+			'WINE PREFIX CLI PASS ordinary signed installed review; exclusive addition; repeat; private data', 'HWTEST PASS wine-prefix-cli fixture'],
 		forbidden: ['HWTEST FAIL', 'Kernel panic']}, hwhost.Run{kernel: os.args[3], guest: os.args[5],
 		extras: work + '/extras', state: work + '/boot', timeout: 120, keep: true})
 	os.write_file(work + '/result.json', json2.encode(outcome))!
