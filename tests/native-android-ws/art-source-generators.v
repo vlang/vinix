@@ -144,7 +144,8 @@ fn check(root string) ! {
 
 fn main() {
 	if os.args.len == 2 && os.args[1] == 'platform' {
-		result := os.exec(['/bin/uname', '-srm'])
+		uname := os.find_abs_path_of_executable('uname') or { eprintln(err); exit(1) }
+		result := os.exec([uname, '-srm'])
 		if result.exit_code != 0 { eprintln(result.output); exit(1) }
 		println(result.output.trim_space())
 		return

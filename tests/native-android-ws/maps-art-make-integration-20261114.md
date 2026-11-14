@@ -1,10 +1,11 @@
-# Prepared ART Makefile integration; checks blocked
+# Checked ART Makefile integration
 
-Continuation of 475aa3ff6. Google sign-in remains unresolved, and no ART runtime
-change has been deployed. `art-generator-overlay.v` prepares an external patch
-for ten original Makefiles to invoke the checked V generators. The final
-integration source and additional package-cleanup helper have not compiled or
-passed their checks yet. Do not use this checkpoint as build qualification.
+Continuation of 475aa3ff6 and the initially blocked 718f690a7 checkpoint.
+Google sign-in remains unresolved, and no ART runtime change has been deployed.
+`art-generator-overlay.v` now passes its source-integration checks and prepares
+an external patch for ten original Makefiles to invoke the V generators.
+The package-cleanup helper also passes its fixture checks. Actual native ART
+compilation and ARM validation remain pending.
 
 The overlay replaces Makefile discovery in main.mk, definitions.mk and
 cleanspec.mk; enum operators in five ART modules; assembly constants in three
@@ -39,7 +40,7 @@ art-source-generators package-overlays ALL_PACKAGES CURRENT_OVERLAYS PREVIOUS_OV
 
 The overlay requires exact command occurrence counts, records original/modified
 Makefile hashes and a patch hash, preserves originals and refuses output reuse.
-Its written self-test checks repeated/missing/duplicate replacements, zero-fuzz
+Its passing self-test checks repeated/missing/duplicate replacements, zero-fuzz
 patch dry-run/application and readback. A GNU Make fixture executes the exact
 rewritten ARM64 definition through eval, using printf to record the expanded
 arguments and checking globbing and output redirection. It does not substitute
@@ -53,12 +54,18 @@ ten files. The updated r2 compiler invocation was refused before launch at
 1356816384 free bytes: exit 125, child exit -1, PID 0, reason `disk growth
 budget`, no supervised groups and `cleanup_complete=false`. No passing result
 is claimed for that invocation. Free space subsequently fell below 1 GiB.
+Space later recovered, allowing final r3 overlay compilation (2021 ms, sampled
+RSS 304873472 bytes) and r3 helper compilation (1419 ms, RSS 309690368 bytes).
+The overlay self-test passed in 389 ms, including exact application to all ten
+files and GNU Make eval/argument/glob/redirection execution. The updated helper
+passed its complete self-test, including package cleanup, and all 50 original
+enum headers. An initial platform probe failed on macOS's uname path; the helper
+now resolves uname through PATH and passed the guarded metadata check. All
+final guarded checks returned 0/0 with complete cleanup under the same caps.
 
 Original caps remain RSS 629145600 bytes, wall 300000 ms, reserve 1073741824,
-growth 536870912 and output 4194304 bytes. No VM was started. Next checks are
-fresh guarded builds of both tools, the overlay self-test, the full source
-helper self-test including package cleanup, platform-mode execution and the
-50-header source check. Then apply to a fresh native source tree alongside
+growth 536870912 and output 4194304 bytes. These host checks started no VM.
+Next, stage the ARM64 helpers and apply to a fresh native source tree alongside
 the complete ABI/lifetime and imageless-compilation patches, retain compiler
 inputs, rebuild ART and run the signed ARM regression and real Maps retry.
 
@@ -77,7 +84,16 @@ Source checkpoint SHA256 values:
 | --- | --- |
 | art-generator-overlay.v | 5488eb024ec5e09694603e7f40bc062ea2db100981e0be32f0178942dd3e3d72 |
 | artgenerators/package_overlays.v | e85dd197021f7846c67dfffe94d5eea314b59d7d0ce9e97955fb06f6f6f55e77 |
-| art-source-generators.v | b11b1d619393c15d43c569bd1fb3d1513640a7b1f755243c7f49d4a40e8de4c7 |
+| art-source-generators.v | d3aaac8657856b078957e5ac6d4f0583e1fcbfcc0673dd2c15fe39879d250c9e |
+
+Qualified external artifacts:
+
+| Artifact | SHA256 |
+| --- | --- |
+| art-make-tools-20261114-r3/art-generator-overlay | 515e1e053a7adc06a1a7f26733cdf4ab102d98f486816caa279b15931cdf1ac7 |
+| art-make-helper-tools-20261114-r3/art-source-generators | e0169562bde7c19f4e189df21fd7a532da47b453ca6f64790249479932403743 |
+| art-make-checks-20261114-r2/overlay/v-generators.patch | 812cc2b6224a8f7e624e795b6798c52d76131d75741cb9621834d557a9bead9f |
+| art-make-checks-20261114-r2/overlay/inputs.json | ae2c32254aba519c95e73005afcec12dff532e6e98570dd71d684727ed8e7af1 |
 
 External evidence is under `/Users/alex/.local/state/vinix/android/`:
 `art-make-tools-20261114-r1`, `art-make-tools-20261114-r2`,
@@ -86,3 +102,7 @@ with sibling logs/receipts. The failed check receipt SHA256 is
 c4e5d9a22e1d6e81fba5310afd3ec54afe122de758bfcef19b2889585d24b57e;
 the refused compiler receipt is
 5d299e61e10a68d2f64b790d5c2d358c2b7cce46aee4ff3f45295adde8976719.
+Final passing roots/receipts are `art-make-tools-20261114-r3`,
+`art-make-helper-tools-20261114-r3`, `art-make-checks-20261114-r2`,
+`art-make-helper-checks-20261114-r2`, `art-make-source-checks-20261114-r2`
+and `art-make-platform-20261114-r1`.

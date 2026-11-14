@@ -79,10 +79,11 @@ the [first three V build helpers](maps-art-generators-20261114.md) now pass
 focused checks and all 50 original enum-header inputs. The
 [V interpreter generator](maps-art-mterp-20261114.md) subsequently passed its
 full synthetic fixture and generated all 256 handlers from the eight original
-ARM64 templates. The [Makefile integration checkpoint](maps-art-make-integration-20261114.md)
-also prepares incremental package-overlay cleanup in V; its final compilation
-and checks were blocked by low host space. Native build integration validation
-and runtime qualification remain required. The imageless-compilation source candidate
+ARM64 templates. The [Makefile integration](maps-art-make-integration-20261114.md)
+subsequently passed exact patch application, a GNU Make expansion fixture,
+incremental package-overlay cleanup and the complete source-helper checks.
+Staging into the native build and runtime qualification remain required.
+The imageless-compilation source candidate
 has not been built or deployed, and Google sign-in remains unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
