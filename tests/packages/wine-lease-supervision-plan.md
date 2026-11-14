@@ -2135,6 +2135,32 @@ guest execution, complete source closure or measured heap qualification is
 claimed. Signed service qualification, migration application/recovery and the
 other section 14 gates remain open.
 
+## Signed install and upgrade review, 2026-11-14
+
+Source `f7ec0a197` adds a local signed-repository host fixture: generate a key,
+pack separate Windows/runtime packages, publish a signed index, refresh trusted
+metadata and install generation 1. Private service preparation acquires its real
+lease and verifies the installed closure before manifest-to-prefix capture.
+The initial review reports a current binding; close releases coordination.
+A second signed publication upgrades the runtime to 2.0.0, changes one DLL and
+adds another. Verified generation 2 reviews the preserved generation-1 prefix
+as exactly one replacement and one creation. Recheck passes, old link text stays
+unchanged and the new link remains absent. All host bridge tests pass using the
+retained V compiler with `-backend c -gc none -manualfree` and repository path.
+
+Evidence is frozen at `/Users/alex/.cache/vwsignedbridge-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-signed-prefix-review-20261114-01.inventory.json`
+has SHA-256 `767d97ab6e37492c456feb168fc72322560c64ad2648850d6208261968de82e4`.
+Record and independent check pass complete bytes, sizes, types, modes and link
+targets. Source copies, generated host C/binaries and logs are retained; final
+upgrade evidence is `tests-upgrade.log`. An earlier attempt to run before build
+completion is retained separately. Test payloads are marker files, never
+executed. This qualifies signed publication/install/upgrade and review components
+in an alternate-root fixture. Public real-root service admission, Wine execution,
+guest/cross-architecture behavior, complete source closure and measured heap
+qualification remain unproven here. The public alternate-root refusal is intact;
+migration application/recovery and other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
