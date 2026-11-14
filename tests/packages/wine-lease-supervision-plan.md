@@ -3481,6 +3481,49 @@ Typed receipt:
 SHA-256 `8a45ad0b79723641b7a831501a5c4531829ccea7966fed1cd97551962b6d2869`.
 Recording and independent comparison pass.
 
+## Full small-fixture CLI sync-boundary matrix, 2026-11-14
+
+Source `4f252474b` adds trailing `--all-syncs` to the public CLI cut fixture.
+All eight successful fsync boundaries for two replacements and one missing
+addition pass on both x86_64 and AArch64: 16 two-boot cases, each within the
+unchanged 120-second cap. Exact cold namespace checks precede recovery:
+
+| Point | Replaced links | Addition present | Pending stage |
+| --- | ---: | --- | --- |
+| 1 | 0 | no | a.dll |
+| 2–3 | 1 | no | absent |
+| 4 | 1 | no | b.dll |
+| 5–6 | 2 | no | absent |
+| 7–8 | 2 | yes | absent |
+
+Points 7/8 exercise completed writes before the interrupted command returns.
+Every case requires actual QEMU SIGKILL, public migrate/repeat/review JSON,
+independent service admission, live lease/reader coordination and post-close
+release, unchanged private data and selected input hashes, and clean VJFS export
+with strict `e2fsck -f -n` exit zero. x86 cases take 22.792–28.436 seconds;
+ARM cases take 18.158–19.682 seconds. The default x86 three-case regression
+passes (25.811/25.956/28.430 seconds), without creating point 4. The CLI built
+without interception is rejected at all eight points for guest shutdown before
+the requested cut. Empty paths and malformed modes reject before work creation.
+
+Evidence is retained at `/Users/alex/.cache/vwwineallcuts-20261114-01`, isolated
+base `6f6e9d051` plus `source.patch`, including exact source identities, generated
+C, parsed-source lists, binaries, kernels, raw and inspection images, serial/QMP
+logs, negative controls and validation notes. Production/manual-free build
+profiles, resource budgets and default three-point mode remain unchanged.
+
+This qualifies all sync boundaries of this small fixture through a byte-identical
+dispatcher source with test-only interception. Marker packages never execute
+Wine. It does not qualify the uninstrumented release binary, physical power or
+host-cache loss, torn writes, other interruption points, 741-row cuts, actual
+Wine-version/GUI/ARM execution, whole-launch lifetime or strict ABI/hermetic
+closure. Earlier complete evidence bundles remain required.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-cli-all-syncs-20261114-01.inventory.json`,
+SHA-256 `e56e3408db785ce9ac4a7fb63d8d76cd6192527658fbee33b6533ba5c470a65e`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
