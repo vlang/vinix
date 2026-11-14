@@ -5,6 +5,56 @@ import crypto.sha256
 import json2
 import os
 
+#include <signal.h>
+#include <unistd.h>
+fn C.getpgid(int) int
+fn C.kill(int, int) int
+
+fn build_scope(process_root string, cwd string, root string, source string) bool {
+	return root.starts_with('/var/tmp/vinix-art-alpine-') && source.starts_with('/work/art-build-')
+		&& !source.contains('/../') && process_root == root && cwd == root + source
+}
+
+fn process_start(stat string) ?string {
+	end := stat.last_index(')') or { return none }
+	fields := stat[end + 1..].fields()
+	if fields.len < 20 { return none }
+	return fields[19]
+}
+
+// Called outside the chroot after a host guard failure. Workers and their
+// process-group leader must have this builder root and exact build cwd.
+fn stop_build(root_arg string, source string) ! {
+	root := os.real_path(root_arg)
+	if !os.is_dir('/proc') || !build_scope(root, root + source, root, source)
+		|| !os.is_file(root + '/etc/alpine-release') { return error('isolated builder scope required') }
+	mut groups := map[int]bool{}
+	entries := os.ls('/proc')!
+	for entry in entries {
+		if entry == '' || !entry.bytes().all(it.is_digit()) { continue }
+		pid := entry.int()
+		if pid <= 1 { continue }
+		base := '/proc/' + entry
+		comm := os.read_file(base + '/comm') or { continue }
+		if comm.trim_space() !in ['make', 'cc1', 'cc1plus', 'gcc', 'g++', 'as', 'ld',
+			'collect2', 'sh', 'sleep', 'vinix-art-sourc', 'vinix-art-mterp'] { continue }
+		before := os.read_file(base + '/stat') or { continue }
+		started := process_start(before) or { continue }
+		if !build_scope(os.real_path(base + '/root'), os.real_path(base + '/cwd'), root, source) { continue }
+		end := before.last_index(')') or { continue }
+		fields := before[end + 1..].fields()
+		group := fields[2].int()
+		if group <= 1 || group in groups || C.getpgid(group) != group { continue }
+		leader := '/proc/' + group.str()
+		if !build_scope(os.real_path(leader + '/root'), os.real_path(leader + '/cwd'), root, source) { continue }
+		after := os.read_file(base + '/stat') or { continue }
+		if process_start(after) or { continue } != started || C.getpgid(pid) != group { continue }
+		if C.kill(-group, C.SIGKILL) != 0 { return error('failed to stop owned compiler group') }
+		groups[group] = true
+	}
+	println('ART-BUILDER-STOP groups=${groups.len}')
+}
+
 struct Response {
 mut:
 	status int
@@ -181,7 +231,47 @@ fn fetch(list string, cache string, output string, direct bool) ! {
 	println('ART-BUILDER-FETCH-PASS packages=' + records.len.str() + '; APK signature verification remains required at install')
 }
 
+fn install_args(list string, cache string) ![]string {
+	if cache.contains(':') || !os.is_file(cache + '/packages.json')
+		|| os.file_size(list) > 1024 * 1024 {
+		return error('one completed package cache and bounded plan required')
+	}
+	lines := os.read_file(list)!.split_into_lines()
+	if lines.len == 0 || lines.len > 512 { return error('bounded nonempty install plan required') }
+	mut seen := map[string]bool{}
+	mut args := ['/sbin/apk', 'add', '--no-network']
+	for url in lines {
+		name := package_name(url)!
+		if name in seen || name.starts_with('python') || name.starts_with('pypy') {
+			return error('duplicate or unsupported interpreter package in build plan')
+		}
+		seen[name] = true
+		path := cached_file(cache, name, url)!
+		if path == '' { return error('install package lacks a completed cache record: ' + name) }
+		args << path
+	}
+	return args
+}
+
 fn main() {
+	if os.args.len == 4 && os.args[1] == '--stop-build' {
+		stop_build(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
+		return
+	}
+	if os.args.len == 4 && os.args[1] == '--apk-install' {
+		if !os.is_file('/etc/alpine-release') || !os.is_file('/sbin/apk') {
+			eprintln('install mode requires the isolated ARM64 Alpine builder'); exit(1)
+		}
+		uname := os.find_abs_path_of_executable('uname') or { eprintln(err); exit(1) }
+		platform := os.exec([uname, '-sm'])
+		if platform.exit_code != 0 || platform.output.trim_space() != 'Linux aarch64' {
+			eprintln('install mode requires native ARM64 Linux'); exit(1)
+		}
+		args := install_args(os.args[2], os.args[3]) or { eprintln(err); exit(1) }
+		// APK still authenticates every archive against the builder's trusted keys.
+		// The plan is resolved separately by APK; no network fallback is allowed.
+		exit(os.system_args(args))
+	}
 	if os.args.len == 3 && os.args[1] == '--self-test' {
 		parsed := response('HTTP/1.1 200 Connection established\r\nContent-Length: 0\r\n\r\nHTTP/2 206\r\nContent-Length: 20\r\nETag: "abc"\r\nContent-Range: bytes 0-19/40\r\n\r\n')
 		assert parsed.status == 206 && parsed.length == 20 && parsed.etag == '"abc"' && parsed.range == 'bytes 0-19/40'
@@ -195,6 +285,13 @@ fn main() {
 		}
 		root := os.abs_path(os.args[2])
 		os.mkdir(root)!
+		assert build_scope('/var/tmp/vinix-art-alpine-test', '/var/tmp/vinix-art-alpine-test/work/art-build-test',
+			'/var/tmp/vinix-art-alpine-test', '/work/art-build-test')
+		assert !build_scope('/', '/work/art-build-test', '/var/tmp/vinix-art-alpine-test', '/work/art-build-test')
+		assert !build_scope('/var/tmp/vinix-art-alpine-test', '/unrelated', '/var/tmp/vinix-art-alpine-test', '/work/art-build-test')
+		assert !build_scope('/', '/work/art-build-test', '/', '/work/art-build-test')
+		os.write_file(root + '/Makefile', '.PHONY: showcommands\nshowcommands:\n' +
+			'out/host/linux-x86/control-wait:\n\t/bin/sleep 60\n')!
 		url := 'https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/test-1.apk'
 		os.write_file(root + '/test-1.apk', 'complete test bytes')!
 		os.write_file(root + '/partial-1.apk', 'incomplete bytes')!
@@ -202,13 +299,24 @@ fn main() {
 			'sha256': hash(root + '/test-1.apk')!}]))!
 		assert cached_file(root, 'test-1.apk', url)! == root + '/test-1.apk'
 		assert cached_file(root, 'partial-1.apk', url)! == ''
+		plan := root + '/plan.urls'
+		os.write_file(plan, url + '\n')!
+		assert install_args(plan, root)! == ['/sbin/apk', 'add', '--no-network', root + '/test-1.apk']
+		for invalid in ['', url + '\n' + url,
+			'https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/partial-1.apk',
+			'https://dl-cdn.alpinelinux.org/alpine/edge/main/aarch64/python3-1.apk'] {
+			os.write_file(plan, invalid)!
+			if _ := install_args(plan, root) { panic('invalid native install plan accepted') }
+		}
+		os.write_file(plan, url + '\n')!
 		os.write_file(root + '/test-1.apk', 'tampered bytes')!
 		if _ := cached_file(root, 'test-1.apk', url) { panic('tampered completed package accepted') }
+		if _ := install_args(plan, root) { panic('tampered install input accepted') }
 		println('ART-BUILDER-FETCH-URL-PASS')
 		return
 	}
 	direct := os.args.len == 5 && os.args[1] == '--direct'
 	args := if direct { os.args[2..] } else { os.args[1..] }
-	if args.len != 3 { eprintln('usage: art-builder-fetch [--direct] URL_LIST CACHE[:CACHE...] FRESH_OUTPUT | --self-test FRESH_OUTPUT'); exit(2) }
+	if args.len != 3 { eprintln('usage: art-builder-fetch [--direct] URL_LIST CACHE[:CACHE...] FRESH_OUTPUT | --self-test FRESH_OUTPUT | --apk-install URL_LIST CACHE'); exit(2) }
 	fetch(args[0], args[1], args[2], direct) or { eprintln(err); exit(1) }
 }

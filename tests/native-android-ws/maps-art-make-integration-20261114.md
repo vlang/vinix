@@ -1,5 +1,12 @@
 # Checked ART Makefile integration
 
+The subsequent [native build continuation](maps-art-native-build-20261114.md)
+extends this checkpoint to eleven Makefiles, an explicit 16-KiB buildspec and
+an 18-file applied-input gate. Native compilation exposed generator allocation
+and compiler-memory limits; the tested fixes and remaining build failures are
+recorded there. The ten-file checks and identities below describe the earlier
+801c43674 checkpoint, not the later build inputs.
+
 Continuation of 475aa3ff6 and the initially blocked 718f690a7 checkpoint.
 Google sign-in remains unresolved, and no ART runtime change has been deployed.
 `art-generator-overlay.v` now passes its source-integration checks and prepares

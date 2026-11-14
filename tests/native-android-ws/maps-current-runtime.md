@@ -73,8 +73,8 @@ retained source is only a six-file audit selection, with no reusable objects.
 The [builder recovery and dependency transport checks](maps-art-builder-20261114.md)
 now provide an isolated native ARM64 Linux/Alpine builder and the full original
 source archive. The complete 150-package fetch and every Alpine package
-signature now pass. Offline installation planning passed; installation remains
-blocked by low host space and the retained resource guard. Separately,
+signature now pass. The toolchain and Java/JNI dependency closure are now
+installed in the isolated builder through two bounded offline transactions. Separately,
 the [first three V build helpers](maps-art-generators-20261114.md) now pass
 focused checks and all 50 original enum-header inputs. The
 [V interpreter generator](maps-art-mterp-20261114.md) subsequently passed its
@@ -82,9 +82,12 @@ full synthetic fixture and generated all 256 handlers from the eight original
 ARM64 templates. The [Makefile integration](maps-art-make-integration-20261114.md)
 subsequently passed exact patch application, a GNU Make expansion fixture,
 incremental package-overlay cleanup and the complete source-helper checks.
-Staging into the native build and runtime qualification remain required.
-The imageless-compilation source candidate
-has not been built or deployed, and Google sign-in remains unresolved.
+The [native build continuation](maps-art-native-build-20261114.md) stages the
+complete source and checks all 18 modified files against audited expectations.
+It fixes a measured assembly-generator allocation problem and adds checked
+remote cancellation. Native compilation has begun, but resource guards have
+stopped the attempts so far. No new ART library has been deployed; ARM runtime
+qualification and Google sign-in remain unresolved.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

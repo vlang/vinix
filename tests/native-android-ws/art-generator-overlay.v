@@ -7,9 +7,14 @@ import os
 
 const helper = '/usr/local/bin/vinix-art-source-generators'
 const interpreter = '/usr/local/bin/vinix-art-mterp'
+const compiler_memory_flags = '-g0 --param=ggc-min-expand=10 --param=ggc-min-heapsize=16384'
 const paths = ['build/core/main.mk', 'build/core/definitions.mk', 'build/core/cleanspec.mk',
 	'build/core/dumpvar.mk', 'build/core/post_clean.mk', 'art/runtime/Android.mk', 'art/compiler/Android.mk',
-	'art/dex2oat/Android.mk', 'art/libartbase/Android.mk', 'art/libdexfile/Android.mk']
+	'art/dex2oat/Android.mk', 'art/libartbase/Android.mk', 'art/libdexfile/Android.mk',
+	'art/build/Android.common_build.mk']
+const base_paths = ['art/libartbase/base/globals.h', 'art/libartbase/base/safe_copy.cc',
+	'art/libartbase/arch/instruction_set.h', 'art/runtime/thread.cc',
+	'art/runtime/monitor_pool.h', 'libcore/luni/src/main/native/Register.cpp']
 
 fn replace_exact(input string, old string, new string, count int) !string {
 	if input.count(old) != count { return error('expected ${count} occurrences of ' + old) }
@@ -25,6 +30,10 @@ fn rewrite(path string, input string) !string {
 			helper + ' platform', 1)!
 	} else if path == 'build/core/post_clean.mk' {
 		text = replace_exact(text, 'build/tools/diff_package_overlays.py ', helper + ' package-overlays ', 1)!
+	} else if path == 'art/build/Android.common_build.mk' {
+		// Deployed libraries are stripped. Keep optimization and runtime macros,
+		// while omitting compiler debug metadata that exceeds the retained RSS cap.
+		text = replace_exact(text, '-ggdb3', compiler_memory_flags, 1)!
 	} else {
 		text = replace_exact(text, 'art/tools/generate_operator_out.py ', helper + ' operators ', 1)!
 		if path in ['art/runtime/Android.mk', 'art/compiler/Android.mk', 'art/dex2oat/Android.mk'] {
@@ -52,6 +61,27 @@ fn rewrite(path string, input string) !string {
 
 fn digest(text string) string { return sha256.sum(text.bytes()).hex() }
 
+fn check_applied(source string, base string, make_tree string, oat string, output string) ! {
+	mut expected := map[string]string{}
+	for path in base_paths {
+		expected[path] = base + '/' + path
+	}
+	for path in paths { expected[path] = make_tree + '/' + path }
+	expected['art/runtime/oat_file_assistant.cc'] = oat
+	mut names := expected.keys()
+	names.sort()
+	mut records := []map[string]string{}
+	for path in names {
+		actual := os.read_file(source + '/' + path)!
+		wanted := os.read_file(expected[path])!
+		if actual != wanted { return error('applied ART input differs: ' + path) }
+		records << {'path': path, 'sha256': digest(actual), 'expected': os.real_path(expected[path])}
+	}
+	os.mkdir(output)!
+	os.write_file(output + '/applied-inputs.json', json2.encode(records, prettify: true) + '\n')!
+	println('ART-APPLIED-INPUTS-PASS files=${records.len} ABI/lifetime, imageless guard and V Makefiles')
+}
+
 fn prepare(input string, output string) ! {
 	// Validate every input before creating output. Retain source and only emit
 	// an overlay; applying to the native tree is a separate checked build step.
@@ -78,6 +108,17 @@ fn prepare(input string, output string) ! {
 			return error('bounded Makefile diff failed: ' + path)
 		}
 		patch += diff.output
+		if path == 'art/build/Android.common_build.mk' {
+			os.write_file(output + '/release-no-debug.patch', diff.output)!
+			// An incremental build may already have the debug-only change. Emit
+			// its exact transition too; never reverse or fuzz an applied patch.
+			prior := output + '/debug-metadata-only.mk'
+			os.write_file(prior, originals[path].replace('-ggdb3', '-g0'))!
+			delta := os.exec(['/usr/bin/diff', '-u', '--label', 'a/' + path,
+				'--label', 'b/' + path, prior, target])
+			if delta.exit_code != 1 { return error('compiler-memory diff failed') }
+			os.write_file(output + '/compiler-memory.patch', delta.output)!
+		}
 		if os.read_file(input + '/' + path)! != originals[path]
 			|| os.read_file(target)! != modified[path] { return error('Makefile changed during preparation') }
 		records << {'path': path, 'input_sha256': digest(originals[path]), 'output_sha256': digest(modified[path])}
@@ -85,7 +126,13 @@ fn prepare(input string, output string) ! {
 	os.write_file(output + '/v-generators.patch', patch)!
 	os.write_file(output + '/inputs.json', json2.encode(records, prettify: true) + '\n')!
 	os.write_file(output + '/patch.sha256', digest(patch) + '  v-generators.patch\n')!
-	println('ART-GENERATOR-OVERLAY-PASS files=10; native ARM64 build required')
+	// Preserve the production recipe's native 16-KiB ABI flags in a V-generated
+	// buildspec. The build receipt must retain this file and emitted C++ argv.
+	buildspec := 'COMMON_GLOBAL_CFLAGS += -DART_PAGE_SIZE=16384\n' +
+		'COMMON_GLOBAL_CPPFLAGS += -DART_PAGE_SIZE=16384\n'
+	os.write_file(output + '/art16k-buildspec.mk', buildspec)!
+	os.write_file(output + '/buildspec.sha256', digest(buildspec) + '  art16k-buildspec.mk\n')!
+	println('ART-GENERATOR-OVERLAY-PASS files=${paths.len}; native ARM64 build required')
 }
 
 fn selftest(input string, output string) ! {
@@ -112,6 +159,18 @@ fn selftest(input string, output string) ! {
 			return error('Makefile patch readback differs')
 		}
 	}
+	os.mkdir_all(output + '/compiler-apply/art/build')!
+	os.cp(output + '/overlay/debug-metadata-only.mk', output + '/compiler-apply/art/build/Android.common_build.mk')!
+	for dry in [true, false] {
+		mut args := ['/usr/bin/patch', '--batch', '--forward', '--fuzz=0', '-p1',
+			'-d', output + '/compiler-apply', '-i', output + '/overlay/compiler-memory.patch']
+		if dry { args << '--dry-run' }
+		if os.system_args(args) != 0 { return error('compiler-memory transition failed exact application') }
+	}
+	if os.read_file(output + '/compiler-apply/art/build/Android.common_build.mk')!
+		!= os.read_file(output + '/overlay/tree/art/build/Android.common_build.mk')! {
+		return error('compiler-memory transition readback differs')
+	}
 	// Execute the exact rewritten ARM64 rule through Make's eval expansion.
 	// printf records the argv; real generator behavior is checked separately.
 	runtime := os.read_file(output + '/overlay/tree/art/runtime/Android.mk')!
@@ -136,10 +195,36 @@ fn selftest(input string, output string) ! {
 	if os.read_file(fixture + '/generated/mterp_arm64.S')! != expected {
 		return error('Make expansion, globbing or output redirection differs')
 	}
+	for path in base_paths {
+		os.mkdir_all(os.dir(output + '/base/' + path))!
+		os.mkdir_all(os.dir(output + '/apply/' + path))!
+		text := 'audited source fixture for ' + path + '\n'
+		os.write_file(output + '/base/' + path, text)!
+		os.write_file(output + '/apply/' + path, text)!
+	}
+	os.write_file(output + '/oat.expected', 'audited imageless guard fixture\n')!
+	os.cp(output + '/oat.expected', output + '/apply/art/runtime/oat_file_assistant.cc')!
+	check_applied(output + '/apply', output + '/base', output + '/overlay/tree',
+		output + '/oat.expected', output + '/applied-inputs')!
+	for i, path in ['art/runtime/monitor_pool.h', 'build/core/definitions.mk', 'art/runtime/oat_file_assistant.cc',
+		'art/build/Android.common_build.mk'] {
+		file := output + '/apply/' + path
+		original := os.read_file(file)!
+		os.write_file(file, original + 'source drift\n')!
+		rejected := output + '/rejected-${i}'
+		if _ := check_applied(output + '/apply', output + '/base', output + '/overlay/tree',
+			output + '/oat.expected', rejected) { return error('applied source drift accepted: ' + path) }
+		if os.exists(rejected) { return error('rejected input published a receipt') }
+		os.write_file(file, original)!
+	}
 	println('ART-GENERATOR-OVERLAY-CHECK-PASS overwrite, drift, duplicate, zero-fuzz dry-run, apply and readback')
 }
 
 fn main() {
+	if os.args.len == 7 && os.args[1] == '--check-applied' {
+		check_applied(os.args[2], os.args[3], os.args[4], os.args[5], os.args[6]) or { eprintln(err); exit(1) }
+		return
+	}
 	if os.args.len == 4 && os.args[1] == '--self-test' {
 		selftest(os.abs_path(os.args[2]), os.abs_path(os.args[3])) or { eprintln(err); exit(1) }
 		return

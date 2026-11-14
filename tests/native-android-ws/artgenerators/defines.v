@@ -33,13 +33,21 @@ pub fn asm_header(input string) !string {
 	mut found := []Define{}
 	mut offset := 0
 	for offset < input.len {
-		begin := input[offset..].index('\">>') or { break }
-		start := offset + begin + 3
-		end := input[start..].index('<<\"') or {
+		// Search the original backing string. Slicing the unconsumed tail for
+		// every marker retains quadratic copies with -gc none on debug assembly.
+		begin := input.index_after('\">>', offset) or { break }
+		// -ggdb3 also emits the ASM_DEFINE macro as an escaped .debug_str
+		// string. Its quoted template is not an emitted constant.
+		if begin > 0 && input[begin - 1] == `\\` {
+			offset = begin + 3
+			continue
+		}
+		start := begin + 3
+		end := input.index_after('<<\"', start) or {
 			return error('unterminated assembly constant')
 		}
-		fields := input[start..start + end].split(' ')
-		offset = start + end + 3
+		fields := input[start..end].split(' ')
+		offset = end + 3
 		if fields.len != 3 || !word(fields[0]) {
 			return error('invalid assembly constant fields')
 		}

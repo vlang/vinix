@@ -72,6 +72,22 @@ fn check(root string) ! {
 		'#define M 0x8000000000000000\n#define N -0x8000000000000000\n' +
 		'#define P 0xffffffffffffffff\n#define U 0xffffffffffffffff\n#define Z 0x7\n'
 	assert artgenerators.asm_header(input)! == expected
+	debug_macro := r'.string "ASM_DEFINE asm volatile(\".ascii \">>\" #NAME \" %0 %1<<\")"' + '\n'
+	assert artgenerators.asm_header(input + '\n' + debug_macro)! == expected
+	// Real GCC debug assembly is several MiB with markers near the front.
+	// Long ignored tails must not be copied for every marker under -gc none.
+	gap := '.debug_string_without_markers\n'.repeat(300000)
+	mut pieces := [gap]
+	mut large_expected := []string{}
+	for i in 0 .. 136 {
+		pieces << '.ascii ">>BOUND_${i} #${i} #0<<"\n'
+		large_expected << '#define BOUND_${i} 0x' + i.hex()
+	}
+	pieces << gap
+	large_expected.sort()
+	large := pieces.join('')
+	assert artgenerators.asm_header(large)! == large_expected.join('\n') + '\n'
+	os.write_file(root + '/large-constants.s', large)!
 	for bad in ['', 'unrelated assembly', '">>X #7 #2<<"', '">>X #x #0<<"',
 		'">>X #18446744073709551616 #0<<"', '">>X #-9223372036854775809 #0<<"',
 		'">>X #1 #0', '">>X Y #1 #0<<"'] {
