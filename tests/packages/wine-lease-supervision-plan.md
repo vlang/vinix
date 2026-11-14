@@ -2183,6 +2183,29 @@ Public real-root admission, actual Wine/guest execution, cross-builds, complete
 source closure and measured heap qualification are not claimed. Migration
 application/recovery and the remaining section 14 gates stay open.
 
+## Installed review command, 2026-11-14
+
+Source `5e3316b2f` exposes `vinix-package wine-prefix-review ID PRIVATE_DATA`.
+The command uses combined service admission, rechecks freshness, emits JSON and
+releases its retained guard/lease on exit. It rejects alternate roots (including
+explicit `--root /`), offline/progress options, bad argument counts, invalid IDs
+and relative private paths. It can create coordination files/directories but
+changes no builtin links and starts no Wine process. JSON carries no admission
+beyond command exit. The existing standalone structural utility is unchanged.
+
+The production host CLI build and eight executable refusal controls pass. Builds
+use the retained V compiler, `-backend c -gc none -manualfree`, repository and
+`tools/accounts` module paths; CLI adds `-prod -cflags -fno-lto -ldflags -fno-lto`.
+The initial missing account-module path build failure is retained. Evidence is
+frozen at `/Users/alex/.cache/vwpublicreview-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-public-prefix-review-20261114-01.inventory.json`
+has SHA-256 `2e40bf434ad8e0dbdf6183e2081323da5e6365747b1f1b5154245bf5aab7a66e`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. New source copies, generated host C/binaries and logs are retained.
+No successful real-root CLI admission, cross-build, guest/Wine execution,
+complete source closure or measured heap qualification is claimed. Migration
+application/recovery and the remaining section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
