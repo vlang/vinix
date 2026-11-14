@@ -370,6 +370,31 @@ the linked kernel SHA-256 is
 `94ec13891e6cc95edb907ead7f2f4565911a125c5f02bc2f0e64f5413541c629`.
 Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 
+### Initial TVB allocation and compute priority defaults
+
+The native queue now allocates the reference's default eight TVB blocks
+before its first scene. The existing staged allocator publishes the complete
+table and inactive firmware counters; initialization failure unwinds the
+whole unpublished graph. G13 compute queues now take priority fields 0 and 5
+from the highest-priority entry when using the reference's default disabled
+compute preemption. The other priority fields retain the requested band.
+
+ASan/UBSan checks cover every initial shared-buffer, UAT-table/block, metadata
+and flush failure on both firmware ABIs, as well as all twelve band/pipe
+combinations and their encoded priority bytes. Reference gates, their unit
+tests, lifetime review and an isolated ARM kernel build passed. The build
+uses `df24c48dd` plus retained `gpu/g13.v` and `fw/workqueue.v`, verified byte
+exact before sealing. The audit remains `not_equivalent` and no hardware
+was accessed. Module/debug overrides and full scheduling remain unchecked.
+
+Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-queue-defaults-20261114/bundle/`.
+The sibling inventory SHA-256 is
+`b7fced80d8483d7c259bab00f9e656284e07fd6a936a253bccf9f6dc274d7ff3`;
+the linked kernel SHA-256 is
+`69498515b1729c638913630c6a78ae00b51f29f1ac189ec1e4cb45aea2908166`.
+Use the retained checker with `check-inventory BUNDLE RECEIPT`.
+
 ## Earlier artifact retention incident
 
 The continuation initially reused the earlier `omarchy-m1-20261114/kernel-build`

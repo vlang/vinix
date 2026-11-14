@@ -20,9 +20,10 @@ fn main() {
 		os.symlink('${repo}/kernel/gpu/agx/${name}', '${scratch}/gpu/agx/${name}')!
 	}
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
-	production := 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport memory\nimport katomic\n' +
+	production := 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport memory\nimport katomic\n' +
 		section(source, 'const g13_tvb_max_size', 'fn write_g13_timestamp(')! +
-		section(source, 'fn (mut mgr GpuManager) ensure_g13_tvb_blocks(', '// Asahi Buffer::auto_grow')!
+		section(source, 'struct G13RenderBufferResources {', 'struct G13TileInfo {')! +
+		section(source, 'fn (mut mgr GpuManager) free_g13_render_buffer_locked(', '// Asahi Buffer::auto_grow')!
 	os.write_file('${scratch}/gpu/production.v', production)!
 	os.cp('${repo}/tests/agx-tvb-growth/test.v', '${scratch}/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })

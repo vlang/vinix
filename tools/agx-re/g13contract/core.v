@@ -46,14 +46,15 @@ pub fn integer_constant(source string, name string, label string) !u64 {
 		}
 		equals := source.index_after('=', end) or { break }
 		mut value := source[equals + 1..].trim_left(' \t\r\n')
-		if value.starts_with('u64(') { value = value[4..].trim_left(' \t\r\n') }
-		if !value.starts_with('0x') { continue }
-		mut length := 2
-		for length < value.len && (value[length].is_hex_digit() || value[length] == `_`) {
+		if value.starts_with('u64(') || value.starts_with('u32(') { value = value[4..].trim_left(' \t\r\n') }
+		hexadecimal := value.starts_with('0x')
+		start := if hexadecimal { 2 } else { 0 }
+		mut length := start
+		for length < value.len && ((if hexadecimal { value[length].is_hex_digit() } else { value[length].is_digit() }) || value[length] == `_`) {
 			length++
 		}
-		if length == 2 { continue }
-		return strconv.parse_uint(value[2..length].replace('_', ''), 16, 64)!
+		if length == start { continue }
+		return strconv.parse_uint(value[start..length].replace('_', ''), if hexadecimal { 16 } else { 10 }, 64)!
 	}
 	return error('${label}: cannot find numeric constant ${name}')
 }
@@ -222,9 +223,25 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'katomic.store(mut &status.resume, u32(1))'], 'Vinix recoverable fault protocol')!
 	channels := read(os.join_path(base, 'fw/channels.rs'))!
 	require_order(channels, ['GrowTVBAck {', 'subpipe: u32', 'halt_count: U64'], 'Asahi GrowTVBAck layout')!
+	parameters := read(os.join_path(base, 'asahi_core.rs'))!
+	require_order(parameters, ['debug_flags: u64 {', 'default: 0,',
+		'compute_preempt: i32 {', 'default: -1,'], 'Asahi default compute preemption')!
+	require_order(workqueue, ['#[ver(G != G14X)]', 'false',
+		'if pipe_type == PipeType::Compute && !preempt', 'prio.0 = 0;', 'prio.5 = 1;'],
+		'Asahi G13 compute priority')!
+	queue_init := section(local, 'fn (mut mgr GpuManager) initialize_g13_subqueue(',
+		'fn (mut mgr GpuManager) invalidate_g13_queue_mappings_locked(', 'Vinix queue priority')!
+	require(queue_init.contains('fw.g13_default_workqueue_priority(resources.priority, pipe_type)'),
+		'Vinix subqueue must use pipe-specific priority')!
+	priority := read(os.join_path(repo, 'kernel/gpu/agx/fw/workqueue.v'))!
+	priority_init := section(priority, 'pub fn g13_default_workqueue_priority(',
+		'pub fn initialize_g13_gpu_context(', 'Vinix queue priority')!
+	require_order(priority_init, ['g13_workqueue_priority(priority)', 'if pipe_type == 2',
+		'value.value_0 = 0', 'value.value_18 = 1'], 'Vinix G13 compute priority')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
 		'pending-stamp fault classification and halt/resume handshake',
-		'TVB growth ACK halt counter']
+		'TVB growth ACK halt counter',
+		'G13 default non-preemptible compute queue priority']
 }
 
 pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
@@ -236,6 +253,18 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 		'used_pages * 3', '.div_ceil(PAGES_PER_BLOCK)', '.min(inner.max_blocks_nomemless)',
 		'need_blocks <= cur_count', 'self.ensure_blocks(want_blocks)'], 'Asahi TVB feedback')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	parameters := read(os.join_path(base, 'asahi_core.rs'))!
+	require_order(parameters, ['initial_tvb_size: usize {', 'default: 0x8,'], 'Asahi initial TVB size')!
+	require(integer_constant(local, 'g13_tvb_initial_blocks', 'Vinix initial TVB')! == 8,
+		'Vinix initial TVB block count differs')!
+	queue := read(os.join_path(base, 'queue/mod.rs'))!
+	require_order(queue, ['let tvb_blocks = *module_parameters::initial_tvb_size.value()',
+		'ret.inner.buffer.ensure_blocks(tvb_blocks)?', 'ret.q_vtx = Some'], 'Asahi initial TVB allocation')!
+	initial := section(local, 'fn (mut mgr GpuManager) initialize_g13_render_buffer(',
+		'// Grow the queue', 'Vinix initial TVB allocation')!
+	require_order(initial, ['if !complete', 'mgr.free_g13_render_buffer_locked',
+		'buffer.initialized = true', 'mgr.ensure_g13_tvb_blocks(mut buffer, g13_tvb_initial_blocks, false)',
+		'complete = true'], 'Vinix initial TVB allocation and unwind')!
 	local_policy := section(local, 'fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(', '// Service firmware', 'Vinix TVB feedback')!
 	require_order(local_policy, ['katomic.load(&stats.max_pages)', 'katomic.store(mut &stats.reset, u32(1))',
 		'u64(g13_tvb_max_blocks_nomemless)', 'used_pages * 2', 'needed < limit',
@@ -290,6 +319,7 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 	require_order(publisher, ['include_init :=', 'vertex_count :=', 'if include_init',
 		'katomic.store(mut &vertex_state.cpu_wptr', 'owned_queue.render_buffer.needs_bind = false'], 'Vinix conditional TVB binding')!
 	return ['TVB page-use feedback, two/three-times headroom and non-memoryless cap',
+		'Initial eight-block TVB allocation before the first scene',
 		'TVB feedback before minimum-dimension growth and scene allocation',
 		'TVB complete allocation before table and counter publication',
 		'TVB slot retained across active scenes and released by the final scene',

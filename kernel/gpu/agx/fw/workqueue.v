@@ -192,6 +192,19 @@ pub fn g13_workqueue_priority(priority u32) ?G13WorkQueuePriority {
 	}
 }
 
+// Asahi WorkQueue::new disables compute preemption by default on G13.
+// Keep the requested band's mask and other fields, but pin the two firmware
+// context-switch fields to the highest-priority entry for compute queues.
+pub fn g13_default_workqueue_priority(priority u32, pipe_type u32) ?G13WorkQueuePriority {
+	if pipe_type >= 3 { return none }
+	mut value := g13_workqueue_priority(priority) or { return none }
+	if pipe_type == 2 {
+		value.value_0 = 0
+		value.value_18 = 1
+	}
+	return value
+}
+
 pub fn initialize_g13_gpu_context(data voidptr, size u64) bool {
 	if data == unsafe { nil } || size < sizeof(G13GpuContextData) {
 		return false

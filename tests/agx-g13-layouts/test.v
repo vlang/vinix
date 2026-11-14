@@ -25,6 +25,7 @@ module main
 // struct layout involved.
 
 import gpu.agx.fw
+import gpu.agx.hw
 
 // The native fixture supplies libc for the kernel's diagnostic-only ABI.
 #include <stdio.h>
@@ -242,6 +243,33 @@ fn check_v13_5_queue_objects() {
 	assert object_u64(scene.data, 0x2c) == 0x0fed_cba9_8765_4321
 }
 
+fn check_default_queue_priorities() {
+	// Independent tuples from packaged fw/workqueue.rs and the compute
+	// override in WorkQueue::new. Assert the bytes firmware actually reads.
+	masks := [u64(0xffff_ffff_ffff_0000), u64(0xffff_ffff_0000_0000),
+		u64(0xffff_0000_0000_0000), u64(0)]!
+	last := [u32(1), u32(0), u32(2), u32(3)]!
+	for band := u32(0); band < 4; band++ {
+		for pipe := u32(0); pipe < 3; pipe++ {
+			priority := fw.g13_default_workqueue_priority(band, pipe) or { panic('priority') }
+			assert priority.value_0 == if pipe == 2 { u32(0) } else { band }
+			assert priority.value_4 == band && priority.mask == masks[band]
+			assert priority.value_10 == if band == 0 { u32(1) } else { u32(0) }
+			assert priority.value_14 == 0
+			assert priority.value_18 == if pipe == 2 { u32(1) } else { last[band] }
+			for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial] {
+				mut bytes := [0xb8]u8{}
+				assert fw.initialize_g13_workqueue_info(unsafe { &bytes[0] }, sizeof(bytes), abi,
+					0x1000, 0x2000, 0x3000, 0x4000, -1, priority, 1, 0x5000)
+				assert object_u32(unsafe { &bytes[0] }, 0x30) == priority.value_0
+				assert object_u32(unsafe { &bytes[0] }, 0x48) == priority.value_18
+			}
+		}
+	}
+	assert fw.g13_default_workqueue_priority(4, 0) == none
+	assert fw.g13_default_workqueue_priority(1, 3) == none
+}
+
 fn check_v13_5_microsequences() {
 	timestamp := fw.G13MicroseqTimestamp{
 		header: 0x8000_0019
@@ -317,6 +345,7 @@ fn main() {
 	check_abi_offset_translation()
 	check_v13_5_command_repacking()
 	check_v13_5_queue_objects()
+	check_default_queue_priorities()
 	check_v13_5_microsequences()
 	println('G13 work-command layout tests passed')
 }

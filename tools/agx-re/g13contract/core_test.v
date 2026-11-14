@@ -17,6 +17,9 @@ fn test_order_rejects_a_reversed_contract() {
 
 fn test_integer_constant_accepts_v_casts_and_separators() {
 	assert integer_constant('pub const aperture = u64(0xffff_ffae_1000_0000)', 'aperture', 'sample')! == u64(0xffffffae10000000)
+	assert integer_constant('const blocks = u32(8)', 'blocks', 'sample')! == 8
+	assert integer_constant('const blocks = u32(0x8)', 'blocks', 'sample')! == 8
+	assert integer_constant('const blocks = 1_024', 'blocks', 'sample')! == 1024
 }
 
 fn test_checked_in_g13_contract_matches_local_m1n1() {

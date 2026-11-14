@@ -14,33 +14,67 @@ fn C.kprintf(format &char, ...) i32
 struct SharedBuffer {
 mut:
 	phys u64
+	va u64
 	size u64
 }
 
 fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
 
-struct G13RenderBufferResources {
+struct G13TailPointerCache {
 mut:
-	initialized   bool            = true
-	context       &mmu.UatContext = unsafe { nil }
-	info          SharedBuffer
-	page_list     &mmu.UatBuffer = unsafe { nil }
-	block_list    &mmu.UatBuffer = unsafe { nil }
-	block_control SharedBuffer
-	blocks        []&mmu.UatBuffer
+	references u32
 }
+
+struct G13QueueResources {
+mut:
+	render_buffer G13RenderBufferResources
+}
+
+struct Allocator {}
+fn (mut allocator Allocator) gc() {}
 
 struct GpuManager {
 mut:
 	hw_config     hw.HwConfig
 	flushes       int
 	fail_flush_at int = -1
+	shared_allocations int
+	shared_releases int
+	fail_shared_at int = -1
+	g13_tvb_slots [127]bool
+	g13_private Allocator
+	g13_shared Allocator
+}
+
+fn (mut mgr GpuManager) alloc_g13_shared_buffer(size u64) ?SharedBuffer {
+	if mgr.shared_allocations == mgr.fail_shared_at { return none }
+	mgr.shared_allocations++
+	storage := unsafe { C.calloc(1, size) }
+	assert storage != unsafe { nil }
+	return SharedBuffer{phys: u64(storage), va: 0x500000 + u64(mgr.shared_allocations) * 0x4000, size: size}
+}
+
+fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64, protection u64) ?SharedBuffer {
+	assert protection == 1
+	return mgr.alloc_g13_shared_buffer(size)
+}
+
+fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
+	if buffer.phys == 0 { return }
+	unsafe { C.free(voidptr(buffer.phys)) }
+	buffer = SharedBuffer{}
+	mgr.shared_releases++
+}
+
+fn (mut mgr GpuManager) release_g13_tpc_locked(mut context mmu.UatContext, cache &G13TailPointerCache) {
+	assert cache == unsafe { nil }, 'no scene exists during queue initialization'
 }
 
 __global observed_control &fw.G13BufferBlockControl = unsafe { nil }
 __global observed_pages &u32 = unsafe { nil }
 __global observed_blocks &u32 = unsafe { nil }
 __global expected_count u32
+__global check_unpublished = true
 
 fn unpublished() {
 	assert observed_control.total == expected_count && observed_control.wptr == expected_count
@@ -54,7 +88,7 @@ fn unpublished() {
 
 fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, address u64, size u64) bool {
 	assert slot == 1 && address % 0x8000 == 0 && size == 0x20000
-	unpublished()
+	if check_unpublished { unpublished() }
 	index := mgr.flushes
 	mgr.flushes++
 	return index != mgr.fail_flush_at
@@ -69,6 +103,7 @@ fn check_growth(abi hw.FirmwareAbi, fail_alloc int, fail_flush int, metadata_fai
 	mut page_buffer := mmu.UatBuffer{ phys: unsafe { u64(&pages) }, size: sizeof(pages) }
 	mut block_buffer := mmu.UatBuffer{ phys: unsafe { u64(&blocks) }, size: sizeof(blocks) }
 	mut buffer := G13RenderBufferResources{
+		initialized: true
 		context:       &context
 		info:          SharedBuffer{ phys: unsafe { u64(&info) }, size: sizeof(info) }
 		page_list:     &page_buffer
@@ -141,6 +176,46 @@ pub fn run_checks() {
 		check_growth(abi, -1, -1, true, false)
 		check_growth(abi, -1, -1, false, false)
 		check_growth(abi, -1, -1, false, true)
+		check_unpublished = false
+		for fail in 0 .. 10 { check_initialization(abi, fail, -1, -1, false) }
+		for fail in 0 .. 5 { check_initialization(abi, -1, fail, -1, false) }
+		for fail in 0 .. 8 { check_initialization(abi, -1, -1, fail, false) }
+		check_initialization(abi, -1, -1, -1, true)
+		check_initialization(abi, -1, -1, -1, false)
+		check_unpublished = true
 	}
 	println('AGX TVB growth: both ABIs, every allocation/flush failure, atomic extension and firmware-owned counters passed')
+	println('AGX initial TVB: eight blocks before any scene, all allocation/flush failures unwind the complete graph on both ABIs passed')
+}
+
+fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fail_flush int, metadata_fail bool) {
+	mut config := hw.t8103_config()
+	config.firmware_abi = abi
+	mut mgr := GpuManager{hw_config: config, fail_shared_at: fail_shared, fail_flush_at: fail_flush}
+	mut context := mmu.UatContext{fail_at: fail_alloc}
+	mut resources := G13QueueResources{}
+	memory.fail_next(metadata_fail)
+	ok := mgr.initialize_g13_render_buffer(mut resources, &context)
+	memory.fail_next(false)
+	if fail_alloc >= 0 || fail_shared >= 0 || fail_flush >= 0 || metadata_fail {
+		assert !ok
+		assert !resources.render_buffer.initialized && resources.render_buffer.info.phys == 0
+		assert resources.render_buffer.blocks.len == 0
+	} else {
+		buffer := &resources.render_buffer
+		assert ok && buffer.initialized && buffer.blocks.len == 8
+		assert !buffer.slot_reserved && buffer.active_scenes == 0 && buffer.tail_pointer_cache == unsafe { nil }
+		control := unsafe { &fw.G13BufferBlockControl(buffer.block_control.cpu_address()) }
+		assert control.total == 8 && control.wptr == 8 && mgr.flushes == 8
+		assert context.allocated == 10 && mgr.shared_allocations == 5
+		// The initial non-active counters agree with the block table rather
+		// than waiting until the first frame to populate firmware state.
+		mut expected := []u8{len: int(buffer.info.size)}
+		unsafe { C.memcpy(expected.data, buffer.info.cpu_address(), buffer.info.size) }
+		assert fw.update_g13_buffer_info_counts(expected.data, abi, 32, 8, 31)
+		assert unsafe { C.memcmp(expected.data, buffer.info.cpu_address(), buffer.info.size) } == 0
+		unsafe { expected.free() }
+		mgr.free_g13_render_buffer_locked(mut resources.render_buffer)
+	}
+	assert context.allocated == context.released && mgr.shared_allocations == mgr.shared_releases
 }

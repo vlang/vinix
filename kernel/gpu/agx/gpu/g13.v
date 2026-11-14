@@ -26,6 +26,7 @@ const g13_tvb_max_size = u64(862_322_688)
 const g13_tvb_max_blocks = u32(g13_tvb_max_size / fw.g13_tvb_block_size)
 const g13_tvb_max_blocks_nomemless = g13_tvb_max_blocks / u32(3)
 const g13_tvb_max_pages = g13_tvb_max_blocks * fw.g13_tvb_pages_per_block
+const g13_tvb_initial_blocks = u32(8)
 
 fn write_g13_timestamp(destination voidptr, v13_5 bool, legacy &fw.G13MicroseqTimestamp,
 	unknown_timestamp_address u64) u64 {
@@ -583,6 +584,9 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 		stats.reset = 1
 	}
 	buffer.initialized = true
+	// Queue::new reserves the module's default eight TVB blocks before any
+	// scene exists. Failure must unwind the entire unpublished buffer graph.
+	if !mgr.ensure_g13_tvb_blocks(mut buffer, g13_tvb_initial_blocks, false) { return false }
 	complete = true
 	return true
 }
@@ -813,7 +817,7 @@ fn (mut mgr GpuManager) initialize_g13_subqueue(mut resources G13QueueResources,
 	}
 	info_size := fw.g13_workqueue_info_active_size(mgr.hw_config.firmware_abi) or { return false }
 	queue.info = mgr.alloc_g13_buffer_with_protection(info_size, pgtable.gpu_prot_fw_private_rw) or { return false }
-	priority := fw.g13_workqueue_priority(resources.priority) or { return false }
+	priority := fw.g13_default_workqueue_priority(resources.priority, pipe_type) or { return false }
 	unsafe {
 		mut state := &fw.G13WorkQueueRingState(queue.state.cpu_address())
 		state.rb_size = fw.g13_workqueue_entries
