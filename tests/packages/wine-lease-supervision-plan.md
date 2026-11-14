@@ -3421,6 +3421,66 @@ Typed receipt:
 SHA-256 `4f8eee15c0b883bf82060bb29c28f774b02e8b7178b82d27077ac22802602d9e`.
 Recording and independent comparison pass.
 
+## Public CLI recovery across VJFS VM cuts, 2026-11-14
+
+Source `867f43bbb` adds CLI mode to the signed-service cut fixture. A V builder
+copies `tools/packages/main.v` byte-for-byte beside a test-only fsync hook,
+records source hashes and refuses an existing output directory. The entrypoint
+SHA-256 is `35d7a221de8b22a9636d8796f6dc38e1064cfa81bae26b4ab8cfd9dfa70cdd41`.
+The production dispatcher source remains unchanged. The CLI test build uses
+`-Dfsync=vinix_wine_cli_cut_fsync`; it passes real syscalls through and pauses
+only for the fixture's UID-1000 migration command, after a stage exists.
+
+The guest closes its preliminary service owner and execs the public
+`wine-prefix-migrate` entrypoint as the writer. The existing three sync
+acknowledgement cuts still require QEMU SIGKILL/signal 9 and a cold boot on
+the same VJFS disk. A tmpfs arm file is absent after reboot. Public migration,
+repeated migration and review must then exit zero and return parsed JSON with
+generation 2, prior generation zero, runtime `wine`, and all three exact current
+`keep` rows. JSON replies are retained in serial output. Independent service
+admission/recheck, lease/reader probes, private-data checks, post-recovery grace,
+poweroff, clear journal marker and strict read-only filesystem inspection remain.
+
+The final controller passes all six cases within the unchanged 120-second cap:
+
+| Cut point | x86 seconds | ARM seconds |
+| --- | ---: | ---: |
+| Stage sync | 32.071 | 20.791 |
+| Destination sync after rename | 40.046 | 20.950 |
+| Source-directory sync | 38.530 | 22.272 |
+
+Before the final empty-path preflight guard, all six CLI cases also passed;
+fresh final-guest-source service-only x86 regression passed in
+27.351/40.867/34.726 seconds. That controller rejected all three no-pause CLI
+cases for ending before the requested cut, and all three service-only guests
+in CLI mode for missing CLI markers. Its exact source is retained separately.
+Final preflight additionally refuses empty CLI paths and malformed modes before
+work creation. All accepted final runs verify selected input and staged-CLI
+hashes before/after and pass separate clean export plus `e2fsck -f -n` exit zero.
+The source-copy overwrite control also refuses.
+
+Evidence is retained at `/Users/alex/.cache/vwwineclicut-20261114-01`, with isolated
+base `c638ff7c6` plus `source.patch`, matching test V files, unchanged dispatcher
+copies, source identities, generated C, parsed-source lists, binaries, kernels,
+raw/inspection images, serial/QMP logs, controls and validation notes. Final
+accepted runs use `check-final`, `guest-amd64/arm64` and `cli-amd64/arm64`;
+the initial UID-prototype refusal and pre-guard source/results remain preserved.
+Production/manual-free V and LLVM/musl profiles retain the existing pointer-type
+exception. Complete prerequisite bundles and original namespaces remain required.
+
+This qualifies the public dispatcher in an instrumented test build at three
+acknowledged VM-cut boundaries for a locally signed three-row marker prefix.
+The packages do not execute Wine. Uninstrumented release-binary durability,
+physical power loss/torn writes/host cache loss, every interruption point,
+plain-ext2 safety, 741-row cuts, real Wine execution/version/GUI compatibility,
+measured heap, complete descriptor accounting, whole-launch lifetime and strict
+ABI/hermetic closure remain separate gates. Product behavior/defaults are unchanged.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-cli-powercut-20261114-01.inventory.json`,
+SHA-256 `8a45ad0b79723641b7a831501a5c4531829ccea7966fed1cd97551962b6d2869`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

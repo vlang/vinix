@@ -1348,6 +1348,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Signed real-root service recovery](tests/packages/wine-lease-supervision-plan.md#signed-real-root-service-recovery-across-vjfs-vm-cuts-2026-11-14)
     also passes those cuts on both architectures with persistent signed state,
     fresh public admission and generation/store coordination release.
+    [Public CLI VM-cut recovery](tests/packages/wine-lease-supervision-plan.md#public-cli-recovery-across-vjfs-vm-cuts-2026-11-14)
+    now passes those three points on both architectures using a byte-identical
+    dispatcher entrypoint with test-only sync interception, cold public-command
+    migration/repetition/review JSON checks and clean filesystem inspection.
     Broader power-loss recovery and Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
