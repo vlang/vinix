@@ -2069,6 +2069,28 @@ complete source closure and measured heap flatness are not claimed. Signed
 end-to-end qualification, migration application/recovery and the remaining
 section 14 gates stay open.
 
+## Persisted prefix-review lease, 2026-11-14
+
+Source `194c95f1a` extends the host bridge controls with persisted generation
+state decoded through `generation_lease()` under a package reader lock. The
+combined review owns the real shared flock lease after the reader lock retires.
+The collector's captured lease cannot acquire an exclusive lock before or after
+review recheck; after repeatable owner close, it acquires that lock and passes
+collection identity checks. Prefix coordination can also be acquired again.
+The complete host bridge tests pass with the retained V compiler, `-backend c
+-gc none -manualfree` and repository module path. Earlier missing-lock and
+incorrect runtime-entrypoint fixture failures remain with final passing logs.
+
+Evidence is frozen at `/Users/alex/.cache/vwleasebridge-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-real-lease-20261114-01.inventory.json`
+has SHA-256 `796f3be416aec33ec9ca52549bad765edfc6c6127d2db09635a05252079db6d2`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. New source copies, generated host C/binaries and logs are retained.
+This verifies real lease ownership and collector-lock contention, not signed
+publisher/payload admission, generation removal, cross-builds, guest execution,
+complete source closure or measured heap flatness. Signed admission qualification,
+migration application/recovery and the other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
