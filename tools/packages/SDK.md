@@ -2026,6 +2026,15 @@ continuity. Construction performs this check before returning. Calling only
 trust or activation. Successful recheck supplies no authority for a later write;
 application and interruption recovery remain separate requirements.
 
+`vinix-package wine-prefix-review ID PRIVATE_DATA` exposes this combined review
+for an installed Windows application, as the ordinary prefix owner. It always
+prints JSON (`--json` is also accepted), rejects `--root`, `--offline` and
+`--progress`, and repeats service-level recheck before output. Private data must
+be an absolute existing account-owned directory. The command may create launch
+and server coordination files/directories, but changes no builtin links and
+starts no Wine process. Exit releases the generation lease and prefix guard;
+the JSON report carries no retained admission for a later command.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership
