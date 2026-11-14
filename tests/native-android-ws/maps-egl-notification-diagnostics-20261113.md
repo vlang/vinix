@@ -18,7 +18,8 @@ diagnostics, not a rendering or notification transport repair.
 The signed API fixture now cancels a never-posted ID twice under its isolated
 identity without a notification broker. It queues a main-handler fence after
 both cancellations, so its pass marker follows their actual queued work.
-ARM execution of this new regression is pending.
+ARM execution of this new regression subsequently
+[passed in fresh r78](maps-diagnostic-api-runtime-20261114.md).
 
 Sources are the nativews diagnostics/egl_state/notifications files and
 current-api-fixture plus notificationcancelprobe in this commit, following
@@ -58,8 +59,10 @@ child exit -1): only 1201610752 bytes were free, below reserve plus growth.
 Its retained maps-current-20261113-r77.stage.guard.json is a refusal, not a
 staging or cleanup pass. Subsequent read-only probes saw less than 1 GiB free.
 No r77 VM was launched; all test VMs started by this continuation are stopped.
-The new native diagnostics and cancellation regression have not passed ARM
-runtime validation. Existing r75 API results do not qualify these new bytes.
+At that point the new native diagnostics and cancellation regression had not
+passed ARM runtime validation. Existing r75 API results do not qualify these bytes.
+This records the r77 refusal; the later r78 signed ARM qualification is linked
+above and retains separate evidence.
 
 A separate unproved rendering lead is shared EGL display lifetime:
 ws_egl_initialize forwards every initialization to Mesa and ws_egl_terminate

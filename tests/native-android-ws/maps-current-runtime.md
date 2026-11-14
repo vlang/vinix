@@ -29,8 +29,12 @@ in r76 observed valid camera/viewport state followed by a bad EGL surface;
 sign-in reached a server communication error page and the main looper later
 failed during notification cancellation. Bounded
 [EGL/notification diagnostics and a signed cancellation regression](maps-egl-notification-diagnostics-20261113.md)
-have passed build checks. Their ARM retry is blocked by host disk space below
-the retained reserve; no test VM from this continuation remains running.
+passed [the full signed ARM regression in r78](maps-diagnostic-api-runtime-20261114.md).
+That Maps retry reached onboarding just before the retained session deadline;
+its two uniform EGL frames produced no error code. It does not resolve r76's
+later failures. Host capacity has recovered, but a newer-V controller build
+was stopped on observed shared disk growth. No test VM from this continuation
+remains running.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.
