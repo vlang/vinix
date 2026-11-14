@@ -2091,6 +2091,28 @@ publisher/payload admission, generation removal, cross-builds, guest execution,
 complete source closure or measured heap flatness. Signed admission qualification,
 migration application/recovery and the other section 14 gates remain open.
 
+## Collection during prefix review, 2026-11-14
+
+Source `626cd8d9c` extends the persisted-state host test through actual
+`collect_locked()` calls under the package writer lock. Activation moves to
+generation 3 with no rollback protection for generation 2. Three collection
+attempts retain generation 2's builtin bytes while the combined review holds its
+lease; review rechecks pass each time. After owner close, collection removes
+generation 2, preserves generation 3 and its activation pointer, and leaves the
+private prefix link text unchanged. The full host bridge test passes using the
+retained V compiler with `-backend c -gc none -manualfree` and repository path.
+
+Evidence is frozen at `/Users/alex/.cache/vwcollectbridge-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-collection-20261114-01.inventory.json`
+has SHA-256 `50f4f547b6a51dbddce81b59228abf4718707b1ab97637ea3fda63e0fdf30db9`.
+Record and independent check pass complete bytes, sizes, types, modes and link
+targets. Initial fixture-directory creation failure is retained beside passing
+corrected logs, generated host C/binaries and new source copies. This qualifies
+local collection retention/removal, not signed publisher admission, Wine
+execution, cross-builds, guest behavior, complete source closure or measured
+heap flatness. Signed service qualification, migration application/recovery and
+the other section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
