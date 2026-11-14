@@ -425,12 +425,16 @@ exercise this path through pipeline creation and deferred dispatch.
 
 Buffer kernels also support scalar integer width casts, signed/unsigned
 integer↔half/float conversions, half↔float precision changes and raw bitcasts
-between i16/half or i32/float. Casts have one-step cost and no flags.
-Integer-pointer, address-space, vector, aggregate, double and bfloat conversions
+between i16/half or i32/float. Casts have one-step cost. Integer `trunc` accepts
+`nuw`/`nsw` (separately or together); `zext` accepts `nneg`. Violating these
+promises produces poison. Other cast flags remain unsupported.
+Integer-pointer, vector, aggregate, double and bfloat conversions
 remain unsupported. Invalid
 float-to-integer inputs yield poison; storing it follows failed-command
 completion, while an unchosen select operand may discard it. Synthetic kernels
 combine signed conversion with floating addition in both directions.
+Deferred dispatch checks also cover flagged truncation and extension, freeze of
+their poison results, and failed-command completion for poison stores.
 
 Scalar half/float `fneg` toggles just the sign bit, including NaN payloads and
 signed zeros. Scalar i1..i64/half/float `freeze` preserves defined bits and

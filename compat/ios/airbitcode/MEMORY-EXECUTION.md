@@ -85,8 +85,12 @@ Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
 unsigned conversions between those integers and half/float, float-to-half
 truncation, half-to-float extension, and same-width integer/floating bitcasts
-at 16/32 bits. Integer width changes require the correct direction. Flags,
-integer-pointer casts, vector/aggregate casts, double and bfloat remain
+at 16/32 bits. Integer width changes require the correct direction. `trunc`
+accepts `nuw`, `nsw` or both: unsigned/signed preservation of the source value
+is required respectively, or the result is poison. `zext nneg` produces poison
+for negative sources (including i1 true). These promises apply in the integer,
+mixed scalar, void and memory profiles and add no execution steps. Other cast
+flags, integer-pointer casts, vector/aggregate casts, double and bfloat remain
 unsupported. Pointer bitcasts and bounded address-space casts are described below.
 Float-to-integer conversion truncates toward zero; NaN, infinity and values
 whose truncated result is outside the destination range produce poison.
@@ -531,6 +535,11 @@ and after subtraction, exact prefix extents, aliases, field-prefix bounds and
 underflow that a later field offset would otherwise hide.
 `tests/ios/air-memory-casts.v` checks load/cast/store bodies against defined
 native LLVM conversions, with separate poison and unsupported-input controls.
+`tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
+extension shape in bounded modules. Defined inputs compare with native LLVM;
+an independent range oracle checks poison without executing invalid native
+casts. It also checks integer/mixed/void APIs, prior-write preservation,
+budgets, preflight metadata rejection, and poison/undef/freeze/select chains.
 `tests/ios/air-memory-unary.v` checks fneg/freeze against native LLVM and exact
 raw-bit expectations, all half encodings, and separate indeterminate choices.
 `tests/ios/air-memory-flags.v` checks integer flags across all widths against a

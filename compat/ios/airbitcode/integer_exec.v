@@ -159,7 +159,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			for target in p.targets[op.targets_start..op.targets_start + op.targets_count] { if target < s.blocks_start || target >= s.blocks_start + s.blocks_count { return error('AIR integer: foreign block target') } }
 			if inst.has_result { if !pair_result && !pair_flow { p.execution_bits(op.result_type, binary32)! }; if inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR integer: result slot') } }
 			floating_result := inst.has_result && p.types[op.result_type].kind in [.float_t, .half_t]!
-			allowed_flags := if code == 34 { u64(32768) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
+			allowed_flags := if code == 34 { u64(32768) } else if code == 3 { scalar_cast_flag_mask(op.opcode) } else if code == 2 && !floating_result { integer_binary_flag_mask(op.opcode) } else { u64(0) }
 			if op.flags & ~allowed_flags != 0 { return error('AIR integer: unsupported instruction flags') }
 			match code {
 				34 {} // Checked direct intrinsic, including its attributes, above.

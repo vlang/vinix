@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1163,6 +1163,12 @@ fn sm_test_compute_library(label string) ![]u8 {
 		for op in ['floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ})\n') }
 	}
 	for name in names {
+		if name in ['cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen'] {
+			trunc_flags := if name.starts_with('cast_trunc') { 'nuw nsw ' } else { '' }
+			zext_flags := if name.starts_with('cast_zext') { 'nneg ' } else { '' }
+			result := if name.ends_with('_frozen') { '%v = freeze i32 %wide' } else { '%v = add i32 %wide, 0' }
+			source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load i32, ptr addrspace(2) %a, align 4\n %small = trunc ${trunc_flags}i32 %x to i8\n %wide = zext ${zext_flags}i8 %small to i32\n ${result}\n store i32 %v, ptr addrspace(1) %out, align 4\n ret void }\n'); continue
+		}
 		if name == 'address_space_sum' {
 			source.write_string('define void @address_space_sum(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %a0 = addrspacecast ptr addrspace(2) %a to ptr\n %a1 = addrspacecast ptr %a0 to ptr addrspace(1)\n %ax = addrspacecast ptr addrspace(1) %a1 to ptr\n %b1 = addrspacecast ptr addrspace(2) %b to ptr addrspace(1)\n %o2 = addrspacecast ptr addrspace(1) %out to ptr addrspace(2)\n %o0 = addrspacecast ptr addrspace(2) %o2 to ptr\n %ox = addrspacecast ptr %o0 to ptr addrspace(2)\n %oy = addrspacecast ptr addrspace(2) %ox to ptr\n %ai = getelementptr i32, ptr %ax, i64 2\n %bi = getelementptr i32, ptr addrspace(1) %b1, i64 1\n %di = getelementptr i32, ptr %oy, i64 3\n %x = load i32, ptr %ai, align 4\n %y = load i32, ptr addrspace(1) %bi, align 4\n %v = add i32 %x, %y\n store i32 %v, ptr %di, align 4\n ret void }\n'); continue
 		}
@@ -1492,6 +1498,27 @@ fn test_software_metal_compute() {
 		sm_test_compute_dispatch(fail_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(fail_encoder, c'endEncoding'); objc_release(fail_pipeline)
 		sm_call(flag_failure, c'commit'); assert sm_send(flag_failure, c'status') == 5 && sm_send(flag_failure, c'error') != 0
 		assert unsafe { *(&u32(outp + 4)) } == 300
+		cast_command := sm_send(queue, c'commandBuffer'); cast_encoder := sm_send(cast_command, c'computeCommandEncoder')
+		for i, name in ['cast_trunc', 'cast_trunc_frozen', 'cast_zext', 'cast_zext_frozen'] {
+			cast_pipeline := sm_test_compute_pipeline(d, library, name, unsafe { nil }); assert cast_pipeline != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(cast_encoder, c'setComputePipelineState:', cast_pipeline) }
+			sm_test_compute_buffer(cast_encoder, a, u64(i * 4), 0); sm_test_compute_buffer(cast_encoder, b, 0, 3)
+			sm_test_compute_buffer(cast_encoder, output, u64(4 + i * 4), 7)
+			sm_test_compute_dispatch(cast_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); objc_release(cast_pipeline)
+		}
+		sm_call(cast_encoder, c'endEncoding')
+		unsafe { *(&u32(ap)) = 73; *(&u32(ap + 4)) = 128; *(&u32(ap + 8)) = 92; *(&u32(ap + 12)) = 255 }
+		sm_call(cast_command, c'commit'); assert sm_send(cast_command, c'status') == 4
+		assert unsafe { *(&u32(outp + 4)) } == 73 && unsafe { *(&u32(outp + 8)) } == 0 && unsafe { *(&u32(outp + 12)) } == 92 && unsafe { *(&u32(outp + 16)) } == 0
+		for i, name in ['cast_trunc', 'cast_zext'] {
+			cast_failed := sm_send(queue, c'commandBuffer'); cast_failed_encoder := sm_send(cast_failed, c'computeCommandEncoder')
+			cast_failed_pipeline := sm_test_compute_pipeline(d, library, name, unsafe { nil }); assert cast_failed_pipeline != 0
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(cast_failed_encoder, c'setComputePipelineState:', cast_failed_pipeline) }
+			sm_test_compute_buffer(cast_failed_encoder, a, u64(4 + i * 8), 0); sm_test_compute_buffer(cast_failed_encoder, b, 0, 3); sm_test_compute_buffer(cast_failed_encoder, output, 4, 7)
+			sm_test_compute_dispatch(cast_failed_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(cast_failed_encoder, c'endEncoding'); objc_release(cast_failed_pipeline)
+			sm_call(cast_failed, c'commit'); assert sm_send(cast_failed, c'status') == 5 && sm_send(cast_failed, c'error') != 0
+			assert unsafe { *(&u32(outp + 4)) } == 73
+		}
 		bits_command := sm_send(queue, c'commandBuffer'); bits_encoder := sm_send(bits_command, c'computeCommandEncoder')
 		for i, name in ['bits', 'bits_frozen'] {
 			bits_pipeline := sm_test_compute_pipeline(d, library, name, unsafe { nil }); assert bits_pipeline != 0
@@ -1891,7 +1918,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/address-space-cast/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/cast-flags/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/address-space-cast/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {
