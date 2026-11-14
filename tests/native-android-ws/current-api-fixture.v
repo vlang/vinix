@@ -24,6 +24,7 @@ import networkvalidationprobe
 import notificationcancelprobe
 import jobimportantprobe
 import bitmapbufferprobe
+import useruidprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1409,6 +1410,7 @@ invoke-static {}, Lorg/vinix/bootstrap/NetworkValidationProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/NotificationCancelProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/JobImportantProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/BitmapBufferProbe;->check()V
+invoke-static {}, Lorg/vinix/bootstrap/UserUidProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1673,6 +1675,7 @@ fn main() {
 	notificationcancelprobe.install(root)!
 	jobimportantprobe.install(root)!
 	bitmapbufferprobe.install(root)!
+	useruidprobe.install(root)!
 	if tls_lifetime { tlslifetimeprobe.install(root)! }
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;

@@ -56,5 +56,9 @@ archive reconstructed without removals (22567 bytes, 45 chunks).
 | maps-headless-egl-api-readback-20261114-r1/archive.json | 077ba3e58e4e943e2cd974798b28549ea52eaf0a86aa5a7ec88dbfc7bd2f6aec |
 | maps-headless-egl-api-child-20261114-r1/child.log | d19c6d525ed78ab4219459e830668a36f207b8c172221e0812f238d7327a956f |
 
-The real headless Google services/account retry remains in progress. These
-checks alone do not establish that sign-in or full Maps works.
+The [completed r95 retry](maps-user-uid-20261114.md) reached authenticator
+service readiness after progressing past eglGetDisplay. A different worker
+then failed on missing UserHandle.getUserHandleForUid, followed by Java exit 10.
+The next SDK adapter and signed UID regression are built; ARM execution is
+pending. r95's private bundle is retained and its guest is stopped. These
+checks do not establish that sign-in or full Maps works.

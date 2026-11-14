@@ -172,6 +172,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_persistent_data_block(smali)!
  framework_bitmap_tiles(smali)!
  framework_bitmap_buffers(smali)!
+ framework_user_uid(smali)!
  framework_window_animations(smali)!
  framework_layout_alignment(smali)!
  framework_user_restrictions(smali)!

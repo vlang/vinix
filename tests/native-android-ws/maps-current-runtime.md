@@ -4,8 +4,13 @@ Latest continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers
 in 7796d94ba passed the signed ARM API suite with current V. Fresh r93 rendered
 Paris tiles, the Eiffel Tower-to-Louvre route and two mapped turn previews.
 The session was stopped and its private evidence synced to the checked data
-volume before stopping QEMU. Imagery, sustained responsiveness and Google
-authentication still require validation; full Maps is not qualified.
+volume before stopping QEMU. The [headless EGL repair](maps-headless-egl-provider-20261114.md)
+in 75d0067fe also passed the signed ARM suite. Real Google services then reached
+authenticator readiness and exited on the missing
+[UserHandle UID conversion](maps-user-uid-20261114.md). That next adapter,
+SDK/native build and signed fixture are ready; ARM execution awaits a quieter
+host and more disk space. All test guests are stopped. Imagery, sustained
+responsiveness and Google authentication remain unqualified.
 
 Earlier continuation, 2026-11-13: real search, Louvre details and photos were
 observed in [r66](maps-current-memory-runtime-20261112.md); tiles and route
