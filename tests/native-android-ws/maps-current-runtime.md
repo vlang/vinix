@@ -65,6 +65,11 @@ AOT attempts are retained as extra startup work, with no causal speedup claim
 or unsupported ART flag change. The session stayed alive beyond five minutes
 after Add account and ended through the checked stop path. Sign-in and fully
 responsive use remain unresolved; both test VMs are stopped.
+The [checked ART source candidate](maps-art-no-image-source-20261114.md)
+addresses the observed compiler launches without a loaded boot image. Its V
+transformation and zero-fuzz patch checks pass. It is not deployed: a matching
+native ARM64 musl ART build and ARM qualification remain required. The local
+retained source is only a six-file audit selection, with no reusable objects.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.
