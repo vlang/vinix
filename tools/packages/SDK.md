@@ -1969,6 +1969,24 @@ admission, lease/launch serialization, fresh rechecks and interruption recovery.
 See the [binding review qualification](../../tests/packages/wine-lease-supervision-plan.md#runtime-binding-review-2026-11-14)
 for host controls and cross-build limits.
 
+`wine-prefix-review PACKAGE_STORE PRIVATE_DATA NEW_BUILTINS --idle` opts into
+managed-launch coordination. It requires an existing private prefix, acquires
+its launch guard, captures the private Wine server namespace and requires no
+server lock owner or socket entry before and after review. Unlike the default
+inspection command, this mode may create coordination files and directories.
+It changes no builtin links and starts no Wine processes. Its guard is released
+when the command exits; printed JSON does not retain admission for a later tool.
+
+Library callers can retain `wineadapter.capture_idle_binding_review()` while
+working, call its `recheck()` to require the same binding rows and an idle,
+unchanged server namespace, then call repeatable `close()`. The capture has one
+owner: do not copy it, close it concurrently, or transfer its borrowed `review`.
+It excludes cooperating managed launches while held, and does not exclude
+arbitrary same-account writers or establish runtime authenticity. As with server
+startup admission, the caller must hold no POSIX locks on the server lock file;
+F_GETLK cannot report the caller's own locks. This remains a migration prerequisite;
+binding application, fresh authentication and interruption recovery remain open.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership

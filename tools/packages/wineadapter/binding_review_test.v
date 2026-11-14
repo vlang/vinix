@@ -3,6 +3,63 @@ module wineadapter
 
 import os
 
+#include <sys/wait.h>
+#include <signal.h>
+#include <poll.h>
+#define wine_binding_test_fork fork
+#define wine_binding_test_waitpid waitpid
+#define wine_binding_test_kill kill
+fn C.pipe(&i32) i32
+fn C.wine_binding_test_fork() int
+fn C.wine_binding_test_waitpid(int, &int, int) int
+fn C.wine_binding_test_kill(int, int) int
+fn C._exit(int)
+struct C.pollfd { mut: fd i32 events i16 revents i16 }
+fn C.poll(&C.pollfd, u64, int) int
+
+fn idle_review_foreign_owner(capture &IdleBindingReview) ! {
+	mut ready := [2]i32{}
+	mut release := [2]i32{}
+	assert C.pipe(&ready[0]) == 0
+	defer { C.close(ready[0]); C.close(ready[1]) }
+	assert C.pipe(&release[0]) == 0
+	defer { C.close(release[0]); C.close(release[1]) }
+	lock_path := capture.server.path + '/lock'
+	defer { unsafe { lock_path.free() } }
+	pid := C.wine_binding_test_fork()
+	assert pid >= 0
+	if pid == 0 {
+		C.close(ready[0]); C.close(release[1])
+		fd := C.open(lock_path.str, C.O_RDWR | C.O_NOFOLLOW | C.O_CLOEXEC)
+		mut record := C.vinix_wine_directory_lock{l_type: i16(C.F_WRLCK), l_whence: i16(C.SEEK_SET), l_len: 1}
+		mut signal := u8(1)
+		if fd < 0 || C.vinix_wine_directory_fcntl(fd, C.F_SETLK, unsafe { &record }) != 0 { C._exit(2) }
+		if C.write(ready[1], &signal, 1) != 1 { C._exit(3) }
+		if C.read(release[0], &signal, 1) != 1 { C._exit(4) }
+		C._exit(0)
+	}
+	mut reaped := false
+	defer {
+		if !reaped {
+			C.wine_binding_test_kill(pid, C.SIGKILL)
+			mut status := 0
+			C.wine_binding_test_waitpid(pid, &status, 0)
+		}
+	}
+	C.close(ready[1]); ready[1] = -1
+	C.close(release[0]); release[0] = -1
+	mut signal := u8(0)
+	mut readable := C.pollfd{fd: ready[0], events: i16(C.POLLIN)}
+	assert C.poll(&readable, 1, 5000) == 1 && readable.revents & C.POLLIN != 0
+	assert C.read(ready[0], &signal, 1) == 1 && signal == 1
+	idle_review_refused(capture, 'lock already has an owner')
+	assert C.write(release[1], &signal, 1) == 1
+	mut status := 0
+	assert C.wine_binding_test_waitpid(pid, &status, 0) == pid && status == 0
+	reaped = true
+	capture.recheck()!
+}
+
 fn binding_snapshot(path string, mut files map[string]string) ! {
 	if os.is_link(path) { files[path] = 'link:' + os.readlink(path)!; return }
 	if os.is_dir(path) {
@@ -45,6 +102,94 @@ fn test_builtin_generation_paths_are_canonical() {
 	generation, runtime := builtin_generation('/store', '/store/generations/18446744073709551615/apps/org.vinix.wine/root/usr/lib/wine/x86_64-windows')!
 	assert generation == u64(18446744073709551615)
 	assert runtime == 'org.vinix.wine'
+}
+
+fn idle_review_refused(capture &IdleBindingReview, message string) {
+	capture.recheck() or { assert err.msg().contains(message), err.msg(); return }
+	assert false, 'changed idle review accepted'
+}
+
+fn test_idle_binding_review_coordinates_launches_and_rechecks_changes() {
+	root := os.real_path(os.temp_dir()) + '/wine-idle-binding-review-' + os.getpid().str()
+	os.mkdir(root)!
+	defer { os.rmdir_all(root) or {} }
+	store := root + '/store'
+	old := store + '/generations/1/apps/org.vinix.wine/root/usr/lib/wine/x86_64-windows'
+	new := store + '/generations/2/apps/org.vinix.wine/root/usr/lib/wine/x86_64-windows'
+	data := root + '/data'
+	os.mkdir_all(old)!; os.mkdir_all(new)!; os.mkdir(data)!
+	os.chmod(data, 0o700)!; os.chown(data, int(C.geteuid()), os.getegid())!
+	os.write_file(old + '/kernel32.dll', 'old')!; os.write_file(new + '/kernel32.dll', 'new')!
+	mut prefix := prepare_prefix(data, old)!
+	defer { prefix.close() }
+	system := data + '/wine/drive_c/windows/system32'
+	mut before := map[string]string{}
+	binding_snapshot(system, mut before)!
+	baseline := C.open(c'/dev/null', C.O_RDONLY | C.O_CLOEXEC)
+	assert baseline >= 0
+	C.close(baseline)
+	mut capture := capture_idle_binding_review(data, new, store)!
+	defer { capture.close() }
+	assert capture.review.prior_generation == 1
+	capture.recheck()!
+	if mut competitor := prefix.acquire_launch(data) {
+		competitor.close(); assert false, 'review failed to exclude competing launch'
+	} else { assert err.msg().contains('already has a managed launch') }
+	cli := os.getenv('VINIX_WINE_PREFIX_REVIEW')
+	if cli != '' {
+		mut child := os.new_process(cli)
+		defer { child.close() }
+		child.set_args([store, data, new, '--idle'])
+		child.set_redirect_stdio_merged(); child.run()
+		output := child.stdout_slurp(); child.wait()
+		assert child.code == 1 && output.contains('already has a managed launch'), output
+	}
+	// An endpoint appearing after capture must refuse even if its bytes are
+	// not a socket. Never remove it as part of admission or cleanup.
+	os.write_file(capture.server.path + '/socket', 'foreign endpoint')!
+	idle_review_refused(&capture, 'socket entry already exists')
+	assert os.read_file(capture.server.path + '/socket')! == 'foreign endpoint'
+	os.rm(capture.server.path + '/socket')!
+	idle_review_foreign_owner(&capture)!
+	lock_path := capture.server.path + '/lock'
+	os.mv(lock_path, lock_path + '.saved')!
+	os.write_file(lock_path, '')!; os.chmod(lock_path, 0o600)!
+	os.chown(lock_path, int(C.geteuid()), os.getegid())!
+	idle_review_refused(&capture, 'lock identity changed')
+	os.rm(lock_path)!; os.mv(lock_path + '.saved', lock_path)!
+	os.write_file(new + '/added.dll', 'new asset')!
+	idle_review_refused(&capture, 'review changed')
+	os.rm(new + '/added.dll')!
+	os.rm(system + '/kernel32.dll')!; os.symlink(new + '/kernel32.dll', system + '/kernel32.dll')!
+	idle_review_refused(&capture, 'review changed')
+	os.rm(system + '/kernel32.dll')!; os.symlink(old + '/kernel32.dll', system + '/kernel32.dll')!
+	capture.recheck()!
+	mut after := map[string]string{}
+	binding_snapshot(system, mut after)!
+	assert before == after
+	capture.close(); capture.close()
+	closed_fd := C.open(c'/dev/null', C.O_RDONLY | C.O_CLOEXEC)
+	assert closed_fd == baseline
+	C.close(closed_fd)
+	idle_review_refused(&capture, 'canonical absolute data path')
+	mut released := prefix.acquire_launch(data)!
+	released.close()
+	if cli != '' {
+		mut child := os.new_process(cli)
+		defer { child.close() }
+		child.set_args([store, data, new, '--idle'])
+		child.set_redirect_stdio_merged(); child.run()
+		output := child.stdout_slurp(); child.wait()
+		assert child.code == 0 && output.contains('"operation":"replace"'), output
+	}
+	// A failed capture releases its guard so the owner can launch again.
+	os.rm(system + '/kernel32.dll')!; os.write_file(system + '/kernel32.dll', 'personal contents')!
+	if mut invalid := capture_idle_binding_review(data, new, store) {
+		invalid.close(); assert false, 'ordinary file accepted'
+	} else { assert err.msg().contains('symlinks') }
+	mut recovered := prefix.acquire_launch(data)!
+	recovered.close()
+	assert os.read_file(system + '/kernel32.dll')! == 'personal contents'
 }
 
 fn test_binding_review_is_read_only_and_refuses_foreign_or_mixed_links() {
