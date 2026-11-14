@@ -329,6 +329,10 @@ fn (mut mgr UatManager) publish_initial_context_roots() {
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
+	// The global TTBR1 invalidation also removes stale bootloader entries
+	// from every cleared user slot before the new graph is published.
+	mgr.kernel_lower_pgtable.bind_tlb(0)
+	mgr.kernel_pgtable.bind_tlb(0)
 }
 
 pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&UatContext {
@@ -659,6 +663,8 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) {
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
+	mut pt := unsafe { ctx.pgtable }
+	pt.bind_tlb(u8(ctx.id))
 }
 
 pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
@@ -673,6 +679,10 @@ pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
+	if ctx.pgtable != unsafe { nil } {
+		mut pt := unsafe { ctx.pgtable }
+		pt.unbind_tlb()
+	}
 }
 
 // Map a driver-owned allocation into context zero. Lower addresses use TTBR0;

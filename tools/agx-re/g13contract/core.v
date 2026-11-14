@@ -158,3 +158,39 @@ pub fn check_asahi(asahi_linux string) ![]string {
 	return ['Asahi KernelMapping cache-safe teardown order',
 		'Asahi TX ring barrier before write-pointer publication']
 }
+
+// Omarchy ships the Asahi driver in linux-aurora. FWCTL cache maintenance
+// does not replace these CPU-side outer-shareable GPU TLB broadcasts.
+pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
+	reference := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mem.rs'))!
+	vinix := read(os.join_path(repo, 'kernel/gpu/agx/tlb/tlb.v'))!
+	check_tlb_instructions(reference, vinix)!
+	mmu := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mmu.rs'))!
+	bind := section(mmu, '    pub(crate) fn bind(&self, vm:', 'binding.bind_token = Some(slot.token());', 'Asahi UAT bind')!
+	require_order(bind, ['ttbs[idx].ttb0.store(ttb,', 'ttbs[idx].ttb1.store(ttb1,',
+		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID reuse invalidation')!
+	drop_start := mmu.index('impl Drop for VmInner') or { return error('Asahi UAT: missing VM teardown') }
+	require_order(mmu[drop_start..], ['.ttb0.store(0,', '.ttb1.store(0,',
+		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID teardown invalidation')!
+	local := read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!
+	local_bind := section(local, 'pub fn (mgr &UatManager) bind_context(', 'pub fn (mgr &UatManager) unbind_context(', 'Vinix UAT bind')!
+	require_order(local_bind, ['slots[ctx.id].ttb0 =', 'slots[ctx.id].ttb1 =',
+		'handoff_unlock(mgr.handoff)', 'pt.bind_tlb(u8(ctx.id))'], 'Vinix ASID reuse invalidation')!
+	local_unbind := section(local, 'pub fn (mgr &UatManager) unbind_context(', '// Map a driver-owned allocation into context zero.', 'Vinix UAT unbind')!
+	require_order(local_unbind, ['slots[ctx.id].ttb0 = 0', 'slots[ctx.id].ttb1 = 0',
+		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()'], 'Vinix ASID teardown invalidation')!
+	return ['outer-shareable GPU TLBI instructions and completion barriers',
+		'ASID invalidation after root publication and removal']
+}
+
+fn check_tlb_instructions(reference string, vinix string) ! {
+	all := section(reference, 'pub(crate) fn tlbi_all()', '/// Invalidate all TLB entries', 'Asahi GPU TLBI')!
+	require(all.contains('tlbi vmalle1os'), 'Asahi global GPU TLBI instruction changed')!
+	asid := section(reference, 'pub(crate) fn tlbi_asid(', '/// Invalidate a single page', 'Asahi GPU TLBI')!
+	require(asid.contains('tlbi aside1os') && asid.contains('<< 48'), 'Asahi GPU ASID encoding changed')!
+	local_all := section(vinix, 'pub fn invalidate_all()', 'pub fn invalidate_asid(', 'Vinix GPU TLBI')!
+	require_order(local_all, ['dsb sy', 'tlbi vmalle1os', 'dsb sy', 'memory'], 'Vinix global GPU TLBI')!
+	local_asid_start := vinix.index('pub fn invalidate_asid(') or { return error('Vinix GPU TLBI: missing ASID invalidation') }
+	require_order(vinix[local_asid_start..], ['u64(asid) << 48', 'dsb sy', 'tlbi aside1os, operand',
+		'dsb sy', 'memory'], 'Vinix ASID GPU TLBI')!
+}

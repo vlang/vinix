@@ -78,3 +78,22 @@ fn test_asahi_contract_requires_teardown_and_publication_order() {
 fn test_unknown_checkout_revision_is_bounded_unknown() {
 	assert git_revision('/nonexistent/vinix-g13-contract') == 'unknown'
 }
+
+fn test_gpu_tlbi_rejects_inner_shareable_instructions_and_missing_barriers() {
+	reference := 'pub(crate) fn tlbi_all() { tlbi vmalle1os }\n/// Invalidate all TLB entries\n' +
+		'pub(crate) fn tlbi_asid(asid: Asid) { tlbi aside1os ((asid as u64) << 48) }\n/// Invalidate a single page'
+	vinix := 'pub fn invalidate_all() { dsb sy tlbi vmalle1os dsb sy memory }\n' +
+		'pub fn invalidate_asid(asid u8) { u64(asid) << 48 dsb sy tlbi aside1os, operand dsb sy memory }'
+	check_tlb_instructions(reference, vinix)!
+	for broken in [vinix.replace('vmalle1os', 'vmalle1is'),
+		vinix.replace('aside1os', 'aside1is'),
+		vinix.replace('tlbi aside1os, operand dsb sy', 'tlbi aside1os, operand'),
+		vinix.replace('u64(asid) << 48', 'u64(asid) << 56')] {
+		if _ := check_tlb_instructions(reference, broken) {
+			assert false, 'invalid GPU TLBI contract was accepted'
+		}
+	}
+	if _ := check_tlb_instructions(reference.replace('aside1os', 'aside1is'), vinix) {
+		assert false, 'reference drift was accepted'
+	}
+}

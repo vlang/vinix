@@ -29,7 +29,10 @@ cause, hardware-only failures:
   remember that the cache flush completed, unmap, then invalidate the
   translation (including safe retry after an unpublished request);
 - a full system barrier between writing a TX ring entry and publishing its
-  write pointer.
+  write pointer;
+- with an Asahi/Linux-Aurora checkout, outer-shareable GPU TLB broadcasts,
+  completion barriers, and ASID invalidation after publishing or removing
+  context roots.
 
 The layout generator and reference checker resolve repository files relative
 to their scripts, so running them from the repository root, an editor, or the
@@ -43,3 +46,8 @@ The Apple artifacts extracted from the local restore image remain under
 mechanically recovers the native t8103 DeviceTree contract. Those inputs cover
 platform data; m1n1 and Asahi remain the executable references for the G13
 queue, UAT, and firmware handoff protocols.
+
+The [Omarchy M1 GPU comparison](omarchy-m1-gpu-port.md) records the upstream
+pins and the missing GPU TLB maintenance adapted from its driver. Run
+`v run tests/agx-tlb/run.v --sanitize` to exercise production page-table edits
+and root publication on the host without executing privileged instructions.

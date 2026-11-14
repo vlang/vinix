@@ -10,6 +10,7 @@ module pgtable
 import memory
 import klock
 import lib
+import gpu.agx.tlb
 
 // --- UAT page table geometry ---
 pub const uat_pgsz = u64(16384)
@@ -94,7 +95,38 @@ pub mut:
 	oas_mask   u64
 	non_global bool
 	owns_root  bool
+	tlb_bound  bool
+	tlb_asid   u8
 	lock       klock.Lock
+}
+
+// Called only after the root has been published in the UAT context table.
+// A reused ASID must lose the previous owner's translations even when this
+// page table has not yet been edited. Borrowed TTBR1 roots contain globals.
+pub fn (mut pt UatPgtable) bind_tlb(asid u8) {
+	pt.lock.acquire()
+	defer { pt.lock.release() }
+	pt.tlb_asid = asid
+	pt.tlb_bound = true
+	pt.invalidate_tlb_locked()
+}
+
+// The context-table roots must be cleared before this call. Complete the
+// invalidation before destroying page tables or releasing physical backing.
+pub fn (mut pt UatPgtable) unbind_tlb() {
+	pt.lock.acquire()
+	defer { pt.lock.release() }
+	pt.invalidate_tlb_locked()
+	pt.tlb_bound = false
+}
+
+fn (pt &UatPgtable) invalidate_tlb_locked() {
+	if !pt.tlb_bound { return }
+	if pt.non_global {
+		tlb.invalidate_asid(pt.tlb_asid)
+	} else {
+		tlb.invalidate_all()
+	}
 }
 
 // Allocate a single 16KB-aligned page table page.
@@ -159,6 +191,7 @@ pub fn (mut pt UatPgtable) clear_external_root_entry(index u32) bool {
 	}
 	pt.lock.acquire()
 	defer {
+		pt.invalidate_tlb_locked()
 		pt.lock.release()
 	}
 	root := unsafe { &u64(u64(pt.l1) + higher_half) }
@@ -287,9 +320,13 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 pub fn (mut pt UatPgtable) map_page(iova u64, phys u64, prot u64) bool {
 	pt.lock.acquire()
 	defer {
+		pt.invalidate_tlb_locked()
 		pt.lock.release()
 	}
+	return pt.map_page_locked(iova, phys, prot)
+}
 
+fn (mut pt UatPgtable) map_page_locked(iova u64, phys u64, prot u64) bool {
 	if iova & uat_pg_mask != 0 || phys & uat_pg_mask != 0 {
 		C.printf(c'uat pgtable: unaligned map iova=0x%llx phys=0x%llx\n', iova, phys)
 		return false
@@ -313,13 +350,19 @@ pub fn (mut pt UatPgtable) map(iova u64, phys u64, size u64, prot u64) bool {
 	if size == 0 {
 		return true
 	}
+	pt.lock.acquire()
+	defer {
+		// Also flush a failed map after its partial mappings are unwound.
+		pt.invalidate_tlb_locked()
+		pt.lock.release()
+	}
 
 	pages := lib.div_roundup(size, uat_pgsz)
 	for i := u64(0); i < pages; i++ {
-		if !pt.map_page(iova + i * uat_pgsz, phys + i * uat_pgsz, prot) {
+		if !pt.map_page_locked(iova + i * uat_pgsz, phys + i * uat_pgsz, prot) {
 			// Unwind on failure
 			for j := u64(0); j < i; j++ {
-				pt.unmap_page(iova + j * uat_pgsz)
+				pt.unmap_page_locked(iova + j * uat_pgsz)
 			}
 			return false
 		}
@@ -330,12 +373,7 @@ pub fn (mut pt UatPgtable) map(iova u64, phys u64, size u64, prot u64) bool {
 // Change only the access/cache attributes of an existing leaf mapping. The
 // physical page and page-table topology stay intact so firmware can evict any
 // cache lines belonging to the old mapping before it is removed.
-fn (mut pt UatPgtable) reprotect_page(iova u64, prot u64) bool {
-	pt.lock.acquire()
-	defer {
-		pt.lock.release()
-	}
-
+fn (mut pt UatPgtable) reprotect_page_locked(iova u64, prot u64) bool {
 	if iova & uat_pg_mask != 0 {
 		return false
 	}
@@ -360,9 +398,16 @@ pub fn (mut pt UatPgtable) reprotect(iova u64, size u64, prot u64) bool {
 	if size == 0 || iova & uat_pg_mask != 0 {
 		return false
 	}
+	pt.lock.acquire()
+	defer {
+		// A missing later PTE must not leave earlier cache-attribute changes
+		// hidden in the GPU TLB when this operation reports failure.
+		pt.invalidate_tlb_locked()
+		pt.lock.release()
+	}
 	pages := lib.div_roundup(size, uat_pgsz)
 	for page := u64(0); page < pages; page++ {
-		if !pt.reprotect_page(iova + page * uat_pgsz, prot) {
+		if !pt.reprotect_page_locked(iova + page * uat_pgsz, prot) {
 			return false
 		}
 	}
@@ -370,12 +415,7 @@ pub fn (mut pt UatPgtable) reprotect(iova u64, size u64, prot u64) bool {
 }
 
 // Unmap a single 16KB GPU page.
-fn (mut pt UatPgtable) unmap_page(iova u64) {
-	pt.lock.acquire()
-	defer {
-		pt.lock.release()
-	}
-
+fn (mut pt UatPgtable) unmap_page_locked(iova u64) {
 	pte_ptr := pt.get_pte(iova, false) or { return }
 
 	unsafe {
@@ -388,10 +428,15 @@ pub fn (mut pt UatPgtable) unmap(iova u64, size u64) {
 	if size == 0 {
 		return
 	}
+	pt.lock.acquire()
+	defer {
+		pt.invalidate_tlb_locked()
+		pt.lock.release()
+	}
 
 	pages := lib.div_roundup(size, uat_pgsz)
 	for i := u64(0); i < pages; i++ {
-		pt.unmap_page(iova + i * uat_pgsz)
+		pt.unmap_page_locked(iova + i * uat_pgsz)
 	}
 }
 

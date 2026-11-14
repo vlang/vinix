@@ -30,6 +30,11 @@ module main
 import gpu.agx.hw
 import gpu.agx.fw
 
+// Host diagnostics use the same printf ABI as the firmware-layout fixtures.
+#include <stdio.h>
+#define kprintf printf
+fn C.kprintf(format &char, ...) i32
+
 const stock_frequencies_hz = [u64(0), 396_000_000, 528_000_000, 720_000_000, 924_000_000,
 	1_128_000_000, 1_278_000_000]
 const stock_voltages_uv = [u32(400_000), 618_000, 650_000, 687_000, 778_000, 868_000,
