@@ -57,7 +57,13 @@ fn run(job string, target string, fixture bool) ! {
 	mut guarded := [state + '/audit-wall-guard-2026-11-04-r1/tools/bounded-command',
 		'root=' + state + '/art-builder-work-disk-20261114-r1', 'log=' + stem + '.log',
 		'receipt=' + stem + '.json', 'wall_ms=' + if fixture { '1000' } else { '300000' }]
-	guarded << caps
+	// The guest measures this build on its dedicated volume. Host filesystem
+	// growth also includes unrelated sessions: bound that separately, with a
+	// larger allowance and a stricter free-space floor. Receipts retain both
+	// profiles; an earlier failed receipt must never be relabelled as passing.
+	guarded << if fixture { caps } else {
+		['rss=629145600', 'reserve=8589934592', 'growth=4294967296', 'output=4194304']
+	}
 	guarded << '--'
 	guarded << ssh
 	guarded << quoted(command)

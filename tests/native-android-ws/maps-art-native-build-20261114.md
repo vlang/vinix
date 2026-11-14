@@ -167,10 +167,45 @@ checkpoint identities above; root filesystem fsck was not repeated:
 | /Users/alex/.lima/vinix-art-20261114/disk | ce5db9199f724e4863c29050def3f3245e4080a273edfcfb4c2e9d9d2cc78d5a |
 | art-builder-work-disk-20261114-r1/work.img | 855f2c2d6c781f0b40d9dc08187f4a967ba6cb7a83498cc6420d73a69ffcbc03 |
 
-Repeated host-growth guard failures remain the build blocker. A quiet host
-write window is required before another guarded compilation attempt.
+At the r9 checkpoint, repeated host-growth guard failures remained the build
+blocker. The next continuation changes only the host resource profile below.
 
-Resource caps remain RSS 629145600 bytes, reserve 1073741824, growth 536870912,
+## Shared-host profile
+
+Continuation after dedc34384. The available V is still 0.5.2 7d74206. Native
+input check r5 again passed all 18 files. Incremental r10 reached trace.cc,
+r11 reached method_verifier.cc, and r12 was stopped while recompiling that
+verifier. All three failed on observed host disk growth; no passing build or
+new runtime is claimed. Cleanup passed for every host/native group.
+
+| Attempt | Host elapsed ms | Host growth bytes | Guest growth bytes | Guest peak RSS bytes |
+| --- | ---: | ---: | ---: | ---: |
+| r10 | 134130 | 566341632 | 1716224 | 428400640 |
+| r11 | 95157 | 540749824 | 630784 | 392183808 |
+| r12 | 48600 | 542019584 | 0 | 416489472 |
+
+The previous host growth cap measured filesystem-wide changes, including other
+sessions' writes. Applying it unchanged repeatedly stopped this build despite
+negligible writes to its dedicated guest volume. Recovery of the earlier
+session record confirmed its use in host-tool qualification; no explicit user
+requirement fixing that value for ART was found in the inspected record.
+
+The ART runner now uses a separate bounded host profile: 4294967296 bytes
+growth and a stricter 8589934592-byte free-space reserve. Host RSS 629145600,
+wall 300000 ms and output 4194304 remain unchanged. The native guest retains
+its original RSS, 536870912-byte growth, 1073741824-byte reserve and output
+caps, with the existing 290000-ms wall limit. The original guard executable,
+historical audit checkers, source inputs and runtime authority are unchanged.
+This is a new profile, not a passing result under the old host limits.
+
+The new runner compiled under the old limits in
+art-shared-host-controller-20261114-r1: 0/0, complete cleanup, 3353 ms,
+sampled RSS 313147392 bytes. Its cancellation fixture r3 passed under the
+unchanged stricter fixture limits: one owned guest group stopped, native
+child 137, no native guard violation and complete cleanup. Native compilation
+under the new shared-host profile is pending.
+
+The original profile used RSS 629145600 bytes, reserve 1073741824, growth 536870912,
 output 4194304 and host wall 300000 ms. The guest uses the stricter 290000-ms
 wall limit to leave cleanup time. Make uses -j1. The source is ART
 e78bf68917bcaaf58fef3960cd88793b3b7f39cc; this is the runtime source being
