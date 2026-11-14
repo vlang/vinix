@@ -72,7 +72,7 @@ Select reads its condition and only the chosen value. Unselected poison/undef
 constants do not reject; selected undef errors, and poison conditions/chosen
 values propagate to a rejected poison store. Selection does not skip earlier
 instructions. Same-binding pointer equality and unsigned ordering are described
-below. Vector comparisons, aggregate comparisons,
+below. Aggregate comparisons,
 general aggregate selects and select flags remain unsupported;
 the overflow-pair select exception is described below.
 
@@ -116,12 +116,12 @@ Integer, mixed scalar and void APIs share validation/evaluation; the integer
 API admits integer lanes only.
 
 `insertelement` creates a new vector snapshot from a supported literal or an
-earlier insertion/shuffle/freeze/select result of the same type. It replaces one lane
+earlier insertion/shuffle/freeze/select/comparison result of the same type. It replaces one lane
 with a scalar value, poison or literal undef; other lanes retain their state.
 Extraction may read either snapshot. A poison or out-of-range insertion index poisons the
 whole new vector; an undef index errors. A later valid insertion can repair
 one lane of poison/undef. Each insertion costs one executed step. Preflight
-caps static insertion, shuffle, vector freeze and vector select results together at 4,096
+caps static insertion, shuffle, vector freeze, select and comparison results together at 4,096
 per function, including inactive blocks.
 One execution-owned array holds those fixed-size snapshots and is freed on
 every exit; loop visits reuse each instruction's slot. Vector PHIs,
@@ -173,6 +173,23 @@ one defined condition lane chooses it; all-poison conditions read neither arm.
 The result uses the same snapshot storage, one executed step, and downstream
 operations as whole-vector selection. Prior source evaluation errors still stop
 execution. Vector condition arguments, PHIs and loads remain unsupported.
+
+Vector `icmp` and `fcmp` compare corresponding lanes and produce a matching
+fixed i1 vector. Sources use the same supported constant/earlier-construction
+rules. All ten integer predicates accept i1..i64 lanes; `samesign` independently
+poisons lanes with different input signs. Half/float support all sixteen
+ordered/unordered predicates, including NaNs, infinities and signed zeros,
+using the existing bit-based scalar helpers. Poison propagates independently
+per lane. Any undef input lane rejects at comparison, even for a discarded
+result or an extraction of another lane. The constant FP predicates false/true
+follow the existing scalar policy: they return uniform defined masks without
+reading either source, while preflight still checks both complete sources.
+Earlier source instructions still execute and may fail.
+Results may feed comparisons, per-lane select, freeze, insertion, shuffle and
+extraction, preserving older snapshots. Comparison costs one executed step;
+validation charges both source counts plus the result count, and results share
+the existing construction storage. Floating/pointer comparison flags, vector
+pointer comparisons and vector arithmetic remain unsupported.
 
 Scalar casts share validation and value conversion with the scalar executor:
 integer truncation/zero extension/sign extension across i1..i64, signed and
@@ -672,6 +689,11 @@ conditions, localized poison, chosen undef, condition/result freezing, discard,
 condition source/type/shape mutations and exact/exceeded shared limits. Only
 fully defined native choices are executed; freeze-dependent values use explicit
 interpreter expectations. Its lane controls check full-buffer write ordering.
+`tests/ios/air-vector-compare.v` covers all vector integer/half/float predicates,
+integer `samesign`, fixed counts, boolean masks feeding selections, native
+defined values, frozen mask choices, poison stores, undef rejection, source
+and result snapshots, constant FP predicates, metadata/source/shape guards,
+step budgets and shared storage/work boundaries through memory and void APIs.
 `tests/ios/air-memory-cast-flags.v` covers every i1..i64 flagged truncation and
 extension shape in bounded modules. Defined inputs compare with native LLVM;
 an independent range oracle checks poison without executing invalid native

@@ -2,7 +2,7 @@
 module airbitcode
 
 fn (p IRTypedProgram) vector_construction(code u64, op IRTypedInstruction) bool {
-	return code in [u64(7), 8]! || (code in [u64(5), 29, 58]! && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .vector_t)
+	return code in [u64(7), 8]! || (code in [u64(5), 9, 28, 29, 58]! && op.result_type >= 0 && op.result_type < p.types.len && p.types[op.result_type].kind == .vector_t)
 }
 fn (p IRTypedProgram) vector_freeze_profile(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, mixed bool, remaining int) !int {
 	vector_operation_shape(p, op, 1)!

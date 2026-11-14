@@ -14,14 +14,14 @@ does not add memory instructions, pointer arguments, kernel ABI binding,
 pipeline construction or dispatch. Discarded poison arithmetic has no returned
 value; poison consumed as a branch condition still rejects.
 
-Fixed-vector insertion, shuffling, freeze, scalar/vector-conditioned select and lane extraction follow the shared
+Fixed-vector insertion, shuffling, freeze, comparisons, scalar/vector-conditioned select and lane extraction follow the shared
 scalar/memory rules:
 1..16 i1..i64/half/float lanes, scalar unsigned indices, preflight of every
 lane and a bounded per-function lane-work budget. A discarded poison result is
 permitted; selected undef still errors at extraction even when its result is
 unused. Insertions preserve earlier snapshots and per-lane poison/undef;
 invalid indices poison the new vector and a later insertion may repair a lane.
-At most 4,096 static insertion/shuffle/freeze/select results share one execution-owned
+At most 4,096 static insertion/shuffle/freeze/select/comparison results share one execution-owned
 storage array.
 Vector freeze preserves defined lanes and independently chooses zero for
 poison/undef lanes. Earlier snapshots retain their state. Vector arguments,
@@ -36,6 +36,14 @@ for its poison/undef lanes. Condition sources follow the same earlier-constructi
 rules as arms and add their lane count to validation work. Arms unused by all
 defined condition lanes are not read. Selections share one-step execution and
 snapshot storage with whole-vector selects.
+Vector comparisons produce fixed i1 masks with per-lane poison propagation.
+Integer comparisons include all predicates and `samesign`; half/float include
+all ordered/unordered predicates. Any undef operand lane rejects at comparison,
+including discarded results. Constant FP false/true predicates follow the
+existing scalar policy and do not read their operands, after full preflight.
+Each comparison costs one step and charges both sources and result to lane work.
+Its snapshot shares construction storage and can feed any supported vector
+operation, including another comparison or a per-lane select.
 `tests/ios/air-constant-extract.v` checks successful discards, indeterminate
 lanes and the whole-function work limit through this API.
 `tests/ios/air-vector-insert.v` also checks the whole-function insertion storage
@@ -48,6 +56,8 @@ the combined construction/storage and lane-work boundaries through this API.
 lane-work boundaries through this API, with selects among the constructions.
 `tests/ios/air-vector-lane-select.v` checks the same limits with vector conditions,
 including their additional lane work and scalar-loop slot reuse.
+`tests/ios/air-vector-compare.v` also checks exact/exceeded shared limits with
+comparison results and their complete source/result lane-work charges.
 
 The maintained serialized-bitcode check is `tests/ios/air-void-execute.v`.
 Build it with the repository's V module path, then run its executable with
