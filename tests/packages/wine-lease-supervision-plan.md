@@ -2279,6 +2279,29 @@ link targets. New source copies, generated host C/binaries and logs are retained
 complete source closure is not claimed. Existing-link migration/recovery,
 real-root/guest qualification and the other section 14 gates remain open.
 
+## Addition writer SIGKILL, 2026-11-14
+
+Source `e04f3c3cf` adds an actual host process-death control. A forked child
+captures the prefix and calls the unmodified additions API for 128 new builtins.
+The parent observes the first link (ten-second bound), stops the child, requires
+strictly partial progress and competing-launch refusal, then kills/reaps it with
+SIGKILL. A fresh capture must recover coordination, count exactly the remaining
+create rows and finish all links while preserving a private sentinel. The run
+passes at 1/128 links before interruption, then completes the remaining 127.
+All adapter tests pass using the retained V compiler with `-backend c -gc none
+-manualfree` and repository module path. Cleanup kills/reaps a surviving fixture
+child on failure. Production mutation code is unchanged by this checkpoint.
+
+Evidence is frozen at `/Users/alex/.cache/vwkilladditions-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-additions-sigkill-20261114-01.inventory.json`
+has SHA-256 `ce06aea33f8bd39c5d85b731ecd64484a231f6e9fd5be02ee1ade0cc06793f97`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Source copies, generated host C/binary and logs are retained.
+This qualifies additions-only host process interruption, not power loss,
+service-owner/guest execution, retargeting, complete source closure or measured
+heap behavior. Existing-link migration/recovery and the other section 14 gates
+remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
