@@ -2415,6 +2415,31 @@ preceding ARM report. This is not strict-build, complete source-closure, general
 ABI, power-loss or measured-heap qualification. Existing-link migration/recovery,
 actual Wine/translation acceptance and remaining section 14 gates stay open.
 
+## Signed upgrade refusal in both guests, 2026-11-14
+
+Source `ef4751dce` extends the real-root fixture with a second signed publication
+and runtime upgrade to 2.0.0 after the ordinary account's initial additions pass.
+The upgraded runtime changes a builtin and adds another; a fresh ordinary child
+must successfully review generation 2 against its retained generation-1 prefix,
+then require additions exit 1. Both original link targets and private sentinel
+must survive, and the new extra link must remain absent. Serial output shows
+generation 2/prior 1, two replacement rows, one creation row and the explicit
+existing-link retarget refusal. Required upgrade and earlier success markers
+pass on x86_64 in 8.041 s and AArch64 in 5.863 s.
+
+Evidence is frozen at `/Users/alex/.cache/vwupgradeprefix-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-prefix-upgrade-guests-20261114-01.inventory.json`
+has SHA-256 `b82a2667fb4bf1c03f323aad071af9eefa233e3651f2e174719ba416d1477f06`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets. Separate result/serial/QEMU bundles, generated probes, source
+copies, CLI binaries and copied kernels are retained. Both unchanged CLIs and
+kernels are reused from the preceding qualification; the expanded probes are
+rebuilt with the retained V/LLVM-musl toolchains and documented pointer-type
+compatibility flag. Marker payloads are never executed. This establishes
+signed upgrade review/refusal, not existing-link migration, actual Wine,
+power-loss durability, strict builds, complete source closure or measured heap
+behavior. Retargeting/recovery and remaining section 14 gates remain open.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
