@@ -5,6 +5,8 @@ module main
 import os
 import time
 import tools.packages.wineadapter
+import tools.packages.pkgcore
+import tests.packages.winecutservice
 
 #include <unistd.h>
 #include <sys/syscall.h>
@@ -13,6 +15,7 @@ import tools.packages.wineadapter
 #include <sys/wait.h>
 #include <fcntl.h>
 #include <grp.h>
+#include <sys/file.h>
 fn C.syscall(i64, ...) i64
 fn C.getpid() i32
 fn C.open(&char, i32, ...i32) i32
@@ -27,6 +30,7 @@ fn C.setuid(u32) i32
 fn C.mount(&char, &char, &char, u64, voidptr) i32
 fn C.sync()
 fn C.reboot(i32) i32
+fn C.flock(i32, i32) i32
 
 __global (
 	cut_point int
@@ -71,14 +75,24 @@ fn persistent_mount() !string {
 	}
 }
 
-fn ordinary(root string, point int) ! {
+fn free_lock(fd i32) ! {
+	if C.flock(fd, C.LOCK_EX | C.LOCK_NB) != 0 { return error('closed service owner retained coordination') }
+	if C.flock(fd, C.LOCK_UN) != 0 { return error('cannot release coordination probe') }
+}
+
+fn ordinary(root string, point int, fresh bool) ! {
 	store := root + '/store'
-	old := store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
-	selected := store + '/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows'
+	old := $if wine_cut_service ? { '/var/lib/vinix-packages/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows' } $else {
+		store + '/generations/1/apps/wine/root/usr/lib/wine/x86_64-windows'
+	}
+	selected := $if wine_cut_service ? { '/var/lib/vinix-packages/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows' } $else {
+		store + '/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows'
+	}
 	data := root + '/private'
 	system := data + '/wine/drive_c/windows/system32'
 	stage := data + '/wine/.vinix-builtin-next'
-	if !os.exists(root + '/armed') {
+	if fresh {
+		$if wine_cut_service ? {} $else {
 		os.mkdir_all(old)!; os.mkdir_all(selected)!; os.mkdir(data)!; os.chmod(data, 0o700)!
 		for name in ['a.dll', 'b.dll']! {
 			os.write_file(old + '/' + name, 'old bytes')!
@@ -89,8 +103,16 @@ fn ordinary(root string, point int) ! {
 		os.write_file(data + '/sentinel', 'private contents')!
 		os.write_file(root + '/armed', point.str())!
 		C.sync() // Durable fixture baseline, before capture and the cut window.
-		mut owner := wineadapter.capture_idle_binding_review(data, selected, store)!
+		}
+		mut owner := $if wine_cut_service ? { (pkgcore.Service{}).wine_prefix_review('app', data)! } $else {
+			wineadapter.capture_idle_binding_review(data, selected, store)!
+		}
 		defer { owner.close() }
+		$if wine_cut_service ? {
+			if owner.review.review.generation != 2 || owner.review.review.prior_generation != 1
+				|| owner.review.review.bindings.len != 3 { return error('signed service cut admission differs') }
+			println('WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=3')
+		}
 		cut_point = point; cut_calls = 0
 		owner.migrate_bindings()!
 		return error('migration returned without the selected power cut')
@@ -112,18 +134,33 @@ fn ordinary(root string, point int) ! {
 		}
 	} else if os.readlink(system + '/a.dll')! != selected + '/a.dll' { return error('reboot lost the synced first replacement') }
 	println('WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings')
-	mut resumed := wineadapter.capture_idle_binding_review(data, selected, store)!
+	mut resumed := $if wine_cut_service ? { (pkgcore.Service{}).wine_prefix_review('app', data)! } $else {
+		wineadapter.capture_idle_binding_review(data, selected, store)!
+	}
 	defer { resumed.close() }
 	resumed.migrate_bindings()!; resumed.migrate_bindings()!; resumed.recheck()!
-	if resumed.review.prior_generation != 0 || resumed.review.bindings.len != 3
-		|| !resumed.review.bindings.all(it.operation == .keep) { return error('reboot recovery inventory differs') }
+	review := $if wine_cut_service ? { resumed.review.review } $else { resumed.review }
+	if review.generation != 2 || review.prior_generation != 0 || review.bindings.len != 3
+		|| !review.bindings.all(it.operation == .keep) { return error('reboot recovery inventory differs') }
 	for name in ['a.dll', 'b.dll', 'c.dll']! {
 		if os.readlink(system + '/' + name)! != selected + '/' + name { return error('reboot recovery target differs') }
 	}
 	if os.exists(stage) || os.is_link(stage) || os.read_file(data + '/sentinel')! != 'private contents' {
 		return error('reboot recovery left staging or changed private data')
 	}
-	resumed.close()
+	$if wine_cut_service ? {
+		lease := C.open(c'/var/lib/vinix-packages/generations/2/lease', C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC)
+		reader := C.open(c'/var/lib/vinix-packages/lock', C.O_RDONLY | C.O_NOFOLLOW | C.O_CLOEXEC)
+		if lease < 0 || reader < 0 { return error('cannot capture service coordination probes') }
+		defer { C.close(lease); C.close(reader) }
+		if C.flock(lease, C.LOCK_EX | C.LOCK_NB) == 0 || (C.errno != C.EAGAIN && C.errno != C.EWOULDBLOCK) {
+			return error('recovered service owner lost its generation lease')
+		}
+		free_lock(reader)!
+		resumed.close()
+		free_lock(lease)!; free_lock(reader)!
+		println('WINE SERVICE POWER CUT PASS point=${point} signed-generation=2 lease-free reader-lock-free')
+	} $else { resumed.close() }
 	// Let ordinary deferred unlink cleanup finish before the final orderly
 	// shutdown. There is no such wait in the interrupted boot.
 	time.sleep(6 * time.second)
@@ -137,11 +174,15 @@ fn run() ! {
 	os.mkdir_all('/tmp')!; os.chmod('/tmp', 0o1777)!
 	mount := persistent_mount()!
 	root := mount + '/wine-cut'
-	if !os.exists(root) { os.mkdir(root)!; os.chown(root, 1000, 1000)!; os.chmod(root, 0o700)! }
+	if !os.exists(root) {
+		os.mkdir(root)!
+		$if wine_cut_service ? { os.chmod(root, 0o755)! } $else { os.chown(root, 1000, 1000)!; os.chmod(root, 0o700)! }
+	}
+	fresh := $if wine_cut_service ? { winecutservice.setup(root, point, mount)! } $else { !os.exists(root + '/armed') }
 	pid := C.fork()
 	if pid == 0 {
 		if C.setgroups(0, unsafe { nil }) != 0 || C.setgid(1000) != 0 || C.setuid(1000) != 0 { C._exit(90) }
-		ordinary(root, point) or { eprintln('HWTEST FAIL wine-prefix-powercut: ' + err.msg()); C._exit(91) }
+		ordinary(root, point, fresh) or { eprintln('HWTEST FAIL wine-prefix-powercut: ' + err.msg()); C._exit(91) }
 		C._exit(0)
 	}
 	mut status := i32(0)

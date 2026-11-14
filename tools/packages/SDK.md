@@ -2212,10 +2212,25 @@ No disk repair is performed. A guest compiled without interception must fail
 before its requested cut. Image creation refuses an existing output; export
 refuses source/destination identity aliases.
 
+For signed-service recovery, additionally compile the guest with
+`-d wine_cut_service`, including the repository/account modules on the V path,
+and add `--service` after `--vjfs` on the controller. Root setup locally signs,
+installs and upgrades marker packages, seeds the old prefix as UID 1000, and
+persists the configuration, trust/catalog metadata and both generations on
+VJFS. Each boot bind-mounts those trees at the normal package paths; the service
+uses no alternate root. The fixture checks that configuration, active state
+and private data have the persistent volume's device identity. After reboot,
+fresh `Service.wine_prefix_review()` admission must recover migration, retain
+the generation lease while live and release lease/reader coordination on close.
+The controller requires both fresh/cold signed-store markers and signed-service
+completion; an adapter-only guest cannot satisfy that mode. The packages contain
+marker bytes, so this does not execute Wine or establish Wine-version compatibility.
+
 These tests qualify selected acknowledged-sync boundaries on journaled VJFS
 with QEMU writeback caching. Host storage caches survive the VM kill. They do
 not establish physical power-loss/torn-write handling, every interruption point,
-signed service/public-command recovery or actual Wine execution compatibility.
+public-command recovery or actual Wine execution compatibility. Signed-service
+admission is covered only by the explicit service mode described above.
 
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command

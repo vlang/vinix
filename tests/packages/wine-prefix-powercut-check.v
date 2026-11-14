@@ -22,10 +22,12 @@ fn tool(command []string, log string) ! {
 }
 
 fn run() ! {
-	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] != '--vjfs') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs]')
+	if os.args.len !in [5, 6, 7] || (os.args.len >= 6 && os.args[5] != '--vjfs')
+		|| (os.args.len == 7 && os.args[6] != '--service') {
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service]]')
 	}
-	journaled := os.args.len == 6
+	journaled := os.args.len >= 6
+	service := os.args.len == 7
 	image_helper := if journaled { os.getenv_opt('VINIX_WINE_IMAGE_HELPER') or { return error('VJFS requires VINIX_WINE_IMAGE_HELPER') } } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(work) || os.is_link(work) { return error('fresh work and supported architecture required') }
@@ -74,6 +76,15 @@ fn run() ! {
 	for point in 1 .. 4 {
 		state := work + '/point-' + point.str()
 		marker := 'WINE POWER CUT READY point=${point}'
+		mut required := [marker, 'WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings',
+			'WINE POWER CUT SETTLED point=${point} grace-seconds=6',
+			'WINE POWER CUT RECOVERY PASS point=${point} fresh-capture repeat private-data', 'HWTEST PASS wine-prefix-powercut']
+		if service {
+			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=true generation=2 signed-root'
+			required << 'WINE SERVICE POWER CUT STORE point=${point} fresh=false generation=2 signed-root'
+			required << 'WINE SERVICE POWER CUT ADMIT point=${point} generation=2 rows=3'
+			required << 'WINE SERVICE POWER CUT PASS point=${point} signed-generation=2 lease-free reader-lock-free'
+		}
 		outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'wine-prefix-powercut', arches: [arch], ending: .poweroff,
 			cmdline: if arch == 'aarch64' { 'vinix.qemu_persist=1' } else { '' },
 			disks: [hwhost.Disk{name: 'prefix.ext2', size_mib: if journaled { 36 } else { 32 }, image: seed}],
@@ -82,9 +93,7 @@ fn run() ! {
 			qemu_aarch64: ['-drive', 'if=none,id=winecut,format=raw,cache=writeback,file={state}/prefix.ext2',
 				'-device', 'virtio-blk-device,drive=winecut'],
 			reboots: [hwhost.Reboot{power_cut_after: marker}],
-			required: [marker, 'WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings',
-				'WINE POWER CUT SETTLED point=${point} grace-seconds=6',
-				'WINE POWER CUT RECOVERY PASS point=${point} fresh-capture repeat private-data', 'HWTEST PASS wine-prefix-powercut'],
+			required: required,
 			forbidden: ['HWTEST FAIL', 'Kernel panic']},
 			hwhost.Run{kernel: os.args[3], guest: os.args[4], state: state, extras: work + '/extras-' + point.str(), timeout: 120, keep: true})
 		os.write_file(state + '/result.json', json2.encode(outcome))!
