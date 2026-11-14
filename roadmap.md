@@ -1293,6 +1293,9 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [Public staging controls](tests/packages/wine-lease-supervision-plan.md#public-migration-staging-controls-2026-11-14)
     preserve unknown files, directories and links at the staging path and
     resume a valid retained stage first in both guests.
+    [Bounded migration payload hashing](tests/packages/wine-lease-supervision-plan.md#bounded-migration-payload-hashing-2026-11-14)
+    now avoids full-payload rehashing for every link while retaining per-write
+    structural and target checks; host scaling and both guest suites pass.
     Power-loss recovery and actual Wine
     compatibility remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)

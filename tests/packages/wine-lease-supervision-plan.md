@@ -2611,6 +2611,46 @@ execute Wine. The retained pointer-compatibility build exception remains;
 strict compilation, complete build-input closure, measured heap behavior,
 actual Wine compatibility and the other section 14 gates remain open.
 
+## Bounded migration payload hashing, 2026-11-14
+
+Source `6d85a6beb` removes two full-payload rehashes per replacement from
+staged migration. Full authenticated payload checks still bracket the complete
+operation. Each replacement retains all-row structural inspection, captured
+directory identities and idle-server admission, but hashes only its selected
+target before staging and again before rename. Digest and captured byte size
+must match. Unrelated payload-byte changes may now refuse at the final full
+check after recoverable partial progress. This retains the cooperating-writer
+assumption; it is not an atomic transaction or arbitrary-writer exclusion.
+Namespace inspection remains quadratic in row count; only payload hashing is
+bounded independently of the number of replacement rows.
+
+The committed `wine-prefix-migration-scale.v` diagnostic checks complete
+retargeting, repeated migration, private data and staging cleanup with bounded
+synthetic assets. Separately compiled baseline and candidate adapters pass a
+sequential 64-row, 16 MiB comparison: migration takes 7.990 seconds before and
+0.524 seconds after on this host. These are diagnostic timings, not a portable
+performance threshold. A candidate 256-row, 64 MiB run also passes (8.164
+seconds, in the initial concurrent diagnostic batch). All generated C,
+executables, baseline sources and per-run logs are retained.
+
+Focused host binding-review tests now apply their mutation/refusal controls to
+both full review and per-replacement admission; signed service upgrade tests
+also pass. Rebuilt CLI and guest probes pass all staging, signed marker-runtime
+upgrade, guard/lease, SIGKILL/resume and repetition checks in x86_64 (17.597
+seconds) and AArch64 (7.295 seconds). The runner and kernel inputs are unchanged.
+The existing C pointer-compatibility exception remains; strict builds, complete
+input closure and measured heap behavior are not qualified. Actual Wine
+relaunch after migration, power-loss recovery and other section 14 gates stay
+open. No real Wine launch was attempted in this scaling check.
+
+Evidence is frozen at `/Users/alex/.cache/vwmigrationscale-20261114-01`.
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-migration-scale-20261114-01.inventory.json`,
+SHA-256 `84afea79bbaf9ea9789e3bc5d56e14b03d2ccdf8481a130455d9872980dab029`.
+Recording and independent comparison pass. Initial build/test-driver failures
+and subsequent successful direct test builds are retained and explained in the
+bundle's build notes. No historical bundle or auditor was changed.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
