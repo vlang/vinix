@@ -1950,6 +1950,11 @@ links plus at most one prior generation of the same runtime; `prior_generation`
 is zero when every link already selects the requested generation. Linked
 directory components, linked new assets, ordinary files replacing prefix links,
 foreign stores/runtimes and inconsistent target basenames are refused.
+The prefix's system32 inventory is bounded to 4096 entries. Extra absolute
+links into the selected store's generation namespace are refused when their
+names are absent from the selected builtin inventory, including dangling links
+to removed DLLs. Ordinary private additions and links outside that namespace
+remain intact. This does not classify arbitrary user links as signed builtins.
 
 This is a read-only structural review: it creates no prefix directories and
 rewrites no bindings. It neither authenticates runtimes nor authorizes migration,

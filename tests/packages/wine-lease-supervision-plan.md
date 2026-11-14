@@ -1876,6 +1876,34 @@ interruption recovery. Migration application, holder-death retention, session
 teardown, ARM owned Wine, fresh owned GUI acceptance and default activation
 remain open; this checkpoint does not complete roadmap section 14.
 
+## Omitted builtin links, 2026-11-14
+
+Source `fcace5dad` closes a gap in the read-only binding review: checking only
+the new runtime's names could overlook a link to a DLL removed by an upgrade.
+The review now inventories system32 (at most 4096 entries) and refuses extra
+absolute links into the selected package store's generation namespace. The
+target need not exist or have a canonical generation spelling to be refused.
+It preserves ordinary personal files and links outside that namespace, without
+classifying those additions as signed builtins or deleting any entry.
+
+Host library and CLI controls pass for old-generation, selected-generation and
+malformed-generation extra targets. Refusal controls now run through the actual
+CLI as well as the library, requiring exit 1 and the expected diagnostic.
+Prefix snapshots confirm no changes on refusal; positive controls retain private
+file contents and an unrelated personal link. Linux x86_64 and AArch64 static
+cross-builds pass; no guest execution, signed Wine rerun or heap measurement is
+claimed. The production launch path remains unchanged, and migration application
+and the other section 14 gates above remain open.
+
+Evidence is frozen at `/Users/alex/.cache/vwbindreview-20261114-02`, including
+final source copies, generated C, host/target binaries and logs. Compiler identity
+uses the exact compiler preserved in the preceding `-01` bundle; complete
+hermetic source closure is not claimed. The receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-binding-review-20261114-02.inventory.json`,
+SHA-256 `883a2d92f84d75a2d936cb4df8292abb25a6db2505ffa33e0158406399ad06af`.
+Recording and independent checking pass complete bytes, sizes, types, modes and
+link targets, with adjacent record/check logs. The preceding bundle is intact.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
