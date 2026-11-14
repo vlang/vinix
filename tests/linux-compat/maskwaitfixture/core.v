@@ -2,6 +2,7 @@
 @[has_globals]
 module maskwaitfixture
 
+#include <alloca.h>
 #include <errno.h>
 #include <signal.h>
 #include <stdio.h>
@@ -42,6 +43,7 @@ mut:
 	observed [2]Observation
 }
 __global ( state &State )
+fn C.alloca(usize) voidptr
 fn C.syscall(isize, ...) isize
 fn C.__errno_location() &i32
 fn C.printf(&char, ...) i32
@@ -125,11 +127,12 @@ fn wait_call(kind int, temporary &u64, epfd int, timeout &i64) isize {
 		}
 	}
 }
-fn suite(signal int, kind int, mode int) Totals {
+fn suite(scratch &State, signal int, kind int, mode int) Totals {
 	unsafe {
 		C.alarm(15)
-		mut s := State{signal: signal, wait: kind, mode: mode}
-		state = &s
+		mut s := scratch
+		*s = State{signal: signal, wait: kind, mode: mode}
+		state = s
 		mut totals := Totals{}
 		initial := mask()
 		original := bit(signal) | bit(C.SIGINT)
@@ -190,7 +193,10 @@ pub fn run() i32 {
 			if pid == 0 {
 				C.close(fds[0])
 				if ordinary && (C.setgid(2000) != 0 || C.setuid(1000) != 0) { fatal(8) }
-				t := suite(signal, kind, mode)
+				// The handler borrows this storage. The entry frame survives
+				// suite(), result reporting and the child's final _exit().
+				scratch := &State(C.alloca(usize(sizeof(State))))
+				t := suite(scratch, signal, kind, mode)
 				C.printf(c'LINUX MASKWAIT CASE: uid=%u gid=%u signal=%d wait=%d mode=%d checks=%d failures=%d\n', C.getuid(), C.getgid(), signal, kind, mode, t.checks, t.failures)
 				if C.write(fds[1], &t, sizeof(Totals)) != sizeof(Totals) { fatal(9) }
 				C.fflush(nil); C._exit(0)

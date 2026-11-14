@@ -2292,6 +2292,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   with generated-C scope and independent lifetime review. See
   [the nfds/output qualification](docs/linux-select-nfds.md).
 
+- [x] Restore fresh empty/masked-wait fixture builds with explicit child-entry
+  State storage and direct C-width atomics. Newly compiled native/Linux ELFs
+  pass 7,440 checks, with unchanged oracles, flat cleanup, generated-C scope
+  and independent lifetime review. Historical compiler failures remain
+  archived. See [the fresh-build qualification](docs/linux-wait-fixture-builds.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

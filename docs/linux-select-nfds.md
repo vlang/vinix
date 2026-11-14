@@ -67,7 +67,10 @@ qualified ELFs are replayed against both fixed kernels, alongside O_PATH poll,
 to complete eight functional cases. The audit requires these exact compiler
 failures and all three successful replays, binding kernel/ELF/image/source pins
 and serial output. Existing strict selectfds, empty-wait and O_PATH poll
-parsers remain unchanged. Fresh legacy-fixture compilation remains open.
+parsers remain unchanged. Fresh legacy-fixture compilation remained open at
+this checkpoint; it is now resolved by the
+[fresh-build qualification](linux-wait-fixture-builds.md). The original bundle
+and its checker still require these recorded failures and retained replays.
 
 ## Evidence and reproduction
 

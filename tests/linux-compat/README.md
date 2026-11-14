@@ -43,6 +43,12 @@ restored masks and flat cleanup. `selectword-reference.v` runs the unchanged
 ELF on Linux; `selectword-evidence.v` audits the complete external bundle.
 See [results, reproduction and limits](../../docs/linux-select-nfds.md).
 
+The empty and masked-wait fixtures use child-entry State storage and direct
+C-width atomic flags so they compile from current sources without implicit
+heap-copy helpers. `waitfixture-evidence.v` audits their reproduced build
+failures, fresh native/Linux ELFs, unchanged checks and measured cleanup.
+See [fresh-build qualification](../../docs/linux-wait-fixture-builds.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

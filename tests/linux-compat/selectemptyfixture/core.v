@@ -2,6 +2,7 @@
 @[has_globals]
 module selectemptyfixture
 
+#include <alloca.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <pthread.h>
@@ -37,8 +38,10 @@ struct State {
 	mode int
 	restart int
 mut:
-	entered int
-	done int
+	// Match C's int width so atomic builtins access these shared fields
+	// directly, without an ABI-conversion temporary and a plain writeback.
+	entered i32
+	done i32
 	sleeps int
 	ignored int
 	sent int
@@ -75,8 +78,8 @@ fn C.sigemptyset(&C.sigset_t) i32
 fn C.sigaddset(&C.sigset_t, i32) i32
 fn C.pthread_create(&C.pthread_t, voidptr, fn (voidptr) voidptr, voidptr) i32
 fn C.pthread_join(C.pthread_t, voidptr) i32
-fn C.__atomic_load_n(&int, int) int
-fn C.__atomic_store_n(&int, int, int)
+fn C.__atomic_load_n(&i32, i32) i32
+fn C.__atomic_store_n(&i32, i32, i32)
 fn C.clock_gettime(i32, &C.timespec) i32
 fn C.pselect(i32, &C.fd_set, &C.fd_set, &C.fd_set, &C.timespec, &C.sigset_t) i32
 fn C.select(i32, &C.fd_set, &C.fd_set, &C.fd_set, &C.timeval) i32
@@ -164,11 +167,12 @@ fn wait_call(api int, nfds int, fds &u64, timeout &C.timespec, temporary &u64) i
 		}
 	}
 }
-fn suite(api int, nfds int, buffer int, mode int, restart int) Totals {
+fn suite(scratch &State, api int, nfds int, buffer int, mode int, restart int) Totals {
 	unsafe {
 		C.alarm(30)
-		mut s := State{tid: int(C.syscall(isize(C.SYS_gettid))), pid: int(C.syscall(isize(C.SYS_getpid))), api: api, nfds: nfds, buffer: buffer, mode: mode, restart: restart, sent: -99, ignored: -99}
-		active = &s
+		mut s := scratch
+		*s = State{tid: int(C.syscall(isize(C.SYS_gettid))), pid: int(C.syscall(isize(C.SYS_getpid))), api: api, nfds: nfds, buffer: buffer, mode: mode, restart: restart, sent: -99, ignored: -99}
+		active = s
 		mut totals := Totals{}
 		mut action := C.sigaction{sa_handler: handler, sa_flags: if restart == 1 { C.SA_RESTART } else { 0 }}
 		if C.sigemptyset(&action.sa_mask) != 0 || C.sigaddset(&action.sa_mask, C.SIGTERM) != 0 || C.sigaction(C.SIGUSR1, &action, nil) != 0 { fatal(9) }
@@ -180,9 +184,9 @@ fn suite(api int, nfds int, buffer int, mode int, restart int) Totals {
 		fds := if buffer == 0 { &u64(nil) } else { &bits[1] }
 		mut worker_id := C.pthread_t{}
 		if mode == 0 {
-			check(mut totals, send_to(&s, C.SIGUSR1) == 0 && s.calls == 0, 10)
+			check(mut totals, send_to(s, C.SIGUSR1) == 0 && s.calls == 0, 10)
 		} else if mode == 1 {
-			if C.pthread_create(&worker_id, nil, observer, &s) != 0 { fatal(10) }
+			if C.pthread_create(&worker_id, nil, observer, s) != 0 { fatal(10) }
 		}
 		mut timeout := C.timespec{}
 		if mode == 3 {
@@ -233,7 +237,10 @@ pub fn run(argc i32, argv &&char) i32 {
 			if pid == 0 {
 				C.close(fds[0])
 				if ordinary && (C.setgid(2000) != 0 || C.setuid(1000) != 0) { fatal(14) }
-				t := suite(api, nfds, buffer, mode, restart)
+				// Keep the signal/observer state in the entry frame through
+				// worker join, result reporting and the child's _exit().
+				scratch := &State(C.alloca(usize(sizeof(State))))
+				t := suite(scratch, api, nfds, buffer, mode, restart)
 				C.printf(c'LINUX SELECTEMPTY CASE: uid=%u gid=%u api=%d nfds=%d buffer=%d mode=%d restart=%d checks=%d failures=%d\n', C.getuid(), C.getgid(), api, nfds, buffer, mode, restart, t.checks, t.failures)
 				if C.write(fds[1], &t, sizeof(t)) != sizeof(t) { fatal(15) }
 				C.fflush(nil); C._exit(0)
@@ -256,7 +263,8 @@ pub fn run(argc i32, argv &&char) i32 {
 					C.printf(c'LINUX SELECTEMPTY STORAGE: uid=%u SKIP reference\n', C.getuid())
 					C.fflush(nil); C._exit(0)
 				}
-				good := storage()
+				scratch := &State(C.alloca(usize(sizeof(State))))
+				good := storage(scratch)
 				C.fflush(nil); C._exit(if good { 0 } else { 1 })
 			}
 			mut status := i32(0)

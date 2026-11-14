@@ -58,11 +58,12 @@ fn cycle() int {
 		fatal(22); return -1
 	}
 }
-fn storage() bool {
+fn storage(scratch &State) bool {
 	unsafe {
 		C.alarm(50)
-		mut s := State{tid: int(C.syscall(isize(C.SYS_gettid))), pid: int(C.syscall(isize(C.SYS_getpid)))}
-		active = &s
+		mut s := scratch
+		*s = State{tid: int(C.syscall(isize(C.SYS_gettid))), pid: int(C.syscall(isize(C.SYS_getpid)))}
+		active = s
 		mut action := C.sigaction{sa_handler: handler}
 		if C.sigemptyset(&action.sa_mask) != 0 || C.sigaction(C.SIGUSR1, &action, nil) != 0 { fatal(23) }
 		fd := C.open(c'/proc/slabinfo', C.O_RDONLY)
