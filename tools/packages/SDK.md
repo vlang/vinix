@@ -2175,6 +2175,19 @@ define requires write mode. Both inventories contain signed marker bytes;
 this measures row-count scaling and does not execute Wine or model its full
 payload size.
 
+`tests/packages/wine-prefix-sync-fault.v` checks synchronous directory-sync
+failure recovery in the adapter. Build with `-enable-globals` and
+`-cflags -Dfsync=vinix_wine_probe_fsync`; run the host binary with a fresh root.
+For a guest, also define `wine_sync_guest` and pass the same `-Dfsync` alias to
+the final C compiler. The fixture injects one `EIO` at each of eight migration
+sync calls and at the direct additions sync. Other calls reach the OS through
+the real fsync syscall. Every refusal must leave the exact expected links and
+stage, then fresh capture must resume, repeat and preserve private data.
+`wine-prefix-sync-check.v FRESH_WORK ARCH KERNEL SYNC_GUEST` requires all nine
+case markers, input hash rechecks and completion within 120 seconds. The
+uninstrumented fixture must fail its injection assertion. These reconstructed
+adapter cases do not exercise signed service admission or actual power loss.
+
 The experimental `wine-native-check ... --owned-manager --migration-probe`
 requires x86_64 and attempts a real Win64 relaunch after explicit public-command
 migration to a newly installed generation of the same signed Wine payload.
