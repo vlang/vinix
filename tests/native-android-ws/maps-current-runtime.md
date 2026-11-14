@@ -58,6 +58,13 @@ passed the full signed ARM regression and rendered the actual route overview
 and mapped turn preview. JIT is enabled; responsive use and Google sign-in
 remain unqualified. Closing Maps caused the existing ancestry guard to end
 that session, and relaunch was refused. The failed receipt remains retained.
+The [fresh account attempt, r85](maps-jit-account-runtime-20261114.md), reached
+Google's error page after a 10000-ms check-in timeout. Later real check-ins
+succeeded; the eligible callback arrived too late. Twenty failed dynamic-module
+AOT attempts are retained as extra startup work, with no causal speedup claim
+or unsupported ART flag change. The session stayed alive beyond five minutes
+after Add account and ended through the checked stop path. Sign-in and fully
+responsive use remain unresolved; both test VMs are stopped.
 [Generator compatibility](maps-generator-current-v-20261113.md)
 keeps these builds on the available latest V. The following records earlier
 attempts; API passes alone do not establish complete Maps functionality.

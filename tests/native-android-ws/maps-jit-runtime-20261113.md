@@ -1,5 +1,9 @@
 # Maps JIT experiment
 
+The later [repaired-SDK retry](maps-jit-route-runtime-20261114.md) enables JIT
+after another full signed ARM pass and actual rendered route/turn validation.
+The observations below retain the earlier experiment's original result.
+
 The experiment changes only ART's -Xusejit:false option to true. It retains JNI
 checks, image compilation policy, memory guards and session deadlines. It is
 not enabled in the repository default: the runtime results below do not
