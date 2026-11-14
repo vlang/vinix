@@ -23,13 +23,14 @@ pub struct IRMemoryProfile {
 	accesses []IRMemoryAccess
 	max_phis int
 pub:
-	steps int // Every static instruction plus all switch case comparisons.
+	steps int // Static instructions, switch comparisons and memset bytes.
 	arguments []IRMemoryArgument
 }
 pub fn (profile &IRMemoryProfile) free() { unsafe { profile.arguments.free(); profile.accesses.free() } }
 struct IRMemoryAccess {
 	argument int = -1
 	comparison u8 // 0: ordinary access; 1/2: precomputed false/true pointer comparison.
+	bytes u32 // Constant memset length; other accesses derive their scalar width.
 	offset u64
 }
 fn (p IRTypedProgram) memory_pointer(pools IRConstantPools, bodies IRFunctionBodies, scope int, operand int, count int, pointers []IRMemoryAccess) !IRMemoryAccess {
@@ -103,7 +104,8 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 // forward branches/switches/PHIs, scalar loads/stores, literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, resolved pointer
 // PHIs/selects/freezes/bitcasts, checked overflow pairs with field
-// extraction/insertion/freeze/select and final ret void.
+// extraction/insertion/freeze/select, nonvolatile constant-length memset
+// and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -139,6 +141,8 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	defer { layouts.free() }
 	mut intrinsic_declarations := [1768]int{} // Forty FP slots + twenty-seven integer families.
 	mut intrinsic_work := 0
+	mut memset_declarations := [6]int{}
+	mut memset_steps := 0
 	for index in s.instructions_start .. s.instructions_start + s.instructions_count {
 		inst := bodies.instructions[index]; op := p.instructions[index]
 		if op.is_volatile { return error('AIR memory execution: decoded access required') }
@@ -171,6 +175,24 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			continue
 		}
 		if code == 34 {
+			if !inst.has_result {
+				length, attributes, key := p.memory_memset_call(ir, stream, pools, op, scope)!
+				if length > u64(max_integer_execution_steps - s.instructions_count - switch_steps - memset_steps) { return error('AIR memory execution: memset execution budget') }
+				memset_steps += int(length)
+				if memset_declarations[key] != 0 && memset_declarations[key] != op.callee_function + 1 { return error('AIR memory execution: duplicate memset declaration') }
+				if memset_declarations[key] == 0 {
+					intrinsic_work += intrinsic_declaration_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work, 4, false)!
+					memset_declarations[key] = op.callee_function + 1
+				}
+				access := p.memory_pointer(pools, bodies, scope, op.operands_start + 1, count, pointers)!
+				if length > 0 {
+					if arguments[access.argument].address_space == 2 || length > u64(64 * 1024 * 1024) - access.offset { return error('AIR memory execution: memset address space/extent') }
+					if access.offset + length > arguments[access.argument].minimum_size { arguments[access.argument].minimum_size = access.offset + length }
+					arguments[access.argument].writable = true
+				}
+				accesses[index - s.instructions_start] = IRMemoryAccess{argument: access.argument, offset: access.offset, bytes: u32(length)}
+				continue
+			}
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: intrinsic result') }
 			key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
 			id := scalar_intrinsic_name(ir.functions[op.callee_function].name)!
@@ -290,7 +312,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		} else if p.operands[op.operands_start + 1].type_index != op.source_type { return error('AIR memory execution: store type') }
 	}
 	keep = true
-	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, steps: s.instructions_count + switch_steps, arguments: arguments}
+	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, steps: s.instructions_count + switch_steps + memset_steps, arguments: arguments}
 }
 pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
@@ -339,7 +361,19 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 				}
 				break
 			}
-			if code == 34 { value := m.intrinsic_value(ir, op)!; m.put(inst, value); continue }
+			if code == 34 {
+				access := profile.accesses[index - s.instructions_start]
+				if access.argument >= 0 {
+					// Zero length has no byte-value evaluation or write permission.
+					if access.bytes != 0 {
+						value := m.read(op.operands_start + 2)!
+						if value.poison { return error('AIR memory execution: poison memset byte') }
+						offset := int(bindings[access.argument].offset + access.offset)
+						for i in 0 .. int(access.bytes) { m.step()!; bindings[access.argument].data[offset + i] = u8(value.value) }
+					}
+				} else { value := m.intrinsic_value(ir, op)!; m.put(inst, value) }
+				continue
+			}
 			if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }
 			if code == 27 { value := m.insert_pair_value(op)!; m.put(inst, value); continue }
 			if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }

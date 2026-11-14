@@ -7,8 +7,9 @@ checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
-Fast-math flags, alloca, integer-pointer/address-space casts, loops, atomics,
-volatile accesses, general calls or aggregate loads/stores
+Nonvolatile constant-length `llvm.memset` calls also initialize byte ranges,
+as described below. Fast-math flags, alloca, integer-pointer/address-space casts,
+loops, atomics, volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
 Unconditional branches and scalar i1 conditional branches must target strictly
@@ -38,7 +39,7 @@ conditions retain the scalar reader's error behavior.
 Buffer extents, alignments and permissions combine every block's requirements,
 including inactive paths. `IRMemoryProfile.steps` is the conservative total
 instruction count across all blocks plus the maximum case comparisons for
-every switch; callers must supply at least that budget
+every switch and every memset byte; callers must supply at least that budget
 before any execution. `IRVoidRun.steps` counts the executed path, charging each
 branch, PHI and return once. Poison branch conditions error; undef conditions
 retain the scalar reader's error behavior. Dynamic errors leave earlier stores
@@ -300,13 +301,41 @@ operation would overwrite or ignore the field. Each insertion costs one step
 and shares scalar validation/evaluation. General aggregates, nested paths and
 aggregate memory remain unsupported.
 
-Only ordinary direct calls to these forty-seven families' exact declarations are admitted:
+Scalar intrinsics require ordinary direct calls to these forty-seven families'
+exact declarations:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other
-intrinsics. Harmless declaration properties and parameter two's immarg use
+scalar intrinsics. Harmless declaration properties and parameter two's immarg use
 the existing scalar allowlist and cumulative attribute-work limit. Each
 declaration's attributes are checked once per profile; each call's signature
 and constant flag are checked independently. No declaration or host pointer
 is invoked by execution. Unsupported calls after stores reject in preflight.
+
+The memory profile additionally admits `llvm.memset.p0.i32/i64`,
+`llvm.memset.p1.i32/i64` and zero-length `llvm.memset.p2.i32/i64`. These must
+be ordinary void direct calls to exactly matching fixed declarations with an
+i8 byte, defined literal i32/i64 length, and literal false i1 volatility flag.
+The destination uses the existing resolved pointer sources. Nonempty calls
+derive their full extent before execution and require write permission;
+address space 2 rejects writes. Unannotated destinations use byte alignment.
+Call-site attributes, tail calls, volatile fills, dynamic/poison/undef lengths,
+literal pointer destinations, inline/atomic variants and general calls reject.
+
+Declaration attributes admit the existing harmless function properties except
+readnone/readonly/speculatable, fourth-parameter immarg, destination writeonly
+and nocapture/captures(none), and memory(argmem: write) encodings 0/1/2.
+Unknown attributes and other parameter properties reject. Declaration scans
+share the existing cumulative work limit and run once per admitted overload.
+The separate scalar and void APIs retain their prior intrinsic profiles.
+
+A memset costs its instruction step plus one step per written byte. The static
+budget sums lengths across all blocks/calls and must fit the million-step
+limit before stores. Runtime reads a nonempty fill's byte once; poison/undef
+errors before any of that fill's writes, preserving earlier stores. Untaken
+fills do not read the byte. Zero length has no byte evaluation or write
+requirement, so it permits poison/undef byte operands and empty readonly
+bindings, including address space 2. Existing GEP extents and earlier executed
+instructions still apply. Execution uses indexed byte writes without calling
+host memset, exposing host addresses or allocating a fill buffer.
 
 `memory_function_profile` validates the supported signature and complete body
 without accessing buffer data. Its owned `arguments` array describes required
@@ -500,6 +529,12 @@ PHI/select/freeze/bitcast chains. It checks scalar/select/branch consumers,
 one-past extents without source reads, aliases, exact costs, budgets, bindings,
 metadata/types, cross-binding and signed-predicate exclusions, and poison/undef
 select conditions with prior writes, plus frozen and untaken conditions.
+
+`tests/ios/air-memory-memset.v` compares all 256 fill bytes with native LLVM
+across i32/i64 lengths, direct/derived destinations, pointer control chains,
+aliases and zero-length indeterminate bytes. It checks exact extents, costs,
+permissions, malformed call/type metadata, literal/volatile/length exclusions,
+dynamic byte errors, frozen/untaken fills and cumulative/million-step budgets.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

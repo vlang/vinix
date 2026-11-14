@@ -98,21 +98,27 @@ fn scalar_intrinsic_attributes(stream Stream, set u64, limit int) !int {
 	return scalar_intrinsic_attributes_profile(stream, set, limit, false)!
 }
 fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second_immarg bool) !int {
+	return intrinsic_declaration_attributes(stream, set, limit, if second_immarg { u64(2) } else { u64(0) }, true)!
+}
+// Share the bounded attribute scanner with memory intrinsics. They permit a
+// fourth-parameter immarg and canonical destination properties, with
+// memory(argmem: write) instead of the scalar memory(none) property.
+fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_slot u64, memory_none bool) !int {
 	if set == 0 { return 0 }
-	mut work := 0; mut number := u64(0); mut groups := [2]u64{}; mut count := 0
+	mut work := 0; mut number := u64(0); mut groups := [3]u64{}; mut count := 0
 	for record in stream.records {
 		work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
 		if stream.blocks[record.block].id != 9 { continue }
 		if record.code != 2 { return error('AIR intrinsic: unsupported attribute-list encoding') }
 		number++
 		if number != set { continue }
-		if record.values_count < 1 || record.values_count > if second_immarg { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
+		if record.values_count < 1 || record.values_count > if !memory_none { 3 } else if immarg_slot != 0 { 2 } else { 1 } { return error('AIR intrinsic: attribute-list slots') }
 		count = record.values_count
 		for i in 0 .. count { groups[i] = ir_values(stream, record)[i]; if groups[i] == 0 { return error('AIR intrinsic: zero attribute group') } }
 		break
 	}
 	if count == 0 { return error('AIR intrinsic: missing attribute list/group') }
-	mut function_seen := false; mut mask_seen := false
+	mut function_seen := false; mut mask_seen := false; mut destination_seen := false
 	for i in 0 .. count {
 		mut found := false
 		for record in stream.records {
@@ -121,18 +127,32 @@ fn scalar_intrinsic_attributes_profile(stream Stream, set u64, limit int, second
 			values := ir_values(stream, record)
 			if values.len < 2 || values[0] != groups[i] { continue }
 			found = true
-			if second_immarg && values[1] == 2 {
+			if immarg_slot != 0 && values[1] == immarg_slot {
 				work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
 				if mask_seen || values.len != 4 || values[2] != 0 || values[3] != 60 { return error('AIR intrinsic: mask immarg attribute required') }
-				mask_seen = true; break // Only parameter two's enum immarg.
+				mask_seen = true; break // Only the admitted parameter's enum immarg.
+			}
+			if !memory_none && values[1] == 1 {
+				if destination_seen || values.len > 12 { return error('AIR intrinsic: destination attribute group') }
+				destination_seen = true
+				mut cursor := 2; mut write_seen := false; mut capture_seen := false
+				for cursor < values.len {
+					work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
+					if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == 52 && !write_seen { write_seen = true; cursor += 2 }
+					else if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] == 11 && !capture_seen { capture_seen = true; cursor += 2 }
+					else if values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 102 && values[cursor + 2] == 0 && !capture_seen { capture_seen = true; cursor += 3 }
+					else { return error('AIR intrinsic: unsupported destination attribute') }
+				}
+				break
 			}
 			if function_seen || values[1] != 0xffffffff || values.len > 64 { return error('AIR intrinsic: function attribute group required') }
 			function_seen = true
 			mut cursor := 2
 			for cursor < values.len {
 				work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
-				if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] in [u64(18), 20, 21, 53, 61, 62, 63, 71, 105]! { cursor += 2 }
-				else if values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 86 && values[cursor + 2] in [u64(0), u64(1) << 56, u64(2) << 56]! { cursor += 3 } // memory(none), versions 0/1/2
+				if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] in [u64(18), 20, 21, 53, 61, 62, 63, 71, 105]! && (memory_none || values[cursor + 1] !in [u64(20), 21, 53]!) { cursor += 2 }
+				else if memory_none && values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 86 && values[cursor + 2] in [u64(0), u64(1) << 56, u64(2) << 56]! { cursor += 3 } // memory(none), versions 0/1/2
+				else if !memory_none && values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 86 && values[cursor + 2] in [u64(2), (u64(1) << 56) | 2, (u64(2) << 56) | 2]! { cursor += 3 } // memory(argmem: write), versions 0/1/2
 				else { return error('AIR intrinsic: unsupported declaration attribute') }
 			}
 			break

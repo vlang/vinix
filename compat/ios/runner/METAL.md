@@ -307,6 +307,19 @@ Cross-binding comparisons reject even for aliased storage; signed ordering
 and literal null/poison/undef pointers reject. Earlier pointer selects still
 evaluate their conditions when executed.
 
+Nonvolatile `llvm.memset` fills accept a runtime i8 byte and a defined literal
+i32/i64 length through a resolved destination pointer. Nonempty fills require
+space 0/1 and write permission, with the complete extent checked before stores.
+Each call costs one instruction step plus one step per byte; lengths across
+all blocks/calls count toward the million-step limit. Poison/undef byte values
+error before that fill writes, retaining earlier stores. Zero-length calls skip
+the byte and need no write permission, including for empty readonly space-2
+bindings. Pointer literals, volatile/dynamic-length fills, inline/atomic
+variants, tail calls and call-site attributes reject. Exact declarations admit
+canonical writeonly/captures(none), fourth immarg and memory(argmem: write)
+properties with bounded validation. Deferred fills check byte ranges, untouched
+prefixes and input changes after encoding.
+
 Integer switches accept i1..i64 and zero through 64 distinct defined literal
 cases with matching types. Default and case destinations must be distinct
 forward blocks. Each tested case costs one additional step; default paths test
