@@ -3115,6 +3115,40 @@ Typed receipt:
 SHA-256 `6d7fabedc54a744db8778bf326b9714b52711df564559ccd305075df26bacfe8`.
 Recording and independent comparison pass.
 
+## Public service successful write heap and coordination cleanup, 2026-11-14
+
+Source `0bca7c574` adds `-d wine_service_heap_writes` and controller `--writes`.
+Each signed marker guest runs 100 same-generation idempotent public migrations
+and 100 public additions cycles, recreating two fixture-owned missing links.
+Every cycle performs full recheck, requires two `keep` bindings and exact signed
+targets, and verifies that owner close releases the generation lease and store
+reader lock. Both measured phases retain zero V objects/bytes. Private sentinel
+contents survive and no stage remains. These cases qualify repeated writes to
+the selected generation; generation retargeting and Wine-version upgrades need
+their own evidence.
+
+Final x86 and ARM guests pass in 35.905 and 8.256 seconds respectively, within
+the unchanged 120-second bound. The new controller also passes the retained
+immutable positive x86 guest in 11.243 seconds and refusal guest in 9.336 seconds;
+these are controller compatibility checks. Both guest compile modes together
+refuse with exit 2 before PID1 setup. Both controller options together refuse
+with exit 1 before creating work. No production implementation changes.
+
+Evidence is preserved at `/Users/alex/.cache/vwservicewrites-20261114-01`, with
+isolated source base `9b9bd017f` plus `source.patch`, final `write-*` binaries,
+generated C, parsed-source lists, kernel copies, validation notes and run logs.
+Both changed V files match the feature commit. Initial `guest-*` builds were
+never run. Complete prior bundles and original namespaces remain required.
+Coverage excludes setup/cold startup, libc/kernel allocations, complete descriptor
+accounting, real Wine execution and whole-launch lifetime. ARM marker programs
+never execute. The existing pointer-compatibility compiler exception remains;
+strict ABI and hermetic build closure remain open.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-service-writes-20261114-01.inventory.json`,
+SHA-256 `316bb4ff5cc23f0b976303e73f077ec3a34a1b6921d8d4ad634038e20e7d27cb`.
+Recording and independent comparison pass.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
