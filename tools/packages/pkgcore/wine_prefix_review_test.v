@@ -44,8 +44,42 @@ fn test_persisted_generation_lease_survives_combined_prefix_review() {
 	state, lease := generation_lease(store, 'aarch64', 'app')!
 	reader.release()
 	index := wine_runtime_index(state, 'app')!
-	// Real decoded state and flock lease; publisher/payload admission is
-	// deliberately outside this bounded ownership/collection-lock test.
+	// Exercise launch verification against the declared on-disk closure.
+	// Provenance is fixture metadata, not a signed repository installation.
+	os.mkdir_all(generation + '/apps/wine/bin')!
+	os.write_file(generation + '/apps/wine/bin/wine', 'runner')!
+	os.chmod(generation + '/apps/wine/bin/wine', 0o755)!
+	os.mkdir_all(generation + '/apps/app/bin')!
+	os.write_file(generation + '/apps/app/bin/program.exe', 'app')!
+	os.chmod(generation + '/apps/app/bin/program.exe', 0o755)!
+	os.mkdir_all(generation + '/share/applications')!
+	os.write_file(generation + '/share/applications/vinix-app.desktop', desktop_entry(app))!
+	os.chmod(generation + '/share/applications/vinix-app.desktop', 0o644)!
+	config := Config{architecture: 'aarch64', repositories: [Repository{id: 'fixture', public_key: key, url: 'file:///fixture'}]}
+	verify_launch_payloads(config, store, state, 'app')!
+	mut revoked := false
+	verify_launch_payloads(Config{architecture: 'aarch64'}, store, state, 'app') or {
+		revoked = err.msg().contains('publisher key has been revoked')
+	}
+	assert revoked
+	os.write_file(generation + '/apps/wine/extra.dll', 'undeclared')!
+	mut extra := false
+	verify_launch_payloads(config, store, state, 'app') or { extra = err.msg().contains('namespace verification failed') }
+	assert extra
+	os.rm(generation + '/apps/wine/extra.dll')!
+	os.write_file(generation + '/share/applications/vinix-app.desktop', 'changed registration')!
+	mut registration := false
+	verify_launch_payloads(config, store, state, 'app') or { registration = err.msg().contains('registration verification failed') }
+	assert registration
+	os.write_file(generation + '/share/applications/vinix-app.desktop', desktop_entry(app))!
+	os.write_file(builtins + '/kernel32.dll', 'BAD')!
+	mut tampered := false
+	verify_launch_payloads(config, store, state, 'app') or {
+		tampered = err.msg().contains('payload changed')
+	}
+	assert tampered
+	os.write_file(builtins + '/kernel32.dll', 'new')!
+	verify_launch_payloads(config, store, state, 'app')!
 	mut admission := WineAdmission{generation: state.generation, runtime: state.packages[index].package,
 		prepared: PreparedLaunch{directory: store.clone(), state: state, lease: lease}}
 	mut owner := WinePrefixReview{admission: admission, review: admission.capture_prefix(data)!}
