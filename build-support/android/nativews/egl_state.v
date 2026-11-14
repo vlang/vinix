@@ -34,6 +34,8 @@ __global ws_egl_error_key u32
 __global ws_egl_binding_key u32
 __global ws_egl_provider voidptr
 __global ws_egl_mutex C.pthread_mutex_t
+__global ws_egl_loader_mutex C.pthread_mutex_t
+__global ws_egl_prepared bool
 
 struct WsEglDisplayLease {
 mut:
@@ -60,14 +62,41 @@ fn ws_egl_display_lease(display voidptr) &WsEglDisplayLease {
 }
 
 fn ws_egl_symbol(name &char) voidptr {
-	unsafe { return C.dlsym(ws_egl_provider, name) }
+	unsafe {
+		// A headless client can query GPU capabilities before opening any UI.
+		// dlsym(nil, ...) would resolve our exported adapter and recurse forever.
+		if !ws_egl_init(ws.root) {
+			C.puts(c'ANDROID-WS-FAIL EGL provider initialization'); C.fflush(nil); C.abort()
+		}
+		address := C.dlsym(ws_egl_provider, name)
+		if address == nil {
+			C.puts(c'ANDROID-WS-FAIL EGL provider symbol'); C.fflush(nil); C.abort()
+		}
+		return address
+	}
+}
+
+// Called on the entry thread before Java/worker startup. This creates only
+// synchronization/TLS state; headless startup still loads no graphics provider.
+fn ws_egl_prepare() bool {
+	unsafe {
+		if ws_egl_prepared { return true }
+		if C.pthread_key_create(&ws_egl_error_key, nil) != 0
+			|| C.pthread_key_create(&ws_egl_binding_key, voidptr(ws_egl_binding_release)) != 0
+			|| C.pthread_mutex_init(&ws_egl_mutex, nil) != 0
+			|| C.pthread_mutex_init(&ws_egl_loader_mutex, nil) != 0 { return false }
+		ws_egl_prepared = true
+		return true
+	}
 }
 
 fn ws_egl_init(root &char) bool {
 	unsafe {
-		if C.pthread_key_create(&ws_egl_error_key, nil) != 0
-			|| C.pthread_key_create(&ws_egl_binding_key, voidptr(ws_egl_binding_release)) != 0
-			|| C.pthread_mutex_init(&ws_egl_mutex, nil) != 0 { return false }
+		if !ws_egl_prepare() { return false }
+		C.pthread_mutex_lock(&ws_egl_loader_mutex)
+		defer { C.pthread_mutex_unlock(&ws_egl_loader_mutex) }
+		// UI attachment must retain keys, display leases and worker bindings.
+		if ws_egl_provider != nil { return true }
 		path := &char(C.alloca(8192))
 		for name in [&char(c'libvinix-ws-GLESv1_CM.so'), &char(c'libvinix-ws-GLESv2.so')]! {
 			C.snprintf(path, 8192, c'%s/usr/lib/art/native-ws/%s', root, name)

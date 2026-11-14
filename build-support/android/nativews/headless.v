@@ -329,7 +329,12 @@ fn ws_service_main(root &char, apk &char, package_name &char, service &char, act
 			return ws_service_terminal_fail(1, 5)
 		}
 		defer { ws_account_service_shutdown(ws.e); ws_web_shutdown(ws.e) }
-		// No surface, fonts, codecs, EGL, drawing state, Activity or Canvas.
+		// No surface, fonts, codecs, graphics provider, Activity or Canvas.
+		// Prepare synchronization before Java workers can request EGL queries.
+		if !ws_egl_prepare() {
+			C.puts(c'ANDROID-SERVICE-FAIL graphics synchronization')
+			return ws_service_terminal_fail(1, 13)
+		}
 		loaded := ws_bootstrap(root, apk, false)
 		if loaded == nil { return ws_service_terminal_fail(1, 6) }
 		e := ws.e
