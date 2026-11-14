@@ -2023,6 +2023,30 @@ link targets. Package-service authentication integration, generation lease
 retention, migration application and recovery remain open. Section 14 remains
 incomplete; accepting a caller-supplied inventory alone establishes no trust.
 
+## Retained runtime admission, 2026-11-14
+
+Source `2fab29c31` adds `Service.wine_admission()`, retaining prepared package
+state and its shared generation lease while exposing the selected runtime
+manifest. It requires an ordinary account and installed real root, validates
+state, selects an explicit Windows runtime dependency and invokes the existing
+launch payload/policy/publisher-key verification. Close retires the owner once.
+
+Host tests pass for valid runtime selection, wrong application/runtime kinds,
+missing dependencies/packages, alternate-root refusal and descriptor close/reuse
+safety. Built using the retained V compiler with `-backend c -gc none
+-manualfree` and repository module path. These controls do not exercise a
+successful signed installed-state admission, collection contention or guest
+execution; those remain required before integrating migration. Prefix capture,
+expected-inventory conversion, application and recovery remain open.
+
+Evidence is frozen at `/Users/alex/.cache/vwadmission-20261114-01`; receipt
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-runtime-admission-20261114-01.inventory.json`
+has SHA-256 `b6c9d8644b869e96834e0755e13fdd42caa209d4b15439d3ca11bedc2c67ffc7`.
+Record and independent check pass complete bytes, sizes, types, modes and link
+targets. This bundle contains the new sources, generated host C/binaries and
+logs; complete source closure, cross-builds and measured heap flatness are not
+claimed. Section 14 remains incomplete.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

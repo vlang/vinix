@@ -2000,6 +2000,15 @@ matching SHA-256 and byte counts. Expectations are borrowed only during the
 call. The caller must authenticate their source and retain the generation lease;
 comparison alone does not establish provenance or authorize migration.
 
+`pkgcore.Service.wine_admission(application_id)` requires the installed real
+root and an ordinary account, selects the Windows application's explicit runtime
+dependency and performs the same policy, publisher-key, namespace and payload
+checks as launch. Its single-owner `WineAdmission` retains the prepared state
+and shared generation lease until repeatable `close()`. The exposed runtime
+manifest borrows that state: do not copy the admission or use metadata after
+close. Admission does not lock a prefix, start Wine or authorize migration;
+combining it with idle review and recovery remains required.
+
 `wine-native-check --check-owned-build x86_64 PREPARED_BUILD` runs read-only
 ownership receipt admission before the full controller creates build/signing
 output. It checks the current runner-source hash, separate compiler ownership
