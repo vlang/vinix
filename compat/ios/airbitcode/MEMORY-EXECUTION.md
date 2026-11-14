@@ -9,7 +9,7 @@ Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
 Nonvolatile constant-length memset, memmove and disjoint memcpy also operate on
 byte ranges, as described below. Fast-math flags, alloca,
-integer-pointer/address-space casts,
+integer-pointer casts,
 loops, atomics, volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
@@ -86,8 +86,8 @@ integer truncation/zero extension/sign extension across i1..i64, signed and
 unsigned conversions between those integers and half/float, float-to-half
 truncation, half-to-float extension, and same-width integer/floating bitcasts
 at 16/32 bits. Integer width changes require the correct direction. Flags,
-integer-pointer/address-space casts, vector/aggregate casts, double and bfloat
-remain unsupported. The pointer bitcast exception is described below.
+integer-pointer casts, vector/aggregate casts, double and bfloat remain
+unsupported. Pointer bitcasts and bounded address-space casts are described below.
 Float-to-integer conversion truncates toward zero; NaN, infinity and values
 whose truncated result is outside the destination range produce poison.
 Poison inputs propagate. Selected undef still errors. Storing a poisoned cast
@@ -110,8 +110,27 @@ Their results resolve during preflight and cost one executed step without
 entering scalar value slots. Bounds, alignment and permissions stay attached
 to the original argument and byte offset. Literal null, poison and undef
 pointers reject during preflight. Freezing a pointer select does not bypass
-its defined-condition requirement. Pointer-integer and address-space casts
-remain unsupported.
+its defined-condition requirement. Pointer-integer casts remain unsupported.
+
+Scalar pointer `addrspacecast` supports all six distinct space-0/1/2 pairs in
+this interpreter's flat virtual target. It preserves the binding identity and
+byte offset; it does not construct or expose host addresses. An explicit
+supported little-endian data layout must give both pointer types 64-bit size
+and 64-bit index width. The existing per-profile layout table is reused and
+freed after preflight. Missing, narrower, non-integral and other unsupported
+layouts reject, as do flags, vector casts, same-space casts, literal pointers
+and spaces outside 0/1/2. This is a target policy, not a promise that arbitrary
+LLVM targets implement those casts as identities.
+
+Cast results may feed GEPs, invariant PHIs/selects, identity operations,
+comparisons, scalar accesses and memory intrinsics. Each executed cast costs
+one step and never enters scalar value slots. Requirements stay on the
+original argument. A space-2 argument cannot acquire write access by casting
+it to another space. Nonempty scalar or intrinsic writes through a space-2
+view also reject, even when the original argument is writable. Returning a
+writable argument to a writable view preserves its original permission.
+Zero-length intrinsics still add no read/write usage. Every block is checked,
+including inactive writes, and aliased bindings retain distinct identities.
 
 Direct LLVM integer bit intrinsics `ctpop`, `bitreverse`, `bswap`, `ctlz` and
 `cttz` are supported using the scalar executor's declaration/signature,
@@ -645,6 +664,13 @@ offsets, compensating offsets, inactive calls, unsupported combined attributes,
 exact budgets and aligned empty readonly zero-length calls in spaces 0/1/2.
 Its optional trailing `inline` argument substitutes inline fills and copies
 for ordinary ones, including declarations without the optional length immarg.
+
+`tests/ios/air-memory-address-space.v` compares all six admitted casts with
+native LLVM across i1..i64, half and float, including round trips, pointer flow,
+shifted and aliased bindings. It checks original argument requirements, exact
+budgets, type/flag mutations, layout exclusions, readonly scalar/intrinsic
+writes in active/inactive blocks, literal pointers, vectors, unsupported spaces,
+zero operations and preservation of binding identities after conversion.
 
 `tests/ios/air-memory-switch.v` compares every case/default path across all
 integer widths and scalar/floating/pair PHIs against native LLVM, including

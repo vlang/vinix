@@ -72,7 +72,7 @@ fn main() {
   expr := if op == 'freeze' { 'freeze ptr ${state}' } else { 'bitcast ptr ${state} to ptr' }
   source.write_string('define void @guard_${op}_${state}(ptr %src, ptr %out) { store i8 17, ptr %out, align 1\n %bad = ${expr}\n ret void }\n')
  } }
- for name, expr in {'integer_pointer': 'inttoptr i64 0 to ptr', 'pointer_integer': 'ptrtoint ptr %out to i64', 'address_space': 'addrspacecast ptr %out to ptr addrspace(1)'} {
+ for name, expr in {'integer_pointer': 'inttoptr i64 0 to ptr', 'pointer_integer': 'ptrtoint ptr %out to i64', 'address_space': 'addrspacecast ptr %out to ptr addrspace(3)'} {
   source.write_string('define void @guard_${name}(ptr %src, ptr %out) { store i8 17, ptr %out, align 1\n %bad = ${expr}\n ret void }\n')
  }
  for state in ['poison', 'undef'] { for early in [false, true] { for used in [false, true] {

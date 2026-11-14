@@ -295,8 +295,19 @@ requires scalar pointer types in the same address space. Arguments, GEPs,
 invariant PHIs/selects and earlier pointer freezes/bitcasts may feed each other.
 Each costs one executed step and resolves during preflight, preserving the
 original binding's bounds, alignment and permissions. Literal null/poison/undef
-pointers, integer-pointer conversions and address-space casts reject. Freeze
+pointers and integer-pointer conversions reject. Freeze
 does not bypass an earlier pointer select's defined-condition requirement.
+
+Scalar pointer `addrspacecast` preserves binding identity and byte offset
+between distinct spaces 0/1/2 in this flat virtual target. Both pointer and
+index widths must be 64 bits in an explicit supported little-endian layout.
+Flags, literal/vector pointers, unsupported layouts and other spaces reject.
+Each executed cast costs one step and may feed the existing pointer operations,
+scalar accesses and memory intrinsics. Bounds, alignment and permissions remain
+attached to the original binding. A space-2 argument cannot gain write access
+through a cast; nonempty writes through a space-2 view also reject. Deferred
+checks exercise all six cast directions, shifted bindings and derived bounds.
+Pipelines reject writes through converted constant arguments and constant views.
 
 Pointer comparisons support `eq`, `ne`, `ugt`, `uge`, `ult` and `ule` on
 exactly matching pointer types resolved within the same binding. Preflight

@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'address_space_sum', 'cast_constant_store', 'cast_constant_view_store', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'branching', 'byte_fill', 'byte_inline_fill', 'byte_move', 'byte_copy', 'byte_inline_copy', 'looping', 'switching', 'oversized_switch', 'backward_sum', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1163,6 +1163,13 @@ fn sm_test_compute_library(label string) ![]u8 {
 		for op in ['floor', 'ceil', 'trunc', 'round', 'roundeven', 'rint', 'nearbyint'] { source.write_string('declare ${typ} @llvm.${op}.f${bits}(${typ})\n') }
 	}
 	for name in names {
+		if name == 'address_space_sum' {
+			source.write_string('define void @address_space_sum(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %a0 = addrspacecast ptr addrspace(2) %a to ptr\n %a1 = addrspacecast ptr %a0 to ptr addrspace(1)\n %ax = addrspacecast ptr addrspace(1) %a1 to ptr\n %b1 = addrspacecast ptr addrspace(2) %b to ptr addrspace(1)\n %o2 = addrspacecast ptr addrspace(1) %out to ptr addrspace(2)\n %o0 = addrspacecast ptr addrspace(2) %o2 to ptr\n %ox = addrspacecast ptr %o0 to ptr addrspace(2)\n %oy = addrspacecast ptr addrspace(2) %ox to ptr\n %ai = getelementptr i32, ptr %ax, i64 2\n %bi = getelementptr i32, ptr addrspace(1) %b1, i64 1\n %di = getelementptr i32, ptr %oy, i64 3\n %x = load i32, ptr %ai, align 4\n %y = load i32, ptr addrspace(1) %bi, align 4\n %v = add i32 %x, %y\n store i32 %v, ptr %di, align 4\n ret void }\n'); continue
+		}
+		if name in ['cast_constant_store', 'cast_constant_view_store'] {
+			cast := if name == 'cast_constant_store' { '%p = addrspacecast ptr addrspace(2) %a to ptr' } else { '%p = addrspacecast ptr addrspace(1) %out to ptr addrspace(2)' }; pointer := if name == 'cast_constant_store' { 'ptr' } else { 'ptr addrspace(2)' }
+			source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { ${cast}\n store i8 7, ${pointer} %p, align 1\n ret void }\n'); continue
+		}
 		if name == 'looping' { source.write_string('define void @looping(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { entry: br label %loop\n loop: br label %loop\n }\n'); continue }
 		if name == 'oversized_switch' {
 			source.write_string('define void @oversized_switch(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { entry: %c = load i8, ptr addrspace(2) %a, align 1\n switch i8 %c, label %default [\n')
@@ -1350,7 +1357,7 @@ fn test_software_metal_compute() {
 		pipeline := sm_test_compute_pipeline(d, library, 'sum', &error_slot)
 		assert pipeline != 0 && error_slot == 0x1234
 		assert sm_send(pipeline, c'device') == d && sm_send(pipeline, c'threadExecutionWidth') == 1 && sm_send(pipeline, c'maxTotalThreadsPerThreadgroup') == 1 && sm_send(pipeline, c'staticThreadgroupMemoryLength') == 0
-		for name in ['bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'looping', 'oversized_switch', 'no_metadata', 'missing'] {
+		for name in ['bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'looping', 'oversized_switch', 'cast_constant_store', 'cast_constant_view_store', 'no_metadata', 'missing'] {
 			error_slot = 0
 			assert sm_test_compute_pipeline(d, library, name, &error_slot) == 0
 			sm_library_check_error(error_slot, if name == 'missing' { i64(1) } else { i64(3) })
@@ -1407,7 +1414,7 @@ fn test_software_metal_compute() {
 		assert unsafe { *(&u32(outp + 12)) } == 42 && unsafe { *(&u32(cp + 16)) } == 42 && unsafe { *(&u32(cp)) } == 0
 		for i in 0 .. 32 { if i < 12 || i >= 16 { assert unsafe { *(&u8(outp + u64(i))) } == 0xcc } }
 		objc_release(command)
-		for indexed_kernel in ['indexed_sum', 'backward_sum'] {
+		for indexed_kernel in ['indexed_sum', 'backward_sum', 'address_space_sum'] {
 			unsafe { *(&u32(outp + 16)) = 0xcccccccc }
 			indexed_command := sm_send(queue, c'commandBuffer'); ie := sm_send(indexed_command, c'computeCommandEncoder')
 			ip := sm_test_compute_pipeline(d, library, indexed_kernel, unsafe { nil }); assert ip != 0
@@ -1884,7 +1891,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/structured-gep/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/forward-branches-PHIs/invariant-pointer-PHIs/address-space-cast/pointer-select/pointer-freeze-bitcast/pointer-compare/memset/inline-memset/memmove/memcpy/inline-memcpy/switch/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {

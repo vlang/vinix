@@ -208,7 +208,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 				if access.offset % alignment.destination != 0 { return error('AIR memory execution: destination call alignment') }
 				if alignment.destination > arguments[access.argument].alignment { arguments[access.argument].alignment = alignment.destination }
 				if length > 0 {
-					if arguments[access.argument].address_space == 2 || length > u64(64 * 1024 * 1024) - access.offset { return error('AIR memory execution: memory destination space/extent') }
+					if arguments[access.argument].address_space == 2 || p.types[p.operands[op.operands_start + 1].type_index].address_space == 2 || length > u64(64 * 1024 * 1024) - access.offset { return error('AIR memory execution: memory destination space/extent') }
 					if access.offset + length > arguments[access.argument].minimum_size { arguments[access.argument].minimum_size = access.offset + length }
 					arguments[access.argument].writable = true
 				}
@@ -272,9 +272,20 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		if code == 3 {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: cast result') }
 			if p.gep_type(op.result_type)!.kind == .pointer_t {
-				if op.opcode != 11 || op.operands_count != 1 || op.indices_count != 0 { return error('AIR memory execution: pointer bitcast shape') }
+				if op.opcode !in [u32(11), 12]! || op.operands_count != 1 || op.indices_count != 0 { return error('AIR memory execution: pointer cast shape') }
 				source := p.gep_type(p.operands[op.operands_start].type_index)!
-				if source.kind != .pointer_t || source.address_space != p.types[op.result_type].address_space { return error('AIR memory execution: pointer bitcast address space') }
+				destination := p.types[op.result_type]
+				if source.kind != .pointer_t { return error('AIR memory execution: pointer cast source') }
+				if op.opcode == 11 {
+					if source.address_space != destination.address_space { return error('AIR memory execution: pointer bitcast address space') }
+				} else {
+					if source.address_space > 2 || destination.address_space > 2 || source.address_space == destination.address_space || ir.data_layout.len == 0 { return error('AIR memory execution: address-space cast profile') }
+					if layouts.entries.len == 0 { layouts = p.type_layouts(ir)! }
+					for typ in [p.operands[op.operands_start].type_index, op.result_type]! {
+						layout := gep_fixed(layouts, typ)!
+						if layout.size_bits != 64 || layout.pointer_index_bits != 64 { return error('AIR memory execution: 64-bit address-space cast required') }
+					}
+				}
 				pointers[int(inst.next_value - s.base_id)] = p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
 				continue
 			}
@@ -338,7 +349,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		accesses[index - s.instructions_start] = access
 		binding := access.argument
 		bits := p.execution_bits(op.source_type, true)!; bytes := u64((bits + 7) / 8)
-		if op.alignment == 0 || op.alignment & (op.alignment - 1) != 0 || access.offset % op.alignment != 0 || bytes > u64(64 * 1024 * 1024) - access.offset || (code != 20 && arguments[binding].address_space == 2) { return error('AIR memory execution: alignment/address space/extent') }
+		if op.alignment == 0 || op.alignment & (op.alignment - 1) != 0 || access.offset % op.alignment != 0 || bytes > u64(64 * 1024 * 1024) - access.offset || (code != 20 && (arguments[binding].address_space == 2 || p.types[p.operands[op.operands_start].type_index].address_space == 2)) { return error('AIR memory execution: alignment/address space/extent') }
 		if op.alignment > arguments[binding].alignment { arguments[binding].alignment = op.alignment }
 		if access.offset + bytes > arguments[binding].minimum_size { arguments[binding].minimum_size = access.offset + bytes }
 		if code == 20 { arguments[binding].readable = true } else { arguments[binding].writable = true }
