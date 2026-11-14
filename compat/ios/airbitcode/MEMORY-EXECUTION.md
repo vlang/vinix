@@ -213,7 +213,7 @@ field 0 or 1 after checking the complete pair shape, source type, result type
 and field index. Each call and extraction costs one step. Extracted values
 can feed scalar operations, freeze/select and scalar stores. Zero/poison pair
 constants are admitted; other pair constants reject. General aggregate memory,
-arguments, returns and insertion remain unsupported here.
+arguments and returns remain unsupported here.
 
 `freeze` also accepts these literal unpacked overflow pairs. Defined fields
 preserve their bits; each poison field independently chooses zero. A direct
@@ -230,6 +230,16 @@ during preflight even in an unchosen arm. A poison condition makes both fields
 poison and a later pair freeze chooses zero for each. Undef conditions and
 earlier dynamic errors still reject. Selection copies both fields and poison
 tags into the result slot and costs one step, using the scalar evaluator.
+
+Unflagged `insertvalue` replaces field 0 or 1 of these pairs. Exactly one
+literal index, matching source/result pair types and the field's exact scalar
+type are required. Only that field and its poison tag change; defined
+replacements repair a poisoned field, while poison replacements leave the
+neighbor unchanged. Zero/poison base constants are allowed; undef bases reject
+during preflight and undef replacements reject dynamically, even if a later
+operation would overwrite or ignore the field. Each insertion costs one step
+and shares scalar validation/evaluation. General aggregates, nested paths and
+aggregate memory remain unsupported.
 
 Only ordinary direct calls to these forty-seven families' exact declarations are admitted:
 no call-site attributes, fast-math flags, tail calls, indirect calls or other

@@ -321,11 +321,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			match code {
 				34 { result = m.intrinsic_value(ir, op)! }
 				26 { result = m.extract_pair_value(op)! }
-				27 {
-					pair := m.read_overflow(start)!; inserted := m.read(start + 1)!
-					bits := p.integer_bits(p.scalar_overflow_element(op.result_type)!)!
-					result = scalar_pair_insert_value(pair, inserted, p.indices[op.indices_start], bits)!
-				}
+				27 { result = m.insert_pair_value(op)! }
 				2 { result = m.binary_value(op)! }
 				9, 28 { result = m.compare_value(op)! }
 				3 { result = m.cast_value(op)! }

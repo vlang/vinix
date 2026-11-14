@@ -68,7 +68,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 // Narrow execution profile: an ordinary void function, pointer arguments, one
 // block, scalar loads/stores, forward literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, checked overflow
-// pairs with field extraction/freeze/select and final ret void.
+// pairs with field extraction/insertion/freeze/select and final ret void.
 // Valid LLVM IR and matching immutable indexes remain preconditions. Validation
 // of every instruction/access precedes execution; dynamic value errors may leave
 // earlier stores visible. No host pointer is accepted or constructed.
@@ -127,6 +127,11 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		if code == 26 {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: extract result') }
 			p.scalar_pair_extract(op, s.base_id, pools, scope)!
+			continue
+		}
+		if code == 27 {
+			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR memory execution: insert result') }
+			p.scalar_pair_insert(op, s.base_id, pools, scope)!
 			continue
 		}
 		if gep {
@@ -213,6 +218,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 		if code == 10 { return IRVoidRun{steps: m.steps} }
 		if code == 34 { value := m.intrinsic_value(ir, op)!; m.put(inst, value); continue }
 		if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }
+		if code == 27 { value := m.insert_pair_value(op)!; m.put(inst, value); continue }
 		if code == 2 { value := m.binary_value(op)!; m.put(inst, value); continue }
 		if code == 3 { value := m.cast_value(op)!; m.put(inst, value); continue }
 		if code == 56 { value := m.fneg_value(op)!; m.put(inst, value); continue }

@@ -1133,7 +1133,7 @@ fn sm_test_compute_library(label string) ![]u8 {
 	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
 	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/' + label } else { '/normal/' + label }
 	assert !os.exists(out); os.mkdir_all(out)!
-	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'no_metadata']
+	names := ['sum', 'float_sum', 'bad_flags', 'bad_access', 'bad_slot', 'bad_builtin', 'divide', 'empty', 'indexed_sum', 'max', 'float_max', 'int_float', 'float_int', 'negate', 'frozen', 'flagged_sum', 'frozen_sum', 'bits', 'bits_frozen', 'funnel', 'extrema', 'abs_keep', 'abs_frozen', 'saturating', 'saturating_shift', 'saturating_shift_frozen', 'bit_permutation', 'float_sign', 'rounding', 'square_root', 'floating_extrema', 'classification', 'fused', 'scaling', 'number_extrema', 'legacy_extrema', 'polynomial', 'optional_fused', 'default_rounding', 'overflowing', 'frozen_overflowing', 'pair_choices', 'selected_overflowing', 'inserted_overflowing', 'no_metadata']
 	mut source := strings.new_builder(8192)
 	defer { unsafe { source.free() } }
 	source.write_string('target datalayout = "e-p:64:64"\n')
@@ -1161,20 +1161,21 @@ fn sm_test_compute_library(label string) ![]u8 {
 		if name == 'pair_choices' {
 			source.write_string('define void @pair_choices(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %p = call {i64, i1} @llvm.umul.with.overflow.i64(i64 poison, i64 0)\n')
 			source.write_string('%lazy = select i1 true, {i64, i1} zeroinitializer, {i64, i1} poison\n %badcond = select i1 poison, {i64, i1} zeroinitializer, {i64, i1} %p\n')
-			for i, seed in ['poison', 'undef', '%p', '%lazy', '%badcond'] {
+			source.write_string('%repair_value = insertvalue {i64, i1} %p, i64 19, 0\n %repair_flag = insertvalue {i64, i1} poison, i1 true, 1\n %repair_selected = select i1 true, {i64, i1} %repair_flag, {i64, i1} %repair_value\n %repair_both = insertvalue {i64, i1} %repair_value, i1 true, 1\n %poison_value = insertvalue {i64, i1} %repair_both, i64 poison, 0\n')
+			for i, seed in ['poison', 'undef', '%p', '%lazy', '%badcond', '%repair_value', '%repair_selected', '%repair_both', '%poison_value'] {
 				source.write_string('%f${i} = freeze {i64, i1} ${seed}\n %v${i * 2} = extractvalue {i64, i1} %f${i}, 0\n %flag${i} = extractvalue {i64, i1} %f${i}, 1\n %v${i * 2 + 1} = zext i1 %flag${i} to i64\n')
 			}
-			for i in 0 .. 10 { source.write_string('%d${i} = getelementptr i64, ptr addrspace(1) %out, i64 ${i}\n store i64 %v${i}, ptr addrspace(1) %d${i}, align 8\n') }
+			for i in 0 .. 18 { source.write_string('%d${i} = getelementptr i64, ptr addrspace(1) %out, i64 ${i}\n store i64 %v${i}, ptr addrspace(1) %d${i}, align 8\n') }
 			source.write_string('ret void }\n'); continue
 		}
-		if name in ['overflowing', 'frozen_overflowing', 'selected_overflowing'] {
+		if name in ['overflowing', 'frozen_overflowing', 'selected_overflowing', 'inserted_overflowing'] {
 			source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) { %x = load i64, ptr addrspace(2) %a, align 8\n %y = load i64, ptr addrspace(2) %b, align 8\n %x32 = trunc i64 %x to i32\n %y32 = trunc i64 %y to i32\n')
-			if name == 'selected_overflowing' { source.write_string('%c = icmp ult i64 %x, %y\n') }
+			if name in ['selected_overflowing', 'inserted_overflowing'] { source.write_string('%c = icmp ult i64 %x, %y\n') }
 			for i, op in ['sadd', 'uadd', 'ssub', 'usub', 'smul', 'umul'] {
-				freezing := if name == 'frozen_overflowing' { '%frozen${i} = freeze {i32, i1} %p${i}\n' } else if name == 'selected_overflowing' { '%frozen${i} = select i1 %c, {i32, i1} %p${i}, {i32, i1} zeroinitializer\n' } else { '' }; value := if name != 'overflowing' { '%frozen${i}' } else { '%p${i}' }
+				freezing := if name == 'frozen_overflowing' { '%frozen${i} = freeze {i32, i1} %p${i}\n' } else if name == 'selected_overflowing' { '%frozen${i} = select i1 %c, {i32, i1} %p${i}, {i32, i1} zeroinitializer\n' } else if name == 'inserted_overflowing' { if i % 2 == 0 { '%frozen${i} = insertvalue {i32, i1} %p${i}, i32 %y32, 0\n' } else { '%frozen${i} = insertvalue {i32, i1} %p${i}, i1 %c, 1\n' } } else { '' }; value := if name != 'overflowing' { '%frozen${i}' } else { '%p${i}' }
 				source.write_string('%p${i} = call {i32, i1} @llvm.${op}.with.overflow.i32(i32 %x32, i32 %y32)\n ${freezing}%r${i} = extractvalue {i32, i1} ${value}, 0\n %f${i} = extractvalue {i32, i1} ${value}, 1\n %v${i * 2} = zext i32 %r${i} to i64\n %v${i * 2 + 1} = zext i1 %f${i} to i64\n')
 			}
-			freezing64 := if name == 'frozen_overflowing' { '%frozen64 = freeze {i64, i1} %p64\n' } else if name == 'selected_overflowing' { '%frozen64 = select i1 %c, {i64, i1} %p64, {i64, i1} zeroinitializer\n' } else { '' }; value64 := if name != 'overflowing' { '%frozen64' } else { '%p64' }
+			freezing64 := if name == 'frozen_overflowing' { '%frozen64 = freeze {i64, i1} %p64\n' } else if name == 'selected_overflowing' { '%frozen64 = select i1 %c, {i64, i1} %p64, {i64, i1} zeroinitializer\n' } else if name == 'inserted_overflowing' { '%frozen64 = insertvalue {i64, i1} %p64, i64 %y, 0\n' } else { '' }; value64 := if name != 'overflowing' { '%frozen64' } else { '%p64' }
 			source.write_string('%p64 = call {i64, i1} @llvm.umul.with.overflow.i64(i64 %x, i64 %y)\n ${freezing64}%v12 = extractvalue {i64, i1} ${value64}, 0\n %f64 = extractvalue {i64, i1} ${value64}, 1\n %v13 = zext i1 %f64 to i64\n')
 			for i in 0 .. 14 { source.write_string('%d${i} = getelementptr i64, ptr addrspace(1) %out, i64 ${i}\n store i64 %v${i}, ptr addrspace(1) %d${i}, align 8\n') }
 			source.write_string('ret void }\n'); continue
@@ -1283,8 +1284,8 @@ fn sm_test_compute_library(label string) ![]u8 {
 		compute := if name in ['max', 'float_max'] { '%c = ${cmp} ${typ} %x, %y\n %v = select i1 %c, ${typ} %x, ${typ} %y\n' } else if name == 'frozen_sum' { '%bad = ${op} i32 %x, %y\n %v = freeze i32 %bad\n' } else { '%v = ${op} ${typ} %x, %y\n' }
 		source.write_string('define void @${name}(ptr addrspace(2) %a, ptr addrspace(2) %b, ptr addrspace(1) %out) {\n ${gep}%x = load ${typ}, ptr addrspace(2) ${a}, align 4\n %y = load ${typ}, ptr addrspace(2) ${b}, align 4\n ${prior}${compute}store ${typ} %v, ptr addrspace(1) ${dst}, align 4\n ret void\n}\n')
 	}
-	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340, !350, !360, !370, !380, !390, !400, !410, !420}\n')
-	for i, name in names[..43] {
+	source.write_string('!air.kernel = !{!0, !10, !20, !30, !40, !50, !60, !70, !80, !90, !100, !110, !120, !130, !140, !150, !160, !170, !180, !190, !200, !210, !220, !230, !240, !250, !260, !270, !280, !290, !300, !310, !320, !330, !340, !350, !360, !370, !380, !390, !400, !410, !420, !430}\n')
+	for i, name in names[..44] {
 		n := i * 10
 		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n!${n + 1} = !{}\n')
 		if name == 'empty' { source.write_string('!${n + 2} = !{}\n'); continue }
@@ -1548,7 +1549,7 @@ fn test_software_metal_compute() {
 		for i in 0 .. 224 { assert unsafe { *(&u8(polyp + u64(i))) } == 0xcc }
 		sm_call(poly_command, c'commit'); assert sm_send(poly_command, c'status') == 4
 		for i, expected in [u64(5), 3, 5, 3, 0x55555555, 0xffffffff, 0x5555555555555555, 0xffffffffffffffff, 0, 0, 0, 0x8000000000000000, 0, 0x80000000, 0x100000000, 0x80000000, 0x89abcdef, 0x89abcdef, 0x0123456789abcdef, 0x0123456789abcdef, 0, 0, 0, 0, 0, 1, 0x8000000000000000, 1]! { assert unsafe { *(&u64(polyp + u64(i * 8))) } == expected }
-		for kernel_name in ['overflowing', 'frozen_overflowing', 'selected_overflowing'] {
+		for kernel_name in ['overflowing', 'frozen_overflowing', 'selected_overflowing', 'inserted_overflowing'] {
 			ov_left := sm_test_buffer(d, 56, 0); ov_right := sm_test_buffer(d, 56, 0); ov_output := sm_test_buffer(d, 784, 0)
 			ovap := sm_send(ov_left, c'contents'); ovbp := sm_send(ov_right, c'contents'); ovp := sm_send(ov_output, c'contents')
 			unsafe { C.memset(voidptr(ovp), 0xcc, 784) }
@@ -1564,6 +1565,7 @@ fn test_software_metal_compute() {
 			for i, value in [u64(1), 1, 0xffffffff, 1, 2, 2, 7]! { unsafe { *(&u64(ovbp + u64(i * 8))) = value } }
 			for i in 0 .. 784 { assert unsafe { *(&u8(ovp + u64(i))) } == 0xcc }
 			sm_call(ov_command, c'commit'); assert sm_send(ov_command, c'status') == 4
+			insert_values := [u64(1), 1, 0xffffffff, 1, 2, 2, 7]!
 			for i, row in [
 				[u64(0), 0, 0, 1, 0xfffffffe, 0, 0xfffffffe, 0, 0xffffffff, 0, 0xffffffff, 0, 0xffffffffffffffff, 0],
 				[u64(0x80000000), 1, 0x80000000, 0, 0x7ffffffe, 0, 0x7ffffffe, 0, 0x7fffffff, 0, 0x7fffffff, 0, 0x7fffffff, 0],
@@ -1572,15 +1574,15 @@ fn test_software_metal_compute() {
 				[u64(1), 0, 1, 1, 0xfffffffd, 0, 0xfffffffd, 0, 0xfffffffe, 0, 0xfffffffe, 1, 0xfffffffffffffffe, 1],
 				[u64(2), 0, 2, 0, 0xfffffffe, 0, 0xfffffffe, 1, 0, 0, 0, 0, 0, 1],
 				[u64(10), 0, 10, 0, 0xfffffffc, 0, 0xfffffffc, 1, 21, 0, 21, 0, 21, 0],
-			] { for j, original in row { expected := if kernel_name == 'selected_overflowing' && i !in [2, 3, 6] { u64(0) } else { original }; assert unsafe { *(&u64(ovp + u64(i * 112 + j * 8))) } == expected } }
-			pair_output := sm_test_buffer(d, 80, 0); pairp := sm_send(pair_output, c'contents'); unsafe { C.memset(voidptr(pairp), 0xcc, 80) }
+			] { for j, original in row { expected := if kernel_name == 'selected_overflowing' && i !in [2, 3, 6] { u64(0) } else if kernel_name == 'inserted_overflowing' && (j == 12 || (j < 12 && j % 4 == 0)) { insert_values[i] } else if kernel_name == 'inserted_overflowing' && j < 12 && j % 4 == 3 { u64(i in [2, 3, 6]) } else { original }; assert unsafe { *(&u64(ovp + u64(i * 112 + j * 8))) } == expected } }
+			pair_output := sm_test_buffer(d, 144, 0); pairp := sm_send(pair_output, c'contents'); unsafe { C.memset(voidptr(pairp), 0xcc, 144) }
 			pair_command := sm_send(queue, c'commandBuffer'); pair_encoder := sm_send(pair_command, c'computeCommandEncoder')
 			pair_pipeline := sm_test_compute_pipeline(d, library, 'pair_choices', unsafe { nil }); assert pair_pipeline != 0
 			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(pair_encoder, c'setComputePipelineState:', pair_pipeline) }
 			sm_test_compute_buffer(pair_encoder, a, 0, 0); sm_test_compute_buffer(pair_encoder, b, 0, 3); sm_test_compute_buffer(pair_encoder, pair_output, 0, 7)
 			sm_test_compute_dispatch(pair_encoder, c'dispatchThreads:threadsPerThreadgroup:', 1); sm_call(pair_encoder, c'endEncoding'); objc_release(pair_pipeline); objc_release(pair_output)
-			for i in 0 .. 80 { assert unsafe { *(&u8(pairp + u64(i))) } == 0xcc }; sm_call(pair_command, c'commit'); assert sm_send(pair_command, c'status') == 4
-			for i in 0 .. 10 { assert unsafe { *(&u64(pairp + u64(i * 8))) } == 0 }
+			for i in 0 .. 144 { assert unsafe { *(&u8(pairp + u64(i))) } == 0xcc }; sm_call(pair_command, c'commit'); assert sm_send(pair_command, c'status') == 4
+			for i, expected in [u64(0), 0, 0, 0, 0, 0, 0, 0, 0, 0, 19, 0, 0, 1, 19, 1, 0, 1]! { assert unsafe { *(&u64(pairp + u64(i * 8))) } == expected }
 		}
 		sign_command := sm_send(queue, c'commandBuffer'); sign_encoder := sm_send(sign_command, c'computeCommandEncoder')
 		sign_pipeline := sm_test_compute_pipeline(d, library, 'float_sign', unsafe { nil }); assert sign_pipeline != 0
@@ -1753,7 +1755,7 @@ fn test_software_metal_compute() {
 		if _ := runtime_symbol('/System/Library/Frameworks/Foundation.framework/Foundation', '_MTLCommandBufferErrorDomain') { assert false }
 		objc_stop()
 	}
-	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-COMPUTE: classic AIR metadata, scalar buffer pipelines, sparse/reordered bindings, empty/indexed/max/conversion/negation/freeze/flagged/bit-intrinsic/funnel/extrema/abs/saturating/saturating-shift/bit-permutation/clmul/overflow-pair/pair-freeze/pair-select/pair-insert/float-sign/rounding/default-rounding/sqrt/floating-extrema/number-extrema/legacy-extrema/classification/fma/fmuladd/ldexp kernels, derived bounds, single-thread dispatch selectors, deferred execution, snapshots, aliasing, ordered blits, eleven encoding guards, pipeline rejection, poison-store failed completion and two drained runtimes PASS')
 }
 fn sm_call(object u64, selector &char) { unsafe { SMVoid(voidptr(C.ios_objc_msgsend))(object, selector) } }
 struct SMBindingReentry {

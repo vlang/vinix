@@ -65,7 +65,7 @@ fn main() {
 			for i, value in values { totals[i] += value.int() }
 			results.write_string(log)
 		}
-		assert totals == [665592, 55296, 531192, 368832, 3456, 3456, 768, 3072, 1536, 384, 8, 122736, 3456, 384, 3072, 768, 64], totals.str()
+		assert totals == [665592, 55296, 531192, 368832, 3456, 3456, 768, 3072, 1536, 384, 4, 122736, 3456, 384, 3072, 768, 64], totals.str()
 		results.write_string('AIR-MEMORY-PAIR-FREEZE: four bounded modules, all i1-i64 widths; 122736 defined native freeze/idempotence checks, 3072 computed poison/undef cases, 768 frozen constants, 3456 metadata/384 type guards, existing 665592 overflow pairs PASS\n')
 		result := results.str(); os.write_file(out + '/result.txt', result)!; print(result); return
 	}
@@ -105,10 +105,7 @@ fn main() {
 			}
 		} }
 	}
-	for mode in ['store', 'insert'] {
-		body := if mode == 'store' { 'store {i32, i1} zeroinitializer, ptr %dst, align 1' } else { '%p = insertvalue {i32, i1} zeroinitializer, i32 1, 0' }
-		source.write_string('define void @unsupported_${mode}(ptr %dst) { store i32 17, ptr %dst, align 1\n ${body}\n ret void }\n')
-	}
+	source.write_string('define void @unsupported_store(ptr %dst) { store i32 17, ptr %dst, align 1\n store {i32, i1} zeroinitializer, ptr %dst, align 1\n ret void }\n')
 	os.write_file(out + '/input.ll', source.str())!
 	mut proc := os.new_process(os.args[1]); proc.set_args([out + '/input.ll', '-o', out + '/input.bc']); proc.set_redirect_stdio_merged(); proc.run()
 	log := proc.stdout_slurp(); proc.wait(); code := proc.code; proc.close(); os.write_file(out + '/assemble.log', log)!; assert code == 0, log

@@ -483,7 +483,7 @@ and undef rejects. `extractvalue` checks pair shape, source/result types and a
 single field index 0 or 1; extracted scalars can feed arithmetic, freeze/select
 and stores. Calls/extractions each cost one step and share scalar validation
 and evaluation. Zero/poison pair constants are supported, while general
-aggregate memory/arguments/returns/insertion remain unsupported.
+aggregate memory/arguments/returns remain unsupported.
 Seven deferred dispatches check all six i32 operations plus i64 unsigned
 multiplication, keeping separate flags and wrapped values through exact u64
 output words. Bad extraction and cached-call metadata reject before stores.
@@ -504,6 +504,16 @@ reject, as do undef pair constants in either arm during preflight. Zero/poison
 pair constants are supported. Each select costs one step and reuses the scalar
 validator/evaluator. Deferred dispatches check both condition values, preserved
 overflow flags, zero arms, unchosen poison and frozen poison conditions.
+
+Overflow-pair `insertvalue` requires zero flags, one literal index 0 or 1,
+matching source/result pair types and the selected field's exact scalar type.
+It replaces that field and its poison tag while preserving the neighbor.
+Defined scalars can repair poisoned fields; replacing both fields repairs the
+pair. Zero/poison base constants are supported; undef bases reject in preflight
+and undef replacements still error even if subsequently ignored or replaced.
+Each insertion costs one step and shares the scalar validator/evaluator.
+Deferred dispatches check both field replacements, neighboring values/flags,
+partial poison through select/freeze, and complete repair before scalar stores.
 
 `setBytes:length:atIndex:` immediately copies 1..4,096 client bytes into an
 owned internal buffer and replaces that slot with offset zero. It does not

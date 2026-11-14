@@ -13,3 +13,9 @@ fn scalar_pair_insert_value(pair IntegerValue, inserted IntegerValue, field u32,
 	if !pair.aggregate || inserted.aggregate || field > 1 || bits < 1 || bits > 64 { return error('AIR overflow: insert value/field/width') }
 	return if field == 0 { IntegerValue{...pair, value: inserted.value & constant_mask(bits), poison: inserted.poison} } else { IntegerValue{...pair, overflow: inserted.value & 1 != 0, flag_poison: inserted.poison} }
 }
+
+fn (m &IntegerMachine) insert_pair_value(op IRTypedInstruction) !IntegerValue {
+	pair := m.read_overflow(op.operands_start)!; inserted := m.read(op.operands_start + 1)!
+	bits := m.p.integer_bits(m.p.scalar_overflow_element(op.result_type)!)!
+	return scalar_pair_insert_value(pair, inserted, m.p.indices[op.indices_start], bits)!
+}
