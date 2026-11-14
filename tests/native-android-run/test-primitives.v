@@ -86,6 +86,49 @@ fn qmp_cases(work string) ! {
 	}
 }
 
+fn typing_server(mut listener unix.StreamListener) !u64 {
+	mut connection := listener.accept()!
+	defer {
+		connection.close() or {}
+		listener.close() or {}
+	}
+	connection.write_string('{"QMP":{}}\n')!
+	assert ah.field(line(mut connection)!, 'execute').text() == 'qmp_capabilities'
+	connection.write_string('{"return":{}}\n')!
+	mut first := u64(0)
+	mut interval := u64(0)
+	for index, name in ['a', 'a', 'b', 'b'] {
+		request := line(mut connection)!
+		now := time.sys_mono_now()
+		if index == 0 { first = now }
+		if index == 2 { interval = now - first }
+		assert ah.field(request, 'execute').text() == 'input-send-event'
+		assert ah.field(request, 'arguments') == ah.Value({
+			'events': ah.Value([androidrun.key_press(name, index % 2 == 0)])
+		})
+		connection.write_string('{"return":{}}\n')!
+	}
+	return interval
+}
+
+fn typing_pace(work string) ! {
+	path := work + '/typing-qmp'
+	mut listener := unix.listen_stream(path)!
+	mut worker := spawn typing_server(mut listener)
+	assert androidrun.input_cli(['type', 'ab', '--socket', path, '--settle', '0',
+		'--key-delay', '0.12'])! == 0
+	// Check the spacing observed by the QMP peer, not just total CLI runtime.
+	assert worker.wait()! >= 100 * time.millisecond
+	if os.exists(path) { os.rm(path)! }
+	mut rejected := false
+	androidrun.input_cli(['type', 'ab', '--socket', work + '/absent-qmp',
+		'--key-delay', '-1']) or {
+		assert err.msg() == 'key delay must be non-negative and finite'
+		rejected = true
+	}
+	assert rejected
+}
+
 fn archives(work string) ! {
 	root := work + '/root'
 	os.mkdir(root)!
@@ -196,7 +239,9 @@ fn json_cases() ! {
 		value := androidrun.load_json(source)!
 		assert androidrun.load_json(androidrun.dump_json(value, -1))! == value, source
 	}
-	assert androidrun.dump_json(androidrun.load_json('"\\ud800"')!, -1) == '"\\ud800"'
+	for source in ['"\\ud800"', '"\\udfff"', '"\\ud800A"', '"\\ud800\\ud800"'] {
+		assert androidrun.dump_json(androidrun.load_json(source)!, -1) == source
+	}
 	assert androidrun.dump_json(androidrun.load_json('"\\ud83e\\udd8a"')!, -1) == '"\\ud83e\\udd8a"'
 	assert androidrun.dump_json(ah.Value({
 		'é': ah.Value([ah.Value(true), ah.Value(1)])
@@ -248,10 +293,11 @@ fn qualify(work string) ! {
 	input_cases()
 	json_cases()!
 	qmp_cases(work)!
+	typing_pace(work)!
 	archives(work)!
 	archive_owners(work)!
 	os.write_file(work + '/passed', 'PASS\n')!
-	println('NATIVE ANDROID PRIMITIVES / actual QMP wide values, event/error precedence, UTF-8, malformed JSON, EOF and deadline / USTAR hardlink and content deduplication / literal paths, copy2 identity and modes / pixel-exact native PNG / key and coordinate events: PASS')
+	println('NATIVE ANDROID PRIMITIVES / actual QMP wide values, event/error precedence, UTF-8, malformed JSON, EOF and deadline / USTAR hardlink and content deduplication / literal paths, copy2 identity and modes / pixel-exact native PNG / key and coordinate events, measured typing pace: PASS')
 }
 
 fn main() {

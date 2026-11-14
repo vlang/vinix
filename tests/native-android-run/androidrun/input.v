@@ -162,7 +162,7 @@ fn send_events(mut monitor Monitor, events []ah.Value) ! {
 }
 
 pub fn input_cli(argv []string) !int {
-	args := cachecli.arguments(argv, ['--socket', '--size', '--settle', '--hold'], [], [], 1, -1, 'input move|click|drag|type|switch [coordinates or text] [--socket PATH --size WIDTHxHEIGHT --settle SECONDS --hold SECONDS]') or { return androidtools.InputError{err.msg()} }
+	args := cachecli.arguments(argv, ['--socket', '--size', '--settle', '--hold', '--key-delay'], [], [], 1, -1, 'input move|click|drag|type|switch [coordinates or text] [--socket PATH --size WIDTHxHEIGHT --settle SECONDS --hold SECONDS --key-delay SECONDS]\nFor type, --key-delay controls the pause between characters (default 0.03 seconds).') or { return androidtools.InputError{err.msg()} }
 	action := args.positional[0]
 	if action !in ['move', 'click', 'drag', 'type', 'switch'] {
 		return androidtools.InputError{'invalid input action: ' + action}
@@ -173,6 +173,10 @@ pub fn input_cli(argv []string) !int {
 	height := strconv.parse_int(dimensions[1], 10, 64)!
 	settle := strconv.atof64(args.value('--settle', '0.25'))!
 	hold := strconv.atof64(args.value('--hold', '0'))!
+	key_delay := strconv.atof64(args.value('--key-delay', '0.03'))!
+	if key_delay < 0 || !math.is_finite(key_delay) {
+		return androidtools.InputError{'key delay must be non-negative and finite'}
+	}
 	mut monitor := connect_monitor(args.value('--socket', if os.getenv('VINIX_QMP_SOCKET') != '' {
 		os.getenv('VINIX_QMP_SOCKET')
 	} else {
@@ -200,7 +204,7 @@ pub fn input_cli(argv []string) !int {
 		for character in coordinates.join(' ').runes() {
 			events := key_events(character.str()) or { continue }
 			for event in events { send_events(mut monitor, [event])! }
-			pause(0.03)!
+			pause(key_delay)!
 		}
 	} else {
 		mut values := []i64{}

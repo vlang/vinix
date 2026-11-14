@@ -64,7 +64,14 @@ fn (mut reader JsonReader) string_value() !string {
 				}
 				// Lone UTF-16 surrogates remain owned WTF-8 until a strict text
 				// boundary, matching the existing tagged metadata transport.
-				bytes << rune(code).str().bytes()
+				if code >= 0xd800 && code <= 0xdfff {
+					// rune.str() normalizes non-scalar values in current V.
+					bytes << u8(0xe0 | (code >> 12))
+					bytes << u8(0x80 | ((code >> 6) & 0x3f))
+					bytes << u8(0x80 | (code & 0x3f))
+				} else {
+					bytes << rune(code).str().bytes()
+				}
 			}
 			else { return error('invalid JSON escape') }
 		}

@@ -28,7 +28,11 @@ mut:
 	revents i16
 }
 
-fn C.poll(&C.pollfd, usize, i32) i32
+$if macos || ios || freebsd || openbsd || dragonfly || android || termux {
+	fn C.poll(&C.pollfd, u32, i32) i32
+} $else {
+	fn C.poll(&C.pollfd, uint, i32) i32
+}
 
 pub struct Monitor {
 mut:
