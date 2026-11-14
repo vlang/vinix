@@ -2703,6 +2703,67 @@ Recording and independent comparison pass. Preserve the full bundle and original
 producer/kernel/tool namespaces; this receipt is integrity evidence, not launch
 qualification or a hermetic input-closure waiver.
 
+## Resource-bounded migration and real Wine relaunch, 2026-11-14
+
+Source `5ccffa91d` replaces per-replacement report reconstruction with admission
+of the exact old link, captured namespace/idle-server state and selected target
+metadata, digest and size. Full structural, payload and service checks still
+bracket the operation. Unrelated inventory, binding or payload changes can now
+refuse at the final full check after recoverable partial progress. This uses
+the existing single cooperating writer contract and retained reader/lease and
+prefix guards; arbitrary same-account writes are not atomically excluded.
+
+Full reviews now enumerate captured directory descriptors with bounded,
+preallocated lists and explicit `readdir` error handling. An enumeration error
+cannot silently become EOF and a partial inventory. The 900-builtin and
+4096-prefix-entry limits remain. Extra-prefix link inspection uses binary
+membership lookup in the sorted canonical binding report. Host tests cover
+bounded/invalid-descriptor enumeration, hidden and dangling entries, target
+symlinks, changed link bytes, directory and idle-owner continuity, and full
+review refusal of unrelated changes. Signed service upgrade and adapter writer
+SIGKILL/resume tests also pass.
+
+The original 741-link synthetic guest now passes migration and repetition in
+12.966 seconds, with migration itself taking 7.054 seconds. It uses the same
+1 GiB guest, kernel, UID/GID 1000, 120-second bound and resource limits that
+previously refused after 22 links. Budget denials stay zero. Mapping counters
+are 130/142/154 objects and 1481472/1631488/1781504 bytes before migration,
+after migration and after repetition. This qualifies the bounded case, not
+flat heap behavior or general leak freedom. Two intermediate all-row checking
+attempts exceeded the unchanged 120-second bound; their failed results,
+generated C and executables remain retained.
+
+`native-run-01` passes real owned x86 Wine `--migration-probe` in 332.642 seconds.
+After caller/SDK SIGKILL, server adoption, foreign-server refusal and natural
+retirement, it reinstalls the same signed Wine closure in a new generation.
+Ordinary-account public review/migration retargets all 741 links. A real Win64
+relaunch from that generation returns 37 with all initial/worker/retirement
+markers, unchanged private sentinel bytes, no runtime processes and a free
+generation lease. Collection removes the obsolete generation and preserves
+rollback. Parsed-source, selected-input, generated-output and controller-source
+rechecks pass; all 21 architecture/ownership/mixed-mode refusals pass too.
+This is same-payload generation-path relocation, not a Wine version upgrade.
+
+Both signed marker-prefix recovery suites also pass: AArch64 in 6.518 seconds
+and x86_64 in 16.109 seconds, requiring every guard, staging, personal-file,
+SIGKILL/resume and repetition marker. The ARM CLI and both probes were rebuilt;
+the x86 marker suite uses the owned-manager CLI built by the native controller.
+No kernel, Wine payload, sandbox policy or resource limit was changed. The
+existing C pointer-compatibility exception remains; strict ABI, measured heap,
+power-loss, ARM Wine, fresh GUI, default activation and broader compatibility
+gates remain open.
+
+Complete evidence is frozen at `/Users/alex/.cache/vwrowcheck-20261114-01`.
+Its isolated tree is base `1414f1f38` plus `source.patch`; the four changed V
+files match the committed feature. Complete selected native input bytes and
+typed PE records are retained in `selected-inputs-01`. Original input namespaces
+and producer/kernel bundles remain required; historical auditors are unchanged.
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-resource-bounded-migration-20261114-01.inventory.json`,
+SHA-256 `a66dfb4d75e7a51b2b232b7706c5edd7dd15195622cf815c10ff1e6dfebefe5a`.
+Recording and independent comparison pass. This is local console acceptance
+and evidence integrity, not a hermetic input-closure waiver.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
