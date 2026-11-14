@@ -2353,6 +2353,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   independent lifetime/ABI audits pass. See
   [the ppoll argument qualification](docs/linux-ppoll-arguments.md).
 
+- [x] Correct select timeout-fixture bounds for coincident kernel clock samples,
+  with noncanonical raw-select inputs that keep fast-path writeback observable.
+  A qualification-only trace proves unchanged remainders are valid. Fresh
+  native/Linux ELFs pass 1,536 AArch64 / 2,208 x86-64 checks, 26 bounds controls
+  and flat cleanup; selecttimeout/ppollargs/maskwait/selectfds pass 4/4 on both
+  unchanged production kernels. Earlier strict refusals remain archived. See
+  [the clock-bound qualification](docs/linux-select-time-bounds.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

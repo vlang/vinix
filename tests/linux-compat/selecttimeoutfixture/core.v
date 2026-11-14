@@ -201,6 +201,9 @@ fn probe(t &Targets, api int, mode int, readonly int, restart int, report bool) 
 		mut timer := &TimeGuard(t.page)
 		*timer = TimeGuard{before:input.before,after:input.after,value:C.timespec{tv_nsec:500_000_000}}
 		if api == 2 { timer.value.tv_nsec /= 1000 }
+		// Canonical output proves writeback on fast select paths even when
+		// both kernel clock samples coincide and no time can be subtracted.
+		if api == 2 && mode in [1,2,3,4] { timer.value.tv_nsec = 1_500_000 }
 		if mode in [0,12] { timer.value.tv_nsec = if api == 2 { 1000 } else { 1_000_000 } }
 		if signal_mode(mode) { timer.value.tv_sec = 5; timer.value.tv_nsec = 0 }
 		if mode == 5 { timer.value.tv_sec = -1 }
@@ -245,10 +248,8 @@ fn probe(t &Targets, api int, mode int, readonly int, restart int, report bool) 
 		} else {
 			elapsed := (stopped.tv_sec-started.tv_sec)*1_000_000_000+stopped.tv_nsec-started.tv_nsec
 			initial := original.tv_sec*1_000_000_000+original.tv_nsec*if api == 2 { 1000 } else { 1 }
-			left := timer.value.tv_sec*1_000_000_000+timer.value.tv_nsec*if api == 2 { 1000 } else { 1 }
-			time_good = timer.value.tv_sec >= 0 && timer.value.tv_nsec >= 0
-				&& timer.value.tv_nsec < if api == 2 { 1_000_000 } else { 1_000_000_000 }
-				&& left < initial && left >= 0 && left >= initial-elapsed-if api == 2 { 999 } else { 0 }
+			time_good = remaining_within_bounds(timer.value.tv_sec,timer.value.tv_nsec,
+				initial,elapsed,if api == 2 { 1000 } else { 1 })
 		}
 		check(mut total,time_good,7,report)
 		check(mut total,C.memcmp(&pair,&original_pair,sizeof(PackGuard)) == 0,8,report)

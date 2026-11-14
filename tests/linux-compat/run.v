@@ -34,6 +34,8 @@ fn fixture_files(name string) []string {
 	// five qualified semwait sources together so every compiled input is pinned.
 	return if name == 'semwait' {
 		['core.v', 'snapshot.v', 'storage.v', 'queued.v', 'lifetime.v']
+	} else if name == 'selecttimeout' {
+		['core.v', 'storage.v', 'bounds.v']
 	} else if name in ['selectempty', 'execown', 'selectfds', 'selectword', 'selectorder', 'selecttimeout', 'selecttimeval', 'ppollargs'] {
 		['core.v', 'storage.v']
 	} else {

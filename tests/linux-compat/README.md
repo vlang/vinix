@@ -60,6 +60,12 @@ input preservation, read-only timeouts, handled/pending signals and core errors.
 It measures repeated cleanup and checks timeout visibility inside the handler.
 `selecttimeout-reference.v` runs the same ELF on Linux; `selecttimeout-evidence.v`
 audits its complete bundle. See [receipts and limits](../../docs/linux-select-timeout.md).
+The current three-source fixture permits coincident kernel clock samples and
+uses noncanonical raw-select inputs to make fast-path writeback observable.
+`selecttimeout-bounds-check.v` checks its exact pure bounds helper;
+`selecttimeout-bounds-evidence.v` audits the fresh bundle together with the
+complete historical ppoll bundle, preserving the earlier strict refusals.
+See [clock-bound qualification](../../docs/linux-select-time-bounds.md).
 
 `--cases selecttimeval` compares raw x86-64 select timeval carries, signed limits,
 zero/nonzero writeback and argument-error precedence, with strict pselect6
