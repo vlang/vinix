@@ -47,6 +47,20 @@ fn check_inputs(make_root string, header_root string, output string) ! {
 
 fn check(root string) ! {
 	os.mkdir(root)!
+	os.write_file(root + '/packages.txt', 'A B C E\n')!
+	current := 'A new\nB   same   layout\nF fresh\n'
+	os.write_file(root + '/current.txt', current)!
+	previous := '# comment\nA old\nB same layout\nC removed\nD earlier\nD carry\nE earlier\nE last\n'
+	os.write_file(root + '/previous.txt', previous)!
+	for _ in 0 .. 2 {
+		assert artgenerators.package_overlays(root + '/packages.txt', root + '/current.txt',
+			root + '/previous.txt')! == ['A', 'F', 'C', 'E']
+		assert os.read_file(root + '/current.txt')! == current + 'D carry\n'
+		assert os.read_file(root + '/previous.txt')! == previous
+		assert os.read_file(root + '/packages.txt')! == 'A B C E\n'
+	}
+	os.write_file(root + '/empty.txt', '')!
+	assert artgenerators.package_overlays(root + '/empty.txt', root + '/empty.txt', root + '/empty.txt')!.len == 0
 	// Independent expected constants include signed minima, unsigned wrapping,
 	// large positive values, lexical sorting and all three immediate prefixes.
 	input := '.ascii ">>Z #7 #0<<"\n.ascii ">>U $-1 $0<<"\n' +
@@ -129,8 +143,19 @@ fn check(root string) ! {
 }
 
 fn main() {
+	if os.args.len == 2 && os.args[1] == 'platform' {
+		result := os.exec(['/bin/uname', '-srm'])
+		if result.exit_code != 0 { eprintln(result.output); exit(1) }
+		println(result.output.trim_space())
+		return
+	}
 	if os.args.len < 3 { eprintln('usage: art-source-generators find-leaves [OPTIONS] DIR... NAME | asm-header INPUT | operators LOCAL HEADER... | --self-test FRESH_ROOT'); exit(2) }
 	match os.args[1] {
+		'package-overlays' {
+			if os.args.len != 5 { exit(2) }
+			changed := artgenerators.package_overlays(os.args[2], os.args[3], os.args[4]) or { eprintln(err); exit(1) }
+			if changed.len > 0 { println(changed.join('\n')) }
+		}
 		'find-leaves' {
 			paths := artgenerators.find_leaves(os.args[2..]) or { eprintln(err); exit(1) }
 			if paths.len > 0 { println(paths.join('\n')) }
