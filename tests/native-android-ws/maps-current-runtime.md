@@ -1,6 +1,13 @@
 # Current Maps runtime work — 2026-11-12
 
-Latest continuation, 2026-11-13: real search, Louvre details and photos were
+Latest continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
+in 7796d94ba passed the signed ARM API suite with current V. Fresh r93 rendered
+Paris tiles, the Eiffel Tower-to-Louvre route and two mapped turn previews.
+The session was stopped and its private evidence synced to the checked data
+volume before stopping QEMU. Imagery, sustained responsiveness and Google
+authentication still require validation; full Maps is not qualified.
+
+Earlier continuation, 2026-11-13: real search, Louvre details and photos were
 observed in [r66](maps-current-memory-runtime-20261112.md); tiles and route
 geometry remain blank, and no account has authenticated. The
 [decor fix](maps-window-decor-runtime-20261112.md) passed on ARM; its account
