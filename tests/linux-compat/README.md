@@ -61,6 +61,12 @@ It measures repeated cleanup and checks timeout visibility inside the handler.
 `selecttimeout-reference.v` runs the same ELF on Linux; `selecttimeout-evidence.v`
 audits its complete bundle. See [receipts and limits](../../docs/linux-select-timeout.md).
 
+`--cases selecttimeval` compares raw x86-64 select timeval carries, signed limits,
+zero/nonzero writeback and argument-error precedence, with strict pselect6
+controls on both architectures and repeated cleanup. `selecttimeval-reference.v`
+runs the same ELF on Linux; `selecttimeval-evidence.v` audits the complete bundle.
+See [receipts and limits](../../docs/linux-select-timeval.md).
+
 Receipt audit sources use V assertions. Build them without `-prod`, which
 removes assertions in the current V3 compiler. `-nocache -cflags -O2` retains
 the checks while optimizing hashing. Confirm a deliberate failing assertion

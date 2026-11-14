@@ -142,10 +142,14 @@ pub fn syscall_select(_ voidptr, nfds_word int, readfds u64, writefds u64, excep
 		if !usercopy.copy_from_user(voidptr(&tv[0]), timeout, 16) {
 			return errno.err, errno.efault
 		}
-		if tv[0] < 0 || tv[1] < 0 || tv[1] >= 1000000 {
+		// Linux carries whole microsecond seconds before validation. Negative
+		// remainders remain invalid; the seconds addition wraps at ABI width.
+		seconds := i64(u64(tv[0]) + u64(tv[1] / 1000000))
+		nanos := (tv[1] % 1000000) * 1000
+		if seconds < 0 || nanos < 0 {
 			return errno.err, errno.einval
 		}
-		deadline = select_deadline(time.TimeSpec{tv[0], tv[1] * 1000})
+		deadline = select_deadline(time.TimeSpec{seconds, nanos})
 		timed = true
 	}
 	result, code := do_select(nfds, readfds, writefds, exceptfds, timed, deadline)

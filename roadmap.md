@@ -2331,6 +2331,14 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   independent lifetime audits pass. See
   [the timeout qualification](docs/linux-select-timeout.md).
 
+- [x] Normalize native raw x86-64 select timevals before validation, with
+  Linux negative-remainder rules and explicit signed64 seconds wrapping.
+  Identical native/Linux ELFs pass 10,368 x86-64 checks and 5,184 unchanged
+  AArch64 pselect6 controls; original x86-64 fails 480. Both credential
+  cohorts retain flat 200-cycle storage; generated-C and independent
+  lifetime/arithmetic audits pass. See
+  [the timeval qualification](docs/linux-select-timeval.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
