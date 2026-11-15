@@ -66,11 +66,42 @@ signed ARM suite passed, child exit 0, readiness pass, CONTACT-LABELS-PASS and
 CURRENT-API-PASS. All mapped types, unknown boundaries, custom identity,
 assistant behavior, supplied Resources, empty labels and worker checks passed.
 The complete public API export reconstructed without removals: 24003 bytes /
-47 chunks. The next protected account retry is pending; full Maps operation
-and account authentication remain unqualified.
+47 chunks. Full Maps operation and account authentication remain unqualified.
 
 | ARM API evidence | SHA256 |
 | --- | --- |
 | maps-contact-api-uart-20261115-r1/full.log | 47051ca8edd3b0ca556fd102429cdf2bd3acf408880538d9efe6238e1355cb60 |
 | maps-contact-api-readback-20261115-r1/archive.json | aff0795c182733027d09f571577bb3124ba5e0e0f5f1e11a692f2932c94cebaa |
 | maps-contact-api-child-20261115-r1/child.log | 52f54f4d1cff9bf7eb0c0f463c6b33606fa94134cd59845ba5bd153d1c38e399 |
+
+## r108 protected account retry
+
+GMS PID46814 reached readiness on checked persistent volume
+dbdf4fd85bcb4f0f9885509582cd56e6. Maps PID51856 launched once; onboarding,
+the chooser and Add account rendered. The account window showed Checking info
+with an animated progress indicator for several minutes. All three device
+check-ins succeeded; the missing contact-label error did not recur. No
+credentials were entered. The next direct account-layout failure was
+CookieManager.nativeClear throwing WebView cookie removal failed, immediately
+after the launcher reported browser engine exited. A separate protobuf parsing
+error belongs to AppCertManager's device-key request, not this layout stack.
+
+The checked stop completed and the full account export reconstructed without
+removals: 1429890 bytes / 2793 chunks. Receipt status is
+user-stopped-no-authentication-claim, with cleanup_survivors=2; this does not
+establish complete controller cleanup. Complete results were copied to
+r108-private/results and synced before stopping QEMU4190. Mount check, copied
+receipt and prompt were observed. PID absence and no image handles preceded
+read-only extraction; e2fsck passed. The private log hashes match their manifest
+and the reconstructed receipt compares identical. The test guest is stopped.
+
+| r108 account evidence | SHA256 |
+| --- | --- |
+| maps-r108-uart-20261115-r1/interval.log | d7c9f6745da078464d6542a248f8a74ea486a8cc95ed401d45d81a5689e0ba0f |
+| maps-r108-readback-20261115-r1/archive.json | cf8abce70441e25b4194161d7d962f32f7ca206d88fb909de0ed43bba9e8aef9 |
+| Same readback/exported-receipt.json | 406394fd754394b8619536dca112afcfff334ac4d19bde941b561f3749186488 |
+| Private r108-private/results/broker.log | 0a931f0abbdfcc1e01afc902784b2f6da2977c2b71b233d41e03a8b2c96e320c |
+
+The browser launcher currently deletes its temporary engine log even on error.
+The next change retains a bounded app-private failure log and numeric engine
+exit status so a fresh protected attempt can identify the actual engine cause.
