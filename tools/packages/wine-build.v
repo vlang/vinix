@@ -11,6 +11,7 @@ import tests.packages.winesource
 import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
+import tests.packages.winehostimages
 
 struct Entry {
 	source string
@@ -63,6 +64,7 @@ fn verify_sources() ! {
 		os.dir(@FILE) + '/../../tests/packages/wineheaders/headers.v': $embed_file('../../tests/packages/wineheaders/headers.v').to_string()
 		os.dir(@FILE) + '/../../tests/packages/winecsource/closure.v': $embed_file('../../tests/packages/winecsource/closure.v').to_string()
 		os.dir(@FILE) + '/../../tests/packages/winelink/link.v': $embed_file('../../tests/packages/winelink/link.v').to_string()
+		os.dir(@FILE) + '/../../tests/packages/winehostimages/images.v': $embed_file('../../tests/packages/winehostimages/images.v').to_string()
 		os.dir(@FILE) + '/wine-runner.v':                 $embed_file('wine-runner.v').to_string()
 		os.dir(@FILE) + '/wineadapter/layout.v':          $embed_file('wineadapter/layout.v').to_string()
 		os.dir(@FILE) + '/wineadapter/patch.v':           $embed_file('wineadapter/patch.v').to_string()
@@ -79,6 +81,7 @@ fn verify_sources() ! {
 }
 
 fn invoke(argv []string, log string) !string {
+	if argv.len > 0 && winehostimages.managed(argv[0]) { return winehostimages.invoke(argv, os.dir(log), log) }
 	os.write_file(log + '.argv.json', json2.encode(argv) + '\n')!
 	mut child := os.new_process(argv[0])
 	defer { child.close() }
@@ -312,7 +315,7 @@ fn build() ! {
 	checked_offer.close()
 	copy_input(application, app + '/bin/program.exe', mut inputs)!
 	for path in [base + '/tools/packages/wine-runner.v', @FILE, base + '/tests/packages/winesource/closure.v',
-		base + '/tests/packages/wineheaders/headers.v', base + '/tests/packages/winecsource/closure.v', base + '/tests/packages/winelink/link.v'] {
+		base + '/tests/packages/wineheaders/headers.v', base + '/tests/packages/winecsource/closure.v', base + '/tests/packages/winelink/link.v', base + '/tests/packages/winehostimages/images.v'] {
 		inputs[path] = digest(path)!
 	}
 	for directory in [base + '/tools/packages/wineadapter', base + '/tools/packages/appsdk',
@@ -416,6 +419,7 @@ fn build() ! {
 	wineheaders.admit_producer(output, inputs)!
 	winecsource.admit(output, output + '/logs')!
 	winelink.admit(output, output + '/logs', runtime + '/bin/wine-runner')!
+	winehostimages.admit_build(output + '/logs', output + '/logs')!
 	os.write_file(output + '/inputs-verified.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
 	for path in os.walk_ext(output, '') {

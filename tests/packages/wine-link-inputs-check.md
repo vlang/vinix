@@ -53,7 +53,10 @@ Every case must fail at its named check without retained output. Mutation
 writes detach private copies before changing data.
 
 This admits captured linker file bytes and an identical replay for the selected
-local static ELF profile. It does not freeze compiler/linker dynamic libraries,
+local static ELF profile. The additional
+[host image check](wine-host-images-check.md) now covers observed ordinary
+non-system Clang/LLD images and a closed child environment. Linker replay alone
+does not freeze compiler/linker dynamic libraries,
 all unreported inputs, search absence or host controller builds, and does not
 establish a complete hermetic build. Original source/distribution/notices,
 selected compiler/header/sysroot/GCC/kernel inputs and historical complete

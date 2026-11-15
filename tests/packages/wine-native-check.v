@@ -12,6 +12,7 @@ import tests.packages.winesource
 import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
+import tests.packages.winehostimages
 import tests.packages.wineowned
 import tools.packages.pkgcore
 import tools.packages.wineadapter
@@ -21,6 +22,10 @@ fn digest(path string) !string {
 }
 
 fn invoke(arguments []string, log string) ! {
+	if arguments.len > 0 && winehostimages.managed(arguments[0]) {
+		winehostimages.invoke(arguments, os.dir(log), log)!
+		return
+	}
 	os.write_file(log + '.argv.json', json2.encode(arguments))!
 	mut child := os.new_process(arguments[0])
 	defer { child.close() }
@@ -114,6 +119,9 @@ fn check() ! {
 	if digest(os.dir(@FILE) + '/winelink/link.v')! != sha256.hexhash($embed_file('winelink/link.v').to_string()) {
 		return error('compiled Wine linker admission differs')
 	}
+	if digest(os.dir(@FILE) + '/winehostimages/images.v')! != sha256.hexhash($embed_file('winehostimages/images.v').to_string()) {
+		return error('compiled Wine host image admission differs')
+	}
 	if digest(os.dir(@FILE) + '/wineowned/receipt.v')! != sha256.hexhash($embed_file('wineowned/receipt.v').to_string()) {
 		return error('compiled Wine owned receipt admission differs')
 	}
@@ -190,6 +198,7 @@ fn check() ! {
 		root + '/tests/packages/wineheaders/headers.v',
 		root + '/tests/packages/winecsource/closure.v',
 		root + '/tests/packages/winelink/link.v',
+		root + '/tests/packages/winehostimages/images.v',
 		'/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', sandbox] {
 		inputs[path] = digest(path)!
 	}
@@ -257,6 +266,7 @@ fn check() ! {
 		wineheaders.admit_build(directory, directory, inputs)!
 		winecsource.admit(directory, directory)!
 		winelink.admit(directory, directory, directory + '/' + program)!
+		winehostimages.admit_build(directory, directory)!
 	}
 	os.write_file(work + '/inputs.json', json2.encode(inputs))!
 	mut generated := map[string]string{}
@@ -267,6 +277,7 @@ fn check() ! {
 			'c-inputs-before.json', 'c-inputs-verified.json', 'c-discover.log', 'c-discover.log.argv.json',
 			'link-inputs.tar', 'link-proof.json', 'link-version.log', 'link-version.log.argv.json', 'link-replay.log', 'link-replay.log.argv.json']
 		names << winelink.artifacts(work + '/build-' + program)!
+		names << winehostimages.artifacts()
 		for name in names {
 			path := 'build-' + program + '/' + name
 			generated[path] = digest(work + '/' + path)!
@@ -360,6 +371,7 @@ fn check() ! {
 		wineheaders.admit_build(directory, directory, inputs)!
 		winecsource.admit(directory, directory)!
 		winelink.admit(directory, directory, directory + '/' + program)!
+		winehostimages.admit_build(directory, directory)!
 	}
 	for path, expected in generated {
 		if digest(work + '/' + path)! != expected {

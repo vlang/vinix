@@ -8,6 +8,7 @@ import tests.packages.winesource
 import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
+import tests.packages.winehostimages
 
 fn check(prepared string) ! {
 	inputs := json2.decode[map[string]string](os.read_file(prepared + '/inputs-before-build.json')!)!
@@ -23,7 +24,13 @@ fn check(prepared string) ! {
 	architectures := os.ls(prepared + '/prepared')!
 	if architectures.len != 1 || architectures[0] !in ['x86_64', 'aarch64'] { return error('producer architecture directory differs') }
 	winelink.admit(prepared, prepared + '/logs', prepared + '/prepared/' + architectures[0] + '/runtime/bin/wine-runner')!
+	winehostimages.admit_build(prepared + '/logs', prepared + '/logs')!
 	outputs := json2.decode[map[string]string](os.read_file(prepared + '/outputs.json')!)!
+	for name in winehostimages.artifacts() {
+		if 'logs/' + name !in outputs || winesource.file_digest(prepared + '/logs/' + name)! != outputs['logs/' + name] {
+			return error('host image producer output differs')
+		}
+	}
 	for name in ['logs/sources-before.txt', 'logs/sources-built.txt', 'logs/discover.log',
 		'logs/discover.log.argv.json', 'logs/v.log', 'logs/v.log.argv.json', 'build/wine-runner.c',
 		'clang-headers.json', 'logs/clang-resource.log', 'logs/clang-resource.log.argv.json', 'logs/cc.log.argv.json',

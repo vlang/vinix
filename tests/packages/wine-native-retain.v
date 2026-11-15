@@ -11,6 +11,7 @@ import tests.packages.winesource
 import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
+import tests.packages.winehostimages
 import tests.packages.wineowned
 import tools.packages.wineadapter
 
@@ -153,6 +154,7 @@ fn retain() ! {
 		'tests/packages/wineheaders/headers.v':          $embed_file('wineheaders/headers.v').to_string()
 		'tests/packages/winecsource/closure.v':          $embed_file('winecsource/closure.v').to_string()
 		'tests/packages/winelink/link.v':          $embed_file('winelink/link.v').to_string()
+		'tests/packages/winehostimages/images.v':          $embed_file('winehostimages/images.v').to_string()
 		'tools/packages/wine-build.v':                  $embed_file('../../tools/packages/wine-build.v').to_string()
 		'tools/packages/wine-runner.v':                 $embed_file('../../tools/packages/wine-runner.v').to_string()
 		'tools/packages/wineadapter/prefix.c.v':        $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
@@ -228,7 +230,7 @@ fn retain() ! {
 		}
 	}
 	for name in ['tests/packages/wine-native-check.v', 'tests/packages/wine-native/main.v',
-		'tests/packages/winesource/closure.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v', 'tests/packages/winelink/link.v']! {
+		'tests/packages/winesource/closure.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v', 'tests/packages/winelink/link.v', 'tests/packages/winehostimages/images.v']! {
 		require_input(inputs, root + '/' + name)!
 	}
 	for directory in [root + '/tools/packages', root + '/tools/accounts',
@@ -248,11 +250,12 @@ fn retain() ! {
 	wineheaders.admit_producer(prepared, producer_inputs)!
 	winecsource.admit(prepared, prepared + '/logs')!
 	winelink.admit(prepared, prepared + '/logs', prepared + '/prepared/' + arch + '/runtime/bin/wine-runner')!
+	winehostimages.admit_build(prepared + '/logs', recorded_prepared + '/logs')!
 	if owned {
 		require_input(inputs, root + '/tests/packages/wineowned/receipt.v')!
 		wineowned.admit(prepared, arch, root)!
 	}
-	for name in ['tools/packages/wine-build.v', 'tools/packages/wine-runner.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v', 'tests/packages/winelink/link.v']! {
+	for name in ['tools/packages/wine-build.v', 'tools/packages/wine-runner.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v', 'tests/packages/winelink/link.v', 'tests/packages/winehostimages/images.v']! {
 		require_input(producer_inputs, root + '/' + name)!
 	}
 	build_record := json2.decode[map[string]string](os.read_file(prepared + '/build-producer.json')!)!
@@ -289,7 +292,11 @@ fn retain() ! {
 	for path, _ in inputs { paths['input/' + path] = path }
 	for path, _ in producer_inputs { paths['producer-input/' + path] = path }
 	for path, _ in winecsource.inputs(prepared)! { paths['producer-c-input/' + path] = path }
+	for path, _ in winehostimages.inputs(prepared + '/logs')! { paths['producer-host-image/' + path] = path }
 	outputs := hashes(prepared + '/outputs.json')!
+	for name in winehostimages.artifacts() {
+		if 'logs/' + name !in outputs { return error('host image producer artifact missing') }
+	}
 	for name in ['build/wine-runner.c', 'build/runtime.c', 'logs/v.log', 'logs/v.log.argv.json',
 		'logs/discover.log', 'logs/discover.log.argv.json', 'logs/sources-before.txt', 'logs/sources-built.txt',
 		'logs/cc.log', 'logs/cc.log.argv.json', 'clang-headers.json', 'logs/clang-resource.log',
@@ -421,6 +428,7 @@ fn retain() ! {
 			'c-inputs-before.json', 'c-inputs-verified.json', 'c-discover.log', 'c-discover.log.argv.json',
 			'link-inputs.tar', 'link-proof.json', 'link-version.log', 'link-version.log.argv.json', 'link-replay.log', 'link-replay.log.argv.json']
 		names << winelink.artifacts(run + '/build-' + program)!
+		names << winehostimages.artifacts()
 		for name in names {
 			required << 'build-' + program + '/' + name
 		}
@@ -429,6 +437,8 @@ fn retain() ! {
 		wineheaders.admit_build(run + '/build-' + program, run + '/build-' + program, inputs)!
 		winecsource.admit(run + '/build-' + program, run + '/build-' + program)!
 		winelink.admit(run + '/build-' + program, run + '/build-' + program, run + '/build-' + program + '/' + program)!
+		winehostimages.admit_build(run + '/build-' + program, recorded_run + '/build-' + program)!
+		for path, _ in winehostimages.inputs(run + '/build-' + program)! { paths[program + '-host-image/' + path] = path }
 		for path, _ in winecsource.inputs(run + '/build-' + program)! { paths[program + '-c-input/' + path] = path }
 	}
 	for name in ['usr/bin/vinix-package', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session',

@@ -23,7 +23,9 @@ the original source/output/ISO checks. The [observed C input check](wine-c-input
 also requires matching discovery and actual compiler include observations,
 resolved targets and hashes. [Linker input capture and replay](wine-link-inputs-check.md)
 add the actual static linker objects/archives and require an identical replay.
-Full hermetic toolchain admission remains separate.
+The [host image/environment check](wine-host-images-check.md) also binds managed
+Clang/LLD child environments and observed ordinary non-system images. OS shared
+cache and full hermetic toolchain admission remain separate.
 
 The historical x86-9 outcome remains a failed checkpoint. The separate
 [translated-fork fixture](wine-translation-fork-check.md) records the original

@@ -4,6 +4,7 @@ module winecsource
 import os
 import json2
 import tests.packages.winesource
+import tests.packages.winehostimages
 
 pub struct File {
 pub:
@@ -75,6 +76,7 @@ fn snapshot(command []string, text string) !Proof {
 }
 
 fn invoke(command []string, log string) !string {
+	if command.len > 0 && winehostimages.managed(command[0]) { return winehostimages.invoke(command, os.dir(log), log) }
 	os.write_file(log + '.argv.json', json2.encode(command) + '\n')!
 	mut child := os.new_process(command[0])
 	defer { child.close() }

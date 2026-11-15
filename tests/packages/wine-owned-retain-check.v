@@ -6,6 +6,7 @@ import json2
 import crypto.sha256
 import tests.packages.wineheaders
 import tests.packages.winecsource
+import tests.packages.winehostimages
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -31,7 +32,11 @@ fn clone_tree(source string, destination string, prepared bool) ! {
 			|| path.ends_with('/c-inputs-verified.json') || path.contains('/link-replay/')
 			|| path.ends_with('/link-inputs.tar') || path.ends_with('/link-proof.json')
 			|| path.ends_with('/link-version.log') || path.ends_with('/link-version.log.argv.json')
-			|| path.ends_with('/link-replay.log.argv.json') {
+			|| path.ends_with('/link-replay.log.argv.json') || path.ends_with('.images.json')
+			|| path.ends_with('.environment.json') || path.ends_with('.dyld.log')
+			|| path.ends_with('/host-images-before.json') || path.ends_with('/host-clang-version.log')
+			|| path.ends_with('/host-linker-version.log') || path.ends_with('/host-clang-version.log.argv.json')
+			|| path.ends_with('/host-linker-version.log.argv.json') {
 			$if macos {
 				if C.clonefile(path.str, to.str, 0) == 0 { continue }
 			}
@@ -131,16 +136,55 @@ fn check() ! {
 	}
 	cases << ['bridge-c-trace', 'bridge-c-manifest', 'guest-c-pin', 'package-c-command', 'guest-c-linked']
 	cases << ['bridge-link-proof', 'bridge-link-response', 'bridge-link-linked', 'guest-link-output', 'package-link-argv']
+	cases << ['bridge-host-baseline', 'bridge-host-environment', 'guest-host-trace', 'package-host-pin', 'guest-host-linked']
 	for name in cases {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
 		mut selected := prepared
 		mut expected := ''
-		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' || name.starts_with('bridge-c-') || name.starts_with('bridge-link-') {
+		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' || name.starts_with('bridge-c-') || name.starts_with('bridge-link-') || name.starts_with('bridge-host-') {
 			selected = dir + '/prepared'
 			clone_tree(prepared, selected, true)!; remap(dir, prepared, selected)!
 		}
-		if name.starts_with('bridge-link-') {
+		if name == 'bridge-host-baseline' {
+			file := 'logs/host-images-before.json'
+			before := json2.decode[winehostimages.Baseline](os.read_file(selected + '/' + file)!)!
+			replace(selected + '/' + file, json2.encode(winehostimages.Baseline{recorded_directory: before.recorded_directory, images: before.images[1..]}))!
+			reseal(dir, selected, [file])!
+			expected = 'host image before-command receipts differ'
+		} else if name == 'bridge-host-environment' {
+			file := 'logs/cc.log.environment.json'
+			mut env := read_map(selected + '/' + file)!
+			env['CPATH'] = '/unrecorded'
+			replace(selected + '/' + file, json2.encode(env))!
+			reseal(dir, selected, [file])!
+			expected = 'host tool environment differs'
+		} else if name == 'guest-host-linked' {
+			file := dir + '/build-guest/host-images-before.json'
+			os.rename(file, file + '-original')!
+			os.symlink(file + '-original', file)!
+			expected = 'host image evidence must be a bounded ordinary file'
+		} else if name == 'guest-host-trace' || name == 'package-host-pin' {
+			file := if name == 'guest-host-trace' { 'build-guest/cc.log.dyld.log' } else { 'build-package/cc.log.images.json' }
+			if name == 'guest-host-trace' {
+				text := os.read_file(dir + '/' + file)!
+				observed := winehostimages.trace(text)!
+				path := observed[0].path
+				lines := text.split_into_lines().filter(!it.ends_with(' ' + path) && !it.ends_with(': ' + os.file_name(path)))
+				replace(dir + '/' + file, lines.join('\n') + '\n')!
+				expected = 'host image observations differ'
+			} else {
+				mut images := json2.decode[[]winehostimages.Image](os.read_file(dir + '/' + file)!)!
+				for index, image in images {
+					if image.sha256 != '' { images[index] = winehostimages.Image{path: image.path, uuid: image.uuid, sha256: 'bad'}; break }
+				}
+				replace(dir + '/' + file, json2.encode(images))!
+				expected = 'host image absent or changed from before-command probes'
+			}
+			mut generated := read_map(dir + '/generated-before-boot.json')!
+			generated[file] = digest(dir + '/' + file)!
+			replace(dir + '/generated-before-boot.json', json2.encode(generated))!
+		} else if name.starts_with('bridge-link-') {
 			if name == 'bridge-link-proof' {
 				mut proof := json2.decode[map[string]json2.Any](os.read_file(selected + '/link-proof.json')!)!
 				proof['archive_sha256'] = json2.Any('bad')
@@ -303,6 +347,6 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline thirty-four exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline thirty-nine exact refusals')
 }
 fn main() { check() or { eprintln(err); exit(1) } }

@@ -6,6 +6,7 @@ import json2
 import crypto.sha256
 import tests.packages.winesource
 import tests.packages.winecsource
+import tests.packages.winehostimages
 
 const linker = '/opt/homebrew/bin/ld.lld'
 
@@ -170,16 +171,7 @@ fn read(path string, bound int) ![]u8 {
 }
 
 fn invoke(command []string, cwd string, log string) !string {
-	os.write_file(log + '.argv.json', json2.encode(command) + '\n')!
-	mut child := os.new_process(command[0])
-	defer { child.close() }
-	child.set_args(command[1..]); child.set_work_folder(cwd)
-	child.set_redirect_stdio_merged(); child.run()
-	C.close(child.stdio_fd[0]); child.stdio_fd[0] = -1
-	text := child.stdout_slurp(); child.wait()
-	os.write_file(log, text)!
-	if child.code != 0 { return error('link replay command failed: ' + log) }
-	return text
+	return winehostimages.invoke(command, cwd, log)
 }
 
 pub fn build(base []string, directory string, logs string) ! {
@@ -221,6 +213,7 @@ pub fn build(base []string, directory string, logs string) ! {
 	os.write_file(directory + '/link-proof.json', json2.encode(Proof{archive_sha256: digest(bytes), members: archive.members,
 		linker: linker, linker_sha256: before, output: output, output_sha256: hash, recorded_directory: directory}) + '\n')!
 	admit(directory, logs, base.last())!
+	winehostimages.admit_link(logs, logs)!
 }
 
 pub fn admit(directory string, logs string, binary string) ! {

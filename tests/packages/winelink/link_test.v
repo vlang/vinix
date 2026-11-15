@@ -73,7 +73,7 @@ fn test_optional_real_link_replay() {
 	root := os.abs_path(os.getenv('VINIX_LINK_PROBE_OUTPUT'))
 	if os.getenv('VINIX_LINK_PROBE_OUTPUT') == '' || os.exists(root) { panic('fresh external linker probe output required') }
 	os.mkdir_all(root)!
-	mut command := json2.decode[[]string](os.read_file(manifest)!)!.filter(it != '-H')
+	mut command := json2.decode[[]string](os.read_file(manifest)!)!.filter(it != '-H' && !it.starts_with('-Wl,--reproduce='))
 	for index, arg in command { if arg.starts_with('-fuse-ld=') { command[index] = '-fuse-ld=' + linker } }
 	command[command.len - 1] = root + '/program'
 	build(command, root, root)!

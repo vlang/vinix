@@ -34,6 +34,9 @@ requires matching discovery/build commands. It also admits the explicit
 It additionally requires [observed C file admission](wine-c-inputs-check.md).
 The [linker archive/replay check](wine-link-inputs-check.md) also requires
 captured static link inputs and an identical replay with the pinned linker.
+The [host image/environment check](wine-host-images-check.md) adds managed
+Clang/LLD image bytes and exact closed child environments, with an explicit
+unadmitted OS shared-cache boundary.
 This is parsed bridge-source, selected resource-header and observed C admission; complete
 C dependency/toolchain closure and hermetic build admission remain separate
 requirements. Historical bundles still need
