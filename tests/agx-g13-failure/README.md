@@ -46,11 +46,18 @@ fixed three-entry storage; notifications are assigned directly into the rings.
 
 Compile `check-prefix-storage.v` to an external executable. Its `--selftest`
 rejects hidden allocation calls, missing/duplicate helper definitions and lost
-stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks twenty-one production
+stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks twenty-two production
 helpers, including initial capture/selection/compaction, registration, publishers
-and the scheduler/input dependency scan and private fence provenance check.
+and the host ring admission, scheduler/input dependency scan and private fence provenance check.
 It rejects temporary allocations and structural queue copies.
 Fixed stack arrays are required for publication, queue gates, acceptance and
 resolution. This catches
 V moving an addressed local into a `memdup` allocation under `-gc none`. It does
 not measure the whole kernel or qualify native GPU execution.
+
+Host ring admission executes the production capacity helper at 5,120 boundaries,
+then drives the actual compute and paired render publishers with firmware rings
+consumed but host retirement withheld. Exact remaining capacity is refused to
+preserve Asahi's spare entry. One host retirement permits atomic retry, including
+wrapped zero/one/two-prefix commands with and without TVB binding. Corrupt and overflowing logical counters fail
+before any publication; these tests introduce no new allocation or freeing path.

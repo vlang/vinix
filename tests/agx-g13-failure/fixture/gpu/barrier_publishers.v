@@ -7,6 +7,7 @@ import gpu.agx.hw
 import katomic
 
 fn check_barrier_publishers() {
+	check_ring_admission()
 	for count := u32(1); count <= 2; count++ {
 		for failure in -1 .. 5 {
 			mut vertex_outer := channel.RingHeader{}

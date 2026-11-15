@@ -110,6 +110,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
 | Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Modern flat-command integration and full admission/backpressure still differ. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
+| Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
@@ -902,6 +903,65 @@ Linked kernel SHA-256 values are
 (AArch64) and
 `6576e8aee7c66353533e4a4f0f57a90e7fe876f19e2a000d4e2813de01901a24`
 (x86_64).
+
+### Host-retirement ring admission
+
+Compute and paired render publication now gate on the host's unretired command
+positions as well as the firmware ring pointers. The pinned Asahi reference
+defines free space as `size - pending.len() - 1` and requires it to be strictly
+greater than the complete command count. Vinix applies the equivalent strict
+predicate to `command_sequence - retired_sequence`, including every prefix and
+optional InitBuffer. Both render halves validate before either ring is changed.
+Corrupt or overflowing logical counters stop publication instead of wrapping.
+
+The existing monotonic retirement high-water mark permits reverse reaping
+without moving a released prefix backward. Manager locking and queue quarantine
+continue to prevent reuse during incomplete cleanup. This adds no fields,
+pointers, allocations or frees. Independent ownership/admission review approved
+the spare-entry arithmetic and reaper interactions.
+
+ASan/UBSan tests pass 5,120 capacity boundaries and drive the real compute/render
+publishers with GPU consumption advanced but host retirement withheld. Exact
+remaining capacity is refused; one host retirement permits atomic retry.
+Wrapped zero/one/two-prefix commands pass with and without TVB binding. Existing
+publisher/recovery tests, async regressions including 540 shutdown cases, three
+V unit suites, source gates and 22 generated ARM helper checks/selftests pass.
+The async fixture still injects publication services; native ring admission is
+exercised by the separate production-publisher fixture.
+
+Isolated AArch64 and ordinary x86_64 builds pass from
+`fbcb0482f46fa4d2a37dd01d17b0191e952b2eca` plus the retained `g13.v`.
+All AGX/syncobj V inputs match the isolated checkout; `g13.v` matches both
+retained input snapshots. Ordinary x86 excludes native AGX code. Omarchy
+`4f26515d55f5d03ddf884a8b416f3b66b8ee7ae4` and package HEAD
+`703430e884c0c46bce2a83f11c34a44af3f2ec5b` were reverified and keep the same
+Asahi/Mesa pins. All selected audit gates pass; the verdict is `not_equivalent`.
+
+Event-slot admission remains separate: Asahi also requires
+`free_slots() > event_count`; Vinix's 127-ticket preparation limit does not
+establish equivalent publication or backlog behavior. Event-window predicates,
+queued backlog, whole-batch readiness/credits, modern ABI/VM/GEM/Mesa and the
+other listed areas remain open. No native GPU execution, Vinix boot, reboot or
+deployment occurred.
+
+The complete evidence bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-ring-admission-20261115/bundle/`.
+Its sibling `inventory.json` SHA-256 is
+`657cc34b164dfd6ec578c3b152f032f5b7416cbd9e1779595f1bce86af99be4c`.
+The sibling `bundle.tar.gz` SHA-256 is
+`f929ec391baca9f495ef330607d9ee37c5506a0598d3065e874beddf55178906`.
+Canonical and fully extracted bundles pass the unchanged inventory checker.
+Linked kernel SHA-256 values are
+`087cccb698a62cd430f29f7a3ba24a07e815ddc855e156e4cf036320eb556172`
+(AArch64) and
+`d82a101cc1c096cfe4999e2de3f366de304aeb406d9e46edfe7bc4f8db6ac2ee`
+(x86_64).
+
+Only byte/mode-identical root staging ELF/C duplicates from earlier completed
+runs were retired when storage was tight. Every complete canonical bundle,
+original receipt and archive remains unchanged; the affected state directories
+retain `redundant-staging-retirement.txt` ledgers. The older artifact incident
+below is unchanged.
 
 ## Earlier artifact retention incident
 

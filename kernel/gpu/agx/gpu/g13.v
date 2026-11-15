@@ -936,6 +936,19 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 	return true
 }
 
+// Caller holds the manager and subqueue locks. Asahi free_space() counts
+// host-pending commands, and both can_submit()/submit() require strictly more
+// space than the complete command prefix. GPU consumption alone cannot release
+// that ownership. Preserve one additional spare entry at the admission boundary.
+fn (mut mgr GpuManager) g13_ring_has_space_locked(published u64, retired u64, count u32) bool {
+	if retired > published || published - retired >= u64(fw.g13_workqueue_entries)
+		|| published > ~u64(0) - u64(count) {
+		mgr.state = .error
+		return false
+	}
+	return u64(fw.g13_workqueue_entries) - 1 - (published - retired) > u64(count)
+}
+
 // Publish up to two prefix barriers and a command into a queue-owned ring,
 // then emit one RunWorkQueue message with the final write pointer. Holding the
 // outer ring lock across both publications prevents a full outer ring from
@@ -985,6 +998,11 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	mut queue := &owned.subqueues[pipe_type]
 	queue.lock.acquire()
 	if owned.released || queue.state.phys == 0 || queue.ring.phys == 0 || queue.info.va == 0 {
+		queue.lock.release()
+		outer.lock.release()
+		return false
+	}
+	if !mgr.g13_ring_has_space_locked(queue.command_sequence, queue.retired_sequence, command_count) {
 		queue.lock.release()
 		outer.lock.release()
 		return false
@@ -1902,6 +1920,10 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 	mut vertex_inner_next := u32(0)
 	mut fragment_inner_wp := u32(0)
 	mut fragment_inner_next := u32(0)
+	if valid {
+		valid = mgr.g13_ring_has_space_locked(vertex_queue.command_sequence, vertex_queue.retired_sequence, vertex_count)
+			&& mgr.g13_ring_has_space_locked(fragment_queue.command_sequence, fragment_queue.retired_sequence, 2)
+	}
 	if valid {
 		vertex_outer_read := unsafe { &u32(vertex_outer.state_phys + higher_half) }
 		vertex_outer_write := unsafe {

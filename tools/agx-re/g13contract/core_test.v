@@ -88,6 +88,20 @@ fn test_queue_fence_contract_rejects_reused_public_or_missing_identity() {
 	if _ := check_queue_fence_contract(contexts, fences, queue, submit.replace('queue_resources.fence_context)', 'u64(request.queue_id))')) { assert false }
 }
 
+fn test_ring_admission_contract_rejects_gpu_only_space_and_missing_spare() {
+	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/gpu/g13.v'))!
+	reference := '    pub(crate) fn free_space(&self) -> usize { self.size as usize - self.pending.len() - 1 }\n    pub(crate) fn free_slots() {}\npub(crate) fn can_submit() { inner.free_space() > self.pending.len() }\npub(crate) fn submit() { inner.free_space() <= command_count }'
+	check_ring_admission_contract(local, reference)!
+	for broken in [local.replace('(published - retired) > u64(count)', '(published - retired) >= u64(count)'),
+		local.replace('published > ~u64(0) - u64(count)', 'false'),
+		local.replace('mgr.g13_ring_has_space_locked(queue.command_sequence, queue.retired_sequence, command_count)', 'true'),
+		local.replace('mgr.g13_ring_has_space_locked(fragment_queue.command_sequence, fragment_queue.retired_sequence, 2)', 'true')] {
+		assert broken != local
+		if _ := check_ring_admission_contract(broken, reference) { assert false }
+	}
+	if _ := check_ring_admission_contract(local, reference.replace('self.pending.len()', 'gpu_doneptr')) { assert false }
+}
+
 fn test_integer_constant_accepts_v_casts_and_separators() {
 	assert integer_constant('pub const aperture = u64(0xffff_ffae_1000_0000)', 'aperture', 'sample')! == u64(0xffffffae10000000)
 	assert integer_constant('const blocks = u32(8)', 'blocks', 'sample')! == 8

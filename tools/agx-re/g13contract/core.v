@@ -266,6 +266,28 @@ fn check_queue_fence_contract(contexts string, fences string, queue string, subm
 		'Native output fences must carry the exact physical queue context')!
 }
 
+fn check_ring_admission_contract(local string, reference string) ! {
+	free := section(reference, '    pub(crate) fn free_space(', '    pub(crate) fn free_slots(', 'Asahi host ring capacity')!
+	require(free.contains('self.size as usize - self.pending.len() - 1'), 'Asahi ring capacity must count host-pending commands')!
+	require_order(reference, ['pub(crate) fn can_submit(', 'inner.free_space() > self.pending.len()',
+		'pub(crate) fn submit(', 'inner.free_space() <= command_count'], 'Asahi spare-entry admission')!
+	gate := section(local, 'fn (mut mgr GpuManager) g13_ring_has_space_locked(',
+		'fn (mut mgr GpuManager) submit_g13_queue_commands(', 'Vinix host ring capacity')!
+	require_order(gate, ['retired > published', 'published - retired >= u64(fw.g13_workqueue_entries)',
+		'published > ~u64(0) - u64(count)', 'mgr.state = .error',
+		'u64(fw.g13_workqueue_entries) - 1 - (published - retired) > u64(count)'], 'Vinix host ring capacity')!
+	compute := section(local, 'fn (mut mgr GpuManager) submit_g13_queue_commands(',
+		'fn (mut mgr GpuManager) publish_g13_compute_job_locked(', 'Vinix compute admission')!
+	require_order(compute, ['mgr.g13_ring_has_space_locked(queue.command_sequence, queue.retired_sequence, command_count)',
+		'inner_done := katomic.load', 'command_count > inner_free', '*entry = command_va',
+		'queue.command_sequence += u64(command_count)', 'katomic.store(mut &state.cpu_wptr'], 'Vinix compute admission')!
+	render := section(local, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(',
+		'// Transfer a prepared render pass', 'Vinix render admission')!
+	require_order(render, ['mgr.g13_ring_has_space_locked(vertex_queue.command_sequence, vertex_queue.retired_sequence, vertex_count)',
+		'mgr.g13_ring_has_space_locked(fragment_queue.command_sequence, fragment_queue.retired_sequence, 2)',
+		'vertex_inner_wp = katomic.load', 'if !valid {', 'vertex_queue.command_sequence += vertex_count'], 'Vinix paired host admission')!
+}
+
 fn check_submission_pipelining(pending string) ! {
 	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix initial dependencies')!
 	require_order(resolve, ['barrier == ioctl.asahi_barrier_none', 'barrier == 0',
@@ -341,6 +363,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'gpu_manager.release_g13_initial_events', 'agxsubmission.install_output_syncs', 'register_g13_pending'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
+	check_ring_admission_contract(local, workqueue)!
 	check_input_dependency_contract(pending)!
 	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
 		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit)!
@@ -478,6 +501,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',
+		'Compute and paired render admission count host-unretired ring commands and preserve the reference spare entry',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
 		'Independent later submissions pipeline after older publication with initial firmware dependencies',
