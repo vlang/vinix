@@ -13,7 +13,7 @@ type. Arguments are masked to their declared width; results keep that width,
 integer kind and exact bits. Poison propagates; selected undef errors. The
 integer-only API rejects these scalar intrinsic calls. Integer-only functions
 using scalar calls execute through `run_scalar_function`. The vector population
-count described below also executes through `run_integer_function`.
+count and bit reversal described below also execute through `run_integer_function`.
 
 Production uses unsigned shifts, masks and additions in loops of at most 64
 iterations (eight for byte swap), without host intrinsics, LLVM, floating point
@@ -94,9 +94,10 @@ with integer vector construction, comparisons and selects. A call costs one
 step, two lane counts of profiling work and one shared construction slot.
 The existing 4,096-result and 1,000,000-work limits apply.
 
-The shared vector declaration cache now has 1,664 stack entries: its previous
-640 floating identities followed by 1,024 population-count identities, one per
-width/count pair. Declaration attributes are checked once per identity;
+Population count occupies shared vector declaration-cache slots 640..1663,
+one per width/count pair. The cache now has 2,688 stack entries: 640 floating
+identities, 1,024 population-count identities and 1,024 bit-reversal identities.
+Declaration attributes are checked once per identity;
 duplicate reserved declarations reject. Unary integer calls reject return/
 parameter attributes, including `immarg`. The normal production lane path
 adds no allocations. Retained heap has not been measured.
@@ -126,6 +127,44 @@ limit through both scalar APIs. The software Metal fixture adds 216 dispatches
 per runtime across 64 kernels and eight representative widths, including deferred writes, sparse
 bindings, pipeline reuse, guard bytes and expected failures. These synthetic
 CPU checks do not qualify an Apple shader, GPU frame or application launch.
+
+## Vector bit reversal
+
+Ordinary direct `llvm.bitreverse.vNiW` calls admit fixed vectors of 1..16
+integer lanes, widths i1..i64. Bit M of each lane moves to bit W-M-1; lane
+order and the exact vector type remain unchanged. The implementation shares
+canonical integer-overload parsing, type/source validation and lane-state
+handling with population count, then reuses the scalar integer bit reverser.
+Both families execute through the mixed, integer-only, void and memory APIs.
+The existing call flags, attributes, cold-block validation and unsupported
+vector-profile restrictions apply. Scalable vectors, i65 and wider types,
+counts above 16 and AIR aliases reject.
+
+Reversal adds cache slots 1664..2687 without moving older identities. Each
+call takes one step, two lane counts of profiling work and one construction
+slot. All existing vector-result, vector-work and attribute-work limits remain.
+Poison propagates per lane, any undef lane fails even when discarded, source
+freezes repair inputs and result freezes choose zero for poison. Results are
+independent snapshots. The normal lane path adds no allocation; retained
+heap has not been measured.
+
+`vector_bitreverse_intrinsics_test.v` compares 1,032,736 exact lane values with
+the standard-library 64-bit reverser shifted to the declared width, independently
+of the production shift loop. It additionally checks 705,024 reversal
+involutions, 104,448 lane-state cases, high-bit masking, snapshots and guards.
+The shared cache unit covers all 2,688 identities.
+
+`tests/ios/air-vector-bitreverse.v LLVM_AS FRESH_EXTERNAL_DIR` checks every
+width/count through 25,600 decoded shapes and 3,347,424 exact native LLVM
+comparisons. Its 606 controls include 320 mixed-family API cases: reversal
+twice restores the input and reversal preserves population count, with both
+call orders through both scalar APIs. It also checks attributes, all overloads
+in bounded cache groups, exact budgets and shared limits through all four
+APIs. VM inputs retain noisy high bits; native loads receive canonical padding,
+following the population-count reference qualification. Native padding behavior
+is not qualified. The software Metal fixture adds 216 dispatches per runtime
+across 64 kernels and eight representative widths, including nontrivial double
+reversal, guards, deferred writes and expected failures.
 
 References: [LLVM population count](https://llvm.org/docs/LangRef.html#llvm-ctpop-intrinsic),
 [bit reversal](https://llvm.org/docs/LangRef.html#llvm-bitreverse-intrinsics),
