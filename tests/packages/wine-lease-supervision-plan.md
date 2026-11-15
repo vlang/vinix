@@ -4243,3 +4243,44 @@ Complete inventory recording and independent comparison pass. The original
 `vwrealpins-20261115-01` bundle and its receipt remain independently required
 and unchanged. No historical audit is weakened and prior failures stay failed;
 broader roadmap 14 runtime, GUI, ARM and lifetime gates remain open.
+
+## Kernel-held workload lease primitive (2026-11-15)
+
+Commit `28ebcee19` adds the [private workload lease API and native fixtures](workload-lease-check.md).
+An independent kernel-owned shared flock survives source-descriptor unlock and
+close, exec, double-fork, `setsid`, and the original holder's `SIGKILL`. Fork
+inherits the creator's immutable lease chain, including `CLONE_PARENT`; the
+last member's retirement releases the lock after page-map teardown. Nested
+groups retain their ancestors, have a depth limit of 32, and release their
+resource charges on final retirement. The new lifetimes received independent
+read-only review, including fork publication versus sibling process exit.
+
+Production kernels build on both architectures, and ARM also builds with
+allocation tracking. Fresh ARM/x86 lifecycle probes pass with exact survivor
+status 37, final lock release, depth-limit refusal, and zero growth in every
+measured slab class, large-page count and written-after-free counter. Both
+architectures have absent-API baseline controls. ARM general retention passes
+all 36 operation measurements and four 300-run churn programs without positive
+slab deltas; cache collection completes. Desktop `idle,apps,drag` passes using
+the retained desktop binary. The allocation checker still exits 1 on both base
+and candidate with the same 179 excess-warning rows; no new rows are added or
+waived. The separate host `poll` declaration fix is `eb994d231`; focused native
+clipboard/loopback checks pass, while the broad source-tools suite retains its
+unrelated staging assertion failure.
+
+Evidence is retained at `/Users/alex/.cache/vwkernellease-20261115-01`, including
+base `c89fc75e1`, implementation/source patches, exact kernels, generated C,
+native run inputs/results, performance transcripts and recovered source versions
+for all earlier recorded probe/controller hashes. Earlier failures remain failed.
+The inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/workload-lease-20261115-01.inventory.json`,
+SHA-256 `e16ff57cbbe68f5212c16ca5eaba30aabf6a57d49f71566fbf8b979573a48721`.
+Complete typed-inventory recording and independent comparison pass. This
+preserves the checkpoint bytes; it does not expand the build-admission scope.
+
+This primitive is not yet wired into package launchers or signed Wine fixtures.
+Dynamic failed-clone, concurrent source-unlock, pledge and resource-exhaustion
+controls, complete compiler/header/sysroot admission, launcher integration and
+signed Wine holder-death qualification remain open. The earlier userspace
+holder's own-death limitation is unchanged in the production launch path;
+default activation and broader section 14 acceptance remain open.
