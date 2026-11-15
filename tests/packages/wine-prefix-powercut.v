@@ -170,10 +170,11 @@ fn ordinary(root string, point int, fresh bool) ! {
 	println('WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings')
 	cut_time(point, 'cold-inspection-end')
 	$if wine_cut_cli ? {
-		for command in ['wine-prefix-migrate', 'wine-prefix-migrate', 'wine-prefix-review']! {
+		winecutservice.preview(data, point)!
+		for command in ['wine-prefix-migrate', 'wine-prefix-migrate', 'wine-prefix-review', 'wine-prefix-additions']! {
 			winecutservice.reply(command, data)!
 		}
-		println('WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json')
+		println('WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json additions-json')
 	}
 	cut_time(point, 'cold-admission-begin')
 	mut resumed := $if wine_cut_service ? { (pkgcore.Service{}).wine_prefix_review('app', data)! } $else {

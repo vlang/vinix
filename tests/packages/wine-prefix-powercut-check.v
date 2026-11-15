@@ -155,7 +155,9 @@ fn run() ! {
 		}
 		if cli != '' {
 			required << 'WINE CLI POWER CUT EXEC point=${point} command=wine-prefix-migrate'
-			required << 'WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json'
+			required << 'WINE CLI PREVIEW PASS point=${point} runtime-version=2.0.0 prefix-unchanged'
+			if boundary.replaced < rows - 1 { required << 'WINE CLI ADDITIONS REFUSED point=${point} prefix-unchanged' }
+			required << 'WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json additions-json'
 		}
 		outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{...base,
 			disks: [hwhost.Disk{name: 'prefix.ext2', size_mib: if journaled { 36 } else { 32 }, image: selected_seed}],

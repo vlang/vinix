@@ -2249,9 +2249,14 @@ its separate `vinix_wine_cut_fsync` alias, then append
 The interrupted ordinary child closes its preliminary owner and execs the
 actual `wine-prefix-migrate` command. A tmpfs arm file activates the CLI hook
 only in that boot; the hook waits for a migration stage before counting syncs.
-After reboot, migration, repeated migration and public review must return exit
-zero and JSON with generation 2, prior generation zero, runtime `wine` and all
-three exact current `keep` targets. Replies are retained in serial output.
+After reboot, public review must first report the exact interrupted namespace:
+each old/current/missing target and its `replace`/`keep`/`create` operation,
+generation 2, the expected prior generation, runtime `wine` and version `2.0.0`.
+If old bindings remain, public additions must refuse. Neither command may
+change any builtin target, pending stage or private sentinel. Migration,
+repeated migration, public review and idempotent additions must then return exit
+zero and JSON with prior generation zero and all three exact current `keep`
+targets, retaining the same runtime version. Replies are retained in serial output.
 Independent service admission, lease/reader probes and filesystem inspection
 still follow. CLI-specific markers reject a service-only guest, while a CLI
 compiled without interception is rejected for ending before the requested cut.
