@@ -114,6 +114,13 @@ same ELF on Linux; `pollcopy-evidence.v` checks baseline failures, generated C,
 native/Linux outcomes, storage and selected regressions. See
 [receipts and limits](../../docs/linux-poll-copyout.md).
 
+`--cases selectwake` checks exception-only select waits on pipe HUP/ERR,
+observed sleep before handled signals, finite/absent timeouts, relevant-set
+controls and unchanged raw ppoll readiness. Both sources are frozen and its
+default budget is 600 seconds. `selectwake-reference.v` runs the same ELF on
+Linux; `selectwake-evidence.v` audits results, cleanup, generated C and review.
+See [receipts and limits](../../docs/linux-select-wakeups.md).
+
 ```sh
 tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-arm
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86

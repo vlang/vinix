@@ -211,11 +211,27 @@ pub const pollwrnorm = 0x100
 // POLLERR and POLLHUP are reported even when userspace did not ask for them.
 // In particular, readers use POLLHUP to notice that the final writer of a
 // pipe has gone away and drain it to EOF.
-fn poll_revents(status int, requested i16) i16 {
+fn poll_revents(status int, requested i16, selecting bool) i16 {
+	if selecting {
+		// Select sleeps until one of its requested sets has a ready bit.
+		// HUP contributes only to reads; ERR contributes to reads/writes.
+		// Neither is an exceptional condition (Linux's POLL*_SET masks).
+		mut ready := i16(0)
+		if requested & i16(pollin) != 0 && status & (pollin | 0x40 | 0x80 | pollhup | pollerr | pollnval) != 0 {
+			ready |= i16(pollin)
+		}
+		if requested & i16(pollout) != 0 && status & (pollout | pollwrnorm | 0x200 | pollerr | pollnval) != 0 {
+			ready |= i16(pollout)
+		}
+		if requested & i16(pollpri) != 0 && status & (pollpri | pollnval) != 0 {
+			ready |= i16(pollpri)
+		}
+		return ready
+	}
 	return (i16(status) & requested) | (i16(status) & i16(pollerr | pollhup))
 }
 
-fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
+fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64, selecting bool) (u64, u64) {
 	if voidptr(sigmask) != unsafe { nil } {
 		mut t := proc.current_thread()
 		proc.begin_wait_mask(mut t, *sigmask)
@@ -302,7 +318,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 
 		status := resource.poll_status(mut resource_)
 
-		revents := poll_revents(status, fdd.events)
+		revents := poll_revents(status, fdd.events, selecting)
 		if revents != 0 {
 			fdd.revents = revents
 			ret++
@@ -361,7 +377,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64) (u64, u64) {
 		// whereas an event's pending wake can be consumed by another poller.
 		for i in 0 .. fdlist.len {
 			mut fdd := unsafe { &fds[fdnums[i]] }
-			fdd.revents = poll_revents(resource.poll_status(mut fdlist[i].handle.resource), fdd.events)
+			fdd.revents = poll_revents(resource.poll_status(mut fdlist[i].handle.resource), fdd.events, selecting)
 			if fdd.revents != 0 { ret++ }
 		}
 		if ret != 0 { return ret, 0 }
@@ -470,7 +486,7 @@ fn poll_user_fds(pagemap &memory.Pagemap, user_fds u64, mut pollfds []PollFD, nf
 	if nfds != 0 {
 		fds_ptr = unsafe { &pollfds[0] }
 	}
-	ret, err := ppoll(fds_ptr, nfds, timeout_ptr, sigmask_ptr)
+	ret, err := ppoll(fds_ptr, nfds, timeout_ptr, sigmask_ptr, false)
 	// Linux publishes revents even when a handled signal interrupts the wait.
 	// Copyout failure still takes precedence over the interrupted result.
 	if err != 0 && err != errno.eintr {

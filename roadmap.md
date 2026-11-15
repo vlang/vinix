@@ -2400,6 +2400,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   originals fail 1,296 / 1,728. Both credential cohorts retain flat storage.
   See [the copyout qualification](docs/linux-poll-copyout.md).
 
+- [x] Keep native exception-only select/pselect6 waits asleep on pipe HUP/ERR
+  while preserving relevant read/write sets and ordinary poll readiness.
+  Identical native/Linux probes cover observed finite/indefinite waits,
+  SA_RESTART, masks and low/high aliases with 5,040 AArch64 / 6,720 x86-64 checks;
+  original kernels fail 1,260 / 1,680. See
+  [the wakeup qualification](docs/linux-select-wakeups.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -213,7 +213,7 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 		if !timed {
 			// An absent timeout is an interruptible, indefinite sleep. Reuse
 			// ppoll's synchronous stack event without replacing a pselect mask.
-			return ppoll(unsafe { nil }, 0, unsafe { nil }, unsafe { nil })
+			return ppoll(unsafe { nil }, 0, unsafe { nil }, unsafe { nil }, true)
 		}
 		left := select_remaining(deadline)
 		if left.tv_sec != 0 || left.tv_nsec != 0 {
@@ -248,7 +248,7 @@ fn do_select(nfds int, readfds u64, writefds u64, exceptfds u64, timed bool, dea
 		timeout_ptr = remaining
 	}
 
-	ready, err := ppoll(unsafe { &polls[0] }, u64(polls.len), timeout_ptr, unsafe { nil })
+	ready, err := ppoll(unsafe { &polls[0] }, u64(polls.len), timeout_ptr, unsafe { nil }, true)
 	if err != 0 {
 		return ready, err
 	}
