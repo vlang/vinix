@@ -3992,3 +3992,36 @@ complete existing packaged-Wine gate on both architectures; ARM translated
 fork remains a separate prerequisite. Preserve exact source/compiler/kernel
 inputs and complete results outside Git. The queued current-CLI diagnostic is
 still selected-input evidence, not this future lifetime qualification.
+
+## Authenticated runtime version in prefix JSON, 2026-11-15
+
+Feature `6b9e3a4c6` adds `WinePrefixReview.document()` and serializes it from
+the public review, additions and migrate commands. The borrowed view retains
+format 1 and existing structural fields, adding the current admitted runtime
+manifest's `runtime_version`. Service-level freshness checks precede disclosure;
+the version is neither the application version nor inferred old-link metadata.
+No later-write authorization is retained by JSON consumers.
+
+The signed-repository host assertion suite passes without `-prod`, including
+runtime-only 1.0.0 to 2.0.0 upgrade, legacy structural JSON decoding and refusal
+after trust, policy, metadata, activation or owner-lifetime changes. Its ASan
+build also passes with leak detection disabled; this does not establish leak
+freedom. Focused three-row public CLI VJFS cut 4 passes on ARM64 (17.613 seconds)
+and x86_64 (17.937 seconds). Both require actual SIGKILL, the exact cold pending
+stage, migrate/repeat/review replies reporting 2.0.0 and every current keep
+target, fresh signed service checks, lease release, cleanup grace, clean export
+and strict e2fsck. Failure arrays are empty. No controller guard is relaxed.
+
+Complete source snapshot, generated sources, build logs, binaries and two-boot
+evidence are retained at `/Users/alex/.cache/vwwineversion-20261115-01`, based on
+`4a0c5476c` plus `source.patch`. The unchanged prerequisite artifacts come from
+`vwwinescaledcli-20261115-01`; its complete bundle remains independently required.
+The external receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-runtime-version-20261115-01.inventory.json`,
+SHA-256 `2a0bd0fb5742867a314cd7db337304ce2a1c3b76754a01890cde60a197be6091`.
+Complete inventory recording and independent comparison pass.
+
+This validates disclosure and one crash boundary per architecture using signed
+marker bytes. It does not requalify the full crash matrix, execute Wine, qualify
+real runtime upgrades/GUI/owned ARM execution, or close whole-launch lifetime,
+physical power-loss, torn-write or broader roadmap 14 acceptance requirements.
