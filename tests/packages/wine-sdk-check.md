@@ -1,6 +1,6 @@
 # Captured SDK library declaration audit
 
-This additive, read-only check runs the retained original format-3 host builder
+The historical additive, read-only CLI runs the retained original format-3 host builder
 against a host build before auditing its captured SDK stubs:
 
 ```
@@ -35,8 +35,14 @@ top-level fields, duplicate identities/fields, malformed declaration lists and
 unsafe library paths refuse. Symbol exports and symbol reexports remain opaque;
 this is not a full YAML/TAPI validator or target-specific ABI check. It does not
 establish full SDK/search closure, absence of unreported reads, sandboxed replay,
-OS shared-cache bytes or hermetic toolchain admission. Integration into required
-host receipts and a fresh signed acceptance run remain separate work.
+OS shared-cache bytes or hermetic toolchain admission.
+
+Current format-4 host receipts directly require this same graph projection as
+`sdk-graph.json`. They recompute and compare it during admission, retain alias
+and resolved source hashes/bytes, and bind the SDK implementation source through
+the host builder's embedded guard. The producer, controller and full retainer
+carry these rows through their mandatory host graphs. The standalone CLI keeps
+its original format-3 contract for historical bundles and their original checker.
 
 Production parser tests cover inline documents and twelve malformed/ambiguous
 cases. Four graph controls cover reexport omission, alias omission, source pin

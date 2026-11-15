@@ -106,13 +106,30 @@ fn check() ! {
 	for name in ['omitted-import', 'v-environment', 'c-environment', 'c-observation', 'c-argv', 'linked-receipt',
 		'input-blob', 'omitted-image', 'binary-mode', 'format', 'v-argv', 'translation-unit', 'scope',
 		'old-format', 'link-output', 'link-loads', 'link-environment', 'link-argv', 'link-extracted',
-		'link-input', 'link-namespace', 'linked-link-receipt'] {
+		'link-input', 'link-namespace', 'linked-link-receipt', 'sdk-graph', 'sdk-linked', 'sdk-input', 'old-link-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-format' {
+		if name == 'sdk-graph' {
+			file := 'sdk-graph.json'
+			os.write_file(dir + '/' + file, '{}\n')!; changed << file
+			expected = 'host SDK graph differs'
+		} else if name == 'sdk-linked' {
+			file := dir + '/sdk-graph.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'host SDK evidence must be bounded and ordinary'
+		} else if name == 'sdk-input' {
+			path := '/Library/Developer/CommandLineTools/SDKs/MacOSX27.2.sdk/usr/lib/libSystem.B.tbd'
+			if path !in proof.inputs { return error('SDK source omission fixture absent') }
+			proof.inputs.delete(path); proof.blobs.delete(path)
+			for file in ['inputs.json', 'inputs-after.json'] { os.write_file(dir + '/' + file, json2.encode(proof.inputs))!; changed << file }
+			expected = 'host observed input is absent or changed'
+		} else if name == 'old-link-format' {
+			proof.format = 3
+			expected = 'host build declaration differs'
+		} else if name == 'old-format' {
 			proof.format = 2
 			expected = 'host build declaration differs'
 		} else if name == 'link-output' {
@@ -212,7 +229,7 @@ fn check() ! {
 		passed << name
 	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline twenty-two exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline twenty-six exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

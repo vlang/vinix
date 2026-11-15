@@ -3,6 +3,7 @@
 module winesdk
 
 import os
+import json2
 import tests.packages.winelink
 import tests.packages.winesource
 
@@ -166,4 +167,35 @@ pub fn verify_sources(graph Graph) ! {
 		if os.real_path(path) != stub.resolved || os.lstat(stub.resolved)!.get_filetype() != .regular
 			|| winesource.file_digest(stub.resolved)! != stub.sha256 { return error('SDK source target or bytes differ') }
 	}
+}
+
+pub fn inputs(graph Graph) map[string]string {
+	mut result := map[string]string{}
+	for path, stub in graph.stubs {
+		result[path] = stub.sha256
+		result[stub.resolved] = stub.sha256
+	}
+	return result
+}
+
+pub fn finish_host(directory string) !Graph {
+	bytes := os.read_bytes(directory + '/link-inputs.tar')!
+	actual := graph(winelink.parse(bytes)!, bytes)!
+	verify_sources(actual)!
+	os.write_file(directory + '/sdk-graph.json', json2.encode(actual) + '\n')!
+	return actual
+}
+
+pub fn admit_host(directory string) !Graph {
+	path := directory + '/sdk-graph.json'
+	st := os.lstat(path)!
+	if st.get_filetype() != .regular || st.size < 1 || st.size > 8 * 1024 * 1024 {
+		return error('host SDK evidence must be bounded and ordinary')
+	}
+	recorded := json2.decode[Graph](os.read_file(path)!)!
+	bytes := os.read_bytes(directory + '/link-inputs.tar')!
+	actual := graph(winelink.parse(bytes)!, bytes)!
+	if recorded != actual { return error('host SDK graph differs') }
+	verify_sources(actual)!
+	return actual
 }

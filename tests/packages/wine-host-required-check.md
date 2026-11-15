@@ -1,6 +1,6 @@
 # Required Wine qualification host receipts
 
-The producer, native controller and full retainer now admit format-3 host-build
+The producer, native controller and full retainer now admit format-4 host-build
 receipts before qualification work. Build each with `wine-host-build.v`; launch
 its `program` in the original build directory. A bare or relocated executable,
 linked receipt, wrong role or unsupported format refuses before creating
@@ -14,12 +14,19 @@ and checks its role and executable hash. The producer and controller must also
 use the compiler bound by their host receipts for guest source generation.
 The original bootstrap builder remains a separately pinned input.
 
-Format 3 additionally requires captured Mach-O link/replay/load evidence for the
+Format 4 retains captured Mach-O link/replay/load evidence for the
 actual running executable. Every archive member, replay artifact and receipt
 belongs to the host output graph; the selected linker and observed ordinary
 host images belong to its input graph and byte store. Missing rows cannot be
-waived by the producer, controller or full retainer. Original format-2 checkers
+waived by the producer, controller or full retainer. Original format-2/3 checkers
 and their complete historical bundles retain their earlier contract.
+
+It also requires `sdk-graph.json`, recomputed SDK stub identities and declared
+reexport coverage. Both alias and resolved source paths/hashes must appear in
+the host input map and retained byte store. The SDK projector source is embedded
+and pinned with the other admission modules. Every qualification role rechecks
+the graph before work, and both producer/controller graphs are rechecked after
+the guest. Full SDK/TAPI/ABI/search and loader admission remain separate gates.
 
 Prepared builds contain `host-producer.json`; native runs contain
 `host-controller.json`. Each binds the host receipt hash, directory, compiler,
@@ -40,7 +47,7 @@ alter its receipt hash or omit a host artifact input. The real controller must
 refuse each before signing/build output; an empty requested directory is allowed.
 Producer host admission runs before signing and is repeated after the guest.
 
-The full owned-retention runner now requires fifty-one refusals after real and
+The full owned-retention runner now requires fifty-three refusals after real and
 unchanged copied baselines. Five host-binding cases change producer/controller
 binding hashes, omit host receipt rows from their input maps or link the native
 binding record. All mutation writes target private copies. Existing 44 cases
@@ -49,7 +56,9 @@ Two additional cases omit the producer's host-link receipt or the controller's
 host-link archive from retained input maps. `wine-owned-retain-check.v` accepts
 `--host-link-only` after its normal arguments to run those two cases with both
 baselines, allowing an incremental check alongside a completed original matrix.
-Alternatively `--partition=0/4` through `--partition=3/4` divide all 51 cases
+Two further cases omit the SDK graph from producer/controller input maps;
+`--host-sdk-only` runs these with both baselines.
+Alternatively `--partition=0/4` through `--partition=3/4` divide all 53 cases
 without weakening either baseline. Use a separate output directory for each;
 `wine-retention-partitions-check.v PREFIX` verifies their exact assigned case
 lists, both baselines and complete unique coverage from `PREFIX0` through `PREFIX3`.

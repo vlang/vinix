@@ -42,6 +42,14 @@ ordinary replay host images are mandatory retained input rows. Shared
 log namespace, captured member hashes, safe reported loads and both executable
 hashes. The running role uses the executable verified by this replay.
 
+Format 4 additionally requires `sdk-graph.json`, checking captured SDK stubs
+against current resolved ordinary sources and declared library reexports across
+all targets. The exact graph must match recomputation; source alias and resolved
+target hashes belong to the input map and byte store. Linked graph records,
+forged graphs, omitted SDK source pins and old format-3 receipts refuse. This is
+the bounded declaration projection described in [the SDK audit](wine-sdk-check.md),
+with symbols opaque and full ABI/search/loader admission still unqualified.
+
 Read-only `check` verifies the fixed profile and original namespace, source
 dumps, V input pins, raw/decoded image records, environments, C command/include
 proofs, complete resource-header snapshot, required input rows, all retained
@@ -52,20 +60,21 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires twenty-two exact resealed refusals. Cases cover omitted parsed
+then requires twenty-six exact resealed refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
 private copy. Nine further cases cover old host format, changed replay output,
 load map, replay environment/argv, extracted bytes, omitted linker input,
 changed link namespace and a linked link receipt. Expected failures use explicit
-checks under `-prod`.
+checks under `-prod`. Four further cases cover changed/linked SDK graphs,
+omitted resolved SDK source input and the old link-only host format.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 3
+The [required host receipt boundary](wine-host-required-check.md) uses format 4
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2 bundles and their original
+retainer also retains its own graph. Original format-1/2/3 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
