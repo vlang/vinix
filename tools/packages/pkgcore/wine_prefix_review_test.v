@@ -180,6 +180,70 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	mut closed := false
 	next_owner.document() or { closed = err.msg().contains('closed or lacks service admission') }
 	assert closed
+
+	// A reviewed package rollback restores version 1 into a NEW generation.
+	// Prefix bindings still name version 2, including its newly added builtin.
+	os.write_file(data + '/sentinel', 'private data survives runtime rollback')!
+	os.write_file(system + '/personal.txt', 'personal system32 contents')!
+	mut rollback_review := service.review('rollback', [])!
+	defer { rollback_review.close() }
+	mut rolled := service.rollback(rollback_review.fingerprint)!
+	defer { rolled.close() }
+	assert rolled.generation > upgraded.generation
+	assert rolled.previous == upgraded.generation
+	mut rollback_prepared := service.prepare_launch('app')!
+	defer { rollback_prepared.close() }
+	verify_launch_payloads(rollback_prepared.config, rollback_prepared.directory, rollback_prepared.state, 'app')!
+	rollback_index := wine_runtime_index(rollback_prepared.state, 'app')!
+	mut rollback_admission := WineAdmission{generation: rollback_prepared.state.generation,
+		runtime: rollback_prepared.state.packages[rollback_index].package, prepared: rollback_prepared}
+	rollback_prepared = PreparedLaunch{}
+	defer { rollback_admission.close() }
+	assert rollback_admission.runtime.version == '1.0.0'
+	mut obsolete_refused := false
+	if mut unexpected := rollback_admission.capture_prefix(data) {
+		unexpected.close()
+	} else { obsolete_refused = err.msg().contains('package-generation link absent from the selected builtin inventory') }
+	assert obsolete_refused
+	assert os.readlink(system + '/kernel32.dll')! == target + '/kernel32.dll'
+	assert os.readlink(system + '/new.dll')! == target + '/new.dll'
+	assert os.read_file(data + '/sentinel')! == 'private data survives runtime rollback'
+	// Explicit fixture-owner cleanup of the known fixture-only builtin. The
+	// production review must never delete obsolete or personal entries itself.
+	os.rm(system + '/new.dll')!
+	mut rollback_owner := WinePrefixReview{admission: rollback_admission,
+		review: rollback_admission.capture_prefix(data)!, root: root.clone(), application: 'app'}
+	rollback_admission = WineAdmission{}
+	defer { rollback_owner.close() }
+	rollback_document := rollback_owner.document()!
+	assert rollback_document.generation == rolled.generation
+	assert rollback_document.prior_generation == upgraded.generation
+	assert rollback_document.runtime_version == '1.0.0'
+	assert rollback_document.bindings.len == 1 && rollback_document.bindings[0].operation == .replace
+	for stale in [installed.generation, upgraded.generation] {
+		mut stale_refused := false
+		rollback_owner.migrate_bindings_at(stale) or {
+			stale_refused = err.msg().contains('generation differs from requested generation')
+		}
+		assert stale_refused
+		mut stale_additions_refused := false
+		rollback_owner.complete_additions_at(stale) or {
+			stale_additions_refused = err.msg().contains('generation differs from requested generation')
+		}
+		assert stale_additions_refused
+		assert os.readlink(system + '/kernel32.dll')! == target + '/kernel32.dll'
+	}
+	rollback_owner.migrate_bindings_at(rolled.generation)!
+	rollback_owner.migrate_bindings_at(rolled.generation)!
+	rollback_owner.complete_additions_at(rolled.generation)!
+	final_document := rollback_owner.document()!
+	assert final_document.runtime_version == '1.0.0' && final_document.prior_generation == 0
+	assert final_document.bindings.len == 1 && final_document.bindings[0].operation == .keep
+	assert os.read_file(system + '/kernel32.dll')! == 'signed fixture builtin'
+	assert os.readlink(system + '/kernel32.dll')! == final_document.bindings[0].replacement
+	assert !os.exists(system + '/new.dll')
+	assert os.read_file(system + '/personal.txt')! == 'personal system32 contents'
+	assert os.read_file(data + '/sentinel')! == 'private data survives runtime rollback'
 }
 
 fn wine_review_collect(store string) ! {

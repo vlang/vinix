@@ -2062,6 +2062,16 @@ Without the option the commands retain their current-generation behavior.
 This pins the selected generation only: prefix contents must still pass fresh
 checks, and no previously observed link set or old runtime version is authorized.
 
+A package rollback restores the old runtime version into a new generation.
+Obtain a fresh prefix review and use its generation for pinned writes; the
+original generation number for that version is stale. If the newer runtime
+introduced builtin links absent from the restored inventory, review refuses
+and preserves them. An owner must inspect those entries before explicitly
+removing known obsolete links; migration never deletes personal or unknown data.
+The signed-repository host regression covers this package/prefix workflow with
+marker payloads, including stale pins and preserved private files. It does not
+establish compatibility of an actual Wine prefix across runtime downgrades.
+
 `WinePrefixReview.complete_additions()` is an explicit library write operation
 for additions-only captures. It retains package reader/lease and prefix guards,
 rechecks service admission, refuses any existing link needing replacement, and
