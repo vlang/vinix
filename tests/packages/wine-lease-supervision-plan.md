@@ -4211,3 +4211,35 @@ does not turn either earlier result into PASS. It relocates the same Wine engine
 bytes between package generations. Actual engine-version compatibility, fresh
 owned GUI, owned ARM, holder-death retention, power-loss, ABI/hermetic closure,
 default activation and broader roadmap 14 acceptance remain open.
+
+## Strict replay verdict and verified result publication, 2026-11-15
+
+Fix `2a04a9513` closes two replay acceptance gaps: success markers could win
+before checking the deadline, and a passing result was written before final
+input verification. The observer now requires each exact marker line once,
+refuses duplicate/quoted/partial substitutes and forbidden output, and accepts
+only strictly before the unchanged 900-second boundary. CRLF remains supported.
+VM executable/firmware hashes must be present before boot. Raw observations go
+to `guest-outcome.json`; `result.json` is published only after input verification
+and `inputs-verified.json`. Failed re-verification cannot publish a passing result.
+
+Debug/manualfree verdict assertions and ASan (leak detection disabled) pass.
+Boundary cases include just before, at and after the deadline, missing and
+duplicate markers, quoted/partial lines, forbidden output and retired guests.
+Five production/manualfree synthetic host controls pass: acceptance, forbidden
+output, post-boot input mutation, missing VM hashes and altered VM memory. The
+mutation control emits all success lines but changes firmware, and must retain
+raw guest success while producing neither verified inputs nor a final result.
+The preflight controls refuse before output creation. The host controls execute
+a V fixture instead of Wine or QEMU. The existing real 576.498-second replay's
+serial still passes the stricter verdict; this is read-only trace compatibility,
+not a new VM/runtime qualification.
+
+Complete evidence is retained at `/Users/alex/.cache/vwreplayverdict-20261115-01`,
+with isolated base `39f8f6cf7` plus `source.patch`. The external receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-replay-verdict-20261115-01.inventory.json`,
+SHA-256 `82709754885e937a75888137474b2d5f1b2b8bf8fb8aa64c2a7c75e5a15c0f7f`.
+Complete inventory recording and independent comparison pass. The original
+`vwrealpins-20261115-01` bundle and its receipt remain independently required
+and unchanged. No historical audit is weakened and prior failures stay failed;
+broader roadmap 14 runtime, GUI, ARM and lifetime gates remain open.
