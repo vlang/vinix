@@ -6,6 +6,8 @@ PATH, locale, timezone and source epoch, private HOME/TMPDIR directories, and
 and loader injection settings are not inherited. The separate
 [V source-generation boundary](wine-v-host-check.md) now covers selected V-to-C
 children. Controller builds and other host tools remain outside this contract.
+The separate optional [host build profile](wine-host-build.md) now admits its
+V/C children and selected image bytes without claiming Mach-O link replay.
 
 Before the first managed command in a build, both pinned tools run `--version`
 under that environment. Their observed image identities are merged and the

@@ -213,6 +213,20 @@ pub fn admit_link(directory string, recorded string) ! {
 	admit_names(directory, recorded, ['c-discover.log', 'cc.log', 'link-version.log', 'link-replay.log'])!
 }
 
+// Host Mach-O builds admit observed C children without claiming ELF replay.
+pub fn admit_c(directory string, recorded string) ! {
+	admit_names(directory, recorded, ['clang-resource.log', 'c-discover.log', 'cc.log'])!
+}
+
+pub fn c_artifacts() []string {
+	mut result := ['host-images-before.json']
+	for name in ['host-clang-version.log', 'host-linker-version.log'] { result << [name, name + '.argv.json'] }
+	for name in ['host-clang-version.log', 'host-linker-version.log', 'clang-resource.log', 'c-discover.log', 'cc.log'] {
+		for suffix in ['.environment.json', '.dyld.log', '.images.json'] { result << name + suffix }
+	}
+	return result
+}
+
 pub fn admit_build(directory string, recorded string) ! {
 	admit_names(directory, recorded, ['clang-resource.log', 'c-discover.log', 'cc.log', 'link-version.log', 'link-replay.log'])!
 }

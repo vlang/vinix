@@ -43,6 +43,10 @@ metadata-only: shared-cache and loader bytes are unadmitted. This is not a
 complete hermetic toolchain qualification. Historical complete inputs and
 original verifiers remain required. Product defaults, owned ARM/GUI and broader
 roadmap 14 acceptance are unchanged.
+An optional [host executable builder and verifier](wine-host-build.md) now
+extends the selected V/C and image checks to host controller/producer builds;
+their complete linker/library closure and mandatory workflow integration remain
+separate gates.
 
 The x86 checkpoint is `/Users/alex/.cache/vwvcompiler-20261115-01`, from isolated
 base `333a49ad3`. Production/manual-free module controls, fresh PE/runtime and
