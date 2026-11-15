@@ -3,9 +3,12 @@ module g13contract
 
 fn check_binary_wait_contract(local string, reference string) ! {
 	create := section(local, 'fn ioctl_syncobj_create(', 'fn create_prime_fd(', 'Vinix binary syncobj creation')!
-	require_order(create, ['syncobj.new_syncobj(', 'if request.flags & ioctl.drm_syncobj_create_signaled != 0 {',
-		'syncobj.new_fence(', 'syncobj.signal(fence)', 'syncobj.replace_fence(obj, fence)'], 'Vinix empty versus signaled creation')!
-	require(create.count('syncobj.new_fence(') == 1, 'Only signaled creation installs a fence')!
+	require_order(create, ['request.flags & ~ioctl.drm_syncobj_create_signaled', 'return -22',
+		'syncobj.new_syncobj_with_flags(u64(handle),',
+		'request.flags & ioctl.drm_syncobj_create_signaled != 0) or { return -12 }',
+		'request.handle = obj.handle'], 'Vinix empty versus signaled creation')!
+	require(!create.contains('syncobj.new_fence(') && !create.contains('syncobj.replace_fence('),
+		'Initial completion must be installed before handle publication')!
 	wait := section(local, 'fn ioctl_syncobj_wait(', 'fn ioctl_syncobj_reset(', 'Vinix binary syncobj wait')!
 	flags := section(wait, 'known_flags :=', 'if request.count_handles == 0', 'Vinix binary wait flags')!
 	require(flags.contains('ioctl.drm_syncobj_wait_all') && flags.contains('ioctl.drm_syncobj_wait_for_submit')

@@ -78,9 +78,9 @@ pub fn run_signal_checks() {
 			for obj in [a, b, c]! { syncobj.replace_fence(obj, old) }
 			time.reset(); usercopy.allow(request.handles, sizeof(handles))
 			memory.fail_in(failed_index)
-			before := memory.outstanding()
+			before := memory.fence_count()
 			assert ioctl_syncobj_signal(voidptr(11), &request) == -12; checks++
-			assert usercopy.reads == 1 && memory.outstanding() == before + failed_index
+			assert usercopy.reads == 1 && memory.fence_count() == before + failed_index
 			for index, obj in [a, b, c]! {
 				if index < failed_index { check_stub(current(obj), 1000) }
 				else { assert voidptr(current(obj)) == voidptr(old) }
@@ -141,7 +141,7 @@ pub fn run_signal_checks() {
 			assert sched.polls == if mode == 1 { u32(1) } else { u32(2) }
 		}
 		// Both exact identities are captured before an effect destroys/reuses b
-		// and mutates the original user handles. Reset only the first head now.
+		// and mutates user handles. The second target must keep its old identity.
 		signal_fixture_other = b; signal_fixture_handles = unsafe { &handles[0] }
 		handles = [a.handle, b.handle, c.handle]!
 		request.handles = unsafe { u64(&handles[0]) }; request.count_handles = 2
@@ -169,8 +169,8 @@ pub fn run_signal_checks() {
 		mut request := ioctl.DrmSyncobjArray{ handles: unsafe { u64(&handles[0]) }, count_handles: count }
 		usercopy.allow(request.handles, u64(count) * 4)
 		assert ioctl_syncobj_signal(voidptr(11), &request) == 0; checks++
-		assert memory.outstanding() == int(count)
-		assert memory.live_bytes() == u64(count) * sizeof(syncobj.DmaFence)
+		assert memory.outstanding() == 0 && memory.fence_count() == int(count)
+		assert memory.live_bytes() == 0 && memory.fence_bytes() == u64(count) * sizeof(syncobj.DmaFence)
 		assert usercopy.reads == 1 && !syncobj.is_signaled(old)
 		check_stub(current(a), 1000)
 		finish_signal_cycle()
@@ -183,11 +183,11 @@ pub fn run_signal_checks() {
 		usercopy.allow(request.handles, sizeof(handles)); memory.fail_in(failed_index)
 		assert ioctl_syncobj_signal(voidptr(11), &request) == -12; checks++
 		published := if failed_index == 0 { 0 } else { failed_index - 1 }
-		assert memory.outstanding() == published
+		assert memory.outstanding() == 0 && memory.fence_count() == published
 		if published == 0 { assert voidptr(current(a)) == voidptr(old) }
 		else { check_stub(current(a), 1000) }
 		assert usercopy.reads == if failed_index == 0 { 0 } else { 1 }
-		assert memory.live_bytes() == u64(published) * sizeof(syncobj.DmaFence)
+		assert memory.live_bytes() == 0 && memory.fence_bytes() == u64(published) * sizeof(syncobj.DmaFence)
 		finish_signal_cycle()
 	}
 	for fault in 0 .. 3 {

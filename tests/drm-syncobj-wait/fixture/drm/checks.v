@@ -7,6 +7,7 @@ import drm.syncobj
 import sched
 import usercopy
 import proc
+import memory
 
 __global wait_fixture_objects [32]&syncobj.SyncObj
 __global wait_fixture_fences [32]&syncobj.DmaFence
@@ -109,7 +110,9 @@ fn clear() {
 	for i in 0 .. wait_fixture_object_count { syncobj.free_object_metadata_for_checks(wait_fixture_objects[i]); wait_fixture_objects[i] = unsafe { nil } }
 	for i in 0 .. wait_fixture_fence_count {
 		fence := wait_fixture_fences[i]
-		unsafe { fence.waiters.free(); free(fence) }
+		unsafe { fence.waiters.free() }
+		if memory.owns(voidptr(fence)) { memory.free(voidptr(fence)) }
+		else { unsafe { free(fence) } }
 		wait_fixture_fences[i] = unsafe { nil }
 	}
 	wait_fixture_object_count = 0; wait_fixture_fence_count = 0
@@ -119,6 +122,7 @@ fn clear() {
 }
 
 pub fn run_wait_checks() {
+	memory.configure_metadata(sizeof(syncobj.SyncObj), sizeof(syncobj.DmaFence))
 	syncobj.run_capture_checks()
 	for _ in 0 .. 200 {
 		proc.reset()

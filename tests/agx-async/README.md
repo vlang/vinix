@@ -32,6 +32,9 @@ must leave no pending-node allocation, job record or file/VM pin behind.
 
 Node allocations and callback counts are measured independently of the
 sync-object implementation's existing retained fence/object allocations.
+The allocator explicitly records syncobj metadata apart from job fault positions
+and live-node counts. Fallible CREATE and unpublished cleanup are exercised by
+`tests/drm-syncobj-wait`; submission fault injection still targets job storage.
 These checks validate ownership and host scheduling; native execution and
 the modern flat-command ABI remain separate acceptance work.
 

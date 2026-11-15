@@ -48,8 +48,16 @@ captures across replacement and handle reuse. The injected allocator counts
 retained fence bytes separately from temporary request storage. Fixture-only
 retirement frees those completions after all users and objects are gone;
 production still retains published fence metadata. Ordinary first completion
-timestamps survive later success/error attempts. Signaled CREATE still uses
-its existing allocation path; its fallibility is separate work.
+timestamps survive later success/error attempts.
+
+CREATE cases inject both object/stub allocation failures, nested creation at
+allocation failure and immediately before namespace publication, and actual
+global-table/per-file handle exhaustion. Every failed request preserves its
+output and existing object identities. Metadata-free hooks verify the namespace
+lock is released and no published object/head points into the retiring region.
+The allocator tracks object metadata, fence metadata and temporary request
+storage separately. After all synchronous consumers finish, fixture cleanup
+drops namespaces and frees metadata; production retains published metadata.
 
 These deterministic interleavings do not exercise actual kernel threads, GPU
 execution or kernel heap usage. Vinix still polls through its scheduler; Linux

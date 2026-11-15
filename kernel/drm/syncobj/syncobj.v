@@ -7,6 +7,7 @@ module syncobj
 
 import klock
 import katomic
+import memory
 import sched
 import time
 
@@ -198,8 +199,30 @@ fn handle_in_use_locked(owner u64, handle u32) bool {
 // Allocate a sync object in one DRM open-file namespace. Different opens may
 // receive the same numeric handle, but never resolve each other's objects.
 pub fn new_syncobj(owner u64) ?&SyncObj {
+	return new_syncobj_with_flags(owner, false)
+}
+
+// Complete private initialization before making the object reachable by a
+// guessed handle. Only unpublished allocations may be freed on failure;
+// published metadata keeps the existing lifetime for in-flight snapshots.
+pub fn new_syncobj_with_flags(owner u64, signaled bool) ?&SyncObj {
 	if owner == 0 {
 		return none
+	}
+	allocation := memory.malloc_packed_fallible(sizeof(SyncObj))
+	if allocation == unsafe { nil } { return none }
+	mut obj := unsafe { &SyncObj(allocation) }
+	unsafe { *obj = SyncObj{ owner: owner } }
+	mut published := false
+	defer {
+		if !published {
+			// This fresh private stub has never had waiters or other holders.
+			if obj.fence != unsafe { nil } { memory.free(voidptr(obj.fence)) }
+			memory.free(allocation)
+		}
+	}
+	if signaled {
+		obj.fence = new_private_stub(now_ns()) or { return none }
 	}
 	syncobj_lock.acquire()
 	defer {
@@ -229,11 +252,8 @@ pub fn new_syncobj(owner u64) ?&SyncObj {
 		return none // table exhausted
 	}
 
-	mut obj := &SyncObj{
-		handle: handle
-		owner: owner
-	}
-
+	obj.handle = handle
+	published = true
 	syncobj_table[slot] = obj
 	return obj
 }

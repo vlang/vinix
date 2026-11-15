@@ -833,12 +833,8 @@ fn ioctl_syncobj_create(handle voidptr, data voidptr) int {
 	if request.flags & ~ioctl.drm_syncobj_create_signaled != 0 {
 		return -22
 	}
-	obj := syncobj.new_syncobj(u64(handle)) or { return -12 }
-	if request.flags & ioctl.drm_syncobj_create_signaled != 0 {
-		fence := syncobj.new_fence(0, 0)
-		syncobj.signal(fence)
-		syncobj.replace_fence(obj, fence)
-	}
+	obj := syncobj.new_syncobj_with_flags(u64(handle),
+		request.flags & ioctl.drm_syncobj_create_signaled != 0) or { return -12 }
 	request.handle = obj.handle
 	return 0
 }

@@ -3,9 +3,27 @@
 module syncobj
 
 import klock
+import memory
 
 pub fn assert_private_stub_for_checks(fence &DmaFence) {
 	assert fence.queue_context == 0 && fence.waiters.len == 0
+}
+
+pub fn before_namespace_lock_for_checks(callback fn ()) {
+	klock.before_once(unsafe { &syncobj_lock }, callback)
+}
+
+pub fn assert_unpublished_allocation_for_checks(allocation voidptr, size u64) {
+	assert !syncobj_lock.is_held(), 'unpublished cleanup must follow namespace unlock'
+	syncobj_lock.acquire()
+	for obj in syncobj_table {
+		if obj == unsafe { nil } { continue }
+		for address in [u64(obj), u64(obj.fence)]! {
+			assert address < u64(allocation) || address - u64(allocation) >= size,
+				'freeing metadata still reachable through a published handle'
+		}
+	}
+	syncobj_lock.release()
 }
 
 __global capture_check_object &SyncObj = unsafe { nil }
@@ -35,7 +53,8 @@ pub fn assert_pending_captures_for_checks(obj &SyncObj, expected int) {
 pub fn free_object_metadata_for_checks(obj &SyncObj) {
 	assert_no_captures_for_checks(obj)
 	// Fixture-only disposal after namespace removal and all synchronous users.
-	unsafe { obj.timeline_points.free(); free(obj) }
+	unsafe { obj.timeline_points.free() }
+	memory.free(voidptr(obj))
 }
 
 pub fn assert_no_capture_in_region_for_checks(obj &SyncObj, allocation voidptr, size u64) {
