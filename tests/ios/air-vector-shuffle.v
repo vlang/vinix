@@ -117,7 +117,7 @@ fn run_batch(assembler_path string, out string, element int) !Counts {
   signature := if guard == 'argument' { '<2 x ${t}> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
-   'load' { '%v = load <2 x ${t}>, ptr %src, align 1\n %z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
+   'load' { '%v = load volatile <2 x ${t}>, ptr %src, align 1\n %z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }
    'freeze_wide_select' { '%selected = select <17 x i1> zeroinitializer, <17 x ${t}> zeroinitializer, <17 x ${t}> poison\n %v = freeze <17 x ${t}> %selected\n %z = shufflevector <17 x ${t}> %v, <17 x ${t}> poison, <1 x i32> zeroinitializer' }
    'wide_select' { '%v = select <17 x i1> zeroinitializer, <17 x ${t}> zeroinitializer, <17 x ${t}> poison\n %z = shufflevector <17 x ${t}> %v, <17 x ${t}> poison, <1 x i32> zeroinitializer' }
    'phi' { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %z = shufflevector <2 x ${t}> %v, <2 x ${t}> poison, <1 x i32> zeroinitializer' }

@@ -181,7 +181,7 @@ fn controls(assembler_path string, out string) ! {
   sig := if guard == 'argument' { '<2 x i8> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%n = zext <2 x i8> %v to <2 x i16>' }
-   'load' { '%v = load <2 x i8>, ptr %src\n %n = zext <2 x i8> %v to <2 x i16>' }
+   'load' { '%v = load volatile <2 x i8>, ptr %src\n %n = zext <2 x i8> %v to <2 x i16>' }
    'phi' { 'br label %body\n body: %v = phi <2 x i8> [zeroinitializer, %entry]\n %n = zext <2 x i8> %v to <2 x i16>' }
    'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold: %n = zext <17 x i8> zeroinitializer to <17 x i16>' }
    'scalable' { '%n = zext <vscale x 2 x i8> zeroinitializer to <vscale x 2 x i16>' }

@@ -184,7 +184,7 @@ fn controls(assembler_path string, out string) ! {
   signature := if guard == 'argument' { '<2 x i32> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%n = uitofp <2 x i32> %v to <2 x float>' }
-   'load' { '%v = load <2 x i32>, ptr %src\n %n = sitofp <2 x i32> %v to <2 x half>' }
+   'load' { '%v = load volatile <2 x i32>, ptr %src\n %n = sitofp <2 x i32> %v to <2 x half>' }
    'phi' { 'br label %body\n body: %v = phi <2 x i32> [zeroinitializer, %entry]\n %n = uitofp <2 x i32> %v to <2 x float>' }
    'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold: %n = sitofp <17 x i32> zeroinitializer to <17 x float>' }
    'scalable' { '%n = uitofp <vscale x 2 x i32> zeroinitializer to <vscale x 2 x float>' }

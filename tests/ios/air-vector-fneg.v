@@ -196,7 +196,7 @@ fn focused_controls(assembler_path string, out string) ! {
     'scalable' { '%n = fneg <vscale x 2 x ${t}> zeroinitializer' }
     'double' { '%n = fneg <2 x double> zeroinitializer' }
     'argument' { '%n = fneg <2 x ${t}> %v' }
-    'load' { '%v = load <2 x ${t}>, ptr %src, align 1\n %n = fneg <2 x ${t}> %v' }
+    'load' { '%v = load volatile <2 x ${t}>, ptr %src, align 1\n %n = fneg <2 x ${t}> %v' }
     else { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %n = fneg <2 x ${t}> %v' }
    }
    s.write_string('define void @guard_${guard}_${element}(${signature}) { entry: store i8 17, ptr %out, align 1\n ${body}\n ret void }\n')

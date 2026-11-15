@@ -106,7 +106,8 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	return IRMemoryAccess{argument: base.argument, offset: offset}, extent
 }
 // Narrow execution profile: an ordinary void function, pointer arguments,
-// forward branches/switches/PHIs, scalar loads/stores, literal GEPs, scalar binary operations,
+// forward branches/switches/PHIs, scalar and byte-aligned vector loads/stores,
+// literal GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, resolved pointer
 // PHIs/selects/freezes/bitcasts, checked overflow pairs with field
 // extraction/insertion/freeze/select, nonvolatile constant-length memory intrinsics
@@ -368,7 +369,21 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		access := p.memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
 		accesses[index - s.instructions_start] = access
 		binding := access.argument
-		bits := p.execution_bits(op.source_type, true)!; bytes := u64((bits + 7) / 8)
+		bits, lanes := p.memory_value_shape(op.source_type)!
+		vector := p.types[op.source_type].kind == .vector_t
+		bytes := u64((bits + 7) / 8) * u64(lanes)
+		if vector {
+			if op.opcode != 0 || op.indices_count != 0 { return error('AIR memory execution: vector access metadata') }
+			if code == 20 {
+				if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
+				if lanes > max_integer_execution_steps - vector_work { return error('AIR vector: constant lane work limit') }
+				vector_results++
+				vector_work += lanes
+			} else {
+				vector_work += p.vector_source_profile(stream, pools, bodies, scope, index,
+					p.operands[op.operands_start + 1], true, max_integer_execution_steps - vector_work)!
+			}
+		}
 		if op.alignment == 0 || op.alignment & (op.alignment - 1) != 0 || access.offset % op.alignment != 0 || bytes > u64(64 * 1024 * 1024) - access.offset || (code != 20 && (arguments[binding].address_space == 2 || p.types[p.operands[op.operands_start].type_index].address_space == 2)) { return error('AIR memory execution: alignment/address space/extent') }
 		if op.alignment > arguments[binding].alignment { arguments[binding].alignment = op.alignment }
 		if access.offset + bytes > arguments[binding].minimum_size { arguments[binding].minimum_size = access.offset + bytes }
@@ -489,7 +504,19 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 			}
 			if code in [u64(4), 30, 43]! { continue }
 			access := profile.accesses[index - s.instructions_start]; binding := access.argument
-			bits := p.execution_bits(op.source_type, true)!; bytes := int((bits + 7) / 8); offset := int(bindings[binding].offset + access.offset)
+			bits, lanes := p.memory_value_shape(op.source_type)!
+			bytes := int((bits + 7) / 8) * lanes
+			offset := int(bindings[binding].offset + access.offset)
+			if p.types[op.source_type].kind == .vector_t {
+				if code == 20 {
+					value := loaded_memory_vector(bindings[binding].data[offset..offset + bytes], bits, lanes)!
+					m.put(inst, m.store_vector_value(inst, value)!)
+				} else {
+					value := m.read_vector(stream, p.operands[op.operands_start + 1])!
+					stored_memory_vector(mut bindings[binding].data[offset..offset + bytes], value, bits, lanes)!
+				}
+				continue
+			}
 			if code == 20 {
 				mut value := u64(0); for i in 0 .. bytes { value |= u64(bindings[binding].data[offset + i]) << u32(i * 8) }
 				m.put(inst, IntegerValue{value: value & constant_mask(bits)})

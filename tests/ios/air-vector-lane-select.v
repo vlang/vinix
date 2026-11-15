@@ -132,7 +132,7 @@ fn run_batch(assembler_path string, out string, element int) !Counts {
   signature := if guard == 'argument' { '<2 x ${t}> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
-   'load' { '%v = load <2 x ${t}>, ptr %src, align 1\n %s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
+   'load' { '%v = load volatile <2 x ${t}>, ptr %src, align 1\n %s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
    'phi' { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
    'wide_condition' { '%s = select <17 x i1> zeroinitializer, <17 x ${t}> zeroinitializer, <17 x ${t}> poison' }
    'wide', 'coldwide' { '${if guard == 'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold:' } else { '' }} %s = select i1 true, <17 x ${t}> zeroinitializer, <17 x ${t}> poison' }
@@ -227,7 +227,7 @@ fn lane_controls(assembler_path string, out string) ! {
   s.write_string('define void @${mode}_${lane}(ptr %out) { store i8 17, ptr %out, align 1\n ${pre}%s = select <4 x i1> ${condition}, <4 x i32> <i32 11, i32 poison, i32 33, i32 undef>, <4 x i32> <i32 poison, i32 22, i32 undef, i32 44>\n ${rest} ret void }\n')
  } }
  // Each is valid LLVM IR, but the whole profile must reject these condition sources.
- s.write_string('define void @guard_argument(<4 x i1> %c, ptr %out) { store i8 17, ptr %out\n %v = select <4 x i1> %c, <4 x i32> zeroinitializer, <4 x i32> poison\n ret void }\n define void @guard_load(ptr %src, ptr %out) { store i8 17, ptr %out\n %c = load <4 x i1>, ptr %src\n %v = select <4 x i1> %c, <4 x i32> zeroinitializer, <4 x i32> poison\n ret void }\n define void @guard_phi(ptr %out) { entry: store i8 17, ptr %out\n br label %body\n body: %c = phi <4 x i1> [zeroinitializer, %entry]\n %v = select <4 x i1> %c, <4 x i32> zeroinitializer, <4 x i32> poison\n ret void }\n define void @guard_cold(ptr %out) { store i8 17, ptr %out\n br i1 true, label %done, label %cold\n done: ret void\n cold: %v = select <17 x i1> zeroinitializer, <17 x i32> zeroinitializer, <17 x i32> poison\n ret void }\n')
+ s.write_string('define void @guard_argument(<4 x i1> %c, ptr %out) { store i8 17, ptr %out\n %v = select <4 x i1> %c, <4 x i32> zeroinitializer, <4 x i32> poison\n ret void }\n define void @guard_load(ptr %src, ptr %out) { store i8 17, ptr %out\n %c = load volatile <4 x i1>, ptr %src\n %v = select <4 x i1> %c, <4 x i32> zeroinitializer, <4 x i32> poison\n ret void }\n define void @guard_phi(ptr %out) { entry: store i8 17, ptr %out\n br label %body\n body: %c = phi <4 x i1> [zeroinitializer, %entry]\n %v = select <4 x i1> %c, <4 x i32> zeroinitializer, <4 x i32> poison\n ret void }\n define void @guard_cold(ptr %out) { store i8 17, ptr %out\n br i1 true, label %done, label %cold\n done: ret void\n cold: %v = select <17 x i1> zeroinitializer, <17 x i32> zeroinitializer, <17 x i32> poison\n ret void }\n')
  data := assemble(assembler_path, out, s.str())!; verify(data)!; stream := airbitcode.parse(data)!; defer { stream.free() }; ir := stream.ir_module(data)!; defer { ir.free() }; pools := ir.constant_pools(stream)!; defer { pools.free() }; bodies := ir.function_bodies(stream, pools)!; defer { bodies.free() }; mut p := ir.typed_operands(stream, pools, bodies)!; defer { p.free() }
  mut checks := 0
  for mode in modes { for lane in 0 .. 5 {

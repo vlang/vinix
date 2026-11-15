@@ -118,7 +118,7 @@ fn run_batch(assembler_path string, out string, element int) !Counts {
   signature := if guard == 'argument' { '<2 x ${t}> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
-   'load' { '%v = load <2 x ${t}>, ptr %src, align 1\n %s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
+   'load' { '%v = load volatile <2 x ${t}>, ptr %src, align 1\n %s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
    'phi' { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %s = select i1 true, <2 x ${t}> zeroinitializer, <2 x ${t}> %v' }
    'wide_condition' { '%s = select <17 x i1> zeroinitializer, <17 x ${t}> zeroinitializer, <17 x ${t}> poison' }
    'wide', 'coldwide' { '${if guard == 'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold:' } else { '' }} %s = select i1 true, <17 x ${t}> zeroinitializer, <17 x ${t}> poison' }

@@ -216,7 +216,7 @@ fn controls(assembler_path string, out string) !int {
   signature := if guard == 'argument' { '<2 x float> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%n = fptoui <2 x float> %v to <2 x i32>' }
-   'load' { '%v = load <2 x half>, ptr %src\n %n = fptosi <2 x half> %v to <2 x i64>' }
+   'load' { '%v = load volatile <2 x half>, ptr %src\n %n = fptosi <2 x half> %v to <2 x i64>' }
    'phi' { 'br label %body\n body: %v = phi <2 x float> [zeroinitializer, %entry]\n %n = fptoui <2 x float> %v to <2 x i32>' }
    'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold: %n = fptosi <17 x half> zeroinitializer to <17 x i32>' }
    'scalable' { '%n = fptoui <vscale x 2 x float> zeroinitializer to <vscale x 2 x i32>' }

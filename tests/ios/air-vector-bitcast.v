@@ -171,7 +171,7 @@ fn controls(assembler_path string, out string) ! {
   signature := if guard == 'argument' { '<2 x i16> %v, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
   body := match guard {
    'argument' { '%n = bitcast <2 x i16> %v to <2 x half>' }
-   'load' { '%v = load <2 x i16>, ptr %src\n %n = bitcast <2 x i16> %v to <2 x half>' }
+   'load' { '%v = load volatile <2 x i16>, ptr %src\n %n = bitcast <2 x i16> %v to <2 x half>' }
    'phi' { 'br label %body\n body: %v = phi <2 x i16> [zeroinitializer, %entry]\n %n = bitcast <2 x i16> %v to <2 x half>' }
    'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold: %n = bitcast <17 x i16> zeroinitializer to <17 x half>' }
    'scalable' { '%n = bitcast <vscale x 2 x i16> zeroinitializer to <vscale x 2 x half>' }

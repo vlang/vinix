@@ -222,7 +222,7 @@ fn focused_controls(assembler_path string, out string) ! {
     'scalable' { '%n = fadd <vscale x 2 x ${t}> zeroinitializer, zeroinitializer' }
     'double', 'bfloat' { '%n = fadd <2 x ${guard}> zeroinitializer, zeroinitializer' }
     'argument' { '%n = fadd <2 x ${t}> %v, zeroinitializer' }
-    'load' { '%v = load <2 x ${t}>, ptr %src, align 1\n %n = fadd <2 x ${t}> %v, zeroinitializer' }
+    'load' { '%v = load volatile <2 x ${t}>, ptr %src, align 1\n %n = fadd <2 x ${t}> %v, zeroinitializer' }
     else { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %n = fadd <2 x ${t}> %v, zeroinitializer' }
    }
    s.write_string('define void @${name}(${signature}) { entry: store i8 17, ptr %out\n ${body}\n ret void }\n'); cases << FloatControl{name: name, guard: true}

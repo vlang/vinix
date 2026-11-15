@@ -20,7 +20,7 @@ fn (p IRTypedProgram) vector_source_profile(stream Stream, pools IRConstantPools
 	producer := bodies.results[s.results_start + int(slot)]
 	if producer < s.instructions_start || producer >= index || producer >= p.instructions.len || producer >= bodies.instructions.len { return error('AIR vector: earlier construction required') }
 	op := p.instructions[producer]; inst := bodies.instructions[producer]
-	if inst.scope != scope || !inst.has_result || inst.next_value != source.number || op.status != .decoded || op.result_type != source.type_index || inst.record < 0 || inst.record >= stream.records.len || !p.vector_construction(stream.records[inst.record].code, op) { return error('AIR vector: construction source required') }
+	if inst.scope != scope || !inst.has_result || inst.next_value != source.number || op.status != .decoded || op.result_type != source.type_index || inst.record < 0 || inst.record >= stream.records.len || !p.vector_storage_producer(stream.records[inst.record].code, op) { return error('AIR vector: construction source required') }
 	return count
 }
 fn (p IRTypedProgram) vector_extract_profile(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, mixed bool, remaining int) !int {
@@ -74,13 +74,13 @@ fn (m &IntegerMachine) read_vector(stream Stream, source IRTypedOperand) !Scalar
 	return result
 }
 // Static construction slots are reused on loop visits. Scalars keep their
-// existing result slots; vector storage is allocated only for constructions.
+// existing result slots; vector storage is allocated for constructions and loads.
 fn (mut m IntegerMachine) seed_vector_slots(stream Stream) ! {
 	if m.vectors.len == 0 { return }
 	s := m.bodies.scopes[m.scope]; mut next := 0
 	for index in s.instructions_start .. s.instructions_start + s.instructions_count {
 		inst := m.bodies.instructions[index]
-		if !m.p.vector_construction(stream.records[inst.record].code, m.p.instructions[index]) { continue }
+		if !m.p.vector_storage_producer(stream.records[inst.record].code, m.p.instructions[index]) { continue }
 		if next >= m.vectors.len || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(m.values.len) { return error('AIR vector: insertion slot count') }
 		m.values[int(inst.next_value - s.base_id)] = IntegerValue{vector: true, value: u64(next)}; next++
 	}

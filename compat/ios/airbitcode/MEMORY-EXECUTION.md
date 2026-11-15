@@ -1,12 +1,45 @@
-# Bounded scalar memory execution
+# Bounded memory execution
 
 `run_memory_function` executes a defined ordinary void function with pointer
-arguments, forward control flow, scalar loads/stores, scalar binary operations,
+arguments, forward control flow, scalar/vector loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, bounded constant GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
-Scalar `extractelement` may also read supported fixed constant/constructed vectors;
-vector memory accesses remain unsupported.
+Scalar `extractelement` may also read supported fixed constant/constructed/loaded
+vectors. Fixed 1..16-lane vector memory accesses accept byte-aligned integer
+widths i8/i16/i24/i32/i40/i48/i56/i64 and half/float. Lanes occupy consecutive
+little-endian bytes and preserve raw floating bits. Non-byte-aligned lanes,
+scalable vectors, vector arguments/returns and vector PHIs remain unsupported.
+This memory profile supersedes the loaded-vector exclusions in the individual
+vector-operation sections below; scalar/void API exclusions still apply.
+
+A vector load owns one existing construction slot and captures every lane before
+later writes, including overlapping bindings. Vector stores validate all lane
+tags before writing any destination byte; poison/undef rejects the entire store
+while earlier instructions remain visible. Explicit alignment, permissions,
+bounds and inactive-block preflight apply to the full stored byte size. Vector
+GEP strides continue to use allocation size: `<3 x i24>` stores nine bytes but
+has a sixteen-byte default allocation stride. Loads and stores charge their
+lane counts to the existing work limit; loads share the 4,096-result cap.
+No new execution array or per-access allocation is added. Retained heap is
+unmeasured.
+
+`memory_vector_test.v` checks 32,768 byte round trips and every indeterminate/
+invalid lane position. `tests/ios/air-memory-vector.v` checks 61,440 exact native
+copies, bitwise inversions and overlapping snapshots, 640 poison/undef/freeze
+cases and 8,640 binding/budget/metadata/API refusals. Additional controls cover
+unsupported shapes, cold blocks, address space 2, constant vectors, explicit
+alignment, vector GEP padding and 4,096/4,097 result boundaries.
+`tests/ios/vector-memory-regressions.v` runs focused controls from 23 existing
+checkers. Their unsupported loaded-vector guards now use volatile vector loads;
+complete historical matrices retain their original entry points.
+
+`tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR vector-memory` builds and
+runs the focused Objective-C runtime fixture with normal and deterministic Swift
+hashing. Each mode checks 40 deferred dispatches across two drained runtimes:
+20 complete and 20 fail on poison/undef without partial vector writes. This
+mode leaves the existing `software` and `default` full-suite entry points intact.
+
 Integer binary opcodes and half/float fadd/fsub/fmul/fdiv/frem reuse the scalar
 interpreter's arithmetic, undefined-operation guards and poison propagation.
 Nonvolatile constant-length memset, memmove and disjoint memcpy also operate on

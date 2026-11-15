@@ -1,7 +1,7 @@
 # Software Metal backend
 
 Build the iOS runner with `-d ios_metal_software` to enable a CPU backend for
-shared buffers, shared 2D textures, buffer blits and bounded scalar compute.
+shared buffers, shared 2D textures, buffer blits and bounded scalar/vector compute.
 `MTLCreateSystemDefaultDevice` then returns
 an owned device implemented by Vinix. Without that build flag it returns nil.
 This backend executes deferred buffer operations and a narrow AIR compute
@@ -245,12 +245,25 @@ file. Neither entry point requires dispatch initialization.
 
 Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, forward-control
-[scalar memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
+[memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
 scalar binary arithmetic/comparisons/select/casts/fneg/freeze, pointer arguments with
 supported constant GEPs,
 explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
 Valid LLVM IR remains a precondition. No source compilation is provided.
+
+Buffer loads/stores also accept fixed 1..16-lane vectors of i8/i16/i24/i32/
+i40/i48/i56/i64, half and float. Lanes occupy consecutive little-endian bytes;
+half/float transfers preserve raw bits. A load captures a complete vector before
+later stores, including overlapping bindings, and composes with the existing
+vector operations. A store validates every lane before writing; poison or undef
+rejects the complete store while preceding instructions remain visible. Byte
+counts use stored size, whereas vector GEP strides use allocation size. Explicit
+alignment, permissions, bounds and all-block preflight apply. Non-byte-aligned
+lanes, scalable vectors, vector arguments/returns and vector PHIs remain outside
+this profile. The software dispatch limit remains one invocation. Deferred
+Objective-C checks cover raw integer/floating vector transfers and poison/undef/
+freeze behavior; this adds no rendering or GPU support.
 
 Every argument requires explicit `air.buffer` metadata, a unique location
 in slots 0..30 with count one, address space 1 or 2, and read/write/read_write
@@ -457,8 +470,8 @@ i1..i64 unsigned index. All lanes are checked before dispatch, with a
 per-function million-lane validation budget shared by vector operations and
 extractions. Only the chosen lane is evaluated: poison propagates, selected
 undef errors and out-of-range indices produce poison. Extractions cost one
-instruction; vector PHIs, loaded vectors, vector
-arguments/storage and scalable vectors remain unsupported.
+instruction; vector PHIs, vector arguments/returns and scalable vectors remain
+unsupported. Loaded vectors use the byte-aligned buffer profile described above.
 Deferred kernels select integer/half/float representations,
 preserve NaN payloads and signed zeros, freeze out-of-range poison, fail poison
 stores and reject an oversized-vector pipeline.
@@ -610,7 +623,8 @@ supported vector operations. Each cast costs one step and source plus result
 lane work, sharing the existing 4,096 construction slots and execution-owned
 array. Mixed, void and memory APIs support these conversions; the integer-only
 API rejects floating lanes. Fast-math flags, `uitofp nneg`, other formats,
-reshaping, vector arguments/returns, PHIs and loads/stores remain unsupported. `tests/ios/air-vector-int-float.v`
+reshaping, vector arguments/returns and PHIs remain unsupported. Loads/stores use
+the byte-aligned buffer profile above. `tests/ios/air-vector-int-float.v`
 compares every source width with native LLVM, exhausts signed/unsigned i1..i16,
 and checks rounding boundaries, poison/undef, freezing, composition, loops,
 unsupported profiles and shared storage/work limits.
@@ -690,8 +704,9 @@ step. The source and result lane counts charge the shared 1,000,000-unit
 validation budget, and results share the existing 4,096 static construction
 slots and execution-owned allocation. Preflight validates complete sources
 and inactive blocks. Fast-math flags, other lane formats, scalable vectors,
-vector arguments/returns, vector PHIs and vector loads/stores remain outside
-this bounded profile. `tests/ios/air-vector-fneg.v` checks exact LLVM values,
+vector arguments/returns and vector PHIs remain outside this bounded profile.
+Loads/stores use the byte-aligned buffer profile above.
+`tests/ios/air-vector-fneg.v` checks exact LLVM values,
 poison/undef policy, source/result freezing, snapshots, loop slot reuse,
 composition, rejected profiles and exact/exceeded storage/work limits.
 
