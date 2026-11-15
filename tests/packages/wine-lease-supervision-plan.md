@@ -4938,3 +4938,53 @@ unreported reads or searches, complete SDK closure, isolation from the installed
 SDK, loader/cache bytes or hermetic toolchain admission. Mandatory host-builder
 integration and fresh signed guest acceptance remain open; product defaults
 and broader ARM/GUI roadmap 14 gates are unchanged.
+
+## Required host Mach-O replay integration (2026-11-16)
+
+Commit `6f0c8b0a0` makes captured Mach-O link/replay/load evidence mandatory in
+[format-3 qualification host receipts](wine-host-required-check.md). The existing
+C observer now uses explicit `ld64.lld` selection and reproduction capture in
+the actual compile/link command. Shared Mach-O admission binds the original log
+namespace, linker identity, archive bytes, extracted members, load observations
+and identical original/replay executable bytes. Every captured/replay artifact
+is a required host output; the selected linker and ordinary observed images are
+required retained inputs. The producer, controller and full retainer carry and
+recheck these complete graphs through their existing binding checks. Builder
+identity, source, header, C, image, role and executable-mode checks remain intact.
+
+The isolated fixture and all three real host roles build and admit successfully.
+`host-controls` passes real/copied baselines, real program entry checks and all
+22 resealed refusals, including nine new link cases. The real PE and owned
+runtime producer pass. `native` passes signed x86 holder-death/collection in
+128.415 seconds with producer host admission before signing and both host
+bindings re-admitted after the guest. All 18 startup/pre-sign refusals and all
+32 receipt controls pass. Standalone format-2 trace admission still passes.
+
+The full retainer passes real/copied baselines in all four disjoint partitions,
+`retention-p0` through `retention-p3`, with 13/13/13/12 named refusals. The
+production aggregate checker verifies exact assigned lists and all 51 unique
+cases, retaining the original 49 gates and adding producer host-link receipt and
+controller host-link archive omissions. `retention-link-controls` independently
+passes both new cases and both baselines. No refusal publishes retained output.
+The runner also supports the complete unpartitioned 51-case matrix. The initial
+unpartitioned run was stopped for partitioning and remains diagnostic, as do the
+initial control-runner compile and missing pinned-V-environment invocation.
+Corrected production tools pass without weakening any admission gate.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostmacho-20261116-01`, with
+isolated `source-final` from base `098b10d9a`, final source/patch/revision,
+generated programs, host input stores, captured link inputs, complete native
+evidence and controls. Final builder is `host-build-final`; real roles are
+`host-controller`, `host-producer` and `host-retainer`. The typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-macho-20261116-01.inventory.json`,
+SHA-256 `0a0a40f3880ef5fc590611d2f251ef4a864a8149d88c3ae5ecd67945f0601a45`.
+Complete inventory recording and independent comparison pass.
+The byte-preserving APFS clone helper recovered space in this new, unsealed
+workspace after equality/mode checks; complete historical bundles remain
+untouched. Original selected namespaces and complete prerequisites remain
+required. `validation.txt` identifies all final tools and diagnostic runs.
+
+This closes mandatory captured-link integration and its fresh signed guest
+qualification. Complete SDK/library/search closure, unreported reads, bootstrap
+and hermetic toolchain admission, OS loader/cache bytes, owned ARM/GUI and
+product default activation remain open. No kernel or product default changed.

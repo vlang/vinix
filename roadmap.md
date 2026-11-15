@@ -1373,17 +1373,17 @@ architectures; broader release/catalog/runtime acceptance remains open.
     alongside the C/header/linker and Clang/LLD image checks. The
     [host controller/producer/retainer builder](tests/packages/wine-host-build.md)
     now retains and admits selected V/C inputs, explicit SDK/resource selection
-    and observed tool images for real host executables, with thirteen resealed
+    and observed tool images for real host executables, with twenty-two resealed
     refusals and real entrypoint checks.
     [Required host receipts](tests/packages/wine-host-required-check.md) now bind
     all three qualification roles and their retained input graphs, including
     producer admission before signing and both bindings after guest execution.
-    A fresh signed x86 run, forty-nine retention refusals and eighteen startup/
-    pre-sign refusals pass. An [experimental Mach-O link check](tests/packages/wine-mach-link.md)
-    reproduces fixture and all three host-role executable bytes from captured
-    inputs, binds observed replay file loads to captured member hashes, and
-    passes thirty-one refusal controls. Mandatory host integration,
-    complete Mach-O linker/library closure, OS shared-cache bytes
+    A fresh signed x86 holder-death/collection run, fifty-one retention refusals
+    and eighteen startup/pre-sign refusals pass. Format-3 host receipts require
+    captured Mach-O inputs, identical replay and observed file-load coverage for
+    every running qualification role. The separate [Mach-O link check](tests/packages/wine-mach-link.md)
+    also passes thirty-one refusal controls. Complete Mach-O linker/library
+    closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader
     lifetime/mapping controls remain open.
