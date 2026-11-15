@@ -1361,13 +1361,19 @@ architectures; broader release/catalog/runtime acceptance remains open.
     plus the original x86 installation/recovery workflow. Every public reply
     validates all 741 targets; earlier failed timing checkpoints remain retained.
     Broader power-loss recovery and Wine version-upgrade/GUI compatibility
-    remain open; ARM Wine execution is not qualified.
+    remain open; ARM owned Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
     now has a read-only preflight and rejects 32 receipt mutations through both
     preflight and full controller startup before signing or guest setup.
-    Default activation, ARM owned Wine, fresh owned graphical
-    acceptance, broader lifetime/mapping controls and holder-death retention
-    remain open.
+    [Explicit x86 holder-death retention](tests/packages/wine-owned-retain-check.md)
+    now passes real and unchanged copied evidence baselines, signed Wine
+    collection and forty-four resealed refusal cases. Selected
+    [V source-generation host admission](tests/packages/wine-v-host-check.md)
+    also binds closed child environments and observed ordinary V image bytes
+    alongside the C/header/linker and Clang/LLD image checks. OS shared-cache
+    bytes, controller builds and complete hermetic toolchain admission remain
+    separate gates. Default activation, ARM owned Wine, fresh owned graphical
+    acceptance and broader lifetime/mapping controls remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.

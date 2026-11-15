@@ -4682,3 +4682,52 @@ OS shared-cache/loader bytes, V/host-controller and other host-tool closure,
 unreported inputs/search absence and full hermetic admission remain open,
 along with default activation, owned ARM/GUI, redistribution and broader
 roadmap 14 acceptance. No kernel or product default is changed.
+
+## Selected V source-generation host boundary (2026-11-15)
+
+Commit `bb695cfa6` adds [V source-generation host admission](wine-v-host-check.md)
+for the bridge, native guest and package CLI. Discovery and actual C generation
+use complete replacement environments with fixed PATH/locale/time/source epoch,
+separate canonical mode-0700 HOME/TMPDIR/VMODULES directories, the selected VEXE
+and disabled automatic fallback. Caller flags, module paths, credentials and
+loader injection settings are excluded. A before-command version probe binds
+observed non-system image UUIDs and canonical ordinary image hashes. Each
+source-generation command retains argv, environment, raw dyld observations and
+decoded images; final admission checks the selected compiler's captured input
+hash, version probe, raw/decoded agreement and current selected image bytes.
+
+Producer/controller checks, native before/after-boot verification, independent
+producer admission and full retention require the twelve new records alongside
+the original parsed-source, C/header/linker and Clang/LLD image checks. Copied
+graphs preserve ordinary receipts and the original recorded namespaces. V image
+paths join the full retained artifact map and the host-image byte/mode store.
+
+Production/manual-free module controls pass real C discovery/generation with
+invalid parent VFLAGS, VMODULES, VEXE and DYLD_INSERT_LIBRARIES, and refuse an
+altered recorded environment. Fresh PE/runtime production, independent producer
+admission and all 32 owned-receipt controls pass. Signed x86 holder-death and
+collection pass in 107.24 seconds, including post-run V image/environment
+checks. Final `controls-02` passes real and unchanged copied retention baselines
+and all forty-four resealed refusals. Five new cases cover omitted V baseline
+images, altered environments, omitted observations, changed hashes and linked
+receipts, each at its named gate without retained output. The initial copied
+baseline refusal remains preserved: the test copier needed to retain both V
+argv receipts as ordinary private files. Production admission was unchanged.
+
+The complete checkpoint is `/Users/alex/.cache/vwvcompiler-20261115-01`, from
+isolated base `333a49ad3`, with the feature patch/revision, tested sources, raw
+commands/results, generated C/binaries, native evidence, all controls, observed
+C byte/mode snapshots, selected V/Clang/LLD image bytes/modes and complete
+selected resource-header copy. Its typed inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-v-host-20261115-01.inventory.json`,
+SHA-256 `a51b8bbf1bf06968be117974e9ed70f7635ea687e694e6361bf57555ee81c6ba`.
+Complete typed-inventory recording and independent comparison pass against the
+retained original checkpoint. Original prerequisite bundles and historical
+complete-input verifiers remain required.
+
+This covers selected V-to-C child execution. Compiler source/bootstrap
+provenance, PE producer/controller executable builds, other host tools,
+unreported inputs/search absence and full hermetic admission remain open.
+OS shared-cache/loader bytes remain explicitly metadata-only and unadmitted.
+Default activation, owned ARM/GUI, redistribution and broader roadmap 14
+acceptance remain open. No kernel or product default is changed.
