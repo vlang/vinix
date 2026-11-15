@@ -31,7 +31,8 @@ in the caller's constant pool, with value 0..1023. Arguments, instruction
 results, poison/undef/opaque constants and masks outside those ten bits reject.
 This validation runs for every call, including in unvisited blocks; caching
 declaration attributes never caches a call's mask. Fast-math/tail flags,
-call-site attributes, vectors, other precisions and AIR aliases reject.
+call-site attributes, other precisions and AIR aliases reject. Fixed-vector
+calls use the separate profile below.
 Valid LLVM IR and matching immutable indexes remain preconditions.
 
 Declaration validation retains the [existing harmless function attributes](SCALAR-INTRINSICS.md).
@@ -68,7 +69,33 @@ Native LLVM/JIT code is not sanitizer-instrumented; retained allocation is not
 measured. The checker only executes its generated fixture. IR, bitcode, every
 comparison, binaries, identities and logs belong in complete external bundles.
 
-This is scalar execution groundwork. It does not execute an AIR shader,
+## Fixed vectors
+
+The mixed scalar, void and memory APIs also accept
+`llvm.is.fpclass.vNf16` and `llvm.is.fpclass.vNf32` for N=1..16. Floating inputs
+produce matching-count i1 vectors. The shared i32 mask is checked at every
+call, including calls whose declaration attributes were already cached. Only
+defined scalar integer/zero constants in 0..1023 are admitted. Parameter two's
+exact `immarg` attribute is allowed for classification and remains forbidden
+for the other vector floating intrinsic families.
+
+Lanes use the existing integer bit classifier. Poison propagates per lane,
+including empty/full masks; any undef source lane rejects at evaluation, even
+for discarded results. Source freezing repairs indeterminate floating inputs
+before classification; freezing a poison predicate chooses false. Results
+remain independent snapshots and can feed vector selects and other supported
+integer operations. Each call costs one step, two lane counts of validation
+work and one shared construction slot. The 32 new declaration identities follow
+the existing 608, extending the vector cache to 640 entries.
+
+`tests/ios/air-vector-fpclass.v` checks native vector values, all class masks,
+source/result states, selects with exact floating bits, per-call mask guards,
+declaration attributes and shared limits. Environment checks require clear
+Vinix exception flags and retain native flag deviations separately. Vector
+arguments/returns, PHIs, loads/stores, scalable vectors, other precisions,
+fast-math, tail calls and strict FP remain outside this profile.
+
+This is CPU execution groundwork. It does not execute an Apple AIR shader,
 create a Metal device, submit GPU work or qualify an iOS application launch.
 
 References: [LLVM classification semantics](https://llvm.org/docs/LangRef.html#llvm-is-fpclass-intrinsic),
