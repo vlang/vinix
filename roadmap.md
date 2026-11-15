@@ -1373,18 +1373,18 @@ architectures; broader release/catalog/runtime acceptance remains open.
     alongside the C/header/linker and Clang/LLD image checks. The
     [host controller/producer/retainer builder](tests/packages/wine-host-build.md)
     now retains and admits selected V/C inputs, explicit SDK/resource selection
-    and observed tool images for real host executables, with twenty-two resealed
+    and observed tool images for real host executables, with twenty-six resealed
     refusals and real entrypoint checks.
     [Required host receipts](tests/packages/wine-host-required-check.md) now bind
     all three qualification roles and their retained input graphs, including
     producer admission before signing and both bindings after guest execution.
-    A fresh signed x86 holder-death/collection run, fifty-one retention refusals
-    and eighteen startup/pre-sign refusals pass. Format-3 host receipts require
+    A fresh signed x86 holder-death/collection run, fifty-three retention refusals
+    and eighteen startup/pre-sign refusals pass. Format-4 host receipts require
     captured Mach-O inputs, identical replay and observed file-load coverage for
     every running qualification role. The separate [Mach-O link check](tests/packages/wine-mach-link.md)
-    also passes thirty-one refusal controls. An additive [SDK declaration audit](tests/packages/wine-sdk-check.md)
-    checks captured stub source identities and declared reexport coverage across
-    all targets; adding that audit to required receipts remains open. Complete
+    also passes thirty-one refusal controls. The [SDK declaration audit](tests/packages/wine-sdk-check.md)
+    now requires graph validation, source pins and retained bytes for all
+    qualification roles, with declared reexport coverage across all targets. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader

@@ -5032,3 +5032,52 @@ complete SDK/search closure, unreported reads and OS loader/cache admission are
 unqualified. SDK-audit integration into required receipts and fresh signed
 acceptance remain open. No new guest run, kernel/default or owned ARM/GUI change
 is claimed.
+
+## Mandatory SDK declaration/source graphs (2026-11-16)
+
+Commit `356930ebe` integrates the [SDK declaration projection](wine-sdk-check.md)
+into format-4 required host receipts. `sdk-graph.json` is a mandatory output,
+recomputed from the captured link archive and current SDK source identities at
+admission. Both alias and resolved source hashes must appear in the host input
+map and retained byte store. The SDK module itself is embedded and pinned with
+the existing source/header/C/image/link admission modules. Every qualification
+role requires this graph; producer/controller bindings carry it before signing
+and after guest execution, and the full retainer includes its own graph too.
+Original format-3 builders and standalone SDK auditors retain their historical
+contract and complete prerequisites.
+
+The isolated fixture, controller, producer and retainer all build and admit.
+`host-controls` passes real/copied baselines, real entry checks and all 26 exact
+refusals, including forged/linked SDK graphs, omitted resolved source input and
+old format-3 declarations. PE/runtime production passes. `native` passes signed
+x86 holder-death/collection in 97.802 seconds, with producer host admission
+before signing and both bindings re-admitted after the guest. All 18 startup/
+pre-sign refusals and all 32 receipt controls pass.
+
+`retention-p0` through `retention-p3` pass both real and unchanged copied
+baselines and 14/13/13/13 exact refusals. The aggregate checker verifies all 53
+unique assigned cases. The original 51 gates remain intact; two new cases omit
+the SDK graph from producer/controller retained input maps. No refusal creates
+retained output. A focused `--host-sdk-only` mode remains available alongside
+the complete unpartitioned and four-partition matrices.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostsdk-20261116-01`, with final
+`source-final` cloned from the original complete host Mach-O source snapshot and
+overlaid with current SDK/integration sources before compilation. It retains
+the feature patch/revision, generated programs, SDK/link graphs, host input
+stores, complete native evidence and controls. Final builder is
+`host-build-final`; roles are `host-controller`, `host-producer`, `host-retainer`.
+The typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-sdk-20261116-01.inventory.json`,
+SHA-256 `35d430ae1b8f31b23cdbb49e4a750d50470b7fb819a65728b44b3f2995133986`.
+Complete inventory recording and independent comparison pass.
+Original selected namespaces and complete historical bundles remain required
+and untouched; `validation.txt` identifies final tools and the preliminary
+repository-root fixture. No failed qualification run supersedes the passing
+isolated results in this checkpoint.
+
+This closes SDK graph integration in required receipts and its fresh signed guest
+qualification. The conservative all-target declaration model still leaves
+symbols opaque. Full YAML/TAPI/ABI interpretation, SDK/search isolation,
+unreported reads, OS loader/cache bytes, bootstrap/hermetic admission, owned
+ARM/GUI and product default activation remain open. No kernel/default change.
