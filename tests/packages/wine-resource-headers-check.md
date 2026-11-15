@@ -45,7 +45,9 @@ ordinary files are copied as ordinary files in the unchanged copied baseline.
 This closes selected Clang resource-header coverage for **bridge and native
 guest/package production**
 under the existing stable local-input contract.
-It does not discover every actual C dependency, freeze compiler dynamic
+The additional [observed C input check](wine-c-inputs-check.md) now binds reported
+include observations for all three C builds. Resource-tree admission alone
+does not discover every actual C dependency, freeze compiler dynamic
 libraries, admit host controller C resource headers, or establish a
 hermetic toolchain. Existing sysroot/GCC/V source inventories remain required.
 Historical checkpoints retain their original complete inputs and verifiers;

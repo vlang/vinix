@@ -10,6 +10,7 @@ import plainiso
 import time
 import tests.packages.winesource
 import tests.packages.wineheaders
+import tests.packages.winecsource
 import tests.packages.wineowned
 import tools.packages.pkgcore
 import tools.packages.wineadapter
@@ -78,10 +79,10 @@ fn build_program(v string, sysroot string, gcc string, source string, arch strin
 	os.write_file(directory + '/runtime.c', '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
 		vlib + '/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + vlib + '/sync/thread_helper.h"\n')!
 	resource := wineheaders.selection(os.read_file(directory + '/clang-resource.log')!)!
-	invoke(['/opt/homebrew/opt/llvm/bin/clang', '--target=' + arch + '-linux-musl',
+	winecsource.build(['/opt/homebrew/opt/llvm/bin/clang', '--target=' + arch + '-linux-musl',
 		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-resource-dir=' + resource, '-fuse-ld=lld', '-O1', '-w',
 		'-fno-stack-protector', '-static', '-D_GNU_SOURCE', '-Wno-error=incompatible-pointer-types',
-		cfile, directory + '/runtime.c', '-lm', '-lpthread', '-o', directory + '/' + name], directory + '/cc.log')!
+		cfile, directory + '/runtime.c', '-lm', '-lpthread', '-o', directory + '/' + name], directory, directory)!
 	wineheaders.admit_build(directory, directory, inputs)!
 	return directory + '/' + name
 }
@@ -105,6 +106,9 @@ fn check() ! {
 	}
 	if digest(os.dir(@FILE) + '/wineheaders/headers.v')! != sha256.hexhash($embed_file('wineheaders/headers.v').to_string()) {
 		return error('compiled Wine header admission differs')
+	}
+	if digest(os.dir(@FILE) + '/winecsource/closure.v')! != sha256.hexhash($embed_file('winecsource/closure.v').to_string()) {
+		return error('compiled Wine C input admission differs')
 	}
 	if digest(os.dir(@FILE) + '/wineowned/receipt.v')! != sha256.hexhash($embed_file('wineowned/receipt.v').to_string()) {
 		return error('compiled Wine owned receipt admission differs')
@@ -180,6 +184,7 @@ fn check() ! {
 		root + '/tests/packages/wine-native/main.v', root + '/tests/packages/winesource/closure.v',
 		root + '/tests/packages/wineowned/receipt.v',
 		root + '/tests/packages/wineheaders/headers.v',
+		root + '/tests/packages/winecsource/closure.v',
 		'/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', sandbox] {
 		inputs[path] = digest(path)!
 	}
@@ -245,13 +250,15 @@ fn check() ! {
 	for program in ['guest', 'package']! {
 		directory := work + '/build-' + program
 		wineheaders.admit_build(directory, directory, inputs)!
+		winecsource.admit(directory, directory)!
 	}
 	os.write_file(work + '/inputs.json', json2.encode(inputs))!
 	mut generated := map[string]string{}
 	for program in ['guest', 'package']! {
 		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
 			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
-			'sources-built.txt', 'clang-headers.json', 'clang-resource.log', 'clang-resource.log.argv.json'] {
+			'sources-built.txt', 'clang-headers.json', 'clang-resource.log', 'clang-resource.log.argv.json',
+			'c-inputs-before.json', 'c-inputs-verified.json', 'c-discover.log', 'c-discover.log.argv.json'] {
 			path := 'build-' + program + '/' + name
 			generated[path] = digest(work + '/' + path)!
 		}
@@ -342,6 +349,7 @@ fn check() ! {
 	for program in ['guest', 'package']! {
 		directory := work + '/build-' + program
 		wineheaders.admit_build(directory, directory, inputs)!
+		winecsource.admit(directory, directory)!
 	}
 	for path, expected in generated {
 		if digest(work + '/' + path)! != expected {

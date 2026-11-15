@@ -6,6 +6,7 @@ import os
 import json2
 import tests.packages.winesource
 import tests.packages.wineheaders
+import tests.packages.winecsource
 
 fn check(prepared string) ! {
 	inputs := json2.decode[map[string]string](os.read_file(prepared + '/inputs-before-build.json')!)!
@@ -17,10 +18,12 @@ fn check(prepared string) ! {
 	}
 	winesource.admit(prepared + '/logs/sources-before.txt', prepared + '/logs/sources-built.txt', inputs)!
 	wineheaders.admit_producer(prepared, inputs)!
+	winecsource.admit(prepared, prepared + '/logs')!
 	outputs := json2.decode[map[string]string](os.read_file(prepared + '/outputs.json')!)!
 	for name in ['logs/sources-before.txt', 'logs/sources-built.txt', 'logs/discover.log',
 		'logs/discover.log.argv.json', 'logs/v.log', 'logs/v.log.argv.json', 'build/wine-runner.c',
-		'clang-headers.json', 'logs/clang-resource.log', 'logs/clang-resource.log.argv.json', 'logs/cc.log.argv.json'] {
+		'clang-headers.json', 'logs/clang-resource.log', 'logs/clang-resource.log.argv.json', 'logs/cc.log.argv.json',
+		'c-inputs-before.json', 'c-inputs-verified.json', 'logs/c-discover.log', 'logs/c-discover.log.argv.json'] {
 		if name !in outputs || winesource.file_digest(prepared + '/' + name)! != outputs[name] {
 			return error('producer closure evidence missing or changed: ' + name)
 		}

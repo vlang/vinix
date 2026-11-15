@@ -5,6 +5,7 @@ import os
 import json2
 import crypto.sha256
 import tests.packages.wineheaders
+import tests.packages.winecsource
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -24,7 +25,10 @@ fn clone_tree(source string, destination string, prepared bool) ! {
 		os.mkdir_all(os.dir(to))!
 		if prepared || path.ends_with('/sources-before.txt') || path.ends_with('/sources-built.txt')
 			|| path.ends_with('/clang-headers.json') || path.ends_with('/clang-resource.log')
-			|| path.ends_with('/clang-resource.log.argv.json') || path.ends_with('/cc.log.argv.json') {
+			|| path.ends_with('/clang-resource.log.argv.json') || path.ends_with('/cc.log.argv.json')
+			|| path.ends_with('/cc.log') || path.ends_with('/c-discover.log')
+			|| path.ends_with('/c-discover.log.argv.json') || path.ends_with('/c-inputs-before.json')
+			|| path.ends_with('/c-inputs-verified.json') {
 			$if macos {
 				if C.clonefile(path.str, to.str, 0) == 0 { continue }
 			}
@@ -122,16 +126,64 @@ fn check() ! {
 	for program in ['guest', 'package']! {
 		for kind in ['manifest', 'input', 'query', 'flag', 'linked']! { cases << program + '-resource-' + kind }
 	}
+	cases << ['bridge-c-trace', 'bridge-c-manifest', 'guest-c-pin', 'package-c-command', 'guest-c-linked']
 	for name in cases {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
 		mut selected := prepared
 		mut expected := ''
-		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' {
+		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' || name.starts_with('bridge-c-') {
 			selected = dir + '/prepared'
 			clone_tree(prepared, selected, true)!; remap(dir, prepared, selected)!
 		}
-		if name.starts_with('guest-resource-') || name.starts_with('package-resource-') {
+		if name.starts_with('bridge-c-') {
+			if name == 'bridge-c-trace' {
+				text := os.read_file(selected + '/logs/cc.log')!
+				observed := winecsource.trace(text)!
+				mut lines := text.split_into_lines()
+				mut removed := false
+				for index, line in lines {
+					if !removed && line.starts_with('.') && line.ends_with(' ' + observed[0]) { lines[index] = 'omitted include'; removed = true }
+				}
+				if !removed { return error('baseline include observation missing') }
+				replace(selected + '/logs/cc.log', lines.join('\n') + '\n')!
+				reseal(dir, selected, ['logs/cc.log'])!
+			} else {
+				proof := json2.decode[winecsource.Proof](os.read_file(selected + '/c-inputs-before.json')!)!
+				changed := winecsource.Proof{sources: proof.sources, includes: proof.includes[1..]}
+				for file in ['c-inputs-before.json', 'c-inputs-verified.json'] { replace(selected + '/' + file, json2.encode(changed))! }
+				reseal(dir, selected, ['c-inputs-before.json', 'c-inputs-verified.json'])!
+			}
+			expected = 'C closure include observations differ'
+		} else if name == 'guest-c-pin' {
+			proof := json2.decode[winecsource.Proof](os.read_file(dir + '/build-guest/c-inputs-before.json')!)!
+			mut includes := proof.includes.clone()
+			file := includes[0]
+			includes[0] = winecsource.File{path: file.path, resolved: file.resolved, sha256: 'bad'}
+			changed := winecsource.Proof{sources: proof.sources, includes: includes}
+			mut generated := read_map(dir + '/generated-before-boot.json')!
+			for receipt in ['c-inputs-before.json', 'c-inputs-verified.json'] {
+				path := 'build-guest/' + receipt
+				replace(dir + '/' + path, json2.encode(changed))!
+				generated[path] = digest(dir + '/' + path)!
+			}
+			replace(dir + '/generated-before-boot.json', json2.encode(generated))!
+			expected = 'C closure input target or bytes changed'
+		} else if name == 'package-c-command' {
+			file := 'build-package/c-discover.log.argv.json'
+			mut args := json2.decode[[]string](os.read_file(dir + '/' + file)!)!
+			args.insert(1, '-DUNRECORDED_INPUT=1')
+			replace(dir + '/' + file, json2.encode(args))!
+			mut generated := read_map(dir + '/generated-before-boot.json')!
+			generated[file] = digest(dir + '/' + file)!
+			replace(dir + '/generated-before-boot.json', json2.encode(generated))!
+			expected = 'C closure discovery argv differs'
+		} else if name == 'guest-c-linked' {
+			file := dir + '/build-guest/c-inputs-before.json'
+			os.rename(file, file + '-original')!
+			os.symlink(file + '-original', file)!
+			expected = 'C closure evidence must be a bounded ordinary file'
+		} else if name.starts_with('guest-resource-') || name.starts_with('package-resource-') {
 			parts := name.split('-')
 			expected = native_resource(dir, parts[0], parts[2])!
 		} else if name == 'package-flag' {
@@ -218,6 +270,6 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline twenty-four exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline twenty-nine exact refusals')
 }
 fn main() { check() or { eprintln(err); exit(1) } }

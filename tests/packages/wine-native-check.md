@@ -19,8 +19,9 @@ compiler's [Clang resource headers](wine-resource-headers-check.md). Each
 complete ordinary include tree is captured before compilation and compared
 after compilation, before boot and after the run. The full retainer requires
 these snapshots, discovery records, input pins and exact C arguments alongside
-the original source/output/ISO checks. Actual C dependency discovery and full
-hermetic toolchain admission remain separate gates.
+the original source/output/ISO checks. The [observed C input check](wine-c-inputs-check.md)
+also requires matching discovery and actual compiler include observations,
+resolved targets and hashes. Full hermetic toolchain admission remains separate.
 
 The historical x86-9 outcome remains a failed checkpoint. The separate
 [translated-fork fixture](wine-translation-fork-check.md) records the original
