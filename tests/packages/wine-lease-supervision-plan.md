@@ -4284,3 +4284,39 @@ controls, complete compiler/header/sysroot admission, launcher integration and
 signed Wine holder-death qualification remain open. The earlier userspace
 holder's own-death limitation is unchanged in the production launch path;
 default activation and broader section 14 acceptance remain open.
+
+## Private-holder kernel attachment (2026-11-15)
+
+Commit `ee65d4a13` adds [strict kernel lease attachment in the private holder](workload-holder-check.md).
+Package core opts into it with both `wine_owned_manager` and
+`wine_kernel_lease`. Attachment happens before the client fork, leaving the
+shared caller outside the newly attached workload. Unsupported kernels or an
+unlocked source refuse at setup stage 9 before exec, without falling back.
+The borrowed close-on-exec descriptor remains the caller's. Holder `SIGKILL`
+returns 137 while a double-forked, execed session leader retains the lock;
+reaping that survivor with exact status 37 releases it.
+
+Both architectures pass the ordinary-user lifecycle and refusal tests and
+32 measured holder/client cycles after matching warmup, with every live slab
+class, large-page and written-after-free delta exactly zero. The original
+holder standard suites also pass on both architectures. Actual x86 package
+dispatch passes kernel mode, ordinary held mode, low descriptors and the
+expected unheld negative control. The first x86 measurement remains failed;
+its per-cycle observer path allocation was removed before the passing rerun.
+The holder implementation and strict positive-delta policy were unchanged.
+
+The complete checkpoint is `/Users/alex/.cache/vwlaunchkernel-20261115-01`,
+with isolated base `49b7b2710`, feature patch, admitted source snapshots, native
+results and generated C. The receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/workload-holder-20261115-01.inventory.json`,
+SHA-256 `f3eba3b0b9410b5f2b519198097c039c531e5709b1b1e1fc9bc6e7850fb78f86`.
+Typed-inventory recording and independent comparison pass; this preserves the
+checkpoint bytes without expanding the selected-input build-admission scope.
+The preceding `vwkernellease-20261115-01` bundle remains independently required
+for the unchanged kernels and baseline controls. Its receipt is unchanged.
+
+This closes the opt-in primitive/dispatcher integration step. Real signed Wine
+holder-death execution and collection, default activation, owned ARM/GUI,
+complete hermetic build admission and the remaining section 14 acceptance
+gates remain open. Existing owned-mode runtime receipts do not imply this
+additional package frontend build flag.
