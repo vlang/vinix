@@ -4988,3 +4988,47 @@ This closes mandatory captured-link integration and its fresh signed guest
 qualification. Complete SDK/library/search closure, unreported reads, bootstrap
 and hermetic toolchain admission, OS loader/cache bytes, owned ARM/GUI and
 product default activation remain open. No kernel or product default changed.
+
+## Captured SDK source identities and declared reexports (2026-11-16)
+
+Commit `42b7911eb` adds a [read-only SDK declaration audit](wine-sdk-check.md).
+It first invokes the exact original format-3 host checker pinned by the selected
+host receipt, requiring unchanged original admission. It then compares every
+captured SDK stub with its current resolved ordinary source and archived bytes,
+projects install names and declared library reexports from the retained TAPI v4
+profile, and requires a separate captured stub with the matching first install
+name for every declaration. Inline documents cannot replace that file. Direct
+libm/libpthread/libSystem aliases must resolve to libSystem.B.tbd. Conflicting
+projected declarations refuse. Source targets/bytes, host proof, archive and
+original checker are rechecked before receipt publication.
+
+All four retained builds from the previous checkpoint pass original host
+admission and the new SDK audit: fixture, controller, producer and retainer each
+have 42 captured stubs and 40 unique install names. Production parser tests pass
+inline and multiple-target cases plus twelve malformed/ambiguous refusals.
+`controls-final` passes the original graph and four graph mutations: reexport
+omission, alias omission, changed source pin and foreign SDK namespace. Two CLI
+cases reject a wrong original checker and an incomplete host bundle without SDK
+receipt output. The graph omission check requires the separate file even when
+its inline document remains present; it does not rely on linker load traces.
+
+The checkpoint is `/Users/alex/.cache/vwsdk-20261116-01`, retaining selected final
+sources/imports, patch/revision, generated V/C programs, four SDK receipts and
+raw outcomes. Final auditor is `sdk-check-02`, graph/CLI runner is
+`sdk-controls-final`, and parser executable is `stubs-test-02`. The earlier
+alias-target assumption failure remains diagnostic. Its typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-sdk-20261116-01.inventory.json`,
+SHA-256 `13c96f35cf5e9ee67f4221edf67a4ef0660f387c72b0cc69efd66b3e2ee7cd78`.
+Complete inventory recording and independent comparison pass. The complete
+original host bundle `/Users/alex/.cache/vwhostmacho-20261116-01` remains required,
+with inventory SHA-256
+`0a0a40f3880ef5fc590611d2f251ef4a864a8149d88c3ae5ecd67945f0601a45`, together with
+its original selected namespaces and prerequisites. No sealed bundle or SDK
+source was modified.
+
+This projects declared libraries conservatively across all targets. Symbols
+remain opaque; full YAML/TAPI interpretation, target-specific ABI compatibility,
+complete SDK/search closure, unreported reads and OS loader/cache admission are
+unqualified. SDK-audit integration into required receipts and fresh signed
+acceptance remain open. No new guest run, kernel/default or owned ARM/GUI change
+is claimed.

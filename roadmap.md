@@ -1382,8 +1382,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     and eighteen startup/pre-sign refusals pass. Format-3 host receipts require
     captured Mach-O inputs, identical replay and observed file-load coverage for
     every running qualification role. The separate [Mach-O link check](tests/packages/wine-mach-link.md)
-    also passes thirty-one refusal controls. Complete Mach-O linker/library
-    closure, OS shared-cache bytes
+    also passes thirty-one refusal controls. An additive [SDK declaration audit](tests/packages/wine-sdk-check.md)
+    checks captured stub source identities and declared reexport coverage across
+    all targets; adding that audit to required receipts remains open. Complete
+    Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader
     lifetime/mapping controls remain open.
