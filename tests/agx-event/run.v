@@ -8,15 +8,17 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/agx-event/fixture', scratch, false)!
+	os.cp_all('${repo}/tests/agx-job-lifetime/fixture/memory', '${scratch}/memory', false)!
 	for name in ['klock', 'katomic'] {
 		os.cp_all('${repo}/tests/agx-g13-failure/fixture/${name}', '${scratch}/${name}', false)!
 	}
 	os.mkdir_all('${scratch}/gpu/agx/event')!
 	os.cp('${repo}/kernel/gpu/agx/event/event.v', '${scratch}/gpu/agx/event/event.v')!
 	os.cp('${repo}/kernel/gpu/agx/event/workqueue.v', '${scratch}/gpu/agx/event/workqueue.v')!
-	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\n')!
+	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\npub fn test_cursor(slot u32, value u32) { gpu_event_mgr.stamps[slot].value = value }\npub fn test_completed(mut queue WorkQueueEvents, value u32) { queue.completed_value = value }\n')!
 	os.cp('${repo}/tests/agx-event/test.v', '${scratch}/main.v')!
 	os.cp('${repo}/tests/agx-event/admission.v', '${scratch}/admission.v')!
+	os.cp('${repo}/tests/agx-event/backlog.v', '${scratch}/backlog.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut flags := ['-nocache', '-no-parallel', '-cc', 'cc', '-enable-globals', '-path',
 		'${scratch}|@vlib|@vmodules']

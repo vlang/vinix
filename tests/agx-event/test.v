@@ -3,6 +3,7 @@ import gpu.agx.event
 import drm.syncobj
 
 fn main() {
+	check_prepared_backlog()
 	check_publication_window()
 	check_initial_events()
 	check_physical_stamp_pins()
@@ -127,7 +128,8 @@ fn main() {
 	assert queue.release(wrap_b.slot, wrap_b.value, true)
 	mut window := [127]event.Ticket{}
 	for i in 0 .. window.len { window[i] = queue.retain() or { panic('fill event window') } }
-	assert queue.retain() == none, 'the local preparation table holds 127 reservations'
+	overflow := queue.retain() or { panic('preparation can exceed the hardware window') }
+	assert queue.release(overflow.slot, overflow.value, false)
 	for i in 0 .. 126 { assert queue.publish(window[i].slot, window[i].value) }
 	assert !queue.publish(window[126].slot, window[126].value), 'publication must preserve the reference spare event'
 	driver[window[125].slot] = window[125].value
@@ -136,11 +138,12 @@ fn main() {
 	assert queue.publish(window[126].slot, window[126].value)
 	driver[window[126].slot] = window[126].value
 	assert queue.release(window[126].slot, window[126].value, true)
-	// A retained old value bounds the sequence window even when slots in
-	// the bookkeeping table are free; no half-range ambiguity can develop.
+	// Prepared values beyond the hardware window remain valid reservations.
 	newest := queue.retain() or { panic('final free event value') }
 	assert newest.value - window[0].value == 127 * 0x100
-	assert queue.retain() == none
+	beyond := queue.retain() or { panic('beyond the old reservation window') }
+	assert beyond.value - window[0].value == 128 * 0x100
+	assert queue.release(beyond.slot, beyond.value, false)
 	assert queue.release(newest.slot, newest.value, false)
 	assert queue.release(window[0].slot, window[0].value, true)
 	event.reset_event_manager()

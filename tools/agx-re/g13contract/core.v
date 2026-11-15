@@ -281,7 +281,7 @@ fn check_event_admission_contract(local string, reference string) ! {
 		'pub fn (mut queue WorkQueueEvents) admit(', '!queue.owns_slot(slot)',
 		'ticket.active && ticket.value == value && !ticket.published', 'ticket.admitted = true',
 		'pub fn (queue &WorkQueueEvents) can_publish(', 'queue.slot != slot',
-		'for ticket in queue.tickets', 'ticket.published', 'admitted = ticket.admitted',
+		'for ticket in block.entries', 'ticket.published', 'admitted = ticket.admitted',
 		'return found && (admitted || queue.can_submit(1))'], 'Vinix event publication spare')!
 	require(!capacity.contains('stamp_value_completed') && !capacity.contains('gpu_event_mgr'), 'Raw GPU progress must not grant host event capacity')!
 	publish := local.all_after('pub fn (mut queue WorkQueueEvents) publish(')
@@ -292,6 +292,31 @@ fn check_event_admission_contract(local string, reference string) ! {
 		'i32(values[index] - values[index - 1]) <= 0', 'ticket.active && ticket.value == values[index] && ticket.admitted && !ticket.published',
 		'if !found { return false }', 'i32(ticket.value - values[count - 1]) > 0',
 		'ticket.value == values[index]', 'if !included { return false }'], 'Vinix complete event FIFO')!
+}
+
+fn check_prepared_backlog_contract(local string, reference string) ! {
+	new_job := section(reference, 'pub(crate) fn new_job(', 'pub(crate) fn pipe_type(', 'Asahi prepared job ownership')!
+	require_order(new_job, ['inner.pending_jobs += 1', 'pending: KVec::new()', 'event_count: 0'], 'Asahi prepared job ownership')!
+	require(!new_job.contains('MAX_JOB_SLOTS') && !new_job.contains('free_slots()'), 'Asahi preparation must not charge hardware event credit')!
+	retain := section(local, 'pub fn (mut queue WorkQueueEvents) retain(', 'pub enum InitialState', 'Vinix prepared backlog')!
+	require(!retain.contains('queue.users >= 127') && !retain.contains('128 * 0x100'), 'Prepared backlog must not be capped by the hardware publication window')!
+	require_order(retain, ['value := advance_stamp', 'value - queue.completed_value >= u32(0x80000000)',
+		'mut block := unsafe { &queue.tickets }', 'for block != unsafe { nil }',
+		'for index, ticket in block.entries', 'value - ticket.value >= u32(0x80000000)',
+		'block = block.next', 'if target == unsafe { nil }',
+		'memory.malloc_packed_fallible(sizeof(TicketBlock))', 'if target == unsafe { nil }',
+		'gpu_event_mgr.cancel_value(queue.slot, value)', 'return none', 'tail.next = target',
+		'queue.sequence++', 'queue.serial++', 'target.entries[vacant] = PendingTicket{',
+		'target.users++', 'queue.users++'], 'Vinix owned overflow allocation and rollback')!
+	release := section(local, 'pub fn (mut queue WorkQueueEvents) release(', 'pub fn (queue &WorkQueueEvents) busy()', 'Vinix overflow retirement')!
+	require_order(release, ['ticket.published != submitted', 'ticket.active = false',
+		'block.users--', 'queue.users--', 'previous != unsafe { nil } && block.users == 0',
+		'previous.next = block.next', 'memory.free(block)', 'queue.users == 0', 'release_stamp(queue.slot)', 'return true'], 'Vinix unlink-before-free overflow retirement')!
+	for name in ['ticket(', 'resolve_initial(', 'admit(', 'can_publish_batch(', 'can_publish(', 'publish('] {
+		start := local.index(') ' + name) or { return error('missing backlog traversal ' + name) }
+		body := local[start..].all_before('\npub fn ')
+		require(body.contains('block.entries') && body.contains('block = block.next'), 'Every ticket operation must visit overflow blocks: ' + name)!
+	}
 }
 
 fn check_batch_admission_contract(local string, pending string, reference string) ! {
@@ -461,6 +486,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_submission_pipelining(pending)!
 	check_ring_admission_contract(local, workqueue)!
 	check_event_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, workqueue)!
+	check_prepared_backlog_contract(read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, workqueue)!
 	check_batch_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_admission.v'))!, pending, queue)!
 	check_batch_publication_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_batch.v'))!, pending, queue)!
 	check_input_dependency_contract(pending)!
@@ -599,6 +625,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',
 		'Compute and paired render admission count host-unretired ring commands and preserve the reference spare entry',
 		'Whole-batch readiness counts all three pipes before publication, including compacted prefixes and simulated TVB bind/growth records; event and ring windows retain the reference spare',
+		'Prepared reservations grow beyond the hardware window in owned overflow blocks, with fallible allocation rollback, signed-half-range safety and unlink-before-free retirement',
 		'Native batch publication completes every fallible ring/wake preparation before notifier accounting or visibility, then exposes and notifies fragment/vertex/compute once each',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',

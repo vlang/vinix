@@ -69,9 +69,18 @@ fn function_body(source string, name string) !string {
 fn check(source string) ! {
 	for name in helpers {
 		body := function_body(source, name)!
+		mut allocation_scan := body
+		if name.ends_with('WorkQueueEvents__retain') {
+			owned := 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock))'
+			if body.count(owned) != 1 { return error('prepared backlog must have exactly one owned overflow allocation site') }
+			allocation_scan = body.replace(owned, 'owned_ticket_block_allocation')
+		}
+		if name.ends_with('WorkQueueEvents__release') && (body.count('memory__free((void*)(block))') != 1 || body.count('memory__free(') != 1) {
+			return error('prepared backlog must have exactly one overflow retirement free site')
+		}
 		for allocation in ['memdup', 'HEAP(', 'malloc', 'calloc', 'realloc', '__new_array',
 			'new_array_from', 'array_clone', 'array_slice'] {
-			if body.contains(allocation) { return error(name + ': unexpected temporary allocation: ' + allocation) }
+			if allocation_scan.contains(allocation) { return error(name + ': unexpected temporary allocation: ' + allocation) }
 		}
 		for copy in ['__v3_struct_eq', 'G13QueueResources __eq'] {
 			if body.contains(copy) { return error(name + ': unexpected structural copy/comparison: ' + copy) }
@@ -101,7 +110,9 @@ fn selftest() ! {
 	for name in helpers {
 		kind := result_type(name)
 		ending := if kind == 'void' { 'return;' } else if kind == 'bool' { 'return true;' } else { 'return (' + kind + '){0};' }
-		fixture += kind + ' ' + name + '(void) {\n void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
+		owned := if name.ends_with('WorkQueueEvents__retain') { 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));\n' }
+			else if name.ends_with('WorkQueueEvents__release') { 'memory__free((void*)(block));\n' } else { '' }
+		fixture += kind + ' ' + name + '(void) {\n' + owned + ' void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
 	}
 	check(fixture)!
 	for name in helpers {
@@ -113,6 +124,13 @@ fn selftest() ! {
 		}
 	}
 	for broken in ['', fixture + fixture,
+		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', ''),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', 'memory__malloc_packed_fallible(1);'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock)); memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));'),
+		fixture.replace('memory__free((void*)(block));', ''),
+		fixture.replace('memory__free((void*)(block));', 'memory__free(queue);'),
+		fixture.replace('memory__free((void*)(block));', 'memory__free((void*)(block)); memory__free((void*)(block));'),
+		fixture.replace('memory__free((void*)(block));', 'memory__free((void*)(block)); memory__free(queue);'),
 		fixture.replace('void* blocked[128];', 'void** blocked;'),
 		fixture.replace('bool unpublished[128];', 'bool* unpublished;'),
 		fixture.replace('G13SubmissionJob jobs[64];', 'G13SubmissionJob* jobs;'),
@@ -132,5 +150,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission storage: thirty-three live generated barrier/publisher/scheduler/initial-event/dependency/admission/transaction helpers contain no temporary allocations')
+	println('G13 submission storage: thirty-three live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
 }

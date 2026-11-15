@@ -142,6 +142,22 @@ fn test_event_admission_rejects_missing_spare_and_regressing_completion() {
 	if _ := check_event_admission_contract(local, reference.replace('> self.event_count', '>= self.event_count')) { assert false }
 }
 
+fn test_prepared_backlog_rejects_fixed_hardware_cap_missing_rollback_and_early_free() {
+	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/event/workqueue.v'))!
+	reference := 'pub(crate) fn new_job() { inner.pending_jobs += 1; pending: KVec::new(); event_count: 0; } pub(crate) fn pipe_type() {}'
+	check_prepared_backlog_contract(local, reference)!
+	for token in ['value - queue.completed_value >= u32(0x80000000)', 'value - ticket.value >= u32(0x80000000)',
+		'gpu_event_mgr.cancel_value(queue.slot, value)', 'tail.next = target', 'target.users++',
+		'previous != unsafe { nil } && block.users == 0', 'previous.next = block.next', 'block = block.next'] {
+		assert local.contains(token)
+		if _ := check_prepared_backlog_contract(local.replace(token, ''), reference) { assert false }
+	}
+	if _ := check_prepared_backlog_contract(local.replace('if queue.users == ~u32(0)', 'if queue.users >= 127'), reference) { assert false }
+	if _ := check_prepared_backlog_contract(local.replace('previous.next = block.next\n\t\t\t\tmemory.free(block)',
+		'memory.free(block)\n\t\t\t\tprevious.next = block.next'), reference) { assert false }
+	if _ := check_prepared_backlog_contract(local, reference.replace('inner.pending_jobs += 1', 'if free_slots() == 0 { return none }; inner.pending_jobs += 1')) { assert false }
+}
+
 fn test_batch_admission_rejects_partial_counts_and_lost_shutdown_gate() {
 	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/gpu/g13_admission.v'))!
 	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!

@@ -38,8 +38,16 @@ fn (mut mgr GpuManager) kick_firmware() bool {
 fn (mut mgr GpuManager) ring_pipe(priority u32, pipe u32) bool {
 	assert priority < 4
 	mgr.doorbells << pipe
-	for job in mgr.g13_compute_jobs { assert job.submitted && job.pending_counted }
-	for job in mgr.g13_render_jobs { assert job.submitted && job.pending_counted }
+	mut submitted := u32(0)
+	for job in mgr.g13_compute_jobs {
+		if mgr.expected_owned == 0 { assert job.submitted }
+		if job.submitted { assert job.pending_counted; submitted++ }
+	}
+	for job in mgr.g13_render_jobs {
+		if mgr.expected_owned == 0 { assert job.submitted }
+		if job.submitted { assert job.pending_counted; submitted++ }
+	}
+	if mgr.expected_owned != 0 { assert submitted == mgr.expected_owned }
 	return mgr.doorbell_fail != int(pipe)
 }
 
@@ -134,6 +142,7 @@ mut:
 	kick_fails bool
 	doorbells []u32
 	doorbell_fail int = -1
+	expected_owned u32
 }
 
 struct G13EventResources {
@@ -259,6 +268,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_prepared_job_backlog()
 	check_batch_publication()
 	check_batch_admission()
 	check_initial_barrier_lifetimes()

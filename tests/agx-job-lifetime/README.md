@@ -78,3 +78,11 @@ Capacity retry succeeds intact; failed wake restores pending accounting. Doorbel
 failure after visibility returns the entire ownership mask and retains backing
 through error quarantine until injected firmware stop. Every final event slot
 returns. Native batches never return the partial masks injected by async tests.
+
+Prepared-backlog checks create 512 actual compute or render job records before
+publication. Eight native 64-command batches remain bound by hardware event
+credit and host retirement. Initial captures span all blocks; failed invalidation
+retains ticket/block ownership until quarantine retry. Stopped cleanup distinguishes
+manager-owned published metadata from caller-owned prepared records, and a partial
+render preparation fails its second overflow allocation after vertex succeeds.
+Every overflow allocation and physical stamp returns through production cleanup.

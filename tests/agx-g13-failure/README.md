@@ -63,6 +63,12 @@ this checker requires every live helper rather than accepting missing bodies.
 The standalone source remains exercised by this failure fixture. Historical
 bundle checkers and their original complete evidence remain unchanged.
 
+Prepared backlog owns one explicit overflow-block allocation site in `retain`
+and one unlink-before-free site in `release`. The generated-C checker requires
+those exact sites and continues to reject every other temporary allocation.
+Negative selftests reject missing, duplicated or differently sized ownership
+allocations, missing/wrong frees and hidden allocation calls in all helpers.
+
 Host ring admission executes the production capacity helper at 5,120 boundaries,
 then drives the actual compute and paired render publishers with firmware rings
 consumed but host retirement withheld. Exact remaining capacity is refused to

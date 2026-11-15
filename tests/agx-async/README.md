@@ -109,3 +109,10 @@ backpressure after admission still exercises partial progress without revisiting
 transferred pointers. Shutdown during the readiness call must release all
 caller-owned metadata in that final poll. Capacity is injected here; the lifetime
 fixture exercises the actual native counting, tickets, TVB binding and prefixes.
+
+Backlog ioctl checks queue eight 64-command compute/render submissions behind an
+unsignaled input while another queue progresses. Per-node VM pins, aggregate
+fences and FIFO survive preparation of all 512 jobs. Later batches remain deferred
+until host callbacks return publication credit. The injected allocator is fully
+drained per scenario; real event overflow allocation/retirement is checked by
+the event and lifetime fixtures.
