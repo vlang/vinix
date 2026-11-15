@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64
+const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 32
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -40,8 +40,14 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	mut work := count
 	for i in 0 .. arity {
 		source := p.operands[op.operands_start + i + 1]
-		if ir.references[signature.refs_start + i + 1] != op.result_type || source.type_index != op.result_type { return error('AIR vector intrinsic: argument type identity') }
-		work += p.vector_source_profile(stream, pools, bodies, scope, index, source, mixed, remaining - work)!
+		argument := ir.references[signature.refs_start + i + 1]
+		if source.type_index != argument { return error('AIR vector intrinsic: argument type identity') }
+		exponent := id == .ldexp && i == 1
+		if exponent {
+			e, width, n := p.scalar_vector_type(argument, false, remaining - work)!
+			if p.types[e].kind != .integer_t || width != 32 || n != count { return error('AIR vector intrinsic: matching i32 exponent vector required') }
+		} else if argument != op.result_type { return error('AIR vector intrinsic: argument type identity') }
+		work += p.vector_source_profile(stream, pools, bodies, scope, index, source, mixed && !exponent, remaining - work)!
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR vector intrinsic: declaration record') }
@@ -64,6 +70,6 @@ fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Strea
 	arity := scalar_intrinsic_arity(id)
 	right := if arity >= 2 { m.read_vector(stream, m.p.operands[op.operands_start + 2])! } else { ScalarVectorValue{} }
 	addend := if arity == 3 { m.read_vector(stream, m.p.operands[op.operands_start + 3])! } else { ScalarVectorValue{} }
-	result := if id in [.fma, .fmuladd]! { fma_intrinsic_vector(left, right, addend, bits, count)! } else if id in [.fabs, .copysign]! { sign_intrinsic_vector(id, left, right, bits, count)! } else if id in [.minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum]! { minmax_intrinsic_vector(id, left, right, bits, count)! } else if id == .sqrt { sqrt_intrinsic_vector(left, bits, count)! } else { rounding_intrinsic_vector(id, left, bits, count)! }
+	result := if id == .ldexp { ldexp_intrinsic_vector(left, right, bits, count)! } else if id in [.fma, .fmuladd]! { fma_intrinsic_vector(left, right, addend, bits, count)! } else if id in [.fabs, .copysign]! { sign_intrinsic_vector(id, left, right, bits, count)! } else if id in [.minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum]! { minmax_intrinsic_vector(id, left, right, bits, count)! } else if id == .sqrt { sqrt_intrinsic_vector(left, bits, count)! } else { rounding_intrinsic_vector(id, left, bits, count)! }
 	return m.store_vector_value(inst, result)!
 }

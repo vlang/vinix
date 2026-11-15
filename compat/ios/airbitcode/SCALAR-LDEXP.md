@@ -6,7 +6,8 @@ argument is a signed i32 exponent: multiply the first argument by `2^exponent`.
 Unlike the other admitted math calls, this signature mixes float and integer
 arguments. Admission verifies the exact names, floating precision, i32 width,
 declared/operand type identity and the existing strict [call profile](SCALAR-INTRINSICS.md).
-Other integer exponent widths, precisions, vectors and AIR aliases reject.
+Other integer exponent widths, precisions and AIR aliases reject. Fixed-vector
+calls use the separate profile below.
 
 Evaluation normalizes the integer significand, adjusts the unbiased exponent,
 then uses the existing packer for one nearest/ties-to-even rounding. Gradual
@@ -49,6 +50,26 @@ downward rounding. Existing guard/corruption controls remain; all native
 references run only in the default environment. The prior half copysign integer
 oracle remains documented separately. LLVM/JIT/native code is not sanitizer-
 instrumented. This does not execute an AIR shader or submit Metal GPU work.
+
+## Fixed vectors
+
+The mixed, void and memory interpreters accept unflagged
+`llvm.ldexp.vNf16.vNi32` and `llvm.ldexp.vNf32.vNi32`, for N=1..16.
+The first operand and result have the same floating type; the second operand
+must be an i32 vector with the same count. Actual declaration and source types
+are checked independently of the overload name. Each lane uses the scalar
+evaluator above. Either source's poison propagates locally; any undef source
+lane rejects even when the result is discarded. Source freezes repair lanes,
+and results retain independent snapshots. Calls cost one step, three lane
+counts of validation work and one shared construction slot. Thirty-two new
+declaration identities extend the vector cache to 608 entries.
+
+`tests/ios/air-vector-ldexp.v` checks all counts and both formats, exact values,
+states, changing-exponent loops, malformed signatures and shared limits.
+Its native reference uses scalar calls for N=1 because the captured LLVM
+AArch64 backend crashes legalizing that vector form; N=2..16 use vector calls.
+Vector arguments/returns, PHIs, loads/stores, scalable vectors, other exponent
+widths, fast-math and strict FP remain unsupported.
 
 References: [LLVM ldexp](https://llvm.org/docs/LangRef.html#llvm-ldexp-intrinsic),
 [LLVM math NaN rules](https://llvm.org/docs/LangRef.html#behavior-of-floating-point-operations).
