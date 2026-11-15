@@ -3,9 +3,11 @@
 Current status: **runtime qualification is incomplete**. A fresh local ARM
 signed Win64 producer, guest and independent fork-safe retainer pass, with all
 55 evidence refusal controls; see [the retained continuation](wine-forksafe-retention-check.md).
-The fresh x86 run reaches Wine but its server fails to load `l_intl.nls`; the
-retainer refuses that failed outcome. The retained
-[checkpoint](wine-native-checkpoint.md) records the previous failed guests.
+Historical x86 runs failed to load `l_intl.nls`; their failed outcomes remain
+retained in the [checkpoint](wine-native-checkpoint.md). Later owned x86 console
+launch, collection, migration and rollback results are recorded in the
+[lease supervision report](wine-lease-supervision-plan.md). Those results do
+not replace the original outcomes or qualify broad Wine compatibility.
 The [nested bridge qualification](wine-nested-bridge-check.md) adds private
 native child bridges and an adjacent ordinary musl copy so Wine can discover
 its loader, server and data through its own executable-directory rules. Both
@@ -16,8 +18,29 @@ The historical x86-9 outcome remains a failed checkpoint. The separate
 [translated-fork fixture](wine-translation-fork-check.md) records the original
 ARM split-WX failure and its source-built fix. The new explicit retainer mode
 below admits one pinned fork-safe build; the original Alpine patch contract
-remains separate. No Calculator UI or ordinary graphical Wine execution has
-passed.
+remains separate. Current owned graphical acceptance remains a separate gate;
+the [GUI qualification](wine-gui-check.md) records the earlier graphical scope.
+
+With `--owned-manager --migration-probe` or `--owned-manager --rollback-probe`,
+the native guest requires authenticated public prefix JSON with the selected
+Wine 9.17.1 runtime version and service scope. It first attempts migration with
+the previous generation pin and requires the specific mismatch refusal, every
+builtin target unchanged and no staging entry. Successful migration uses the
+freshly reviewed generation. Rollback repeats those checks before a real Win64
+relaunch returning status 37. These modes retain caller/manager-death, foreign
+server refusal, lease, private-data and collection requirements. They relocate
+the same Wine engine bytes between package generations; they do not establish
+compatibility between Wine engine versions.
+
+`wine-native-replay ORIGINAL_NATIVE_RUN FRESH_OUTPUT` reuses an existing x86
+rollback ISO when rebuilding another bundle would consume too much storage.
+It requires matching original/verified input maps, rechecks the generated
+artifacts and exact ISO, and admits only the recorded 3 GiB/two-vCPU TCG profile.
+Only serial and QMP output paths change. It checks every rollback acceptance
+marker and forbidden output under the same 900-second outer limit; the guest's
+internal command limits stay embedded in the unchanged ISO. Inputs are checked
+again afterward. A replay records a separate result and never changes the
+original outcome or substitutes for producer/historical evidence audits.
 
 This fixture is designed to run an actual AMD64 PE32+ console program through Wine 9.17-r1
 under an ordinary Vinix account. The runtime and application are separate signed

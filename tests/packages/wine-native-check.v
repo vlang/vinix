@@ -363,6 +363,10 @@ fn check() ! {
 	}
 	if caller_death && os.args[10] == '--rollback-probe' {
 		required << 'Wine rollback prefix migrated and real Win64 relaunched status37 PASS'
+		required << 'Wine rollback stale-generation refusal all-targets-unchanged PASS'
+	}
+	if caller_death && os.args[10] in ['--migration-probe', '--rollback-probe'] {
+		required << 'Wine migration stale-generation refusal all-targets-unchanged PASS'
 	}
 	scenario := hwhost.Scenario{
 		name:        'packaged-Wine'

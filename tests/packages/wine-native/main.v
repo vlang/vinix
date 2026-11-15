@@ -37,20 +37,61 @@ fn C.execv(&char, &&char) int
 const application = 'org.vinix.wine-win64-probe'
 const data = '/home/alex/.local/share/vinix-apps/' + application
 
+struct MigrationReview {
+	format int
+	scope string
+	generation u64
+	prior_generation u64
+	runtime_id string
+	runtime_version string
+	bindings []wineadapter.BuiltinBinding
+}
+
+fn (mut review MigrationReview) close() {
+	unsafe {
+		for row in review.bindings { row.name.free(); row.observed.free(); row.replacement.free() }
+		(&array(&review.bindings)).free()
+		review.scope.free(); review.runtime_id.free(); review.runtime_version.free()
+	}
+	review = MigrationReview{}
+}
+
 fn prefix_command_child() {
-	if os.args.len != 3 || os.args[2] !in ['wine-prefix-review', 'wine-prefix-migrate'] { exit(125) }
+	if os.args.len != 4 || os.args[2] !in ['wine-prefix-review', 'wine-prefix-migrate'] { exit(125) }
+	if os.args[2] == 'wine-prefix-migrate' && os.args[3].u64() == 0 { exit(125) }
 	if C.setgroups(0, unsafe { nil }) != 0 || C.setresgid(1000, 1000, 1000) != 0 || C.setresuid(1000, 1000, 1000) != 0 { exit(124) }
-	args := ['/usr/bin/vinix-package', os.args[2], application, data]!
-	mut pointers := unsafe { [5]&char{} }
+	mut args := ['/usr/bin/vinix-package', os.args[2], application, data]
+	if os.args[2] == 'wine-prefix-migrate' { args << '--generation'; args << os.args[3] }
+	mut pointers := unsafe { [7]&char{} }
 	for index, argument in args { pointers[index] = argument.str }
 	C.execv(args[0].str, &pointers[0])
 	exit(127)
 }
 
-fn migration_review(command string) !wineadapter.BindingReview {
-	output := collection_command_status([os.executable(), '--prefix-command', command], '', 0)!
+fn migration_review(command string, generation u64) !MigrationReview {
+	output := collection_command_status([os.executable(), '--prefix-command', command, generation.str()], '', 0)!
 	defer { unsafe { output.free() } }
-	return json2.decode[wineadapter.BindingReview](output)
+	mut review := json2.decode[MigrationReview](output)!
+	if review.format != 1 || review.runtime_id != 'org.vinix.wine-runtime' || review.runtime_version != '9.17.1'
+		|| review.scope != 'authenticated current-runtime review; no retained admission or later-write authorization' {
+		review.close()
+		return error('real Wine authenticated prefix document differs')
+	}
+	return review
+}
+
+fn refuse_stale_prefix(before MigrationReview, stale u64, phase string) ! {
+	output := collection_command_status([os.executable(), '--prefix-command', 'wine-prefix-migrate', stale.str()], '', 1)!
+	defer { unsafe { output.free() } }
+	if !output.contains('generation differs from requested generation') { return error('real Wine stale generation did not refuse') }
+	for row in before.bindings {
+		if os.readlink(data + '/wine/drive_c/windows/system32/' + row.name)! != row.observed {
+			return error('stale Wine generation pin changed a builtin target')
+		}
+	}
+	stage := data + '/wine/.vinix-builtin-next'
+	if os.exists(stage) || os.is_link(stage) { return error('stale Wine generation pin created a stage') }
+	println('HWTEST INFO Wine ' + phase + ' stale-generation refusal all-targets-unchanged PASS')
 }
 
 // Diagnostic-only continuation after the real remove/rollback transition.
@@ -62,11 +103,12 @@ fn rollback_relaunch(previous string, architecture string, sentinel string) ! {
 	if state.generation == 0 || state.generation == os.file_name(previous).u64() { return error('rollback did not restore a fresh deployment') }
 	current := '/var/lib/vinix-packages/generations/' + state.generation.str()
 	defer { unsafe { current.free() } }
-	mut before := migration_review('wine-prefix-review')!
+	mut before := migration_review('wine-prefix-review', 0)!
 	defer { before.close() }
 	if before.generation != state.generation || before.prior_generation != os.file_name(previous).u64()
 		|| !before.bindings.any(it.operation == .replace) { return error('rollback prefix did not retain the prior deployment bindings') }
-	mut migrated := migration_review('wine-prefix-migrate')!
+	refuse_stale_prefix(before, os.file_name(previous).u64(), 'rollback')!
+	mut migrated := migration_review('wine-prefix-migrate', state.generation)!
 	defer { migrated.close() }
 	if migrated.generation != state.generation || migrated.prior_generation != 0
 		|| migrated.bindings.len != before.bindings.len || !migrated.bindings.all(it.operation == .keep) { return error('rollback prefix migration incomplete') }
@@ -987,12 +1029,13 @@ fn collection_run(generation string, architecture string) ! {
 			if selected.generation == os.file_name(generation).u64() { return error('migration did not select a new generation') }
 			unsafe { relaunched_generation.free() }
 			relaunched_generation = '/var/lib/vinix-packages/generations/' + selected.generation.str()
-			mut before_migration := migration_review('wine-prefix-review')!
+			mut before_migration := migration_review('wine-prefix-review', 0)!
 			defer { before_migration.close() }
 			if before_migration.generation != selected.generation || before_migration.prior_generation != os.file_name(generation).u64()
 				|| !before_migration.bindings.any(it.operation == .replace) { return error('real Wine prior-generation review differs') }
 			println('HWTEST INFO Wine migration selected links=' + before_migration.bindings.len.str())
-			mut migrated := migration_review('wine-prefix-migrate') or {
+			refuse_stale_prefix(before_migration, os.file_name(generation).u64(), 'migration')!
+			mut migrated := migration_review('wine-prefix-migrate', selected.generation) or {
 				mut replaced := 0
 				for entry in before_migration.bindings {
 					observed := os.readlink(data + '/wine/drive_c/windows/system32/' + entry.name) or { '' }
@@ -1044,7 +1087,7 @@ fn collection_run(generation string, architecture string) ! {
 		return error('collection removed the retained rollback generation')
 	}
 	$if wine_rollback_probe ? {
-		mut final := migration_review('wine-prefix-review')!
+		mut final := migration_review('wine-prefix-review', 0)!
 		defer { final.close() }
 		if final.generation != retained.generation || final.prior_generation != 0 || !final.bindings.all(it.operation == .keep) { return error('collection broke restored prefix bindings') }
 		println('HWTEST INFO Wine rolled-back prefix relaunch status37 private-data lease-free collected PASS')
