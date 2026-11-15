@@ -3,6 +3,7 @@ module winehostimages
 
 import os
 import json2
+import tests.packages.winesource
 
 fn line(pid string, path string) string {
 	return 'dyld[' + pid + ']: <12345678-1234-1234-1234-123456789ABC> ' + path + '\n'
@@ -52,5 +53,40 @@ fn test_real_managed_child_ignores_parent_loader_injection() {
 	os.write_file(root + '/cc.log.environment.json', json2.encode(poisoned))!
 	mut refused := false
 	admit_names(root, root, ['cc.log']) or { refused = true }
+	assert refused
+}
+
+fn test_optional_real_v_source_generation_ignores_parent_settings() {
+	tool := os.getenv('VINIX_V_HOST_TEST_COMPILER')
+	if tool == '' { return }
+	root := os.abs_path(os.getenv('VINIX_V_HOST_TEST_STATE'))
+	if os.getenv('VINIX_V_HOST_TEST_STATE') == '' || os.exists(root) { panic('fresh external V host state required') }
+	os.mkdir_all(root)!
+	mut previous := map[string]string{}
+	mut present := map[string]bool{}
+	for key in ['VFLAGS', 'VMODULES', 'VEXE', 'DYLD_INSERT_LIBRARIES'] {
+		if value := os.getenv_opt(key) { previous[key] = value; present[key] = true }
+		os.setenv(key, if key == 'VFLAGS' { '-definitely-invalid-parent-flag' } else { '/definitely-absent-parent-setting' }, true)
+	}
+	defer {
+		for key in ['VFLAGS', 'VMODULES', 'VEXE', 'DYLD_INSERT_LIBRARIES'] {
+			if present[key] { os.setenv(key, previous[key], true) } else { os.unsetenv(key) }
+		}
+	}
+	os.write_file(root + '/program.v', 'module main\nfn main() { println("closed V environment") }\n')!
+	base := [tool, '-backend', 'c', '-prod', '-os', 'linux', '-arch', 'amd64', '-gc', 'none', '-manualfree', '-o', root + '/program.c', root + '/program.v']
+	mut discover := base.clone(); discover.insert(1, ['-print-watched-files', '-dump-files', root + '/sources-before.txt'])
+	invoke_v(discover, root, root + '/discover.log')!
+	mut compile := base.clone(); compile.insert(1, ['-dump-files', root + '/sources-built.txt'])
+	invoke_v(compile, root, root + '/v.log')!
+	inputs := {tool: winesource.file_digest(tool)!}
+	admit_v(root, root, tool, inputs)!
+	assert os.is_file(root + '/program.c')
+	assert os.read_file(root + '/sources-before.txt')! == os.read_file(root + '/sources-built.txt')!
+	mut poisoned := v_environment(root, tool)
+	poisoned['VFLAGS'] = '-unrecorded'
+	os.write_file(root + '/v.log.environment.json', json2.encode(poisoned))!
+	mut refused := false
+	admit_v(root, root, tool, inputs) or { refused = true }
 	assert refused
 }

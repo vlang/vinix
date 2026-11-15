@@ -3,8 +3,9 @@
 Managed Homebrew Clang/LLD children now use a closed environment with fixed
 PATH, locale, timezone and source epoch, private HOME/TMPDIR directories, and
 `DYLD_PRINT_LIBRARIES=1`. Parent include/library search variables, credentials
-and loader injection settings are not inherited. V compilation, controller
-builds and other host tools remain outside this environment contract.
+and loader injection settings are not inherited. The separate
+[V source-generation boundary](wine-v-host-check.md) now covers selected V-to-C
+children. Controller builds and other host tools remain outside this contract.
 
 Before the first managed command in a build, both pinned tools run `--version`
 under that environment. Their observed image identities are merged and the
@@ -47,13 +48,14 @@ child to succeed without inheriting it, then requires an added CPATH entry in
 its recorded environment to refuse. Optional `VINIX_HOST_IMAGE_TEST_STATE`
 preserves raw test state in a fresh external directory.
 
-The full retention runner requires thirty-nine resealed refusals after real
-and unchanged copied baselines pass. Five new cases omit a before-command
+The full retention runner now requires forty-four resealed refusals after real
+and unchanged copied baselines pass. Five Clang/LLD cases omit a before-command
 image, alter a child environment, omit an observed image, change a recorded
-image hash or link an image receipt. Every case must fail at its named check
+image hash or link an image receipt; five V cases exercise the corresponding
+source-generation records. Every case must fail at its named check
 without retained output, using private copies and detached mutation writes.
 
-Remaining gates include OS shared-cache/loader bytes, V/host-controller and
+Remaining gates include OS shared-cache/loader bytes, host-controller and
 other host-tool coverage, unreported inputs/search absence, full hermetic
 admission, default activation, owned ARM/GUI and broader roadmap 14 acceptance.
 Historical complete bundles and original verifiers remain required. This

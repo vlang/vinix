@@ -26,6 +26,8 @@ add the actual static linker objects/archives and require an identical replay.
 The [host image/environment check](wine-host-images-check.md) also binds managed
 Clang/LLD child environments and observed ordinary non-system images. OS shared
 cache and full hermetic toolchain admission remain separate.
+Selected [V-to-C children](wine-v-host-check.md) also require closed environments
+and observed compiler-image admission before and after boot.
 
 The historical x86-9 outcome remains a failed checkpoint. The separate
 [translated-fork fixture](wine-translation-fork-check.md) records the original

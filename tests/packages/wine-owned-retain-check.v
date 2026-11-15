@@ -36,7 +36,9 @@ fn clone_tree(source string, destination string, prepared bool) ! {
 			|| path.ends_with('.environment.json') || path.ends_with('.dyld.log')
 			|| path.ends_with('/host-images-before.json') || path.ends_with('/host-clang-version.log')
 			|| path.ends_with('/host-linker-version.log') || path.ends_with('/host-clang-version.log.argv.json')
-			|| path.ends_with('/host-linker-version.log.argv.json') {
+			|| path.ends_with('/host-linker-version.log.argv.json') || path.ends_with('/v-host-images-before.json')
+			|| path.ends_with('/host-v-version.log') || path.ends_with('/host-v-version.log.argv.json')
+			|| path.ends_with('/discover.log.argv.json') || path.ends_with('/v.log.argv.json') {
 			$if macos {
 				if C.clonefile(path.str, to.str, 0) == 0 { continue }
 			}
@@ -137,36 +139,39 @@ fn check() ! {
 	cases << ['bridge-c-trace', 'bridge-c-manifest', 'guest-c-pin', 'package-c-command', 'guest-c-linked']
 	cases << ['bridge-link-proof', 'bridge-link-response', 'bridge-link-linked', 'guest-link-output', 'package-link-argv']
 	cases << ['bridge-host-baseline', 'bridge-host-environment', 'guest-host-trace', 'package-host-pin', 'guest-host-linked']
+	cases << ['bridge-v-host-baseline', 'bridge-v-host-environment', 'guest-v-host-trace', 'package-v-host-pin', 'guest-v-host-linked']
 	for name in cases {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
 		mut selected := prepared
 		mut expected := ''
-		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' || name.starts_with('bridge-c-') || name.starts_with('bridge-link-') || name.starts_with('bridge-host-') {
+		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' || name.starts_with('bridge-c-') || name.starts_with('bridge-link-') || name.starts_with('bridge-host-') || name.starts_with('bridge-v-host-') {
 			selected = dir + '/prepared'
 			clone_tree(prepared, selected, true)!; remap(dir, prepared, selected)!
 		}
-		if name == 'bridge-host-baseline' {
-			file := 'logs/host-images-before.json'
+		v_host := name.contains('-v-host-')
+		if name in ['bridge-host-baseline', 'bridge-v-host-baseline'] {
+			file := 'logs/' + if v_host { 'v-host-images-before.json' } else { 'host-images-before.json' }
 			before := json2.decode[winehostimages.Baseline](os.read_file(selected + '/' + file)!)!
 			replace(selected + '/' + file, json2.encode(winehostimages.Baseline{recorded_directory: before.recorded_directory, images: before.images[1..]}))!
 			reseal(dir, selected, [file])!
-			expected = 'host image before-command receipts differ'
-		} else if name == 'bridge-host-environment' {
-			file := 'logs/cc.log.environment.json'
+			expected = if v_host { 'V host before-command receipts differ' } else { 'host image before-command receipts differ' }
+		} else if name in ['bridge-host-environment', 'bridge-v-host-environment'] {
+			file := 'logs/' + if v_host { 'v.log.environment.json' } else { 'cc.log.environment.json' }
 			mut env := read_map(selected + '/' + file)!
-			env['CPATH'] = '/unrecorded'
+			env[if v_host { 'VFLAGS' } else { 'CPATH' }] = '/unrecorded'
 			replace(selected + '/' + file, json2.encode(env))!
 			reseal(dir, selected, [file])!
 			expected = 'host tool environment differs'
-		} else if name == 'guest-host-linked' {
-			file := dir + '/build-guest/host-images-before.json'
+		} else if name in ['guest-host-linked', 'guest-v-host-linked'] {
+			file := dir + '/build-guest/' + if v_host { 'v-host-images-before.json' } else { 'host-images-before.json' }
 			os.rename(file, file + '-original')!
 			os.symlink(file + '-original', file)!
 			expected = 'host image evidence must be a bounded ordinary file'
-		} else if name == 'guest-host-trace' || name == 'package-host-pin' {
-			file := if name == 'guest-host-trace' { 'build-guest/cc.log.dyld.log' } else { 'build-package/cc.log.images.json' }
-			if name == 'guest-host-trace' {
+		} else if name in ['guest-host-trace', 'package-host-pin', 'guest-v-host-trace', 'package-v-host-pin'] {
+			is_trace := name.ends_with('-trace')
+			file := if is_trace { 'build-guest/' } else { 'build-package/' } + if v_host { 'v.log' } else { 'cc.log' } + if is_trace { '.dyld.log' } else { '.images.json' }
+			if is_trace {
 				text := os.read_file(dir + '/' + file)!
 				observed := winehostimages.trace(text)!
 				path := observed[0].path
@@ -347,6 +352,6 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline thirty-nine exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline forty-four exact refusals')
 }
 fn main() { check() or { eprintln(err); exit(1) } }

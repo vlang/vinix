@@ -15,6 +15,13 @@ struct Copy {
 	mode u32
 }
 
+fn admit(directory string) ! {
+	winehostimages.admit_build(directory, directory)!
+	args := json2.decode[[]string](os.read_file(directory + '/v.log.argv.json')!)!
+	if args.len == 0 { return error('host snapshot V compiler command missing') }
+	winehostimages.admit_v(directory, directory, args[0], {args[0]: winesource.file_digest(args[0])!})!
+}
+
 fn run() ! {
 	$if prod {} $else { return error('compile host image snapshot with -prod') }
 	if os.args.len != 5 { return error('usage: SNAPSHOT BRIDGE_LOGS GUEST_LOGS PACKAGE_LOGS FRESH_OUTPUT') }
@@ -30,9 +37,14 @@ fn run() ! {
 	mut inputs := map[string]string{}
 	mut records := map[string]string{}
 	for directory in os.args[1..4] {
-		winehostimages.admit_build(directory, directory)!
-		for name in winehostimages.artifacts() { records[directory + '/' + name] = winesource.file_digest(directory + '/' + name)! }
-		for path, hash in winehostimages.inputs(directory)! {
+		admit(directory)!
+		for name in [...winehostimages.artifacts(), ...winehostimages.v_artifacts()] { records[directory + '/' + name] = winesource.file_digest(directory + '/' + name)! }
+		mut selected := winehostimages.inputs(directory)!
+		for path, hash in winehostimages.v_inputs(directory)! {
+			if path in selected && selected[path] != hash { return error('host snapshot V/C image contexts differ') }
+			selected[path] = hash
+		}
+		for path, hash in selected {
 			if path in inputs && inputs[path] != hash { return error('host snapshot image contexts differ') }
 			inputs[path] = hash
 		}
@@ -51,7 +63,7 @@ fn run() ! {
 		}
 		copies << Copy{path, stored, expected, mode}
 	}
-	for directory in os.args[1..4] { winehostimages.admit_build(directory, directory)! }
+	for directory in os.args[1..4] { admit(directory)! }
 	for path, expected in records { if winesource.file_digest(path)! != expected { return error('host image evidence changed during snapshot') } }
 	os.write_file(out + '/images.json', json2.encode(copies) + '\n')!
 	os.write_file(out + '/records.json', json2.encode(records) + '\n')!

@@ -234,3 +234,85 @@ pub fn inputs(directory string) !map[string]string {
 	for image in baseline.images { if !system(image.path) { result[image.path] = image.sha256 } }
 	return result
 }
+
+// V's source-generation phase has a separate, selected executable and private
+// module/home/tmp namespaces. No caller flags, module search or fallback enter.
+fn v_environment(directory string, tool string) map[string]string {
+	mut env := environment(directory)
+	env['HOME'] = directory + '/v-host-home'
+	env['TMPDIR'] = directory + '/v-host-tmp'
+	env['VMODULES'] = directory + '/v-host-modules'
+	env['VEXE'] = tool
+	env['V_MACOS_V3_CALLER_VEXE'] = tool
+	env['V_MACOS_V3_CALLER_VEXE_PRESENT'] = '1'
+	env['V_MACOS_V3_CALLER_VCHILD_PRESENT'] = '0'
+	env['V_MACOS_V3_NO_FALLBACK'] = '1'
+	return env
+}
+
+fn v_tool(tool string) ! {
+	if !safe_path(tool) || os.real_path(tool) != tool || os.lstat(tool)!.get_filetype() != .regular {
+		return error('V host compiler must be a canonical ordinary file')
+	}
+}
+
+pub fn invoke_v(command []string, cwd string, log string) !string {
+	if command.len == 0 { return error('missing V host compiler') }
+	tool := command[0]
+	v_tool(tool)!
+	directory := os.dir(log)
+	for name in ['v-host-home', 'v-host-tmp', 'v-host-modules'] {
+		path := directory + '/' + name
+		os.mkdir_all(path)!
+		if os.real_path(path) != path || os.lstat(path)!.get_filetype() != .directory {
+			return error('V host environment directory is not canonical')
+		}
+		os.chmod(path, 0o700)!
+	}
+	env := v_environment(directory, tool)
+	baseline_path := directory + '/v-host-images-before.json'
+	if !os.exists(baseline_path) && !os.is_link(baseline_path) {
+		images := raw([tool, '-version'], directory, directory + '/host-v-version.log', env)!
+		os.write_file(baseline_path, json2.encode(Baseline{recorded_directory: directory, images: images}) + '\n')!
+	}
+	baseline := json2.decode[Baseline](record(baseline_path)!)!
+	if baseline.format != 1 || baseline.recorded_directory != directory { return error('V host before-command namespace differs') }
+	compatible(raw(command, cwd, log, env)!, baseline.images)!
+	return os.read_file(log)
+}
+
+pub fn admit_v(directory string, recorded string, tool string, inputs map[string]string) ! {
+	v_tool(tool)!
+	if tool !in inputs || winesource.file_digest(tool)! != inputs[tool] { return error('V host compiler input absent or changed') }
+	baseline := json2.decode[Baseline](record(directory + '/v-host-images-before.json')!)!
+	if baseline.format != 1 || !os.is_abs_path(recorded) || baseline.recorded_directory != recorded {
+		return error('V host before-command namespace differs')
+	}
+	env := v_environment(recorded, tool)
+	probe := directory + '/host-v-version.log'
+	if json2.decode[[]string](record(probe + '.argv.json')!)! != [tool, '-version'] { return error('V host probe argv differs') }
+	if admit_record(probe, env, tool)! != baseline.images { return error('V host before-command receipts differ') }
+	for name in ['discover.log', 'v.log'] {
+		compatible(admit_record(directory + '/' + name, env, tool)!, baseline.images)!
+	}
+	for image in baseline.images {
+		if system(image.path) { continue }
+		if os.real_path(image.path) != image.path || os.lstat(image.path)!.get_filetype() != .regular
+			|| winesource.file_digest(image.path)! != image.sha256 { return error('V host image bytes or target changed') }
+	}
+}
+
+pub fn v_artifacts() []string {
+	mut result := ['v-host-images-before.json', 'host-v-version.log', 'host-v-version.log.argv.json']
+	for name in ['host-v-version.log', 'discover.log', 'v.log'] {
+		for suffix in ['.environment.json', '.dyld.log', '.images.json'] { result << name + suffix }
+	}
+	return result
+}
+
+pub fn v_inputs(directory string) !map[string]string {
+	baseline := json2.decode[Baseline](record(directory + '/v-host-images-before.json')!)!
+	mut result := map[string]string{}
+	for image in baseline.images { if !system(image.path) { result[image.path] = image.sha256 } }
+	return result
+}

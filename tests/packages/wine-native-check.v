@@ -66,7 +66,7 @@ fn discover_program(v string, source string, arch string, work string, name stri
 	os.mkdir_all(directory)!
 	mut command := v_program(v, source, arch, directory + '/' + name + '.c', owned, collection, caller_death, idle_server)!
 	command.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
-	invoke(command, directory + '/discover.log')!
+	winehostimages.invoke_v(command, directory, directory + '/discover.log')!
 	winesource.capture(directory + '/sources-before.txt', mut inputs)!
 	invoke(['/opt/homebrew/opt/llvm/bin/clang', '-print-resource-dir'], directory + '/clang-resource.log')!
 	resource := wineheaders.selection(os.read_file(directory + '/clang-resource.log')!)!
@@ -79,7 +79,7 @@ fn build_program(v string, sysroot string, gcc string, source string, arch strin
 	cfile := directory + '/' + name + '.c'
 	mut command := v_program(v, source, arch, cfile, owned, collection, caller_death, idle_server)!
 	command.insert(1, ['-dump-files', directory + '/sources-built.txt'])
-	invoke(command, directory + '/v.log')!
+	winehostimages.invoke_v(command, directory, directory + '/v.log')!
 	winesource.admit(directory + '/sources-before.txt', directory + '/sources-built.txt', inputs)!
 	vlib := os.dir(v) + '/vlib'
 	os.write_file(directory + '/runtime.c', '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
@@ -267,6 +267,7 @@ fn check() ! {
 		winecsource.admit(directory, directory)!
 		winelink.admit(directory, directory, directory + '/' + program)!
 		winehostimages.admit_build(directory, directory)!
+		winehostimages.admit_v(directory, directory, host.v, inputs)!
 	}
 	os.write_file(work + '/inputs.json', json2.encode(inputs))!
 	mut generated := map[string]string{}
@@ -278,6 +279,7 @@ fn check() ! {
 			'link-inputs.tar', 'link-proof.json', 'link-version.log', 'link-version.log.argv.json', 'link-replay.log', 'link-replay.log.argv.json']
 		names << winelink.artifacts(work + '/build-' + program)!
 		names << winehostimages.artifacts()
+		names << winehostimages.v_artifacts()
 		for name in names {
 			path := 'build-' + program + '/' + name
 			generated[path] = digest(work + '/' + path)!
@@ -372,6 +374,7 @@ fn check() ! {
 		winecsource.admit(directory, directory)!
 		winelink.admit(directory, directory, directory + '/' + program)!
 		winehostimages.admit_build(directory, directory)!
+		winehostimages.admit_v(directory, directory, host.v, inputs)!
 	}
 	for path, expected in generated {
 		if digest(work + '/' + path)! != expected {

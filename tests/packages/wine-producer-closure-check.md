@@ -37,6 +37,8 @@ captured static link inputs and an identical replay with the pinned linker.
 The [host image/environment check](wine-host-images-check.md) adds managed
 Clang/LLD image bytes and exact closed child environments, with an explicit
 unadmitted OS shared-cache boundary.
+The [V source-generation check](wine-v-host-check.md) also requires exact child
+environments and observed image admission for discovery and actual C generation.
 This is parsed bridge-source, selected resource-header and observed C admission; complete
 C dependency/toolchain closure and hermetic build admission remain separate
 requirements. Historical bundles still need

@@ -25,8 +25,10 @@ fn check(prepared string) ! {
 	if architectures.len != 1 || architectures[0] !in ['x86_64', 'aarch64'] { return error('producer architecture directory differs') }
 	winelink.admit(prepared, prepared + '/logs', prepared + '/prepared/' + architectures[0] + '/runtime/bin/wine-runner')!
 	winehostimages.admit_build(prepared + '/logs', prepared + '/logs')!
+	compiler := json2.decode[map[string]string](os.read_file(prepared + '/build-producer.json')!)!['compiler']
+	winehostimages.admit_v(prepared + '/logs', prepared + '/logs', compiler, inputs)!
 	outputs := json2.decode[map[string]string](os.read_file(prepared + '/outputs.json')!)!
-	for name in winehostimages.artifacts() {
+	for name in [...winehostimages.artifacts(), ...winehostimages.v_artifacts()] {
 		if 'logs/' + name !in outputs || winesource.file_digest(prepared + '/logs/' + name)! != outputs['logs/' + name] {
 			return error('host image producer output differs')
 		}

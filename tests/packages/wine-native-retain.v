@@ -251,6 +251,7 @@ fn retain() ! {
 	winecsource.admit(prepared, prepared + '/logs')!
 	winelink.admit(prepared, prepared + '/logs', prepared + '/prepared/' + arch + '/runtime/bin/wine-runner')!
 	winehostimages.admit_build(prepared + '/logs', recorded_prepared + '/logs')!
+	winehostimages.admit_v(prepared + '/logs', recorded_prepared + '/logs', declaration['compiler'], producer_inputs)!
 	if owned {
 		require_input(inputs, root + '/tests/packages/wineowned/receipt.v')!
 		wineowned.admit(prepared, arch, root)!
@@ -293,9 +294,13 @@ fn retain() ! {
 	for path, _ in producer_inputs { paths['producer-input/' + path] = path }
 	for path, _ in winecsource.inputs(prepared)! { paths['producer-c-input/' + path] = path }
 	for path, _ in winehostimages.inputs(prepared + '/logs')! { paths['producer-host-image/' + path] = path }
+	for path, _ in winehostimages.v_inputs(prepared + '/logs')! { paths['producer-v-host-image/' + path] = path }
 	outputs := hashes(prepared + '/outputs.json')!
 	for name in winehostimages.artifacts() {
 		if 'logs/' + name !in outputs { return error('host image producer artifact missing') }
+	}
+	for name in winehostimages.v_artifacts() {
+		if 'logs/' + name !in outputs { return error('V host producer artifact missing') }
 	}
 	for name in ['build/wine-runner.c', 'build/runtime.c', 'logs/v.log', 'logs/v.log.argv.json',
 		'logs/discover.log', 'logs/discover.log.argv.json', 'logs/sources-before.txt', 'logs/sources-built.txt',
@@ -429,6 +434,7 @@ fn retain() ! {
 			'link-inputs.tar', 'link-proof.json', 'link-version.log', 'link-version.log.argv.json', 'link-replay.log', 'link-replay.log.argv.json']
 		names << winelink.artifacts(run + '/build-' + program)!
 		names << winehostimages.artifacts()
+		names << winehostimages.v_artifacts()
 		for name in names {
 			required << 'build-' + program + '/' + name
 		}
@@ -438,6 +444,8 @@ fn retain() ! {
 		winecsource.admit(run + '/build-' + program, run + '/build-' + program)!
 		winelink.admit(run + '/build-' + program, run + '/build-' + program, run + '/build-' + program + '/' + program)!
 		winehostimages.admit_build(run + '/build-' + program, recorded_run + '/build-' + program)!
+		winehostimages.admit_v(run + '/build-' + program, recorded_run + '/build-' + program, declaration['compiler'], inputs)!
+		for path, _ in winehostimages.v_inputs(run + '/build-' + program)! { paths[program + '-v-host-image/' + path] = path }
 		for path, _ in winehostimages.inputs(run + '/build-' + program)! { paths[program + '-host-image/' + path] = path }
 		for path, _ in winecsource.inputs(run + '/build-' + program)! { paths[program + '-c-input/' + path] = path }
 	}

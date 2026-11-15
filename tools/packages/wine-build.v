@@ -340,11 +340,11 @@ fn build() ! {
 	if owned { runner_command.insert(1, ['-d', 'wine_owned_manager']) }
 	mut discovery := runner_command.clone()
 	discovery.insert(1, ['-print-watched-files', '-dump-files', output + '/logs/sources-before.txt'])
-	invoke(discovery, output + '/logs/discover.log')!
+	winehostimages.invoke_v(discovery, output + '/logs', output + '/logs/discover.log')!
 	winesource.capture(output + '/logs/sources-before.txt', mut inputs)!
 	os.write_file(output + '/inputs-before-build.json', json2.encode(inputs) + '\n')!
 	runner_command.insert(1, ['-dump-files', output + '/logs/sources-built.txt'])
-	invoke(runner_command, output + '/logs/v.log')!
+	winehostimages.invoke_v(runner_command, output + '/logs', output + '/logs/v.log')!
 	winesource.admit(output + '/logs/sources-before.txt', output + '/logs/sources-built.txt', inputs)!
 	if owned { os.write_file(output + '/owned-manager.json', json2.encode({'architecture': arch, 'mode': 'wine_owned_manager', 'runner_source_sha256': inputs[base + '/tools/packages/wine-runner.v']}))! }
 	runtime_c := output + '/build/runtime.c'
@@ -420,6 +420,7 @@ fn build() ! {
 	winecsource.admit(output, output + '/logs')!
 	winelink.admit(output, output + '/logs', runtime + '/bin/wine-runner')!
 	winehostimages.admit_build(output + '/logs', output + '/logs')!
+	winehostimages.admit_v(output + '/logs', output + '/logs', v, inputs)!
 	os.write_file(output + '/inputs-verified.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
 	for path in os.walk_ext(output, '') {
