@@ -19,9 +19,9 @@ import gpu.agx.gpu
 import klock
 import katomic
 import proc
-import sched
 import usercopy
 import aarch64.timer
+import memory
 
 const max_submission_commands = u32(64)
 const max_submission_syncs = agxsubmission.max_syncs
@@ -62,6 +62,8 @@ mut:
 	fence         &syncobj.DmaFence = unsafe { nil }
 	result        &gem.GemObject = unsafe { nil }
 	result_offset u64
+	submission    &G13PendingSubmission = unsafe { nil }
+	compute       bool
 }
 
 pub struct GpuFile {
@@ -911,35 +913,8 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 	return -22
 }
 
-fn wait_g13_fence(fence &syncobj.DmaFence) int {
-	if fence == unsafe { nil } {
-		return -22
-	}
-	for !syncobj.is_signaled(fence) {
-		manager := gpu.get_global_manager() or { return -19 }
-		if manager.state != .running {
-			return -19
-		}
-		syncobj.wait(fence, 1_000_000)
-		sched.yield(false)
-	}
-	if syncobj.get_error(fence) != 0 {
-		return syncobj.get_error(fence)
-	}
-	return 0
-}
-
-fn wait_staged_syncs(staged &agxsubmission.SyncArray) int {
-	for i := u32(0); i < staged.count; i++ {
-		result := wait_g13_fence(staged.fences[i])
-		if result != 0 {
-			return result
-		}
-	}
-	return 0
-}
-
 fn discard_g13_completion(mut state G13SubmitCompletion) {
+	submission := state.submission
 	if state.file != unsafe { nil } && state.vm_id < mmu.uat_num_contexts {
 		katomic.dec(mut &state.file.inflight_by_vm[state.vm_id])
 	}
@@ -950,13 +925,25 @@ fn discard_g13_completion(mut state G13SubmitCompletion) {
 	unsafe {
 		free(voidptr(state))
 	}
+	// Last access to the submission: user-visible fences can be signaled by
+	// clients, so only this callback count proves its backing is no longer read.
+	if submission != unsafe { nil } { katomic.dec(mut &submission.callbacks_remaining) }
 }
 
 fn finish_g13_submit(mut state G13SubmitCompletion, successful bool, failure int) {
-	if successful {
+	mut result := if successful { 0 } else { failure }
+	if state.submission != unsafe { nil } {
+		override_error := katomic.load(&state.submission.failure)
+		if override_error != 0 { result = override_error }
+		if state.compute {
+			katomic.store(mut &state.submission.compute_error, result)
+			katomic.store(mut &state.submission.compute_done, true)
+		}
+	}
+	if result == 0 {
 		syncobj.signal(state.fence)
 	} else {
-		syncobj.signal_error(state.fence, failure)
+		syncobj.signal_error(state.fence, result)
 	}
 	discard_g13_completion(mut state)
 }
@@ -1024,11 +1011,8 @@ fn g13_result_info(failure &gpu.G13JobError, successful bool) ioctl.DrmAsahiResu
 	}
 }
 
-// Submit one or two byte-exact v12.3 G13 commands. Mesa emits a
-// compute-then-render pair when a batch needs both subqueues. Vinix preserves
-// that barrier conservatively by waiting for compute retirement before
-// publishing render; the userspace output fence is attached only to the final
-// command. G17/HAL300 payloads continue to fail closed.
+// Prepare immutable G13 commands synchronously. Dependency/queue waits and
+// compute-to-render ordering are polled by the GPU worker after enqueue.
 pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	request := unsafe { data }
 	if request.extensions != 0 || request.flags != 0 || request.command_count == 0
@@ -1049,10 +1033,6 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	output_result, output_syncs := agxsubmission.stage_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 {
 		return output_result
-	}
-	dependency_result := wait_staged_syncs(&input_syncs)
-	if dependency_result != 0 {
-		return dependency_result
 	}
 	manager := gpu.get_global_manager() or { return -19 }
 	if manager.hw_config.gpu_gen != .g13 || manager.state != .running {
@@ -1100,13 +1080,6 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	vm := f.find_vm(vm_id) or { return -22 }
 
-	for gpu_manager.g13_queue_busy(queue_resources) {
-		if gpu_manager.state != .running {
-			return -19
-		}
-		sched.yield(false)
-	}
-
 	mut result_object := &gem.GemObject(unsafe { nil })
 	for i := u32(0); i < request.command_count; i++ {
 		descriptor := commands[i].descriptor
@@ -1126,6 +1099,18 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		}
 	}
 
+	storage := memory.malloc_packed_fallible(sizeof(G13PendingSubmission)) @[freed]
+	if storage == unsafe { nil } { return -12 }
+	mut pending := unsafe { &G13PendingSubmission(storage) }
+	unsafe { *pending = G13PendingSubmission{
+		file: &f
+		vm_id: vm_id
+		queue: queue_resources
+		manager: manager
+		dependencies: input_syncs
+	} }
+	mut queued := false
+	defer { if !queued { memory.free(storage) } }
 	mut render_job := &gpu.G13RenderJobResources(unsafe { nil })
 	mut compute_job := &gpu.G13ComputeJobResources(unsafe { nil })
 	mut render_index := -1
@@ -1171,7 +1156,10 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				&gem.GemObject(unsafe { nil })
 			}
 			result_offset: compute_descriptor.result_offset
-		}
+			submission: pending
+			compute: true
+		} @[freed]
+		katomic.inc(mut &pending.callbacks_remaining)
 		katomic.inc(mut &f.inflight_by_vm[vm_id])
 		if !gpu_manager.set_g13_compute_completion(compute_job, g13_compute_completed, voidptr(completion)) {
 			discard_g13_completion(mut completion)
@@ -1197,7 +1185,9 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 				&gem.GemObject(unsafe { nil })
 			}
 			result_offset: render_descriptor.result_offset
-		}
+			submission: pending
+		} @[freed]
+		katomic.inc(mut &pending.callbacks_remaining)
 		katomic.inc(mut &f.inflight_by_vm[vm_id])
 		if !gpu_manager.set_g13_render_completion(render_job, g13_render_completed, voidptr(completion)) {
 			discard_g13_completion(mut completion)
@@ -1217,26 +1207,18 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		}
 		return -22
 	}
-	if compute_job != unsafe { nil } {
-		if !gpu_manager.submit_g13_compute_job(compute_job) {
-			gpu_manager.release_g13_compute_job(compute_job)
-			if render_job != unsafe { nil } {
-				gpu_manager.release_g13_render_job(render_job)
-			}
-			return -16
-		}
-		if render_job != unsafe { nil } {
-			compute_result := wait_g13_fence(compute_fence)
-			if compute_result != 0 {
-				gpu_manager.release_g13_render_job(render_job)
-				return compute_result
-			}
-		}
+	pending.compute_job = compute_job
+	pending.render_job = render_job
+	pending.has_compute = compute_job != unsafe { nil }
+	// Keep the file/VM graph alive even between individual job callbacks.
+	katomic.inc(mut &f.inflight_by_vm[vm_id])
+	if !gpu_manager.queue_g13_submission(enqueue_g13_pending, voidptr(pending)) {
+		cancel_g13_pending(mut pending, -19)
+		assert katomic.load(&pending.callbacks_remaining) == 0
+		katomic.dec(mut &f.inflight_by_vm[vm_id])
+		return -19
 	}
-	if render_job != unsafe { nil } && !gpu_manager.submit_g13_render_job(render_job) {
-		gpu_manager.release_g13_render_job(render_job)
-		return -16
-	}
+	queued = true
 	return 0
 }
 

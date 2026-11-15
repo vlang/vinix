@@ -1178,7 +1178,7 @@ pub fn initialise() {
 
 	agx_driver_inst.gpu = mgr
 	gpu.set_global_manager(agx_driver_inst.gpu)
-	mgr.set_file_reaper(agx_file.reap_closed_files)
+	mgr.set_file_reaper(agx_file.service_file_work)
 
 	// Step 7: Register DRM driver (name "asahi", features GEM|RENDER|COMPUTE)
 	agx_drm_driver := &drm.DrmDriver{

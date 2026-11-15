@@ -239,6 +239,26 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(priority_init, ['g13_workqueue_priority(priority)', 'if pipe_type == 2',
 		'value.value_0 = 0', 'value.value_18 = 1'], 'Vinix G13 compute priority')!
 	queue := read(os.join_path(base, 'queue/mod.rs'))!
+	require_order(queue, ['job.add_dependency(fence)?', 'job.commit()?', 'let mut job = job.arm()',
+		'job.push()'], 'Asahi asynchronous dependency scheduling')!
+	file_source := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
+	ioctl_submit := section(file_source, 'pub fn (mut f GpuFile) ioctl_submit(',
+		'fn dispatch(', 'Vinix async submission ioctl')!
+	require(!ioctl_submit.contains('wait_g13_fence') && !ioctl_submit.contains('syncobj.wait')
+		&& !ioctl_submit.contains('sched.yield'), 'Vinix submission must not wait for dependencies or GPU work')!
+	require_order(ioctl_submit, ['agxsubmission.stage_commands', 'agxsubmission.stage_sync_array',
+		'f.lock.acquire()', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
+		'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
+		'agxsubmission.install_output_syncs', 'gpu_manager.queue_g13_submission'], 'Vinix prepared async submission')!
+	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
+	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
+	require_order(pending, ['status := g13_dependency_status', 'manager.g13_queue_dispatch_blocked',
+		'manager.submit_g13_compute_job', 'katomic.load(&item.compute_done)',
+		'manager.submit_g13_render_job'], 'Vinix dependency and compute/render polling')!
+	require_order(pending, ['pending_head = unsafe { nil }', 'current = item.next',
+		'if earlier || poll_g13_pending', 'katomic.load(&item.callbacks_remaining) == 0',
+		'memory.free(voidptr(item))', 'retained_tail.next = pending_head', 'pending_head = retained_head'],
+		'Vinix FIFO retry and callback-owned retirement')!
 	require_order(manager, ['impl Default for ID {', 'Self::new(2)',
 		'let id = self.ids.queue.next()'], 'Asahi global queue identity')!
 	require(queue.contains('generation: AtomicU32::new(id as u32)') &&
@@ -276,6 +296,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter',
 		'G13 default non-preemptible compute queue priority',
+		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',
 		'Firmware 13.5 shared per-queue command/start counters']

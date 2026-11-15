@@ -2731,10 +2731,10 @@ pub fn (mut mgr GpuManager) release_g13_queue_resources(resources &G13QueueResou
 	return true
 }
 
-// Vinix currently serializes native G13 submissions per userspace queue. This
-// preserves the DRM scheduler's implicit ordering until multi-command barrier
-// objects and independent TVB scene slots are implemented.
-pub fn (mut mgr GpuManager) g13_queue_busy(resources &G13QueueResources) bool {
+// Vinix currently serializes published native G13 submissions per userspace
+// queue. Prepared jobs may wait on dependencies without blocking other queues.
+// Quarantined backing must retire before another command can be published.
+pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(resources &G13QueueResources) bool {
 	if resources == unsafe { nil } {
 		return true
 	}
@@ -2746,12 +2746,12 @@ pub fn (mut mgr GpuManager) g13_queue_busy(resources &G13QueueResources) bool {
 		return true
 	}
 	for job in mgr.g13_render_jobs {
-		if !job.released && voidptr(job.queue) == voidptr(resources) {
+		if !job.released && (job.submitted || job.quarantined) && voidptr(job.queue) == voidptr(resources) {
 			return true
 		}
 	}
 	for job in mgr.g13_compute_jobs {
-		if !job.released && voidptr(job.queue) == voidptr(resources) {
+		if !job.released && (job.submitted || job.quarantined) && voidptr(job.queue) == voidptr(resources) {
 			return true
 		}
 	}

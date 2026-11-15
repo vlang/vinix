@@ -142,6 +142,15 @@ fn (mut mgr GpuManager) reap_file_resources() {
 	if callback != unsafe { nil } { callback() }
 }
 
+// Serialize accepted submissions with the worker's final shutdown poll.
+pub fn (mut mgr GpuManager) queue_g13_submission(enqueue fn (voidptr), data voidptr) bool {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	if mgr.state != .running { return false }
+	enqueue(data)
+	return true
+}
+
 __global (
 	global_gpu_mgr = unsafe { &GpuManager(nil) }
 )

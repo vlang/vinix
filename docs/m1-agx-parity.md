@@ -108,8 +108,8 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix accepts at most two commands in the compute-then-render form and waits on dependencies in the ioctl. The reference accepts general batches through DRM scheduling, with multiple in-flight jobs and per-subqueue barriers. |
-| Render scenes | The backend supports overlapping scene ownership and conditional buffer binding as described below. The active userspace submission path still serializes work. |
+| Submission scheduling | Vinix prepares at most two commands in the compute-then-render form, then polls dependencies and completion in the GPU worker. Independent queues progress concurrently; each queue retains FIFO and serial publication. General batches, same-queue overlap and firmware subqueue barriers still differ from DRM scheduling. |
+| Render scenes | Multiple prepared scenes retain shared backing and conditional binding. The worker publishes one submission at a time per queue; independent queues may execute concurrently. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
@@ -442,6 +442,49 @@ Its complete source/audit bundle is
 The sibling `freshness-inventory.json` SHA-256 is
 `3ec287c00de04872522bb7385a1bac41b1eec523806bb1fa03d6672fb5d6d532`.
 The original sealed feature bundles and receipts were preserved.
+
+### Asynchronous native submission polling
+
+The native G13 ioctl now snapshots and validates user input, prepares jobs and
+installs output fences before returning. Input dependencies, queue backpressure
+and compute-to-render completion are polled by the GPU worker. An unsignaled
+dependency blocks its own queue while unrelated queues progress. Failed
+dependencies retain their errno on the output fence; failed compute cancels
+the unsubmitted render half. The active ABI still accepts only the legacy
+single-command or compute-then-render pair.
+
+An allocation-free poll loop maintains per-queue FIFO. Older retained nodes
+are prepended ahead of concurrent enqueues. Manager-locked registration closes
+the final-shutdown-poll race. Pending nodes own caller-prepared job pointers
+until publication, and keep an additional file/VM pin through every callback
+gap. Internal callback counts and compute completion flags govern retirement;
+client-signaled output fences cannot advance phases or release node backing.
+
+ASan/UBSan fixtures execute the production ioctl, staging, sync objects,
+callbacks, poller, registration and dispatch guard with injected GPU services.
+They cover dependencies/errors, independent queues/FIFO, result references,
+backpressure, setup failures, concurrent enqueue, stopped registration and
+shutdown with published/prepared jobs. Two hundred immediate-retirement cycles
+leave no pending-node allocation, job record or file/VM pin in the fixture.
+Existing retained sync-object/fence allocations remain outside that measure.
+The cleanup/recovery fixtures, source/unit checks, two independent lifetime
+reviews and an isolated ARM build passed. Generated C confirms fixed stack
+storage in the poll loop; native execution remains untested.
+
+Package HEAD `fb18a8a7359142ab33f65d906d956b3cc3590a53` retains the same
+kernel and Mesa pins. The source audit remains `not_equivalent`; the modern
+ABI, general batches, firmware barriers, VM/GEM and other rows above remain
+incomplete. The build uses `1c078554a89bbfbd5b3eeeaaac4213a8396ab584` plus
+the five retained kernel files, verified byte exact before sealing.
+
+Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-async-20261115/bundle/`.
+The sibling inventory SHA-256 is
+`18ac9e8176c0d12c3c182acd5117555b474f8273faf9e004015f41107dd1a170`;
+the linked kernel SHA-256 is
+`7a768ea652765d50ed3bf17dbce5e5a1bfa8748894525533239a201162890866`.
+Use the retained checker with `check-inventory BUNDLE RECEIPT`.
+No hardware access, boot or reboot was performed.
 
 ## Earlier artifact retention incident
 
