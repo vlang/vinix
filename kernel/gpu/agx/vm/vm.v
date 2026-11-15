@@ -15,6 +15,28 @@ pub const address_space_end = u64(1) << 39
 pub const user_start = page_size
 pub const user_end = address_space_end - 2 * page_size
 pub const kernel_min_size = u64(0x20000000)
+// Asahi buffer::PAGE_SIZE, distinct from the 16 KiB UAT granule.
+pub const driver_page_size = u64(0x8000)
+
+pub struct DriverWindow {
+pub:
+	start u64
+	midpoint u64
+	end u64
+}
+
+// Validate the userspace reservation before aligning inward. Both driver
+// heaps use 32 KiB boundaries, including the split of an odd-sized window.
+pub fn driver_window(kernel_start u64, kernel_end u64) ?DriverWindow {
+	if !valid_window(kernel_start, kernel_end) { return none }
+	mask := driver_page_size - 1
+	start := (kernel_start + mask) & ~mask
+	end := kernel_end & ~mask
+	if start >= end { return none }
+	half := ((end - start) >> 1) & ~mask
+	if half == 0 || half >= end - start { return none }
+	return DriverWindow{ start: start, midpoint: start + half, end: end }
+}
 
 pub fn valid_window(kernel_start u64, kernel_end u64) bool {
 	return kernel_start >= user_start && kernel_start < kernel_end

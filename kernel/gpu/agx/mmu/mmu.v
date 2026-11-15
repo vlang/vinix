@@ -347,9 +347,7 @@ fn (mut mgr UatManager) publish_initial_context_roots() {
 }
 
 pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&UatContext {
-	if !agxvm.valid_window(kernel_start, kernel_end) {
-		return none
-	}
+	window := agxvm.driver_window(kernel_start, kernel_end) or { return none }
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
@@ -357,11 +355,6 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 	for i := u32(1); i < uat_num_contexts; i++ {
 		if mgr.contexts[i] == unsafe { nil } {
 			identity := allocate_context_identity() or { return none }
-			kernel_half_size := ((kernel_end - kernel_start) >> 1) & ~pgtable.uat_pg_mask
-			kernel_midpoint := kernel_start + kernel_half_size
-			if kernel_half_size == 0 || kernel_midpoint >= kernel_end {
-				return none
-			}
 			mut pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
 			dummy_phys := u64(memory.pmm_alloc_aligned_fallible(4, 4))
 			if dummy_phys == 0 {
@@ -380,10 +373,10 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				active: true
 				vm_id: i
 				dummy_phys: dummy_phys
-				kernel_start: kernel_start
-				kernel_end: kernel_end
-				driver_gpu: gpu_alloc.new_heap('uat-user-gpu', kernel_start, kernel_midpoint)
-				driver_private: gpu_alloc.new_heap('uat-user-private', kernel_midpoint, kernel_end)
+				kernel_start: window.start
+				kernel_end: window.end
+				driver_gpu: gpu_alloc.new_heap('uat-user-gpu', window.start, window.midpoint)
+				driver_private: gpu_alloc.new_heap('uat-user-private', window.midpoint, window.end)
 			}
 			// Nothing slices the list, so growing it can free the old buffer.
 			ctx.driver_buffers.flags |= .noslices
@@ -437,7 +430,11 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 		|| alignment & pgtable.uat_pg_mask != 0 {
 		return none
 	}
-	aligned_size := (size + alignment - 1) & ~(alignment - 1)
+	// The per-VM allocators in Asahi have a 32 KiB minimum alignment, even
+	// when the requested object and UAT page alignment are smaller.
+	actual_alignment := if alignment < agxvm.driver_page_size { agxvm.driver_page_size } else { alignment }
+	if size > ~u64(0) - (actual_alignment - 1) { return none }
+	aligned_size := (size + actual_alignment - 1) & ~(actual_alignment - 1)
 	pages := aligned_size / memory.page_size
 
 	ctx.lock.acquire()
@@ -457,12 +454,12 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 	}
 
 	va := if private {
-		ctx.driver_private.alloc(aligned_size, alignment) or {
+		ctx.driver_private.alloc(aligned_size, actual_alignment) or {
 			memory.pmm_free(voidptr(phys), pages)
 			return none
 		}
 	} else {
-		ctx.driver_gpu.alloc(aligned_size, alignment) or {
+		ctx.driver_gpu.alloc(aligned_size, actual_alignment) or {
 			memory.pmm_free(voidptr(phys), pages)
 			return none
 		}
