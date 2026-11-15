@@ -38,9 +38,20 @@ It requires matching original/verified input maps, rechecks the generated
 artifacts and exact ISO, and admits only the recorded 3 GiB/two-vCPU TCG profile.
 Only serial and QMP output paths change. It checks every rollback acceptance
 marker and forbidden output under the same 900-second outer limit; the guest's
-internal command limits stay embedded in the unchanged ISO. Inputs are checked
-again afterward. A replay records a separate result and never changes the
-original outcome or substitutes for producer/historical evidence audits.
+internal command limits stay embedded in the unchanged ISO. Acceptance requires
+each exact marker line once, with no forbidden output, strictly before the
+deadline. Inputs are checked again afterward. `guest-outcome.json` records the
+unverified observation; `result.json` is published only after successful input
+re-verification and `inputs-verified.json`. A replay never changes the original
+outcome or substitutes for producer/historical evidence audits.
+
+`wine-native-replay-check REPLAY_EXECUTABLE FRESH_OUTPUT [RETAINED_REPLAY]`
+uses a synthetic host executable to check passing/failing guest output,
+post-boot input changes, missing VM input hashes and altered VM profiles. The
+optional retained replay checks its passing serial against the stricter verdict
+without booting a VM. `winereplay/verdict_test.v` covers deadline boundaries,
+missing, quoted, partial and duplicate markers, forbidden output and CRLF logs.
+These host controls do not execute Wine or supply new runtime qualification.
 
 This fixture is designed to run an actual AMD64 PE32+ console program through Wine 9.17-r1
 under an ordinary Vinix account. The runtime and application are separate signed

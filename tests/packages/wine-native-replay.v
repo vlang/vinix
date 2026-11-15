@@ -6,21 +6,12 @@ import os
 import json2
 import time
 import tests.packages.winesource
+import tests.packages.winereplay
 
 struct RecordedOutcome {
 	scenario string
 	interrupted bool
 }
-
-const required = [
-	'Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS',
-	'Wine manager-SIGKILL adopted-server foreign-refusal126 lease-busy PASS',
-	'Wine migration stale-generation refusal all-targets-unchanged PASS',
-	'Wine rollback stale-generation refusal all-targets-unchanged PASS',
-	'Wine rollback prefix migrated and real Win64 relaunched status37 PASS',
-	'Wine rolled-back prefix relaunch status37 private-data lease-free collected PASS',
-	'HWTEST PASS packaged-Wine',
-]
 
 fn verify(inputs map[string]string) ! {
 	for path, hash in inputs {
@@ -38,6 +29,9 @@ fn run() ! {
 	if outcome.scenario != 'packaged-Wine' || outcome.interrupted { return error('replay requires a completed native attempt') }
 	mut inputs := json2.decode[map[string]string](os.read_file(original + '/inputs.json')!)!
 	if inputs != json2.decode[map[string]string](os.read_file(original + '/inputs-verified.json')!)! { return error('original input verification differs') }
+	for path in [declaration['qemu'], declaration['firmware']] {
+		if path == '' || path !in inputs { return error('original VM executable or firmware is not inventoried') }
+	}
 	for relative, hash in json2.decode[map[string]string](os.read_file(original + '/generated-before-boot.json')!)! {
 		inputs[original + '/' + relative] = hash
 	}
@@ -66,24 +60,22 @@ fn run() ! {
 	mut reason := ''
 	for {
 		serial := os.read_file(work + '/serial.log') or { '' }
-		forbidden := serial.contains('HWTEST FAIL') || serial.contains('Kernel panic') || serial.contains('KERNEL PANIC') || serial.contains('FATAL EXCEPTION')
-		complete := required.all(serial.contains(it))
+		decision := winereplay.assess(serial, time.sys_mono_now() - started, child.is_alive())
 		unsafe { serial.free() }
-		if forbidden {
-			reason = 'forbidden guest output'; break
+		if decision.finished {
+			passed = decision.passed; reason = decision.reason; break
 		}
-		if complete { passed = true; break }
-		if !child.is_alive() { reason = 'guest stopped before acceptance'; break }
-		if time.sys_mono_now() - started > 900 * time.second { reason = 'guest exceeded unchanged 900-second rollback bound'; break }
 		time.sleep(100 * time.millisecond)
 	}
 	if child.is_alive() { child.signal_kill() }
 	child.wait()
-	os.write_file(work + '/result.json', json2.encode({'passed': json2.Any(passed), 'reason': reason,
+	result := json2.encode({'passed': json2.Any(passed), 'reason': reason,
 		'seconds': f64(time.sys_mono_now() - started) / f64(time.second), 'original': original,
-		'scope': 'replay of exact existing signed x86 Wine image; original outcome unchanged'}))!
+		'scope': 'replay of exact existing signed x86 Wine image; original outcome unchanged'})
+	os.write_file(work + '/guest-outcome.json', result)!
 	verify(inputs)!
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
+	os.write_file(work + '/result.json', result)!
 	if !passed { return error('Wine replay failed: ' + reason) }
 	println('WINE NATIVE REPLAY PASS original outcome preserved; exact ISO and VM profile')
 }
