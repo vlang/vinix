@@ -4060,3 +4060,46 @@ These checks use signed marker bytes and selected boundaries. They do not
 qualify the full crash matrix, new 741-row coverage, real Wine upgrades/GUI,
 owned ARM execution, physical power loss/torn writes, whole-launch lifetime or
 the complete roadmap 14 acceptance gate.
+
+## Generation-pinned prefix writes, 2026-11-15
+
+Feature `66c9b97cc` adds optional trailing `--generation N` to the public
+additions and migration commands, with `complete_additions_at(N)` and
+`migrate_bindings_at(N)` library methods. Canonical positive generation numbers
+only are accepted; zero and mismatch refuse before binding writes. Fresh
+admission and comparison hold the package reader lock throughout the write.
+Existing unpinned commands retain their current-generation behavior. This pins
+the selected generation, not an old runtime version or a previously seen link
+set; current trust, policy, metadata, payload and prefix checks remain required.
+
+The signed-install debug host assertion suite passes, covering zero/mismatch
+with preserved old links and missing additions, matching pinned writes, legacy
+repetition and activation-change refusal. ASan passes with leak detection
+disabled. Expanded host CLI controls reject malformed, missing, overflow and
+unsupported generation options and offline requests. Fresh manualfree V guest
+and instrumented CLI builds and static LLVM/musl links pass on both targets.
+
+Focused three-row signed-service VJFS CLI sync-4 recovery passes on ARM64
+(18.350 seconds) and x86_64 (23.168 seconds). Warm migration uses the original
+unpinned command. Cold public migration and additions with generation 1 both
+refuse while generation 2 is active, preserving namespace cardinality, every
+target, pending stage target and private sentinel. Successful cold writes use
+generation 2 and return complete current keep JSON and runtime version 2.0.0.
+Both failure arrays are empty. SIGKILL, exact cold-state review, independent
+signed admission/lease checks, cleanup grace, final poweroff, clean VJFS export
+and strict e2fsck checks remain required without relaxed budgets or guards.
+
+Complete evidence is retained at `/Users/alex/.cache/vwwinegenpin-20261115-01`,
+based on `a653d9be2` plus `source.patch`. The copied original CLI entrypoint SHA
+is `09e1d77e0d65eedabbe1b9c5f627e787152dd8f566ffe190ec6233ef9dd4f5a4`;
+the existing hook and generator identities are recorded in `source-identity.json`.
+Unchanged kernels, image helper and runtime support come from
+`vwwineversion-20261115-01`; its complete original prerequisites remain required.
+The external receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-generation-pin-20261115-01.inventory.json`,
+SHA-256 `6b4068913c484a408271f3d4efcab6262470844e5f19506bb491596e2f1849c8`.
+Complete inventory recording and independent comparison pass.
+
+Selected marker-byte boundaries do not qualify the full crash matrix, 741-row
+paths, real Wine version upgrades/GUI/owned ARM execution, whole-launch lifetime,
+physical power-loss/torn writes or the broader roadmap 14 acceptance gate.
