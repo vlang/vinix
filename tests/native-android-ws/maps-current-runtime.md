@@ -10,11 +10,14 @@ progressed past that layout failure. The [WebView loader adapter](maps-webview-l
 in 38730c57d passed the complete signed ARM suite in r102, including hostile
 context-loader and worker checks. Real account fragment creation then failed
 because the SDK declares ValueCallback as a class. The
-[interface repair candidate](maps-value-callback-20261115.md) and regression
-fixture are prepared, but unvalidated: the original build guard refused to
-start tooling with only 1177317376 bytes free. Complete exports and private
-copies are retained and checked; all owned test guests are stopped.
-Restore space and a quiet disk window before the next qualification.
+[interface repair](maps-value-callback-20261115.md) in 6a301fe1c now passes SDK
+assembly, native build and the complete signed ARM suite in r103, including
+generic reflection, application dispatch, cookie-wrapper forwarding and worker
+checks. r103 used the API-only profile to reduce disk use. The next full
+account-profile staging was refused before launch with only 812937216 bytes
+free, below the retained reserve. Qualified artifacts and complete exports
+are retained and checked; all owned test guests are stopped.
+Restore space and a quiet disk window before the protected account retry.
 Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
