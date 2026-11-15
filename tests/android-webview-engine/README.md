@@ -72,6 +72,21 @@ builds the copied modules, checks they remain unchanged, and records command
 arguments, tool hashes, complete logs, binary and artifact checksums. It does
 not execute the guest.
 
+If the cross compiler needs an explicit zlib input, append `ZLIB_ROOT` containing
+`zlib.h`, `zconf.h` and `libz.a` to the build runner arguments. Those files are
+copied and checked as build inputs. Missing runtime audit directories are
+rejected before building. The runner executes the real host tests sequentially
+using current V, then performs the API export and VGC checks before inventorying
+a successful build.
+
+`recover-runtime-inputs.v STOPPED_PARENT_VM FRESH_EXTERNAL_ROOT` recovers the
+eight API audit libraries and three musl aliases from existing stopped Maps
+media. Verify that no process holds its image before running this tool. Every
+recovered file must match the deployment metadata. `verify-musl.v ENGINE
+TOOLCHAIN_LIBC DEPLOYED_LIBC FRESH_EXTERNAL_ROOT` reuses the production
+muslabi auditor and retains checked input copies and its symbol report.
+These checks qualify selected inputs and ABI; guest execution remains required.
+
 Cookie coverage executes the production callback bodies against controlled
 WebKit completions and real SQLite storage. It checks full attribute/session
 round trips, restore barriers, clear/no-match results, empty snapshots,

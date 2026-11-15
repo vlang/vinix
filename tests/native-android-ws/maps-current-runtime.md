@@ -37,9 +37,10 @@ focused host/ASan tests, AArch64 build and r110 ARM validation. Real account
 setup passed display admission and identified the next engine failure: SQLite
 cannot open the cookie snapshot through its proc-fd alias with OPEN_NOFOLLOW.
 The [canonical-path fix](maps-cookie-snapshot-20261115.md) passes 15 host and
-ASan cookie-store cases. Its current-V engine build is blocked by shared disk
-writes under the original caps; three read-only probes exceeded their growth
-allowance in 1.5–2.2 seconds. Updated build and staging tooling is retained.
+ASan cookie-store cases. The full current-V engine build now passes under the
+original caps with recovered actual deployment inputs, all 99 API exports and
+136 musl ABI symbols verified. Fresh full-profile r111 staging and readback
+passed; signed ARM and protected account validation are in progress.
 Complete r107–r110 public/private evidence is preserved, and those guests are stopped.
 Authentication and full Maps operation remain unqualified.
 

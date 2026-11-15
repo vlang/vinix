@@ -89,6 +89,7 @@ fn run() ! {
 	}
 	repo, compiler, base, addon, root := os.real_path(os.args[1]), os.real_path(os.args[2]), os.real_path(os.args[3]), os.real_path(os.args[4]), os.abs_path(os.args[5])
 	zlib := if os.args.len == 7 { os.real_path(os.args[6]) } else { '' }
+	if !os.is_dir(base) || !os.is_dir(addon) { return error('existing runtime audit input directories required') }
 	if os.exists(root) || os.is_link(root) || root.starts_with(repo + '/') || root == repo {
 		return error('fresh external build root required')
 	}
