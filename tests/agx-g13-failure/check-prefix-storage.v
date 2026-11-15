@@ -12,6 +12,8 @@ const helpers = [
 	'syncobj__release_capture',
 	'drm__ioctl_syncobj_wait',
 	'drm__ioctl_syncobj_reset',
+	'drm__ioctl_syncobj_signal',
+	'syncobj__new_private_stub',
 	'syncobj__replace_fence',
 	'syncobj__signal',
 	'syncobj__signal_error',
@@ -62,7 +64,8 @@ fn result_type(name string) string {
 	if name == 'drm__syncobj_wait_geometry' { return '__v_option_drm__SyncobjWaitGeometry' }
 	if name in ['drm__new_syncobj_wait_buffer', 'drm__new_syncobj_handle_buffer'] { return '__v_option_drm__SyncobjWaitBuffer' }
 	if name == 'drm__SyncobjWaitBuffer__free_owned' { return 'void' }
-	if name in ['drm__ioctl_syncobj_wait', 'drm__ioctl_syncobj_reset'] { return 'i64' }
+	if name in ['drm__ioctl_syncobj_wait', 'drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal'] { return 'i64' }
+	if name == 'syncobj__new_private_stub' { return '__v_option_syncobj__DmaFenceptr' }
 	if name == 'syncobj__captured_fence' { return '__v_option_syncobj__DmaFenceptr' }
 	if name in ['syncobj__signal', 'syncobj__signal_error', 'syncobj__SyncObj__publish_captures_locked', 'syncobj__release_capture', 'syncobj__replace_fence'] { return 'void' }
 	if name == 'fw__g13_fragment_tib_blocks' { return '__v_option_u32' }
@@ -119,6 +122,14 @@ fn check(source string) ! {
 			if body.count(owned) != 1 { return error('reset storage must have exactly one checked prefix allocation site') }
 			allocation_scan = body.replace(owned, 'owned_reset_storage_allocation')
 		}
+		if name == 'syncobj__new_private_stub' {
+			owned := 'memory__malloc_packed_fallible(sizeof(syncobj__DmaFence))'
+			if body.count(owned) != 1 { return error('private stub must have exactly one fallible fence allocation site') }
+			if body.count('array_new(sizeof(syncobj__FenceWaiter*), 0, 0)') != 1 {
+				return error('private stub waiter array must be initialized empty without allocation')
+			}
+			allocation_scan = body.replace(owned, 'retained_private_stub_allocation')
+		}
 		if name == 'drm__SyncobjWaitBuffer__free_owned' &&
 			(body.count('memory__free(buffer->allocation)') != 1 || body.count('memory__free(') != 1) {
 			return error('large wait storage must have exactly one matching owner free site')
@@ -141,9 +152,9 @@ fn check(source string) ! {
 			|| !body.contains('void* objects[64]') || !body.contains('syncobj__FenceCapture captures[64]')) {
 			return error('binary wait snapshots are not fixed stack storage')
 		}
-		if name == 'drm__ioctl_syncobj_reset' && (!body.contains('u32 handles[64]')
+		if name in ['drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal'] && (!body.contains('u32 handles[64]')
 			|| !body.contains('void* objects[64]') || body.contains('syncobj__FenceCapture captures[')) {
-			return error('reset snapshots must use fixed stack handles/objects without capture storage')
+			return error('reset/signal snapshots must use fixed stack handles/objects without capture storage')
 		}
 		if name.ends_with('admit_g13_batch_locked') && (!body.contains('u32 events[3]') || !body.contains('u32 commands[3]')) {
 			return error('batch capacity counts are not fixed stack arrays')
@@ -167,8 +178,9 @@ fn selftest() ! {
 			else if name.ends_with('WorkQueueEvents__release') { 'memory__free((void*)(block));\n' }
 			else if name == 'drm__new_syncobj_wait_buffer' { 'memory__malloc_packed_fallible(geometry.bytes);\n' }
 			else if name == 'drm__new_syncobj_handle_buffer' { 'memory__malloc_packed_fallible(geometry.captures_offset);\n' }
+			else if name == 'syncobj__new_private_stub' { 'memory__malloc_packed_fallible(sizeof(syncobj__DmaFence)); array_new(sizeof(syncobj__FenceWaiter*), 0, 0);\n' }
 			else if name == 'drm__SyncobjWaitBuffer__free_owned' { 'memory__free(buffer->allocation);\n' } else { '' }
-		captures := if name == 'drm__ioctl_syncobj_reset' { '' } else { 'syncobj__FenceCapture captures[64];\n' }
+		captures := if name in ['drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal'] { '' } else { 'syncobj__FenceCapture captures[64];\n' }
 		fixture += kind + ' ' + name + '(void) {\n' + owned + ' u32 handles[64];\n void* objects[64];\n ' + captures + ' void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
 	}
 	check(fixture)!
@@ -195,6 +207,11 @@ fn selftest() ! {
 		fixture.replace('memory__malloc_packed_fallible(geometry.captures_offset);', 'memory__malloc_packed_fallible(geometry.bytes);'),
 		fixture.replace('memory__malloc_packed_fallible(geometry.captures_offset);', 'memory__malloc_packed_fallible(geometry.captures_offset); memory__malloc_packed_fallible(geometry.captures_offset);'),
 		fixture.replace('drm__ioctl_syncobj_reset(void) {', 'drm__ioctl_syncobj_reset(void) { syncobj__FenceCapture captures[64];'),
+		fixture.replace('drm__ioctl_syncobj_signal(void) {', 'drm__ioctl_syncobj_signal(void) { syncobj__FenceCapture captures[64];'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__DmaFence));', ''),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__DmaFence));', 'memory__malloc_packed_fallible(1);'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__DmaFence));', 'memory__malloc_packed_fallible(sizeof(syncobj__DmaFence)); memory__malloc_packed_fallible(sizeof(syncobj__DmaFence));'),
+		fixture.replace('array_new(sizeof(syncobj__FenceWaiter*), 0, 0)', 'array_new(sizeof(syncobj__FenceWaiter*), 0, 1)'),
 		fixture.replace('memory__free(buffer->allocation);', ''),
 		fixture.replace('memory__free(buffer->allocation);', 'memory__free(buffer);'),
 		fixture.replace('memory__free(buffer->allocation);', 'memory__free(buffer->allocation); memory__free(buffer->allocation);'),
@@ -220,5 +237,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission/mapping storage: fifty-four live helpers contain no temporary allocations; only owned overflow-block and checked wait/reset storage allocation sites are permitted')
+	println('G13 submission/mapping storage: fifty-six live helpers contain no temporary allocations; only owned overflow-block, checked wait/reset storage and retained private completion allocation sites are permitted')
 }

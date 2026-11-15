@@ -3,7 +3,7 @@
 Compile `run.v` with V into an external executable, then run it. Set
 `DRM_SYNCOBJ_WAIT_TEST_BINARY` to retain the ASan/UBSan executable outside Git.
 
-The runner executes the production create/wait/reset ioctl handlers, common
+The runner executes the production create/wait/reset/signal ioctl handlers, common
 ioctl registration, syncobj module, pending-signal reader and request definitions.
 It injects bounded user copies,
 thread/process state, locks, atomics, monotonic time and scheduler steps.
@@ -39,6 +39,17 @@ clears timeline lookup membership while previously captured fences remain valid.
 Pending publication registrations survive a nil reset, capture the first later
 fence and retain it across another reset. Every allocated reset owner is freed;
 reset does not signal the old GPU fence or allocate wait capture nodes.
+
+SIGNAL cases execute the production handler and private completion allocator.
+They check fresh context/sequence-zero successes and timestamps for duplicate
+handles, all identities before effects, sequential prefix preservation on OOM,
+inline/owned failure cleanup and stable old GPU/timeline/first-publication
+captures across replacement and handle reuse. The injected allocator counts
+retained fence bytes separately from temporary request storage. Fixture-only
+retirement frees those completions after all users and objects are gone;
+production still retains published fence metadata. Ordinary first completion
+timestamps survive later success/error attempts. Signaled CREATE still uses
+its existing allocation path; its fallibility is separate work.
 
 These deterministic interleavings do not exercise actual kernel threads, GPU
 execution or kernel heap usage. Vinix still polls through its scheduler; Linux

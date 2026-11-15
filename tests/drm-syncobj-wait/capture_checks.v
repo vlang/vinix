@@ -4,6 +4,10 @@ module syncobj
 
 import klock
 
+pub fn assert_private_stub_for_checks(fence &DmaFence) {
+	assert fence.queue_context == 0 && fence.waiters.len == 0
+}
+
 __global capture_check_object &SyncObj = unsafe { nil }
 __global capture_check_fence &DmaFence = unsafe { nil }
 __global capture_check_node &FenceCapture = unsafe { nil }

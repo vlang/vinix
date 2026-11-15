@@ -8,7 +8,7 @@ fn check_fence_completion_contract(local string, reference string) ! {
 		'// Check whether a fence has been signaled', 'Vinix failed fence completion')!
 	for source in [success, failure] {
 		require_order(source, ['f.lock.acquire()', 'if f.signaled {', 'f.lock.release()',
-			'return', 'katomic.store(mut &f.signaled, true)',
+			'return', 'f.timestamp_ns = time.monotonic_ns()', 'katomic.store(mut &f.signaled, true)',
 			'for mut w in f.waiters', 'if !w.triggered', 'w.callback(fence)', 'f.lock.release()'],
 			'Vinix first-completion guard and release publication')!
 	}

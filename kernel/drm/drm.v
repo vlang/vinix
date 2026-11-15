@@ -309,6 +309,9 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 		ioctl.drm_ioctl_syncobj_reset {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjArray)), direction: ioctl_write | ioctl_read }
 		}
+		ioctl.drm_ioctl_syncobj_signal {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjArray)), direction: ioctl_write | ioctl_read }
+		}
 		ioctl.drm_ioctl_mode_create_dumb {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmModeCreateDumb))
@@ -1123,6 +1126,32 @@ fn ioctl_syncobj_reset(handle voidptr, data voidptr) int {
 	return 0
 }
 
+fn ioctl_syncobj_signal(handle voidptr, data voidptr) int {
+	if handle == unsafe { nil } || data == unsafe { nil } { return -14 }
+	request := unsafe { &ioctl.DrmSyncobjArray(data) }
+	if request.pad != 0 || request.count_handles == 0 { return -22 }
+	mut handles := [64]u32{}
+	mut objects := unsafe { [64]voidptr{} }
+	mut buffer := SyncobjWaitBuffer{ handles: unsafe { &handles[0] }, objects: unsafe { &objects[0] } }
+	if request.count_handles > 64 {
+		buffer = new_syncobj_handle_buffer(request.count_handles) or { return -12 }
+	}
+	defer { buffer.free_owned() }
+	if !usercopy.copy_from_user(buffer.handles, request.handles,
+		u64(request.count_handles) * sizeof(u32)) { return -14 }
+	for i := u32(0); i < request.count_handles; i++ {
+		object := syncobj.lookup(u64(handle), unsafe { buffer.handles[i] }) or { return -2 }
+		unsafe { buffer.objects[i] = voidptr(object) }
+	}
+	// Linux allocates one private completion per array entry, including
+	// duplicates. OOM preserves the already-replaced prefix, then stops.
+	for i := u32(0); i < request.count_handles; i++ {
+		fence := syncobj.new_private_stub(syncobj.now_ns()) or { return -12 }
+		syncobj.replace_fence(unsafe { &syncobj.SyncObj(buffer.objects[i]) }, fence)
+	}
+	return 0
+}
+
 fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 	match cmd {
 		ioctl.drm_ioctl_version {
@@ -1157,6 +1186,9 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		}
 		ioctl.drm_ioctl_syncobj_reset {
 			return ioctl_syncobj_reset(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_signal {
+			return ioctl_syncobj_signal(handle, data)
 		}
 		else {
 			return none

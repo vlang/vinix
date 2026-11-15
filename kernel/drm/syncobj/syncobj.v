@@ -24,6 +24,7 @@ pub mut:
 	seqno    u64
 	signaled bool
 	error    int // 0 = success, negative = error code
+	timestamp_ns u64 // first completion's monotonic timestamp
 	context  u64
 	lock     klock.Lock
 	waiters  []&FenceWaiter
@@ -72,6 +73,7 @@ pub fn signal(fence &DmaFence) {
 		f.lock.release()
 		return
 	}
+	f.timestamp_ns = time.monotonic_ns()
 	katomic.store(mut &f.signaled, true)
 
 	// Wake every registered waiter
@@ -101,6 +103,7 @@ pub fn signal_error(fence &DmaFence, err int) {
 		return
 	}
 	f.error = err
+	f.timestamp_ns = time.monotonic_ns()
 	katomic.store(mut &f.signaled, true)
 
 	for mut w in f.waiters {

@@ -12,7 +12,7 @@ fn check_reset_contract(drm string, wire string, storage string, sync string,
 	require_order(registration, ['ioctl.drm_ioctl_syncobj_reset {', 'size: u32(sizeof(ioctl.DrmSyncobjArray)), direction: ioctl_write | ioctl_read'], 'Vinix RESET size/direction')!
 	dispatch := drm.all_after('fn core_ioctl(')
 	require_order(dispatch, ['ioctl.drm_ioctl_syncobj_reset {', 'return ioctl_syncobj_reset(handle, data)'], 'Vinix RESET dispatch')!
-	reset := section(drm, 'fn ioctl_syncobj_reset(', 'fn core_ioctl(', 'Vinix RESET handler')!
+	reset := section(drm, 'fn ioctl_syncobj_reset(', 'fn ioctl_syncobj_signal(', 'Vinix RESET handler')!
 	require_order(reset, ['if request.pad != 0 || request.count_handles == 0 { return -22 }',
 		'mut handles := [64]u32{}', 'mut objects := unsafe { [64]voidptr{} }',
 		'if request.count_handles > 64 {', 'new_syncobj_handle_buffer(request.count_handles)',

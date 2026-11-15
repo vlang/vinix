@@ -11,7 +11,7 @@ fn test_fence_completion_guards_reject_status_rewrite_and_reference_drift() {
 		'trace_dma_fence_signaled(fence);\nlist_for_each_entry_safe(cur, tmp, &cb_list, node) cur->func(fence, cur);\n' +
 		'EXPORT_SYMBOL(dma_fence_signal_timestamp_locked)'
 	check_fence_completion_contract(local, reference)!
-	for token in ['if f.signaled {', 'katomic.store(mut &f.signaled, true)'] {
+	for token in ['if f.signaled {', 'f.timestamp_ns = time.monotonic_ns()', 'katomic.store(mut &f.signaled, true)'] {
 		if _ := check_fence_completion_contract(local.replace(token, ''), reference) { assert false }
 	}
 	if _ := check_fence_completion_contract(local.replace('if f.signaled {', 'f.error = err\nif f.signaled {'), reference) { assert false }
