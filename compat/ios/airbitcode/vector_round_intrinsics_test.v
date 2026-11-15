@@ -33,12 +33,13 @@ fn test_vector_rounding_every_half_encoding() {
 }
 fn test_vector_rounding_names_states_and_cache() {
 	mut seen := [vector_float_intrinsic_slots]bool{}; mut checks := 0
-	for bits in [u32(16), 32]! { for id in [ScalarIntrinsic.fabs, .copysign, .floor, .ceil, .trunc, .round, .roundeven, .rint, .nearbyint, .sqrt, .minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum, .fma]! { for count in 1 .. 17 {
+	for bits in [u32(16), 32]! { for id in [ScalarIntrinsic.fabs, .copysign, .floor, .ceil, .trunc, .round, .roundeven, .rint, .nearbyint, .sqrt, .minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum, .fma, .fmuladd]! { for count in 1 .. 17 {
 		name := 'llvm.${id}.v${count}f${bits}'; parsed, n, b := vector_float_intrinsic_name(name)!; assert parsed == id && n == count && b == bits
 		key := vector_float_intrinsic_key(id, count, bits)!; assert !seen[key]; seen[key] = true
 		if id in [.fabs, .copysign]! { assert key == vector_sign_intrinsic_key(id, count, bits)!; continue }
 		if id == .sqrt { assert key >= 288; continue }
 		if id == .fma { assert key >= 512; continue }
+		if id == .fmuladd { assert key >= 544; continue }
 		if id in [.minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum]! { assert key >= 320; continue }
 		for target in 0 .. count {
 			mut source := ScalarVectorValue{}; source.lanes[target] = IntegerValue{poison: true}; result := rounding_intrinsic_vector(id, source, bits, count)!
@@ -53,5 +54,5 @@ fn test_vector_rounding_names_states_and_cache() {
 	for count in [0, 17] { if _ := rounding_intrinsic_vector(.floor, ScalarVectorValue{}, 16, count) { assert false, 'count' } }
 	for tag in [IntegerValue{aggregate: true}, IntegerValue{vector: true}] { mut source := ScalarVectorValue{}; source.lanes[0] = tag; if _ := rounding_intrinsic_vector(.floor, source, 32, 1) { assert false, 'scalar tag' } }
 	assert checks == 22848
-	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 544 sign/rounding/sqrt/minmax/fma overload/cache identities and family/shape/name/tag guards PASS')
+	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 576 sign/rounding/sqrt/minmax/fma/fmuladd overload/cache identities and family/shape/name/tag guards PASS')
 }

@@ -25,8 +25,9 @@ fn test_vector_fma_encodings_and_states() {
 			sources[side].undef = u16(1) << u32(target); if _ := fma_intrinsic_vector(sources[0], sources[1], sources[2], bits, count) { assert false, 'undef must dominate poison' }; checks++
 		} }
 	} }; for slot in seen { assert slot }; assert checks == 9792
-	for name in ['llvm.fma.f32', 'llvm.fma.v0f16', 'llvm.fma.v01f16', 'llvm.fma.v17f32', 'llvm.fma.v999999999999999999f16', 'llvm.fma.v2f64', 'llvm.fma.v2bf16', 'llvm.fma.v2i32', 'llvm.fma.v2f016', 'llvm.fma.v2f32.spoof', 'llvm.fma.nxv2f32', 'llvm.fmuladd.v2f32', 'air.fma.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
+	for name in ['llvm.fma.f32', 'llvm.fma.v0f16', 'llvm.fma.v01f16', 'llvm.fma.v17f32', 'llvm.fma.v999999999999999999f16', 'llvm.fma.v2f64', 'llvm.fma.v2bf16', 'llvm.fma.v2i32', 'llvm.fma.v2f016', 'llvm.fma.v2f32.spoof', 'llvm.fma.nxv2f32', 'llvm.fmuladd.v2f64', 'air.fma.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
+ for bits in [u32(16), 32]! { for count in 1 .. 17 { id, n, width := vector_float_intrinsic_name('llvm.fmuladd.v${count}f${bits}')!; assert id == .fmuladd && n == count && width == bits; assert vector_float_intrinsic_key(id, count, bits)! == 544 + int(bits == 16) * 16 + count - 1 } }
 	for width in [u32(0), 1, 64]! { if _ := fma_intrinsic_vector(ScalarVectorValue{}, ScalarVectorValue{}, ScalarVectorValue{}, width, 1) { assert false, 'width' } }; for count in [0, 17] { if _ := fma_intrinsic_vector(ScalarVectorValue{}, ScalarVectorValue{}, ScalarVectorValue{}, 16, count) { assert false, 'count' } }
 	for side in 0 .. 3 { for tag in [IntegerValue{aggregate: true}, IntegerValue{vector: true}] { mut sources := [3]ScalarVectorValue{}; sources[side].lanes[0] = tag; if _ := fma_intrinsic_vector(sources[0], sources[1], sources[2], 32, 1) { assert false, 'scalar lane tag' } } }
-	println('AIR-VECTOR-FMA-STATES: ${identities} exact a*1+signed-zero identity lane results, ${checks} three-source poison/undef/freeze checks and 32 canonical cache/name/shape/tag guards PASS')
+	println('AIR-VECTOR-FMA-STATES: ${identities} exact a*1+signed-zero identity lane results, ${checks} three-source poison/undef/freeze checks and 64 canonical cache/name/shape/tag guards PASS')
 }

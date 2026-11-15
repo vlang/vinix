@@ -220,11 +220,11 @@ fn focused_controls(assembler_path string, out string) ! {
  mut s := strings.new_builder(65536)
  s.write_string('target datalayout = "e-p:64:64"\n')
  modes := ['raw', 'source', 'result', 'discard', 'old', 'chain']
- guards := ['fmf', 'tail', 'attribute', 'argument', 'load', 'phi', 'wide', 'scalable', 'double', 'optional']
+ guards := ['fmf', 'tail', 'attribute', 'argument', 'load', 'phi', 'wide', 'scalable', 'double', 'alias']
  for width in [16, 32] {
   t := if width == 16 { 'half' } else { 'float' }; one := if width == 16 { u64(0x3c00) } else { u64(0x3f800000) }; sign := u64(1) << u32(width - 1); element := if width == 16 { 64 } else { 65 }
   for count in [2, 17] { s.write_string('declare <${count} x ${t}> @llvm.fma.v${count}f${width}(<${count} x ${t}>, <${count} x ${t}>, <${count} x ${t}>)\n') }
-  s.write_string('declare <vscale x 2 x ${t}> @llvm.fma.nxv2f${width}(<vscale x 2 x ${t}>, <vscale x 2 x ${t}>, <vscale x 2 x ${t}>)\n declare <2 x ${t}> @llvm.fmuladd.v2f${width}(<2 x ${t}>, <2 x ${t}>, <2 x ${t}>)\n declare <2 x ${t}> @reserved_alias_${width}(<2 x ${t}>, <2 x ${t}>, <2 x ${t}>)\n')
+  s.write_string('declare <vscale x 2 x ${t}> @llvm.fma.nxv2f${width}(<vscale x 2 x ${t}>, <vscale x 2 x ${t}>, <vscale x 2 x ${t}>)\n declare <2 x ${t}> @air.fmuladd.v2f${width}(<2 x ${t}>, <2 x ${t}>, <2 x ${t}>)\n declare <2 x ${t}> @reserved_alias_${width}(<2 x ${t}>, <2 x ${t}>, <2 x ${t}>)\n')
   for side in 0 .. 3 { for state in ['defined', 'poison', 'undef'] { for mode in modes {
    mut args := []string{}; for i, word in [one + 1, one - 2, one | sign]! { args << if i == side && state != 'defined' { state } else { '<${t} ${literal(element, word)}, ${t} ${literal(element, word)}>' } }
    mut pre := ''; if mode == 'source' { pre = '%s = freeze <2 x ${t}> ${args[side]}\n'; args[side] = '%s' }
@@ -237,7 +237,7 @@ fn focused_controls(assembler_path string, out string) ! {
   } } }
   for guard in guards {
    count := if guard == 'wide' { 17 } else { 2 }; vt := if guard == 'scalable' { '<vscale x 2 x ${t}>' } else if guard == 'double' { '<2 x double>' } else { '<${count} x ${t}>' }
-   callee := if guard == 'scalable' { 'llvm.fma.nxv2f${width}' } else if guard == 'double' { 'llvm.fma.v2f64' } else if guard == 'optional' { 'llvm.fmuladd.v2f${width}' } else { 'llvm.fma.v${count}f${width}' }
+   callee := if guard == 'scalable' { 'llvm.fma.nxv2f${width}' } else if guard == 'double' { 'llvm.fma.v2f64' } else if guard == 'alias' { 'air.fmuladd.v2f${width}' } else { 'llvm.fma.v${count}f${width}' }
    signature := if guard == 'argument' { '<2 x ${t}> %a, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
    pre := if guard == 'load' { '%a = load <2 x ${t}>, ptr %src, align 1\n' } else if guard == 'phi' { 'br label %body\n body: %a = phi <2 x ${t}> [zeroinitializer, %entry]\n' } else if guard == 'wide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold:' } else { '' }
    s.write_string('define void @guard_${width}_${guard}(${signature}) { entry: store i8 17, ptr %out\n ${pre}%n = ${if guard == 'tail' { 'tail ' } else { '' }}call ${if guard == 'fmf' { 'nnan ' } else { '' }}${vt} @${callee}(${vt} ${if guard in ['argument', 'load', 'phi'] { '%a' } else { 'zeroinitializer' }}, ${vt} zeroinitializer, ${vt} zeroinitializer)${if guard == 'attribute' { ' #1' } else { '' }}\n ret void }\n')

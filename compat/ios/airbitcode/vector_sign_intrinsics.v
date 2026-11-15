@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 32
+const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -64,6 +64,6 @@ fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Strea
 	arity := scalar_intrinsic_arity(id)
 	right := if arity >= 2 { m.read_vector(stream, m.p.operands[op.operands_start + 2])! } else { ScalarVectorValue{} }
 	addend := if arity == 3 { m.read_vector(stream, m.p.operands[op.operands_start + 3])! } else { ScalarVectorValue{} }
-	result := if id == .fma { fma_intrinsic_vector(left, right, addend, bits, count)! } else if id in [.fabs, .copysign]! { sign_intrinsic_vector(id, left, right, bits, count)! } else if id in [.minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum]! { minmax_intrinsic_vector(id, left, right, bits, count)! } else if id == .sqrt { sqrt_intrinsic_vector(left, bits, count)! } else { rounding_intrinsic_vector(id, left, bits, count)! }
+	result := if id in [.fma, .fmuladd]! { fma_intrinsic_vector(left, right, addend, bits, count)! } else if id in [.fabs, .copysign]! { sign_intrinsic_vector(id, left, right, bits, count)! } else if id in [.minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum]! { minmax_intrinsic_vector(id, left, right, bits, count)! } else if id == .sqrt { sqrt_intrinsic_vector(left, bits, count)! } else { rounding_intrinsic_vector(id, left, bits, count)! }
 	return m.store_vector_value(inst, result)!
 }

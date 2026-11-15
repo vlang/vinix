@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
+// FMA is exact until one final rounding. Optional-fusion fmuladd consistently
+// selects this same fused evaluation, matching the scalar execution policy.
 fn fma_intrinsic_vector(left ScalarVectorValue, right ScalarVectorValue, addend ScalarVectorValue, bits u32, count int) !ScalarVectorValue {
 	vector_float_intrinsic_key(.fma, count, bits)!
 	mask := constant_mask(bits)
