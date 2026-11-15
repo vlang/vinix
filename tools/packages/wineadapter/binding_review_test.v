@@ -365,12 +365,15 @@ fn test_binding_digest_streams_across_buffer_boundary() {
 	root := os.real_path(os.temp_dir()) + '/wine-binding-digest-' + os.getpid().str()
 	os.mkdir(root)!
 	defer { os.rmdir_all(root) or {} }
-	text := 'a'.repeat(65537)
-	os.write_file(root + '/large.dll', text)!
 	fd := absolute_directory(root)!
 	defer { C.close(fd) }
-	digest, size := binding_asset_digest(fd, 'large.dll')!
-	assert size == 65537 && digest == local_source_digest(text)
+	for count in [1, 14, 65535, 65536, 65537] {
+		text := 'a'.repeat(count)
+		os.write_file(root + '/large.dll', text)!
+		digest, size := binding_asset_digest(fd, 'large.dll')!
+		assert size == u64(count) && digest == local_source_digest(text)
+		unsafe { digest.free() }
+	}
 	os.write_file(root + '/empty.dll', '')!
 	if _, _ := binding_asset_digest(fd, 'empty.dll') { assert false, 'empty DLL accepted' }
 }

@@ -13,7 +13,9 @@ fn binding_asset_digest(parent int, name string) !(string, u64) {
 		return error('Wine binding review asset must be ordinary and between 1 byte and 64 MiB')
 	}
 	mut hash := sha256.new()
-	mut buffer := []u8{len: 65536}
+	// The admitted size is positive and bounded; retain the 64 KiB streaming cap.
+	buffer_size := if before.st_size < 65536 { int(before.st_size) } else { 65536 }
+	mut buffer := []u8{len: buffer_size}
 	mut sum := []u8{len: sha256.size}
 	defer { unsafe { hash.free(); free(hash); buffer.free(); sum.free() } }
 	mut count := u64(0)

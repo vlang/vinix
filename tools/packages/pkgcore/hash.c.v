@@ -68,7 +68,10 @@ fn hash_file_with(path string, options HashReadOptions) !string {
 // checks its named identity. Packing uses its captured parent for that check.
 fn hash_opened(fd int, expected u64, path string, options HashReadOptions) !string {
 	mut hash := sha256.new()
-	mut buffer := []u8{len: 64 * 1024}
+	// Small manifests should not force a 64 KiB allocation for each tiny asset.
+	// Keep one byte for the EOF sentinel even when the admitted file is empty.
+	buffer_size := if expected == 0 { 1 } else if expected < 64 * 1024 { int(expected) } else { 64 * 1024 }
+	mut buffer := []u8{len: buffer_size}
 	defer {
 		unsafe { buffer.free(); hash.free(); free(hash) }
 	}

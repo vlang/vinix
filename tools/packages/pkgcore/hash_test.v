@@ -9,7 +9,7 @@ import time
 #include <sys/wait.h>
 #include <sys/resource.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
 fn C.mkfifo(&char, u32) int
@@ -28,7 +28,7 @@ fn test_hash_exact_bytes_boundaries_and_owned_results() {
 	work := hash_work()!
 	defer { os.rmdir_all(work) or {} }
 	path := work + '/payload with spaces 日本語'
-	for text in ['', 'binary\x00content', 'x'.repeat(65535), 'y'.repeat(65536), 'z'.repeat(65537), 'a'.repeat(140000)] {
+	for text in ['', 'x', 'binary\x00content', 'x'.repeat(65535), 'y'.repeat(65536), 'z'.repeat(65537), 'a'.repeat(140000)] {
 		os.write_file(path, text)!
 		os.chmod(path, 0o600)!
 		digest := hash_file(path)!
@@ -56,7 +56,7 @@ fn hash_denied(path string) {
 		}
 		C._exit(42)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, &status, 0) == child
 	assert status == 0, '${path}: expected prompt hash/verification refusal, wait status ${status}'
 }
