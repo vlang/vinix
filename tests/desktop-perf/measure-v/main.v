@@ -134,8 +134,13 @@ fn reset_tracker() ! {
 
 fn raw_snapshot(snapshot &perfheap.Snapshot, label string, operation string, directory string, phase string) ! {
 	require(snapshot.valid, 'attempt to print an invalid full snapshot')!
-	C.printf(c'PERF-HEAP-BEGIN %s op="%s" dir=%s phase=%s schema=vinix-slab-14-4k-v1 bytes=%ld\n',
-		chars(label), chars(operation), chars(directory), chars(phase), i64(snapshot.raw_len))
+	$if perf_slab16k ? {
+		C.printf(c'PERF-HEAP-BEGIN %s op="%s" dir=%s phase=%s schema=vinix-slab-18-16k-v1 bytes=%ld\n',
+			chars(label), chars(operation), chars(directory), chars(phase), i64(snapshot.raw_len))
+	} $else {
+		C.printf(c'PERF-HEAP-BEGIN %s op="%s" dir=%s phase=%s schema=vinix-slab-14-4k-v1 bytes=%ld\n',
+			chars(label), chars(operation), chars(directory), chars(phase), i64(snapshot.raw_len))
+	}
 	require(C.fflush(C.stdout) == 0, 'snapshot prefix flush failed')!
 	mut offset := 0
 	for offset < snapshot.raw_len {
@@ -297,7 +302,7 @@ fn run() !int {
 		label := os.args[3..].join(' ')
 		defer { unsafe { label.free() } }
 		require(valid_label(label, mode), 'invalid perf label')!
-		require(C.sysconf(C._SC_PAGESIZE) == 4096, 'slab schema requires 4096-byte pages')!
+		perfheap.require_page_size(C.sysconf(C._SC_PAGESIZE))!
 		require(C.setvbuf(C.stdout, unsafe { nil }, C._IOLBF, 0) == 0, 'line buffering failed')!
 		if mode == 'ops' { operations(label)! } else { heap_churn(label)! }
 		return 0

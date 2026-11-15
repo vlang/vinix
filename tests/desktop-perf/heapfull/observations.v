@@ -55,7 +55,7 @@ pub:
 	pairs []ObservedCohort
 }
 
-// Sum the reported fourteen slab classes and large pages exactly, even when
+// Sum every reported slab class and large pages exactly, even when
 // individually valid u64 counters exceed u64 storage after addition.
 fn reported_pages(snapshot &perfheap.Snapshot) !big.Integer {
 	mut total := big.integer_from_string(snapshot.large_pages.str())!
@@ -113,7 +113,7 @@ pub fn observe(transcript []u8) !Observations {
 			unsafe { &offset })!
 		mut delta := perfheap.Delta{}
 		perfheap.compare(unsafe { &before }, unsafe { &after }, unsafe { &delta })!
-		mut rows := []ObservedClass{cap: 14}
+		mut rows := []ObservedClass{cap: perfheap.class_count}
 		mut nonzero := delta.large_pages != 0 || delta.written_after_free != 0
 		for index, row in delta.classes {
 			if row.objects != 0 { object_rows++; nonzero = true }
@@ -141,14 +141,14 @@ pub fn observe(transcript []u8) !Observations {
 		seen[begin.identity] = true
 		snapshots += 2
 	}
-	require(seen.len == 40 && pairs.len == 40 && snapshots == 80 && deltas == 640,
-		'observations require 40 complete pairs, 80 snapshots and 640 canonical delta rows')!
+	require(seen.len == 40 && pairs.len == 40 && snapshots == 80 && deltas == expected_delta_rows,
+		'observations require 40 complete pairs, 80 snapshots and all canonical delta rows')!
 	mut physical := []string{}
 	for line in text.split_into_lines() {
 		if line.contains('PERF-CHURN ') || line.contains('PERF-CACHE ') { physical << line.clone() }
 	}
 	return Observations{qualification: false, measurements: summary.rows.len, cohorts: pairs.len,
-		snapshots: snapshots, delta_rows: deltas, class_rows: pairs.len * 14,
+		snapshots: snapshots, delta_rows: deltas, class_rows: pairs.len * perfheap.class_count,
 		nonzero_delta_cohorts: changed, nonzero_object_rows: object_rows,
 		nonzero_page_rows: page_rows, nonzero_large_rows: large_rows,
 		corruption_counter_cohorts: corruption, physical_and_cache_observations: physical, pairs: pairs}

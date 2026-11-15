@@ -5,10 +5,12 @@ module heapfull
 import perfheap
 import perfflatness
 import perfreport
+import perfprotocol
 import strconv
 
 pub const max_transcript_bytes = 32 * 1024 * 1024
-const schema = 'vinix-slab-14-4k-v1'
+pub const schema = perfheap.schema
+pub const expected_delta_rows = 40 * (perfheap.class_count + 2)
 const protocol_marker = 'PERF-HEAP'
 
 pub struct Report {
@@ -68,11 +70,7 @@ fn line_at(text string, offset int) !Line {
 // The original transcript is passed unchanged to the summary gate and SHA.
 fn protocol_line(line Line) !string {
 	require(line.terminated, 'unterminated full heap protocol line')!
-	text := if line.text.ends_with('\r') { line.text[..line.text.len - 1] } else { line.text }
-	for byte in text {
-		require(byte >= 32 && byte <= 126, 'non-ASCII or control byte in full heap protocol')!
-	}
-	return text
+	return perfprotocol.line(line.text)!
 }
 
 fn parse_begin(line string, known map[string]bool) !Begin {
@@ -122,7 +120,7 @@ fn signed(value i64) string {
 fn delta_lines(identity string, before &perfheap.Snapshot, after &perfheap.Snapshot,
 	delta &perfheap.Delta) []string {
 	prefix := 'PERF-HEAP-DELTA ' + identity + ' '
-	mut lines := []string{cap: 16}
+	mut lines := []string{cap: perfheap.class_count + 2}
 	for row in delta.classes {
 		lines << prefix + 'class=size-' + row.size.str() + ' objects=' + signed(row.objects)
 			+ ' pages=' + signed(row.pages)
@@ -154,7 +152,7 @@ fn read_deltas(text string, identity string, before &perfheap.Snapshot,
 
 // Fixed new=, one-round ops/churn/cache/idle/apps/drag evidence. The unchanged
 // summary gate checks all 44 measurements and DONE; exact full observations add
-// 40 unique cohorts, 80 admitted raw snapshots and 640 consistent delta rows.
+// 40 unique cohorts, 80 raw snapshots and all class/large/footer delta rows.
 pub fn inspect(transcript []u8) !Report {
 	require(transcript.len > 0 && transcript.len <= max_transcript_bytes,
 		'captured serial transcript must contain at most 32 MiB')!
@@ -194,7 +192,7 @@ pub fn inspect(transcript []u8) !Report {
 		snapshots += 2
 	}
 	require(seen.len == identities.len, 'missing full heap cohorts: expected 40, received ' + seen.len.str())!
-	require(snapshots == 80 && deltas == 640, 'incomplete full heap snapshot or DELTA counts')!
+	require(snapshots == 80 && deltas == expected_delta_rows, 'incomplete full heap snapshot or DELTA counts')!
 	return Report{cohorts: seen.len, snapshots: snapshots, delta_rows: deltas, ops: summary.ops,
 		slab_rows: summary.slab_rows, observations: summary.observations}
 }

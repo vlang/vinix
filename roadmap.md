@@ -2444,6 +2444,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   samplers on both architectures. See [the sampler build receipts](docs/linux-performance-sampler-builds.md)
   for the separate current-compiler precision defect and remaining runtime/schema gates.
 
+- [x] Add an explicitly selected 16 KiB/eighteen-class ARM slab observation
+  profile while retaining the strict default 4 KiB/fourteen-class contract.
+  Qualify complete medium-class deltas, foreign-schema refusals and native
+  200-read cleanup with flat object/pages/large storage on both architectures.
+  See [the ARM schema receipts](docs/linux-performance-arm-schema.md); full
+  performance and broader application acceptance remain open.
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -8,15 +8,15 @@ import perfreport
 
 struct FixtureCounts {
 mut:
-	objects [14]u64
-	pages [14]u64
+	objects [perfheap.class_count]u64
+	pages [perfheap.class_count]u64
 	large u64
 	written u64
 }
 
 fn fixture_counts() FixtureCounts {
 	mut counts := FixtureCounts{large: 9}
-	for index in 0 .. 14 {
+	for index in 0 .. perfheap.class_count {
 		counts.objects[index] = 20
 		counts.pages[index] = 4
 	}
@@ -38,7 +38,7 @@ fn fixture_block(identity string, phase string, counts FixtureCounts) string {
 }
 
 fn fixture_raw_block(identity string, phase string, body string) string {
-	return 'PERF-HEAP-BEGIN ' + identity + ' phase=' + phase + ' schema=vinix-slab-14-4k-v1 bytes='
+	return 'PERF-HEAP-BEGIN ' + identity + ' phase=' + phase + ' schema=' + schema + ' bytes='
 		+ body.len.str() + '\n' + body + 'PERF-HEAP-END ' + identity + ' phase=' + phase + '\n'
 }
 
@@ -134,14 +134,14 @@ pub fn selfcheck() !int {
 	base := fixture('clean')!
 	mut checks := 0
 	valid := inspect(base.bytes())!
-	require(valid.cohorts == 40 && valid.snapshots == 80 && valid.delta_rows == 640
+	require(valid.cohorts == 40 && valid.snapshots == 80 && valid.delta_rows == expected_delta_rows
 		&& valid.ops == 36 && valid.slab_rows == 0 && valid.observations.len == 5,
 		'complete full heap fixture counts or observation preservation differ')!
 	require(fixture_summaries().split_into_lines().len == 45,
 		'fixture must retain exactly 44 measurements plus DONE')!
 	checks++
 	crlf := inspect(base.replace('\n', '\r\n').bytes())!
-	require(crlf.cohorts == 40 && crlf.delta_rows == 640, 'CRLF serial protocol was rejected')!
+	require(crlf.cohorts == 40 && crlf.delta_rows == expected_delta_rows, 'CRLF serial protocol was rejected')!
 	checks++
 	physical := base.replace('retained_kb=0 per_run_bytes=0', 'retained_kb=4 per_run_bytes=13')
 		.replace('used_mb=32 cached_kb=32768', 'used_mb=40 cached_kb=40960')
@@ -163,7 +163,7 @@ pub fn selfcheck() !int {
 	deltas := fixture_deltas(identity, counts, counts)
 	cohort := before + after + deltas
 	body := fixture_snapshot(counts)
-	begin := 'PERF-HEAP-BEGIN ' + identity + ' phase=before schema=vinix-slab-14-4k-v1 bytes=' + body.len.str() + '\n'
+	begin := 'PERF-HEAP-BEGIN ' + identity + ' phase=before schema=' + schema + ' bytes=' + body.len.str() + '\n'
 	end := 'PERF-HEAP-END ' + identity + ' phase=before\n'
 	delta := 'PERF-HEAP-DELTA ' + identity + ' class=size-16 objects=+0 pages=+0\n'
 	delta32 := 'PERF-HEAP-DELTA ' + identity + ' class=size-32 objects=+0 pages=+0\n'
@@ -186,7 +186,7 @@ pub fn selfcheck() !int {
 		replace_once(base, begin, begin.replace('op="stat"', 'op="unknown"'))!,
 		replace_once(base, begin, begin.replace('round=1', 'round=2'))!,
 		replace_once(base, begin, begin.replace('variant=new', 'variant=new variant=new'))!,
-		replace_once(base, begin, begin.replace('schema=vinix-slab-14-4k-v1', 'schema=unknown'))!,
+		replace_once(base, begin, begin.replace('schema=' + schema, 'schema=unknown'))!,
 		replace_once(base, begin, begin.replace('phase=before', 'phase=other'))!,
 		replace_once(base, begin, 'serial-prefix ' + begin)!,
 		replace_once(base, after, before)!,
@@ -219,5 +219,9 @@ pub fn selfcheck() !int {
 		refuse(bad, 'framing, schema, identity, length, completeness or arithmetic control')!
 		checks++
 	}
+	$if perf_slab16k ? { checks += medium_controls(base)! }
 	return checks
 }
+
+// Intentional host fixture; it is never guest execution evidence.
+pub fn clean_fixture() !string { return fixture('clean') }

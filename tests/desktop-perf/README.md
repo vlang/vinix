@@ -99,6 +99,19 @@ repository from its source path and retains results in a fresh temporary
 directory printed on success. See the [production sampler build receipts](../../docs/linux-performance-sampler-builds.md)
 for the qualified compiler, strict target links and remaining schema gates.
 
+The gate now checks both slab profiles and their cross-schema refusals. The
+default consumer accepts only `vinix-slab-14-4k-v1`. Compile a consumer with
+`-d perf_slab16k` to read `vinix-slab-18-16k-v1`; the maintained AArch64 sampler
+builder selects that flag automatically. Both retain complete raw snapshots
+and all exact class, large-page and corruption counters. See the
+[ARM profile receipts](../../docs/linux-performance-arm-schema.md).
+
+`heap-native/main.v` is a separate PID1 probe for the selected schema and
+200-read cleanup, rather than an application performance run. Build it with
+the sampler's target flags and matching profile. `heap-native-check.v
+check|controls SERIAL` validates its captured output and rejection controls;
+compile that checker with the same profile flag.
+
 The retained `run-arm.v` and `run-x86.v` adapters generate their PID1 through
 `perfproducer.generate_init`, using the maintained freestanding V module path.
 The initializer uses native C-width libc calls and stack shell arguments.

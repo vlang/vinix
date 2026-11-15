@@ -58,6 +58,10 @@ ARM 16 KiB/18-class integration, native performance runs, selected x86 runtime's
 missing curl and inherited kernel allocation allowances remain separate open gates. The existing
 4 KiB/14-class schema and historical evidence/checkers are unchanged.
 
+The subsequent [explicit ARM schema qualification](linux-performance-arm-schema.md)
+adds a separately selected 16 KiB/eighteen-class profile, preserving the default
+legacy contract and qualifying native reader cleanup on both architectures.
+
 Complete evidence: `/Users/alex/.cache/vx-sb-1115/bundle`, archived at
 `/Users/alex/.cache/vx-sb-1115.tar.gz`, SHA-256
 `75b6bd6683fc067fa7b5a3b4cb8baaf61a4b28bee26b2fc8806051f155fe574f`.

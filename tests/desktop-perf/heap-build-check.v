@@ -31,7 +31,7 @@ fn run() ! {
 		path := root + '/tests/desktop-perf/' + name
 		inputs[path] = digest(path)!
 	}
-	for folder in ['perfheap', 'heapfull'] {
+	for folder in ['perfheap', 'heapfull', 'perfprotocol'] {
 		for path in os.walk_ext(root + '/tests/desktop-perf/' + folder, '.v') { inputs[path] = digest(path)! }
 	}
 	inputs[compiler] = digest(compiler)!
@@ -39,24 +39,53 @@ fn run() ! {
 	// A failed selected compiler must fail the check, rather than trying a fallback.
 	os.setenv('V_MACOS_V3_NO_FALLBACK', '1', true)
 	os.setenv('V_MACOS_V3_CALLER_NO_FALLBACK', '1', true)
+	for schema in ['4k', '16k'] {
 	for profile in ['normal', 'production'] {
 		for target in ['heap-selfcheck', 'heap-full-check'] {
-			name := profile + '-' + target
+			name := schema + '-' + profile + '-' + target
 			binary := state + '/' + name
 			mut args := [compiler, '-cc', 'cc']
+			if schema == '16k' { args << ['-d', 'perf_slab16k'] }
 			if profile == 'production' { args << '-prod' }
 			args << ['-o', binary, root + '/tests/desktop-perf/' + target + '.v']
 			execute(args, state + '/' + name + '-compile')!
-			argument := if target == 'heap-selfcheck' { state + '/reader-' + profile } else { 'selfcheck' }
+			argument := if target == 'heap-selfcheck' { state + '/reader-' + schema + '-' + profile } else { 'selfcheck' }
 			output := execute([binary, argument], state + '/' + name + '-run')!
-			expected := if target == 'heap-selfcheck' { 'PERF HEAP explicit parser/reader controls PASS 373' }
-				else { 'PERF FULL HEAP explicit controls PASS 57' }
+			expected := if target == 'heap-selfcheck' {
+				'PERF HEAP explicit parser/reader controls PASS ' + if schema == '4k' { '373' } else { '479' }
+			} else { 'PERF FULL HEAP explicit controls PASS ' + if schema == '4k' { '57' } else { '72' } }
 			if output.trim_space() != expected { return error('incomplete observer controls: ' + name) }
-			println(profile + ': ' + expected)
+			println(schema + ' ' + profile + ': ' + expected)
+		}
+	}
+	}
+	for profile in ['normal', 'production'] {
+		for schema in ['4k', '16k'] {
+			binary := state + '/' + schema + '-' + profile + '-heap-full-check'
+			fixture := state + '/' + schema + '-' + profile + '.fixture'
+			execute([binary, 'fixture', fixture], fixture + '-create')!
+			execute([binary, 'check', fixture], fixture + '-check')!
+			for count in [2, 3] {
+				console := fixture + '-cr' + count.str()
+				os.write_file(console, os.read_file(fixture)!.replace('\n', '\r'.repeat(count) + '\n'))!
+				args := [binary, 'check', console]
+				os.write_file(console + '.argv.json', json2.encode(args) + '\n')!
+				result := os.exec(args)
+				os.write_file(console + '.log', result.output)!
+				os.write_file(console + '.status', result.exit_code.str() + '\n')!
+				if (result.exit_code == 0) != (schema == '16k' && count == 2) { return error('console terminal sequence policy differs') }
+			}
+			other := state + '/' + if schema == '4k' { '16k' } else { '4k' } + '-' + profile + '-heap-full-check'
+			args := [other, 'check', fixture]
+			os.write_file(fixture + '-foreign.argv.json', json2.encode(args) + '\n')!
+			result := os.exec(args)
+			os.write_file(fixture + '-foreign.log', result.output)!
+			os.write_file(fixture + '-foreign.status', result.exit_code.str() + '\n')!
+			if result.exit_code == 0 { return error('foreign schema accepted') }
 		}
 	}
 	for path, pin in inputs { if digest(path)! != pin { return error('changed build input: ' + path) } }
-	os.write_file(state + '/result', 'PASS normal and production observer controls\n')!
+	os.write_file(state + '/result', 'PASS both schemas, normal/production observer controls and foreign-schema refusals\n')!
 	println('PERF HEAP BUILD PASS; retained state: ' + state)
 }
 

@@ -11,6 +11,11 @@ import os
 #include <stdlib.h>
 
 fn run() ! {
+	if os.args.len == 3 && os.args[1] == 'fixture' {
+		if os.exists(os.args[2]) || os.is_link(os.args[2]) { return error('fixture output must be fresh') }
+		os.write_file(os.args[2], heapfull.clean_fixture()!)!
+		return
+	}
 	if os.args.len == 2 && os.args[1] == 'selfcheck' {
 		controls := heapfull.selfcheck()!
 		println('PERF FULL HEAP explicit controls PASS ' + controls.str())

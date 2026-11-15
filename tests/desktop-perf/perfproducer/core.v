@@ -40,11 +40,12 @@ pub fn generate(compiler string, root string, directory string, arch string) !st
 	vfile := directory + '/measure-v.c'
 	// The guest declares the native i32 handler field; os's V-int handler
 	// metadata would insert a callback adapter with a different native ABI.
-	argv := [compiler, '-backend', 'c', '-prod', '-nocache', '-enable-globals', '-os', 'linux',
+	mut argv := [compiler, '-backend', 'c', '-prod', '-nocache', '-enable-globals', '-os', 'linux',
 		'-arch', if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree',
 		'-exclude', '@vlib/os/os_structs_sigaction_default.c.v',
-		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path', '@vlib|@vmodules|' + root + '/tests/desktop-perf',
-		'-o', vfile, root + '/tests/desktop-perf/measure-v']
+		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-path', '@vlib|@vmodules|' + root + '/tests/desktop-perf']
+	if arch == 'aarch64' { argv << ['-d', 'perf_slab16k'] }
+	argv << ['-o', vfile, root + '/tests/desktop-perf/measure-v']
 	os.write_file(directory + '/measure-v.argv.json', json2.encode(argv) + '\n')!
 	hwhost.run_tool(argv, {}, directory + '/measure-v.log', 300)!
 	copy := directory + '/measure-legacy.c'

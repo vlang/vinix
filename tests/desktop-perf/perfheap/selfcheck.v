@@ -85,8 +85,8 @@ pub fn selfcheck(fresh_root string) !int {
 	mut delta := Delta{}
 	mut checks := 0
 	parse_snapshot(base.str, base.len, unsafe { &before })!
-	require(raw_matches(unsafe { &before }, base) && before.classes[13].objects == 20
-		&& before.classes[13].pages == 4 && before.large_pages == 9
+	require(raw_matches(unsafe { &before }, base) && before.classes[class_count - 1].objects == 20
+		&& before.classes[class_count - 1].pages == 4 && before.large_pages == 9
 		&& before.written_after_free == 3, 'complete snapshot or raw retention differs')!
 	checks++
 	// Each proper prefix must refuse, including one ending at a complete row.
@@ -132,12 +132,13 @@ pub fn selfcheck(fresh_root string) !int {
 	changed := fixture('21', '5', '10', '4')
 	parse_snapshot(changed.str, changed.len, unsafe { &after })!
 	compare(unsafe { &before }, unsafe { &after }, unsafe { &delta })!
-	require(delta.valid && delta.bytes == 11200 && delta.large_pages == 1
+	expected_bytes := if class_count == 14 { i64(11200) } else { i64(43712) }
+	require(delta.valid && delta.bytes == expected_bytes && delta.large_pages == 1
 		&& delta.written_after_free == 1, 'positive exact byte or special-counter deltas differ')!
 	for row in delta.classes { require(row.objects == 1 && row.pages == 1, 'class delta omitted')! }
 	checks++
 	compare(unsafe { &after }, unsafe { &before }, unsafe { &delta })!
-	require(delta.valid && delta.bytes == -11200 && delta.large_pages == -1
+	require(delta.valid && delta.bytes == -expected_bytes && delta.large_pages == -1
 		&& delta.written_after_free == -1, 'negative exact deltas differ')!
 	checks++
 	parse_snapshot(base.str, base.len, unsafe { &after })!
@@ -242,5 +243,6 @@ pub fn selfcheck(fresh_root string) !int {
 	read_from_fd(-1, unsafe { &after }) or { bad_fd_refused = true }
 	require(bad_fd_refused && !after.valid && after.raw_len == 0, 'failed descriptor read was accepted')!
 	checks++
+	$if perf_slab16k ? { checks += medium_controls(base, unsafe { &before }, unsafe { &after }, unsafe { &delta })! }
 	return checks
 }

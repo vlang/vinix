@@ -3,6 +3,7 @@
 module heapfull
 
 import perfreport
+import perfheap
 
 fn refuse_observation(text string) ! {
 	mut refused := false
@@ -14,11 +15,12 @@ pub fn observation_selfcheck() !int {
 	base := fixture('clean')!
 	clean := observe(base.bytes())!
 	require(!clean.qualification && clean.measurements == 44 && clean.cohorts == 40
-		&& clean.snapshots == 80 && clean.delta_rows == 640 && clean.class_rows == 560
+		&& clean.snapshots == 80 && clean.delta_rows == expected_delta_rows && clean.class_rows == 40 * perfheap.class_count
 		&& clean.nonzero_delta_cohorts == 0 && clean.corruption_counter_cohorts == 0,
 		'complete diagnostic counts or nonqualification marker differ')!
-	require(clean.pairs[0].classes.len == 14 && clean.pairs[0].reported_pages_before == '65'
-		&& clean.pairs[0].reported_pages_after == '65' && clean.pairs[0].reported_pages_delta == '0',
+	pages := if perfheap.class_count == 14 { '65' } else { '81' }
+	require(clean.pairs[0].classes.len == perfheap.class_count && clean.pairs[0].reported_pages_before == pages
+		&& clean.pairs[0].reported_pages_after == pages && clean.pairs[0].reported_pages_delta == '0',
 		'complete diagnostic class rows or exact total-page values differ')!
 	mut checks := 1
 	for change in ['object', 'page', 'cancel', 'large', 'reclaim', 'footer-new',
@@ -74,12 +76,12 @@ pub fn observation_selfcheck() !int {
 	checks++
 	// A literal oracle prevents total-page addition from silently wrapping u64.
 	mut maximum := fixture_counts()
-	for index in 0 .. 14 { maximum.pages[index] = u64(18446744073709551615) }
+	for index in 0 .. perfheap.class_count { maximum.pages[index] = u64(18446744073709551615) }
 	wide := replace_once(base, fixture_cohort(identities[0], counts, counts),
 		fixture_cohort(identities[0], maximum, maximum))!
 	wide_report := observe(wide.bytes())!
 	require(wide_report.pairs[0].classes[0].pages_before == '18446744073709551615'
-		&& wide_report.pairs[0].reported_pages_before == '258254417031933722619'
+		&& wide_report.pairs[0].reported_pages_before == if perfheap.class_count == 14 { '258254417031933722619' } else { '332041393326771929079' }
 		&& wide_report.pairs[0].reported_pages_delta == '0', 'full-width counters or aggregate pages lost precision')!
 	checks++
 	crlf := observe(late_text.replace('\n', '\r\n').bytes())!

@@ -16,7 +16,7 @@ struct CapturedObservations {
 	serial_path string
 	serial_sha256 string
 	integer_encoding string = 'Counter values and deltas are exact decimal strings.'
-	scope string = '44 measurements and DONE; 40 raw pairs, 80 snapshots and 640 canonical delta rows. Nonzero allocations, pages and corruption counters are recorded, never accepted as flatness. Process exits and immutable input/audit receipts remain separate.'
+	scope string = '44 measurements and DONE; 40 raw pairs, 80 snapshots and every profile class/large/footer delta row. Nonzero allocations, pages and corruption counters are recorded, never accepted as flatness. Process exits and immutable input/audit receipts remain separate.'
 	observations heapfull.Observations
 }
 

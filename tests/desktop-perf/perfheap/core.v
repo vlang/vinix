@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Fixed-storage observer for the source-pinned 4 KiB Vinix slab schema.
+// Fixed-storage observer for an explicitly selected Vinix slab schema.
 module perfheap
 
 #include <errno.h>
@@ -12,12 +12,7 @@ fn C.read(i32, voidptr, u64) i64
 fn C.close(i32) i32
 fn C.memmove(voidptr, voidptr, u64) voidptr
 
-pub const class_sizes = [u64(16), 32, 48, 64, 96, 128, 192, 256, 384, 512, 768,
-	1024, 1536, 2048]!
 pub const raw_capacity = 4096
-pub const page_size = 4096
-pub const kernel_revision = '9acefa77bee69247c837e97987a2377536aa41cc'
-pub const procfs_sha256 = 'd6c9bddf457cc46c9b588749768e9e4bdce43a51ac540d52b696a6447298d1b1'
 const unsigned_max = u64(18446744073709551615)
 const signed_max = i64(9223372036854775807)
 const signed_min = i64(-9223372036854775807 - 1)
@@ -34,7 +29,7 @@ pub struct Snapshot {
 pub mut:
 	raw [4096]u8
 	raw_len int
-	classes [14]ClassSnapshot
+	classes [class_count]ClassSnapshot
 	large_pages u64
 	written_after_free u64
 	valid bool
@@ -49,7 +44,7 @@ pub:
 
 pub struct Delta {
 pub mut:
-	classes [14]ClassDelta
+	classes [class_count]ClassDelta
 	large_pages i64
 	written_after_free i64
 	// Object bytes plus large-allocation pages, as in the original observer.
@@ -67,6 +62,10 @@ mut:
 
 fn require(ok bool, message string) ! {
 	if !ok { return error(message) }
+}
+
+pub fn require_page_size(actual i64) ! {
+	require(actual == page_size, page_error)!
 }
 
 fn literal(cursor Cursor, text string) !Cursor {
