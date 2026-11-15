@@ -171,3 +171,45 @@ RSS 42303488 and observed growth 178970624 bytes, exit/child 0/0, empty reason,
 complete cleanup. Its binaries match r111; the completed signed API evidence
 is reused, with no new API-pass claim for r112. The new checked persistent volume
 mounted before services startup. Protected account validation is pending.
+
+## r112 kernel fault; guest memory preserved
+
+Services reached `ready-awaiting-user-account-interaction`; the descriptor
+snapshot for GMS PID31851 reported 234 descriptors, unavailable 0, non-atomic
+true. The protected Maps launch occurred once. Its window stayed black and
+no Sign in / Add account action or credential entry occurred.
+
+The kernel then reported `ec=0x25 esr=0x96000007 far=0x60`,
+`pc=0xffffffff802e6c94`, `x22=0`, process PID31851 `main`.
+The unchanged parent kernel's symbols and disassembly locate this at
+`table__syscall_trace_ret`: a load of `current_thread->audit_sequence`
+at offset 96 through a null current-thread pointer. The return address
+`0xffffffff80309880` is `handle_svc`, vectors.S:406.
+
+The stop request was acknowledged (`controller=673`), but terminals subsequently
+stalled. No complete account BEGIN/END export or copied-and-synced private
+results were observed. QEMU PID77747 was paused through checked QMP, preserving
+RAM and open images. It has **not** been terminated or relaunched; its images
+must not be inspected offline while held by QEMU. Account cleanup and complete
+private evidence remain unresolved. The signed API evidence remains r111's.
+
+`guest-monitor.v` checks the owned PID command line, QMP socket and pidfile
+before querying status or pausing. It confirms the paused acknowledgement
+and records both statuses. It has no termination or relaunch operation.
+Both current-V C generation and host linking passed the original limits;
+the real pause and subsequent status queries passed.
+
+Evidence is retained under `/Users/alex/.local/state/vinix/android/`:
+
+| Retained artifact | SHA256 |
+| --- | --- |
+| maps-r112-paused-20261115-r1.json | e4b309e5ef88baafb2749f8e713b22d205206c2b03f533aad7a755ddffb3ef9b |
+| maps-r112-kernel-20261115-r1/paused-uart.log | e5b23347423c0f8b9d166b5279bc3f74f410713d15ffb070e4f1ea125fe7b23f |
+| maps-r112-kernel-20261115-r1/vinix (stopped parent boot image) | a54505e3725e11bb2f769d62c1260f0b447a4d9fbcde21ba7f9119e08ba75151 |
+
+The frozen original generated C is retained at
+`pidfd-wait-kernel-build-2026-10-26-r1/kernel-aarch64-r2/source/kernel/obj/blob.c`,
+SHA256 d472464b984da437c553e6ec044b43389af46b7b9f565b67a00dca1e76a68077.
+A guarded frozen boot-image copy was refused before spawning due to disk
+reserve; no actual-r112 offline kernel readback or image comparison is claimed.
+Maps, authentication and sustained responsiveness remain unqualified.
