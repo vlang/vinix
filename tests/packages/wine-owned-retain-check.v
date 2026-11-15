@@ -122,7 +122,9 @@ fn admit(retainer string, run string, prepared string, out string, log string) !
 	return child.code
 }
 fn check() ! {
-	if os.args.len != 5 { return error('usage: CHECK RETAINER RUN PREPARED FRESH_OUTPUT') }
+	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] !in ['--host-link-only', '--partition=0/4', '--partition=1/4', '--partition=2/4', '--partition=3/4']) {
+		return error('usage: CHECK RETAINER RUN PREPARED FRESH_OUTPUT [--host-link-only|--partition=N/4]')
+	}
 	retainer := os.real_path(os.args[1]); run := os.real_path(os.args[2]); prepared := os.real_path(os.args[3]); out := os.abs_path(os.args[4])
 	if os.exists(out) || os.is_link(out) { return error('fresh output required') }
 	os.mkdir_all(out)!
@@ -141,6 +143,19 @@ fn check() ! {
 	cases << ['bridge-host-baseline', 'bridge-host-environment', 'guest-host-trace', 'package-host-pin', 'guest-host-linked']
 	cases << ['bridge-v-host-baseline', 'bridge-v-host-environment', 'guest-v-host-trace', 'package-v-host-pin', 'guest-v-host-linked']
 	cases << ['bridge-host-binding', 'bridge-host-input', 'controller-host-binding', 'controller-host-input', 'controller-host-linked']
+	link_cases := ['bridge-host-link-input', 'controller-host-link-input']
+	if os.args.len == 6 && os.args[5] == '--host-link-only' { cases = link_cases.clone() }
+	else {
+		cases << link_cases
+		// Four disjoint partitions cover the full fixed list. Every invocation
+		// still requires both baselines and its original named refusal gates.
+		if os.args.len == 6 {
+			partition := os.args[5].all_after('=').all_before('/').int()
+			mut selected := []string{}
+			for index, name in cases { if index % 4 == partition { selected << name } }
+			cases = selected.clone()
+		}
+	}
 	for name in cases {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
@@ -163,13 +178,17 @@ fn check() ! {
 				replace(dir + '/generated-before-boot.json', json2.encode(generated))!
 			}
 			expected = 'host build binding record differs'
-		} else if name in ['bridge-host-input', 'controller-host-input'] {
+		} else if name in ['bridge-host-input', 'controller-host-input', 'bridge-host-link-input', 'controller-host-link-input'] {
 			bridge := name.starts_with('bridge-')
 			binding := read_map(if bridge { selected + '/host-producer.json' } else { dir + '/host-controller.json' })!
 			for file in if bridge { ['inputs-before-build.json', 'inputs-verified.json'] } else { ['inputs-before-build.json', 'inputs.json', 'inputs-verified.json'] } {
 				path := (if bridge { selected } else { dir }) + '/' + file
 				mut inputs := read_map(path)!
-				inputs.delete(binding['directory'] + '/host-build.json')
+				artifact := if name.ends_with('-link-input') {
+					if bridge { '/host-link.json' } else { '/link-inputs.tar' }
+				} else { '/host-build.json' }
+				if binding['directory'] + artifact !in inputs { return error('host artifact omission fixture absent') }
+				inputs.delete(binding['directory'] + artifact)
 				replace(path, json2.encode(inputs))!
 			}
 			if bridge { reseal(dir, selected, ['inputs-before-build.json', 'inputs-verified.json'])! }
@@ -380,6 +399,8 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline forty-nine exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline ' + if os.args.len == 6 {
+		if os.args[5] == '--host-link-only' { 'two host-link exact refusals' } else { os.args[5] + ' exact refusals=' + cases.len.str() }
+	} else { 'fifty-one exact refusals' })
 }
 fn main() { check() or { eprintln(err); exit(1) } }

@@ -33,6 +33,15 @@ Selected V, C, header and host-image bytes are retained in a content-addressed
 input store. APFS clones avoid unnecessary physical copies; ordinary copies are
 the fallback. A changed previously pinned input refuses when phases are merged.
 
+Format 3 selects `ld64.lld` for that same compile/link command and requires its
+captured inputs, byte-identical replay and observed file-load coverage. The
+archive, extracted members, replay executable, raw command/environment/image
+records and `host-link.json` are mandatory output rows. The selected linker and
+ordinary replay host images are mandatory retained input rows. Shared
+`winemacholink` admission checks the fixed SDK/toolchain profile, the original
+log namespace, captured member hashes, safe reported loads and both executable
+hashes. The running role uses the executable verified by this replay.
+
 Read-only `check` verifies the fixed profile and original namespace, source
 dumps, V input pins, raw/decoded image records, environments, C command/include
 proofs, complete resource-header snapshot, required input rows, all retained
@@ -43,27 +52,30 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires thirteen exact resealed refusals. Cases cover omitted parsed
+then requires twenty-two exact resealed refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
-private copy. Expected failures use explicit checks under `-prod`.
+private copy. Nine further cases cover old host format, changed replay output,
+load map, replay environment/argv, extracted bytes, omitted linker input,
+changed link namespace and a linked link receipt. Expected failures use explicit
+checks under `-prod`.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 2
+The [required host receipt boundary](wine-host-required-check.md) uses format 3
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1 bundles and their original
+retainer also retains its own graph. Original format-1/2 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
-absence, full SDK content and Mach-O linker/library closure remain open. No
-link replay or deterministic executable reproduction is claimed. macOS loader
+absence, full SDK content and complete Mach-O linker/library closure remain open.
+Captured-link reproduction covers this local profile. macOS loader
 and shared-cache bytes remain explicitly unadmitted. Local receipts are not
 publisher authentication. Original prerequisite bundles and historical
-verifiers remain required. No new guest execution, kernel/default change,
-owned ARM/GUI or complete roadmap 14 acceptance is claimed.
+verifiers remain required. Kernel/default changes, owned ARM/GUI and complete
+roadmap 14 acceptance remain separate gates.
 
-The checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
+The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and
 `producer-01`; the fixture executes successfully and both real programs pass
 their embedded source guards and return the expected usage status. Final

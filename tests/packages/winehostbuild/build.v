@@ -9,6 +9,7 @@ import tests.packages.winesource
 import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winehostimages
+import tests.packages.winemacholink
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -16,7 +17,7 @@ $if macos {
 }
 
 const clang = '/opt/homebrew/opt/llvm/bin/clang'
-const scope = 'selected host V/C sources, resource headers and observed tool images; macOS linked libraries, system loader/cache and hermetic build admission remain unqualified'
+const scope = 'selected host V/C sources, resource headers, observed tool images and captured Mach-O replay/load evidence; complete library/search closure, system loader/cache and hermetic build admission remain unqualified'
 
 struct Proof {
 	format int
@@ -62,16 +63,16 @@ fn selected_sdk() !string {
 	return path
 }
 
-fn c_command(directory string, resource string, sdk string) []string {
-	return [clang, '-arch', 'arm64', '-isysroot', sdk, '-O2', '-w', '-fno-lto', '-Wno-error=incompatible-pointer-types', '-resource-dir=' + resource,
-		directory + '/program.c', directory + '/runtime.c', '-lm', '-lpthread', '-o', directory + '/program']
+fn c_command(directory string, resource string, sdk string) ![]string {
+	return winemacholink.host_command(directory, resource, sdk)
 }
 
-fn artifacts() []string {
+fn artifacts(directory string) ![]string {
 	mut names := ['program', 'program.c', 'runtime.c', 'v-inputs-before.json', 'inputs.json', 'inputs-after.json', 'sources-before.txt', 'sources-built.txt',
 		'clang-headers.json', 'c-inputs-before.json', 'c-inputs-verified.json']
 	for name in ['discover.log', 'v.log', 'clang-resource.log', 'c-discover.log', 'cc.log'] { names << ['logs/' + name, 'logs/' + name + '.argv.json'] }
 	for name in [...winehostimages.v_artifacts(), ...winehostimages.c_artifacts()] { names << 'logs/' + name }
+	names << winemacholink.host_artifacts(directory)!
 	return names
 }
 
@@ -84,6 +85,8 @@ pub fn verify_self() ! {
 		os.dir(@FILE) + '/../wineheaders/headers.v': $embed_file('../wineheaders/headers.v').to_string()
 		os.dir(@FILE) + '/../winecsource/closure.v': $embed_file('../winecsource/closure.v').to_string()
 		os.dir(@FILE) + '/../winehostimages/images.v': $embed_file('../winehostimages/images.v').to_string()
+		os.dir(@FILE) + '/../winemacholink/link.v': $embed_file('../winemacholink/link.v').to_string()
+		os.dir(@FILE) + '/../winelink/link.v': $embed_file('../winelink/link.v').to_string()
 	} { if digest(path)! != sha256.hexhash(text) { return error('compiled host builder source differs: ' + path) } }
 }
 
@@ -91,7 +94,7 @@ pub fn admit(directory string) ! {
 	verify_self()!
 	proof := json2.decode[Proof](record(directory + '/host-build.json')!)!
 	root := os.real_path(os.dir(@FILE) + '/../../..')
-	if proof.format != 2 || proof.scope != scope || proof.root != root || !os.is_abs_path(proof.directory)
+	if proof.format != 3 || proof.scope != scope || proof.root != root || !os.is_abs_path(proof.directory)
 		|| proof.sdk != selected_sdk()! || os.real_path(proof.compiler) != proof.compiler { return error('host build declaration differs') }
 	base := v_command(root, proof.directory, proof.compiler, proof.role)!
 	mut discover := base.clone(); discover.insert(1, ['-print-watched-files', '-dump-files', proof.directory + '/sources-before.txt'])
@@ -108,18 +111,22 @@ pub fn admit(directory string) ! {
 	wineheaders.admit_build(directory, logs, proof.inputs)!
 	winecsource.admit(directory, logs)!
 	winehostimages.admit_c(logs, proof.directory + '/logs')!
-	for selected in [winecsource.inputs(directory)!, winehostimages.inputs(logs)!, winehostimages.v_inputs(logs)!] {
+	winemacholink.admit_host(directory, proof.directory)!
+	for selected in [winecsource.inputs(directory)!, winehostimages.inputs(logs)!, winehostimages.v_inputs(logs)!, winemacholink.host_inputs(directory)!] {
 		for path, hash in selected {
 			if path !in proof.inputs || proof.inputs[path] != hash { return error('host observed input is absent or changed') }
 		}
 	}
 	resource := wineheaders.selection(record(logs + '/clang-resource.log')!)!
-	mut expected_cc := c_command(proof.directory, resource, proof.sdk); expected_cc.insert(1, '-H')
+	mut expected_cc := c_command(proof.directory, resource, proof.sdk)!; expected_cc.insert(1, '-H')
 	if json2.decode[[]string](record(logs + '/cc.log.argv.json')!)! != expected_cc { return error('host C command differs') }
 	if os.real_path(proof.builder) != proof.builder || os.lstat(proof.builder)!.get_filetype() != .regular { return error('host builder identity differs') }
 	for path in [proof.compiler, proof.builder, clang, proof.sdk + '/SDKSettings.json', source(root, proof.role)!, @FILE, root + '/tests/packages/wine-host-build.v',
 		root + '/tests/packages/winehostimages/images.v', root + '/tests/packages/winesource/closure.v',
 		root + '/tests/packages/wineheaders/headers.v', root + '/tests/packages/winecsource/closure.v'] {
+		if path !in proof.inputs { return error('host required input is missing') }
+	}
+	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v'] {
 		if path !in proof.inputs { return error('host required input is missing') }
 	}
 	if proof.inputs.len != proof.blobs.len { return error('host retained input map differs') }
@@ -128,7 +135,7 @@ pub fn admit(directory string) ! {
 			|| os.lstat(directory + '/' + proof.blobs[path])!.get_filetype() != .regular
 			|| digest(directory + '/' + proof.blobs[path])! != hash { return error('host selected input bytes differ') }
 	}
-	names := artifacts()
+	names := artifacts(directory)!
 	if proof.outputs.len != names.len { return error('host output inventory differs') }
 	for name in names {
 		if name !in proof.outputs || os.lstat(directory + '/' + name)!.get_filetype() != .regular
@@ -160,6 +167,7 @@ pub fn build(role string, compiler string, requested string) ! {
 		root + '/tests/packages/wineheaders/headers.v', root + '/tests/packages/winecsource/closure.v'] {
 		inputs[path] = digest(path)!
 	}
+	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v'] { inputs[path] = digest(path)! }
 	mut discover := base.clone(); discover.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
 	winehostimages.invoke_v(discover, directory, directory + '/logs/discover.log')!
 	winesource.capture(directory + '/sources-before.txt', mut inputs)!
@@ -172,10 +180,11 @@ pub fn build(role string, compiler string, requested string) ! {
 	winesource.admit(directory + '/sources-before.txt', directory + '/sources-built.txt', inputs)!
 	os.write_file(directory + '/runtime.c', '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
 		os.dir(tool) + '/vlib/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + os.dir(tool) + '/vlib/sync/thread_helper.h"\n')!
-	winecsource.build(c_command(directory, resource, sdk), directory, directory + '/logs')!
+	winecsource.build(c_command(directory, resource, sdk)!, directory, directory + '/logs')!
+	winemacholink.finish_host(directory)!
 	os.chmod(directory + '/program', 0o755)!
 	// Capture actual C targets and selected host images as well as parsed V files.
-	for selected in [winecsource.inputs(directory)!, winehostimages.inputs(directory + '/logs')!, winehostimages.v_inputs(directory + '/logs')!] {
+	for selected in [winecsource.inputs(directory)!, winehostimages.inputs(directory + '/logs')!, winehostimages.v_inputs(directory + '/logs')!, winemacholink.host_inputs(directory)!] {
 		for path, hash in selected {
 			if path in inputs && inputs[path] != hash { return error('host selected input changed between phases') }
 			inputs[path] = hash
@@ -197,8 +206,8 @@ pub fn build(role string, compiler string, requested string) ! {
 	}
 	os.write_file(directory + '/inputs-after.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
-	for name in artifacts() { outputs[name] = digest(directory + '/' + name)! }
-	os.write_file(directory + '/host-build.json', json2.encode(Proof{format: 2, scope: scope, role: role, root: root, directory: directory, compiler: tool, builder: os.real_path(os.executable()), sdk: sdk, inputs: inputs, outputs: outputs, blobs: blobs}) + '\n')!
+	for name in artifacts(directory)! { outputs[name] = digest(directory + '/' + name)! }
+	os.write_file(directory + '/host-build.json', json2.encode(Proof{format: 3, scope: scope, role: role, root: root, directory: directory, compiler: tool, builder: os.real_path(os.executable()), sdk: sdk, inputs: inputs, outputs: outputs, blobs: blobs}) + '\n')!
 	admit(directory)!
 	println('WINE HOST BUILD PASS ' + role + ': ' + directory + '/program')
 }

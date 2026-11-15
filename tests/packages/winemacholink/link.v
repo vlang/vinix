@@ -60,6 +60,10 @@ fn runtime_archive(bytes []u8) bool {
 // Exact observed SDK/toolchain profile. libLTO is an obsolete ignored option
 // in this LLD; it is preserved in the response but is not a captured input.
 pub fn profile(archive winelink.Archive, bytes []u8, recorded string) ! {
+	profile_tmp(archive, bytes, recorded)!
+}
+
+fn profile_tmp(archive winelink.Archive, bytes []u8, temporary_root string) ! {
 	lines := archive.response.trim_space().split_into_lines()
 	if lines.len != 15 || lines[..9] != ['-demangle', '-lto_library ' + llvm + '/lib/libLTO.dylib',
 		'-dynamic', '-arch arm64', '-platform_version macos 27.2.0 27.2', '-syslibroot ' + sdk[1..],
@@ -71,7 +75,7 @@ pub fn profile(archive winelink.Archive, bytes []u8, recorded string) ! {
 	if archive.version != 'Homebrew LLD 23.1.5\n' { return error('Mach-O archive version differs') }
 	for index in [9, 10] {
 		path := lines[index]
-		prefix := recorded[1..] + '/host-tmp/' + if index == 9 { 'program-' } else { 'runtime-' }
+		prefix := temporary_root[1..] + '/host-tmp/' + if index == 9 { 'program-' } else { 'runtime-' }
 		if !relative(path) || !path.starts_with(prefix) || !path.ends_with('.o') || path[prefix.len..].contains('/') {
 			return error('Mach-O object namespace differs')
 		}
@@ -96,6 +100,78 @@ pub fn profile(archive winelink.Archive, bytes []u8, recorded string) ! {
 	if !runtime_archive(bytes[runtime.offset..runtime.offset + runtime.size]) {
 		return error('Mach-O runtime archive header differs')
 	}
+}
+
+// The integrated host build uses the same C observer and log namespace as
+// before; only its selected linker and mandatory captured-link evidence change.
+pub fn host_command(directory string, resource string, selected_sdk string) ![]string {
+	if resource != llvm + '/lib/clang/23' || selected_sdk != sdk { return error('host Mach-O toolchain profile differs') }
+	return command(directory)
+}
+
+struct HostProof {
+	format int = 1
+	recorded_directory string
+	archive_sha256 string
+	output_sha256 string
+	linker string
+	linker_sha256 string
+	loads map[string]string
+}
+
+pub fn finish_host(directory string) ! {
+	logs := directory + '/logs'
+	bytes := os.read_bytes(directory + '/link-inputs.tar')!
+	archive := winelink.parse(bytes)!
+	profile_tmp(archive, bytes, logs)!
+	for path, member in archive.members {
+		os.mkdir_all(os.dir(directory + '/link-replay/' + path))!
+		os.write_file_array(directory + '/link-replay/' + path, bytes[member.offset..member.offset + member.size])!
+	}
+	trace := winehostimages.invoke_macho([linker, '-t', '@response.txt'], directory + '/link-replay/link-inputs', logs + '/macho-replay.log')!
+	os.write_file(directory + '/host-link.json', json2.encode(HostProof{recorded_directory: directory,
+		archive_sha256: digest(directory + '/link-inputs.tar')!, output_sha256: digest(directory + '/program')!,
+		linker: os.real_path(linker), linker_sha256: digest(os.real_path(linker))!, loads: loads(trace, archive)!}) + '\n')!
+	admit_host(directory, directory)!
+}
+
+pub fn admit_host(directory string, recorded string) ! {
+	// Read only ordinary evidence, including copied bundles retaining their
+	// original command namespace. The enclosing host receipt pins every row.
+	digest(directory + '/host-link.json')!
+	proof := json2.decode[HostProof](os.read_file(directory + '/host-link.json')!)!
+	if proof.format != 1 || proof.recorded_directory != recorded { return error('host Mach-O link declaration differs') }
+	if proof.linker != os.real_path(linker) || digest(proof.linker)! != proof.linker_sha256 { return error('host Mach-O linker changed') }
+	if digest(directory + '/link-inputs.tar')! != proof.archive_sha256 { return error('host Mach-O archive bytes differ') }
+	bytes := os.read_bytes(directory + '/link-inputs.tar')!
+	archive := winelink.parse(bytes)!
+	profile_tmp(archive, bytes, recorded + '/logs')!
+	for path, member in archive.members {
+		if digest(directory + '/link-replay/' + path)! != member.sha256 { return error('host Mach-O extracted member differs') }
+	}
+	if digest(directory + '/program')! != proof.output_sha256
+		|| digest(directory + '/link-replay/link-inputs/program')! != proof.output_sha256 { return error('host Mach-O replay output differs') }
+	logs := directory + '/logs'
+	if json2.decode[[]string](os.read_file(logs + '/macho-replay.log.argv.json')!)! != [linker, '-t', '@response.txt'] {
+		return error('host Mach-O replay command differs')
+	}
+	if os.read_file(logs + '/macho-version.log')! != archive.version { return error('host Mach-O linker version differs') }
+	if loads(os.read_file(logs + '/macho-replay.log')!, archive)! != proof.loads { return error('host Mach-O load receipt differs') }
+	winehostimages.admit_macho(logs, recorded + '/logs')!
+}
+
+pub fn host_artifacts(directory string) ![]string {
+	archive := winelink.parse(os.read_bytes(directory + '/link-inputs.tar')!)!
+	mut result := ['host-link.json', 'link-inputs.tar', 'link-replay/link-inputs/program']
+	for path, _ in archive.members { result << 'link-replay/' + path }
+	for name in winehostimages.macho_artifacts() { result << 'logs/' + name }
+	return result
+}
+
+pub fn host_inputs(directory string) !map[string]string {
+	mut result := winehostimages.macho_inputs(directory + '/logs')!
+	result[os.real_path(linker)] = digest(os.real_path(linker))!
+	return result
 }
 
 fn command(directory string) []string {

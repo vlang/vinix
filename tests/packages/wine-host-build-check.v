@@ -28,6 +28,17 @@ mut:
 	blobs map[string]string
 }
 
+struct HostLink {
+mut:
+	format int
+	recorded_directory string
+	archive_sha256 string
+	output_sha256 string
+	linker string
+	linker_sha256 string
+	loads map[string]string
+}
+
 fn digest(path string) !string { return winesource.file_digest(path) }
 fn read_map(path string) !map[string]string { return json2.decode[map[string]string](os.read_file(path)!)! }
 
@@ -93,13 +104,50 @@ fn check() ! {
 	}
 	mut passed := []string{}
 	for name in ['omitted-import', 'v-environment', 'c-environment', 'c-observation', 'c-argv', 'linked-receipt',
-		'input-blob', 'omitted-image', 'binary-mode', 'format', 'v-argv', 'translation-unit', 'scope'] {
+		'input-blob', 'omitted-image', 'binary-mode', 'format', 'v-argv', 'translation-unit', 'scope',
+		'old-format', 'link-output', 'link-loads', 'link-environment', 'link-argv', 'link-extracted',
+		'link-input', 'link-namespace', 'linked-link-receipt'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'omitted-import' || name == 'omitted-image' {
+		if name == 'old-format' {
+			proof.format = 2
+			expected = 'host build declaration differs'
+		} else if name == 'link-output' {
+			file := 'link-replay/link-inputs/program'
+			os.write_file(dir + '/' + file, 'changed replay')!; changed << file
+			expected = 'host Mach-O replay output differs'
+		} else if name == 'link-loads' || name == 'link-namespace' {
+			mut link := json2.decode[HostLink](os.read_file(dir + '/host-link.json')!)!
+			if name == 'link-loads' { link.loads = map[string]string{} }
+			else { link.recorded_directory += '-other' }
+			os.write_file(dir + '/host-link.json', json2.encode(link))!; changed << 'host-link.json'
+			expected = if name == 'link-loads' { 'host Mach-O load receipt differs' } else { 'host Mach-O link declaration differs' }
+		} else if name == 'link-environment' {
+			file := 'logs/macho-replay.log.environment.json'
+			mut env := read_map(dir + '/' + file)!; env['LIBRARY_PATH'] = '/unrecorded'
+			os.write_file(dir + '/' + file, json2.encode(env))!; changed << file
+			expected = 'host tool environment differs'
+		} else if name == 'link-argv' {
+			file := 'logs/macho-replay.log.argv.json'
+			os.write_file(dir + '/' + file, json2.encode(['/opt/homebrew/bin/ld64.lld', '@response.txt']))!; changed << file
+			expected = 'host Mach-O replay command differs'
+		} else if name == 'link-extracted' {
+			file := 'link-replay/link-inputs/version.txt'
+			os.write_file(dir + '/' + file, 'changed version')!; changed << file
+			expected = 'host Mach-O extracted member differs'
+		} else if name == 'link-input' {
+			path := os.real_path('/opt/homebrew/bin/ld64.lld')
+			proof.inputs.delete(path); proof.blobs.delete(path)
+			for file in ['inputs.json', 'inputs-after.json'] { os.write_file(dir + '/' + file, json2.encode(proof.inputs))!; changed << file }
+			expected = 'host observed input is absent or changed'
+		} else if name == 'linked-link-receipt' {
+			file := dir + '/host-link.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'Mach-O evidence must be canonical ordinary files'
+		} else if name == 'omitted-import' || name == 'omitted-image' {
 			mut before := read_map(dir + '/v-inputs-before.json')!
 			mut path := proof.root + '/tests/packages/winehostfixture/token.v'
 			if name == 'omitted-image' {
@@ -164,7 +212,7 @@ fn check() ! {
 		passed << name
 	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline thirteen exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline twenty-two exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

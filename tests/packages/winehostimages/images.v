@@ -382,3 +382,10 @@ pub fn macho_artifacts() []string {
 pub fn admit_macho_capture(directory string, recorded string) ! {
 	admit_names(directory, recorded, ['cc.log'])!
 }
+
+pub fn macho_inputs(directory string) !map[string]string {
+	baseline := json2.decode[Baseline](record(directory + '/macho-images-before.json')!)!
+	mut result := map[string]string{}
+	for image in baseline.images { if !system(image.path) { result[image.path] = image.sha256 } }
+	return result
+}

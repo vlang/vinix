@@ -44,10 +44,12 @@ This is a retained local reproduction check. It does not establish complete
 SDK reexport/search closure, independence from the installed SDK, a sandboxed
 linker, C header closure, or hermetic toolchain admission. The proof file is
 an audit receipt, not a signature or a trust anchor. Preserve the complete
-external audit bundle and its independent inventory. The existing host
-builder continues to use its existing receipt profile; integrating captured
-Mach-O links into all mandatory roles and rerunning signed guest acceptance
-remains future work.
+external audit bundle and its independent inventory. The standalone format-2
+protocol remains separate from the host builder's format-3 receipt. The host
+builder now uses the shared capture/profile/replay/load checks in its actual C
+build and retains the complete link graph through every qualification role.
+Full SDK closure, unreported reads/searches and OS loader/cache admission remain
+separate from that integration.
 
 The production control runner checks real and copied baselines, twenty-one exact
 receipt refusals (including resealed output, extraction, argv, environment,
