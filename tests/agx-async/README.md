@@ -40,11 +40,12 @@ backpressure holds only later commands on the same pipe. Overlap fixtures cover
 both completion orders, older barrier targets, blocked heads, independent ring
 backpressure, quarantine at publication, a fault with another job still running,
 four 64-command reverse-callback batches, shutdown and immediate callbacks.
-Later batches on the same queue remain FIFO through retirement. Nonzero in-batch
+Later batches preserve publication FIFO; explicit index-zero dependencies still
+wait for prior same-queue retirement. Nonzero in-batch
 dependencies also configure firmware prefixes before callback registration.
 Every setup-failure and stop position is injected independently. Firmware prefixes
 wait for execution; the poller does not wait for producer CPU callbacks. Initial
-dependencies and overlap across submissions remain separate work.
+dependencies retain this conservative guard until firmware event capture is implemented.
 
 The injected firmware model separates execution from CPU retirement. Four complete
 64-command dependency chains must publish before any callback. Out-of-order execution
@@ -60,3 +61,11 @@ orderings (512 cases), and immediately before the final callback-count load unde
 four backpressure limits (16 cases). The latter closes the window between checking
 manager state and acquiring zero callbacks. Both paths must release caller-owned
 prepared metadata before retiring the node or notifying its aggregate fence.
+
+Independent later batches on the same queue now pipeline after older publication.
+The new checks run/retire either pipe's later batch first and verify each node's
+VM pin, result references and aggregate fence remain independent. They cover two
+overlapping batches totaling 127 jobs, partial publication, a concurrent append,
+forged user fences, fault/stop, both index-zero bits, and a saturated 128-queue
+lookup with overflow deferral and resumption. Input sync dependencies and
+unpublished predecessors retain FIFO order. Firmware scheduling remains injected.

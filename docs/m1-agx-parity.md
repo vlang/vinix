@@ -108,8 +108,8 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. Nonzero in-batch dependencies wait for producer publication, then use firmware barrier prefixes for execution ordering without waiting for CPU callbacks. Later batches on the same queue wait through retirement. Modern flat-command integration and initial dependencies/overlap across submissions still differ from DRM scheduling. |
-| Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands within one batch and independent queues may execute concurrently; later batches on the same queue wait through retirement. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. Nonzero in-batch dependencies use firmware prefixes. Independent later batches can pipeline after older publication; explicit index-zero dependencies conservatively wait for prior same-queue retirement. Modern flat-command integration, firmware initial-event capture and full admission/backpressure still differ from DRM scheduling. |
+| Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and independent batches on one queue may overlap; an explicit index-zero dependency retains the conservative prior-retirement guard. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
@@ -691,6 +691,57 @@ its SHA-256 is
 A complete archive extraction and the canonical bundle both pass the unchanged
 inventory checker. Only the task's rebuildable checkout was removed after the
 complete retained bundle passed verification.
+
+### Pipelining independent submissions
+
+Later independent batches on one queue now enter firmware once older publication
+finishes, allowing either pipe's later batch to complete first, as the packaged
+Asahi scheduler permits. Pending nodes retain separate callbacks, VM pins and
+aggregate fences. The worker keeps only queue identities and unpublished-work
+bits in fixed stack arrays; no reference to an older node survives a poll.
+Partial publication and unsatisfied input syncs still hold later same-queue work.
+
+Explicit index-zero bits are staged separately from in-batch dependency positions.
+If either bit is present, the whole batch conservatively waits for **all** prior
+same-queue retirement. This preserves ordering without trusting a client-signaled
+user fence, but remains more restrictive than upstream's captured initial events.
+Full firmware initial-event capture and scheduler admission/backpressure remain
+open, alongside modern ABI/VM/GEM/Mesa migration and the other listed gaps.
+
+ASan/UBSan checks pass reverse cross-batch completion with independent node/result/
+VM ownership, overlapping 64+63 jobs, both initial-dependency bits, partial
+publication, a concurrent append, a full 128-entry queue table with overflow and
+resumption, failed-input isolation and 12 new multi-batch shutdown interleavings.
+The prior 528 shutdown cases also pass. Production reapers and event management
+pass 64 and 127 live compute/paired-render jobs with reverse traversal; vertex-only
+completion retains every render scene. Close, source gates and three V unit
+suites pass. Independent lifetime review approved the final implementation.
+
+The generated-C checker now covers eight barrier/publisher/scheduler helpers,
+rejects hidden temporary allocations in each, and requires both fixed 128-entry
+scheduler arrays. Its negative selftests pass. This is not a whole-kernel leak
+measurement or evidence that native firmware executes the injected host model.
+No GPU access, Vinix boot, reboot or deployment was performed.
+
+Isolated AArch64 and ordinary x86_64 builds pass from
+`c89fc75e1eafba8f6fe3274c5a5ab99b02edd702` plus the retained `pending.v`.
+Every AGX V input matches the isolated checkout. Fresh Omarchy
+`d7cbcac2f96a579123e285fb223eab0c1e80dc20` and package checkout
+`dd29deefca1f82a325ec82513e5ed25a094a7f13` keep the same kernel and Mesa pins.
+All selected audit gates pass; the whole-driver verdict remains `not_equivalent`.
+
+The complete retained bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-pipelining-20261115/bundle/`.
+Its sibling `inventory.json` SHA-256 is
+`0dcdf95d42cb3b622632d68d483d137be46f86b607db9f21418b4fc38d2f869e`.
+The sibling `bundle.tar.gz` SHA-256 is
+`3b9753cb0d2d833feb839afef96201b7fef0ce9198881c1cddf4c6fdaec59d3c`.
+The canonical bundle and a complete archive extraction pass the unchanged
+inventory checker. Linked kernel SHA-256 values are
+`ba0d6473b410a6558c483896fcf4394bb88ad08e5b88ceb5557add4fdd1362cf`
+(AArch64) and
+`25942c343bcf819d49ca9e15e01a4a9bee26b6da61dac2cdc1ed4dbcea889a3f`
+(x86_64).
 
 ## Earlier artifact retention incident
 

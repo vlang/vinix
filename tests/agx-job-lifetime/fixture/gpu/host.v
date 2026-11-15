@@ -341,6 +341,11 @@ pub fn run_checks() {
 }
 
 fn check_published_batches() {
+	for count in [64, 127]! { check_published_batch(count) }
+	println('AGX published lifetimes: 64/127 compute and paired render jobs retire in reverse traversal; vertex-only completion retains all render scenes')
+}
+
+fn check_published_batch(count int) {
 	for render in [false, true]! {
 		mut stamps := [128]u32{}
 		mut firmware := [128]u32{}
@@ -348,12 +353,12 @@ fn check_published_batches() {
 		mut queue := G13QueueResources{}
 		mut context := mmu.UatContext{}
 		mut mgr := GpuManager{}
-		mut completions := [64]Completion{}
+		mut completions := [127]Completion{}
 		mut last_vertex := u32(0)
 		mut last_fragment := u32(0)
 		mut vertex_slot := u32(0)
 		mut fragment_slot := u32(0)
-		for index in 0 .. 64 {
+		for index in 0 .. count {
 			if render {
 				mut job := mgr.render_job(mut queue, &context, unsafe { &completions[index] })
 				assert queue.subqueues[0].events.publish(job.vertex_event_slot, job.vertex_stamp_value)
@@ -377,24 +382,24 @@ fn check_published_batches() {
 			}
 			mgr.pending++
 		}
-		assert mgr.pending == 64
+		assert mgr.pending == count
 		stamps[vertex_slot] = last_vertex
 		if render {
 			mgr.reap_g13_render_jobs()
-			assert mgr.g13_render_jobs.len == 64 && queue.render_buffer.active_scenes == 64
-			for completion in completions {
-				assert completion.calls == 0
+			assert mgr.g13_render_jobs.len == count && queue.render_buffer.active_scenes == count
+			for index in 0 .. count {
+				assert completions[index].calls == 0
 			}
 			stamps[fragment_slot] = last_fragment
 			mgr.reap_g13_render_jobs()
-			assert mgr.retirements == 128 && queue.render_buffer.active_scenes == 0
+			assert mgr.retirements == 2 * count && queue.render_buffer.active_scenes == 0
 			assert !queue.render_buffer.slot_reserved
 		} else {
 			mgr.reap_g13_compute_jobs()
-			assert mgr.retirements == 64 && context.releases == 64
+			assert mgr.retirements == count && context.releases == count
 		}
-		for completion in completions {
-			assert completion.calls == 1 && completion.ok
+		for index in 0 .. count {
+			assert completions[index].calls == 1 && completions[index].ok
 		}
 		assert mgr.pending == 0 && mgr.g13_compute_jobs.len == 0 && mgr.g13_render_jobs.len == 0
 		for subqueue in queue.subqueues {
@@ -402,7 +407,6 @@ fn check_published_batches() {
 		}
 		event.reset_event_manager()
 	}
-	println('AGX published lifetimes: 64 compute and 64 paired render jobs retire in reverse traversal; vertex-only completion retains all render scenes')
 }
 
 fn check_queue_cleanup_retry() {

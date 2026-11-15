@@ -46,7 +46,8 @@ fixed three-entry storage; notifications are assigned directly into the rings.
 
 Compile `check-prefix-storage.v` to an external executable. Its `--selftest`
 rejects hidden allocation calls, missing/duplicate helper definitions and lost
-stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks five production
-helper bodies, including both publishers, for temporary allocations. This catches
+stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks eight production
+helper bodies, including both publishers and the scheduler, for temporary allocations.
+The scheduler must also retain its two fixed 128-entry stack arrays. This catches
 V moving an addressed local into a `memdup` allocation under `-gc none`. It does
 not measure the whole kernel or qualify native GPU execution.

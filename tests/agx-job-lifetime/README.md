@@ -7,6 +7,12 @@ public discard methods, completion callbacks, reapers and firmware-stopped
 cleanup. It uses the real event manager. UAT invalidation, driver allocations,
 ring retirement and shared-buffer backing are injected host services.
 
+Published-job tests exercise both 64 and 127 live commands per subqueue using
+the production event manager and reapers. Reverse traversal must retire all
+compute jobs and paired render scenes; vertex-only completion retains every
+render scene until its fragment stamp advances. These include multiple batches'
+worth of live jobs without executing a GPU.
+
 Scene tests execute the production TVB lease and GrowTVB owner selector.
 They cover pool exhaustion, overlapping completion, final-owner release,
 unchanged and displaced slot hints, oldest-free selection, canceled first bindings, and stale or

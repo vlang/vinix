@@ -33,6 +33,7 @@ mut:
 	manager             &gpu.GpuManager        = unsafe { nil }
 	dependencies        submission.SyncArray
 	dependencies_ready  bool
+	initial_barriers    u32 // explicit index-zero dependencies, by subqueue
 	final_fence         &syncobj.DmaFence = unsafe { nil }
 	commands            [64]G13PendingCommand
 	command_count       u32
@@ -51,7 +52,8 @@ fn signal_g13_submission_fence(fence &syncobj.DmaFence, failure int) {
 }
 
 // Resolve subqueue-local barrier indices while the staged input is alive.
-// Index zero names the previous submission, already ordered by queue FIFO.
+// Index zero names prior submissions and retains a retirement guard; other
+// indices resolve to this batch's commands and installed firmware prefixes.
 // Only integer positions survive; no staged payload or job pointer escapes.
 fn resolve_g13_batch_dependencies(mut item G13PendingSubmission, commands []submission.Command) bool {
 	if commands.len != int(item.command_count) { return false }
@@ -66,7 +68,8 @@ fn resolve_g13_batch_dependencies(mut item G13PendingSubmission, commands []subm
 		}
 		for pipe in 0 .. 2 {
 			barrier := commands[index].descriptor.barriers[pipe]
-			if barrier == ioctl.asahi_barrier_none || barrier == 0 { continue }
+			if barrier == ioctl.asahi_barrier_none { continue }
+			if barrier == 0 { item.initial_barriers |= u32(1) << pipe; continue }
 			if barrier > counts[pipe] { return false }
 			entry.wait_for[pipe] = positions[pipe][barrier - 1] + 1
 		}
@@ -157,7 +160,8 @@ fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
 // Explicit dependencies wait only for producer publication. Their installed
 // firmware prefixes wait for execution; CPU callback/reaper order must not
 // serialize GPU work. Unpublished producers still block dependent subqueues.
-// Later submissions on the same queue retain FIFO ordering through retirement.
+// Across submissions, unpublished jobs retain FIFO order. Index-zero barriers
+// conservatively wait for earlier same-queue submissions to retire.
 fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	mut manager := unsafe { item.manager }
 	if manager.state != .running {
@@ -239,9 +243,21 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	return false
 }
 
+// Only the worker changes these pointers. A transferred or canceled job no
+// longer prevents later submissions from entering the same firmware queues.
+// Callbacks still retain this node and its VM pin until complete retirement.
+fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool {
+	for index := u32(0); index < item.command_count; index++ {
+		if item.commands[index].compute_job != unsafe { nil }
+			|| item.commands[index].render_job != unsafe { nil } { return false }
+	}
+	return true
+}
+
 // Only the GPU worker consumes nodes. Detach a bounded snapshot, then put
-// retained older nodes BEFORE concurrent appends. Requeueing at the tail
-// would let a newer same-queue stamp overtake an older unpublished job.
+// retained older nodes BEFORE concurrent appends. Remember both outstanding
+// retirement and unpublished work per queue; only the latter blocks an
+// independent later batch. No pointer to an older node survives this poll.
 fn process_pending_submissions() {
 	pending_lock.acquire()
 	if pending_poll_active || pending_head == unsafe { nil } {
@@ -258,23 +274,27 @@ fn process_pending_submissions() {
 	mut retained_tail := &G13PendingSubmission(unsafe { nil })
 	mut retained_count := u64(0)
 	mut blocked := unsafe { [128]voidptr{} }
+	mut unpublished := [128]bool{}
 	mut blocked_count := u32(0)
 	for current != unsafe { nil } {
 		mut item := unsafe { current }
 		current = item.next
 		item.next = unsafe { nil }
-		mut earlier := blocked_count == 128
+		mut gate := -1
 		for index := u32(0); index < blocked_count; index++ {
 			if blocked[index] == voidptr(item.queue) {
-				earlier = true
+				gate = int(index)
 				break
 			}
 		}
+		earlier := if gate >= 0 { unpublished[gate] || item.initial_barriers != 0 } else { blocked_count == 128 }
 		if earlier || poll_g13_pending(mut item) {
-			if !earlier && blocked_count < 128 {
+			if gate < 0 && blocked_count < 128 {
+				gate = int(blocked_count)
 				blocked[blocked_count] = voidptr(item.queue)
 				blocked_count++
 			}
+			if gate >= 0 && !g13_pending_dispatch_complete(item) { unpublished[gate] = true }
 			if retained_tail == unsafe { nil } {
 				retained_head = item
 			} else {

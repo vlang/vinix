@@ -13,6 +13,10 @@ struct ScheduledCommand {
 }
 
 fn submit_scheduled(mut file GpuFile, schedule []ScheduledCommand, out &syncobj.SyncObj, results bool) int {
+	return submit_scheduled_on_queue(mut file, 1, schedule, out, results)
+}
+
+fn submit_scheduled_on_queue(mut file GpuFile, queue u32, schedule []ScheduledCommand, out &syncobj.SyncObj, results bool) int {
 	assert schedule.len > 0 && schedule.len <= 64
 	compute := ioctl.DrmAsahiCmdCompute{ encoder_ptr: 0x12340000 }
 	render := ioctl.DrmAsahiCmdRender{
@@ -46,7 +50,7 @@ fn submit_scheduled(mut file GpuFile, schedule []ScheduledCommand, out &syncobj.
 	}
 	out_sync := ioctl.DrmAsahiSync{ handle: out.handle }
 	request := ioctl.DrmAsahiSubmit{
-		queue_id:       1
+		queue_id:       queue
 		commands:       unsafe { u64(&commands) }
 		command_count:  u32(schedule.len)
 		result_handle:  if results { 7 } else { 0 }

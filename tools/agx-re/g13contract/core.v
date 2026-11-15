@@ -211,6 +211,24 @@ fn check_dependency_publication(poll string) ! {
 		'final_error := g13_pending_error(item)'], 'Vinix shutdown after callback acquisition')!
 }
 
+fn check_submission_pipelining(pending string) ! {
+	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix initial dependencies')!
+	require_order(resolve, ['barrier == ioctl.asahi_barrier_none', 'barrier == 0',
+		'item.initial_barriers |= u32(1) << pipe', 'barrier > counts[pipe]'], 'Vinix initial dependencies')!
+	dispatch := section(pending, 'fn g13_pending_dispatch_complete(', '// Only the GPU worker consumes nodes.', 'Vinix dispatch completion')!
+	require_order(dispatch, ['item.commands[index].compute_job != unsafe { nil }',
+		'item.commands[index].render_job != unsafe { nil }', 'return false', 'return true'], 'Vinix dispatch completion')!
+	require(!dispatch.contains('callbacks_remaining') && !dispatch.contains('syncobj.'),
+		'Publication completion must not depend on retirement or a user fence')!
+	drain := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Vinix submission pipelining')!
+	require_order(drain, ['mut unpublished := [128]bool{}', 'current = item.next',
+		'mut gate := -1', 'gate = int(index)', 'unpublished[gate] || item.initial_barriers != 0',
+		'blocked_count == 128', 'if earlier || poll_g13_pending',
+		'if gate < 0 && blocked_count < 128', '!g13_pending_dispatch_complete(item)',
+		'unpublished[gate] = true', 'retained_tail.next = pending_head', 'pending_head = retained_head'],
+		'Vinix submission pipelining')!
+}
+
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
 	manager := read(os.join_path(base, 'gpu.rs'))!
@@ -266,6 +284,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'install_g13_batch_barriers',
 		'agxsubmission.install_output_syncs', 'gpu_manager.queue_g13_submission'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
+	check_submission_pipelining(pending)!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
 	poll := section(pending, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'Vinix batch overlap')!
 	check_dependency_publication(poll)!
@@ -377,6 +396,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
+		'Independent later submissions pipeline after older publication; initial-zero dependencies retain retirement guards',
 		'G13 explicit barrier wire fields, private tails, physical stamp pins and atomic prefixes',
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',

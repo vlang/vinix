@@ -27,6 +27,19 @@ fn test_order_rejects_a_reversed_contract() {
 	}
 }
 
+fn test_submission_pipelining_preserves_initial_guards_and_bounded_fifo() {
+	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
+	check_submission_pipelining(pending)!
+	for broken in [pending.replace('item.initial_barriers |= u32(1) << pipe', ''),
+		pending.replace('unpublished[gate] || item.initial_barriers != 0', 'unpublished[gate]'),
+		pending.replace('if gate < 0 && blocked_count < 128', 'if gate < 0'),
+		pending.replace('!g13_pending_dispatch_complete(item)', 'false'),
+		pending.replace('fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool {',
+			'fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool { _ = item.callbacks_remaining')] {
+		if _ := check_submission_pipelining(broken) { assert false, 'unsafe pipelining source contract accepted' }
+	}
+}
+
 fn test_integer_constant_accepts_v_casts_and_separators() {
 	assert integer_constant('pub const aperture = u64(0xffff_ffae_1000_0000)', 'aperture', 'sample')! == u64(0xffffffae10000000)
 	assert integer_constant('const blocks = u32(8)', 'blocks', 'sample')! == 8

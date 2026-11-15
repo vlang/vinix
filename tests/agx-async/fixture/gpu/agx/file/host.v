@@ -140,7 +140,7 @@ fn check_dependencies_and_fifo() {
 	assert pending_count == 2 && !syncobj.is_signaled(fence(a)) && syncobj.is_signaled(fence(c))
 	syncobj.signal(dependency)
 	service_file_work()
-	assert manager.published == [u32(22), 12]
+	assert manager.published == [u32(22), 12, 12]
 	manager.finish_compute(0)
 	service_file_work()
 	assert manager.published == [u32(22), 12, 12]
@@ -302,5 +302,6 @@ pub fn run_checks() {
 	check_batches()
 	check_overlap()
 	check_firmware_dependencies()
+	check_submission_pipelining()
 	println('AGX async: ioctl staging, independent queues/FIFO, compute→render phases, forged fences, failure cleanup, enqueue/shutdown races, backpressure and 200 immediate-retirement cycles passed')
 }
