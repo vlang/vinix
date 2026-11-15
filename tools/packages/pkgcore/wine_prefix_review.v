@@ -36,7 +36,7 @@ pub fn (owner &WinePrefixReview) document() !WinePrefixDocument {
 	}
 	return WinePrefixDocument{
 		format: view.format
-		scope: view.scope
+		scope: 'authenticated current-runtime review; no retained admission or later-write authorization'
 		generation: view.generation
 		prior_generation: view.prior_generation
 		runtime_id: owner.admission.runtime.id

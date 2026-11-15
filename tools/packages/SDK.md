@@ -2046,6 +2046,12 @@ the previous runtime version from old link paths. The added field preserves
 structural consumers that ignore unknown JSON fields; it supplies no authority
 for a later write.
 
+The service document's `scope` identifies an authenticated current-runtime
+review with no retained admission or later-write authorization. The lower-level
+adapter report keeps its structural-only scope because it does not authenticate
+package trust or runtime payloads. Consumers must not treat either scope string
+as an authorization token; service freshness checks still run for every write.
+
 The write commands accept trailing `--generation N`, where N is a canonical
 positive decimal generation from the review JSON. A mismatch refuses before
 any binding write. The library counterparts are `complete_additions_at(N)` and

@@ -10,6 +10,7 @@ fn C.execv(&char, &&char) i32
 
 struct CliReview {
 	format int
+	scope string
 	generation u64
 	prior_generation u64
 	runtime_id string
@@ -47,11 +48,12 @@ fn checked_reply(command string, data string, replaced int, added bool) ! {
 	defer {
 		unsafe {
 			for row in report.bindings { row.name.free(); row.observed.free(); row.replacement.free() }
-			report.runtime_id.free(); report.runtime_version.free(); (&array(&report.bindings)).free()
+			report.scope.free(); report.runtime_id.free(); report.runtime_version.free(); (&array(&report.bindings)).free()
 		}
 	}
 	prior := if replaced < names.len - 1 { u64(1) } else { u64(0) }
 	if report.format != 1 || report.generation != 2 || report.prior_generation != prior || report.runtime_id != 'wine'
+		|| report.scope != 'authenticated current-runtime review; no retained admission or later-write authorization'
 		|| report.runtime_version != '2.0.0' || report.bindings.len != names.len
 		{ return error('public recovery JSON inventory differs') }
 	for index, name in names {

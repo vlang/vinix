@@ -65,6 +65,8 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	initial_document := owner.document()!
 	assert initial_document.runtime_id == 'wine'
 	assert initial_document.runtime_version == '1.0.0'
+	assert initial_document.scope == 'authenticated current-runtime review; no retained admission or later-write authorization'
+	assert owner.review.review.scope == 'read-only structural review; no runtime authentication or migration authorization'
 	assert initial_document.generation == installed.generation
 	owner.close(); owner.close()
 	mut released := prefix.acquire_launch(data)!
@@ -132,6 +134,7 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	next_owner.complete_additions()!
 	completed_document := next_owner.document()!
 	assert completed_document.runtime_version == '2.0.0'
+	assert completed_document.scope == 'authenticated current-runtime review; no retained admission or later-write authorization'
 	assert completed_document.prior_generation == 0
 	assert completed_document.bindings.all(it.operation == .keep)
 	assert os.readlink(system + '/new.dll')! == target + '/new.dll'
