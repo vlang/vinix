@@ -8,6 +8,7 @@ import json2
 import os
 import plainiso
 import tests.packages.winesource
+import tests.packages.wineowned
 import tools.packages.wineadapter
 
 struct WineOutcome {
@@ -15,6 +16,7 @@ struct WineOutcome {
 	passed      bool
 	interrupted bool
 	reason      string
+	seconds     f64
 }
 
 struct WineReceipt {
@@ -72,7 +74,7 @@ fn argv(path string) ![]string {
 	return json2.decode[[]string](os.read_file(path)!)!
 }
 
-fn producer_argv(vargv string, ccargv string, compiler string, architecture string, cfile string, runtime string, output string, source string, root string, sysroot string, gcc string, native bool) ! {
+fn producer_argv(vargv string, ccargv string, compiler string, architecture string, cfile string, runtime string, output string, source string, root string, sysroot string, gcc string, native bool, owned bool) ! {
 	v := argv(vargv)!
 	c := argv(ccargv)!
 	mut expected_v := [compiler, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
@@ -83,6 +85,16 @@ fn producer_argv(vargv string, ccargv string, compiler string, architecture stri
 		expected_v << ['-path', '@vlib|' + root + '|' + root + '/tools/accounts|@vmodules']
 	}
 	expected_v << ['-o', cfile, source]
+	if owned {
+		expected_v.insert(1, ['-d', 'wine_owned_manager'])
+		if native {
+			if source == root + '/tests/packages/wine-native/main.v' {
+				expected_v.insert(1, ['-d', 'wine_collection_probe'])
+				expected_v.insert(1, ['-d', 'wine_caller_death_probe'])
+			}
+			expected_v.insert(1, ['-d', 'wine_kernel_lease', '-d', 'wine_holder_death_probe'])
+		}
+	}
 	closure_dir := if native { os.dir(cfile) } else { os.dir(os.dir(cfile)) + '/logs' }
 	expected_v.insert(1, ['-dump-files', closure_dir + '/sources-built.txt'])
 	mut expected_discovery := [compiler, '-print-watched-files', '-dump-files',
@@ -107,10 +119,11 @@ fn retain() ! {
 	} $else {
 		return error('compile Wine retention with -prod for embedded source admission')
 	}
-	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] != '--forksafe-translator') {
-		return error('usage: wine-native-retain RUN PREPARED_BUILD ARCH NEW_OUTPUT [--forksafe-translator]')
+	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] !in ['--forksafe-translator', '--owned-holder-death']) {
+		return error('usage: wine-native-retain RUN PREPARED_BUILD ARCH NEW_OUTPUT [--forksafe-translator|--owned-holder-death]')
 	}
-	forksafe := os.args.len == 6
+	forksafe := os.args.len == 6 && os.args[5] == '--forksafe-translator'
+	owned := os.args.len == 6 && os.args[5] == '--owned-holder-death'
 	root := hwhost.find_root(@FILE)!
 	run := os.abs_path(os.args[1])
 	prepared := os.abs_path(os.args[2])
@@ -118,11 +131,12 @@ fn retain() ! {
 	if forksafe && arch != 'aarch64' {
 		return error('fork-safe translator admission requires aarch64')
 	}
+	if owned && arch != 'x86_64' { return error('owned holder retention requires x86_64') }
 	out := os.abs_path(os.args[4])
 	if arch !in ['aarch64', 'x86_64'] || os.exists(out) {
 		return error('unsupported architecture or existing retention output')
 	}
-	expected_sources := {
+	mut expected_sources := {
 		'tests/packages/wine-native-retain.v':          $embed_file('wine-native-retain.v').to_string()
 		'tests/packages/wine-native-check.v':           $embed_file('wine-native-check.v').to_string()
 		'tests/packages/wine-native/main.v':            $embed_file('wine-native/main.v').to_string()
@@ -140,6 +154,24 @@ fn retain() ! {
 		'tools/packages/wineadapter/pe_proof.c.v':      $embed_file('../../tools/packages/wineadapter/pe_proof.c.v').to_string()
 		'tools/packages/wineadapter/pe_reader.v':       $embed_file('../../tools/packages/wineadapter/pe_reader.v').to_string()
 		'tests/hardware-platform/plainiso/iso.v':       plainiso.source()
+	}
+	if owned {
+		expected_sources['tests/packages/wineowned/receipt.v'] = $embed_file('wineowned/receipt.v').to_string()
+		expected_sources['tools/packages/launchhold/core.v'] = $embed_file('../../tools/packages/launchhold/core.v').to_string()
+		expected_sources['tools/packages/launchhold/holder_linux.c.v'] = $embed_file('../../tools/packages/launchhold/holder_linux.c.v').to_string()
+		expected_sources['tools/packages/pkgcore/generation_launch.v'] = $embed_file('../../tools/packages/pkgcore/generation_launch.v').to_string()
+		expected_sources['tools/packages/wineadapter/launch_guard.c.v'] = $embed_file('../../tools/packages/wineadapter/launch_guard.c.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_directory.c.v'] = $embed_file('../../tools/packages/wineadapter/server_directory.c.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_child.v'] = $embed_file('../../tools/packages/wineadapter/server_child.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_child_linux.c.v'] = $embed_file('../../tools/packages/wineadapter/server_child_linux.c.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_identity.v'] = $embed_file('../../tools/packages/wineadapter/server_identity.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_identity_linux.c.v'] = $embed_file('../../tools/packages/wineadapter/server_identity_linux.c.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_endpoint.v'] = $embed_file('../../tools/packages/wineadapter/server_endpoint.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_endpoint_linux.c.v'] = $embed_file('../../tools/packages/wineadapter/server_endpoint_linux.c.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_connection.v'] = $embed_file('../../tools/packages/wineadapter/server_connection.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_connection_linux.c.v'] = $embed_file('../../tools/packages/wineadapter/server_connection_linux.c.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_readiness.v'] = $embed_file('../../tools/packages/wineadapter/server_readiness.v').to_string()
+		expected_sources['tools/packages/wineadapter/server_readiness_linux.c.v'] = $embed_file('../../tools/packages/wineadapter/server_readiness_linux.c.v').to_string()
 	}
 	for name, source in expected_sources {
 		if digest(root + '/' + name)! != sha256.hexhash(source) {
@@ -201,6 +233,10 @@ fn retain() ! {
 	}
 	verify(producer_inputs)!
 	winesource.admit(prepared + '/logs/sources-before.txt', prepared + '/logs/sources-built.txt', producer_inputs)!
+	if owned {
+		require_input(inputs, root + '/tests/packages/wineowned/receipt.v')!
+		wineowned.admit(prepared, arch, root)!
+	}
 	for name in ['tools/packages/wine-build.v', 'tools/packages/wine-runner.v']! {
 		require_input(producer_inputs, root + '/' + name)!
 	}
@@ -400,20 +436,26 @@ fn retain() ! {
 		return error('staged sandbox differs')
 	}
 	producer_argv(run + '/build-guest/v.log.argv.json', run + '/build-guest/cc.log.argv.json', declaration['compiler'], arch,
-		recorded_run + '/build-guest/guest.c', recorded_run + '/build-guest/runtime.c', recorded_run + '/build-guest/guest', root + '/tests/packages/wine-native/main.v', root, declaration['sysroot'], declaration['gcc_runtime'], true)!
+		recorded_run + '/build-guest/guest.c', recorded_run + '/build-guest/runtime.c', recorded_run + '/build-guest/guest', root + '/tests/packages/wine-native/main.v', root, declaration['sysroot'], declaration['gcc_runtime'], true, owned)!
 	producer_argv(run + '/build-package/v.log.argv.json', run + '/build-package/cc.log.argv.json', declaration['compiler'], arch,
-		recorded_run + '/build-package/package.c', recorded_run + '/build-package/runtime.c', recorded_run + '/build-package/package', root + '/tools/packages/main.v', root, declaration['sysroot'], declaration['gcc_runtime'], true)!
+		recorded_run + '/build-package/package.c', recorded_run + '/build-package/runtime.c', recorded_run + '/build-package/package', root + '/tools/packages/main.v', root, declaration['sysroot'], declaration['gcc_runtime'], true, owned)!
 	producer_argv(prepared + '/logs/v.log.argv.json', prepared + '/logs/cc.log.argv.json', declaration['compiler'], arch,
-		recorded_prepared + '/build/wine-runner.c', recorded_prepared + '/build/runtime.c', recorded_prepared + '/prepared/' + arch + '/runtime/bin/wine-runner', root + '/tools/packages/wine-runner.v', root, declaration['sysroot'], declaration['gcc_runtime'], false)!
+		recorded_prepared + '/build/wine-runner.c', recorded_prepared + '/build/runtime.c', recorded_prepared + '/prepared/' + arch + '/runtime/bin/wine-runner', root + '/tools/packages/wine-runner.v', root, declaration['sysroot'], declaration['gcc_runtime'], false, owned)!
 	result := json2.decode[WineOutcome](os.read_file(run + '/result.json')!)!
 	if result.scenario != 'packaged-Wine' || !result.passed || result.interrupted || result.reason != '' {
 		return error('requires uninterrupted passing native Wine outcome')
+	}
+	if owned {
+		if result.seconds <= 0 || result.seconds >= 600 || result != json2.decode[WineOutcome](os.read_file(run + '/guest-outcome.json')!)! {
+			return error('owned holder raw/final outcome or deadline differs')
+		}
+		add(mut paths, 'native-evidence/guest-outcome.json', run + '/guest-outcome.json')!
 	}
 	vm_command := argv(run + '/boot/qemu-0.argv.json')!
 	memory_at := vm_command.index('-m')
 	if vm_command.len == 0 || vm_command[0] != declaration['qemu']
 		|| vm_command.filter(it == '-m').len != 1 || memory_at < 0 || memory_at + 1 >= vm_command.len
-		|| vm_command[memory_at + 1] != if arch == 'aarch64' { '3072' } else { '1024' } {
+		|| vm_command[memory_at + 1] != if arch == 'aarch64' || owned { '3072' } else { '1024' } {
 		return error('Wine guest memory command differs')
 	}
 	serial := os.read_file(run + '/boot/serial.log')!
@@ -421,6 +463,15 @@ fn retain() ! {
 		if serial.contains(forbidden) { return error('forbidden serial marker: ' + forbidden) }
 	}
 	mut markers := ['HWTEST START packaged-Wine']
+	if owned {
+		markers << ['HWTEST INFO Wine ordinary-caller-SIGKILL outer-status137 holder-alive PASS',
+			'HWTEST INFO Wine signed competing-prefix refusal126 after caller death original-workload-live lease-busy PASS',
+			'HWTEST INFO Wine holder-SIGKILL reaped9 manager-adopted kernel-lease-busy PASS',
+			'HWTEST INFO Wine initial-client-gone server-live obsolete-generation collection-retained PASS',
+			'HWTEST INFO Wine holder-death manager-status37 all-runtime-retired lease-free PASS',
+			'HWTEST INFO Wine signed holder-SIGKILL kernel-lease collection-retained natural-retirement PASS',
+			'HWTEST PASS packaged-Wine']
+	} else {
 	if arch == 'aarch64' {
 		markers << 'HWTEST INFO Wine translated BusyBox true ordinary split-WX control PASS'
 	}
@@ -432,7 +483,9 @@ fn retain() ! {
 	markers << ['VINIX SIGNED REAL WIN64 READY', 'VINIX SIGNED REAL WIN64 PASS',
 		'HWTEST INFO Wine signed-real-Win64 ordinary-private-prefix socket lease Windows-API outside-write-refused natural-exit PASS',
 		'HWTEST PASS packaged-Wine']
-	lines := serial.split_into_lines().map(it.trim_space())
+	}
+	lines := if owned { serial.split('\n').map(if it.ends_with('\r') { it[..it.len - 1] } else { it }) }
+		else { serial.split_into_lines().map(it.trim_space()) }
 	mut previous := -1
 	for marker in markers {
 		if lines.filter(it == marker).len != 1 {
@@ -480,7 +533,8 @@ fn retain() ! {
 		}
 	}
 	os.mkdir_all(out)!
-	os.write_file(out + '/wine-' + arch + '.json', json2.encode(WineReceipt{ architecture: arch, markers: markers, artifacts: artifacts, artifact_paths: paths }) + '\n')!
+	scope := if owned { 'local-only owned x86 Wine holder-SIGKILL collection case; authenticated UID1000 caller/holder/manager/server; busy obsolete generation after caller/holder death; manager37, runtime retirement, free lease and final collection; no ordinary API/SEH, GUI, ARM or redistribution qualification' } else { WineReceipt{}.scope }
+	os.write_file(out + '/wine-' + arch + '.json', json2.encode(WineReceipt{ architecture: arch, scope: scope, markers: markers, artifacts: artifacts, artifact_paths: paths }) + '\n')!
 	os.cp(run + '/boot/serial.log', out + '/wine-' + arch + '.serial.txt')!
 	println('WINE RETAIN PASS ' + arch + ': exact native outcome, source/input/output and local-only source-evidence admission')
 }

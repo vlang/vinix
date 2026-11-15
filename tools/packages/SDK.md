@@ -1931,6 +1931,14 @@ that collection removes the obsolete generation. This remains an explicit
 x86_64 qualification mode; it shares the existing 3 GiB collection fixture
 and selects one lifetime probe per invocation.
 
+The [full owned holder-death retainer](../../tests/packages/wine-owned-retain-check.md)
+uses `wine-native-retain RUN PREPARED_BUILD x86_64 OUTPUT --owned-holder-death`.
+It requires the complete recorded producer/native evidence and emits a receipt
+scoped to that lifetime case. Ordinary console and fork-safe receipts keep
+their separate contracts. Original and copied evidence baselines and nine
+resealed refusal cases qualify this explicit mode; full C header/hermetic
+admission, default activation and owned ARM/GUI remain open.
+
 The `--caller-death-probe` and `--idle-server-probe` cases also attempt a second
 actual package launch before remove/rollback. It must return 126 within fifteen
 seconds at the managed-prefix guard while the original caller stays gone, holder/server/worker

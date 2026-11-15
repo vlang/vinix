@@ -123,6 +123,7 @@ fn run() ! {
 	source := root + '/tests/packages/wine-native-check.v'
 	mut inputs := map[string]string{}
 	for path in [@FILE, os.executable(), native, v, source, root + '/tests/packages/winesource/closure.v',
+		root + '/tests/packages/wineowned/receipt.v',
 		root + '/tools/packages/wine-runner.v'] {
 		inputs[path] = wineoverlay.digest(path)!
 	}
