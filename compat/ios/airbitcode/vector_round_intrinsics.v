@@ -20,6 +20,10 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+ for id in [ScalarIntrinsic.smin, .smax, .umin, .umax]! {
+  prefix := match id {.smin {'llvm.smin.v'} .smax {'llvm.smax.v'} .umin {'llvm.umin.v'} else {'llvm.umax.v'}}
+  if name.starts_with(prefix) {count,bits:=vector_integer_overload(name,11)!;return id,count,bits}
+ }
 	if name.starts_with('llvm.fshl.v') || name.starts_with('llvm.fshr.v') { count, bits := vector_integer_overload(name, 11)!; return if name[8] == `l` { ScalarIntrinsic.fshl } else { ScalarIntrinsic.fshr }, count, bits }
 	if name.starts_with('llvm.cttz.v') { count, bits := vector_integer_overload(name, 11)!; return ScalarIntrinsic.cttz, count, bits }
 	if name.starts_with('llvm.ctlz.v') { count, bits := vector_integer_overload(name, 11)!; return ScalarIntrinsic.ctlz, count, bits }
@@ -36,6 +40,10 @@ fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
+	if scalar_integer_extremum(id) {
+		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
+		return 6848 + vector_integer_extremum_index(id)! * 1024 + int(bits - 1) * 16 + count - 1
+	}
 	if scalar_integer_funnel(id) {
 		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
 		return 4800 + int(id == .fshr) * 1024 + int(bits - 1) * 16 + count - 1

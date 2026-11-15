@@ -95,10 +95,10 @@ step, two lane counts of profiling work and one shared construction slot.
 The existing 4,096-result and 1,000,000-work limits apply.
 
 Population count occupies shared vector declaration-cache slots 640..1663,
-one per width/count pair. The cache now has 6,848 stack entries: 640 floating
+one per width/count pair. The cache now has 10,944 stack entries: 640 floating
 identities, 1,024 population-count identities, 1,024 bit-reversal identities,
-64 byte-swap identities, 1,024 leading-zero identities, 1,024 trailing-zero identities
-and 2,048 funnel-shift identities.
+64 byte-swap identities, 1,024 leading-zero identities, 1,024 trailing-zero identities,
+2,048 funnel-shift identities and 4,096 integer-extrema identities.
 Declaration attributes are checked once per identity;
 duplicate reserved declarations reject. Unary integer calls reject return/
 parameter attributes, including `immarg`. The normal production lane path
@@ -154,7 +154,7 @@ heap has not been measured.
 the standard-library 64-bit reverser shifted to the declared width, independently
 of the production shift loop. It additionally checks 705,024 reversal
 involutions, 104,448 lane-state cases, high-bit masking, snapshots and guards.
-The shared cache unit covers all 6,848 identities.
+The shared cache unit covers all 10,944 identities.
 
 `tests/ios/air-vector-bitreverse.v LLVM_AS FRESH_EXTERNAL_DIR` checks every
 width/count through 25,600 decoded shapes and 3,347,424 exact native LLVM
@@ -190,8 +190,8 @@ vectors, vector arguments/returns/loads/stores/PHIs and AIR aliases reject.
 standard-library 64-bit byte reverser shifted to the declared width, plus
 52,224 involutions and 6,528 lane-state checks. It exhausts i16 and checks wide
 patterns, individual set/clear bits, high-bit noise, snapshots and guards.
-The shared cache unit covers all 6,848 identities. Older integer-vector units
-replace their unsupported-byte-swap guards with unsupported vector signed-minimum
+The shared cache unit covers all 10,944 identities. Older integer-vector units
+replace their unsupported-byte-swap guards with unsupported vector absolute-value
 because byte swap is now admitted. Their positive value/state coverage remains.
 
 `tests/ios/air-vector-bswap.v LLVM_AS FRESH_EXTERNAL_DIR` checks 1,600 decoded
@@ -217,6 +217,10 @@ its independent value/state coverage and native reference checker.
 Vector funnel shifts use slots 4800..6847 and three homogeneous integer vector
 arguments. The [vector funnel profile](SCALAR-FUNNEL.md#vector-funnel-shifts) describes
 modulo shifts, poison/undef behavior, shared limits and qualification.
+
+Vector signed/unsigned minimum and maximum use slots 6848..10943. The
+[integer-extrema profile](SCALAR-INTEGER-EXTREMA.md#vector-integer-extrema) documents
+their binary argument checks, poison/undef handling, limits and qualification.
 
 References: [LLVM population count](https://llvm.org/docs/LangRef.html#llvm-ctpop-intrinsic),
 [bit reversal](https://llvm.org/docs/LangRef.html#llvm-bitreverse-intrinsics),
