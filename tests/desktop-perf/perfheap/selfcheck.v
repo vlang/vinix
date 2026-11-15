@@ -5,7 +5,7 @@ module perfheap
 import os
 
 fn C.pipe(&i32) i32
-fn C.write(i32, voidptr, usize) isize
+fn C.write(i32, voidptr, u64) i64
 fn C.fcntl(i32, i32, ...voidptr) i32
 
 fn fixture(objects string, pages string, large string, written string) string {
@@ -59,7 +59,7 @@ fn pipe_control(text string, accepted bool, out &Snapshot) ! {
 		C.close(descriptors[0])
 		if !writer_closed { C.close(descriptors[1]) }
 	}
-	amount := C.write(descriptors[1], text.str, usize(text.len))
+	amount := C.write(descriptors[1], text.str, u64(text.len))
 	require(amount == text.len, 'short pipe fixture write')!
 	writer_closed = true
 	require(C.close(descriptors[1]) == 0, 'pipe writer close failed')!

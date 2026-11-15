@@ -10,11 +10,11 @@ import math.big
 #include <stdlib.h>
 
 fn C.strtod(&char, &&char) f64
-fn C.snprintf(&char, usize, &char, ...) i32
+fn C.snprintf(&char, u64, &char, ...) i32
 
 fn float_format(value f64, format string) string {
 	mut bytes := []u8{len: 400}
-	count := unsafe { C.snprintf(&char(bytes.data), usize(bytes.len), &char(format.str), value) }
+	count := unsafe { C.snprintf(&char(bytes.data), u64(bytes.len), &char(format.str), value) }
 	assert count >= 0 && count < bytes.len
 	return bytes[..count].bytestr()
 }

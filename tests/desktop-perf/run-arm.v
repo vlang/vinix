@@ -133,14 +133,15 @@ fn admitted(root string, base string, state string, expected string) !string {
 	return archive_record(base)!
 }
 
-fn compile_command(cc string, linker string, sysroot string, gcc string, source string, output string, init bool) []string {
+fn compile_command(cc string, linker string, sysroot string, gcc string, source string, output string, runtime bool) []string {
 	lib := sysroot + '/usr/lib'
 	mut argv := [cc, '--no-default-config', '--target=aarch64-linux-musl', '-static', '-nostdinc', '-nostdlib',
 		'-isystem', gcc + '/include', '-isystem', sysroot + '/usr/include', '-O2', '-Wall',
 		'-Werror=incompatible-pointer-types', '-Werror=format',
 		'-D_GNU_SOURCE', '-fno-stack-protector', lib + '/crt1.o', lib + '/crti.o', gcc + '/crtbeginT.o', source,
 		'-L' + lib, '-L' + gcc]
-	if init { argv << ['-lm', '-lpthread'] }
+	// musl provides pthread symbols in libc; some SDKs omit the empty stub archive.
+	if runtime { argv << '-lm' }
 	argv << ['-lc', '-lgcc', gcc + '/crtend.o', lib + '/crtn.o', '-fuse-ld=' + linker, '-o', output]
 	return argv
 }

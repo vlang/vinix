@@ -54,6 +54,12 @@ bundle. No full ops/churn/cache or idle/apps/drag performance pass is claimed.
 Historical evidence/checkers and broader section 15 acceptance gates are
 unchanged.
 
+The subsequent [sampler build qualification](linux-performance-sampler-builds.md)
+removes the deprecated aliases, restores production consumer controls and
+qualifies byte-identical strict target links with the verified compiler. The
+current compiler's separate printf precision defect and broader runtime/schema
+gates remain visible there.
+
 Complete evidence remains at `/Users/alex/.cache/vx-hv-1115/bundle`, archived as
 `/Users/alex/.cache/vx-hv-1115.tar.gz`, SHA-256
 `52bbb9e2a4c2f3f0d0eacc2233a51b0d66cf9fec84afc88e3629a5b41f5de389`.

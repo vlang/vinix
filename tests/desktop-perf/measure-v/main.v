@@ -33,12 +33,12 @@ struct C.snapshot {
 // global emits no conflicting extern declaration; stdout/FILE are builtin.
 __global C.scratch_dir &char
 fn C.printf(&char, ...) i32
-fn C.snprintf(&char, usize, &char, ...) i32
+fn C.snprintf(&char, u64, &char, ...) i32
 fn C.fflush(&C.FILE) i32
-fn C.setvbuf(&C.FILE, &char, i32, usize) i32
-fn C.write(i32, voidptr, usize) isize
+// os supplies setvbuf's size_t declaration for the selected compiler.
+fn C.write(i32, voidptr, u64) i64
 fn C.open(&char, i32, ...voidptr) i32
-fn C.read(i32, voidptr, usize) isize
+fn C.read(i32, voidptr, u64) i64
 fn C.close(i32) i32
 fn C.sleep(u32) u32
 fn C.sync()
@@ -139,7 +139,7 @@ fn raw_snapshot(snapshot &perfheap.Snapshot, label string, operation string, dir
 	require(C.fflush(C.stdout) == 0, 'snapshot prefix flush failed')!
 	mut offset := 0
 	for offset < snapshot.raw_len {
-		got := C.write(1, unsafe { &snapshot.raw[offset] }, usize(snapshot.raw_len - offset))
+		got := C.write(1, unsafe { &snapshot.raw[offset] }, u64(snapshot.raw_len - offset))
 		if got < 0 && C.errno == C.EINTR { continue }
 		require(got > 0 && got <= snapshot.raw_len - offset, 'raw snapshot write failed')!
 		offset += int(got)

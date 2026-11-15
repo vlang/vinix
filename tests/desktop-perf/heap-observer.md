@@ -4,6 +4,11 @@ Host controls, both strict static target links and independent generated-C
 reviews passed; see [the qualification report](heap-qualification.md). Native
 measurements and architecture-adapter qualification remain separate gates.
 
+The [production build compatibility follow-up](../../docs/linux-performance-sampler-builds.md)
+qualifies explicit LP64 libc types, normal/production controls in the public
+host suite and byte-identical strict target links using the verified compiler.
+It retains the existing schema and current-compiler format refusal.
+
 `measure-v/main.v` owns the ops/churn observer. `perfproducer` generates its C
 and includes the unchanged, hash-pinned `measure.c` under an entry-point rename.
 All operation probes and legacy non-heap modes retain their original C bytes.

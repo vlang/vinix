@@ -8,9 +8,9 @@ module perfheap
 #include <unistd.h>
 
 fn C.open(&char, i32, ...voidptr) i32
-fn C.read(i32, voidptr, usize) isize
+fn C.read(i32, voidptr, u64) i64
 fn C.close(i32) i32
-fn C.memmove(voidptr, voidptr, usize) voidptr
+fn C.memmove(voidptr, voidptr, u64) voidptr
 
 pub const class_sizes = [u64(16), 32, 48, 64, 96, 128, 192, 256, 384, 512, 768,
 	1024, 1536, 2048]!
@@ -126,7 +126,7 @@ pub fn parse_snapshot(data &u8, length int, out &Snapshot) ! {
 	cursor = literal(after_footer, '\n')!
 	require(cursor.position == length, 'extra or trailing slab snapshot data')!
 	unsafe {
-		C.memmove(&out.raw[0], data, usize(length))
+		C.memmove(&out.raw[0], data, u64(length))
 		out.raw_len = length
 		out.large_pages = large_pages
 		out.written_after_free = written_after_free
@@ -150,7 +150,7 @@ fn read_from_fd(fd i32, out &Snapshot) ! {
 			require(amount == 0, 'slab snapshot exceeds fixed storage')!
 			break
 		}
-		amount := C.read(fd, unsafe { &out.raw[used] }, usize(raw_capacity - used))
+		amount := C.read(fd, unsafe { &out.raw[used] }, u64(raw_capacity - used))
 		if amount < 0 {
 			if C.errno == C.EINTR { continue }
 			return error('slab snapshot read failed')

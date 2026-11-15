@@ -2438,6 +2438,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   and shell arguments with 11 native cases per architecture; preserve the next
   sampler-build and ARM schema gates. See [the harness build receipts](docs/linux-performance-harness-builds.md).
 
+- [x] Restore production slab observer/consumer builds with explicit LP64 libc
+  types and run normal/production controls in the public host suite. Qualify
+  strict static links with the verified compiler and byte-identical before/after
+  samplers on both architectures. See [the sampler build receipts](docs/linux-performance-sampler-builds.md)
+  for the separate current-compiler precision defect and remaining runtime/schema gates.
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

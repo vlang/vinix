@@ -86,6 +86,19 @@ driver and resource checks. `sh -n tests/desktop-perf/perf-init.sh` checks the g
 script without booting QEMU. See [native qualification](native-tools.md) for the
 tested boundaries and the limits of host fixture evidence.
 
+The public host suite also builds and runs the existing slab parser/reader and
+complete-transcript controls in both normal and production modes. Its maintained
+V front can take an explicit compiler and fresh external state:
+
+```sh
+build-support/run-v-tool.sh tests/desktop-perf/heap-build-check.v /path/to/v /path/to/vinix /external/fresh-heap-check
+```
+
+With no arguments it selects the compiler that built the front, derives the
+repository from its source path and retains results in a fresh temporary
+directory printed on success. See the [production sampler build receipts](../../docs/linux-performance-sampler-builds.md)
+for the qualified compiler, strict target links and remaining schema gates.
+
 The retained `run-arm.v` and `run-x86.v` adapters generate their PID1 through
 `perfproducer.generate_init`, using the maintained freestanding V module path.
 The initializer uses native C-width libc calls and stack shell arguments.
