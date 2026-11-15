@@ -71,7 +71,15 @@ unpublished predecessors retain FIFO order. Firmware scheduling remains injected
 
 Initial-event checks cover idle source subqueues, a dependency on only a later
 command in a batch, immutable targets despite newer accepted work, consumers
-executing and retiring before producer callbacks, canceled input dependencies,
+executing and retiring before producer callbacks, errored input dependencies,
 rejected ioctls preserving accepted markers, and capture cleanup on every setup
 failure/stop path. Actual event/pin/byte compaction behavior is covered by the
 event and lifetime fixtures; this fixture injects firmware execution.
+
+Signaled input fences release scheduling waits even when they carry an error,
+matching the packaged DRM scheduler. Eight real-ioctl scenarios permute two
+input fences and their signaling order, preserve the original fence snapshot
+after userspace replaces a syncobj, and retain the submission's own GPU error
+independently of input errno. An errored input never releases another unsignaled
+input or a firmware initial-event dependency. Existing producer-fault and stop
+cases continue to cancel caller-owned jobs and retain hardware-owned backing.

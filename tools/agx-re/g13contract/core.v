@@ -237,6 +237,17 @@ fn check_initial_snapshot_contract(initial string, barriers string, workqueue st
 		'mgr.accept_g13_submission_locked(jobs, count)', 'enqueue(data)'], 'Vinix atomic initial acceptance')!
 }
 
+fn check_input_dependency_contract(pending string) ! {
+	ready := section(pending, 'fn g13_dependencies_ready(', 'fn cancel_g13_pending(', 'Vinix input dependency readiness')!
+	require_order(ready, ['index < dependencies.count', '!syncobj.is_signaled(dependencies.fences[index])',
+		'return false', 'return true'], 'Vinix input dependency readiness')!
+	require(!ready.contains('get_error'), 'Signaled input fence errors must not cancel the dependent submission')!
+	poll := section(pending, 'fn poll_g13_pending(', 'mut blocked := [2]bool{}', 'Vinix input dependency scheduling')!
+	require_order(poll, ['if !item.dependencies_ready', 'if !g13_dependencies_ready(&item.dependencies) { return true }',
+		'item.dependencies_ready = true', 'failure := g13_pending_error(item)',
+		'cancel_g13_pending(mut item, if failure != 0'], 'Vinix input dependency scheduling')!
+}
+
 fn check_submission_pipelining(pending string) ! {
 	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix initial dependencies')!
 	require_order(resolve, ['barrier == ioctl.asahi_barrier_none', 'barrier == 0',
@@ -312,10 +323,26 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'gpu_manager.release_g13_initial_events', 'agxsubmission.install_output_syncs', 'register_g13_pending'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
+	check_input_dependency_contract(pending)!
+	scheduler := read(os.join_path(asahi_linux, 'drivers/gpu/drm/scheduler/sched_entity.c'))!
+	dependency_cb := section(scheduler, 'static bool drm_sched_entity_add_dependency_cb(',
+		'static struct dma_fence *', 'Asahi scheduler input dependency callback')!
+	require_order(dependency_cb, ['!fence->error && s_fence', 'dma_fence_add_callback(entity->dependency',
+		'return true', 'dma_fence_put(entity->dependency)', 'return false'], 'Asahi scheduler input dependency readiness')!
+	require(!dependency_cb.contains('dma_fence_set_error'), 'Asahi input dependency callback must not propagate input errno')!
+	pop := section(scheduler, 'struct drm_sched_job *drm_sched_entity_pop_job(',
+		'void drm_sched_entity_select_rq(', 'Asahi scheduler pop')!
+	require_order(pop, ['drm_sched_job_dependency(sched_job, entity)',
+		'drm_sched_entity_add_dependency_cb(entity, sched_job)', 'if (entity->guilty',
+		'dma_fence_set_error(&sched_job->s_fence->finished, -ECANCELED)', 'return sched_job'], 'Asahi scheduler pop')!
+	run := section(read(os.join_path(asahi_linux, 'drivers/gpu/drm/scheduler/sched_main.c'))!,
+		'static void drm_sched_run_job_work(', 'static struct workqueue_struct *drm_sched_alloc_wq(', 'Asahi scheduler run')!
+	require_order(run, ['drm_sched_entity_pop_job(entity)', 'sched->ops->run_job(sched_job)',
+		'drm_sched_fence_scheduled(s_fence, fence)', 'drm_sched_job_done(sched_job, fence->error)'], 'Asahi scheduler completion error origin')!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
 	poll := section(pending, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'Vinix batch overlap')!
 	check_dependency_publication(poll)!
-	require_order(poll, ['status := g13_dependency_status', 'failure := g13_pending_error(item)',
+	require_order(poll, ['g13_dependencies_ready(&item.dependencies)', 'failure := g13_pending_error(item)',
 		'mut blocked := [2]bool{}', 'command.published', 'blocked[command.pipe]', 'command.wait_for', 'if !prior.published',
 		'katomic.load(&prior.done)', 'katomic.load(&prior.error)', 'completed_error := g13_pending_error(item)',
 		'manager.g13_queue_dispatch_blocked', 'manager.submit_g13_compute_job',
@@ -424,6 +451,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'TVB growth ACK halt counter',
 		'G13 default non-preemptible compute queue priority',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
+		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
 		'Independent later submissions pipeline after older publication with initial firmware dependencies',

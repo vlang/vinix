@@ -58,6 +58,19 @@ fn test_initial_snapshot_contract_rejects_pin_identity_and_acceptance_regression
 	if _ := check_initial_snapshot_contract(initial, barriers, workqueue, manager.replace('mgr.accept_g13_submission_locked(jobs, count)', 'true')) { assert false }
 }
 
+fn test_input_dependency_contract_rejects_errno_propagation_and_early_release() {
+	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
+	check_input_dependency_contract(pending)!
+	for broken in [pending.replace('index < dependencies.count', 'index < 1'),
+		pending.replace('!syncobj.is_signaled(dependencies.fences[index])', 'false'),
+		pending.replace('return false }\n\t}\n\treturn true', 'return false }\n\t}\n\t_ := syncobj.get_error(dependencies.fences[0])\n\treturn true'),
+		pending.replace('if !g13_dependencies_ready(&item.dependencies) { return true }', ''),
+		pending.replace('failure := g13_pending_error(item)', 'failure := 0')] {
+		assert broken != pending
+		if _ := check_input_dependency_contract(broken) { assert false, 'invalid input dependency policy accepted' }
+	}
+}
+
 fn test_integer_constant_accepts_v_casts_and_separators() {
 	assert integer_constant('pub const aperture = u64(0xffff_ffae_1000_0000)', 'aperture', 'sample')! == u64(0xffffffae10000000)
 	assert integer_constant('const blocks = u32(8)', 'blocks', 'sample')! == 8

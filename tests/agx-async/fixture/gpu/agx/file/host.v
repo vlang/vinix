@@ -198,7 +198,7 @@ fn check_failures() {
 		assert code < 0
 		assert_drained(file)
 	}
-	// Failed dependency cancels unpublished jobs and preserves its errno.
+	// A signaled dependency's error does not become this job's error.
 	gpu.reset()
 	mut file := new_file()
 	mut manager := gpu.get_global_manager() or { panic('manager') }
@@ -209,7 +209,11 @@ fn check_failures() {
 	syncobj.replace_fence(input, failed)
 	assert submit(mut file, 1, true, input, out, false) == 0
 	service_file_work()
-	assert syncobj.get_error(fence(out)) == -110 && manager.published.len == 0
+	assert manager.published == [u32(12), 10] && !syncobj.is_signaled(fence(out))
+	manager.finish_compute(0)
+	manager.finish_render(0)
+	service_file_work()
+	assert syncobj.get_error(fence(out)) == 0 && syncobj.is_signaled(fence(out))
 	assert_drained(file)
 	// A compute fault also cancels the unsubmitted render half.
 	gpu.reset()
@@ -305,5 +309,6 @@ pub fn run_checks() {
 	check_firmware_dependencies()
 	check_submission_pipelining()
 	check_initial_submission_events()
+	check_input_sync_errors()
 	println('AGX async: ioctl staging, independent queues/FIFO, compute→render phases, forged fences, failure cleanup, enqueue/shutdown races, backpressure and 200 immediate-retirement cycles passed')
 }

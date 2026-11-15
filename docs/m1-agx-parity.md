@@ -108,7 +108,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Modern flat-command integration, full admission/backpressure and input-fence failure policy still require comparison. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Signaled input fences satisfy waits independently of their errno. Modern flat-command integration, scheduler fence elision and full admission/backpressure still differ. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
@@ -803,6 +803,53 @@ Linked kernel SHA-256 values are
 (AArch64) and
 `baa14451cf5b65b7791bb96903c93ba78e18f4ad58acf0e0c53fdf7769914b8a`
 (x86_64). Rejected intermediate binaries/C are explicitly labeled diagnostics.
+
+### Input-fence error handling
+
+The pinned Asahi scheduler adds input fences as ordering dependencies.
+`drm_sched_entity_add_dependency_cb` releases signaled waits without copying
+their errno into the dependent job; `drm_sched_run_job_work` reports that job's
+own completion error. Vinix previously canceled the waiting submission on an
+input error. Its native pending worker now waits for every original input fence
+to signal and leaves the input errno separate from the submission's GPU result.
+Firmware initial-event waits, producer-fault handling and shutdown ownership
+remain enforced.
+
+Eight ASan/UBSan ioctl scenarios permute two input/signal orders and successful
+versus faulted GPU completion. They verify that neither an errored input nor a
+replacement syncobj fence releases an unsignaled original snapshot. Existing
+mixed-job, cross-submission, initial-prefix, own-fault, backpressure, 64+63 overlap
+and 540 shutdown cases pass. Three V unit suites pass, including negative policy
+gates and a scheduler-C retention check. The source audit now retains and hashes
+the actual scheduler C files and Rust wrapper. All selected gates pass; the
+whole-driver verdict remains `not_equivalent`.
+
+Isolated AArch64 and ordinary x86_64 builds pass from
+`c8c44aaa2c6c5b8426ece91b5b77f2f8663a09bc` plus the retained `pending.v`.
+Every AGX V source matches the isolated checkout; `pending.v` matches both
+retained build snapshots. Twenty generated ARM helper bodies and checker
+selftests pass the allocation, structural-copy and fixed-storage guards. The
+ordinary x86 build excludes native AGX code. No ownership fields or new frees
+were introduced. The preceding lifetime/event/publisher/close evidence remains
+unchanged. No native GPU test, Vinix boot, reboot or deployment occurred.
+
+References reuse the immediately preceding fresh Omarchy clone
+`4f26515d55f5d03ddf884a8b416f3b66b8ee7ae4` and package/kernel/Mesa pins.
+Scheduler fence elision, complete admission/backpressure, modern ABI/VM/GEM/Mesa
+and the remaining areas above are still incomplete.
+
+The complete evidence bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-input-sync-20261115/bundle/`.
+Its sibling `inventory.json` SHA-256 is
+`533f1e4f7f730ab4a797873dd510029bbcc6e14a0f5a291c441940164bc58d45`.
+The sibling `bundle.tar.gz` SHA-256 is
+`22726a81661b9ed1d123f11d0e9164220f3bc84ddeb4bf2b1c12b0b72c7dea4f`.
+Canonical and fully extracted bundles pass the unchanged inventory checker.
+Linked kernel SHA-256 values are
+`a5b0bc70299001293f19ed684721acbc4512db44b19cb72984c0eef15cfc0707`
+(AArch64) and
+`a7f97f10ebb8feb9b9c5189d25d6682b0a1e3d478088cc63910fc5cd21460910`
+(x86_64).
 
 ## Earlier artifact retention incident
 

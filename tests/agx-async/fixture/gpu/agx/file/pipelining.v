@@ -237,14 +237,17 @@ fn check_failed_input_between_live_submissions() {
 	assert submit(mut file, 1, false, input, b, false) == 0
 	assert submit_scheduled(mut file, [ScheduledCommand{}], c, false) == 0
 	service_file_work()
-	assert manager.published_order == [u32(0), 2] && manager.released_order == [u32(1)]
-	assert syncobj.get_error(fence(b)) == -110 && !syncobj.is_signaled(fence(a))
-	assert pending_count == 2 && file.inflight_by_vm[1] == 4
+	assert manager.published_order == [u32(0), 1, 2] && manager.released_order.len == 0
+	assert !syncobj.is_signaled(fence(b)) && !syncobj.is_signaled(fence(a))
+	assert pending_count == 3 && file.inflight_by_vm[1] == 6
 	assert manager.execute_firmware(2, 0)
 	manager.retire_firmware(2)
 	assert manager.execute_firmware(0, 0)
 	manager.retire_firmware(0)
+	assert manager.execute_firmware(1, 0)
+	manager.retire_firmware(1)
 	service_file_work()
+	assert syncobj.is_signaled(fence(b)) && syncobj.get_error(fence(b)) == 0
 	assert_drained(file)
 }
 

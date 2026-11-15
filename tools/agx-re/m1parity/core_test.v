@@ -159,3 +159,17 @@ fn test_reference_inputs_must_be_clean() {
 		assert false, 'dirty reference accepted'
 	}
 }
+
+fn test_scheduler_c_inputs_are_hashed_and_retained() {
+	root := os.join_path(os.temp_dir(), 'vinix-m1parity-scheduler-${os.getpid()}')
+	os.mkdir_all('${root}/asahi')!
+	defer { os.rmdir_all(root) or { panic(err) } }
+	os.write_file('${root}/asahi/sched_entity.c', 'dependency source fixture')!
+	mut sources := []Source{}
+	snapshot('asahi', '${root}/asahi', 'sched_entity.c', mut sources)!
+	assert sources.len == 1 && sources[0].sha256 == hash_file('${root}/asahi/sched_entity.c')!
+	inputs := Inputs{ asahi: '${root}/asahi', vinix: '${root}/vinix', packages: '${root}/packages',
+		omarchy: '${root}/omarchy', m1n1: '${root}/m1n1' }
+	retain(inputs, Report{ sources: sources }, '${root}/evidence')!
+	assert os.read_file('${root}/evidence/source/asahi/sched_entity.c')! == 'dependency source fixture'
+}

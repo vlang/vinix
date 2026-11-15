@@ -11,6 +11,7 @@ const helpers = [
 	'gpu__agx__file__g13_pending_dispatch_complete',
 	'gpu__agx__file__process_pending_submissions',
 	'gpu__agx__file__register_g13_pending',
+	'gpu__agx__file__g13_dependencies_ready',
 	'gpu__agx__gpu__GpuManager__queue_g13_submission',
 	'gpu__agx__gpu__GpuManager__accept_g13_submission_locked',
 	'gpu__agx__gpu__GpuManager__capture_g13_initial_events',
@@ -107,5 +108,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission storage: nineteen generated barrier/publisher/scheduler/initial-event helpers contain no temporary allocations')
+	println('G13 submission storage: twenty generated barrier/publisher/scheduler/initial-event/dependency helpers contain no temporary allocations')
 }

@@ -143,18 +143,14 @@ fn enqueue_g13_pending(data voidptr) {
 	pending_lock.release()
 }
 
-fn g13_dependency_status(dependencies &submission.SyncArray) int {
-	mut waiting := false
+// DRM scheduler dependencies order execution. A signaled input fence releases
+// its wait even when it carries an error; only this submission's own work sets
+// its completion error. Keep waiting for every unsignaled input.
+fn g13_dependencies_ready(dependencies &submission.SyncArray) bool {
 	for index := u32(0); index < dependencies.count; index++ {
-		fence := dependencies.fences[index]
-		if !syncobj.is_signaled(fence) {
-			waiting = true
-			continue
-		}
-		failure := syncobj.get_error(fence)
-		if failure != 0 { return failure }
+		if !syncobj.is_signaled(dependencies.fences[index]) { return false }
 	}
-	return if waiting { 1 } else { 0 }
+	return true
 }
 
 fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
@@ -188,12 +184,7 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 		return katomic.load(&item.callbacks_remaining) != 0
 	}
 	if !item.dependencies_ready {
-		status := g13_dependency_status(&item.dependencies)
-		if status == 1 { return true }
-		if status != 0 {
-			cancel_g13_pending(mut item, status)
-			return katomic.load(&item.callbacks_remaining) != 0
-		}
+		if !g13_dependencies_ready(&item.dependencies) { return true }
 		item.dependencies_ready = true
 	}
 	failure := g13_pending_error(item)

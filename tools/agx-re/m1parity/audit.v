@@ -133,7 +133,7 @@ fn snapshot(role string, root string, relative string, mut sources []Source) ! {
 		names.sort()
 		for name in names { snapshot(role, root, os.join_path(relative, name), mut sources)! }
 	} else if os.is_file(path) {
-		if !path.ends_with('.v') && !path.ends_with('.rs') && !path.ends_with('.py')
+		if !path.ends_with('.v') && !path.ends_with('.rs') && !path.ends_with('.py') && !path.ends_with('.c')
 			&& !path.ends_with('.h') && os.file_name(path) != 'PKGBUILD' {
 			return
 		}
@@ -156,7 +156,8 @@ fn root_for(inputs Inputs, role string) !string {
 pub fn audit(inputs Inputs) !Report {
 	package_path := 'pkgbuilds/linux-aurora/PKGBUILD'
 	require_clean(inputs.packages, [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD'])!
-	require_clean(inputs.asahi, ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h'])!
+	require_clean(inputs.asahi, ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h',
+		'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'rust/kernel/drm/sched.rs'])!
 	require_clean(inputs.m1n1, ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx'])!
 	pin := package_pin(os.read_file(os.join_path(inputs.packages, package_path))!)!
 	mut revisions := map[string]string{}
@@ -176,7 +177,8 @@ pub fn audit(inputs Inputs) !Report {
 	for role, paths in {
 		'vinix':    ['kernel/gpu/agx', 'kernel/drm/ioctl/ioctl.v', 'tools/agx-re/m1parity',
 			'tools/agx-re/audit_m1_parity.v', 'tools/agx-re/g13contract', 'tools/agx-re/g13layout']
-		'asahi':    ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h']
+		'asahi':    ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h',
+			'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'rust/kernel/drm/sched.rs']
 		'packages': [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD']
 		'm1n1':     ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx']
 	} {
@@ -225,6 +227,7 @@ pub fn audit(inputs Inputs) !Report {
 		unverified_areas: [
 			'Complete ABI migration and matched Mesa integration',
 			'Modern flat-command ABI integration and full cross-submission admission/backpressure',
+			'Scheduler fence elision and complete dependency/error policy',
 			'VM replacement/splitting, reservation fences and object memory accounting',
 			'Complete render object defaults and scheduler backpressure',
 			'Every remaining firmware field, initialization default and error path',

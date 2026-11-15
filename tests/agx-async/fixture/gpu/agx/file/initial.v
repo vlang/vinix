@@ -44,7 +44,8 @@ fn check_initial_submission_events() {
 	manager.retire_firmware(0)
 	service_file_work()
 	assert_drained(file)
-	// An accepted source canceled by an input error produces no firmware wait.
+	// An errored input releases the source, while its consumer still waits for
+	// the captured firmware event rather than inheriting the input error.
 	gpu.reset()
 	manager = gpu.get_global_manager() or { panic('manager') }
 	input, failed, consumer := output(), output(), output()
@@ -56,14 +57,19 @@ fn check_initial_submission_events() {
 	assert manager.published.len == 0
 	syncobj.signal_error(dependency, -110)
 	service_file_work()
-	assert manager.published_order == [u32(1)] && manager.g13_render_jobs[0].barrier_sources == [
+	assert manager.published_order == [u32(0), 1] && manager.g13_render_jobs[0].barrier_sources == [
 		u32(0),
-		0,
+		1,
 	]!
+	assert !manager.execute_firmware(1, 0)
+	assert manager.execute_firmware(0, 0)
 	assert manager.execute_firmware(1, 0)
 	manager.retire_firmware(1)
 	service_file_work()
-	assert syncobj.get_error(fence(failed)) == -110 && syncobj.get_error(fence(consumer)) == 0
+	assert !syncobj.is_signaled(fence(failed)) && syncobj.get_error(fence(consumer)) == 0
+	manager.retire_firmware(0)
+	service_file_work()
+	assert syncobj.is_signaled(fence(failed)) && syncobj.get_error(fence(failed)) == 0
 	assert_drained(file)
 	// Failed ioctls must not replace the last accepted event marker.
 	gpu.reset()
@@ -81,7 +87,7 @@ fn check_initial_submission_events() {
 	service_file_work()
 	assert_drained(file)
 	check_initial_capture_setup_failures()
-	println('AGX initial submissions: empty pipe, per-command prefix, immutable prior target, execution-before-callback, canceled source, rejected admission and capture setup/stop cleanup passed')
+	println('AGX initial submissions: empty pipe, per-command prefix, immutable prior target, execution-before-callback, errored input with firmware ordering, rejected admission and capture setup/stop cleanup passed')
 }
 
 fn check_initial_capture_setup_failures() {
