@@ -21,7 +21,9 @@ after compilation, before boot and after the run. The full retainer requires
 these snapshots, discovery records, input pins and exact C arguments alongside
 the original source/output/ISO checks. The [observed C input check](wine-c-inputs-check.md)
 also requires matching discovery and actual compiler include observations,
-resolved targets and hashes. Full hermetic toolchain admission remains separate.
+resolved targets and hashes. [Linker input capture and replay](wine-link-inputs-check.md)
+add the actual static linker objects/archives and require an identical replay.
+Full hermetic toolchain admission remains separate.
 
 The historical x86-9 outcome remains a failed checkpoint. The separate
 [translated-fork fixture](wine-translation-fork-check.md) records the original

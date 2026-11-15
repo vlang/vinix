@@ -10,6 +10,7 @@ import plainiso
 import tests.packages.winesource
 import tests.packages.wineheaders
 import tests.packages.winecsource
+import tests.packages.winelink
 import tests.packages.wineowned
 import tools.packages.wineadapter
 
@@ -109,12 +110,14 @@ fn producer_argv(vargv string, ccargv string, compiler string, architecture stri
 		return error('V producer argv differs')
 	}
 	mut expected_c := ['/opt/homebrew/opt/llvm/bin/clang', '--target=' + architecture + '-linux-musl',
-		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-fuse-ld=lld',
+		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-fuse-ld=/opt/homebrew/bin/ld.lld',
 		if native { '-O1' } else { '-O2' }, '-w', '-fno-stack-protector', '-static', '-D_GNU_SOURCE',
 		'-Wno-error=incompatible-pointer-types', cfile, runtime, '-lm', '-lpthread', '-o', output]
 	resource := wineheaders.selection(os.read_file(os.dir(ccargv) + '/clang-resource.log')!)!
 	expected_c.insert(4, '-resource-dir=' + resource)
 	expected_c.insert(1, '-H')
+	link_directory := if native { os.dir(cfile) } else { os.dir(os.dir(cfile)) }
+	expected_c.insert(2, '-Wl,--reproduce=' + link_directory + '/link-inputs.tar')
 	if c != expected_c {
 		return error('C producer argv differs')
 	}
@@ -149,6 +152,7 @@ fn retain() ! {
 		'tests/packages/winesource/closure.v':          $embed_file('winesource/closure.v').to_string()
 		'tests/packages/wineheaders/headers.v':          $embed_file('wineheaders/headers.v').to_string()
 		'tests/packages/winecsource/closure.v':          $embed_file('winecsource/closure.v').to_string()
+		'tests/packages/winelink/link.v':          $embed_file('winelink/link.v').to_string()
 		'tools/packages/wine-build.v':                  $embed_file('../../tools/packages/wine-build.v').to_string()
 		'tools/packages/wine-runner.v':                 $embed_file('../../tools/packages/wine-runner.v').to_string()
 		'tools/packages/wineadapter/prefix.c.v':        $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
@@ -224,7 +228,7 @@ fn retain() ! {
 		}
 	}
 	for name in ['tests/packages/wine-native-check.v', 'tests/packages/wine-native/main.v',
-		'tests/packages/winesource/closure.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v']! {
+		'tests/packages/winesource/closure.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v', 'tests/packages/winelink/link.v']! {
 		require_input(inputs, root + '/' + name)!
 	}
 	for directory in [root + '/tools/packages', root + '/tools/accounts',
@@ -243,11 +247,12 @@ fn retain() ! {
 	winesource.admit(prepared + '/logs/sources-before.txt', prepared + '/logs/sources-built.txt', producer_inputs)!
 	wineheaders.admit_producer(prepared, producer_inputs)!
 	winecsource.admit(prepared, prepared + '/logs')!
+	winelink.admit(prepared, prepared + '/logs', prepared + '/prepared/' + arch + '/runtime/bin/wine-runner')!
 	if owned {
 		require_input(inputs, root + '/tests/packages/wineowned/receipt.v')!
 		wineowned.admit(prepared, arch, root)!
 	}
-	for name in ['tools/packages/wine-build.v', 'tools/packages/wine-runner.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v']! {
+	for name in ['tools/packages/wine-build.v', 'tools/packages/wine-runner.v', 'tests/packages/wineheaders/headers.v', 'tests/packages/winecsource/closure.v', 'tests/packages/winelink/link.v']! {
 		require_input(producer_inputs, root + '/' + name)!
 	}
 	build_record := json2.decode[map[string]string](os.read_file(prepared + '/build-producer.json')!)!
@@ -290,6 +295,7 @@ fn retain() ! {
 		'logs/cc.log', 'logs/cc.log.argv.json', 'clang-headers.json', 'logs/clang-resource.log',
 		'logs/clang-resource.log.argv.json', 'application.json', 'runtime.json',
 		'c-inputs-before.json', 'c-inputs-verified.json', 'logs/c-discover.log', 'logs/c-discover.log.argv.json',
+		'link-inputs.tar', 'link-proof.json', 'logs/link-version.log', 'logs/link-version.log.argv.json', 'logs/link-replay.log', 'logs/link-replay.log.argv.json',
 		'build-producer.json', 'pe-producer.json', 'publisher-notices/source-offer.json',
 		'prepared/' + arch + '/runtime/bin/wine-runner', 'prepared/' + arch + '/runtime/bin/wine64',
 		'prepared/' + arch + '/runtime/bin/wineserver',
@@ -409,16 +415,20 @@ fn retain() ! {
 	generated := hashes(run + '/generated-before-boot.json')!
 	mut required := []string{}
 	for program in ['guest', 'package']! {
-		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
+		mut names := [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
 			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
 			'sources-built.txt', 'clang-headers.json', 'clang-resource.log', 'clang-resource.log.argv.json',
-			'c-inputs-before.json', 'c-inputs-verified.json', 'c-discover.log', 'c-discover.log.argv.json'] {
+			'c-inputs-before.json', 'c-inputs-verified.json', 'c-discover.log', 'c-discover.log.argv.json',
+			'link-inputs.tar', 'link-proof.json', 'link-version.log', 'link-version.log.argv.json', 'link-replay.log', 'link-replay.log.argv.json']
+		names << winelink.artifacts(run + '/build-' + program)!
+		for name in names {
 			required << 'build-' + program + '/' + name
 		}
 		winesource.admit(run + '/build-' + program + '/sources-before.txt',
 			run + '/build-' + program + '/sources-built.txt', inputs)!
 		wineheaders.admit_build(run + '/build-' + program, run + '/build-' + program, inputs)!
 		winecsource.admit(run + '/build-' + program, run + '/build-' + program)!
+		winelink.admit(run + '/build-' + program, run + '/build-' + program, run + '/build-' + program + '/' + program)!
 		for path, _ in winecsource.inputs(run + '/build-' + program)! { paths[program + '-c-input/' + path] = path }
 	}
 	for name in ['usr/bin/vinix-package', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session',

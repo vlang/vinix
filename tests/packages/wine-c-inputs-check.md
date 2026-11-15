@@ -56,7 +56,9 @@ remain ordinary in copied graphs, and mutations detach before writing.
 This admits **observed C file inputs** under the existing stable local-input
 contract. Include-search absence, inputs not reported by Clang, linker inputs,
 compiler/dynamic-library closure and host controller builds are not fully
-admitted; this is not a hermetic build. Default activation, owned ARM/GUI,
+admitted by this C-input check; the additional
+[linker archive/replay check](wine-link-inputs-check.md) now covers selected
+static linker files and identical replay. This is not a hermetic build. Default activation, owned ARM/GUI,
 redistribution and broader roadmap 14 acceptance remain open.
 
 The x86 checkpoint is `/Users/alex/.cache/vwcclosure-20261115-01`, from

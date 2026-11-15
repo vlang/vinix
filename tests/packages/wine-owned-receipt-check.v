@@ -126,6 +126,7 @@ fn run() ! {
 		root + '/tests/packages/wineowned/receipt.v',
 		root + '/tests/packages/wineheaders/headers.v',
 		root + '/tests/packages/winecsource/closure.v',
+		root + '/tests/packages/winelink/link.v',
 		root + '/tools/packages/wine-runner.v'] {
 		inputs[path] = wineoverlay.digest(path)!
 	}
@@ -137,7 +138,7 @@ fn run() ! {
 	os.cp(source, stale_source)!
 	os.cp(source, work + '/stale-source-before.v')!
 	os.cp(root + '/tests/packages/winesource/closure.v', work + '/stale-source/winesource/closure.v')!
-	for name in ['wineowned/receipt.v', 'wineheaders/headers.v', 'winecsource/closure.v'] {
+	for name in ['wineowned/receipt.v', 'wineheaders/headers.v', 'winecsource/closure.v', 'winelink/link.v'] {
 		os.mkdir_all(os.dir(work + '/stale-source/' + name))!
 		os.cp(root + '/tests/packages/' + name, work + '/stale-source/' + name)!
 	}

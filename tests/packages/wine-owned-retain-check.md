@@ -31,14 +31,15 @@ CHECK RETAINER RUN PREPARED_BUILD FRESH_CONTROL_OUTPUT
 ```
 
 It requires real and unchanged copied baselines, including the producer's
-original recorded build namespace. Twenty-nine mutations must fail at their named
+original recorded build namespace. Thirty-four mutations must fail at their named
 gates and create no retained output: missing kernel flag, linked mode receipt,
 omitted hidden SDK input with resealed inventories, mismatched raw outcome,
 deadline equality, missing/duplicate/embedded-CR milestones, and altered VM
 memory, plus five [Clang resource-header controls](wine-resource-headers-check.md)
 with resealed output/input receipts, and ten corresponding guest/package
 resource controls with resealed native output maps, plus five
-[observed C input controls](wine-c-inputs-check.md). Mutated files are detached
+[observed C input controls](wine-c-inputs-check.md) and five
+[link archive/replay controls](wine-link-inputs-check.md). Mutated files are detached
 before writing. Prepared payloads are private copy-on-write clones on macOS,
 with ordinary copies as fallback; no mutation writes through a link to the baseline.
 

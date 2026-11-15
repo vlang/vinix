@@ -28,7 +28,10 @@ fn clone_tree(source string, destination string, prepared bool) ! {
 			|| path.ends_with('/clang-resource.log.argv.json') || path.ends_with('/cc.log.argv.json')
 			|| path.ends_with('/cc.log') || path.ends_with('/c-discover.log')
 			|| path.ends_with('/c-discover.log.argv.json') || path.ends_with('/c-inputs-before.json')
-			|| path.ends_with('/c-inputs-verified.json') {
+			|| path.ends_with('/c-inputs-verified.json') || path.contains('/link-replay/')
+			|| path.ends_with('/link-inputs.tar') || path.ends_with('/link-proof.json')
+			|| path.ends_with('/link-version.log') || path.ends_with('/link-version.log.argv.json')
+			|| path.ends_with('/link-replay.log.argv.json') {
 			$if macos {
 				if C.clonefile(path.str, to.str, 0) == 0 { continue }
 			}
@@ -127,16 +130,46 @@ fn check() ! {
 		for kind in ['manifest', 'input', 'query', 'flag', 'linked']! { cases << program + '-resource-' + kind }
 	}
 	cases << ['bridge-c-trace', 'bridge-c-manifest', 'guest-c-pin', 'package-c-command', 'guest-c-linked']
+	cases << ['bridge-link-proof', 'bridge-link-response', 'bridge-link-linked', 'guest-link-output', 'package-link-argv']
 	for name in cases {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
 		mut selected := prepared
 		mut expected := ''
-		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' || name.starts_with('bridge-c-') {
+		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' || name.starts_with('bridge-c-') || name.starts_with('bridge-link-') {
 			selected = dir + '/prepared'
 			clone_tree(prepared, selected, true)!; remap(dir, prepared, selected)!
 		}
-		if name.starts_with('bridge-c-') {
+		if name.starts_with('bridge-link-') {
+			if name == 'bridge-link-proof' {
+				mut proof := json2.decode[map[string]json2.Any](os.read_file(selected + '/link-proof.json')!)!
+				proof['archive_sha256'] = json2.Any('bad')
+				replace(selected + '/link-proof.json', json2.encode(proof))!
+				reseal(dir, selected, ['link-proof.json'])!
+				expected = 'link proof binding differs'
+			} else if name == 'bridge-link-response' {
+				file := 'link-replay/link-inputs/response.txt'
+				replace(selected + '/' + file, os.read_file(selected + '/' + file)! + '--plugin unrecorded\n')!
+				reseal(dir, selected, [file])!
+				expected = 'link replay input differs'
+			} else {
+				os.rm(selected + '/link-inputs.tar')!
+				os.symlink(prepared + '/link-inputs.tar', selected + '/link-inputs.tar')!
+				expected = 'link evidence must be a bounded ordinary file'
+			}
+		} else if name == 'guest-link-output' || name == 'package-link-argv' {
+			file := if name == 'guest-link-output' { 'build-guest/link-replay/link-inputs/guest' } else { 'build-package/link-replay.log.argv.json' }
+			if name == 'guest-link-output' {
+				replace(dir + '/' + file, 'changed link output')!
+				expected = 'link replay executable differs'
+			} else {
+				replace(dir + '/' + file, '["/opt/homebrew/bin/ld.lld","@different.txt"]')!
+				expected = 'link replay argv or version differs'
+			}
+			mut generated := read_map(dir + '/generated-before-boot.json')!
+			generated[file] = digest(dir + '/' + file)!
+			replace(dir + '/generated-before-boot.json', json2.encode(generated))!
+		} else if name.starts_with('bridge-c-') {
 			if name == 'bridge-c-trace' {
 				text := os.read_file(selected + '/logs/cc.log')!
 				observed := winecsource.trace(text)!
@@ -270,6 +303,6 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline twenty-nine exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline thirty-four exact refusals')
 }
 fn main() { check() or { eprintln(err); exit(1) } }

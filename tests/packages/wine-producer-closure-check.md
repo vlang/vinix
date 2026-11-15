@@ -32,6 +32,8 @@ input, admits the actual source lists, checks retained output hashes, and
 requires matching discovery/build commands. It also admits the explicit
 [Clang resource-header selection and complete header tree](wine-resource-headers-check.md).
 It additionally requires [observed C file admission](wine-c-inputs-check.md).
+The [linker archive/replay check](wine-link-inputs-check.md) also requires
+captured static link inputs and an identical replay with the pinned linker.
 This is parsed bridge-source, selected resource-header and observed C admission; complete
 C dependency/toolchain closure and hermetic build admission remain separate
 requirements. Historical bundles still need
