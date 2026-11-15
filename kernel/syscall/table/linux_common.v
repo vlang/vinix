@@ -393,6 +393,17 @@ fn syscall_linux_prctl(gpr_state voidptr, _option int, arg2 u64, _arg3 u64, _arg
 	option := int(i32(_option))
 
 	match option {
+		proc.pr_vinix_workload_lease {
+			if arg2 > u64(0x7fffffff) || _arg3 != 0 || _arg4 != 0 || _arg5 != 0 { return errno.err, errno.einval }
+			return file.attach_workload_lease(int(arg2))
+		}
+		proc.pr_vinix_workload_depth {
+			if arg2 != 0 || _arg3 != 0 || _arg4 != 0 || _arg5 != 0 { return errno.err, errno.einval }
+			process.threads_lock.acquire()
+			depth := if process.workload_lease == unsafe { nil } { 0 } else { process.workload_lease.depth }
+			process.threads_lock.release()
+			return u64(depth), 0
+		}
 		proc.mac_prctl {
 			return proc.mac_control(arg2, _arg3, _arg4, _arg5)
 		}

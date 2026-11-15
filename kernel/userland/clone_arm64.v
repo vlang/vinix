@@ -320,6 +320,7 @@ fn abandon_new_process(mut new_process proc.Process) {
 	proc.unlock_table()
 	if doomed != unsafe { nil } { mmap.delete_pagemap(mut doomed) or {} }
 	for i in 0 .. new_process.fds.len { file.fdnum_close(&new_process, i, true) or {} }
+	proc.release_workload(mut new_process)
 	fs.release_process_namespaces(mut new_process)
 	proc.free_pid(new_process.pid)
 }

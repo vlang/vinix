@@ -165,6 +165,8 @@ fn pledge_prctl(option u64) u64 {
 		36, 0x59616d61 {
 			proc.pledge_proc
 		}
+		proc.pr_vinix_workload_lease { proc.pledge_proc | proc.pledge_flock }
+		proc.pr_vinix_workload_depth { pledge_stdio }
 		else {
 			pledge_never
 		}

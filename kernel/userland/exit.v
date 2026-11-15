@@ -313,6 +313,7 @@ fn exit_process(mut current_process proc.Process, mut current_thread proc.Thread
 	fs.release_process_namespaces(mut current_process)
 
 	mmap.delete_pagemap_for_exit(mut old_pagemap, current_process.pid) or {}
+	proc.release_workload(mut current_process)
 	complete_vfork(mut current_process)
 	oom_victim_gone(current_process)
 

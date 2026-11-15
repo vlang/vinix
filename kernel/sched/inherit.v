@@ -193,5 +193,7 @@ pub fn new_process_with_vm(old_process &proc.Process, pagemap &memory.Pagemap, a
 	}
 
 	new_proc.cgroup_account = unsafe { account }
+	// No failing preparation remains. Failed publication uses abandon_new_process.
+	proc.inherit_workload(mut new_proc, old_process)
 	return new_proc
 }

@@ -239,6 +239,8 @@ pub mut:
 	saved_auxv []u8
 	threads                  []&Thread
 	threads_lock             klock.Lock
+	// Kernel-only lease chain; protected by threads_lock and preserved by exec.
+	workload_lease &WorkloadLease = unsafe { nil }
 	fds_lock                 klock.Lock
 	rlimits_lock             klock.Lock
 	// The descriptor table, initial_fds entries allocated with the process,

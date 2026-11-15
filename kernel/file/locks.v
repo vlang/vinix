@@ -272,6 +272,10 @@ fn release_posix_locks(res &resource.Resource, pid int) {
 }
 
 fn release_description_locks(handle &Handle, only_flock bool) {
+	release_owner_locks(handle, u64(handle), only_flock)
+}
+
+fn release_owner_locks(handle &Handle, owner u64, only_flock bool) {
 	// syscall_flock admits only regular files and directories. Pipe/socket
 	// teardown cannot release an entry from this table.
 	mode := handle.resource.stat.mode
@@ -279,7 +283,6 @@ fn release_description_locks(handle &Handle, only_flock bool) {
 		return
 	}
 	resource_id := lock_resource_id(handle.resource)
-	owner := u64(handle)
 	advisory_locks_lock.acquire()
 	mut next := []AdvisoryLock{cap: advisory_locks.len} @[freed]
 	mut changed := false
