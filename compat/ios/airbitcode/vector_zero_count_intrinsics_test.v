@@ -50,7 +50,7 @@ fn test_vector_ctlz_states_and_names() {
    source.undef = u16(1) << u32(target); if _ := zero_count_intrinsic_vector(.ctlz, source, width, count, flag) { assert false, 'undef dominates poison' }; checks++
   }
  } } }; for slot in seen { assert slot }; assert checks == 208896
- for name in ['llvm.ctlz.i32','llvm.ctlz.v0i32','llvm.ctlz.v01i32','llvm.ctlz.v17i32','llvm.ctlz.v999999999999i32','llvm.ctlz.v2i0','llvm.ctlz.v2i01','llvm.ctlz.v2i65','llvm.ctlz.v2i128','llvm.ctlz.v2i+1','llvm.ctlz.v2i1x','llvm.ctlz.v2i32.i32','llvm.ctlz.v2f32','llvm.ctlz.nxv2i32','air.ctlz.v2i32','llvm.sshl.sat.v2i32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
+ for name in ['llvm.ctlz.i32','llvm.ctlz.v0i32','llvm.ctlz.v01i32','llvm.ctlz.v17i32','llvm.ctlz.v999999999999i32','llvm.ctlz.v2i0','llvm.ctlz.v2i01','llvm.ctlz.v2i65','llvm.ctlz.v2i128','llvm.ctlz.v2i+1','llvm.ctlz.v2i1x','llvm.ctlz.v2i32.i32','llvm.ctlz.v2f32','llvm.ctlz.nxv2i32','air.ctlz.v2i32','llvm.clmul.v2i32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
  for flag in [u64(2),255,~u64(0)]! {if _:=zero_count_intrinsic_vector(.ctlz,ScalarVectorValue{},32,1,flag){assert false,'flag'}}
  for width in [u32(0),65,128]! { if _ := zero_count_intrinsic_vector(.ctlz, ScalarVectorValue{}, width, 1, 0) { assert false, 'width' } }
  for count in [0,17] { if _ := zero_count_intrinsic_vector(.ctlz, ScalarVectorValue{}, 32, count, 0) { assert false, 'count' } }

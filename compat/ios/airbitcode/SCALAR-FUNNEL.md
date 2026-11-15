@@ -83,7 +83,7 @@ wider lanes, AIR aliases and flagged calls remain outside this profile.
 
 Slots 4800..5823 belong to funnel-left and 5824..6847 to funnel-right. They add
 2,048 independent width/count identities. Integer extrema add another 4,096;
-abs adds 1,024 and saturating add/sub adds 4,096, making 16,064 shared stack entries.
+abs adds 1,024, saturating add/sub adds 4,096 and saturating shifts add 2,048, making 18,112 shared stack entries.
 Each call costs one instruction, four lane counts of profiling work and one
 shared construction slot. The existing 4,096-result and 1,000,000-work limits
 remain. Declaration attributes are checked once per cached identity; each call
@@ -93,8 +93,8 @@ existing rejection of funnel operations.
 `vector_funnel_intrinsics_test.v` checks 1,968,288 independent output-bit-selection
 comparisons, including every i1..i5 triple, wider patterns, every width/count,
 modulo/zero shifts, high-bit noise and snapshots. Another 626,688 poison/undef/
-freeze checks cover all three inputs. The shared cache test covers all 16,064
-identities; older units replace newly admitted name guards with vector-saturating-shift guards.
+freeze checks cover all three inputs. The shared cache test covers all 18,112
+identities; older units replace newly admitted name guards with vector-carryless-multiply guards.
 
 `tests/ios/air-vector-funnel.v LLVM_AS FRESH_EXTERNAL_DIR` checks both directions
 in 51,200 decoded shapes, five source forms and five construction paths through

@@ -92,7 +92,7 @@ i65/wider lanes, vector arguments/returns/PHIs/loads/stores, scalable/oversized
 vectors and AIR aliases remain outside this profile.
 
 Slots 10944..11967 add 1,024 distinct width/count identities, taking the shared
-stack cache to 16,064 entries with the further 4,096 saturating-add/sub slots.
+stack cache to 18,112 entries with the further 4,096 saturating-add/sub and 2,048 saturating-shift slots.
 Flags share an identity but retain independent meanings. Each call costs one
 instruction, two lane counts of profiling work and
 one construction slot. The 4,096-result and 1,000,000-work caps remain unchanged.
@@ -101,8 +101,8 @@ one construction slot. The 4,096-result and 1,000,000-work caps remain unchanged
 using safe signed reconstruction and handling each minimum before signed negation.
 It exhausts all i1..i16 bit patterns under both flags and checks wider patterns,
 every shape, boundaries, high-bit noise and snapshots. Another 208,896 lane-state
-checks cover poison/undef/freezes. The shared cache test covers all 16,064 keys.
-Older units use unsupported vector saturating-shift name guards.
+checks cover poison/undef/freezes. The shared cache test covers all 18,112 keys.
+Older units use unsupported vector carryless-multiply name guards.
 
 `tests/ios/air-vector-abs.v LLVM_AS FRESH_EXTERNAL_DIR` generates the decoded
 reference matrix, bulk narrow exhaustion/wide patterns, call-local flag/cache

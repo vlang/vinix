@@ -69,3 +69,41 @@ This is scalar execution groundwork. No AIR shader, Metal device, GPU command
 or application launch is qualified.
 
 Reference: [LLVM saturation semantics](https://llvm.org/docs/LangRef.html#saturation-arithmetic-intrinsics).
+
+## Fixed integer vectors
+
+The interpreter also accepts `llvm.sshl.sat.vNiW` and `llvm.ushl.sat.vNiW`,
+with 1..16 lanes and widths 1..64. Each lane reuses the poison-aware scalar
+evaluator. Shift amounts are truncated to the lane width and interpreted as
+unsigned; amounts at least W produce poison even for zero. They are never
+reduced modulo W. Input poison propagates per lane; any undef source lane
+rejects. Freezes repair indeterminate lanes with zero and results are snapshots.
+
+The existing binary integer profile checks both equal-shaped sources, exact
+external declaration identity/signature and ordinary call metadata before
+execution. Parameter/return attributes, including immarg, reject. Scalable
+vectors, wider/oversized shapes and AIR aliases reject. Each call uses one
+instruction, three lane counts of profiling work and one construction slot.
+Existing result/work limits remain unchanged. Signed slots 16064..17087 and
+unsigned slots 17088..18111 bring the shared vector cache to 18,112 entries.
+The normal lane path adds no allocation; retained heap is unmeasured.
+
+`vector_saturating_shift_test.v` checks 1,251,520 independent checked-doubling
+value/tag results, including 232,928 poison results, all narrow i1..i8 pairs,
+wide patterns, every shape, masking and snapshots. Another 34,816 source-state
+positions cover poison, undef and freezes. The shared cache test checks all
+18,112 identities. Older unsupported-name guards now use vector carryless multiply.
+
+`tests/ios/air-vector-saturating-shift.v LLVM_AS FRESH_EXTERNAL_DIR` generates
+64 LLVM-verified modules covering all 2,048 overloads. A twelve-value by
+twelve-shift matrix checks 152,064 defined memory outputs against native LLVM
+and the independent doubling oracle. Another 142,848 cases reject poison stores
+after preserving the preceding marker write. Both scalar APIs check 589,824
+value/tag results. Native code runs only for defined shifts with canonicalized
+padding; interpreter inputs retain high-bit noise. Another 47,104 malformed
+call/source mutations and 2,048 short budgets reject before writes. Each
+comparison, module, tool identity, binary and log belongs in external evidence.
+The JIT is not sanitizer-instrumented; leak detection is disabled.
+
+This checkpoint validates interpreter execution only. It adds no host fixture
+and does not qualify an AIR shader, Metal device, GPU command or Fortnite frame.

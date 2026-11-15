@@ -91,7 +91,7 @@ vector extrema without changing its source checks or work accounting.
 
 The four families use separate 1,024-entry width/count ranges in the order above:
 11968..12991, 12992..14015, 14016..15039 and 15040..16063. The shared declaration
-cache now has 16,064 stack entries. Each call costs one instruction, three lane
+cache now has 18,112 stack entries, including 2,048 saturating-shift identities. Each call costs one instruction, three lane
 counts of profiling work and one construction slot. Existing 4,096-result and
 1,000,000-work limits remain unchanged. Attributes are checked per cached
 identity; both sources are checked on every call.
@@ -101,8 +101,8 @@ checked signed margins and two unsigned 32-bit limbs with explicit carry.
 Every i1..i8 pair, 4,096 wider patterns per operation, all widths/counts, another
 36,864 boundary pairs, addition commutativity, zero identities, masking and
 snapshots are covered. Another 835,584 lane-state checks cover both inputs.
-The shared cache test checks all 16,064 identities. Older units now use
-unsupported vector saturating-shift name guards while preserving positive tests.
+The shared cache test checks all 18,112 identities. Older units now use
+unsupported vector carryless-multiply name guards while preserving positive tests.
 
 `tests/ios/air-vector-saturating.v LLVM_AS FRESH_EXTERNAL_DIR` generates all four
 operations in the decoded matrix and bulk narrow exhaustion/wide patterns. It

@@ -81,8 +81,8 @@ outside this profile.
 
 The four families add distinct 1,024-entry width/count ranges: signed minimum
 6848..7871, signed maximum 7872..8895, unsigned minimum 8896..9919 and unsigned
-maximum 9920..10943. Abs adds 1,024 and saturating add/sub adds 4,096; the
-shared declaration cache now has 16,064 stack entries.
+maximum 9920..10943. Abs adds 1,024, saturating add/sub adds 4,096 and saturating shifts add 2,048; the
+shared declaration cache now has 18,112 stack entries.
 Attributes are checked once per declaration/identity. Each call costs one step,
 three lane counts of profiling work and one shared construction slot. The
 4,096-result and 1,000,000-work limits remain unchanged.
@@ -92,8 +92,8 @@ safe signed-value reconstruction and direct unsigned comparisons, including
 all i1..i8 pairs, 4,096 wider patterned pairs per operation, every shape, signed/
 unsigned boundary values, high-bit noise, symmetry, idempotence and snapshots.
 Another 835,584 poison/undef/freeze checks cover both sources. The cache test
-checks all 16,064 identities. Older units update unsupported vector-smin names
-to unsupported vector-saturating-shift names while preserving positive coverage.
+checks all 18,112 identities. Older units update unsupported vector-smin names
+to unsupported vector-carryless-multiply names while preserving positive coverage.
 
 `tests/ios/air-vector-integer-extrema.v LLVM_AS FRESH_EXTERNAL_DIR` checks all
 four operations in 102,400 decoded shapes through memory and both scalar APIs.
