@@ -2,6 +2,7 @@ module workqueue
 
 pub struct WorkQueue {
 pub mut:
+	vm_id u32
 	destroyed bool
 }
 

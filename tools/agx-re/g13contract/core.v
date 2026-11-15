@@ -473,6 +473,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(queue, ['job.add_dependency(fence)?', 'job.commit()?', 'let mut job = job.arm()',
 		'job.push()'], 'Asahi asynchronous dependency scheduling')!
 	file_source := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
+	check_user_mapping_contract(file_source, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	ioctl_submit := section(file_source, 'pub fn (mut f GpuFile) ioctl_submit(',
 		'fn dispatch(', 'Vinix async submission ioctl')!
 	require(!ioctl_submit.contains('wait_g13_fence') && !ioctl_submit.contains('syncobj.wait')
@@ -617,6 +618,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
+		'User mapping backing survives failed invalidation; serialized flush/stop, VM mutation lock and new-submit admission retain ownership',
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter',
 		'G13 default non-preemptible compute queue priority',

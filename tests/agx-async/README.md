@@ -7,6 +7,12 @@ staging, payload validation, sync objects, completion finish/discard, pending
 poller, manager-locked registration and queue dispatch guard. GPU allocation,
 publication, completion and shutdown are injected services. It executes no GPU.
 
+Mapping cleanup is injected in this fixture. A refused retry must return EIO
+before preparing or queuing jobs, preserve input/output fence identities, and
+release staging storage. After the gate clears, the same submission completes.
+The file-close fixture exercises the actual mapping ioctls, BO ownership,
+retirement helper and shutdown-serialized flush wrapper with injected services.
+
 The production worker now hands a batch to the manager and clears transferred
 pointers using its ownership mask, including immediate metadata retirement.
 The native publisher prepares every participating pipe before exposing any

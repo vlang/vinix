@@ -3,8 +3,10 @@ module file
 
 import drm
 import drm.gem
+import gpu.agx.bo
 import gpu.agx.gpu
 import gpu.agx.mmu
+import gpu.agx.pgtable
 import gpu.agx.workqueue
 import klock
 
@@ -16,21 +18,30 @@ struct G17QueueOwnership {
 	resources &gpu.G17QueueResources
 }
 
-struct GpuMapping {
-	obj &gem.GemObject
-}
-
 struct TimestampObject {
 	va   u64
 	size u64
 	obj  &gem.GemObject
 }
 
-struct Objects {}
+struct Objects {
+mut:
+	table bo.Table
+}
 
 __global table_releases = 0
 
-fn (mut objects Objects) release_all() { table_releases++ }
+fn (mut objects Objects) release_all() { objects.table.release_all(); table_releases++ }
+fn (objects &Objects) get_ref(handle u32) ?&gem.GemObject { return objects.table.get_ref(handle) }
+fn (objects &Objects) contains(object &gem.GemObject) bool { return objects.table.contains(object) }
+fn (mut objects Objects) remove(handle u32) ?&gem.GemObject { return objects.table.remove(handle) }
+
+fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
+	assert ctx.pgtable != unsafe { nil } && !ctx.destroyed
+	assert addr != 0 && size != 0
+	mut manager := gpu.get_global_manager() or { panic('manager') }
+	return manager.flush_g13_file_mapping(ctx.id, addr, size, unmapped)
+}
 
 struct GpuFile {
 mut:
@@ -65,8 +76,9 @@ pub fn run_checks() {
 	uat_mgr = &vm_manager
 	mut queue_a := gpu.G13QueueResources{ failures: 1 }
 	mut queue_b := gpu.G13QueueResources{ failures: 1 }
-	mut vm_a := mmu.UatContext{ queue: &queue_a }
-	mut vm_b := mmu.UatContext{ queue: &queue_b }
+	mut pt := pgtable.UatPgtable{}
+	mut vm_a := mmu.UatContext{ id: 1, pgtable: &pt, queue: &queue_a }
+	mut vm_b := mmu.UatContext{ id: 2, queue: &queue_b }
 	mut logical := workqueue.WorkQueue{}
 	mut mapped := gem.GemObject{}
 	mut timestamp := gem.GemObject{}
@@ -75,7 +87,7 @@ pub fn run_checks() {
 		g13_queues:        [G13QueueOwnership{ resources: &queue_a },
 			G13QueueOwnership{ resources: &queue_b }]
 		vms:               [&vm_a, &vm_b]
-		mappings:          [GpuMapping{ obj: &mapped }]
+		mappings:          [GpuMapping{ vm_id: 1, addr: 0x4000, size: 0x4000, obj: &mapped }]
 		timestamp_objects: [TimestampObject{ va: 0x10000, size: 4096, obj: &timestamp }]
 	}
 	file.inflight_by_vm[1] = 1
@@ -139,5 +151,6 @@ pub fn run_checks() {
 	release_handle(&device, voidptr(3))
 	stopping_file = unsafe { nil }
 	assert stopped_vm.destroyed && table_releases == 4 && closing_count == 0
+	check_mapping_retirement()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

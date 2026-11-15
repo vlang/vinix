@@ -39,6 +39,13 @@ mut:
 	vm             &mmu.UatContext = unsafe { nil }
 	objects        Objects
 	inflight_by_vm [64]u64
+	mapping_retry_blocked bool
+}
+
+// Mapping/page-table services are injected here; the close fixture exercises
+// the production retirement helper and ioctl mapping paths.
+fn (mut file GpuFile) cleanup_closed_mappings_locked(_vm_id u32) bool {
+	return !file.mapping_retry_blocked
 }
 
 fn (file &GpuFile) find_vm(id u32) ?&mmu.UatContext {
@@ -298,7 +305,35 @@ fn check_shutdown_and_immediate_retirement() {
 	}
 }
 
+fn check_mapping_admission() {
+	gpu.reset()
+	mut file := new_file()
+	mut manager := gpu.get_global_manager() or { panic('manager') }
+	input := output()
+	old := syncobj.new_fence(1, 1)
+	syncobj.replace_fence(input, old)
+	out := output()
+	previous := syncobj.new_fence(1, 2)
+	syncobj.replace_fence(out, previous)
+	file.mapping_retry_blocked = true
+	assert submit(mut file, 1, true, input, out, false) == -5
+	assert voidptr(fence(out)) == voidptr(previous) && !syncobj.is_signaled(previous)
+	assert voidptr(fence(input)) == voidptr(old) && !syncobj.is_signaled(old)
+	assert manager.published.len == 0
+	assert_drained(file)
+	file.mapping_retry_blocked = false
+	assert submit(mut file, 1, true, input, out, false) == 0
+	syncobj.signal(old)
+	service_file_work()
+	manager.finish_compute(0)
+	manager.finish_render(0)
+	service_file_work()
+	assert syncobj.is_signaled(fence(out))
+	assert_drained(file)
+}
+
 pub fn run_checks() {
+	check_mapping_admission()
 	check_queued_ioctl_backlog()
 	check_batch_capacity()
 	check_dependencies_and_fifo()

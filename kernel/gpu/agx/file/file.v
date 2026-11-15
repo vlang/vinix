@@ -30,11 +30,12 @@ const max_command_attachments = u32(16)
 
 struct GpuMapping {
 mut:
-	vm_id  u32
-	handle u32
-	addr   u64
-	size   u64
-	obj    &gem.GemObject = unsafe { nil }
+	vm_id    u32
+	handle   u32
+	addr     u64
+	size     u64
+	obj      &gem.GemObject = unsafe { nil }
+	retiring bool // PTEs removed; backing retained until firmware invalidation completes
 }
 
 struct G17QueueOwnership {
@@ -188,6 +189,14 @@ pub fn (mut f GpuFile) close() bool {
 			}
 		}
 	}
+	// Queue teardown alone does not invalidate userspace mappings. A failed
+	// flush must keep their backing and VM alive for the next close retry.
+	for index := f.mappings.len - 1; index >= 0; index-- {
+		if !f.retire_mapping_locked(index) {
+			f.lock.release()
+			return false
+		}
+	}
 	for mut q in f.queues { q.destroy() }
 	unsafe { f.queues.free() }
 	f.queues = []&workqueue.WorkQueue{}
@@ -265,34 +274,53 @@ fn (mut f GpuFile) mmap_page(page u64) voidptr {
 	return f.objects.mmap_page(page)
 }
 
+// Caller holds file.lock and has excluded in-flight jobs from this VM. Once
+// PTEs are removed, retries invalidate the same range without unmapping it
+// again. The mapping's existing object reference is released only after the
+// firmware acknowledges invalidation, or after firmware has stopped.
+fn (mut f GpuFile) retire_mapping_locked(index int) bool {
+	mapping := f.mappings[index]
+	if mapping.vm_id >= mmu.uat_num_contexts
+		|| katomic.load(&f.inflight_by_vm[mapping.vm_id]) != 0 { return false }
+	ctx := f.find_vm(mapping.vm_id) or { return false }
+	if ctx.pgtable == unsafe { nil } { return false }
+	if !mapping.retiring {
+		mut pt := unsafe { ctx.pgtable }
+		pt.unmap(mapping.addr, mapping.size)
+		f.mappings[index].retiring = true
+	}
+	if !flush_firmware_mapping(ctx, mapping.addr, mapping.size, true) {
+		return false
+	}
+	gem.unref(mapping.obj)
+	f.mappings.delete(index)
+	return true
+}
+
 // GEM_CLOSE drops every GPU-VA binding owned by the handle once the target VM
 // is idle. A close racing an in-flight job leaves the binding retained; the
 // next bind into that VM collects it after completion. CPU mmap authorization
 // holds its own reference independently.
 fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
-	if vm_id >= mmu.uat_num_contexts || katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
+	if vm_id >= mmu.uat_num_contexts { return false }
+	if katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
+		for mapping in f.mappings {
+			if mapping.vm_id == vm_id && mapping.retiring { return false }
+		}
 		return true
 	}
-	ctx := f.find_vm(vm_id) or { return false }
-	if ctx.pgtable == unsafe { nil } {
-		return false
-	}
-	mut pt := unsafe { ctx.pgtable }
 	mut success := true
 	for index := f.mappings.len - 1; index >= 0; index-- {
 		mapping := f.mappings[index]
 		if mapping.vm_id != vm_id {
 			continue
 		}
-		if f.objects.contains(mapping.obj) {
+		if !mapping.retiring && f.objects.contains(mapping.obj) {
 			continue
 		}
-		pt.unmap(mapping.addr, mapping.size)
-		if !flush_firmware_mapping(ctx, mapping.addr, mapping.size) {
+		if !f.retire_mapping_locked(index) {
 			success = false
 		}
-		gem.unref(mapping.obj)
-		f.mappings.delete(index)
 	}
 	return success
 }
@@ -390,14 +418,14 @@ fn ranges_overlap(first_addr u64, first_size u64, second_addr u64, second_size u
 // generation fails closed. Returning success without flushing would hand
 // userspace a mapping the GPU may never observe, or keep a freed page live in
 // a firmware translation.
-fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64) bool {
+fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
 	manager := gpu.get_global_manager() or { return false }
 	if manager.hw_config.gpu_gen != .g13 {
 		println('agx: no firmware mapping-flush protocol for this GPU generation')
 		return false
 	}
 	mut gpu_manager := unsafe { manager }
-	return gpu_manager.flush_g13_uat_range(ctx.id, addr, size)
+	return gpu_manager.flush_g13_file_mapping(ctx.id, addr, size, unmapped)
 }
 
 fn asahi_variant(config &gpu.GpuManager) u32 {
@@ -577,6 +605,9 @@ pub fn (mut f GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) 
 
 pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	request := unsafe { data }
+	// Keep VM/page-table and handle lookup stable through mapping mutation.
+	f.lock.acquire()
+	defer { f.lock.release() }
 	ctx := f.find_vm(request.vm_id) or { return -22 }
 	if ctx.pgtable == unsafe { nil }
 		|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) {
@@ -586,7 +617,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 
 	match request.op {
 		ioctl.asahi_bind_op_bind {
-			obj := f.get_object_ref(request.handle) or { return -2 }
+			obj := f.objects.get_ref(request.handle) or { return -2 }
 			if request.offset > obj.size || request.range > obj.size - request.offset {
 				gem.unref(obj)
 				return -22
@@ -596,30 +627,20 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			} else {
 				pgtable.gpu_prot_gpu_shared_ro
 			}
-			f.lock.acquire()
 			if !f.cleanup_closed_mappings_locked(request.vm_id) {
-				f.lock.release()
 				gem.unref(obj)
 				return -5
 			}
 			for mapping in f.mappings {
 				if mapping.vm_id == request.vm_id
 					&& ranges_overlap(mapping.addr, mapping.size, request.addr, request.range) {
-					f.lock.release()
 					gem.unref(obj)
 					return -16 // EBUSY
 				}
 			}
 			if !pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) {
-				f.lock.release()
 				gem.unref(obj)
 				return -12
-			}
-			if !flush_firmware_mapping(ctx, request.addr, request.range) {
-				pt.unmap(request.addr, request.range)
-				f.lock.release()
-				gem.unref(obj)
-				return -5 // EIO
 			}
 			f.mappings << GpuMapping{
 				vm_id: request.vm_id
@@ -628,36 +649,33 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				size: request.range
 				obj: obj
 			}
-			f.lock.release()
+			if !flush_firmware_mapping(ctx, request.addr, request.range, false) {
+				// Firmware may have observed the new mapping before the flush
+				// failed. Remove PTEs but retain backing until a retry is safe.
+				pt.unmap(request.addr, request.range)
+				f.mappings[f.mappings.len - 1].retiring = true
+				return -5 // EIO
+			}
 			return 0
 		}
 		ioctl.asahi_bind_op_unbind {
-			f.lock.acquire()
 			if request.vm_id >= mmu.uat_num_contexts
 				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {
-				f.lock.release()
 				return -16 // EBUSY: firmware may still dereference this mapping
 			}
 			for i, mapping in f.mappings {
 				if mapping.vm_id == request.vm_id && mapping.addr == request.addr
 					&& mapping.size == request.range {
-					pt.unmap(request.addr, request.range)
-					flush_ok := flush_firmware_mapping(ctx, request.addr, request.range)
-					gem.unref(mapping.obj)
-					f.mappings.delete(i)
-					f.lock.release()
+					flush_ok := f.retire_mapping_locked(i)
 					return if flush_ok { 0 } else { -5 }
 				}
 			}
-			f.lock.release()
 			return -22
 		}
 		ioctl.asahi_bind_op_unbind_all {
-			obj := f.get_object_ref(request.handle) or { return -2 }
-			f.lock.acquire()
+			obj := f.objects.get_ref(request.handle) or { return -2 }
 			if request.vm_id >= mmu.uat_num_contexts
 				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {
-				f.lock.release()
 				gem.unref(obj)
 				return -16
 			}
@@ -665,15 +683,11 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			for i := f.mappings.len - 1; i >= 0; i-- {
 				mapping := f.mappings[i]
 				if mapping.vm_id == request.vm_id && voidptr(mapping.obj) == voidptr(obj) {
-					pt.unmap(mapping.addr, mapping.size)
-					if !flush_firmware_mapping(ctx, mapping.addr, mapping.size) {
+					if !f.retire_mapping_locked(i) {
 						flush_ok = false
 					}
-					gem.unref(mapping.obj)
-					f.mappings.delete(i)
 				}
 			}
-			f.lock.release()
 			gem.unref(obj)
 			return if flush_ok { 0 } else { -5 }
 		}
@@ -1071,6 +1085,9 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }
 	vm := f.find_vm(vm_id) or { return -22 }
+	// Never publish work through an incompletely invalidated mapping. This
+	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
+	if !f.cleanup_closed_mappings_locked(vm_id) { return -5 }
 	mut queue_resources := &gpu.G13QueueResources(unsafe { nil })
 	for ownership in f.g13_queues {
 		if ownership.queue_id == request.queue_id { queue_resources = ownership.resources; break }

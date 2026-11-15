@@ -2,6 +2,9 @@
 import os
 
 const helpers = [
+	'gpu__agx__file__GpuFile__retire_mapping_locked',
+	'gpu__agx__file__GpuFile__cleanup_closed_mappings_locked',
+	'gpu__agx__gpu__GpuManager__flush_g13_file_mapping',
 	'gpu__agx__file__install_g13_batch_barriers',
 	'gpu__agx__gpu__GpuManager__initialize_g13_barriers_locked',
 	'gpu__agx__gpu__GpuManager__g13_ring_has_space_locked',
@@ -150,5 +153,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission storage: thirty-three live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
+	println('G13 submission/mapping storage: thirty-six live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
 }

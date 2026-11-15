@@ -13,3 +13,17 @@ between failed close and registration executes the production manager-locked
 registration method and proves synchronous cleanup after the worker exits.
 The failure fixture separately executes the worker callback dispatcher with
 a lock-taking callback to enforce its outside-manager-lock contract.
+
+Production BIND, UNBIND, UNBIND_ALL, GEM-close cleanup, VM destruction and
+mapping retirement now run in the same fixture, using the real BO handle
+table and VM request validation. Two hundred cycles inject repeated flush
+failures before releasing dynamically allocated GEM objects. Failed binds,
+partial unbind-all, closed handles, busy VM pins, blocked replacement and close
+retries retain backing until invalidation succeeds. Tombstones unmap only once.
+The production file-flush wrapper holds the manager lock across transport use
+and the stopped decision. Deterministic lock scheduling completes an in-progress
+shutdown before retirement can free backing, and confirms a racing bind fails.
+Another injection destroys a VM before BIND acquires the file mutation lock;
+the ioctl must re-resolve it without touching the destroyed page table.
+These injected services establish host ownership and lock order, not actual
+firmware invalidation, concurrent hardware behavior or whole-kernel leak rates.
