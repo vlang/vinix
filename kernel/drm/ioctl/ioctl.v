@@ -326,6 +326,10 @@ pub const asahi_compute_no_preemption = u64(1) << 0
 pub const asahi_queue_cap_render = u32(1) << asahi_cmd_render
 pub const asahi_queue_cap_blit = u32(1) << asahi_cmd_blit
 pub const asahi_queue_cap_compute = u32(1) << asahi_cmd_compute
+pub const asahi_priority_low = u32(0)
+pub const asahi_priority_medium = u32(1)
+pub const asahi_priority_high = u32(2)
+pub const asahi_priority_realtime = u32(3)
 pub const asahi_barrier_none = u32(0xffffffff)
 
 pub const asahi_sync_syncobj = u32(0)

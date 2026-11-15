@@ -478,6 +478,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(queue, ['job.add_dependency(fence)?', 'job.commit()?', 'let mut job = job.arm()',
 		'job.push()'], 'Asahi asynchronous dependency scheduling')!
 	file_source := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
+	check_queue_priority_local(file_source, read(os.join_path(repo, 'kernel/drm/ioctl/ioctl.v'))!, local)!
+	check_queue_priority_reference(read(os.join_path(asahi_linux, 'include/uapi/drm/asahi_drm.h'))!,
+		read(os.join_path(base, 'file.rs'))!)!
 	check_private_bo_local(file_source, read(os.join_path(repo, 'kernel/gpu/agx/bo/bo.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!, read(os.join_path(repo, 'kernel/drm/gem/gem.v'))!,
 		read(os.join_path(repo, 'kernel/drm/drm.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/vm/identity.v'))!)!
@@ -631,7 +634,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'User mapping backing survives failed invalidation; serialized flush/stop, VM mutation lock and new-submit admission retain ownership',
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter',
-		'G13 default non-preemptible compute queue priority',
+		'G13 LOW/MEDIUM admission, reversed firmware bands, default compute priority and retained failed-create VM ownership',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',

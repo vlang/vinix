@@ -2738,6 +2738,20 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 	return resources
 }
 
+// A failed constructor may retain backing after an interrupted invalidation.
+// The caller holds the VM owner's file lock until it records this ownership.
+pub fn (mut mgr GpuManager) retained_g13_queue_resources(queue_id u32, vm &mmu.UatContext) ?&G13QueueResources {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	for resources in mgr.g13_queues {
+		if resources.queue_id == queue_id && voidptr(resources.vm) == voidptr(vm)
+			&& resources.quarantined && !resources.released {
+			return resources
+		}
+	}
+	return none
+}
+
 pub fn (mut mgr GpuManager) release_g13_queue_resources(resources &G13QueueResources) bool {
 	if resources == unsafe { nil } {
 		return false

@@ -43,3 +43,14 @@ release before the injected fd creator. GEM construction and VM creation are
 injected here; `tests/gem-private` separately runs the real GEM constructors.
 The production global identity allocator runs under its actual locking wrapper;
 the pure VM fixture covers exhaustion without wrap or reuse.
+
+Production queue creation runs with the real packed firmware priority builder.
+Six hundred LOW/MEDIUM render/compute/mixed queues select bands 3/2, including
+the compute override. HIGH, REALTIME and unknown values refuse before queue ID
+or resource allocation. Host/GPU construction failures, retained quarantined
+failure ownership, repeated close retries and VM destruction before the file
+lock pass. Unpublished logical queue metadata is actually allocated and freed;
+successful queue metadata is freed only by fixture cleanup after final close,
+since the kernel's existing successful-queue metadata retention is unchanged.
+GPU resources use a bounded injected pool; this establishes ioctl ownership,
+not firmware execution or whole-kernel heap measurements.

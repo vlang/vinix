@@ -11,10 +11,13 @@ import gpu.agx.workqueue
 import klock
 
 struct G13QueueOwnership {
+	queue_id u32
+	vm_id u32
 	resources &gpu.G13QueueResources
 }
 
 struct G17QueueOwnership {
+	queue_id u32
 	resources &gpu.G17QueueResources
 }
 
@@ -57,6 +60,8 @@ mut:
 	mappings          []GpuMapping
 	objects           Objects
 	next_timestamp_id u32 = 1
+	next_queue_id u32 = 1
+	owner_process_id u32 = 7
 	closing_next      &GpuFile = unsafe { nil }
 	closing_queued    bool
 }
@@ -157,5 +162,6 @@ pub fn run_checks() {
 	check_mapping_retirement()
 	check_mapping_permissions()
 	check_private_objects()
+	check_queue_priorities()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

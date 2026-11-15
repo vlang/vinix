@@ -45,6 +45,7 @@ struct G17QueueOwnership {
 
 struct G13QueueOwnership {
 	queue_id  u32
+	vm_id     u32
 	resources &gpu.G13QueueResources = unsafe { nil }
 }
 
@@ -359,6 +360,12 @@ fn (mut f GpuFile) allocate_queue_id_locked() ?u32 {
 				break
 			}
 		}
+		for ownership in f.g13_queues {
+			if ownership.queue_id == candidate {
+				used = true
+				break
+			}
+		}
 		if !used {
 			f.next_queue_id = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
 			return candidate
@@ -558,6 +565,11 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 		if q.vm_id == request.vm_id {
 			return -16 // EBUSY
 		}
+	}
+	// Failed construction can retain a quarantined queue without exposing a
+	// userspace queue ID. Close retries its cleanup before releasing this VM.
+	for ownership in f.g13_queues {
+		if ownership.vm_id == request.vm_id { return -16 }
 	}
 	for mapping in f.mappings {
 		if mapping.vm_id == request.vm_id {
@@ -804,27 +816,27 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	mut request := unsafe { data }
 	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit | ioctl.asahi_queue_cap_compute
-	if request.extensions != 0 || request.flags != 0 || request.pad != 0 || request.priority > 3
+	if request.extensions != 0 || request.flags != 0 || request.pad != 0 || request.priority > ioctl.asahi_priority_realtime
 		|| request.queue_caps == 0 || request.queue_caps & ~known_caps != 0 {
 		return -22
 	}
-	vm := f.find_vm(request.vm_id) or { return -22 }
+	manager := gpu.get_global_manager() or { return -19 }
+	// On G13, refuse unsupported HIGH and reserved REALTIME, as in Asahi.
+	// Userspace numbering increases with priority; firmware bands decrease.
+	if manager.hw_config.gpu_gen == .g13 && request.priority > ioctl.asahi_priority_medium { return -22 }
+	firmware_priority := if manager.hw_config.gpu_gen == .g13 {
+		ioctl.asahi_priority_realtime - request.priority
+	} else { request.priority }
 	f.lock.acquire()
-	id := f.allocate_queue_id_locked() or {
-		f.lock.release()
-		return -24 // EMFILE
-	}
-	f.lock.release()
-	wq := workqueue.new_workqueue(id, request.vm_id, request.priority, request.queue_caps) or {
+	defer { f.lock.release() }
+	// Keep the VM and its page table alive until the new queue is installed.
+	vm := f.find_vm(request.vm_id) or { return -22 }
+	id := f.allocate_queue_id_locked() or { return -24 } // EMFILE
+	wq := workqueue.new_workqueue(id, request.vm_id, firmware_priority, request.queue_caps) or {
 		return -12
 	}
 	mut g17_resources := &gpu.G17QueueResources(unsafe { nil })
 	mut g13_resources := &gpu.G13QueueResources(unsafe { nil })
-	manager := gpu.get_global_manager() or {
-		mut queue := unsafe { wq }
-		queue.destroy()
-		return -19
-	}
 	if manager.hw_config.gpu_gen == .g17 {
 		mut channel_mask := u32(0)
 		if request.queue_caps & ioctl.asahi_queue_cap_render != 0 {
@@ -840,6 +852,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 		g17_resources = gpu_manager.create_g17_queue_resources(id, f.owner_process_id, channel_mask, request.priority) or {
 			mut queue := unsafe { wq }
 			queue.destroy()
+			unsafe { free(queue) }
 			return -12
 		}
 	} else if manager.hw_config.gpu_gen == .g13 {
@@ -854,13 +867,18 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 			channel_mask |= gpu.g13_queue_channel_compute
 		}
 		mut gpu_manager := unsafe { manager }
-		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, request.priority, vm) or {
+		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm) or {
+			// Failed invalidation may leave a partially built queue borrowing
+			// this VM. Adopt that graph before releasing the file lock.
+			if retained := gpu_manager.retained_g13_queue_resources(id, vm) {
+				f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: retained }
+			}
 			mut queue := unsafe { wq }
 			queue.destroy()
+			unsafe { free(queue) }
 			return -12
 		}
 	}
-	f.lock.acquire()
 	f.queues << wq
 	if g17_resources != unsafe { nil } {
 		f.g17_queues << G17QueueOwnership{
@@ -871,10 +889,10 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	if g13_resources != unsafe { nil } {
 		f.g13_queues << G13QueueOwnership{
 			queue_id: id
+			vm_id: request.vm_id
 			resources: g13_resources
 		}
 	}
-	f.lock.release()
 	request.queue_id = id
 	return 0
 }

@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [VM-private buffer isolation](m1-agx-private-bo.md)
-(2026-11-15). The [GPU mapping permissions](m1-agx-gpu-permissions.md),
+Latest offline increment: [G13 queue priority and failed-create ownership](m1-agx-queue-priority.md)
+(2026-11-15). The [VM-private buffer isolation](m1-agx-private-bo.md),
+[GPU mapping permissions](m1-agx-gpu-permissions.md),
 [user mapping retirement](m1-agx-user-map-retirement.md),
 [prepared backlog](m1-agx-prepared-backlog.md),
 [batch publication](m1-agx-batch-publication.md) and [admission](m1-agx-batch-admission.md)
