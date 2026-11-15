@@ -4163,3 +4163,51 @@ installation and marker bytes. It is not a new guest check or actual Wine
 prefix downgrade compatibility qualification. GUI/owned ARM, crash/lifetime
 and full roadmap 14 acceptance remain separate. Earlier complete VM bundles
 remain preserved independently.
+
+## Real owned Wine generation pins and exact-image replay, 2026-11-15
+
+Source `97c319780` makes the real x86 Wine migration/rollback guest consume
+authenticated service JSON, including runtime 9.17.1 and the current service
+scope. Before each migration it requires the specific stale-generation refusal,
+every one of the 741 builtin targets unchanged and no staging entry. Successful
+writes use the freshly reviewed generation. The controller requires both new
+refusal markers alongside its existing death, lease, rollback and relaunch gates.
+
+The fresh native controller, guest and current package CLI build successfully.
+`native-01` signs and installs the retained real runtime into a fresh local
+repository. It passes both generation refusals, migration, rollback and real
+Win64 status-37 relaunches, but its final public review exceeds the unchanged
+180-second command limit: overall FAIL in 698.808 seconds. Input verification
+passes. A second fresh attempt is canceled before guest boot as disk space
+falls; it supplies no acceptance outcome. These checkpoints remain retained.
+
+`wine-native-replay.v` reuses that exact ISO without copying its runtime. It
+admits matching original/verified input maps, generated output hashes and the
+recorded 3 GiB/two-vCPU x86 TCG argv, changing only serial/QMP destinations.
+It requires all seven rollback markers and the original forbidden patterns,
+retains the guest's internal limits and the 900-second outer bound, and verifies
+inputs again afterward. Usage and existing-output controls refuse before boot.
+The first replay times out during rollback migration at the outer bound and
+remains failed. The second unchanged-image replay passes in 576.498 seconds,
+including both stale-pin refusals, 741-link migration, rollback, both real Win64
+relaunches returning 37, private-data preservation, lease/collection checks,
+final public review and `HWTEST PASS`. Its input verification passes. Host load
+was above 100 during early attempts and fell to single digits before the final
+replay; this observation does not establish the timeout's cause.
+
+Complete evidence is frozen at `/Users/alex/.cache/vwrealpins-20261115-01`,
+with isolated base `90c3e83bc` plus `source.patch`. Original prepared runtime
+`vwcollect-20261113-01/prepared-03`, kernel `vpr-20261113-01/x86-production-01`
+and original producer/compiler/stage bundles remain independently required.
+Only retired zero-byte replay QMP endpoints were removed before inventorying;
+all byte-bearing evidence and failed outcomes remain. The receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-real-pins-20261115-01.inventory.json`,
+SHA-256 `abab800dc2682b48a4018e3dad6f13fa266c1098c5a7dbb2a87604a5a63a5184`.
+Complete inventory recording and independent comparison pass.
+
+This qualifies local execution of the exact freshly signed image already built
+by the failed native attempt; it is not another fresh signing/producer run and
+does not turn either earlier result into PASS. It relocates the same Wine engine
+bytes between package generations. Actual engine-version compatibility, fresh
+owned GUI, owned ARM, holder-death retention, power-loss, ABI/hermetic closure,
+default activation and broader roadmap 14 acceptance remain open.
