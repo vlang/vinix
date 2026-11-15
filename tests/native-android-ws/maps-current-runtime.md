@@ -1,13 +1,15 @@
 # Current Maps runtime work — 2026-11-12
 
 Latest continuation, 2026-11-15: the [GNSS metadata adapter](maps-gnss-hardware-20261115.md)
-in 6a701e0d9 passed the full signed ARM API suite in r98 using current V.
-Real Google services progressed past the GNSS failure. Maps reached the
-account chooser, but Add account ended the service at the native UI pump
-without an exception description. Its complete export and private disk copy
-are retained and checked; the owned guest is stopped. Authentication remains
-unqualified. The next candidate reports pending cycle exceptions before
-releasing the JNI frame, retaining the failure status and authority guards.
+passed the signed ARM suite in r98. Active-cycle exception reporting in
+b8a310c0a identified a null parent in the real account layout callback.
+The [window content parent](maps-window-content-runtime-20261115.md) repair
+in a1b021c3d and AlertDialog follow-up in b06a335c0 passed the complete signed
+ARM suite in r101 using current V. Real Maps opened the chooser and Add account
+progressed past that layout failure. Google services then failed on the missing
+WebView.getWebViewClassLoader static API. Complete exports and private copies
+are retained and checked; the owned guests are stopped. The loader adapter is
+the next task. Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
 in 7796d94ba passed the signed ARM API suite with current V. Fresh r93 rendered

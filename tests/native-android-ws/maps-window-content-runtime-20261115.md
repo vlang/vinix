@@ -149,5 +149,29 @@ API export reconstructed without removals: 23475 bytes / 46 chunks.
 | maps-dialog-api-readback-20261115-r1/archive.json | 77f9b7e5725cff7ccbbe1d400d8615d4eb6420fc3625f144c041b1f069bbd146 |
 | maps-dialog-api-child-20261115-r1/child.log | d0bda82b5dc93fa483c34bf9d05b1e18c38216bf63613ae6a5bdd6e6eb5ee08f |
 
-The real account retry is pending in r101.
+In the r101 real attempt, Maps PID26853 opened the account chooser normally
+and Add account progressed past the previous frmk layout failure. GMS PID23785
+then failed with NoSuchMethodError for the static
+WebView.getWebViewClassLoader()Ljava/lang/ClassLoader; method, during an account
+activity onCreate through the main Looper. The new failure is the next SDK task.
+The descriptor snapshot captured 231 entries / unavailable=0 / non_atomic=true.
+No credentials were entered and the protected session was not restarted.
+
+The checked data volume UUID was 90bf6dbcc6d7474a86c21935188bbe99. Full private
+API/account results were copied to r101-private and synced, with copied receipt
+and prompt observed before stopping owned QEMU54224. PID absence and no open
+image handles preceded read-only extraction. e2fsck passed; the storage watch
+is partial. Private logs match their manifest. The complete Maps export
+reconstructed without removals: 1429559 bytes / 2793 chunks; exported receipt
+compares identical to the private copy. The retained root is
+maps-current-20261115-r101-account/private-readback.
+
+| r101 account evidence | SHA256 |
+| --- | --- |
+| maps-r101-uart-20261115-r1/interval.log | 04a3644eede230a75dc24b49ab7769df60b26afd1dfccfed848b366ca8960994 |
+| maps-r101-readback-20261115-r1/archive.json | 27f8b4a97c7ebc698e7452f817c62414bd79feec85b9f4684591ff6af5441a09 |
+| Same readback/exported-receipt.json | 3247576105a616e5f2d20fdaa8f8b2921b2b9c81b491d5885a3b3570f3bfe7ac |
+| Private r101-private/results/broker.log | 737a891823d63057221a219a3e797fe03e6fd92aafa5cd1a95136eaa63f15460 |
+| Private r101-private/results/maps.log | 7800b7d0dd192911e1d9a01550a70ba628edbc53e938fc75e4ec883ec7402261 |
+
 Google Maps is not fully qualified and no Google authentication success is claimed.
