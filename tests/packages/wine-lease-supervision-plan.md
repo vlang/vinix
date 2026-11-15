@@ -4133,3 +4133,33 @@ SHA-256 `8456c72f58d7c0397b97e393a9ac773c7e95560d698919cce49814fc7ec3bc49`.
 Complete inventory recording and independent comparison pass. This is selected
 marker-byte qualification, not real Wine execution or completion of the full
 crash/runtime/GUI/lifetime and roadmap 14 acceptance gates.
+
+## Reviewed runtime rollback and prefix pins, 2026-11-15
+
+Regression `7fae8e891` extends the signed-repository host fixture through actual
+`Service.review('rollback')` and `Service.rollback(review.fingerprint)` after
+runtime-only upgrade and prefix migration. Runtime version 1.0.0 is restored
+into new generation 3, with generation 2 retained as previous. The restored
+payload closure verifies. Prefix capture specifically refuses the newer-only
+builtin absent from the restored inventory and preserves both links and data.
+After explicit fixture-owner cleanup of that known fixture link, the report
+identifies version 1.0.0, selected generation 3, prior generation 2 and replace.
+Both write methods refuse stale pins 1 and 2 without changing the target.
+Pinned generation-3 migration, repetition and additions finish with keep/prior
+zero, original signed version-1 bytes, and preserved personal system32/private
+files. SDK guidance explains why the original version's generation is stale.
+
+The debug C-backend manualfree assertion suite and ASan run pass; assertions
+are enabled without `-prod`, and leak detection is disabled. Production code
+is unchanged. Complete source/build/log evidence is retained at
+`/Users/alex/.cache/vwwinerollback-20261115-01`, based on `2e6bfeb05` plus
+`source.patch`. The external inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-rollback-pins-20261115-01.inventory.json`,
+SHA-256 `9540d4bb1ea81a924684f119c612bc3230c2c57fa65c1a2aaf702389641c4bc2`.
+Complete inventory recording and independent comparison pass.
+
+This uses private admission components for an alternate-root signed host
+installation and marker bytes. It is not a new guest check or actual Wine
+prefix downgrade compatibility qualification. GUI/owned ARM, crash/lifetime
+and full roadmap 14 acceptance remain separate. Earlier complete VM bundles
+remain preserved independently.
