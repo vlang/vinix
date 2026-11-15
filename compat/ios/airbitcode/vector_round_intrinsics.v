@@ -20,6 +20,7 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('llvm.fshl.v') || name.starts_with('llvm.fshr.v') { count, bits := vector_integer_overload(name, 11)!; return if name[8] == `l` { ScalarIntrinsic.fshl } else { ScalarIntrinsic.fshr }, count, bits }
 	if name.starts_with('llvm.cttz.v') { count, bits := vector_integer_overload(name, 11)!; return ScalarIntrinsic.cttz, count, bits }
 	if name.starts_with('llvm.ctlz.v') { count, bits := vector_integer_overload(name, 11)!; return ScalarIntrinsic.ctlz, count, bits }
 	if name.starts_with('llvm.bswap.v') { count, bits := vector_integer_overload(name, 12)!; if bits % 16 != 0 { return error('AIR vector intrinsic: even byte width required') }; return ScalarIntrinsic.bswap, count, bits }
@@ -35,6 +36,10 @@ fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
+	if scalar_integer_funnel(id) {
+		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
+		return 4800 + int(id == .fshr) * 1024 + int(bits - 1) * 16 + count - 1
+	}
 	if id in [.ctlz, .cttz]! {
 		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
 		return 2752 + int(id == .cttz) * 1024 + int(bits - 1) * 16 + count - 1
