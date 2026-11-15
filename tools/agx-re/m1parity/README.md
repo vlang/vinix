@@ -17,9 +17,10 @@ Alternatively, `make -C tools/agx-re audit-m1-parity` accepts `ASAHI_LINUX`,
 `OMARCHY_PACKAGES`, `OMARCHY_REPO` and optional `AUDIT_OUTPUT` directories.
 The existing V tool launcher compiles outside the source checkout.
 
-Sparse Linux checkouts must include `drivers/dma-buf/dma-fence.c` as well as
-the Asahi and scheduler sources. Fence-completion checks use the packaged
-Linux core implementation; the audit checks and retains that source too.
+Sparse Linux checkouts must include `drivers/dma-buf/dma-fence.c` and
+`drivers/gpu/drm/drm_syncobj.c` as well as the Asahi and scheduler sources.
+Fence-completion and binary-wait checks use the packaged Linux core
+implementations; the audit checks and retains those sources too.
 
 The report distinguishes:
 

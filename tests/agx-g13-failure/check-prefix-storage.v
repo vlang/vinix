@@ -2,6 +2,7 @@
 import os
 
 const helpers = [
+	'drm__ioctl_syncobj_wait',
 	'syncobj__signal',
 	'syncobj__signal_error',
 	'fw__g13_fragment_tib_blocks',
@@ -48,6 +49,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'drm__ioctl_syncobj_wait' { return 'i64' }
 	if name in ['syncobj__signal', 'syncobj__signal_error'] { return 'void' }
 	if name == 'fw__g13_fragment_tib_blocks' { return '__v_option_u32' }
 	if name == 'vm__driver_window' { return '__v_option_vm__DriverWindow' }
@@ -107,6 +109,10 @@ fn check(source string) ! {
 		if (name.ends_with('register_g13_pending') || name.ends_with('admit_g13_pending') || name.ends_with('submit_g13_pending')) && !body.contains('G13SubmissionJob jobs[64]') {
 			return error('acceptance references are not a fixed stack array')
 		}
+		if name == 'drm__ioctl_syncobj_wait' && (!body.contains('u32 handles[64]')
+			|| !body.contains('syncobj__SyncObj* objects[64]') || !body.contains('syncobj__DmaFence* fences[64]')) {
+			return error('binary wait snapshots are not fixed stack storage')
+		}
 		if name.ends_with('admit_g13_batch_locked') && (!body.contains('u32 events[3]') || !body.contains('u32 commands[3]')) {
 			return error('batch capacity counts are not fixed stack arrays')
 		}
@@ -127,7 +133,7 @@ fn selftest() ! {
 		ending := if kind == 'void' { 'return;' } else if kind == 'bool' { 'return true;' } else { 'return (' + kind + '){0};' }
 		owned := if name.ends_with('WorkQueueEvents__retain') { 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));\n' }
 			else if name.ends_with('WorkQueueEvents__release') { 'memory__free((void*)(block));\n' } else { '' }
-		fixture += kind + ' ' + name + '(void) {\n' + owned + ' void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
+		fixture += kind + ' ' + name + '(void) {\n' + owned + ' u32 handles[64];\n syncobj__SyncObj* objects[64];\n syncobj__DmaFence* fences[64];\n void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
 	}
 	check(fixture)!
 	for name in helpers {
@@ -148,6 +154,9 @@ fn selftest() ! {
 		fixture.replace('memory__free((void*)(block));', 'memory__free((void*)(block)); memory__free(queue);'),
 		fixture.replace('void* blocked[128];', 'void** blocked;'),
 		fixture.replace('bool unpublished[128];', 'bool* unpublished;'),
+		fixture.replace('u32 handles[64];', 'u32* handles;'),
+		fixture.replace('syncobj__SyncObj* objects[64];', 'syncobj__SyncObj** objects;'),
+		fixture.replace('syncobj__DmaFence* fences[64];', 'syncobj__DmaFence** fences;'),
 		fixture.replace('G13SubmissionJob jobs[64];', 'G13SubmissionJob* jobs;'),
 		fixture.replace('u32 events[3];', 'u32* events;'),
 		fixture.replace('u32 commands[3];', 'u32* commands;'),
@@ -165,5 +174,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission/mapping storage: forty-three live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
+	println('G13 submission/mapping storage: forty-four live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
 }

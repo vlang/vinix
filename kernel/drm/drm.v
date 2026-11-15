@@ -15,6 +15,7 @@ import event.eventstruct
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import sched
 import memory
 import memory.mmap
 import usercopy
@@ -826,10 +827,10 @@ fn ioctl_syncobj_create(handle voidptr, data voidptr) int {
 		return -22
 	}
 	obj := syncobj.new_syncobj(u64(handle)) or { return -12 }
-	fence := syncobj.new_fence(0, 0)
-	syncobj.replace_fence(obj, fence)
 	if request.flags & ioctl.drm_syncobj_create_signaled != 0 {
+		fence := syncobj.new_fence(0, 0)
 		syncobj.signal(fence)
+		syncobj.replace_fence(obj, fence)
 	}
 	request.handle = obj.handle
 	return 0
@@ -1017,41 +1018,48 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 	return 0
 }
 
-fn syncobj_wait_ready(owner u64, request &ioctl.DrmSyncobjWait, wait_all bool) (bool, u32) {
-	mut ready_count := u32(0)
-	mut first := u32(0)
-	for i := u32(0); i < request.count_handles; i++ {
-		handle := usercopy.read_u32(request.handles + u64(i) * sizeof(u32)) or {
-			return false, u32(0xffffffff)
-		}
-		obj := syncobj.lookup(owner, handle) or { return false, u32(0xffffffff) }
-		if obj.fence != unsafe { nil } && syncobj.is_signaled(obj.fence) {
-			if ready_count == 0 {
-				first = i
-			}
-			ready_count++
-		}
-	}
-	return if wait_all { ready_count == request.count_handles } else { ready_count != 0 }, first
-}
-
 fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 	if handle == unsafe { nil } || data == unsafe { nil } {
 		return -14
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjWait(data) }
-	known_flags := ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit | ioctl.drm_syncobj_wait_available | ioctl.drm_syncobj_wait_deadline
-	if request.handles == 0 || request.count_handles == 0 || request.count_handles > 64
-		|| request.flags & ~known_flags != 0 || request.pad != 0 {
+	known_flags := ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit | ioctl.drm_syncobj_wait_deadline
+	if request.flags & ~known_flags != 0 || request.count_handles > 64 {
 		return -22
 	}
-	wait_all := request.flags & ioctl.drm_syncobj_wait_all != 0
-	owner := u64(handle)
-	for {
-		ready, first := syncobj_wait_ready(owner, request, wait_all)
-		if first == u32(0xffffffff) {
-			return -22
+	if request.count_handles == 0 { return 0 }
+	mut handles := [64]u32{}
+	if !usercopy.copy_from_user(unsafe { &handles[0] }, request.handles,
+		u64(request.count_handles) * sizeof(u32)) { return -14 }
+	// Retained syncobj/fence metadata keeps these synchronous snapshots valid
+	// even if another thread replaces a fence or destroys/reuses its handle.
+	mut objects := unsafe { [64]&syncobj.SyncObj{} }
+	mut fences := unsafe { [64]&syncobj.DmaFence{} }
+	for i := u32(0); i < request.count_handles; i++ {
+		objects[i] = syncobj.lookup(u64(handle), handles[i]) or { return -2 }
+	}
+	for i := u32(0); i < request.count_handles; i++ {
+		fences[i] = syncobj.get_fence(objects[i]) or {
+			if request.flags & ioctl.drm_syncobj_wait_for_submit == 0 { return -22 }
+			unsafe { nil }
 		}
+	}
+	wait_all := request.flags & ioctl.drm_syncobj_wait_all != 0
+	for {
+		mut ready_count := u32(0)
+		mut first := u32(0)
+		for i := u32(0); i < request.count_handles; i++ {
+			// WAIT_FOR_SUBMIT follows only an empty object until its first
+			// fence arrives. Once captured, replacements cannot redirect it.
+			if fences[i] == unsafe { nil } {
+				fences[i] = syncobj.get_fence(objects[i]) or { continue }
+			}
+			if syncobj.is_signaled(fences[i]) {
+				if ready_count == 0 { first = i }
+				ready_count++
+			}
+		}
+		ready := if wait_all { ready_count == request.count_handles } else { ready_count != 0 }
 		if ready {
 			request.first_signaled = first
 			return 0
@@ -1060,14 +1068,8 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 		if request.timeout_nsec <= 0 || u64(request.timeout_nsec) <= now {
 			return -62 // ETIME
 		}
-		// Poll in bounded slices so WAIT_ANY observes every fence.
-		remaining := u64(request.timeout_nsec) - now
-		slice := if remaining < 100_000 { remaining } else { u64(100_000) }
-		first_handle := usercopy.read_u32(request.handles) or { return -14 }
-		first_obj := syncobj.lookup(owner, first_handle) or { return -22 }
-		if first_obj.fence != unsafe { nil } {
-			syncobj.wait(first_obj.fence, slice)
-		}
+		// Also yield while waiting for submission into an empty object.
+		sched.reschedule()
 	}
 	return -62
 }
