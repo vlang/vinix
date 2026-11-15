@@ -175,7 +175,7 @@ pub fn audit(inputs Inputs) !Report {
 	}
 	mut sources := []Source{}
 	for role, paths in {
-		'vinix':    ['kernel/gpu/agx', 'kernel/drm/ioctl/ioctl.v', 'tools/agx-re/m1parity',
+		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'tools/agx-re/m1parity',
 			'tools/agx-re/audit_m1_parity.v', 'tools/agx-re/g13contract', 'tools/agx-re/g13layout']
 		'asahi':    ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h',
 			'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'rust/kernel/drm/sched.rs']
@@ -227,7 +227,7 @@ pub fn audit(inputs Inputs) !Report {
 		unverified_areas: [
 			'Complete ABI migration and matched Mesa integration',
 			'Modern flat-command ABI integration and full cross-submission admission/backpressure',
-			'Scheduler fence elision and complete dependency/error policy',
+			'Complete scheduler dependency/error policy beyond selected own-queue elision and input-errno handling',
 			'VM replacement/splitting, reservation fences and object memory accounting',
 			'Complete render object defaults and scheduler backpressure',
 			'Every remaining firmware field, initialization default and error path',

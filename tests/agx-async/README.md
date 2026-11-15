@@ -66,8 +66,8 @@ The new checks run/retire either pipe's later batch first and verify each node's
 VM pin, result references and aggregate fence remain independent. They cover two
 overlapping batches totaling 127 jobs, partial publication, a concurrent append,
 forged user fences, fault/stop, both index-zero bits, and a saturated 128-queue
-lookup with overflow deferral and resumption. Input sync dependencies and
-unpublished predecessors retain FIFO order. Firmware scheduling remains injected.
+lookup with overflow deferral and resumption. External input sync dependencies
+and unpublished predecessors retain FIFO order. Firmware scheduling remains injected.
 
 Initial-event checks cover idle source subqueues, a dependency on only a later
 command in a batch, immutable targets despite newer accepted work, consumers
@@ -83,3 +83,11 @@ after userspace replaces a syncobj, and retain the submission's own GPU error
 independently of input errno. An errored input never releases another unsignaled
 input or a firmware initial-event dependency. Existing producer-fault and stop
 cases continue to cancel caller-owned jobs and retain hardware-owned backing.
+
+The queue's own native completion fences are elided as in its per-queue DRM
+scheduler entity. Immutable private scalar provenance prevents a generic fence,
+another queue, or a recreated queue with the same public handle from eliding
+the wait. Tests retain publication FIFO and explicit firmware waits, reverse
+retirement and independent errors, and shutdown ownership. The production
+context allocator is checked at its final two identities and must remain
+exhausted rather than wrap or reuse an identity. No fence retains a queue pointer.

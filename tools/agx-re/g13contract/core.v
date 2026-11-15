@@ -239,13 +239,31 @@ fn check_initial_snapshot_contract(initial string, barriers string, workqueue st
 
 fn check_input_dependency_contract(pending string) ! {
 	ready := section(pending, 'fn g13_dependencies_ready(', 'fn cancel_g13_pending(', 'Vinix input dependency readiness')!
-	require_order(ready, ['index < dependencies.count', '!syncobj.is_signaled(dependencies.fences[index])',
+	require_order(ready, ['index < dependencies.count', '!syncobj.queue_dependency_ready(dependencies.fences[index], queue_context)',
 		'return false', 'return true'], 'Vinix input dependency readiness')!
 	require(!ready.contains('get_error'), 'Signaled input fence errors must not cancel the dependent submission')!
 	poll := section(pending, 'fn poll_g13_pending(', 'mut blocked := [2]bool{}', 'Vinix input dependency scheduling')!
-	require_order(poll, ['if !item.dependencies_ready', 'if !g13_dependencies_ready(&item.dependencies) { return true }',
+	require_order(poll, ['if !item.dependencies_ready', 'if !g13_dependencies_ready(&item.dependencies, item.queue.fence_context) { return true }',
 		'item.dependencies_ready = true', 'failure := g13_pending_error(item)',
 		'cancel_g13_pending(mut item, if failure != 0'], 'Vinix input dependency scheduling')!
+}
+
+fn check_queue_fence_contract(contexts string, fences string, queue string, submit string) ! {
+	require_order(contexts.fields().join(' '), ['next u64 = 1', 'fn (mut contexts QueueFenceContexts) allocate()',
+		'if contexts.next == 0 { return none }', 'value := contexts.next',
+		'contexts.next = if value == ~u64(0) { u64(0) } else { value + 1 }',
+		'pub fn new_queue_context()', 'queue_context_lock.acquire()', 'defer { queue_context_lock.release() }',
+		'return queue_contexts.allocate()', 'pub fn new_queue_fence(', 'queue_context: queue_context',
+		'pub fn queue_dependency_ready(', 'queue_context != 0 && fence.queue_context == queue_context',
+		'return is_signaled(fence)'], 'Vinix private queue fence identity')!
+	fields := section(fences, 'pub struct DmaFence {', 'pub mut:', 'Vinix immutable fence provenance')!
+	require(fields.contains('queue_context u64') && !fields.contains('&'), 'Queue fence provenance must be a private immutable scalar')!
+	create := section(queue, 'pub fn (mut mgr GpuManager) create_g13_queue_resources(',
+		'mut complete := false', 'Vinix queue fence context')!
+	require_order(create, ['mgr.state != .running', 'syncobj.new_queue_context() or { return none }',
+		'&G13QueueResources{', 'fence_context: fence_context'], 'Vinix queue fence context')!
+	require(submit.contains('syncobj.new_queue_fence(f.owner_key, timer.get_ns(), queue_resources.fence_context)'),
+		'Native output fences must carry the exact physical queue context')!
 }
 
 fn check_submission_pipelining(pending string) ! {
@@ -324,9 +342,16 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
 	check_input_dependency_contract(pending)!
+	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
+		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit)!
+	require_order(queue, ['let sched = sched::Scheduler::new(', 'let entity = sched::Entity::new(&sched,',
+		'_sched: sched,', 'entity,'], 'Asahi per-user-queue scheduler ownership')!
 	scheduler := read(os.join_path(asahi_linux, 'drivers/gpu/drm/scheduler/sched_entity.c'))!
 	dependency_cb := section(scheduler, 'static bool drm_sched_entity_add_dependency_cb(',
 		'static struct dma_fence *', 'Asahi scheduler input dependency callback')!
+	require_order(dependency_cb, ['fence->context == entity->fence_context',
+		'fence->context == entity->fence_context + 1', 'dma_fence_put(entity->dependency)',
+		'return false', 's_fence = to_drm_sched_fence(fence)'], 'Asahi own-entity fence elision')!
 	require_order(dependency_cb, ['!fence->error && s_fence', 'dma_fence_add_callback(entity->dependency',
 		'return true', 'dma_fence_put(entity->dependency)', 'return false'], 'Asahi scheduler input dependency readiness')!
 	require(!dependency_cb.contains('dma_fence_set_error'), 'Asahi input dependency callback must not propagate input errno')!
@@ -342,7 +367,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
 	poll := section(pending, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'Vinix batch overlap')!
 	check_dependency_publication(poll)!
-	require_order(poll, ['g13_dependencies_ready(&item.dependencies)', 'failure := g13_pending_error(item)',
+	require_order(poll, ['g13_dependencies_ready(&item.dependencies, item.queue.fence_context)', 'failure := g13_pending_error(item)',
 		'mut blocked := [2]bool{}', 'command.published', 'blocked[command.pipe]', 'command.wait_for', 'if !prior.published',
 		'katomic.load(&prior.done)', 'katomic.load(&prior.error)', 'completed_error := g13_pending_error(item)',
 		'manager.g13_queue_dispatch_blocked', 'manager.submit_g13_compute_job',
@@ -452,6 +477,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 default non-preemptible compute queue priority',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
+		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
 		'Independent later submissions pipeline after older publication with initial firmware dependencies',

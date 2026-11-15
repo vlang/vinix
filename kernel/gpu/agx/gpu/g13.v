@@ -14,6 +14,7 @@ import gpu.agx.pgtable
 import gpu.agx.event
 import gpu.agx.mmu
 import gpu.agx.render as agxrender
+import drm.syncobj
 import katomic
 import klock
 import memory
@@ -274,6 +275,7 @@ pub mut:
 pub struct G13QueueResources {
 pub:
 	queue_id     u32
+	fence_context u64
 	channel_mask u32
 	priority     u32
 mut:
@@ -2655,8 +2657,10 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 		return none
 	}
 
+	fence_context := syncobj.new_queue_context() or { return none }
 	mut resources := &G13QueueResources{
 		queue_id: queue_id
+		fence_context: fence_context
 		firmware_id: mgr.g13_queue_ids.allocate()
 		channel_mask: channel_mask
 		priority: priority

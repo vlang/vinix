@@ -108,7 +108,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Signaled input fences satisfy waits independently of their errno. Modern flat-command integration, scheduler fence elision and full admission/backpressure still differ. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Modern flat-command integration and full admission/backpressure still differ. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
@@ -849,6 +849,58 @@ Linked kernel SHA-256 values are
 `a5b0bc70299001293f19ed684721acbc4512db44b19cb72984c0eef15cfc0707`
 (AArch64) and
 `a7f97f10ebb8feb9b9c5189d25d6682b0a1e3d478088cc63910fc5cd21460910`
+(x86_64).
+
+### Per-queue scheduler fence elision
+
+The packaged Asahi driver creates one DRM scheduler and entity per user queue.
+Its dependency callback ignores that entity's own completion fences. Vinix now
+does the same for native queue fences without signaling them early or changing
+their independent callback/result/VM ownership. External fences and fences from
+other queues still wait for actual signaling; publication FIFO and explicit
+firmware prefixes still order the queue's commands.
+
+Each physical queue receives a globally serialized, non-reused 64-bit context.
+Its output fences retain only an immutable private scalar, separate from public
+context/sequence fields. Failed queue construction consumes the identity, and
+exhaustion remains permanent rather than wrapping. Reusing a public queue handle
+or releasing/resetting its resources cannot transfer provenance to a new queue.
+No new queue pointer or freeing path is retained in a fence. Independent read-only
+review approved identity lifetime, lock ordering and cleanup.
+
+ASan/UBSan checks pass own/foreign queue waits, mixed own/external inputs in both
+orders, reverse retirement and independent errors, shutdown, older partial
+publication, initial firmware waits, generic fences with matching public fields,
+and recreated handles. The production allocator passes its final two identities
+and repeated exhaustion. The expanded fixture retires the earlier drained handle
+namespace through production `destroy_owner`; it preserves the 1,024-object limit
+and retained allocations. Existing overlap, 540 shutdown cases, immediate
+retirement and close checks pass. Three V unit suites, negative identity/policy
+gates, and 21 generated ARM helper checks/selftests pass. Firmware execution and
+host locking remain injected; these checks do not measure whole-kernel leaks.
+
+Isolated AArch64 and ordinary x86_64 builds pass from
+`e3a5d07f4d55db18b244d344f3cf068713dea694` plus five retained AGX/syncobj
+files. Every AGX and syncobj V source matches the isolated checkout, and the five
+changed sources match both retained input snapshots. Ordinary x86 includes
+syncobj but excludes native AGX code. Omarchy HEAD remains
+`4f26515d55f5d03ddf884a8b416f3b66b8ee7ae4`; a fresh package clone is
+`703430e884c0c46bce2a83f11c34a44af3f2ec5b`, retaining the same Asahi/Mesa
+pins. All selected audit gates pass; the verdict remains `not_equivalent`.
+Full admission/backpressure, modern ABI/VM/GEM/Mesa and the other listed areas
+remain incomplete. No native GPU test, Vinix boot, reboot or deployment occurred.
+
+The complete evidence bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-queue-fences-20261115/bundle/`.
+Its sibling `inventory.json` SHA-256 is
+`cdf8e901a96e236ac249d86d68f649baf7f03f35daa1bab211c80d2ba85307ed`.
+The sibling `bundle.tar.gz` SHA-256 is
+`405811267fe7d1d1e147188b5de971f66852245d92e2a562b6f1c187ad7d829c`.
+Canonical and fully extracted bundles pass the unchanged inventory checker.
+Linked kernel SHA-256 values are
+`4429be593a093ed7ed5b309076f16fd17f498617db9805d6b0968baec891dda9`
+(AArch64) and
+`6576e8aee7c66353533e4a4f0f57a90e7fe876f19e2a000d4e2813de01901a24`
 (x86_64).
 
 ## Earlier artifact retention incident

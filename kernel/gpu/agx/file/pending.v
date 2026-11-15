@@ -145,10 +145,11 @@ fn enqueue_g13_pending(data voidptr) {
 
 // DRM scheduler dependencies order execution. A signaled input fence releases
 // its wait even when it carries an error; only this submission's own work sets
-// its completion error. Keep waiting for every unsignaled input.
-fn g13_dependencies_ready(dependencies &submission.SyncArray) bool {
+// its completion error. The queue's own native fences are elided, as in its
+// DRM scheduler entity; every other input still waits for actual signaling.
+fn g13_dependencies_ready(dependencies &submission.SyncArray, queue_context u64) bool {
 	for index := u32(0); index < dependencies.count; index++ {
-		if !syncobj.is_signaled(dependencies.fences[index]) { return false }
+		if !syncobj.queue_dependency_ready(dependencies.fences[index], queue_context) { return false }
 	}
 	return true
 }
@@ -184,7 +185,7 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 		return katomic.load(&item.callbacks_remaining) != 0
 	}
 	if !item.dependencies_ready {
-		if !g13_dependencies_ready(&item.dependencies) { return true }
+		if !g13_dependencies_ready(&item.dependencies, item.queue.fence_context) { return true }
 		item.dependencies_ready = true
 	}
 	failure := g13_pending_error(item)

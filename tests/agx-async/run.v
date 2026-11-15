@@ -14,10 +14,11 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/agx-async/fixture', scratch, false)!
+	os.cp_all('${repo}/kernel/drm/syncobj', '${scratch}/drm/syncobj', false)!
 	os.mkdir_all('${scratch}/aarch64')!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/aarch64/timer', '${scratch}/aarch64/timer', false)!
-	for path in ['drm/ioctl', 'drm/syncobj', 'gpu/agx/command', 'gpu/agx/compute', 'gpu/agx/render',
+	for path in ['drm/ioctl', 'gpu/agx/command', 'gpu/agx/compute', 'gpu/agx/render',
 		'gpu/agx/submission'] {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!

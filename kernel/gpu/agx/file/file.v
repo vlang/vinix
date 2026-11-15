@@ -1125,7 +1125,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	if !install_g13_batch_barriers(mut pending) { return -5 }
 	gpu_manager.release_g13_initial_events(mut pending.initial_events)
-	pending.final_fence = syncobj.new_fence(f.owner_key, timer.get_ns())
+	pending.final_fence = syncobj.new_queue_fence(f.owner_key, timer.get_ns(), queue_resources.fence_context)
 	for index := u32(0); index < request.command_count; index++ {
 		code := f.install_g13_batch_completion(mut pending, index, unsafe { &commands[index] }, result_object)
 		if code != 0 { return code }

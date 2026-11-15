@@ -62,13 +62,30 @@ fn test_input_dependency_contract_rejects_errno_propagation_and_early_release() 
 	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
 	check_input_dependency_contract(pending)!
 	for broken in [pending.replace('index < dependencies.count', 'index < 1'),
-		pending.replace('!syncobj.is_signaled(dependencies.fences[index])', 'false'),
+		pending.replace('!syncobj.queue_dependency_ready(dependencies.fences[index], queue_context)', 'false'),
 		pending.replace('return false }\n\t}\n\treturn true', 'return false }\n\t}\n\t_ := syncobj.get_error(dependencies.fences[0])\n\treturn true'),
-		pending.replace('if !g13_dependencies_ready(&item.dependencies) { return true }', ''),
+		pending.replace('if !g13_dependencies_ready(&item.dependencies, item.queue.fence_context) { return true }', ''),
 		pending.replace('failure := g13_pending_error(item)', 'failure := 0')] {
 		assert broken != pending
 		if _ := check_input_dependency_contract(broken) { assert false, 'invalid input dependency policy accepted' }
 	}
+}
+
+fn test_queue_fence_contract_rejects_reused_public_or_missing_identity() {
+	repo := g13layout.repo_root()
+	contexts := os.read_file('${repo}/kernel/drm/syncobj/queue.v')!
+	fences := os.read_file('${repo}/kernel/drm/syncobj/syncobj.v')!
+	queue := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
+	submit := os.read_file('${repo}/kernel/gpu/agx/file/file.v')!
+	check_queue_fence_contract(contexts, fences, queue, submit)!
+	for broken in [contexts.replace('queue_context != 0 && ', ''),
+		contexts.replace('fence.queue_context == queue_context', 'fence.context == queue_context'),
+		contexts.replace('if value == ~u64(0) { u64(0) } else { value + 1 }', 'value + 1')] {
+		if _ := check_queue_fence_contract(broken, fences, queue, submit) { assert false }
+	}
+	if _ := check_queue_fence_contract(contexts, fences.replace('queue_context u64', ''), queue, submit) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue.replace('fence_context: fence_context', 'fence_context: 0'), submit) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue, submit.replace('queue_resources.fence_context)', 'u64(request.queue_id))')) { assert false }
 }
 
 fn test_integer_constant_accepts_v_casts_and_separators() {

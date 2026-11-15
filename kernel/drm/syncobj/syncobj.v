@@ -17,6 +17,9 @@ pub mut:
 }
 
 pub struct DmaFence {
+	// Kernel-only provenance, independent of the public context/seqno. A fence
+	// retains only this scalar after its originating queue is destroyed.
+	queue_context u64
 pub mut:
 	seqno    u64
 	signaled bool

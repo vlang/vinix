@@ -52,8 +52,8 @@ fn reap_closed_files() { file_reaps++ }
 
 fn new_file() &GpuFile {
 	ctx := &mmu.UatContext{}
-	q1 := &gpu.G13QueueResources{ id: 1 }
-	q2 := &gpu.G13QueueResources{ id: 2 }
+	q1 := &gpu.G13QueueResources{ id: 1, fence_context: syncobj.new_queue_context() or { panic('queue context') } }
+	q2 := &gpu.G13QueueResources{ id: 2, fence_context: syncobj.new_queue_context() or { panic('queue context') } }
 	return &GpuFile{
 		queues:     [LogicalQueue{ id: 1 }, LogicalQueue{ id: 2 }]
 		g13_queues: [Ownership{ queue_id: 1, resources: q1 }, Ownership{ queue_id: 2, resources: q2 }]
@@ -310,5 +310,7 @@ pub fn run_checks() {
 	check_submission_pipelining()
 	check_initial_submission_events()
 	check_input_sync_errors()
+	check_queue_fence_elision()
+	syncobj.check_queue_context_allocator()
 	println('AGX async: ioctl staging, independent queues/FIFO, compute→render phases, forged fences, failure cleanup, enqueue/shutdown races, backpressure and 200 immediate-retirement cycles passed')
 }
