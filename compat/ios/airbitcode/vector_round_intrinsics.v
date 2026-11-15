@@ -20,6 +20,10 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+ for id in [ScalarIntrinsic.sadd_sat,.uadd_sat,.ssub_sat,.usub_sat]! {
+  prefix:=match id{.sadd_sat{'llvm.sadd.sat.v'} .uadd_sat{'llvm.uadd.sat.v'} .ssub_sat{'llvm.ssub.sat.v'} else{'llvm.usub.sat.v'}}
+  if name.starts_with(prefix){count,bits:=vector_integer_overload(name,15)!;return id,count,bits}
+ }
 	if name.starts_with('llvm.abs.v') { count, bits := vector_integer_overload(name, 10)!; return ScalarIntrinsic.iabs, count, bits }
  for id in [ScalarIntrinsic.smin, .smax, .umin, .umax]! {
   prefix := match id {.smin {'llvm.smin.v'} .smax {'llvm.smax.v'} .umin {'llvm.umin.v'} else {'llvm.umax.v'}}
@@ -41,6 +45,10 @@ fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
+ if scalar_integer_saturating(id) {
+  if count<1||count>16||bits<1||bits>64{return error('AIR vector intrinsic: cache shape')}
+  return 11968+vector_saturating_index(id)!*1024+int(bits-1)*16+count-1
+ }
 	if id == .iabs {
 		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
 		return 10944 + int(bits - 1) * 16 + count - 1

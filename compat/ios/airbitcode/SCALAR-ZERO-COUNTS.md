@@ -86,7 +86,7 @@ The existing scalar leading-zero evaluator supplies value/poison results;
 untagged integer evaluators continue to reject these operations. The normal
 lane path adds no allocation. Slots 2752..3775 add 1,024 width/count identities
 to the shared vector declaration cache. Trailing-zero identities follow them;
-the cache now has 11,968 stack entries. Flag values
+the cache now has 16,064 stack entries. Flag values
 share an identity but are read separately per call. A call costs one step,
 two lane counts of profiling work and one shared construction slot. Existing
 4,096-result and 1,000,000-work limits remain unchanged.
@@ -95,9 +95,9 @@ two lane counts of profiling work and one shared construction slot. Existing
 comparisons with the standard-library leading-zero counter adjusted to the
 declared width, including both flags, every i1..i16 encoding, wide patterns,
 individual bits, high-bit noise and snapshots. Another 208,896 lane-state
-checks cover poison/undef/freezes. The shared cache unit covers all 11,968
+checks cover poison/undef/freezes. The shared cache unit covers all 16,064
 identities. Existing units replace newly supported vector name guards with
-unsupported vector-saturating-add guards; untagged evaluator rejection remains tested.
+unsupported vector-saturating-shift guards; untagged evaluator rejection remains tested.
 
 `tests/ios/air-vector-ctlz.v LLVM_AS FRESH_EXTERNAL_DIR` exercises all widths,
 counts and both flags through 51,200 decoded shapes, native defined-value
@@ -127,8 +127,8 @@ No new allocation is added on the normal lane path. Both scalar APIs, void and
 memory execution support these calls; floating producers still need mixed execution.
 
 Slots 3776..4799 add 1,024 distinct width/count identities after leading-zero
-counts. Funnel shifts, integer extrema and abs add another 7,168 identities, making
-11,968 shared stack entries. The two zero-count operations and both flag values
+counts. Funnel shifts, integer extrema, abs and saturating add/sub add 11,264 identities, making
+16,064 shared stack entries. The two zero-count operations and both flag values
 retain their independent meanings: flags share an operation/shape identity and
 are validated on every call, even after declaration attributes are cached.
 Work, construction storage, step budgets and existing limits are unchanged.

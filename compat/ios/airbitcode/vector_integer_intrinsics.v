@@ -41,3 +41,17 @@ fn integer_intrinsic_vector(id ScalarIntrinsic, source ScalarVectorValue, bits u
  }
  return result
 }
+
+fn (p IRTypedProgram) vector_integer_binary_intrinsic_profile(ir IRModule, stream Stream, pools IRConstantPools,
+ bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, count int, bits u32, remaining int) !int {
+ signature := ir.types[op.call_signature]
+ element, actual_bits, actual_count := p.scalar_vector_type(op.result_type, false, remaining)!
+ if p.types[element].kind != .integer_t || actual_bits != bits || actual_count != count { return error("AIR vector intrinsic: integer name/type mismatch") }
+ mut work := count
+ for i in 0 .. 2 {
+  source := p.operands[op.operands_start + i + 1]
+  if ir.references[signature.refs_start + i + 1] != op.result_type || source.type_index != op.result_type { return error("AIR vector intrinsic: matching integer argument/result required") }
+  work += p.vector_source_profile(stream, pools, bodies, scope, index, source, false, remaining - work)!
+ }
+ return work
+}

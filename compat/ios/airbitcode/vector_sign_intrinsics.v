@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 64 + 2048 + 64 + 9216
+const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 64 + 2048 + 64 + 13312
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -35,12 +35,12 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	if callee.number >= u32(pools.declarations.len) || pools.declarations[int(callee.number)] != f.record || callee.type_index < 0 || callee.type_index >= p.types.len || p.types[callee.type_index].kind != .pointer_t || p.types[callee.type_index].address_space != 0 { return error('AIR vector intrinsic: direct declaration identity') }
 	signature := ir.types[f.signature]; arity := scalar_intrinsic_arity(id)
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 || ir.references[signature.refs_start] != op.result_type { return error('AIR vector intrinsic: signature/arity') }
-	if !mixed && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs]! { return error('AIR vector intrinsic: mixed floating execution required') }
+	if !mixed && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat]! { return error('AIR vector intrinsic: mixed floating execution required') }
 	mut work := 0
 	if scalar_integer_funnel(id) {
 		work = p.vector_funnel_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
-	} else if scalar_integer_extremum(id) {
-		work = p.vector_integer_extremum_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
+	} else if scalar_integer_extremum(id) || scalar_integer_saturating(id) {
+		work = p.vector_integer_binary_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
 	} else if id == .iabs {
 		work = p.vector_integer_abs_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
 	} else if id in [.ctlz, .cttz]! {
@@ -87,6 +87,10 @@ fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Strea
 	if id == .iabs {
 		flag := m.read(op.operands_start + 2)!
 		return m.store_vector_value(inst, integer_abs_vector(left, bits, count, flag.value)!)!
+	}
+	if scalar_integer_saturating(id) {
+		right := m.read_vector(stream, m.p.operands[op.operands_start + 2])!
+		return m.store_vector_value(inst, saturating_intrinsic_vector(id, left, right, bits, count)!)!
 	}
 	if scalar_integer_extremum(id) {
 		right := m.read_vector(stream, m.p.operands[op.operands_start + 2])!
