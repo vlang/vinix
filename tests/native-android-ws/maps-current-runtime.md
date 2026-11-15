@@ -40,7 +40,10 @@ The [canonical-path fix](maps-cookie-snapshot-20261115.md) passes 15 host and
 ASan cookie-store cases. The full current-V engine build now passes under the
 original caps with recovered actual deployment inputs, all 99 API exports and
 136 musl ABI symbols verified. Fresh full-profile r111 staging and readback
-passed; signed ARM and protected account validation are in progress.
+passed, followed by the complete signed ARM suite. That guest disappeared
+during services startup before a protected Maps launch; its API evidence and
+partial persistent data are retained. Fresh r112 reuses the same qualified
+binaries and signed API evidence for the protected account retry.
 Complete r107–r110 public/private evidence is preserved, and those guests are stopped.
 Authentication and full Maps operation remain unqualified.
 

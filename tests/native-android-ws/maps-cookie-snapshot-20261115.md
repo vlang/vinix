@@ -138,3 +138,36 @@ empty reason and complete cleanup. The copied engine matches the qualified
 digest. Both admission manifests and actual deployment inputs were updated;
 all other closure hashes and principal assertions were preserved. Signed ARM
 and the next protected account retry are pending in this fresh guest.
+
+## r111 ARM pass and interrupted services startup
+
+The complete signed ARM suite passed: child exit 0, readiness pass,
+CONTACT-LABELS-PASS and CURRENT-API-PASS. The full public API export was
+24007 bytes / 47 chunks and reconstructed without removals.
+
+| ARM evidence | SHA256 |
+| --- | --- |
+| maps-cookie-api-uart-20261115-r1/full.log | b3647aeae254cc80d67da6d4fbc9441a2f07fb7a79ee0c0c57be67ef48f87d84 |
+| maps-cookie-api-readback-20261115-r1/archive.json | 0f6fb57cde62c62a30d94bd6359301421cfb26deafc14257b577bf8af3090f6e |
+| maps-cookie-api-child-20261115-r1/child.log | 11567a622b4a9cafc7a4ce702680fb802816d6c9886c3f36d4ace01b89562f84 |
+
+After the checked persistent mount, Google services started, but QEMU60163
+disappeared before the protected Maps launch or any Add account interaction.
+QMP refused connections, the PID was absent and no image handles remained.
+No owned stop had been requested and qemu.log is empty; the cause is unknown.
+There is no complete account export or successful broker cleanup claim.
+
+Read-only extraction retained r111-private/current-api-r111 and a partial
+storage watch. The persisted API child log compares identical to the verified
+public child log. Read-only e2fsck exited 4, reporting block/inode bitmap and
+directory-count inconsistencies; the interrupted image was preserved unchanged,
+without repair or relaunch. Its checked volume UUID was
+e13e04c989fc4a9d90da3eb828c383fb. The retained final app-data.ext2 SHA256 is
+6269f8849823d9d74d784f49a5023c5d430ce9ea40f0f8b4502112cbd58acf34
+(maps-r111-data-hash-20261115-r1.log/guard receipt).
+
+Fresh r112 staging passed under the original caps: elapsed 5857 ms, sampled
+RSS 42303488 and observed growth 178970624 bytes, exit/child 0/0, empty reason,
+complete cleanup. Its binaries match r111; the completed signed API evidence
+is reused, with no new API-pass claim for r112. The new checked persistent volume
+mounted before services startup. Protected account validation is pending.
