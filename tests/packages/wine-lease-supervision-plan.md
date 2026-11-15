@@ -4761,3 +4761,51 @@ checkpoint. Original selected compiler/real-link inputs and historical complete
 bundles remain required. No new guest execution is claimed. OS shared-cache,
 host build closure, full hermetic admission, default activation, owned ARM/GUI,
 redistribution and broader roadmap 14 acceptance remain open.
+
+## Selected host controller/producer build admission (2026-11-15)
+
+Commit `55f4a7b75` adds an optional [host builder and read-only verifier](wine-host-build.md)
+for arm64 Mach-O controller/producer executables. The fixed production/manual-
+free profile separates V-to-C discovery/generation from Clang compilation,
+selects SDK/resource paths explicitly, disables default backtrace/segfault
+handling, and uses the existing closed V/C child environments and observed
+ordinary image admission. Parsed V files and complete resource-header inputs
+are pinned before generation; separately captured before/actual C include
+observations bind resolved targets and bytes. Phase merging refuses changed
+existing pins. SDK settings and observed C/image inputs join the selected set.
+
+Selected input bytes are retained in a content-addressed ordinary-file store,
+using APFS clones with a copy fallback. Admission checks exact commands and
+original namespaces, source dumps, V/C/image records, required input rows,
+retained bytes, output inventory and Mach-O header/mode. Generated C outputs
+must retain their compile-input hashes after output-map resealing. Historical
+source/header/linker and complete-input verifiers are unchanged.
+
+Final `build-04` admits the real controller, real producer and transitive-import
+fixture. The fixture executes; both real programs pass source guards and return
+their expected usage statuses. Final `controls-02` passes real/copied baselines,
+both real build admissions/entrypoints and thirteen exact resealed refusals.
+Cases cover omitted imports/images, V/C environments/commands, omitted C
+observations, linked receipts, changed input blobs, executable mode, format,
+scope and generated C. Production/manual-free host-image and real poisoned-
+parent V-generation controls pass too. The initial missing segfault-handler
+link failure is preserved; the documented disabled-handler profile passes
+without relaxing an admission guard.
+
+The checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
+`d4dd87232`, retaining source snapshots, feature patch/revision, actual input
+blobs, generated C/binaries, commands, raw observations and all controls. Its
+typed inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-build-20261115-01.inventory.json`,
+SHA-256 `80cfcd1b0ef823cdeea1eff372b3ad5ea517b8c7512012d02e0613b1072d4b7d`.
+Complete recording and independent comparison pass against the retained
+original checkpoint. Original namespaces and prerequisite bundles remain
+required. The final matrix is `controls-run-02`; earlier binaries/results remain
+diagnostic or superseded checks.
+
+Mandatory host-receipt integration into native/full-retainer workflows remains
+open. This does not admit the builder bootstrap, complete compiler/SDK content,
+unreported inputs/search absence, Mach-O linker/library closure or OS loader/
+shared-cache bytes. Link replay and deterministic executable reproduction are
+not claimed. No new guest execution or kernel/product default change is made;
+owned ARM/GUI, redistribution and broader roadmap 14 acceptance remain open.
