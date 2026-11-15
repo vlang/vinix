@@ -4025,3 +4025,38 @@ This validates disclosure and one crash boundary per architecture using signed
 marker bytes. It does not requalify the full crash matrix, execute Wine, qualify
 real runtime upgrades/GUI/owned ARM execution, or close whole-launch lifetime,
 physical power-loss, torn-write or broader roadmap 14 acceptance requirements.
+
+## Public preview before crash recovery, 2026-11-15
+
+Feature `d4b2c721e` extends the public CLI VM-cut fixture to inspect interrupted
+state before any recovery. Public review must return version 2.0.0, the expected
+prior generation and every exact old/current/missing binding with its
+replace/keep/create operation. Additions must refuse while old links remain.
+After each inspection/refusal, builtin namespace cardinality, targets, pending
+stage target and the private sentinel must match the interrupted boundary.
+After migration/repetition, public review and additions both require complete
+current keep JSON. The controller requires the new preview/refusal/completion
+markers in addition to all previous cold-state, admission, lease and fsck checks.
+
+Fresh production/manualfree guest builds and static LLVM/musl links pass on both
+targets. Focused three-row signed-service VJFS CLI cases pass: staged second
+replacement at sync 4 on ARM64 (18.047 seconds) and x86_64 (25.135 seconds), plus
+all replacements complete with the addition missing at sync 6 on ARM64 (19.395
+seconds). All positive failure arrays are empty. The unchanged SIGKILL,
+two-boot, 120-second cap, cleanup grace, clean export and strict e2fsck checks
+remain required. An ARM64 sync-4 control using the old CLI without version
+disclosure fails at cold public preview with `public recovery JSON inventory
+differs`, exit 1, before preview success. This is an expected negative result.
+
+Complete evidence is retained at `/Users/alex/.cache/vwwinepreview-20261115-01`,
+based on `f73688f2f` plus `source.patch`. Unchanged CLI/kernel/image prerequisites
+come from `vwwineversion-20261115-01`; that complete bundle and its original
+prerequisites remain independently required. The external inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-preview-20261115-01.inventory.json`,
+SHA-256 `da089c63e643fded2fc2ae9ffbd8cddf9c03826f4963589035f70421b2c41240`.
+Complete inventory recording and independent comparison pass.
+
+These checks use signed marker bytes and selected boundaries. They do not
+qualify the full crash matrix, new 741-row coverage, real Wine upgrades/GUI,
+owned ARM execution, physical power loss/torn writes, whole-launch lifetime or
+the complete roadmap 14 acceptance gate.
