@@ -133,7 +133,14 @@ close/reuse, aliases and separately reopened pipes, with guarded event sets and
 flat stable-description registration cleanup. Both fixture sources are frozen;
 the default budget is 600 seconds. `epollkey-reference.v` runs the same ELF on
 Linux, and `epollkey-evidence.v` audits the complete evidence bundle. See
-[receipts and the unresolved full-churn growth](../../docs/linux-epoll-registration-key.md).
+[receipts and the historical full-churn growth](../../docs/linux-epoll-registration-key.md).
+
+`--cases epollchurn` repeats the epoll identity checks with fresh endpoints,
+procfs reopens and epoll sets throughout its strict 200-cycle cleanup guard.
+It qualifies the procfs Text-header leak fix; optional root-only allocation
+tracking names surviving allocations without changing storage assertions.
+Both sources are frozen, with a 600-second default budget. See
+[attribution, receipts and broader harness limits](../../docs/linux-procfd-builder-lifetime.md).
 
 ```sh
 tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-arm

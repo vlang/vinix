@@ -2421,9 +2421,17 @@ application catalog without host-side image rebuilds or manual runtime surgery.
 - [x] Match native epoll registrations by descriptor number and retained open
   description across close/reuse, duplicates and separately reopened same-inode
   descriptions. Identical native/Linux ELFs pass 5,760 checks per architecture;
-  originals fail 840 each. Stable-description registration cleanup stays flat;
-  full-churn size-48 growth remains unresolved. See
-  [the registration-key qualification](docs/linux-epoll-registration-key.md).
+  originals fail 840 each. Stable-description registration cleanup stays flat.
+  See [the registration-key qualification](docs/linux-epoll-registration-key.md)
+  for the original full-churn failure and its follow-up below.
+
+- [x] Resolve the recorded full-churn size-48 growth by consuming anonymous
+  procfs descriptor-text builders as values. Live tracking attributes all 7,200
+  old headers per 200-cycle cohort; corrected fresh-endpoint/reopen/epoll churn
+  stays flat on both architectures. All 5,760 semantic checks and 3/3 registered
+  suites pass per architecture, with complete C scope and independent lifetime
+  review. See [the builder-lifetime qualification](docs/linux-procfd-builder-lifetime.md)
+  for the retained broader performance-harness blockers.
 
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.

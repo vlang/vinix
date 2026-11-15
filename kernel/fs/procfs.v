@@ -2075,7 +2075,8 @@ fn anonymous_descriptor_text(res &resource.Resource) string {
 	}
 	text.add_unsigned(res.stat.ino)
 	text.add_byte(`]`)
-	return text.str()
+	// Consuming the value avoids V boxing this temporary for a mut receiver.
+	return lib.finish_text(text)
 }
 
 // A process's file shows ids as the tree it is in numbers them.

@@ -69,3 +69,7 @@ Concurrent close/reuse, nested epoll, fairness, ET/oneshot transitions, pressure
 GNU/foreign/32-bit paths and application installation/integration remain
 unqualified. The broader section 15 gates and historical memory issues remain
 open.
+
+The subsequent [builder-lifetime qualification](linux-procfd-builder-lifetime.md)
+attributes and removes the recorded full-churn size-48 growth. Its new complete
+runs do not change the historical failed measurements or bundle above.
