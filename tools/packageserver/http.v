@@ -14,7 +14,11 @@ import time
 #include <stdio.h>
 #include <sys/socket.h>
 struct C.pollfd { mut: fd i32 events i16 revents i16 }
-fn C.poll(&C.pollfd, usize, i32) i32
+$if macos || ios || freebsd || openbsd || dragonfly || android || termux {
+	fn C.poll(&C.pollfd, u32, i32) i32
+} $else {
+	fn C.poll(&C.pollfd, uint, i32) i32
+}
 fn C.rename(&char, &char) i32
 fn C.fsync(i32) i32
 fn C.mkdtemp(&char) &char
