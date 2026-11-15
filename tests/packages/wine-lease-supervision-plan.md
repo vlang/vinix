@@ -5124,3 +5124,67 @@ unqualified. The SDK is still required for original admission, source checks
 and unrestricted controls. Mandatory host receipt integration of this restriction,
 owned ARM/GUI, broader lifetime/mapping controls and default activation remain
 open. This step changes no guest, kernel or default behavior.
+
+## Required installed-SDK read-denied host receipts (2026-11-16)
+
+Commit `919665989` integrates installed CLT SDK read-denied replay into format-5
+[required host receipts](wine-host-required-check.md). The shared `winesdkdeny`
+module captures a separate replay graph alongside the existing Mach-O replay
+and SDK declaration graph. The pinned builder applies the sandbox restriction
+in a child before LLD exec, records the actual command/environment/policy, and
+requires identical captured and unrestricted installed-SDK executable bytes.
+Three SDK read controls require EPERM/EACCES; the restricted installed-SDK link
+must exit 1 with the three exact missing-library diagnostics and no executable.
+The system sandbox API is resolved explicitly through its OS library; its
+loader/cache bytes remain outside admission.
+
+Every replay member, output, execution record, child command/environment/exit,
+raw log and receipt is mandatory in the host output graph. The implementation
+source is embedded, pinned and retained with the other admission modules.
+Shared admission rechecks the exact policy and execution records, successful
+outputs, expected denials, captured member bytes and observed loads/images.
+Producer, controller and full retainer inherit these requirements; their
+bindings and retained input maps cannot omit the new graph. Original format-4
+checkers, standalone SDK-denied auditors and historical bundles keep their
+original contracts and complete prerequisite requirements.
+
+All four host roles pass production/manualfree builds and admission, with
+sixteen runtime denial controls. Host controls pass real/copied baselines,
+fixture, controller and producer entrypoints, and thirty-six exact resealed refusals.
+Ten new cases cover weakened policy, disabled execution restriction, added
+environment input, a successful negative exit, unrelated read/link failures,
+changed output/member bytes, linked evidence and an old format-4 proof.
+The PE and prepared runtime builds pass. A fresh signed x86 holder-SIGKILL/
+collection run passes in **95.514 seconds**, with producer admission before
+signing and both producer/controller bindings re-admitted after the guest.
+All eighteen startup/pre-sign and thirty-two receipt controls pass.
+
+Four retention partitions pass real and unchanged copied baselines plus
+14/14/14/13 exact refusals. The partition checker confirms all fifty-five
+unique assigned cases. Two new cases omit `sdk-denied/receipt.json` from the
+producer/controller retained input maps; neither creates retained output.
+All previous fifty-three named gates remain intact.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostdeny-20261116-01`.
+`source-final` is an APFS clone of the prior format-4 source snapshot with this
+feature's V sources overlaid before compilation. Final builder is
+`host-build-final`; roles are `host-fixture`, `host-controller`, `host-producer`
+and `host-retainer`. Passing signed evidence is `native-03`; final receipt
+controls are `receipt-controls-02`, with retention in `retention-p0` through
+`retention-p3`. The checkpoint includes selected sources/imports, feature patch/
+revision, generated programs, complete graphs/byte stores, raw outcomes and
+`validation.txt`. Initial compiler/module-path and native compiler/ISO-loader
+selection failures remain diagnostic; the corrected final runs above pass.
+The typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-sdk-denied-20261116-01.inventory.json`,
+SHA-256 `de90437e4191d741f0ecc43df07b1e11c7cbb0450ab1d3d37faf1ba31ea34f1d`.
+Complete inventory recording and independent comparison both pass. Original
+historical bundles and selected namespaces remain required and unchanged.
+
+This closes required-host integration and fresh signed x86 qualification for
+the narrow installed CLT SDK read restriction. Other filesystem/network access,
+helper startup, complete library/search/read closure, full TAPI/ABI interpretation,
+OS loader/cache bytes and bootstrap/hermetic admission remain unqualified.
+The installed SDK is still required for original source checks and unrestricted
+controls. Owned ARM/GUI, broader lifetime/mapping controls and default activation
+remain open. No guest/kernel/default behavior changes.
