@@ -4404,3 +4404,44 @@ The original selected distribution reconstruction, local-only notices and
 qualified kernel bundles remain independently required. C header/hermetic
 admission, full owned retention, default activation, owned ARM/GUI and broader
 section 14 acceptance remain open.
+
+## Full owned holder-death retainer admission (2026-11-15)
+
+Commit `9fa42b621` adds [explicit x86 owned holder-death retention](wine-owned-retain-check.md)
+with `--owned-holder-death`. Native production and retention share the captured
+ordinary-file owned-build validator, with source guards and input pins. The
+retainer retains every existing complete recorded input-tree, parsed-source,
+PE producer, private runtime/layout, graphics, local source-offer, generated
+output, compiler-argument and ISO check. It additionally binds the owned
+manager's server/identity/connection and launcher sources to embedded bytes.
+
+This mode requires exact owned bridge/guest/package flags, a 3 GiB VM, matching
+raw/final passing outcomes below 600 seconds and exact unique ordered lifetime
+milestones. Its receipt scope names caller/holder death, retained obsolete
+generation, manager status 37, runtime retirement, free lease and final
+collection. It does not claim the separate ordinary Windows API/SEH, GUI, ARM
+or redistribution qualifications. Default console and fork-safe contracts
+remain distinct; the default mode refuses this owned fixture.
+
+The fresh PE and owned runtime pass signed native holder-death/collection in
+130.139 seconds. The complete real graph and unchanged copied graph both pass
+the full retainer, including original recorded build namespaces. Nine resealed
+controls fail at their named gates and create no retained output: missing
+package kernel flag, linked mode receipt, omitted hidden SDK source, changed
+raw outcome, deadline equality, missing/duplicated/embedded-CR milestones and
+changed VM memory. The shared validator also passes all 32 existing receipt
+mutation controls. ARM refuses this x86-only mode before output creation.
+
+The complete checkpoint is `/Users/alex/.cache/vwownedretain-20261115-01`,
+with isolated base `e2cec2527`, feature patch, exact fresh producer/native
+artifacts, real/copied retained receipts, private control copies and refusal
+logs. Its inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-owned-retain-20261115-01.inventory.json`,
+SHA-256 `3dac039f8765d37c468f39cc7ca315032290670f836602d20b5397451823b0a9`.
+Complete typed-inventory recording and independent comparison pass against
+the retained checkpoint, preserving its stated recorded-input scope.
+Historical bundles are unchanged and retain their original complete-input
+requirements. Selected original distribution, notices, toolchain and kernel
+prerequisites remain independently required. C resource-header/hermetic
+admission, default activation, owned ARM/GUI and broader section 14 acceptance
+remain open.
