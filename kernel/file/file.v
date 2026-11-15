@@ -476,9 +476,13 @@ fn poll_user_fds(pagemap &memory.Pagemap, user_fds u64, mut pollfds []PollFD, nf
 	if err != 0 && err != errno.eintr {
 		return ret, err
 	}
-	if nfds != 0
-		&& !usercopy.copy_to_pagemap(pagemap, user_fds, unsafe { voidptr(&pollfds[0]) }, nfds * sizeof(PollFD)) {
-		return errno.err, errno.efault
+	// Only revents is output. fd/events can occupy read-only pages, and a
+	// later refused store must leave earlier entries published in array order.
+	for i := u64(0); i < nfds; i++ {
+		if !usercopy.copy_to_pagemap(pagemap, user_fds + i * sizeof(PollFD) + __offsetof(PollFD, revents),
+			unsafe { voidptr(&pollfds[int(i)].revents) }, sizeof(i16)) {
+			return errno.err, errno.efault
+		}
 	}
 	return ret, err
 }

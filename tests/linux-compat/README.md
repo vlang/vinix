@@ -107,6 +107,13 @@ the checks while optimizing hashing. Confirm a deliberate failing assertion
 exits nonzero before using a compiler for an audit. Application catalog
 validation uses explicit errors and retains its checks in production builds.
 
+`--cases pollcopy` qualifies result-only poll/ppoll copyout with read-only
+headers, first/later refused outputs, inaccessible imports and surrounding
+byte guards. Both fixture sources are frozen. `pollcopy-reference.v` runs the
+same ELF on Linux; `pollcopy-evidence.v` checks baseline failures, generated C,
+native/Linux outcomes, storage and selected regressions. See
+[receipts and limits](../../docs/linux-poll-copyout.md).
+
 ```sh
 tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-arm
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86

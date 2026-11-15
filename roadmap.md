@@ -2394,6 +2394,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   The older additional size-64 object remains unattributed. See
   [the warmup qualification](docs/linux-poll-signal-warmup.md).
 
+- [x] Publish only native poll/ppoll revents fields in array order, accepting
+  read-only input headers and preserving completed outputs before later EFAULT.
+  Identical native/Linux probes pass 10,368 AArch64 / 13,824 x86-64 checks;
+  originals fail 1,296 / 1,728. Both credential cohorts retain flat storage.
+  See [the copyout qualification](docs/linux-poll-copyout.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 
