@@ -46,7 +46,8 @@ compiler flags, verifies the selected QEMU and 3 GiB memory command, and require
 an uninterrupted outcome within the unchanged 600-second outer bound. Positive
 milestones must be exact, unique lines in order. Baseline refusal must name the
 capability gate before Wine output and leave no passing result. Production
-controls cover missing/duplicate/quoted/reordered milestones, forbidden output,
+controls cover missing/duplicate/quoted/reordered milestones, embedded carriage
+returns, forbidden output,
 wrong refusal gates, and missing/duplicate/merged compiler flags.
 
 This is a focused native outcome and recorded-input check. The existing ordinary

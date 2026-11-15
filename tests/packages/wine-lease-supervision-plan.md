@@ -4320,3 +4320,50 @@ holder-death execution and collection, default activation, owned ARM/GUI,
 complete hermetic build admission and the remaining section 14 acceptance
 gates remain open. Existing owned-mode runtime receipts do not imply this
 additional package frontend build flag.
+
+## Signed Wine collection after holder SIGKILL (2026-11-15)
+
+Feature `4ea2d3663` adds the [signed x86 holder-death case](wine-holder-death-check.md)
+through `--owned-manager --holder-death-probe`. The native controller builds
+the real package frontend with `wine_kernel_lease`; the existing admitted
+owned Wine runtime and locally signed Win64 fixture remain its runtime inputs.
+After authenticating the process chain and checking competing-prefix refusal,
+the fixture kills and reaps both ordinary caller and private holder. The
+adopted SDK manager, server and Windows child stay live, and the generation
+lease remains busy. Real remove/rollback transitions make the generation
+obsolete; three collections must preserve its directory and executable hash.
+
+`native-05` passes in 107.6 seconds. After the Windows child release handshake,
+the fixture collects only identified adopted runtime PIDs, requires child
+status 0 and manager status 37, records two auxiliary Wine statuses of 0, checks
+that all generation-matched runtime command lines are gone, and acquires an
+exclusive lease before final collection removes the obsolete generation.
+The rollback generation remains available. The ordinary owned-Wine regression
+also passes in 106.163 seconds. `baseline-02` refuses the original kernel at the
+workload capability gate before Wine launch, with verified inputs and no final
+passing result. `native-04` remains failed: its final scan caught auxiliary
+Wine processes the fixture had not yet collected. The corrected fixture waits
+for those admitted processes; it sends them no cleanup signal.
+
+The focused `wine-holder-evidence.v` checker independently rehashes every
+recorded input and generated artifact, checks compiler flags and VM identity,
+and requires exact unique ordered milestones, matched final/raw outcomes and
+the unchanged outer deadline. Both positive and baseline evidence pass.
+Production rejection controls cover missing, duplicated, quoted, reordered and
+embedded-CR milestones, forbidden output, wrong refusal gates and compiler
+flags. Follow-up `6fafc972f` restricts CR normalization to line endings. This
+focused checker leaves the ordinary runtime retainer and complete original
+producer/compiler/header closure admission as separate requirements.
+
+The complete checkpoint is `/Users/alex/.cache/vwwineholder-20261115-01`, with
+isolated base `54f4f8134`, feature/fix patches, exact binaries, native outcomes,
+source versions, raw failures and checker logs. Its stable receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-holder-death-20261115-02.inventory.json`,
+SHA-256 `534297e38a377f22358dc306d60a703ad19294cac1b2afa369862628898cad02`.
+Typed-inventory recording and independent comparison both pass against the
+stable checkpoint, without expanding the recorded-input admission scope.
+The earlier inventory construction refused workspace mutation during checker
+finalization; it is not the qualified receipt. Original `vwcollect-20261113-01`
+and `vwkernellease-20261115-01` prerequisites remain independently required and
+unchanged. Default activation, owned ARM/GUI, full build admission and broader
+section 14 acceptance remain open.
