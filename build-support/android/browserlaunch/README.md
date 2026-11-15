@@ -74,6 +74,11 @@ then launches `webview-engine --control-fd N --profile ABS`. The helper receives
 an explicitly constructed environment containing only browser closure library
 paths, never ART's preload, Bionic paths or service/WS authority descriptors.
 Startup failures close the channel and report through the original stderr.
+An engine exit also reports its numeric process status. Failed sessions retain
+only the final 64 KiB of their private log at `webview/last-failure.log`, mode
+0600, replacing the previous failure atomically. Temporary session files and
+the X authority cookie are still removed. The log stays in app-private storage;
+it is never copied to public stderr and may contain sensitive browser details.
 
 Run focused host tests with:
 

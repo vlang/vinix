@@ -141,3 +141,48 @@ fn test_disabled_launch_never_creates_a_supervisor_or_descriptor() {
 	assert config.launch()! == -1
 	assert config.manifest_fd == -1 && config.root_fd == -1
 }
+
+fn test_failure_log_retains_bounded_binary_tail_without_moving_source_offset() {
+	base := os.real_path(os.temp_dir()) + '/vinix-browser-failure-${C.getpid()}'
+	os.mkdir(base)!
+	os.chmod(base, 0o700)!
+	defer { os.rmdir_all(base) or {} }
+	for length in [0, 100, 65536, 70000] {
+		bytes := []u8{len: length, init: u8(index % 251)}
+		os.write_file_array(base + '/source', bytes)!
+		mut source := os.open(base + '/source')!
+		assert C.lseek(i32(source.fd), 7, C.SEEK_SET) == 7
+		retain_failure_log(i32(source.fd), base)!
+		assert C.lseek(i32(source.fd), 0, C.SEEK_CUR) == 7
+		source.close()
+		start := if length > 65536 { length - 65536 } else { 0 }
+		assert os.read_bytes(base + '/last-failure.log')! == bytes[start..]
+		assert os.stat(base + '/last-failure.log')!.mode & 0o7777 == 0o600
+		assert os.ls(base)!.len == 2
+	}
+}
+
+fn test_failure_log_replaces_destination_symlink_and_rejects_invalid_sources() {
+	base := os.real_path(os.temp_dir()) + '/vinix-browser-failure-links-${C.getpid()}'
+	os.mkdir(base)!
+	os.chmod(base, 0o700)!
+	defer { os.rmdir_all(base) or {} }
+	os.write_file(base + '/source', 'engine error')!
+	os.write_file(base + '/victim', 'unchanged')!
+	os.symlink(base + '/victim', base + '/last-failure.log')!
+	mut source := os.open(base + '/source')!
+	retain_failure_log(i32(source.fd), base)!
+	source.close()
+	assert os.lstat(base + '/last-failure.log')!.get_filetype() == .regular
+	assert os.read_file(base + '/last-failure.log')! == 'engine error'
+	assert os.read_file(base + '/victim')! == 'unchanged'
+	mut device := os.open('/dev/null')!
+	for fd in [i32(-1), i32(device.fd)] {
+		mut rejected := false
+		retain_failure_log(fd, base) or { rejected = true }
+		assert rejected
+	}
+	device.close()
+	assert os.ls(base)!.len == 3
+	assert os.read_file(base + '/last-failure.log')! == 'engine error'
+}

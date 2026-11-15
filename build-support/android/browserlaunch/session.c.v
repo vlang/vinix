@@ -29,6 +29,7 @@ fn C.getresgid(&u32, &u32, &u32) i32
 fn C.getgroups(i32, voidptr) i32
 fn C.dup2(i32, i32) i32
 fn C.dup(i32) i32
+fn C.pread(i32, voidptr, usize, i64) isize
 // Keep the typed status binding separate from builtin's platform-int binding,
 // which os.Process uses with the compiler's C-int copyback conversion.
 @[c: 'waitpid']
@@ -248,7 +249,40 @@ fn stop(mut process os.Process) {
 	process.close()
 }
 
-fn (mut config Config) session(fd i32, profile_path string) ! {
+// Keep only the last 64 KiB from the still-open private log. Atomic replacement
+// bounds retained diagnostics across failed sessions and does not follow an
+// existing last-failure.log symlink. Never copy logs to public stderr.
+fn retain_failure_log(fd i32, profile_path string) ! {
+	mut info := C.stat{}
+	if C.fstat(fd, &info) != 0 || u32(info.st_mode) & 0o170000 != 0o100000
+		|| info.st_size < 0 || info.st_uid != C.getuid() || info.st_nlink != 1 {
+		return error('invalid private browser log descriptor')
+	}
+	size := i64(info.st_size)
+	length := int(if size > 65536 { i64(65536) } else { size })
+	mut bytes := []u8{len: length}
+	mut read := 0
+	for read < length {
+		n := unsafe { C.pread(fd, &bytes[read], usize(length - read), size - length + read) }
+		if n < 0 && C.errno == C.EINTR { continue }
+		if n <= 0 { return error('cannot read private browser failure log') }
+		read += int(n)
+	}
+	temporary := profile_path + '/failure-' + rand.bytes(16)!.hex() + '.tmp'
+	output := unsafe { C.open(&char(temporary.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_CLOEXEC | C.O_NOFOLLOW, 0o600) }
+	if output < 0 { return error('cannot create private browser failure log') }
+	defer { C.close(output); os.rm(temporary) or {} }
+	mut written := 0
+	for written < length {
+		n := unsafe { C.write(output, &bytes[written], usize(length - written)) }
+		if n < 0 && C.errno == C.EINTR { continue }
+		if n <= 0 { return error('cannot write private browser failure log') }
+		written += int(n)
+	}
+	os.rename(temporary, profile_path + '/last-failure.log')!
+}
+
+fn (mut config Config) session(fd i32, profile_path string, diagnostics i32) ! {
 	defer { C.close(fd); config.close() }
 	for {
 		if await_command(fd, 500)! { break }
@@ -267,10 +301,19 @@ fn (mut config Config) session(fd i32, profile_path string) ! {
 		private_directory(session_path + '/' + name, config.uid, config.gid, true)!
 	}
 	log_path := session_path + '/session.log'
-	log := unsafe { C.open(&char(log_path.str), C.O_WRONLY | C.O_CREAT | C.O_EXCL | C.O_CLOEXEC | C.O_NOFOLLOW, 0o600) }
+	log := unsafe { C.open(&char(log_path.str), C.O_RDWR | C.O_CREAT | C.O_EXCL | C.O_CLOEXEC | C.O_NOFOLLOW, 0o600) }
 	if log < 0 { return error('cannot create private browser session log') }
 	if C.dup2(log, 1) < 0 || C.dup2(log, 2) < 0 { C.close(log); return error('cannot redirect browser session log') }
-	C.close(log)
+	mut completed := false
+	defer {
+		if !completed {
+			retain_failure_log(log, profile_path) or {
+				message := 'run-android browser: failure log retention failed\n'
+				unsafe { C.write(diagnostics, message.str, usize(message.len)) }
+			}
+		}
+		C.close(log)
+	}
 	display := choose_display()!
 	mut cookie := rand.bytes(16)!
 	defer { for index in 0 .. cookie.len { cookie[index] = 0 } }
@@ -304,9 +347,13 @@ fn (mut config Config) session(fd i32, profile_path string) ! {
 	defer { stop(mut engine) }
 	for client_alive(fd) {
 		if !server.is_alive() { return error('private browser display exited') }
-		if !engine.is_alive() { return error('browser engine exited') }
+		if !engine.is_alive() {
+			engine.wait()
+			return error('browser engine exited status=' + engine.code.str())
+		}
 		time.sleep(25 * time.millisecond)
 	}
+	completed = true
 }
 
 // Called only after nativeidentity.activate irreversibly drops privileges. No
@@ -333,7 +380,7 @@ pub fn (mut config Config) launch() !int {
 		if diagnostics < 3 { C._exit(1) }
 		cloexec(diagnostics, true) or { C._exit(1) }
 		close_unrelated([pair[1], config.manifest_fd, config.root_fd, diagnostics]) or { C._exit(1) }
-		config.session(pair[1], profile_path) or {
+		config.session(pair[1], profile_path, diagnostics) or {
 			C.dup2(diagnostics, 2)
 			eprintln('run-android browser: ${err}')
 			C._exit(1)
