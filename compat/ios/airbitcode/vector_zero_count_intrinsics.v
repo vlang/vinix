@@ -21,7 +21,7 @@ fn (p IRTypedProgram) vector_zero_count_profile(ir IRModule, stream Stream, pool
  return work
 }
 fn zero_count_intrinsic_vector(id ScalarIntrinsic, source ScalarVectorValue, bits u32, count int, zero_poison u64) !ScalarVectorValue {
- if id != .ctlz || zero_poison > 1 { return error('AIR vector intrinsic: leading-zero operation/flag') }
+ if id !in [.ctlz, .cttz]! || zero_poison > 1 { return error('AIR vector intrinsic: zero-count operation/flag') }
  vector_float_intrinsic_key(id, count, bits)!
  mut result := ScalarVectorValue{}
  for lane in 0 .. count {

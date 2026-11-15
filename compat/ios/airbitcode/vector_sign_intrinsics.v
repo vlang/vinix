@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 64 + 2048 + 64 + 1024
+const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 64 + 2048 + 64 + 2048
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -35,9 +35,9 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	if callee.number >= u32(pools.declarations.len) || pools.declarations[int(callee.number)] != f.record || callee.type_index < 0 || callee.type_index >= p.types.len || p.types[callee.type_index].kind != .pointer_t || p.types[callee.type_index].address_space != 0 { return error('AIR vector intrinsic: direct declaration identity') }
 	signature := ir.types[f.signature]; arity := scalar_intrinsic_arity(id)
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 || ir.references[signature.refs_start] != op.result_type { return error('AIR vector intrinsic: signature/arity') }
-	if !mixed && id !in [.ctpop, .bitreverse, .bswap, .ctlz]! { return error('AIR vector intrinsic: mixed floating execution required') }
+	if !mixed && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz]! { return error('AIR vector intrinsic: mixed floating execution required') }
 	mut work := 0
-	if id == .ctlz {
+	if id in [.ctlz, .cttz]! {
 		work = p.vector_zero_count_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
 	} else if id in [.ctpop, .bitreverse, .bswap]! {
 		work = p.vector_integer_unary_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
@@ -61,7 +61,7 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR vector intrinsic: declaration record') }
-	return work, vector_float_intrinsic_key(id, count, bits)!, ir_values(stream, raw)[6], id in [.is_fpclass, .ctlz]!
+	return work, vector_float_intrinsic_key(id, count, bits)!, ir_values(stream, raw)[6], id in [.is_fpclass, .ctlz, .cttz]!
 }
 fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right ScalarVectorValue, bits u32, count int) !ScalarVectorValue {
 	vector_sign_intrinsic_key(id, count, bits)!
@@ -78,7 +78,7 @@ fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Strea
 	id, count, bits := vector_float_intrinsic_name(ir.functions[op.callee_function].name)!
 	left := m.read_vector(stream, m.p.operands[op.operands_start + 1])!
 	if id in [.ctpop, .bitreverse, .bswap]! { return m.store_vector_value(inst, integer_intrinsic_vector(id, left, bits, count)!)! }
-	if id == .ctlz {
+	if id in [.ctlz, .cttz]! {
 		flag := m.read(op.operands_start + 2)!
 		return m.store_vector_value(inst, zero_count_intrinsic_vector(id, left, bits, count, flag.value)!)!
 	}
