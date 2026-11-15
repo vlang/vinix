@@ -252,6 +252,16 @@ explicit access alignment and final ret void. Calling convention and LLVM functi
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
 Valid LLVM IR remains a precondition. No source compilation is provided.
 
+Pipeline creation prepares the memory function once and owns its validated
+profile alongside the immutable library/index storage. Deferred dispatches reuse
+that preparation while checking every current buffer binding, permission,
+alignment, extent, memcpy alias and step budget before writes. Each execution
+still uses fresh temporary value storage; earlier results or failures do not
+carry into subsequent dispatches. The pipeline releases the prepared profile
+before releasing its borrowed indexes. The focused `vector-memory` runtime test
+also checks eight dispatches reusing two pipelines across two drained runtimes,
+changing buffer offsets and releasing caller references before commit.
+
 Buffer loads/stores also accept fixed 1..16-lane vectors of i8/i16/i24/i32/
 i40/i48/i56/i64, half and float. Lanes occupy consecutive little-endian bytes;
 half/float transfers preserve raw bits. A load captures a complete vector before

@@ -18,12 +18,12 @@ struct SoftwareMetalKernel {
 	pools airbitcode.IRConstantPools
 	bodies airbitcode.IRFunctionBodies
 	program airbitcode.IRTypedProgram
-	profile airbitcode.IRMemoryProfile
+	prepared airbitcode.IRPreparedMemoryFunction
 	function int
 	arguments []SoftwareMetalKernelArgument
 }
 fn (kernel &SoftwareMetalKernel) free() {
-	kernel.profile.free(); kernel.program.free(); kernel.bodies.free()
+	kernel.prepared.free(); kernel.program.free(); kernel.bodies.free()
 	kernel.pools.free(); kernel.ir.free(); kernel.stream.free()
 	unsafe { kernel.arguments.free() }
 }
@@ -53,16 +53,16 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 	if function < 0 { return error('Software Metal requires an air.kernel entry') }
 	entry := entries.entries[entry_index]
 	if entry.opaque_attributes { return error('Software Metal does not support extra kernel attributes') }
-	profile := program.memory_function_profile(ir, stream, pools, bodies, function)!
-	defer { if !keep { profile.free() } }
-	mut arguments := []SoftwareMetalKernelArgument{len: profile.arguments.len}
+	prepared := program.prepare_memory_function(ir, stream, pools, bodies, function)!
+	defer { if !keep { prepared.free() } }
+	mut arguments := []SoftwareMetalKernelArgument{len: prepared.argument_count()}
 	defer { if !keep { unsafe { arguments.free() } } }
 	mut slots := u32(0)
 	for arg in entries.arguments[entry.arguments_start..entry.arguments_start + entry.arguments_count] {
 		if arg.kind != 'air.buffer' || arg.opaque_attributes || arg.condition >= 0 || arg.unused || !arg.has_location || arg.location_count != 1 || arg.location >= 31 || !arg.has_address_space || arg.address_space !in [u32(1), 2]! || arg.access !in [.read, .write, .read_write]! || (arg.address_space == 2 && arg.access != .read) { return error('Software Metal requires explicit scalar buffer metadata') }
 		if slots & (u32(1) << arg.location) != 0 { return error('Software Metal buffer slots overlap') }
 		slots |= u32(1) << arg.location
-		a := profile.arguments[int(arg.index)]
+		a := prepared.argument(int(arg.index))!
 		if (a.writable && arg.access == .read) || (a.readable && arg.access == .write) { return error('Software Metal buffer access disagrees with body') }
 		alignment := if arg.has_alignment && arg.alignment > a.alignment { arg.alignment } else { a.alignment }
 		mut minimum := a.minimum_size
@@ -72,7 +72,7 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 		arguments[int(arg.index)] = SoftwareMetalKernelArgument{int(arg.location), alignment, minimum, arg.access != .read}
 	}
 	keep = true
-	return SoftwareMetalKernel{stream, ir, pools, bodies, program, profile, function, arguments}
+	return SoftwareMetalKernel{stream, ir, pools, bodies, program, prepared, function, arguments}
 }
 fn sm_compute_pipeline(device u64, selector &char, function u64, output &u64) u64 {
 	C.ios_objc_initialize_lock()
@@ -257,7 +257,7 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 		// vbytes borrows storage; freeing bindings must never free its data.
 		bindings << airbitcode.IRMemoryBinding{data: unsafe { (&u8(sm_storage_base(buffer))).vbytes(int(sm_buffer_length(buffer))) }, offset: state.offsets[arg.slot], base_alignment: 256, writable: arg.writable}
 	}
-	k.program.run_memory_function(k.ir, k.stream, k.pools, k.bodies, k.function, mut bindings, k.profile.steps)!
+	k.prepared.run(mut bindings, k.prepared.steps())!
 }
 fn sm_compute_start(device u64, command u64) {
 	for name in [c'VinixSoftwareMTLComputePipelineState', c'VinixSoftwareMTLComputeCommandEncoder']! {

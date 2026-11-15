@@ -399,6 +399,16 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
 	profile := p.memory_function_profile(ir, stream, pools, bodies, function)!
 	defer { profile.free() }
+	return p.execute_memory_function(ir, stream, pools, bodies, function, profile, mut bindings, step_limit)!
+}
+
+// The profile and indexes belong to a successful preflight of this exact
+// immutable function. Keep this entry point private; public prepared functions
+// capture that association at construction instead of accepting caller profiles.
+fn (p IRTypedProgram) execute_memory_function(ir IRModule, stream Stream, pools IRConstantPools,
+	bodies IRFunctionBodies, function int, profile IRMemoryProfile,
+	mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
+	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
 	if bindings.len != profile.arguments.len || profile.steps > step_limit { return error('AIR memory execution: binding count/budget') }
 	for i, b in bindings {
 		a := profile.arguments[i]

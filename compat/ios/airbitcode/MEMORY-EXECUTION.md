@@ -48,6 +48,41 @@ integer-pointer casts,
 loops, atomics, volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
+## Prepared memory functions
+
+`p.prepare_memory_function(ir, stream, pools, bodies, function)` validates the
+complete function once and returns an owned `IRPreparedMemoryFunction`. Call
+`prepared.run(mut bindings, step_limit)` for subsequent executions. The object
+captures its function and indexes internally; execution does not accept a caller
+supplied profile. `argument_count()`, `argument(index)` and `steps()` expose the
+binding requirements and static upper bound on steps. Each argument query returns
+a value copy, so changing it cannot alter the cached requirements. A default
+uninitialized object rejects execution.
+
+The prepared object owns only its profile arrays. The program, module, stream,
+constant pools, bodies and backing bitcode are borrowed: they must remain alive
+and immutable through the last execution. Free the prepared object exactly once
+before freeing those indexes. It does not clone or freeze their storage. Valid
+LLVM IR remains a precondition. The ordinary `run_memory_function` entry point
+continues to preflight each call, including the existing mutation checks.
+
+Every prepared execution still checks the current binding count, sizes, offsets,
+alignment, permissions, address-space restrictions, step limit and actual
+backing-address overlap for memcpy. These checks run before any writes, including
+for inactive memcpy instructions. Execution allocates fresh scalar/vector/PHI/
+move scratch and releases it on success or error; values and failures do not
+persist between runs. The operation semantics and execution engine are shared
+with the ordinary API. The software Metal pipeline owns this preparation and
+reuses it when deferred dispatch snapshots execute.
+
+`tests/ios/air-memory-prepared.v` compares 28,928 scalar/vector copies with the
+ordinary API and independent expected bytes. Another 3,314 controls cover changing
+inputs, branch PHIs, fills/copies/moves, poison recovery, copied metadata and
+binding/budget guards. Extra controls cover aliases, explicit alignment, readonly
+address space 2, invalid cold blocks, empty functions and default objects. Its
+alternating five-round microbenchmark uses a synthetic 2,048-instruction cold
+block and reports raw times; it is not an application performance measurement.
+
 Unconditional branches and scalar i1 conditional branches must target strictly
 later blocks in the function's block order; conditional destinations must be
 distinct. All blocks are partitioned and preflighted, including unvisited

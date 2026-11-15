@@ -3922,10 +3922,36 @@ fn sm_test_vector_memory_focus() ! {
 		queue := sm_send(device, c'newCommandQueue')
 		a := sm_test_buffer(device, 16, 0); b := sm_test_buffer(device, 16, 0); output := sm_test_buffer(device, 32, 0)
 		sm_test_vector_memory(device, library, queue, a, b, output, sm_send(a, c'contents'), sm_send(output, c'contents'))
+		sm_test_prepared_memory_bindings(device, library, queue)
 		objc_release(a); objc_release(b); objc_release(output); objc_release(queue); objc_release(library); objc_release(device)
 		objc_pool_pop(pool); objc_stop()
 	}
 	println('IOS-SOFTWARE-METAL-VECTOR-MEMORY: 40 deferred dispatches, integer/half/float loads/stores, input and output offset snapshots, 20 successful and 20 poison/undef failed commands, whole-store refusal, padding and two drained runtimes PASS')
+	println('IOS-SOFTWARE-METAL-PREPARED: 8 dispatches reuse two prepared pipelines with changing buffer offsets, deferred inputs, released caller references and isolated outputs PASS')
+}
+fn sm_test_prepared_memory_bindings(device u64, library u64, queue u64) {
+	a := sm_test_buffer(device, 32, 0); b := sm_test_buffer(device, 16, 0); output := sm_test_buffer(device, 96, 0)
+	ap := sm_send(a, c'contents'); outp := sm_send(output, c'contents')
+	pipeline := sm_test_compute_pipeline(device, library, 'vmem_i64_raw', unsafe { nil }); assert pipeline != 0
+	command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+	unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+	sm_test_compute_buffer(encoder, a, 0, 0); sm_test_compute_buffer(encoder, b, 0, 3); sm_test_compute_buffer(encoder, output, 4, 7)
+	for i in 0 .. 4 {
+		sm_test_compute_offset(encoder, u64((i % 2) * 16), 0)
+		sm_test_compute_offset(encoder, u64(i * 24 + 4), 7)
+		sm_test_compute_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', 1)
+	}
+	sm_call(encoder, c'endEncoding')
+	for i in 0 .. 32 { unsafe { *(&u8(ap + u64(i))) = u8(i * 37 + 19) } }
+	unsafe { C.memset(voidptr(outp), 0xcc, 96) }
+	objc_release(pipeline); objc_release(a); objc_release(b); objc_release(output)
+	for i in 0 .. 96 { assert unsafe { *(&u8(outp + u64(i))) } == 0xcc }
+	sm_call(command, c'commit'); assert sm_send(command, c'status') == 4
+	for i in 0 .. 96 {
+		offset := i % 24
+		expected := if offset == 4 { u8(17) } else if offset >= 5 && offset < 21 { u8(((i / 24 % 2) * 16 + offset - 5) * 37 + 19) } else { u8(0xcc) }
+		assert unsafe { *(&u8(outp + u64(i))) } == expected
+	}
 }
 fn sm_test_vector_memory(device u64, library u64, queue u64, a u64, b u64, output u64, ap u64, outp u64) {
 	mut completed := 0; mut failed := 0
