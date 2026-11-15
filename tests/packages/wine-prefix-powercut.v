@@ -257,9 +257,6 @@ fn run() ! {
 }
 
 fn main() {
-	$if wine_cut_scaled ? {
-		$if wine_cut_cli ? { eprintln('scaled power-cut fixture does not support CLI mode'); exit(2) }
-	}
 	$if wine_cut_cli ? {
 		$if wine_cut_service ? {} $else { eprintln('CLI power-cut mode requires service mode'); exit(2) }
 	}

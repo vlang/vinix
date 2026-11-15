@@ -2270,8 +2270,12 @@ capture and idempotent recovery. The 32 MiB home, 4 MiB VJFS journal and
 compile with `-d wine_cut_service` and use `--vjfs --service --scaled`. The
 fixture signs, installs and upgrades all marker rows at the real package paths,
 then requires fresh public service admission, exact cold state, recovery and
-lease/reader coordination release. Scaled CLI mode and mixed selectors are refused.
-Optional trailing `--prepared` (`--vjfs --service --scaled --prepared`) installs
+lease/reader coordination release. For scaled public-command checks, also compile
+the guest with `wine_cut_cli`, build the copied dispatcher with the current CLI
+cut hook, and use `--vjfs --service --cli COMPILED_CLI --scaled`. Migration,
+repetition and review must return JSON with all 741 exact current `keep` targets;
+the independent signed-service and lease/reader checks still follow.
+Optional trailing `--prepared` (after `--scaled`, in service or CLI mode) installs
 and verifies the signed baseline in one separate boot, capped at 120 seconds,
 then cleanly exports/checks it before cloning its disk for each cut. Each
 writer/recovery case still has its own 120-second two-boot cap and full signed

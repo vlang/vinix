@@ -25,7 +25,7 @@ fn cli_cut_fsync(fd i32) i32 {
 		if os.geteuid() == 1000 && os.args.len == 4 && os.args[1] == 'wine-prefix-migrate'
 			&& os.args[2] == 'app' && os.exists('/tmp/wine-cli-cut') {
 			text := os.read_file('/tmp/wine-cli-cut') or { C.errno = C.EINVAL; return -1 }
-			if text !in ['1', '2', '3', '4', '5', '6', '7', '8'] { C.errno = C.EINVAL; return -1 }
+			if text !in ['1', '2', '3', '4', '5', '6', '7', '8', '1112', '2219', '2221', '2222'] { C.errno = C.EINVAL; return -1 }
 			cli_cut_point = text.int()
 		}
 	}

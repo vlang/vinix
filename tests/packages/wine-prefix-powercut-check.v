@@ -34,8 +34,7 @@ fn run() ! {
 		|| (args.len >= 7 && args[6] != '--service') || (args.len >= 9 && args[7] != '--cli') {
 		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs | --scaled [--prepared]] [--point=N]')
 	}
-	if prepared && (!scaled || args.len != 7) { return error('prepared baseline requires scaled VJFS service mode') }
-	if scaled && args.len >= 9 { return error('scaled power-cut fixture does not support CLI mode') }
+	if prepared && (!scaled || args.len !in [7, 9]) { return error('prepared baseline requires scaled VJFS service or CLI mode') }
 	if args.len >= 9 && args[8] == '' { return error('nonempty compiled CLI path required') }
 	journaled := args.len >= 6
 	service := args.len >= 7

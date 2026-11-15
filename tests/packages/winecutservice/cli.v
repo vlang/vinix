@@ -4,6 +4,7 @@ module winecutservice
 import json2
 import os
 import tools.packages.wineadapter
+import tests.packages.winecutfixture
 
 fn C.execv(&char, &&char) i32
 
@@ -26,6 +27,7 @@ pub fn exec_cut(data string, point int) ! {
 }
 
 pub fn reply(command string, data string) ! {
+	names := winecutfixture.names($if wine_cut_scaled ? { true } $else { false })
 	mut child := os.new_process('/usr/bin/vinix-package')
 	defer { child.close() }
 	child.set_args([command, 'app', data]); child.set_redirect_stdio_merged(); child.run()
@@ -41,8 +43,8 @@ pub fn reply(command string, data string) ! {
 		}
 	}
 	if report.format != 1 || report.generation != 2 || report.prior_generation != 0 || report.runtime_id != 'wine'
-		|| report.bindings.len != 3 || !report.bindings.all(it.operation == .keep) { return error('public recovery JSON inventory differs') }
-	for index, name in ['a.dll', 'b.dll', 'c.dll']! {
+		|| report.bindings.len != names.len || !report.bindings.all(it.operation == .keep) { return error('public recovery JSON inventory differs') }
+	for index, name in names {
 		expected := '/var/lib/vinix-packages/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows/' + name
 		if report.bindings[index].name != name || report.bindings[index].observed != expected
 			|| report.bindings[index].replacement != expected { return error('public recovery JSON target differs') }
