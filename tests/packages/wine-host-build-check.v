@@ -106,13 +106,51 @@ fn check() ! {
 	for name in ['omitted-import', 'v-environment', 'c-environment', 'c-observation', 'c-argv', 'linked-receipt',
 		'input-blob', 'omitted-image', 'binary-mode', 'format', 'v-argv', 'translation-unit', 'scope',
 		'old-format', 'link-output', 'link-loads', 'link-environment', 'link-argv', 'link-extracted',
-		'link-input', 'link-namespace', 'linked-link-receipt', 'sdk-graph', 'sdk-linked', 'sdk-input', 'old-link-format'] {
+		'link-input', 'link-namespace', 'linked-link-receipt', 'sdk-graph', 'sdk-linked', 'sdk-input', 'old-link-format',
+		'denied-policy', 'denied-execution', 'denied-environment', 'denied-exit', 'denied-read', 'denied-installed',
+		'denied-output', 'denied-member', 'denied-linked', 'old-sdk-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'sdk-graph' {
+		if name == 'old-sdk-format' {
+			proof.format = 4
+			expected = 'host build declaration differs'
+		} else if name == 'denied-linked' {
+			file := dir + '/sdk-denied/receipt.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'SDK-denied evidence must be bounded and ordinary'
+		} else if name == 'denied-policy' {
+			file := 'sdk-denied/receipt.json'
+			mut denied := json2.decode[map[string]json2.Any](os.read_file(dir + '/' + file)!)!
+			denied['policy'] = json2.Any('(allow default)')
+			os.write_file(dir + '/' + file, json2.encode(denied))!; changed << file
+			expected = 'SDK-denied declaration differs'
+		} else if name == 'denied-execution' {
+			file := 'sdk-denied/captured-denied.exec.json'
+			mut denied := json2.decode[map[string]json2.Any](os.read_file(dir + '/' + file)!)!
+			denied['sdk_read_denied'] = json2.Any(false)
+			os.write_file(dir + '/' + file, json2.encode(denied))!; changed << file
+			expected = 'SDK-denied execution record differs'
+		} else if name == 'denied-environment' {
+			file := 'sdk-denied/captured-denied.log.environment.json'
+			mut env := read_map(dir + '/' + file)!; env['SDKROOT'] = '/unrecorded'
+			os.write_file(dir + '/' + file, json2.encode(env))!; changed << file
+			expected = 'SDK-denied child invocation differs'
+		} else if name == 'denied-exit' {
+			file := 'sdk-denied/installed-denied.log.exit.json'
+			os.write_file(dir + '/' + file, json2.encode({'exit': 0}))!; changed << file
+			expected = 'SDK-denied child invocation differs'
+		} else if name == 'denied-read' || name == 'denied-installed' {
+			file := 'sdk-denied/' + if name == 'denied-read' { 'read-probe-1.log' } else { 'installed-denied.log' }
+			os.write_file(dir + '/' + file, 'unrelated failure\n')!; changed << file
+			expected = if name == 'denied-read' { 'SDK-denied read refusal differs' } else { 'SDK-denied installed refusal differs' }
+		} else if name == 'denied-output' || name == 'denied-member' {
+			file := 'sdk-denied/replay/link-inputs/' + if name == 'denied-output' { 'captured-program' } else { 'version.txt' }
+			os.write_file(dir + '/' + file, 'changed replay bytes')!; changed << file
+			expected = if name == 'denied-output' { 'SDK-denied replay output differs' } else { 'SDK-denied captured member differs' }
+		} else if name == 'sdk-graph' {
 			file := 'sdk-graph.json'
 			os.write_file(dir + '/' + file, '{}\n')!; changed << file
 			expected = 'host SDK graph differs'
@@ -229,7 +267,7 @@ fn check() ! {
 		passed << name
 	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline twenty-six exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline thirty-six exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

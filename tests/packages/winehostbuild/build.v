@@ -11,6 +11,7 @@ import tests.packages.winecsource
 import tests.packages.winehostimages
 import tests.packages.winemacholink
 import tests.packages.winesdk
+import tests.packages.winesdkdeny
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -18,7 +19,7 @@ $if macos {
 }
 
 const clang = '/opt/homebrew/opt/llvm/bin/clang'
-const scope = 'selected host V/C sources, resource headers, observed tool images, captured Mach-O replay/load evidence and SDK source/reexport declarations; complete library/search closure, system loader/cache and hermetic build admission remain unqualified'
+const scope = 'selected host V/C sources, resource headers, observed tool images, captured Mach-O replay/load evidence, SDK source/reexport declarations and installed CLT SDK read-denied replay; complete library/search closure, system loader/cache and hermetic build admission remain unqualified'
 
 struct Proof {
 	format int
@@ -74,6 +75,7 @@ fn artifacts(directory string) ![]string {
 	for name in ['discover.log', 'v.log', 'clang-resource.log', 'c-discover.log', 'cc.log'] { names << ['logs/' + name, 'logs/' + name + '.argv.json'] }
 	for name in [...winehostimages.v_artifacts(), ...winehostimages.c_artifacts()] { names << 'logs/' + name }
 	names << winemacholink.host_artifacts(directory)!
+	names << winesdkdeny.artifacts(directory)!
 	return names
 }
 
@@ -89,6 +91,7 @@ pub fn verify_self() ! {
 		os.dir(@FILE) + '/../winemacholink/link.v': $embed_file('../winemacholink/link.v').to_string()
 		os.dir(@FILE) + '/../winelink/link.v': $embed_file('../winelink/link.v').to_string()
 		os.dir(@FILE) + '/../winesdk/stubs.v': $embed_file('../winesdk/stubs.v').to_string()
+		os.dir(@FILE) + '/../winesdkdeny/replay.v': $embed_file('../winesdkdeny/replay.v').to_string()
 	} { if digest(path)! != sha256.hexhash(text) { return error('compiled host builder source differs: ' + path) } }
 }
 
@@ -96,7 +99,7 @@ pub fn admit(directory string) ! {
 	verify_self()!
 	proof := json2.decode[Proof](record(directory + '/host-build.json')!)!
 	root := os.real_path(os.dir(@FILE) + '/../../..')
-	if proof.format != 4 || proof.scope != scope || proof.root != root || !os.is_abs_path(proof.directory)
+	if proof.format != 5 || proof.scope != scope || proof.root != root || !os.is_abs_path(proof.directory)
 		|| proof.sdk != selected_sdk()! || os.real_path(proof.compiler) != proof.compiler { return error('host build declaration differs') }
 	base := v_command(root, proof.directory, proof.compiler, proof.role)!
 	mut discover := base.clone(); discover.insert(1, ['-print-watched-files', '-dump-files', proof.directory + '/sources-before.txt'])
@@ -115,6 +118,7 @@ pub fn admit(directory string) ! {
 	winehostimages.admit_c(logs, proof.directory + '/logs')!
 	winemacholink.admit_host(directory, proof.directory)!
 	sdk_graph := winesdk.admit_host(directory)!
+	winesdkdeny.admit(directory, proof.directory, proof.builder)!
 	for selected in [winecsource.inputs(directory)!, winehostimages.inputs(logs)!, winehostimages.v_inputs(logs)!, winemacholink.host_inputs(directory)!, winesdk.inputs(sdk_graph)] {
 		for path, hash in selected {
 			if path !in proof.inputs || proof.inputs[path] != hash { return error('host observed input is absent or changed') }
@@ -129,7 +133,7 @@ pub fn admit(directory string) ! {
 		root + '/tests/packages/wineheaders/headers.v', root + '/tests/packages/winecsource/closure.v'] {
 		if path !in proof.inputs { return error('host required input is missing') }
 	}
-	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v'] {
+	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v', root + '/tests/packages/winesdkdeny/replay.v'] {
 		if path !in proof.inputs { return error('host required input is missing') }
 	}
 	if proof.inputs.len != proof.blobs.len { return error('host retained input map differs') }
@@ -170,7 +174,7 @@ pub fn build(role string, compiler string, requested string) ! {
 		root + '/tests/packages/wineheaders/headers.v', root + '/tests/packages/winecsource/closure.v'] {
 		inputs[path] = digest(path)!
 	}
-	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v'] { inputs[path] = digest(path)! }
+	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v', root + '/tests/packages/winesdkdeny/replay.v'] { inputs[path] = digest(path)! }
 	mut discover := base.clone(); discover.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
 	winehostimages.invoke_v(discover, directory, directory + '/logs/discover.log')!
 	winesource.capture(directory + '/sources-before.txt', mut inputs)!
@@ -186,6 +190,7 @@ pub fn build(role string, compiler string, requested string) ! {
 	winecsource.build(c_command(directory, resource, sdk)!, directory, directory + '/logs')!
 	winemacholink.finish_host(directory)!
 	sdk_graph := winesdk.finish_host(directory)!
+	winesdkdeny.finish(directory, os.real_path(os.executable()))!
 	os.chmod(directory + '/program', 0o755)!
 	// Capture actual C targets and selected host images as well as parsed V files.
 	for selected in [winecsource.inputs(directory)!, winehostimages.inputs(directory + '/logs')!, winehostimages.v_inputs(directory + '/logs')!, winemacholink.host_inputs(directory)!, winesdk.inputs(sdk_graph)] {
@@ -211,7 +216,7 @@ pub fn build(role string, compiler string, requested string) ! {
 	os.write_file(directory + '/inputs-after.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
 	for name in artifacts(directory)! { outputs[name] = digest(directory + '/' + name)! }
-	os.write_file(directory + '/host-build.json', json2.encode(Proof{format: 4, scope: scope, role: role, root: root, directory: directory, compiler: tool, builder: os.real_path(os.executable()), sdk: sdk, inputs: inputs, outputs: outputs, blobs: blobs}) + '\n')!
+	os.write_file(directory + '/host-build.json', json2.encode(Proof{format: 5, scope: scope, role: role, root: root, directory: directory, compiler: tool, builder: os.real_path(os.executable()), sdk: sdk, inputs: inputs, outputs: outputs, blobs: blobs}) + '\n')!
 	admit(directory)!
 	println('WINE HOST BUILD PASS ' + role + ': ' + directory + '/program')
 }

@@ -47,3 +47,8 @@ unqualified. The installed SDK is still needed for original admission, source
 rechecks and unrestricted controls. This does not establish complete search/read
 closure, ABI interpretation or hermetic toolchain admission, and does not change
 the mandatory format-4 host receipt or guest/default behavior.
+
+Current format-5 required host receipts integrate the same narrow restriction
+through `winesdkdeny`, with all replay/control artifacts mandatory in the host
+graph. The standalone tool above keeps its original format-4 admission contract
+for historical bundles. See [required host receipts](wine-host-required-check.md).

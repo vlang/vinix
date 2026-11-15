@@ -22,7 +22,8 @@ fn expected_cases() []string {
 	names << ['bridge-host-baseline', 'bridge-host-environment', 'guest-host-trace', 'package-host-pin', 'guest-host-linked']
 	names << ['bridge-v-host-baseline', 'bridge-v-host-environment', 'guest-v-host-trace', 'package-v-host-pin', 'guest-v-host-linked']
 	names << ['bridge-host-binding', 'bridge-host-input', 'controller-host-binding', 'controller-host-input', 'controller-host-linked',
-		'bridge-host-link-input', 'controller-host-link-input', 'bridge-host-sdk-input', 'controller-host-sdk-input']
+		'bridge-host-link-input', 'controller-host-link-input', 'bridge-host-sdk-input', 'controller-host-sdk-input',
+		'bridge-host-sdk-denied-input', 'controller-host-sdk-denied-input']
 	return names
 }
 
@@ -45,10 +46,10 @@ fn check() ! {
 			seen[name] = true
 		}
 	}
-	if seen.len != 53 || 'bridge-host-sdk-input' !in seen || 'controller-host-sdk-input' !in seen {
+	if seen.len != 55 || 'bridge-host-sdk-denied-input' !in seen || 'controller-host-sdk-denied-input' !in seen {
 		return error('complete host SDK/link retention matrix required')
 	}
-	println('WINE RETENTION PARTITIONS PASS four real/copied baselines; fifty-three unique exact refusals')
+	println('WINE RETENTION PARTITIONS PASS four real/copied baselines; fifty-five unique exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

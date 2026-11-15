@@ -4,9 +4,14 @@ module main
 
 import os
 import tests.packages.winehostbuild
+import tests.packages.winesdkdeny
 
 fn main() {
 	winehostbuild.verify_self() or { eprintln(err); exit(1) }
+	if os.args.len >= 2 && os.args[1] == 'sdk-replay-child' {
+		winesdkdeny.child() or { eprintln(err); exit(1) }
+		return
+	}
 	if os.args.len == 3 && os.args[1] == 'check' {
 		winehostbuild.admit(os.real_path(os.args[2])) or { eprintln(err); exit(1) }
 		println('WINE HOST BUILD ADMISSION PASS')

@@ -1,6 +1,6 @@
 # Required Wine qualification host receipts
 
-The producer, native controller and full retainer now admit format-4 host-build
+The producer, native controller and full retainer now admit format-5 host-build
 receipts before qualification work. Build each with `wine-host-build.v`; launch
 its `program` in the original build directory. A bare or relocated executable,
 linked receipt, wrong role or unsupported format refuses before creating
@@ -14,11 +14,11 @@ and checks its role and executable hash. The producer and controller must also
 use the compiler bound by their host receipts for guest source generation.
 The original bootstrap builder remains a separately pinned input.
 
-Format 4 retains captured Mach-O link/replay/load evidence for the
+Format 5 retains captured Mach-O link/replay/load evidence for the
 actual running executable. Every archive member, replay artifact and receipt
 belongs to the host output graph; the selected linker and observed ordinary
 host images belong to its input graph and byte store. Missing rows cannot be
-waived by the producer, controller or full retainer. Original format-2/3 checkers
+waived by the producer, controller or full retainer. Original format-2/3/4 checkers
 and their complete historical bundles retain their earlier contract.
 
 It also requires `sdk-graph.json`, recomputed SDK stub identities and declared
@@ -27,6 +27,15 @@ the host input map and retained byte store. The SDK projector source is embedded
 and pinned with the other admission modules. Every qualification role rechecks
 the graph before work, and both producer/controller graphs are rechecked after
 the guest. Full SDK/TAPI/ABI/search and loader admission remain separate gates.
+
+It additionally requires an installed CLT SDK read-denied replay and its four
+runtime denial controls in `sdk-denied/`. Captured output must match the running
+executable; the installed-SDK baseline must also match before its restricted
+counterpart fails. The graph's exact policy, commands, environments, exits,
+observed loads/images and retained bytes are checked at every shared admission.
+The restriction implementation is embedded and pinned with the host builder.
+This covers installed SDK reads during LLD replay; other filesystem/network
+access, bootstrap and OS loader/cache bytes remain unqualified.
 
 Prepared builds contain `host-producer.json`; native runs contain
 `host-controller.json`. Each binds the host receipt hash, directory, compiler,
@@ -47,7 +56,7 @@ alter its receipt hash or omit a host artifact input. The real controller must
 refuse each before signing/build output; an empty requested directory is allowed.
 Producer host admission runs before signing and is repeated after the guest.
 
-The full owned-retention runner now requires fifty-three refusals after real and
+The full owned-retention runner now requires fifty-five refusals after real and
 unchanged copied baselines. Five host-binding cases change producer/controller
 binding hashes, omit host receipt rows from their input maps or link the native
 binding record. All mutation writes target private copies. Existing 44 cases
@@ -58,7 +67,9 @@ host-link archive from retained input maps. `wine-owned-retain-check.v` accepts
 baselines, allowing an incremental check alongside a completed original matrix.
 Two further cases omit the SDK graph from producer/controller input maps;
 `--host-sdk-only` runs these with both baselines.
-Alternatively `--partition=0/4` through `--partition=3/4` divide all 53 cases
+Two more omit `sdk-denied/receipt.json` from producer/controller retained input
+maps; `--host-sdk-denied-only` runs these with both baselines.
+Alternatively `--partition=0/4` through `--partition=3/4` divide all 55 cases
 without weakening either baseline. Use a separate output directory for each;
 `wine-retention-partitions-check.v PREFIX` verifies their exact assigned case
 lists, both baselines and complete unique coverage from `PREFIX0` through `PREFIX3`.

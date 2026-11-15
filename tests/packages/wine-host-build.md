@@ -60,7 +60,7 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires twenty-six exact resealed refusals. Cases cover omitted parsed
+then requires thirty-six exact resealed refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
@@ -69,12 +69,16 @@ load map, replay environment/argv, extracted bytes, omitted linker input,
 changed link namespace and a linked link receipt. Expected failures use explicit
 checks under `-prod`. Four further cases cover changed/linked SDK graphs,
 omitted resolved SDK source input and the old link-only host format.
+Ten further cases cover the required SDK-denied replay: weakened policy,
+disabled restriction in the execution record, added environment input, successful
+negative-control exit, unrelated read/link failures, changed replay/member bytes,
+a linked receipt and the old SDK-graph-only host format.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 4
+The [required host receipt boundary](wine-host-required-check.md) uses format 5
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2/3 bundles and their original
+retainer also retains its own graph. Original format-1/2/3/4 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
@@ -83,6 +87,24 @@ and shared-cache bytes remain explicitly unadmitted. Local receipts are not
 publisher authentication. Original prerequisite bundles and historical
 verifiers remain required. Kernel/default changes, owned ARM/GUI and complete
 roadmap 14 acceptance remain separate gates.
+
+Format 5 additionally requires `sdk-denied/receipt.json` and every captured
+member, executable, child command/environment/exit, raw log and LLD execution
+record in that replay graph. The pinned builder dispatches a child that loads
+the system sandbox API, denies reads under installed CLT SDK roots, then execs
+LLD with a closed environment. Captured replay must match the original output;
+three SDK path reads must fail with EPERM/EACCES, and an installed-SDK response
+must link identically unrestricted and fail with the exact missing-library
+diagnostics when restricted. The temporary symlink used by a read control is
+removed after execution; its original path remains bound in the command log.
+Admission rechecks these controls and observations from retained ordinary files,
+including unchanged copied bundles with their original namespaces. The new
+module is embedded, pinned and retained alongside existing admission sources.
+The [historical standalone qualifier](wine-sdk-denied-replay.md) retains its
+format-4 contract. This restriction covers LLD's installed CLT SDK reads;
+other filesystem/network access, helper startup and OS library/cache bytes remain
+outside that restriction's claim. Installed SDK source checks and unrestricted
+controls still require the original SDK.
 
 The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and
