@@ -26,6 +26,15 @@ __global stop_callback fn () = unsafe { nil }
 __global failed_mapping_flushes = 0
 __global mapping_flushes = 0
 __global stops_finished = 0
+__global timestamp_maps = 0
+
+pub fn maps() int { return timestamp_maps }
+
+pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(physical u64, size u64) ?u64 {
+	assert physical != 0 && size != 0
+	timestamp_maps++
+	return u64(0xffffffae10000000) + u64(timestamp_maps - 1) * 0x4000
+}
 
 pub fn stop_count() int { return stops_finished }
 

@@ -70,6 +70,8 @@ mut:
 }
 
 pub struct UatContext {
+pub:
+	identity       u64 // non-reused VM-private BO reservation domain
 pub mut:
 	id             u32
 	pgtable        &pgtable.UatPgtable = unsafe { nil }
@@ -83,6 +85,15 @@ pub mut:
 	driver_private gpu_alloc.HeapAllocator
 mut:
 	driver_buffers []&UatBuffer
+}
+
+__global context_identity_lock klock.Lock
+__global context_identities = agxvm.IdentityPool{}
+
+fn allocate_context_identity() ?u64 {
+	context_identity_lock.acquire()
+	defer { context_identity_lock.release() }
+	return context_identities.allocate()
 }
 
 // Driver-owned backing mapped into a user UAT context. These objects occupy
@@ -345,6 +356,7 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 	}
 	for i := u32(1); i < uat_num_contexts; i++ {
 		if mgr.contexts[i] == unsafe { nil } {
+			identity := allocate_context_identity() or { return none }
 			kernel_half_size := ((kernel_end - kernel_start) >> 1) & ~pgtable.uat_pg_mask
 			kernel_midpoint := kernel_start + kernel_half_size
 			if kernel_half_size == 0 || kernel_midpoint >= kernel_end {
@@ -363,6 +375,7 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 			}
 			mut ctx := &UatContext{
 				id: i
+				identity: identity
 				pgtable: pt
 				active: true
 				vm_id: i

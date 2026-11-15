@@ -19,9 +19,10 @@ struct G17QueueOwnership {
 }
 
 struct TimestampObject {
+	id   u32
 	va   u64
 	size u64
-	obj  &gem.GemObject
+	obj  &gem.GemObject = unsafe { nil }
 }
 
 struct Objects {
@@ -35,6 +36,7 @@ fn (mut objects Objects) release_all() { objects.table.release_all(); table_rele
 fn (objects &Objects) get_ref(handle u32) ?&gem.GemObject { return objects.table.get_ref(handle) }
 fn (objects &Objects) contains(object &gem.GemObject) bool { return objects.table.contains(object) }
 fn (mut objects Objects) remove(handle u32) ?&gem.GemObject { return objects.table.remove(handle) }
+fn (mut objects Objects) add_created(object &gem.GemObject) { objects.table.add_created(object) }
 
 fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
 	assert ctx.pgtable != unsafe { nil } && !ctx.destroyed
@@ -54,6 +56,7 @@ mut:
 	vms               []&mmu.UatContext
 	mappings          []GpuMapping
 	objects           Objects
+	next_timestamp_id u32 = 1
 	closing_next      &GpuFile = unsafe { nil }
 	closing_queued    bool
 }
@@ -153,5 +156,6 @@ pub fn run_checks() {
 	assert stopped_vm.destroyed && table_releases == 4 && closing_count == 0
 	check_mapping_retirement()
 	check_mapping_permissions()
+	check_private_objects()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

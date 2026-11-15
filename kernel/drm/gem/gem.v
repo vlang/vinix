@@ -24,6 +24,8 @@ pub mut:
 	name        string
 	pte_extra   u64 // identical cache attributes for kernel and user aliases
 	external    bool // host-visible aperture; never returned to the PMM
+pub:
+	vm_private_identity u64 // zero: shareable; otherwise immutable owning VM identity
 }
 
 const gem_max_handles = u32(4096)
@@ -43,16 +45,23 @@ pub fn create(size u64) ?&GemObject {
 // Create a GEM object with a physical and size alignment suitable for the
 // target device. AGX callers require 16 KiB alignment on either kernel granule.
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
-	return create_object(size, alignment, false)
+	return create_object(size, alignment, false, 0)
+}
+
+// Set the private reservation identity before the object becomes visible in
+// any handle table. Only its owning VM may bind it, and PRIME cannot export it.
+pub fn create_aligned_private(size u64, alignment u64, identity u64) ?&GemObject {
+	if identity == 0 { return none }
+	return create_object(size, alignment, false, identity)
 }
 
 // Metadata for a host-owned resource. The driver installs its physical
 // aperture after RESOURCE_MAP_BLOB succeeds; the PMM never owns those pages.
 pub fn create_external(size u64) ?&GemObject {
-	return create_object(size, page_size, true)
+	return create_object(size, page_size, true, 0)
 }
 
-fn create_object(size u64, alignment u64, external bool) ?&GemObject {
+fn create_object(size u64, alignment u64, external bool, private_identity u64) ?&GemObject {
 	if size == 0 {
 		return none
 	}
@@ -106,6 +115,7 @@ fn create_object(size u64, alignment u64, external bool) ?&GemObject {
 	mut obj := &GemObject{
 		handle:      handle
 		external:    external
+		vm_private_identity: private_identity
 		size:        aligned_size
 		refcount:    1
 		phys_addr:   u64(phys)

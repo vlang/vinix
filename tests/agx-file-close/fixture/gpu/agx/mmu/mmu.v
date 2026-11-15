@@ -10,12 +10,15 @@ pub struct UatManager {}
 pub struct UatContext {
 pub mut:
 	id u32
+	identity u64
 	pgtable &pgtable.UatPgtable = unsafe { nil }
 	kernel_start u64 = 0x100000000
 	kernel_end u64 = 0x120000000
 	destroyed bool
 	queue     &gpu.G13QueueResources = unsafe { nil }
 }
+
+pub fn new_identity() u64 { return allocate_context_identity() or { panic('VM identity') } }
 
 pub fn (mut vm_manager UatManager) destroy_context(context &UatContext) {
 	mut owned := unsafe { context }

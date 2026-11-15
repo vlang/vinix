@@ -175,7 +175,8 @@ pub fn audit(inputs Inputs) !Report {
 	}
 	mut sources := []Source{}
 	for role, paths in {
-		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'tools/agx-re/m1parity',
+		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/gem',
+			'kernel/drm/drm.v', 'tools/agx-re/m1parity',
 			'tools/agx-re/audit_m1_parity.v', 'tools/agx-re/g13contract', 'tools/agx-re/g13layout']
 		'asahi':    ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h',
 			'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'rust/kernel/drm/sched.rs']

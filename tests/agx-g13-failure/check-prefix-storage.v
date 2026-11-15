@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'vm__IdentityPool__allocate',
+	'mmu__allocate_context_identity',
 	'gpu__agx__file__GpuFile__retire_mapping_locked',
 	'gpu__agx__file__GpuFile__cleanup_closed_mappings_locked',
 	'gpu__agx__gpu__GpuManager__flush_g13_file_mapping',
@@ -41,6 +43,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name.ends_with('IdentityPool__allocate') || name.ends_with('allocate_context_identity') { return '__v_option_u64' }
 	if name.ends_with('process_pending_submissions') || name.ends_with('write_g13_barrier')
 		|| name.ends_with('release_g13_initial_events') || name.ends_with('release_g13_barrier_pins')
 		|| name.ends_with('submit_g13_pending') || name.ends_with('append_g13_batch_command') { return 'void' }
@@ -153,5 +156,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission/mapping storage: thirty-six live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
+	println('G13 submission/mapping storage: thirty-eight live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
 }

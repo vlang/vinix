@@ -32,3 +32,14 @@ The real BIND ioctl also checks distinct RO, WO and RW permissions against the
 injected page-table service. Empty and unknown flags must reject before mapping
 or taking a mapping reference. The separate TLB fixture checks the actual UAT
 leaf encodings and reprotection transitions with the production page-table code.
+
+The fixture also runs production GEM-create, special-object binding and PRIME
+export refusal. VM-private objects bind only into their original non-reused
+reservation identity; a recreated context with the same numeric ID is refused.
+Private import and kernel timestamp bindings are refused without retaining a
+new reference, while owner CPU authorization and shareable objects still work.
+Four hundred PRIME refusals check both custom and default export reference
+release before the injected fd creator. GEM construction and VM creation are
+injected here; `tests/gem-private` separately runs the real GEM constructors.
+The production global identity allocator runs under its actual locking wrapper;
+the pure VM fixture covers exhaustion without wrap or reuse.

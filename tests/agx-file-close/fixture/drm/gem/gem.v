@@ -2,8 +2,11 @@
 module gem
 
 __global live_objects = 0
+__global next_created_handle = u32(100)
+__global reject_create = false
 
 pub fn live() int { return live_objects }
+pub fn fail_creates(reject bool) { reject_create = reject }
 
 pub struct GemObject {
 pub mut:
@@ -12,6 +15,22 @@ pub mut:
 	size u64 = 0x10000
 	phys_addr u64 = 0x200000
 	owned bool
+	vm_private_identity u64
+}
+
+pub fn create_aligned(size u64, alignment u64) ?&GemObject {
+	if reject_create || size == 0 { return none }
+	next_created_handle++
+	mut object := create(next_created_handle)
+	object.size = (size + alignment - 1) & ~(alignment - 1)
+	return object
+}
+
+pub fn create_aligned_private(size u64, alignment u64, identity u64) ?&GemObject {
+	if identity == 0 { return none }
+	mut object := create_aligned(size, alignment) or { return none }
+	object.vm_private_identity = identity
+	return object
 }
 
 pub fn create(handle u32) &GemObject {

@@ -581,15 +581,20 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	if request.extensions != 0 || request.pad != 0 || request.flags & ~valid_flags != 0 {
 		return -22
 	}
+	f.lock.acquire()
+	defer { f.lock.release() }
+	mut private_identity := u64(0)
 	if request.flags & ioctl.asahi_gem_vm_private != 0 {
-		f.find_vm(request.vm_id) or { return -22 }
+		vm := f.find_vm(request.vm_id) or { return -2 }
+		if vm.identity == 0 { return -22 }
+		private_identity = vm.identity
 	} else if request.vm_id != 0 {
 		return -22
 	}
-	obj := gem.create_aligned(request.size, pgtable.uat_pgsz) or { return -12 }
-	f.lock.acquire()
+	obj := if private_identity != 0 {
+		gem.create_aligned_private(request.size, pgtable.uat_pgsz, private_identity) or { return -12 }
+	} else { gem.create_aligned(request.size, pgtable.uat_pgsz) or { return -12 } }
 	f.objects.add_created(obj)
-	f.lock.release()
 	request.handle = obj.handle
 	return 0
 }
@@ -618,6 +623,10 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	match request.op {
 		ioctl.asahi_bind_op_bind {
 			obj := f.objects.get_ref(request.handle) or { return -2 }
+			if obj.vm_private_identity != 0 && obj.vm_private_identity != ctx.identity {
+				gem.unref(obj)
+				return -22
+			}
 			if request.offset > obj.size || request.range > obj.size - request.offset {
 				gem.unref(obj)
 				return -22
@@ -726,6 +735,9 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				return -22
 			}
 			obj := f.get_object_ref(request.handle) or { return -2 }
+			// Timestamp objects belong to the kernel VM, outside any private
+			// userspace reservation domain.
+			if obj.vm_private_identity != 0 { gem.unref(obj); return -22 }
 			if request.offset > obj.size || request.range > obj.size - request.offset
 				|| obj.phys_addr > u64(-1) - request.offset {
 				gem.unref(obj)

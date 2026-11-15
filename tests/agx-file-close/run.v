@@ -28,14 +28,22 @@ fn main() {
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
 		section(source, 'fn (mut f GpuFile) retire_mapping_locked(', '// Reserve a nonzero per-open queue ID.')! +
 		section(source, 'fn (f &GpuFile) find_vm(', '// Firmware may retain both UAT translations')! +
-		section(source, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'pub fn (mut f GpuFile) ioctl_gem_create(')! +
-		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'pub fn (f &GpuFile) ioctl_get_time(')!
+		section(source, 'fn (mut f GpuFile) allocate_timestamp_id_locked(', 'fn (f &GpuFile) find_vm(')! +
+		section(source, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(')! +
+		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'pub fn (f &GpuFile) ioctl_get_time(')! +
+		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'pub fn (mut f GpuFile) ioctl_queue_create(')!
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp('${repo}/kernel/gpu/agx/file/closing.v', '${scratch}/gpu/agx/file/closing.v')!
 	gpu_source := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
 	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\n' +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) queue_file_retirement(', 'fn (mut mgr GpuManager) reap_file_resources(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) flush_g13_file_mapping(', '// Publish a G13 UAT invalidation through')!)!
+	mmu_source := os.read_file('${repo}/kernel/gpu/agx/mmu/mmu.v')!
+	os.write_file('${scratch}/gpu/agx/mmu/identity.v', 'module mmu\nimport klock\nimport gpu.agx.vm as agxvm\n' +
+		section(mmu_source, '__global context_identity_lock', '// Driver-owned backing')!)!
+	drm_source := os.read_file('${repo}/kernel/drm/drm.v')!
+	os.write_file('${scratch}/drm/prime.v', 'module drm\nimport drm.gem\nimport drm.ioctl\n' +
+		section(drm_source, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(')!)!
 	os.cp('${repo}/tests/agx-file-close/test.v', '${scratch}/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',

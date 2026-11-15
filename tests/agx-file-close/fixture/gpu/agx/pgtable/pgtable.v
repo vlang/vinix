@@ -1,5 +1,8 @@
 module pgtable
 
+pub const uat_pgsz = u64(0x4000)
+pub const uat_pg_mask = u64(0x3fff)
+
 pub const gpu_prot_gpu_shared_rw = u64(1)
 pub const gpu_prot_gpu_shared_ro = u64(2)
 pub const gpu_prot_gpu_shared_wo = u64(3)

@@ -46,7 +46,7 @@ pub fn (table &Table) get_ref(handle u32) ?&gem.GemObject {
 }
 
 pub fn (mut table Table) import_object(object &gem.GemObject) ?u32 {
-	if object == unsafe { nil } {
+	if object == unsafe { nil } || object.vm_private_identity != 0 {
 		return none
 	}
 	for existing in table.objects {

@@ -906,6 +906,14 @@ fn ioctl_prime_handle_to_fd(dev &DrmDevice, handle voidptr, data voidptr) int {
 		return -22
 	}
 	obj := dev.driver.gem_export(dev, handle, request.handle) or { return -2 }
+	if obj.vm_private_identity != 0 {
+		// The exporter returned an owned reference. Refuse private reservation
+		// domains before creating an fd, using the exporter's matching put.
+		if dev.driver.gem_export_put != unsafe { nil } {
+			dev.driver.gem_export_put(dev, obj)
+		} else { gem.unref(obj) }
+		return -22 // EINVAL, as in Asahi's non-exportable object policy
+	}
 	fdnum := create_prime_fd(dev, obj, request.flags) or { return -24 }
 	request.fd = i32(fdnum)
 	return 0

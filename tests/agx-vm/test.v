@@ -21,6 +21,16 @@ fn bind_request() ioctl.DrmAsahiGemBind {
 }
 
 fn main() {
+	mut identities := agxvm.IdentityPool{}
+	for expected := u64(1); expected < 10001; expected++ {
+		assert (identities.allocate() or { panic('identity') }) == expected
+	}
+	mut final_identities := agxvm.IdentityPool{ next: ~u64(0) - 1 }
+	assert (final_identities.allocate() or { panic('penultimate identity') }) == ~u64(0) - 1
+	assert (final_identities.allocate() or { panic('final identity') }) == ~u64(0)
+	for _ in 0 .. 10 {
+		if _ := final_identities.allocate() { panic('identity reused after exhaustion') }
+	}
 	kernel_start := u64(0x100000000)
 	kernel_end := kernel_start + agxvm.kernel_min_size
 	assert agxvm.valid_window(kernel_start, kernel_end)
@@ -64,5 +74,6 @@ fn main() {
 	test_request.handle = 0
 	assert !agxvm.valid_bind_request(&test_request, kernel_start, kernel_end)
 
+	println('AGX VM identities: 10000 ordered identities, final two identities, permanent exhaustion without wrap or reuse passed')
 	println('shared AGX VM contract tests passed')
 }

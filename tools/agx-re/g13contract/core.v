@@ -478,6 +478,10 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(queue, ['job.add_dependency(fence)?', 'job.commit()?', 'let mut job = job.arm()',
 		'job.push()'], 'Asahi asynchronous dependency scheduling')!
 	file_source := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
+	check_private_bo_local(file_source, read(os.join_path(repo, 'kernel/gpu/agx/bo/bo.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!, read(os.join_path(repo, 'kernel/drm/gem/gem.v'))!,
+		read(os.join_path(repo, 'kernel/drm/drm.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/vm/identity.v'))!)!
+	check_private_bo_reference(read(os.join_path(base, 'gem.rs'))!)!
 	check_user_mapping_contract(file_source, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	ioctl_submit := section(file_source, 'pub fn (mut f GpuFile) ioctl_submit(',
 		'fn dispatch(', 'Vinix async submission ioctl')!
@@ -623,6 +627,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
+		'VM-private BO domains reject foreign/recreated VMs, import, kernel timestamp mapping and PRIME export before publication',
 		'User mapping backing survives failed invalidation; serialized flush/stop, VM mutation lock and new-submit admission retain ownership',
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter',
