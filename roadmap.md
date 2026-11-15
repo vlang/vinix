@@ -1384,7 +1384,11 @@ architectures; broader release/catalog/runtime acceptance remains open.
     every running qualification role. The separate [Mach-O link check](tests/packages/wine-mach-link.md)
     also passes thirty-one refusal controls. The [SDK declaration audit](tests/packages/wine-sdk-check.md)
     now requires graph validation, source pins and retained bytes for all
-    qualification roles, with declared reexport coverage across all targets. Complete
+    qualification roles, with declared reexport coverage across all targets.
+    An additive [installed-SDK read-denied replay](tests/packages/wine-sdk-denied-replay.md)
+    reproduces all four host-role executables, with sixteen runtime denial
+    controls and three admission refusals. Integration of that restriction into
+    required host receipts remains open. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader

@@ -5081,3 +5081,46 @@ qualification. The conservative all-target declaration model still leaves
 symbols opaque. Full YAML/TAPI/ABI interpretation, SDK/search isolation,
 unreported reads, OS loader/cache bytes, bootstrap/hermetic admission, owned
 ARM/GUI and product default activation remain open. No kernel/default change.
+
+## Installed SDK read-denied host replay (2026-11-16)
+
+Commit `73bfb57c8` adds a separate [SDK read-denied replay qualifier](wine-sdk-denied-replay.md).
+It first requires the exact original format-4 builder's full admission, then
+extracts its captured link archive into a fresh directory. A child applies a
+macOS sandbox policy denying file reads under the installed CLT SDK directory
+and its Data-volume alias before executing the pinned LLD. The replay records
+its actual command/environment/policy, validates observed captured file loads
+and ordinary image identities, and requires the original executable hash.
+Before publication it rechecks archive members, successful outputs, ordinary
+images, current SDK sources and original proof/archive/checker/self hashes.
+
+Fixture, controller, producer and retainer replays all pass against the complete
+format-4 checkpoint above. All four reproduce their original executable bytes
+while installed SDK reads are denied. Each also passes an unrestricted
+installed-SDK link with identical bytes, followed by the same response failing
+under restriction with exit 1, no executable and the three expected missing
+library diagnostics. Direct SDK reads, a private symlink and the Data-volume
+alias succeed in the parent and fail with EPERM/EACCES in restricted children.
+These are sixteen runtime denial controls in total. Three separate CLI controls
+reject the wrong checker, an incomplete host bundle and an old-format proof
+without publishing replay receipts. Production/manualfree builds pass.
+
+The retained checkpoint is `/Users/alex/.cache/vwsdkdeny-20261116-01`.
+Final tool `replay-qualified` uses frozen `final-source`; the passing directories
+are `fixture-qualified`, `controller-qualified`, `producer-qualified` and
+`retainer-qualified`. It includes raw commands, environments, execution records,
+outputs, controls, generated programs, feature patch/revision and `validation.txt`
+identifying earlier diagnostic tools. Its complete typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-sdk-denied-20261116-01.inventory.json`,
+SHA-256 `0eb7fc3498e605c217c9fe340163d4cd84ff52cd790aaa9834094686b05a72a4`.
+Recording and independent inventory comparison both pass. The complete original
+format-4 host checkpoint, original selected namespaces and historical bundles
+remain required and unchanged.
+
+This qualifies installed CLT SDK path-read denial during LLD replay. Other
+filesystem/network access stays allowed; helper startup, OS loader/cache bytes,
+complete search/read closure, ABI interpretation and hermetic admission remain
+unqualified. The SDK is still required for original admission, source checks
+and unrestricted controls. Mandatory host receipt integration of this restriction,
+owned ARM/GUI, broader lifetime/mapping controls and default activation remain
+open. This step changes no guest, kernel or default behavior.
