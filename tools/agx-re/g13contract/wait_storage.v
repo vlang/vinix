@@ -2,7 +2,7 @@
 module g13contract
 
 fn check_wait_storage_contract(drm string, storage string, reference string) ! {
-	wait := section(drm, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(', 'Vinix counted binary waits')!
+	wait := section(drm, 'fn ioctl_syncobj_wait(', 'fn ioctl_syncobj_reset(', 'Vinix counted binary waits')!
 	require(!wait.contains('request.count_handles > 64 {\n\t\treturn'), 'Wait count must not be capped at the inline capacity')!
 	require_order(wait, ['if request.count_handles == 0 { return 0 }', 'mut handles := [64]u32{}',
 		'mut objects := unsafe { [64]voidptr{} }', 'mut captures := [64]syncobj.FenceCapture{}',

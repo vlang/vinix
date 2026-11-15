@@ -441,6 +441,12 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_reset_contract(read(os.join_path(repo, 'kernel/drm/drm.v'))!,
+		read(os.join_path(repo, 'kernel/drm/ioctl/ioctl.v'))!,
+		read(os.join_path(repo, 'kernel/drm/wait_storage.v'))!,
+		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
+		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!,
+		read(os.join_path(asahi_linux, 'include/uapi/drm/drm.h'))!)!
 	check_wait_storage_contract(read(os.join_path(repo, 'kernel/drm/drm.v'))!,
 		read(os.join_path(repo, 'kernel/drm/wait_storage.v'))!,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!)!
@@ -656,6 +662,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Binary syncobj waits retain captured object/fence snapshots, validate all inputs and follow empty objects only with WAIT_FOR_SUBMIT',
 		'Empty binary waits capture the first publication under the object lock, detach borrowed nodes on every exit and honor unmasked signals/thread exit',
 		'Binary waits use checked owned storage above the inline capacity and detach captures before freeing that owner',
+		'Binary syncobj RESET validates all handle identities before sequential nil replacement and preserves captured fences',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',

@@ -19,6 +19,7 @@ pub const drm_ioctl_syncobj_destroy = u32(0xc0)
 pub const drm_ioctl_syncobj_handle_to_fd = u32(0xc1)
 pub const drm_ioctl_syncobj_fd_to_handle = u32(0xc2)
 pub const drm_ioctl_syncobj_wait = u32(0xc3)
+pub const drm_ioctl_syncobj_reset = u32(0xc4)
 pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
 pub const drm_ioctl_mode_create_dumb = u32(0xb2)
 pub const drm_ioctl_mode_map_dumb = u32(0xb3)
@@ -121,6 +122,13 @@ pub mut:
 	first_signaled u32
 	pad            u32
 	deadline_nsec  u64
+}
+
+pub struct DrmSyncobjArray {
+pub mut:
+	handles       u64
+	count_handles u32
+	pad           u32
 }
 
 // include/uapi/drm/drm_mode.h. Keep the field order exact: libdrm builds the
@@ -666,7 +674,8 @@ pub fn validate_asahi_25_layouts() bool {
 	return sizeof(DrmVersion) == 64 && sizeof(DrmGetCap) == 16 && sizeof(DrmGemClose) == 8
 		&& sizeof(DrmPrimeHandle) == 12 && sizeof(DrmSyncobjCreate) == 8
 		&& sizeof(DrmSyncobjDestroy) == 8 && sizeof(DrmSyncobjHandle) == 16
-		&& sizeof(DrmSyncobjWait) == 40 && sizeof(DrmAsahiParamsGlobal) == 432
+		&& sizeof(DrmSyncobjWait) == 40 && sizeof(DrmSyncobjArray) == 16
+		&& sizeof(DrmAsahiParamsGlobal) == 432
 		&& sizeof(DrmAsahiGetParams) == 32 && sizeof(DrmAsahiVmCreate) == 32
 		&& sizeof(DrmAsahiVmDestroy) == 16 && sizeof(DrmAsahiGemCreate) == 32
 		&& sizeof(DrmAsahiGemMmapOffset) == 24 && sizeof(DrmAsahiGemBind) == 48

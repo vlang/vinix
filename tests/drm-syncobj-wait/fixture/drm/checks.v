@@ -105,7 +105,8 @@ fn clear() {
 	// Fixture-only cleanup after every wait and scripted action has returned;
 	// production metadata retention and object/fence lifetime are unchanged.
 	syncobj.destroy_owner(11)
-	for i in 0 .. wait_fixture_object_count { unsafe { free(wait_fixture_objects[i]) }; wait_fixture_objects[i] = unsafe { nil } }
+	syncobj.destroy_owner(12)
+	for i in 0 .. wait_fixture_object_count { syncobj.free_object_metadata_for_checks(wait_fixture_objects[i]); wait_fixture_objects[i] = unsafe { nil } }
 	for i in 0 .. wait_fixture_fence_count {
 		fence := wait_fixture_fences[i]
 		unsafe { fence.waiters.free(); free(fence) }

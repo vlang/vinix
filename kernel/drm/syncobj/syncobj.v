@@ -292,6 +292,9 @@ pub fn replace_fence(obj &SyncObj, fence &DmaFence) {
 	mut o := unsafe { obj }
 	o.lock.acquire()
 	o.fence = unsafe { fence }
+	// Binary replacement discards the previous timeline lookup chain. Fence
+	// allocations already captured by submissions/waiters remain retained.
+	o.timeline_points.clear()
 	o.publish_captures_locked(fence)
 	o.lock.release()
 }

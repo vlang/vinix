@@ -6,7 +6,7 @@ fn check_binary_wait_contract(local string, reference string) ! {
 	require_order(create, ['syncobj.new_syncobj(', 'if request.flags & ioctl.drm_syncobj_create_signaled != 0 {',
 		'syncobj.new_fence(', 'syncobj.signal(fence)', 'syncobj.replace_fence(obj, fence)'], 'Vinix empty versus signaled creation')!
 	require(create.count('syncobj.new_fence(') == 1, 'Only signaled creation installs a fence')!
-	wait := section(local, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(', 'Vinix binary syncobj wait')!
+	wait := section(local, 'fn ioctl_syncobj_wait(', 'fn ioctl_syncobj_reset(', 'Vinix binary syncobj wait')!
 	flags := section(wait, 'known_flags :=', 'if request.count_handles == 0', 'Vinix binary wait flags')!
 	require(flags.contains('ioctl.drm_syncobj_wait_all') && flags.contains('ioctl.drm_syncobj_wait_for_submit')
 		&& flags.contains('ioctl.drm_syncobj_wait_deadline') && !flags.contains('ioctl.drm_syncobj_wait_available'),

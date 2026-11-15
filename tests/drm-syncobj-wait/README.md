@@ -3,8 +3,9 @@
 Compile `run.v` with V into an external executable, then run it. Set
 `DRM_SYNCOBJ_WAIT_TEST_BINARY` to retain the ASan/UBSan executable outside Git.
 
-The runner executes the production create/wait ioctl handlers, syncobj module,
-pending-signal reader and request definitions. It injects bounded user copies,
+The runner executes the production create/wait/reset ioctl handlers, common
+ioctl registration, syncobj module, pending-signal reader and request definitions.
+It injects bounded user copies,
 thread/process state, locks, atomics, monotonic time and scheduler steps.
 Repeated scenarios check empty/signaled
 creation, upfront validation, stable fence and handle snapshots, submission
@@ -29,6 +30,15 @@ free, a hook checks that no pending capture points into that allocation.
 Every large request must return all owned bytes, including copy/lookup/prepare
 errors, timeout and interruption. Huge requests use a fixture-only allocation
 ceiling to test ENOMEM without exhausting the host.
+
+Reset cases check the exact 16-byte request and ioctl encoding, zero-count/pad
+rejection, one copied handle snapshot and complete lookup before effects.
+Counts 1..4096 include duplicate handles, allocation/copy/namespace failures,
+and handle destruction/reuse between lookup and replacement. Binary replacement
+clears timeline lookup membership while previously captured fences remain valid.
+Pending publication registrations survive a nil reset, capture the first later
+fence and retain it across another reset. Every allocated reset owner is freed;
+reset does not signal the old GPU fence or allocate wait capture nodes.
 
 These deterministic interleavings do not exercise actual kernel threads, GPU
 execution or kernel heap usage. Vinix still polls through its scheduler; Linux

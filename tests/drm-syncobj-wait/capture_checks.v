@@ -18,6 +18,22 @@ pub fn assert_no_captures_for_checks(obj &SyncObj) {
 	o.lock.release()
 }
 
+pub fn assert_pending_captures_for_checks(obj &SyncObj, expected int) {
+	mut o := unsafe { obj }
+	o.lock.acquire()
+	mut cursor := unsafe { o.pending_captures }
+	mut count := 0
+	for cursor != unsafe { nil } { count++; cursor = unsafe { cursor.next } }
+	assert count == expected
+	o.lock.release()
+}
+
+pub fn free_object_metadata_for_checks(obj &SyncObj) {
+	assert_no_captures_for_checks(obj)
+	// Fixture-only disposal after namespace removal and all synchronous users.
+	unsafe { obj.timeline_points.free(); free(obj) }
+}
+
 pub fn assert_no_capture_in_region_for_checks(obj &SyncObj, allocation voidptr, size u64) {
 	mut o := unsafe { obj }
 	o.lock.acquire()

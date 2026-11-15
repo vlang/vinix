@@ -33,6 +33,17 @@ mut:
 	captures &syncobj.FenceCapture = unsafe { nil }
 }
 
+// Reset needs only handle/object snapshots; no capture nodes are registered.
+fn new_syncobj_handle_buffer(count u32) ?SyncobjWaitBuffer {
+	geometry := syncobj_wait_geometry(u64(count)) or { return none }
+	allocation := memory.malloc_packed_fallible(geometry.captures_offset) @[freed]
+	if allocation == unsafe { nil } { return none }
+	unsafe { C.memset(allocation, 0, geometry.captures_offset) }
+	return SyncobjWaitBuffer{ allocation: allocation,
+		handles: unsafe { &u32(allocation) },
+		objects: unsafe { &voidptr(u64(allocation) + geometry.objects_offset) } }
+}
+
 fn new_syncobj_wait_buffer(count u32) ?SyncobjWaitBuffer {
 	geometry := syncobj_wait_geometry(u64(count)) or { return none }
 	allocation := memory.malloc_packed_fallible(geometry.bytes) @[freed]

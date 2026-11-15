@@ -19,7 +19,7 @@ fn check_wait_capture_contract(drm string, objects string, captures string, refe
 	require_order(release, ['o.lock.acquire()', 'if c.pending {', 'voidptr(cursor) == voidptr(capture)',
 		'o.pending_captures =', 'previous.next =', 'c.object = unsafe { nil }',
 		'c.next = unsafe { nil }', 'c.fence = unsafe { nil }', 'c.pending = false', 'o.lock.release()'], 'Vinix unlink before stack retirement')!
-	wait := section(drm, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(', 'Vinix signal-interruptible wait')!
+	wait := section(drm, 'fn ioctl_syncobj_wait(', 'fn ioctl_syncobj_reset(', 'Vinix signal-interruptible wait')!
 	require_order(wait, ['defer {', 'syncobj.release_capture(', 'syncobj.prepare_capture(',
 		'if ready {', 'request.timeout_nsec <= 0', 'proc.current_thread()',
 		'katomic.load(&waiting_thread.must_exit)', 'proc.pending_signals(waiting_thread) & ~waiting_thread.masked_signals',

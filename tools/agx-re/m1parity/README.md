@@ -18,7 +18,8 @@ Alternatively, `make -C tools/agx-re audit-m1-parity` accepts `ASAHI_LINUX`,
 The existing V tool launcher compiles outside the source checkout.
 
 Sparse Linux checkouts must include `drivers/dma-buf/dma-fence.c` and
-`drivers/gpu/drm/drm_syncobj.c` as well as the Asahi and scheduler sources.
+`drivers/gpu/drm/drm_syncobj.c` and `include/uapi/drm/drm.h` as well as the
+Asahi and scheduler sources. The generic DRM header supplies the RESET wire ABI.
 Fence-completion and binary-wait checks use the packaged Linux core
 implementations; the audit checks and retains those sources too.
 
