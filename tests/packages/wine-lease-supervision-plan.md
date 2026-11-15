@@ -4635,3 +4635,50 @@ redistribution and broader section 14 acceptance. Original selected source,
 distribution/notices, compiler/header/sysroot/GCC/kernel bundles and historical
 complete artifacts/verifiers remain independently required. No kernel or
 product default is changed.
+
+## Observed compiler host images and closed environments (2026-11-15)
+
+Commit `1b9db0481` adds [host image and child environment admission](wine-host-images-check.md)
+to bridge, guest and package production. Managed pinned Clang/LLD children use
+an exact replacement environment with fixed search path, locale/time/source
+epoch and private HOME/TMPDIR. Parent include/library search variables,
+credentials and loader injection settings are excluded. Before-command version
+probes bind observed canonical ordinary non-system image UUIDs and file hashes.
+Each resource query, C discovery/compile and linker version/replay command
+records its environment and dyld observations; final admission rechecks the
+raw observations, identities, namespaces, selected image bytes and output pins.
+
+Known delayed-image notices require a prior matching same-PID observation;
+unknown diagnostics refuse. OS `/usr/lib/` and `/System/Library/` images remain
+explicitly metadata-only with no invented file hash. Their shared-cache and
+loader bytes are unadmitted. V/controller builds and other host tools remain
+outside this closed environment contract. Original source, C/header/linker
+replay and complete historical-input verifiers remain required.
+
+Production/manual-free parser and real child controls pass, including an
+invalid parent loader-injection setting and refusal of an altered recorded
+environment. The initial delayed-image refusal is retained as a diagnostic.
+The real Clang/LLD probe, fresh PE/runtime, independent producer admission and
+all 32 owned-receipt controls pass. Signed x86 holder-death/collection passes in
+93.933 seconds with post-run host image verification. Real and unchanged copied
+retention baselines pass; all thirty-nine resealed mutations refuse at their
+named gates without retained output. Five new cases cover omitted baseline
+images, environment changes, omitted observations, changed image hashes and
+linked image receipts.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostimages-20261115-01`, from
+isolated base `44d4689f7`. It retains the final feature patch/revision, exact
+tested sources, raw commands/results, native evidence, all controls, observed C
+byte/mode snapshots, selected ordinary host-image byte/mode storage and the
+complete selected resource-header copy. Final production/native/retainer and
+producer-check binaries use the `-02` suffix; earlier binaries remain diagnostic.
+The typed inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-images-20261115-01.inventory.json`,
+SHA-256 `aa51b078c69868f40b3a5c0102ca11e0e19e9d8a84604eb9f8095a66f98033fd`.
+Complete typed-inventory recording and independent comparison pass against the
+retained original checkpoint. Original prerequisite bundles remain required.
+
+OS shared-cache/loader bytes, V/host-controller and other host-tool closure,
+unreported inputs/search absence and full hermetic admission remain open,
+along with default activation, owned ARM/GUI, redistribution and broader
+roadmap 14 acceptance. No kernel or product default is changed.
