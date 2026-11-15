@@ -30,7 +30,7 @@ fn (p IRTypedProgram) vector_integer_unary_profile(ir IRModule, stream Stream, p
  return count + p.vector_source_profile(stream, pools, bodies, scope, index, source, false, remaining - count)!
 }
 fn integer_intrinsic_vector(id ScalarIntrinsic, source ScalarVectorValue, bits u32, count int) !ScalarVectorValue {
- if id !in [ScalarIntrinsic.ctpop, .bitreverse]! { return error('AIR vector intrinsic: unary integer family') }
+ if id !in [ScalarIntrinsic.ctpop, .bitreverse, .bswap]! { return error('AIR vector intrinsic: unary integer family') }
  vector_float_intrinsic_key(id, count, bits)!
  mut result := ScalarVectorValue{}
  for lane in 0 .. count {

@@ -51,7 +51,7 @@ fn test_vector_ctpop_states_and_names() {
    source.undef = u16(1) << u32(target); if _ := ctpop_intrinsic_vector(source, width, count) { assert false, 'undef dominates poison' }; checks++
   }
  } }; for slot in seen { assert slot }; assert checks == 104448
- for name in ['llvm.ctpop.i32','llvm.ctpop.v0i32','llvm.ctpop.v01i32','llvm.ctpop.v17i32','llvm.ctpop.v999999999999i32','llvm.ctpop.v2i0','llvm.ctpop.v2i01','llvm.ctpop.v2i65','llvm.ctpop.v2i128','llvm.ctpop.v2i+1','llvm.ctpop.v2i1x','llvm.ctpop.v2i32.i32','llvm.ctpop.v2f32','llvm.ctpop.nxv2i32','air.ctpop.v2i32','llvm.bswap.v2i32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
+ for name in ['llvm.ctpop.i32','llvm.ctpop.v0i32','llvm.ctpop.v01i32','llvm.ctpop.v17i32','llvm.ctpop.v999999999999i32','llvm.ctpop.v2i0','llvm.ctpop.v2i01','llvm.ctpop.v2i65','llvm.ctpop.v2i128','llvm.ctpop.v2i+1','llvm.ctpop.v2i1x','llvm.ctpop.v2i32.i32','llvm.ctpop.v2f32','llvm.ctpop.nxv2i32','air.ctpop.v2i32','llvm.ctlz.v2i32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
  for width in [u32(0),65,128]! { if _ := ctpop_intrinsic_vector(ScalarVectorValue{}, width, 1) { assert false, 'width' } }
  for count in [0,17] { if _ := ctpop_intrinsic_vector(ScalarVectorValue{}, 32, count) { assert false, 'count' } }
  for tag in [IntegerValue{aggregate: true},IntegerValue{vector: true}] { mut source := ScalarVectorValue{}; source.lanes[0] = tag; if _ := ctpop_intrinsic_vector(source, 32, 1) { assert false, 'lane tag' } }

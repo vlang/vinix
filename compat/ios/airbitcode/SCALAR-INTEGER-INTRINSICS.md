@@ -13,7 +13,7 @@ type. Arguments are masked to their declared width; results keep that width,
 integer kind and exact bits. Poison propagates; selected undef errors. The
 integer-only API rejects these scalar intrinsic calls. Integer-only functions
 using scalar calls execute through `run_scalar_function`. The vector population
-count and bit reversal described below also execute through `run_integer_function`.
+count, bit reversal and byte swap described below also execute through `run_integer_function`.
 
 Production uses unsigned shifts, masks and additions in loops of at most 64
 iterations (eight for byte swap), without host intrinsics, LLVM, floating point
@@ -95,8 +95,9 @@ step, two lane counts of profiling work and one shared construction slot.
 The existing 4,096-result and 1,000,000-work limits apply.
 
 Population count occupies shared vector declaration-cache slots 640..1663,
-one per width/count pair. The cache now has 2,688 stack entries: 640 floating
-identities, 1,024 population-count identities and 1,024 bit-reversal identities.
+one per width/count pair. The cache now has 2,752 stack entries: 640 floating
+identities, 1,024 population-count identities, 1,024 bit-reversal identities
+and 64 byte-swap identities.
 Declaration attributes are checked once per identity;
 duplicate reserved declarations reject. Unary integer calls reject return/
 parameter attributes, including `immarg`. The normal production lane path
@@ -152,7 +153,7 @@ heap has not been measured.
 the standard-library 64-bit reverser shifted to the declared width, independently
 of the production shift loop. It additionally checks 705,024 reversal
 involutions, 104,448 lane-state cases, high-bit masking, snapshots and guards.
-The shared cache unit covers all 2,688 identities.
+The shared cache unit covers all 2,752 identities.
 
 `tests/ios/air-vector-bitreverse.v LLVM_AS FRESH_EXTERNAL_DIR` checks every
 width/count through 25,600 decoded shapes and 3,347,424 exact native LLVM
@@ -165,6 +166,45 @@ following the population-count reference qualification. Native padding behavior
 is not qualified. The software Metal fixture adds 216 dispatches per runtime
 across 64 kernels and eight representative widths, including nontrivial double
 reversal, guards, deferred writes and expected failures.
+
+## Vector byte swap
+
+Ordinary direct `llvm.bswap.vNiW` calls accept 1..16 fixed lanes at widths
+i16, i32, i48 and i64. Each lane reverses its bytes while preserving bit order
+within each byte and the order of lanes. These are the even-byte widths in the
+interpreter's i1..i64 range. Scalar implementation, canonical integer-overload
+parsing, type/source validation and lane execution are shared with the existing
+integer operations. Both scalar execution APIs, void and memory execution admit
+these vector calls. The normal lane path adds no allocation.
+
+Byte swap adds cache slots 2688..2751 without moving the preceding 2,688 slots.
+All existing call, signature, flag, attribute and cold-block guards apply.
+Poison propagates per lane, any undef lane fails even when discarded, source
+freezes repair inputs and result freezes choose zero for poison. Each call
+costs one step, two lane counts of profiling work and one shared construction
+slot. Existing result/work limits remain. Other widths, oversized/scalable
+vectors, vector arguments/returns/loads/stores/PHIs and AIR aliases reject.
+
+`vector_bswap_intrinsics_test.v` checks 130,048 exact values against the
+standard-library 64-bit byte reverser shifted to the declared width, plus
+52,224 involutions and 6,528 lane-state checks. It exhausts i16 and checks wide
+patterns, individual set/clear bits, high-bit noise, snapshots and guards.
+The shared cache unit covers all 2,752 identities. Older integer-vector units
+replace their unsupported-byte-swap guards with unsupported leading-zero count
+because byte swap is now admitted. Their positive value/state coverage remains.
+
+`tests/ios/air-vector-bswap.v LLVM_AS FRESH_EXTERNAL_DIR` checks 1,600 decoded
+shapes and 266,556 exact native comparisons: all i16 values, 65,536 patterns
+per wider width, and composed cases across all 16 counts. Its 926 controls
+include 320 population-count/involution cases and 320 byte-swap/bit-reversal
+commutation cases through both scalar APIs and both call orders. It verifies
+all 64 declarations together, attributes, budgets and exact shared storage/
+work boundaries through all four APIs. A mixed floating predicate is widened
+to i16 before byte swapping; integer-only execution must reject its floating
+producer. A valid LLVM i80 byte swap in a cold block rejects before writes.
+The software Metal fixture adds 108 dispatches per runtime across 32 kernels,
+including deferred writes, sparse bindings, double swaps, guards and expected
+failures. Retained heap and GPU rendering are not qualified.
 
 References: [LLVM population count](https://llvm.org/docs/LangRef.html#llvm-ctpop-intrinsic),
 [bit reversal](https://llvm.org/docs/LangRef.html#llvm-bitreverse-intrinsics),

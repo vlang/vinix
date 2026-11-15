@@ -20,6 +20,7 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('llvm.bswap.v') { count, bits := vector_integer_overload(name, 12)!; if bits % 16 != 0 { return error('AIR vector intrinsic: even byte width required') }; return ScalarIntrinsic.bswap, count, bits }
 	if name.starts_with('llvm.bitreverse.v') { count, bits := vector_integer_overload(name, 17)!; return ScalarIntrinsic.bitreverse, count, bits }
 	if name.starts_with('llvm.ctpop.v') { count, bits := vector_integer_overload(name, 12)!; return ScalarIntrinsic.ctpop, count, bits }
 	if name.starts_with('llvm.is.fpclass.v') { count, bits := vector_float_overload(name, 17)!; return ScalarIntrinsic.is_fpclass, count, bits }
@@ -32,6 +33,10 @@ fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
+	if id == .bswap {
+		if count < 1 || count > 16 || bits < 16 || bits > 64 || bits % 16 != 0 { return error('AIR vector intrinsic: cache shape') }
+		return 2688 + int(bits / 16 - 1) * 16 + count - 1
+	}
 	if id in [.ctpop, .bitreverse]! {
 		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
 		return 640 + int(id == .bitreverse) * 1024 + int(bits - 1) * 16 + count - 1
