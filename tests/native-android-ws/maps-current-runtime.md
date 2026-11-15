@@ -33,8 +33,12 @@ its private engine log on failure; [bounded retention and exit-status reporting]
 passed host/ASan checks, current-V AArch64 build and r109 ARM validation.
 The retained r109 log identified an earlier X11 admission error; the
 [readable rejection reply fix](maps-x11-rejection-20261115.md) now passes
-focused host/ASan tests and AArch64 build. Complete r107/r108/r109 public/private
-evidence is preserved, and those guests are stopped.
+focused host/ASan tests, AArch64 build and r110 ARM validation. Real account
+setup passed display admission and identified the next engine failure: SQLite
+cannot open the cookie snapshot through its proc-fd alias with OPEN_NOFOLLOW.
+The canonical-path fix passes 15 host and ASan cookie-store cases; rebuilding
+the engine is in progress under the original caps. Complete r107–r110
+public/private evidence is preserved, and those guests are stopped.
 Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
