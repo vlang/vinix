@@ -103,3 +103,11 @@ a fresh full account profile and run the protected account retry, preserving
 the checked persistent-volume and single-use rules. Do not infer a successful
 Google account transition from the API-only result. All owned guests are
 stopped; Google Maps and authentication remain incomplete.
+
+In the subsequent full r104 profile the same signed suite passed again. That
+guest was interrupted before services became ready. Fresh r105 then reached
+the actual account chooser and Add account progressed past the callback-type
+failure, ending instead on the missing View.setRevealOnFocusHint API. Complete
+r105 private/public evidence and the next repair are recorded in the
+[reveal-hint continuation](maps-reveal-hint-20261115.md). No Google authentication
+success is inferred from that progression.

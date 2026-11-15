@@ -28,6 +28,7 @@ import useruidprobe
 import gnsshardwareprobe
 import webviewloaderprobe
 import valuecallbackprobe
+import revealhintprobe
 
 const subscription_source = r'
 .method public static forceLayoutProbe(Landroid/content/Context;)V
@@ -1417,6 +1418,7 @@ invoke-static {}, Lorg/vinix/bootstrap/UserUidProbe;->check()V
 invoke-static {p0}, Lorg/vinix/bootstrap/GnssHardwareProbe;->check(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/WebViewLoaderProbe;->check()V
 invoke-static {}, Lorg/vinix/bootstrap/ValueCallbackProbe;->check()V
+invoke-static {p0}, Lorg/vinix/bootstrap/RevealHintProbe;->check(Landroid/content/Context;)V
 invoke-static {p0}, Lorg/vinix/bootstrap/Main;->restrictions(Landroid/content/Context;)V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->subscriptions()V
 invoke-static {}, Lorg/vinix/bootstrap/Main;->shortcuts()V
@@ -1685,6 +1687,7 @@ fn main() {
 	gnsshardwareprobe.install(root)!
 	webviewloaderprobe.install(root)!
 	valuecallbackprobe.install(root)!
+	revealhintprobe.install(root)!
 	if tls_lifetime { tlslifetimeprobe.install(root)! }
 	if network { certificateprobe.install_network(root)! }
 	os.write_file(root + '/smali/TestLayoutTable.smali', r'.class public Lorg/vinix/bootstrap/TestLayoutTable;

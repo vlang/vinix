@@ -13,11 +13,17 @@ because the SDK declares ValueCallback as a class. The
 [interface repair](maps-value-callback-20261115.md) in 6a301fe1c now passes SDK
 assembly, native build and the complete signed ARM suite in r103, including
 generic reflection, application dispatch, cookie-wrapper forwarding and worker
-checks. r103 used the API-only profile to reduce disk use. The next full
-account-profile staging was refused before launch with only 812937216 bytes
-free, below the retained reserve. Qualified artifacts and complete exports
-are retained and checked; all owned test guests are stopped.
-Restore space and a quiet disk window before the protected account retry.
+checks. The same signed suite passed in the full r104 profile after space
+recovered; that guest was interrupted before services became ready. Fresh r105
+reached Add account and progressed past the callback type error, then failed
+on the missing View.setRevealOnFocusHint API. The
+[focus-hint repair](maps-reveal-hint-20261115.md) now passes full SDK assembly,
+DEX readback, nine input refusals, native -Werror build and fixture signing.
+Its ARM staging was refused before launch with 1540935680 bytes free, below
+the required reserve plus growth budget. Complete r105 public/private evidence
+and the new built artifacts are retained; all owned test guests are stopped.
+Restore space and a quiet disk window before signed ARM qualification and the
+next protected account retry.
 Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
