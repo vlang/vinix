@@ -135,6 +135,45 @@ fn test_root_publication_and_reuse() {
 	}
 }
 
+fn test_gpu_permissions() {
+	// Independent leaf encodings from Asahi AP_GPU=2, AttrIndx=2, AF=1,
+	// GPU_ACCESS=bit55 and the PXN/UXN permission selector at bits53/54.
+	modes := [pgtable.gpu_prot_gpu_shared_ro, pgtable.gpu_prot_gpu_shared_wo,
+		pgtable.gpu_prot_gpu_shared_rw]!
+	words := [u64(0x0080000000000488), 0x00a0000000000488, 0x00c0000000000488]!
+	mut pt := pgtable.new_pgtable(39, 48) or { panic('permission page table') }
+	pt.bind_tlb(11)
+	tlb.clear()
+	for index, mode in modes {
+		assert mode == words[index]
+		address := u64(0x4000) * u64(index + 1)
+		physical := u64(0x200000) + u64(0x4000) * u64(index)
+		assert pt.map(address, physical, pgtable.uat_pgsz, mode)
+		pte := pt.get_pte(address, false) or { panic('permission PTE') }
+		tlb.clear()
+		tlb.observe(pte, unsafe { nil })
+		assert unsafe { *pte } == physical | words[index] | u64(0x803)
+		assert !pgtable.is_cached_noncoherent(unsafe { *pte })
+		// Every transition replaces the selector, retaining the PA and ASID
+		// scope. In particular, WO -> RW must clear PXN rather than OR bits.
+		for target, next in modes {
+			assert pt.reprotect(address, pgtable.uat_pgsz, mode)
+			expect_asid(11, physical | words[index] | u64(0x803))
+			assert pt.reprotect(address, pgtable.uat_pgsz, next)
+			expect_asid(11, physical | words[target] | u64(0x803))
+			assert unsafe { *pte } == physical | words[target] | u64(0x803)
+		}
+		pt.unmap(address, pgtable.uat_pgsz)
+		expect_asid(11, 0)
+		tlb.observe(unsafe { nil }, unsafe { nil })
+	}
+	pt.unbind_tlb()
+	tlb.clear()
+	pgtable.destroy(pt)
+	unsafe { free(pt) }
+	println('AGX GPU permissions: exact RO/WO/RW leaf words, nine reprotect transitions and visible ASID invalidations passed')
+}
+
 fn test_range_operands() {
 	single := tlb.range_plan(3, 0x4000, 1) or { panic('page plan') }
 	pair := tlb.range_plan(3, 0x4000, 0x8000) or { panic('range plan') }
@@ -171,6 +210,7 @@ fn test_range_operands() {
 fn main() {
 	test_user_mappings()
 	test_root_publication_and_reuse()
+	test_gpu_permissions()
 	test_range_operands()
 	assert memory.live_pages() == 0
 	println('AGX TLB: mapping visibility, cache transitions, rollback, globals and context reuse passed')

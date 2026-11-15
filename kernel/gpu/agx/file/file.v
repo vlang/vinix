@@ -622,10 +622,12 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				gem.unref(obj)
 				return -22
 			}
-			protection := if request.flags & ioctl.asahi_bind_write != 0 {
-				pgtable.gpu_prot_gpu_shared_rw
+			protection := if request.flags & ioctl.asahi_bind_read != 0 {
+				if request.flags & ioctl.asahi_bind_write != 0 {
+					pgtable.gpu_prot_gpu_shared_rw
+				} else { pgtable.gpu_prot_gpu_shared_ro }
 			} else {
-				pgtable.gpu_prot_gpu_shared_ro
+				pgtable.gpu_prot_gpu_shared_wo
 			}
 			if !f.cleanup_closed_mappings_locked(request.vm_id) {
 				gem.unref(obj)

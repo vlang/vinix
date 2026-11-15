@@ -152,5 +152,6 @@ pub fn run_checks() {
 	stopping_file = unsafe { nil }
 	assert stopped_vm.destroyed && table_releases == 4 && closing_count == 0
 	check_mapping_retirement()
+	check_mapping_permissions()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

@@ -186,3 +186,36 @@ fn check_mapping_retirement() {
 	}
 	println('AGX mapping retirement: 200 bind/unbind/GEM-close/retry cycles, failed bind ownership, busy VM admission, partial UNBIND_ALL, replacement, stopped cleanup, exact-lock shutdown races and VM destruction before BIND passed')
 }
+
+fn check_mapping_permissions() {
+	gpu.set_running(true)
+	gpu.fail_flushes(0)
+	mut pt := pgtable.UatPgtable{}
+	mut vm := mmu.UatContext{ id: 1, pgtable: &pt }
+	mut file := GpuFile{ vms: [&vm] }
+	file.mappings.flags |= .noslices
+	object := gem.create(7)
+	file.objects.table.add_created(object)
+	flags := [ioctl.asahi_bind_read, ioctl.asahi_bind_write,
+		ioctl.asahi_bind_read | ioctl.asahi_bind_write]!
+	protection := [pgtable.gpu_prot_gpu_shared_ro, pgtable.gpu_prot_gpu_shared_wo,
+		pgtable.gpu_prot_gpu_shared_rw]!
+	for index, mode in flags {
+		mut request := bind(7, 1, 0x4000)
+		request.flags = mode
+		assert file.ioctl_gem_bind(&request) == 0
+		assert pt.last_protection == protection[index]
+		assert object.references == 2 && file.mappings.len == 1
+		assert file.ioctl_gem_bind(unbind(1, 0x4000)) == 0
+		assert object.references == 1 && file.mappings.len == 0
+	}
+	for mode in [u32(0), 4, 5, 6, 7, 0x80000000, 0xffffffff]! {
+		mut request := bind(7, 1, 0x4000)
+		request.flags = mode
+		before := pt.maps
+		assert file.ioctl_gem_bind(&request) == -22
+		assert pt.maps == before && object.references == 1 && file.mappings.len == 0
+	}
+	assert file.close() && gem.live() == 0
+	println('AGX mapping permissions: real ioctl preserves distinct read-only, write-only and read/write selectors; empty/unknown permissions reject before mapping')
+}

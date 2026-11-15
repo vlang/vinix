@@ -163,6 +163,10 @@ pub fn check_asahi(asahi_linux string) ![]string {
 // Omarchy ships the Asahi driver in linux-aurora. FWCTL cache maintenance
 // does not replace these CPU-side outer-shareable GPU TLB broadcasts.
 pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
+	check_gpu_permission_contract(read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/pgtable.rs'))!,
+		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/file.rs'))!)!
 	reference := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mem.rs'))!
 	vinix := read(os.join_path(repo, 'kernel/gpu/agx/tlb/tlb.v'))!
 	check_tlb_instructions(reference, vinix)!
@@ -181,7 +185,8 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	require_order(local_unbind, ['slots[ctx.id].ttb0 = 0', 'slots[ctx.id].ttb1 = 0',
 		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()'], 'Vinix ASID teardown invalidation')!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
-		'ASID invalidation after root publication and removal']
+		'ASID invalidation after root publication and removal',
+		'Distinct GPU-only coherent RO/WO/RW bind permissions and Asahi UAT selectors']
 }
 
 fn check_tlb_instructions(reference string, vinix string) ! {

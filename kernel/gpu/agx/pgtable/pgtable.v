@@ -68,6 +68,8 @@ pub const gpu_prot_fw_mmio_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only | 
 pub const gpu_prot_fw_mmio_ro = uat_pte_os | uat_pte_ap_fw_only | uat_memattr_device | uat_pte_af
 pub const gpu_prot_gpu_shared_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_gpu_only | uat_memattr_normal_uncached | uat_pte_af
 pub const gpu_prot_gpu_shared_ro = uat_pte_os | uat_pte_ap_gpu_only | uat_memattr_normal_uncached | uat_pte_af
+// GPU-only write permission uses PXN, unlike GPU-only read/write (UXN).
+pub const gpu_prot_gpu_shared_wo = uat_pte_os | uat_pte_pxn | uat_pte_ap_gpu_only | uat_memattr_normal_uncached | uat_pte_af
 
 // Cached mappings visible to firmware are noncoherent with the ASC. Before
 // their backing can be unmapped, m1n1 and Asahi both replace the cacheable PTE

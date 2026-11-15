@@ -27,3 +27,8 @@ Another injection destroys a VM before BIND acquires the file mutation lock;
 the ioctl must re-resolve it without touching the destroyed page table.
 These injected services establish host ownership and lock order, not actual
 firmware invalidation, concurrent hardware behavior or whole-kernel leak rates.
+
+The real BIND ioctl also checks distinct RO, WO and RW permissions against the
+injected page-table service. Empty and unknown flags must reject before mapping
+or taking a mapping reference. The separate TLB fixture checks the actual UAT
+leaf encodings and reprotection transitions with the production page-table code.

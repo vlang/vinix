@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [retry-safe user mapping retirement](m1-agx-user-map-retirement.md)
-(2026-11-15). The [prepared backlog](m1-agx-prepared-backlog.md),
+Latest offline increment: [distinct GPU mapping permissions](m1-agx-gpu-permissions.md)
+(2026-11-15). The [user mapping retirement](m1-agx-user-map-retirement.md),
+[prepared backlog](m1-agx-prepared-backlog.md),
 [batch publication](m1-agx-batch-publication.md) and [admission](m1-agx-batch-admission.md)
 reports retain their original evidence.
 

@@ -1,6 +1,7 @@
 # Apple GPU TLB invalidation
 
-Run `v run tests/agx-tlb/run.v --sanitize` from the repository root.
+Compile `run.v` with V to an external executable, then run it with `--sanitize`.
+Set `AGX_TLB_TEST_BINARY` to retain the sanitizer executable outside Git.
 
 The runner executes the production UAT page-table operations and context-root
 publishers against host allocations. Only physical allocation, locks, handoff
@@ -13,12 +14,15 @@ the PTE and context-table words visible at each invalidation. It checks:
 - each range causes one invalidation, and unpublished tables cause none;
 - root publication, removal and reuse invalidate the correct ASID;
 - global firmware mappings use full invalidation;
+- RO, WO and RW mappings use Asahi's distinct exact leaf encodings, and all
+  nine reprotection transitions replace the permission selector before TLBI;
 - 16 KiB page/range TLBI operands cover scale boundaries and advance the
   address between full chunks, including canonical high addresses;
 - all host page-table allocations are released.
 
 The source-reference gate independently checks the actual instructions,
-barriers and root-publication order against Omarchy's Asahi-derived driver:
+barriers, root-publication order, bind permission selection and GPU UAT
+permission encodings against Omarchy's Asahi-derived driver:
 
 ```sh
 make -C tools/agx-re check-g13-reference ASAHI_LINUX=/path/to/linux-aurora
