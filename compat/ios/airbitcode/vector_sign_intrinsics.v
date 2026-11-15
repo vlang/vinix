@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 64
+const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 64 + 1024
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -28,15 +28,18 @@ fn vector_sign_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
 // Validate direct identity, exact signature and every source before execution.
 // Return lane work, cache key and declaration attributes for the bounded scanner.
 fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, mixed bool, remaining int) !(int, int, u64, bool) {
-	if !mixed || op.flags != 32768 || op.opcode != 0 || op.calling_convention != 0 || op.fast_math_flags != 0 || op.attribute_set != 0 || op.targets_count != 0 || op.indices_count != 0 || op.callee_function < 0 || op.callee_function >= ir.functions.len || op.operands_start < 0 || op.operands_start > p.operands.len || op.operands_count < 2 || op.operands_count > p.operands.len - op.operands_start { return error('AIR vector intrinsic: ordinary unflagged direct call required') }
+	if op.flags != 32768 || op.opcode != 0 || op.calling_convention != 0 || op.fast_math_flags != 0 || op.attribute_set != 0 || op.targets_count != 0 || op.indices_count != 0 || op.callee_function < 0 || op.callee_function >= ir.functions.len || op.operands_start < 0 || op.operands_start > p.operands.len || op.operands_count < 2 || op.operands_count > p.operands.len - op.operands_start { return error('AIR vector intrinsic: ordinary unflagged direct call required') }
 	f := ir.functions[op.callee_function]; id, count, bits := vector_float_intrinsic_name(f.name)!
 	if !f.declaration || f.calling_convention != 0 || f.linkage != 0 || f.signature != op.call_signature || f.signature < 0 || f.signature >= ir.types.len || f.record < 0 || f.record >= stream.records.len { return error('AIR vector intrinsic: declaration signature/header') }
 	callee := p.operands[op.operands_start]
 	if callee.number >= u32(pools.declarations.len) || pools.declarations[int(callee.number)] != f.record || callee.type_index < 0 || callee.type_index >= p.types.len || p.types[callee.type_index].kind != .pointer_t || p.types[callee.type_index].address_space != 0 { return error('AIR vector intrinsic: direct declaration identity') }
 	signature := ir.types[f.signature]; arity := scalar_intrinsic_arity(id)
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 || ir.references[signature.refs_start] != op.result_type { return error('AIR vector intrinsic: signature/arity') }
+	if !mixed && id != .ctpop { return error('AIR vector intrinsic: mixed floating execution required') }
 	mut work := 0
-	if id == .is_fpclass {
+	if id == .ctpop {
+		work = p.vector_ctpop_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
+	} else if id == .is_fpclass {
 		work = p.vector_fpclass_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
 	} else {
 	element, actual_bits, actual_count := p.scalar_vector_type(op.result_type, mixed, remaining)!
@@ -72,6 +75,7 @@ fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right Scala
 fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Stream, inst IRInstruction, op IRTypedInstruction) !IntegerValue {
 	id, count, bits := vector_float_intrinsic_name(ir.functions[op.callee_function].name)!
 	left := m.read_vector(stream, m.p.operands[op.operands_start + 1])!
+	if id == .ctpop { return m.store_vector_value(inst, ctpop_intrinsic_vector(left, bits, count)!)! }
 	if id == .is_fpclass {
 		mask := m.read(op.operands_start + 2)!
 		return m.store_vector_value(inst, fpclass_intrinsic_vector(left, bits, count, mask.value)!)!

@@ -11,16 +11,18 @@ The mixed scalar interpreter accepts ordinary direct LLVM calls to:
 Each intrinsic takes one integer argument and returns the identical integer
 type. Arguments are masked to their declared width; results keep that width,
 integer kind and exact bits. Poison propagates; selected undef errors. The
-integer-only API retains its existing no-call profile. Integer-only functions
-using these calls execute through `run_scalar_function`.
+integer-only API rejects these scalar intrinsic calls. Integer-only functions
+using scalar calls execute through `run_scalar_function`. The vector population
+count described below also executes through `run_integer_function`.
 
 Production uses unsigned shifts, masks and additions in loops of at most 64
 iterations (eight for byte swap), without host intrinsics, LLVM, floating point
 or new allocation. Intrinsic CALL costs one executed instruction; primitive
 CALL/return takes two. Name recognition inspects bytes directly without a
 substring allocation or permissive numeric parser. Only canonical decimal
-suffixes 1..64 are admitted; leading zeros, signs, trailing suffixes, vectors,
-floating types, AIR aliases and unsupported byte-swap widths reject.
+suffixes 1..64 are admitted; leading zeros, signs, trailing suffixes, scalar calls
+with vector arguments, floating types, AIR aliases and unsupported byte-swap
+widths reject.
 
 The [existing direct-call profile](SCALAR-INTRINSICS.md) checks declaration
 identity, external linkage, signature/arity, default pointer address space,
@@ -72,6 +74,58 @@ binaries, identities and logs belong in complete external evidence bundles.
 
 This is scalar execution groundwork. No AIR shader, Metal device, GPU command
 or application launch is qualified.
+
+## Vector population count
+
+Ordinary direct `llvm.ctpop.vNiW` calls accept fixed vectors of 1..16 lanes
+and integer widths i1..i64, returning the identical vector type. Canonical
+name, signature, argument/result identity, direct declaration, flags, calling
+convention and attributes are checked before execution, including cold blocks.
+Both mixed and integer-only execution APIs admit these integer calls. Floating
+producers/classification still require mixed execution; scalar intrinsic calls
+retain their existing policy. Vector arguments/returns, loads/stores, PHIs,
+scalable vectors, widths above 64, counts above 16 and AIR aliases reject.
+
+Each lane reuses the scalar integer population counter, masking the declared
+width. Lane poison propagates; any undef lane errors even if the result is
+discarded. Source freezes repair indeterminate inputs before counting. Result
+freezes choose zero for poison. Results are independent snapshots and compose
+with integer vector construction, comparisons and selects. A call costs one
+step, two lane counts of profiling work and one shared construction slot.
+The existing 4,096-result and 1,000,000-work limits apply.
+
+The shared vector declaration cache now has 1,664 stack entries: its previous
+640 floating identities followed by 1,024 population-count identities, one per
+width/count pair. Declaration attributes are checked once per identity;
+duplicate reserved declarations reject. Unary integer calls reject return/
+parameter attributes, including `immarg`. The normal production lane path
+adds no allocations. Retained heap has not been measured.
+
+`vector_ctpop_intrinsics_test.v` checks 1,032,736 exact lane values with an
+independent low-set-bit-clearing oracle, including every i1..i16 encoding,
+wide patterns, single-set/clear bits, upper-bit noise and snapshots. Another
+104,448 lane poison/undef/freeze checks and the shared cache unit cover all
+1,024 new identities alongside the original 640.
+
+`tests/ios/air-vector-ctpop.v LLVM_AS FRESH_EXTERNAL_DIR` generates and verifies
+25,600 shapes across every width/count, five source forms and five construction
+paths, exercising mixed scalar, integer-only and memory execution. Bounded
+bulk modules compare 3,276,832 native LLVM lane values, exhausting narrow widths
+and using 65,536 mixed patterns per wider width. The VM receives nonzero
+padding bits; native loads receive canonical padding because the captured LLVM
+legalizer can retain unused load bits in i1 vector operations. Both results
+must agree with the independent width-masked oracle. The failed initial noisy
+native comparison remains in the evidence bundle.
+
+Controls cover strict undef/discards, poison/freeze, snapshots, chains,
+signatures, declaration attributes, duplicates, all 1,024 overloads in bounded
+cache groups, changing-source loops, floating/integer API isolation, malformed
+metadata, exact budgets and shared storage/work boundaries through all four
+APIs. A combined 1,024-declaration module must reject the shared attribute-work
+limit through both scalar APIs. The software Metal fixture adds 216 dispatches
+per runtime across 64 kernels and eight representative widths, including deferred writes, sparse
+bindings, pipeline reuse, guard bytes and expected failures. These synthetic
+CPU checks do not qualify an Apple shader, GPU frame or application launch.
 
 References: [LLVM population count](https://llvm.org/docs/LangRef.html#llvm-ctpop-intrinsic),
 [bit reversal](https://llvm.org/docs/LangRef.html#llvm-bitreverse-intrinsics),

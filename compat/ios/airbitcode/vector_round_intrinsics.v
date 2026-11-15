@@ -20,6 +20,7 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('llvm.ctpop.v') { count, bits := vector_ctpop_overload(name)!; return ScalarIntrinsic.ctpop, count, bits }
 	if name.starts_with('llvm.is.fpclass.v') { count, bits := vector_float_overload(name, 17)!; return ScalarIntrinsic.is_fpclass, count, bits }
 	if name.starts_with('llvm.ldexp.') { return vector_ldexp_intrinsic_name(name) }
 	if name.starts_with('llvm.fmuladd.v') { count, bits := vector_float_overload(name, 14)!; return ScalarIntrinsic.fmuladd, count, bits }
@@ -30,6 +31,10 @@ fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
+	if id == .ctpop {
+		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
+		return 640 + int(bits - 1) * 16 + count - 1
+	}
 	if id in [.ldexp, .is_fpclass]! {
 		if count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector intrinsic: cache shape') }
 		return 576 + int(id == .is_fpclass) * 32 + int(bits == 16) * 16 + count - 1
