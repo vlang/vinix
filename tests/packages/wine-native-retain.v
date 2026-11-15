@@ -111,10 +111,8 @@ fn producer_argv(vargv string, ccargv string, compiler string, architecture stri
 		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-fuse-ld=lld',
 		if native { '-O1' } else { '-O2' }, '-w', '-fno-stack-protector', '-static', '-D_GNU_SOURCE',
 		'-Wno-error=incompatible-pointer-types', cfile, runtime, '-lm', '-lpthread', '-o', output]
-	if !native {
-		resource := wineheaders.selection(os.read_file(os.dir(ccargv) + '/clang-resource.log')!)!
-		expected_c.insert(4, '-resource-dir=' + resource)
-	}
+	resource := wineheaders.selection(os.read_file(os.dir(ccargv) + '/clang-resource.log')!)!
+	expected_c.insert(4, '-resource-dir=' + resource)
 	if c != expected_c {
 		return error('C producer argv differs')
 	}
@@ -223,7 +221,7 @@ fn retain() ! {
 		}
 	}
 	for name in ['tests/packages/wine-native-check.v', 'tests/packages/wine-native/main.v',
-		'tests/packages/winesource/closure.v']! {
+		'tests/packages/winesource/closure.v', 'tests/packages/wineheaders/headers.v']! {
 		require_input(inputs, root + '/' + name)!
 	}
 	for directory in [root + '/tools/packages', root + '/tools/accounts',
@@ -407,11 +405,12 @@ fn retain() ! {
 	for program in ['guest', 'package']! {
 		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
 			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
-			'sources-built.txt'] {
+			'sources-built.txt', 'clang-headers.json', 'clang-resource.log', 'clang-resource.log.argv.json'] {
 			required << 'build-' + program + '/' + name
 		}
 		winesource.admit(run + '/build-' + program + '/sources-before.txt',
 			run + '/build-' + program + '/sources-built.txt', inputs)!
+		wineheaders.admit_build(run + '/build-' + program, run + '/build-' + program, inputs)!
 	}
 	for name in ['usr/bin/vinix-package', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session',
 		'usr/bin/vinix-sandbox', 'etc/vinix/auth.conf', 'etc/vinix-packages/config.json']! {

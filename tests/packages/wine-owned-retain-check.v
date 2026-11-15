@@ -22,7 +22,9 @@ fn clone_tree(source string, destination string, prepared bool) ! {
 		if !os.is_file(path) { continue }
 		to := destination + path[source.len..]
 		os.mkdir_all(os.dir(to))!
-		if prepared || path.ends_with('/sources-before.txt') || path.ends_with('/sources-built.txt') {
+		if prepared || path.ends_with('/sources-before.txt') || path.ends_with('/sources-built.txt')
+			|| path.ends_with('/clang-headers.json') || path.ends_with('/clang-resource.log')
+			|| path.ends_with('/clang-resource.log.argv.json') || path.ends_with('/cc.log.argv.json') {
 			$if macos {
 				if C.clonefile(path.str, to.str, 0) == 0 { continue }
 			}
@@ -51,6 +53,48 @@ fn reseal(run string, prepared string, changed []string) ! {
 		replace(run + '/' + name, json2.encode(inputs))!
 	}
 }
+
+fn native_resource(run string, program string, kind string) !string {
+	directory := run + '/build-' + program
+	mut changed := ''
+	mut expected := ''
+	if kind == 'manifest' {
+		snapshot := json2.decode[wineheaders.Snapshot](os.read_file(directory + '/clang-headers.json')!)!
+		mut files := snapshot.files.clone()
+		files.delete(files.keys()[0])
+		replace(directory + '/clang-headers.json', json2.encode(wineheaders.Snapshot{directory: snapshot.directory, directories: snapshot.directories, files: files}))!
+		changed = 'clang-headers.json'
+		expected = 'Clang resource header tree changed'
+	} else if kind == 'input' {
+		snapshot := json2.decode[wineheaders.Snapshot](os.read_file(directory + '/clang-headers.json')!)!
+		for name in ['inputs-before-build.json', 'inputs.json', 'inputs-verified.json'] {
+			mut inputs := read_map(run + '/' + name)!
+			inputs.delete(snapshot.files.keys()[0])
+			replace(run + '/' + name, json2.encode(inputs))!
+		}
+		expected = 'Clang resource header input absent or changed'
+	} else if kind == 'query' {
+		replace(directory + '/clang-resource.log', os.read_file(directory + '/clang-resource.log')! + '\n')!
+		changed = 'clang-resource.log'
+		expected = 'invalid Clang resource directory response'
+	} else if kind == 'flag' {
+		mut args := json2.decode[[]string](os.read_file(directory + '/cc.log.argv.json')!)!
+		for index, arg in args { if arg.starts_with('-resource-dir=') { args[index] = '-resource-dir=/other' } }
+		replace(directory + '/cc.log.argv.json', json2.encode(args))!
+		changed = 'cc.log.argv.json'
+		expected = 'Clang resource compile selection differs'
+	} else if kind == 'linked' {
+		os.rename(directory + '/clang-headers.json', directory + '/manifest-original.json')!
+		os.symlink(directory + '/manifest-original.json', directory + '/clang-headers.json')!
+		expected = 'Clang resource evidence must be a bounded ordinary file'
+	} else { return error('unknown native resource control') }
+	if changed != '' {
+		mut generated := read_map(run + '/generated-before-boot.json')!
+		generated['build-' + program + '/' + changed] = digest(directory + '/' + changed)!
+		replace(run + '/generated-before-boot.json', json2.encode(generated))!
+	}
+	return expected
+}
 fn admit(retainer string, run string, prepared string, out string, log string) !int {
 	mut child := os.new_process(retainer)
 	defer { child.close() }
@@ -73,8 +117,12 @@ fn check() ! {
 	clone_tree(run, copy, false)!; clone_tree(prepared, copy + '/prepared', true)!; remap(copy, prepared, copy + '/prepared')!
 	if admit(retainer, copy, copy + '/prepared', out + '/copied-retained', out + '/copied.log')! != 0 { return error('owned copied baseline refused') }
 	mut refused := []string{}
-	for name in ['package-flag', 'linked-mode', 'hidden-import', 'raw-outcome', 'deadline', 'missing-marker', 'duplicate-marker', 'marker-cr', 'vm-memory',
-		'resource-manifest', 'resource-input', 'resource-query', 'resource-flag', 'linked-resource'] {
+	mut cases := ['package-flag', 'linked-mode', 'hidden-import', 'raw-outcome', 'deadline', 'missing-marker', 'duplicate-marker', 'marker-cr', 'vm-memory',
+		'resource-manifest', 'resource-input', 'resource-query', 'resource-flag', 'linked-resource']
+	for program in ['guest', 'package']! {
+		for kind in ['manifest', 'input', 'query', 'flag', 'linked']! { cases << program + '-resource-' + kind }
+	}
+	for name in cases {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
 		mut selected := prepared
@@ -83,7 +131,10 @@ fn check() ! {
 			selected = dir + '/prepared'
 			clone_tree(prepared, selected, true)!; remap(dir, prepared, selected)!
 		}
-		if name == 'package-flag' {
+		if name.starts_with('guest-resource-') || name.starts_with('package-resource-') {
+			parts := name.split('-')
+			expected = native_resource(dir, parts[0], parts[2])!
+		} else if name == 'package-flag' {
 			file := 'build-package/v.log.argv.json'
 			mut args := json2.decode[[]string](os.read_file(dir + '/' + file)!)!
 			at := args.index('wine_kernel_lease')
@@ -167,6 +218,6 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline fourteen exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline twenty-four exact refusals')
 }
 fn main() { check() or { eprintln(err); exit(1) } }

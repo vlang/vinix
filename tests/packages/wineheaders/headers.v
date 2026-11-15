@@ -87,14 +87,20 @@ fn record(path string, bound u64) !string {
 }
 
 pub fn admit_producer(prepared string, inputs map[string]string) ! {
-	expected := json2.decode[Snapshot](record(prepared + '/clang-headers.json', 8 * 1024 * 1024)!)!
-	query := json2.decode[[]string](record(prepared + '/logs/clang-resource.log.argv.json', 8192)!)!
+	admit_build(prepared, prepared + '/logs', inputs)!
+}
+
+// Native builds keep their C command and discovery records beside the output;
+// bridge production keeps them in logs/. Both use the same admission rules.
+pub fn admit_build(directory string, logs string, inputs map[string]string) ! {
+	expected := json2.decode[Snapshot](record(directory + '/clang-headers.json', 8 * 1024 * 1024)!)!
+	query := json2.decode[[]string](record(logs + '/clang-resource.log.argv.json', 8192)!)!
 	if query != ['/opt/homebrew/opt/llvm/bin/clang', '-print-resource-dir'] {
 		return error('Clang resource discovery argv differs')
 	}
-	resource := selection(record(prepared + '/logs/clang-resource.log', 8192)!)!
+	resource := selection(record(logs + '/clang-resource.log', 8192)!)!
 	if expected.directory != resource + '/include' { return error('Clang resource snapshot selection differs') }
-	cc := json2.decode[[]string](record(prepared + '/logs/cc.log.argv.json', 65536)!)!
+	cc := json2.decode[[]string](record(logs + '/cc.log.argv.json', 65536)!)!
 	flags := cc.filter(it.starts_with('-resource-dir'))
 	if flags != ['-resource-dir=' + resource] || cc.len == 0 || cc[0] != query[0] {
 		return error('Clang resource compile selection differs')

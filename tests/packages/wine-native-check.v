@@ -9,6 +9,7 @@ import os
 import plainiso
 import time
 import tests.packages.winesource
+import tests.packages.wineheaders
 import tests.packages.wineowned
 import tools.packages.pkgcore
 import tools.packages.wineadapter
@@ -60,6 +61,10 @@ fn discover_program(v string, source string, arch string, work string, name stri
 	command.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
 	invoke(command, directory + '/discover.log')!
 	winesource.capture(directory + '/sources-before.txt', mut inputs)!
+	invoke(['/opt/homebrew/opt/llvm/bin/clang', '-print-resource-dir'], directory + '/clang-resource.log')!
+	resource := wineheaders.selection(os.read_file(directory + '/clang-resource.log')!)!
+	headers := wineheaders.capture(resource + '/include', mut inputs)!
+	os.write_file(directory + '/clang-headers.json', json2.encode(headers) + '\n')!
 }
 
 fn build_program(v string, sysroot string, gcc string, source string, arch string, work string, name string, owned bool, collection bool, caller_death bool, idle_server bool, inputs map[string]string) !string {
@@ -72,10 +77,12 @@ fn build_program(v string, sysroot string, gcc string, source string, arch strin
 	vlib := os.dir(v) + '/vlib'
 	os.write_file(directory + '/runtime.c', '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +
 		vlib + '/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + vlib + '/sync/thread_helper.h"\n')!
+	resource := wineheaders.selection(os.read_file(directory + '/clang-resource.log')!)!
 	invoke(['/opt/homebrew/opt/llvm/bin/clang', '--target=' + arch + '-linux-musl',
-		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-fuse-ld=lld', '-O1', '-w',
+		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-resource-dir=' + resource, '-fuse-ld=lld', '-O1', '-w',
 		'-fno-stack-protector', '-static', '-D_GNU_SOURCE', '-Wno-error=incompatible-pointer-types',
 		cfile, directory + '/runtime.c', '-lm', '-lpthread', '-o', directory + '/' + name], directory + '/cc.log')!
+	wineheaders.admit_build(directory, directory, inputs)!
 	return directory + '/' + name
 }
 
@@ -95,6 +102,9 @@ fn check() ! {
 	}
 	if digest(os.dir(@FILE) + '/winesource/closure.v')! != sha256.hexhash($embed_file('winesource/closure.v').to_string()) {
 		return error('compiled Wine source closure admission differs')
+	}
+	if digest(os.dir(@FILE) + '/wineheaders/headers.v')! != sha256.hexhash($embed_file('wineheaders/headers.v').to_string()) {
+		return error('compiled Wine header admission differs')
 	}
 	if digest(os.dir(@FILE) + '/wineowned/receipt.v')! != sha256.hexhash($embed_file('wineowned/receipt.v').to_string()) {
 		return error('compiled Wine owned receipt admission differs')
@@ -169,6 +179,7 @@ fn check() ! {
 	for path in [os.executable(), host.v, kernel, host.qemu, host.firmware, @FILE,
 		root + '/tests/packages/wine-native/main.v', root + '/tests/packages/winesource/closure.v',
 		root + '/tests/packages/wineowned/receipt.v',
+		root + '/tests/packages/wineheaders/headers.v',
 		'/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', sandbox] {
 		inputs[path] = digest(path)!
 	}
@@ -231,12 +242,16 @@ fn check() ! {
 	mut state := service.transact('install', ['org.vinix.wine-win64-probe'], pkgcore.TransactionOptions{})!
 	state.close()
 	verify(inputs)!
+	for program in ['guest', 'package']! {
+		directory := work + '/build-' + program
+		wineheaders.admit_build(directory, directory, inputs)!
+	}
 	os.write_file(work + '/inputs.json', json2.encode(inputs))!
 	mut generated := map[string]string{}
 	for program in ['guest', 'package']! {
 		for name in [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
 			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
-			'sources-built.txt'] {
+			'sources-built.txt', 'clang-headers.json', 'clang-resource.log', 'clang-resource.log.argv.json'] {
 			path := 'build-' + program + '/' + name
 			generated[path] = digest(work + '/' + path)!
 		}
@@ -324,6 +339,10 @@ fn check() ! {
 	outcome := hwhost.run_scenario(runtime_host, scenario, hwhost.Run{ kernel: kernel, guest: guest, extras: extras, state: work + '/boot', timeout: bound, keep: true, memory_mib: if arch == 'aarch64' || collection { 3072 } else { 1024 } })
 	os.write_file(work + '/guest-outcome.json', json2.encode(outcome))!
 	verify(inputs)!
+	for program in ['guest', 'package']! {
+		directory := work + '/build-' + program
+		wineheaders.admit_build(directory, directory, inputs)!
+	}
 	for path, expected in generated {
 		if digest(work + '/' + path)! != expected {
 			return error('Wine generated output changed: ' + path)

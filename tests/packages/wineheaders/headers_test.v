@@ -83,6 +83,15 @@ fn test_resource_receipt_binds_discovery_and_actual_compile_selection() {
 	os.write_file(root + '/logs/clang-resource.log', root + '/resource\n')!
 	os.write_file(root + '/logs/cc.log.argv.json', cc)!
 	admit_producer(root, inputs)!
+	// Native builds keep these same records beside the generated program.
+	for name in ['clang-resource.log', 'clang-resource.log.argv.json', 'cc.log.argv.json'] {
+		os.cp(root + '/logs/' + name, root + '/' + name)!
+	}
+	admit_build(root, root, inputs)!
+	os.write_file(root + '/cc.log.argv.json', '["/opt/homebrew/opt/llvm/bin/clang"]')!
+	mut native_refused := false
+	admit_build(root, root, inputs) or { native_refused = true }
+	assert native_refused
 	for contents in ['[]', json2.encode(['/opt/homebrew/opt/llvm/bin/clang']),
 		json2.encode(['/opt/homebrew/opt/llvm/bin/clang', '-resource-dir=' + root + '/resource', '-resource-dir=/other']),
 		json2.encode(['/other/clang', '-resource-dir=' + root + '/resource'])] {

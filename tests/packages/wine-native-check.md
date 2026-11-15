@@ -14,6 +14,14 @@ its loader, server and data through its own executable-directory rules. Both
 prepared architectures pass independent layout and source-binding controls;
 these host checks alone do not establish a passing signed Wine launch.
 
+Fresh native builds explicitly select and inventory the guest and package
+compiler's [Clang resource headers](wine-resource-headers-check.md). Each
+complete ordinary include tree is captured before compilation and compared
+after compilation, before boot and after the run. The full retainer requires
+these snapshots, discovery records, input pins and exact C arguments alongside
+the original source/output/ISO checks. Actual C dependency discovery and full
+hermetic toolchain admission remain separate gates.
+
 The historical x86-9 outcome remains a failed checkpoint. The separate
 [translated-fork fixture](wine-translation-fork-check.md) records the original
 ARM split-WX failure and its source-built fix. The new explicit retainer mode
