@@ -31,12 +31,14 @@ CHECK RETAINER RUN PREPARED_BUILD FRESH_CONTROL_OUTPUT
 ```
 
 It requires real and unchanged copied baselines, including the producer's
-original recorded build namespace. Nine mutations must fail at their named
+original recorded build namespace. Fourteen mutations must fail at their named
 gates and create no retained output: missing kernel flag, linked mode receipt,
 omitted hidden SDK input with resealed inventories, mismatched raw outcome,
 deadline equality, missing/duplicate/embedded-CR milestones, and altered VM
-memory. Mutated files are detached before writing. Prepared payloads are private
-copy-on-write clones on macOS, with ordinary copies as fallback; no mutation
+memory, plus five [Clang resource-header controls](wine-resource-headers-check.md)
+with resealed output/input receipts. Mutated files are detached before writing.
+Prepared payloads are private copy-on-write clones on macOS, with ordinary copies
+as fallback; no mutation
 writes through a link to the baseline.
 
 The existing owned-receipt suite also binds the new shared helper and exercises
@@ -45,7 +47,8 @@ ordinary-mode control refuses owned evidence, and ARM refuses this x86-only
 retainer option before producing an output.
 
 This remains local evidence admission through the retainer's stated recorded
-inputs. Complete C resource-header/hermetic toolchain coverage, default
+inputs. The bridge's selected Clang resource headers are now admitted;
+complete C dependency/hermetic toolchain coverage, default
 activation, owned ARM/GUI, catalog/redistribution acceptance and broader
 roadmap 14 gates remain separate.
 

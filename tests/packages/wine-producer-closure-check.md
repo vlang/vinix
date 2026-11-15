@@ -29,9 +29,11 @@ CHECK /absolute/fresh-prepared-build
 
 It independently compares producer input inventories, rehashes every recorded
 input, admits the actual source lists, checks retained output hashes, and
-requires matching discovery/build commands. This is parsed bridge-source
-admission; complete runtime retention, C header/toolchain closure and hermetic
-build admission remain separate requirements. Historical bundles still need
+requires matching discovery/build commands. It also admits the explicit
+[Clang resource-header selection and complete header tree](wine-resource-headers-check.md).
+This is parsed bridge-source and selected resource-header admission; complete
+C dependency/toolchain closure and hermetic build admission remain separate
+requirements. Historical bundles still need
 their original complete inputs and original auditors; no missing evidence is
 waived.
 

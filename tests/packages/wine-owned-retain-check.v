@@ -4,6 +4,7 @@ module main
 import os
 import json2
 import crypto.sha256
+import tests.packages.wineheaders
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -72,12 +73,13 @@ fn check() ! {
 	clone_tree(run, copy, false)!; clone_tree(prepared, copy + '/prepared', true)!; remap(copy, prepared, copy + '/prepared')!
 	if admit(retainer, copy, copy + '/prepared', out + '/copied-retained', out + '/copied.log')! != 0 { return error('owned copied baseline refused') }
 	mut refused := []string{}
-	for name in ['package-flag', 'linked-mode', 'hidden-import', 'raw-outcome', 'deadline', 'missing-marker', 'duplicate-marker', 'marker-cr', 'vm-memory'] {
+	for name in ['package-flag', 'linked-mode', 'hidden-import', 'raw-outcome', 'deadline', 'missing-marker', 'duplicate-marker', 'marker-cr', 'vm-memory',
+		'resource-manifest', 'resource-input', 'resource-query', 'resource-flag', 'linked-resource'] {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
 		mut selected := prepared
 		mut expected := ''
-		if name in ['linked-mode', 'hidden-import'] {
+		if name in ['linked-mode', 'hidden-import'] || name.starts_with('resource-') || name == 'linked-resource' {
 			selected = dir + '/prepared'
 			clone_tree(prepared, selected, true)!; remap(dir, prepared, selected)!
 		}
@@ -104,6 +106,36 @@ fn check() ! {
 			for file in ['inputs-before-build.json', 'inputs-verified.json'] { replace(selected + '/' + file, json2.encode(before))! }
 			reseal(dir, selected, ['inputs-before-build.json', 'inputs-verified.json'])!
 			expected = 'compiler source input is absent or changed'
+		} else if name == 'resource-manifest' {
+			snapshot := json2.decode[wineheaders.Snapshot](os.read_file(selected + '/clang-headers.json')!)!
+			mut files := snapshot.files.clone()
+			files.delete(files.keys()[0])
+			replace(selected + '/clang-headers.json', json2.encode(wineheaders.Snapshot{directory: snapshot.directory, directories: snapshot.directories, files: files}))!
+			reseal(dir, selected, ['clang-headers.json'])!
+			expected = 'Clang resource header tree changed'
+		} else if name == 'resource-input' {
+			snapshot := json2.decode[wineheaders.Snapshot](os.read_file(selected + '/clang-headers.json')!)!
+			mut before := read_map(selected + '/inputs-before-build.json')!
+			before.delete(snapshot.files.keys()[0])
+			for file in ['inputs-before-build.json', 'inputs-verified.json'] { replace(selected + '/' + file, json2.encode(before))! }
+			reseal(dir, selected, ['inputs-before-build.json', 'inputs-verified.json'])!
+			expected = 'Clang resource header input absent or changed'
+		} else if name == 'resource-query' {
+			file := 'logs/clang-resource.log'
+			replace(selected + '/' + file, os.read_file(selected + '/' + file)! + '\n')!
+			reseal(dir, selected, [file])!
+			expected = 'invalid Clang resource directory response'
+		} else if name == 'resource-flag' {
+			file := 'logs/cc.log.argv.json'
+			mut args := json2.decode[[]string](os.read_file(selected + '/' + file)!)!
+			for index, arg in args { if arg.starts_with('-resource-dir=') { args[index] = '-resource-dir=/other' } }
+			replace(selected + '/' + file, json2.encode(args))!
+			reseal(dir, selected, [file])!
+			expected = 'Clang resource compile selection differs'
+		} else if name == 'linked-resource' {
+			os.rm(selected + '/clang-headers.json')!
+			os.symlink(prepared + '/clang-headers.json', selected + '/clang-headers.json')!
+			expected = 'Clang resource evidence must be a bounded ordinary file'
 		} else if name == 'deadline' {
 			for file in ['guest-outcome.json', 'result.json'] {
 				mut result := json2.decode[map[string]json2.Any](os.read_file(dir + '/' + file)!)!
@@ -135,6 +167,6 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline nine exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline fourteen exact refusals')
 }
 fn main() { check() or { eprintln(err); exit(1) } }

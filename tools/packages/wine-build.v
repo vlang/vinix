@@ -8,6 +8,7 @@ import json2
 import os
 import wineadapter
 import tests.packages.winesource
+import tests.packages.wineheaders
 
 struct Entry {
 	source string
@@ -57,6 +58,7 @@ fn verify_sources() ! {
 	for path, contents in {
 		@FILE:                                            $embed_file('wine-build.v').to_string()
 		os.dir(@FILE) + '/../../tests/packages/winesource/closure.v': $embed_file('../../tests/packages/winesource/closure.v').to_string()
+		os.dir(@FILE) + '/../../tests/packages/wineheaders/headers.v': $embed_file('../../tests/packages/wineheaders/headers.v').to_string()
 		os.dir(@FILE) + '/wine-runner.v':                 $embed_file('wine-runner.v').to_string()
 		os.dir(@FILE) + '/wineadapter/layout.v':          $embed_file('wineadapter/layout.v').to_string()
 		os.dir(@FILE) + '/wineadapter/patch.v':           $embed_file('wineadapter/patch.v').to_string()
@@ -305,7 +307,8 @@ fn build() ! {
 	mut checked_offer := wineadapter.admit_local_source_offer(output + '/publisher-notices', 'org.vinix.wine-runtime', '9.17-r1', arch)!
 	checked_offer.close()
 	copy_input(application, app + '/bin/program.exe', mut inputs)!
-	for path in [base + '/tools/packages/wine-runner.v', @FILE, base + '/tests/packages/winesource/closure.v'] {
+	for path in [base + '/tools/packages/wine-runner.v', @FILE, base + '/tests/packages/winesource/closure.v',
+		base + '/tests/packages/wineheaders/headers.v'] {
 		inputs[path] = digest(path)!
 	}
 	for directory in [base + '/tools/packages/wineadapter', base + '/tools/packages/appsdk',
@@ -318,6 +321,10 @@ fn build() ! {
 	for path in [v, '/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', '/usr/bin/tar'] {
 		inputs[path] = digest(path)!
 	}
+	resource := wineheaders.selection(invoke(['/opt/homebrew/opt/llvm/bin/clang', '-print-resource-dir'],
+		output + '/logs/clang-resource.log')!)!
+	headers := wineheaders.capture(resource + '/include', mut inputs)!
+	os.write_file(output + '/clang-headers.json', json2.encode(headers) + '\n')!
 	generated := output + '/build/wine-runner.c'
 	mut runner_command := [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree', '-d',
@@ -338,7 +345,7 @@ fn build() ! {
 		os.dir(v) + '/vlib/os/execute_capture_nix.h"\n#define V_SYNC_THREAD_SCOPE\n#include "' + os.dir(v) + '/vlib/sync/thread_helper.h"\n')!
 	os.mkdir_all(runtime + '/bin')!
 	invoke(['/opt/homebrew/opt/llvm/bin/clang', '--target=' + arch + '-linux-musl',
-		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-fuse-ld=lld', '-O2', '-w',
+		'--sysroot=' + sysroot, '--gcc-install-dir=' + gcc, '-resource-dir=' + resource, '-fuse-ld=lld', '-O2', '-w',
 		'-fno-stack-protector', '-static', '-D_GNU_SOURCE', '-Wno-error=incompatible-pointer-types',
 		generated, runtime_c, '-lm', '-lpthread', '-o', runtime + '/bin/wine-runner'], output + '/logs/cc.log')!
 	for name in ['wine64', 'wineserver']! {
@@ -402,6 +409,7 @@ fn build() ! {
 		if digest(path)! != hash { return error('Wine producer input changed: ' + path) }
 	}
 	verify_sources()!
+	wineheaders.admit_producer(output, inputs)!
 	os.write_file(output + '/inputs-verified.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
 	for path in os.walk_ext(output, '') {
