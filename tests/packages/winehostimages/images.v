@@ -330,3 +330,55 @@ pub fn v_inputs(directory string) !map[string]string {
 	for image in baseline.images { if !system(image.path) { result[image.path] = image.sha256 } }
 	return result
 }
+
+// Separate exploratory Mach-O replay evidence. This does not extend the
+// existing ELF or mandatory host receipt profiles.
+pub fn invoke_macho(command []string, cwd string, log string) !string {
+	tool := '/opt/homebrew/bin/ld64.lld'
+	if command.len == 0 || command[0] != tool { return error('unsupported Mach-O replay tool') }
+	directory := os.dir(log)
+	for name in ['host-home', 'host-tmp'] {
+		os.mkdir_all(directory + '/' + name)!
+		if os.real_path(directory + '/' + name) != directory + '/' + name { return error('Mach-O environment directory differs') }
+	}
+	env := environment(directory)
+	baseline_path := directory + '/macho-images-before.json'
+	if !os.exists(baseline_path) && !os.is_link(baseline_path) {
+		images := raw([tool, '--version'], directory, directory + '/macho-version.log', env)!
+		os.write_file(baseline_path, json2.encode(Baseline{recorded_directory: directory, images: images}) + '\n')!
+	}
+	baseline := json2.decode[Baseline](record(baseline_path)!)!
+	if baseline.format != 1 || baseline.recorded_directory != directory { return error('Mach-O image namespace differs') }
+	compatible(raw(command, cwd, log, env)!, baseline.images)!
+	return os.read_file(log)
+}
+
+pub fn admit_macho(directory string, recorded string) ! {
+	tool := '/opt/homebrew/bin/ld64.lld'
+	baseline := json2.decode[Baseline](record(directory + '/macho-images-before.json')!)!
+	if baseline.format != 1 || baseline.recorded_directory != recorded { return error('Mach-O image namespace differs') }
+	env := environment(recorded)
+	if json2.decode[[]string](record(directory + '/macho-version.log.argv.json')!)! != [tool, '--version'] {
+		return error('Mach-O version argv differs')
+	}
+	if admit_record(directory + '/macho-version.log', env, tool)! != baseline.images { return error('Mach-O version images differ') }
+	compatible(admit_record(directory + '/macho-replay.log', env, tool)!, baseline.images)!
+	for image in baseline.images {
+		if system(image.path) { continue }
+		if os.real_path(image.path) != image.path || os.lstat(image.path)!.get_filetype() != .regular
+			|| winesource.file_digest(image.path)! != image.sha256 { return error('Mach-O host image changed') }
+	}
+}
+
+pub fn macho_artifacts() []string {
+	mut result := ['macho-images-before.json']
+	for name in ['macho-version.log', 'macho-replay.log'] {
+		result << name
+		for suffix in ['.argv.json', '.environment.json', '.dyld.log', '.images.json'] { result << name + suffix }
+	}
+	return result
+}
+
+pub fn admit_macho_capture(directory string, recorded string) ! {
+	admit_names(directory, recorded, ['cc.log'])!
+}
