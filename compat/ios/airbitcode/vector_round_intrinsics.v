@@ -22,14 +22,14 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	if name.starts_with('llvm.fabs.') || name.starts_with('llvm.copysign.') { return vector_sign_intrinsic_name(name) }
 	if name.starts_with('llvm.sqrt.v') { count, bits := vector_float_overload(name, 11)!; return ScalarIntrinsic.sqrt, count, bits }
-	if name.starts_with('llvm.minimum.v') || name.starts_with('llvm.maximum.v') { count, bits := vector_float_overload(name, 14)!; return if name[6] == `i` { ScalarIntrinsic.minimum } else { ScalarIntrinsic.maximum }, count, bits }
+	if name.starts_with('llvm.min') || name.starts_with('llvm.max') { return vector_minmax_intrinsic_name(name) }
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
 	if id in [.fabs, .copysign]! { return vector_sign_intrinsic_key(id, count, bits) }
-	if id in [.minimum, .maximum]! {
+	if id in [.minimum, .maximum, .minimumnum, .maximumnum, .minnum, .maxnum]! {
 		if count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector intrinsic: cache shape') }
-		return vector_sign_intrinsic_slots + 224 + 32 + int(id == .maximum) * 32 + int(bits == 16) * 16 + count - 1
+		return vector_sign_intrinsic_slots + 224 + 32 + vector_minmax_intrinsic_index(id)! * 32 + int(bits == 16) * 16 + count - 1
 	}
 	if id == .sqrt {
 		if count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector intrinsic: cache shape') }
