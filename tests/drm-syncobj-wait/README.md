@@ -21,9 +21,17 @@ cleanup and exact-lock publication/cancellation interleavings. The ioctl tests
 check that no registrations survive validation failure, completion, timeout or
 interruption, including publication after the ioctl has returned.
 
+Large-wait cases cover the inline boundary at 64 handles, owned buffers for
+65..4096 handles and a ready index of 4095. Geometry probes check aligned,
+non-overlapping regions, wide counts and overflow. The allocator starts memory
+with nonzero bytes, injects failures and tracks live buffers/bytes. Before each
+free, a hook checks that no pending capture points into that allocation.
+Every large request must return all owned bytes, including copy/lookup/prepare
+errors, timeout and interruption. Huge requests use a fixture-only allocation
+ceiling to test ENOMEM without exhausting the host.
+
 These deterministic interleavings do not exercise actual kernel threads, GPU
-execution or kernel heap usage. Vinix still limits one wait to 64 handles and
-polls through its scheduler; Linux uses dynamically sized sleeping waits and
-fence callbacks. Timeline waits and deadline scheduling hints remain separate
-work. Deterministic interleavings do not qualify multi-CPU races or syscall
-restart after actual userspace signal delivery.
+execution or kernel heap usage. Vinix still polls through its scheduler; Linux
+uses sleeping waits and fence callbacks. Timeline waits and deadline scheduling
+hints remain separate work. These tests do not qualify multi-CPU races or
+syscall restart after actual userspace signal delivery.

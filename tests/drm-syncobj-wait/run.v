@@ -23,11 +23,12 @@ fn main() {
 		section(source, 'fn ioctl_syncobj_create(', 'fn create_prime_fd(')! +
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
 	os.write_file('${scratch}/drm/production.v', production)!
+	os.cp('${repo}/kernel/drm/wait_storage.v', '${scratch}/drm/wait_storage.v')!
 	os.cp('${repo}/tests/drm-syncobj-wait/capture_checks.v', '${scratch}/drm/syncobj/capture_checks.v')!
 	process_source := os.read_file('${repo}/kernel/proc/proc.v')!
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
-	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',

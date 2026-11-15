@@ -12,7 +12,7 @@ fn check_binary_wait_contract(local string, reference string) ! {
 		&& flags.contains('ioctl.drm_syncobj_wait_deadline') && !flags.contains('ioctl.drm_syncobj_wait_available'),
 		'Binary waits must reject the timeline-only availability flag')!
 	require_order(wait, ['if request.count_handles == 0 { return 0 }', 'usercopy.copy_from_user(',
-		'objects[i] = syncobj.lookup(', 'return -2', 'defer {', 'syncobj.release_capture(',
+		'object := syncobj.lookup(', 'return -2', 'buffer.objects[i] = voidptr(object)', 'defer {', 'syncobj.release_capture(',
 		'if !syncobj.prepare_capture(', 'request.flags & ioctl.drm_syncobj_wait_for_submit != 0',
 		'return -22', 'for {', 'syncobj.captured_fence(', 'syncobj.is_signaled(fence)',
 		'if ready {', 'request.timeout_nsec <= 0', 'sched.reschedule()'],

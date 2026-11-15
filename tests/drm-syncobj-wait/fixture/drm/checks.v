@@ -151,7 +151,7 @@ pub fn run_wait_checks() {
 		bad.count_handles = 0
 		assert ioctl_syncobj_wait(voidptr(11), &bad) == 0
 		bad.count_handles = 65
-		assert ioctl_syncobj_wait(voidptr(11), &bad) == -22
+		assert ioctl_syncobj_wait(voidptr(11), &bad) == -14
 		bad.count_handles = 1; bad.handles = unsafe { u64(&handles[0]) }
 		usercopy.allow(bad.handles, 8); usercopy.inject_fault()
 		assert ioctl_syncobj_wait(voidptr(11), &bad) == -14

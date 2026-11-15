@@ -18,6 +18,19 @@ pub fn assert_no_captures_for_checks(obj &SyncObj) {
 	o.lock.release()
 }
 
+pub fn assert_no_capture_in_region_for_checks(obj &SyncObj, allocation voidptr, size u64) {
+	mut o := unsafe { obj }
+	o.lock.acquire()
+	mut cursor := unsafe { o.pending_captures }
+	for cursor != unsafe { nil } {
+		address := u64(cursor)
+		assert address < u64(allocation) || address - u64(allocation) >= size,
+			'wait storage freed before its capture nodes were detached'
+		cursor = unsafe { cursor.next }
+	}
+	o.lock.release()
+}
+
 pub fn run_capture_checks() {
 	assert !prepare_capture(unsafe { nil }, unsafe { nil }, true)
 	assert !prepare_capture(unsafe { nil }, unsafe { nil }, false)

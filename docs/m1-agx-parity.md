@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [first-submission capture and wait interruption](m1-agx-wait-capture.md)
-(2026-11-16). The [binary wait snapshots](m1-agx-binary-wait.md),
+Latest offline increment: [binary wait storage beyond 64 handles](m1-agx-wait-storage.md)
+(2026-11-16). The [first-submission capture and interruption](m1-agx-wait-capture.md),
+[binary wait snapshots](m1-agx-binary-wait.md),
 [fence completion status](m1-agx-fence-completion.md),
 [native fragment TIB sizing](m1-agx-render-tib.md),
 [native driver VM geometry](m1-agx-vm-geometry.md),

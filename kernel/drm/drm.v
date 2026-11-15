@@ -1025,29 +1025,44 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjWait(data) }
 	known_flags := ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit | ioctl.drm_syncobj_wait_deadline
-	if request.flags & ~known_flags != 0 || request.count_handles > 64 {
+	if request.flags & ~known_flags != 0 {
 		return -22
 	}
 	if request.count_handles == 0 { return 0 }
 	mut handles := [64]u32{}
-	if !usercopy.copy_from_user(unsafe { &handles[0] }, request.handles,
-		u64(request.count_handles) * sizeof(u32)) { return -14 }
 	// Retained syncobj/fence metadata keeps these synchronous snapshots valid
 	// even if another thread replaces a fence or destroys/reuses its handle.
-	mut objects := unsafe { [64]&syncobj.SyncObj{} }
+	mut objects := unsafe { [64]voidptr{} }
 	mut captures := [64]syncobj.FenceCapture{}
+	mut buffer := SyncobjWaitBuffer{
+		handles: unsafe { &handles[0] }
+		objects: unsafe { &objects[0] }
+		captures: unsafe { &captures[0] }
+	}
+	if request.count_handles > 64 {
+		buffer = new_syncobj_wait_buffer(request.count_handles) or { return -12 }
+	}
+	// Defer order is intentional: the later capture detachment runs first.
+	defer { buffer.free_owned() }
+	if !usercopy.copy_from_user(buffer.handles, request.handles,
+		u64(request.count_handles) * sizeof(u32)) { return -14 }
 	for i := u32(0); i < request.count_handles; i++ {
-		objects[i] = syncobj.lookup(u64(handle), handles[i]) or { return -2 }
+		object := syncobj.lookup(u64(handle), unsafe { buffer.handles[i] }) or { return -2 }
+		unsafe { buffer.objects[i] = voidptr(object) }
 	}
 	// Every prepared entry is detached before this synchronous ioctl unwinds,
 	// including validation failures, timeout, signal interruption and success.
 	defer {
-		for i := u32(0); i < request.count_handles; i++ {
-			syncobj.release_capture(unsafe { &captures[i] })
+		// Registrations prepend to each object's list. Reverse retirement
+		// removes duplicate-handle registrations without repeated tail scans.
+		mut remaining := request.count_handles
+		for remaining > 0 {
+			remaining--
+			syncobj.release_capture(unsafe { &buffer.captures[remaining] })
 		}
 	}
 	for i := u32(0); i < request.count_handles; i++ {
-		if !syncobj.prepare_capture(objects[i], unsafe { &captures[i] },
+		if !syncobj.prepare_capture(unsafe { &syncobj.SyncObj(buffer.objects[i]) }, unsafe { &buffer.captures[i] },
 			request.flags & ioctl.drm_syncobj_wait_for_submit != 0) { return -22 }
 	}
 	wait_all := request.flags & ioctl.drm_syncobj_wait_all != 0
@@ -1055,7 +1070,7 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 		mut ready_count := u32(0)
 		mut first := u32(0)
 		for i := u32(0); i < request.count_handles; i++ {
-			fence := syncobj.captured_fence(unsafe { &captures[i] }) or { continue }
+			fence := syncobj.captured_fence(unsafe { &buffer.captures[i] }) or { continue }
 			if syncobj.is_signaled(fence) {
 				if ready_count == 0 { first = i }
 				ready_count++
