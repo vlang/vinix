@@ -13,9 +13,9 @@ fn invoke(argv []string, log string) ! {
 	hwhost.run_tool(argv, map[string]string{}, log, 300)!
 }
 fn run() ! {
-	if os.args.len != 8 { return error('usage: CHECK FRESH_OUTPUT KERNEL SYSROOT GCC_INSTALL CLANG V held|unheld') }
+	if os.args.len != 8 { return error('usage: CHECK FRESH_OUTPUT KERNEL SYSROOT GCC_INSTALL CLANG V held|unheld|kernel') }
 	work := os.abs_path(os.args[1]); mode := os.args[7]
-	if mode !in ['held', 'unheld'] || os.exists(work) || os.is_link(work) { return error('fresh output and held|unheld required') }
+	if mode !in ['held', 'unheld', 'kernel'] || os.exists(work) || os.is_link(work) { return error('fresh output and held|unheld|kernel required') }
 	root := os.real_path(os.dir(@FILE) + '/../..')
 	probe := root + '/tools/packages/pkgcore/generation_launch_test.v'
 	if winesource.file_digest(@FILE)! != sha256.hexhash($embed_file('generation-launch-check.v').to_string())
@@ -27,7 +27,8 @@ fn run() ! {
 	os.mkdir_all(work)!
 	mut command := [os.args[6], '-backend', 'c', '-prod', '-os', 'linux', '-arch', 'amd64', '-gc', 'none', '-manualfree',
 		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-d', 'generation_launch_fixture', '-path', '@vlib|' + root + '|@vmodules', '-o', work + '/probe.c', probe]
-	if mode == 'held' { command.insert(1, ['-d', 'wine_owned_manager']) }
+	if mode in ['held', 'kernel'] { command.insert(1, ['-d', 'wine_owned_manager']) }
+	if mode == 'kernel' { command.insert(1, ['-d', 'wine_kernel_lease']) }
 	mut discovery := command.clone(); discovery.insert(1, ['-print-watched-files', '-dump-files', work + '/sources-before.txt'])
 	invoke(discovery, work + '/discover.log')!
 	winesource.capture(work + '/sources-before.txt', mut inputs)!
@@ -43,7 +44,7 @@ fn run() ! {
 	outcome := hwhost.run_scenario(boot_host, hwhost.Scenario{name: 'generation-launch', arches: ['x86_64'], ending: .running,
 		required: ['HWTEST PASS generation launch: holder adoption; lease lifetime; status37; missing lease; non-Windows dispatch; low descriptor isolation'], forbidden: ['HWTEST FAIL', 'Kernel panic']},
 		hwhost.Run{kernel: os.args[2], guest: work + '/probe', state: work + '/boot', timeout: 60, keep: true})
-	os.write_file(work + '/result.json', json2.encode(outcome))!
+	os.write_file(work + '/guest-outcome.json', json2.encode(outcome))!
 	for path, hash in inputs { if winesource.file_digest(path)! != hash { return error('generation check input changed') } }
 	for path, hash in generated { if winesource.file_digest(path)! != hash { return error('generation generated artifact changed') } }
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
@@ -51,6 +52,7 @@ fn run() ! {
 	if mode == 'unheld' {
 		if outcome.passed || !outcome.reason.contains('HWTEST FAIL generation launch: generation worker readiness timed out') { return error('unheld control failed at wrong gate: ' + outcome.reason) }
 	} else if !outcome.passed { return error('generation dispatch check failed: ' + outcome.reason) }
+	os.write_file(work + '/result.json', json2.encode({'passed': json2.Any(true), 'mode': mode}))!
 	println('GENERATION LAUNCH CHECK PASS ' + mode)
 }
 fn main() {

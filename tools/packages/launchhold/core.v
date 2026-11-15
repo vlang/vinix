@@ -9,11 +9,15 @@ pub:
 	program string
 	directory string
 	arguments []string
+	// Require Vinix's kernel-owned lease before starting the client. Unsupported
+	// kernels refuse before exec; the shared caller is never enrolled.
+	kernel_lease bool
 }
 
 // The private non-execing holder keeps its own lease copy until its initial
-// client and adopted descendants retire. SIGKILL of that holder is outside
-// this guarantee. This primitive does not authenticate a Wine server/prefix.
+// client and adopted descendants retire. With kernel_lease, descendants also
+// retain an independent kernel lock after holder SIGKILL. Without it, holder
+// SIGKILL remains outside the guarantee. This does not authenticate Wine.
 pub fn run(command Command, lease_fd i32) !int {
 	$if linux {
 		$if amd64 || arm64 { return run_linux(command, lease_fd) }

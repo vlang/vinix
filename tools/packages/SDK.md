@@ -1902,6 +1902,23 @@ This uses the same 3 GiB fixture and is mutually exclusive with
 records its scope; holder SIGKILL, full session teardown and broader lifetime
 guarantees remain open.
 
+Package frontends may additionally opt into `-d wine_kernel_lease` alongside
+`-d wine_owned_manager`. Before forking its client, the private generation
+holder requires Vinix's kernel-owned shared lease. Unsupported kernels and
+invalid source locks fail at setup stage 9 before client exec, without a
+userspace-only fallback. The caller remains outside the workload, and its
+borrowed descriptor stays intact. Descendants inherit membership across exec,
+double-fork and new sessions; holder `SIGKILL` returns status 137 to its caller
+while a surviving member still retains the generation. Final member retirement
+releases the kernel lock. Ordinary holder completion still returns the initial
+client's saved status.
+
+The [native holder integration](../../tests/packages/workload-holder-check.md)
+qualifies this primitive on both architectures and the opt-in package dispatch
+on x86_64, including low descriptors. It does not qualify a signed Wine workload
+under holder death or change default enablement. The existing `wine-build` and
+`wine-native-check` owned-mode receipts do not imply this additional flag.
+
 The `--caller-death-probe` and `--idle-server-probe` cases also attempt a second
 actual package launch before remove/rollback. It must return 126 within fifteen
 seconds at the managed-prefix guard while the original caller stays gone, holder/server/worker

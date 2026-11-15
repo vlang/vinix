@@ -5,8 +5,9 @@ import tools.packages.launchhold
 
 // Opt-in counterpart to the SDK's owned entrypoint. Keep holder creation out
 // of the shared caller: only the private holder may reap arbitrary descendants.
-// The caller owns the verified lease throughout; holder SIGKILL remains outside
-// this guarantee. Non-Windows and default builds keep their original behavior.
+// The caller owns the verified lease throughout. wine_kernel_lease additionally
+// requires kernel membership in the private holder before its client forks.
+// Non-Windows and default builds keep their original behavior.
 fn run_generation_launch(launch Launch, windows bool, lease int) !int {
 	$if wine_owned_manager ? {
 		if windows {
@@ -21,7 +22,9 @@ fn run_generation_launch(launch Launch, windows bool, lease int) !int {
 				// Duplicate the same open description, never unlock/reopen it. The
 				// borrowed low descriptor stays CLOEXEC and remains the caller's.
 				defer { if held != lease { C.close(held) } }
-				return launchhold.run(launchhold.Command{program: launch.program, arguments: launch.arguments, directory: launch.directory}, held)
+				mut kernel_lease := false
+				$if wine_kernel_lease ? { kernel_lease = true }
+				return launchhold.run(launchhold.Command{program: launch.program, arguments: launch.arguments, directory: launch.directory, kernel_lease: kernel_lease}, held)
 			} $else { return error('owned Windows generation supervision is qualified only for x86_64') }
 		}
 	}

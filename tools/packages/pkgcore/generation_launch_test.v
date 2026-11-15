@@ -7,6 +7,8 @@ import time
 #include <unistd.h>
 #include <grp.h>
 #include <sys/wait.h>
+#include <sys/prctl.h>
+fn C.prctl(i32, ...voidptr) i32
 #define generation_test_wait waitpid
 fn C.generation_test_wait(i32, &i32, i32) i32
 fn C.getpid() i32
@@ -50,6 +52,9 @@ fn generation_fixture(low bool) ! {
 			if !refused || C.fcntl(borrowed, C.F_GETFD) != 0 || C.fcntl(borrowed, C.F_SETFD, C.FD_CLOEXEC) != 0 { C._exit(92) }
 		}
 		code := run_generation_launch(launch, true, borrowed) or { eprintln('HWTEST FAIL generation dispatch: ' + err.msg()); C._exit(81); return }
+		$if wine_kernel_lease ? {
+			if C.prctl(0x56490004, voidptr(0), voidptr(0), voidptr(0), voidptr(0)) != 0 { C._exit(93) }
+		}
 		flags := C.fcntl(borrowed, C.F_GETFD)
 		if flags < 0 || flags & C.FD_CLOEXEC == 0 { C._exit(88) }
 		generation_lock(root + '/lease', true) or { C._exit(89) }
@@ -85,6 +90,9 @@ fn generation_fixture(low bool) ! {
 fn testsuite_begin() {
 	$if generation_launch_fixture ? {
 		if os.args.len == 3 && os.args[1] == '--generation-client' {
+			$if wine_kernel_lease ? {
+				if C.prctl(0x56490004, voidptr(0), voidptr(0), voidptr(0), voidptr(0)) != 1 { C._exit(94) }
+			}
 			root := os.args[2]
 			if root.ends_with('-low') && C.fcntl(0, C.F_GETFD) >= 0 { C._exit(90) }
 			owner := C.getppid()

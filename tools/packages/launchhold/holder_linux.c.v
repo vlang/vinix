@@ -52,7 +52,7 @@ fn close_interval(first u32, last u32) bool {
 
 // No V allocation, formatting, environment lookup or Process object after
 // fork. All masks and wait/status records are genuine stack ABI objects.
-fn holder(program &char, directory &char, argv &&char, lease i32, report i32, inherited &u64) {
+fn holder(program &char, directory &char, argv &&char, lease i32, report i32, inherited &u64, kernel_lease bool) {
 	default_action := SignalAction{}
 	mut inherited_action := SignalAction{}
 	if action(C.SIGCHLD, unsafe { &default_action }, unsafe { &inherited_action }) != 0 { fail(report, 2) }
@@ -64,6 +64,11 @@ fn holder(program &char, directory &char, argv &&char, lease i32, report i32, in
 	high := u32(if lease < report { report } else { lease })
 	if !close_interval(3, low - 1) || !close_interval(low + 1, high - 1)
 		|| !close_interval(high + 1, ~u32(0)) { fail(report, 4) }
+	// Attach only in the single-threaded private holder. Both it and the client
+	// inherit membership; the shared caller remains outside this workload.
+	if kernel_lease && C.prctl(0x56490003, voidptr(i64(lease)), voidptr(0), voidptr(0), voidptr(0)) != 0 {
+		fail(report, 9)
+	}
 	client := C._Fork()
 	if client < 0 { fail(report, 5) }
 	if client == 0 {
@@ -173,7 +178,7 @@ fn run_linux(command Command, lease i32) !int {
 				if C.vinix_launchhold_syscall(C.SYS_kill, C.vinix_launchhold_syscall(C.SYS_getpid), C.SIGUSR1) != 0 { fail(fds[1], 1) }
 			}
 		}
-		holder(program, directory, unsafe { &&char(argv.data) }, lease, fds[1], unsafe { &inherited })
+		holder(program, directory, unsafe { &&char(argv.data) }, lease, fds[1], unsafe { &inherited }, command.kernel_lease)
 		C._exit(126)
 	}
 	mask_result := set_mask(unsafe { &inherited }, unsafe { nil })
@@ -203,7 +208,7 @@ fn run_linux(command Command, lease i32) !int {
 	if count == 0 || (count < 0 && C.errno == C.EAGAIN) {
 		return if status & 0x7f == 0 { int((status >> 8) & 0xff) } else { int(128 + (status & 0x7f)) }
 	}
-	if count != 8 || record[0] < 1 || record[0] > 8 { return error('invalid holder failure record') }
+	if count != 8 || record[0] < 1 || record[0] > 9 { return error('invalid holder failure record') }
 	stage := record[0].str(); code := record[1].str()
 	defer { unsafe { stage.free(); code.free() } }
 	return error('generation lease holder setup stage ' + stage + ' failed (errno ' + code + ')')
