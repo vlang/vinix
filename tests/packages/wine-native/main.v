@@ -16,6 +16,8 @@ import tools.packages.wineadapter
 #include <grp.h>
 #include <poll.h>
 #include <signal.h>
+#include <sys/prctl.h>
+fn C.prctl(i32, ...voidptr) i32
 #define wine_fixture_kill kill
 fn C.wine_fixture_kill(i32, i32) i32
 
@@ -759,7 +761,57 @@ fn collection_clients(generation string, expected string) !int {
 	return live
 }
 
+// Reap only an identified runtime process adopted by this fixture, never -1.
+fn collection_reap_adopted(pid string, code int, allow_retired bool) !bool {
+	if !os.exists('/proc/' + pid) {
+		if allow_retired { return true }
+		return error('identified Wine manager disappeared before exact status collection')
+	}
+	if collection_field(pid, 'PPid')! != '1' { return false }
+	mut status := i32(0)
+	waited := C.waitpid(pid.int(), &status, C.WNOHANG)
+	if waited == 0 || (waited < 0 && C.errno == C.EINTR) { return false }
+	if waited != pid.int() || status != code << 8 { return error('adopted Wine runtime status differs: ' + pid) }
+	return true
+}
+
+// Wineboot/services may have been adopted by the dead holder as well. Match
+// their admitted generation and credentials; do not collect arbitrary children.
+fn collection_reap_runtime(generation string, manager string, descendant string) !bool {
+	names := os.ls('/proc')!
+	defer { unsafe { names.free() } }
+	mut retired := true
+	for pid in names {
+		if pid == '' || pid[0] < `0` || pid[0] > `9` || pid == manager || pid == descendant { continue }
+		line := wineproc.command_line('/proc/' + pid)!
+		defer { unsafe { line.free() } }
+		if !line.contains(generation + '/apps/org.vinix.wine-runtime/') { continue }
+		ordinary_status(pid) or {
+			if !os.exists('/proc/' + pid) { unsafe { err.free() }; continue }
+			return err
+		}
+		parent := collection_field(pid, 'PPid') or {
+			if !os.exists('/proc/' + pid) { unsafe { err.free() }; continue }
+			return err
+		}
+		defer { unsafe { parent.free() } }
+		if parent != '1' { retired = false; continue }
+		mut status := i32(0)
+		waited := C.waitpid(pid.int(), &status, C.WNOHANG)
+		if waited == pid.int() {
+			println('HWTEST INFO Wine adopted auxiliary runtime pid=' + pid + ' raw-status=' + status.str())
+		} else if waited == 0 || (waited < 0 && C.errno == C.EINTR) { retired = false }
+		else { return error('cannot collect identified adopted Wine process: ' + pid) }
+	}
+	return retired
+}
+
 fn collection_run(generation string, architecture string) ! {
+	$if wine_holder_death_probe ? {
+		if C.prctl(0x56490004, voidptr(0), voidptr(0), voidptr(0), voidptr(0)) != 0 {
+			return error('holder-death qualification requires kernel workload leases and an unenrolled observer')
+		}
+	}
 	println('HWTEST INFO Wine collection launch begin')
 	mut child := os.new_process('/usr/bin/vinix-package')
 	defer {
@@ -792,6 +844,10 @@ fn collection_run(generation string, architecture string) ! {
 	mut caller := ''
 	mut holder := ''
 	defer { unsafe { caller.free(); holder.free() } }
+	mut orphan_manager := ''
+	defer { unsafe { orphan_manager.free() } }
+	mut manager_reaped := false
+	mut runtime_retired := false
 	mut holder_reaped := false
 	mut idle_checked := false
 	mut last_clients := -1
@@ -904,6 +960,37 @@ fn collection_run(generation string, architecture string) ! {
 					collection_lease_busy(generation)!
 					println('HWTEST INFO Wine manager-SIGKILL adopted-server foreign-refusal126 lease-busy PASS')
 				}
+				$if wine_holder_death_probe ? {
+					orphan_manager = collection_field(server, 'PPid')!
+					collection_live(orphan_manager)!
+					line := wineproc.command_line('/proc/' + orphan_manager)!
+					defer { unsafe { line.free() } }
+					if orphan_manager == holder || collection_field(orphan_manager, 'PPid')! != holder
+						|| !line.contains(generation + '/apps/org.vinix.wine-runtime/bin/wine-runner\x00') {
+						return error('SDK manager identity changed before holder SIGKILL')
+					}
+					if C.wine_fixture_kill(i32(holder.int()), C.SIGKILL) != 0 { return error('cannot kill generation holder') }
+					mut status := i32(0)
+					holder_deadline := time.sys_mono_now() + 10 * time.second
+					for {
+						waited := C.waitpid(holder.int(), &status, C.WNOHANG)
+						if waited == holder.int() {
+							if status != C.SIGKILL { return error('holder did not retire by SIGKILL') }
+							break
+						}
+						if (waited < 0 && C.errno != C.EINTR) || time.sys_mono_now() > holder_deadline { return error('cannot reap killed holder') }
+						time.sleep(10 * time.millisecond)
+					}
+					holder_reaped = true
+					if os.exists('/proc/' + holder) || collection_field(orphan_manager, 'PPid')! != '1' {
+						return error('holder survived or SDK manager was not adopted')
+					}
+					collection_live(orphan_manager)!
+					collection_live(server)!
+					collection_live(descendant)!
+					collection_lease_busy(generation)!
+					println('HWTEST INFO Wine holder-SIGKILL reaped9 manager-adopted kernel-lease-busy PASS')
+				}
 			}
 			// Two real administrative transitions make the running generation
 			// neither active nor rollback. No state/lease files are synthesized.
@@ -929,7 +1016,10 @@ fn collection_run(generation string, architecture string) ! {
 				collection_live(descendant)!
 				$if wine_caller_death_probe ? {
 					if os.exists('/proc/' + caller) || child.is_alive() { return error('dead package caller returned during collection') }
-					collection_live(holder)!
+					$if wine_holder_death_probe ? {
+						if os.exists('/proc/' + holder) { return error('dead holder returned during collection') }
+						collection_live(orphan_manager)!
+					} $else { collection_live(holder)! }
 				} $else {
 					if !child.is_alive() { return error('package CLI returned during collection') }
 				}
@@ -971,6 +1061,13 @@ fn collection_run(generation string, architecture string) ! {
 			}
 		}
 		$if wine_caller_death_probe ? {
+			$if wine_holder_death_probe ? {
+				if collected {
+					collection_reap_adopted(descendant, 0, true)!
+					if !manager_reaped { manager_reaped = collection_reap_adopted(orphan_manager, 37, false)! }
+					runtime_retired = collection_reap_runtime(generation, orphan_manager, descendant)!
+				}
+			}
 			if collected && !holder_reaped {
 				mut status := i32(0)
 				waited := C.waitpid(holder.int(), &status, C.WNOHANG)
@@ -980,7 +1077,11 @@ fn collection_run(generation string, architecture string) ! {
 					holder_reaped = true
 				} else if waited < 0 && C.errno != C.EINTR { return error('cannot collect adopted lease holder') }
 			}
-			if holder_reaped && !os.exists('/proc/' + server) && !os.exists('/proc/' + descendant) { break }
+			if holder_reaped && !os.exists('/proc/' + server) && !os.exists('/proc/' + descendant) {
+				$if wine_holder_death_probe ? {
+					if manager_reaped && runtime_retired && !os.exists('/proc/' + orphan_manager) { break }
+				} $else { break }
+			}
 		} $else {
 			if !child.is_alive() { break }
 		}
@@ -1007,6 +1108,22 @@ fn collection_run(generation string, architecture string) ! {
 	}
 	$if wine_caller_death_probe ? {
 		if !holder_reaped || os.exists('/proc/' + caller) || os.exists('/proc/' + holder) { return error('caller/holder retirement differs') }
+	}
+	$if wine_holder_death_probe ? {
+		if !manager_reaped || os.exists('/proc/' + orphan_manager) { return error('SDK manager retirement differs after holder death') }
+		names := os.ls('/proc')!
+		defer { unsafe { names.free() } }
+		for pid in names {
+			if pid == '' || pid[0] < `0` || pid[0] > `9` { continue }
+			line := wineproc.command_line('/proc/' + pid)!
+			defer { unsafe { line.free() } }
+			if line.contains(generation + '/apps/org.vinix.wine-runtime/') { return error('runtime process remains after holder-death retirement') }
+		}
+		lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
+		if lease < 0 { return error('holder-death generation lease disappeared') }
+		if C.flock(lease, C.LOCK_EX | C.LOCK_NB) != 0 { C.close(lease); return error('retired Wine workload still retains kernel lease') }
+		C.close(lease)
+		println('HWTEST INFO Wine holder-death manager-status37 all-runtime-retired lease-free PASS')
 	}
 	$if wine_relaunch_probe ? {
 		lease := C.open((generation + '/lease').str, C.O_RDONLY | C.O_CLOEXEC)
@@ -1095,6 +1212,8 @@ fn collection_run(generation string, architecture string) ! {
 		println('HWTEST INFO Wine signed migrated-generation prefix relaunch status37 private-data lease-free PASS')
 	} $else $if wine_relaunch_probe ? {
 		println('HWTEST INFO Wine signed same-generation prefix relaunch after manager death status37 PASS')
+	} $else $if wine_holder_death_probe ? {
+		println('HWTEST INFO Wine signed holder-SIGKILL kernel-lease collection-retained natural-retirement PASS')
 	} $else $if wine_manager_death_probe ? {
 		println('HWTEST INFO Wine signed manager-SIGKILL foreign-server-refused holder-status137 collection-retained PASS')
 	} $else $if wine_idle_server_probe ? {

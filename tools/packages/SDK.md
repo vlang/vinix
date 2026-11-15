@@ -1919,6 +1919,18 @@ on x86_64, including low descriptors. It does not qualify a signed Wine workload
 under holder death or change default enablement. The existing `wine-build` and
 `wine-native-check` owned-mode receipts do not imply this additional flag.
 
+`--owned-manager --holder-death-probe` on `wine-native-check` selects the
+[signed kernel-lease holder-death check](../../tests/packages/wine-holder-death-check.md).
+The controller builds the package frontend with `wine_kernel_lease`. After
+authenticating the ordinary caller/holder/manager/server chain, the fixture
+kills and reaps caller and holder, makes the running generation obsolete, and
+requires three collections to preserve its bytes while Wine remains live.
+After the Windows child handshake completes, PID1 collects identified adopted
+runtime processes, requires manager status 37 and a free lease, then checks
+that collection removes the obsolete generation. This remains an explicit
+x86_64 qualification mode; it shares the existing 3 GiB collection fixture
+and selects one lifetime probe per invocation.
+
 The `--caller-death-probe` and `--idle-server-probe` cases also attempt a second
 actual package launch before remove/rollback. It must return 126 within fifteen
 seconds at the managed-prefix guard while the original caller stays gone, holder/server/worker
