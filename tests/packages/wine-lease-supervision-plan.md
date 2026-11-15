@@ -4528,3 +4528,52 @@ section 14 acceptance remain open. Original distribution/notices,
 compiler/toolchain and qualified kernel bundles remain independently required;
 historical bundles and their original verifiers are unchanged. No kernel or
 product default changes are included.
+
+## Observed C file admission and preservation (2026-11-15)
+
+Commit `e65577c26` adds [observed C input admission](wine-c-inputs-check.md)
+for bridge, guest and package production. A syntax-only discovery command
+retains target/sysroot/GCC/resource/optimization/definition/source arguments
+from the actual command. Both passes enable `-H`. The producer captures both
+translation units and every ordered include observation, preserving repeated
+paths and spaces, with resolved ordinary targets and SHA-256. Actual compilation
+must preserve those observations and hashes before a verified C receipt is
+written. Producer/native final checks and native pre/post-boot checks re-admit
+the proof. Independent retention requires both receipts, discovery output/argv,
+the actual compile trace and its exact C command. Observed C inputs join the
+retainer's byte-bearing artifact map; helper source is embedded and pinned.
+
+The snapshot tool independently admits each proof before/after copying its
+resolved targets, verifies bytes/modes and records observed/resolved namespaces.
+Bridge, guest and package snapshots all pass. It preserves observed target
+bytes without claiming to reconstruct alias chains or a self-contained toolchain.
+The complete selected resource-header tree is also copied and byte/name compared.
+
+Fresh PE and owned runtime production, independent producer admission, and the
+32 owned-receipt controls pass. The signed holder-death/collection run passes
+in 146.666 seconds with post-run C proof checks. Production/manual-free module
+controls pass for real two-unit compilation, a header outside manual seed trees
+with a space in its name, changed bytes, identical-byte target replacement,
+omitted observations/receipt entries, linked receipts and malformed traces.
+The initial assertion's failure to account for SDK metadata and the initial
+control-runner compile refusal remain preserved failures. Real and unchanged
+copied graphs pass full retention. All twenty-nine resealed mutations refuse
+at named checks without retained output, including bridge trace/receipt omission,
+guest input-hash change, package discovery-command change and guest receipt link.
+
+The checkpoint is `/Users/alex/.cache/vwcclosure-20261115-01`, with isolated
+base `47460a42f`, feature patch/revision, fresh producers/native result, all
+positive/negative controls and observed C target-byte/mode snapshots. Its
+typed inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-c-inputs-20261115-01.inventory.json`,
+SHA-256 `7440e247ee1249ab8690cdf694b40b3ce21c582bc4449869478379304ea65a7f`.
+Complete typed-inventory recording and independent comparison pass against
+the retained checkpoint, preserving the stated observed-input scope.
+
+This is observed-file admission under the existing stable local-input contract.
+Include-search absence, inputs not reported by Clang, linker inputs, compiler/
+dynamic-library closure, host controller builds and full hermetic admission
+remain open, as do default activation, owned ARM/GUI and broader section 14
+acceptance. Original distribution/notices, compiler/toolchain and qualified
+kernel bundles remain independently required. Historical bundles and their
+original verifiers are unchanged; no kernel or product default is changed.
