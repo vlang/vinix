@@ -26,8 +26,11 @@ const milestones = [
 ]
 const unavailable = 'HWTEST FAIL packaged-Wine: holder-death qualification requires kernel workload leases and an unenrolled observer'
 
+fn terminal_cr(line string) string {
+	return if line.ends_with('\r') { line[..line.len - 1] } else { line }
+}
 fn trace(serial string, baseline bool) ! {
-	lines := serial.replace('\r', '').split_into_lines()
+	lines := serial.split('\n').map(terminal_cr(it))
 	if baseline {
 		if lines.filter(it == unavailable).len != 1 || serial.contains('VINIX COLLECTION')
 			|| serial.contains('HWTEST PASS') || serial.contains('holder-SIGKILL reaped9') {
@@ -64,6 +67,7 @@ fn controls() ! {
 	trace(unavailable + '\n', true)!
 	for bad in [good.replace(milestones[3] + '\n', ''), good + milestones[3] + '\n',
 		good.replace(milestones[3], 'quoted "' + milestones[3] + '"'),
+		good.replace(milestones[3], milestones[3].replace('holder-SIGKILL', 'holder-\rSIGKILL')),
 		good.replace(milestones[3], milestones[4]).replace(milestones[4] + '\n' + milestones[4], milestones[4] + '\n' + milestones[3]),
 		good + 'HWTEST FAIL late failure\n', good + 'Kernel panic\n'] {
 		mut refused := false
