@@ -4809,3 +4809,52 @@ unreported inputs/search absence, Mach-O linker/library closure or OS loader/
 shared-cache bytes. Link replay and deterministic executable reproduction are
 not claimed. No new guest execution or kernel/product default change is made;
 owned ARM/GUI, redistribution and broader roadmap 14 acceptance remain open.
+
+## Required qualification host receipts (2026-11-15)
+
+Commit `723ea681f` makes [selected host-build receipts mandatory](wine-host-required-check.md)
+for the producer, native controller and full retainer. Shared `winehostbuild`
+admission uses format 2, checks the exact executable/role/compiler/source and
+original namespace, and preserves existing V/C/resource/image checks. The
+bootstrap CLI builds all three roles. Missing/linked receipts, relocated
+executables, wrong roles and unsupported formats refuse qualification work.
+Original format-1 bundles and original checkers keep their historical contract.
+
+Prepared/native evidence carries producer/controller binding records with host
+receipt hashes. Their input maps include all admitted host inputs, stored input
+bytes, outputs and receipts. The controller admits the producer before signing
+and re-admits both bindings after the guest. The full retainer verifies both
+graphs and their input-map coverage and retains/rechecks its own host graph.
+Copied evidence preserves original namespaces and ordinary binding records.
+
+Final host builds, PE/runtime production and independent producer admission
+pass. `native-02` passes signed x86 holder-death/collection in 104.796 seconds
+with both post-guest host checks. All 32 receipt controls and 18 startup/pre-sign
+controls pass. Final `host-retainer-final-02/program` passes real and unchanged
+copied baselines and all forty-nine named resealed refusals in
+`retention-controls-02`. The original 44 gates remain intact; five new cases
+cover changed producer/controller bindings, missing host-artifact input rows and
+a linked native binding. No failed case creates retained output.
+
+The earlier signed run is superseded by the producer pre-sign check. The first
+matrix's diagnostic-order failure is preserved: guest-header input omission
+reached controller host coverage too early. Moving that coverage check after
+guest source/header/C/image admission restores the original header diagnostic
+without skipping any host check. Producer/controller/native input maps contain
+no retainer-source row, so the observer-only fix leaves signed evidence intact.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostrequired-20261115-01`, with
+final isolated source in `source-final` from base `a58e30385`, final feature
+patch/revision, source hashes, host input stores, raw commands/outcomes, generated
+C/binaries, all controls and preserved intermediate diagnostics. Its typed
+inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-required-20261115-01.inventory.json`,
+SHA-256 `9be690707c16f39c6a712ea592f5b254a545485165ab082b1d0f80348273074b`.
+Complete inventory recording and independent comparison pass. Original input
+namespaces and historical complete prerequisite bundles remain required.
+
+This closes mandatory selected host-receipt integration in qualification tools.
+Builder bootstrap, complete compiler/SDK content, unreported inputs/search
+absence, Mach-O linker/library closure and OS loader/shared-cache bytes remain
+open. Kernel and product defaults are unchanged; owned ARM/GUI, redistribution
+and broader roadmap 14 acceptance remain open.

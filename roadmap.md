@@ -1370,15 +1370,19 @@ architectures; broader release/catalog/runtime acceptance remains open.
     collection and forty-four resealed refusal cases. Selected
     [V source-generation host admission](tests/packages/wine-v-host-check.md)
     also binds closed child environments and observed ordinary V image bytes
-    alongside the C/header/linker and Clang/LLD image checks. An
-    [optional host controller/producer builder](tests/packages/wine-host-build.md)
+    alongside the C/header/linker and Clang/LLD image checks. The
+    [host controller/producer/retainer builder](tests/packages/wine-host-build.md)
     now retains and admits selected V/C inputs, explicit SDK/resource selection
     and observed tool images for real host executables, with thirteen resealed
-    refusals and real entrypoint checks. Mandatory host-receipt integration,
-    Mach-O linker/library closure, OS shared-cache bytes and complete hermetic
-    toolchain admission remain separate gates. Default activation, ARM owned
-    Wine, fresh owned graphical acceptance and broader lifetime/mapping controls
-    remain open.
+    refusals and real entrypoint checks.
+    [Required host receipts](tests/packages/wine-host-required-check.md) now bind
+    all three qualification roles and their retained input graphs, including
+    producer admission before signing and both bindings after guest execution.
+    A fresh signed x86 run, forty-nine retention refusals and eighteen startup/
+    pre-sign refusals pass. Mach-O linker/library closure, OS shared-cache bytes
+    and complete hermetic toolchain admission remain separate gates. Default
+    activation, ARM owned Wine, fresh owned graphical acceptance and broader
+    lifetime/mapping controls remain open.
   - [x] [An AArch64 iOS publisher profile](tools/packages/SDK.md#apple-ios-arm64-publisher-profile)
     validates thin Mach-O headers/maps, XML/binary bundle identity, static native
     launchers and explicit licensed runtime closures before pinning a catalog.
