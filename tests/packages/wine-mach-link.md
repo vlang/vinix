@@ -24,14 +24,21 @@ are refused. The original response retains the driver's absolute
 `-lto_library` option; this LLD documents that option as obsolete and ignored.
 The referenced libLTO is **not** represented as a captured input.
 
-The replay invokes the selected linker directly with `@response.txt`, in the
-extracted namespace. Both compilation and replay use closed child environments
-and record observed host images. Ordinary non-system tool images are checked
+Format 2 invokes the selected linker directly with `-t @response.txt`, in the
+extracted namespace. Its retained load trace must name captured files only;
+absolute paths, path traversal, unparsed output and missing required object or
+direct-library observations refuse admission. A `link-loads.json` map binds
+each observed path to its archived member hash. Multiple loaded archive members
+or TBD documents can refer to the same captured file. Unused archive operands
+need not appear in the load trace. Both compilation and replay use closed child
+environments and record observed host images. Ordinary non-system tool images are checked
 against before-command probes and current bytes. OS shared-cache images remain
 UUID metadata only. The check requires byte-identical original/replayed
 executables and validates retained evidence hashes, extracted member hashes,
 command profiles, environment records and image observations. A copied capture
 retains its original recorded command namespace and can be checked there.
+Historical format-1 captures require their retained original checker; the new
+checker refuses them because they do not contain file-load evidence.
 
 This is a retained local reproduction check. It does not establish complete
 SDK reexport/search closure, independence from the installed SDK, a sandboxed
@@ -42,8 +49,11 @@ builder continues to use its existing receipt profile; integrating captured
 Mach-O links into all mandatory roles and rerunning signed guest acceptance
 remains future work.
 
-The production control runner checks real and copied baselines, twelve exact
+The production control runner checks real and copied baselines, twenty-one exact
 receipt refusals (including resealed output, extraction, argv, environment,
-version and image mutations), five response-profile refusals and five input
-header refusals. It uses
-explicit checks that remain active under `-prod`.
+version, image, trace and load-map mutations), five response-profile refusals
+and five input header refusals. A resealed archive omission removes an SDK
+reexport stub from both the archive and extracted inventory and must fail
+because the recorded replay loaded that file. These are file-load observations;
+they do not prove absence of unreported reads, search attempts or loader inputs.
+All checks remain active under `-prod`.

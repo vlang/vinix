@@ -14,7 +14,7 @@ const sdk = '/Library/Developer/CommandLineTools/SDKs/MacOSX27.2.sdk'
 const llvm = '/opt/homebrew/Cellar/llvm/23.1.5_1'
 
 struct Proof {
-	format int = 1
+	format int = 2
 	recorded_directory string
 	inputs map[string]string
 	files map[string]string
@@ -105,8 +105,42 @@ fn command(directory string) []string {
 		'-lm', '-lpthread', '-o', directory + '/program']
 }
 
+// LLD -t reports ordinary objects directly, and dylib/archive loads as
+// FILE(INSTALL_NAME_OR_MEMBER). Only files present in the capture are admitted.
+pub fn loads(text string, archive winelink.Archive) !map[string]string {
+	if text.len == 0 || text.len > 8 * 1024 * 1024 || !text.ends_with('\n')
+		|| text.contains('\r') || text.contains('\x00') { return error('Mach-O load trace framing differs') }
+	mut found := map[string]string{}
+	for line in text.split_into_lines() {
+		mut path := line
+		if open := line.index('(') {
+			if !line.ends_with(')') { return error('Mach-O load trace record differs') }
+			path = line[..open]
+			name := line[open + 1..line.len - 1]
+			if path.ends_with('.tbd') {
+				if !name.starts_with('/usr/lib/') || !relative(name[1..]) || !name.ends_with('.dylib') {
+					return error('Mach-O load trace library name differs')
+				}
+			} else if !path.ends_with('.a') || !relative(name) || !name.ends_with('.o') {
+				return error('Mach-O load trace record differs')
+			}
+		} else if !path.ends_with('.o') { return error('Mach-O load trace record differs') }
+		if !relative(path) { return error('Mach-O load trace path differs') }
+		member := archive.members['link-inputs/' + path] or { return error('Mach-O loaded file absent from capture') }
+		// Multiple archive members or TBD documents can name the same file.
+		found[path] = member.sha256
+	}
+	lines := archive.response.trim_space().split_into_lines()
+	if lines.len != 15 { return error('Mach-O load trace response differs') }
+	for path in [lines[9], lines[10], sdk[1..] + '/usr/lib/libm.tbd',
+		sdk[1..] + '/usr/lib/libpthread.tbd', sdk[1..] + '/usr/lib/libSystem.tbd'] {
+		if path !in found { return error('Mach-O required load observation absent') }
+	}
+	return found
+}
+
 fn artifacts(archive winelink.Archive) []string {
-	mut files := ['program.c', 'runtime.c', 'program', 'link-inputs.tar', 'replay/link-inputs/program',
+	mut files := ['program.c', 'runtime.c', 'program', 'link-inputs.tar', 'link-loads.json', 'replay/link-inputs/program',
 		'host-images-before.json', 'host-clang-version.log', 'host-linker-version.log', 'cc.log']
 	for name in ['host-clang-version.log', 'host-linker-version.log', 'cc.log'] {
 		for suffix in ['.argv.json', '.environment.json', '.dyld.log', '.images.json'] { files << name + suffix }
@@ -118,7 +152,7 @@ fn artifacts(archive winelink.Archive) []string {
 
 pub fn admit(directory string) ! {
 	proof := json2.decode[Proof](os.read_file(directory + '/macho-link.json')!)!
-	if proof.format != 1 || !relative(proof.recorded_directory.trim_left('/'))
+	if proof.format != 2 || !relative(proof.recorded_directory.trim_left('/'))
 		|| !proof.recorded_directory.starts_with('/') { return error('Mach-O proof namespace differs') }
 	for path, hash in proof.inputs { if digest(path)! != hash { return error('Mach-O selected input changed') } }
 	if proof.inputs.len != 2 || os.real_path(clang) !in proof.inputs || os.real_path(linker) !in proof.inputs {
@@ -140,10 +174,14 @@ pub fn admit(directory string) ! {
 	if output.len < 32 || output[..8] != [u8(0xcf), 0xfa, 0xed, 0xfe, 0x0c, 0, 0, 1]
 		|| output[12..16] != [u8(2), 0, 0, 0] { return error('Mach-O executable header differs') }
 	if json2.decode[[]string](os.read_file(directory + '/cc.log.argv.json')!)! != command(proof.recorded_directory)
-		|| json2.decode[[]string](os.read_file(directory + '/macho-replay.log.argv.json')!)! != [linker, '@response.txt'] {
+		|| json2.decode[[]string](os.read_file(directory + '/macho-replay.log.argv.json')!)! != [linker, '-t', '@response.txt'] {
 		return error('Mach-O command differs')
 	}
 	if os.read_file(directory + '/macho-version.log')! != archive.version { return error('Mach-O linker version differs') }
+	if loads(os.read_file(directory + '/macho-replay.log')!, archive)!
+		!= json2.decode[map[string]string](os.read_file(directory + '/link-loads.json')!)! {
+		return error('Mach-O load receipt differs')
+	}
 	winehostimages.admit_macho_capture(directory, proof.recorded_directory)!
 	winehostimages.admit_macho(directory, proof.recorded_directory)!
 }
@@ -164,7 +202,8 @@ pub fn build(source string, requested string) ! {
 		os.mkdir_all(os.dir(directory + '/replay/' + path))!
 		os.write_file_array(directory + '/replay/' + path, bytes[member.offset..member.offset + member.size])!
 	}
-	winehostimages.invoke_macho([linker, '@response.txt'], directory + '/replay/link-inputs', directory + '/macho-replay.log')!
+	trace := winehostimages.invoke_macho([linker, '-t', '@response.txt'], directory + '/replay/link-inputs', directory + '/macho-replay.log')!
+	os.write_file(directory + '/link-loads.json', json2.encode(loads(trace, archive)!) + '\n')!
 	mut files := map[string]string{}
 	for path in artifacts(archive) { files[path] = digest(directory + '/' + path)! }
 	os.write_file(directory + '/macho-link.json', json2.encode(Proof{recorded_directory: directory, inputs: inputs, files: files}) + '\n')!

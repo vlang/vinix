@@ -47,13 +47,23 @@ fn run() ! {
 		'tools-absent': 'Mach-O selected tools absent'
 		'extracted': 'Mach-O extracted member differs'
 		'header': 'Mach-O executable header differs'
+		'old-format': 'Mach-O proof namespace differs'
+		'trace-empty': 'Mach-O load trace framing differs'
+		'trace-absolute': 'Mach-O load trace path differs'
+		'trace-escape': 'Mach-O load trace path differs'
+		'trace-unparsed': 'Mach-O load trace record differs'
+		'trace-missing': 'Mach-O required load observation absent'
+		'trace-outside': 'Mach-O loaded file absent from capture'
+		'load-receipt': 'Mach-O load receipt differs'
+		'capture-omission': 'Mach-O loaded file absent from capture'
 	} {
 		directory := output + '/' + name
 		os.cp_all(original, directory, false)!
 		mut proof := json2.decode[Proof](os.read_file(directory + '/macho-link.json')!)!
 		mut changed := ''
 		match name {
-			'format' { proof = Proof{...proof, format: 2} }
+			'format' { proof = Proof{...proof, format: 3} }
+			'old-format' { proof = Proof{...proof, format: 1} }
 			'inventory' { proof.files.delete('program.c') }
 			'bytes' { os.write_file(directory + '/program.c', 'changed\n')! }
 			'output' { changed = 'replay/link-inputs/program'; os.write_file(directory + '/' + changed, 'different\n')! }
@@ -72,6 +82,36 @@ fn run() ! {
 				os.write_file(directory + '/replay/link-inputs/program', 'different\n')!
 				proof.files['program'] = sha256.hexhash('different\n')
 				proof.files['replay/link-inputs/program'] = sha256.hexhash('different\n')
+			}
+			'trace-empty' { changed = 'macho-replay.log'; os.write_file(directory + '/' + changed, '')! }
+			'trace-absolute', 'trace-escape', 'trace-unparsed', 'trace-outside' {
+				changed = 'macho-replay.log'
+				extra := match name {
+					'trace-absolute' { '/tmp/outside.o\n' }
+					'trace-escape' { '../outside.o\n' }
+					'trace-outside' { 'outside.o\n' }
+					else { 'unparsed output\n' }
+				}
+				os.write_file(directory + '/' + changed, os.read_file(directory + '/' + changed)! + extra)!
+			}
+			'trace-missing' {
+				changed = 'macho-replay.log'
+				text := os.read_file(directory + '/' + changed)!
+				os.write_file(directory + '/' + changed, text.split_into_lines()[1..].join('\n') + '\n')!
+			}
+			'load-receipt' { changed = 'link-loads.json'; os.write_file(directory + '/' + changed, '{}\n')! }
+			'capture-omission' {
+				archive_path := directory + '/link-inputs.tar'
+				bytes := os.read_bytes(archive_path)!
+				archive := winelink.parse(bytes)!
+				path := 'link-inputs/Library/Developer/CommandLineTools/SDKs/MacOSX27.2.sdk/usr/lib/system/libcache.tbd'
+				member := archive.members[path] or { return error('omission fixture absent') }
+				mut reduced := bytes[..member.offset - 512].clone()
+				reduced << bytes[member.offset + (member.size + 511) / 512 * 512..]
+				os.write_file_array(archive_path, reduced)!
+				proof.files['link-inputs.tar'] = sha256.hexhash(reduced.bytestr())
+				os.rm(directory + '/replay/' + path)!
+				proof.files.delete('replay/' + path)
 			}
 			else { return error('unknown control') }
 		}
@@ -113,7 +153,7 @@ fn run() ! {
 		winemacholink.profile(archive, changed, proof.recorded_directory) or { refused = err.msg() == 'Mach-O runtime archive header differs' }
 		if !refused { return error('Mach-O fat archive mutation accepted') }
 	}
-	println('WINE MACH-O CONTROLS PASS real and copied baselines; twelve receipt refusals; five response refusals; five input header refusals')
+	println('WINE MACH-O CONTROLS PASS real and copied baselines; twenty-one receipt refusals; five response refusals; five input header refusals')
 }
 
 fn main() { run() or { eprintln(err); exit(1) } }
