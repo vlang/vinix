@@ -102,3 +102,7 @@ The final native serial hashes are
 `cb8219e4db520d2fe4fe54340b7cf1d6e59de14bd76ac0bf9ce2643557a1b0f7`
 (ARM) and `eb133a8ca39950fa2d0b911d73bc4d4fa2f6a1735a3c32f86c742dde0c99a78e`
 (x86). Archive integrity does not turn the incomplete workload into a pass.
+
+The subsequent [compact source snapshot run](linux-performance-source-snapshot.md)
+resolves the observer timing blocker and completes all six ARM scenarios under
+the unchanged limits. Its five backing-page deltas still fail strict flatness.

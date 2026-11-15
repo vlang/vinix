@@ -2479,6 +2479,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   controls in both host build modes. See [the warmup receipts](docs/linux-performance-reader-warmup.md)
   for the incomplete workload, strict page failure and observer timing blockers.
 
+- [x] Stage verified adapter source closures with preserved internal module
+  links and typed receipts; refuse changed, escaping or overwritten snapshots.
+  Qualify normal/production owners and adapters from the smaller tree, then
+  complete all six ARM scenarios within the original observer/resource bounds.
+  See [the source snapshot receipts](docs/linux-performance-source-snapshot.md)
+  for all 40 warmup proofs and the five page deltas still refusing flatness.
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

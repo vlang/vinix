@@ -150,6 +150,16 @@ and the existing native flatness/refusal contract.
 See the [warmup receipts](../../docs/linux-performance-reader-warmup.md) for the
 qualified scope and the full-workload observer blockers.
 
+`stage-source.v stage SOURCE FRESH-DEST FRESH-RECEIPT` creates a smaller frozen
+source tree for the fixed adapters. It includes their declared source roots,
+helper scripts and recursively required internal module links. File bytes,
+modes, literal links and resolved targets are checked before publishing the
+external receipt. `stage-source.v verify RECEIPT` rechecks that fixed selection
+and rejects source changes or missing/extra/changed staged entries. Builds and
+test results belong outside the frozen tree. This changes the host input tree;
+the fixed workload and all observer limits stay intact. See the
+[source snapshot receipts](../../docs/linux-performance-source-snapshot.md).
+
 The retained `run-arm.v` and `run-x86.v` adapters generate their PID1 through
 `perfproducer.generate_init`, using the maintained freestanding V module path.
 The initializer uses native C-width libc calls and stack shell arguments.
