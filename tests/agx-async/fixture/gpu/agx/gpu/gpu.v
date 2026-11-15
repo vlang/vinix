@@ -89,6 +89,8 @@ pub mut:
 	barrier_setups        int
 	fail_barrier_at       int = -1
 	stop_barrier_at       int = -1
+	stop_publish_at       int = -1
+	stop_submit_at        int = -1
 	fail_prepare_at       int          = -1
 	fail_callback_at      int          = -1
 	stop_callback_at      int          = -1
@@ -101,6 +103,10 @@ pub mut:
 	ring_full             bool
 	compute_ring_full     bool
 	render_ring_full      bool
+	publication_limit     int = -1
+	firmware_done         [1024]bool
+	firmware_vertex_done  [1024]bool
+	firmware_status       [1024]u32
 	immediate_fault_at    int   = -1
 	on_submit             fn () = unsafe { nil }
 	immediate_complete    bool
@@ -284,12 +290,15 @@ pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 }
 
 pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) bool {
+	if int(job.ordinal) == mgr.stop_submit_at { mgr.stop() }
 	if mgr.on_submit != unsafe { nil } {
 		hook := mgr.on_submit
 		mgr.on_submit = unsafe { nil }
 		hook()
 	}
-	if mgr.state != .running || mgr.ring_full || mgr.compute_ring_full || mgr.g13_queue_dispatch_blocked_locked(job.queue) {
+	if mgr.state != .running || mgr.ring_full || mgr.compute_ring_full
+		|| (mgr.publication_limit >= 0 && mgr.published.len >= mgr.publication_limit)
+		|| mgr.g13_queue_dispatch_blocked_locked(job.queue) {
 		return false
 	}
 	assert !job.submitted && !job.released
@@ -297,6 +306,7 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 	mgr.published << job.queue.id * 10 + 2
 	mgr.published_order << job.ordinal
 	status := if int(job.ordinal) == mgr.immediate_fault_at { u32(3) } else { u32(0) }
+	if int(job.ordinal) == mgr.stop_publish_at { mgr.stop() }
 	if mgr.on_publish != unsafe { nil } {
 		hook := mgr.on_publish
 		mgr.on_publish = unsafe { nil }
@@ -307,12 +317,15 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 }
 
 pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bool {
+	if int(job.ordinal) == mgr.stop_submit_at { mgr.stop() }
 	if mgr.on_submit != unsafe { nil } {
 		hook := mgr.on_submit
 		mgr.on_submit = unsafe { nil }
 		hook()
 	}
-	if mgr.state != .running || mgr.ring_full || mgr.render_ring_full || mgr.g13_queue_dispatch_blocked_locked(job.queue) {
+	if mgr.state != .running || mgr.ring_full || mgr.render_ring_full
+		|| (mgr.publication_limit >= 0 && mgr.published.len >= mgr.publication_limit)
+		|| mgr.g13_queue_dispatch_blocked_locked(job.queue) {
 		return false
 	}
 	assert !job.submitted && !job.released
@@ -320,6 +333,7 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 	mgr.published << job.queue.id * 10
 	mgr.published_order << job.ordinal
 	status := if int(job.ordinal) == mgr.immediate_fault_at { u32(3) } else { u32(0) }
+	if int(job.ordinal) == mgr.stop_publish_at { mgr.stop() }
 	if mgr.immediate_complete { mgr.finish_render(status) }
 	return true
 }

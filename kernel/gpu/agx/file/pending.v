@@ -154,9 +154,10 @@ fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
 	}
 }
 
-// Independent commands can overlap within a batch. Explicit barriers wait on
-// internal callbacks, and a blocked command stalls only its own subqueue.
-// Firmware barriers and overlap across submissions remain separate work.
+// Explicit dependencies wait only for producer publication. Their installed
+// firmware prefixes wait for execution; CPU callback/reaper order must not
+// serialize GPU work. Unpublished producers still block dependent subqueues.
+// Later submissions on the same queue retain FIFO ordering through retirement.
 fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	mut manager := unsafe { item.manager }
 	if manager.state != .running {
@@ -183,17 +184,23 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	}
 	mut blocked := [2]bool{}
 	for index := u32(0); index < item.command_count; index++ {
+		// Shutdown can deliver callbacks for prepared jobs while their metadata
+		// is still caller-owned. Drop those pointers before retiring this node.
+		if manager.state != .running {
+			cancel_g13_pending(mut item, -19)
+			return katomic.load(&item.callbacks_remaining) != 0
+		}
 		mut command := &item.commands[index]
 		if katomic.load(&command.done) || command.published { continue }
 		if blocked[command.pipe] { continue }
 		for dependency in command.wait_for {
 			if dependency == 0 { continue }
 			prior := &item.commands[dependency - 1]
-			if !katomic.load(&prior.done) {
+			if !prior.published {
 				blocked[command.pipe] = true
 				continue
 			}
-			dependency_error := katomic.load(&prior.error)
+			dependency_error := if katomic.load(&prior.done) { katomic.load(&prior.error) } else { 0 }
 			if dependency_error != 0 {
 				cancel_g13_pending(mut item, dependency_error)
 				return katomic.load(&item.callbacks_remaining) != 0
@@ -221,6 +228,10 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 		if !command.published { blocked[command.pipe] = true }
 	}
 	if katomic.load(&item.callbacks_remaining) != 0 { return true }
+	// Acquiring zero callbacks observes shutdown's preceding state write.
+	// Check afterward: stop may have run during the last publication or just
+	// before this count load, leaving caller-owned prepared metadata behind.
+	if manager.state != .running { cancel_g13_pending(mut item, -19) }
 	// The last callback can run during publication. Read its error only after
 	// acquiring the zero callback count, before allowing aggregate notification.
 	final_error := g13_pending_error(item)

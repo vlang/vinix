@@ -161,9 +161,9 @@ fn check_pair_and_forged_fence() {
 	assert file.inflight_by_vm[1] == 3 && object.references == 3
 	syncobj.signal(fence(out)) // clients must not drive internal phase/lifetime
 	service_file_work()
-	assert manager.published == [u32(12)] && memory.outstanding() == 1
+	assert manager.published == [u32(12), 10] && memory.outstanding() == 1
 	service_file_work()
-	assert manager.published == [u32(12)] && file.inflight_by_vm[1] == 3
+	assert manager.published == [u32(12), 10] && file.inflight_by_vm[1] == 3
 	manager.finish_compute(0)
 	assert file.inflight_by_vm[1] == 2 && object.references == 2
 	service_file_work()
@@ -215,6 +215,7 @@ fn check_failures() {
 	manager = gpu.get_global_manager() or { panic('manager') }
 	failed_compute := output()
 	assert submit(mut file, 1, true, unsafe { nil }, failed_compute, false) == 0
+	manager.render_ring_full = true
 	service_file_work()
 	manager.finish_compute(3)
 	service_file_work()
@@ -300,5 +301,6 @@ pub fn run_checks() {
 	check_shutdown_and_immediate_retirement()
 	check_batches()
 	check_overlap()
+	check_firmware_dependencies()
 	println('AGX async: ioctl staging, independent queues/FIFO, compute→render phases, forged fences, failure cleanup, enqueue/shutdown races, backpressure and 200 immediate-retirement cycles passed')
 }

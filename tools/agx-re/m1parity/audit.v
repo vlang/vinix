@@ -224,7 +224,7 @@ pub fn audit(inputs Inputs) !Report {
 		sources:          sources
 		unverified_areas: [
 			'Complete ABI migration and matched Mesa integration',
-			'Modern flat-command ABI integration, firmware-driven dependency scheduling and overlap across submissions',
+			'Modern flat-command ABI integration, index-zero initial dependencies and overlap across submissions',
 			'VM replacement/splitting, reservation fences and object memory accounting',
 			'Complete render object defaults and scheduler backpressure',
 			'Every remaining firmware field, initialization default and error path',

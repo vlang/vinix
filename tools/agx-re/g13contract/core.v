@@ -197,6 +197,20 @@ fn check_tlb_instructions(reference string, vinix string) ! {
 		'dsb sy', 'memory'], 'Vinix ASID GPU TLBI')!
 }
 
+fn check_dependency_publication(poll string) ! {
+	dependencies := section(poll, 'for dependency in command.wait_for',
+		'if blocked[command.pipe] { continue }', 'Vinix firmware dependency scheduling')!
+	require_order(dependencies, ['prior := &item.commands[dependency - 1]',
+		'if !prior.published {', 'blocked[command.pipe] = true', 'continue',
+		'if katomic.load(&prior.done)', 'katomic.load(&prior.error)'],
+		'Vinix firmware dependency scheduling')!
+	require(!dependencies.contains('if !katomic.load(&prior.done)'),
+		'Vinix must not serialize firmware barriers on CPU callbacks')!
+	require_order(poll, ['if katomic.load(&item.callbacks_remaining) != 0 { return true }',
+		'if manager.state != .running { cancel_g13_pending(mut item, -19) }',
+		'final_error := g13_pending_error(item)'], 'Vinix shutdown after callback acquisition')!
+}
+
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
 	manager := read(os.join_path(base, 'gpu.rs'))!
@@ -254,8 +268,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
 	poll := section(pending, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'Vinix batch overlap')!
+	check_dependency_publication(poll)!
 	require_order(poll, ['status := g13_dependency_status', 'failure := g13_pending_error(item)',
-		'mut blocked := [2]bool{}', 'command.published', 'blocked[command.pipe]', 'command.wait_for',
+		'mut blocked := [2]bool{}', 'command.published', 'blocked[command.pipe]', 'command.wait_for', 'if !prior.published',
 		'katomic.load(&prior.done)', 'katomic.load(&prior.error)', 'completed_error := g13_pending_error(item)',
 		'manager.g13_queue_dispatch_blocked', 'manager.submit_g13_compute_job',
 		'command.published = true', 'manager.submit_g13_render_job',
@@ -361,7 +376,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 default non-preemptible compute queue priority',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
-		'Native intra-batch overlap with callback barriers, per-subqueue FIFO and locked quarantine gates',
+		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
 		'G13 explicit barrier wire fields, private tails, physical stamp pins and atomic prefixes',
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',

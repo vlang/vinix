@@ -29,8 +29,9 @@ retry without permitting new submissions.
 Barrier tests execute the production setters and job cleanup with the real
 event manager. An independent byte oracle and canaries verify the records stay
 after the logical command/microsequence, with both type fields at their reference
-offsets. Four hundred cycles cover real producer/consumer reaping, duplicate
-physical pins, partial setup, failed flush, quarantine retry and stopped cleanup;
+offsets. Four hundred eighty cycles cover real producer/consumer reaping, duplicate
+physical pins, partial setup, failed flush, quarantine retry and stopped cleanup,
+including consumer callbacks before producer callbacks after both stamps advance;
 each returns all 128 physical slots. The separate event fixture checks 1,000
 producer-owner/pin/reuse cycles and overflow/invalid-slot guards. These checks
 measure event ownership and injected backing, without native GPU execution.

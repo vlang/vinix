@@ -7,6 +7,18 @@ fn test_order_accepts_repeated_tokens() {
 	require_order('flush reprotect flush unmap flush', ['flush', 'flush', 'flush'], 'sample')!
 }
 
+fn test_dependency_publication_rejects_callback_waits_and_missing_producer_gate() {
+	source := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
+	poll := section(source, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'test poll')!
+	check_dependency_publication(poll)!
+	for broken in [poll.replace('if !prior.published {', 'if !katomic.load(&prior.done) {'),
+		poll.replace('if !prior.published {', 'if false {'),
+		poll.replace('if !prior.published {', 'if !prior.published || !katomic.load(&prior.done) {'),
+		poll.replace('if manager.state != .running { cancel_g13_pending(mut item, -19) }', '')] {
+		if _ := check_dependency_publication(broken) { assert false, 'invalid dependency scheduling accepted' }
+	}
+}
+
 fn test_order_rejects_a_reversed_contract() {
 	if _ := require_order('unmap flush reprotect', ['reprotect', 'unmap'], 'sample') {
 		assert false

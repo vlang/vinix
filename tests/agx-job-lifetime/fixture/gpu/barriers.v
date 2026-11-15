@@ -48,7 +48,7 @@ fn check_barrier_lifetimes() {
 	mut firmware := [128]u32{}
 	assert event.configure_event_manager(0x10000, unsafe { u64(&driver) }, 0x20000, unsafe { u64(&firmware) })
 	for render_consumer in [false, true]! {
-		for mode in 0 .. 5 {
+		for mode in 0 .. 6 {
 			for _ in 0 .. 40 {
 				mut queue := G13QueueResources{}
 				mut context := mmu.UatContext{}
@@ -117,6 +117,34 @@ fn check_barrier_lifetimes() {
 				} else {
 					mgr.set_g13_compute_barriers(compute, sources)
 				})
+				if mode == 5 {
+					// Both jobs are in firmware together. Its stamps advance before
+					// either CPU reaper; the consumer callback may then arrive first.
+					assert queue.subqueues[0].events.publish(render.vertex_event_slot, render.vertex_stamp_value)
+					assert queue.subqueues[1].events.publish(render.fragment_event_slot, render.fragment_stamp_value)
+					assert queue.subqueues[2].events.publish(compute.event_slot, compute.stamp_value)
+					render.submitted = true
+					compute.submitted = true
+					render.vertex_retirement_sequence = 1
+					render.fragment_retirement_sequence = 1
+					compute.retirement_sequence = 1
+					mgr.reap_g13_compute_jobs()
+					mgr.reap_g13_render_jobs()
+					assert producer_completion.calls == 0 && consumer_completion.calls == 0
+					driver[render.vertex_event_slot] = render.vertex_stamp_value
+					driver[render.fragment_event_slot] = render.fragment_stamp_value
+					driver[compute.event_slot] = compute.stamp_value
+					firmware[pinned_slot] = wait_value
+					if render_consumer { mgr.reap_g13_render_jobs() } else { mgr.reap_g13_compute_jobs() }
+					assert consumer_completion.calls == 1 && consumer_completion.ok
+					assert producer_completion.calls == 0
+					expect_free_events(if render_consumer { 127 } else { 126 }, int(pinned_slot))
+					if render_consumer { mgr.reap_g13_compute_jobs() } else { mgr.reap_g13_render_jobs() }
+					assert producer_completion.calls == 1 && producer_completion.ok
+					assert mgr.g13_compute_jobs.len == 0 && mgr.g13_render_jobs.len == 0
+					expect_free_events(128, -1)
+					continue
+				}
 				if mode == 0 {
 					if render_consumer {
 						assert queue.subqueues[2].events.publish(compute.event_slot, compute.stamp_value)
@@ -194,5 +222,5 @@ fn check_barrier_lifetimes() {
 		}
 	}
 	event.reset_event_manager()
-	println('AGX firmware barriers: byte oracle, tail canaries, duplicate pins, partial setup/flush failure, producer retirement, quarantine retry and stopped cleanup pass 400 cycles with all 128 slots returned')
+	println('AGX firmware barriers: byte oracle, tail canaries, duplicate pins, partial setup/flush failure, producer/consumer callback orders, quarantine retry and stopped cleanup pass 480 cycles with all 128 slots returned')
 }

@@ -1,6 +1,14 @@
+@[has_globals]
 module katomic
 
-pub fn load[T](value &T) T { return unsafe { *value } }
+__global before_load fn (voidptr) = unsafe { nil }
+
+pub fn set_load_hook(callback fn (voidptr)) { before_load = callback }
+
+pub fn load[T](value &T) T {
+	if before_load != unsafe { nil } { before_load(voidptr(value)) }
+	return unsafe { *value }
+}
 
 pub fn store[T](mut target T, value T) { target = value }
 

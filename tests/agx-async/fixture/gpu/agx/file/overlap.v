@@ -81,8 +81,8 @@ fn check_independent_completion_orders() {
 }
 
 fn check_subqueue_dependencies() {
-	// A render head waits for compute #1. Its successor cannot pass it,
-	// while the second compute can publish and have its callback run first.
+	// An unpublished compute blocks the dependent render head and its successor.
+	// Once published, all commands can enter firmware without CPU callbacks.
 	gpu.reset()
 	mut file := new_file()
 	mut manager := gpu.get_global_manager() or { panic('manager') }
@@ -91,14 +91,18 @@ fn check_subqueue_dependencies() {
 		ScheduledCommand{ compute_barrier: 1 }, ScheduledCommand{}, ScheduledCommand{ compute: true }], out, false) == 0
 	assert manager.g13_render_jobs[0].barrier_sources == [u32(0), 1]!
 	assert manager.g13_render_jobs[1].barrier_sources == [u32(0), 0]!
+	manager.compute_ring_full = true
 	service_file_work()
-	assert manager.published_order == [u32(0), 3]
+	assert manager.published_order.len == 0
+	manager.compute_ring_full = false
+	service_file_work()
+	assert manager.published_order == [u32(0), 1, 2, 3]
 	manager.finish_compute_at(3, 0)
 	service_file_work()
-	assert manager.published_order == [u32(0), 3]
+	assert manager.published_order == [u32(0), 1, 2, 3]
 	manager.finish_compute_at(0, 0)
 	service_file_work()
-	assert manager.published_order == [u32(0), 3, 1, 2]
+	assert manager.published_order == [u32(0), 1, 2, 3]
 	manager.finish_render_at(2, 0)
 	service_file_work()
 	assert !syncobj.is_signaled(fence(out))
@@ -112,7 +116,7 @@ fn check_subqueue_dependencies() {
 	assert submit_scheduled(mut file, [ScheduledCommand{ compute: true },
 		ScheduledCommand{ compute: true }, ScheduledCommand{ compute_barrier: 1 }], nth, false) == 0
 	service_file_work()
-	assert manager.published_order == [u32(0), 1]
+	assert manager.published_order == [u32(0), 1, 2]
 	manager.finish_compute_at(0, 0)
 	service_file_work()
 	assert manager.published_order == [u32(0), 1, 2]
@@ -122,20 +126,20 @@ fn check_subqueue_dependencies() {
 	manager.finish_compute_at(1, 0)
 	service_file_work()
 	assert_drained(file)
-	// Render dependencies require the full render callback, including fragment.
+	// A render dependency names fragment completion in firmware, not its callback.
 	gpu.reset()
 	manager = gpu.get_global_manager() or { panic('manager') }
 	reverse := output()
 	assert submit_scheduled(mut file, [ScheduledCommand{},
 		ScheduledCommand{ compute: true, render_barrier: 1 }, ScheduledCommand{}], reverse, false) == 0
 	service_file_work()
-	assert manager.published_order == [u32(0), 2]
+	assert manager.published_order == [u32(0), 1, 2]
 	manager.finish_render_at(2, 0)
 	service_file_work()
-	assert manager.published_order == [u32(0), 2]
+	assert manager.published_order == [u32(0), 1, 2]
 	manager.finish_render_at(0, 0)
 	service_file_work()
-	assert manager.published_order == [u32(0), 2, 1]
+	assert manager.published_order == [u32(0), 1, 2]
 	manager.finish_compute(0)
 	service_file_work()
 	assert_drained(file)
@@ -204,6 +208,7 @@ fn check_overlap_failure_and_shutdown() {
 	assert submit_scheduled(mut file, [ScheduledCommand{ compute: true }, ScheduledCommand{},
 		ScheduledCommand{ compute: true, render_barrier: 1 }, ScheduledCommand{ compute_barrier: 1 }], out, false) == 0
 	watch_batch(file, unsafe { nil }, fence(out))
+	manager.publication_limit = 2
 	service_file_work()
 	assert manager.published_order == [u32(0), 1]
 	manager.finish_compute(3)

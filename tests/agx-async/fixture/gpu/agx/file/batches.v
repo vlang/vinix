@@ -128,7 +128,7 @@ fn check_full_batch(pattern int) {
 	watch_batch(file, &object, fence(out))
 	service_file_work()
 	for index := u32(0); index < 64; index++ {
-		assert manager.published.len == int(index + 1)
+		assert manager.published.len == 64, 'firmware dependencies must not wait for CPU callbacks'
 		assert manager.published[index] == if is_compute(index, pattern) {
 			u32(12)
 		} else {
@@ -212,6 +212,7 @@ fn check_middle_failure_and_shutdown() {
 	assert submit_batch(mut file, 64, 2, 0, unsafe { nil }, out, false) == 0
 	before_notifications := notifications
 	watch_batch(file, unsafe { nil }, fence(out))
+	manager.publication_limit = 32
 	service_file_work()
 	for index := u32(0); index < 32; index++ {
 		status := if index == 31 { u32(3) } else { u32(0) }
@@ -231,6 +232,7 @@ fn check_middle_failure_and_shutdown() {
 	manager = gpu.get_global_manager() or { panic('manager') }
 	stopped := output()
 	assert submit_batch(mut file, 64, 3, 0, unsafe { nil }, stopped, false) == 0
+	manager.publication_limit = 1
 	service_file_work()
 	manager.stop()
 	service_file_work()
