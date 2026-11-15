@@ -23,6 +23,10 @@ const helpers = [
 	'gpu__agx__gpu__release_g13_barrier_pins',
 	'gpu__agx__event__WorkQueueEvents__resolve_initial',
 	'gpu__agx__event__WorkQueueEvents__ticket',
+	'gpu__agx__event__WorkQueueEvents__retain',
+	'gpu__agx__event__WorkQueueEvents__release',
+	'gpu__agx__event__WorkQueueEvents__can_publish',
+	'gpu__agx__event__WorkQueueEvents__publish',
 	'gpu__agx__gpu__g13_barrier_source',
 ]
 
@@ -30,7 +34,7 @@ fn result_type(name string) string {
 	if name.ends_with('process_pending_submissions') || name.ends_with('write_g13_barrier')
 		|| name.ends_with('release_g13_initial_events') || name.ends_with('release_g13_barrier_pins') { return 'void' }
 	if name.ends_with('capture_g13_initial_events') { return '__v_option_gpu__agx__gpu__G13InitialEvents' }
-	if name.ends_with('WorkQueueEvents__ticket') || name.ends_with('g13_barrier_source') { return '__v_option_gpu__agx__event__Ticket' }
+	if name.ends_with('WorkQueueEvents__ticket') || name.ends_with('WorkQueueEvents__retain') || name.ends_with('g13_barrier_source') { return '__v_option_gpu__agx__event__Ticket' }
 	if name.ends_with('WorkQueueEvents__resolve_initial') { return 'multi_return_int_gpu__agx__event__Ticket' }
 	return 'bool'
 }
@@ -110,5 +114,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission storage: twenty-two generated barrier/publisher/scheduler/initial-event/dependency helpers contain no temporary allocations')
+	println('G13 submission storage: twenty-six generated barrier/publisher/scheduler/initial-event/dependency helpers contain no temporary allocations')
 }

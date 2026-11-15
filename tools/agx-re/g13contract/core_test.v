@@ -102,6 +102,21 @@ fn test_ring_admission_contract_rejects_gpu_only_space_and_missing_spare() {
 	if _ := check_ring_admission_contract(local, reference.replace('self.pending.len()', 'gpu_doneptr')) { assert false }
 }
 
+fn test_event_admission_rejects_missing_spare_and_regressing_completion() {
+	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/event/workqueue.v'))!
+	reference := 'const MAX_JOB_SLOTS: u32 = 127\npub(crate) fn can_submit() { inner.free_slots() > self.event_count }\npub(crate) fn free_slots() { self.last_submitted; .last_completed; ls.delta(&lc); ((MAX_JOB_SLOTS as i32) - busy_slots).max(0) }'
+	check_event_admission_contract(local, reference)!
+	for broken in [local.replace('busy >= 126', 'busy > 126'),
+		local.replace('i32(queue.published_value - queue.completed_value)', 'i32(value - queue.completed_value)'),
+		local.replace('i32(value - queue.completed_value) > 0', 'true'),
+		local.replace('queue.completed_value = value - u32(0x100)', 'queue.completed_value = 0'),
+		local.replace('if submitted && ', 'if !submitted && ')] {
+		assert broken != local
+		if _ := check_event_admission_contract(broken, reference) { assert false }
+	}
+	if _ := check_event_admission_contract(local, reference.replace('> self.event_count', '>= self.event_count')) { assert false }
+}
+
 fn test_integer_constant_accepts_v_casts_and_separators() {
 	assert integer_constant('pub const aperture = u64(0xffff_ffae_1000_0000)', 'aperture', 'sample')! == u64(0xffffffae10000000)
 	assert integer_constant('const blocks = u32(8)', 'blocks', 'sample')! == 8

@@ -266,6 +266,27 @@ fn check_queue_fence_contract(contexts string, fences string, queue string, subm
 		'Native output fences must carry the exact physical queue context')!
 }
 
+fn check_event_admission_contract(local string, reference string) ! {
+	require_order(reference, ['const MAX_JOB_SLOTS: u32 = 127', 'pub(crate) fn can_submit(',
+		'inner.free_slots() > self.event_count', 'pub(crate) fn free_slots(', 'self.last_submitted',
+		'.last_completed', 'ls.delta(&lc)', '((MAX_JOB_SLOTS as i32) - busy_slots).max(0)'], 'Asahi host event admission')!
+	retain := section(local, 'pub fn (mut queue WorkQueueEvents) retain(', 'pub enum InitialState', 'Vinix event baseline')!
+	require_order(retain, ['value := advance_stamp', 'if queue.users == 0 {',
+		'queue.completed_value = value - u32(0x100)', 'queue.published_value = queue.completed_value',
+		'queue.users++'], 'Vinix event baseline')!
+	release := section(local, 'pub fn (mut queue WorkQueueEvents) release(', 'pub fn (queue &WorkQueueEvents) busy()', 'Vinix event retirement')!
+	require_order(release, ['if ticket.published != submitted',
+		'if submitted && i32(value - queue.completed_value) > 0 { queue.completed_value = value }',
+		'ticket.active = false', 'queue.users--'], 'Vinix monotonic host event completion')!
+	can := section(local, 'pub fn (queue &WorkQueueEvents) can_publish(', '// Call only after the ring publication', 'Vinix event publication')!
+	require_order(can, ['queue.users == 0', 'i32(queue.published_value - queue.completed_value) >> 8', 'busy >= 126',
+		'return false', 'for ticket in queue.tickets', 'ticket.published', 'return found'], 'Vinix event publication spare')!
+	require(!can.contains('stamp_value_completed') && !can.contains('gpu_event_mgr'), 'Raw GPU progress must not grant host event capacity')!
+	publish := local.all_after('pub fn (mut queue WorkQueueEvents) publish(')
+	require_order(publish, ['queue.can_publish(slot, value)', 'ticket.published = true',
+		'queue.published_value = value'], 'Vinix successful event publication')!
+}
+
 fn check_ring_admission_contract(local string, reference string) ! {
 	free := section(reference, '    pub(crate) fn free_space(', '    pub(crate) fn free_slots(', 'Asahi host ring capacity')!
 	require(free.contains('self.size as usize - self.pending.len() - 1'), 'Asahi ring capacity must count host-pending commands')!
@@ -364,6 +385,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
 	check_ring_admission_contract(local, workqueue)!
+	check_event_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, workqueue)!
 	check_input_dependency_contract(pending)!
 	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
 		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit)!
@@ -502,6 +524,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',
 		'Compute and paired render admission count host-unretired ring commands and preserve the reference spare entry',
+		'Single-event publication preserves the reference spare window and advances only through monotonic host retirement',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
 		'Independent later submissions pipeline after older publication with initial firmware dependencies',

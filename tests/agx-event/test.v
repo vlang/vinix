@@ -3,6 +3,7 @@ import gpu.agx.event
 import drm.syncobj
 
 fn main() {
+	check_publication_window()
 	check_initial_events()
 	check_physical_stamp_pins()
 	mut driver := [128]u32{}
@@ -126,9 +127,15 @@ fn main() {
 	assert queue.release(wrap_b.slot, wrap_b.value, true)
 	mut window := [127]event.Ticket{}
 	for i in 0 .. window.len { window[i] = queue.retain() or { panic('fill event window') } }
-	assert queue.retain() == none, 'upstream permits at most 127 pending event values'
-	for ticket in window { assert queue.publish(ticket.slot, ticket.value) }
-	for i in 1 .. window.len { assert queue.release(window[i].slot, window[i].value, true) }
+	assert queue.retain() == none, 'the local preparation table holds 127 reservations'
+	for i in 0 .. 126 { assert queue.publish(window[i].slot, window[i].value) }
+	assert !queue.publish(window[126].slot, window[126].value), 'publication must preserve the reference spare event'
+	driver[window[125].slot] = window[125].value
+	assert !queue.can_publish(window[126].slot, window[126].value), 'raw GPU progress is not host retirement'
+	for i in 1 .. 126 { assert queue.release(window[i].slot, window[i].value, true) }
+	assert queue.publish(window[126].slot, window[126].value)
+	driver[window[126].slot] = window[126].value
+	assert queue.release(window[126].slot, window[126].value, true)
 	// A retained old value bounds the sequence window even when slots in
 	// the bookkeeping table are free; no half-range ambiguity can develop.
 	newest := queue.retain() or { panic('final free event value') }

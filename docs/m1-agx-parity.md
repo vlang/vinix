@@ -111,6 +111,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Modern flat-command integration and full admission/backpressure still differ. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
+| Event publication capacity | One-event publication now applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. The separate 127-ticket preparation table and whole-batch admission remain different. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
@@ -962,6 +963,60 @@ runs were retired when storage was tight. Every complete canonical bundle,
 original receipt and archive remains unchanged; the affected state directories
 retain `redundant-staging-retirement.txt` ledgers. The older artifact incident
 below is unchanged.
+
+### Event publication window
+
+Native workqueue events now separate the last successfully published stamp from
+the host-retired stamp. Asahi's `MAX_JOB_SLOTS=127` and strict
+`free_slots() > event_count` admit one event only when the existing signed
+stamp delta is below 126. Vinix applies that predicate independently of its
+127-ticket preparation table. Raw GPU progress and unpublished cancellation
+cannot grant host completion credit. Submitted retirement advances monotonically
+across zero/sign wrap, so reverse cleanup cannot reduce available capacity.
+
+Admission uses the last published stamp rather than the candidate reservation.
+That distinction lets the first real job run after all 126 preceding
+reservations are canceled; the published gap then holds further work until
+host retirement. First ownership initializes both counters from the observed
+physical stamp. No reference, allocation or freeing path is added. Independent
+review approved cancellation, wrap, invalidation and quarantine behavior.
+
+ASan/UBSan tests pass 1,000 full-window cycles, including actual crossings of
+`0x7fffffff` and zero, tail rollback/ABA, cancellation holes, raw-progress
+refusal and host-retirement retry. Production compute/render reapers retain
+127-job coverage: 126 publish, the last stays prepared, the first host retirement
+opens capacity, and the remaining jobs retire in reverse. Vertex-only completion
+still retains every incomplete render scene. Existing initial-event/barrier/TPC
+lifecycles, async regressions, three V unit suites and source gates pass. The
+generated-C checker now guards 26 helpers, including event retain, release,
+readiness and successful publication; its negative selftests pass.
+
+Isolated AArch64 and explicitly clean-qualified ordinary x86_64 builds pass from
+`c603ad27a10141461ad313363441834297924a08` plus retained event `workqueue.v`.
+All AGX/syncobj V inputs match the isolated checkout and the changed source
+matches both retained build snapshots. Ordinary x86 excludes native AGX.
+Reverified Omarchy `4f26515d55f5d03ddf884a8b416f3b66b8ee7ae4` and packages
+`703430e884c0c46bce2a83f11c34a44af3f2ec5b` keep the same Asahi/Mesa pins.
+All selected audit gates pass; the verdict remains `not_equivalent`.
+
+The preparation backlog is still bounded at 127 tickets; this does not implement
+Asahi's complete whole-batch readiness/credits or queued staging model.
+Modern ABI/VM/GEM/Mesa and the remaining listed areas stay open. No native GPU
+execution, Vinix boot, reboot or deployment occurred. Host synchronization and
+firmware services remain injected; these checks do not measure whole-kernel leaks.
+
+The complete evidence bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-event-admission-20261115/bundle/`.
+Its sibling `inventory.json` SHA-256 is
+`922efe4671b912c81cd0f955515c88ff7c4ce273e6f24de22787448759c3bffc`.
+The sibling `bundle.tar.gz` SHA-256 is
+`86763685d5f577a73bd413f20e80e07a9a1bf433105f54a5981bf132b258e389`.
+Canonical and fully extracted bundles pass the unchanged inventory checker.
+Linked kernel SHA-256 values are
+`3cc7445f9cb1d593719adfe7aa604c05787edbb1de169943b6101f60c43603b3`
+(AArch64) and
+`3a459f9ba3c901c582ebe4f3dd372174c6273b770a3889581a8820a1b4f91bef`
+(x86_64).
 
 ## Earlier artifact retention incident
 

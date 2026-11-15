@@ -7,8 +7,10 @@ public discard methods, completion callbacks, reapers and firmware-stopped
 cleanup. It uses the real event manager. UAT invalidation, driver allocations,
 ring retirement and shared-buffer backing are injected host services.
 
-Published-job tests exercise both 64 and 127 live commands per subqueue using
-the production event manager and reapers. Reverse traversal must retire all
+Published-job tests exercise 64 commands and 127 prepared commands per subqueue
+using the production event manager and reapers. At the latter boundary, only
+126 publish initially; the 127th remains prepared until a real host retirement
+opens capacity, then resumes. Reverse traversal must retire all
 compute jobs and paired render scenes; vertex-only completion retains every
 render scene until its fragment stamp advances. These include multiple batches'
 worth of live jobs without executing a GPU.
@@ -22,7 +24,7 @@ covered separately by the failure fixture; these checks execute no GPU work.
 Sanitizer checks cover caller-owned prepared jobs, cancellation failure and
 retry, per-job retirement on a shared stamp, callback ownership and shutdown.
 The event fixture separately covers publication order, cancellation rollback,
-the 127-value window and physical-slot reuse. Neither fixture executes a GPU.
+the separate preparation/publication windows and physical-slot reuse. Neither fixture executes a GPU.
 
 TPC tests use the production cache allocator/reference helpers and render-buffer
 cleanup with kernel allocator semantics (`-gc none`). They cover 500 same-size

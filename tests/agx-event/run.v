@@ -16,6 +16,7 @@ fn main() {
 	os.cp('${repo}/kernel/gpu/agx/event/workqueue.v', '${scratch}/gpu/agx/event/workqueue.v')!
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\n')!
 	os.cp('${repo}/tests/agx-event/test.v', '${scratch}/main.v')!
+	os.cp('${repo}/tests/agx-event/admission.v', '${scratch}/admission.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut flags := ['-nocache', '-no-parallel', '-cc', 'cc', '-enable-globals', '-path',
 		'${scratch}|@vlib|@vmodules']
@@ -23,7 +24,7 @@ fn main() {
 		flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
 			'-fsanitize=address,undefined']
 	}
-	flags << ['-o', '${scratch}/test', '${scratch}/main.v']
+	flags << ['-o', '${scratch}/test', scratch]
 	build.set_args(flags)
 	build.run()
 	build.wait()

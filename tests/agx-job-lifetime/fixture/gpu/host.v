@@ -353,7 +353,7 @@ pub fn run_checks() {
 
 fn check_published_batches() {
 	for count in [64, 127]! { check_published_batch(count) }
-	println('AGX published lifetimes: 64/127 compute and paired render jobs retire in reverse traversal; vertex-only completion retains all render scenes')
+	println('AGX published lifetimes: 64 published and 127 prepared compute/render jobs; the 127th waits for host retirement, then resumes; reverse traversal and vertex-only retention pass')
 }
 
 fn check_published_batch(count int) {
@@ -369,9 +369,19 @@ fn check_published_batch(count int) {
 		mut last_fragment := u32(0)
 		mut vertex_slot := u32(0)
 		mut fragment_slot := u32(0)
+		early := if count == 127 { 1 } else { 0 }
 		for index in 0 .. count {
 			if render {
 				mut job := mgr.render_job(mut queue, &context, unsafe { &completions[index] })
+				if index == 126 {
+					assert !queue.subqueues[0].events.can_publish(job.vertex_event_slot, job.vertex_stamp_value)
+					assert !queue.subqueues[1].events.can_publish(job.fragment_event_slot, job.fragment_stamp_value)
+					first := mgr.g13_render_jobs[0]
+					stamps[first.vertex_event_slot] = first.vertex_stamp_value
+					stamps[first.fragment_event_slot] = first.fragment_stamp_value
+					mgr.reap_g13_render_jobs()
+					assert completions[0].calls == 1 && completions[index].calls == 0
+				}
 				assert queue.subqueues[0].events.publish(job.vertex_event_slot, job.vertex_stamp_value)
 				assert queue.subqueues[1].events.publish(job.fragment_event_slot, job.fragment_stamp_value)
 				job.submitted = true
@@ -384,6 +394,13 @@ fn check_published_batch(count int) {
 				fragment_slot = job.fragment_event_slot
 			} else {
 				mut job := mgr.compute_job(mut queue, &context, unsafe { &completions[index] })
+				if index == 126 {
+					assert !queue.subqueues[2].events.can_publish(job.event_slot, job.stamp_value)
+					first := mgr.g13_compute_jobs[0]
+					stamps[first.event_slot] = first.stamp_value
+					mgr.reap_g13_compute_jobs()
+					assert completions[0].calls == 1 && completions[index].calls == 0
+				}
 				assert queue.subqueues[2].events.publish(job.event_slot, job.stamp_value)
 				job.submitted = true
 				job.pending_counted = true
@@ -393,13 +410,13 @@ fn check_published_batch(count int) {
 			}
 			mgr.pending++
 		}
-		assert mgr.pending == count
+		assert mgr.pending == count - early
 		stamps[vertex_slot] = last_vertex
 		if render {
 			mgr.reap_g13_render_jobs()
-			assert mgr.g13_render_jobs.len == count && queue.render_buffer.active_scenes == count
+			assert mgr.g13_render_jobs.len == count - early && queue.render_buffer.active_scenes == count - early
 			for index in 0 .. count {
-				assert completions[index].calls == 0
+				assert completions[index].calls == if index < early { 1 } else { 0 }
 			}
 			stamps[fragment_slot] = last_fragment
 			mgr.reap_g13_render_jobs()

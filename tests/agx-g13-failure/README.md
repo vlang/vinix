@@ -46,9 +46,9 @@ fixed three-entry storage; notifications are assigned directly into the rings.
 
 Compile `check-prefix-storage.v` to an external executable. Its `--selftest`
 rejects hidden allocation calls, missing/duplicate helper definitions and lost
-stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks twenty-two production
+stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks twenty-six production
 helpers, including initial capture/selection/compaction, registration, publishers
-and the host ring admission, scheduler/input dependency scan and private fence provenance check.
+and the host ring/event admission, scheduler/input dependency scan and private fence provenance check.
 It rejects temporary allocations and structural queue copies.
 Fixed stack arrays are required for publication, queue gates, acceptance and
 resolution. This catches

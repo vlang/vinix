@@ -10,6 +10,8 @@ mut:
 	users    u32
 	sequence u64
 	serial   u64 // host identity never rolls back with a canceled stamp value
+	completed_value u32 // host-retired prefix, independent of prepared reservations
+	published_value u32 // only successful firmware publication consumes capacity
 	tickets  [127]PendingTicket
 }
 
@@ -43,14 +45,18 @@ pub fn (mut queue WorkQueueEvents) retain() ?Ticket {
 			vacant = index
 			continue
 		}
-		// MAX_JOB_SLOTS in Asahi bounds the sequence window, including
-		// earlier jobs retained while newer jobs have already retired.
+		// Local bounded reservations prevent ambiguous value reuse while old
+		// metadata remains retained. Publication capacity is tracked separately.
 		if value - ticket.value >= u32(128 * 0x100) {
 			gpu_event_mgr.cancel_value(queue.slot, value)
 			return none
 		}
 	}
 	if vacant < 0 { return none }
+	if queue.users == 0 {
+		queue.completed_value = value - u32(0x100)
+		queue.published_value = queue.completed_value
+	}
 	sequence := queue.sequence
 	queue.sequence++
 	serial := queue.serial
@@ -101,6 +107,9 @@ pub fn (mut queue WorkQueueEvents) release(slot u32, value u32, submitted bool) 
 	for mut ticket in queue.tickets {
 		if ticket.active && ticket.value == value {
 			if ticket.published != submitted { return false }
+			// A later retired stamp covers earlier work on this physical queue.
+			// Reverse metadata cleanup must never move its completed prefix back.
+			if submitted && i32(value - queue.completed_value) > 0 { queue.completed_value = value }
 			if !submitted && ticket.sequence + 1 == queue.sequence { queue.sequence-- }
 			ticket.active = false
 			found = true
@@ -120,6 +129,11 @@ pub fn (queue &WorkQueueEvents) busy() bool { return queue.users != 0 }
 // would make a later low-valued command look complete before GPU execution.
 pub fn (queue &WorkQueueEvents) can_publish(slot u32, value u32) bool {
 	if queue.users == 0 || queue.slot != slot { return false }
+	// Asahi requires free_slots() > event_count with MAX_JOB_SLOTS=127.
+	// One new event must leave a spare. Count the published prefix, not the
+	// candidate: cancellation holes must not strand the first runnable job.
+	busy := i32(queue.published_value - queue.completed_value) >> 8
+	if busy >= 126 { return false }
 	mut found := false
 	for ticket in queue.tickets {
 		if !ticket.active { continue }
@@ -140,6 +154,7 @@ pub fn (mut queue WorkQueueEvents) publish(slot u32, value u32) bool {
 	for mut ticket in queue.tickets {
 		if ticket.active && ticket.value == value {
 			ticket.published = true
+			queue.published_value = value
 			return true
 		}
 	}
