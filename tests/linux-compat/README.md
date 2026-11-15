@@ -128,6 +128,13 @@ budget is 600 seconds. `pipeready-reference.v` runs the same ELF on Linux;
 `pipeready-evidence.v` audits the complete bundle, matching original failures,
 generated C and lifetime review. See [receipts and limits](../../docs/linux-pipe-readiness.md).
 
+`--cases epollkey` checks epoll's descriptor-number/open-description key across
+close/reuse, aliases and separately reopened pipes, with guarded event sets and
+flat stable-description registration cleanup. Both fixture sources are frozen;
+the default budget is 600 seconds. `epollkey-reference.v` runs the same ELF on
+Linux, and `epollkey-evidence.v` audits the complete evidence bundle. See
+[receipts and the unresolved full-churn growth](../../docs/linux-epoll-registration-key.md).
+
 ```sh
 tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-arm
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86

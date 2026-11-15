@@ -2418,6 +2418,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   3,342. Repeated cleanup stays flat. See
   [the endpoint qualification](docs/linux-pipe-readiness.md).
 
+- [x] Match native epoll registrations by descriptor number and retained open
+  description across close/reuse, duplicates and separately reopened same-inode
+  descriptions. Identical native/Linux ELFs pass 5,760 checks per architecture;
+  originals fail 840 each. Stable-description registration cleanup stays flat;
+  full-churn size-48 growth remains unresolved. See
+  [the registration-key qualification](docs/linux-epoll-registration-key.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

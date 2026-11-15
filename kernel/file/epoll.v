@@ -257,6 +257,9 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, eve
 		return errno.err, errno.eperm
 	}
 
+	// A watch is keyed by both the number used to add it and its retained open
+	// description. After close/dup2 reuses that number, a duplicate can keep
+	// the old description's watch alive alongside a new registration.
 	// The set's own lock, held only for the list mutation, keeps a concurrent
 	// epoll_pwait on another thread from scanning entries as they move. No
 	// reference is given back while it is held: the last one on a file takes
@@ -268,7 +271,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, eve
 	match op {
 		epoll_ctl_add {
 			for entry in epoll_res.entries {
-				if entry.fd == fd {
+				if entry.fd == fd && voidptr(entry.handle) == voidptr(watched_fd.handle) {
 					failure = errno.eexist
 					break
 				}
@@ -302,7 +305,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, eve
 		epoll_ctl_del {
 			failure = errno.enoent
 			for i, entry in epoll_res.entries {
-				if entry.fd == fd {
+				if entry.fd == fd && voidptr(entry.handle) == voidptr(watched_fd.handle) {
 					removed = epoll_res.entries[i].handle
 					epoll_res.entries.delete(i)
 					failure = 0
@@ -313,7 +316,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, eve
 		epoll_ctl_mod {
 			failure = errno.enoent
 			for mut entry in epoll_res.entries {
-				if entry.fd == fd {
+				if entry.fd == fd && voidptr(entry.handle) == voidptr(watched_fd.handle) {
 					entry.events = requested.events
 					entry.data = requested.data
 					// EPOLL_CTL_MOD rearms EPOLLONESHOT and establishes a new
