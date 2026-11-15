@@ -10,7 +10,9 @@ import os
 fn digest(path string) !string { return sha256.sum(os.read_bytes(path)!).hex() }
 
 fn run() ! {
-	if os.args.len != 6 { return error('usage: heap-placement-host INIT KERNEL-DIR LAUNCH-ROOT FRESH-STATE aarch64|x86_64') }
+	if os.args.len !in [6, 7] { return error('usage: heap-placement-host INIT KERNEL-DIR LAUNCH-ROOT FRESH-STATE aarch64|x86_64 [reader]') }
+	reader := os.args.len == 7
+	if reader && os.args[6] != 'reader' { return error('unknown native reader mode') }
 	init, kernel, launch_root := os.real_path(os.args[1]), os.real_path(os.args[2]), os.real_path(os.args[3])
 	state, arch := os.abs_path(os.args[4]), os.args[5]
 	if arch !in ['aarch64', 'x86_64'] || os.exists(state) || os.is_link(state) { return error('invalid architecture or state already exists') }
@@ -47,8 +49,8 @@ fn run() ! {
 	os.write_file(state + '/inputs-before.json', json2.encode(inputs, prettify: true) + '\n')!
 	os.write_file(state + '/qemu.command.json', json2.encode(launch.command, prettify: true) + '\n')!
 	result := guesthost.boot_session(launch.command, launch.env, state, guesthost.SessionPolicy{
-		pass: 'HEAP-PLACEMENT SUMMARY cases=4 restored=3 qualification=false'
-		failures: ['HEAP-PLACEMENT FAIL', 'KERNEL PANIC', 'FATAL EXCEPTION', 'V panic:']
+		pass: if reader { 'LINUX PERFHEAP SUMMARY:' } else { 'HEAP-PLACEMENT SUMMARY cases=4 restored=3 qualification=false' }
+		failures: ['HEAP-PLACEMENT FAIL', 'LINUX PERFHEAP FAIL:', 'KERNEL PANIC', 'FATAL EXCEPTION', 'V panic:']
 		settle: 1
 		log: state + '/live.log'
 	}, 300, true)!

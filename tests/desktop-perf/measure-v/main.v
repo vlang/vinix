@@ -6,6 +6,7 @@ module main
 
 import os
 import perfheap
+import perfreader
 
 #include <stdio.h>
 #include <signal.h>
@@ -176,6 +177,7 @@ fn measure_probe(index int, file bool, label string, directory string) ! {
 	perfheap.compare(unsafe { &before }, unsafe { &after }, unsafe { &delta })!
 	reset_tracker()!
 	for iteration in 0 .. 200 { probe(index, file, i32(iteration)) }
+	reader_mask := perfreader.warm('/proc/slabinfo', unsafe { &before }, unsafe { &after })!
 	grace(13)
 	perfheap.read_snapshot('/proc/slabinfo', unsafe { &before })!
 	reset_tracker()!
@@ -186,6 +188,8 @@ fn measure_probe(index int, file bool, label string, directory string) ! {
 	raw_snapshot(unsafe { &before }, label, name, directory, 'before')!
 	raw_snapshot(unsafe { &after }, label, name, directory, 'after')!
 	full_delta(unsafe { &before }, unsafe { &after }, unsafe { &delta }, label, name, directory)!
+	C.printf(c'PERF-READER %s op="%s" dir=%s mask=%lu restored=%lu reads_per_cpu=%d\n',
+		chars(label), chars(name), chars(directory), reader_mask, reader_mask, i32(perfreader.reads_per_cpu))
 	mut prefix := [640]char{}
 	C.snprintf(unsafe { &prefix[0] }, prefix.len, c'PERF-SITE %s op=%s dir=%s', chars(label), chars(name), chars(directory))
 	C.copy_lines(c'/proc/allocsites', unsafe { &prefix[0] }, C.stdout)
@@ -239,6 +243,7 @@ fn heap_churn(label string) ! {
 	for index, name in churn_names {
 		reset_tracker()!
 		for _ in 0 .. 300 { require(C.run_program(unsafe { &programs[index][0] }) == 1, 'churn warm child failed')! }
+		reader_mask := perfreader.warm('/proc/slabinfo', unsafe { &before }, unsafe { &after })!
 		C.sync(); grace(7)
 		_ := physical(unsafe { &memory })!
 		perfheap.read_snapshot('/proc/slabinfo', unsafe { &before })!
@@ -254,6 +259,8 @@ fn heap_churn(label string) ! {
 		raw_snapshot(unsafe { &before }, label, name, '-', 'before')!
 		raw_snapshot(unsafe { &after }, label, name, '-', 'after')!
 		full_delta(unsafe { &before }, unsafe { &after }, unsafe { &delta }, label, name, '-')!
+		C.printf(c'PERF-READER %s op="%s" dir=- mask=%lu restored=%lu reads_per_cpu=%d\n',
+			chars(label), chars(name), reader_mask, reader_mask, i32(perfreader.reads_per_cpu))
 		C.printf(c'PERF-CHURN %s program="%s" runs=300 retained_kb=%ld per_run_bytes=%ld\n', chars(label), chars(name), retained / 1024, retained / 300)
 		for item in delta.classes {
 			if item.objects != 0 || item.pages != 0 {

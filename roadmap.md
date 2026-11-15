@@ -2472,6 +2472,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   [the placement receipts](docs/linux-performance-reader-placement.md); this
   does not qualify the four deltas in the fixed six-scenario run.
 
+- [x] Warm the slab observer on each allowed CPU while restoring its entry
+  placement and affinity mask; preserve measured probe counts and grace waits.
+  Qualify native restricted-mask, pending-migration and failed-read restoration
+  plus strict cross-CPU cleanup on both architectures. Add complete warm-proof
+  controls in both host build modes. See [the warmup receipts](docs/linux-performance-reader-warmup.md)
+  for the incomplete workload, strict page failure and observer timing blockers.
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

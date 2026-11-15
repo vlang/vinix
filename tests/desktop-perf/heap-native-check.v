@@ -53,11 +53,29 @@ fn verify(raw string) ! {
 }
 
 fn run() ! {
-	require(os.args.len == 3 && os.args[1] in ['check', 'controls'], 'usage: heap-native-check check|controls SERIAL')!
+	require(os.args.len == 3 && os.args[1] in ['check', 'controls', 'reader', 'reader-controls'],
+		'usage: heap-native-check check|controls|reader|reader-controls SERIAL')!
 	require(os.file_size(os.args[2]) <= 32 * 1024 * 1024, 'native transcript exceeds bound')!
 	raw := os.read_file(os.args[2])!
 	verify(raw)!
-	if os.args[1] == 'controls' {
+	if os.args[1].starts_with('reader') {
+		reader_proof(raw)!
+		if os.args[1] == 'reader-controls' {
+			mut bad := [raw.replace('subset=1', 'subset=3'), raw.replace('refused=5', 'refused=4'),
+				raw.replace('restored=3', 'restored=1'), raw.replace('cross=0/1', 'cross=0/0'),
+				raw.replace('reads_per_cpu=64', 'reads_per_cpu=63'), raw.replace('mask=3', 'mask=03')]
+			for row in raw.split('\n').filter(it.starts_with('HEAP-READER')) {
+				bad << raw.replace(row + '\n', '')
+				bad << raw + row + '\n'
+			}
+			for candidate in bad {
+				reader_proof(candidate) or { continue }
+				return error('invalid native reader proof accepted')
+			}
+			println('Native reader proof controls PASS ' + bad.len.str())
+		}
+	}
+	if os.args[1] in ['controls', 'reader-controls'] {
 		text := raw.replace('\r', '')
 		verify(text)!
 		verify(text.replace('\n', '\r\n'))!
@@ -79,6 +97,19 @@ fn run() ! {
 		println('Native heap checker controls PASS ' + bad.len.str())
 	}
 	println('Native slab profile and reader cleanup: PASS ' + perfheap.schema)
+}
+
+fn reader_proof(raw string) ! {
+	mut rows := []string{}
+	lines := raw.split('\n')
+	for i, row in lines {
+		if row.starts_with('HEAP-READER') {
+			require(i < lines.len - 1, 'unterminated native reader proof')!
+			rows << perfprotocol.line(row)!
+		}
+	}
+	require(rows == ['HEAP-READER-CONTROL mask=3 subset=1 refused=5 restored=3 cross=0/1 reads_per_cpu=64'],
+		'native reader admission/refusal proof differs')!
 }
 
 fn main() { run() or { eprintln(err); exit(1) } }

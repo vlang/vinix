@@ -129,6 +129,27 @@ both profiles and build modes in the public suite. These observations leave the
 fixed sampler and strict flatness gate unchanged. See the
 [reader placement receipts](../../docs/linux-performance-reader-placement.md).
 
+The V sampler now primes its slab reader on every CPU in its saved affinity
+mask after each workload warm cohort, before the existing grace wait and
+baseline snapshot. `perfreader` checks effective placement, alternates the two
+snapshot buffers over 64 reads per CPU and verifies restoration of the original
+mask after returning to an admitted entry CPU. The measured workload retains
+its original scheduling mask, operation counts and waits. Each completed
+measured pair emits a `PERF-READER` proof.
+`reader-warm-check.v check SERIAL` requires all 40 proofs and the unchanged
+strict heap policy; `observe SERIAL` preserves nonzero deltas and explicitly
+returns `qualification=false`. Both profiles and build modes run its proof
+refusals in the public host suite.
+
+`heap-reader/main.v` exercises the shared warmup with a restricted mask, invalid
+CPUs/empty masks and restoration after a failed read, then forces the measured
+reader pair from CPU 0 to CPU 1. Use the same strict target flags and schema as
+the sampler. The bounded host accepts a final `reader` argument to capture it;
+`heap-native-check.v reader-controls SERIAL` checks both its exact control proof
+and the existing native flatness/refusal contract.
+See the [warmup receipts](../../docs/linux-performance-reader-warmup.md) for the
+qualified scope and the full-workload observer blockers.
+
 The retained `run-arm.v` and `run-x86.v` adapters generate their PID1 through
 `perfproducer.generate_init`, using the maintained freestanding V module path.
 The initializer uses native C-width libc calls and stack shell arguments.
