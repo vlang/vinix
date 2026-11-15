@@ -4103,3 +4103,33 @@ Complete inventory recording and independent comparison pass.
 Selected marker-byte boundaries do not qualify the full crash matrix, 741-row
 paths, real Wine version upgrades/GUI/owned ARM execution, whole-launch lifetime,
 physical power-loss/torn writes or the broader roadmap 14 acceptance gate.
+
+## Authenticated report scope correction, 2026-11-15
+
+Fix `743fb07ae` corrects the public service document's inherited structural-only
+scope. It now identifies an authenticated current-runtime review with no
+retained admission or later-write authorization. The lower-level adapter keeps
+its structural-only scope. SDK documentation and JSON reply checks distinguish
+the two contracts; no admission, write or authorization policy changes.
+
+Debug/manualfree signed-repository assertions and ASan (leak detection disabled)
+pass. Fresh production/manualfree guest and instrumented CLI builds and static
+LLVM/musl links pass for both targets. Focused three-row signed-service VJFS
+CLI sync-8 recovery passes on ARM64 (19.880 seconds) and x86_64 (24.046 seconds).
+These require the exact completed cold namespace, corrected scope and version
+in all replies, generation-1 refusal with unchanged state, generation-2 pinned
+writes, independent admission/lease checks, cleanup grace, clean export and
+strict e2fsck. Failure arrays are empty. The ARM64 control using the previous
+CLI's old scope fails at cold preview with `public recovery JSON inventory
+differs`, exit 1, before preview success. No checker guard is relaxed.
+
+Complete source, builds and raw evidence are retained at
+`/Users/alex/.cache/vwwinescope-20261115-01`, based on `b7cce04eb` plus
+`source.patch`. Unchanged controller/kernel/image prerequisites come from
+`vwwinegenpin-20261115-01`; its complete bundle and original prerequisites remain
+independently required. The receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-scope-20261115-01.inventory.json`,
+SHA-256 `8456c72f58d7c0397b97e393a9ac773c7e95560d698919cce49814fc7ec3bc49`.
+Complete inventory recording and independent comparison pass. This is selected
+marker-byte qualification, not real Wine execution or completion of the full
+crash/runtime/GUI/lifetime and roadmap 14 acceptance gates.
