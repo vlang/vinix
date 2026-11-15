@@ -441,6 +441,8 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_fence_completion_contract(read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
+		read(os.join_path(asahi_linux, 'drivers/dma-buf/dma-fence.c'))!)!
 	manager := read(os.join_path(base, 'gpu.rs'))!
 	workqueue := read(os.join_path(base, 'workqueue.rs'))!
 	require_order(workqueue, ['let last_wptr = inner.pending[completed_commands - 1].inner.wptr()',
@@ -641,6 +643,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter',
 		'G13 LOW/MEDIUM admission, reversed firmware bands, default compute priority and retained failed-create VM ownership',
+		'First fence completion preserves its status and callbacks across later completion attempts',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',

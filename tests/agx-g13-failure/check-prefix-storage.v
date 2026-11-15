@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'syncobj__signal',
+	'syncobj__signal_error',
 	'fw__g13_fragment_tib_blocks',
 	'vm__driver_window',
 	'gpu__agx__gpu__GpuManager__retained_g13_queue_resources',
@@ -46,6 +48,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name in ['syncobj__signal', 'syncobj__signal_error'] { return 'void' }
 	if name == 'fw__g13_fragment_tib_blocks' { return '__v_option_u32' }
 	if name == 'vm__driver_window' { return '__v_option_vm__DriverWindow' }
 	if name.ends_with('retained_g13_queue_resources') { return '__v_option_gpu__agx__gpu__G13QueueResourcesptr' }
@@ -162,5 +165,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission/mapping storage: forty-one live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
+	println('G13 submission/mapping storage: forty-three live helpers contain no temporary allocations; exactly one owned overflow-block allocation site is permitted')
 }

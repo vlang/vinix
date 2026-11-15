@@ -122,3 +122,8 @@ fences and FIFO survive preparation of all 512 jobs. Later batches remain deferr
 until host callbacks return publication credit. The injected allocator is fully
 drained per scenario; real event overflow allocation/retirement is checked by
 the event and lifetime fixtures.
+
+Completed real-ioctl output fences also reject late shutdown/cancellation
+status rewrites. Both successful work and the original GPU fault remain final
+after repeated signaling. `tests/drm-fence` separately exercises the complete
+production fence module, callbacks and exact-lock competing-producer cases.

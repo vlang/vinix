@@ -67,7 +67,11 @@ pub fn signal(fence &DmaFence) {
 
 	mut f := unsafe { fence }
 	f.lock.acquire()
-	f.signaled = true
+	if f.signaled {
+		f.lock.release()
+		return
+	}
+	katomic.store(mut &f.signaled, true)
 
 	// Wake every registered waiter
 	for mut w in f.waiters {
@@ -89,8 +93,14 @@ pub fn signal_error(fence &DmaFence, err int) {
 
 	mut f := unsafe { fence }
 	f.lock.acquire()
+	// A completed fence's result is final. A losing shutdown/error producer
+	// must not change the status already observed by its waiters.
+	if f.signaled {
+		f.lock.release()
+		return
+	}
 	f.error = err
-	f.signaled = true
+	katomic.store(mut &f.signaled, true)
 
 	for mut w in f.waiters {
 		if !w.triggered {

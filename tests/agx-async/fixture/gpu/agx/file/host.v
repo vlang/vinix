@@ -221,6 +221,8 @@ fn check_failures() {
 	manager.finish_render(0)
 	service_file_work()
 	assert syncobj.get_error(fence(out)) == 0 && syncobj.is_signaled(fence(out))
+	syncobj.signal_error(fence(out), -19)
+	assert syncobj.get_error(fence(out)) == 0, 'late shutdown changed a completed success'
 	assert_drained(file)
 	// A compute fault also cancels the unsubmitted render half.
 	gpu.reset()
@@ -233,7 +235,11 @@ fn check_failures() {
 	service_file_work()
 	assert manager.published == [u32(12)]
 	assert syncobj.get_error(fence(failed_compute)) == -110
+	syncobj.signal_error(fence(failed_compute), -125)
+	syncobj.signal(fence(failed_compute))
+	assert syncobj.get_error(fence(failed_compute)) == -110, 'late cancellation changed the original GPU error'
 	assert_drained(file)
+	println('AGX completed output fences: real ioctl success/fault retain original status after late shutdown/cancellation signals')
 }
 
 __global append_file &GpuFile = unsafe { nil }
