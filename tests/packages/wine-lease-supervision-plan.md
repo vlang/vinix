@@ -4485,3 +4485,46 @@ activation, owned ARM/GUI and broader section 14 acceptance remain open.
 Original distribution/notices, compiler/toolchain and qualified kernel bundles
 remain independently required; historical bundles and their verifiers are
 unchanged. No kernel or product default is changed by this checkpoint.
+
+## Native guest/package Clang resource-header admission (2026-11-15)
+
+Commit `be658c126` extends [resource-header admission](wine-resource-headers-check.md)
+to both native C builds. Each discovers the pinned Clang's canonical resource
+directory, captures its entire ordinary include tree before either actual
+build and selects it explicitly in the C command. Shared native input pins
+cover every header. Separate guest/package snapshots and discovery records
+join the before-boot generated-output map. The controller checks each tree
+after compilation, before boot and after the guest run. The full retainer
+independently requires both snapshots, input coverage, discovery/C selections
+and the existing exact command/output/source/ISO bindings. Its helper source
+is embedded and pinned by the controller and retainer.
+
+Fresh PE and owned runtime production and independent producer admission pass.
+The signed holder-death/collection run passes in 121.070 seconds, including
+post-run native header verification. Production/manual-free module controls
+and all 32 owned-receipt mutations pass. The stale-controller fixture now
+preserves all embedded helper dependencies. Real and unchanged copied graphs
+pass the full retainer; all twenty-four resealed mutations refuse at their
+named checks without retained output. Ten new controls cover guest/package
+snapshot omissions, missing shared native input pins, malformed discovery,
+substituted C flags and linked snapshots. Captured ordinary native records
+remain ordinary in copied graphs; mutation writes detach before changing bytes.
+
+The checkpoint is `/Users/alex/.cache/vwnativeheaders-20261115-01`, with
+isolated base `d46c1d336`, feature patch/revision, fresh producers/native run,
+all positive/negative control evidence and complete selected resource-header
+bytes. Copied headers pass an independent byte/name comparison with the
+original. Its typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-native-resource-headers-20261115-01.inventory.json`,
+SHA-256 `b11a8c3c22316b449554f405c88824acabf0bc8b79daa26e21359e160318fb77`.
+Complete typed-inventory recording and independent comparison pass against
+the retained checkpoint, preserving its stated selected-input scope.
+
+This closes selected resource-header coverage for bridge and native
+guest/package production under the existing stable-input contract. Host
+controller C headers, actual transitive C dependencies, complete compiler/
+library/hermetic admission, default activation, owned ARM/GUI and broader
+section 14 acceptance remain open. Original distribution/notices,
+compiler/toolchain and qualified kernel bundles remain independently required;
+historical bundles and their original verifiers are unchanged. No kernel or
+product default changes are included.
