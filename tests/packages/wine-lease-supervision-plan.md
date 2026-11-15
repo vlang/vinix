@@ -3705,6 +3705,80 @@ SHA-256 `a1835721a68582412013c447270e329adbbaefc49f736da9ea695c8d76537e6d`.
 Recording and independent comparison pass for complete bytes, sizes, types,
 modes and link targets. This verifies evidence integrity, not a passing x86 matrix.
 
+## Hash scratch sizing and full scaled-service cuts, 2026-11-15
+
+Diagnostic source `fc5a3b40b` adds optional canonical `--point=N` selection,
+hashed `selection.json`, distinct `FOCUSED PASS` output and guest phase timing.
+The V reporter rejects untimed input and concatenated/reset boot clocks. Guest
+monotonic deltas diagnose phases; the host deadline remains authoritative.
+
+Product source `350ee4b24` sizes scratch to the admitted payload length, retaining
+the 64 KiB streaming cap and a one-byte EOF buffer for empty generic files.
+Both generic package and Wine binding hash readers previously requested 64 KiB
+for each 9–14 byte marker asset. All digest, length, growth/truncation, mode,
+identity, namespace, trust, generation and coordination checks remain. Buffer
+lifetimes/frees and the 64 MiB binding limit are unchanged.
+
+In paired x86 focused final-directory-cut traces, cold service admission,
+migration, repetition and recheck total about 21.5 seconds before and 8.0 after
+the change. This measures these instrumented marker runs, not general Wine
+speed or the cause of every earlier timeout. Both focused architecture cases
+pass; focused passes are not combined into a full-matrix qualification.
+
+The final production/manual-free static LLVM/musl prepared-baseline matrices
+pass **all four cuts on both architectures**, with exact cold state, all 741
+current targets, signed public admission, lease/reader probes, private data,
+six-second cleanup grace, final poweroff, selected/template hash checks, clear
+VJFS marker, separate export and strict `e2fsck -f -n` exit zero:
+
+| Cut | x86 seconds | ARM seconds |
+| --- | ---: | ---: |
+| 1112 | 87.020 | 26.240 |
+| 2219 | 49.040 | 41.530 |
+| 2221 | 41.596 | 29.104 |
+| 2222 | 42.815 | 27.474 |
+
+The 120-second two-boot case cap, 32 MiB home, 4 MiB journal and writeback cache
+mode are unchanged. Each prepared matrix also passes its separately bounded
+signed baseline installation and clean inspection. Previous failed matrices
+remain failed and retained; this new full prepared matrix supersedes the prior
+prepared-recovery x86 timing checkpoint for these inputs.
+The original x86 workflow, with both signed installations and recovery inside
+each case and no `--prepared`, also passes its entire matrix in
+59.807/52.433/54.042/64.512 seconds for 1112/2219/2221/2222. Its selected input
+hashes verify and failures array is empty. This closes the earlier original-mode
+x86 timing checkpoint for the new inputs too; all earlier refusals remain retained.
+
+Full assertion-enabled C-backend manual-free hash and binding host suites pass,
+including empty/one-byte/binary/64 KiB boundaries, special files, descriptor
+release, replaced names, growth/truncation, authenticated length and migration/
+addition SIGKILL controls. Both full suites also pass AddressSanitizer without
+reports (`detect_leaks=0`; memory safety, not leak freedom). Initial raw `-prod`
+host attempts are retained but excluded: this compiler drops asserts, including
+assert-dependent fixture setup. Final host unit runs retain assertions; Linux
+VM tests retain `-prod`. The test wait-status declaration now explicitly matches
+the existing imported i32 ABI.
+
+The default three-point ARM regression passes; `--all-syncs --point=4` passes
+the exact pending-second-stage case. Six malformed/out-of-matrix point controls
+refuse before work creation. The full matrix retains normal PASS output and
+its four-point selection; diagnostic focus records one point and FOCUSED PASS.
+
+Evidence is retained at `/Users/alex/.cache/vwwinecutprofile-20261114-01`, baseline
+`7275c4cbe` plus `source.patch` for timing and `fixed-source.patch` for the product
+change, with both source trees, source lists, generated C, binaries, kernels,
+raw/inspection disks, serial/QMP logs, phase reports and all initial failures.
+Earlier complete bundles remain required. This still samples four synthetic
+signed-service cuts; all 2222 cuts, scaled CLI, actual Wine version/GUI/ARM
+execution, physical power/host-cache loss, torn writes, plain-ext2 safety,
+whole-launch lifetime and strict ABI/hermetic closure remain separate gates.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-hash-scratch-20261115-01.inventory.json`,
+SHA-256 `89f01f44373ca299d74657fef248b524a6bc284d46d84a936f456c488acc4187`.
+Recording and independent comparison pass for complete bytes, sizes, types,
+modes and link targets. Earlier complete failure bundles remain required.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the
