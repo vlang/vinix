@@ -23,14 +23,16 @@ fn tool(command []string, log string) ! {
 }
 
 fn run() ! {
-	prepared := os.args.len > 1 && os.args.last() == '--prepared'
-	mode_args := if prepared { os.args[..os.args.len - 1] } else { os.args }
+	point_option := os.args.len > 1 && os.args.last().starts_with('--point=')
+	point_args := if point_option { os.args[..os.args.len - 1] } else { os.args }
+	prepared := point_args.len > 1 && point_args.last() == '--prepared'
+	mode_args := if prepared { point_args[..point_args.len - 1] } else { point_args }
 	all_syncs := mode_args.len > 1 && mode_args.last() == '--all-syncs'
 	scaled := mode_args.len > 1 && mode_args.last() == '--scaled'
 	args := if all_syncs || scaled { mode_args[..mode_args.len - 1] } else { mode_args }
 	if args.len !in [5, 6, 7, 9] || (args.len >= 6 && args[5] != '--vjfs')
 		|| (args.len >= 7 && args[6] != '--service') || (args.len >= 9 && args[7] != '--cli') {
-		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs | --scaled [--prepared]]')
+		return error('usage: CHECK FRESH_WORK ARCH KERNEL POWERCUT_GUEST [--vjfs [--service [--cli COMPILED_CLI]]] [--all-syncs | --scaled [--prepared]] [--point=N]')
 	}
 	if prepared && (!scaled || args.len != 7) { return error('prepared baseline requires scaled VJFS service mode') }
 	if scaled && args.len >= 9 { return error('scaled power-cut fixture does not support CLI mode') }
@@ -38,7 +40,13 @@ fn run() ! {
 	journaled := args.len >= 6
 	service := args.len >= 7
 	cli := if args.len >= 9 { args[8] } else { '' }
-	points := winecutfixture.points(scaled, all_syncs)
+	mut points := winecutfixture.points(scaled, all_syncs)
+	if point_option {
+		text := os.args.last().all_after('--point=')
+		point := text.int()
+		if point !in points || text != point.str() { return error('point must be a canonical member of the selected fixture matrix') }
+		points = [point]
+	}
 	rows := if scaled { 741 } else { 3 }
 	image_helper := if journaled { os.getenv_opt('VINIX_WINE_IMAGE_HELPER') or { return error('VJFS requires VINIX_WINE_IMAGE_HELPER') } } else { '' }
 	work := os.abs_path(os.args[1]); arch := os.args[2]
@@ -67,6 +75,8 @@ fn run() ! {
 		inputs[loader] = winesource.file_digest(loader)!
 	}
 	os.mkdir_all(work)!
+	os.write_file(work + '/selection.json', json2.encode(points))!
+	inputs[work + '/selection.json'] = winesource.file_digest(work + '/selection.json')!
 	seed := work + '/blank.img'
 	if journaled {
 		os.mkdir(work + '/seed')!
@@ -170,7 +180,9 @@ fn run() ! {
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
 	os.write_file(work + '/failures.json', json2.encode(failures))!
 	if failures.len > 0 { return error(failures.join('\n')) }
-	println('WINE POWERCUT GUEST PASS ' + arch)
+	if point_option {
+		println('WINE POWERCUT FOCUSED PASS arch=${arch} point=${points[0]}')
+	} else { println('WINE POWERCUT GUEST PASS ' + arch) }
 }
 
 fn main() {

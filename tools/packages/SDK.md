@@ -2281,6 +2281,15 @@ preparation boot is additional work, and the original per-case installation mode
 remains available. It is not a claim that installation plus recovery fits one cap.
 It samples four boundaries, not all 2222 syncs or a real Wine payload upgrade.
 
+For a focused diagnostic, append `--point=N` last. The point must be a canonical
+member of the selected matrix (for example `--scaled --prepared --point=2222`);
+the default three-point matrix does not admit point 4 unless `--all-syncs` is set.
+The controller records `selection.json`, verifies it as an input and reports
+`FOCUSED PASS` separately from a full matrix pass. Compile the guest with
+`-d wine_cut_timing` for optional per-phase monotonic timestamps, then use
+`wine-prefix-powercut-timing.v SERIAL_LOG...` to report within-boot deltas. These
+guest timings are diagnostic; the host's case deadline remains authoritative.
+
 These tests qualify selected acknowledged-sync boundaries on journaled VJFS
 with QEMU writeback caching. Host storage caches survive the VM kill. They do
 not establish physical power-loss/torn-write handling, every interruption point

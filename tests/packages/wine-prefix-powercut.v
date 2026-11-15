@@ -83,6 +83,12 @@ fn free_lock(fd i32) ! {
 	if C.flock(fd, C.LOCK_UN) != 0 { return error('cannot release coordination probe') }
 }
 
+fn cut_time(point int, phase string) {
+	$if wine_cut_timing ? {
+		println('WINE POWER CUT TIME point=${point} phase=${phase} ns=${time.sys_mono_now()}')
+	}
+}
+
 fn ordinary(root string, point int, fresh bool) ! {
 	names := winecutfixture.names($if wine_cut_scaled ? { true } $else { false })
 	old_count := names.len - 1
@@ -110,10 +116,12 @@ fn ordinary(root string, point int, fresh bool) ! {
 		os.write_file(root + '/armed', point.str())!
 		C.sync() // Durable fixture baseline, before capture and the cut window.
 		}
+		cut_time(point, 'warm-admission-begin')
 		mut owner := $if wine_cut_service ? { (pkgcore.Service{}).wine_prefix_review('app', data)! } $else {
 			wineadapter.capture_idle_binding_review(data, selected, store)!
 		}
 		defer { owner.close() }
+		cut_time(point, 'warm-admission-end')
 		$if wine_cut_service ? {
 			if owner.review.review.generation != 2 || owner.review.review.prior_generation != 1
 				|| owner.review.review.bindings.len != names.len { return error('signed service cut admission differs') }
@@ -126,9 +134,11 @@ fn ordinary(root string, point int, fresh bool) ! {
 			return error('public migration exec returned unexpectedly')
 		}
 		cut_point = point; cut_calls = 0
+		cut_time(point, 'warm-migrate-begin')
 		owner.migrate_bindings()!
 		return error('migration returned without the selected power cut')
 	}
+	cut_time(point, 'cold-inspection-begin')
 	if os.read_file(root + '/armed')! != point.str() { return error('reboot cut identity differs') }
 	if os.read_file(data + '/sentinel')! != 'private contents' { return error('reboot lost private data') }
 	for name in names[..old_count] {
@@ -158,17 +168,25 @@ fn ordinary(root string, point int, fresh bool) ! {
 	} else if os.exists(stage) || os.is_link(stage) { return error('reboot retained an unexpected stage') }
 	println('WINE POWER CUT STATE point=${point} replaced=${replaced} added=${added} staged=${staged}')
 	println('WINE POWER CUT OBSERVED point=${point} ext2 private-data old-new-bindings')
+	cut_time(point, 'cold-inspection-end')
 	$if wine_cut_cli ? {
 		for command in ['wine-prefix-migrate', 'wine-prefix-migrate', 'wine-prefix-review']! {
 			winecutservice.reply(command, data)!
 		}
 		println('WINE CLI POWER CUT PASS point=${point} migrate-repeat review-json')
 	}
+	cut_time(point, 'cold-admission-begin')
 	mut resumed := $if wine_cut_service ? { (pkgcore.Service{}).wine_prefix_review('app', data)! } $else {
 		wineadapter.capture_idle_binding_review(data, selected, store)!
 	}
 	defer { resumed.close() }
-	resumed.migrate_bindings()!; resumed.migrate_bindings()!; resumed.recheck()!
+	cut_time(point, 'cold-admission-end')
+	resumed.migrate_bindings()!
+	cut_time(point, 'cold-migrate-end')
+	resumed.migrate_bindings()!
+	cut_time(point, 'cold-repeat-end')
+	resumed.recheck()!
+	cut_time(point, 'cold-recheck-end')
 	review := $if wine_cut_service ? { resumed.review.review } $else { resumed.review }
 	if review.generation != 2 || review.prior_generation != 0 || review.bindings.len != names.len
 		|| !review.bindings.all(it.operation == .keep) { return error('reboot recovery inventory differs') }
@@ -193,8 +211,11 @@ fn ordinary(root string, point int, fresh bool) ! {
 	} $else { resumed.close() }
 	// Let ordinary deferred unlink cleanup finish before the final orderly
 	// shutdown. There is no such wait in the interrupted boot.
+	cut_time(point, 'cleanup-grace-begin')
 	time.sleep(6 * time.second)
+	cut_time(point, 'cleanup-grace-end')
 	C.sync()
+	cut_time(point, 'final-sync-end')
 	println('WINE POWER CUT SETTLED point=${point} grace-seconds=6')
 	println('WINE POWER CUT RECOVERY PASS point=${point} fresh-capture repeat private-data')
 }
@@ -214,7 +235,9 @@ fn run() ! {
 		os.mkdir(root)!
 		$if wine_cut_service ? { os.chmod(root, 0o755)! } $else { os.chown(root, 1000, 1000)!; os.chmod(root, 0o700)! }
 	}
+	cut_time(point, 'store-setup-begin')
 	fresh := $if wine_cut_service ? { winecutservice.setup(root, point, mount)! } $else { !os.exists(root + '/armed') }
+	cut_time(point, 'store-setup-end')
 	if preparing {
 		time.sleep(6 * time.second)
 		println('WINE POWER CUT BASELINE PASS bindings=741')
