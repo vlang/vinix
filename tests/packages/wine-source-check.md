@@ -1,5 +1,12 @@
 # Wine parsed source closure
 
+The [2026-11-15 bridge producer extension](wine-producer-closure-check.md) also
+captures `wine-build`'s target compiler source lists, binds their actual build
+and discovery arguments, and retains them in output receipts. Its parser rejects
+CR before line splitting, and the current production suite includes a sixth
+refusal for CR input. The historical qualifications below keep their original
+source versions and evidence requirements.
+
 The native controller and retainer now bind the compiler's actual parsed V files. A discovery pass captures each program's ordered source dump and hashes before build; the real build must produce the same dump and preserve every hash. This captures the transitive `compat/ios/plist/plist.v` input that directory inventories missed. The evidence copier preserves ordinary source-dump files so an unchanged copied baseline retains the same admission rules.
 
 Baseline `f6f1b4068` plus the five V source snapshots and hashes in the audit's `capture-report.json` reproduce this change. The external audit is `/Users/alex/Library/Caches/vinix-codex/section14/wine-source-2026-10-26`; its `SHA256SUMS` SHA-256 is `62e077c7dcf05ff60b81b8ddc1303b1d8f867b73b93a27d7a47534cd570eab54`. It preserves all 8,413 input-map entries and their bytes, source snapshots, compiler argument receipts and the guest attempt. This is parsed V source coverage; it does not establish complete header or hermetic toolchain coverage.

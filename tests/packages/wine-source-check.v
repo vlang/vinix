@@ -30,7 +30,7 @@ fn check() ! {
 	mut inputs := map[string]string{}
 	winesource.capture(discovered, mut inputs)!
 	winesource.admit(discovered, compiled, inputs)!
-	for failure in ['omitted-import', 'uncaptured-import', 'changed-import', 'duplicate-import', 'relative-import']! {
+	for failure in ['omitted-import', 'uncaptured-import', 'changed-import', 'duplicate-import', 'relative-import', 'carriage-return']! {
 		os.write_file(compiled, baseline)!
 		os.write_file(a, 'module a\n')!
 		if failure == 'omitted-import' { os.write_file(compiled, a + '\n')! }
@@ -38,6 +38,7 @@ fn check() ! {
 		if failure == 'changed-import' { os.write_file(a, 'module changed\n')! }
 		if failure == 'duplicate-import' { os.write_file(compiled, a + '\n' + a + '\n')! }
 		if failure == 'relative-import' { os.write_file(compiled, 'a.v\n')! }
+		if failure == 'carriage-return' { os.write_file(compiled, baseline.replace('\n', '\r\n'))! }
 		mut refused := false
 		winesource.admit(discovered, compiled, inputs) or { refused = true }
 		if !refused { return error('source closure admitted ' + failure) }
@@ -46,8 +47,8 @@ fn check() ! {
 		os.write_file(compiled, baseline)!
 		winesource.admit(discovered, compiled, inputs)!
 	}
-	os.write_file(work + '/result.txt', 'WINE SOURCE PASS: baseline and five closure/input refusals\n')!
-	println('WINE SOURCE PASS: baseline and five closure/input refusals')
+	os.write_file(work + '/result.txt', 'WINE SOURCE PASS: baseline and six closure/input refusals\n')!
+	println('WINE SOURCE PASS: baseline and six closure/input refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

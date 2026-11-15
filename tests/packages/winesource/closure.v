@@ -23,6 +23,9 @@ fn paths(file string) ![]string {
 	}
 	text := os.read_file(file)!
 	defer { unsafe { text.free() } }
+	// split_into_lines normalizes CRLF. Reject control bytes before splitting,
+	// so source-list admission cannot silently change their spelling.
+	if text.contains('\r') || text.contains('\x00') { return error('invalid compiler source closure control byte') }
 	result := text.split_into_lines()
 	mut accepted := false
 	defer { if !accepted { close(result) } }

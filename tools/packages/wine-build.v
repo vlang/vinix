@@ -7,6 +7,7 @@ import crypto.sha256
 import json2
 import os
 import wineadapter
+import tests.packages.winesource
 
 struct Entry {
 	source string
@@ -55,6 +56,7 @@ fn verify_sources() ! {
 	}
 	for path, contents in {
 		@FILE:                                            $embed_file('wine-build.v').to_string()
+		os.dir(@FILE) + '/../../tests/packages/winesource/closure.v': $embed_file('../../tests/packages/winesource/closure.v').to_string()
 		os.dir(@FILE) + '/wine-runner.v':                 $embed_file('wine-runner.v').to_string()
 		os.dir(@FILE) + '/wineadapter/layout.v':          $embed_file('wineadapter/layout.v').to_string()
 		os.dir(@FILE) + '/wineadapter/patch.v':           $embed_file('wineadapter/patch.v').to_string()
@@ -303,7 +305,7 @@ fn build() ! {
 	mut checked_offer := wineadapter.admit_local_source_offer(output + '/publisher-notices', 'org.vinix.wine-runtime', '9.17-r1', arch)!
 	checked_offer.close()
 	copy_input(application, app + '/bin/program.exe', mut inputs)!
-	for path in [base + '/tools/packages/wine-runner.v', @FILE] {
+	for path in [base + '/tools/packages/wine-runner.v', @FILE, base + '/tests/packages/winesource/closure.v'] {
 		inputs[path] = digest(path)!
 	}
 	for directory in [base + '/tools/packages/wineadapter', base + '/tools/packages/appsdk',
@@ -316,14 +318,20 @@ fn build() ! {
 	for path in [v, '/opt/homebrew/opt/llvm/bin/clang', '/opt/homebrew/bin/ld.lld', '/usr/bin/tar'] {
 		inputs[path] = digest(path)!
 	}
-	os.write_file(output + '/inputs-before-build.json', json2.encode(inputs) + '\n')!
 	generated := output + '/build/wine-runner.c'
 	mut runner_command := [v, '-backend', 'c', '-prod', '-os', 'linux', '-arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-gc', 'none', '-manualfree', '-d',
 		'no_backtrace', '-d', 'no_segfault_handler', '-o', generated,
 		base + '/tools/packages/wine-runner.v']
 	if owned { runner_command.insert(1, ['-d', 'wine_owned_manager']) }
+	mut discovery := runner_command.clone()
+	discovery.insert(1, ['-print-watched-files', '-dump-files', output + '/logs/sources-before.txt'])
+	invoke(discovery, output + '/logs/discover.log')!
+	winesource.capture(output + '/logs/sources-before.txt', mut inputs)!
+	os.write_file(output + '/inputs-before-build.json', json2.encode(inputs) + '\n')!
+	runner_command.insert(1, ['-dump-files', output + '/logs/sources-built.txt'])
 	invoke(runner_command, output + '/logs/v.log')!
+	winesource.admit(output + '/logs/sources-before.txt', output + '/logs/sources-built.txt', inputs)!
 	if owned { os.write_file(output + '/owned-manager.json', json2.encode({'architecture': arch, 'mode': 'wine_owned_manager', 'runner_source_sha256': inputs[base + '/tools/packages/wine-runner.v']}))! }
 	runtime_c := output + '/build/runtime.c'
 	os.write_file(runtime_c, '#include <unistd.h>\n#include <fcntl.h>\n#include <sys/wait.h>\n#define V_OS_EXECUTE_SCOPE\n#include "' +

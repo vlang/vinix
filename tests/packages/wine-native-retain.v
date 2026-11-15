@@ -83,14 +83,13 @@ fn producer_argv(vargv string, ccargv string, compiler string, architecture stri
 		expected_v << ['-path', '@vlib|' + root + '|' + root + '/tools/accounts|@vmodules']
 	}
 	expected_v << ['-o', cfile, source]
-	if native {
-		expected_v.insert(1, ['-dump-files', os.dir(cfile) + '/sources-built.txt'])
-		mut expected_discovery := [compiler, '-print-watched-files', '-dump-files',
-			os.dir(cfile) + '/sources-before.txt']
-		for argument in expected_v[3..] { expected_discovery << argument }
-		if argv(os.dir(vargv) + '/discover.log.argv.json')! != expected_discovery {
-			return error('V source discovery argv differs')
-		}
+	closure_dir := if native { os.dir(cfile) } else { os.dir(os.dir(cfile)) + '/logs' }
+	expected_v.insert(1, ['-dump-files', closure_dir + '/sources-built.txt'])
+	mut expected_discovery := [compiler, '-print-watched-files', '-dump-files',
+		closure_dir + '/sources-before.txt']
+	for argument in expected_v[3..] { expected_discovery << argument }
+	if argv(os.dir(vargv) + '/discover.log.argv.json')! != expected_discovery {
+		return error('V source discovery argv differs')
 	}
 	if v != expected_v {
 		return error('V producer argv differs')
@@ -201,6 +200,7 @@ fn retain() ! {
 		return error('Wine producer input verification differs')
 	}
 	verify(producer_inputs)!
+	winesource.admit(prepared + '/logs/sources-before.txt', prepared + '/logs/sources-built.txt', producer_inputs)!
 	for name in ['tools/packages/wine-build.v', 'tools/packages/wine-runner.v']! {
 		require_input(producer_inputs, root + '/' + name)!
 	}
@@ -239,6 +239,7 @@ fn retain() ! {
 	for path, _ in producer_inputs { paths['producer-input/' + path] = path }
 	outputs := hashes(prepared + '/outputs.json')!
 	for name in ['build/wine-runner.c', 'build/runtime.c', 'logs/v.log', 'logs/v.log.argv.json',
+		'logs/discover.log', 'logs/discover.log.argv.json', 'logs/sources-before.txt', 'logs/sources-built.txt',
 		'logs/cc.log', 'logs/cc.log.argv.json', 'application.json', 'runtime.json',
 		'build-producer.json', 'pe-producer.json', 'publisher-notices/source-offer.json',
 		'prepared/' + arch + '/runtime/bin/wine-runner', 'prepared/' + arch + '/runtime/bin/wine64',
