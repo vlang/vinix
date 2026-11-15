@@ -33,3 +33,12 @@ Fence observers assert that all callbacks and result references are retired
 before notification, including reverse error cancellation. A failed output
 installation exposes a binary-sync prefix, then verifies its error notification
 runs after node cleanup and after dropping the file lock.
+
+Independent commands within one native batch can publish together. Explicit
+barriers wait for internal callbacks at their subqueue-local positions, and
+backpressure holds only later commands on the same pipe. Overlap fixtures cover
+both completion orders, older barrier targets, blocked heads, independent ring
+backpressure, quarantine at publication, a fault with another job still running,
+four 64-command reverse-callback batches, shutdown and immediate callbacks.
+Later batches on the same queue remain FIFO through retirement. Firmware barrier
+encoding and overlap across submissions remain separate work.

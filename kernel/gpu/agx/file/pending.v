@@ -3,6 +3,7 @@
 module file
 
 import drm.syncobj
+import drm.ioctl
 import gpu.agx.gpu
 import gpu.agx.submission
 import katomic
@@ -16,6 +17,9 @@ struct G13PendingCommand {
 mut:
 	compute_job &gpu.G13ComputeJobResources = unsafe { nil }
 	render_job  &gpu.G13RenderJobResources  = unsafe { nil }
+	pipe        u32
+	wait_for    [2]u32 // command position + 1; zero has no in-batch dependency
+	published   bool
 	done        bool
 	error       int
 }
@@ -32,7 +36,6 @@ mut:
 	final_fence         &syncobj.DmaFence = unsafe { nil }
 	commands            [64]G13PendingCommand
 	command_count       u32
-	next_command        u32
 	callbacks_remaining u32
 	failure             int
 }
@@ -45,6 +48,43 @@ __global pending_poll_active = false
 
 fn signal_g13_submission_fence(fence &syncobj.DmaFence, failure int) {
 	if failure == 0 { syncobj.signal(fence) } else { syncobj.signal_error(fence, failure) }
+}
+
+// Resolve subqueue-local barrier indices while the staged input is alive.
+// Index zero names the previous submission, already ordered by queue FIFO.
+// Only integer positions survive; no staged payload or job pointer escapes.
+fn resolve_g13_batch_dependencies(mut item G13PendingSubmission, commands []submission.Command) bool {
+	if commands.len != int(item.command_count) { return false }
+	mut positions := [2][64]u32{}
+	mut counts := [2]u32{}
+	for index := u32(0); index < item.command_count; index++ {
+		mut entry := &item.commands[index]
+		entry.pipe = if commands[index].descriptor.cmd_type == ioctl.asahi_cmd_render {
+			u32(0)
+		} else {
+			u32(1)
+		}
+		for pipe in 0 .. 2 {
+			barrier := commands[index].descriptor.barriers[pipe]
+			if barrier == ioctl.asahi_barrier_none || barrier == 0 { continue }
+			if barrier > counts[pipe] { return false }
+			entry.wait_for[pipe] = positions[pipe][barrier - 1] + 1
+		}
+		positions[entry.pipe][counts[entry.pipe]] = index
+		counts[entry.pipe]++
+	}
+	return true
+}
+
+fn g13_pending_error(item &G13PendingSubmission) int {
+	for index := u32(0); index < item.command_count; index++ {
+		command := &item.commands[index]
+		if katomic.load(&command.done) {
+			failure := katomic.load(&command.error)
+			if failure != 0 { return failure }
+		}
+	}
+	return 0
 }
 
 // Called under manager.lock while the ioctl still holds file.lock.
@@ -91,9 +131,9 @@ fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
 	}
 }
 
-// Publish at most one command per poll. Conservative execution order meets
-// every validated subqueue dependency; firmware barriers and same-queue overlap
-// are a later step. External fence state never controls internal advancement.
+// Independent commands can overlap within a batch. Explicit barriers wait on
+// internal callbacks, and a blocked command stalls only its own subqueue.
+// Firmware barriers and overlap across submissions remain separate work.
 fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	mut manager := unsafe { item.manager }
 	if manager.state != .running {
@@ -109,31 +149,60 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 		}
 		item.dependencies_ready = true
 	}
-	for item.next_command < item.command_count {
-		mut command := &item.commands[item.next_command]
-		if katomic.load(&command.done) {
-			failure := katomic.load(&command.error)
-			if failure != 0 {
-				cancel_g13_pending(mut item, failure)
+	failure := g13_pending_error(item)
+	if failure != 0 || katomic.load(&item.failure) != 0 {
+		cancel_g13_pending(mut item, if failure != 0 {
+			failure
+		} else {
+			katomic.load(&item.failure)
+		})
+		return katomic.load(&item.callbacks_remaining) != 0
+	}
+	mut blocked := [2]bool{}
+	for index := u32(0); index < item.command_count; index++ {
+		mut command := &item.commands[index]
+		if katomic.load(&command.done) || command.published { continue }
+		if blocked[command.pipe] { continue }
+		for dependency in command.wait_for {
+			if dependency == 0 { continue }
+			prior := &item.commands[dependency - 1]
+			if !katomic.load(&prior.done) {
+				blocked[command.pipe] = true
+				continue
+			}
+			dependency_error := katomic.load(&prior.error)
+			if dependency_error != 0 {
+				cancel_g13_pending(mut item, dependency_error)
 				return katomic.load(&item.callbacks_remaining) != 0
 			}
-			item.next_command++
-			continue
+		}
+		if blocked[command.pipe] { continue }
+		completed_error := g13_pending_error(item)
+		if completed_error != 0 {
+			cancel_g13_pending(mut item, completed_error)
+			return katomic.load(&item.callbacks_remaining) != 0
 		}
 		if manager.g13_queue_dispatch_blocked(item.queue) { return true }
 		if command.compute_job != unsafe { nil } {
 			if manager.submit_g13_compute_job(command.compute_job) {
 				// The manager can free transferred metadata before returning.
 				command.compute_job = unsafe { nil }
+				command.published = true
 			}
 		} else if command.render_job != unsafe { nil } {
 			if manager.submit_g13_render_job(command.render_job) {
 				command.render_job = unsafe { nil }
+				command.published = true
 			}
 		}
-		return true
+		if !command.published { blocked[command.pipe] = true }
 	}
-	return katomic.load(&item.callbacks_remaining) != 0
+	if katomic.load(&item.callbacks_remaining) != 0 { return true }
+	// The last callback can run during publication. Read its error only after
+	// acquiring the zero callback count, before allowing aggregate notification.
+	final_error := g13_pending_error(item)
+	if final_error != 0 { katomic.store(mut &item.failure, final_error) }
+	return false
 }
 
 // Only the GPU worker consumes nodes. Detach a bounded snapshot, then put

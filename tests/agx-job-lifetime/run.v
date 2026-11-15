@@ -31,7 +31,7 @@ fn main() {
 		['fn (mut mgr GpuManager) free_g13_render_buffer_locked(', 'fn (mut mgr GpuManager) initialize_g13_render_buffer('],
 		['fn (mut mgr GpuManager) reserve_g13_tvb_slot()', '// Caller holds mgr.lock. No submitted job'],
 		['fn (mgr &GpuManager) g13_tvb_owner_locked(', '// Service firmware'],
-		['pub fn (mut mgr GpuManager) release_g13_queue_resources(', '// Vinix currently serializes'],
+		['pub fn (mut mgr GpuManager) release_g13_queue_resources(', '// Quarantined backing must retire'],
 		['fn (mut mgr GpuManager) release_g13_render_scene_backing_locked(',
 			'fn (mut mgr GpuManager) free_g13_render_scene_locked('],
 		['fn (mut mgr GpuManager) free_g13_render_job_locked(', '// Construct the complete paired'],

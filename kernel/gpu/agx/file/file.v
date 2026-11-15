@@ -1099,6 +1099,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		dependencies: input_syncs
 		command_count: request.command_count
 	} }
+	if !resolve_g13_batch_dependencies(mut pending, commands) { memory.free(storage); return -22 }
 	mut queued := false
 	defer {
 		if !queued {

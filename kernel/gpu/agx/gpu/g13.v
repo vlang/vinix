@@ -2047,6 +2047,7 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 		|| owned.queue.threshold.phys == 0 || owned.queue.render_buffer.counter.phys == 0 {
 		return false
 	}
+	if mgr.g13_queue_dispatch_blocked_locked(owned.queue) { return false }
 	mut queue := unsafe { owned.queue }
 	if !queue.subqueues[0].events.can_publish(owned.vertex_event_slot, owned.vertex_stamp_value)
 		|| !queue.subqueues[1].events.can_publish(owned.fragment_event_slot, owned.fragment_stamp_value) {
@@ -2511,6 +2512,7 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 		|| owned.context == unsafe { nil } || !owned.context.active {
 		return false
 	}
+	if mgr.g13_queue_dispatch_blocked_locked(owned.queue) { return false }
 	mut queue := unsafe { owned.queue }
 	if queue.threshold.phys == 0 {
 		return false
@@ -2731,9 +2733,8 @@ pub fn (mut mgr GpuManager) release_g13_queue_resources(resources &G13QueueResou
 	return true
 }
 
-// Vinix currently serializes published native G13 submissions per userspace
-// queue. Prepared jobs may wait on dependencies without blocking other queues.
 // Quarantined backing must retire before another command can be published.
+// Submitted jobs may overlap; event tickets preserve subqueue publication order.
 pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(resources &G13QueueResources) bool {
 	if resources == unsafe { nil } {
 		return true
@@ -2742,16 +2743,22 @@ pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(resources &G13QueueResour
 	defer {
 		mgr.lock.release()
 	}
+	return mgr.g13_queue_dispatch_blocked_locked(resources)
+}
+
+// Also checked under the publication lock to close the poll-to-submit race.
+fn (mgr &GpuManager) g13_queue_dispatch_blocked_locked(resources &G13QueueResources) bool {
+	if resources == unsafe { nil } { return true }
 	if resources.released || resources.quarantined {
 		return true
 	}
 	for job in mgr.g13_render_jobs {
-		if !job.released && (job.submitted || job.quarantined) && voidptr(job.queue) == voidptr(resources) {
+		if !job.released && job.quarantined && voidptr(job.queue) == voidptr(resources) {
 			return true
 		}
 	}
 	for job in mgr.g13_compute_jobs {
-		if !job.released && (job.submitted || job.quarantined) && voidptr(job.queue) == voidptr(resources) {
+		if !job.released && job.quarantined && voidptr(job.queue) == voidptr(resources) {
 			return true
 		}
 	}

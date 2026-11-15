@@ -108,8 +108,8 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI, then polls dependencies and completion in the GPU worker. Independent queues progress concurrently; each queue retains FIFO and serial publication. Modern flat-command integration, same-queue overlap and firmware subqueue barriers still differ from DRM scheduling. |
-| Render scenes | Multiple prepared scenes retain shared backing and conditional binding. The worker publishes one submission at a time per queue; independent queues may execute concurrently. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. Independent commands within a batch can overlap; explicit dependencies wait on internal callbacks and each subqueue preserves publication order. Later batches on the same queue wait through retirement. Modern flat-command integration, firmware barrier commands and overlap across submissions still differ from DRM scheduling. |
+| Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands within one batch and independent queues may execute concurrently; later batches on the same queue wait through retirement. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
@@ -493,9 +493,9 @@ No hardware access, boot or reboot was performed.
 Native submission now accepts up to 64 render/compute commands in arbitrary
 order, matching the packaged reference's hardware-command count limit. The
 legacy descriptors and payloads are staged before GPU preparation, and barrier
-indices are checked against previous commands of each subqueue. Execution
-remains serial within a queue. This satisfies the accepted dependency ordering
-but does not implement the reference's firmware barriers or scheduling overlap.
+indices are checked against previous commands of each subqueue. At this
+checkpoint execution remained serial within a queue. The later overlap change
+below relaxes that restriction within a batch; firmware barriers remain separate.
 The fake backend retains its existing two-command contract.
 
 Staged payloads use fallible temporary heap storage. The pending node owns
@@ -530,6 +530,59 @@ The sibling inventory SHA-256 is
 the linked kernel SHA-256 is
 `61784c84cf87d8a8453e8dd0b2cb3a1b880e0988e3d18580ee590c35afa246aa`.
 The retained checker passes `check-inventory BUNDLE RECEIPT`.
+
+### Overlapping commands within a native batch
+
+Independent commands in one submission can now publish together, instead of
+waiting for every earlier command's callback. Barrier indices resolve to scalar
+positions in the pending node before staged storage is freed. A barrier waits
+for the specified command of its own subqueue; render completion includes both
+vertex and fragment work. A blocked dependency or full ring holds later commands
+on that pipe while the other pipe can progress. Later submissions on the same
+queue retain FIFO through retirement.
+
+Submitted jobs no longer block publication by themselves. Both native submit
+methods check quarantine while holding the manager lock, closing the gap between
+polling and publication. Completed errors are checked before further work, and
+the aggregate fence still waits for all callback references. A synchronous final
+callback's error is read after observing the callback count reach zero. Existing
+per-job/per-scene backing, shared TPC/TVB owners, event tickets and reverse
+cancellation retain their ownership rules; the poller adds no allocation.
+
+ASan/UBSan checks pass both independent completion orders, older barrier targets,
+subqueue FIFO, per-pipe backpressure, quarantine at publication, a fault with
+another published job still pending, four full 64-command reverse-callback
+batches, shutdown and synchronous first/last errors. The production reaper
+fixture also retires 64 compute jobs and 64 paired render jobs; vertex-only
+completion retains all render scenes. Existing batch, close and recovery
+fixtures, source gates, unit tests and independent lifetime review pass.
+The existing 200 immediate-retirement cycles still drain nodes, jobs and file/VM
+pins; retained sync-object/fence allocations remain outside that measurement.
+
+Isolated AArch64 and clean x86_64 kernel builds pass from
+`cab44e91988c37aae1bab7af0fe7183dcd5ddd8a` plus three retained kernel files,
+compared byte-for-byte before retention. Generated ARM C uses fixed arrays in
+dependency resolution and polling. The local ioctl frame is 7,600 bytes in
+disassembly; this is not a peak call-chain measurement. The ARM ELF and C were
+retained before switching architectures; initial sparse-dependency and mixed
+object failures are preserved separately from the successful clean x86 build.
+
+A fresh Omarchy clone is at `c30411b92bd3bf87535bef4e13ce7015087fc648`.
+Package HEAD remains `fb18a8a7359142ab33f65d906d956b3cc3590a53`, retaining
+the kernel and Mesa pins above. The source audit remains `not_equivalent`.
+Firmware barrier commands, overlap across submissions, modern ABI registration,
+VM/GEM/Mesa integration and the other listed gaps remain incomplete. No hardware
+access, boot or reboot was performed.
+
+Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-overlap-20261115/bundle/`.
+The sibling inventory SHA-256 is
+`f7ce46536c4017b717a4c976fd26f9f526ae8e6e0b4f93e6378ff594cf367930`.
+Linked kernel SHA-256 values are
+`a0d2ba244097b05b72b6f7df692c32cf4996a5730c9b53ee2d9264a45dd8130f`
+(AArch64) and
+`1bf2f083e14a9849213d607177e02b1bcd7e5280084f5e310da0abde13cd2a70`
+(x86_64). The retained checker passes `check-inventory BUNDLE RECEIPT`.
 
 ## Earlier artifact retention incident
 

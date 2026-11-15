@@ -299,5 +299,6 @@ pub fn run_checks() {
 	check_append_and_backpressure()
 	check_shutdown_and_immediate_retirement()
 	check_batches()
+	check_overlap()
 	println('AGX async: ioctl staging, independent queues/FIFO, compute→render phases, forged fences, failure cleanup, enqueue/shutdown races, backpressure and 200 immediate-retirement cycles passed')
 }

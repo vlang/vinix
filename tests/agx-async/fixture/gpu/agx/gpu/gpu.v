@@ -80,6 +80,7 @@ pub mut:
 	g13_compute_jobs      []&G13ComputeJobResources
 	g13_render_jobs       []&G13RenderJobResources
 	published             []u32
+	published_order       []u32
 	released_order        []u32
 	prepares              int
 	callbacks             int
@@ -93,6 +94,10 @@ pub mut:
 	fail_compute_callback bool
 	fail_render_callback  bool
 	ring_full             bool
+	compute_ring_full     bool
+	render_ring_full      bool
+	immediate_fault_at    int   = -1
+	on_submit             fn () = unsafe { nil }
 	immediate_complete    bool
 	stop_after_callback   bool
 	on_publish            fn () = unsafe { nil }
@@ -106,12 +111,14 @@ pub fn reset() {
 		test_async_gpu_manager.g13_compute_jobs.free()
 		test_async_gpu_manager.g13_render_jobs.free()
 		test_async_gpu_manager.published.free()
+		test_async_gpu_manager.published_order.free()
 		test_async_gpu_manager.released_order.free()
 	}
 	test_async_gpu_manager = GpuManager{}
 	test_async_gpu_manager.g13_compute_jobs.flags |= .noslices
 	test_async_gpu_manager.g13_render_jobs.flags |= .noslices
 	test_async_gpu_manager.published.flags |= .noslices
+	test_async_gpu_manager.published_order.flags |= .noslices
 	test_async_gpu_manager.released_order.flags |= .noslices
 }
 
@@ -232,31 +239,58 @@ pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 }
 
 pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) bool {
-	if mgr.state != .running || mgr.ring_full { return false }
+	if mgr.on_submit != unsafe { nil } {
+		hook := mgr.on_submit
+		mgr.on_submit = unsafe { nil }
+		hook()
+	}
+	if mgr.state != .running || mgr.ring_full || mgr.compute_ring_full || mgr.g13_queue_dispatch_blocked_locked(job.queue) {
+		return false
+	}
 	assert !job.submitted && !job.released
 	unsafe { job.submitted = true }
 	mgr.published << job.queue.id * 10 + 2
+	mgr.published_order << job.ordinal
+	status := if int(job.ordinal) == mgr.immediate_fault_at { u32(3) } else { u32(0) }
 	if mgr.on_publish != unsafe { nil } {
 		hook := mgr.on_publish
 		mgr.on_publish = unsafe { nil }
 		hook()
 	}
-	if mgr.immediate_complete { mgr.finish_compute(0) }
+	if mgr.immediate_complete { mgr.finish_compute(status) }
 	return true
 }
 
 pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bool {
-	if mgr.state != .running || mgr.ring_full { return false }
+	if mgr.on_submit != unsafe { nil } {
+		hook := mgr.on_submit
+		mgr.on_submit = unsafe { nil }
+		hook()
+	}
+	if mgr.state != .running || mgr.ring_full || mgr.render_ring_full || mgr.g13_queue_dispatch_blocked_locked(job.queue) {
+		return false
+	}
 	assert !job.submitted && !job.released
 	unsafe { job.submitted = true }
 	mgr.published << job.queue.id * 10
-	if mgr.immediate_complete { mgr.finish_render(0) }
+	mgr.published_order << job.ordinal
+	status := if int(job.ordinal) == mgr.immediate_fault_at { u32(3) } else { u32(0) }
+	if mgr.immediate_complete { mgr.finish_render(status) }
 	return true
 }
 
 pub fn (mut mgr GpuManager) finish_compute(status u32) {
-	for i, job in mgr.g13_compute_jobs {
+	for job in mgr.g13_compute_jobs {
 		if !job.submitted { continue }
+		mgr.finish_compute_at(job.ordinal, status)
+		return
+	}
+	panic('no submitted compute')
+}
+
+pub fn (mut mgr GpuManager) finish_compute_at(ordinal u32, status u32) {
+	for i, job in mgr.g13_compute_jobs {
+		if !job.submitted || job.ordinal != ordinal { continue }
 		unsafe { job.error = G13JobError{ status: status } }
 		mgr.complete_compute(job, status == 0)
 		mgr.g13_compute_jobs.delete(i)
@@ -267,8 +301,17 @@ pub fn (mut mgr GpuManager) finish_compute(status u32) {
 }
 
 pub fn (mut mgr GpuManager) finish_render(status u32) {
-	for i, job in mgr.g13_render_jobs {
+	for job in mgr.g13_render_jobs {
 		if !job.submitted { continue }
+		mgr.finish_render_at(job.ordinal, status)
+		return
+	}
+	panic('no submitted render')
+}
+
+pub fn (mut mgr GpuManager) finish_render_at(ordinal u32, status u32) {
+	for i, job in mgr.g13_render_jobs {
+		if !job.submitted || job.ordinal != ordinal { continue }
 		unsafe { job.error = G13JobError{ status: status } }
 		mgr.complete_render(job, status == 0)
 		mgr.g13_render_jobs.delete(i)

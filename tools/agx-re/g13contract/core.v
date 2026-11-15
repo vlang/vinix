@@ -252,9 +252,24 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'agxsubmission.install_output_syncs', 'gpu_manager.queue_g13_submission'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
-	require_order(pending, ['status := g13_dependency_status', 'katomic.load(&command.done)',
-		'katomic.load(&command.error)', 'manager.g13_queue_dispatch_blocked', 'manager.submit_g13_compute_job',
-		'manager.submit_g13_render_job'], 'Vinix dependency and compute/render polling')!
+	poll := section(pending, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'Vinix batch overlap')!
+	require_order(poll, ['status := g13_dependency_status', 'failure := g13_pending_error(item)',
+		'mut blocked := [2]bool{}', 'command.published', 'blocked[command.pipe]', 'command.wait_for',
+		'katomic.load(&prior.done)', 'katomic.load(&prior.error)', 'completed_error := g13_pending_error(item)',
+		'manager.g13_queue_dispatch_blocked', 'manager.submit_g13_compute_job',
+		'command.published = true', 'manager.submit_g13_render_job',
+		'if !command.published { blocked[command.pipe] = true }',
+		'if katomic.load(&item.callbacks_remaining) != 0', 'final_error := g13_pending_error(item)'],
+		'Vinix dependency, per-subqueue FIFO and overlapping publication')!
+	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix barrier resolution')!
+	require_order(resolve, ['mut positions := [2][64]u32{}', 'barrier == 0', 'barrier > counts[pipe]',
+		'positions[pipe][barrier - 1] + 1', 'positions[entry.pipe][counts[entry.pipe]] = index',
+		'counts[entry.pipe]++'], 'Vinix subqueue-local barrier positions')!
+	guard := section(local, 'fn (mgr &GpuManager) g13_queue_dispatch_blocked_locked(',
+		'// Caller holds the manager lock during shutdown.', 'Vinix quarantine gate')!
+	require(!guard.contains('job.submitted') && guard.count('job.quarantined') == 2 &&
+		local.count('if mgr.g13_queue_dispatch_blocked_locked(owned.queue)') == 2,
+		'Vinix overlap must gate quarantine under each publication lock')!
 	submission := read(os.join_path(repo, 'kernel/gpu/agx/submission/submission.v'))!
 	reference_file := read(os.join_path(base, 'file.rs'))!
 	require(integer_constant(submission, 'max_commands', 'Vinix command count')! ==
@@ -315,6 +330,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 default non-preemptible compute queue priority',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
+		'Native intra-batch overlap with callback barriers, per-subqueue FIFO and locked quarantine gates',
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',
 		'Firmware 13.5 shared per-queue command/start counters']
