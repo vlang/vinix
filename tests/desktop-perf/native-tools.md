@@ -36,6 +36,12 @@ The compiler uses its configured local standard library. Sanitizers check
 invalid accesses and undefined behavior with leak detection disabled; flat
 descriptor checks do not establish flat heap usage.
 
+The [November 15 build repair](../../docs/linux-performance-harness-builds.md)
+records the current compiler's passing public host suite, 18/37 staging adapter
+controls and native initializer fault-injection checks. These bounded receipts
+do not replace the historical qualification or close the broader guest
+performance gates.
+
 Originals and qualification records are retained locally under
 `~/.cache/vinix-desktop-perf-native-20261012/`; temporary builds live under
 `/Volumes/VinixPythonDeviceScratch/desktop-perf-20261012/`.

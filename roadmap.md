@@ -2433,6 +2433,11 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   review. See [the builder-lifetime qualification](docs/linux-procfd-builder-lifetime.md)
   for the retained broader performance-harness blockers.
 
+- [x] Restore the performance host report suite and retained native initializer
+  builds with strict format/type checks. Qualify initializer failure handling
+  and shell arguments with 11 native cases per architecture; preserve the next
+  sampler-build and ARM schema gates. See [the harness build receipts](docs/linux-performance-harness-builds.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

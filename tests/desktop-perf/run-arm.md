@@ -16,10 +16,10 @@ source roots, and owns preparation and its sampled live disk budget.
 the unchanged prepared receipt. Generated C, build argv/logs, ELF inspection,
 sources, manifests, media and eventual results stay in the external state.
 
-Preparation compiles the V PID1 with `-nocache`, generates static AArch64
-PID1 and measure ELFs, and retains readelf headers, segments and dynamic
-sections. Its explicit clang argv disables default config, default headers
-and default libraries; it selects GCC includes/crt/libgcc, musl headers/crt
+Preparation emits PID1 through the maintained freestanding V module generator,
+generates static AArch64 PID1 and measure ELFs, and retains readelf headers,
+segments and dynamic sections. Its explicit clang argv disables default config,
+default headers and default libraries; it selects GCC includes/crt/libgcc, musl headers/crt
 and libc from the named sysroot and a named `ld.lld`. The entire sysroot is
 hashed in place, with literal guest links. The installed host loader and
 compiler dependency closure are not claimed hermetic. Runtime-name presence
@@ -65,6 +65,11 @@ growth totals 4,251,568 KiB, below the existing 4.5 GiB ceiling. This is a
 proposal, not admission: all charged roots, existing usage, fresh df, exact
 tool/source/input pins and the final profile require review before staging.
 Space consumed by other active work must be included or coordinated.
+
+The [November 15 build qualification](../../docs/linux-performance-harness-builds.md)
+records the restored initializer build and native fault-injection checks.
+Production staging reaches the sampler's separate deprecated-alias refusal;
+the current ARM page/class schema and full six-scenario guest run remain open.
 
 Status: normal and production host adapters each passed eighteen controls;
 host owners each passed the historical twenty-four and sixteen ARM controls.

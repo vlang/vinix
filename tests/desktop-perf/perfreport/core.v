@@ -7,6 +7,7 @@ import math
 import math.big
 
 #include <stdio.h>
+#include <stdlib.h>
 
 fn C.strtod(&char, &&char) f64
 fn C.snprintf(&char, usize, &char, ...) i32

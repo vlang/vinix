@@ -9,6 +9,25 @@ import hwhost
 
 pub const legacy_sha256 = '2490bc0e69142080f52a469e241cbb37d61d0e0687a191618654a3b617b68771'
 
+pub fn generate_init(compiler string, root string, directory string, arch string) !string {
+	if arch !in ['aarch64', 'x86_64'] { return error('unsupported initializer architecture') }
+	name := if arch == 'aarch64' { 'perfinitarm' } else { 'perfinitx86' }
+	folder := if arch == 'aarch64' { 'arm-init' } else { 'x86-init' }
+	source := root + '/tests/desktop-perf/' + folder + '/main.v'
+	module_dir := directory + '/' + name
+	output := directory + '/init.c'
+	if os.exists(module_dir) || os.exists(output) { return error('initializer output must be fresh') }
+	os.mkdir_all(module_dir)!
+	text := os.read_file(source)!
+	os.write_file(module_dir + '/core.v', text)!
+	os.write_file(directory + '/init-source.v', text)!
+	argv := [root + '/build-support/compile-v-module', module_dir, output, '--arch',
+		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'nofloat']
+	os.write_file(directory + '/init-v.argv.json', json2.encode(argv) + '\n')!
+	hwhost.run_tool(argv, {'VINIX_V_COMPILER': compiler}, directory + '/init-v.log', 300)!
+	return output
+}
+
 pub fn generate(compiler string, root string, directory string, arch string) !string {
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported producer architecture') }
 	legacy := os.read_file(root + '/tests/desktop-perf/measure.c')!

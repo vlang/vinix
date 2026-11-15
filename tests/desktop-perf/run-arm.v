@@ -98,6 +98,10 @@ fn selected_linker() !string {
 }
 
 fn source_inputs(root string, mut pins map[string]string) ! {
+	for name in ['build-support/compile-v-module', 'build-support/run-v-tool.sh',
+		'build-support/find-v.sh', 'tests/linuxkpi/generate_module.v'] {
+		pins[root + '/' + name] = digest(root + '/' + name)!
+	}
 	for dir in ['tests/desktop-perf', 'tests/hardware-platform/hwhost', 'tests/hardware-platform/plainiso',
 		'tests/linuxkpi/hosttest', 'tools/hosttest', 'tools/sourcecommand', 'tools/qmpclient'] {
 		for extension in ['.v', '.h', '.c', '.sh'] {
@@ -225,10 +229,9 @@ fn prepare(args []string, stage bool) ! {
 	for name in ['sh', 'true', 'sleep', 'mkdir', 'chmod', 'od', 'tr', 'rm', 'touch', 'kill', 'sync',
 		'cat', 'sed', 'dd', 'awk', 'grep', 'tail', 'install', 'ln'] { os.symlink('/bin/busybox', state + '/rootfs/bin/' + name)! }
 	os.mkdir(state + '/guest')!
-	c_file := state + '/guest/init.c'; init := state + '/rootfs/sbin/init'
-	tool([compiler, '-nocache', '-os', 'linux', '-arch', 'arm64', '-gc', 'none', '-d', 'no_backtrace',
-		'-d', 'no_segfault_handler', '-o', c_file, root + '/tests/desktop-perf/arm-init'], state, 'init-v')!
-	tool(compile_command(cc, linker, sysroot, gcc, c_file, init, true), state, 'init-link')!
+	c_file := perfproducer.generate_init(compiler, root, state + '/guest', 'aarch64')!
+	init := state + '/rootfs/sbin/init'
+	tool(compile_command(cc, linker, sysroot, gcc, c_file, init, false), state, 'init-link')!
 	perf := state + '/rootfs/opt/vinix-perf'
 	measure_c := perfproducer.generate(compiler, root, state + '/guest', 'aarch64')!
 	tool(compile_command(cc, linker, sysroot, gcc, measure_c, perf + '/measure', true), state, 'measure-link')!
@@ -263,10 +266,11 @@ fn finish_prepare(root string, base string, kernel string, state string, argumen
 	os.write_file(state + '/root.ext2', '')!; os.truncate(state + '/root.ext2', u64(256) << 20)!
 	tool([mkfs, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-O',
 		'filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum', state + '/root.ext2'], state, 'ext2')!
-	for path in [c_file, init, perf + '/measure', state + '/guest/measure-v.c', state + '/guest/measure-legacy.c',
+	for path in [c_file, init, state + '/guest/init-source.v', state + '/guest/init-v.argv.json',
+		state + '/guest/init-v.log', perf + '/measure', state + '/guest/measure-v.c', state + '/guest/measure-legacy.c',
 		state + '/guest/measure-combined.c', archive, image, state + '/vars.fd', state + '/root.ext2', state + '/limine.conf',
 		state + '/base-before.tsv', state + '/sysroot-before.tsv'] { pin(mut pins, path)! }
-	sources := pins.keys().filter(it.starts_with(root + '/') && (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh')))
+	sources := pins.keys().filter(it.starts_with(root + '/') && (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh') || it.ends_with('/compile-v-module')))
 	for path in sources {
 		destination := state + '/source/' + path[root.len + 1..]
 		os.mkdir_all(os.dir(destination))!; os.cp(path, destination)!; pins[destination] = digest(destination)!

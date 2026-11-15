@@ -85,3 +85,29 @@ Run `tests/desktop-perf/run-host-tests.sh` for native report, controller, saved
 driver and resource checks. `sh -n tests/desktop-perf/perf-init.sh` checks the guest
 script without booting QEMU. See [native qualification](native-tools.md) for the
 tested boundaries and the limits of host fixture evidence.
+
+The retained `run-arm.v` and `run-x86.v` adapters generate their PID1 through
+`perfproducer.generate_init`, using the maintained freestanding V module path.
+The initializer uses native C-width libc calls and stack shell arguments.
+Its copied source and generation argv/log join the prepared input pins.
+The ARM initializer needs libc only; the sampler keeps its existing link recipe.
+
+`init-check.v` builds the unchanged production initializer plus a syscall-wrapped
+probe for console errors, existing `/root`, mount diagnostics and shell handoff:
+
+```sh
+v -cc cc -path 'tests/desktop-perf|tests/hardware-platform|tests/linuxkpi|tools|@vlib' \
+  -o /external/init-check tests/desktop-perf/init-check.v
+/external/init-check build /path/to/v /path/to/vinix /path/to/support /external/fresh-build aarch64
+/external/init-check check /external/native/serial.log aarch64
+/external/init-check controls /external/native/serial.log aarch64
+```
+
+Use `x86_64` for the other architecture. ARM support supplies `sdk` with the
+musl/GCC layout used by the compatibility fixtures; the host selects clang or
+`x86_64-linux-musl-gcc` from PATH. The generated `probe` runs as PID1 with
+`ppollsignal-host.v native` and `VINIX_COMPAT_CASE=perfinit`, using that host's
+retained launcher support and an explicitly selected kernel. The probe wraps
+mount and exec calls: it checks the initializer contract, without qualifying
+real disk mounts, a running shell or desktop performance. See the
+[current build and guest receipts](../../docs/linux-performance-harness-builds.md).

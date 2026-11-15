@@ -319,6 +319,10 @@ fn closure(base string, programs []string, readelf string) ! {
 }
 
 fn source_inputs(root string, mut pins map[string]string) ! {
+	for name in ['build-support/compile-v-module', 'build-support/run-v-tool.sh',
+		'build-support/find-v.sh', 'tests/linuxkpi/generate_module.v'] {
+		pins[root + '/' + name] = digest(root + '/' + name)!
+	}
 	for dir in ['tests/desktop-perf', 'tests/hardware-platform/hwhost',
 		'tests/hardware-platform/plainiso', 'tests/linuxkpi/hosttest', 'tools/hosttest',
 		'tools/sourcecommand', 'tools/qmpclient'] {
@@ -478,10 +482,7 @@ fn prepare(args []string, stage bool) ! {
 	}
 	os.mkdir_all(state + '/guest')!
 	init := state + '/guest/init'
-	init_c := state + '/guest/init.c'
-	guest_tool([host.v, '-nocache', '-os', 'linux', '-arch', 'amd64', '-gc', 'none',
-		'-d', 'no_backtrace', '-d', 'no_segfault_handler', '-o', init_c,
-		root + '/tests/desktop-perf/x86-init'], state + '/guest', 'init-v')!
+	init_c := perfproducer.generate_init(host.v, root, state + '/guest', 'x86_64')!
 	guest_tool(guest_link_command(cc, guest, init_c, init), state + '/guest', 'init-link')!
 	os.rm(state + '/rootfs/sbin/init') or {}
 	os.cp(init, state + '/rootfs/sbin/init')!
@@ -493,7 +494,8 @@ fn prepare(args []string, stage bool) ! {
 		state + '/guest', 'measure-link')!
 	guest_elf(readelf, init, state + '/guest', 'init')!
 	guest_elf(readelf, perf + '/measure', state + '/guest', 'measure')!
-	for path in [init, state + '/guest/init.c', perf + '/measure', state + '/guest/measure-v.c',
+	for path in [init, state + '/guest/init.c', state + '/guest/init-source.v',
+		state + '/guest/init-v.argv.json', state + '/guest/init-v.log', perf + '/measure', state + '/guest/measure-v.c',
 		state + '/guest/measure-legacy.c', state + '/guest/measure-combined.c'] { pins[path] = digest(path)! }
 	for build in plan.builds { stage_file(build.binary, perf + '/vinix-desktop-' + build.name, clone)! }
 	os.cp(root + '/tests/desktop-perf/perf-init.sh', perf + '/perf-init.sh')!
@@ -528,7 +530,7 @@ fn prepare(args []string, stage bool) ! {
 		state + '/gcc-before.tsv'] { pins[path] = digest(path)! }
 	// Preserve the actual maintained adapter and unchanged supervisor/workloads.
 	sources := pins.keys().filter(it.starts_with(root + '/')
-		&& (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh')))
+		&& (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh') || it.ends_with('/compile-v-module')))
 	for path in sources {
 		destination := state + '/source/' + path[root.len + 1..]
 		os.mkdir_all(os.dir(destination))!

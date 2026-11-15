@@ -298,21 +298,19 @@ fn test_unprintable_identity_diagnostic_and_wide_exit() {
 }
 
 fn test_detail_preserves_values_at_the_import_boundary() {
-	row := map[string]Value{
-		'report': Value('PERF-OPS')
-		'op':     Value(Number{'1267650600228229401496703205376'})
-		'dir':    Value(false)
-	}
+	mut row := map[string]Value{}
+	row['report'] = Value('PERF-OPS')
+	row['op'] = Value(Number{'1267650600228229401496703205376'})
+	row['dir'] = Value(false)
 	assert encode(detail_values(row), false) == '["PERF-OPS",1267650600228229401496703205376,false]'
 }
 
 fn test_summary_zero_ties_are_stable_in_large_batches() {
 	mut rows := []map[string]Value{}
 	for index in 0 .. 128 {
-		mut row := map[string]Value{
-			'scenario': Value('idle')
-			'variant':  Value('new')
-		}
+		mut row := map[string]Value{}
+		row['scenario'] = Value('idle')
+		row['variant'] = Value('new')
 		for key in metrics { row[key] = if index % 2 == 0 { Value('-0.0') } else { Value('0.0') } }
 		rows << row
 	}
@@ -322,16 +320,16 @@ fn test_summary_zero_ties_are_stable_in_large_batches() {
 }
 
 fn test_literal_transport_marker_dictionaries_remain_dictionaries() {
-	wire := Value(map[string]Value{
-		'$escaped_map': Value(map[string]Value{
-			'$nonfinite_number': Value('inf')
-		})
-	})
+	mut literal := map[string]Value{}
+	literal['$nonfinite_number'] = Value('inf')
+	mut escaped := map[string]Value{}
+	escaped['$escaped_map'] = Value(literal)
+	wire := Value(escaped)
 	assert encode(from_wire(wire), false) == '{"$nonfinite_number":"inf"}'
-	nested := Value(map[string]Value{
-		'$escaped_map': Value(map[string]Value{
-			'$escaped_map': wire
-		})
-	})
+	mut inner := map[string]Value{}
+	inner['$escaped_map'] = wire
+	mut outer := map[string]Value{}
+	outer['$escaped_map'] = Value(inner)
+	nested := Value(outer)
 	assert encode(from_wire(nested), false) == '{"$escaped_map":{"$nonfinite_number":"inf"}}'
 }

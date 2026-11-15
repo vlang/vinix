@@ -61,6 +61,11 @@ blocked before boot; no guest pass is claimed and no assertion, warning guard
 or input requirement is relaxed. All partial stages and compiler logs remain
 retained.
 
+The subsequent [performance-harness build repair](linux-performance-harness-builds.md)
+restores the host suite and both initializer builds. Its native fault-injection
+receipts cover initializer behavior; the report retains the next sampler and
+architecture-schema blockers without claiming broader performance success.
+
 `tests/linux-compat/run --cases epollchurn` freezes both fixture sources and has
 a 600-second default budget. `epollchurn-reference.v` runs the same ELF on a
 supplied Linux kernel; `epollchurn-evidence.v` checks the complete bundle,
