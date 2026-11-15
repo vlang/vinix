@@ -441,6 +441,8 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_namespace_contract(read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
+		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!)!
 	check_create_contract(read(os.join_path(repo, 'kernel/drm/drm.v'))!,
 		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!)!
@@ -674,6 +676,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Binary syncobj RESET validates all handle identities before sequential nil replacement and preserves captured fences',
 		'Binary syncobj SIGNAL validates all identities then installs private timestamped completions with sequential OOM prefix semantics',
 		'Syncobj CREATE initializes fallible object/completion storage before namespace publication and frees only unpublished preparation on error',
+		'Syncobj namespaces allocate/reuse nonzero 32-bit handles without fixed global/per-file object caps and retain detached snapshots',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',

@@ -50,14 +50,28 @@ retirement frees those completions after all users and objects are gone;
 production still retains published fence metadata. Ordinary first completion
 timestamps survive later success/error attempts.
 
-CREATE cases inject both object/stub allocation failures, nested creation at
-allocation failure and immediately before namespace publication, and actual
-global-table/per-file handle exhaustion. Every failed request preserves its
+CREATE cases inject both object/stub allocation failures and nested creation at
+allocation failure and immediately before namespace publication. Every failed request preserves its
 output and existing object identities. Metadata-free hooks verify the namespace
 lock is released and no published object/head points into the retiring region.
 The allocator tracks object metadata, fence metadata and temporary request
 storage separately. After all synchronous consumers finish, fixture cleanup
 drops namespaces and frees metadata; production retains published metadata.
+
+Namespace cases cross the former limits with 4,096 objects across four files
+and 4,096 in one file. They check high-handle reuse with captured old identities,
+capture survival across file close, first/middle/last handle reuse, neighboring
+owner blocks, unsigned 64-bit owner keys and 5,000 operations against a bitmap
+model. The checked handle-successor helper is tested at UINT32_MAX; a complete
+32-bit namespace is not materialized. Published owner/handle keys are immutable:
+any future key update must unlink and reinsert the object under the namespace
+lock. The current index uses one global lock and linear traversal.
+
+Allocator roles are injected at checked exact production allocation sites in
+the copied host source. Object and fence sizes may coincide, so ownership is
+tagged explicitly rather than inferred from size. Request allocation/free and
+fault counters remain independent of retained object/fence metadata. The
+native kernel source and retained generated kernel C use the real allocator.
 
 These deterministic interleavings do not exercise actual kernel threads, GPU
 execution or kernel heap usage. Vinix still polls through its scheduler; Linux

@@ -104,55 +104,6 @@ pub fn run_create_checks() {
 		assert legacy.handle == 3; assert_has_no_fence(legacy); checks++
 		clear(); memory.reset()
 	}
-	// Fill the real global table using independent namespaces, avoiding a
-	// fixture replica of insertion. Failures must free all private preparation
-	// and preserve every previously published object/fence identity.
-	mut objects := unsafe { [1024]&syncobj.SyncObj{} }
-	mut fences := unsafe { [1024]&syncobj.DmaFence{} }
-	for index in 0 .. objects.len {
-		obj := syncobj.new_syncobj_with_flags(u64(100 + index), index % 2 == 0) or { panic('fill namespace table') }
-		objects[index] = obj
-		assert obj.handle == 1
-		if fence := syncobj.get_fence(obj) { fences[index] = fence }
-	}
-	assert memory.object_count() == 1024 && memory.fence_count() == 512
-	for flags in [u32(0), ioctl.drm_syncobj_create_signaled]! {
-		mut request := ioctl.DrmSyncobjCreate{ flags: flags, handle: 99 }
-		assert ioctl_syncobj_create(voidptr(11), &request) == -12; checks++
-		assert request.handle == 99 && memory.object_count() == 1024 && memory.fence_count() == 512
-	}
-	for index, obj in objects {
-		assert voidptr(syncobj.lookup(u64(100 + index), 1) or { panic('exhaustion erased handle') }) == voidptr(obj)
-		assert syncobj.destroy(u64(100 + index), 1)
-		if fences[index] != unsafe { nil } {
-			assert voidptr(current(obj)) == voidptr(fences[index])
-			memory.free(voidptr(fences[index]))
-		}
-		syncobj.free_object_metadata_for_checks(obj)
-	}
-	assert memory.object_count() == 0 && memory.fence_count() == 0
-	// Exercise the separate per-namespace handle-exhaustion exit while one
-	// global table slot is still free, again using actual creation/insertion.
-	for index in 0 .. 1023 {
-		obj := syncobj.new_syncobj_with_flags(11, index % 2 == 0) or { panic('fill per-file handle space') }
-		objects[index] = obj
-		assert obj.handle == u32(index + 1)
-		fences[index] = syncobj.get_fence(obj) or { unsafe { nil } }
-	}
-	assert memory.object_count() == 1023 && memory.fence_count() == 512
-	for flags in [u32(0), ioctl.drm_syncobj_create_signaled]! {
-		mut request := ioctl.DrmSyncobjCreate{ flags: flags, handle: 99 }
-		assert ioctl_syncobj_create(voidptr(11), &request) == -12; checks++
-		assert request.handle == 99 && memory.object_count() == 1023 && memory.fence_count() == 512
-	}
-	for index in 0 .. 1023 {
-		obj := objects[index]
-		assert voidptr(syncobj.lookup(11, u32(index + 1)) or { panic('handle exhaustion erased identity') }) == voidptr(obj)
-		assert syncobj.destroy(11, u32(index + 1))
-		if fences[index] != unsafe { nil } { memory.free(voidptr(fences[index])) }
-		syncobj.free_object_metadata_for_checks(obj)
-	}
-	assert memory.object_count() == 0 && memory.fence_count() == 0
 	memory.check_metadata_free(unsafe { nil }); memory.reset()
-	println('DRM CREATE: ${checks} cases over 200 failure/publication cycles, real 1024-object global exhaustion and 1023-handle namespace exhaustion; fallible object/stub initialization, unchanged outputs on error, private cleanup after unlock, nested guessed-handle races, initial completed fence visibility and empty legacy creation passed')
+	println('DRM CREATE: ${checks} cases over 200 failure/publication cycles; fallible object/stub initialization, unchanged outputs on error, private cleanup after unlock, nested guessed-handle races, initial completed fence visibility and empty legacy creation passed')
 }

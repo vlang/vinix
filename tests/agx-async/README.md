@@ -35,6 +35,8 @@ sync-object implementation's existing retained fence/object allocations.
 The allocator explicitly records syncobj metadata apart from job fault positions
 and live-node counts. Fallible CREATE and unpublished cleanup are exercised by
 `tests/drm-syncobj-wait`; submission fault injection still targets job storage.
+The copied host source tags the exact object-allocation call site; equal object
+and job sizes cannot silently change ownership or fault classification.
 These checks validate ownership and host scheduling; native execution and
 the modern flat-command ABI remain separate acceptance work.
 

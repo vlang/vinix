@@ -15,6 +15,11 @@ fn main() {
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/agx-async/fixture', scratch, false)!
 	os.cp_all('${repo}/kernel/drm/syncobj', '${scratch}/drm/syncobj', false)!
+	object_path := '${scratch}/drm/syncobj/syncobj.v'
+	object_source := os.read_file(object_path)!
+	allocation := 'memory.malloc_packed_fallible(sizeof(SyncObj))'
+	assert object_source.count(allocation) == 1
+	os.write_file(object_path, object_source.replace(allocation, 'memory.malloc_syncobj_fallible(sizeof(SyncObj))'))!
 	os.mkdir_all('${scratch}/aarch64')!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/aarch64/timer', '${scratch}/aarch64/timer', false)!
@@ -37,7 +42,7 @@ fn main() {
 		section(gpu, 'pub fn (mut mgr GpuManager) queue_g13_submission(', '__global (')! +
 		section(g13, 'pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(', '// Caller holds the manager lock during shutdown.')! +
 		section(errors, 'pub struct G13JobError {', 'fn g13_error_at_stamp(')!)!
-	os.write_file('${scratch}/main.v', 'import gpu.agx.file\nimport drm.syncobj\nimport memory\nfn main() { memory.configure_object_metadata(sizeof(syncobj.SyncObj)); file.run_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import gpu.agx.file\nfn main() { file.run_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',

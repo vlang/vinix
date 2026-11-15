@@ -16,14 +16,41 @@ pub fn before_namespace_lock_for_checks(callback fn ()) {
 pub fn assert_unpublished_allocation_for_checks(allocation voidptr, size u64) {
 	assert !syncobj_lock.is_held(), 'unpublished cleanup must follow namespace unlock'
 	syncobj_lock.acquire()
-	for obj in syncobj_table {
-		if obj == unsafe { nil } { continue }
-		for address in [u64(obj), u64(obj.fence)]! {
+	mut cursor := unsafe { syncobj_head }
+	mut count := 0
+	for cursor != unsafe { nil } {
+		count++; assert count <= memory.object_count(), 'namespace cycle'
+		for address in [u64(cursor), u64(cursor.fence)]! {
 			assert address < u64(allocation) || address - u64(allocation) >= size,
 				'freeing metadata still reachable through a published handle'
 		}
+		cursor = unsafe { cursor.namespace_next }
 	}
 	syncobj_lock.release()
+}
+
+pub fn assert_namespace_for_checks(expected int) {
+	syncobj_lock.acquire()
+	mut cursor := unsafe { syncobj_head }
+	mut owner := u64(0)
+	mut handle := u32(0)
+	mut count := 0
+	for cursor != unsafe { nil } {
+		assert cursor.owner > owner || (cursor.owner == owner && cursor.handle > handle), 'namespace order/uniqueness'
+		assert cursor.owner != 0 && cursor.handle != 0
+		owner = cursor.owner; handle = cursor.handle
+		count++; assert count <= expected, 'namespace cycle/count'
+		cursor = unsafe { cursor.namespace_next }
+	}
+	assert count == expected
+	syncobj_lock.release()
+}
+
+pub fn check_namespace_boundaries_for_checks() {
+	for value in [u32(1), 1023, 1024, 0xffff_fffe]! {
+		assert next_namespace_handle(value) or { panic('valid namespace successor') } == value + 1
+	}
+	if _ := next_namespace_handle(~u32(0)) { assert false, 'handle wrapped to zero' }
 }
 
 __global capture_check_object &SyncObj = unsafe { nil }
@@ -52,6 +79,7 @@ pub fn assert_pending_captures_for_checks(obj &SyncObj, expected int) {
 
 pub fn free_object_metadata_for_checks(obj &SyncObj) {
 	assert_no_captures_for_checks(obj)
+	assert obj.namespace_next == unsafe { nil }, 'retired object retained a namespace link'
 	// Fixture-only disposal after namespace removal and all synchronous users.
 	unsafe { obj.timeline_points.free() }
 	memory.free(voidptr(obj))

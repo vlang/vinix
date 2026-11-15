@@ -4,6 +4,10 @@ import os
 const helpers = [
 	'drm__ioctl_syncobj_create',
 	'syncobj__new_syncobj_with_flags',
+	'syncobj__next_namespace_handle',
+	'syncobj__lookup',
+	'syncobj__destroy',
+	'syncobj__destroy_owner',
 	'drm__syncobj_wait_geometry',
 	'drm__new_syncobj_wait_buffer',
 	'drm__new_syncobj_handle_buffer',
@@ -67,7 +71,9 @@ fn result_type(name string) string {
 	if name in ['drm__new_syncobj_wait_buffer', 'drm__new_syncobj_handle_buffer'] { return '__v_option_drm__SyncobjWaitBuffer' }
 	if name == 'drm__SyncobjWaitBuffer__free_owned' { return 'void' }
 	if name in ['drm__ioctl_syncobj_create', 'drm__ioctl_syncobj_wait', 'drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal'] { return 'i64' }
-	if name in ['syncobj__new_syncobj', 'syncobj__new_syncobj_with_flags'] { return '__v_option_syncobj__SyncObjptr' }
+	if name in ['syncobj__new_syncobj', 'syncobj__new_syncobj_with_flags', 'syncobj__lookup'] { return '__v_option_syncobj__SyncObjptr' }
+	if name == 'syncobj__next_namespace_handle' { return '__v_option_u32' }
+	if name == 'syncobj__destroy_owner' { return 'void' }
 	if name == 'syncobj__new_private_stub' { return '__v_option_syncobj__DmaFenceptr' }
 	if name == 'syncobj__captured_fence' { return '__v_option_syncobj__DmaFenceptr' }
 	if name in ['syncobj__signal', 'syncobj__signal_error', 'syncobj__SyncObj__publish_captures_locked', 'syncobj__release_capture', 'syncobj__replace_fence'] { return 'void' }
@@ -253,5 +259,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission/mapping storage: fifty-eight live helpers contain no temporary allocations; only owned overflow-block, checked wait/reset storage, syncobj preparation and retained private completion allocation sites are permitted')
+	println('G13 submission/mapping storage: sixty-two live helpers contain no temporary allocations; only owned overflow-block, checked wait/reset storage, syncobj preparation and retained private completion allocation sites are permitted')
 }

@@ -3,6 +3,7 @@ module memory
 
 __global wait_storage_allocations [8192]voidptr
 __global wait_storage_sizes [8192]u64
+__global allocation_kinds [8192]u8
 __global wait_storage_calls = 0
 __global wait_storage_frees = 0
 __global wait_storage_live = 0
@@ -34,11 +35,7 @@ pub fn when_failing(callback fn ()) { failure_action = callback }
 pub fn fail_next() { wait_storage_fail_next = true }
 pub fn fail_in(successful_calls int) { wait_storage_fail_at = allocation_attempts + successful_calls + 1 }
 pub fn configure_metadata(objects u64, fences u64) {
-	assert objects != 0 && fences != 0 && objects != fences
-	// Every owned request has at least 65 handles and object pointers. Refuse
-	// an ambiguous size classification if metadata ever grows that large.
-	assert objects < 65 * (sizeof(u32) + sizeof(voidptr))
-	assert fences < 65 * (sizeof(u32) + sizeof(voidptr))
+	assert objects != 0 && fences != 0
 	metadata_object_size = objects; metadata_fence_size = fences
 }
 pub fn object_count() int { return metadata_objects }
@@ -52,8 +49,22 @@ pub fn live_bytes() u64 { return wait_storage_live_bytes }
 pub fn last_request() u64 { return wait_storage_last_request }
 
 pub fn malloc_packed_fallible(size u64) voidptr {
+	return allocate(size, 0)
+}
+
+pub fn malloc_syncobj_fallible(size u64) voidptr {
+	assert size == metadata_object_size
+	return allocate(size, 1)
+}
+
+pub fn malloc_fence_fallible(size u64) voidptr {
+	assert size == metadata_fence_size
+	return allocate(size, 2)
+}
+
+fn allocate(size u64, kind u8) voidptr {
 	allocation_attempts++
-	metadata := size == metadata_object_size || size == metadata_fence_size
+	metadata := kind != 0
 	if !metadata { wait_storage_calls++ }
 	wait_storage_last_request = size
 	// Inject ENOMEM for enormous requests without exhausting the host. This
@@ -73,8 +84,9 @@ pub fn malloc_packed_fallible(size u64) voidptr {
 		if wait_storage_allocations[index] == unsafe { nil } {
 			wait_storage_allocations[index] = buffer
 			wait_storage_sizes[index] = size
-			if size == metadata_object_size { metadata_objects++ }
-			else if size == metadata_fence_size { metadata_fences++ }
+			allocation_kinds[index] = kind
+			if kind == 1 { metadata_objects++ }
+			else if kind == 2 { metadata_fences++ }
 			else { wait_storage_live++; wait_storage_live_bytes += size }
 			return buffer
 		}
@@ -86,13 +98,15 @@ pub fn free(buffer voidptr) {
 	for index in 0 .. wait_storage_allocations.len {
 		if wait_storage_allocations[index] == buffer && buffer != unsafe { nil } {
 			size := wait_storage_sizes[index]
-			metadata := size == metadata_object_size || size == metadata_fence_size
+			kind := allocation_kinds[index]
+			metadata := kind != 0
 			if !metadata && wait_storage_free_check != unsafe { nil } { wait_storage_free_check(buffer, size) }
 			if metadata && metadata_free_check != unsafe { nil } { metadata_free_check(buffer, size) }
 			unsafe { C.memset(buffer, 0xd3, size); C.free(buffer) }
 			wait_storage_allocations[index] = unsafe { nil }; wait_storage_sizes[index] = 0
-			if size == metadata_object_size { metadata_objects-- }
-			else if size == metadata_fence_size { metadata_fences-- }
+			allocation_kinds[index] = 0
+			if kind == 1 { metadata_objects-- }
+			else if kind == 2 { metadata_fences-- }
 			else { wait_storage_frees++; wait_storage_live--; wait_storage_live_bytes -= size }
 			return
 		}
@@ -111,7 +125,7 @@ pub fn release_retained_fences(size u64) {
 	for index in 0 .. wait_storage_allocations.len {
 		buffer := wait_storage_allocations[index]
 		if buffer != unsafe { nil } {
-			assert wait_storage_sizes[index] == size, 'temporary request owner survived'
+			assert wait_storage_sizes[index] == size && allocation_kinds[index] == 2, 'non-fence allocation survived'
 			free(buffer)
 		}
 	}

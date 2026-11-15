@@ -22,7 +22,7 @@ fn test_creation_guards_reject_early_publication_and_unsafe_failure_cleanup() {
 		if _ := check_create_contract(drm, objects.replace(token, ''), reference) { assert false, token }
 	}
 	if _ := check_create_contract(drm, objects.replace('published = true', 'destroy(owner, handle)\npublished = true'), reference) { assert false }
-	if _ := check_create_contract(drm, objects.replace('obj.handle = handle', 'syncobj_table[slot] = obj\nobj.handle = handle'), reference) { assert false }
+	if _ := check_create_contract(drm, objects.replace('obj.handle = handle', 'syncobj_head = obj\nobj.handle = handle'), reference) { assert false }
 	if _ := check_create_contract(drm.replace('request.handle = obj.handle', ''), objects, reference) { assert false }
 	if _ := check_create_contract(drm, objects, reference.replace('drm_syncobj_create(&syncobj, flags, NULL);', '')) { assert false }
 }

@@ -18,11 +18,11 @@ fn check_create_contract(drm string, objects string, reference string) ! {
 		'defer {', 'if !published {', 'if obj.fence != unsafe { nil } { memory.free(voidptr(obj.fence)) }',
 		'memory.free(allocation)', 'if signaled {', 'obj.fence = new_private_stub(now_ns()) or { return none }',
 		'syncobj_lock.acquire()', 'defer {', 'syncobj_lock.release()',
-		'if slot == syncobj_max_objects', 'return none', 'if handle == 0', 'return none',
-		'obj.handle = handle', 'published = true', 'syncobj_table[slot] = obj', 'return obj'],
+		'mut handle := u32(1)', 'next_namespace_handle(handle) or { return none }',
+		'obj.handle = handle', 'obj.namespace_next = unsafe { cursor }', 'published = true', 'syncobj_head = obj', 'return obj'],
 		'Vinix private initialization, unlocked failure cleanup and complete publication')!
 	require(create.count('memory.malloc_packed_fallible(') == 1 && create.count('new_private_stub(') == 1
-		&& create.count('published = true') == 1 && create.count('syncobj_table[slot] = obj') == 1
+		&& create.count('published = true') == 1 && create.count('syncobj_head = obj') == 1
 		&& !create.contains('destroy('), 'Creation must transfer ownership only once, without handle rollback')!
 	ref_create := section(reference, 'int drm_syncobj_create(', 'EXPORT_SYMBOL(drm_syncobj_create)', 'Linux private creation')!
 	require_order(ref_create, ['kzalloc_obj(struct drm_syncobj)', 'if (!syncobj)', 'return -ENOMEM',

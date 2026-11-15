@@ -45,12 +45,13 @@ mut:
 	owner           u64
 	timeline_points []TimelinePoint
 	pending_captures &FenceCapture = unsafe { nil }
+	// Namespace links and the published owner/handle keys are protected by
+	// syncobj_lock. Unlinking never retires object/fence snapshot metadata.
+	namespace_next &SyncObj = unsafe { nil }
 }
 
-const syncobj_max_objects = u32(1024)
-
 __global (
-	syncobj_table [1024]&SyncObj
+	syncobj_head &SyncObj = unsafe { nil }
 	syncobj_lock  klock.Lock
 )
 
@@ -187,13 +188,9 @@ pub fn add_waiter(fence &DmaFence, waiter &FenceWaiter) {
 	f.lock.release()
 }
 
-fn handle_in_use_locked(owner u64, handle u32) bool {
-	for obj in syncobj_table {
-		if obj != unsafe { nil } && obj.owner == owner && obj.handle == handle {
-			return true
-		}
-	}
-	return false
+fn next_namespace_handle(handle u32) ?u32 {
+	if handle == ~u32(0) { return none }
+	return handle + 1
 }
 
 // Allocate a sync object in one DRM open-file namespace. Different opens may
@@ -229,62 +226,63 @@ pub fn new_syncobj_with_flags(owner u64, signaled bool) ?&SyncObj {
 		syncobj_lock.release()
 	}
 
-	mut slot := u32(syncobj_max_objects)
-	for i := u32(0); i < syncobj_max_objects; i++ {
-		if syncobj_table[i] == unsafe { nil } {
-			slot = i
-			break
-		}
+	// Sorted owner/handle order lets one pass find the lowest nonzero free
+	// handle without a fixed table or auxiliary namespace allocations.
+	mut previous := &SyncObj(unsafe { nil })
+	mut cursor := unsafe { syncobj_head }
+	for cursor != unsafe { nil } && cursor.owner < owner {
+		previous = unsafe { cursor }
+		cursor = unsafe { cursor.namespace_next }
 	}
-	if slot == syncobj_max_objects {
-		return none
+	mut handle := u32(1)
+	for cursor != unsafe { nil } && cursor.owner == owner {
+		if cursor.handle > handle { break }
+		handle = next_namespace_handle(handle) or { return none }
+		previous = unsafe { cursor }
+		cursor = unsafe { cursor.namespace_next }
 	}
-
-	// Recycle the lowest free handle in this open-file namespace.
-	mut handle := u32(0)
-	for i := u32(1); i < syncobj_max_objects; i++ {
-		if !handle_in_use_locked(owner, i) {
-			handle = i
-			break
-		}
-	}
-	if handle == 0 {
-		return none // table exhausted
-	}
-
 	obj.handle = handle
+	obj.namespace_next = unsafe { cursor }
 	published = true
-	syncobj_table[slot] = obj
+	if previous == unsafe { nil } { syncobj_head = obj }
+	else { unsafe { previous.namespace_next = obj } }
 	return obj
 }
 
 // Look up a sync object by its owner and per-open handle.
 pub fn lookup(owner u64, handle u32) ?&SyncObj {
-	if owner == 0 || handle == 0 || handle >= syncobj_max_objects {
+	if owner == 0 || handle == 0 {
 		return none
 	}
 
 	syncobj_lock.acquire()
 	defer { syncobj_lock.release() }
-	for i := u32(0); i < syncobj_max_objects; i++ {
-		obj := syncobj_table[i]
-		if obj != unsafe { nil } && obj.owner == owner && obj.handle == handle {
-			return unsafe { obj }
-		}
+	mut cursor := unsafe { syncobj_head }
+	for cursor != unsafe { nil } {
+		if cursor.owner > owner || (cursor.owner == owner && cursor.handle > handle) { break }
+		if cursor.owner == owner && cursor.handle == handle { return unsafe { cursor } }
+		cursor = unsafe { cursor.namespace_next }
 	}
 	return none
 }
 
 // Destroy one object only when it belongs to the calling open file.
 pub fn destroy(owner u64, handle u32) bool {
+	if owner == 0 || handle == 0 { return false }
 	syncobj_lock.acquire()
 	defer { syncobj_lock.release() }
-	for i := u32(0); i < syncobj_max_objects; i++ {
-		obj := syncobj_table[i]
-		if obj != unsafe { nil } && obj.owner == owner && obj.handle == handle {
-			syncobj_table[i] = unsafe { nil }
+	mut previous := &SyncObj(unsafe { nil })
+	mut cursor := unsafe { syncobj_head }
+	for cursor != unsafe { nil } {
+		if cursor.owner > owner || (cursor.owner == owner && cursor.handle > handle) { break }
+		if cursor.owner == owner && cursor.handle == handle {
+			if previous == unsafe { nil } { syncobj_head = unsafe { cursor.namespace_next } }
+			else { unsafe { previous.namespace_next = cursor.namespace_next } }
+			unsafe { cursor.namespace_next = nil }
 			return true
 		}
+		previous = unsafe { cursor }
+		cursor = unsafe { cursor.namespace_next }
 	}
 	return false
 }
@@ -297,11 +295,18 @@ pub fn destroy_owner(owner u64) {
 		return
 	}
 	syncobj_lock.acquire()
-	for i := u32(0); i < syncobj_max_objects; i++ {
-		obj := syncobj_table[i]
-		if obj != unsafe { nil } && obj.owner == owner {
-			syncobj_table[i] = unsafe { nil }
-		}
+	mut previous := &SyncObj(unsafe { nil })
+	mut cursor := unsafe { syncobj_head }
+	for cursor != unsafe { nil } && cursor.owner < owner {
+		previous = unsafe { cursor }
+		cursor = unsafe { cursor.namespace_next }
+	}
+	for cursor != unsafe { nil } && cursor.owner == owner {
+		next := unsafe { cursor.namespace_next }
+		if previous == unsafe { nil } { syncobj_head = unsafe { next } }
+		else { unsafe { previous.namespace_next = next } }
+		unsafe { cursor.namespace_next = nil }
+		cursor = unsafe { next }
 	}
 	syncobj_lock.release()
 }

@@ -15,6 +15,17 @@ fn main() {
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/drm-syncobj-wait/fixture', scratch, false)!
 	os.cp_all('${repo}/kernel/drm/syncobj', '${scratch}/drm/syncobj', false)!
+	// Inject allocator identity at the two exact production allocation sites.
+	// Object/fence sizes may coincide; size alone cannot identify ownership.
+	for name, pair in {
+		'syncobj.v': ['memory.malloc_packed_fallible(sizeof(SyncObj))', 'memory.malloc_syncobj_fallible(sizeof(SyncObj))']
+		'stub.v': ['memory.malloc_packed_fallible(sizeof(DmaFence))', 'memory.malloc_fence_fallible(sizeof(DmaFence))']
+	} {
+		path := '${scratch}/drm/syncobj/${name}'
+		body := os.read_file(path)!
+		assert body.count(pair[0]) == 1
+		os.write_file(path, body.replace(pair[0], pair[1]))!
+	}
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/katomic', '${scratch}/katomic', false)!
@@ -31,7 +42,7 @@ fn main() {
 	process_source := os.read_file('${repo}/kernel/proc/proc.v')!
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
-	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
