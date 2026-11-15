@@ -129,5 +129,8 @@ The complete API export reconstructed without removals: 23863 bytes / 47 chunks.
 | maps-reveal-api-readback-20261115-r1/archive.json | 707746a751f57d6241a8f2374f1df84998ba86e0e073e8118e06df861009e535 |
 | maps-reveal-api-child-20261115-r1/child.log | dd94939d591e0232dd40a9caaf2051c1506d6f525d80377dd240fbf1d3aaccdd |
 
-The real protected account retry is pending in r107. No full Maps or Google
-authentication claim follows from the API qualification.
+The real protected account retry completed in r107 and progressed past the
+focus-hint failure. Device check-in succeeded, then a missing contact-label API
+terminated GoogleApiHandler. Complete preserved evidence and the next adapter
+are recorded in [the contact-label report](maps-contact-labels-20261115.md).
+Full Maps operation and Google authentication remain unqualified.

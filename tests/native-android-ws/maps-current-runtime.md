@@ -19,11 +19,16 @@ reached Add account and progressed past the callback type error, then failed
 on the missing View.setRevealOnFocusHint API. The
 [focus-hint repair](maps-reveal-hint-20261115.md) now passes full SDK assembly,
 DEX readback, nine input refusals, native -Werror build and fixture signing.
-Its ARM staging was refused before launch with 1540935680 bytes free, below
-the required reserve plus growth budget. Complete r105 public/private evidence
-and the new built artifacts are retained; all owned test guests are stopped.
-Restore space and a quiet disk window before signed ARM qualification and the
-next protected account retry.
+After space recovered, the complete signed ARM suite passed in fresh r107.
+The protected account retry progressed to successful Google device check-in,
+then failed on the missing Email.getTypeLabel API in PeopleChimeraService.
+The same method also requests Phone labels. The
+[contact-label adapter](maps-contact-labels-20261115.md) now passes full SDK
+assembly, both-class DEX readback, 22 input refusals, native -Werror build and
+fixture signing with current V. Fresh full-profile r108 staging and the
+complete signed ARM suite passed under the original caps; real account
+validation is in progress.
+Complete r107 public/private evidence is preserved, and that guest is stopped.
 Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)

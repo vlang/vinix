@@ -203,6 +203,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_webview_loader(smali)!
  framework_value_callback(smali)!
  framework_reveal_hint(smali)!
+ framework_contact_labels(smali)!
  framework_boot_classpath(smali)!
  framework_restrictions_service(smali)!
  framework_runtime_queries(smali)!
