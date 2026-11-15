@@ -53,5 +53,30 @@ without removals: 23607 bytes / 47 chunks.
 | maps-webloader-api-readback-20261115-r1/archive.json | 40cf82a089acadf5efb3f873b4f2ab560c36f979326febea27820b6faa92b121 |
 | maps-webloader-api-child-20261115-r1/child.log | b919d20a546d4a95303ce5c659dc1f06c6b5b6fe9585f547458f1a9ced04a909 |
 
-The real account retry is pending in r102.
+In r102, GMS PID29873 reached readiness. Its descriptor snapshot captured
+245 entries, unavailable=0, non_atomic=true. Maps PID15250 launched once,
+opened the chooser and attempted Add account once. The loader failure is gone;
+account fragment creation then failed with IncompatibleClassChangeError:
+GMS class attt implements android.webkit.ValueCallback, but the retained SDK
+declares that type as a class. No credentials were entered and no restart was
+attempted. The [callback interface repair](maps-value-callback-20261115.md) is
+prepared separately; its qualification is blocked by host disk pressure.
+
+The checked data volume UUID was 7ec5976cb3af4fd48f8e9dd7bba2851d. The full
+private API/account results were copied to r102-private and synced, with the
+copied receipt and prompt observed before stopping owned QEMU66337. PID absence
+and no image handles preceded read-only extraction. e2fsck passed. The storage
+watch is partial. Complete private evidence is under
+maps-current-20261115-r102-account/private-readback. Logs match their private
+manifest. The complete public Maps export reconstructed without removals:
+1429550 bytes / 2793 chunks, receipt identical to the private copy.
+
+| r102 account evidence | SHA256 |
+| --- | --- |
+| maps-r102-uart-20261115-r1/interval.log | b60d92adb9102fc747e3b9fa386fff72f00b4710c20fead63c6c6d572f8ef8b0 |
+| maps-r102-readback-20261115-r1/archive.json | 6effe83e16495aebef701f73163bdb33fdcd33014707958cc63df32a745d6097 |
+| Same readback/exported-receipt.json | 23800a184f7ae2ace053bca79d63bea728725c8d596da5a691ab7f2c47642d7c |
+| Private r102-private/results/broker.log | e5bfe131b5c28f8d5ef92ab1f4076302835326d7b7166c3c36781dde9cb70853 |
+| Private r102-private/results/maps.log | 15df2664b9beb312a7eed4d5eececa81635d73f8cfcef4b427c99be72ebac557 |
+
 Google Maps remains incomplete; no Google authentication success is claimed.

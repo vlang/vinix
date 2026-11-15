@@ -6,10 +6,16 @@ b8a310c0a identified a null parent in the real account layout callback.
 The [window content parent](maps-window-content-runtime-20261115.md) repair
 in a1b021c3d and AlertDialog follow-up in b06a335c0 passed the complete signed
 ARM suite in r101 using current V. Real Maps opened the chooser and Add account
-progressed past that layout failure. Google services then failed on the missing
-WebView.getWebViewClassLoader static API. Complete exports and private copies
-are retained and checked; the owned guests are stopped. The loader adapter is
-the next task. Authentication and full Maps operation remain unqualified.
+progressed past that layout failure. The [WebView loader adapter](maps-webview-loader-20261115.md)
+in 38730c57d passed the complete signed ARM suite in r102, including hostile
+context-loader and worker checks. Real account fragment creation then failed
+because the SDK declares ValueCallback as a class. The
+[interface repair candidate](maps-value-callback-20261115.md) and regression
+fixture are prepared, but unvalidated: the original build guard refused to
+start tooling with only 1177317376 bytes free. Complete exports and private
+copies are retained and checked; all owned test guests are stopped.
+Restore space and a quiet disk window before the next qualification.
+Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
 in 7796d94ba passed the signed ARM API suite with current V. Fresh r93 rendered
