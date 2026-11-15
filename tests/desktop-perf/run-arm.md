@@ -6,6 +6,8 @@
 flatness and allocation-site measurements. It does not supply an ARM baseline
 or establish a paired delta. `measure.c`, `perf-init.sh`, `perfrunner` and the
 foreground process owner are shared with the existing x86 path.
+Full heap operations and churn require an `ALLOC_TRACK=1` kernel and root access
+to `/proc/allocstart`. A tracking-disabled kernel fails explicitly after boot.
 
 The adapter accepts `check|prepare REPO BASE_ARCHIVE KERNEL FRESH_STATE
 new=DESKTOP` with the fixed options above and a required
@@ -73,7 +75,10 @@ The subsequent [sampler](../../docs/linux-performance-sampler-builds.md) and
 strict links and the explicit 16 KiB/eighteen-class observer. The
 [compiler selection follow-up](../../docs/linux-performance-compiler-selection.md)
 records complete ARM preparation with separate initializer/sampler compilers.
-The fixed six-scenario guest run and actual PCI firmware boot remain unqualified.
+The [supervised compiler follow-up](../../docs/linux-performance-supervised-compilers.md)
+records supervised preparation and actual PCI firmware boot with ext2 mounting.
+Its first guest refuses measurement because the reused kernel disables allocation
+tracking. Full performance qualification is separate from successful boot.
 
 Status: normal and production host adapters each passed eighteen controls;
 host owners each passed the historical twenty-four and sixteen ARM controls.
@@ -81,7 +86,8 @@ Six limit admission controls also passed. The retained host-only bundle
 passed the unchanged original full evidence seal, separate check and independent
 root check. See `foreground-supervise-report.md` for exact receipts.
 The historical pending PID1/measure builds and staging are resolved by the
-follow-ups above. A current supervised preparation profile, actual PCI firmware
-boot, all six scenario results and allocation-site symbolization remain pending.
-The latest staging diagnostic does not establish supervised runtime admission;
-the existing disk floors remain enforced.
+follow-ups above. The supervised follow-up resolves preparation and boot admission
+and records a tracking-enabled completion of all six scenarios. Its complete
+diagnostic transcript has four nonzero backing-page deltas and therefore fails
+the unchanged strict heap-flatness gate. All object/large-page deltas and corruption
+counters stay zero. The existing disk floors and charged-state ceiling remain enforced.

@@ -20,6 +20,20 @@ pub fn sampler_compiler(fallback string) !string {
 	return selected
 }
 
+fn compiler_environment(compiler string) map[string]string {
+	return {
+		'V': compiler
+		'VINIX_V_COMPILER': compiler
+		'VEXE': compiler
+		'V_MACOS_V3_CALLER_VEXE': compiler
+		'V_MACOS_V3_CALLER_VEXE_PRESENT': '1'
+		'V_MACOS_V3_CALLER_VCHILD_PRESENT': '0'
+		'V_MACOS_V3_NO_FALLBACK': '1'
+		'V_MACOS_V3_CALLER_NO_FALLBACK': '1'
+		'V_MACOS_V3_CALLER_NO_FALLBACK_PRESENT': '1'
+	}
+}
+
 pub fn generate_init(compiler string, root string, directory string, arch string) !string {
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported initializer architecture') }
 	name := if arch == 'aarch64' { 'perfinitarm' } else { 'perfinitx86' }
@@ -37,7 +51,7 @@ pub fn generate_init(compiler string, root string, directory string, arch string
 	os.write_file(directory + '/init-v.argv.json', json2.encode(argv) + '\n')!
 	// find-v.sh gives V precedence over VINIX_V_COMPILER. Override both and
 	// VEXE so an inherited sampler selection cannot replace this compiler.
-	environment := {'V': compiler, 'VINIX_V_COMPILER': compiler, 'VEXE': compiler}
+	environment := compiler_environment(compiler)
 	os.write_file(directory + '/init-v.env.json', json2.encode(environment) + '\n')!
 	hwhost.run_tool(argv, environment, directory + '/init-v.log', 300)!
 	return output
@@ -47,7 +61,7 @@ pub fn generate(compiler string, root string, directory string, arch string) !st
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported producer architecture') }
 	legacy := os.read_file(root + '/tests/desktop-perf/measure.c')!
 	if sha256.hexhash(legacy) != legacy_sha256 { return error('legacy operation-probe source differs') }
-	for name in ['measure-v.c', 'measure-legacy.c', 'measure-combined.c', 'measure-v.argv.json', 'measure-v.log'] {
+	for name in ['measure-v.c', 'measure-legacy.c', 'measure-combined.c', 'measure-v.argv.json', 'measure-v.env.json', 'measure-v.log'] {
 		if os.exists(directory + '/' + name) || os.is_link(directory + '/' + name) {
 			return error('producer output must be fresh')
 		}
@@ -62,7 +76,11 @@ pub fn generate(compiler string, root string, directory string, arch string) !st
 	if arch == 'aarch64' { argv << ['-d', 'perf_slab16k'] }
 	argv << ['-o', vfile, root + '/tests/desktop-perf/measure-v']
 	os.write_file(directory + '/measure-v.argv.json', json2.encode(argv) + '\n')!
-	hwhost.run_tool(argv, {}, directory + '/measure-v.log', 300)!
+	// A complete frontend checkout in inherited VEXE would otherwise make an
+	// older target compiler import the frontend's incompatible standard library.
+	environment := compiler_environment(compiler)
+	os.write_file(directory + '/measure-v.env.json', json2.encode(environment) + '\n')!
+	hwhost.run_tool(argv, environment, directory + '/measure-v.log', 300)!
 	copy := directory + '/measure-legacy.c'
 	os.write_file(copy, legacy)!
 	if sha256.hexhash(os.read_file(copy)!) != legacy_sha256 { return error('legacy probe copy differs') }

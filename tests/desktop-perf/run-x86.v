@@ -497,7 +497,7 @@ fn prepare(args []string, stage bool) ! {
 	guest_elf(readelf, perf + '/measure', state + '/guest', 'measure')!
 	for path in [init, state + '/guest/init.c', state + '/guest/init-source.v',
 		state + '/guest/init-v.argv.json', state + '/guest/init-v.log', state + '/guest/init-v.env.json', perf + '/measure', state + '/guest/measure-v.c',
-		state + '/guest/measure-legacy.c', state + '/guest/measure-combined.c'] { pins[path] = digest(path)! }
+		state + '/guest/measure-legacy.c', state + '/guest/measure-combined.c', state + '/guest/measure-v.env.json'] { pins[path] = digest(path)! }
 	for build in plan.builds { stage_file(build.binary, perf + '/vinix-desktop-' + build.name, clone)! }
 	os.cp(root + '/tests/desktop-perf/perf-init.sh', perf + '/perf-init.sh')!
 	os.write_file(perf + '/config', "VARIANTS='" + plan.builds.map(it.name).join(' ') + "'\nSCENARIOS='" + plan.scenarios.join(' ') + "'\nROUNDS=${plan.rounds}\nSETTLE=${plan.settle}\nMEASURE=${plan.seconds}\nDESKTOP_ARGS='" + plan.desktop_args + "'\n")!

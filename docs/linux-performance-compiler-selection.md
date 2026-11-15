@@ -62,3 +62,8 @@ sparse/archive and inventory refusal selftests pass. Inventory receipt
 `f43421a1ddc51bb7c0bf4deedbb2a37b26009bb7f802dc09ed4b14a97b078a2d`.
 This records evidence integrity; it does not replace a launch audit or qualify
 the six-scenario guest workload.
+
+The [supervised compiler follow-up](linux-performance-supervised-compilers.md)
+adds typed supervisor selection, binds each payload's saved caller environment
+and records supervised preparation, actual PCI firmware boot and ext2 mounting.
+It retains the first observer refusal on the tracking-disabled kernel separately.

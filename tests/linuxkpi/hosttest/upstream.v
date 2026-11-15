@@ -17,13 +17,13 @@ struct C.archive_entry {}
 fn C.archive_read_new() &C.archive
 fn C.archive_read_support_filter_xz(&C.archive) i32
 fn C.archive_read_support_format_tar(&C.archive) i32
-fn C.archive_read_open_filename(&C.archive, &char, usize) i32
+fn C.archive_read_open_filename(&C.archive, &char, u64) i32
 fn C.archive_read_next_header(&C.archive, &&C.archive_entry) i32
 fn C.archive_entry_pathname(&C.archive_entry) &char
 fn C.archive_entry_hardlink(&C.archive_entry) &char
 fn C.archive_entry_filetype(&C.archive_entry) u32
 fn C.archive_entry_size(&C.archive_entry) i64
-fn C.archive_read_data(&C.archive, voidptr, usize) isize
+fn C.archive_read_data(&C.archive, voidptr, u64) i64
 fn C.archive_error_string(&C.archive) &char
 fn C.archive_read_free(&C.archive) i32
 
@@ -125,7 +125,7 @@ pub fn archive_members(archive string, names []string) !map[string][]u8 {
 		mut bytes := []u8{len: int(size)}
 		mut position := 0
 		for position < bytes.len {
-			read := unsafe { C.archive_read_data(reader, &bytes[position], usize(bytes.len - position)) }
+			read := unsafe { C.archive_read_data(reader, &bytes[position], u64(bytes.len - position)) }
 			if read < 0 { return archive_error(reader) }
 			if read == 0 { return error('Unexpected end of archive member: ' + name) }
 			position += int(read)
@@ -174,7 +174,7 @@ pub fn archive_ascii_members(archive string, prefixes []string, names []string) 
 		mut bytes := []u8{len: int(size)}
 		mut position := 0
 		for position < bytes.len {
-			read := unsafe { C.archive_read_data(reader, &bytes[position], usize(bytes.len - position)) }
+			read := unsafe { C.archive_read_data(reader, &bytes[position], u64(bytes.len - position)) }
 			if read < 0 { return archive_error(reader) }
 			if read == 0 { return error('Unexpected end of archive member: ' + name) }
 			position += int(read)

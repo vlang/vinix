@@ -270,7 +270,7 @@ fn finish_prepare(root string, base string, kernel string, state string, argumen
 		'filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum', state + '/root.ext2'], state, 'ext2')!
 	for path in [c_file, init, state + '/guest/init-source.v', state + '/guest/init-v.argv.json',
 		state + '/guest/init-v.log', state + '/guest/init-v.env.json', perf + '/measure', state + '/guest/measure-v.c', state + '/guest/measure-legacy.c',
-		state + '/guest/measure-combined.c', archive, image, state + '/vars.fd', state + '/root.ext2', state + '/limine.conf',
+		state + '/guest/measure-combined.c', state + '/guest/measure-v.env.json', archive, image, state + '/vars.fd', state + '/root.ext2', state + '/limine.conf',
 		state + '/base-before.tsv', state + '/sysroot-before.tsv'] { pin(mut pins, path)! }
 	sources := pins.keys().filter(it.starts_with(root + '/') && (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh') || it.ends_with('/compile-v-module')))
 	for path in sources {

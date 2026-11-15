@@ -107,7 +107,7 @@ fn module_write(path string, text string) ! {
 	mut closed := false
 	defer { if !closed { C.fclose(stream) } }
 	C.errno = 0
-	if C.fwrite(text.str, usize(1), usize(text.len), stream) != usize(text.len) {
+	if C.fwrite(text.str, u64(1), u64(text.len), stream) != u64(text.len) {
 		number := if C.errno == 0 { int(C.EIO) } else { int(C.errno) }
 		return ModuleFileError{'', number, 'Cannot write module output'}
 	}
@@ -219,9 +219,9 @@ pub fn module_copy_file(source string, destination string) ! {
 	mut buffer := []u8{len: 8192}
 	for {
 		C.errno = 0
-		count := C.fread(buffer.data, usize(1), usize(buffer.len), input)
+		count := C.fread(buffer.data, u64(1), u64(buffer.len), input)
 		read_number := int(C.errno)
-		if count > 0 && C.fwrite(buffer.data, usize(1), count, output) != count {
+		if count > 0 && C.fwrite(buffer.data, u64(1), count, output) != count {
 			number := if C.errno == 0 { int(C.EIO) } else { int(C.errno) }
 			return ModuleFileError{'', number, 'Cannot write source destination'}
 		}
@@ -229,7 +229,7 @@ pub fn module_copy_file(source string, destination string) ! {
 			number := if read_number == 0 { int(C.EIO) } else { read_number }
 			return ModuleFileError{'', number, 'Cannot read source copy'}
 		}
-		if count < usize(buffer.len) { break }
+		if count < u64(buffer.len) { break }
 	}
 	closed = true
 	if C.fclose(output) != 0 { return ModuleFileError{'', int(C.errno), 'Cannot close source destination'} }

@@ -5,4 +5,6 @@ support_root=$(CDPATH= cd -- "$(dirname -- "$0")/../.." && pwd)
 "$support_root/build-support/run-v-tool.sh" "$support_root/tests/desktop-perf/perfreport/core_test.v"
 "$support_root/build-support/run-v-tool.sh" "$support_root/tests/desktop-perf/test-runner.v"
 "$support_root/build-support/run-v-tool.sh" "$support_root/tests/desktop-perf/producer-check.v"
+"$support_root/build-support/run-v-tool.sh" "$support_root/tests/desktop-perf/foreground-supervise.v" compilercheck
+"$support_root/build-support/run-v-tool.sh" "$support_root/tests/linuxkpi/hosttest/io_test.v"
 "$support_root/build-support/run-v-tool.sh" "$support_root/tests/desktop-perf/heap-build-check.v"

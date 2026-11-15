@@ -16,6 +16,16 @@ paths, and the same `charged_roots`, `input_roots`, `charged_limit_kib`,
 120..1800 seconds. Both fresh output states must be covered by charged roots
 and separate from each other and from every selected input tree.
 
+Preparation profiles may also name `sampler_compiler`. An omitted or empty
+field selects `compiler` for both payloads. A distinct selection must be a
+canonical executable; its complete parent tree joins the approved before/after
+input map. Shared compiler directories are inventoried once. Both compiler
+trees exclude preparation outputs, and the prepared receipt must retain the
+approved hash of each selected executable. The fixed preparation environment
+sets `VINIX_PERF_SAMPLER_V` from this typed field, replacing any inherited value.
+Each payload generator sets its own `V`, `VINIX_V_COMPILER`, `VEXE`, saved caller
+selection and fallback guards, and records them in its pinned environment receipt.
+
 `admit-prepare NEW-STATE PROFILE.json` records a read-only selected input
 map for review, without scanning the base, staging a runtime or running a VM.
 Copy its `admission.json` `inputs_sha256` value into the reviewed profile.
@@ -170,6 +180,15 @@ admission controls at actual low usage; they do not allocate to those limits.
 Host qualification results and checksums are recorded in
 `foreground-supervise-report.md`. No guest performance measurement is
 implied by the host controls.
+
+`compilercheck [NEW-STATE]` runs 28 small host fixture controls for both native
+architectures' typed compiler selection, sanitized environments, complete compiler
+tree identity, prepared pins and output-overlap refusals. It executes no compiler,
+adapter or VM. With no state argument it retains a fresh temporary directory.
+The public host suite includes these controls and the module file/archive I/O
+tests. Existing `selfcheck`, live budget gates and historical audit modes retain
+their requirements. See the [supervised compiler receipts](../../docs/linux-performance-supervised-compilers.md)
+for current builds and actual guest boundaries.
 
 ARM preparation uses `arch: "aarch64"` and the separate `run-arm.v` adapter.
 It retains a pinned base archive and a small ordered overlay instead of an

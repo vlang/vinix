@@ -10,13 +10,14 @@ import json2
 fn check(args []string) ! {
 	compiler, root, state, arch := args[0], args[1], args[2], args[3]
 	if os.exists(state) || os.is_link(state) { return error('fresh generation state required') }
-	for name in ['V', 'VINIX_V_COMPILER', 'VEXE'] {
+	for name in ['V', 'VINIX_V_COMPILER', 'VEXE', 'V_MACOS_V3_CALLER_VEXE'] {
 		os.setenv(name, '/missing-inherited-compiler', true)
 	}
+	os.setenv('V_MACOS_V3_CALLER_VEXE_PRESENT', '1', true)
 	os.mkdir_all(state)!
 	output := perfproducer.generate_init(compiler, root, state, arch)!
 	environment := json2.decode[map[string]string](os.read_file(state + '/init-v.env.json')!)!
-	for name in ['V', 'VINIX_V_COMPILER', 'VEXE'] {
+	for name in ['V', 'VINIX_V_COMPILER', 'VEXE', 'V_MACOS_V3_CALLER_VEXE'] {
 		if environment[name] != compiler { return error('initializer compiler receipt differs') }
 	}
 	name := if arch == 'aarch64' { 'perfinitarm' } else { 'perfinitx86' }

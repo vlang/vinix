@@ -122,8 +122,9 @@ Both adapters default to the selected `V` compiler for both payloads. Set
 `VINIX_PERF_SAMPLER_V` to a canonical absolute executable to select a separately
 qualified sampler compiler. Both executables join the prepared hashes; an invalid
 explicit sampler is refused without fallback. Initializer generation explicitly
-sets `V`, `VINIX_V_COMPILER` and `VEXE` to its own compiler. The public host suite
-checks selection refusals. Exercise real initializer generation with invalid
+sets `V`, `VINIX_V_COMPILER`, `VEXE` and saved caller selection to its own compiler.
+Both generators enforce fallback refusal and retain their environment receipts.
+The public host suite checks selection refusals. Exercise real initializer generation with invalid
 inherited compiler variables on either architecture using:
 
 ```sh
@@ -133,6 +134,19 @@ build-support/run-v-tool.sh tests/desktop-perf/producer-init-check.v /path/to/v 
 Use `x86_64` for the other architecture. This emits C and checks the compiler
 receipt; it does not boot a guest. See [compiler selection and staging receipts](../../docs/linux-performance-compiler-selection.md)
 for the qualified pair and remaining runtime admission limits.
+
+The supervisor's typed `sampler_compiler` field carries this selection through
+approved input inventories and sanitized preparation. To reproduce target
+generation while inheriting a different complete frontend checkout, run:
+
+```sh
+build-support/run-v-tool.sh tests/desktop-perf/producer-sampler-check.v /path/to/target-v /path/to/frontend/v /path/to/vinix /external/fresh-sampler-check aarch64
+```
+
+Use `x86_64` for the other target. Both executables must be explicit; the frontend
+must have its complete adjacent `vlib`. This control generates the complete
+sampler and checks its compiler receipts and unchanged legacy operation probes.
+See the [supervised compiler qualification](../../docs/linux-performance-supervised-compilers.md).
 
 `init-check.v` builds the unchanged production initializer plus a syscall-wrapped
 probe for console errors, existing `/root`, mount diagnostics and shell handoff:

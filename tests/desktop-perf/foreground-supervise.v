@@ -83,6 +83,7 @@ struct PrepareProfile {
 	desktop_sha256 string
 	prepared_state string
 	compiler string
+	sampler_compiler string
 	qemu string
 	firmware string
 	cc string
@@ -235,7 +236,7 @@ fn inventory(path string, ancestors []string, deadline u64, mut context Inventor
 	if info.get_filetype() == .symbolic_link {
 		values['link:' + path] = os.readlink(path)!
 		resolved := os.real_path(path)
-		if resolved == '' || resolved == path || resolved in ancestors { return error('dangling/cyclic input') }
+		if resolved == '' || resolved == path || resolved in ancestors { return error('dangling/cyclic input: ' + path) }
 		values['resolved:' + path] = resolved
 		inventory(resolved, ancestors, deadline, mut context, mut values)!
 		return
@@ -400,9 +401,9 @@ fn journal_append(path string, text string, expected u64) ! {
 	defer { if !closed { C.close(fd) } }
 	mut offset := 0
 	for offset < text.len {
-		count := C.write(fd, unsafe { text.str + offset }, usize(text.len - offset))
+		count := C.write(fd, unsafe { text.str + offset }, u64(text.len - offset))
 		if count < 0 && C.errno == C.EINTR { continue }
-		if count <= 0 || count > isize(text.len - offset) { return error('observation journal write failed') }
+		if count <= 0 || count > i64(text.len - offset) { return error('observation journal write failed') }
 		offset += int(count)
 	}
 	closed = true
@@ -732,6 +733,28 @@ fn prepare_argv(p PrepareProfile) []string {
 		...prepare_arguments(p), '--base-manifest-sha256=' + p.base_manifest_sha256]
 }
 
+fn prepare_compilers(p PrepareProfile) []string {
+	if p.sampler_compiler == '' || p.sampler_compiler == p.compiler { return [p.compiler] }
+	return [p.compiler, p.sampler_compiler]
+}
+
+fn prepare_compiler_roots(p PrepareProfile) []string {
+	mut roots := []string{}
+	for compiler in prepare_compilers(p) {
+		root := os.dir(compiler)
+		if root !in roots { roots << root }
+	}
+	return roots
+}
+
+fn prepared_compilers(p PrepareProfile, prepared PreparedView, before map[string]string) ! {
+	for compiler in prepare_compilers(p) {
+		require(compiler in before && digest_text(before[compiler])
+			&& compiler in prepared.inputs && prepared.inputs[compiler] == before[compiler],
+			'prepared compiler pin differs from selected map: ' + compiler)!
+	}
+}
+
 fn prepare_validated(p PrepareProfile, state string) !Profile {
 	fresh(state)!; fresh(p.prepared_state)!
 	require(!inside(state, p.prepared_state) && !inside(p.prepared_state, state), 'preparation outputs must be separate')!
@@ -748,7 +771,7 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 		require(path == os.real_path(path) && os.is_file(path) && digest_text(pin), 'canonical pinned adapter/kernel/desktop required')!
 		require(hash(path)! == pin, 'preparation input digest mismatch: ' + path)!
 	}
-	mut executables := [p.adapter, p.compiler, p.qemu, p.cc, p.readelf, p.mkfs]
+	mut executables := [p.adapter, ...prepare_compilers(p), p.qemu, p.cc, p.readelf, p.mkfs]
 	if p.arch == 'aarch64' { executables << [p.mformat, p.mmd, p.mcopy] } else { executables << p.xorriso }
 	for path in executables {
 		require(path == os.real_path(path) && os.is_file(path) && os.is_executable(path), 'canonical executable preparation tool required: ' + path)!
@@ -783,7 +806,7 @@ fn prepare_validated(p PrepareProfile, state string) !Profile {
 	}
 	for output in [state, p.prepared_state] {
 		require(p.charged_roots.any(inside(output, it)), 'preparation output must be covered by a charged root')!
-		for root in [p.directory, p.base, os.dir(p.compiler), ...p.input_roots] {
+		for root in [p.directory, p.base, ...prepare_compiler_roots(p), ...p.input_roots] {
 			require(root.starts_with('/') && (os.exists(root) || os.is_link(root)), 'preparation input root missing')!
 			resolved := os.real_path(root)
 			require(!inside(output, resolved) && !inside(resolved, output), 'preparation output overlaps an input tree')!
@@ -807,6 +830,7 @@ fn prepare_environment(p PrepareProfile, state string) ! {
 		'V': p.compiler
 		'VEXE': p.compiler
 		'VINIX_V_COMPILER': p.compiler
+		'VINIX_PERF_SAMPLER_V': if p.sampler_compiler == '' { p.compiler } else { p.sampler_compiler }
 		'V_MACOS_V3_CALLER_VEXE': p.compiler
 		'V_MACOS_V3_CALLER_VEXE_PRESENT': '1'
 		'V_MACOS_V3_CALLER_VCHILD_PRESENT': '0'
@@ -856,7 +880,7 @@ fn prepare_paths(p PrepareProfile, profile_path string) ![]string {
 		'tests/linuxkpi/hosttest', 'tools/hosttest', 'tools/sourcecommand', 'tools/qmpclient'] { paths << p.directory + '/' + directory }
 	clang := '/Library/Developer/CommandLineTools/usr/bin/clang'
 	resource := command([clang, '-print-resource-dir'])!.trim_space()
-	paths << [p.adapter, p.kernel, p.desktop, os.dir(p.compiler), p.qemu, p.firmware, p.cc, p.readelf, p.mkfs, p.linker,
+	paths << [p.adapter, p.kernel, p.desktop, ...prepare_compiler_roots(p), p.qemu, p.firmware, p.cc, p.readelf, p.mkfs, p.linker,
 		p.sdk + '/SDKSettings.json', p.sdk + '/SDKSettings.plist',
 		'/bin/cp', '/usr/bin/tar', '/bin/df', '/usr/bin/du', '/usr/bin/xcrun', clang,
 		'/Library/Developer/CommandLineTools/usr/bin/ld', resource + '/include', os.executable(), @FILE, profile_path]
@@ -893,6 +917,7 @@ fn prepared_checked(p PrepareProfile, profile Profile, state string, before map[
 		input := pair[0]; pin := pair[1]
 		require(prepared.inputs[input] == pin, 'prepared selected input pin differs')!
 	}
+	prepared_compilers(p, prepared, before)!
 	for input, pin in prepared.inputs {
 		if !inside(input, p.prepared_state) {
 			// Source walks retain a tools/hosttest alias-file key; the host
@@ -1517,6 +1542,123 @@ fn armcheck(state string, compiler string) ! {
 	println('PERF FOREGROUND ARM HOST PASS sixteen controls; no adapter or guest executed')
 }
 
+// Small host fixtures exercise compiler admission and inventory without a
+// compiler child, adapter, VM or a change to the production budget gates.
+fn compilercheck(state string) ! {
+	fresh(state)!
+	require(!inside(state, os.real_path(@DIR + '/../..')), 'external compiler control state required')!
+	os.mkdir(state)!
+	original_environment := os.environ()
+	defer {
+		for key, _ in os.environ() { os.unsetenv(key) }
+		for key, value in original_environment { os.setenv(key, value, true) }
+	}
+	input := state + '/inputs'; output := state + '/outputs'
+	for directory in ['frontend', 'sampler', 'source', 'base', 'sysroot/gcc', 'sdk', 'tools'] {
+		os.mkdir_all(input + '/' + directory)!
+	}
+	os.mkdir(output)!
+	frontend := input + '/frontend/v'; sampler := input + '/sampler/v'
+	for path in [frontend, sampler, input + '/frontend/second-v', input + '/tools/xorriso'] {
+		os.write_file(path, 'compiler admission fixture; never executed\n')!; os.chmod(path, 0o755)!
+	}
+	for path in [input + '/frontend/stdlib.v', input + '/sampler/stdlib.v',
+		input + '/base.tar', input + '/vars.fd', input + '/source/BOOTAA64.EFI', input + '/plain'] {
+		os.write_file(path, 'compiler control fixture\n')!
+	}
+	os.chmod(input + '/plain', 0o600)!
+	os.symlink(sampler, input + '/sampler-alias')!
+	os.symlink(os.executable(), input + '/tools/ld.lld')!
+	pin := hash(os.executable())!
+	p := PrepareProfile{arch: 'aarch64', adapter: os.executable(), adapter_sha256: pin,
+		directory: input + '/source', base: input + '/base.tar', base_mode: os.lstat(input + '/base.tar')!.mode,
+		base_manifest_sha256: hash(input + '/base.tar')!, kernel: os.executable(), kernel_sha256: pin,
+		desktop: os.executable(), desktop_sha256: pin, prepared_state: output + '/prepared', compiler: frontend,
+		qemu: os.executable(), firmware: input + '/base.tar', firmware_vars: input + '/vars.fd',
+		cc: os.executable(), readelf: os.executable(), mkfs: os.executable(), limine: input + '/source',
+		mformat: os.executable(), mmd: os.executable(), mcopy: os.executable(),
+		sdk: input + '/sdk', sysroot: input + '/sysroot', gcc: input + '/sysroot/gcc',
+		linker: input + '/tools/ld.lld', charged_roots: [output], input_roots: [input + '/source']}
+	mut checks := []string{}
+	require(prepare_compilers(p) == [frontend] && prepare_compiler_roots(p) == [os.dir(frontend)], 'default compiler roots differ')!
+	checks << 'omitted sampler preserves one compiler tree'
+	require(prepare_compilers(PrepareProfile{...p, sampler_compiler: frontend}) == [frontend], 'identical compiler duplicated')!
+	checks << 'identical sampler preserves one compiler'
+	require(prepare_compiler_roots(PrepareProfile{...p, sampler_compiler: input + '/frontend/second-v'})
+		== [os.dir(frontend)], 'shared compiler directory duplicated')!
+	checks << 'two executables in one tree inventory that tree once'
+	for arch in ['aarch64', 'x86_64'] {
+		for selected in ['', sampler] {
+			base := if arch == 'aarch64' { input + '/base.tar' } else { input + '/base' }
+			profile := PrepareProfile{...p, arch: arch, base: base, base_mode: os.lstat(base)!.mode,
+				sampler_compiler: selected, xorriso: if arch == 'x86_64' { input + '/tools/xorriso' } else { '' }}
+			prepare_validated(profile, output + '/owner')!
+			os.setenv('VINIX_PERF_SAMPLER_V', '/missing-inherited-sampler', true)
+			os.setenv('UNAPPROVED_COMPILER', 'inherited', true)
+			prepare_environment(profile, output + '/owner')!
+			require(os.getenv('V') == frontend && os.getenv('VINIX_V_COMPILER') == frontend
+				&& os.getenv('VEXE') == frontend && os.getenv('VINIX_PERF_SAMPLER_V') ==
+				(if selected == '' { frontend } else { sampler })
+				&& os.getenv_opt('UNAPPROVED_COMPILER') == none, 'typed compiler environment differs')!
+			checks << arch + ': admitted profile and replaced inherited compiler environment: ' + if selected == '' { 'default' } else { 'pair' }
+		}
+	}
+	pair := PrepareProfile{...p, sampler_compiler: sampler}
+	for bad in ['v', input + '/sampler', input + '/missing', input + '/plain', input + '/sampler-alias'] {
+		prepare_refuses(PrepareProfile{...pair, sampler_compiler: bad}, output + '/owner', 'canonical executable preparation tool')!
+		checks << 'refused unusable explicit sampler: ' + bad
+	}
+	encoded := json2.encode(pair)
+	require(json2.decode[PrepareProfile](encoded)!.sampler_compiler == sampler, 'typed profile lost sampler')!
+	checks << 'typed profile retains explicit sampler'
+	roots := prepare_compiler_roots(pair)
+	before := inputs(roots)!
+	require(frontend in before && sampler in before && input + '/frontend/stdlib.v' in before
+		&& input + '/sampler/stdlib.v' in before, 'compiler source tree missing from inventory')!
+	checks << 'both complete compiler trees bound in selected inventory'
+	for path in [frontend, sampler, input + '/sampler/stdlib.v'] {
+		bytes := os.read_bytes(path)!
+		os.write_file(path, 'changed compiler input\n')!
+		require(inputs(roots)! != before, 'changed compiler input was invisible')!
+		os.write_file_array(path, bytes)!
+		checks << 'inventory detects changed bytes: ' + path
+	}
+	os.chmod(sampler, 0o644)!
+	require(inputs(roots)! != before, 'changed compiler permissions were invisible')!
+	os.chmod(sampler, 0o755)!
+	require(inputs(roots)! == before, 'restored compiler inventory differs')!
+	checks << 'inventory detects compiler mode changes and exact restoration'
+	prepared := PreparedView{inputs: {frontend: before[frontend], sampler: before[sampler]}}
+	prepared_compilers(pair, prepared, before)!; checks << 'prepared receipt binds both selected compilers'
+	prepared_compilers(p, PreparedView{inputs: {frontend: before[frontend]}}, before)!
+	checks << 'default prepared receipt needs only its selected compiler'
+	for compiler in [frontend, sampler] {
+		for kind in ['missing', 'different', 'unapproved'] {
+			mut pins := prepared.inputs.clone(); mut approved := before.clone()
+			if kind == 'missing' { pins.delete(compiler) }
+			if kind == 'different' { pins[compiler] = '0'.repeat(64) }
+			if kind == 'unapproved' { approved.delete(compiler) }
+			prepared_compilers(pair, PreparedView{inputs: pins}, approved) or {
+				require(err.msg().contains('prepared compiler pin differs'), 'unexpected compiler pin refusal')!
+				checks << 'refused ' + kind + ' prepared compiler: ' + compiler
+				continue
+			}
+			return error('unbound prepared compiler accepted')
+		}
+	}
+	for compiler_root in roots {
+		prepare_refuses(PrepareProfile{...pair, charged_roots: [output, compiler_root]},
+			compiler_root + '/owner', 'overlaps an input tree')!
+		checks << 'refused output inside compiler tree: ' + compiler_root
+	}
+	require(checks.len == 28 && !os.exists(p.prepared_state) && !os.exists(output + '/owner'),
+		'compiler control count or output differs')!
+	os.write_file(state + '/profile.json', encoded + '\n')!
+	os.write_file(state + '/compiler-inputs.json', json2.encode(before) + '\n')!
+	os.write_file(state + '/result.json', json2.encode(checks) + '\n')!
+	println('PERF FOREGROUND COMPILER HOST PASS 28 controls; retained state: ' + state)
+}
+
 fn selfcheck(state string, compiler string) ! {
 	fresh(state)!
 	require(compiler.starts_with('/') && os.is_file(compiler), 'absolute complete V executable required')!
@@ -1689,6 +1831,12 @@ fn qualify(state string, compiler string, mode string) ! {
 
 fn main() {
 	if os.args.len == 3 && os.args[1] == '--fixture' { fixture(os.args[2]); return }
+	if os.args.len in [2, 3] && os.args[1] == 'compilercheck' {
+		state := if os.args.len == 3 { os.args[2] } else {
+			os.real_path(os.temp_dir()) + '/vinix-perf-compiler-' + os.getpid().str()
+		}
+		compilercheck(state) or { eprintln(err); exit(1) }; return
+	}
 	if os.args.len == 5 && os.args[1] == 'audit' {
 		audit_owned(os.args[2], os.args[3], os.args[4]) or {
 			eprintln(err); exit(1)
@@ -1718,6 +1866,6 @@ fn main() {
 			eprintln(err); exit(1)
 		}; exit(status)
 	}
-	eprintln('usage: foreground-supervise run|admit-prepare|prepare NEW-STATE PROFILE.json\n       foreground-supervise audit frame|atomic NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|armcheck|qualify|qualify-adapter|qualify-arm-adapter|qualify-arm-owner NEW-STATE COMPLETE-V\n       foreground-supervise limitcheck NEW-STATE')
+	eprintln('usage: foreground-supervise run|admit-prepare|prepare NEW-STATE PROFILE.json\n       foreground-supervise audit frame|atomic NEW-STATE PROFILE.json\n       foreground-supervise selfcheck|armcheck|qualify|qualify-adapter|qualify-arm-adapter|qualify-arm-owner NEW-STATE COMPLETE-V\n       foreground-supervise compilercheck [NEW-STATE]\n       foreground-supervise limitcheck NEW-STATE')
 	exit(2)
 }
