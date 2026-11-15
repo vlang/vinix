@@ -46,7 +46,7 @@ fixed three-entry storage; notifications are assigned directly into the rings.
 
 Compile `check-prefix-storage.v` to an external executable. Its `--selftest`
 rejects hidden allocation calls, missing/duplicate helper definitions and lost
-stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks thirty production
+stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks thirty-three live production
 helpers, including initial capture/selection/compaction, registration, publishers
 and the host ring/event admission, scheduler/input dependency scan and private fence provenance check.
 It rejects temporary allocations and structural queue copies.
@@ -56,7 +56,12 @@ V moving an addressed local into a `memdup` allocation under `-gc none`. It does
 not measure the whole kernel or qualify native GPU execution.
 
 The checks include whole-batch admission and its synchronous borrowed references,
-with fixed three-pipe capacity arrays.
+the complete event FIFO, ownership-mask handoff and native transaction, with fixed
+three-pipe plans and 64-entry bind/position storage. Standalone compute/paired
+publishers are now unreachable in the native kernel and V omits their bodies;
+this checker requires every live helper rather than accepting missing bodies.
+The standalone source remains exercised by this failure fixture. Historical
+bundle checkers and their original complete evidence remain unchanged.
 
 Host ring admission executes the production capacity helper at 5,120 boundaries,
 then drives the actual compute and paired render publishers with firmware rings

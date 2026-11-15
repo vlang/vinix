@@ -7,6 +7,15 @@ staging, payload validation, sync objects, completion finish/discard, pending
 poller, manager-locked registration and queue dispatch guard. GPU allocation,
 publication, completion and shutdown are injected services. It executes no GPU.
 
+The production worker now hands a batch to the manager and clears transferred
+pointers using its ownership mask, including immediate metadata retirement.
+The native publisher prepares every participating pipe before exposing any
+write pointer and returns either no ownership or the complete batch. This
+fixture deliberately injects partial transfers as an adversarial backend, so
+the existing partial-publication/fault/stop checks continue to stress file-layer
+ownership. They do not describe native publication granularity. Actual native
+batch/ring/event/reaper behavior is exercised by `tests/agx-job-lifetime`.
+
 Checks cover unsignaled/failed dependencies, independent queues, per-queue FIFO,
 compute→render phases, client-signaled output fences, result-object references,
 ring backpressure, setup/OOM/copy failures and a concurrent append during a

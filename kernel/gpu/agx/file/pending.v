@@ -141,6 +141,28 @@ fn admit_g13_pending(mut manager gpu.GpuManager, item &G13PendingSubmission) boo
 	return manager.g13_batch_ready(jobs, item.command_count)
 }
 
+fn submit_g13_pending(mut manager gpu.GpuManager, mut item G13PendingSubmission) {
+	mut jobs := [64]gpu.G13SubmissionJob{}
+	mut positions := [64]u32{}
+	mut count := u32(0)
+	for index := u32(0); index < item.command_count; index++ {
+		command := &item.commands[index]
+		if command.compute_job == unsafe { nil } && command.render_job == unsafe { nil } { continue }
+		jobs[count] = gpu.G13SubmissionJob{ render: command.render_job, compute: command.compute_job }
+		positions[count] = index
+		count++
+	}
+	if count == 0 { return }
+	transferred := manager.submit_g13_batch(jobs, count)
+	for index := u32(0); index < count; index++ {
+		if transferred & (u64(1) << index) == 0 { continue }
+		// Transferred metadata may already be freed. Clear values only.
+		mut command := &item.commands[positions[index]]
+		command.compute_job, command.render_job = unsafe { nil }, unsafe { nil }
+		command.published = true
+	}
+}
+
 // Called under manager.lock while the ioctl still holds file.lock.
 fn enqueue_g13_pending(data voidptr) {
 	mut item := unsafe { &G13PendingSubmission(data) }
@@ -182,9 +204,8 @@ fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
 	}
 }
 
-// Explicit dependencies wait only for producer publication. Their installed
-// firmware prefixes wait for execution; CPU callback/reaper order must not
-// serialize GPU work. Unpublished producers still block dependent subqueues.
+// Installed firmware prefixes order execution while all commands in this batch
+// publish together. CPU callback/reaper order must not serialize GPU work.
 // Across submissions, unpublished jobs retain FIFO order. Initial prefixes
 // resolve under the publication lock without waiting for CPU retirement.
 fn poll_g13_pending(mut item G13PendingSubmission) bool {
@@ -219,51 +240,11 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 		}
 		item.admitted = true
 	}
-	mut blocked := [2]bool{}
-	for index := u32(0); index < item.command_count; index++ {
-		// Shutdown can deliver callbacks for prepared jobs while their metadata
-		// is still caller-owned. Drop those pointers before retiring this node.
-		if manager.state != .running {
-			cancel_g13_pending(mut item, -19)
-			return katomic.load(&item.callbacks_remaining) != 0
-		}
-		mut command := &item.commands[index]
-		if katomic.load(&command.done) || command.published { continue }
-		if blocked[command.pipe] { continue }
-		for dependency in command.wait_for {
-			if dependency == 0 { continue }
-			prior := &item.commands[dependency - 1]
-			if !prior.published {
-				blocked[command.pipe] = true
-				continue
-			}
-			dependency_error := if katomic.load(&prior.done) { katomic.load(&prior.error) } else { 0 }
-			if dependency_error != 0 {
-				cancel_g13_pending(mut item, dependency_error)
-				return katomic.load(&item.callbacks_remaining) != 0
-			}
-		}
-		if blocked[command.pipe] { continue }
-		completed_error := g13_pending_error(item)
-		if completed_error != 0 {
-			cancel_g13_pending(mut item, completed_error)
-			return katomic.load(&item.callbacks_remaining) != 0
-		}
-		if manager.g13_queue_dispatch_blocked(item.queue) { return true }
-		if command.compute_job != unsafe { nil } {
-			if manager.submit_g13_compute_job(command.compute_job) {
-				// The manager can free transferred metadata before returning.
-				command.compute_job = unsafe { nil }
-				command.published = true
-			}
-		} else if command.render_job != unsafe { nil } {
-			if manager.submit_g13_render_job(command.render_job) {
-				command.render_job = unsafe { nil }
-				command.published = true
-			}
-		}
-		if !command.published { blocked[command.pipe] = true }
-	}
+	if !manager.g13_queue_dispatch_blocked(item.queue) { submit_g13_pending(mut manager, mut item) }
+	// A backend may complete transferred metadata before returning. Read the
+	// node's callback state only after clearing every transferred pointer.
+	completed_error := g13_pending_error(item)
+	if completed_error != 0 { cancel_g13_pending(mut item, completed_error) }
 	if katomic.load(&item.callbacks_remaining) != 0 { return true }
 	// Acquiring zero callbacks observes shutdown's preceding state write.
 	// Check afterward: stop may have run during the last publication or just

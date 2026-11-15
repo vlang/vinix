@@ -150,6 +150,27 @@ pub fn (mut queue WorkQueueEvents) admit(slot u32, value u32) bool {
 	return false
 }
 
+// Validate the complete admitted sequence before writing any command. Checking
+// only its first ticket would miss an omitted unpublished ticket in the middle.
+pub fn (queue &WorkQueueEvents) can_publish_batch(slot u32, values [64]u32, count u32) bool {
+	if count == 0 || count > 64 || !queue.owns_slot(slot) { return false }
+	for index := u32(0); index < count; index++ {
+		if index != 0 && i32(values[index] - values[index - 1]) <= 0 { return false }
+		mut found := false
+		for ticket in queue.tickets {
+			if ticket.active && ticket.value == values[index] && ticket.admitted && !ticket.published { found = true; break }
+		}
+		if !found { return false }
+	}
+	for ticket in queue.tickets {
+		if !ticket.active || ticket.published || i32(ticket.value - values[count - 1]) > 0 { continue }
+		mut included := false
+		for index := u32(0); index < count; index++ { if ticket.value == values[index] { included = true; break } }
+		if !included { return false }
+	}
+	return true
+}
+
 // Asahi rejects out-of-order commit/submit. A higher stamp published first
 // would make a later low-valued command look complete before GPU execution.
 pub fn (queue &WorkQueueEvents) can_publish(slot u32, value u32) bool {

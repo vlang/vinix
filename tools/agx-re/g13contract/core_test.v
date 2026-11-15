@@ -7,16 +7,36 @@ fn test_order_accepts_repeated_tokens() {
 	require_order('flush reprotect flush unmap flush', ['flush', 'flush', 'flush'], 'sample')!
 }
 
-fn test_dependency_publication_rejects_callback_waits_and_missing_producer_gate() {
+fn test_dependency_publication_rejects_callback_waits_and_missing_batch_gate() {
 	source := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
 	poll := section(source, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'test poll')!
 	check_dependency_publication(poll)!
-	for broken in [poll.replace('if !prior.published {', 'if !katomic.load(&prior.done) {'),
-		poll.replace('if !prior.published {', 'if false {'),
-		poll.replace('if !prior.published {', 'if !prior.published || !katomic.load(&prior.done) {'),
+	for broken in [poll + '\nif !katomic.load(&item.commands[0].done) { return true }',
+		poll.replace('if !manager.g13_queue_dispatch_blocked(item.queue)', 'if true'),
+		poll.replace('submit_g13_pending(mut manager, mut item)', ''),
 		poll.replace('if manager.state != .running { cancel_g13_pending(mut item, -19) }', '')] {
 		if _ := check_dependency_publication(broken) { assert false, 'invalid dependency scheduling accepted' }
 	}
+}
+
+fn test_batch_publication_rejects_early_visibility_and_lost_transfer_cleanup() {
+	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/gpu/g13_batch.v'))!
+	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
+	reference := 'frag_sub = Some(wqjob.submit()?); vtx_sub = Some(wqjob.submit()?); comp_sub = Some(wqjob.submit()?); raw.increase(job.notification_count); frag_sub.map(|a| gpu.run_job(a)); vtx_sub.map(|a| gpu.run_job(a)); comp_sub.map(|a| gpu.run_job(a));'
+	check_batch_publication_contract(local, pending, reference)!
+	for token in ['outer.validate_pointers(outer_rp, outer_wp)', 'pipes[pipe].outer_next == outer_rp',
+		'free >= fw.g13_workqueue_entries', 'old_pending > ~u32(0) - count',
+		'katomic.store(mut pending, old_pending)', 'job.submitted, job.pending_counted = true, true',
+		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)'] {
+		assert local.contains(token)
+		if _ := check_batch_publication_contract(local.replace(token, ''), pending, reference) { assert false }
+	}
+	for token in ['transferred & (u64(1) << index)', 'command.compute_job, command.render_job = unsafe { nil }, unsafe { nil }'] {
+		if _ := check_batch_publication_contract(local, pending.replace(token, ''), reference) { assert false }
+	}
+	if _ := check_batch_publication_contract(local, pending, reference.replace('comp_sub = Some(wqjob.submit()?)', 'skip')) { assert false }
+	late := 'katomic.store(mut threshold,'
+	if _ := check_batch_publication_contract(late + local.replace(late, ''), pending, reference) { assert false }
 }
 
 fn test_order_rejects_a_reversed_contract() {
@@ -110,6 +130,8 @@ fn test_event_admission_rejects_missing_spare_and_regressing_completion() {
 		local.replace('admitted || queue.can_submit(1)', 'true'),
 		local.replace('ticket.admitted = true', ''),
 		local.replace('ticket.admitted = false', ''),
+		local.replace('if !included { return false }', ''),
+		local.replace('i32(values[index] - values[index - 1]) <= 0', 'false'),
 		local.replace('i32(queue.published_value - queue.completed_value)', 'i32(value - queue.completed_value)'),
 		local.replace('i32(value - queue.completed_value) > 0', 'true'),
 		local.replace('queue.completed_value = value - u32(0x100)', 'queue.completed_value = 0'),

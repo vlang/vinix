@@ -17,6 +17,7 @@ fn main() {
 	for name in ['klock', 'katomic'] {
 		os.cp_all('${repo}/tests/agx-g13-failure/fixture/${name}', '${scratch}/${name}', false)!
 	}
+	os.write_file('${scratch}/klock/host.v', 'module klock\npub fn (guard &Lock) is_locked() bool { return guard.held }\n')!
 	os.cp_all('${repo}/tests/agx-event/fixture/drm', '${scratch}/drm', false)!
 	os.mkdir_all('${scratch}/gpu/agx')!
 	os.cp_all('${repo}/kernel/gpu/agx/event', '${scratch}/gpu/agx/event', false)!
@@ -24,6 +25,13 @@ fn main() {
 	os.cp('${repo}/kernel/gpu/agx/gpu/g13_barriers.v', '${scratch}/gpu/barrier_production.v')!
 	os.cp('${repo}/kernel/gpu/agx/gpu/g13_initial.v', '${scratch}/gpu/initial_production.v')!
 	os.cp('${repo}/kernel/gpu/agx/gpu/g13_admission.v', '${scratch}/gpu/admission_production.v')!
+	os.cp('${repo}/kernel/gpu/agx/gpu/g13_batch.v', '${scratch}/gpu/batch_production.v')!
+	os.mkdir_all('${scratch}/gpu/agx/channel')!
+	os.cp('${repo}/kernel/gpu/agx/channel/channel.v', '${scratch}/gpu/agx/channel/channel.v')!
+	os.write_file('${scratch}/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n')!
+	os.mkdir_all('${scratch}/gpu/agx/alloc')!
+	allocator := os.read_file('${repo}/kernel/gpu/agx/alloc/alloc.v')!
+	os.write_file('${scratch}/gpu/agx/alloc/constants.v', 'module alloc\n' + section(allocator, 'pub const g13_private_start', '// RTKit system endpoints')!)!
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\npub fn test_force_refs(slot u32, value u32) u32 { old := gpu_event_mgr.stamps[slot].references; gpu_event_mgr.stamps[slot].references = value; return old }\n')!
 	os.symlink('${repo}/kernel/gpu/agx/fw', '${scratch}/gpu/agx/fw')!
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!

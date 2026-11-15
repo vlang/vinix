@@ -4,16 +4,18 @@ import os
 const helpers = [
 	'gpu__agx__file__install_g13_batch_barriers',
 	'gpu__agx__gpu__GpuManager__initialize_g13_barriers_locked',
-	'gpu__agx__gpu__GpuManager__publish_g13_compute_job_locked',
-	'gpu__agx__gpu__GpuManager__submit_g13_queue_commands',
 	'gpu__agx__gpu__GpuManager__g13_ring_has_space_locked',
-	'gpu__agx__gpu__GpuManager__publish_g13_render_job_locked',
 	'gpu__agx__file__poll_g13_pending',
 	'gpu__agx__file__g13_pending_dispatch_complete',
 	'gpu__agx__file__process_pending_submissions',
 	'gpu__agx__file__register_g13_pending',
 	'gpu__agx__file__admit_g13_pending',
+	'gpu__agx__file__submit_g13_pending',
 	'gpu__agx__gpu__GpuManager__g13_batch_ready',
+	'gpu__agx__gpu__GpuManager__admit_g13_batch_locked',
+	'gpu__agx__gpu__GpuManager__submit_g13_batch',
+	'gpu__agx__gpu__g13_batch_address',
+	'gpu__agx__gpu__append_g13_batch_command',
 	'gpu__agx__file__g13_dependencies_ready',
 	'syncobj__queue_dependency_ready',
 	'gpu__agx__gpu__GpuManager__queue_g13_submission',
@@ -30,13 +32,16 @@ const helpers = [
 	'gpu__agx__event__WorkQueueEvents__can_publish',
 	'gpu__agx__event__WorkQueueEvents__can_submit',
 	'gpu__agx__event__WorkQueueEvents__admit',
+	'gpu__agx__event__WorkQueueEvents__can_publish_batch',
 	'gpu__agx__event__WorkQueueEvents__publish',
 	'gpu__agx__gpu__g13_barrier_source',
 ]
 
 fn result_type(name string) string {
 	if name.ends_with('process_pending_submissions') || name.ends_with('write_g13_barrier')
-		|| name.ends_with('release_g13_initial_events') || name.ends_with('release_g13_barrier_pins') { return 'void' }
+		|| name.ends_with('release_g13_initial_events') || name.ends_with('release_g13_barrier_pins')
+		|| name.ends_with('submit_g13_pending') || name.ends_with('append_g13_batch_command') { return 'void' }
+	if name.ends_with('GpuManager__submit_g13_batch') { return 'u64' }
 	if name.ends_with('capture_g13_initial_events') { return '__v_option_gpu__agx__gpu__G13InitialEvents' }
 	if name.ends_with('WorkQueueEvents__ticket') || name.ends_with('WorkQueueEvents__retain') || name.ends_with('g13_barrier_source') { return '__v_option_gpu__agx__event__Ticket' }
 	if name.ends_with('WorkQueueEvents__resolve_initial') { return 'multi_return_int_gpu__agx__event__Ticket' }
@@ -71,18 +76,19 @@ fn check(source string) ! {
 		for copy in ['__v3_struct_eq', 'G13QueueResources __eq'] {
 			if body.contains(copy) { return error(name + ': unexpected structural copy/comparison: ' + copy) }
 		}
-		if name.ends_with('publish_g13_compute_job_locked') && !body.contains('u64 storage[3];') {
-			return error('compute prefix storage is not a fixed stack array')
-		}
 		if name.ends_with('process_pending_submissions') &&
 			(!body.contains('void* blocked[128]') || !body.contains('bool unpublished[128]')) {
 			return error('scheduler queue gates are not fixed stack arrays')
 		}
-		if (name.ends_with('register_g13_pending') || name.ends_with('admit_g13_pending')) && !body.contains('G13SubmissionJob jobs[64]') {
+		if (name.ends_with('register_g13_pending') || name.ends_with('admit_g13_pending') || name.ends_with('submit_g13_pending')) && !body.contains('G13SubmissionJob jobs[64]') {
 			return error('acceptance references are not a fixed stack array')
 		}
-		if name.ends_with('g13_batch_ready') && (!body.contains('u32 events[3]') || !body.contains('u32 commands[3]')) {
+		if name.ends_with('admit_g13_batch_locked') && (!body.contains('u32 events[3]') || !body.contains('u32 commands[3]')) {
 			return error('batch capacity counts are not fixed stack arrays')
+		}
+		if name.ends_with('submit_g13_pending') && !body.contains('u32 positions[64]') { return error('batch transfer positions are not fixed stack storage') }
+		if name.ends_with('GpuManager__submit_g13_batch') && (!body.contains('G13BatchPipe pipes[3]') || !body.contains('bool binds[64]')) {
+			return error('native batch ring/bind plan is not fixed stack storage')
 		}
 		if name.ends_with('resolve_g13_initial_barriers_locked') && !body.contains('Ticket resolved[2]') {
 			return error('resolved initial tickets are not a fixed stack array')
@@ -95,7 +101,7 @@ fn selftest() ! {
 	for name in helpers {
 		kind := result_type(name)
 		ending := if kind == 'void' { 'return;' } else if kind == 'bool' { 'return true;' } else { 'return (' + kind + '){0};' }
-		fixture += kind + ' ' + name + '(void) {\n u64 storage[3];\n void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n ' + ending + '\n}\n'
+		fixture += kind + ' ' + name + '(void) {\n void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
 	}
 	check(fixture)!
 	for name in helpers {
@@ -106,12 +112,15 @@ fn selftest() ! {
 			}
 		}
 	}
-	for broken in ['', fixture.replace('u64 storage[3];', 'u64* storage;'), fixture + fixture,
+	for broken in ['', fixture + fixture,
 		fixture.replace('void* blocked[128];', 'void** blocked;'),
 		fixture.replace('bool unpublished[128];', 'bool* unpublished;'),
 		fixture.replace('G13SubmissionJob jobs[64];', 'G13SubmissionJob* jobs;'),
 		fixture.replace('u32 events[3];', 'u32* events;'),
 		fixture.replace('u32 commands[3];', 'u32* commands;'),
+		fixture.replace('u32 positions[64];', 'u32* positions;'),
+		fixture.replace('G13BatchPipe pipes[3];', 'G13BatchPipe* pipes;'),
+		fixture.replace('bool binds[64];', 'bool* binds;'),
 		fixture.replace('Ticket resolved[2];', 'Ticket* resolved;')] {
 		if _ := check(broken) { return error('malformed storage selftest accepted') }
 	}
@@ -123,5 +132,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission storage: thirty generated barrier/publisher/scheduler/initial-event/dependency/admission helpers contain no temporary allocations')
+	println('G13 submission storage: thirty-three live generated barrier/publisher/scheduler/initial-event/dependency/admission/transaction helpers contain no temporary allocations')
 }

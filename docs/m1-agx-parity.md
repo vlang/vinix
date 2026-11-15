@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [whole-batch event/ring admission](m1-agx-batch-admission.md),
-including cancellation-gap grants and retained build/test evidence (2026-11-15).
+Latest offline increment: [prepared batch publication](m1-agx-batch-publication.md),
+with one notification per participating pipe (2026-11-15). The
+[earlier admission report](m1-agx-batch-admission.md) retains its original evidence.
 
 ## Offline sign-off audit, 2026-11-14
 

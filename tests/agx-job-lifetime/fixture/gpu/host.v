@@ -4,6 +4,7 @@ module gpu
 import gpu.agx.event
 import gpu.agx.fw
 import gpu.agx.mmu
+import gpu.agx.channel
 import klock
 import memory
 
@@ -11,6 +12,36 @@ import memory
 #define kprintf printf
 
 fn C.kprintf(format &char, ...) i32
+
+__global higher_half = u64(0)
+
+struct GpuChannels {
+mut:
+	pipes [12]channel.TxChannel
+}
+
+enum Generation { g13 other }
+struct Config { gpu_gen Generation = .g13 }
+
+fn pipe_index(priority u32, pipe u32) int { return int(priority * 3 + pipe) }
+
+fn (mut mgr GpuManager) g13_pending_submissions_locked() ?&u32 {
+	if mgr.pending_missing { return none }
+	return unsafe { &mgr.batch_pending }
+}
+
+fn (mut mgr GpuManager) kick_firmware() bool {
+	mgr.kicks++
+	return !mgr.kick_fails
+}
+
+fn (mut mgr GpuManager) ring_pipe(priority u32, pipe u32) bool {
+	assert priority < 4
+	mgr.doorbells << pipe
+	for job in mgr.g13_compute_jobs { assert job.submitted && job.pending_counted }
+	for job in mgr.g13_render_jobs { assert job.submitted && job.pending_counted }
+	return mgr.doorbell_fail != int(pipe)
+}
 
 struct SharedBuffer {
 mut:
@@ -45,6 +76,9 @@ mut:
 	released      bool
 	quarantined bool
 	mappings_published bool
+	priority u32
+	channel_mask u32 = 7
+	threshold SharedBuffer
 }
 
 struct G13RenderBufferResources {
@@ -91,6 +125,15 @@ mut:
 	g13_queues            []&G13QueueResources
 	flush_fails bool
 	flushes int
+	channels GpuChannels
+	hw_config Config
+	g13_channels &u8 = unsafe { nil }
+	batch_pending u32
+	pending_missing bool
+	kicks int
+	kick_fails bool
+	doorbells []u32
+	doorbell_fail int = -1
 }
 
 struct G13EventResources {
@@ -133,6 +176,7 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut queue G13QueueResour
 
 fn (mut mgr GpuManager) end_g13_operation_locked() bool {
 	mgr.pending--
+	if mgr.batch_pending != 0 { mgr.batch_pending-- }
 	return true
 }
 
@@ -215,6 +259,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_batch_publication()
 	check_batch_admission()
 	check_initial_barrier_lifetimes()
 	check_initial_cancellation_fallback()

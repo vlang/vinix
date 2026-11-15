@@ -10,6 +10,10 @@ import gpu.agx.fw
 pub fn (mut mgr GpuManager) g13_batch_ready(jobs [64]G13SubmissionJob, count u32) bool {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
+	return mgr.admit_g13_batch_locked(jobs, count)
+}
+
+fn (mut mgr GpuManager) admit_g13_batch_locked(jobs [64]G13SubmissionJob, count u32) bool {
 	if mgr.state != .running || count == 0 || count > 64 { return false }
 	mut queue := &G13QueueResources(unsafe { nil })
 	mut events := [3]u32{}

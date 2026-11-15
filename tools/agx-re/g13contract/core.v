@@ -198,14 +198,11 @@ fn check_tlb_instructions(reference string, vinix string) ! {
 }
 
 fn check_dependency_publication(poll string) ! {
-	dependencies := section(poll, 'for dependency in command.wait_for',
-		'if blocked[command.pipe] { continue }', 'Vinix firmware dependency scheduling')!
-	require_order(dependencies, ['prior := &item.commands[dependency - 1]',
-		'if !prior.published {', 'blocked[command.pipe] = true', 'continue',
-		'if katomic.load(&prior.done)', 'katomic.load(&prior.error)'],
-		'Vinix firmware dependency scheduling')!
-	require(!dependencies.contains('if !katomic.load(&prior.done)'),
-		'Vinix must not serialize firmware barriers on CPU callbacks')!
+	require_order(poll, ['failure := g13_pending_error(item)', 'if !item.admitted',
+		'if !manager.g13_queue_dispatch_blocked(item.queue) { submit_g13_pending(mut manager, mut item) }',
+		'completed_error := g13_pending_error(item)', 'cancel_g13_pending(mut item, completed_error)'], 'Vinix firmware batch scheduling')!
+	require(!poll.contains('.done') && !poll.contains('command.wait_for'),
+		'Vinix must publish installed firmware dependencies together without CPU callback waits')!
 	require_order(poll, ['if katomic.load(&item.callbacks_remaining) != 0 { return true }',
 		'if manager.state != .running { cancel_g13_pending(mut item, -19) }',
 		'final_error := g13_pending_error(item)'], 'Vinix shutdown after callback acquisition')!
@@ -242,7 +239,7 @@ fn check_input_dependency_contract(pending string) ! {
 	require_order(ready, ['index < dependencies.count', '!syncobj.queue_dependency_ready(dependencies.fences[index], queue_context)',
 		'return false', 'return true'], 'Vinix input dependency readiness')!
 	require(!ready.contains('get_error'), 'Signaled input fence errors must not cancel the dependent submission')!
-	poll := section(pending, 'fn poll_g13_pending(', 'mut blocked := [2]bool{}', 'Vinix input dependency scheduling')!
+	poll := section(pending, 'fn poll_g13_pending(', 'if !item.admitted', 'Vinix input dependency scheduling')!
 	require_order(poll, ['if !item.dependencies_ready', 'if !g13_dependencies_ready(&item.dependencies, item.queue.fence_context) { return true }',
 		'item.dependencies_ready = true', 'failure := g13_pending_error(item)',
 		'cancel_g13_pending(mut item, if failure != 0'], 'Vinix input dependency scheduling')!
@@ -290,6 +287,11 @@ fn check_event_admission_contract(local string, reference string) ! {
 	publish := local.all_after('pub fn (mut queue WorkQueueEvents) publish(')
 	require_order(publish, ['queue.can_publish(slot, value)', 'ticket.published = true',
 		'ticket.admitted = false', 'queue.published_value = value'], 'Vinix successful event publication')!
+	batch := section(local, 'pub fn (queue &WorkQueueEvents) can_publish_batch(', '// Asahi rejects out-of-order', 'Vinix complete event FIFO')!
+	require_order(batch, ['count == 0 || count > 64 || !queue.owns_slot(slot)',
+		'i32(values[index] - values[index - 1]) <= 0', 'ticket.active && ticket.value == values[index] && ticket.admitted && !ticket.published',
+		'if !found { return false }', 'i32(ticket.value - values[count - 1]) > 0',
+		'ticket.value == values[index]', 'if !included { return false }'], 'Vinix complete event FIFO')!
 }
 
 fn check_batch_admission_contract(local string, pending string, reference string) ! {
@@ -324,7 +326,40 @@ fn check_batch_admission_contract(local string, pending string, reference string
 	require_order(poll, ['g13_dependencies_ready(', 'failure := g13_pending_error(item)', 'if !item.admitted',
 		'if !admit_g13_pending(mut manager, item)', '_ = katomic.load(&item.callbacks_remaining)',
 		'if manager.state != .running', 'cancel_g13_pending(mut item, -19)',
-		'item.admitted = true', 'mut blocked := [2]bool{}', 'manager.submit_g13_compute_job('], 'Vinix batch admission scheduling')!
+		'item.admitted = true', 'submit_g13_pending(mut manager, mut item)'], 'Vinix batch admission scheduling')!
+}
+
+fn check_batch_publication_contract(local string, pending string, reference string) ! {
+	require_order(reference, ['frag_sub = Some(wqjob.submit()?)', 'vtx_sub = Some(wqjob.submit()?)',
+		'comp_sub = Some(wqjob.submit()?)', 'raw.increase(job.notification_count)',
+		'frag_sub.map(|a| gpu.run_job(a))', 'vtx_sub.map(|a| gpu.run_job(a))',
+		'comp_sub.map(|a| gpu.run_job(a))'], 'Asahi fallible preparation before publication')!
+	require_order(local, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+		'admit_g13_batch_locked(jobs, count)', 'mut pipes := [3]G13BatchPipe{}', 'mut binds := [64]bool{}',
+		'i32(job.stamp_value - pipes[2].last_value) <= 0',
+		'i32(job.fragment_stamp_value - pipes[1].last_value) <= 0',
+		'.events.can_publish_batch(pipes[pipe].slot, pipes[pipe].values, pipes[pipe].events)',
+		'lock.acquire()', 'outer.validate_pointers(outer_rp, outer_wp)',
+		'pipes[pipe].outer_next == outer_rp', 'free >= fw.g13_workqueue_entries',
+		'pipes[pipe].count > fw.g13_workqueue_entries - used - 1',
+		'g13_pending_submissions_locked()', 'old_pending > ~u32(0) - count',
+		'katomic.store(mut pending, old_pending + count)', '!mgr.kick_firmware()',
+		'katomic.store(mut pending, old_pending)', 'katomic.store(mut threshold,',
+		'append_g13_batch_command(queue, 2', 'job.submitted, job.pending_counted = true, true',
+		'job.vertex_ring_slot, job.vertex_retirement_sequence',
+		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()',
+		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)', 'katomic.sync()',
+		'katomic.store(mut write, pipes[pipe].outer_next)', 'mgr.ring_pipe(queue.priority, u32(pipe))',
+		'return if count == 64 { ~u64(0) }'], 'Vinix prepared batch publication')!
+	require(local.count('mgr.ring_pipe(') == 1 && local.count('for pipe in [1, 0, 2]!') == 3,
+		'Native batch must publish and notify once per participating pipe in reference order')!
+	helper := section(pending, 'fn submit_g13_pending(', '// Called under manager.lock', 'Vinix batch ownership transfer')!
+	require_order(helper, ['mut jobs := [64]gpu.G13SubmissionJob{}', 'mut positions := [64]u32{}',
+		'positions[count] = index', 'manager.submit_g13_batch(jobs, count)',
+		'transferred & (u64(1) << index)', 'command.compute_job, command.render_job = unsafe { nil }, unsafe { nil }',
+		'command.published = true'], 'Vinix batch ownership transfer')!
+	require(!helper.all_after('manager.submit_g13_batch(jobs, count)').contains('jobs['),
+		'Transferred job metadata must never be dereferenced after publication returns')!
 }
 
 fn check_ring_admission_contract(local string, reference string) ! {
@@ -427,6 +462,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_ring_admission_contract(local, workqueue)!
 	check_event_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, workqueue)!
 	check_batch_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_admission.v'))!, pending, queue)!
+	check_batch_publication_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_batch.v'))!, pending, queue)!
 	check_input_dependency_contract(pending)!
 	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
 		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit)!
@@ -454,11 +490,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	poll := section(pending, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'Vinix batch overlap')!
 	check_dependency_publication(poll)!
 	require_order(poll, ['g13_dependencies_ready(&item.dependencies, item.queue.fence_context)', 'failure := g13_pending_error(item)',
-		'mut blocked := [2]bool{}', 'command.published', 'blocked[command.pipe]', 'command.wait_for', 'if !prior.published',
-		'katomic.load(&prior.done)', 'katomic.load(&prior.error)', 'completed_error := g13_pending_error(item)',
-		'manager.g13_queue_dispatch_blocked', 'manager.submit_g13_compute_job',
-		'command.published = true', 'manager.submit_g13_render_job',
-		'if !command.published { blocked[command.pipe] = true }',
+		'if !item.admitted', 'manager.g13_queue_dispatch_blocked', 'submit_g13_pending(mut manager, mut item)',
+		'completed_error := g13_pending_error(item)',
 		'if katomic.load(&item.callbacks_remaining) != 0', 'final_error := g13_pending_error(item)'],
 		'Vinix dependency, per-subqueue FIFO and overlapping publication')!
 	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix barrier resolution')!
@@ -566,6 +599,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',
 		'Compute and paired render admission count host-unretired ring commands and preserve the reference spare entry',
 		'Whole-batch readiness counts all three pipes before publication, including compacted prefixes and simulated TVB bind/growth records; event and ring windows retain the reference spare',
+		'Native batch publication completes every fallible ring/wake preparation before notifier accounting or visibility, then exposes and notifies fragment/vertex/compute once each',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
 		'Independent later submissions pipeline after older publication with initial firmware dependencies',

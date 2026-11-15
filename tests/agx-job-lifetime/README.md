@@ -65,3 +65,16 @@ Canceled-predecessor tests admit two events after 125 stamp gaps on both compute
 and render, then publish and reap both without an intermediate retirement. An
 unused grant is cleared on canceled-ticket reuse; ordinary publication retains
 the strict single-event spare check.
+
+Native batch publication executes the actual manager method with real channels,
+ring buffers, events and reapers; wake, MMIO notification and UAT services are
+injected. Seventy-five transactions cover compute/render/mixed batches of
+1/2/63/64 jobs, wrapped inner/outer rings and signed/zero stamp boundaries,
+canceled stamp gaps, a byte oracle for every prefix and TVB binding, one available
+notification slot per pipe, and notifier/pending counter accounting. Every late
+preparation refusal leaves all rings, pointers and accounting unchanged, including
+an omitted unpublished middle ticket and a malformed workpipe write offset.
+Capacity retry succeeds intact; failed wake restores pending accounting. Doorbell
+failure after visibility returns the entire ownership mask and retains backing
+through error quarantine until injected firmware stop. Every final event slot
+returns. Native batches never return the partial masks injected by async tests.
