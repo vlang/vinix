@@ -121,6 +121,13 @@ default budget is 600 seconds. `selectwake-reference.v` runs the same ELF on
 Linux; `selectwake-evidence.v` audits results, cleanup, generated C and review.
 See [receipts and limits](../../docs/linux-select-wakeups.md).
 
+`--cases pipeready` checks anonymous pipe endpoint direction with poll/select/
+epoll, normal readiness masks, original/high/paired aliases, queue/flag guards
+and flat repeated cleanup. Both fixture sources are frozen and its default
+budget is 600 seconds. `pipeready-reference.v` runs the same ELF on Linux;
+`pipeready-evidence.v` audits the complete bundle, matching original failures,
+generated C and lifetime review. See [receipts and limits](../../docs/linux-pipe-readiness.md).
+
 ```sh
 tests/linux-compat/run --arch aarch64 --kernel-dir /path/to/arm/kernel --state-dir /path/to/fresh-arm
 tests/linux-compat/run --arch x86_64 --kernel-dir /path/to/x86/kernel --state-dir /path/to/fresh-x86

@@ -124,7 +124,7 @@ pub mut:
 // Preserve this asynchronous object's existing status rather than treating
 // its regular-file metadata as ordinary filesystem readiness. Fence-driven
 // DMA-BUF readiness remains a separate implementation.
-fn (mut this GemPrimeResource) poll_status() int {
+fn (mut this GemPrimeResource) poll_status(_access int) int {
 	return this.status
 }
 

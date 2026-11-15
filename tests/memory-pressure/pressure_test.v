@@ -71,10 +71,10 @@ fn test_regular_metadata_keeps_asynchronous_readiness() {
 	memory.set_snapshot(0, 0)
 	mut source := new_memory_pressure_source(stat.Stat{mode: 0x8000 | 0o444})
 	mut opened := open_pressure(mut source)
-	assert resource.poll_status(mut opened) == pollin
+	assert resource.poll_status(mut opened, resource.o_rdonly) == pollin
 	read_pressure(mut opened, 0, 512)
-	assert resource.poll_status(mut opened) == 0
+	assert resource.poll_status(mut opened, resource.o_rdonly) == 0
 	memory.set_snapshot(1, 1)
-	assert resource.poll_status(mut opened) == pollin
+	assert resource.poll_status(mut opened, resource.o_rdonly) == pollin
 	opened.unref(unsafe { nil }) or { panic('close failed') }
 }

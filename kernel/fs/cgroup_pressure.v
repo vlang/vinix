@@ -97,7 +97,7 @@ fn (mut this CGroupPressureFile) text(value string) {
 	}
 }
 
-fn (mut this CGroupPressureFile) poll_status() int {
+fn (mut this CGroupPressureFile) poll_status(_access int) int {
 	this.l.acquire()
 	defer { this.l.release() }
 	return this.status

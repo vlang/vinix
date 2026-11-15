@@ -94,7 +94,7 @@ fn process_pending(mask u64) u64 {
 	return proc.pending_signals(current) & mask
 }
 
-fn (mut this SignalFD) poll_status() int {
+fn (mut this SignalFD) poll_status(_access int) int {
 	this.l.acquire()
 	mask := this.mask
 	this.l.release()

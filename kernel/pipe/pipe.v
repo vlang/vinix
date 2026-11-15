@@ -52,6 +52,24 @@ pub mut:
 
 pub fn initialise() {}
 
+fn (mut this Pipe) poll_status(access int) int {
+	this.l.acquire()
+	defer { this.l.release() }
+	// Named FIFO hangups need per-open writer-generation accounting. Preserve
+	// their existing path here; this callback qualifies anonymous endpoints.
+	if this.fifo { return this.status }
+	mut ready := 0
+	if access == resource.o_rdonly || access == resource.o_rdwr {
+		if this.used != 0 { ready |= file.pollin | 0x40 } // RDNORM
+		if this.writers == 0 { ready |= file.pollhup }
+	}
+	if access == resource.o_wronly || access == resource.o_rdwr {
+		if this.used < this.capacity { ready |= file.pollout | file.pollwrnorm }
+		if this.readers == 0 { ready |= file.pollerr }
+	}
+	return ready
+}
+
 pub fn create() ?&Pipe {
 	charge := proc.reserve_kernel(.ipc, 4096)?
 	mut p := &Pipe{

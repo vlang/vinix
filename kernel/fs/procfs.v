@@ -917,7 +917,7 @@ fn (this &ProcFSResource) shows_layout() bool {
 
 // Virtual filesystem files have a poll operation even when their contents
 // need no wait. Keep them distinct from ordinary files for epoll admission.
-fn (mut this ProcFSResource) poll_status() int {
+fn (mut this ProcFSResource) poll_status(_access int) int {
 	return 0x145 // IN | OUT | RDNORM | WRNORM
 }
 

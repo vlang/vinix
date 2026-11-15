@@ -2411,6 +2411,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   original kernels fail 1,260 / 1,680. See
   [the wakeup qualification](docs/linux-select-wakeups.md).
 
+- [x] Compute native anonymous-pipe readiness for the open description's access
+  mode, including normal read/write bits and epoll forwarding. Empty, queued,
+  full, hung-up and broken endpoints with aliases pass 24,180 AArch64 / 30,960
+  x86-64 checks against identical Linux ELFs; matching originals fail 2,616 /
+  3,342. Repeated cleanup stays flat. See
+  [the endpoint qualification](docs/linux-pipe-readiness.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

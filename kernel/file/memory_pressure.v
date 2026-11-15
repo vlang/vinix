@@ -88,7 +88,7 @@ fn notify_memory_pressure(generation u64) {
 	}
 }
 
-fn (mut this MemoryPressureFile) poll_status() int {
+fn (mut this MemoryPressureFile) poll_status(_access int) int {
 	this.l.acquire()
 	defer { this.l.release() }
 	return this.status

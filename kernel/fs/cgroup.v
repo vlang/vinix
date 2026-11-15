@@ -859,7 +859,7 @@ fn (mut this CGroupResource) open(flags int) ?&resource.Resource {
 	return open_cgroup_pressure(this.group, this.stat)
 }
 
-fn (mut this CGroupResource) poll_status() int {
+fn (mut this CGroupResource) poll_status(_access int) int {
 	return 0x145 // IN | OUT | RDNORM | WRNORM
 }
 

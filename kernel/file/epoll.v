@@ -361,22 +361,10 @@ fn epoll_ready_events(mut entry EpollEntry, status int, generation u64) u32 {
 		return 0
 	}
 
-	mut current := u32(0)
-	if status & pollin != 0 && entry.events & epollin != 0 {
-		current |= epollin
-	}
-	if status & pollout != 0 && entry.events & epollout != 0 {
-		current |= epollout
-	}
-	if status & pollhup != 0 {
-		current |= epollhup
-	}
-	if status & pollerr != 0 {
-		current |= epollerr
-	}
-	if status & pollrdhup != 0 && entry.events & epollrdhup != 0 {
-		current |= epollrdhup
-	}
+	// Forward normal/band readiness as well as IN/OUT/PRI. Pipe backends
+	// report RDNORM/WRNORM separately, and epoll must preserve requested bits.
+	readiness := u32(epollin | epollout | epollpri | epollrdhup | 0x40 | 0x80 | pollwrnorm | 0x200)
+	current := (u32(status) & entry.events & readiness) | (u32(status) & u32(epollhup | epollerr))
 
 	mut deliverable := current
 	if entry.events & epollet != 0 {
@@ -591,7 +579,7 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?EpollReadySnapshot {
 			continue
 		}
 		mut watched := entry.handle.resource
-		revents := epoll_ready_events(mut entry, resource.poll_status(mut watched), watched.event.generation)
+		revents := epoll_ready_events(mut entry, resource.poll_status(mut watched, entry.handle.flags & resource.o_accmode), watched.event.generation)
 		if revents != 0 {
 			events << EpollEvent{
 				events: revents

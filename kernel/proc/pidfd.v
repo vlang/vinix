@@ -142,7 +142,7 @@ fn (mut this PidFile) unref(_handle voidptr) ? {
 	unlock_table()
 }
 
-fn (mut this PidFile) poll_status() int {
+fn (mut this PidFile) poll_status(_access int) int {
 	return katomic.load(&this.status)
 }
 

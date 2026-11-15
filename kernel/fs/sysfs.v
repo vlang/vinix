@@ -387,7 +387,7 @@ fn add_node_meminfo_line(mut text lib.Text, node int, label string, kb u64) {
 	text.add(' kB\n')
 }
 
-fn (mut this SysFSResource) poll_status() int {
+fn (mut this SysFSResource) poll_status(_access int) int {
 	return 0x145 // IN | OUT | RDNORM | WRNORM
 }
 
