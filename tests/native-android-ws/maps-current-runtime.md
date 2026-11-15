@@ -30,8 +30,11 @@ complete signed ARM suite passed under the original caps. Real account setup
 progressed past the label calls and displayed Checking info, then logged a
 cookie-removal exception after the browser engine exited. The launcher deletes
 its private engine log on failure; [bounded retention and exit-status reporting](maps-browser-engine-20261115.md)
-now pass host/ASan checks and the current-V AArch64 build. Complete r107/r108 public/private evidence is
-preserved, and both guests are stopped.
+passed host/ASan checks, current-V AArch64 build and r109 ARM validation.
+The retained r109 log identified an earlier X11 admission error; the
+[readable rejection reply fix](maps-x11-rejection-20261115.md) now passes
+focused host/ASan tests and AArch64 build. Complete r107/r108/r109 public/private
+evidence is preserved, and those guests are stopped.
 Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)

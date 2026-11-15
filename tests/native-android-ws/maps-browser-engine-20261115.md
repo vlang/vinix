@@ -39,5 +39,50 @@ complete cleanup. Root: browser-failure-protocol-build-20261115-r1.
 run-android SHA256:
 ba2e85a71e4f285fb91162c6c62bf82331003f47986417b9a2e8e41d84b0240b.
 
-Fresh ARM/account validation is pending. This diagnostic change does not yet
-identify the engine's underlying cause or qualify account authentication.
+## r109 ARM and protected retry
+
+Fresh staging and the complete signed ARM suite passed, child exit 0,
+readiness pass and CURRENT-API-PASS. The complete API export reconstructed
+without removals: 24059 bytes / 47 chunks.
+
+| API evidence | SHA256 |
+| --- | --- |
+| maps-browser-api-uart-20261115-r1/full.log | 5f3c81cc503cfaa0c9920fc0d4ecf507edf1b61525c6dbe88f267f56108058a6 |
+| maps-browser-api-readback-20261115-r1/archive.json | 6c2a2121836de8b53aaa4db271f94a4265adb3b370c8948c47bf352d36846b74 |
+| maps-browser-api-child-20261115-r1/child.log | b4028702a84ea8880f3390fb868cea1f2d2362230e8d11b98ff0cdbf3057ff8c |
+
+GMS PID24020 reached readiness on checked persistent volume
+42e185336c2d46c7b08a37891d41e70b. Maps PID64752 launched once, rendered
+onboarding and the chooser, and attempted Add account once. Three device
+check-ins succeeded. This run failed earlier than r108: X11 admission socket
+failed before engine startup, followed by the same cookie-removal exception.
+Maps exited on the account query deadline; GMS remained alive. No credentials
+were entered. The retained private log contains Xvfb/XKB warnings, not an
+engine exit or sandbox failure. The numeric engine-status path remains pending.
+
+The production diagnostic retained an app-private mode-0600 log, 898 bytes;
+it was copied to r109-private/browser-failure.log before the checked stop.
+After the complete account export ended, full results were copied and synced
+to the checked data volume. Mount check, copied receipt/log and prompt preceded
+stopping QEMU23328. PID absence and no open image handles preceded read-only
+extraction; e2fsck passed. The complete export reconstructed without removals:
+1429898 bytes / 2793 chunks. The receipt compares identical to the private copy
+and private logs match their manifest. Receipt status is
+user-stopped-no-authentication-claim with cleanup_survivors=1, so complete
+controller cleanup is unqualified. The test guest is stopped. Account
+authentication remains unqualified.
+
+| Account evidence | SHA256 |
+| --- | --- |
+| maps-r109-uart-20261115-r1/interval.log | 2406268988d5c7a4d493ef038a90bd55ace17b65692a541af2c67fd1fd8532c5 |
+| maps-r109-readback-20261115-r1/archive.json | 9b8ad8c08ca859bbe093fb9f92eb26224a5faab21b9da5fdc256eed141907357 |
+| Same readback/exported-receipt.json | 5f856f6a091b5157ac331f4c6ffac5df87543ff4e1b64e0cd042519bf3cf4e57 |
+| Private r109-private/results/broker.log | 4e6635c569b2c49ea621d24e94e6a0ce66ffcfa5525c42adb745d779a9d1a2a2 |
+| Private r109-private/browser-failure.log | 142634a775ba4852e36feca88bb2403a1227439c43b13a6762ad0a4955beaca9 |
+
+The X11 waiter currently rejects POLLERR before checking readable data. Vinix's
+Unix close path explicitly sets POLLIN|POLLHUP|POLLERR, including when a reply
+remains queued. This can discard the wrong-cookie rejection response used by
+display admission. The next fix drains readable responses while preserving
+complete-header validation and refusal of connection errors/invalid descriptors.
+It does not establish the underlying engine failure seen in r108.

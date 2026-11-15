@@ -10,6 +10,51 @@ fn x11_test_fd_count() int {
 	return count
 }
 
+fn test_x11_readiness_drains_a_reply_when_peer_close_also_reports_error() {
+	for closed in [i16(0), i16(C.POLLHUP), i16(C.POLLERR), i16(C.POLLHUP | C.POLLERR)] {
+		assert x11_ready(i16(C.POLLIN) | closed, C.POLLIN)!
+	}
+	assert !x11_ready(0, C.POLLIN)!
+	assert !x11_ready(C.POLLOUT, C.POLLIN)!
+	assert x11_ready(C.POLLOUT, C.POLLOUT)!
+	for flags in [i16(C.POLLERR), i16(C.POLLHUP), i16(C.POLLNVAL),
+		i16(C.POLLIN | C.POLLNVAL), i16(C.POLLOUT | C.POLLERR)] {
+		mut rejected := false
+		x11_ready(flags, if flags & C.POLLOUT != 0 { i16(C.POLLOUT) } else { i16(C.POLLIN) }) or { rejected = true }
+		assert rejected
+	}
+}
+
+fn test_x11_exchange_requires_complete_rejection_header_even_on_close() {
+	for length in [0, 1, 7, 8] {
+		pair := control_pair()!
+		child := C.fork()
+		assert child >= 0
+		if child == 0 {
+			C.close(pair[0])
+			mut request := [48]u8{}
+			mut used := 0
+			for used < request.len {
+				n := unsafe { C.read(pair[1], &request[used], usize(request.len - used)) }
+				if n <= 0 { C._exit(2) }
+				used += int(n)
+			}
+			header := [u8(0), 0, 11, 0, 0, 0, 0, 0]
+			if length > 0 { C.write(pair[1], header.data, usize(length)) }
+			C.close(pair[1])
+			C._exit(0)
+		}
+		C.close(pair[1])
+		mut rejected := false
+		header := x11_exchange(pair[0], setup_packet([]u8{len: 16})) or { rejected = true; []u8{} }
+		C.close(pair[0])
+		mut status := i32(0)
+		assert C.browser_waitpid(child, &status, 0) == child && status == 0
+		assert rejected == (length < 8)
+		if length == 8 { assert header.len == 8 && header[0] == 0 }
+	}
+}
+
 fn x11_test_bound_socket(path string) !i32 {
 	mut address := C.sockaddr_un{}
 	$if macos {

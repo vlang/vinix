@@ -13,6 +13,18 @@ fn x11_nonblocking(fd i32) ! {
 	}
 }
 
+fn x11_ready(revents i16, events i16) !bool {
+	if revents & C.POLLNVAL != 0 { return error('X11 admission socket failed') }
+	// Vinix reports POLLIN|POLLHUP|POLLERR after a Unix peer closes, even
+	// while its rejection header remains queued. Drain readable bytes before
+	// interpreting the close; the exchange still requires all eight bytes.
+	if events & C.POLLIN != 0 && revents & C.POLLIN != 0 { return true }
+	if revents & C.POLLERR != 0 { return error('X11 admission socket failed') }
+	if revents & events != 0 { return true }
+	if revents & C.POLLHUP != 0 { return error('X11 admission socket closed') }
+	return false
+}
+
 fn x11_wait(fd i32, events i16, deadline u64) ! {
 	for {
 		now := time.sys_mono_now()
@@ -22,11 +34,7 @@ fn x11_wait(fd i32, events i16, deadline u64) ! {
 		result := C.poll(&ready, 1, remaining)
 		if result < 0 && C.errno == C.EINTR { continue }
 		if result <= 0 { return error('X11 admission deadline expired') }
-		if ready.revents & (C.POLLERR | C.POLLNVAL) != 0 {
-			return error('X11 admission socket failed')
-		}
-		if ready.revents & events != 0 { return }
-		if ready.revents & C.POLLHUP != 0 { return error('X11 admission socket closed') }
+		if x11_ready(ready.revents, events)! { return }
 	}
 }
 
