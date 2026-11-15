@@ -187,6 +187,7 @@ pub mut:
 	stamp_value        u32
 	event_sequence     u64
 	command            SharedBuffer
+	explicit_barriers  G13CommandBarriers
 	microsequence      SharedBuffer
 	timestamps         SharedBuffer
 	preempt            &mmu.UatBuffer = unsafe { nil }
@@ -241,6 +242,7 @@ pub mut:
 	vertex_event_sequence   u64
 	fragment_event_sequence u64
 	init_buffer             SharedBuffer
+	explicit_barriers       G13CommandBarriers
 	barrier                 SharedBuffer
 	vertex                  SharedBuffer
 	fragment                SharedBuffer
@@ -931,22 +933,22 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 	return true
 }
 
-// Publish a complete command batch into a queue-owned ring, then emit one
-// RunWorkQueue message containing the final write pointer. InitBuffer+Vertex
-// and Barrier+Fragment must become visible atomically as pairs. Holding the
+// Publish up to two prefix barriers and a command into a queue-owned ring,
+// then emit one RunWorkQueue message with the final write pointer. Holding the
 // outer ring lock across both publications prevents a full outer ring from
 // stranding already-visible inner commands.
 fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
-	pipe_type u32, command_vas []u64, event_slot u32) bool {
+	pipe_type u32, command_vas [3]u64, command_count u32, event_slot u32) bool {
 	if resources == unsafe { nil } || resources.released || mgr.state != .running
-		|| mgr.hw_config.gpu_gen != .g13 || pipe_type >= 3 || command_vas.len == 0
-		|| command_vas.len >= int(fw.g13_workqueue_entries)
+		|| mgr.hw_config.gpu_gen != .g13 || pipe_type >= 3 || command_count == 0
+		|| command_count > 3
 		|| event_slot >= event.max_stamps
 		|| resources.channel_mask & (u32(1) << pipe_type) == 0
 		|| resources.priority >= 4 {
 		return false
 	}
-	for command_va in command_vas {
+	for index := u32(0); index < command_count; index++ {
+		command_va := command_vas[index]
 		if !((command_va >= alloc.g13_gpu_readonly_start
 			&& command_va < alloc.g13_gpu_readonly_end)
 			|| (command_va >= alloc.g13_private_start && command_va < alloc.g13_private_end)) {
@@ -995,34 +997,34 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	}
 	inner_used := (inner_wp + fw.g13_workqueue_entries - inner_done) % fw.g13_workqueue_entries
 	inner_free := fw.g13_workqueue_entries - inner_used - 1
-	if u32(command_vas.len) > inner_free {
+	if command_count > inner_free {
 		queue.lock.release()
 		outer.lock.release()
 		return false
 	}
 	mut inner_next := inner_wp
-	for command_va in command_vas {
+	for index := u32(0); index < command_count; index++ {
+		command_va := command_vas[index]
 		unsafe {
 			mut entry := &u64(queue.ring.phys + higher_half + u64(inner_next) * sizeof(u64))
 			*entry = command_va
 		}
 		inner_next = (inner_next + 1) % fw.g13_workqueue_entries
 	}
-	queue.command_sequence += u64(command_vas.len)
+	queue.command_sequence += u64(command_count)
 	queue.last_command_slot = (inner_next + fw.g13_workqueue_entries - 1) % fw.g13_workqueue_entries
 	katomic.sync()
 	katomic.store(mut &state.cpu_wptr, inner_next)
 
-	message := fw.FwRunWorkQueueMsg{
-		pipe_type: pipe_type
-		work_queue_addr: queue.info.va
-		write_ptr: inner_next
-		event_slot: event_slot
-		is_new: if queue.is_new { u32(1) } else { u32(0) }
-	}
 	unsafe {
-		destination := voidptr(outer.ring_phys + higher_half + u64(outer_wp) * outer.entry_size)
-		C.memcpy(destination, &message, sizeof(fw.FwRunWorkQueueMsg))
+		mut destination := &fw.FwRunWorkQueueMsg(outer.ring_phys + higher_half + u64(outer_wp) * outer.entry_size)
+		*destination = fw.FwRunWorkQueueMsg{
+			pipe_type: pipe_type
+			work_queue_addr: queue.info.va
+			write_ptr: inner_next
+			event_slot: event_slot
+			is_new: if queue.is_new { u32(1) } else { u32(0) }
+		}
 	}
 	katomic.sync()
 	katomic.store(mut outer_write, outer_next)
@@ -1039,19 +1041,20 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	return true
 }
 
+// Prefix barriers and RunCompute become visible in a single ring transaction.
+fn (mut mgr GpuManager) publish_g13_compute_job_locked(job &G13ComputeJobResources) bool {
+	if !job.explicit_barriers.publishable(&job.microsequence) { return false }
+	mut storage := [3]u64{}
+	for index := u32(0); index < job.explicit_barriers.count; index++ {
+		storage[index] = job.microsequence.va + job.explicit_barriers.offset + u64(index) * g13_barrier_stride
+	}
+	storage[job.explicit_barriers.count] = job.command.va
+	return mgr.submit_g13_queue_commands(job.queue, 2, storage, job.explicit_barriers.count + 1, job.event_slot)
+}
+
 fn (mut mgr GpuManager) submit_g13_queue_command(resources &G13QueueResources,
 	pipe_type u32, command_va u64, event_slot u32) bool {
-	// A list over the stack: a `[command_va]` literal was a heap allocation on
-	// every compute submission.
-	mut storage := [command_va]!
-	mut command_vas := []u64{}
-	unsafe {
-		command_vas.data = voidptr(&storage[0])
-		command_vas.len = 1
-		command_vas.cap = 1
-		command_vas.flags = .nogrow | .nofree
-	}
-	return mgr.submit_g13_queue_commands(resources, pipe_type, command_vas, event_slot)
+	return mgr.submit_g13_queue_commands(resources, pipe_type, [command_va, u64(0), 0]!, 1, event_slot)
 }
 
 // Firmware's done pointer and the host's free pointer have different owners.
@@ -1208,6 +1211,7 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 		}
 	}
 	job.released = true
+	release_g13_barrier_pins(mut job.explicit_barriers)
 	if job.vertex_event_reserved {
 		mut queue := unsafe { job.queue }
 		queue.subqueues[0].events.release(job.vertex_event_slot, job.vertex_stamp_value, job.submitted)
@@ -1331,7 +1335,8 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	fragment_start_ts_offset := fw.g13_fragment_start_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	fragment_end_ts_offset := fw.g13_fragment_end_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 
-	job.init_buffer = mgr.alloc_g13_buffer_with_protection(sizeof(fw.G13InitBufferCommand), pgtable.gpu_prot_fw_private_rw) or { return none }
+	job.explicit_barriers.offset = g13_barrier_tail_offset(sizeof(fw.G13InitBufferCommand))
+	job.init_buffer = mgr.alloc_g13_buffer_with_protection(job.explicit_barriers.offset + g13_barrier_tail_size, pgtable.gpu_prot_fw_private_rw) or { return none }
 	job.barrier = mgr.alloc_g13_buffer_with_protection(sizeof(fw.G13BarrierCommand), pgtable.gpu_prot_fw_private_rw) or { return none }
 	job.vertex = mgr.alloc_g13_buffer_with_protection(vertex_size, pgtable.gpu_prot_gpu_ro_fw_private_rw) or { return none }
 	job.fragment = mgr.alloc_g13_buffer_with_protection(fragment_size, pgtable.gpu_prot_gpu_ro_fw_private_rw) or { return none }
@@ -1857,6 +1862,7 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		|| mgr.g13_channels == unsafe { nil } {
 		return false
 	}
+	if !job.explicit_barriers.publishable(&job.init_buffer) { return false }
 	queue := job.queue
 	vertex_outer_index := pipe_index(queue.priority, 0)
 	fragment_outer_index := pipe_index(queue.priority, 1)
@@ -1868,7 +1874,7 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 	mut owned_queue := unsafe { queue }
 	block_count := u32(job.tvb_size_bytes / fw.g13_tvb_block_size)
 	include_init := owned_queue.render_buffer.needs_bind || owned_queue.render_buffer.bound_blocks < block_count
-	vertex_count := if include_init { u32(2) } else { u32(1) }
+	vertex_count := job.explicit_barriers.count + if include_init { u32(2) } else { u32(1) }
 	mut vertex_queue := &owned_queue.subqueues[0]
 	mut fragment_queue := &owned_queue.subqueues[1]
 	vertex_queue.lock.acquire()
@@ -1962,9 +1968,14 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		mut fragment_entry_1 := &u64(fragment_queue.ring.phys + higher_half + u64((fragment_inner_wp + 1) % fw.g13_workqueue_entries) * sizeof(u64))
 		*fragment_entry_0 = job.barrier.va
 		*fragment_entry_1 = job.fragment.va
-		mut vertex_entry_0 := &u64(vertex_queue.ring.phys + higher_half + u64(vertex_inner_wp) * sizeof(u64))
+		for index := u32(0); index < job.explicit_barriers.count; index++ {
+			mut entry := &u64(vertex_queue.ring.phys + higher_half + u64((vertex_inner_wp + index) % fw.g13_workqueue_entries) * sizeof(u64))
+			*entry = job.init_buffer.va + job.explicit_barriers.offset + u64(index) * g13_barrier_stride
+		}
+		command_wp := (vertex_inner_wp + job.explicit_barriers.count) % fw.g13_workqueue_entries
+		mut vertex_entry_0 := &u64(vertex_queue.ring.phys + higher_half + u64(command_wp) * sizeof(u64))
 		if include_init {
-			mut vertex_entry_1 := &u64(vertex_queue.ring.phys + higher_half + u64((vertex_inner_wp + 1) % fw.g13_workqueue_entries) * sizeof(u64))
+			mut vertex_entry_1 := &u64(vertex_queue.ring.phys + higher_half + u64((command_wp + 1) % fw.g13_workqueue_entries) * sizeof(u64))
 			*vertex_entry_0 = job.init_buffer.va
 			*vertex_entry_1 = job.vertex.va
 		} else { *vertex_entry_0 = job.vertex.va }
@@ -1981,25 +1992,23 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		owned_queue.render_buffer.needs_bind = false
 	}
 
-	fragment_message := fw.FwRunWorkQueueMsg{
-		pipe_type: 1
-		work_queue_addr: fragment_queue.info.va
-		write_ptr: fragment_inner_next
-		event_slot: job.fragment_event_slot
-		is_new: if fragment_queue.is_new { u32(1) } else { u32(0) }
-	}
-	vertex_message := fw.FwRunWorkQueueMsg{
-		pipe_type: 0
-		work_queue_addr: vertex_queue.info.va
-		write_ptr: vertex_inner_next
-		event_slot: job.vertex_event_slot
-		is_new: if vertex_queue.is_new { u32(1) } else { u32(0) }
-	}
 	unsafe {
-		fragment_destination := voidptr(fragment_outer.ring_phys + higher_half + u64(fragment_outer_wp) * fragment_outer.entry_size)
-		C.memcpy(fragment_destination, &fragment_message, sizeof(fw.FwRunWorkQueueMsg))
-		vertex_destination := voidptr(vertex_outer.ring_phys + higher_half + u64(vertex_outer_wp) * vertex_outer.entry_size)
-		C.memcpy(vertex_destination, &vertex_message, sizeof(fw.FwRunWorkQueueMsg))
+		mut fragment_destination := &fw.FwRunWorkQueueMsg(fragment_outer.ring_phys + higher_half + u64(fragment_outer_wp) * fragment_outer.entry_size)
+		*fragment_destination = fw.FwRunWorkQueueMsg{
+			pipe_type: 1
+			work_queue_addr: fragment_queue.info.va
+			write_ptr: fragment_inner_next
+			event_slot: job.fragment_event_slot
+			is_new: if fragment_queue.is_new { u32(1) } else { u32(0) }
+		}
+		mut vertex_destination := &fw.FwRunWorkQueueMsg(vertex_outer.ring_phys + higher_half + u64(vertex_outer_wp) * vertex_outer.entry_size)
+		*vertex_destination = fw.FwRunWorkQueueMsg{
+			pipe_type: 0
+			work_queue_addr: vertex_queue.info.va
+			write_ptr: vertex_inner_next
+			event_slot: job.vertex_event_slot
+			is_new: if vertex_queue.is_new { u32(1) } else { u32(0) }
+		}
 	}
 	mut fragment_outer_write := unsafe {
 		&u32(fragment_outer.state_phys + higher_half + fragment_outer.write_off)
@@ -2204,6 +2213,7 @@ fn (mut mgr GpuManager) free_g13_compute_job_locked(mut job G13ComputeJobResourc
 		}
 	}
 	job.released = true
+	release_g13_barrier_pins(mut job.explicit_barriers)
 	if job.event_reserved {
 		mut queue := unsafe { job.queue }
 		queue.subqueues[2].events.release(job.event_slot, job.stamp_value, job.submitted)
@@ -2299,7 +2309,8 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 	} else {
 		if input.has_result { u64(0x228) } else { u64(0x1c0) }
 	}
-	job.microsequence = mgr.alloc_g13_buffer_with_protection(logical_microsequence_size, pgtable.gpu_prot_fw_private_rw) or { return none }
+	job.explicit_barriers.offset = g13_barrier_tail_offset(logical_microsequence_size)
+	job.microsequence = mgr.alloc_g13_buffer_with_protection(job.explicit_barriers.offset + g13_barrier_tail_size, pgtable.gpu_prot_fw_private_rw) or { return none }
 	job.timestamps = mgr.alloc_g13_shared_buffer(sizeof(fw.G13JobTimestamps)) or { return none }
 
 	mut owned_queue := unsafe { resources }
@@ -2526,7 +2537,7 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 		return false
 	}
 	owned.pending_counted = true
-	if !mgr.submit_g13_queue_command(queue, 2, owned.command.va, owned.event_slot) {
+	if !mgr.publish_g13_compute_job_locked(owned) {
 		mgr.end_g13_operation_locked()
 		owned.pending_counted = false
 		katomic.store(mut threshold, old_threshold)

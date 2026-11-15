@@ -56,6 +56,7 @@ pub mut:
 	quarantined bool
 	marker      u64
 	ordinal     u32
+	barrier_sources [2]u32
 	completion  fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
 	data        voidptr
 }
@@ -68,6 +69,7 @@ pub mut:
 	released    bool
 	quarantined bool
 	ordinal     u32
+	barrier_sources [2]u32
 	completion  fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
 	data        voidptr
 }
@@ -84,6 +86,9 @@ pub mut:
 	released_order        []u32
 	prepares              int
 	callbacks             int
+	barrier_setups        int
+	fail_barrier_at       int = -1
+	stop_barrier_at       int = -1
 	fail_prepare_at       int          = -1
 	fail_callback_at      int          = -1
 	stop_callback_at      int          = -1
@@ -166,6 +171,46 @@ pub fn (mut mgr GpuManager) set_g13_compute_completion(job &G13ComputeJobResourc
 		mgr.on_callback(data)
 	}
 	if index == mgr.stop_callback_at { mgr.stop() }
+	return true
+}
+
+pub struct G13BarrierSource {
+pub:
+	render &G13RenderJobResources = unsafe { nil }
+	compute &G13ComputeJobResources = unsafe { nil }
+}
+
+fn (mut mgr GpuManager) stage_barrier_sources(queue &G13QueueResources, sources [2]G13BarrierSource) ?[2]u32 {
+	if mgr.state != .running { return none }
+	index := mgr.barrier_setups
+	mgr.barrier_setups++
+	if index == mgr.fail_barrier_at { return none }
+	mut result := [2]u32{}
+	for pipe, source in sources {
+		if source.render != unsafe { nil } {
+			assert pipe == 0 && source.render.queue == queue && !source.render.submitted && !source.render.released
+			result[pipe] = source.render.ordinal + 1
+		}
+		if source.compute != unsafe { nil } {
+			assert pipe == 1 && source.compute.queue == queue && !source.compute.submitted && !source.compute.released
+			result[pipe] = source.compute.ordinal + 1
+		}
+	}
+	if index == mgr.stop_barrier_at { mgr.stop() }
+	return result
+}
+
+pub fn (mut mgr GpuManager) set_g13_compute_barriers(job &G13ComputeJobResources, sources [2]G13BarrierSource) bool {
+	if job.released || job.submitted || job.quarantined { return false }
+	values := mgr.stage_barrier_sources(job.queue, sources) or { return false }
+	unsafe { job.barrier_sources = values }
+	return true
+}
+
+pub fn (mut mgr GpuManager) set_g13_render_barriers(job &G13RenderJobResources, sources [2]G13BarrierSource) bool {
+	if job.released || job.submitted || job.quarantined { return false }
+	values := mgr.stage_barrier_sources(job.queue, sources) or { return false }
+	unsafe { job.barrier_sources = values }
 	return true
 }
 

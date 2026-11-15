@@ -25,3 +25,12 @@ invalidation, metadata/GPU allocation failure, failed invalidation and retry,
 stopped firmware, and zero retained cache metadata after teardown. Queue cleanup
 also runs the real public release method to verify quarantine permits teardown
 retry without permitting new submissions.
+
+Barrier tests execute the production setters and job cleanup with the real
+event manager. An independent byte oracle and canaries verify the records stay
+after the logical command/microsequence, with both type fields at their reference
+offsets. Four hundred cycles cover real producer/consumer reaping, duplicate
+physical pins, partial setup, failed flush, quarantine retry and stopped cleanup;
+each returns all 128 physical slots. The separate event fixture checks 1,000
+producer-owner/pin/reuse cycles and overflow/invalid-slot guards. These checks
+measure event ownership and injected backing, without native GPU execution.

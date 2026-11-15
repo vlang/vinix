@@ -149,8 +149,9 @@ pub mut:
 	wait_slot    u32
 	stamp_self   u32
 	uuid         u32
-	barrier_type u32
-	padding      [0x20]u8
+	external_barrier u32
+	internal_barrier_type u32
+	padding      [0x1c]u8
 }
 
 pub fn g13_workqueue_priority(priority u32) ?G13WorkQueuePriority {
@@ -228,4 +229,8 @@ pub fn validate_g13_workqueue_layouts() bool {
 		&& sizeof(G13WorkQueueInfoV135) == 0xb8
 		&& sizeof(G13GpuContextData) == 0x40
 		&& sizeof(G13BarrierCommand) == 0x40
+		&& __offsetof(G13BarrierCommand, wait_stamp) == 0x04
+		&& __offsetof(G13BarrierCommand, external_barrier) == 0x1c
+		&& __offsetof(G13BarrierCommand, internal_barrier_type) == 0x20
+		&& __offsetof(G13BarrierCommand, padding) == 0x24
 }

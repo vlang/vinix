@@ -87,6 +87,29 @@ fn g13_pending_error(item &G13PendingSubmission) int {
 	return 0
 }
 
+// All source metadata remains caller-owned until this node is queued. The
+// manager reads and pins its event slots while holding its publication lock.
+fn install_g13_batch_barriers(mut item G13PendingSubmission) bool {
+	mut manager := unsafe { item.manager }
+	for index := u32(0); index < item.command_count; index++ {
+		command := &item.commands[index]
+		mut sources := [2]gpu.G13BarrierSource{}
+		for pipe in 0 .. 2 {
+			dependency := command.wait_for[pipe]
+			if dependency == 0 { continue }
+			prior := &item.commands[dependency - 1]
+			sources[pipe] = gpu.G13BarrierSource{ render: prior.render_job, compute: prior.compute_job }
+		}
+		installed := if command.compute_job != unsafe { nil } {
+			manager.set_g13_compute_barriers(command.compute_job, sources)
+		} else {
+			manager.set_g13_render_barriers(command.render_job, sources)
+		}
+		if !installed { return false }
+	}
+	return true
+}
+
 // Called under manager.lock while the ioctl still holds file.lock.
 fn enqueue_g13_pending(data voidptr) {
 	mut item := unsafe { &G13PendingSubmission(data) }

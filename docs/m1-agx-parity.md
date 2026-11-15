@@ -108,7 +108,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. Independent commands within a batch can overlap; explicit dependencies wait on internal callbacks and each subqueue preserves publication order. Later batches on the same queue wait through retirement. Modern flat-command integration, firmware barrier commands and overlap across submissions still differ from DRM scheduling. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. Independent commands within a batch can overlap; nonzero dependencies now have firmware barrier prefixes and still wait on internal callbacks. Later batches on the same queue wait through retirement. Modern flat-command integration, firmware-driven dependency scheduling and initial dependencies/overlap across submissions still differ from DRM scheduling. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands within one batch and independent queues may execute concurrently; later batches on the same queue wait through retirement. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
@@ -583,6 +583,59 @@ Linked kernel SHA-256 values are
 (AArch64) and
 `1bf2f083e14a9849213d607177e02b1bcd7e5280084f5e310da0abde13cd2a70`
 (x86_64). The retained checker passes `check-inventory BUNDLE RECEIPT`.
+
+### Firmware barrier prefixes and physical event ownership
+
+Nonzero in-batch dependencies now produce the packaged reference's explicit
+barrier records, with UUID `0xffffbbbb`, external field zero and internal type one.
+The two type fields occupy distinct words at offsets `0x1c` and `0x20`; the
+record remains 64 bytes. Prefixes precede InitBuffer/Vertex or RunCompute in
+one publication transaction, including ring capacity and retirement accounting.
+
+Each consumer pins the physical event counters it references until its complete
+graph passes invalidation or firmware stops. Producer retirement, partial setup,
+flush failure and quarantine do not release those pins early. Records occupy
+reserved tails in existing private microsequence/InitBuffer allocations; the
+current ABI forms still fit their existing 16KiB pages. Logical microsequence
+lengths remain unchanged. Setup runs after all jobs are prepared and before
+callback/fence installation.
+
+Generated-C inspection caught hidden temporary allocations in the prefix array
+and firmware notification copies. Fixed three-entry storage and direct packed
+ring writes remove them. A maintained checker and its negative selftests verify
+five generated helper bodies. This does not measure whole-kernel allocation
+rates or qualify native GPU execution.
+
+ASan/UBSan checks pass the independent byte oracle, tail canaries, 400 producer/
+consumer lifecycle cycles returning all 128 event slots, 1,000 physical ownership/
+reuse cycles, every barrier-setup/stop position in a 64-command batch, wrapped/
+full rings, retry and conditional TVB binding. Existing async, close, recovery,
+lifetime, source and unit checks pass. Independent lifetime review approved the
+pins, fixed storage and notification ordering. An isolated AArch64 build and
+ordinary x86_64 build pass from `0be4a7d02ba11ef73e2007d35079dff24b02f5a3`
+plus six retained kernel files. Every AGX V source matches the final ARM build
+input byte-for-byte.
+
+The fresh Omarchy clone is `6306130eb877be9312197b4ea74eb0d0dc626f0d`;
+package, kernel and Mesa pins remain unchanged. The audit remains
+`not_equivalent`. CPU callback waits, index-zero ordering through batch FIFO,
+modern ABI integration, full firmware-driven/cross-submission scheduling and
+VM/GEM/Mesa integration remain incomplete. No native GPU test, Vinix boot or
+reboot was performed.
+
+The complete retained bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-barriers-20261115/bundle/`.
+Its sibling `inventory.json` SHA-256 is
+`8e6967c99a6a654b1a56e4e4b56a7506b2247e77b2dd8aa0b54785f3cda5e1be`.
+The sibling `bundle.tar.gz` contains the bundle and receipt; its SHA-256 is
+`7489c179c96f59d148629ca9487624050cf076fe5bcb86e3025c8cfb62644949`.
+Both the original and a full archive extraction pass the retained
+`check-inventory BUNDLE RECEIPT` checker. Linked kernel SHA-256 values are
+`f17318ba7d2e45474fd9ac3cede06b4ed439d43523b525229fe1d2819da6ed15`
+(AArch64) and
+`914068b75c957ef1e496c11a6d8edef8619bbcabfd6d568269e2f77e334e8376`
+(x86_64). Storage interruptions were resolved with a task-owned RAM build;
+the accepted artifacts and archive are retained on persistent storage.
 
 ## Earlier artifact retention incident
 

@@ -139,10 +139,10 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
 	batch := section(vinix_jobs, 'fn (mut mgr GpuManager) submit_g13_queue_commands(', 'fn (mut mgr GpuManager) submit_g13_queue_command(', 'Vinix batched G13 publisher')!
 	require_order(batch, ['*entry = command_va', 'katomic.sync()', 'katomic.store(mut &state.cpu_wptr',
-		'C.memcpy(destination', 'katomic.sync()', 'katomic.store(mut outer_write'], 'Vinix batched G13 publication')!
+		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()', 'katomic.store(mut outer_write'], 'Vinix batched G13 publication')!
 	render := section(vinix_jobs, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(', '// Transfer a prepared render pass', 'Vinix paired G13 publisher')!
 	require_order(render, ['*vertex_entry_1 = job.vertex.va', 'katomic.sync()',
-		'katomic.store(mut &fragment_state.cpu_wptr', 'C.memcpy(vertex_destination',
+		'katomic.store(mut &fragment_state.cpu_wptr', '*vertex_destination = fw.FwRunWorkQueueMsg',
 		'katomic.sync()', 'katomic.store(mut fragment_outer_write'], 'Vinix paired G13 publication')!
 	results << 'batched compute/render entry barriers before inner and outer pointer publication'
 	return results
@@ -249,6 +249,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(ioctl_submit, ['agxsubmission.stage_command_array', 'agxsubmission.stage_sync_array',
 		'f.lock.acquire()', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
 		'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
+		'install_g13_batch_barriers',
 		'agxsubmission.install_output_syncs', 'gpu_manager.queue_g13_submission'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
@@ -277,6 +278,36 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Native hardware-command limit differs')!
 	require_order(queue, ['const SQ_RENDER: usize = 0', 'const SQ_COMPUTE: usize = 1',
 		'events[queue_idx].get(*index as usize)'], 'Asahi subqueue barrier numbering')!
+	barrier_wire := read(os.join_path(base, 'fw/workqueue.rs'))!
+	require_order(barrier_wire, ['pub(crate) struct Barrier {', 'wait_stamp: GpuWeakPointer<FwStamp>',
+		'external_barrier: u32', 'internal_barrier_type: u32', 'padding: Pad<0x1c>'], 'Asahi barrier wire fields')!
+	require_order(queue, ['Create Explicit Barrier', 'wait_stamp: event.fw_stamp_pointer',
+		'wait_value: event.value', 'stamp_self: queue_job.event_info().value.next()',
+		'uuid: 0xffffbbbb', 'external_barrier: 0', 'internal_barrier_type: 1',
+		'queue_job.add(barrier, vm_slot)'], 'Asahi explicit barrier prefix')!
+	barriers := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_barriers.v'))!
+	require_order(barriers.fields().join(' '), ['fn (mut mgr GpuManager) initialize_g13_barriers_locked(',
+		'barriers.configured = true', 'event.retain_stamp(wait.slot)',
+		'barriers.slots[index] = wait.slot', 'barriers.count++',
+		'wait_stamp: event.firmware_stamp_address(wait.slot)', 'wait_value: wait.value',
+		'stamp_self: stamp_self', 'uuid: 0xffffbbbb', 'external_barrier: 0',
+		'internal_barrier_type: 1', 'mgr.flush_g13_kernel_buffer(&owner)', 'barriers.ready = true'],
+		'Vinix owned firmware barrier prefix')!
+	require_order(local, ['job.explicit_barriers.offset = g13_barrier_tail_offset(sizeof(fw.G13InitBufferCommand))',
+		'job.explicit_barriers.offset + g13_barrier_tail_size',
+		'vertex_count := job.explicit_barriers.count +',
+		'index < job.explicit_barriers.count', 'command_wp := (vertex_inner_wp + job.explicit_barriers.count)',
+		'*vertex_entry_0 = job.init_buffer.va',
+		'job.explicit_barriers.offset = g13_barrier_tail_offset(logical_microsequence_size)',
+		'job.explicit_barriers.offset + g13_barrier_tail_size',
+		'mgr.publish_g13_compute_job_locked(owned)'], 'Vinix private tail placement and barrier publication')!
+	compute_prefix := section(local, 'fn (mut mgr GpuManager) publish_g13_compute_job_locked(',
+		'fn (mut mgr GpuManager) submit_g13_queue_command(', 'Vinix compute barrier transaction')!
+	require_order(compute_prefix, ['explicit_barriers.publishable', 'mut storage := [3]u64{}',
+		'job.microsequence.va + job.explicit_barriers.offset', 'storage[job.explicit_barriers.count] = job.command.va',
+		'mgr.submit_g13_queue_commands(job.queue, 2, storage, job.explicit_barriers.count + 1'], 'Vinix atomic compute prefix')!
+	require(local.count('release_g13_barrier_pins(mut job.explicit_barriers)') == 2,
+		'Both native job cleanup paths must release barrier pins')!
 	stage := section(submission, 'pub fn stage_command_array(', '// The fake backend retains', 'Vinix mixed batch staging')!
 	require_order(stage, ['count > max_commands', 'mut counts := [2]u32{}',
 		'barrier > counts[pipe]', 'staged[index] = command', 'asahi_cmd_render { 0 } else { 1 }',
@@ -331,6 +362,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch overlap with callback barriers, per-subqueue FIFO and locked quarantine gates',
+		'G13 explicit barrier wire fields, private tails, physical stamp pins and atomic prefixes',
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',
 		'Firmware 13.5 shared per-queue command/start counters']

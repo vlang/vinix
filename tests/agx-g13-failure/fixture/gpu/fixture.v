@@ -161,6 +161,7 @@ mut:
 	barrier             SharedBuffer
 	fragment            SharedBuffer
 	init_buffer         SharedBuffer
+	explicit_barriers   G13CommandBarriers
 	vertex              SharedBuffer
 	vertex_event_slot   u32
 	fragment_event_slot u32
@@ -178,6 +179,9 @@ mut:
 
 struct G13ComputeJobResources {
 mut:
+	command SharedBuffer
+	microsequence SharedBuffer
+	explicit_barriers G13CommandBarriers
 	context &Context = unsafe { nil }
 	queue &G13QueueResources = unsafe { nil }
 	event_slot u32
@@ -274,6 +278,7 @@ pub fn run_checks() {
 	event_worker(mut stopped_maintenance)
 	assert maintenance_calls == 2 && maintenance_stopped
 	check_publishers()
+	check_barrier_publishers()
 	check_retirement()
 	check_recovery()
 	check_tvb_feedback()
@@ -627,7 +632,7 @@ fn check_publishers() {
 			else {}
 		}
 		before := katomic.barriers()
-		published := mgr.submit_g13_queue_commands(&resources, 2, [alloc.g13_private_start + 0x4000], 0)
+		published := mgr.submit_g13_queue_commands(&resources, 2, [alloc.g13_private_start + 0x4000, u64(0), 0]!, 1, 0)
 		if broken == -1 {
 			assert published && mgr.rings == 1 && katomic.barriers() == before + 2
 			assert ring[0] == alloc.g13_private_start + 0x4000

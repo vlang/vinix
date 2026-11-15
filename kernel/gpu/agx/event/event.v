@@ -21,6 +21,7 @@ pub mut:
 	value     u32
 	fence     &syncobj.DmaFence = unsafe { nil }
 	in_use    bool
+	references u32
 	completed bool
 	armed     bool
 }
@@ -96,6 +97,7 @@ pub fn (mut em EventManager) alloc_stamp() ?u32 {
 	for i := u32(0); i < max_stamps; i++ {
 		if !em.stamps[i].in_use {
 			em.stamps[i].in_use = true
+			em.stamps[i].references = 1
 			// Slot release changes ownership, not the firmware counters. Start
 			// from the last observed stamp so an old event cannot match the
 			// next owner's first command. Asahi EventInner::current does this.
@@ -123,11 +125,25 @@ pub fn (mut em EventManager) free_stamp(index u32) {
 		em.lock.release()
 	}
 
+	if !em.stamps[index].in_use || em.stamps[index].references == 0 { return }
+	em.stamps[index].references--
+	if em.stamps[index].references != 0 { return }
 	em.stamps[index].in_use = false
 	em.stamps[index].fence = unsafe { nil }
 	em.stamps[index].value = 0
 	em.stamps[index].completed = false
 	em.stamps[index].armed = false
+}
+
+// A firmware barrier can outlive the producing workqueue's last job. Keep
+// its physical counters owned until the consuming command has retired.
+pub fn (mut em EventManager) retain_stamp(index u32) bool {
+	em.lock.acquire()
+	defer { em.lock.release() }
+	if !em.initialized || index >= max_stamps || !em.stamps[index].in_use
+		|| em.stamps[index].references == 0 || em.stamps[index].references == ~u32(0) { return false }
+	em.stamps[index].references++
+	return true
 }
 
 // Return the GPU virtual address of a stamp slot.
@@ -280,6 +296,10 @@ pub fn reserve_stamp() ?u32 {
 
 pub fn release_stamp(index u32) {
 	gpu_event_mgr.free_stamp(index)
+}
+
+pub fn retain_stamp(index u32) bool {
+	return gpu_event_mgr.retain_stamp(index)
 }
 
 pub fn advance_stamp(index u32) ?u32 {

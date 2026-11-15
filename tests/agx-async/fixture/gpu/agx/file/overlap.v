@@ -89,6 +89,8 @@ fn check_subqueue_dependencies() {
 	out := output()
 	assert submit_scheduled(mut file, [ScheduledCommand{ compute: true },
 		ScheduledCommand{ compute_barrier: 1 }, ScheduledCommand{}, ScheduledCommand{ compute: true }], out, false) == 0
+	assert manager.g13_render_jobs[0].barrier_sources == [u32(0), 1]!
+	assert manager.g13_render_jobs[1].barrier_sources == [u32(0), 0]!
 	service_file_work()
 	assert manager.published_order == [u32(0), 3]
 	manager.finish_compute_at(3, 0)

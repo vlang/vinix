@@ -163,7 +163,7 @@ fn assert_reverse(order []u32, count int) {
 }
 
 fn check_batch_failures() {
-	for mode in 0 .. 3 {
+	for mode in 0 .. 5 {
 		for index in 0 .. 64 {
 			gpu.reset()
 			mut file := new_file()
@@ -171,6 +171,8 @@ fn check_batch_failures() {
 			manager.fail_prepare_at = if mode == 0 { index } else { -1 }
 			manager.fail_callback_at = if mode == 1 { index } else { -1 }
 			manager.stop_callback_at = if mode == 2 { index } else { -1 }
+			manager.fail_barrier_at = if mode == 3 { index } else { -1 }
+			manager.stop_barrier_at = if mode == 4 { index } else { -1 }
 			out := output()
 			assert submit_batch(mut file, 64, 2, 0, unsafe { nil }, out, false) < 0
 			assert manager.published.len == 0
@@ -295,5 +297,5 @@ fn check_batches() {
 	check_middle_failure_and_shutdown()
 	check_fake_pair_limit()
 	check_unqueued_notification()
-	println('AGX batches: four 64-command orderings, per-subqueue barrier bounds, final fence/results, all 64 prepare/callback/stop failure positions, both allocations, reverse unwind, middle failure and fake pair limit passed')
+	println('AGX batches: four 64-command orderings, per-subqueue barrier bounds, final fence/results, all 64 prepare/barrier/callback/stop failure positions, both allocations, reverse unwind, middle failure and fake pair limit passed')
 }

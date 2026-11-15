@@ -40,5 +40,8 @@ backpressure holds only later commands on the same pipe. Overlap fixtures cover
 both completion orders, older barrier targets, blocked heads, independent ring
 backpressure, quarantine at publication, a fault with another job still running,
 four 64-command reverse-callback batches, shutdown and immediate callbacks.
-Later batches on the same queue remain FIFO through retirement. Firmware barrier
-encoding and overlap across submissions remain separate work.
+Later batches on the same queue remain FIFO through retirement. Nonzero in-batch
+dependencies also configure firmware prefixes before callback registration.
+Every setup-failure and stop position is injected independently. The existing
+CPU callback waits remain; firmware-driven scheduling and initial dependencies
+across submissions remain separate work.

@@ -3,6 +3,7 @@ import gpu.agx.event
 import drm.syncobj
 
 fn main() {
+	check_physical_stamp_pins()
 	mut driver := [128]u32{}
 	mut firmware := [128]u32{}
 	assert event.configure_event_manager(0x10000, unsafe { u64(&driver) }, 0x20000,
@@ -137,4 +138,51 @@ fn main() {
 	event.reset_event_manager()
 	println('AGX events: initial slot counters, 300 slot reuses, stale completion isolation, counter wrap and fence signaling passed')
 	println('AGX workqueue events: 64 shared tickets, independent retirement, final-owner release, tail rollback and wrap passed')
+}
+
+fn check_physical_stamp_pins() {
+	mut driver := [128]u32{}
+	mut firmware := [128]u32{}
+	mut em := event.EventManager{ initialized: true, stamp_phys: unsafe { u64(&driver) }, fw_stamp_phys: unsafe { u64(&firmware) } }
+	slot := em.alloc_stamp() or { panic('owner') }
+	assert em.retain_stamp(slot) && em.retain_stamp(slot)
+	assert em.stamps[slot].references == 3
+	em.free_stamp(slot)
+	assert em.stamps[slot].in_use && em.stamps[slot].references == 2
+	em.free_stamp(slot)
+	assert em.stamps[slot].in_use && em.stamps[slot].references == 1
+	em.free_stamp(slot)
+	em.free_stamp(slot) // releasing an unused slot cannot underflow
+	assert !em.stamps[slot].in_use && !em.retain_stamp(slot)
+	assert !em.retain_stamp(event.max_stamps)
+	assert (em.alloc_stamp() or { panic('reuse') }) == slot
+	em.stamps[slot].references = ~u32(0)
+	assert !em.retain_stamp(slot) && em.stamps[slot].references == ~u32(0)
+	em.stamps[slot].references = 1
+	em.initialized = false
+	assert !em.retain_stamp(slot)
+	// Real workqueue ownership may end while firmware still owns a barrier.
+	assert event.configure_event_manager(0x10000, unsafe { u64(&driver) }, 0x20000, unsafe { u64(&firmware) })
+	mut queue := event.WorkQueueEvents{}
+	for _ in 0 .. 1000 {
+		ticket := queue.retain() or { panic('producer') }
+		assert ticket.slot == 0
+		assert event.retain_stamp(ticket.slot) && event.retain_stamp(ticket.slot)
+		assert queue.publish(ticket.slot, ticket.value)
+		driver[ticket.slot] = ticket.value
+		firmware[ticket.slot] = ticket.value
+		assert queue.release(ticket.slot, ticket.value, true) && !queue.busy()
+		for remaining in [2, 1]! {
+			other := event.reserve_stamp() or { panic('other owner') }
+			assert other == 1, 'barrier pins prevent physical slot reuse (${remaining} pins)'
+			assert driver[0] == ticket.value && firmware[0] == ticket.value
+			event.release_stamp(other)
+			event.release_stamp(ticket.slot)
+		}
+		reused := event.reserve_stamp() or { panic('last barrier released') }
+		assert reused == 0
+		event.release_stamp(reused)
+	}
+	event.reset_event_manager()
+	println('AGX stamp pins: owner release, two barrier references, overflow/invalid/unused guards and 1000 physical reuse cycles passed')
 }

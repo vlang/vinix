@@ -19,6 +19,8 @@ mut:
 	size u64
 }
 
+fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
+
 enum State {
 	running
 	stopped
@@ -83,6 +85,14 @@ mut:
 	g13_tvb_free_order    [127]u64
 	g13_tvb_release_clock u64
 	g13_queues            []&G13QueueResources
+	flush_fails bool
+	flushes int
+}
+
+fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
+	assert buffer.phys != 0 && buffer.size != 0
+	mgr.flushes++
+	return !mgr.flush_fails
 }
 
 fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext, buffer &mmu.UatBuffer) bool {
@@ -196,6 +206,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_barrier_lifetimes()
 	check_published_batches()
 	check_scene_slots()
 	check_tail_pointer_cache()

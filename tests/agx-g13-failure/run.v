@@ -25,6 +25,8 @@ fn run_checks() int {
 	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')
 	production = production.replace('import sched\n', 'import sched\nimport aarch64.timer\n')
 	submissions := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v') or { panic(err) }
+	barriers := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_barriers.v') or { panic(err) }
+	production += section(barriers, 'const g13_barrier_stride', 'fn g13_barrier_source(') or { panic(err) }
 	production += section(submissions, 'fn (mut mgr GpuManager) submit_g13_queue_commands(', 'fn (mut mgr GpuManager) submit_g13_queue_command(') or { panic(err) }
 	production += section(submissions, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(', '// Transfer a prepared render pass') or { panic(err) }
 	production += section(submissions, 'fn (mut mgr GpuManager) retire_g13_subqueue_locked(', 'fn build_g13_attachments(') or { panic(err) }

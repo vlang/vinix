@@ -1,6 +1,6 @@
-Run `v run tests/agx-g13-failure/run.v --sanitize` from the repository root.
-Set `V` to select the compiler and `AGX_G13_TEST_BINARY` to retain the native
-executable for running on the M1 Air.
+Compile `run.v` to an external executable and run it with `--sanitize` from
+the repository root. Set `V_C_ERROR_BUG_REPORT_DISABLED=1`, `V` to select the
+compiler, and `AGX_G13_TEST_BINARY` to retain the host executable outside Git.
 
 The V runner copies the production channel implementation and extracts the
 production compute/render publishers, retirement, recovery, event handler, health check, worker and
@@ -37,3 +37,16 @@ allocation or GPU page consumption.
 Source-bound Apple instruction checks live in `tools/agx-re/g13failure`;
 `g13contract` independently checks the older FWStatus wire layout against
 m1n1. A native test pass on macOS does not validate Vinix firmware execution.
+
+Prefix tests cover one or two firmware barriers before compute and vertex
+commands, wrapped rings, exact/insufficient capacity, outer-ring refusal,
+unready setup and retry, conditional TVB binding and retirement sequences.
+Invalid counts must be rejected before any ring write. Compute prefixes use
+fixed three-entry storage; notifications are assigned directly into the rings.
+
+Compile `check-prefix-storage.v` to an external executable. Its `--selftest`
+rejects hidden allocation calls, missing/duplicate helper definitions and lost
+stack storage. Passing an isolated ARM `kernel/obj/blob.c` checks five production
+helper bodies, including both publishers, for temporary allocations. This catches
+V moving an addressed local into a `memdup` allocation under `-gc none`. It does
+not measure the whole kernel or qualify native GPU execution.

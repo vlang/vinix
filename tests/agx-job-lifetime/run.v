@@ -21,6 +21,7 @@ fn main() {
 	os.mkdir_all('${scratch}/gpu/agx')!
 	os.cp_all('${repo}/kernel/gpu/agx/event', '${scratch}/gpu/agx/event', false)!
 	os.cp('${repo}/kernel/gpu/agx/gpu/g13_tpc.v', '${scratch}/gpu/tpc.v')!
+	os.cp('${repo}/kernel/gpu/agx/gpu/g13_barriers.v', '${scratch}/gpu/barrier_production.v')!
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\n')!
 	os.symlink('${repo}/kernel/gpu/agx/fw', '${scratch}/gpu/agx/fw')!
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
