@@ -39,6 +39,8 @@ Clang/LLD image bytes and exact closed child environments, with an explicit
 unadmitted OS shared-cache boundary.
 The [V source-generation check](wine-v-host-check.md) also requires exact child
 environments and observed image admission for discovery and actual C generation.
+The [required host receipt](wine-host-required-check.md) binds the exact producer
+executable and requires every admitted host artifact in its input map.
 This is parsed bridge-source, selected resource-header and observed C admission; complete
 C dependency/toolchain closure and hermetic build admission remain separate
 requirements. Historical bundles still need

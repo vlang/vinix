@@ -1,7 +1,7 @@
 # Selected host executable build admission
 
-`wine-host-build.v` builds the Wine native controller and bridge producer as
-arm64 Mach-O host programs. The optional builder also has a small fixture with
+`wine-host-build.v` builds the Wine native controller, bridge producer and full
+retainer as arm64 Mach-O host programs. The builder also has a small fixture with
 a transitive V import. It records V-to-C generation and the actual Clang
 compile/link command separately, binding their selected inputs and outputs.
 
@@ -11,6 +11,7 @@ v -backend c -prod -gc none -manualfree -cflags -fno-lto \
   tests/packages/wine-host-build.v
 /external/host-build build controller /absolute/selected/v /external/new-controller
 /external/host-build build producer /absolute/selected/v /external/new-producer
+/external/host-build build retainer /absolute/selected/v /external/new-retainer
 /external/host-build check /external/new-controller
 ```
 
@@ -48,9 +49,13 @@ records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
 private copy. Expected failures use explicit checks under `-prod`.
 
-This is an optional selected-input host build contract. Existing native and
-full-retainer workflows do not yet require these host-build receipts. The
-builder's own bootstrap, complete compiler provenance, unreported inputs/search
+The [required host receipt boundary](wine-host-required-check.md) uses format 2
+and shared `winehostbuild` admission. Qualification work in the producer,
+controller and retainer requires the matching receipt beside the executable.
+Native and prepared evidence bind the producer/controller host graphs; the full
+retainer also retains its own graph. Original format-1 bundles and their original
+checkers keep their historical contract. The builder's own bootstrap, complete
+compiler provenance, unreported inputs/search
 absence, full SDK content and Mach-O linker/library closure remain open. No
 link replay or deterministic executable reproduction is claimed. macOS loader
 and shared-cache bytes remain explicitly unadmitted. Local receipts are not

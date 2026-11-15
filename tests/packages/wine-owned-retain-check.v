@@ -38,7 +38,7 @@ fn clone_tree(source string, destination string, prepared bool) ! {
 			|| path.ends_with('/host-linker-version.log') || path.ends_with('/host-clang-version.log.argv.json')
 			|| path.ends_with('/host-linker-version.log.argv.json') || path.ends_with('/v-host-images-before.json')
 			|| path.ends_with('/host-v-version.log') || path.ends_with('/host-v-version.log.argv.json')
-			|| path.ends_with('/discover.log.argv.json') || path.ends_with('/v.log.argv.json') {
+			|| path.ends_with('/discover.log.argv.json') || path.ends_with('/v.log.argv.json') || path.ends_with('/host-controller.json') {
 			$if macos {
 				if C.clonefile(path.str, to.str, 0) == 0 { continue }
 			}
@@ -140,6 +140,7 @@ fn check() ! {
 	cases << ['bridge-link-proof', 'bridge-link-response', 'bridge-link-linked', 'guest-link-output', 'package-link-argv']
 	cases << ['bridge-host-baseline', 'bridge-host-environment', 'guest-host-trace', 'package-host-pin', 'guest-host-linked']
 	cases << ['bridge-v-host-baseline', 'bridge-v-host-environment', 'guest-v-host-trace', 'package-v-host-pin', 'guest-v-host-linked']
+	cases << ['bridge-host-binding', 'bridge-host-input', 'controller-host-binding', 'controller-host-input', 'controller-host-linked']
 	for name in cases {
 		dir := out + '/' + name
 		clone_tree(run, dir, false)!
@@ -150,7 +151,34 @@ fn check() ! {
 			clone_tree(prepared, selected, true)!; remap(dir, prepared, selected)!
 		}
 		v_host := name.contains('-v-host-')
-		if name in ['bridge-host-baseline', 'bridge-v-host-baseline'] {
+		if name in ['bridge-host-binding', 'controller-host-binding'] {
+			file := if name.starts_with('bridge-') { selected + '/host-producer.json' } else { dir + '/host-controller.json' }
+			mut binding := read_map(file)!
+			binding['proof_sha256'] = 'bad'
+			replace(file, json2.encode(binding))!
+			if name.starts_with('bridge-') { reseal(dir, selected, ['host-producer.json'])! }
+			else {
+				mut generated := read_map(dir + '/generated-before-boot.json')!
+				generated['host-controller.json'] = digest(file)!
+				replace(dir + '/generated-before-boot.json', json2.encode(generated))!
+			}
+			expected = 'host build binding record differs'
+		} else if name in ['bridge-host-input', 'controller-host-input'] {
+			bridge := name.starts_with('bridge-')
+			binding := read_map(if bridge { selected + '/host-producer.json' } else { dir + '/host-controller.json' })!
+			for file in if bridge { ['inputs-before-build.json', 'inputs-verified.json'] } else { ['inputs-before-build.json', 'inputs.json', 'inputs-verified.json'] } {
+				path := (if bridge { selected } else { dir }) + '/' + file
+				mut inputs := read_map(path)!
+				inputs.delete(binding['directory'] + '/host-build.json')
+				replace(path, json2.encode(inputs))!
+			}
+			if bridge { reseal(dir, selected, ['inputs-before-build.json', 'inputs-verified.json'])! }
+			expected = 'host build artifact input absent or changed'
+		} else if name == 'controller-host-linked' {
+			file := dir + '/host-controller.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'host build evidence must be bounded and ordinary'
+		} else if name in ['bridge-host-baseline', 'bridge-v-host-baseline'] {
 			file := 'logs/' + if v_host { 'v-host-images-before.json' } else { 'host-images-before.json' }
 			before := json2.decode[winehostimages.Baseline](os.read_file(selected + '/' + file)!)!
 			replace(selected + '/' + file, json2.encode(winehostimages.Baseline{recorded_directory: before.recorded_directory, images: before.images[1..]}))!
@@ -352,6 +380,6 @@ fn check() ! {
 		refused << name
 	}
 	os.write_file(out + '/result.json', json2.encode({'baseline': json2.Any(true), 'copied_baseline': true, 'refused': refused}))!
-	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline forty-four exact refusals')
+	println('WINE OWNED RETENTION CONTROLS PASS real baseline copied baseline forty-nine exact refusals')
 }
 fn main() { check() or { eprintln(err); exit(1) } }

@@ -13,6 +13,7 @@ import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
 import tests.packages.winehostimages
+import tests.packages.winehostbuild
 import tests.packages.wineowned
 import tools.packages.pkgcore
 import tools.packages.wineadapter
@@ -126,6 +127,7 @@ fn check() ! {
 		return error('compiled Wine owned receipt admission differs')
 	}
 	if os.args.len == 4 && os.args[1] == '--check-owned-build' {
+		winehostbuild.require_self('controller')!
 		wineowned.admit(os.real_path(os.args[3]), os.args[2], hwhost.find_root(@FILE)!)!
 		println('WINE OWNED BUILD PREFLIGHT PASS receipt/source/compiler-mode/runner bindings')
 		return
@@ -135,6 +137,7 @@ fn check() ! {
 		return error('usage: wine-native-check ARCH OUTPUT PREPARED_BUILD KERNEL ASSEMBLED_STAGE SYSROOT GCC_RUNTIME SANDBOX [--owned-manager [--collection-probe|--caller-death-probe|--holder-death-probe|--idle-server-probe|--manager-death-probe|--relaunch-probe|--migration-probe|--rollback-probe]]')
 	}
 	owned := os.args.len >= 10
+	host_build := winehostbuild.require_self('controller')!
 	collection := os.args.len == 11
 	caller_death := collection && os.args[10] in ['--caller-death-probe', '--holder-death-probe', '--idle-server-probe', '--manager-death-probe', '--relaunch-probe', '--migration-probe', '--rollback-probe']
 	idle_server := collection && os.args[10] == '--idle-server-probe'
@@ -157,8 +160,15 @@ fn check() ! {
 	if owned {
 		wineowned.admit(prepared, arch, root)!
 	}
+	producer_record := json2.decode[map[string]string](os.read_file(prepared + '/build-producer.json')!)!
+	producer_inputs := json2.decode[map[string]string](os.read_file(prepared + '/inputs-before-build.json')!)!
+	producer_build := winehostbuild.admit_binding(prepared + '/host-producer.json', 'producer', os.real_path(producer_record['executable']), host_build.compiler, producer_inputs)!
 	host := hwhost.find_host(root, arch, '')!
+	if host.v != host_build.compiler { return error('host controller compiler differs') }
 	mut inputs := map[string]string{}
+	for path, hash in host_build.artifacts { inputs[path] = hash }
+	for path, hash in producer_build.artifacts { inputs[path] = hash }
+	os.write_file(work + '/host-controller.json', json2.encode(host_build.data) + '\n')!
 	image_inputs := if arch == 'x86_64' { plainiso.inputs(root)! } else { map[string]string{} }
 	for _, path in image_inputs { inputs[path] = digest(path)! }
 	mut arm_loader := ''
@@ -271,6 +281,7 @@ fn check() ! {
 	}
 	os.write_file(work + '/inputs.json', json2.encode(inputs))!
 	mut generated := map[string]string{}
+	generated['host-controller.json'] = digest(work + '/host-controller.json')!
 	for program in ['guest', 'package']! {
 		mut names := [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
 			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
@@ -381,6 +392,8 @@ fn check() ! {
 			return error('Wine generated output changed: ' + path)
 		}
 	}
+	winehostbuild.admit_binding(work + '/host-controller.json', 'controller', os.real_path(os.executable()), host.v, inputs)!
+	winehostbuild.admit_binding(prepared + '/host-producer.json', 'producer', os.real_path(producer_record['executable']), host.v, producer_inputs)!
 	os.write_file(work + '/inputs-verified.json', json2.encode(inputs))!
 	if digest(@FILE)! != sha256.hexhash($embed_file('wine-native-check.v').to_string()) {
 		return error('compiled Wine native controller source changed')

@@ -26,7 +26,7 @@ The optional module control uses `VINIX_V_HOST_TEST_COMPILER` and a fresh
 `VINIX_V_HOST_TEST_STATE`. It poisons parent VFLAGS, VMODULES, VEXE and
 DYLD_INSERT_LIBRARIES, then requires real discovery and C generation to succeed
 with matching parsed source lists. Adding VFLAGS to the recorded child
-environment must refuse. The full retention runner has forty-four mutation
+environment must refuse. The full retention runner has forty-nine mutation
 cases, including five V host cases: omitted baseline images, altered child
 environment, omitted raw observations, changed image hashes and linked receipts.
 Real and unchanged copied baselines must pass first; every mutation must refuse
@@ -37,16 +37,15 @@ supersedes earlier assertion-dependent module results; full-retainer controls
 already use explicit errors.
 
 This covers the selected V-to-C processes. Compiler source/bootstrap provenance,
-controller/producer executable builds, other host tools, unreported inputs and
+complete host executable closure, other host tools, unreported inputs and
 search absence remain separate gates. macOS system images remain explicitly
 metadata-only: shared-cache and loader bytes are unadmitted. This is not a
 complete hermetic toolchain qualification. Historical complete inputs and
 original verifiers remain required. Product defaults, owned ARM/GUI and broader
 roadmap 14 acceptance are unchanged.
-An optional [host executable builder and verifier](wine-host-build.md) now
-extends the selected V/C and image checks to host controller/producer builds;
-their complete linker/library closure and mandatory workflow integration remain
-separate gates.
+The [host executable builder and verifier](wine-host-build.md) now provides
+[required host receipts](wine-host-required-check.md) for the controller,
+producer and full retainer. Complete linker/library closure remains separate.
 
 The x86 checkpoint is `/Users/alex/.cache/vwvcompiler-20261115-01`, from isolated
 base `333a49ad3`. Production/manual-free module controls, fresh PE/runtime and

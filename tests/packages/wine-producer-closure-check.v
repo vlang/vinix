@@ -9,6 +9,7 @@ import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
 import tests.packages.winehostimages
+import tests.packages.winehostbuild
 
 fn check(prepared string) ! {
 	inputs := json2.decode[map[string]string](os.read_file(prepared + '/inputs-before-build.json')!)!
@@ -26,6 +27,8 @@ fn check(prepared string) ! {
 	winelink.admit(prepared, prepared + '/logs', prepared + '/prepared/' + architectures[0] + '/runtime/bin/wine-runner')!
 	winehostimages.admit_build(prepared + '/logs', prepared + '/logs')!
 	compiler := json2.decode[map[string]string](os.read_file(prepared + '/build-producer.json')!)!['compiler']
+	producer := json2.decode[map[string]string](os.read_file(prepared + '/build-producer.json')!)!['executable']
+	winehostbuild.admit_binding(prepared + '/host-producer.json', 'producer', os.real_path(producer), compiler, inputs)!
 	winehostimages.admit_v(prepared + '/logs', prepared + '/logs', compiler, inputs)!
 	outputs := json2.decode[map[string]string](os.read_file(prepared + '/outputs.json')!)!
 	for name in [...winehostimages.artifacts(), ...winehostimages.v_artifacts()] {

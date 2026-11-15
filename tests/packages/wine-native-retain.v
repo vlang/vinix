@@ -12,6 +12,7 @@ import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
 import tests.packages.winehostimages
+import tests.packages.winehostbuild
 import tests.packages.wineowned
 import tools.packages.wineadapter
 
@@ -135,6 +136,7 @@ fn retain() ! {
 	forksafe := os.args.len == 6 && os.args[5] == '--forksafe-translator'
 	owned := os.args.len == 6 && os.args[5] == '--owned-holder-death'
 	root := hwhost.find_root(@FILE)!
+	self_build := winehostbuild.require_self('retainer')!
 	run := os.abs_path(os.args[1])
 	prepared := os.abs_path(os.args[2])
 	arch := os.args[3]
@@ -155,6 +157,8 @@ fn retain() ! {
 		'tests/packages/winecsource/closure.v':          $embed_file('winecsource/closure.v').to_string()
 		'tests/packages/winelink/link.v':          $embed_file('winelink/link.v').to_string()
 		'tests/packages/winehostimages/images.v':          $embed_file('winehostimages/images.v').to_string()
+		'tests/packages/winehostbuild/build.v':          $embed_file('winehostbuild/build.v').to_string()
+		'tests/packages/wine-host-build.v':          $embed_file('wine-host-build.v').to_string()
 		'tools/packages/wine-build.v':                  $embed_file('../../tools/packages/wine-build.v').to_string()
 		'tools/packages/wine-runner.v':                 $embed_file('../../tools/packages/wine-runner.v').to_string()
 		'tools/packages/wineadapter/prefix.c.v':        $embed_file('../../tools/packages/wineadapter/prefix.c.v').to_string()
@@ -265,6 +269,7 @@ fn retain() ! {
 		return error('Wine producer executable declaration differs')
 	}
 	require_input(producer_inputs, build_record['executable'])!
+	winehostbuild.admit_binding(prepared + '/host-producer.json', 'producer', os.real_path(build_record['executable']), declaration['compiler'], producer_inputs)!
 	require_input(producer_inputs, '/opt/homebrew/opt/llvm/bin/llvm-readelf')!
 	for directory in [root + '/tools/packages/wineadapter', root + '/tools/packages/appsdk',
 		root + '/tools/packages/pkgprotocol', os.dir(declaration['compiler']) + '/vlib',
@@ -290,12 +295,16 @@ fn retain() ! {
 		return error('Wine prepared PE differs from its admitted producer')
 	}
 	mut paths := map[string]string{}
+	for path, _ in self_build.artifacts { paths['retainer-host/' + path] = path }
+	paths['producer-host-binding'] = prepared + '/host-producer.json'
+	paths['controller-host-binding'] = run + '/host-controller.json'
 	for path, _ in inputs { paths['input/' + path] = path }
 	for path, _ in producer_inputs { paths['producer-input/' + path] = path }
 	for path, _ in winecsource.inputs(prepared)! { paths['producer-c-input/' + path] = path }
 	for path, _ in winehostimages.inputs(prepared + '/logs')! { paths['producer-host-image/' + path] = path }
 	for path, _ in winehostimages.v_inputs(prepared + '/logs')! { paths['producer-v-host-image/' + path] = path }
 	outputs := hashes(prepared + '/outputs.json')!
+	if 'host-producer.json' !in outputs || outputs['host-producer.json'] != digest(prepared + '/host-producer.json')! { return error('host producer output binding differs') }
 	for name in winehostimages.artifacts() {
 		if 'logs/' + name !in outputs { return error('host image producer artifact missing') }
 	}
@@ -425,7 +434,7 @@ fn retain() ! {
 		}
 	}
 	generated := hashes(run + '/generated-before-boot.json')!
-	mut required := []string{}
+	mut required := ['host-controller.json']
 	for program in ['guest', 'package']! {
 		mut names := [program, program + '.c', 'runtime.c', 'v.log', 'v.log.argv.json', 'cc.log',
 			'cc.log.argv.json', 'discover.log', 'discover.log.argv.json', 'sources-before.txt',
@@ -449,6 +458,7 @@ fn retain() ! {
 		for path, _ in winehostimages.inputs(run + '/build-' + program)! { paths[program + '-host-image/' + path] = path }
 		for path, _ in winecsource.inputs(run + '/build-' + program)! { paths[program + '-c-input/' + path] = path }
 	}
+	winehostbuild.admit_binding(run + '/host-controller.json', 'controller', os.real_path(declaration['controller']), declaration['compiler'], inputs)!
 	for name in ['usr/bin/vinix-package', 'usr/sbin/vinix-account', 'usr/sbin/vinix-session',
 		'usr/bin/vinix-sandbox', 'etc/vinix/auth.conf', 'etc/vinix-packages/config.json']! {
 		required << 'extras/' + name
@@ -577,6 +587,7 @@ fn retain() ! {
 			return error('compiled Wine fixture source changed during admission: ' + name)
 		}
 	}
+	for path, hash in self_build.artifacts { if digest(path)! != hash { return error('retainer host input changed during admission') } }
 	os.mkdir_all(out)!
 	scope := if owned { 'local-only owned x86 Wine holder-SIGKILL collection case; authenticated UID1000 caller/holder/manager/server; busy obsolete generation after caller/holder death; manager37, runtime retirement, free lease and final collection; no ordinary API/SEH, GUI, ARM or redistribution qualification' } else { WineReceipt{}.scope }
 	os.write_file(out + '/wine-' + arch + '.json', json2.encode(WineReceipt{ architecture: arch, scope: scope, markers: markers, artifacts: artifacts, artifact_paths: paths }) + '\n')!

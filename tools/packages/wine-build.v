@@ -12,6 +12,7 @@ import tests.packages.wineheaders
 import tests.packages.winecsource
 import tests.packages.winelink
 import tests.packages.winehostimages
+import tests.packages.winehostbuild
 
 struct Entry {
 	source string
@@ -162,6 +163,7 @@ fn admit_translator(staging string, base string) !Translator {
 
 fn build() ! {
 	verify_sources()!
+	host_build := winehostbuild.require_self('producer')!
 	owned := os.args.len > 1 && os.args.last() == '--owned-manager'
 	count := os.args.len - if owned { 1 } else { 0 }
 	if count !in [10, 11] || os.args[9] != '--local-qualification-only' {
@@ -180,6 +182,7 @@ fn build() ! {
 	stage := os.real_path(os.args[2])
 	output := os.abs_path(os.args[3])
 	v := os.real_path(os.args[4])
+	if v != host_build.compiler { return error('host producer compiler differs') }
 	sysroot := os.real_path(os.args[5])
 	gcc := os.real_path(os.args[6])
 	notices := os.real_path(os.args[7])
@@ -200,6 +203,8 @@ fn build() ! {
 	runtime := prepared + '/runtime'
 	app := prepared + '/application'
 	mut inputs := map[string]string{}
+	for path, hash in host_build.artifacts { inputs[path] = hash }
+	os.write_file(output + '/host-producer.json', json2.encode(host_build.data) + '\n')!
 	for path in [os.executable(), '/opt/homebrew/opt/llvm/bin/llvm-readelf', '/usr/bin/tar']! {
 		inputs[path] = digest(path)!
 	}
@@ -421,6 +426,7 @@ fn build() ! {
 	winelink.admit(output, output + '/logs', runtime + '/bin/wine-runner')!
 	winehostimages.admit_build(output + '/logs', output + '/logs')!
 	winehostimages.admit_v(output + '/logs', output + '/logs', v, inputs)!
+	winehostbuild.admit_binding(output + '/host-producer.json', 'producer', os.real_path(os.executable()), v, inputs)!
 	os.write_file(output + '/inputs-verified.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
 	for path in os.walk_ext(output, '') {

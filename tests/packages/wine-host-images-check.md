@@ -5,9 +5,9 @@ PATH, locale, timezone and source epoch, private HOME/TMPDIR directories, and
 `DYLD_PRINT_LIBRARIES=1`. Parent include/library search variables, credentials
 and loader injection settings are not inherited. The separate
 [V source-generation boundary](wine-v-host-check.md) now covers selected V-to-C
-children. Controller builds and other host tools remain outside this contract.
-The separate optional [host build profile](wine-host-build.md) now admits its
-V/C children and selected image bytes without claiming Mach-O link replay.
+children. The [required host build profile](wine-host-required-check.md) also
+admits V/C children and selected image bytes for qualification executables;
+other host tools remain separate, and Mach-O link replay is not claimed.
 
 Before the first managed command in a build, both pinned tools run `--version`
 under that environment. Their observed image identities are merged and the
@@ -52,7 +52,7 @@ preserves raw test state in a fresh external directory.
 These checks now use [production-active explicit conditions](wine-helper-controls-check.md),
 with private safety mutations proving refusal detection under `-prod`.
 
-The full retention runner now requires forty-four resealed refusals after real
+The full retention runner now requires forty-nine resealed refusals after real
 and unchanged copied baselines pass. Five Clang/LLD cases omit a before-command
 image, alter a child environment, omit an observed image, change a recorded
 image hash or link an image receipt; five V cases exercise the corresponding

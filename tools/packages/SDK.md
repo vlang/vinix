@@ -1939,7 +1939,7 @@ their separate contracts. The bridge/native producers and retainer now admit the
 [explicit Clang resource-header selection and complete include tree](../../tests/packages/wine-resource-headers-check.md).
 Both guest and package native C builds retain separate snapshots and select
 the recorded resource directory explicitly. Original and copied evidence
-baselines and forty-four resealed refusal cases
+baselines and forty-nine resealed refusal cases
 exercise this explicit mode. The [observed C input check](../../tests/packages/wine-c-inputs-check.md)
 binds matching discovery/actual include observations, resolved targets and hashes
 for bridge, guest and package builds. Their
@@ -1950,8 +1950,11 @@ executable bytes using the explicitly selected linker. Their
 binds observed ordinary non-system Clang/LLD images and closed child environments;
 OS shared-cache bytes remain unadmitted. The selected
 [V source-generation children](../../tests/packages/wine-v-host-check.md) also
-use closed environments and observed image admission. Controller builds remain
-separate. Full dependency/hermetic admission, default
+use closed environments and observed image admission. Host controller, producer
+and retainer qualification executables now require
+[host-build receipts](../../tests/packages/wine-host-required-check.md) and retain
+their selected V/C/input/image graphs. Complete host linker/library closure,
+full dependency/hermetic admission, default
 activation and owned ARM/GUI remain open.
 
 The `--caller-death-probe` and `--idle-server-probe` cases also attempt a second
