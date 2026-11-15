@@ -13,6 +13,7 @@ struct CliReview {
 	generation u64
 	prior_generation u64
 	runtime_id string
+	runtime_version string
 	bindings []wineadapter.BuiltinBinding
 }
 
@@ -39,11 +40,12 @@ pub fn reply(command string, data string) ! {
 	defer {
 		unsafe {
 			for row in report.bindings { row.name.free(); row.observed.free(); row.replacement.free() }
-			report.runtime_id.free(); (&array(&report.bindings)).free()
+			report.runtime_id.free(); report.runtime_version.free(); (&array(&report.bindings)).free()
 		}
 	}
 	if report.format != 1 || report.generation != 2 || report.prior_generation != 0 || report.runtime_id != 'wine'
-		|| report.bindings.len != names.len || !report.bindings.all(it.operation == .keep) { return error('public recovery JSON inventory differs') }
+		|| report.runtime_version != '2.0.0' || report.bindings.len != names.len
+		|| !report.bindings.all(it.operation == .keep) { return error('public recovery JSON inventory differs') }
 	for index, name in names {
 		expected := '/var/lib/vinix-packages/generations/2/apps/wine/root/usr/lib/wine/x86_64-windows/' + name
 		if report.bindings[index].name != name || report.bindings[index].observed != expected

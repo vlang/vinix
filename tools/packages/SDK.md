@@ -2037,6 +2037,15 @@ and server coordination files/directories, but changes no builtin links and
 starts no Wine process. Exit releases the generation lease and prefix guard;
 the JSON report carries no retained admission for a later command.
 
+`WinePrefixReview.document()` repeats service-level recheck and returns a borrowed
+JSON view, valid until its owner closes or mutates the review. Do not free the
+view independently. The three public prefix commands serialize this view with
+the existing format-1 fields plus `runtime_version`: the selected runtime's
+authenticated manifest version, not the application's version. It does not infer
+the previous runtime version from old link paths. The added field preserves
+structural consumers that ignore unknown JSON fields; it supplies no authority
+for a later write.
+
 `WinePrefixReview.complete_additions()` is an explicit library write operation
 for additions-only captures. It retains package reader/lease and prefix guards,
 rechecks service admission, refuses any existing link needing replacement, and

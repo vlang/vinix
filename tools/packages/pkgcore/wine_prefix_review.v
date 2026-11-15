@@ -14,6 +14,37 @@ mut:
 	application string
 }
 
+// Borrows admission metadata and binding rows until the owner closes or mutates.
+// Do not free this document independently of its owner.
+pub struct WinePrefixDocument {
+pub:
+	format int
+	scope string
+	generation u64
+	prior_generation u64
+	runtime_id string
+	runtime_version string
+	bindings []wineadapter.BuiltinBinding
+}
+
+// Authenticate current admission again before exposing its runtime version.
+pub fn (owner &WinePrefixReview) document() !WinePrefixDocument {
+	owner.recheck()!
+	view := owner.review.review
+	if view.runtime_id != owner.admission.runtime.id || view.generation != owner.admission.generation {
+		return error('Wine prefix document runtime binding differs from admission')
+	}
+	return WinePrefixDocument{
+		format: view.format
+		scope: view.scope
+		generation: view.generation
+		prior_generation: view.prior_generation
+		runtime_id: owner.admission.runtime.id
+		runtime_version: owner.admission.runtime.version
+		bindings: view.bindings
+	}
+}
+
 pub fn (mut owner WinePrefixReview) close() {
 	owner.review.close()
 	owner.admission.close()

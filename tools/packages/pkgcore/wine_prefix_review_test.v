@@ -57,11 +57,15 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	builtins := admission.prepared.directory + '/generations/' + number + '/apps/wine/root/usr/lib/wine/x86_64-windows'
 	mut prefix := wineadapter.prepare_prefix(data, builtins)!
 	defer { prefix.close() }
-	mut owner := WinePrefixReview{admission: admission, review: admission.capture_prefix(data)!}
+	mut owner := WinePrefixReview{admission: admission, review: admission.capture_prefix(data)!, root: root.clone(), application: 'app'}
 	admission = WineAdmission{}
 	defer { owner.close() }
 	assert owner.review.review.bindings.len == 1 && owner.review.review.bindings[0].operation == .keep
 	owner.review.recheck()!
+	initial_document := owner.document()!
+	assert initial_document.runtime_id == 'wine'
+	assert initial_document.runtime_version == '1.0.0'
+	assert initial_document.generation == installed.generation
 	owner.close(); owner.close()
 	mut released := prefix.acquire_launch(data)!
 	released.close()
@@ -91,6 +95,16 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	assert next_owner.review.review.bindings.len == 2
 	assert next_owner.review.review.bindings[0].operation == .replace
 	assert next_owner.review.review.bindings[1].operation == .create
+	upgrade_document := next_owner.document()!
+	assert upgrade_document.runtime_version == '2.0.0'
+	assert upgrade_document.prior_generation == installed.generation
+	// Existing format-1 consumers can continue decoding the structural fields.
+	document_json := json2.encode(upgrade_document)
+	defer { unsafe { document_json.free() } }
+	mut legacy := json2.decode[wineadapter.BindingReview](document_json)!
+	defer { legacy.close() }
+	assert legacy.format == 1 && legacy.runtime_id == 'wine'
+	assert legacy.generation == upgraded.generation && legacy.bindings.len == 2
 	assert os.readlink(data + '/wine/drive_c/windows/system32/kernel32.dll')! == builtins + '/kernel32.dll'
 	assert !os.exists(data + '/wine/drive_c/windows/system32/new.dll')
 	next_owner.review.recheck()!
@@ -106,12 +120,16 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	assert os.readlink(system + '/kernel32.dll')! == target + '/kernel32.dll'
 	next_owner.complete_additions()!
 	next_owner.complete_additions()!
+	completed_document := next_owner.document()!
+	assert completed_document.runtime_version == '2.0.0'
+	assert completed_document.prior_generation == 0
+	assert completed_document.bindings.all(it.operation == .keep)
 	assert os.readlink(system + '/new.dll')! == target + '/new.dll'
 	configuration_path := root + '/etc/vinix-packages/config.json'
 	original_config := os.read_file(configuration_path)!
 	os.write_file(configuration_path, json2.encode(Config{architecture: 'aarch64', policy: Policy{reserve_bytes: 0}}))!
 	mut revoked := false
-	next_owner.recheck() or { revoked = err.msg().contains('publisher key has been revoked') }
+	next_owner.document() or { revoked = err.msg().contains('publisher key has been revoked') }
 	assert revoked
 	os.write_file(configuration_path, original_config)!
 	next_owner.recheck()!
@@ -123,7 +141,7 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	assert changed_state != original_state
 	os.write_file(state_path, changed_state)!
 	mut metadata_changed := false
-	next_owner.recheck() or { metadata_changed = err.msg().contains('active generation metadata changed') }
+	next_owner.document() or { metadata_changed = err.msg().contains('active generation metadata changed') }
 	assert metadata_changed
 	os.write_file(state_path, original_state)!
 	next_owner.recheck()!
@@ -131,7 +149,7 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 		repositories: [Repository{id: 'fixture', url: 'file://' + repository, public_key: key}],
 		policy: Policy{allowed: ['other'], reserve_bytes: 0}}))!
 	mut blocked := false
-	next_owner.recheck() or { blocked = err.msg().contains('blocked by organization allowlist') }
+	next_owner.document() or { blocked = err.msg().contains('blocked by organization allowlist') }
 	assert blocked
 	os.write_file(configuration_path, original_config)!
 	next_owner.recheck()!
@@ -139,7 +157,7 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	activate(next_owner.admission.prepared.directory, installed.generation)!
 	activation.release()
 	mut changed := false
-	next_owner.recheck() or { changed = err.msg().contains('active generation changed') }
+	next_owner.document() or { changed = err.msg().contains('active generation changed') }
 	assert changed
 	restore := acquire(next_owner.admission.prepared.directory)!
 	activate(next_owner.admission.prepared.directory, upgraded.generation)!
@@ -147,7 +165,7 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	next_owner.recheck()!
 	next_owner.close()
 	mut closed := false
-	next_owner.recheck() or { closed = err.msg().contains('closed or lacks service admission') }
+	next_owner.document() or { closed = err.msg().contains('closed or lacks service admission') }
 	assert closed
 }
 
