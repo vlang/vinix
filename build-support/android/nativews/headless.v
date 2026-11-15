@@ -254,6 +254,9 @@ fn ws_service_run(e voidptr, binding voidptr, control_fd i32, package_name &char
 			}
 			if ok { terminal_reason = 6 }
 			if ok { ok = ws_service_ui_pump(e) }
+			// Report while this cycle's JNI frame is still live. UI callbacks may
+			// leave an exception which otherwise disappears into a numeric exit.
+			if !ok { ws_service_failure(e, c'ANDROID-SERVICE-FAIL active cycle', 3, terminal_reason) }
 			pop_frame(e)
 			if !ok { return ws_service_terminal_fail(3, terminal_reason) }
 			state_after := ws_service_control(control_fd, 0)

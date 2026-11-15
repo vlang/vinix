@@ -41,6 +41,8 @@ fn main() {
 		run.replace('ok = ws_account_service_pump(e,binder)', 'ok = true'),
 		run.replace('if ok { ok = ws_service_ui_pump(e) }', ''),
 		run.replace('if ok { ok = ws_service_ui_pump(e) }', 'ok = ws_service_ui_pump(e)'),
+		run.replace("if !ok { ws_service_failure(e, c'ANDROID-SERVICE-FAIL active cycle', 3, terminal_reason) }", ''),
+		run.replace("if !ok { ws_service_failure(e, c'ANDROID-SERVICE-FAIL active cycle', 3, terminal_reason) }\n\t\t\tpop_frame(e)", "pop_frame(e)\n\t\t\tif !ok { ws_service_failure(e, c'ANDROID-SERVICE-FAIL active cycle', 3, terminal_reason) }"),
 	]
 	mut checks := 'fn main() {\n assert lifecycle_suite(ws_service_run, ws_service_shutdown, true)\n'
 	for i, mutation in mutations {
@@ -66,7 +68,7 @@ fn main() {
 		program += '\n' + mutation.replace('fn ws_service_shutdown(', 'fn ' + name + '(')
 		checks += ' assert !lifecycle_suite(ws_service_run, ${name}, false), "shutdown mutant ${i} escaped"\n'
 	}
-	checks += ' println("HEADLESS-LIFECYCLE-PASS cases=33 negative-mutations=18")\n}\n'
+	checks += ' println("HEADLESS-LIFECYCLE-PASS cases=33 negative-mutations=20")\n}\n'
 	work := os.join_path(os.temp_dir(), 'vinix-headless-lifecycle-' + os.getpid().str())
 	assert !os.exists(work)
 	os.mkdir_all(work)!
@@ -79,7 +81,7 @@ fn main() {
 	if built.exit_code != 0 { panic(built.output) }
 	result := os.exec([work + '/probe'])
 	if result.exit_code != 0 { panic(result.output) }
-	assert result.output.trim_space() == 'HEADLESS-LIFECYCLE-PASS cases=33 negative-mutations=18'
+	assert result.output.trim_space() == 'HEADLESS-LIFECYCLE-PASS cases=33 negative-mutations=20'
 	println(result.output.trim_space())
 }
 
@@ -171,6 +173,7 @@ fn slot(e voidptr, index int) voidptr {
 fn ws_failure(e voidptr, stage &char) bool {
  assert_env(e)
  assert stage != unsafe { nil }
+ if unsafe { cstring_to_vstring(stage) } == "ANDROID-SERVICE-FAIL active cycle" && p.frame_depth != 1 { p.unsafe_jni++ }
  failed := p.exception
  // Match JNI ExceptionDescribe: reporting also clears the current exception.
  p.exception = false
@@ -359,8 +362,8 @@ fn lifecycle_suite(run ServiceRun, shutdown ServiceShutdown, loud bool) bool {
   lifecycle_case("protocol during main callback", Probe{controls:[i32(1),1,1,1,-1]}, Expected{result:1,ready:1,pumps:2,account:1,ui:1}, run, shutdown, loud),
   lifecycle_case("account pump failure", Probe{controls:[i32(1),1,1,1],fail_account:true}, Expected{result:1,ready:1,pumps:2,account:1}, run, shutdown, loud),
   lifecycle_case("UI pump failure", Probe{controls:[i32(1),1,1,1],fail_ui:true}, Expected{result:1,ready:1,pumps:2,account:1,ui:1}, run, shutdown, loud),
-  lifecycle_case("account pump exception", Probe{controls:[i32(1),1,1,1],account_throws:true}, Expected{result:1,ready:1,pumps:2,account:1,clears:1}, run, shutdown, loud),
-  lifecycle_case("UI pump exception", Probe{controls:[i32(1),1,1,1],ui_throws:true}, Expected{result:1,ready:1,pumps:2,account:1,ui:1,clears:1}, run, shutdown, loud),
+  lifecycle_case("account pump exception", Probe{controls:[i32(1),1,1,1],account_throws:true}, Expected{result:1,ready:1,pumps:2,account:1}, run, shutdown, loud),
+  lifecycle_case("UI pump exception", Probe{controls:[i32(1),1,1,1],ui_throws:true}, Expected{result:1,ready:1,pumps:2,account:1,ui:1}, run, shutdown, loud),
   lifecycle_case("cleanup pump failure", Probe{controls:[i32(1),1,1,0],fail_cleanup:true}, Expected{result:1,ready:1,callbacks:0}, run, shutdown, loud),
   lifecycle_case("cleanup bounded", Probe{controls:[i32(1),1,1,0],stuck_cleanup:true}, Expected{result:1,ready:1,cleanup:64,callbacks:0}, run, shutdown, loud),
   lifecycle_case("cleanup delayed", Probe{controls:[i32(1),1,1,0],close_after:3}, Expected{ready:1,cleanup:3,closed:1}, run, shutdown, loud),
