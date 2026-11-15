@@ -430,7 +430,8 @@ fn prepare(args []string, stage bool) ! {
 	mkfs := os.find_abs_path_of_executable(os.getenv_opt('VINIX_PERF_MKFS') or { 'mkfs.ext2' })!
 	mut pins := map[string]string{}
 	source_inputs(root, mut pins)!
-	for path in [kernel, host.v, host.qemu, host.firmware, cc, readelf, mkfs, os.executable(),
+	sampler := perfproducer.sampler_compiler(host.v)!
+	for path in [kernel, host.v, sampler, host.qemu, host.firmware, cc, readelf, mkfs, os.executable(),
 		os.find_abs_path_of_executable('cp')!, os.find_abs_path_of_executable('tar')!] {
 		pin(mut pins, path)!
 	}
@@ -489,13 +490,13 @@ fn prepare(args []string, stage bool) ! {
 	os.chmod(state + '/rootfs/sbin/init', 0o755)!
 	perf := state + '/rootfs/opt/vinix-perf'
 	os.mkdir_all(perf)!
-	measure_c := perfproducer.generate(host.v, root, state + '/guest', 'x86_64')!
+	measure_c := perfproducer.generate(sampler, root, state + '/guest', 'x86_64')!
 	guest_tool(guest_link_command(cc, guest, measure_c, perf + '/measure'),
 		state + '/guest', 'measure-link')!
 	guest_elf(readelf, init, state + '/guest', 'init')!
 	guest_elf(readelf, perf + '/measure', state + '/guest', 'measure')!
 	for path in [init, state + '/guest/init.c', state + '/guest/init-source.v',
-		state + '/guest/init-v.argv.json', state + '/guest/init-v.log', perf + '/measure', state + '/guest/measure-v.c',
+		state + '/guest/init-v.argv.json', state + '/guest/init-v.log', state + '/guest/init-v.env.json', perf + '/measure', state + '/guest/measure-v.c',
 		state + '/guest/measure-legacy.c', state + '/guest/measure-combined.c'] { pins[path] = digest(path)! }
 	for build in plan.builds { stage_file(build.binary, perf + '/vinix-desktop-' + build.name, clone)! }
 	os.cp(root + '/tests/desktop-perf/perf-init.sh', perf + '/perf-init.sh')!

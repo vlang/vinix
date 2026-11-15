@@ -9,6 +9,17 @@ import hwhost
 
 pub const legacy_sha256 = '2490bc0e69142080f52a469e241cbb37d61d0e0687a191618654a3b617b68771'
 
+// The freestanding initializer uses the maintained host frontend. A separately
+// qualified target-only compiler may emit the runtime sampler instead.
+pub fn sampler_compiler(fallback string) !string {
+	selected := os.getenv_opt('VINIX_PERF_SAMPLER_V') or { fallback }
+	if !os.is_abs_path(selected) || selected != os.real_path(selected)
+		|| !os.is_file(selected) || !os.is_executable(selected) {
+		return error('canonical executable sampler compiler required: VINIX_PERF_SAMPLER_V')
+	}
+	return selected
+}
+
 pub fn generate_init(compiler string, root string, directory string, arch string) !string {
 	if arch !in ['aarch64', 'x86_64'] { return error('unsupported initializer architecture') }
 	name := if arch == 'aarch64' { 'perfinitarm' } else { 'perfinitx86' }
@@ -24,7 +35,11 @@ pub fn generate_init(compiler string, root string, directory string, arch string
 	argv := [root + '/build-support/compile-v-module', module_dir, output, '--arch',
 		if arch == 'aarch64' { 'arm64' } else { 'amd64' }, '-d', 'nofloat']
 	os.write_file(directory + '/init-v.argv.json', json2.encode(argv) + '\n')!
-	hwhost.run_tool(argv, {'VINIX_V_COMPILER': compiler}, directory + '/init-v.log', 300)!
+	// find-v.sh gives V precedence over VINIX_V_COMPILER. Override both and
+	// VEXE so an inherited sampler selection cannot replace this compiler.
+	environment := {'V': compiler, 'VINIX_V_COMPILER': compiler, 'VEXE': compiler}
+	os.write_file(directory + '/init-v.env.json', json2.encode(environment) + '\n')!
+	hwhost.run_tool(argv, environment, directory + '/init-v.log', 300)!
 	return output
 }
 

@@ -2451,6 +2451,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   See [the ARM schema receipts](docs/linux-performance-arm-schema.md); full
   performance and broader application acceptance remain open.
 
+- [x] Select and pin initializer and sampler compilers independently in both
+  retained performance adapters, refusing invalid explicit selections. Qualify
+  hostile inherited compiler variables, strict initializer links and complete
+  ARM boot-media preparation. See [the compiler selection receipts](docs/linux-performance-compiler-selection.md)
+  for the failed host attempts and unresolved runtime disk admission.
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

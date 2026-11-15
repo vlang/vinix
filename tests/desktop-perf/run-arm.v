@@ -204,6 +204,7 @@ fn prepare(args []string, stage bool) ! {
 		&& plan.seconds == 5 && plan.timeout == 2400
 		&& plan.scenarios == ['ops', 'churn', 'cache', 'idle', 'apps', 'drag'], 'fixed ARM six-scenario plan required')!
 	compiler := selected('V', false)!; qemu := selected('VINIX_QEMU_AARCH64', false)!
+	sampler := perfproducer.sampler_compiler(compiler)!
 	firmware := selected('VINIX_OVMF_CODE_AARCH64', false)!; variables := selected('VINIX_OVMF_VARS_AARCH64', false)!
 	cc := selected('CC_AARCH64', false)!; linker := selected_linker()!
 	sysroot := selected('VINIX_AARCH64_SYSROOT', true)!; gcc := selected('VINIX_PERF_ARM_GCC', true)!
@@ -213,7 +214,7 @@ fn prepare(args []string, stage bool) ! {
 	require(inside(gcc, sysroot), 'selected GCC must be inside ARM sysroot')!
 	require(!inside(state, sysroot) && !inside(sysroot, state), 'state overlaps ARM sysroot')!
 	mut pins := map[string]string{}; source_inputs(root, mut pins)!
-	for path in [base, kernel, plan.builds[0].binary, compiler, qemu, firmware, variables, cc, linker,
+	for path in [base, kernel, plan.builds[0].binary, compiler, sampler, qemu, firmware, variables, cc, linker,
 		readelf, mkfs, mformat, mmd, mcopy, loader, os.executable(), '/usr/bin/tar', '/bin/cp'] { pin(mut pins, path)! }
 	elf(kernel)!; elf(plan.builds[0].binary)!
 	if !stage { println('PERF ARM INPUT CHECK PASS; archive pinned; no staging or VM execution'); return }
@@ -234,7 +235,7 @@ fn prepare(args []string, stage bool) ! {
 	init := state + '/rootfs/sbin/init'
 	tool(compile_command(cc, linker, sysroot, gcc, c_file, init, false), state, 'init-link')!
 	perf := state + '/rootfs/opt/vinix-perf'
-	measure_c := perfproducer.generate(compiler, root, state + '/guest', 'aarch64')!
+	measure_c := perfproducer.generate(sampler, root, state + '/guest', 'aarch64')!
 	tool(compile_command(cc, linker, sysroot, gcc, measure_c, perf + '/measure', true), state, 'measure-link')!
 	for path in [init, perf + '/measure'] {
 		elf(path)!
@@ -268,7 +269,7 @@ fn finish_prepare(root string, base string, kernel string, state string, argumen
 	tool([mkfs, '-q', '-F', '-t', 'ext2', '-b', '4096', '-I', '128', '-O',
 		'filetype,sparse_super,^has_journal,^resize_inode,^dir_index,^extent,^64bit,^metadata_csum', state + '/root.ext2'], state, 'ext2')!
 	for path in [c_file, init, state + '/guest/init-source.v', state + '/guest/init-v.argv.json',
-		state + '/guest/init-v.log', perf + '/measure', state + '/guest/measure-v.c', state + '/guest/measure-legacy.c',
+		state + '/guest/init-v.log', state + '/guest/init-v.env.json', perf + '/measure', state + '/guest/measure-v.c', state + '/guest/measure-legacy.c',
 		state + '/guest/measure-combined.c', archive, image, state + '/vars.fd', state + '/root.ext2', state + '/limine.conf',
 		state + '/base-before.tsv', state + '/sysroot-before.tsv'] { pin(mut pins, path)! }
 	sources := pins.keys().filter(it.starts_with(root + '/') && (it.ends_with('.v') || it.ends_with('.c') || it.ends_with('.h') || it.ends_with('.sh') || it.ends_with('/compile-v-module')))

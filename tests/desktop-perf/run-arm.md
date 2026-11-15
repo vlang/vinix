@@ -68,14 +68,20 @@ Space consumed by other active work must be included or coordinated.
 
 The [November 15 build qualification](../../docs/linux-performance-harness-builds.md)
 records the restored initializer build and native fault-injection checks.
-Production staging reaches the sampler's separate deprecated-alias refusal;
-the current ARM page/class schema and full six-scenario guest run remain open.
+The subsequent [sampler](../../docs/linux-performance-sampler-builds.md) and
+[ARM profile](../../docs/linux-performance-arm-schema.md) qualifications restore
+strict links and the explicit 16 KiB/eighteen-class observer. The
+[compiler selection follow-up](../../docs/linux-performance-compiler-selection.md)
+records complete ARM preparation with separate initializer/sampler compilers.
+The fixed six-scenario guest run and actual PCI firmware boot remain unqualified.
 
 Status: normal and production host adapters each passed eighteen controls;
 host owners each passed the historical twenty-four and sixteen ARM controls.
 Six limit admission controls also passed. The retained host-only bundle
 passed the unchanged original full evidence seal, separate check and independent
 root check. See `foreground-supervise-report.md` for exact receipts.
-Guest PID1 and measure cross-compilation, a reviewed preparation profile,
-staging, actual PCI firmware boot, all six scenario results and allocation-site
-symbolization remain pending. Runtime disk admission remains held.
+The historical pending PID1/measure builds and staging are resolved by the
+follow-ups above. A current supervised preparation profile, actual PCI firmware
+boot, all six scenario results and allocation-site symbolization remain pending.
+The latest staging diagnostic does not establish supervised runtime admission;
+the existing disk floors remain enforced.

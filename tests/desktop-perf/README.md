@@ -115,8 +115,24 @@ compile that checker with the same profile flag.
 The retained `run-arm.v` and `run-x86.v` adapters generate their PID1 through
 `perfproducer.generate_init`, using the maintained freestanding V module path.
 The initializer uses native C-width libc calls and stack shell arguments.
-Its copied source and generation argv/log join the prepared input pins.
+Its copied source and generation argv/environment/log join the prepared input pins.
 The ARM initializer needs libc only; the sampler keeps its existing link recipe.
+
+Both adapters default to the selected `V` compiler for both payloads. Set
+`VINIX_PERF_SAMPLER_V` to a canonical absolute executable to select a separately
+qualified sampler compiler. Both executables join the prepared hashes; an invalid
+explicit sampler is refused without fallback. Initializer generation explicitly
+sets `V`, `VINIX_V_COMPILER` and `VEXE` to its own compiler. The public host suite
+checks selection refusals. Exercise real initializer generation with invalid
+inherited compiler variables on either architecture using:
+
+```sh
+build-support/run-v-tool.sh tests/desktop-perf/producer-init-check.v /path/to/v /path/to/vinix /external/fresh-init-check aarch64
+```
+
+Use `x86_64` for the other architecture. This emits C and checks the compiler
+receipt; it does not boot a guest. See [compiler selection and staging receipts](../../docs/linux-performance-compiler-selection.md)
+for the qualified pair and remaining runtime admission limits.
 
 `init-check.v` builds the unchanged production initializer plus a syscall-wrapped
 probe for console errors, existing `/root`, mount diagnostics and shell handoff:
