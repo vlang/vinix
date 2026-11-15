@@ -4367,3 +4367,40 @@ finalization; it is not the qualified receipt. Original `vwcollect-20261113-01`
 and `vwkernellease-20261115-01` prerequisites remain independently required and
 unchanged. Default activation, owned ARM/GUI, full build admission and broader
 section 14 acceptance remain open.
+
+## Parsed bridge source admission in the runtime producer (2026-11-15)
+
+Commit `a99e31095` extends [parsed source capture to `wine-build`](wine-producer-closure-check.md).
+The producer discovers and hashes the target compiler's ordered source list
+before the actual bridge build, requires the same list and bytes afterward,
+and retains both lists plus discovery/build argv/logs in its output receipt.
+The ordinary Win64 retainer now requires those producer artifacts and checks
+recorded discovery/build paths, including copied-evidence namespaces. It does
+not accept missing historical receipts or waive original input requirements.
+
+The first new source-list unit run caught CRLF normalization before validation.
+The parser now rejects CR/NUL before splitting. Unit refusal tests and the
+production baseline plus six refusal controls pass. A fresh Win64 PE producer
+and fresh owned x86 runtime build pass. The bridge lists 342 parsed inputs,
+including the host SDK settings file outside the former manual directory
+inventory. The focused producer checker verifies unchanged input maps, actual
+source admission, output hashes and matching compiler commands. The retainer
+builds; full owned-mode retention admission remains a separate gate.
+
+The fresh runtime and PE also pass the actual signed holder-death/collection
+test in 129.031 seconds, with a passing focused holder-evidence check. Its
+initial isolated bootloader-path refusal remains failed; the shared qualified
+bootloader was linked before the new successful attempt. No prior result is
+promoted by this checkpoint.
+
+Evidence is retained at `/Users/alex/.cache/vwwineclosure-20261115-01`, with
+isolated base `c8c44aaa2`, feature patch, exact fresh producers/outputs, source
+lists, raw failures, native outcome and focused checker logs. The receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-producer-closure-20261115-01.inventory.json`,
+SHA-256 `6e5a3de6d97e0fcab7b8e5396fbd3848b28d35863e9d402ea1b43408d3d1a44e`.
+Complete typed-inventory recording and independent comparison pass against
+the retained checkpoint; this does not expand the source-admission scope.
+The original selected distribution reconstruction, local-only notices and
+qualified kernel bundles remain independently required. C header/hermetic
+admission, full owned retention, default activation, owned ARM/GUI and broader
+section 14 acceptance remain open.
