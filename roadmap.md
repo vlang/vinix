@@ -2486,6 +2486,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   See [the source snapshot receipts](docs/linux-performance-source-snapshot.md)
   for all 40 warmup proofs and the five page deltas still refusing flatness.
 
+- [x] Read native slab statistics with caller-stack class storage and bounded
+  decimal/range formatting, preserving the text schema without formatter
+  allocations. Qualify partial/EOF/guarded reads and flat repeated cleanup as
+  root and UID1000 on both architectures, with full generated-C and independent
+  lifetime review. See [the observer qualification](docs/linux-slabinfo-observer.md)
+  for cold-reader results, full-workload checks and remaining section 15 gates.
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

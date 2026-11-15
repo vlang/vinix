@@ -3,7 +3,7 @@ module memory
 
 import katomic
 
-// Caller-owned statistics for opt-in native lifetime measurements. Boot has
+// Caller-owned statistics for procfs and native lifetime measurements. Boot has
 // initialized the immutable class/shard registry; the caller holds no slab or
 // PMM lock. Each class is sampled under its existing lock, independently of
 // other classes. This is not an atomic whole-heap snapshot or XNU zone stats.

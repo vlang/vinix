@@ -37,6 +37,7 @@ import time
 import pager
 import drm
 import kprint
+import slabreport
 
 pub type NetTcpSnapshot = fn () string
 
@@ -654,9 +655,6 @@ fn (this &ProcFSResource) contents() string {
 			meminfo_builder.add('\n')
 			return lib.finish_text(*meminfo_builder)
 		}
-		.slabinfo {
-			return slabinfo_text()
-		}
 		// Leak hunting, in an ALLOC_TRACK=1 kernel: see c/alloc_track.c.
 		.allocstart {
 			$if alloc_track ? {
@@ -925,6 +923,9 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 	if stat.isdir(this.stat.mode) {
 		errno.set(errno.eisdir)
 		return none
+	}
+	if this.kind == .slabinfo {
+		return slabinfo_read(buf, loc, count)
 	}
 	if (this.kind == .allocstart || this.kind == .allocsites)
 		&& !proc.may_read_kernel_diagnostics() {
@@ -1245,29 +1246,29 @@ fn heap_pages() u64 {
 fn C.alloc_track_start()
 fn C.alloc_track_dump(buf &char, cap u64, min_count u64) u64
 
-fn slabinfo_text() string {
-	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
-	unsafe { *text = lib.new_text(1024) }
-	text.add('# class      size    objects   pages\n')
-	classes := memory.heap_classes()
-	for class in classes {
-		text.add('size-')
-		text.add_unsigned(class.size)
-		text.add_byte(` `)
-		text.add_unsigned(class.size)
-		text.add_byte(` `)
-		text.add_unsigned(class.live)
-		text.add_byte(` `)
-		text.add_unsigned(class.pages)
-		text.add_byte(`\n`)
+fn slabinfo_read(buf voidptr, loc u64, count u64) ?i64 {
+	$if xnu_zone ? {
+		errno.set(errno.eopnotsupp)
+		return none
 	}
-	unsafe { classes.free() }
-	text.add('large - - ')
-	text.add_unsigned(memory.heap_big_pages())
-	text.add('\n# written after free ')
-	text.add_unsigned(memory.heap_written_after_free())
-	text.add_byte(`\n`)
-	return lib.finish_text(text)
+	// Explicit caller-frame storage: no class array, Text buffer or returned
+	// string may allocate while observing the allocator. Nothing escapes this
+	// synchronous read. Shards are still sampled under their individual locks.
+	classes := unsafe { &memory.HeapClass(C.vinix_stack_alloc(18 * sizeof(memory.HeapClass))) }
+	n := memory.heap_classes_into(classes, 18)
+	if n < 0 {
+		errno.set(errno.eio)
+		return none
+	}
+	mut output := unsafe { &slabreport.Writer(C.vinix_stack_alloc(sizeof(slabreport.Writer))) }
+	unsafe { *output = slabreport.writer(buf, loc, count) }
+	output.header()
+	for i in 0 .. n {
+		class := unsafe { classes[i] }
+		output.class(class.size, class.live, class.pages)
+	}
+	output.footer(memory.heap_big_pages(), memory.heap_written_after_free())
+	return i64(output.count())
 }
 
 // What a process maps and has resident; see mmap.process_memory. The table
