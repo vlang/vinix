@@ -4858,3 +4858,45 @@ Builder bootstrap, complete compiler/SDK content, unreported inputs/search
 absence, Mach-O linker/library closure and OS loader/shared-cache bytes remain
 open. Kernel and product defaults are unchanged; owned ARM/GUI, redistribution
 and broader roadmap 14 acceptance remain open.
+
+## Experimental captured Mach-O host links (2026-11-16)
+
+Commit `e63335dfd` adds a separate [captured Mach-O link check](wine-mach-link.md).
+It copies retained host C units, selects arm64 Clang/LLD and the local SDK
+explicitly, captures LLD's reproduction archive, validates its bounded ordinary
+USTAR members and replays the response in the extracted namespace. Exact
+response options, thin arm64 object headers, SDK text-stub member types and
+the universal compiler-runtime container are checked. Runtime slice bounds,
+alignment, overlap and the single ordinary arm64 archive are required.
+Compilation and replay use closed child environments with before-command
+ordinary host-image byte checks; OS images remain metadata-only.
+
+The fixture, controller, producer and retainer captures all reproduce identical
+executable bytes. Final `mach-link-final-02` independently admits all four.
+Both fixture outputs execute with the expected marker; the final fixture build
+also ignores deliberately invalid parent CPATH, LIBRARY_PATH, SDKROOT and
+CCC_OVERRIDE_OPTIONS. Production `check-final-03` passes real/copied baselines,
+twelve receipt refusals, five response-profile refusals and five object/runtime
+header refusals in `controls-final`. Resealed receipt cases exercise output
+equality, extracted members, commands, environment, version and image records.
+The production host-image regression executable passes too.
+
+The complete checkpoint is `/Users/alex/.cache/vwmacholink-20261115-01`, with
+`source-final`, feature patch/revision, generated C/binaries, captured archives,
+extracted inputs, raw command/image records and controls. Final fixture evidence
+is `fixture-final-02`; real-role captures are `controller-02`, `producer-02` and
+`retainer-02`, each with a final verifier log. Earlier probes and failed header
+experiments remain diagnostic. The typed inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-macho-link-20261115-01.inventory.json`,
+SHA-256 `a95cc5e8206f14e3153d145b5002b0e924ec7ce2f1be4d74cef6efde82032325`.
+Complete recording and independent comparison pass against the retained bundle.
+The original host-C bundles, selected tool paths and historical prerequisites
+remain required.
+
+This establishes local captured-link reproduction, not complete Mach-O library
+closure or isolation from the installed SDK. LLD's preserved obsolete
+`-lto_library` option refers to an uncaptured, ignored library. SDK reexport/
+search closure, mandatory host-builder integration, OS shared-cache bytes and
+hermetic toolchain admission remain open. No new signed guest run or default
+activation is claimed; ARM owned Wine, fresh owned GUI acceptance and broader
+roadmap 14 gates remain open.

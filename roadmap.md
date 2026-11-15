@@ -1379,7 +1379,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     all three qualification roles and their retained input graphs, including
     producer admission before signing and both bindings after guest execution.
     A fresh signed x86 run, forty-nine retention refusals and eighteen startup/
-    pre-sign refusals pass. Mach-O linker/library closure, OS shared-cache bytes
+    pre-sign refusals pass. An [experimental Mach-O link check](tests/packages/wine-mach-link.md)
+    reproduces fixture and all three host-role executable bytes from captured
+    inputs, with twenty-two refusal controls. Mandatory host integration,
+    complete Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader
     lifetime/mapping controls remain open.
