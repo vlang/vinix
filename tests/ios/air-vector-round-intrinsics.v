@@ -203,7 +203,7 @@ fn focused_controls(assembler_path string, out string) ! {
  guards := ['fmf', 'tail', 'callattr', 'argument', 'load', 'phi', 'coldwide', 'scalable', 'double', 'other']
  for element in [64, 65] { t := typ(element); width := bits(element); raw := if width == 16 { u64(0xbe00) } else { u64(0xbfc00000) }; defined := '<${t} ${literal(element, raw)}, ${t} ${literal(element, raw)}>'
   for operation in operations { for count in [2, 17] { s.write_string('declare <${count} x ${t}> @llvm.${operation}.v${count}f${width}(<${count} x ${t}>)\n') }; s.write_string('declare <vscale x 2 x ${t}> @llvm.${operation}.nxv2f${width}(<vscale x 2 x ${t}>)\n declare <2 x ${t}> @alias_${operation}_${width}(<2 x ${t}>)\n') }
-  s.write_string('declare <2 x ${t}> @llvm.sqrt.v2f${width}(<2 x ${t}>)\n declare <2 x double> @llvm.floor.v2f64(<2 x double>)\n')
+  s.write_string('declare <2 x ${t}> @llvm.sin.v2f${width}(<2 x ${t}>)\n declare <2 x double> @llvm.floor.v2f64(<2 x double>)\n')
   for operation in operations {
    name := 'llvm.${operation}.v2f${width}'
    for mode in modes {
@@ -221,7 +221,7 @@ fn focused_controls(assembler_path string, out string) ! {
     args := if guard in ['argument', 'load'] { 'ptr %out, ' + if guard == 'argument' { '<2 x ${t}> %arg' } else { 'ptr %input' } } else { 'ptr %out' }
     pre := if guard == 'load' { '%arg = load <2 x ${t}>, ptr %input\n' } else if guard == 'phi' { 'br label %next\n next: %arg = phi <2 x ${t}> [zeroinitializer, %0]\n' } else { '' }
     vt := if guard == 'coldwide' { '<17 x ${t}>' } else if guard == 'scalable' { '<vscale x 2 x ${t}>' } else if guard == 'double' { '<2 x double>' } else { '<2 x ${t}>' }
-    callee := if guard == 'coldwide' { 'llvm.${operation}.v17f${width}' } else if guard == 'scalable' { 'llvm.${operation}.nxv2f${width}' } else if guard == 'double' { 'llvm.floor.v2f64' } else if guard == 'other' { 'llvm.sqrt.v2f${width}' } else { name }
+    callee := if guard == 'coldwide' { 'llvm.${operation}.v17f${width}' } else if guard == 'scalable' { 'llvm.${operation}.nxv2f${width}' } else if guard == 'double' { 'llvm.floor.v2f64' } else if guard == 'other' { 'llvm.sin.v2f${width}' } else { name }
     s.write_string('define void @guard_${guard}_${operation}_${width}(${args}) { store i8 17, ptr %out\n ${pre}%n = ${if guard == 'tail' { 'tail ' } else { '' }}call ${if guard == 'fmf' { 'nnan ' } else { '' }}${vt} @${callee}(${vt} ${if guard in ['argument', 'load', 'phi'] { '%arg' } else { 'zeroinitializer' }})${if guard == 'callattr' { ' nounwind' } else { '' }}\n ret void }\n')
    }
    for kind in ['memory', 'void'] { s.write_string('define void @duplicate_${kind}_${operation}_${width}(${if kind == 'memory' { 'ptr %out' } else { '' }}) { ${if kind == 'memory' { 'store i8 17, ptr %out\n' } else { '' }}%a = call <2 x ${t}> @${name}(<2 x ${t}> zeroinitializer)\n %b = call <2 x ${t}> @alias_${operation}_${width}(<2 x ${t}> zeroinitializer)\n ret void }\n') }
@@ -246,7 +246,7 @@ fn focused_controls(assembler_path string, out string) ! {
    for count in [u64(1), 2, 3, 16, 257, 513]! { run := p.run_scalar_function(ir, stream, pools, bodies, fi(ir, 'loop_${operation}_${width}'), [count], int(count * 14 + 2))!; assert !run.poison && run.value == if operation == 'ceil' { count - 1 } else { u64(0) }; assert run.steps == int(count * 14 + 2); checks++ }
    for guard in guards { mut output := []u8{len: 32, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bs << airbitcode.IRMemoryBinding{data: output} }; if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_${guard}_${operation}_${width}'), mut bs, 100) { panic('guard: ' + guard) }; unchanged(output); checks++; unsafe { output.free(); bs.free() } }
    callee := fi(ir, 'llvm.${operation}.v2f${width}'); original := functions[callee]
-   for changed in [airbitcode.IRFunction{...original, declaration: false}, airbitcode.IRFunction{...original, calling_convention: 8}, airbitcode.IRFunction{...original, linkage: 1}, airbitcode.IRFunction{...original, signature: -1}, airbitcode.IRFunction{...original, record: -1}, airbitcode.IRFunction{...original, name: 'llvm.sqrt.v2f32'}, airbitcode.IRFunction{...original, name: 'llvm.floor.v17f16'}] {
+   for changed in [airbitcode.IRFunction{...original, declaration: false}, airbitcode.IRFunction{...original, calling_convention: 8}, airbitcode.IRFunction{...original, linkage: 1}, airbitcode.IRFunction{...original, signature: -1}, airbitcode.IRFunction{...original, record: -1}, airbitcode.IRFunction{...original, name: 'llvm.sin.v2f32'}, airbitcode.IRFunction{...original, name: 'llvm.floor.v17f16'}] {
     functions[callee] = changed; mut output := [u8(0xcc)]; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if _ := p.run_memory_function(view, stream, pools, bodies, fi(ir, 'literal_${operation}_${width}'), mut bs, 100) { panic('declaration mutation') }; unchanged(output); if _ := p.run_scalar_function(view, stream, pools, bodies, constant, [], 4) { panic('scalar declaration mutation') }; checks += 2; unsafe { output.free(); bs.free() }
    }; functions[callee] = original
    alias := fi(ir, 'alias_${operation}_${width}'); old := functions[alias]; functions[alias] = airbitcode.IRFunction{...old, name: original.name}

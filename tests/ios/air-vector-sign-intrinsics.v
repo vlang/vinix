@@ -186,7 +186,7 @@ fn focused_controls(assembler_path string, out string) ! {
  for element in [64, 65] {
   t := typ(element); width := bits(element)
   for count in [2, 17] { for operation in ['fabs', 'copysign'] { s.write_string('declare <${count} x ${t}> @llvm.${operation}.v${count}f${width}(<${count} x ${t}>${if operation == 'copysign' { ', <${count} x ${t}>' } else { '' }})\n') } }
-  s.write_string('declare <vscale x 2 x ${t}> @llvm.fabs.nxv2f${width}(<vscale x 2 x ${t}>)\n declare <2 x ${t}> @llvm.sqrt.v2f${width}(<2 x ${t}>)\n declare <2 x ${t}> @reserved_alias_${width}(<2 x ${t}>)\n')
+  s.write_string('declare <vscale x 2 x ${t}> @llvm.fabs.nxv2f${width}(<vscale x 2 x ${t}>)\n declare <2 x ${t}> @llvm.sin.v2f${width}(<2 x ${t}>)\n declare <2 x ${t}> @reserved_alias_${width}(<2 x ${t}>)\n')
   raw := if width == 16 { u64(0xfc01) } else { u64(0xff812345) }; sign := u64(1) << u32(width - 1)
   defined := '<${t} ${literal(element, raw)}, ${t} ${literal(element, raw)}>'; signs := '<${t} ${literal(element, sign)}, ${t} zeroinitializer>'
   for operation in ['fabs', 'copysign'] {
@@ -208,7 +208,7 @@ fn focused_controls(assembler_path string, out string) ! {
     signature := if guard == 'argument' { '<2 x ${t}> %a, ptr %out' } else if guard == 'load' { 'ptr %src, ptr %out' } else { 'ptr %out' }
     pre := if guard == 'load' { '%a = load <2 x ${t}>, ptr %src, align 1\n' } else if guard == 'phi' { 'br label %body\n body: %a = phi <2 x ${t}> [zeroinitializer, %entry]\n' } else if guard == 'coldwide' { 'br i1 true, label %done, label %cold\n done: ret void\n cold:' } else { '' }
     count := if guard == 'coldwide' { 17 } else { 2 }; vt := if guard == 'scalable' { '<vscale x 2 x ${t}>' } else if guard == 'double' { '<2 x double>' } else { '<${count} x ${t}>' }
-    callee := if guard == 'scalable' { 'llvm.fabs.nxv2f${width}' } else if guard == 'double' { 'llvm.${operation}.v2f64' } else if guard == 'other' { 'llvm.sqrt.v2f${width}' } else { 'llvm.${operation}.v${count}f${width}' }
+    callee := if guard == 'scalable' { 'llvm.fabs.nxv2f${width}' } else if guard == 'double' { 'llvm.${operation}.v2f64' } else if guard == 'other' { 'llvm.sin.v2f${width}' } else { 'llvm.${operation}.v${count}f${width}' }
     binary := operation == 'copysign' && guard !in ['scalable', 'other']; arg := if guard in ['argument', 'load', 'phi'] { '%a' } else { 'zeroinitializer' }
     s.write_string('define void @guard_${guard}_${operation}_${width}(${signature}) { entry: store i8 17, ptr %out, align 1\n ${pre}%n = ${if guard == 'tail' { 'tail ' } else { '' }}call ${if guard == 'fmf' { 'nnan ' } else { '' }}${vt} @${callee}(${vt} ${arg}${if binary { ', ' + vt + ' zeroinitializer' } else { '' }})${if guard == 'callattr' { ' #1' } else { '' }}\n ret void }\n')
    }
@@ -232,7 +232,7 @@ fn focused_controls(assembler_path string, out string) ! {
    for count in [u64(1), 2, 3, 16, 257, 513]! { run := p.run_scalar_function(ir, stream, pools, bodies, fi(ir, 'loop_${operation}_${width}'), [count], int(count * 16 + 2))!; assert !run.poison && run.value == count * (count - 1) / 2 && run.steps == int(count * 16 + 2); checks++ }
    for guard in guards { mut output := []u8{len: 32, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bs << airbitcode.IRMemoryBinding{data: output, writable: true} }; if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_${guard}_${operation}_${width}'), mut bs, 100) { panic('unsupported intrinsic: ' + guard) }; unchanged(output); checks++; unsafe { output.free(); bs.free() } }
    callee := fi(ir, 'llvm.${operation}.v2f${width}'); original := functions[callee]
-   for changed in [airbitcode.IRFunction{...original, declaration: false}, airbitcode.IRFunction{...original, calling_convention: 8}, airbitcode.IRFunction{...original, linkage: 1}, airbitcode.IRFunction{...original, signature: -1}, airbitcode.IRFunction{...original, record: -1}, airbitcode.IRFunction{...original, name: 'llvm.sqrt.v2f32'}, airbitcode.IRFunction{...original, name: 'llvm.fabs.v17f16'}] {
+   for changed in [airbitcode.IRFunction{...original, declaration: false}, airbitcode.IRFunction{...original, calling_convention: 8}, airbitcode.IRFunction{...original, linkage: 1}, airbitcode.IRFunction{...original, signature: -1}, airbitcode.IRFunction{...original, record: -1}, airbitcode.IRFunction{...original, name: 'llvm.sin.v2f32'}, airbitcode.IRFunction{...original, name: 'llvm.fabs.v17f16'}] {
     functions[callee] = changed; mut output := [u8(0xcc)]; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if _ := p.run_memory_function(view, stream, pools, bodies, fi(ir, 'literal_${operation}_${width}'), mut bs, 100) { panic('declaration mutation admitted') }; unchanged(output); if _ := p.run_scalar_function(view, stream, pools, bodies, constant, [], 4) { panic('scalar declaration mutation admitted') }; checks += 2; unsafe { output.free(); bs.free() }
    }; functions[callee] = original
   }

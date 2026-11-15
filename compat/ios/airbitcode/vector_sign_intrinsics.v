@@ -2,20 +2,24 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224
+const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	id := if name.starts_with('llvm.fabs.v') { ScalarIntrinsic.fabs } else if name.starts_with('llvm.copysign.v') { ScalarIntrinsic.copysign } else { return error('AIR vector intrinsic: unsupported name') }
-	mut offset := if id == .fabs { 11 } else { 15 }
-	if offset >= name.len || name[offset] == `0` { return error('AIR vector intrinsic: canonical lane count required') }
+	count, bits := vector_float_overload(name, if id == .fabs { 11 } else { 15 })!
+	return id, count, bits
+}
+fn vector_float_overload(name string, start int) !(int, u32) {
+	mut offset := start
+	if offset < 0 || offset >= name.len || name[offset] == `0` { return error('AIR vector intrinsic: canonical lane count required') }
 	mut count := 0
 	for offset < name.len && name[offset] >= `0` && name[offset] <= `9` {
 		count = count * 10 + int(name[offset] - `0`); offset++
 		if count > 16 { return error('AIR vector intrinsic: lane count') }
 	}
 	if count < 1 || name.len - offset != 3 || name[offset] != `f` || !((name[offset + 1] == `1` && name[offset + 2] == `6`) || (name[offset + 1] == `3` && name[offset + 2] == `2`)) { return error('AIR vector intrinsic: half/float overload required') }
-	return id, count, if name[offset + 1] == `1` { u32(16) } else { u32(32) }
+	return count, if name[offset + 1] == `1` { u32(16) } else { u32(32) }
 }
 fn vector_sign_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
 	if id !in [.fabs, .copysign]! || count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector intrinsic: cache shape') }
@@ -58,6 +62,6 @@ fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Strea
 	id, count, bits := vector_float_intrinsic_name(ir.functions[op.callee_function].name)!
 	left := m.read_vector(stream, m.p.operands[op.operands_start + 1])!
 	right := if id == .copysign { m.read_vector(stream, m.p.operands[op.operands_start + 2])! } else { ScalarVectorValue{} }
-	result := if id in [.fabs, .copysign]! { sign_intrinsic_vector(id, left, right, bits, count)! } else { rounding_intrinsic_vector(id, left, bits, count)! }
+	result := if id in [.fabs, .copysign]! { sign_intrinsic_vector(id, left, right, bits, count)! } else if id == .sqrt { sqrt_intrinsic_vector(left, bits, count)! } else { rounding_intrinsic_vector(id, left, bits, count)! }
 	return m.store_vector_value(inst, result)!
 }

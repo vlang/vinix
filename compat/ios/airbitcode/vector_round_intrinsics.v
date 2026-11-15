@@ -16,21 +16,20 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	else if name.starts_with('llvm.rint.v') { id = .rint; offset = 11 }
 	else if name.starts_with('llvm.nearbyint.v') { id = .nearbyint; offset = 16 }
 	else { return error('AIR vector intrinsic: unsupported name') }
-	if offset >= name.len || name[offset] == `0` { return error('AIR vector intrinsic: canonical lane count required') }
-	mut count := 0
-	for offset < name.len && name[offset] >= `0` && name[offset] <= `9` {
-		count = count * 10 + int(name[offset] - `0`); offset++
-		if count > 16 { return error('AIR vector intrinsic: lane count') }
-	}
-	if count < 1 || name.len - offset != 3 || name[offset] != `f` || !((name[offset + 1] == `1` && name[offset + 2] == `6`) || (name[offset + 1] == `3` && name[offset + 2] == `2`)) { return error('AIR vector intrinsic: half/float overload required') }
-	return id, count, if name[offset + 1] == `1` { u32(16) } else { u32(32) }
+	count, bits := vector_float_overload(name, offset)!
+	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	if name.starts_with('llvm.fabs.') || name.starts_with('llvm.copysign.') { return vector_sign_intrinsic_name(name) }
+	if name.starts_with('llvm.sqrt.v') { count, bits := vector_float_overload(name, 11)!; return ScalarIntrinsic.sqrt, count, bits }
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
 	if id in [.fabs, .copysign]! { return vector_sign_intrinsic_key(id, count, bits) }
+	if id == .sqrt {
+		if count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector intrinsic: cache shape') }
+		return vector_sign_intrinsic_slots + 224 + int(bits == 16) * 16 + count - 1
+	}
 	operation := vector_round_intrinsic_index(id)!
 	if count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector intrinsic: cache shape') }
 	return vector_sign_intrinsic_slots + operation * 32 + int(bits == 16) * 16 + count - 1
