@@ -109,16 +109,26 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	assert !os.exists(data + '/wine/drive_c/windows/system32/new.dll')
 	next_owner.review.recheck()!
 	next_owner.recheck()!
+	for generation in [u64(0), installed.generation] {
+		mut migration_refused := false
+		next_owner.migrate_bindings_at(generation) or { migration_refused = true }
+		assert migration_refused
+		mut additions_refused := false
+		next_owner.complete_additions_at(generation) or { additions_refused = true }
+		assert additions_refused
+		assert os.readlink(data + '/wine/drive_c/windows/system32/kernel32.dll')! == builtins + '/kernel32.dll'
+		assert !os.exists(data + '/wine/drive_c/windows/system32/new.dll')
+	}
 	mut retarget_refused := false
 	next_owner.complete_additions() or { retarget_refused = err.msg().contains('all existing links') }
 	assert retarget_refused
 	assert !os.exists(data + '/wine/drive_c/windows/system32/new.dll')
 	system := data + '/wine/drive_c/windows/system32'
 	target := next_owner.admission.prepared.directory + '/generations/' + upgraded.generation.str() + '/apps/wine/root/usr/lib/wine/x86_64-windows'
-	next_owner.migrate_bindings()!
+	next_owner.migrate_bindings_at(upgraded.generation)!
 	next_owner.migrate_bindings()!
 	assert os.readlink(system + '/kernel32.dll')! == target + '/kernel32.dll'
-	next_owner.complete_additions()!
+	next_owner.complete_additions_at(upgraded.generation)!
 	next_owner.complete_additions()!
 	completed_document := next_owner.document()!
 	assert completed_document.runtime_version == '2.0.0'
@@ -157,7 +167,7 @@ fn test_signed_repository_install_to_guarded_prefix_review() {
 	activate(next_owner.admission.prepared.directory, installed.generation)!
 	activation.release()
 	mut changed := false
-	next_owner.document() or { changed = err.msg().contains('active generation changed') }
+	next_owner.migrate_bindings_at(upgraded.generation) or { changed = err.msg().contains('active generation changed') }
 	assert changed
 	restore := acquire(next_owner.admission.prepared.directory)!
 	activate(next_owner.admission.prepared.directory, upgraded.generation)!

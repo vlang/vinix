@@ -82,20 +82,34 @@ pub fn (owner &WinePrefixReview) recheck() ! {
 // Keep package transactions excluded throughout fresh admission and exclusive
 // additions. Retargeting is refused; partial progress resumes via fresh review.
 pub fn (mut owner WinePrefixReview) complete_additions() ! {
-	if owner.admission.prepared.lease < 0 { return error('Wine prefix review is closed') }
-	guard := acquire_reader(owner.admission.prepared.directory)!
-	defer { guard.release() }
-	owner.recheck()!
-	owner.review.complete_additions()!
-	owner.recheck()!
+	owner.write_bindings(0, true)!
 }
 
 pub fn (mut owner WinePrefixReview) migrate_bindings() ! {
+	owner.write_bindings(0, false)!
+}
+
+// Pin the selected package generation, while retaining all normal fresh
+// admission checks. This does not authorize a previously observed link set.
+pub fn (mut owner WinePrefixReview) complete_additions_at(generation u64) ! {
+	if generation == 0 { return error('Wine prefix generation must be positive') }
+	owner.write_bindings(generation, true)!
+}
+
+pub fn (mut owner WinePrefixReview) migrate_bindings_at(generation u64) ! {
+	if generation == 0 { return error('Wine prefix generation must be positive') }
+	owner.write_bindings(generation, false)!
+}
+
+fn (mut owner WinePrefixReview) write_bindings(expected u64, additions bool) ! {
 	if owner.admission.prepared.lease < 0 { return error('Wine prefix review is closed') }
 	guard := acquire_reader(owner.admission.prepared.directory)!
 	defer { guard.release() }
 	owner.recheck()!
-	owner.review.migrate_bindings()!
+	if expected != 0 && expected != owner.admission.generation {
+		return error('Wine prefix generation differs from requested generation; review again')
+	}
+	if additions { owner.review.complete_additions()! } else { owner.review.migrate_bindings()! }
 	owner.recheck()!
 }
 

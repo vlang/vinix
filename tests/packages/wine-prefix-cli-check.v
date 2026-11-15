@@ -27,6 +27,16 @@ fn run() ! {
 		refused(cli, [command, 'app', 'relative'], 'requires a valid application ID')!
 		refused(cli, ['--progress', command, 'app', '/tmp/private'], '--progress supports')!
 	}
+	for command in ['wine-prefix-additions', 'wine-prefix-migrate'] {
+		for value in ['', '0', '00', '01', '-1', '+1', ' 1', '1 ', '1x'] {
+			refused(cli, [command, 'app', '/tmp/private', '--generation', value], 'canonical positive generation')!
+		}
+		refused(cli, [command, 'app', '/tmp/private', '--generation', '18446744073709551616'], 'exceeds the generation number range')!
+		refused(cli, [command, 'app', '/tmp/private', '--generation'], 'requires an installed application ID')!
+		refused(cli, [command, 'app', '/tmp/private', '--other', '2'], 'requires an installed application ID')!
+		refused(cli, ['--offline', command, 'app', '/tmp/private', '--generation', '2'], 'requires the real root')!
+	}
+	refused(cli, ['wine-prefix-review', 'app', '/tmp/private', '--generation', '2'], 'requires an installed application ID')!
 	println('Wine installed-prefix CLI refusal controls PASS (no installed-state success claimed)')
 }
 

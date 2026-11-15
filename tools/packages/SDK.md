@@ -2046,6 +2046,16 @@ the previous runtime version from old link paths. The added field preserves
 structural consumers that ignore unknown JSON fields; it supplies no authority
 for a later write.
 
+The write commands accept trailing `--generation N`, where N is a canonical
+positive decimal generation from the review JSON. A mismatch refuses before
+any binding write. The library counterparts are `complete_additions_at(N)` and
+`migrate_bindings_at(N)`; both reject zero. The comparison and fresh admission
+checks run under the package reader lock retained throughout the operation, so
+an intervening activation cannot silently select an unreviewed generation.
+Without the option the commands retain their current-generation behavior.
+This pins the selected generation only: prefix contents must still pass fresh
+checks, and no previously observed link set or old runtime version is authorized.
+
 `WinePrefixReview.complete_additions()` is an explicit library write operation
 for additions-only captures. It retains package reader/lease and prefix guards,
 rechecks service admission, refuses any existing link needing replacement, and
@@ -2257,6 +2267,10 @@ change any builtin target, pending stage or private sentinel. Migration,
 repeated migration, public review and idempotent additions must then return exit
 zero and JSON with prior generation zero and all three exact current `keep`
 targets, retaining the same runtime version. Replies are retained in serial output.
+The fixture also invokes both write commands with generation 1 while generation
+2 is active, requiring refusal and unchanged interrupted state. Successful cold
+write replies use `--generation 2`; the interrupted warm migration retains the
+original unpinned command, covering both interfaces.
 Independent service admission, lease/reader probes and filesystem inspection
 still follow. CLI-specific markers reject a service-only guest, while a CLI
 compiled without interception is rejected for ending before the requested cut.

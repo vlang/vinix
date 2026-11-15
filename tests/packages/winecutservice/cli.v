@@ -36,7 +36,9 @@ fn checked_reply(command string, data string, replaced int, added bool) ! {
 	names := winecutfixture.names($if wine_cut_scaled ? { true } $else { false })
 	mut child := os.new_process('/usr/bin/vinix-package')
 	defer { child.close() }
-	child.set_args([command, 'app', data]); child.set_redirect_stdio_merged(); child.run()
+	mut args := [command, 'app', data]
+	if command != 'wine-prefix-review' { args << '--generation'; args << '2' }
+	child.set_args(args); child.set_redirect_stdio_merged(); child.run()
 	output := child.stdout_slurp()
 	defer { unsafe { output.free() } }
 	child.wait()
@@ -73,6 +75,20 @@ pub fn preview(data string, point int) ! {
 	boundary := winecutfixture.boundary(point, names.len - 1)!
 	checked_reply('wine-prefix-review', data, boundary.replaced, boundary.added)!
 	check_unchanged(data, point, names, boundary)!
+	for command in ['wine-prefix-migrate', 'wine-prefix-additions']! {
+		mut child := os.new_process('/usr/bin/vinix-package')
+		defer { child.close() }
+		child.set_args([command, 'app', data, '--generation', '1'])
+		child.set_redirect_stdio_merged(); child.run()
+		output := child.stdout_slurp()
+		defer { unsafe { output.free() } }
+		child.wait()
+		if child.code == 0 || !output.contains('generation differs from requested generation') {
+			return error('public generation guard did not refuse: ' + output)
+		}
+		check_unchanged(data, point, names, boundary)!
+	}
+	println('WINE CLI GENERATION REFUSED point=${point} expected=1 active=2 prefix-unchanged')
 	if boundary.replaced < names.len - 1 {
 		mut child := os.new_process('/usr/bin/vinix-package')
 		defer { child.close() }

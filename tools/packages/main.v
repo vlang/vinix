@@ -29,8 +29,8 @@ const usage = 'usage: vinix-package [--root DIR] [--offline] [--json] [--progres
 	'  deployment-review FILE | deployment-apply REVIEW_FINGERPRINT FILE\n' +
 	'  run ID [ABSOLUTE_FILE...] | data-list | purge-data ID | mirror NEW_DIRECTORY ID...\n' +
 	'  wine-prefix-review ID PRIVATE_DATA (JSON review; may create coordination files)\n' +
-	'  wine-prefix-additions ID PRIVATE_DATA (create missing builtin links; never retarget)\n' +
-	'  wine-prefix-migrate ID PRIVATE_DATA (explicit staged builtin retarget and additions)\n' +
+	'  wine-prefix-additions ID PRIVATE_DATA [--generation N] (create missing builtin links; never retarget)\n' +
+	'  wine-prefix-migrate ID PRIVATE_DATA [--generation N] (explicit staged builtin retarget and additions)\n' +
 	'  mirror-review NEW_DIRECTORY ID... | mirror-apply REVIEW_FINGERPRINT NEW_DIRECTORY ID...\n' +
 	'  mirror-deployment-review NEW_DIRECTORY LOCK.json | mirror-deployment-apply REVIEW_FINGERPRINT NEW_DIRECTORY LOCK.json\n' +
 	'  run-terminal ID [ABSOLUTE_FILE...] (terminal standard input/output required)\n' +
@@ -142,7 +142,16 @@ fn checked(arguments []string) !int {
 	}
 	match command {
 		'wine-prefix-review', 'wine-prefix-additions', 'wine-prefix-migrate' {
-			if names.len != 2 { return error('${command} requires an installed application ID and absolute private data directory') }
+			mut expected_generation := u64(0)
+			if names.len == 4 && command != 'wine-prefix-review' && names[2] == '--generation' {
+				text := names[3]
+				if text == '' || text[0] == `0` || !text.bytes().all(it >= `0` && it <= `9`) {
+					return error('--generation requires a canonical positive generation number')
+				}
+				expected_generation = strconv.parse_uint(text, 10, 64) or { return error('--generation exceeds the generation number range') }
+			} else if names.len != 2 {
+				return error('${command} requires an installed application ID and absolute private data directory; write commands accept --generation N')
+			}
 			if root_option || offline { return error('${command} requires the real root without offline options') }
 			if !pkgcore.identifier(names[0]) || !os.is_abs_path(names[1]) || names[1].contains('\x00') {
 				return error('${command} requires a valid application ID and absolute private data directory')
@@ -151,8 +160,12 @@ fn checked(arguments []string) !int {
 			defer { owner.close() }
 			// Write methods recheck admission under their retained reader lock.
 			// The document refreshes admission again before serialization.
-			if command == 'wine-prefix-additions' { owner.complete_additions()! }
-			if command == 'wine-prefix-migrate' { owner.migrate_bindings()! }
+			if command == 'wine-prefix-additions' {
+				if expected_generation != 0 { owner.complete_additions_at(expected_generation)! } else { owner.complete_additions()! }
+			}
+			if command == 'wine-prefix-migrate' {
+				if expected_generation != 0 { owner.migrate_bindings_at(expected_generation)! } else { owner.migrate_bindings()! }
+			}
 			println(json2.encode(owner.document()!))
 			return 0
 		}
