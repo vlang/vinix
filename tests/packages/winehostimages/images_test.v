@@ -5,6 +5,10 @@ import os
 import json2
 import tests.packages.winesource
 
+// The pinned compiler omits assert statements in -prod builds.
+fn require_check(ok bool) { if !ok { panic('WINE helper control failed') } }
+fn require_refusal(ok bool) { if !ok { panic('WINE helper expected refusal') } }
+
 fn line(pid string, path string) string {
 	return 'dyld[' + pid + ']: <12345678-1234-1234-1234-123456789ABC> ' + path + '\n'
 }
@@ -12,20 +16,20 @@ fn line(pid string, path string) string {
 fn test_observed_identities_and_explicit_os_boundary() {
 	text := line('12', '/opt/tool') + line('13', '/opt/tool') + line('12', '/usr/lib/libSystem.B.dylib') + 'dyld[12]: move loaded to delayed: tool\n'
 	images := trace(text)!
-	assert images.len == 2 && images[0].path == '/opt/tool'
+	require_check(images.len == 2 && images[0].path == '/opt/tool')
 	for bad in ['', text + 'unparsed\n', line('x', '/opt/tool'), line('1', '/opt/../tool'),
 		text.replace('12345678-', 'g2345678-'), text.replace('\n', '\r\n'), text + '\x00',
 		text + 'dyld[12]: move loaded to delayed: unknown\n'] {
 		mut refused := false
 		trace(bad) or { refused = true }
-		assert refused
+		require_refusal(refused)
 	}
 	mut refused := false
 	compatible([Image{path: '/opt/other', uuid: images[0].uuid, sha256: 'hash'}], images) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	refused = false
 	compatible([Image{path: '/usr/lib/libSystem.B.dylib', uuid: images[1].uuid, sha256: 'invented'}], images) or { refused = true }
-	assert refused
+	require_refusal(refused)
 }
 
 fn test_real_managed_child_ignores_parent_loader_injection() {
@@ -44,16 +48,16 @@ fn test_real_managed_child_ignores_parent_loader_injection() {
 	}
 	invoke([clang, '--version'], root, root + '/cc.log')!
 	baseline := json2.decode[Baseline](os.read_file(root + '/host-images-before.json')!)!
-	assert baseline.images.any(!system(it.path) && it.sha256.len == 64)
-	assert json2.decode[map[string]string](os.read_file(root + '/cc.log.environment.json')!)! == environment(root)
-	assert 'DYLD_INSERT_LIBRARIES' !in environment(root)
+	require_check(baseline.images.any(!system(it.path) && it.sha256.len == 64))
+	require_check(json2.decode[map[string]string](os.read_file(root + '/cc.log.environment.json')!)! == environment(root))
+	require_check('DYLD_INSERT_LIBRARIES' !in environment(root))
 	admit_names(root, root, ['cc.log'])!
 	mut poisoned := environment(root)
 	poisoned['CPATH'] = '/unrecorded'
 	os.write_file(root + '/cc.log.environment.json', json2.encode(poisoned))!
 	mut refused := false
 	admit_names(root, root, ['cc.log']) or { refused = true }
-	assert refused
+	require_refusal(refused)
 }
 
 fn test_optional_real_v_source_generation_ignores_parent_settings() {
@@ -81,12 +85,12 @@ fn test_optional_real_v_source_generation_ignores_parent_settings() {
 	invoke_v(compile, root, root + '/v.log')!
 	inputs := {tool: winesource.file_digest(tool)!}
 	admit_v(root, root, tool, inputs)!
-	assert os.is_file(root + '/program.c')
-	assert os.read_file(root + '/sources-before.txt')! == os.read_file(root + '/sources-built.txt')!
+	require_check(os.is_file(root + '/program.c'))
+	require_check(os.read_file(root + '/sources-before.txt')! == os.read_file(root + '/sources-built.txt')!)
 	mut poisoned := v_environment(root, tool)
 	poisoned['VFLAGS'] = '-unrecorded'
 	os.write_file(root + '/v.log.environment.json', json2.encode(poisoned))!
 	mut refused := false
 	admit_v(root, root, tool, inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 }

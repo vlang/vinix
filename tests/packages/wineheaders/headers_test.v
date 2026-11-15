@@ -4,6 +4,9 @@ module wineheaders
 import os
 import json2
 
+fn require_check(ok bool) { if !ok { panic('WINE helper control failed') } }
+fn require_refusal(ok bool) { if !ok { panic('WINE helper expected refusal') } }
+
 fn test_complete_resource_tree_and_input_pins() {
 	root := os.real_path(os.temp_dir()) + '/vinix-wine-headers-' + os.getpid().str()
 	os.mkdir_all(root + '/include/nested')!
@@ -12,35 +15,35 @@ fn test_complete_resource_tree_and_input_pins() {
 	os.write_file(file, '#define HEADER 1\n')!
 	mut inputs := map[string]string{}
 	expected := capture(root + '/include', mut inputs)!
-	assert selection(root + '\n')! == root
+	require_check(selection(root + '\n')! == root)
 	admit(expected, inputs)!
 	mut refused := false
 	admit(expected, map[string]string{}) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	mut changed := inputs.clone()
 	changed[file] = 'bad'
 	refused = false
 	admit(expected, changed) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.write_file(file, '#define HEADER 2\n')!
 	refused = false
 	admit(expected, inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.write_file(file, '#define HEADER 1\n')!
 	os.write_file(root + '/include/extra.h', '')!
 	refused = false
 	admit(expected, inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.rm(root + '/include/extra.h')!
 	os.mkdir(root + '/include/extra')!
 	refused = false
 	admit(expected, inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.rmdir(root + '/include/extra')!
 	os.rm(file)!
 	refused = false
 	admit(expected, inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.write_file(file, '#define HEADER 1\n')!
 	admit(expected, inputs)!
 }
@@ -53,18 +56,18 @@ fn test_linked_resource_entries_and_ambiguous_selection_refuse() {
 	for text in ['', root, root + '\r\n', root + '\n\n', root + '\x00\n', 'relative\n', root + '/.\n'] {
 		mut refused := false
 		selection(text) or { refused = true }
-		assert refused
+		require_refusal(refused)
 	}
 	mut inputs := map[string]string{}
 	os.symlink(root + '/include/stddef.h', root + '/include/alias.h')!
 	mut refused := false
 	capture(root + '/include', mut inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.rm(root + '/include/alias.h')!
 	os.symlink(root + '/include', root + '/include/linked-directory')!
 	refused = false
 	capture(root + '/include', mut inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 }
 
 fn test_resource_receipt_binds_discovery_and_actual_compile_selection() {
@@ -91,24 +94,24 @@ fn test_resource_receipt_binds_discovery_and_actual_compile_selection() {
 	os.write_file(root + '/cc.log.argv.json', '["/opt/homebrew/opt/llvm/bin/clang"]')!
 	mut native_refused := false
 	admit_build(root, root, inputs) or { native_refused = true }
-	assert native_refused
+	require_refusal(native_refused)
 	for contents in ['[]', json2.encode(['/opt/homebrew/opt/llvm/bin/clang']),
 		json2.encode(['/opt/homebrew/opt/llvm/bin/clang', '-resource-dir=' + root + '/resource', '-resource-dir=/other']),
 		json2.encode(['/other/clang', '-resource-dir=' + root + '/resource'])] {
 		os.write_file(root + '/logs/cc.log.argv.json', contents)!
 		mut refused := false
 		admit_producer(root, inputs) or { refused = true }
-		assert refused
+		require_refusal(refused)
 	}
 	os.write_file(root + '/logs/cc.log.argv.json', cc)!
 	os.write_file(root + '/logs/clang-resource.log.argv.json', '["clang","-print-resource-dir"]')!
 	mut refused := false
 	admit_producer(root, inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.write_file(root + '/logs/clang-resource.log.argv.json', query)!
 	os.rename(root + '/clang-headers.json', root + '/manifest')!
 	os.symlink(root + '/manifest', root + '/clang-headers.json')!
 	refused = false
 	admit_producer(root, inputs) or { refused = true }
-	assert refused
+	require_refusal(refused)
 }

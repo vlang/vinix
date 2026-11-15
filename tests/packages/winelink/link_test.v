@@ -5,6 +5,9 @@ import strconv
 import os
 import json2
 
+fn require_check(ok bool) { if !ok { panic('WINE helper control failed') } }
+fn require_refusal(ok bool) { if !ok { panic('WINE helper expected refusal') } }
+
 // The actual linker replay is exercised by the production probe and fresh Wine
 // producers. These archive controls deliberately contain no executable code.
 fn member(name string, data string, kind u8) []u8 {
@@ -37,18 +40,18 @@ fn test_archive_profile_and_response_refusals() {
 	response := '--chroot .\n--sysroot root/sysroot\n-m elf_x86_64\n--Bstatic\n-o program\none.o\ntwo.o\nlib.a\n'
 	bytes := fixture(response)
 	archive := parse(bytes)!
-	assert archive.members.len == 5
+	require_check(archive.members.len == 5)
 	response_check(archive, 'program')!
 	for changed in [response + '--plugin evil.so\n', response.replace('one.o', '../one.o'),
 		response.replace('-o program', '-o /outside'), response + '-o program\n', response.replace('--chroot .\n', '')] {
 		mut refused := false
 		response_check(parse(fixture(changed))!, 'program') or { refused = true }
-		assert refused
+		require_refusal(refused)
 	}
 	mut changed := bytes.clone(); changed[0] ^= 1
 	mut refused := false
 	parse(changed) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	for extra in [member('link-inputs/../escape', 'bad', `0`), member('link-inputs/one.o', 'dup', `0`),
 		member('link-inputs/ONE.o', 'case alias', `0`), member('link-inputs/one.o/child', 'collision', `0`),
 		member('link-inputs/link', 'one.o', `2`)] {
@@ -56,15 +59,15 @@ fn test_archive_profile_and_response_refusals() {
 		malformed << extra; malformed << []u8{len: 1024}
 		refused = false
 		parse(malformed) or { refused = true }
-		assert refused
+		require_refusal(refused)
 	}
 	refused = false
 	parse(bytes[..bytes.len - 512]) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	changed = bytes.clone(); changed[changed.len - 1] = 1
 	refused = false
 	parse(changed) or { refused = true }
-	assert refused
+	require_refusal(refused)
 }
 
 fn test_optional_real_link_replay() {

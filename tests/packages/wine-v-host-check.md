@@ -31,6 +31,10 @@ cases, including five V host cases: omitted baseline images, altered child
 environment, omitted raw observations, changed image hashes and linked receipts.
 Real and unchanged copied baselines must pass first; every mutation must refuse
 at its named check without retained output.
+The module checks now use [explicit production-active conditions](wine-helper-controls-check.md)
+because the pinned compiler omits `assert` under `-prod`. Their requalification
+supersedes earlier assertion-dependent module results; full-retainer controls
+already use explicit errors.
 
 This covers the selected V-to-C processes. Compiler source/bootstrap provenance,
 controller/producer executable builds, other host tools, unreported inputs and

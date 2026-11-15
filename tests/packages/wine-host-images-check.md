@@ -47,6 +47,8 @@ control poisons the parent's `DYLD_INSERT_LIBRARIES`, requires the controlled
 child to succeed without inheriting it, then requires an added CPATH entry in
 its recorded environment to refuse. Optional `VINIX_HOST_IMAGE_TEST_STATE`
 preserves raw test state in a fresh external directory.
+These checks now use [production-active explicit conditions](wine-helper-controls-check.md),
+with private safety mutations proving refusal detection under `-prod`.
 
 The full retention runner now requires forty-four resealed refusals after real
 and unchanged copied baselines pass. Five Clang/LLD cases omit a before-command

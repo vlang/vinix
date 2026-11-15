@@ -4,12 +4,15 @@ module winecsource
 import os
 import json2
 
+fn require_check(ok bool) { if !ok { panic('WINE helper control failed') } }
+fn require_refusal(ok bool) { if !ok { panic('WINE helper expected refusal') } }
+
 fn test_trace_preserves_absolute_paths_spaces_order_and_repetition() {
-	assert trace('. /one header.h\n.. /two.h\n. /one header.h\ncompiler note\n')! == ['/one header.h', '/two.h', '/one header.h']
+	require_check(trace('. /one header.h\n.. /two.h\n. /one header.h\ncompiler note\n')! == ['/one header.h', '/two.h', '/one header.h'])
 	for text in ['', 'diagnostics only\n', '. relative.h\n', '. /file\r\n', '. /file\x00\n'] {
 		mut refused := false
 		trace(text) or { refused = true }
-		assert refused
+		require_refusal(refused)
 	}
 }
 
@@ -26,20 +29,20 @@ fn test_real_two_unit_compilation_admits_hidden_header_and_refuses_mutations() {
 	build(base, root, root)!
 	admit(root, root)!
 	proof := json2.decode[Proof](os.read_file(root + '/c-inputs-before.json')!)!
-	assert proof.includes.filter(it.path == header).len == 2
-	assert header in inputs(root)!, inputs(root)!.str()
+	require_check(proof.includes.filter(it.path == header).len == 2)
+	require_check(header in inputs(root)!)
 	// A changed header outside any manual seed tree must refuse.
 	os.write_file(header, 'int different(void);\n')!
 	mut refused := false
 	admit(root, root) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.write_file(header, 'int token(void);\n')!
 	// A different resolved target refuses even when its bytes are identical.
 	os.rename(header, root + '/saved')!
 	os.symlink(root + '/saved', header)!
 	refused = false
 	admit(root, root) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.rm(header)!; os.rename(root + '/saved', header)!
 	admit(root, root)!
 	before := os.read_file(root + '/c-inputs-before.json')!
@@ -48,18 +51,18 @@ fn test_real_two_unit_compilation_admits_hidden_header_and_refuses_mutations() {
 	os.write_file(root + '/cc.log', '. ' + header + '\n')!
 	refused = false
 	admit(root, root) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.write_file(root + '/cc.log', cc_log)!
 	changed := Proof{sources: proof.sources, includes: proof.includes[..1]}
 	for name in ['c-inputs-before.json', 'c-inputs-verified.json'] { os.write_file(root + '/' + name, json2.encode(changed))! }
 	refused = false
 	admit(root, root) or { refused = true }
-	assert refused
+	require_refusal(refused)
 	os.write_file(root + '/c-inputs-before.json', before)!
 	os.write_file(root + '/c-inputs-verified.json', verified)!
 	os.rename(root + '/c-inputs-before.json', root + '/saved-proof')!
 	os.symlink(root + '/saved-proof', root + '/c-inputs-before.json')!
 	refused = false
 	admit(root, root) or { refused = true }
-	assert refused
+	require_refusal(refused)
 }
