@@ -11,10 +11,24 @@ fn ws_dialog_decor(e voidptr, dialog voidptr) voidptr {
 fn ws_dialog_node(e voidptr, dialog voidptr, index i32) voidptr {
 	unsafe {
 		args := &Value(C.alloca(sizeof(Value)))
+		args[0] = Value{ i: 0x1020002 }
+		content := obj(e, ws_dialog_decor(e, dialog), c'android/view/View', c'findViewById', c'(I)Landroid/view/View;', args)
+		if pending(e) { return nil }
+		if content == nil {
+			throw(e, c'java/lang/IllegalStateException', c'Dialog has no content container')
+			return nil
+		}
 		args[0] = Value{ i: 0 }
-		root := obj(e, ws_dialog_decor(e, dialog), c'android/view/ViewGroup', c'getChildAt', c'(I)Landroid/view/View;', args)
+		root := obj(e, content, c'android/view/ViewGroup', c'getChildAt', c'(I)Landroid/view/View;', args)
+		if pending(e) { return nil }
+		if root == nil {
+			throw(e, c'java/lang/IllegalStateException', c'Dialog has no content tree')
+			return nil
+		}
 		args[0] = Value{ i: index }
-		return obj(e, root, c'android/view/ViewGroup', c'getChildAt', c'(I)Landroid/view/View;', args)
+		node := obj(e, root, c'android/view/ViewGroup', c'getChildAt', c'(I)Landroid/view/View;', args)
+		if !pending(e) && node == nil { throw(e, c'java/lang/IllegalStateException', c'Dialog content node is absent') }
+		return node
 	}
 }
 
@@ -47,6 +61,7 @@ fn ws_dialog_construct(e voidptr, dialog voidptr) {
 fn ws_dialog_text(e voidptr, dialog voidptr, index i32, text voidptr) {
 	if !instance_of(e, dialog, c'android/app/AlertDialog') { return }
 	node := ws_dialog_node(e, dialog, index)
+	if pending(e) { return }
 	args := [Value{ l: text }]!
 	call(e, node, c'android/widget/TextView', c'setText', c'(Ljava/lang/CharSequence;)V', unsafe { &args[0] })
 	visibility(e, node, text != unsafe { nil })
@@ -56,6 +71,7 @@ fn ws_dialog_text(e voidptr, dialog voidptr, index i32, text voidptr) {
 fn ws_dialog_set_view(e voidptr, dialog voidptr, view voidptr) {
 	put_object(e, dialog, c'android/app/AlertDialog', c'vinixCustomView', c'Landroid/view/View;', view)
 	holder := ws_dialog_node(e, dialog, 2)
+	if pending(e) { return }
 	call(e, holder, c'android/view/ViewGroup', c'removeAllViews', c'()V', unsafe { nil })
 	if view != unsafe { nil } { add_view(e, holder, view) }
 	ws_mark()

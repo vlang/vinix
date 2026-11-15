@@ -97,5 +97,57 @@ followed by CURRENT-API-PASS. The API export reconstructed without removals:
 | maps-content-api-readback-20261115-r1/archive.json | feb9787335ec99b0682e9ca14fff19c098866ff3458286fad4d4f1f55c29fbc7 |
 | maps-content-api-child-20261115-r1/child.log | d4ff972bc173380359554e075891b5af164125ce88fe0c108433e2e513181903 |
 
-The next real account attempt is pending. Google Maps is not fully qualified
-and no Google authentication success is claimed.
+## r100 chooser regression and dialog follow-up
+
+The r100 real attempt exposed a second tree assumption: Maps PID49596 exited
+when Sign in opened the account chooser, before Add account. ART rejected JNI
+ViewGroup.removeAllViews on null from AlertDialog.setView. The native
+ws_dialog_node helper assumed decor child zero was the dialog body; it is now
+the content container. GMS PID15381 remained ready. Its descriptor snapshot
+captured 221 entries / unavailable=0 / non_atomic=true. This run does not prove
+the original GMS layout failure resolved, because it never reached Add account.
+
+The follow-up native helper finds android.R.id.content first, then the body
+and selected node. Missing trees leave a managed IllegalStateException instead
+of invoking JNI on null. Callers return with that exception pending. The signed
+probe now exercises AlertDialog custom view replacement and removal, title and
+message text, findViewById, and the missing-container exception path.
+
+After checked --stop, the complete export ended. The checked data volume UUID
+was 0d3fbe74cc224c3bafffab192070ff09. Full API/account evidence was copied to
+r100-private and synced, with copied receipt and prompt observed before
+stopping owned QEMU49155. PID absence and no image handles preceded read-only
+extraction; e2fsck passed. The storage watch is partial. Private logs match
+their manifest. The complete public export reconstructed without removals:
+1429293 bytes / 2792 chunks, receipt identical to the private copy.
+
+| r100 account evidence | SHA256 |
+| --- | --- |
+| maps-r100-uart-20261115-r1/interval.log | f4d58702352f89067e2875c2c30bf3fc69de3f733741befe948b04e2cc5bf30f |
+| maps-r100-readback-20261115-r1/archive.json | 2efe6042923f673b53742c5a2803c447509d38cd4539f379c8543cb89e754cb6 |
+| Same readback/exported-receipt.json | 9cc9cacd56154693c3ed1458019edc2fbf612f7917ac318ae4af96817b397bec |
+| Private r100-private/results/maps.log | d11e5faec6d7a87747951dd7d743097f7624acd59993896215feba6b89ab8502 |
+| Private r100-private/results/broker.log | ad68a3a10b0b162299c1df6249d8eab9a318a66841ea7178c7b221a5fc811e99 |
+
+Private root: maps-current-20261115-r100-account/private-readback.
+The dialog native producer dialog-content-native-20261115-r1 passed in
+9553 ms / RSS 577060864 / observed growth 11042816 bytes under the original
+caps. The updated signed fixture is current-api-dialog-content-20261115-r1.
+
+| Dialog candidate artifact | SHA256 |
+| --- | --- |
+| dialog-content-native-20261115-r1/native/libvinix-android-native.so | 11500fa1ed2b0ceacdfb1c1cbb0555441008cf81379d19575765c504e620dd2d |
+| current-api-dialog-content-20261115-r1/probe.apk | 65f144f368ff66588a342d6eff8f1e9a066dec6c3292334d3b2fe2a682a7e5b6 |
+
+The complete signed ARM API suite passed in fresh r101, child exit 0, including
+the alert-dialog marker and missing-container exception check. Its complete
+API export reconstructed without removals: 23475 bytes / 46 chunks.
+
+| r101 ARM API evidence | SHA256 |
+| --- | --- |
+| maps-dialog-api-uart-20261115-r1/full.log | 775bf9bfe5a499acd3c652f0bbcffea5a8e609562ba7cdb714bfde47fcb999e9 |
+| maps-dialog-api-readback-20261115-r1/archive.json | 77f9b7e5725cff7ccbbe1d400d8615d4eb6420fc3625f144c041b1f069bbd146 |
+| maps-dialog-api-child-20261115-r1/child.log | d0bda82b5dc93fa483c34bf9d05b1e18c38216bf63613ae6a5bdd6e6eb5ee08f |
+
+The real account retry is pending in r101.
+Google Maps is not fully qualified and no Google authentication success is claimed.
