@@ -18,4 +18,18 @@ must leave no pending-node allocation, job record or file/VM pin behind.
 Node allocations and callback counts are measured independently of the
 sync-object implementation's existing retained fence/object allocations.
 These checks validate ownership and host scheduling; native execution and
-the modern general-batch ABI remain separate acceptance work.
+the modern flat-command ABI remain separate acceptance work.
+
+Native batches accept up to 64 mixed commands. The batch checks exercise all
+compute/render orderings, aggregate fence publication, per-command result
+references, prior-subqueue barrier indices, both storage allocation failures,
+and preparation/callback/shutdown injection at every command position. Reverse
+unwind must drop the newest event reservation first. The fake backend's existing
+two-command contract is tested independently. Large payload staging uses owned
+heap storage and is released before worker execution; its allocation is included
+in the allocator accounting above.
+
+Fence observers assert that all callbacks and result references are retired
+before notification, including reverse error cancellation. A failed output
+installation exposes a binary-sync prefix, then verifies its error notification
+runs after node cleanup and after dropping the file lock.

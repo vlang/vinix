@@ -108,7 +108,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares at most two commands in the compute-then-render form, then polls dependencies and completion in the GPU worker. Independent queues progress concurrently; each queue retains FIFO and serial publication. General batches, same-queue overlap and firmware subqueue barriers still differ from DRM scheduling. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI, then polls dependencies and completion in the GPU worker. Independent queues progress concurrently; each queue retains FIFO and serial publication. Modern flat-command integration, same-queue overlap and firmware subqueue barriers still differ from DRM scheduling. |
 | Render scenes | Multiple prepared scenes retain shared backing and conditional binding. The worker publishes one submission at a time per queue; independent queues may execute concurrently. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
@@ -136,7 +136,8 @@ subqueue barriers, short records and unsupported tails. Generic DRM framing
 can select a negotiated ABI and apply extensible request copying.
 
 These components are not yet registered by the native Asahi driver. Its
-active Mesa 25 ABI and two-command scheduler therefore remain gaps. The
+active Mesa 25 ABI remains a gap; the two-command limit at this checkpoint
+was subsequently expanded as described below. The
 protocol fixtures exercise the production reader and request-copy routines
 under address/undefined-behavior sanitizers; they do not execute GPU work.
 Generator unit tests and both kernel builds passed. Kernel builds use
@@ -450,8 +451,9 @@ installs output fences before returning. Input dependencies, queue backpressure
 and compute-to-render completion are polled by the GPU worker. An unsignaled
 dependency blocks its own queue while unrelated queues progress. Failed
 dependencies retain their errno on the output fence; failed compute cancels
-the unsubmitted render half. The active ABI still accepts only the legacy
-single-command or compute-then-render pair.
+the unsubmitted render half. At this checkpoint the active ABI accepted only
+the legacy single-command or compute-then-render pair; the later mixed-batch
+change below removes that restriction on the native path.
 
 An allocation-free poll loop maintains per-queue FIFO. Older retained nodes
 are prepended ahead of concurrent enqueues. Manager-locked registration closes
@@ -485,6 +487,49 @@ the linked kernel SHA-256 is
 `7a768ea652765d50ed3bf17dbce5e5a1bfa8748894525533239a201162890866`.
 Use the retained checker with `check-inventory BUNDLE RECEIPT`.
 No hardware access, boot or reboot was performed.
+
+### Native mixed command batches
+
+Native submission now accepts up to 64 render/compute commands in arbitrary
+order, matching the packaged reference's hardware-command count limit. The
+legacy descriptors and payloads are staged before GPU preparation, and barrier
+indices are checked against previous commands of each subqueue. Execution
+remains serial within a queue. This satisfies the accepted dependency ordering
+but does not implement the reference's firmware barriers or scheduling overlap.
+The fake backend retains its existing two-command contract.
+
+Staged payloads use fallible temporary heap storage. The pending node owns
+prepared jobs, indexed callbacks and one aggregate fence. Reverse cancellation
+refunds unpublished event reservations from newest to oldest. Fence notification
+follows all callbacks and result-reference releases, with the extra file/VM pin
+still held. Partial output-installation failure signals its exposed sync prefix
+after cleanup and after releasing the file lock.
+
+ASan/UBSan fixtures pass four full-batch orderings; every one of the 64
+preparation, callback and stop-during-registration failure positions; both raw
+allocation failures; invalid descriptors/barriers; middle-command faults;
+shutdown; aggregate-fence observers; and the fake pair limit. The existing 200
+immediate-retirement cycles still drain pending nodes, jobs and file/VM pins.
+Existing retained sync-object/fence allocations are outside that measurement.
+The TPC fixture also passes 64 simultaneous shared scene references. Cleanup,
+recovery, source gates, unit tests, independent lifetime review and an isolated
+ARM kernel build pass. The local ioctl stack frame is 7,088 bytes in the retained
+disassembly; this is not a peak call-chain measurement.
+
+The build uses `b06a335c04f183a3aee13bd3d312cd88d102d1fb` plus four retained
+kernel files, compared byte-for-byte before sealing. Package HEAD remains
+`fb18a8a7359142ab33f65d906d956b3cc3590a53`, with unchanged kernel/Mesa pins.
+The audit remains `not_equivalent`: modern ABI registration, firmware barriers,
+same-queue overlap, VM/GEM/Mesa integration and the other differences above
+remain incomplete. No hardware access, boot or reboot was performed.
+
+Evidence is retained at
+`/Users/alex/.local/state/vinix/omarchy-m1-batches-20261115/bundle/`.
+The sibling inventory SHA-256 is
+`118504e4b838f9a9d2a8f8d93acbeb02e08e4f73ac148314365dc81e4e9cdeee`;
+the linked kernel SHA-256 is
+`61784c84cf87d8a8453e8dd0b2cb3a1b880e0988e3d18580ee590c35afa246aa`.
+The retained checker passes `check-inventory BUNDLE RECEIPT`.
 
 ## Earlier artifact retention incident
 

@@ -403,6 +403,17 @@ fn check_tail_pointer_cache() {
 	mut mgr := GpuManager{}
 	first := mgr.retain_g13_tpc_locked(mut owner, 1) or { panic('initial TPC') }
 	assert first.buffer.size == 0x4000 && first.references == 2 && context.allocations == 1
+	// A full render batch prepares 64 scenes before publishing its first.
+	for _ in 0 .. 64 {
+		shared := mgr.retain_g13_tpc_locked(mut owner, 1) or { panic('batch TPC') }
+		assert voidptr(shared) == voidptr(first)
+	}
+	assert first.references == 66 && context.allocations == 1
+	for _ in 0 .. 64 {
+		assert mgr.invalidate_g13_tpc_locked(mut context, first)
+		mgr.release_g13_tpc_locked(mut context, first)
+	}
+	assert first.references == 2 && mgr.driver_invalidations == 0
 	for _ in 0 .. 500 {
 		cached := mgr.retain_g13_tpc_locked(mut owner, 0x4000) or { panic('reused TPC') }
 		assert voidptr(cached) == voidptr(first) && cached.references == 3

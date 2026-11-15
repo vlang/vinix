@@ -11,7 +11,15 @@ import memory
 
 // Prepared jobs stay caller-owned until publication. Each callback retains
 // this node through callbacks_remaining; one extra VM pin spans the whole
-// submission, including gaps between compute and render callbacks.
+// submission, including gaps between command callbacks.
+struct G13PendingCommand {
+mut:
+	compute_job &gpu.G13ComputeJobResources = unsafe { nil }
+	render_job  &gpu.G13RenderJobResources  = unsafe { nil }
+	done        bool
+	error       int
+}
+
 struct G13PendingSubmission {
 mut:
 	next                &G13PendingSubmission = unsafe { nil }
@@ -21,11 +29,10 @@ mut:
 	manager             &gpu.GpuManager        = unsafe { nil }
 	dependencies        submission.SyncArray
 	dependencies_ready  bool
-	compute_job         &gpu.G13ComputeJobResources = unsafe { nil }
-	render_job          &gpu.G13RenderJobResources  = unsafe { nil }
-	has_compute         bool
-	compute_done        bool
-	compute_error       int
+	final_fence         &syncobj.DmaFence = unsafe { nil }
+	commands            [64]G13PendingCommand
+	command_count       u32
+	next_command        u32
 	callbacks_remaining u32
 	failure             int
 }
@@ -35,6 +42,10 @@ __global pending_head &G13PendingSubmission = unsafe { nil }
 __global pending_tail &G13PendingSubmission = unsafe { nil }
 __global pending_count = u64(0)
 __global pending_poll_active = false
+
+fn signal_g13_submission_fence(fence &syncobj.DmaFence, failure int) {
+	if failure == 0 { syncobj.signal(fence) } else { syncobj.signal_error(fence, failure) }
+}
 
 // Called under manager.lock while the ioctl still holds file.lock.
 fn enqueue_g13_pending(data voidptr) {
@@ -64,21 +75,25 @@ fn g13_dependency_status(dependencies &submission.SyncArray) int {
 fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
 	if katomic.load(&item.failure) == 0 { katomic.store(mut &item.failure, failure) }
 	mut manager := unsafe { item.manager }
-	if item.compute_job != unsafe { nil } {
-		job := item.compute_job
-		item.compute_job = unsafe { nil }
-		manager.release_g13_compute_job(job)
-	}
-	if item.render_job != unsafe { nil } {
-		job := item.render_job
-		item.render_job = unsafe { nil }
-		manager.release_g13_render_job(job)
+	// Reverse order refunds the newest unpublished event reservations first.
+	for index := int(item.command_count) - 1; index >= 0; index-- {
+		mut command := &item.commands[index]
+		if command.compute_job != unsafe { nil } {
+			job := command.compute_job
+			command.compute_job = unsafe { nil }
+			manager.release_g13_compute_job(job)
+		}
+		if command.render_job != unsafe { nil } {
+			job := command.render_job
+			command.render_job = unsafe { nil }
+			manager.release_g13_render_job(job)
+		}
 	}
 }
 
-// True retains the node for another poll. No fence or queue wait occurs on
-// this path. In particular, a client signaling an output fence cannot make
-// compute-to-render ordering or node retirement happen before a GPU callback.
+// Publish at most one command per poll. Conservative execution order meets
+// every validated subqueue dependency; firmware barriers and same-queue overlap
+// are a later step. External fence state never controls internal advancement.
 fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	mut manager := unsafe { item.manager }
 	if manager.state != .running {
@@ -94,26 +109,28 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 		}
 		item.dependencies_ready = true
 	}
-	if item.compute_job != unsafe { nil } {
-		if manager.g13_queue_dispatch_blocked(item.queue) { return true }
-		if manager.submit_g13_compute_job(item.compute_job) {
-			// The manager may retire/free the job immediately after unlock.
-			// Never read it again after this ownership transfer.
-			item.compute_job = unsafe { nil }
-		}
-		return true
-	}
-	if item.render_job != unsafe { nil } {
-		if item.has_compute {
-			if !katomic.load(&item.compute_done) { return true }
-			failure := katomic.load(&item.compute_error)
+	for item.next_command < item.command_count {
+		mut command := &item.commands[item.next_command]
+		if katomic.load(&command.done) {
+			failure := katomic.load(&command.error)
 			if failure != 0 {
 				cancel_g13_pending(mut item, failure)
 				return katomic.load(&item.callbacks_remaining) != 0
 			}
+			item.next_command++
+			continue
 		}
 		if manager.g13_queue_dispatch_blocked(item.queue) { return true }
-		if manager.submit_g13_render_job(item.render_job) { item.render_job = unsafe { nil } }
+		if command.compute_job != unsafe { nil } {
+			if manager.submit_g13_compute_job(command.compute_job) {
+				// The manager can free transferred metadata before returning.
+				command.compute_job = unsafe { nil }
+			}
+		} else if command.render_job != unsafe { nil } {
+			if manager.submit_g13_render_job(command.render_job) {
+				command.render_job = unsafe { nil }
+			}
+		}
 		return true
 	}
 	return katomic.load(&item.callbacks_remaining) != 0
@@ -163,8 +180,12 @@ fn process_pending_submissions() {
 			retained_tail = item
 			retained_count++
 		} else {
-			assert item.compute_job == unsafe { nil } && item.render_job == unsafe { nil }
+			for index := u32(0); index < item.command_count; index++ {
+				assert item.commands[index].compute_job == unsafe { nil }
+				assert item.commands[index].render_job == unsafe { nil }
+			}
 			assert katomic.load(&item.callbacks_remaining) == 0
+			signal_g13_submission_fence(item.final_fence, katomic.load(&item.failure))
 			katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])
 			memory.free(voidptr(item))
 		}

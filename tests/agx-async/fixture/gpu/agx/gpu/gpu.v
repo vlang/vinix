@@ -55,6 +55,7 @@ pub mut:
 	released    bool
 	quarantined bool
 	marker      u64
+	ordinal     u32
 	completion  fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
 	data        voidptr
 }
@@ -66,6 +67,7 @@ pub mut:
 	submitted   bool
 	released    bool
 	quarantined bool
+	ordinal     u32
 	completion  fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
 	data        voidptr
 }
@@ -78,6 +80,14 @@ pub mut:
 	g13_compute_jobs      []&G13ComputeJobResources
 	g13_render_jobs       []&G13RenderJobResources
 	published             []u32
+	released_order        []u32
+	prepares              int
+	callbacks             int
+	fail_prepare_at       int          = -1
+	fail_callback_at      int          = -1
+	stop_callback_at      int          = -1
+	inspect_callback_at   int          = -1
+	on_callback           fn (voidptr) = unsafe { nil }
 	fail_compute          bool
 	fail_render           bool
 	fail_compute_callback bool
@@ -96,11 +106,13 @@ pub fn reset() {
 		test_async_gpu_manager.g13_compute_jobs.free()
 		test_async_gpu_manager.g13_render_jobs.free()
 		test_async_gpu_manager.published.free()
+		test_async_gpu_manager.released_order.free()
 	}
 	test_async_gpu_manager = GpuManager{}
 	test_async_gpu_manager.g13_compute_jobs.flags |= .noslices
 	test_async_gpu_manager.g13_render_jobs.flags |= .noslices
 	test_async_gpu_manager.published.flags |= .noslices
+	test_async_gpu_manager.released_order.flags |= .noslices
 }
 
 pub fn get_global_manager() ?&GpuManager { return unsafe { &test_async_gpu_manager } }
@@ -112,7 +124,10 @@ pub fn (job &G13RenderJobResources) result_values() RenderValues { return Render
 pub fn (mut mgr GpuManager) prepare_g13_compute_job(queue &G13QueueResources, ctx &mmu.UatContext,
 	input &compute.Command) ?&G13ComputeJobResources {
 	if mgr.fail_compute { return none }
-	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr }
+	index := mgr.prepares
+	mgr.prepares++
+	if index == mgr.fail_prepare_at { return none }
+	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr, ordinal: u32(index) }
 	mgr.g13_compute_jobs << job
 	return job
 }
@@ -120,29 +135,49 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(queue &G13QueueResources, ct
 pub fn (mut mgr GpuManager) prepare_g13_render_job(queue &G13QueueResources,
 	input &render.Command) ?&G13RenderJobResources {
 	if mgr.fail_render { return none }
-	job := &G13RenderJobResources{ queue: unsafe { queue } }
+	index := mgr.prepares
+	mgr.prepares++
+	if index == mgr.fail_prepare_at { return none }
+	job := &G13RenderJobResources{ queue: unsafe { queue }, ordinal: u32(index) }
 	mgr.g13_render_jobs << job
 	return job
 }
 
 pub fn (mut mgr GpuManager) set_g13_compute_completion(job &G13ComputeJobResources,
 	callback fn (&G13ComputeJobResources, bool, voidptr), data voidptr) bool {
-	if mgr.fail_compute_callback { return false }
+	if mgr.fail_compute_callback || job.released || job.submitted || job.completion != unsafe { nil } {
+		return false
+	}
+	index := mgr.callbacks
+	mgr.callbacks++
+	if index == mgr.fail_callback_at { return false }
 	unsafe {
 		job.completion = callback
 		job.data = data
 	}
+	if index == mgr.inspect_callback_at && mgr.on_callback != unsafe { nil } {
+		mgr.on_callback(data)
+	}
+	if index == mgr.stop_callback_at { mgr.stop() }
 	return true
 }
 
 pub fn (mut mgr GpuManager) set_g13_render_completion(job &G13RenderJobResources,
 	callback fn (&G13RenderJobResources, bool, voidptr), data voidptr) bool {
-	if mgr.fail_render_callback { return false }
+	if mgr.fail_render_callback || job.released || job.submitted || job.completion != unsafe { nil } {
+		return false
+	}
+	index := mgr.callbacks
+	mgr.callbacks++
+	if index == mgr.fail_callback_at { return false }
 	unsafe {
 		job.completion = callback
 		job.data = data
 	}
-	if mgr.stop_after_callback { mgr.stop() }
+	if index == mgr.inspect_callback_at && mgr.on_callback != unsafe { nil } {
+		mgr.on_callback(data)
+	}
+	if mgr.stop_after_callback || index == mgr.stop_callback_at { mgr.stop() }
 	return true
 }
 
@@ -172,6 +207,7 @@ fn (mut mgr GpuManager) complete_render(job &G13RenderJobResources, successful b
 
 pub fn (mut mgr GpuManager) release_g13_compute_job(job &G13ComputeJobResources) {
 	assert !job.submitted
+	mgr.released_order << job.ordinal
 	mgr.complete_compute(job, false)
 	for i, item in mgr.g13_compute_jobs {
 		if voidptr(item) == voidptr(job) {
@@ -184,6 +220,7 @@ pub fn (mut mgr GpuManager) release_g13_compute_job(job &G13ComputeJobResources)
 
 pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 	assert !job.submitted
+	mgr.released_order << job.ordinal
 	mgr.complete_render(job, false)
 	for i, item in mgr.g13_render_jobs {
 		if voidptr(item) == voidptr(job) {

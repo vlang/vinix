@@ -12,7 +12,8 @@ import gpu.agx.compute as agxcompute
 import gpu.agx.render as agxrender
 import usercopy
 
-pub const max_commands = u32(2)
+pub const max_commands = u32(64)
+pub const max_legacy_commands = u32(2)
 pub const max_syncs = u32(64)
 
 pub struct SyncArray {
@@ -77,10 +78,10 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 		}
 	}
 	return 0, SyncArray{
-		count: count
-		objects: objects
-		fences: fences
-		timeline: timeline
+		count:           count
+		objects:         objects
+		fences:          fences
+		timeline:        timeline
 		timeline_values: timeline_values
 	}
 }
@@ -102,76 +103,81 @@ pub fn install_output_syncs(staged &SyncArray, fence &syncobj.DmaFence) bool {
 	return true
 }
 
-// Copy the complete command array once. The two-command form accepted by the
-// current Asahi UAPI is an ordered compute-then-render pair.
+// Snapshot one descriptor and its nested payload before taking backend locks.
+pub fn stage_command(pointer u64, index u32) (int, Command) {
+	if pointer == 0 || index >= max_commands { return -22, Command{} }
+	bytes := u64(index + 1) * sizeof(ioctl.DrmAsahiCommand)
+	if bytes - 1 > ~pointer { return -14, Command{} }
+	mut descriptor := ioctl.DrmAsahiCommand{}
+	if !usercopy.copy_from_user(voidptr(&descriptor), pointer + u64(index) * sizeof(ioctl.DrmAsahiCommand), sizeof(ioctl.DrmAsahiCommand)) {
+		return -14, Command{}
+	}
+	if descriptor.extensions != 0 || descriptor.flags != 0 || descriptor.cmd_buffer == 0 {
+		return -22, Command{}
+	}
+	for barrier in descriptor.barriers {
+		if barrier != ioctl.asahi_barrier_none && barrier > index { return -22, Command{} }
+	}
+	match descriptor.cmd_type {
+		ioctl.asahi_cmd_render {
+			if descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
+				|| (descriptor.result_size != 0 && descriptor.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
+				return -22, Command{}
+			}
+			mut input := ioctl.DrmAsahiCmdRender{}
+			if !usercopy.copy_from_user(voidptr(&input), descriptor.cmd_buffer, sizeof(input)) {
+				return -14, Command{}
+			}
+			code, command := agxrender.stage_uapi(&input, descriptor.result_size != 0)
+			return code, Command{ descriptor: descriptor, render: command }
+		}
+		ioctl.asahi_cmd_compute {
+			// Mesa 25.0.5 reports sizeof - 8 but points to the current struct.
+			if (descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
+				&& descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute) - u64(8))
+				|| (descriptor.result_size != 0 && descriptor.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
+				return -22, Command{}
+			}
+			mut input := ioctl.DrmAsahiCmdCompute{}
+			if !usercopy.copy_from_user(voidptr(&input), descriptor.cmd_buffer, sizeof(input)) {
+				return -14, Command{}
+			}
+			code, command := agxcompute.stage_uapi(&input, descriptor.result_size != 0)
+			return code, Command{ descriptor: descriptor, compute: command }
+		}
+		else { return -22, Command{} }
+	}
+}
+
+// The caller supplies owned, correctly sized kernel storage. No allocation
+// occurs here. Barrier indices name PREVIOUS commands of their own subqueue,
+// including index zero for the initial no-command event, as in Asahi's parser.
+pub fn stage_command_array(pointer u64, count u32, mut staged []Command) int {
+	if count == 0 || count > max_commands || staged.len != int(count) { return -22 }
+	mut counts := [2]u32{}
+	for index := u32(0); index < count; index++ {
+		code, command := stage_command(pointer, index)
+		if code != 0 { return code }
+		for pipe in 0 .. 2 {
+			barrier := command.descriptor.barriers[pipe]
+			if barrier != ioctl.asahi_barrier_none && barrier > counts[pipe] { return -22 }
+		}
+		staged[index] = command
+		pipe := if command.descriptor.cmd_type == ioctl.asahi_cmd_render { 0 } else { 1 }
+		counts[pipe]++
+	}
+	return 0
+}
+
+// The fake backend retains its previous two-command contract while native
+// G13 uses the general bounded array above.
 pub fn stage_commands(pointer u64, count u32) (int, [2]Command) {
 	mut staged := [2]Command{}
-	if pointer == 0 || count == 0 || count > max_commands {
-		return -22, staged
-	}
-	bytes := u64(count) * sizeof(ioctl.DrmAsahiCommand)
-	if bytes - 1 > ~pointer {
-		return -14, staged
-	}
+	if count == 0 || count > max_legacy_commands { return -22, staged }
 	for index := u32(0); index < count; index++ {
-		mut descriptor := ioctl.DrmAsahiCommand{}
-		if !usercopy.copy_from_user(voidptr(&descriptor), pointer + u64(index) * sizeof(ioctl.DrmAsahiCommand), sizeof(ioctl.DrmAsahiCommand)) {
-			return -14, staged
-		}
-		if descriptor.extensions != 0 || descriptor.flags != 0 || descriptor.cmd_buffer == 0 {
-			return -22, staged
-		}
-		for barrier in descriptor.barriers {
-			if barrier != ioctl.asahi_barrier_none && barrier > index {
-				return -22, staged
-			}
-		}
-		match descriptor.cmd_type {
-			ioctl.asahi_cmd_render {
-				if descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdRender)
-					|| (descriptor.result_size != 0
-						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultRender)) {
-					return -22, staged
-				}
-				mut render := ioctl.DrmAsahiCmdRender{}
-				if !usercopy.copy_from_user(voidptr(&render), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdRender)) {
-					return -14, staged
-				}
-				render_result, render_command := agxrender.stage_uapi(&render, descriptor.result_size != 0)
-				if render_result != 0 {
-					return render_result, staged
-				}
-				staged[index] = Command{
-					descriptor: descriptor
-					render: render_command
-				}
-			}
-			ioctl.asahi_cmd_compute {
-				// Mesa 25.0.5 reports sizeof - 8 for compatibility with 6.11.8,
-				// while the userspace pointer still addresses the current struct.
-				if (descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute)
-					&& descriptor.cmd_buffer_size != sizeof(ioctl.DrmAsahiCmdCompute) - u64(8))
-					|| (descriptor.result_size != 0
-						&& descriptor.result_size < sizeof(ioctl.DrmAsahiResultCompute)) {
-					return -22, staged
-				}
-				mut compute := ioctl.DrmAsahiCmdCompute{}
-				if !usercopy.copy_from_user(voidptr(&compute), descriptor.cmd_buffer, sizeof(ioctl.DrmAsahiCmdCompute)) {
-					return -14, staged
-				}
-				compute_result, compute_command := agxcompute.stage_uapi(&compute, descriptor.result_size != 0)
-				if compute_result != 0 {
-					return compute_result, staged
-				}
-				staged[index] = Command{
-					descriptor: descriptor
-					compute: compute_command
-				}
-			}
-			else {
-				return -22, staged
-			}
-		}
+		code, command := stage_command(pointer, index)
+		if code != 0 { return code, staged }
+		staged[index] = command
 	}
 	if count == 2 && (staged[0].descriptor.cmd_type != ioctl.asahi_cmd_compute
 		|| staged[1].descriptor.cmd_type != ioctl.asahi_cmd_render

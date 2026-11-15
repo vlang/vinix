@@ -246,19 +246,36 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'fn dispatch(', 'Vinix async submission ioctl')!
 	require(!ioctl_submit.contains('wait_g13_fence') && !ioctl_submit.contains('syncobj.wait')
 		&& !ioctl_submit.contains('sched.yield'), 'Vinix submission must not wait for dependencies or GPU work')!
-	require_order(ioctl_submit, ['agxsubmission.stage_commands', 'agxsubmission.stage_sync_array',
+	require_order(ioctl_submit, ['agxsubmission.stage_command_array', 'agxsubmission.stage_sync_array',
 		'f.lock.acquire()', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
 		'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
 		'agxsubmission.install_output_syncs', 'gpu_manager.queue_g13_submission'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
-	require_order(pending, ['status := g13_dependency_status', 'manager.g13_queue_dispatch_blocked',
-		'manager.submit_g13_compute_job', 'katomic.load(&item.compute_done)',
+	require_order(pending, ['status := g13_dependency_status', 'katomic.load(&command.done)',
+		'katomic.load(&command.error)', 'manager.g13_queue_dispatch_blocked', 'manager.submit_g13_compute_job',
 		'manager.submit_g13_render_job'], 'Vinix dependency and compute/render polling')!
+	submission := read(os.join_path(repo, 'kernel/gpu/agx/submission/submission.v'))!
+	reference_file := read(os.join_path(base, 'file.rs'))!
+	require(integer_constant(submission, 'max_commands', 'Vinix command count')! ==
+		integer_constant(reference_file, 'MAX_COMMANDS_PER_SUBMISSION', 'Asahi command count')!,
+		'Native hardware-command limit differs')!
+	require_order(queue, ['const SQ_RENDER: usize = 0', 'const SQ_COMPUTE: usize = 1',
+		'events[queue_idx].get(*index as usize)'], 'Asahi subqueue barrier numbering')!
+	stage := section(submission, 'pub fn stage_command_array(', '// The fake backend retains', 'Vinix mixed batch staging')!
+	require_order(stage, ['count > max_commands', 'mut counts := [2]u32{}',
+		'barrier > counts[pipe]', 'staged[index] = command', 'asahi_cmd_render { 0 } else { 1 }',
+		'counts[pipe]++'], 'Vinix per-subqueue barrier validation')!
+	require_order(pending, ['int(item.command_count) - 1', 'command.compute_job = unsafe { nil }',
+		'manager.release_g13_compute_job', 'command.render_job = unsafe { nil }',
+		'manager.release_g13_render_job'], 'Vinix reverse command cancellation')!
 	require_order(pending, ['pending_head = unsafe { nil }', 'current = item.next',
 		'if earlier || poll_g13_pending', 'katomic.load(&item.callbacks_remaining) == 0',
-		'memory.free(voidptr(item))', 'retained_tail.next = pending_head', 'pending_head = retained_head'],
+		'signal_g13_submission_fence(item.final_fence', 'memory.free(voidptr(item))',
+		'retained_tail.next = pending_head', 'pending_head = retained_head'],
 		'Vinix FIFO retry and callback-owned retirement')!
+	completion := section(file_source, 'fn finish_g13_submit(', 'fn g13_render_completed(', 'Vinix aggregate fence')!
+	require(!completion.contains('syncobj.signal'), 'Per-command completion must not signal the aggregate fence')!
 	require_order(manager, ['impl Default for ID {', 'Self::new(2)',
 		'let id = self.ids.queue.next()'], 'Asahi global queue identity')!
 	require(queue.contains('generation: AtomicU32::new(id as u32)') &&
@@ -297,6 +314,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'TVB growth ACK halt counter',
 		'G13 default non-preemptible compute queue priority',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
+		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',
 		'Firmware 13.5 shared per-queue command/start counters']

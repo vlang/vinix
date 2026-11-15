@@ -26,7 +26,7 @@ import usercopy
 import aarch64.timer
 
 const max_submission_syncs = agxsubmission.max_syncs
-const max_submission_commands = agxsubmission.max_commands
+const max_submission_commands = agxsubmission.max_legacy_commands
 const max_command_attachments = u32(16)
 const fake_completion_delay_ns = i64(100_000_000)
 // Power-column count the fake device reports to the encoder. Hardware takes it
