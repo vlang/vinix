@@ -4900,3 +4900,41 @@ search closure, mandatory host-builder integration, OS shared-cache bytes and
 hermetic toolchain admission remain open. No new signed guest run or default
 activation is claimed; ARM owned Wine, fresh owned GUI acceptance and broader
 roadmap 14 gates remain open.
+
+## Observed Mach-O replay file loads (2026-11-16)
+
+Commit `cc098ab1c` extends the [experimental Mach-O check](wine-mach-link.md)
+with format-2 file-load evidence. Replay uses LLD `-t`; its raw log is parsed
+into `link-loads.json`, mapping each reported file to its captured member hash.
+All observed paths must be safe relative captured files. The two object
+operands and the direct libm/libpthread/libSystem stubs must be observed.
+Archive-member and TBD-document records may repeat a file. Unused operands
+need not appear. Missing/fractured traces, unparsed output, absolute/escaping
+paths, uncaptured loads and changed observation maps refuse admission.
+
+Fresh fixture/controller/producer/retainer links all pass identical-byte replay,
+each with 44 file-load records. `mach-link-final` rechecks the three real-role
+captures and builds `fixture-final`; both fixture executables run successfully.
+Production `check-final` passes real/copied baselines and all 31 refusals in
+`controls-final`: the original 22 plus nine format/load cases. A fully resealed
+archive omission removes libcache.tbd and its extracted output/inventory row;
+the recorded replay's load must then refuse as absent from the capture.
+The retained historical checker still admits the unchanged format-1 fixture;
+the new checker refuses it for missing format-2 evidence.
+
+The complete checkpoint is `/Users/alex/.cache/vwmachotrace-20261116-01`, with
+final sources, patch/revision, generated programs, captures, raw load/image
+observations and controls. Real-role captures are `controller-01`, `producer-01`
+and `retainer-01`; final verifier logs identify their rechecks. `probe-replay`
+and its inherited-environment trace are exploratory, not qualification evidence.
+The typed inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-macho-trace-20261116-01.inventory.json`,
+SHA-256 `3b2efd56aabf28777c4ce2504482786e64384cdef06def3ac3898483b6d23e88`.
+Complete inventory recording and independent comparison pass. Original selected
+tool paths and complete historical prerequisites remain required.
+
+This admits reported file-load coverage. It does not prove absence of
+unreported reads or searches, complete SDK closure, isolation from the installed
+SDK, loader/cache bytes or hermetic toolchain admission. Mandatory host-builder
+integration and fresh signed guest acceptance remain open; product defaults
+and broader ARM/GUI roadmap 14 gates are unchanged.
