@@ -2465,6 +2465,13 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   for all 40 observed heap cohorts and the four backing-page deltas that still
   fail strict flatness. Allocation allowances and broader acceptance remain open.
 
+- [x] Add a separate native slab-reader placement diagnostic with effective CPU
+  checks, affinity restoration and complete observation/refusal controls.
+  Reproduce an ARM backing-page increase without a workload and compare warmed
+  cross-CPU and same-CPU readers on both architectures. See
+  [the placement receipts](docs/linux-performance-reader-placement.md); this
+  does not qualify the four deltas in the fixed six-scenario run.
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

@@ -27,7 +27,8 @@ fn run() ! {
 	if os.exists(state) || os.is_link(state) { return error('heap build state must be fresh') }
 	os.mkdir_all(state)!
 	mut inputs := map[string]string{}
-	for name in ['heap-build-check.v', 'heap-selfcheck.v', 'heap-full-check.v', 'perfreport/core.v'] {
+	for name in ['heap-build-check.v', 'heap-selfcheck.v', 'heap-full-check.v',
+		'heap-placement-check.v', 'perfreport/core.v'] {
 		path := root + '/tests/desktop-perf/' + name
 		inputs[path] = digest(path)!
 	}
@@ -41,7 +42,7 @@ fn run() ! {
 	os.setenv('V_MACOS_V3_CALLER_NO_FALLBACK', '1', true)
 	for schema in ['4k', '16k'] {
 	for profile in ['normal', 'production'] {
-		for target in ['heap-selfcheck', 'heap-full-check'] {
+		for target in ['heap-selfcheck', 'heap-full-check', 'heap-placement-check'] {
 			name := schema + '-' + profile + '-' + target
 			binary := state + '/' + name
 			mut args := [compiler, '-cc', 'cc']
@@ -53,7 +54,9 @@ fn run() ! {
 			output := execute([binary, argument], state + '/' + name + '-run')!
 			expected := if target == 'heap-selfcheck' {
 				'PERF HEAP explicit parser/reader controls PASS ' + if schema == '4k' { '373' } else { '479' }
-			} else { 'PERF FULL HEAP explicit controls PASS ' + if schema == '4k' { '57' } else { '72' } }
+			} else if target == 'heap-full-check' {
+				'PERF FULL HEAP explicit controls PASS ' + if schema == '4k' { '57' } else { '72' }
+			} else { 'Placement checker controls PASS ' + if schema == '4k' { '156' } else { '187' } }
 			if output.trim_space() != expected { return error('incomplete observer controls: ' + name) }
 			println(schema + ' ' + profile + ': ' + expected)
 		}

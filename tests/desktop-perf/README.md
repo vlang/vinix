@@ -112,6 +112,23 @@ the sampler's target flags and matching profile. `heap-native-check.v
 check|controls SERIAL` validates its captured output and rejection controls;
 compile that checker with the same profile flag.
 
+`heap-placement/main.v` is a separate two-CPU PID1 diagnostic for observer
+placement. It measures a cold cross-CPU reader pair, both warmed cross-CPU
+directions and a warmed same-CPU pair, checking effective placement and restoring
+the original affinity mask. Use the sampler's target flags/profile and
+`-D_GNU_SOURCE` at the strict static link. It requires exactly CPUs 0 and 1.
+Compile `heap-placement-host.v` with the additional module search roots
+`tests/native-guest-tools`, `tests/linuxkpi` and `tools`. Invoke it as
+`heap-placement-host INIT KERNEL-DIR LAUNCH-ROOT FRESH-STATE aarch64|x86_64`;
+`LAUNCH-ROOT` supplies the retained ISO scripts, configuration and Limine cache
+used by `guesthost.launch_from`. The host owns a fresh, network-free guest with
+a 300-second deadline, records inputs and retires its process group.
+`heap-placement-check.v check SERIAL` validates the selected profile's complete
+capture and reports changes with `qualification=false`. Its `selfcheck` runs in
+both profiles and build modes in the public suite. These observations leave the
+fixed sampler and strict flatness gate unchanged. See the
+[reader placement receipts](../../docs/linux-performance-reader-placement.md).
+
 The retained `run-arm.v` and `run-x86.v` adapters generate their PID1 through
 `perfproducer.generate_init`, using the maintained freestanding V module path.
 The initializer uses native C-width libc calls and stack shell arguments.
