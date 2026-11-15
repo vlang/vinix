@@ -3779,6 +3779,66 @@ SHA-256 `89f01f44373ca299d74657fef248b524a6bc284d46d84a936f456c488acc4187`.
 Recording and independent comparison pass for complete bytes, sizes, types,
 modes and link targets. Earlier complete failure bundles remain required.
 
+## Selected 741-row public CLI VM cuts, 2026-11-15
+
+Source `a06648eaf` extends the copied CLI's test hook to 1112/2219/2221/2222
+and validates public replies against the canonical 741-row inventory. The
+controller/guest now admit scaled CLI mode, optionally with `--prepared`.
+The dispatcher entrypoint remains byte-identical, SHA-256
+`35d7a221de8b22a9636d8796f6dc38e1064cfa81bae26b4ab8cfd9dfa70cdd41`;
+the new hook SHA-256 is
+`187e7d3f52b25f94f55c5375dbd58883c2bae9f70d094e30ad3db438ff295806`.
+The compiled builder records both copies and refuses existing output directories.
+
+Prepared-baseline public CLI matrices pass all four cuts on both architectures:
+
+| Cut | x86 seconds | ARM seconds |
+| --- | ---: | ---: |
+| 1112 | 42.740 | 24.165 |
+| 2219 | 41.480 | 24.236 |
+| 2221 | 41.551 | 24.807 |
+| 2222 | 40.845 | 23.890 |
+
+Original x86 installation-plus-recovery mode also passes the entire matrix in
+70.171/78.686/57.410/57.836 seconds. All twelve scaled cases verify selected
+inputs; prepared matrices also verify the template digest. Each retains the
+120-second two-boot cap, 32 MiB home, 4 MiB journal and six-second recovery grace.
+
+Every accepted case requires actual QEMU SIGKILL and exact cold namespace state
+before public recovery. Public migration, repetition and review must exit zero
+and return parsed JSON format 1, generation 2, prior generation zero, runtime
+`wine` and all 741 exact current `keep` targets. Every name, observed link and
+replacement is checked in order; complete raw replies remain in serial logs.
+Independent fresh signed-service admission, migration/repetition/recheck,
+private-data checks, busy live generation lease, free reader and release on
+close still follow. Final poweroff, clear VJFS marker, separate export and strict
+read-only `e2fsck -f -n` exit zero remain mandatory.
+
+The default ARM CLI three-point regression passes in 17.517/17.627/17.476
+seconds without creating point 4. Focused small-fixture point 4 passes in
+17.930 seconds, including the exact pending second stage. The identical ARM
+CLI C linked without interception passes baseline preparation, then is rejected
+at focused point 2222 for guest shutdown before its requested cut. Empty CLI,
+prepared adapter, unscaled prepared CLI, mixed selector and noncanonical point
+controls refuse before work creation. Product code, budgets and limits are unchanged.
+
+Evidence is retained at `/Users/alex/.cache/vwwinescaledcli-20261115-01`, isolated
+base `f8b2d4a31` plus `source.patch`, with copied entrypoint/hook identities,
+source lists, generated C, binaries, kernels, all raw/inspection disks,
+serial/QMP logs, complete JSON replies, controls and validation notes. Earlier
+complete prerequisite bundles remain required. This qualifies an instrumented
+test build at four selected boundaries over signed marker bytes. It does not
+execute Wine or qualify all 2222 cuts, the uninstrumented release binary, real
+Wine version/GUI/ARM execution, physical power/host-cache loss, torn writes,
+plain-ext2 safety, whole-launch lifetime, measured heap/complete descriptor
+accounting or strict ABI/hermetic closure.
+
+Typed receipt:
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-scaled-cli-syncs-20261115-01.inventory.json`,
+SHA-256 `23ef1ecd3647ddd8e19b705f826646225269c01899bfae3807e37ec468d96295`.
+Recording and independent comparison pass for complete bytes, sizes, types,
+modes and link targets. Earlier complete evidence bundles remain required.
+
 ## Existing contract and gap
 
 [`generation_lease`](../../tools/packages/pkgcore/launch.v#L239) opens the

@@ -1356,6 +1356,10 @@ architectures; broader release/catalog/runtime acceptance remains open.
     extend coverage to all eight boundaries through direct adapter, signed-service
     and public CLI entrypoints, including completed writes before return;
     exact cold namespace checks precede idempotent recovery.
+    [741-row public CLI recovery](tests/packages/wine-lease-supervision-plan.md#selected-741-row-public-cli-vm-cuts-2026-11-15)
+    now passes four sampled cuts on both architectures with prepared baselines,
+    plus the original x86 installation/recovery workflow. Every public reply
+    validates all 741 targets; earlier failed timing checkpoints remain retained.
     Broader power-loss recovery and Wine version-upgrade/GUI compatibility
     remain open; ARM Wine execution is not qualified.
     [Owned-build receipt admission](tests/packages/wine-lease-supervision-plan.md#owned-build-receipt-preflight-2026-11-13)
