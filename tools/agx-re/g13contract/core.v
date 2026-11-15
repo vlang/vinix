@@ -660,6 +660,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 
 pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_fragment_tib_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/fw/fragment.v'))!,
+		read(os.join_path(base, 'queue/render.rs'))!)!
 	reference := read(os.join_path(base, 'buffer.rs'))!
 	policy := section(reference, '    pub(crate) fn auto_grow(', '    /// Synchronously grow', 'Asahi TVB feedback')!
 	require_order(policy, ['raw.max_pages.load', 'raw.reset.store(1, Ordering::Release)',
@@ -733,6 +736,7 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 	require_order(publisher, ['include_init :=', 'vertex_count :=', 'if include_init',
 		'katomic.store(mut &vertex_state.cpu_wptr', 'owned_queue.render_buffer.needs_bind = false'], 'Vinix conditional TVB binding')!
 	return ['TVB page-use feedback, two/three-times headroom and non-memoryless cap',
+		'G13 fragment TIB words derive from the uTile sample footprint in 2 KiB blocks',
 		'Initial eight-block TVB allocation before the first scene',
 		'TVB feedback before minimum-dimension growth and scene allocation',
 		'TVB complete allocation before table and counter publication',

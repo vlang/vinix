@@ -1297,6 +1297,8 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	vertex_attachments := build_g13_attachments(input.vertex_attachment_count, input.vertex_attachments) or { return none }
 	fragment_attachments := build_g13_attachments(input.fragment_attachment_count, input.fragment_attachments) or { return none }
 	tile := g13_tile_info(input.framebuffer_width, input.framebuffer_height, input.layers, input.utile_width, input.utile_height, input.samples, input.ppp_control, input.vertex_helper_cfg) or { return none }
+	blocks_per_utile := fw.g13_fragment_tib_blocks(input.utile_width, input.utile_height,
+		input.samples, input.sample_size) or { return none }
 
 	mgr.lock.acquire()
 	defer {
@@ -1556,7 +1558,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				utiles_per_mtile_y: u16(tile.utiles_per_mtile_y)
 				utiles_per_mtile_x: u16(tile.utiles_per_mtile_x)
 				tile_counts: ((tile.tiles_y - 1) << 12) | (tile.tiles_x - 1)
-				tib_blocks: input.tib_blocks
+				tib_blocks: blocks_per_utile
 				isp_bgobjdepth: input.isp_bgobjdepth
 				isp_bgobjvals: input.isp_bgobjvals | 0x400
 				unk_3c: 1
@@ -1591,7 +1593,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				stencil_buffer_ptr_2: input.stencil_buffer_store
 				stencil_buffer_ptr_3: input.stencil_buffer_partial
 				stencil_meta_buffer_ptr_3: input.stencil_meta_buffer_partial
-				tib_blocks: input.tib_blocks
+				tib_blocks: blocks_per_utile
 				aux_fb_info: aux_info
 				tile_config: tile_config
 				unk_partial_store_pipeline: fw.g13_store_pipeline_binding(input.partial_store_pipeline_bind, input.partial_store_pipeline)

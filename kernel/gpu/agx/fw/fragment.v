@@ -235,6 +235,21 @@ pub mut:
 	bytes [0x974]u8
 }
 
+// Asahi submit_render derives the number of 2 KiB tile-image blocks from
+// the uTile's sample footprint. Legacy inputs have a wider sample-size field,
+// so calculate in 64 bits and check the firmware word before narrowing it.
+pub fn g13_fragment_tib_blocks(utile_width u32, utile_height u32, samples u32,
+	sample_size u32) ?u32 {
+	if !((utile_width == 32 && utile_height == 32)
+		|| (utile_width == 32 && utile_height == 16)
+		|| (utile_width == 16 && utile_height == 16))
+		|| (samples != 1 && samples != 2 && samples != 4) { return none }
+	bytes := u64(utile_width) * utile_height * samples * sample_size
+	blocks := (bytes + 2047) / 2048
+	if blocks > u64(~u32(0)) { return none }
+	return u32(blocks)
+}
+
 pub fn g13_fragment_active_size(abi hw.FirmwareAbi) ?u64 {
 	return match abi {
 		.v12_3 { u64(sizeof(G13RunFragment)) }

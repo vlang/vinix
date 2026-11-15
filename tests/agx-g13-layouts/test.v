@@ -213,7 +213,11 @@ fn check_v13_5_command_repacking() {
 	}
 	fragment.job_params_1.aux_fb_info = fw.G13AuxFramebufferInfo{width: 1920, height: 1080}
 	fragment.job_params_3.aux_fb_info = fw.G13AuxFramebufferInfo{width: 800, height: 600}
+	fragment.job_params_2.tib_blocks = 0x1234_5678
+	fragment.job_params_3.tib_blocks = 0x8765_4321
 	fragment_new := fw.make_g13_fragment_v13_5(&fragment, 0xabcdef0100000004)
+	assert object_u32(voidptr(&fragment_new), 0x3f4) == 0x1234_5678
+	assert object_u32(voidptr(&fragment_new), 0x6d0) == 0x8765_4321
 	assert object_u64(voidptr(&fragment_new), 0x4) == 0xabcdef0100000004
 	assert object_u32(voidptr(&fragment_new), 0xb8) == 1920
 	assert object_u32(voidptr(&fragment_new), 0xbc) == 1080
@@ -231,6 +235,31 @@ fn check_v13_5_command_repacking() {
 	assert object_u64(voidptr(&fragment_new), 0x920) == fragment.start_ts
 	assert object_u64(voidptr(&fragment_new), 0x928) == fragment.end_ts
 	assert object_u32(voidptr(&fragment_new), 0x940) & 0xff == fragment.client_sequence
+}
+
+fn check_fragment_tib_sizing() {
+	// Reference byte footprints reduce to these independent rational sizes
+	// in 2 KiB units. Exercise every value of the packaged u8 sample size.
+	for config in [[u32(32), 32, 1, 2, 1], [u32(32), 32, 2, 1, 1],
+		[u32(32), 32, 4, 1, 2], [u32(32), 16, 1, 4, 1],
+		[u32(32), 16, 2, 2, 1], [u32(32), 16, 4, 1, 1],
+		[u32(16), 16, 1, 8, 1], [u32(16), 16, 2, 4, 1], [u32(16), 16, 4, 2, 1]] {
+		for size in 0 .. 256 {
+			actual := fw.g13_fragment_tib_blocks(config[0], config[1], config[2], u32(size)) or { panic('TIB size') }
+			expected := (u32(size) + config[3] - 1) / config[3] * config[4]
+			assert actual == expected
+		}
+	}
+	assert (fw.g13_fragment_tib_blocks(32, 32, 4, 0x7fffffff) or { 0 }) == 0xfffffffe
+	assert (fw.g13_fragment_tib_blocks(16, 16, 4, ~u32(0)) or { 0 }) == 0x80000000
+	for config in [[u32(32), 32, 4, 0x80000000], [u32(32), 32, 4, ~u32(0)],
+		[u32(16), 32, 1, 8], [u32(0), 16, 1, 8], [u32(32), 32, 0, 8],
+		[u32(32), 32, 3, 8], [u32(32), 32, 8, 8], [~u32(0), ~u32(0), 4, ~u32(0)]] {
+		if _ := fw.g13_fragment_tib_blocks(config[0], config[1], config[2], config[3]) { panic('invalid TIB geometry/overflow') }
+	}
+	assert __offsetof(fw.G13FragmentJobParameters2, tib_blocks) == 0x2c
+	assert __offsetof(fw.G13FragmentJobParameters3, tib_blocks) == 0x218
+	println('G13 TIB sizing: 2304 packaged sample footprints, wide legacy bounds/overflow and both fragment wire fields passed')
 }
 
 fn check_v13_5_queue_objects() {
@@ -354,6 +383,7 @@ fn main() {
 	check_channel_offsets()
 	check_abi_offset_translation()
 	check_v13_5_command_repacking()
+	check_fragment_tib_sizing()
 	check_v13_5_queue_objects()
 	check_default_queue_priorities()
 	check_v13_5_microsequences()
