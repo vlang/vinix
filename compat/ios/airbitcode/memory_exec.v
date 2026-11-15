@@ -146,7 +146,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	mut layouts := IRTypeLayouts{}
 	defer { layouts.free() }
 	mut intrinsic_declarations := [scalar_intrinsic_cache_slots]int{} // Existing FP/integer identities, then two-width conversions.
-	mut vector_intrinsic_declarations := [vector_sign_intrinsic_slots]int{}
+	mut vector_intrinsic_declarations := [vector_float_intrinsic_slots]int{}
 	mut intrinsic_work := 0
 	mut vector_work := 0
 	mut vector_results := 0
@@ -167,7 +167,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if code != 6 {
 				if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
 				if code == 34 {
-					work, key, attributes := p.vector_sign_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)!
+					work, key, attributes := p.vector_float_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)!
 					if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector intrinsic: duplicate reserved declaration') }
 					if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
 					vector_work += work
@@ -457,7 +457,7 @@ pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools 
 						offset := int(bindings[access.argument].offset + access.offset)
 						for i in 0 .. int(access.bytes) { m.step()!; bindings[access.argument].data[offset + i] = u8(value.value) }
 					}
-				} else { value := if p.vector_construction(code, op) { m.sign_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! }; m.put(inst, value) }
+				} else { value := if p.vector_construction(code, op) { m.float_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! }; m.put(inst, value) }
 				continue
 			}
 			if code == 26 { value := m.extract_pair_value(op)!; m.put(inst, value); continue }

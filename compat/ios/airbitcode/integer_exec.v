@@ -116,7 +116,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	if s.instructions_start < 0 || s.instructions_count < 1 || s.instructions_start > p.instructions.len || s.instructions_count > p.instructions.len - s.instructions_start || s.blocks_start < 0 || s.blocks_count < 1 || s.blocks_start > bodies.blocks.len || s.blocks_count > bodies.blocks.len - s.blocks_start || s.results_count < 0 || s.results_count > max_body_instructions { return error('AIR integer: body ranges') }
 	mut max_phis := 0
 	mut intrinsic_declarations := [scalar_intrinsic_cache_slots]int{} // Existing FP/integer identities, then two-width conversions.
-	mut vector_intrinsic_declarations := [vector_sign_intrinsic_slots]int{}
+	mut vector_intrinsic_declarations := [vector_float_intrinsic_slots]int{}
 	mut intrinsic_work := 0
 	mut vector_work := 0
 	mut vector_results := 0
@@ -162,7 +162,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			} else if vector_result {
 				if !inst.has_result || vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
 				if code == 34 {
-					work, key, attributes := p.vector_sign_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
+					work, key, attributes := p.vector_float_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 					if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector intrinsic: duplicate reserved declaration') }
 					if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes(stream, attributes, max_integer_execution_steps - intrinsic_work)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
 					vector_work += work
@@ -345,7 +345,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				6 { result = m.extract_constant_lane(stream, op)! }
 				7 { result = m.insert_vector_value(stream, inst, op)! }
 				8 { result = m.shuffle_vector_value(stream, inst, op)! }
-				34 { result = if p.vector_construction(code, op) { m.sign_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! } }
+				34 { result = if p.vector_construction(code, op) { m.float_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! } }
 				26 { result = m.extract_pair_value(op)! }
 				27 { result = m.insert_pair_value(op)! }
 				2 { result = if p.types[op.result_type].kind == .vector_t { m.binary_vector_value(stream, inst, op)! } else { m.binary_value(op)! } }
