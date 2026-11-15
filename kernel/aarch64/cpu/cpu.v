@@ -675,6 +675,26 @@ pub fn tlbi_vaae1(addr u64) {
 }
 
 // Interrupt state management (replaces x86 cli/sti/pushf)
+// Preserve every DAIF mask bit across a short CPU-local critical section.
+pub fn interrupt_save() u64 {
+	mut saved := u64(0)
+	asm volatile aarch64 {
+		mrs saved, daif
+		msr daifset, 0xf
+		; =r (saved)
+		; ; memory
+	}
+	return saved
+}
+
+pub fn interrupt_restore(saved u64) {
+	asm volatile aarch64 {
+		msr daif, saved
+		; ; r (saved)
+		; memory
+	}
+}
+
 pub fn interrupt_state() bool {
 	mut daif_val := u64(0)
 	asm volatile aarch64 {

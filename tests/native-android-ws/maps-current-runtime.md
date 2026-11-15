@@ -43,7 +43,12 @@ original caps with recovered actual deployment inputs, all 99 API exports and
 passed, followed by the complete signed ARM suite. That guest disappeared
 during services startup before a protected Maps launch; its API evidence and
 partial persistent data are retained. Fresh r112 reuses the same qualified
-binaries and signed API evidence for the protected account retry.
+binaries and signed API evidence. It reached services readiness, then faulted
+in the kernel on the first protected Maps launch, before account interaction.
+Its unresponsive guest is paused with RAM preserved. A
+[migration-safe ARM thread lookup](../kernel-current-thread/README.md)
+passes focused migration and assembly checks with current V; full kernel
+compilation hit the retained RSS limit, so the fix is not guest-validated.
 Complete r107–r110 public/private evidence is preserved, and those guests are stopped.
 Authentication and full Maps operation remain unqualified.
 

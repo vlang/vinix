@@ -258,8 +258,13 @@ pub fn (t &Thread) syscall_args_text() string {
 pub const interrupted_errno = 512
 
 pub fn current_thread() &Thread {
+	// A timer may migrate us after reading the CPU number. Keep the slot
+	// lookup on that CPU, then restore the caller's complete interrupt mask.
+	saved := cpu.interrupt_save()
 	cpu_num := cpu.read_tpidr_el1()
-	return unsafe { &Thread(per_cpu_current_thread[cpu_num]) }
+	thrd := unsafe { &Thread(per_cpu_current_thread[cpu_num]) }
+	cpu.interrupt_restore(saved)
+	return thrd
 }
 
 pub fn set_current_thread(cpu_num u64, thrd &Thread) {
