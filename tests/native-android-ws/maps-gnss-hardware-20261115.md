@@ -75,5 +75,28 @@ The complete API export reconstructed without removals: 22759 bytes / 45 chunks.
 | maps-gnss-api-readback-20261115-r1/archive.json | ac0ceeeb34ed387ef3c33311be07bd8e3fa3d30529910e67cbf9c277e18f5de1 |
 | maps-gnss-api-child-20261115-r1/child.log | adb55ff6cf7b97610a3cc216d9d4c24b03dc3694ed14c521d3c0e369b7ff0db2 |
 
-The actual Google services retry is in progress in r98. No full Maps or Google
-authentication claim is made.
+In r98 Google services remained ready beyond the previous GNSS failure. Maps
+launched once, displayed onboarding and the account chooser. Selecting Add
+account entered AccountIntroChimeraActivity and queued PreAddAccountActivity,
+then the service exited with phase=3 reason=6 status=1. The native UI pump did
+not describe its pending exception; the next diagnostic change addresses that
+gap. The caught mReferrer reflection exception is not established as the cause.
+No credentials were entered and Maps was not restarted.
+
+The checked data volume was mounted before the broker. The complete private
+API run and account results were copied to r98-private and synced, with the
+copy's receipt and prompt observed before stopping owned QEMU77249. PID absence
+and no open image handles were verified before read-only extraction. Read-only
+e2fsck passed. The storage watch is partial. The complete Maps export reconstructed
+without removals: 1429558 bytes / 2793 chunks. The exported receipt compares
+identical to the private receipt; broker.log matches its private manifest.
+The private bundle is maps-current-20261115-r98-account/private-readback/r98-private.
+
+| r98 account evidence | SHA256 |
+| --- | --- |
+| maps-r98-uart-20261115-r1/interval.log | 27b637e61908c93c6d80ceb99d3264d624c0e24d6e094533e2a4fe2c9372feb2 |
+| maps-r98-readback-20261115-r1/archive.json | 650f6cd296a77632f50b066135c2e77bf5780e119ef45ad58f4ac65987dc65c4 |
+| Same readback/exported-receipt.json | 02ff98783433e8bd853e03fa2740effc9e70723129b1c1a632f2fab77b586eb4 |
+| Private results/broker.log | d4b9a091a5a130abd53bc35a1e0853f7ee0c800a5542597d84518eaacabc18f7 |
+
+No full Maps or Google authentication claim is made.

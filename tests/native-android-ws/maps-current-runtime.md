@@ -1,6 +1,15 @@
 # Current Maps runtime work — 2026-11-12
 
-Latest continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
+Latest continuation, 2026-11-15: the [GNSS metadata adapter](maps-gnss-hardware-20261115.md)
+in 6a701e0d9 passed the full signed ARM API suite in r98 using current V.
+Real Google services progressed past the GNSS failure. Maps reached the
+account chooser, but Add account ended the service at the native UI pump
+without an exception description. Its complete export and private disk copy
+are retained and checked; the owned guest is stopped. Authentication remains
+unqualified. The next candidate reports pending cycle exceptions before
+releasing the JNI frame, retaining the failure status and authority guards.
+
+Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
 in 7796d94ba passed the signed ARM API suite with current V. Fresh r93 rendered
 Paris tiles, the Eiffel Tower-to-Louvre route and two mapped turn previews.
 The session was stopped and its private evidence synced to the checked data
