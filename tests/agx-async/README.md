@@ -91,3 +91,12 @@ the wait. Tests retain publication FIFO and explicit firmware waits, reverse
 retirement and independent errors, and shutdown ownership. The production
 context allocator is checked at its final two identities and must remain
 exhausted rather than wrap or reuse an identity. No fence retains a queue pointer.
+
+Whole-batch capacity is checked before the first publication and cached as one
+scalar across retries. Real-ioctl checks hold 64 new same-pipe commands behind
+63 older publications until host retirement, while another queue progresses.
+Mixed batches wait intact when any pipe lacks event/ring capacity; publication
+backpressure after admission still exercises partial progress without revisiting
+transferred pointers. Shutdown during the readiness call must release all
+caller-owned metadata in that final poll. Capacity is injected here; the lifetime
+fixture exercises the actual native counting, tickets, TVB binding and prefixes.

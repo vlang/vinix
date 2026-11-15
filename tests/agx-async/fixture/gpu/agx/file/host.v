@@ -299,6 +299,7 @@ fn check_shutdown_and_immediate_retirement() {
 }
 
 pub fn run_checks() {
+	check_batch_capacity()
 	check_dependencies_and_fifo()
 	check_pair_and_forged_fence()
 	check_failures()

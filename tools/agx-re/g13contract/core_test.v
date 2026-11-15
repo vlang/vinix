@@ -106,7 +106,10 @@ fn test_event_admission_rejects_missing_spare_and_regressing_completion() {
 	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/event/workqueue.v'))!
 	reference := 'const MAX_JOB_SLOTS: u32 = 127\npub(crate) fn can_submit() { inner.free_slots() > self.event_count }\npub(crate) fn free_slots() { self.last_submitted; .last_completed; ls.delta(&lc); ((MAX_JOB_SLOTS as i32) - busy_slots).max(0) }'
 	check_event_admission_contract(local, reference)!
-	for broken in [local.replace('busy >= 126', 'busy > 126'),
+	for broken in [local.replace('u32(free_slots) > count', 'u32(free_slots) >= count'),
+		local.replace('admitted || queue.can_submit(1)', 'true'),
+		local.replace('ticket.admitted = true', ''),
+		local.replace('ticket.admitted = false', ''),
 		local.replace('i32(queue.published_value - queue.completed_value)', 'i32(value - queue.completed_value)'),
 		local.replace('i32(value - queue.completed_value) > 0', 'true'),
 		local.replace('queue.completed_value = value - u32(0x100)', 'queue.completed_value = 0'),
@@ -115,6 +118,30 @@ fn test_event_admission_rejects_missing_spare_and_regressing_completion() {
 		if _ := check_event_admission_contract(broken, reference) { assert false }
 	}
 	if _ := check_event_admission_contract(local, reference.replace('> self.event_count', '>= self.event_count')) { assert false }
+}
+
+fn test_batch_admission_rejects_partial_counts_and_lost_shutdown_gate() {
+	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/gpu/g13_admission.v'))!
+	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
+	reference := 'fn prepare() { sj_vtx.can_submit(); sj_frag.can_submit(); sj_comp.can_submit(); }'
+	check_batch_admission_contract(local, pending, reference)!
+	for token in ['index < count', 'voidptr(queue) != voidptr(owner)',
+		'.events.ticket(job.vertex_event_slot, job.vertex_stamp_value)',
+		'.events.ticket(job.fragment_event_slot, job.fragment_stamp_value)',
+		'commands[2] += 1 + job.explicit_barriers.count', 'commands[1] += 2',
+		'bound_blocks = block_count', '.events.can_submit(events[pipe])',
+		'queue.subqueues[pipe].retired_sequence, commands[pipe])',
+		'.events.admit(source.compute.event_slot, source.compute.stamp_value)',
+		'.events.admit(source.render.fragment_event_slot, source.render.fragment_stamp_value)'] {
+		assert local.contains(token)
+		if _ := check_batch_admission_contract(local.replace(token, ''), pending, reference) { assert false }
+	}
+	for token in ['if !item.admitted', '_ = katomic.load(&item.callbacks_remaining)', 'item.admitted = true'] {
+		assert pending.contains(token)
+		if _ := check_batch_admission_contract(local, pending.replace(token, ''), reference) { assert false }
+	}
+	if _ := check_batch_admission_contract(local + '\njob.submitted = true', pending, reference) { assert false }
+	if _ := check_batch_admission_contract(local, pending, reference.replace('sj_frag.can_submit()', 'sj_frag.run()')) { assert false }
 }
 
 fn test_integer_constant_accepts_v_casts_and_separators() {

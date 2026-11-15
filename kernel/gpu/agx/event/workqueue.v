@@ -22,6 +22,7 @@ mut:
 	serial    u64
 	active    bool
 	published bool
+	admitted  bool // whole-subqueue admission survives canceled stamp gaps
 }
 
 pub struct Ticket {
@@ -125,26 +126,47 @@ pub fn (mut queue WorkQueueEvents) release(slot u32, value u32, submitted bool) 
 
 pub fn (queue &WorkQueueEvents) busy() bool { return queue.users != 0 }
 
+// Asahi checks the entire subqueue job before its first publication. Prepared
+// reservations do not consume this window; only host-unretired publications do.
+pub fn (queue &WorkQueueEvents) can_submit(count u32) bool {
+	if queue.users == 0 { return false }
+	busy := i32(queue.published_value - queue.completed_value) >> 8
+	free_slots := if busy >= 127 { i32(0) } else { i32(127) - busy }
+	return u32(free_slots) > count
+}
+
+// Caller has checked every participating subqueue under the manager lock.
+// This grants one existing prepared ticket, without publishing or pinning it.
+// The file poller's FIFO excludes a later batch until this grant is consumed
+// or canceled. Like Asahi's Job, admitted events are not charged twice.
+pub fn (mut queue WorkQueueEvents) admit(slot u32, value u32) bool {
+	if !queue.owns_slot(slot) { return false }
+	for mut ticket in queue.tickets {
+		if ticket.active && ticket.value == value && !ticket.published {
+			ticket.admitted = true
+			return true
+		}
+	}
+	return false
+}
+
 // Asahi rejects out-of-order commit/submit. A higher stamp published first
 // would make a later low-valued command look complete before GPU execution.
 pub fn (queue &WorkQueueEvents) can_publish(slot u32, value u32) bool {
 	if queue.users == 0 || queue.slot != slot { return false }
-	// Asahi requires free_slots() > event_count with MAX_JOB_SLOTS=127.
-	// One new event must leave a spare. Count the published prefix, not the
-	// candidate: cancellation holes must not strand the first runnable job.
-	busy := i32(queue.published_value - queue.completed_value) >> 8
-	if busy >= 126 { return false }
 	mut found := false
+	mut admitted := false
 	for ticket in queue.tickets {
 		if !ticket.active { continue }
 		if ticket.value == value {
 			if ticket.published { return false }
 			found = true
+			admitted = ticket.admitted
 		} else if !ticket.published && i32(value - ticket.value) > 0 {
 			return false
 		}
 	}
-	return found
+	return found && (admitted || queue.can_submit(1))
 }
 
 // Call only after the ring publication succeeds, while holding the same
@@ -154,6 +176,7 @@ pub fn (mut queue WorkQueueEvents) publish(slot u32, value u32) bool {
 	for mut ticket in queue.tickets {
 		if ticket.active && ticket.value == value {
 			ticket.published = true
+			ticket.admitted = false
 			queue.published_value = value
 			return true
 		}

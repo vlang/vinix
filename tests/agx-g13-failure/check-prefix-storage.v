@@ -12,6 +12,8 @@ const helpers = [
 	'gpu__agx__file__g13_pending_dispatch_complete',
 	'gpu__agx__file__process_pending_submissions',
 	'gpu__agx__file__register_g13_pending',
+	'gpu__agx__file__admit_g13_pending',
+	'gpu__agx__gpu__GpuManager__g13_batch_ready',
 	'gpu__agx__file__g13_dependencies_ready',
 	'syncobj__queue_dependency_ready',
 	'gpu__agx__gpu__GpuManager__queue_g13_submission',
@@ -26,6 +28,8 @@ const helpers = [
 	'gpu__agx__event__WorkQueueEvents__retain',
 	'gpu__agx__event__WorkQueueEvents__release',
 	'gpu__agx__event__WorkQueueEvents__can_publish',
+	'gpu__agx__event__WorkQueueEvents__can_submit',
+	'gpu__agx__event__WorkQueueEvents__admit',
 	'gpu__agx__event__WorkQueueEvents__publish',
 	'gpu__agx__gpu__g13_barrier_source',
 ]
@@ -74,8 +78,11 @@ fn check(source string) ! {
 			(!body.contains('void* blocked[128]') || !body.contains('bool unpublished[128]')) {
 			return error('scheduler queue gates are not fixed stack arrays')
 		}
-		if name.ends_with('register_g13_pending') && !body.contains('G13SubmissionJob jobs[64]') {
+		if (name.ends_with('register_g13_pending') || name.ends_with('admit_g13_pending')) && !body.contains('G13SubmissionJob jobs[64]') {
 			return error('acceptance references are not a fixed stack array')
+		}
+		if name.ends_with('g13_batch_ready') && (!body.contains('u32 events[3]') || !body.contains('u32 commands[3]')) {
+			return error('batch capacity counts are not fixed stack arrays')
 		}
 		if name.ends_with('resolve_g13_initial_barriers_locked') && !body.contains('Ticket resolved[2]') {
 			return error('resolved initial tickets are not a fixed stack array')
@@ -88,7 +95,7 @@ fn selftest() ! {
 	for name in helpers {
 		kind := result_type(name)
 		ending := if kind == 'void' { 'return;' } else if kind == 'bool' { 'return true;' } else { 'return (' + kind + '){0};' }
-		fixture += kind + ' ' + name + '(void) {\n u64 storage[3];\n void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n ' + ending + '\n}\n'
+		fixture += kind + ' ' + name + '(void) {\n u64 storage[3];\n void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n ' + ending + '\n}\n'
 	}
 	check(fixture)!
 	for name in helpers {
@@ -103,6 +110,8 @@ fn selftest() ! {
 		fixture.replace('void* blocked[128];', 'void** blocked;'),
 		fixture.replace('bool unpublished[128];', 'bool* unpublished;'),
 		fixture.replace('G13SubmissionJob jobs[64];', 'G13SubmissionJob* jobs;'),
+		fixture.replace('u32 events[3];', 'u32* events;'),
+		fixture.replace('u32 commands[3];', 'u32* commands;'),
 		fixture.replace('Ticket resolved[2];', 'Ticket* resolved;')] {
 		if _ := check(broken) { return error('malformed storage selftest accepted') }
 	}
@@ -114,5 +123,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission storage: twenty-six generated barrier/publisher/scheduler/initial-event/dependency helpers contain no temporary allocations')
+	println('G13 submission storage: thirty generated barrier/publisher/scheduler/initial-event/dependency/admission helpers contain no temporary allocations')
 }

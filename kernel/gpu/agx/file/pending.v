@@ -34,6 +34,7 @@ mut:
 	manager             &gpu.GpuManager        = unsafe { nil }
 	dependencies        submission.SyncArray
 	dependencies_ready  bool
+	admitted            bool // scalar survives publication and immediate metadata retirement
 	initial_barriers    u32 // explicit index-zero dependencies, by subqueue
 	initial_events      gpu.G13InitialEvents
 	final_fence         &syncobj.DmaFence = unsafe { nil }
@@ -132,6 +133,14 @@ fn register_g13_pending(mut manager gpu.GpuManager, item &G13PendingSubmission) 
 	return manager.queue_g13_submission(jobs, item.command_count, enqueue_g13_pending, voidptr(item))
 }
 
+fn admit_g13_pending(mut manager gpu.GpuManager, item &G13PendingSubmission) bool {
+	mut jobs := [64]gpu.G13SubmissionJob{}
+	for index := u32(0); index < item.command_count; index++ {
+		jobs[index] = gpu.G13SubmissionJob{ render: item.commands[index].render_job, compute: item.commands[index].compute_job }
+	}
+	return manager.g13_batch_ready(jobs, item.command_count)
+}
+
 // Called under manager.lock while the ioctl still holds file.lock.
 fn enqueue_g13_pending(data voidptr) {
 	mut item := unsafe { &G13PendingSubmission(data) }
@@ -196,6 +205,19 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 			katomic.load(&item.failure)
 		})
 		return katomic.load(&item.callbacks_remaining) != 0
+	}
+	if !item.admitted {
+		if !admit_g13_pending(mut manager, item) {
+			// Shutdown can finish every callback during this final readiness
+			// check. Release caller-owned metadata before the node can retire.
+			_ = katomic.load(&item.callbacks_remaining)
+			if manager.state != .running {
+				cancel_g13_pending(mut item, -19)
+				return katomic.load(&item.callbacks_remaining) != 0
+			}
+			return true
+		}
+		item.admitted = true
 	}
 	mut blocked := [2]bool{}
 	for index := u32(0); index < item.command_count; index++ {

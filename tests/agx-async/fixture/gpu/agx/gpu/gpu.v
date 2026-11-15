@@ -29,6 +29,8 @@ pub mut:
 	released    bool
 	quarantined bool
 	initial_events [2]G13InitialEvent
+	admission_slots [3]u32 = [u32(127), 127, 127]!
+	admission_space [3]u32 = [u32(1279), 1279, 1279]!
 }
 
 pub struct ComputeValues {
@@ -117,6 +119,8 @@ pub mut:
 	immediate_complete    bool
 	stop_after_callback   bool
 	on_publish            fn () = unsafe { nil }
+	on_admit              fn () = unsafe { nil }
+	admissions            int
 }
 
 __global test_async_gpu_manager GpuManager

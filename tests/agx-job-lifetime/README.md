@@ -52,3 +52,16 @@ unused pipes and snapshot release after the owning manager's event reset.
 Two-source tests omit the first record, wait for the second, compact to one
 record while retaining two pins, and preserve both through flush retry and
 quarantine. All 128 physical slots return after cleanup.
+
+Batch admission runs the production preflight, ring helper and event windows.
+With 63 older publications and 64 prepared commands on the same pipe, no new
+command is admitted until an actual host reaper returns capacity. Raw GPU
+progress is insufficient. Mixed-batch tests check strict ring equality on all
+three pipes, zero/one/two prefixes, initial-prefix compaction and flush retry,
+TVB first binding and growth without changing live binding state, physical queue
+identity, invalid tickets and corrupt logical counters. Ownership and all 128
+physical slots return through the real cleanup paths.
+Canceled-predecessor tests admit two events after 125 stamp gaps on both compute
+and render, then publish and reap both without an intermediate retirement. An
+unused grant is cleared on canceled-ticket reuse; ordinary publication retains
+the strict single-event spare check.

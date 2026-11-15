@@ -278,13 +278,53 @@ fn check_event_admission_contract(local string, reference string) ! {
 	require_order(release, ['if ticket.published != submitted',
 		'if submitted && i32(value - queue.completed_value) > 0 { queue.completed_value = value }',
 		'ticket.active = false', 'queue.users--'], 'Vinix monotonic host event completion')!
-	can := section(local, 'pub fn (queue &WorkQueueEvents) can_publish(', '// Call only after the ring publication', 'Vinix event publication')!
-	require_order(can, ['queue.users == 0', 'i32(queue.published_value - queue.completed_value) >> 8', 'busy >= 126',
-		'return false', 'for ticket in queue.tickets', 'ticket.published', 'return found'], 'Vinix event publication spare')!
-	require(!can.contains('stamp_value_completed') && !can.contains('gpu_event_mgr'), 'Raw GPU progress must not grant host event capacity')!
+	capacity := section(local, 'pub fn (queue &WorkQueueEvents) can_submit(', '// Call only after the ring publication', 'Vinix event publication')!
+	require_order(capacity, ['queue.users == 0', 'i32(queue.published_value - queue.completed_value) >> 8',
+		'if busy >= 127 { i32(0) } else { i32(127) - busy }', 'return u32(free_slots) > count',
+		'pub fn (mut queue WorkQueueEvents) admit(', '!queue.owns_slot(slot)',
+		'ticket.active && ticket.value == value && !ticket.published', 'ticket.admitted = true',
+		'pub fn (queue &WorkQueueEvents) can_publish(', 'queue.slot != slot',
+		'for ticket in queue.tickets', 'ticket.published', 'admitted = ticket.admitted',
+		'return found && (admitted || queue.can_submit(1))'], 'Vinix event publication spare')!
+	require(!capacity.contains('stamp_value_completed') && !capacity.contains('gpu_event_mgr'), 'Raw GPU progress must not grant host event capacity')!
 	publish := local.all_after('pub fn (mut queue WorkQueueEvents) publish(')
 	require_order(publish, ['queue.can_publish(slot, value)', 'ticket.published = true',
-		'queue.published_value = value'], 'Vinix successful event publication')!
+		'ticket.admitted = false', 'queue.published_value = value'], 'Vinix successful event publication')!
+}
+
+fn check_batch_admission_contract(local string, pending string, reference string) ! {
+	require_order(reference, ['fn prepare(', 'sj_vtx', 'can_submit()', 'sj_frag', 'can_submit()',
+		'sj_comp', 'can_submit()'], 'Asahi whole-batch readiness')!
+	require_order(local, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+		'count == 0 || count > 64', 'mut events := [3]u32{}', 'mut commands := [3]u32{}',
+		'index < count', 'voidptr(queue) != voidptr(owner)',
+		'.events.ticket(job.event_slot, job.stamp_value)', 'resolve_g13_initial_barriers_locked',
+		'events[2]++', 'commands[2] += 1 + job.explicit_barriers.count',
+		'.events.ticket(job.vertex_event_slot, job.vertex_stamp_value)',
+		'.events.ticket(job.fragment_event_slot, job.fragment_stamp_value)',
+		'resolve_g13_initial_barriers_locked', 'block_count := u32(job.tvb_size_bytes / fw.g13_tvb_block_size)',
+		'include_init := needs_bind || bound_blocks < block_count',
+		'commands[0] += job.explicit_barriers.count + if include_init { u32(2) } else { u32(1) }',
+		'commands[1] += 2', 'events[0]++', 'events[1]++', 'needs_bind = false', 'bound_blocks = block_count',
+		'for pipe in 0 .. 3', 'events[pipe] == 0', '.events.can_submit(events[pipe])',
+		'g13_ring_has_space_locked(queue.subqueues[pipe].command_sequence,',
+		'queue.subqueues[pipe].retired_sequence, commands[pipe])',
+		'for index := u32(0); index < count; index++',
+		'.events.admit(source.compute.event_slot, source.compute.stamp_value)',
+		'.events.admit(source.render.vertex_event_slot, source.render.vertex_stamp_value)',
+		'.events.admit(source.render.fragment_event_slot, source.render.fragment_stamp_value)'], 'Vinix whole-batch readiness')!
+	for mutation in ['.submitted =', '.events.publish(', '.command_sequence +=', '.render_buffer.needs_bind =',
+		'.render_buffer.bound_blocks ='] {
+		require(!local.contains(mutation), 'Batch preflight must not publish or change live binding: ' + mutation)!
+	}
+	helper := section(pending, 'fn admit_g13_pending(', '// Called under manager.lock', 'Vinix borrowed batch references')!
+	require_order(helper, ['mut jobs := [64]gpu.G13SubmissionJob{}', 'index < item.command_count',
+		'manager.g13_batch_ready(jobs, item.command_count)'], 'Vinix borrowed batch references')!
+	poll := section(pending, 'fn poll_g13_pending(', '// Only the worker changes these pointers.', 'Vinix batch admission scheduling')!
+	require_order(poll, ['g13_dependencies_ready(', 'failure := g13_pending_error(item)', 'if !item.admitted',
+		'if !admit_g13_pending(mut manager, item)', '_ = katomic.load(&item.callbacks_remaining)',
+		'if manager.state != .running', 'cancel_g13_pending(mut item, -19)',
+		'item.admitted = true', 'mut blocked := [2]bool{}', 'manager.submit_g13_compute_job('], 'Vinix batch admission scheduling')!
 }
 
 fn check_ring_admission_contract(local string, reference string) ! {
@@ -386,6 +426,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_submission_pipelining(pending)!
 	check_ring_admission_contract(local, workqueue)!
 	check_event_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, workqueue)!
+	check_batch_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_admission.v'))!, pending, queue)!
 	check_input_dependency_contract(pending)!
 	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
 		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit)!
@@ -524,7 +565,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',
 		'Compute and paired render admission count host-unretired ring commands and preserve the reference spare entry',
-		'Single-event publication preserves the reference spare window and advances only through monotonic host retirement',
+		'Whole-batch readiness counts all three pipes before publication, including compacted prefixes and simulated TVB bind/growth records; event and ring windows retain the reference spare',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
 		'Independent later submissions pipeline after older publication with initial firmware dependencies',

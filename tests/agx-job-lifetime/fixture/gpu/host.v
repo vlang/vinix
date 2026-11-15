@@ -23,6 +23,7 @@ fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
 
 enum State {
 	running
+	error
 	stopped
 }
 
@@ -57,6 +58,7 @@ mut:
 	slot_token_valid bool
 	active_scenes    u32
 	needs_bind       bool
+	bound_blocks     u32
 	blocks []&mmu.UatBuffer
 	block_list &mmu.UatBuffer = unsafe { nil }
 	page_list &mmu.UatBuffer = unsafe { nil }
@@ -213,6 +215,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_batch_admission()
 	check_initial_barrier_lifetimes()
 	check_initial_cancellation_fallback()
 	check_initial_acceptance_and_reset()
