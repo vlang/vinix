@@ -19,10 +19,10 @@ fn test_binary_wait_guard_rejects_snapshot_and_flag_regressions() {
 		'do {\nfence = entries[i].fence;\ndma_fence_is_signaled(fence);\n* drm_timeout_abs_to_jiffies'
 	check_binary_wait_contract(local, reference)!
 	for token in ['if request.count_handles == 0 { return 0 }', 'usercopy.copy_from_user(',
-		'if fences[i] == unsafe { nil } {', 'sched.reschedule()'] {
+		'syncobj.captured_fence(', 'syncobj.release_capture(', 'sched.reschedule()'] {
 		if _ := check_binary_wait_contract(local.replace(token, ''), reference) { assert false, token }
 	}
 	if _ := check_binary_wait_contract(local.replace('known_flags :=', 'known_flags := ioctl.drm_syncobj_wait_available |'), reference) { assert false }
-	if _ := check_binary_wait_contract(local.replace('syncobj.is_signaled(fences[i])', 'syncobj.is_signaled(obj.fence)'), reference) { assert false }
+	if _ := check_binary_wait_contract(local.replace('syncobj.is_signaled(fence)', 'syncobj.is_signaled(obj.fence)'), reference) { assert false }
 	if _ := check_binary_wait_contract(local, reference.replace('fence = entries[i].fence;', '')) { assert false }
 }

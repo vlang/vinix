@@ -12,13 +12,14 @@ fn check_binary_wait_contract(local string, reference string) ! {
 		&& flags.contains('ioctl.drm_syncobj_wait_deadline') && !flags.contains('ioctl.drm_syncobj_wait_available'),
 		'Binary waits must reject the timeline-only availability flag')!
 	require_order(wait, ['if request.count_handles == 0 { return 0 }', 'usercopy.copy_from_user(',
-		'objects[i] = syncobj.lookup(', 'return -2', 'fences[i] = syncobj.get_fence(objects[i])',
-		'if request.flags & ioctl.drm_syncobj_wait_for_submit == 0 { return -22 }',
-		'for {', 'if fences[i] == unsafe { nil } {', 'fences[i] = syncobj.get_fence(objects[i])',
-		'syncobj.is_signaled(fences[i])', 'if ready {', 'request.timeout_nsec <= 0', 'sched.reschedule()'],
-		'Vinix upfront snapshots and empty-only fence capture')!
+		'objects[i] = syncobj.lookup(', 'return -2', 'defer {', 'syncobj.release_capture(',
+		'if !syncobj.prepare_capture(', 'request.flags & ioctl.drm_syncobj_wait_for_submit != 0',
+		'return -22', 'for {', 'syncobj.captured_fence(', 'syncobj.is_signaled(fence)',
+		'if ready {', 'request.timeout_nsec <= 0', 'sched.reschedule()'],
+		'Vinix upfront snapshots, submission capture and deferred detachment')!
 	require(wait.count('usercopy.copy_from_user(') == 1 && !wait.contains('usercopy.read_u32(')
-		&& !wait.contains('obj.fence'), 'Waiting must not reread user handles or unlocked object fences')!
+		&& !wait.contains('obj.fence') && !wait.contains('syncobj.get_fence('),
+		'Waiting must not reread user handles or current object fences')!
 	ref_create := section(reference, 'int drm_syncobj_create(', 'EXPORT_SYMBOL(drm_syncobj_create)', 'Linux syncobj creation')!
 	require_order(ref_create, ['kzalloc_obj(struct drm_syncobj)', 'if (flags & DRM_SYNCOBJ_CREATE_SIGNALED)',
 		'drm_syncobj_assign_null_handle(syncobj)', 'if (fence)', 'drm_syncobj_replace_fence(syncobj, fence)'], 'Linux empty versus signaled creation')!

@@ -441,6 +441,10 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_wait_capture_contract(read(os.join_path(repo, 'kernel/drm/drm.v'))!,
+		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
+		read(os.join_path(repo, 'kernel/drm/syncobj/capture.v'))!,
+		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!)!
 	check_binary_wait_contract(read(os.join_path(repo, 'kernel/drm/drm.v'))!,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!)!
 	check_fence_completion_contract(read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
@@ -647,6 +651,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 LOW/MEDIUM admission, reversed firmware bands, default compute priority and retained failed-create VM ownership',
 		'First fence completion preserves its status and callbacks across later completion attempts',
 		'Binary syncobj waits retain captured object/fence snapshots, validate all inputs and follow empty objects only with WAIT_FOR_SUBMIT',
+		'Empty binary waits capture the first publication under the object lock, detach borrowed nodes on every exit and honor unmasked signals/thread exit',
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Signaled input dependencies release waits without propagating input errno; own GPU failures remain separate',
 		'Per-user-queue scheduler fence elision uses immutable, non-reused private scalar identities',

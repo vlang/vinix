@@ -16,6 +16,7 @@ import drm.gem
 import drm.ioctl
 import drm.syncobj
 import sched
+import proc
 import memory
 import memory.mmap
 import usercopy
@@ -1034,27 +1035,28 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 	// Retained syncobj/fence metadata keeps these synchronous snapshots valid
 	// even if another thread replaces a fence or destroys/reuses its handle.
 	mut objects := unsafe { [64]&syncobj.SyncObj{} }
-	mut fences := unsafe { [64]&syncobj.DmaFence{} }
+	mut captures := [64]syncobj.FenceCapture{}
 	for i := u32(0); i < request.count_handles; i++ {
 		objects[i] = syncobj.lookup(u64(handle), handles[i]) or { return -2 }
 	}
-	for i := u32(0); i < request.count_handles; i++ {
-		fences[i] = syncobj.get_fence(objects[i]) or {
-			if request.flags & ioctl.drm_syncobj_wait_for_submit == 0 { return -22 }
-			unsafe { nil }
+	// Every prepared entry is detached before this synchronous ioctl unwinds,
+	// including validation failures, timeout, signal interruption and success.
+	defer {
+		for i := u32(0); i < request.count_handles; i++ {
+			syncobj.release_capture(unsafe { &captures[i] })
 		}
+	}
+	for i := u32(0); i < request.count_handles; i++ {
+		if !syncobj.prepare_capture(objects[i], unsafe { &captures[i] },
+			request.flags & ioctl.drm_syncobj_wait_for_submit != 0) { return -22 }
 	}
 	wait_all := request.flags & ioctl.drm_syncobj_wait_all != 0
 	for {
 		mut ready_count := u32(0)
 		mut first := u32(0)
 		for i := u32(0); i < request.count_handles; i++ {
-			// WAIT_FOR_SUBMIT follows only an empty object until its first
-			// fence arrives. Once captured, replacements cannot redirect it.
-			if fences[i] == unsafe { nil } {
-				fences[i] = syncobj.get_fence(objects[i]) or { continue }
-			}
-			if syncobj.is_signaled(fences[i]) {
+			fence := syncobj.captured_fence(unsafe { &captures[i] }) or { continue }
+			if syncobj.is_signaled(fence) {
 				if ready_count == 0 { first = i }
 				ready_count++
 			}
@@ -1067,6 +1069,10 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 		now := syncobj.now_ns()
 		if request.timeout_nsec <= 0 || u64(request.timeout_nsec) <= now {
 			return -62 // ETIME
+		}
+		waiting_thread := proc.current_thread()
+		if katomic.load(&waiting_thread.must_exit) || proc.pending_signals(waiting_thread) & ~waiting_thread.masked_signals != 0 {
+			return -proc.interrupted_errno
 		}
 		// Also yield while waiting for submission into an empty object.
 		sched.reschedule()

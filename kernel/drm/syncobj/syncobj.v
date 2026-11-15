@@ -42,6 +42,7 @@ pub mut:
 mut:
 	owner           u64
 	timeline_points []TimelinePoint
+	pending_captures &FenceCapture = unsafe { nil }
 }
 
 const syncobj_max_objects = u32(1024)
@@ -291,6 +292,7 @@ pub fn replace_fence(obj &SyncObj, fence &DmaFence) {
 	mut o := unsafe { obj }
 	o.lock.acquire()
 	o.fence = unsafe { fence }
+	o.publish_captures_locked(fence)
 	o.lock.release()
 }
 

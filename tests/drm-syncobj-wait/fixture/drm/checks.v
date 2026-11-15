@@ -6,6 +6,7 @@ import drm.ioctl
 import drm.syncobj
 import sched
 import usercopy
+import proc
 
 __global wait_fixture_objects [32]&syncobj.SyncObj
 __global wait_fixture_fences [32]&syncobj.DmaFence
@@ -67,6 +68,22 @@ fn scripted(step u32) {
 			if step == 1 { syncobj.signal(wait_fixture_original) }
 			if step == 3 { syncobj.signal_error(wait_fixture_replacement, -5) }
 		}
+		7 {
+			if step == 1 {
+				syncobj.replace_fence(wait_fixture_target, wait_fixture_original)
+				syncobj.replace_fence(wait_fixture_target, unsafe { nil })
+				syncobj.signal(wait_fixture_replacement)
+				syncobj.replace_fence(wait_fixture_target, wait_fixture_replacement)
+			}
+			if step == 2 { syncobj.signal(wait_fixture_original) }
+		}
+		8 { if step == 1 { proc.private_signal(false) } }
+		9 { if step == 1 { proc.shared_signal() } }
+		10 { if step == 1 { proc.exit_thread() } }
+		11 {
+			if step == 1 { proc.private_signal(true) }
+			if step == 2 { syncobj.signal(wait_fixture_original) }
+		}
 		else {}
 	}
 }
@@ -78,6 +95,7 @@ fn check(mut handles [2]u32, count u32, flags u32, timeout i64, expected int) u3
 		first_signaled: 123, pad: 77, deadline_nsec: ~u64(0) }
 	wait_fixture_waits++
 	assert ioctl_syncobj_wait(voidptr(11), &request) == expected
+	for index in 0 .. wait_fixture_object_count { syncobj.assert_no_captures_for_checks(wait_fixture_objects[index]) }
 	if expected != 0 { assert request.first_signaled == 123 }
 	assert usercopy.reads == if count == 0 || flags & ioctl.drm_syncobj_wait_available != 0 { 0 } else { 1 }
 	return request.first_signaled
@@ -100,7 +118,9 @@ fn clear() {
 }
 
 pub fn run_wait_checks() {
+	syncobj.run_capture_checks()
 	for _ in 0 .. 200 {
+		proc.reset()
 		sched.reset(unsafe { nil })
 		empty := make_object(0)
 		if _ := syncobj.get_fence(empty) { assert false, 'unsignaled creation must start empty' }
@@ -151,6 +171,7 @@ pub fn run_wait_checks() {
 				first_signaled: 123 }
 			sched.reset(scripted)
 			result := ioctl_syncobj_wait(voidptr(11), &request)
+			for index in 0 .. wait_fixture_object_count { syncobj.assert_no_captures_for_checks(wait_fixture_objects[index]) }
 			wait_fixture_waits++
 			assert result == if scenario == 2 { -62 } else { 0 }
 			assert sched.polls == match scenario { 2 { u32(5) } 3 { u32(3) } else { u32(2) } }
@@ -167,6 +188,37 @@ pub fn run_wait_checks() {
 		assert sched.polls == 3
 		sched.reset(unsafe { nil })
 		check(mut handles, 2, 0, 1, 0) // readiness wins over expired absolute timeout
+		for scenario in 7 .. 12 {
+			proc.reset()
+			wait_fixture_mode = scenario
+			wait_fixture_target = make_object(0)
+			wait_fixture_original = make_fence(); wait_fixture_replacement = make_fence()
+			if scenario == 11 { syncobj.replace_fence(wait_fixture_target, wait_fixture_original) }
+			handles = [wait_fixture_target.handle, wait_fixture_target.handle]!
+			sched.reset(scripted)
+			expected := if scenario in [8, 9, 10] { -512 } else { 0 }
+			check(mut handles, 2, ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit, 6000, expected)
+			assert sched.polls == if expected == 0 { u32(2) } else { u32(1) }
+			// Publication after cleanup must not touch the returned wait's stack.
+			syncobj.replace_fence(wait_fixture_target, wait_fixture_replacement)
+		}
+		proc.reset(); sched.reset(unsafe { nil })
+		proc.private_signal(false)
+		handles = [done.handle, done.handle]!
+		check(mut handles, 1, 0, 6000, 0) // completion precedes pending signal
+		handles[0] = empty.handle
+		check(mut handles, 1, ioctl.drm_syncobj_wait_for_submit, 0, -62) // timeout precedes signal
+		check(mut handles, 1, ioctl.drm_syncobj_wait_for_submit, 6000, -512)
+		assert sched.polls == 0
+		proc.reset(); proc.shared_signal()
+		handles[0] = pending.handle
+		check(mut handles, 1, 0, 6000, -512) // an existing pending fence is interruptible too
+		proc.reset(); proc.private_signal(true)
+		check(mut handles, 1, 0, 6000, -62) // masked signals do not abort a pending wait
+		proc.reset(); proc.exit_thread()
+		handles[0] = done.handle
+		check(mut handles, 1, 0, 6000, 0) // completion also wins over must_exit
+		proc.reset()
 		clear()
 	}
 	println('DRM binary waits: ${wait_fixture_waits} checks across 200 cycles; empty/signaled creation, stable fence/object/user-handle snapshots, submission capture, WAIT_ANY/ALL, errors, deadlines, flags and copy faults passed')
