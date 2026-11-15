@@ -4577,3 +4577,61 @@ remain open, as do default activation, owned ARM/GUI and broader section 14
 acceptance. Original distribution/notices, compiler/toolchain and qualified
 kernel bundles remain independently required. Historical bundles and their
 original verifiers are unchanged; no kernel or product default is changed.
+
+## Captured linker inputs and identical replay (2026-11-15)
+
+Commit `ddf560030` adds [linker capture/replay admission](wine-link-inputs-check.md)
+to bridge, guest and package production. Clang selects the pinned absolute LLD
+path and requests a reproducer archive. The archive retains response/version
+records, transient compiler objects, startup objects and complete archives,
+including cross-toolchain musl/startup files outside the supplied sysroot.
+Existing source, observed C and complete selected header-tree checks remain.
+
+A bounded V USTAR validator checks checksums, data/numeric bounds, the complete
+zero end/padding region, safe relative names, duplicates, case aliases and
+file/directory conflicts. Links and extended records refuse. The response
+allowlist admits only the selected static ELF profile with relative operands,
+one output and one chroot; plugin/unknown arguments refuse. Extracted canonical
+paths and hashes are checked before replay. The pinned linker replays the
+captured response in a fresh directory and must produce identical executable
+bytes. Linker bytes/version, archive/member hashes, commands, recorded namespace
+and output/replay hashes are bound in final admission. Unsupported quoted or
+space-containing path spellings refuse in this profile.
+
+Native replay members/output join the before-boot generated map. Producer
+replay artifacts join its output map. Final producer/controller admission,
+native checks before/after boot, the independent producer checker and full
+retainer require the complete linker evidence. Copied graphs retain ordinary
+records/replay files and the original command namespace. Helper source is
+embedded and pinned; historical original-input checks are unchanged.
+
+Production/manual-free module controls pass, including archive/response
+corruption, traversal, duplicate/case aliases, parent-file conflicts, links,
+end-region failures and unsafe argument/output cases. Initial fixture compile
+refusals remain failed diagnostics. An early real link probe passes; final
+fresh PE/runtime and all three producer link replays pass with the hardened
+helper. The signed holder-death/collection run passes in 134.528 seconds with
+post-run linker proof checks; all 32 owned-receipt controls pass. Real and
+unchanged copied graphs pass full retention, and all thirty-four resealed
+mutations refuse at their named checks without retained output. Five new cases
+cover archive bindings, extracted response bytes, archive links, replay output
+and replay argv. Mutation writes detach private copies before changing data.
+
+The complete checkpoint is `/Users/alex/.cache/vwlinkinputs-20261115-01`, with
+isolated base `b5f0b1fa1`, final feature patch/revision, raw archives/extracted
+members/replayed binaries, exact fresh production/native evidence, all controls,
+observed C byte/mode snapshots and the selected resource-header copy. Its
+typed inventory receipt is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-link-inputs-20261115-01.inventory.json`,
+SHA-256 `4283909c652ee74c4f693331ff6c56c447d2eeb605dcf542a8ffad74afbc437e`.
+Complete typed-inventory recording and independent comparison pass against
+the retained checkpoint, preserving the stated captured-linker-input scope.
+
+This admits captured static linker file bytes and identical replay under the
+existing stable local-input contract. Complete compiler/linker dynamic-library
+closure, unreported inputs/search absence, host controller builds and full
+hermetic admission remain open, as do default activation, owned ARM/GUI,
+redistribution and broader section 14 acceptance. Original selected source,
+distribution/notices, compiler/header/sysroot/GCC/kernel bundles and historical
+complete artifacts/verifiers remain independently required. No kernel or
+product default is changed.
