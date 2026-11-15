@@ -256,6 +256,14 @@ fn (a &Api) text(statement voidptr, column int) !string {
 	return value
 }
 
+fn database_path(private_data_dir string) string {
+	// SQLite's NOFOLLOW checks every path component, including the intentional
+	// /proc/self/fd links. Use the canonical path whose ancestors were opened
+	// without following links and checked for ownership and protected modes.
+	// Only root or the selected application UID can rename those directories.
+	return private_data_dir + '/browser-cookies/snapshot.sqlite'
+}
+
 pub fn open(private_data_dir string) !&Store {
 	uid := u32(os.geteuid())
 	parent := open_data_directory(private_data_dir, uid)!
@@ -271,12 +279,7 @@ pub fn open(private_data_dir string) !&Store {
 	check_files(directory, uid, true)!
 	library, a := load_api()!
 	defer { if !ready { dl.close(library) } }
-	mut path := ''
-	$if linux {
-		path = '/proc/self/fd/${directory}/snapshot.sqlite'
-	} $else {
-		path = private_data_dir + '/browser-cookies/snapshot.sqlite'
-	}
+	path := database_path(private_data_dir)
 	defer { unsafe { path.free() } }
 	mut db := unsafe { nil }
 	// READWRITE | FULLMUTEX | NOFOLLOW. The file was securely precreated.

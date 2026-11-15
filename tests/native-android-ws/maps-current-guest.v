@@ -122,6 +122,10 @@ fn stage(parent string, framework string, native string, root string) ! {
 		inputs[relative] = json2.Any(sha256.sum(os.read_bytes(boot)!).hex())
 		deployment['inputs_sha256'] = json2.Any(inputs)
 	}
+	if engine := os.getenv_opt('VINIX_CURRENT_BROWSER_ENGINE') {
+		media.stage_browser_engine(engine, root + '/boot.img', root + '/payload', root + '/browser-engine-baseline', mut inputs, mut deployment)!
+		deployment['inputs_sha256'] = json2.Any(inputs)
+	}
 	os.mkdir_all(root + '/payload/opt/vinix-maps-account')!
 	os.write_file(root + '/payload/opt/vinix-maps-account/build.json', json2.encode(deployment))!
 	if fixture := os.getenv_opt('VINIX_CURRENT_API_FIXTURE') {

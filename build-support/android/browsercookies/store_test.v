@@ -7,7 +7,8 @@ import os
 #include <sys/wait.h>
 
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+@[c: 'mkfifo']
+fn C.browser_cookie_test_mkfifo(&char, u32) i32
 
 struct C.flock {
 mut:
@@ -109,6 +110,24 @@ fn test_real_sqlite_atomic_replace_reopen_session_and_exact_attributes() {
 	reopened.replace([sample('new')])!
 	expect_snapshot(mut reopened, [sample('new')])
 	dispose(mut store)!
+}
+
+fn test_sqlite_nofollow_requires_the_checked_canonical_database_path() {
+	path := fixture('canonical-open')
+	defer { os.rmdir_all(path) or {} }
+	mut store := open(path)!
+	defer { dispose(mut store) or { panic(err) } }
+	assert database_path(path) == path + '/browser-cookies/snapshot.sqlite'
+	store.replace([sample('persisted')])!
+	// Reproduce the proc-fd problem with an explicit directory symlink on
+	// every host platform: SQLite refuses symlinks in ancestor components.
+	os.symlink(path + '/browser-cookies', path + '/alias')!
+	mut db := unsafe { nil }
+	alias := path + '/alias/snapshot.sqlite'
+	status := unsafe { store.api.open_v2(alias.str, &db, 0x00000002 | 0x00010000 | 0x01000000, nil) }
+	if db != unsafe { nil } { store.api.close(db) }
+	assert status != sqlite_ok
+	expect_snapshot(mut store, [sample('persisted')])
 }
 
 fn test_empty_snapshot_durably_clears_every_cookie() {
@@ -357,7 +376,7 @@ fn test_database_and_sidecar_links_and_special_files_are_rejected() {
 			} else if attack == 'hardlink' {
 				assert unsafe { C.link(target.str, file.str) } == 0
 			} else if attack == 'fifo' {
-				assert unsafe { C.mkfifo(file.str, u32(0o600)) } == 0
+				assert unsafe { C.browser_cookie_test_mkfifo(file.str, u32(0o600)) } == 0
 			} else {
 				os.write_file(file, '')!
 				os.chmod(file, 0o644)!

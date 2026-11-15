@@ -36,9 +36,11 @@ The retained r109 log identified an earlier X11 admission error; the
 focused host/ASan tests, AArch64 build and r110 ARM validation. Real account
 setup passed display admission and identified the next engine failure: SQLite
 cannot open the cookie snapshot through its proc-fd alias with OPEN_NOFOLLOW.
-The canonical-path fix passes 15 host and ASan cookie-store cases; rebuilding
-the engine is in progress under the original caps. Complete r107–r110
-public/private evidence is preserved, and those guests are stopped.
+The [canonical-path fix](maps-cookie-snapshot-20261115.md) passes 15 host and
+ASan cookie-store cases. Its current-V engine build is blocked by shared disk
+writes under the original caps; three read-only probes exceeded their growth
+allowance in 1.5–2.2 seconds. Updated build and staging tooling is retained.
+Complete r107–r110 public/private evidence is preserved, and those guests are stopped.
 Authentication and full Maps operation remain unqualified.
 
 Earlier continuation, 2026-11-14: the [bitmap buffer adapter](maps-bitmap-buffers-20261114.md)
