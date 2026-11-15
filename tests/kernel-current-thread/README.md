@@ -63,3 +63,38 @@ records the fault and paused guest. The regression demonstrates a race
 capable of producing the observed null pointer; it does not prove that this
 was the only cause of that guest's fault. A full bounded kernel build and
 fresh guest validation remain required before claiming the crash resolved.
+
+## Follow-up compiler profiling
+
+The accessor fix remains committed as 4ab3de1c4. Direct current-V generation
+of the isolated kernel's 205,043 parsed lines reached the checking boundary
+at about 414 MB RSS, then exceeded the retained 600 MiB aggregate cap during
+reachability (`markused`), before emitting C. This is earlier than
+monomorphization; the initial progress update used the wrong stage name.
+Checking all library bodies and retaining unused functions also exceeded
+the same cap. These were distinct compiler-strategy probes, with no limit
+increase and no kernel image modification.
+
+All evidence below is beneath `/Users/alex/.local/state/vinix/android/`;
+each receipt retains the exact command and original limits.
+
+| Guard receipt | Result / sampled peak RSS | SHA256 |
+| --- | --- | --- |
+| maps-thread-kernel-profile-20261115-r1.guard.json | RSS guard, 697,958,400 bytes | 12fe97e563c83ff0f8d08aae28b5084e9a5b85d1c001ce672d5edab7c933bf20 |
+| maps-thread-kernel-all-bodies-20261115-r1.guard.json | RSS guard, 643,547,136 bytes | 60db079f7f3dc3721160effbfcf22622d1795780bc62e5eaa49fd38267b23d48 |
+| maps-thread-kernel-retain-20261115-r1.guard.json | RSS guard, 651,657,216 bytes | cc952db535d7e8f8e006e4e422bba0f729f8143864df5e85a97189226a02d102 |
+
+All three guards completed cleanup. A read-only feasibility probe of the
+unchanged deployed kernel source also failed current-V checks, including
+deprecated `usize` spellings, before generation. Its source and historical
+bundle were not modified; no old compiler was selected. The receipt
+`maps-deployed-kernel-profile-20261115-r1.guard.json` has exit/child 1/1,
+complete cleanup and SHA256
+6024489c36df66b6dbde008019979bb4318dfb1fc2fcc7a9c4a8722e85f8ab1c.
+
+The next proposed attempt uses the already isolated, fixed current kernel
+and current V with a kernel-only 2 GiB aggregate RSS ceiling, retaining the
+300-second deadline, 512 MiB shared growth cap, 1 GiB reserve and 4 MiB
+output cap. This larger ceiling has not been applied. SDK and focused-check
+limits remain unchanged. The r112 guest remains paused, with RAM preserved
+and complete private export unresolved; it has not validated the fix.
