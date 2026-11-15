@@ -113,3 +113,21 @@ staging these exact qualified host artifacts in a fresh guest after restoring
 space and a quiet disk window, then run the signed suite before a protected
 account attempt. Source/compiler requirements remain current V, without a
 historical compiler pin.
+
+## r107 signed ARM qualification
+
+After space recovered, the retained SDK/native/fixture artifacts matched their
+recorded checksums and fresh full-profile staging passed under the original
+caps. The complete signed ARM suite passed with child exit 0. Its log contains
+REVEAL-HINT-PASS and CURRENT-API-PASS, including constructor defaults, inherited
+TextView methods, repeated toggles, independent state and no focus acquisition.
+The complete API export reconstructed without removals: 23863 bytes / 47 chunks.
+
+| ARM API evidence | SHA256 |
+| --- | --- |
+| maps-reveal-api-uart-20261115-r1/full.log | bb63dfb6db754e913fdd672df75640bf20ad3da87065be42653215de4b2bc54c |
+| maps-reveal-api-readback-20261115-r1/archive.json | 707746a751f57d6241a8f2374f1df84998ba86e0e073e8118e06df861009e535 |
+| maps-reveal-api-child-20261115-r1/child.log | dd94939d591e0232dd40a9caaf2051c1506d6f525d80377dd240fbf1d3aaccdd |
+
+The real protected account retry is pending in r107. No full Maps or Google
+authentication claim follows from the API qualification.
