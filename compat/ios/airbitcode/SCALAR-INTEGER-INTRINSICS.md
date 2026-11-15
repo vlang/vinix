@@ -95,9 +95,9 @@ step, two lane counts of profiling work and one shared construction slot.
 The existing 4,096-result and 1,000,000-work limits apply.
 
 Population count occupies shared vector declaration-cache slots 640..1663,
-one per width/count pair. The cache now has 2,752 stack entries: 640 floating
-identities, 1,024 population-count identities, 1,024 bit-reversal identities
-and 64 byte-swap identities.
+one per width/count pair. The cache now has 3,776 stack entries: 640 floating
+identities, 1,024 population-count identities, 1,024 bit-reversal identities,
+64 byte-swap identities and 1,024 leading-zero identities.
 Declaration attributes are checked once per identity;
 duplicate reserved declarations reject. Unary integer calls reject return/
 parameter attributes, including `immarg`. The normal production lane path
@@ -153,7 +153,7 @@ heap has not been measured.
 the standard-library 64-bit reverser shifted to the declared width, independently
 of the production shift loop. It additionally checks 705,024 reversal
 involutions, 104,448 lane-state cases, high-bit masking, snapshots and guards.
-The shared cache unit covers all 2,752 identities.
+The shared cache unit covers all 3,776 identities.
 
 `tests/ios/air-vector-bitreverse.v LLVM_AS FRESH_EXTERNAL_DIR` checks every
 width/count through 25,600 decoded shapes and 3,347,424 exact native LLVM
@@ -189,8 +189,8 @@ vectors, vector arguments/returns/loads/stores/PHIs and AIR aliases reject.
 standard-library 64-bit byte reverser shifted to the declared width, plus
 52,224 involutions and 6,528 lane-state checks. It exhausts i16 and checks wide
 patterns, individual set/clear bits, high-bit noise, snapshots and guards.
-The shared cache unit covers all 2,752 identities. Older integer-vector units
-replace their unsupported-byte-swap guards with unsupported leading-zero count
+The shared cache unit covers all 3,776 identities. Older integer-vector units
+replace their unsupported-byte-swap guards with unsupported trailing-zero count
 because byte swap is now admitted. Their positive value/state coverage remains.
 
 `tests/ios/air-vector-bswap.v LLVM_AS FRESH_EXTERNAL_DIR` checks 1,600 decoded
@@ -205,6 +205,10 @@ producer. A valid LLVM i80 byte swap in a cold block rejects before writes.
 The software Metal fixture adds 108 dispatches per runtime across 32 kernels,
 including deferred writes, sparse bindings, double swaps, guards and expected
 failures. Retained heap and GPU rendering are not qualified.
+
+Vector `llvm.ctlz` uses slots 2752..3775 and a call-local constant i1 poison
+flag. Its [leading-zero profile and qualification](SCALAR-ZERO-COUNTS.md#vector-leading-zero-count)
+describe immediate validation, defined-zero/poison behavior and supported APIs.
 
 References: [LLVM population count](https://llvm.org/docs/LangRef.html#llvm-ctpop-intrinsic),
 [bit reversal](https://llvm.org/docs/LangRef.html#llvm-bitreverse-intrinsics),
