@@ -18,6 +18,7 @@ mut:
 	compute_job &gpu.G13ComputeJobResources = unsafe { nil }
 	render_job  &gpu.G13RenderJobResources  = unsafe { nil }
 	pipe        u32
+	initial_barriers u32
 	wait_for    [2]u32 // command position + 1; zero has no in-batch dependency
 	published   bool
 	done        bool
@@ -34,6 +35,7 @@ mut:
 	dependencies        submission.SyncArray
 	dependencies_ready  bool
 	initial_barriers    u32 // explicit index-zero dependencies, by subqueue
+	initial_events      gpu.G13InitialEvents
 	final_fence         &syncobj.DmaFence = unsafe { nil }
 	commands            [64]G13PendingCommand
 	command_count       u32
@@ -52,8 +54,8 @@ fn signal_g13_submission_fence(fence &syncobj.DmaFence, failure int) {
 }
 
 // Resolve subqueue-local barrier indices while the staged input is alive.
-// Index zero names prior submissions and retains a retirement guard; other
-// indices resolve to this batch's commands and installed firmware prefixes.
+// Index zero selects the captured prior subqueue event; other indices resolve
+// to this batch's commands and installed firmware prefixes.
 // Only integer positions survive; no staged payload or job pointer escapes.
 fn resolve_g13_batch_dependencies(mut item G13PendingSubmission, commands []submission.Command) bool {
 	if commands.len != int(item.command_count) { return false }
@@ -69,7 +71,11 @@ fn resolve_g13_batch_dependencies(mut item G13PendingSubmission, commands []subm
 		for pipe in 0 .. 2 {
 			barrier := commands[index].descriptor.barriers[pipe]
 			if barrier == ioctl.asahi_barrier_none { continue }
-			if barrier == 0 { item.initial_barriers |= u32(1) << pipe; continue }
+			if barrier == 0 {
+				item.initial_barriers |= u32(1) << pipe
+				entry.initial_barriers |= u32(1) << pipe
+				continue
+			}
 			if barrier > counts[pipe] { return false }
 			entry.wait_for[pipe] = positions[pipe][barrier - 1] + 1
 		}
@@ -99,7 +105,12 @@ fn install_g13_batch_barriers(mut item G13PendingSubmission) bool {
 		mut sources := [2]gpu.G13BarrierSource{}
 		for pipe in 0 .. 2 {
 			dependency := command.wait_for[pipe]
-			if dependency == 0 { continue }
+			if dependency == 0 {
+				if command.initial_barriers & (u32(1) << pipe) != 0 {
+					sources[pipe] = gpu.G13BarrierSource{ initial: item.initial_events.values[pipe] }
+				}
+				continue
+			}
 			prior := &item.commands[dependency - 1]
 			sources[pipe] = gpu.G13BarrierSource{ render: prior.render_job, compute: prior.compute_job }
 		}
@@ -111,6 +122,14 @@ fn install_g13_batch_barriers(mut item G13PendingSubmission) bool {
 		if !installed { return false }
 	}
 	return true
+}
+
+fn register_g13_pending(mut manager gpu.GpuManager, item &G13PendingSubmission) bool {
+	mut jobs := [64]gpu.G13SubmissionJob{}
+	for index := u32(0); index < item.command_count; index++ {
+		jobs[index] = gpu.G13SubmissionJob{ render: item.commands[index].render_job, compute: item.commands[index].compute_job }
+	}
+	return manager.queue_g13_submission(jobs, item.command_count, enqueue_g13_pending, voidptr(item))
 }
 
 // Called under manager.lock while the ioctl still holds file.lock.
@@ -160,8 +179,8 @@ fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
 // Explicit dependencies wait only for producer publication. Their installed
 // firmware prefixes wait for execution; CPU callback/reaper order must not
 // serialize GPU work. Unpublished producers still block dependent subqueues.
-// Across submissions, unpublished jobs retain FIFO order. Index-zero barriers
-// conservatively wait for earlier same-queue submissions to retire.
+// Across submissions, unpublished jobs retain FIFO order. Initial prefixes
+// resolve under the publication lock without waiting for CPU retirement.
 fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	mut manager := unsafe { item.manager }
 	if manager.state != .running {
@@ -287,7 +306,7 @@ fn process_pending_submissions() {
 				break
 			}
 		}
-		earlier := if gate >= 0 { unpublished[gate] || item.initial_barriers != 0 } else { blocked_count == 128 }
+		earlier := if gate >= 0 { unpublished[gate] } else { blocked_count == 128 }
 		if earlier || poll_g13_pending(mut item) {
 			if gate < 0 && blocked_count < 128 {
 				gate = int(blocked_count)

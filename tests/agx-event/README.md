@@ -13,3 +13,8 @@ The fixture also executes production `WorkQueueEvents` ownership. A batch of
 and the last owner releases it. Tests reject out-of-order/double publication,
 double release and a 128th outstanding ticket; they cover the bounded sequence
 window, cancellation rollback of both stamp and event sequence, and wrap.
+Initial-event selection also runs 1,000 cancellation/ABA/older-unpublished/
+slot-rollover/producer-retirement cycles. Host reservation identities never
+roll back with a canceled firmware value or sequence. Wrapped zero-valued
+targets remain valid. The selector excludes future reservations and blocks
+any unpublished reservation at or before its captured cutoff.

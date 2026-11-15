@@ -31,13 +31,31 @@ fn test_submission_pipelining_preserves_initial_guards_and_bounded_fifo() {
 	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
 	for broken in [pending.replace('item.initial_barriers |= u32(1) << pipe', ''),
-		pending.replace('unpublished[gate] || item.initial_barriers != 0', 'unpublished[gate]'),
+		pending.replace('if gate >= 0 { unpublished[gate] }', 'if gate >= 0 { unpublished[gate] || item.initial_barriers != 0 }'),
 		pending.replace('if gate < 0 && blocked_count < 128', 'if gate < 0'),
 		pending.replace('!g13_pending_dispatch_complete(item)', 'false'),
 		pending.replace('fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool {',
 			'fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool { _ = item.callbacks_remaining')] {
 		if _ := check_submission_pipelining(broken) { assert false, 'unsafe pipelining source contract accepted' }
 	}
+}
+
+fn test_initial_snapshot_contract_rejects_pin_identity_and_acceptance_regressions() {
+	repo := g13layout.repo_root()
+	initial := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_initial.v')!
+	barriers := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_barriers.v')!
+	workqueue := os.read_file('${repo}/kernel/gpu/agx/event/workqueue.v')!
+	manager := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
+	check_initial_snapshot_contract(initial, barriers, workqueue, manager)!
+	for broken in [initial.replace('value.valid && mgr.g13_events.initialized', 'value.valid'),
+		initial.replace('voidptr(queue) != voidptr(owner)', 'queue != owner'),
+		initial.replace('last.pipe != u32(pipe)', 'false'),
+		initial.replace('owner.subqueues[0].events.ticket', 'owner.subqueues[1].events.ticket')] {
+		if _ := check_initial_snapshot_contract(broken, barriers, workqueue, manager) { assert false }
+	}
+	if _ := check_initial_snapshot_contract(initial, barriers.replace('index < barriers.pin_count', 'index < barriers.count'), workqueue, manager) { assert false }
+	if _ := check_initial_snapshot_contract(initial, barriers, workqueue.replace('queue.serial++', 'queue.serial--'), manager) { assert false }
+	if _ := check_initial_snapshot_contract(initial, barriers, workqueue, manager.replace('mgr.accept_g13_submission_locked(jobs, count)', 'true')) { assert false }
 }
 
 fn test_integer_constant_accepts_v_casts_and_separators() {

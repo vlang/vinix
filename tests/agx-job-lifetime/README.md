@@ -41,3 +41,12 @@ including consumer callbacks before producer callbacks after both stamps advance
 each returns all 128 physical slots. The separate event fixture checks 1,000
 producer-owner/pin/reuse cycles and overflow/invalid-slot guards. These checks
 measure event ownership and injected backing, without native GPU execution.
+
+Initial-event tests run production acceptance/capture/resolve/release paths and
+the real event manager. They cover 140 lifecycle cycles, byte-exact fallback
+after canceled-target ABA, idle/retired sources, atomic rejection of an invalid
+vertex ticket, distinct queues with equal contents, partial capture overflow,
+unused pipes and snapshot release after the owning manager's event reset.
+Two-source tests omit the first record, wait for the second, compact to one
+record while retaining two pins, and preserve both through flush retry and
+quarantine. All 128 physical slots return after cleanup.

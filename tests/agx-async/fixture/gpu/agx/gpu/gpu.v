@@ -27,6 +27,7 @@ pub mut:
 	id          u32
 	released    bool
 	quarantined bool
+	initial_events [2]G13InitialEvent
 }
 
 pub struct ComputeValues {
@@ -57,6 +58,7 @@ pub mut:
 	marker      u64
 	ordinal     u32
 	barrier_sources [2]u32
+	initial_sources [2]u32
 	completion  fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
 	data        voidptr
 }
@@ -70,6 +72,7 @@ pub mut:
 	quarantined bool
 	ordinal     u32
 	barrier_sources [2]u32
+	initial_sources [2]u32
 	completion  fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
 	data        voidptr
 }
@@ -87,6 +90,7 @@ pub mut:
 	prepares              int
 	callbacks             int
 	barrier_setups        int
+	capture_pins          int
 	fail_barrier_at       int = -1
 	stop_barrier_at       int = -1
 	stop_publish_at       int = -1
@@ -184,6 +188,7 @@ pub struct G13BarrierSource {
 pub:
 	render &G13RenderJobResources = unsafe { nil }
 	compute &G13ComputeJobResources = unsafe { nil }
+	initial G13InitialEvent
 }
 
 fn (mut mgr GpuManager) stage_barrier_sources(queue &G13QueueResources, sources [2]G13BarrierSource) ?[2]u32 {
@@ -193,6 +198,11 @@ fn (mut mgr GpuManager) stage_barrier_sources(queue &G13QueueResources, sources 
 	if index == mgr.fail_barrier_at { return none }
 	mut result := [2]u32{}
 	for pipe, source in sources {
+		if source.initial.valid {
+			assert source.initial.queue == queue
+			assert source.initial.pipe == u32(pipe)
+			result[pipe] = source.initial.ordinal + 1
+		}
 		if source.render != unsafe { nil } {
 			assert pipe == 0 && source.render.queue == queue && !source.render.submitted && !source.render.released
 			result[pipe] = source.render.ordinal + 1
@@ -210,6 +220,7 @@ pub fn (mut mgr GpuManager) set_g13_compute_barriers(job &G13ComputeJobResources
 	if job.released || job.submitted || job.quarantined { return false }
 	values := mgr.stage_barrier_sources(job.queue, sources) or { return false }
 	unsafe { job.barrier_sources = values }
+	for pipe, source in sources { if source.initial.valid { unsafe { job.initial_sources[pipe] = source.initial.ordinal + 1 } } }
 	return true
 }
 
@@ -217,6 +228,7 @@ pub fn (mut mgr GpuManager) set_g13_render_barriers(job &G13RenderJobResources, 
 	if job.released || job.submitted || job.quarantined { return false }
 	values := mgr.stage_barrier_sources(job.queue, sources) or { return false }
 	unsafe { job.barrier_sources = values }
+	for pipe, source in sources { if source.initial.valid { unsafe { job.initial_sources[pipe] = source.initial.ordinal + 1 } } }
 	return true
 }
 
@@ -302,6 +314,8 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 		return false
 	}
 	assert !job.submitted && !job.released
+	resolved := mgr.resolve_initial_sources(job.queue, job.initial_sources, job.barrier_sources) or { return false }
+	unsafe { job.barrier_sources = resolved }
 	unsafe { job.submitted = true }
 	mgr.published << job.queue.id * 10 + 2
 	mgr.published_order << job.ordinal
@@ -329,6 +343,8 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 		return false
 	}
 	assert !job.submitted && !job.released
+	resolved := mgr.resolve_initial_sources(job.queue, job.initial_sources, job.barrier_sources) or { return false }
+	unsafe { job.barrier_sources = resolved }
 	unsafe { job.submitted = true }
 	mgr.published << job.queue.id * 10
 	mgr.published_order << job.ordinal

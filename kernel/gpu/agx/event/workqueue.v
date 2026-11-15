@@ -9,6 +9,7 @@ mut:
 	slot     u32
 	users    u32
 	sequence u64
+	serial   u64 // host identity never rolls back with a canceled stamp value
 	tickets  [127]PendingTicket
 }
 
@@ -16,6 +17,7 @@ struct PendingTicket {
 mut:
 	value     u32
 	sequence  u64
+	serial    u64
 	active    bool
 	published bool
 }
@@ -25,6 +27,7 @@ pub:
 	slot     u32
 	value    u32
 	sequence u64
+	serial   u64
 }
 
 pub fn (mut queue WorkQueueEvents) retain() ?Ticket {
@@ -50,9 +53,46 @@ pub fn (mut queue WorkQueueEvents) retain() ?Ticket {
 	if vacant < 0 { return none }
 	sequence := queue.sequence
 	queue.sequence++
-	queue.tickets[vacant] = PendingTicket{ value: value, sequence: sequence, active: true }
+	serial := queue.serial
+	queue.serial++
+	queue.tickets[vacant] = PendingTicket{ value: value, sequence: sequence, serial: serial, active: true }
 	queue.users++
-	return Ticket{ slot: queue.slot, value: value, sequence: sequence }
+	return Ticket{ slot: queue.slot, value: value, sequence: sequence, serial: serial }
+}
+
+pub enum InitialState { absent pending ready }
+
+pub fn (queue &WorkQueueEvents) owns_slot(slot u32) bool {
+	return queue.users != 0 && queue.slot == slot
+}
+
+pub fn (queue &WorkQueueEvents) ticket(slot u32, value u32) ?Ticket {
+	if !queue.owns_slot(slot) { return none }
+	for entry in queue.tickets {
+		if entry.active && entry.value == value {
+			return Ticket{ slot: slot, value: value, sequence: entry.sequence, serial: entry.serial }
+		}
+	}
+	return none
+}
+
+// Caller holds the manager lock and a physical-slot pin. A canceled reservation
+// may reuse its value/sequence, but never its host identity. Do not wait on a
+// future reservation or discard an older unpublished dependency.
+pub fn (queue &WorkQueueEvents) resolve_initial(captured Ticket) (InitialState, Ticket) {
+	if stamp_value_completed(captured.slot, captured.value) { return .ready, captured }
+	if !queue.owns_slot(captured.slot) { return .absent, Ticket{} }
+	mut found := false
+	mut latest := Ticket{}
+	for entry in queue.tickets {
+		if !entry.active || i64(entry.serial - captured.serial) > 0 { continue }
+		if !entry.published { return .pending, Ticket{} }
+		if !found || i64(entry.serial - latest.serial) > 0 {
+			latest = Ticket{ slot: queue.slot, value: entry.value, sequence: entry.sequence, serial: entry.serial }
+			found = true
+		}
+	}
+	return if found { InitialState.ready } else { InitialState.absent }, latest
 }
 
 pub fn (mut queue WorkQueueEvents) release(slot u32, value u32, submitted bool) bool {

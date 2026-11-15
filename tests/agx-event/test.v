@@ -3,6 +3,7 @@ import gpu.agx.event
 import drm.syncobj
 
 fn main() {
+	check_initial_events()
 	check_physical_stamp_pins()
 	mut driver := [128]u32{}
 	mut firmware := [128]u32{}
@@ -138,6 +139,64 @@ fn main() {
 	event.reset_event_manager()
 	println('AGX events: initial slot counters, 300 slot reuses, stale completion isolation, counter wrap and fence signaling passed')
 	println('AGX workqueue events: 64 shared tickets, independent retirement, final-owner release, tail rollback and wrap passed')
+}
+
+fn check_initial_events() {
+	mut driver := [128]u32{}
+	mut firmware := [128]u32{}
+	assert event.configure_event_manager(0x10000, unsafe { u64(&driver) }, 0x20000, unsafe { u64(&firmware) })
+	for _ in 0 .. 1000 {
+		mut queue := event.WorkQueueEvents{}
+		older := queue.retain() or { panic('older') }
+		captured := queue.retain() or { panic('captured') }
+		assert event.retain_stamp(captured.slot)
+		assert (queue.ticket(captured.slot, captured.value) or { panic('lookup') }).serial == captured.serial
+		assert queue.release(captured.slot, captured.value, false)
+		future := queue.retain() or { panic('ABA future') }
+		assert future.value == captured.value && future.sequence == captured.sequence
+		assert future.serial != captured.serial
+		state0, _ := queue.resolve_initial(captured)
+		assert state0 == .pending, 'an older unpublished reservation must block'
+		assert queue.publish(older.slot, older.value)
+		state1, target := queue.resolve_initial(captured)
+		assert state1 == .ready && target.serial == older.serial
+		assert target.value != future.value, 'never depend on a future reuse of the canceled value'
+		assert queue.release(future.slot, future.value, false)
+		driver[older.slot] = older.value
+		assert queue.release(older.slot, older.value, true)
+		state2, _ := queue.resolve_initial(captured)
+		assert state2 == .absent
+		new_owner := queue.retain() or { panic('slot rollover') }
+		assert new_owner.slot != captured.slot
+		state3, _ := queue.resolve_initial(captured)
+		assert state3 == .absent, 'do not borrow an event from the replacement physical slot'
+		assert queue.release(new_owner.slot, new_owner.value, false)
+		event.release_stamp(captured.slot)
+		mut complete := event.WorkQueueEvents{}
+		published := complete.retain() or { panic('published') }
+		assert event.retain_stamp(published.slot) && complete.publish(published.slot, published.value)
+		driver[published.slot] = published.value
+		assert complete.release(published.slot, published.value, true)
+		state4, original := complete.resolve_initial(published)
+		assert state4 == .ready && original.value == published.value
+		event.release_stamp(published.slot)
+	}
+	driver[0] = 0xffffff00
+	mut wrap := event.WorkQueueEvents{}
+	zero := wrap.retain() or { panic('wrapped initial value') }
+	assert zero.value == 0 && event.retain_stamp(zero.slot)
+	state5, _ := wrap.resolve_initial(zero)
+	assert state5 == .pending
+	assert wrap.publish(zero.slot, zero.value)
+	state6, _ := wrap.resolve_initial(zero)
+	assert state6 == .ready
+	driver[zero.slot] = 0
+	assert wrap.release(zero.slot, zero.value, true)
+	state7, _ := wrap.resolve_initial(zero)
+	assert state7 == .ready
+	event.release_stamp(zero.slot)
+	event.reset_event_manager()
+	println('AGX initial events: 1000 cancellation/ABA/older-unpublished/slot-rollover/producer-retirement cycles and wrapped zero targets passed')
 }
 
 fn check_physical_stamp_pins() {

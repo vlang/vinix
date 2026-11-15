@@ -40,12 +40,11 @@ backpressure holds only later commands on the same pipe. Overlap fixtures cover
 both completion orders, older barrier targets, blocked heads, independent ring
 backpressure, quarantine at publication, a fault with another job still running,
 four 64-command reverse-callback batches, shutdown and immediate callbacks.
-Later batches preserve publication FIFO; explicit index-zero dependencies still
-wait for prior same-queue retirement. Nonzero in-batch
+Later batches preserve publication FIFO; explicit index-zero dependencies use
+captured prior-subqueue events in firmware prefixes. Nonzero in-batch
 dependencies also configure firmware prefixes before callback registration.
 Every setup-failure and stop position is injected independently. Firmware prefixes
-wait for execution; the poller does not wait for producer CPU callbacks. Initial
-dependencies retain this conservative guard until firmware event capture is implemented.
+wait for execution; the poller does not wait for producer CPU callbacks.
 
 The injected firmware model separates execution from CPU retirement. Four complete
 64-command dependency chains must publish before any callback. Out-of-order execution
@@ -69,3 +68,10 @@ overlapping batches totaling 127 jobs, partial publication, a concurrent append,
 forged user fences, fault/stop, both index-zero bits, and a saturated 128-queue
 lookup with overflow deferral and resumption. Input sync dependencies and
 unpublished predecessors retain FIFO order. Firmware scheduling remains injected.
+
+Initial-event checks cover idle source subqueues, a dependency on only a later
+command in a batch, immutable targets despite newer accepted work, consumers
+executing and retiring before producer callbacks, canceled input dependencies,
+rejected ioctls preserving accepted markers, and capture cleanup on every setup
+failure/stop path. Actual event/pin/byte compaction behavior is covered by the
+event and lifetime fixtures; this fixture injects firmware execution.

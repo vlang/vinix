@@ -9,6 +9,8 @@ import gpu.agx.event
 import katomic
 import klock
 
+struct G13InitialEvent {}
+
 #include <stdio.h>
 #define kprintf printf
 

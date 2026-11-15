@@ -211,6 +211,32 @@ fn check_dependency_publication(poll string) ! {
 		'final_error := g13_pending_error(item)'], 'Vinix shutdown after callback acquisition')!
 }
 
+fn check_initial_snapshot_contract(initial string, barriers string, workqueue string, manager string) ! {
+	init := initial.fields().join(' ')
+	require_order(init, ['accept_g13_submission_locked', 'count > 64',
+		'voidptr(queue) != voidptr(owner)',
+		'owner.subqueues[0].events.ticket', 'owner.subqueues[physical].events.ticket',
+		'queue.initial_events[pipe] = last[pipe]', 'capture_g13_initial_events',
+		'!mgr.g13_events.initialized', 'mask & (u32(1) << pipe)',
+		'voidptr(last.queue) != voidptr(queue)', 'last.pipe != u32(pipe)', 'owns_slot(last.ticket.slot)', 'event.retain_stamp(last.ticket.slot)',
+		'event.release_stamp(prior.ticket.slot)', 'release_g13_initial_events',
+		'value.valid && mgr.g13_events.initialized', 'value = G13InitialEvent{}'], 'Vinix initial snapshot ownership')!
+	require_order(workqueue, ['serial := queue.serial', 'queue.serial++', 'serial: serial',
+		'resolve_initial(captured Ticket)', 'stamp_value_completed', '!queue.owns_slot(captured.slot)',
+		'i64(entry.serial - captured.serial) > 0', 'if !entry.published', 'InitialState.absent'], 'Vinix stable initial identity')!
+	require(!workqueue.contains('queue.serial--'), 'Canceled tickets must not reuse their host identity')!
+	resolution := section(barriers, 'fn (mut mgr GpuManager) resolve_g13_initial_barriers_locked(',
+		'pub fn (mut mgr GpuManager) set_g13_compute_barriers(', 'Vinix initial resolution')!
+	require_order(resolution, ['barriers.pin_count', 'barriers.waits[index]', 'events.resolve_initial',
+		'state == .pending', 'state == .absent', 'write_g13_barrier', 'mgr.flush_g13_kernel_buffer',
+		'barriers.count = count', 'barriers.initial_pending = false'], 'Vinix initial resolution')!
+	require(barriers.all_after('fn release_g13_barrier_pins(').contains('index < barriers.pin_count'),
+		'Omitted/compacted initial records must keep every physical pin until graph cleanup')!
+	registration := section(manager, 'pub fn (mut mgr GpuManager) queue_g13_submission(', '__global (', 'Vinix initial acceptance')!
+	require_order(registration, ['mgr.lock.acquire()', 'mgr.state != .running',
+		'mgr.accept_g13_submission_locked(jobs, count)', 'enqueue(data)'], 'Vinix atomic initial acceptance')!
+}
+
 fn check_submission_pipelining(pending string) ! {
 	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix initial dependencies')!
 	require_order(resolve, ['barrier == ioctl.asahi_barrier_none', 'barrier == 0',
@@ -222,11 +248,12 @@ fn check_submission_pipelining(pending string) ! {
 		'Publication completion must not depend on retirement or a user fence')!
 	drain := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Vinix submission pipelining')!
 	require_order(drain, ['mut unpublished := [128]bool{}', 'current = item.next',
-		'mut gate := -1', 'gate = int(index)', 'unpublished[gate] || item.initial_barriers != 0',
+		'mut gate := -1', 'gate = int(index)', 'if gate >= 0 { unpublished[gate] }',
 		'blocked_count == 128', 'if earlier || poll_g13_pending',
 		'if gate < 0 && blocked_count < 128', '!g13_pending_dispatch_complete(item)',
 		'unpublished[gate] = true', 'retained_tail.next = pending_head', 'pending_head = retained_head'],
 		'Vinix submission pipelining')!
+	require(!drain.contains('item.initial_barriers != 0'), 'Initial events must not wait for whole-batch CPU retirement')!
 }
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
@@ -280,9 +307,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		&& !ioctl_submit.contains('sched.yield'), 'Vinix submission must not wait for dependencies or GPU work')!
 	require_order(ioctl_submit, ['agxsubmission.stage_command_array', 'agxsubmission.stage_sync_array',
 		'f.lock.acquire()', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
-		'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
+		'gpu_manager.capture_g13_initial_events', 'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
 		'install_g13_batch_barriers',
-		'agxsubmission.install_output_syncs', 'gpu_manager.queue_g13_submission'], 'Vinix prepared async submission')!
+		'gpu_manager.release_g13_initial_events', 'agxsubmission.install_output_syncs', 'register_g13_pending'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
@@ -320,13 +347,16 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'uuid: 0xffffbbbb', 'external_barrier: 0', 'internal_barrier_type: 1',
 		'queue_job.add(barrier, vm_slot)'], 'Asahi explicit barrier prefix')!
 	barriers := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_barriers.v'))!
+	check_initial_snapshot_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_initial.v'))!, barriers,
+		read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	require_order(barriers.fields().join(' '), ['fn (mut mgr GpuManager) initialize_g13_barriers_locked(',
 		'barriers.configured = true', 'event.retain_stamp(wait.slot)',
-		'barriers.slots[index] = wait.slot', 'barriers.count++',
-		'wait_stamp: event.firmware_stamp_address(wait.slot)', 'wait_value: wait.value',
-		'stamp_self: stamp_self', 'uuid: 0xffffbbbb', 'external_barrier: 0',
-		'internal_barrier_type: 1', 'mgr.flush_g13_kernel_buffer(&owner)', 'barriers.ready = true'],
+		'barriers.slots[index] = wait.slot', 'barriers.waits[index]', 'barriers.pin_count++', 'barriers.count++',
+		'write_g13_barrier(&owner', 'mgr.flush_g13_kernel_buffer(&owner)', 'barriers.ready = true'],
 		'Vinix owned firmware barrier prefix')!
+	writer := section(barriers, 'fn write_g13_barrier(', '// Caller holds manager.lock.', 'Vinix barrier wire writer')!
+	require_order(writer.fields().join(' '), ['wait_stamp: event.firmware_stamp_address(wait.slot)', 'wait_value: wait.value',
+		'stamp_self: stamp_self', 'uuid: 0xffffbbbb', 'external_barrier: 0', 'internal_barrier_type: 1'], 'Vinix barrier wire writer')!
 	require_order(local, ['job.explicit_barriers.offset = g13_barrier_tail_offset(sizeof(fw.G13InitBufferCommand))',
 		'job.explicit_barriers.offset + g13_barrier_tail_size',
 		'vertex_count := job.explicit_barriers.count +',
@@ -396,7 +426,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Native asynchronous dependency polling, per-queue FIFO and callback-owned retirement',
 		'Native 64-command mixed batches, subqueue barrier bounds and reverse unwind',
 		'Native intra-batch firmware dependencies, per-subqueue FIFO and locked quarantine gates',
-		'Independent later submissions pipeline after older publication; initial-zero dependencies retain retirement guards',
+		'Independent later submissions pipeline after older publication with initial firmware dependencies',
+		'Initial event capture, stable host identities, cancellation fallback and pin-preserving prefix compaction',
 		'G13 explicit barrier wire fields, private tails, physical stamp pins and atomic prefixes',
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',

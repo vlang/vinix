@@ -285,6 +285,7 @@ mut:
 	subqueues          [3]G13SubQueueResources
 	render_buffer      G13RenderBufferResources
 	command_counter    G13CommandCounter
+	initial_events     [2]G13InitialEvent
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
 	quarantined        bool
@@ -2062,6 +2063,8 @@ pub fn (mut mgr GpuManager) submit_g13_render_job(job &G13RenderJobResources) bo
 		|| !queue.subqueues[1].events.can_publish(owned.fragment_event_slot, owned.fragment_stamp_value) {
 		return false
 	}
+	if !mgr.resolve_g13_initial_barriers_locked(mut owned.explicit_barriers, mut owned.init_buffer,
+		owned.queue, owned.vertex_stamp_value) { return false }
 	mut threshold := unsafe { &u64(owned.queue.threshold.cpu_address()) }
 	old_threshold := katomic.load(threshold)
 	katomic.store(mut threshold, old_threshold + u64(2))
@@ -2529,6 +2532,8 @@ pub fn (mut mgr GpuManager) submit_g13_compute_job(job &G13ComputeJobResources) 
 		return false
 	}
 	if !queue.subqueues[2].events.can_publish(owned.event_slot, owned.stamp_value) { return false }
+	if !mgr.resolve_g13_initial_barriers_locked(mut owned.explicit_barriers, mut owned.microsequence,
+		owned.queue, owned.stamp_value) { return false }
 	mut threshold := unsafe { &u64(queue.threshold.cpu_address()) }
 	old_threshold := katomic.load(threshold)
 	katomic.store(mut threshold, old_threshold + u64(1))

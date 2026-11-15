@@ -3,6 +3,14 @@ module event
 
 pub const max_stamps = u32(128)
 
+pub struct Ticket {
+pub:
+	slot u32
+	value u32
+	sequence u64
+	serial u64
+}
+
 pub fn scan_all_completions() {}
 
 __global completed = [128]bool{}

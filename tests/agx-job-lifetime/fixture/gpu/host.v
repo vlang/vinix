@@ -37,6 +37,7 @@ mut:
 
 struct G13QueueResources {
 mut:
+	initial_events [2]G13InitialEvent
 	subqueues     [3]G13SubQueueResources
 	render_buffer G13RenderBufferResources
 	vm            &mmu.UatContext = unsafe { nil }
@@ -67,6 +68,7 @@ mut:
 
 struct GpuManager {
 mut:
+	g13_events G13EventResources
 	lock                  klock.Lock
 	state                 State = .running
 	g13_compute_jobs      []&G13ComputeJobResources
@@ -87,6 +89,11 @@ mut:
 	g13_queues            []&G13QueueResources
 	flush_fails bool
 	flushes int
+}
+
+struct G13EventResources {
+	mut:
+	initialized bool = true
 }
 
 fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
@@ -206,6 +213,10 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_initial_barrier_lifetimes()
+	check_initial_cancellation_fallback()
+	check_initial_acceptance_and_reset()
+	check_initial_compaction()
 	check_barrier_lifetimes()
 	check_published_batches()
 	check_scene_slots()

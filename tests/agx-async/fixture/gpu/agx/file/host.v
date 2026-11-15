@@ -115,6 +115,7 @@ fn assert_drained(file &GpuFile) {
 	assert file.inflight_by_vm[1] == 0 && memory.outstanding() == 0
 	manager := gpu.get_global_manager() or { panic('manager') }
 	assert manager.g13_compute_jobs.len == 0 && manager.g13_render_jobs.len == 0
+	assert manager.capture_pins == 0
 }
 
 fn check_dependencies_and_fifo() {
@@ -303,5 +304,6 @@ pub fn run_checks() {
 	check_overlap()
 	check_firmware_dependencies()
 	check_submission_pipelining()
+	check_initial_submission_events()
 	println('AGX async: ioctl staging, independent queues/FIFO, compute→render phases, forged fences, failure cleanup, enqueue/shutdown races, backpressure and 200 immediate-retirement cycles passed')
 }

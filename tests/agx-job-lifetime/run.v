@@ -22,7 +22,8 @@ fn main() {
 	os.cp_all('${repo}/kernel/gpu/agx/event', '${scratch}/gpu/agx/event', false)!
 	os.cp('${repo}/kernel/gpu/agx/gpu/g13_tpc.v', '${scratch}/gpu/tpc.v')!
 	os.cp('${repo}/kernel/gpu/agx/gpu/g13_barriers.v', '${scratch}/gpu/barrier_production.v')!
-	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\n')!
+	os.cp('${repo}/kernel/gpu/agx/gpu/g13_initial.v', '${scratch}/gpu/initial_production.v')!
+	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\npub fn test_force_refs(slot u32, value u32) u32 { old := gpu_event_mgr.stamps[slot].references; gpu_event_mgr.stamps[slot].references = value; return old }\n')!
 	os.symlink('${repo}/kernel/gpu/agx/fw', '${scratch}/gpu/agx/fw')!
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	mut production := 'module gpu\nimport gpu.agx.event\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport klock\n'

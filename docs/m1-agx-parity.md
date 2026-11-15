@@ -108,8 +108,8 @@ These are implementation gaps, not items certified by a passing source gate.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. Nonzero in-batch dependencies use firmware prefixes. Independent later batches can pipeline after older publication; explicit index-zero dependencies conservatively wait for prior same-queue retirement. Modern flat-command integration, firmware initial-event capture and full admission/backpressure still differ from DRM scheduling. |
-| Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and independent batches on one queue may overlap; an explicit index-zero dependency retains the conservative prior-retirement guard. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Modern flat-command integration, full admission/backpressure and input-fence failure policy still require comparison. |
+| Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
@@ -742,6 +742,67 @@ inventory checker. Linked kernel SHA-256 values are
 (AArch64) and
 `25942c343bcf819d49ca9e15e01a4a9bee26b6da61dac2cdc1ed4dbcea889a3f`
 (x86_64).
+
+### Captured initial firmware events
+
+Explicit index-zero dependencies now capture the prior accepted event on each
+requested subqueue before preparing the new submission. Individual commands use
+firmware prefixes instead of waiting for whole-batch CPU retirement. Acceptance
+validates every prepared job, including both render tickets, before atomically
+updating the queue's weak markers and enqueueing. Rejected ioctls preserve the
+previous accepted state.
+
+Captures pin physical stamp slots while prefixes acquire their own pins. A
+monotonic host reservation identity excludes future reuse of a canceled firmware
+value/sequence. Publication waits for older unpublished reservations, falls back
+to older published work after cancellation, and omits absent sources. Immutable
+wait metadata permits flush retry and two-to-one record compaction while retaining
+both pins until complete graph invalidation or stopped cleanup. Cancellation on
+input-fence errors remains a Vinix adaptation; complete upstream input-error
+policy is not certified by this change.
+
+Native generated-C inspection caught an addressed loop-local `memdup` and V
+structural comparisons of queue pointers. Passing the source by value and using
+explicit `voidptr` identity remove those defects. The ARM acceptance frame fell
+from 27,264 to 288 bytes. Kernel stacks are 64 KiB; this does not establish that
+the old frame overflowed. The checker now guards 19 generated function bodies
+against temporary allocations and structural copies, requires fixed stack
+arrays, passes negative selftests, and rejects the retained defective C. These
+checks do not measure whole-kernel leaks.
+
+ASan/UBSan validation passes 1,000 initial-event cancellation/ABA/rollover cycles
+and wrapped zero targets; 140 production acceptance/capture/resolution/reaper
+lifecycles; byte-exact cancellation fallback; two-source compaction, flush retry,
+quarantine, partial pin overflow, foreign equal queues and manager-reset cleanup.
+All 128 physical slots return after cleanup. Async checks cover per-command and
+immutable cross-submission targets, execution before producer callbacks, rejected
+admission and setup/stop cleanup. Existing overlap, 540 shutdown interleavings,
+64/127 live-job reapers, publisher/recovery, close, source gates and three V unit
+suites also pass. Independent review approved the final new lifetimes.
+
+Isolated AArch64 and ordinary x86_64 builds pass from
+`3c8c576fb62aad653336f063d2afbcc245c8c7d3` plus seven retained AGX files.
+Every AGX V source matches the isolated checkout; all seven changed sources match
+both retained input snapshots. The ordinary x86 build excludes native AGX code.
+Fresh Omarchy `4f26515d55f5d03ddf884a8b416f3b66b8ee7ae4` and packages
+`dd29deefca1f82a325ec82513e5ed25a094a7f13` retain the same Asahi/Mesa pins.
+All selected audit gates pass; the whole-driver verdict remains
+`not_equivalent`. Modern ABI/VM/GEM/Mesa integration, full admission/backpressure,
+input-error policy, remaining render defaults, topology and power management are
+still open. No native GPU execution, Vinix boot, reboot or deployment occurred.
+
+The complete evidence bundle is
+`/Users/alex/.local/state/vinix/omarchy-m1-initial-20261115/bundle/`.
+Its sibling `inventory.json` SHA-256 is
+`c0e368ae7f59a82763f5d136f65c7fbaf158658ea25cab54a87440c39d8e1076`.
+The sibling `bundle.tar.gz` SHA-256 is
+`6168beafcf4af7b90190ec9bbb7209e165a5189066e0caffb0327fca00ecddc4`.
+Both canonical and fully extracted bundles pass the unchanged inventory checker.
+Linked kernel SHA-256 values are
+`690028b9dd5e5d6f81319a5e357506fd61805f383afe2e85e5d958f859e2fca6`
+(AArch64) and
+`baa14451cf5b65b7791bb96903c93ba78e18f4ad58acf0e0c53fdf7769914b8a`
+(x86_64). Rejected intermediate binaries/C are explicitly labeled diagnostics.
 
 ## Earlier artifact retention incident
 

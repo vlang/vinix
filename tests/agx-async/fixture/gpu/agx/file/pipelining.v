@@ -54,15 +54,16 @@ fn check_initial_dependencies_hold_followers() {
 		// A client-signaled user fence cannot release an internal dependency.
 		syncobj.signal(fence(a))
 		service_file_work()
-		assert manager.published_order == [u32(0), 3]
+		assert manager.published_order == [u32(0), 1, 2, 3]
+		assert !manager.execute_firmware(1, 0), 'the initial prefix still waits for the producer in firmware'
 		service_file_work()
-		assert manager.published_order == [u32(0), 3]
+		assert manager.published_order == [u32(0), 1, 2, 3]
 		assert manager.execute_firmware(3, 0)
 		manager.retire_firmware(3)
 		assert manager.execute_firmware(0, 0)
 		manager.retire_firmware(0)
 		service_file_work()
-		assert manager.published_order == [u32(0), 3, 1, 2]
+		assert manager.published_order == [u32(0), 1, 2, 3]
 		for index := u32(1); index < 3; index++ {
 			assert manager.execute_firmware(index, 0)
 			manager.retire_firmware(index)

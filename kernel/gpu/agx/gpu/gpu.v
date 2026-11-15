@@ -143,10 +143,12 @@ fn (mut mgr GpuManager) reap_file_resources() {
 }
 
 // Serialize accepted submissions with the worker's final shutdown poll.
-pub fn (mut mgr GpuManager) queue_g13_submission(enqueue fn (voidptr), data voidptr) bool {
+pub fn (mut mgr GpuManager) queue_g13_submission(jobs [64]G13SubmissionJob, count u32,
+	enqueue fn (voidptr), data voidptr) bool {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
 	if mgr.state != .running { return false }
+	if !mgr.accept_g13_submission_locked(jobs, count) { return false }
 	enqueue(data)
 	return true
 }

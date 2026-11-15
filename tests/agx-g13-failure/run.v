@@ -18,7 +18,7 @@ fn run_checks() int {
 	os.write_file('${scratch}/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n') or { panic(err) }
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v') or { panic(err) }
 	mut production := 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport katomic\nimport sched\n__global higher_half = u64(0)\n'
-	production += section(source, 'pub fn (mut mgr GpuManager) set_file_reaper(', '__global (') or { panic(err) }
+	production += section(source, 'pub fn (mut mgr GpuManager) set_file_reaper(', '// Serialize accepted submissions') or { panic(err) }
 	production += section(source, 'pub fn (mut mgr GpuManager) handle_event()', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) check_g13_firmware_health()', '// Shutdown the GPU') or { panic(err) }
 	production += source.all_after('// Shutdown the GPU\n')

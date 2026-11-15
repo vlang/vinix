@@ -1104,6 +1104,8 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	defer {
 		if !queued {
 			cancel_g13_pending(mut pending, -5)
+			mut owner := unsafe { pending.manager }
+			owner.release_g13_initial_events(mut pending.initial_events)
 			assert katomic.load(&pending.callbacks_remaining) == 0
 			unqueued_fence = pending.final_fence
 			unqueued_failure = katomic.load(&pending.failure)
@@ -1111,6 +1113,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		}
 	}
 	mut gpu_manager := unsafe { manager }
+	pending.initial_events = gpu_manager.capture_g13_initial_events(queue_resources, pending.initial_barriers) or { return -5 }
 	for index := u32(0); index < request.command_count; index++ {
 		if commands[index].descriptor.cmd_type == ioctl.asahi_cmd_compute {
 			pending.commands[index].compute_job = gpu_manager.prepare_g13_compute_job(queue_resources, vm,
@@ -1121,6 +1124,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		}
 	}
 	if !install_g13_batch_barriers(mut pending) { return -5 }
+	gpu_manager.release_g13_initial_events(mut pending.initial_events)
 	pending.final_fence = syncobj.new_fence(f.owner_key, timer.get_ns())
 	for index := u32(0); index < request.command_count; index++ {
 		code := f.install_g13_batch_completion(mut pending, index, unsafe { &commands[index] }, result_object)
@@ -1128,7 +1132,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	if !agxsubmission.install_output_syncs(&output_syncs, pending.final_fence) { return -22 }
 	katomic.inc(mut &f.inflight_by_vm[vm_id])
-	if !gpu_manager.queue_g13_submission(enqueue_g13_pending, voidptr(pending)) {
+	if !register_g13_pending(mut gpu_manager, pending) {
 		cancel_g13_pending(mut pending, -19)
 		assert katomic.load(&pending.callbacks_remaining) == 0
 		katomic.dec(mut &f.inflight_by_vm[vm_id])
