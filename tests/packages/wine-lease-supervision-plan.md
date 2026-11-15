@@ -4731,3 +4731,33 @@ unreported inputs/search absence and full hermetic admission remain open.
 OS shared-cache/loader bytes remain explicitly metadata-only and unadmitted.
 Default activation, owned ARM/GUI, redistribution and broader roadmap 14
 acceptance remain open. No kernel or product default is changed.
+
+## Production-active helper refusal checks (2026-11-15)
+
+Commit `55d194614` fixes [helper test enforcement](wine-helper-controls-check.md):
+the pinned V compiler omits `assert` under `-prod`, so source-closure,
+resource-header, observed C-input, linker and host-image unit tests now use
+explicit panic conditions. Earlier production module runs are superseded for
+their assertion-dependent checks; original evidence remains intact. The
+44-case full-retainer matrix and 32 owned-receipt controls already use explicit
+errors and are unaffected. Production admission code is unchanged.
+
+A source-bound V driver copies the ten helper/test files into private fixtures,
+runs all five suites in normal and production/manual-free modes, and builds
+five production mutants with one real safety check disabled in each. All ten
+baseline suites pass. Every mutant compiles, then fails at its explicit
+expected-refusal check; compile errors or unrelated failures cannot count.
+Normal and production suites include real C compilation, fresh static linker
+replay and real V source generation under poisoned parent settings. The driver
+verifies source/compiler pins afterward. Original replay archives are preserved.
+
+The checkpoint is `/Users/alex/.cache/vwhelpercontrols-20261115-01`, based on
+`be740f6d0`, with the feature patch/revision, copied sources, generated C/binaries,
+all fifteen compile/run results and raw probe evidence. Its typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-helper-controls-20261115-01.inventory.json`,
+SHA-256 `f9df72ea48d8a83a9a12fcc64d1a05b30ab85382c0b4a866b0f60d3de2e737ed`.
+Complete recording and independent comparison pass against the retained original
+checkpoint. Original selected compiler/real-link inputs and historical complete
+bundles remain required. No new guest execution is claimed. OS shared-cache,
+host build closure, full hermetic admission, default activation, owned ARM/GUI,
+redistribution and broader roadmap 14 acceptance remain open.
