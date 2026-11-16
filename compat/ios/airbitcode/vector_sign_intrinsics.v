@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_subinsert_cache_base + 8976
+const vector_float_intrinsic_slots = vector_air_unary_cache_base + 112
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -92,7 +92,7 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR vector intrinsic: declaration record') }
-	key := if conversion_key >= 0 { conversion_key } else { vector_float_intrinsic_key(id, count, bits)! }
+	key := if f.name.starts_with('air.') { air_vector_unary_key(id, count, bits)! } else if conversion_key >= 0 { conversion_key } else { vector_float_intrinsic_key(id, count, bits)! }
 	return work, key, ir_values(stream, raw)[6], if id == .vector_insert { u64(3) } else if id in [.is_fpclass, .ctlz, .cttz, .iabs, .vector_extract]! { u64(2) } else { u64(0) }
 }
 fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right ScalarVectorValue, bits u32, count int) !ScalarVectorValue {

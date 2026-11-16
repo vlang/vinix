@@ -1,5 +1,21 @@
 # Void-return scalar execution
 
+Fixed 1..16-lane float32 vectors accept unary `air.fabs.vNf32`,
+`air.floor.vNf32`, `air.ceil.vNf32`, `air.trunc.vNf32`, `air.sqrt.vNf32`,
+`air.round.vNf32` and `air.rint.vNf32`. These reuse the LLVM lane evaluators:
+fabs preserves NaN payloads while arithmetic results canonicalize NaNs, round
+takes half ties away from zero, and rint/sqrt round to nearest with ties to even.
+Poison stays local to its lane; any unfrozen undef source lane refuses. Freezes,
+discarded poison and scalar extraction retain existing rules. Exact vector
+argument/result types, ordinary calls, pure attributes and duplicate checks
+remain required, including after cache hits. Keys 61604..61715 append 112 AIR
+identities, separate from LLVM, for 61,716 vector entries. Scalar entries stay
+2,179. One call uses one existing result slot/step and the established vector
+source/result work charges. Half, scalable, fast and other AIR vector families
+remain excluded; floating address projections reject. Existing owners and
+cleanup paths are reused. Invalid profiles reject before writes; runtime state
+failures retain earlier stores.
+
 Ternary `air.clamp.f32(x, low, high)` composes AIR `fmax(x, low)` then
 `fmin(result, high)`, retaining numeric NaN preference and first-argument zero
 ties. Ordered `low > high` produces poison, representing the Metal specification's
@@ -105,7 +121,7 @@ the inserted count and keeps the full window in range. Exact declaration immarg
 placement is selected per family: third parameter for insertion, second for
 existing immediate families. Both scalar and memory scanners share this policy.
 One call costs one step, one existing result slot and 2*base_count + inserted_count
-work units. The vector cache has 61,604 entries, with new keys 52628..61603; the
+work units. The vector cache has 61,716 entries, with new keys 52628..61603; the
 scalar cache remains 2,179. Existing slots, snapshots and cleanup retain ownership.
 Maintained tests cover overwritten poison/undef, surrounding lanes, input/result
 freezes, discarded void results, loop reuse and existing resource bounds.

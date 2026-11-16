@@ -1,5 +1,17 @@
 # Software Metal backend
 
+Prepared pipelines execute `air.fabs.vNf32`, `air.floor.vNf32`,
+`air.ceil.vNf32`, `air.trunc.vNf32`, `air.sqrt.vNf32`, `air.round.vNf32`
+and `air.rint.vNf32` for fixed 1..16-lane vectors. Existing lane evaluators
+preserve raw fabs payloads, canonical arithmetic NaNs, signed zeros and
+subnormals. Round uses half ties away from zero; rint and sqrt use nearest
+rounding with ties to even. A two-lane coordinate fixture checks every family
+and both signs against independent scalar expressions before its RGBA8 oracle.
+AIR keys 61604..61715 append without moving LLVM keys; the vector cache has
+61,716 entries and the scalar cache remains 2,179. Exact vector signatures,
+ordinary pure calls and existing state/work/slot rules apply. Half, fast and
+other AIR vector families remain excluded; floating address projections reject.
+
 Prepared pipelines execute ternary `air.clamp.f32` as AIR max then min, with
 numeric NaN preference and first-argument zero ties. Reversed numeric bounds
 produce poison; NaN bounds do not count as reversed. Existing poison/undef,

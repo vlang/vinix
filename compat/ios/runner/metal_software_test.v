@@ -5185,6 +5185,13 @@ declare float @air.fma.f32(float, float, float) #0
 declare float @air.fmin.f32(float, float) #0
 declare float @air.fmax.f32(float, float) #0
 declare float @air.clamp.f32(float, float, float) #0
+declare <2 x float> @air.fabs.v2f32(<2 x float>) #0
+declare <2 x float> @air.floor.v2f32(<2 x float>) #0
+declare <2 x float> @air.ceil.v2f32(<2 x float>) #0
+declare <2 x float> @air.trunc.v2f32(<2 x float>) #0
+declare <2 x float> @air.sqrt.v2f32(<2 x float>) #0
+declare <2 x float> @air.round.v2f32(<2 x float>) #0
+declare <2 x float> @air.rint.v2f32(<2 x float>) #0
 declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
@@ -5336,7 +5343,61 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  %clip_pair1 = and i1 %zero_clip_ok, %freeze_clip_ok
  %clip_pair2 = and i1 %clip_pair0, %clip_pair1
  %clamp_ok = and i1 %clip_pair2, %lazy_clip_ok
- %float_ok = and i1 %float_before_clamp_ok, %clamp_ok
+ %float_before_vector_air_ok = and i1 %float_before_clamp_ok, %clamp_ok
+ %air_input0 = insertelement <2 x float> zeroinitializer, float %negative, i32 0
+ %air_input = insertelement <2 x float> %air_input0, float %fraction, i32 1
+ %air_square0 = insertelement <2 x float> zeroinitializer, float %square, i32 0
+ %air_square = insertelement <2 x float> %air_square0, float %square, i32 1
+ %air_fabs = call <2 x float> @air.fabs.v2f32(<2 x float> %air_input)
+ %air_fabs0 = extractelement <2 x float> %air_fabs, i32 0
+ %air_fabs1 = extractelement <2 x float> %air_fabs, i32 1
+ %air_fabs_ok0 = fcmp oeq float %air_fabs0, %fraction
+ %air_fabs_ok1 = fcmp oeq float %air_fabs1, %fraction
+ %air_fabs_ok = and i1 %air_fabs_ok0, %air_fabs_ok1
+ %air_unary_ok0 = and i1 %float_before_vector_air_ok, %air_fabs_ok
+ %air_floor = call <2 x float> @air.floor.v2f32(<2 x float> %air_input)
+ %air_floor0 = extractelement <2 x float> %air_floor, i32 0
+ %air_floor1 = extractelement <2 x float> %air_floor, i32 1
+ %air_floor_ok0 = fcmp oeq float %air_floor0, %negative_next_x
+ %air_floor_ok1 = fcmp oeq float %air_floor1, %xf
+ %air_floor_ok = and i1 %air_floor_ok0, %air_floor_ok1
+ %air_unary_ok1 = and i1 %air_unary_ok0, %air_floor_ok
+ %air_ceil = call <2 x float> @air.ceil.v2f32(<2 x float> %air_input)
+ %air_ceil0 = extractelement <2 x float> %air_ceil, i32 0
+ %air_ceil1 = extractelement <2 x float> %air_ceil, i32 1
+ %air_ceil_ok0 = fcmp oeq float %air_ceil0, %negative_x
+ %air_ceil_ok1 = fcmp oeq float %air_ceil1, %next_x
+ %air_ceil_ok = and i1 %air_ceil_ok0, %air_ceil_ok1
+ %air_unary_ok2 = and i1 %air_unary_ok1, %air_ceil_ok
+ %air_trunc = call <2 x float> @air.trunc.v2f32(<2 x float> %air_input)
+ %air_trunc0 = extractelement <2 x float> %air_trunc, i32 0
+ %air_trunc1 = extractelement <2 x float> %air_trunc, i32 1
+ %air_trunc_ok0 = fcmp oeq float %air_trunc0, %negative_x
+ %air_trunc_ok1 = fcmp oeq float %air_trunc1, %xf
+ %air_trunc_ok = and i1 %air_trunc_ok0, %air_trunc_ok1
+ %air_unary_ok3 = and i1 %air_unary_ok2, %air_trunc_ok
+ %air_sqrt = call <2 x float> @air.sqrt.v2f32(<2 x float> %air_square)
+ %air_sqrt0 = extractelement <2 x float> %air_sqrt, i32 0
+ %air_sqrt1 = extractelement <2 x float> %air_sqrt, i32 1
+ %air_sqrt_ok0 = fcmp oeq float %air_sqrt0, %xf
+ %air_sqrt_ok1 = fcmp oeq float %air_sqrt1, %xf
+ %air_sqrt_ok = and i1 %air_sqrt_ok0, %air_sqrt_ok1
+ %air_unary_ok4 = and i1 %air_unary_ok3, %air_sqrt_ok
+ %air_round = call <2 x float> @air.round.v2f32(<2 x float> %air_input)
+ %air_round0 = extractelement <2 x float> %air_round, i32 0
+ %air_round1 = extractelement <2 x float> %air_round, i32 1
+ %air_round_ok0 = fcmp oeq float %air_round0, %negative_next_x
+ %air_round_ok1 = fcmp oeq float %air_round1, %next_x
+ %air_round_ok = and i1 %air_round_ok0, %air_round_ok1
+ %air_unary_ok5 = and i1 %air_unary_ok4, %air_round_ok
+ %air_rint = call <2 x float> @air.rint.v2f32(<2 x float> %air_input)
+ %air_rint0 = extractelement <2 x float> %air_rint, i32 0
+ %air_rint1 = extractelement <2 x float> %air_rint, i32 1
+ %air_rint_ok0 = fcmp oeq float %air_rint0, %negative_ties
+ %air_rint_ok1 = fcmp oeq float %air_rint1, %ties
+ %air_rint_ok = and i1 %air_rint_ok0, %air_rint_ok1
+ %air_unary_ok6 = and i1 %air_unary_ok5, %air_rint_ok
+ %float_ok = and i1 %air_unary_ok6, true
  %coordinate = or i32 %x, 0
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate
