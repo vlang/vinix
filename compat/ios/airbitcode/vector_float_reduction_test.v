@@ -30,7 +30,7 @@ fn test_float_reduction_states(){
  }if count>1 {mut source:=ScalarVectorValue{};source.lanes[0]=IntegerValue{poison:true};source.undef=u16(1)<<u32(count-1);if _:=reduced_floating_vector(id,source,bits,count) {assert false};checks++}}}}
  assert checks==1148
  for name in ['llvm.vector.reduce.fminimum.v0f16','llvm.vector.reduce.fmaximum.v01f32','llvm.vector.reduce.fminimum.v17f32','llvm.vector.reduce.fmaximum.v2f64','llvm.vector.reduce.fminimum.v2i32','llvm.vector.reduce.fminimum.nxv2f32','llvm.vector.reduce.fminimum.v2f32.spoof','llvm.vector.reduce.fmin.v2f32','llvm.vector.reduce.fminimumnum.v2f32'] {if _,_,_:=floating_vector_reduction_name(name) {assert false,name}}
- for id in [ScalarIntrinsic.floor,.minnum,.maximum]! {if id==.maximum {continue};if _:=reduced_floating_vector(id,ScalarVectorValue{},32,1) {assert false}}
+ for id in [ScalarIntrinsic.floor,.minimumnum,.maximum]! {if id==.maximum {continue};if _:=reduced_floating_vector(id,ScalarVectorValue{},32,1) {assert false}}
  for bits in [u32(0),1,64]! {if _:=reduced_floating_vector(.minimum,ScalarVectorValue{},bits,1) {assert false}}
  for count in [0,17] {if _:=reduced_floating_vector(.maximum,ScalarVectorValue{},32,count) {assert false}}
  for tag in [IntegerValue{aggregate:true},IntegerValue{vector:true}] {mut source:=ScalarVectorValue{};source.lanes[0]=tag;if _:=reduced_floating_vector(.minimum,source,32,1) {assert false}}

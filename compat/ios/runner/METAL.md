@@ -1045,6 +1045,25 @@ intrinsics with explicit scalar chains and the interpreter, including half
 sweeps, order-sensitive rounding, seed/lane states, freezes, loop reuse,
 ordinary/prepared memory, metadata guards and exact shared limits.
 
+Number-preferring floating reductions support ordinary direct
+`llvm.vector.reduce.fmin.vNf16/f32` and `fmax` calls for fixed 1..16 lanes.
+The result is the numeric minimum/maximum, ignoring quiet NaNs when a number
+is available and ordering -0 below +0. The existing scalar minnum/maxnum
+refinement treats signaling NaNs as quiet too. Multiple all-NaN lanes produce
+the preferred quiet NaN; a single lane preserves its raw bits. Every lane is
+observed: poison propagates and executed undef rejects, including after NaNs
+or poison. Source freeze repairs indeterminate lanes; result freeze repairs
+poison without suppressing earlier undef errors. These scalar results reuse
+mixed, void and memory execution and require N+1 validation work units with
+no vector construction slot. Declaration/type/attribute guards and shared
+limits are unchanged. Integer-only execution, floating address dependencies,
+fast-math flags, scalable vectors, wider formats and newer fminimumnum/
+fmaximumnum reduction names remain excluded.
+`tests/ios/air-vector-number-reduction.v` compares native LLVM on defined,
+quieted reference inputs, while independently checking the raw signaling-NaN
+refinement, strict undef/poison, freeze and prewrite behavior in the interpreter.
+The unit oracle ignores NaNs and selects extrema by integer encoding order.
+
 Floating minimum/maximum reductions support ordinary direct
 `llvm.vector.reduce.fminimum.vNf16/f32` and `fmaximum` calls for fixed 1..16
 lanes. They return one matching half/float scalar, propagate NaNs and order

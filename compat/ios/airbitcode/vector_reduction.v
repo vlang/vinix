@@ -71,6 +71,10 @@ fn reduced_integer_vector(id IntegerVectorReduction, source ScalarVectorValue, b
 	return result
 }
 fn (m &IntegerMachine) reduction_value(ir IRModule, stream Stream, op IRTypedInstruction) !IntegerValue {
+	if number_vector_reduction_call(ir, op) {
+		id, count, bits := number_vector_reduction_name(ir.functions[op.callee_function].name)!
+		return reduced_floating_vector(id, m.read_vector(stream, m.p.operands[op.operands_start + 1])!, bits, count)!
+	}
 	if sequential_vector_reduction_call(ir, op) {
 		id, count, bits := sequential_vector_reduction_name(ir.functions[op.callee_function].name)!
 		seed := m.read(op.operands_start + 1)!

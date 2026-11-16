@@ -18,6 +18,12 @@ fn floating_vector_reduction_key(id ScalarIntrinsic, count int, bits u32) !int {
 	return floating_vector_reduction_cache_base + int(id == .maximum) * 32 + int(bits == 16) * 16 + count - 1
 }
 fn (p IRTypedProgram) scalar_vector_reduction_profile(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, mixed bool, remaining int) !(int, int, u64) {
+	if number_vector_reduction_call(ir, op) {
+		if !mixed { return error('AIR vector reduction: mixed floating execution required') }
+		id, count, bits := number_vector_reduction_name(ir.functions[op.callee_function].name)!
+		work, attributes := p.vector_reduction_shape(ir, stream, pools, bodies, scope, index, op, count, bits, true, false, remaining)!
+		return work, number_vector_reduction_key(id, count, bits)!, attributes
+	}
 	if sequential_vector_reduction_call(ir, op) {
 		if !mixed { return error('AIR vector reduction: mixed floating execution required') }
 		id, count, bits := sequential_vector_reduction_name(ir.functions[op.callee_function].name)!
@@ -31,7 +37,10 @@ fn (p IRTypedProgram) scalar_vector_reduction_profile(ir IRModule, stream Stream
 	return work, floating_vector_reduction_key(id, count, bits)!, attributes
 }
 fn reduced_floating_vector(id ScalarIntrinsic, source ScalarVectorValue, bits u32, count int) !IntegerValue {
-	floating_vector_reduction_key(id, count, bits)!
+	if id in [.minnum, .maxnum]! { number_vector_reduction_key(id, count, bits)! } else { floating_vector_reduction_key(id, count, bits)! }
+	// fmin/fmax choose the existing scalar minnum/maxnum refinement: treat
+	// signaling NaNs as quiet and prefer a number. This fixed left fold is a
+	// permitted reduction order; poison and undef still observe every lane.
 	mut result := IntegerValue{}
 	for lane in 0 .. count {
 		if source.undef & (u16(1) << u32(lane)) != 0 { return error('AIR vector reduction: undef floating source lane') }
