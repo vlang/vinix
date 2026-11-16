@@ -5600,11 +5600,42 @@ define void @image_air_clamp(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %
 declare i8 @llvm.umulh.i8(i8, i8)
 declare <2 x i8> @llvm.smulh.v2i8(<2 x i8>, <2 x i8>)
 declare <2 x i8> @llvm.umulh.v2i8(<2 x i8>, <2 x i8>)
+declare <2 x i32> @air.mul_hi.s.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @air.mul_hi.u.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.smulh.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.umulh.v2i32(<2 x i32>, <2 x i32>)
 define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
  %x = extractelement <3 x i32> %gid, i32 0
  %y = extractelement <3 x i32> %gid, i32 1
  %w = extractelement <3 x i32> %grid, i32 0
  %h = extractelement <3 x i32> %grid, i32 1
+ %air_negative = or i32 %x, 2147483648
+ %air_v0 = insertelement <2 x i32> zeroinitializer, i32 %x, i32 0
+ %air_v = insertelement <2 x i32> %air_v0, i32 %air_negative, i32 1
+ %air_vs = call <2 x i32> @air.mul_hi.s.v2i32(<2 x i32> %air_v, <2 x i32> <i32 -1, i32 -1>)
+ %air_vu = call <2 x i32> @air.mul_hi.u.v2i32(<2 x i32> %air_v, <2 x i32> <i32 -1, i32 -1>)
+ %llvm_vs = call <2 x i32> @llvm.smulh.v2i32(<2 x i32> %air_v, <2 x i32> <i32 -1, i32 -1>)
+ %llvm_vu = call <2 x i32> @llvm.umulh.v2i32(<2 x i32> %air_v, <2 x i32> <i32 -1, i32 -1>)
+ %air_xs = sext <2 x i32> %air_v to <2 x i64>
+ %air_xu = zext <2 x i32> %air_v to <2 x i64>
+ %air_ps = mul <2 x i64> %air_xs, <i64 -1, i64 -1>
+ %air_pu = mul <2 x i64> %air_xu, <i64 4294967295, i64 4294967295>
+ %air_hs = lshr <2 x i64> %air_ps, <i64 32, i64 32>
+ %air_hu = lshr <2 x i64> %air_pu, <i64 32, i64 32>
+ %air_expected_s = trunc <2 x i64> %air_hs to <2 x i32>
+ %air_expected_u = trunc <2 x i64> %air_hu to <2 x i32>
+ %air_s_equal = icmp eq <2 x i32> %air_vs, %llvm_vs
+ %air_u_equal = icmp eq <2 x i32> %air_vu, %llvm_vu
+ %air_s_wide = icmp eq <2 x i32> %air_vs, %air_expected_s
+ %air_u_wide = icmp eq <2 x i32> %air_vu, %air_expected_u
+ %air_eq0 = and <2 x i1> %air_s_equal, %air_u_equal
+ %air_eq1 = and <2 x i1> %air_s_wide, %air_u_wide
+ %air_eq = and <2 x i1> %air_eq0, %air_eq1
+ %air_ok0 = extractelement <2 x i1> %air_eq, i32 0
+ %air_ok1 = extractelement <2 x i1> %air_eq, i32 1
+ %air_ok = and i1 %air_ok0, %air_ok1
+ %air_u1 = extractelement <2 x i32> %air_vu, i32 1
+ %air_coordinate = sub i32 %air_u1, 2147483647
  %a = trunc i32 %x to i8
  %factor = or i8 %a, 128
  %sh = call i8 @llvm.smulh.i8(i8 %a, i8 255)
@@ -5616,7 +5647,9 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %slane = extractelement <2 x i8> %vs, i32 1
  %ulane = extractelement <2 x i8> %vu, i32 1
  %coordinate8 = sub i8 %ulane, 127
- %coordinate = zext i8 %coordinate8 to i32
+ %coordinate_old = zext i8 %coordinate8 to i32
+ %coordinate_same = icmp eq i32 %coordinate_old, %air_coordinate
+ %coordinate = select i1 %coordinate_same, i32 %air_coordinate, i32 poison
  %air_signed = call i32 @air.mul_hi.s.i32(i32 %x, i32 4294967295)
  %air_unsigned = call i32 @air.mul_hi.u.i32(i32 %x, i32 4294967295)
  %air_sh = trunc i32 %air_signed to i8
@@ -5628,7 +5661,8 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %offset0 = xor i8 %checked_sh, %checked_uh
  %offset1 = xor i8 %slane, %ulane
  %offset8 = xor i8 %offset0, %offset1
- %offset = zext i8 %offset8 to i32
+ %offset_raw = zext i8 %offset8 to i32
+ %offset = select i1 %air_ok, i32 %offset_raw, i32 poison
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index

@@ -139,6 +139,7 @@ fn test_vector_rounding_names_states_and_cache() {
 	for count in 1 .. 17 { key := air_vector_float_key(.fma, count, 32)!; assert key == 61716 + count - 1 && !seen[key]; seen[key] = true }
 	for id in [ScalarIntrinsic.air_fmin, .air_fmax]! { for count in 1 .. 17 { key := air_vector_float_key(id, count, 32)!; assert key == 61732 + int(id == .air_fmax) * 16 + count - 1 && !seen[key]; seen[key] = true } }
 	for count in 1 .. 17 { key := air_vector_float_key(.air_clamp, count, 32)!; assert key == 61764 + count - 1 && !seen[key]; seen[key] = true }
+	for id in [ScalarIntrinsic.smulh, .umulh]! { for count in 1 .. 17 { key := air_vector_intrinsic_key(id, count, 32)!; assert key == 61780 + int(id == .umulh) * 16 + count - 1 && !seen[key]; seen[key] = true } }
 	for slot in seen { assert slot }
 	for name in ['llvm.floor.f32', 'llvm.floor.v0f16', 'llvm.floor.v01f32', 'llvm.floor.v17f16', 'llvm.floor.v99999999999999999999f16', 'llvm.floor.v2f64', 'llvm.floor.v2bf16', 'llvm.floor.v2f016', 'llvm.floor.v2f32.spoof', 'llvm.floor.nxv2f32', 'llvm.roundeven.vf32', 'llvm.nearbyint.v2i32', 'llvm.sin.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
 	for id in [ScalarIntrinsic.fabs, .sqrt, .fma]! { if _ := rounding_intrinsic_vector(id, ScalarVectorValue{}, 32, 1) { assert false, 'family' } }
@@ -146,5 +147,5 @@ fn test_vector_rounding_names_states_and_cache() {
 	for count in [0, 17] { if _ := rounding_intrinsic_vector(.floor, ScalarVectorValue{}, 16, count) { assert false, 'count' } }
 	for tag in [IntegerValue{aggregate: true}, IntegerValue{vector: true}] { mut source := ScalarVectorValue{}; source.lanes[0] = tag; if _ := rounding_intrinsic_vector(.floor, source, 32, 1) { assert false, 'scalar tag' } }
 	assert checks == 22848
-	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 61780 floating/integer/conversion overload/cache identities and family/shape/name/tag guards PASS')
+	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 61812 floating/integer/conversion overload/cache identities and family/shape/name/tag guards PASS')
 }

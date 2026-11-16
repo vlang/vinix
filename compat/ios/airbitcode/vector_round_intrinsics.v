@@ -20,6 +20,7 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('air.mul_hi.') { return air_vector_integer_name(name) }
 	if name.starts_with('air.') { return air_vector_float_name(name) }
 	if name.starts_with('llvm.vector.insert.') { count, _, format := vector_subinsert_name(name)!; return ScalarIntrinsic.vector_insert, count, if format < 64 { u32(format + 1) } else if format == 64 { u32(16) } else { u32(32) } }
 	if name.starts_with('llvm.vector.extract.') { count, _, format := vector_subvector_name(name)!; return ScalarIntrinsic.vector_extract, count, if format < 64 { u32(format + 1) } else if format == 64 { u32(16) } else { u32(32) } }
