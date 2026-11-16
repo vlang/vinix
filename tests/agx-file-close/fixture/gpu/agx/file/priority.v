@@ -127,7 +127,7 @@ fn check_queue_priorities() {
 	klock.before_once(unsafe { &raced.lock }, destroy_before_bind)
 	request = queue_request(ioctl.asahi_priority_medium, ioctl.asahi_queue_cap_render)
 	host_before, gpu_before := workqueue.creation_attempts(), gpu.queue_creates()
-	assert raced.ioctl_queue_create(&request) == -22 && request.queue_id == 0
+	assert raced.ioctl_queue_create(&request) == -2 && request.queue_id == 0
 	assert race_vm.destroyed && raced.queues.len == 0 && raced.g13_queues.len == 0
 	assert workqueue.creation_attempts() == host_before && gpu.queue_creates() == gpu_before
 	destroying_vm_file = unsafe { nil }

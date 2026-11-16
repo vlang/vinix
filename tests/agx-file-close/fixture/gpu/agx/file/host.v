@@ -162,6 +162,7 @@ pub fn run_checks() {
 	check_mapping_retirement()
 	check_mapping_permissions()
 	check_private_objects()
+	check_identity_lookups()
 	check_queue_priorities()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

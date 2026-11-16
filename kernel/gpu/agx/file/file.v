@@ -584,7 +584,7 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 			return 0
 		}
 	}
-	return -22
+	return -2 // ENOENT: no VM in this open-file namespace.
 }
 
 pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
@@ -830,7 +830,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	f.lock.acquire()
 	defer { f.lock.release() }
 	// Keep the VM and its page table alive until the new queue is installed.
-	vm := f.find_vm(request.vm_id) or { return -22 }
+	vm := f.find_vm(request.vm_id) or { return -2 }
 	id := f.allocate_queue_id_locked() or { return -24 } // EMFILE
 	wq := workqueue.new_workqueue(id, request.vm_id, firmware_priority, request.queue_caps) or {
 		return -12
@@ -951,7 +951,7 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 		}
 	}
 	f.lock.release()
-	return -22
+	return -2 // ENOENT: no queue in this open-file namespace.
 }
 
 fn discard_g13_completion(mut state G13SubmitCompletion) {
@@ -1112,9 +1112,14 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	mut vm_id := u32(0)
 	mut queue_caps := u32(0)
+	mut queue_found := false
 	for queue in f.queues {
-		if queue.id == request.queue_id { vm_id = queue.vm_id; queue_caps = queue.caps; break }
+		if queue.id == request.queue_id {
+			queue_found = true
+			vm_id = queue.vm_id; queue_caps = queue.caps; break
+		}
 	}
+	if !queue_found { return -2 }
 	if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }
 	vm := f.find_vm(vm_id) or { return -22 }
 	// Never publish work through an incompletely invalidated mapping. This

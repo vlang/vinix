@@ -54,3 +54,11 @@ successful queue metadata is freed only by fixture cleanup after final close,
 since the kernel's existing successful-queue metadata retention is unchanged.
 GPU resources use a bounded injected pool; this establishes ioctl ownership,
 not firmware execution or whole-kernel heap measurements.
+
+Identity lookup cases run production VM destruction, queue creation and queue
+destruction. Missing, removed and foreign-file names return ENOENT; malformed
+requests retain EINVAL and known busy VMs retain EBUSY. Repeated failures leave
+queue output IDs, allocation counters, live VM/queue identities and resource
+counts unchanged. A successful queue/VM destruction followed by a repeated
+request checks removed identities without double teardown. Fixture cleanup
+frees successful logical queue metadata only after every consumer is gone.

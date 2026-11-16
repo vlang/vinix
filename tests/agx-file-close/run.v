@@ -32,7 +32,7 @@ fn main() {
 		section(source, 'fn (mut f GpuFile) allocate_queue_id_locked(', 'fn (mut f GpuFile) allocate_timestamp_id_locked(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'pub fn (f &GpuFile) ioctl_get_time(')! +
-		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'pub fn (mut f GpuFile) ioctl_queue_destroy(')!
+		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'fn discard_g13_completion(')!
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp('${repo}/kernel/gpu/agx/file/closing.v', '${scratch}/gpu/agx/file/closing.v')!
 	gpu_source := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
