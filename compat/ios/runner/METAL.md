@@ -321,7 +321,7 @@ words are passed through the memory API's typed value bindings and captured
 before execution; library, pipeline and buffer ownership are unchanged.
 A scalar builtin can directly index a supported single-index GEP. Extracted
 geometry lanes can also feed bounded integer add/subtract/multiply,
-signed/unsigned division/remainder, scalar integer comparisons/selects, bitwise
+signed/unsigned division/remainder, scalar integer comparisons/selects/freezes, bitwise
 AND/OR/XOR, left/logical-right/arithmetic-right shifts and width casts
 to form a checked buffer index, including a flattened multidimensional position.
 Only argument/literal dependencies are admitted; general SSA indices remain
@@ -339,7 +339,8 @@ existing buffer-backed textures expose the exact pixels through `getBytes`.
 The image kernel decomposes a linear address with remainder and exact division,
 then forms row/pixel addresses with flagged shifts and disjoint OR.
 An integer samesign comparison of x against grid width selects the final address
-or poison. The unchosen poison value must not prevent valid pixel writes.
+or poison, followed by a scalar freeze. Prevalidation and execution preserve the
+same defined address; poison/direct undef freezes choose zero.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.

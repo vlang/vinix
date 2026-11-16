@@ -11,6 +11,7 @@ enum MemoryIndexKind {
 	binary
 	compare
 	select_value
+	freeze_value
 	cast
 }
 
@@ -53,6 +54,12 @@ fn (b MemoryIndexBuilder) argument(source IRTypedOperand) !int {
 }
 
 fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, depth int) !int {
+	return b.expression_source(operand, before, depth, false)!
+}
+
+// Only a direct freeze operand may admit undef. Check this before cache lookup
+// so a previously frozen constant cannot admit undef on an ordinary path.
+fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before int, depth int, frozen bool) !int {
 	if depth >= max_memory_index_depth { return error('AIR memory index: expression depth limit') }
 	bits := b.p.integer_bits(operand.type_index)!
 	scope := b.bodies.scopes[b.scope]
@@ -73,6 +80,9 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 	} else if v.pooled.type_index != operand.type_index {
 		return error('AIR memory index: operand type')
 	}
+	if producer < 0 && v.pooled.kind == .constant && b.pools.constants[v.pooled.constant_index].kind == .undef && !frozen {
+		return error('AIR memory index: undef requires direct freeze')
+	}
 	if cached := b.cache[operand.number] {
 		if b.nodes[cached].height > max_memory_index_depth - depth {
 			return error('AIR memory index: expression depth limit')
@@ -91,10 +101,10 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 			node = MemoryIndexNode{ kind: .lane, bits: bits, argument: b.argument(operand)! }
 		} else if v.pooled.kind == .constant {
 			c := b.pools.constants[v.pooled.constant_index]
-			if c.kind !in [.zero, .integer, .poison] || c.splat {
+			if c.kind !in [.zero, .integer, .poison, .undef] || c.splat {
 				return error('AIR memory index: defined integer literal required')
 			}
-			node = if c.kind == .poison { MemoryIndexNode{kind: .poison, bits: bits} } else { MemoryIndexNode{ bits: bits, value: b.pools.scalar_bits(v.pooled.constant_index)! & constant_mask(bits) } }
+			node = if c.kind in [.poison, .undef] { MemoryIndexNode{kind: .poison, bits: bits} } else { MemoryIndexNode{ bits: bits, value: b.pools.scalar_bits(v.pooled.constant_index)! & constant_mask(bits) } }
 		} else {
 			return error('AIR memory index: argument/literal required')
 		}
@@ -146,6 +156,10 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 			if b.nodes[rhs].height > height { height = b.nodes[rhs].height }
 			if b.nodes[cond].height > height { height = b.nodes[cond].height }
 			node = MemoryIndexNode{kind: .select_value, bits: bits, left: lhs, right: rhs, condition: cond, height: height + 1}
+		} else if code == 58 {
+			b.p.scalar_unary_profile(op, true, false)!
+			lhs := b.expression_source(b.p.operands[op.operands_start], producer, depth + 1, true)!
+			node = MemoryIndexNode{kind: .freeze_value, bits: bits, left: lhs, height: 1 + b.nodes[lhs].height}
 		} else if code == 3 && op.opcode <= 2 {
 			b.p.scalar_cast_profile(op, true)!
 			source := b.p.operands[op.operands_start]
@@ -211,6 +225,10 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.select_value {
 				chosen := if values[node.condition] & 1 != 0 { node.left } else { node.right }
 				value = IntegerValue{value: values[chosen], poison: poisons[node.condition] || poisons[chosen]}
+			}
+			.freeze_value {
+				// Match IntegerMachine.read_frozen's stable zero choice.
+				value = IntegerValue{value: if poisons[node.left] { u64(0) } else { values[node.left] }}
 			}
 			.cast {
 				value = scalar_integer_cast(node.opcode, node.flags, node.source_bits, node.bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] })!

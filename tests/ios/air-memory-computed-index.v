@@ -161,10 +161,10 @@ fn control_cases(assembler string, root string) ! {
 		'pointer_comparison': '%v = icmp eq ptr %out, null\n %idx = zext i1 %v to i64'
 		'vector_comparison': '%v = icmp eq <2 x i64> zeroinitializer, zeroinitializer\n %first = extractelement <2 x i1> %v, i32 0\n %idx = zext i1 %first to i64'
 		'intrinsic': '%idx = call i64 @llvm.ctpop.i64(i64 %arg)'
-		'freeze':   '%idx = freeze i64 %arg'
+		'float_cast': '%idx = fptoui float 0.0 to i64'
 		'pointer_integer': '%idx = ptrtoint ptr %out to i64'
 		'undef':    '%idx = add i64 %arg, undef'
-		'poison_freeze': '%idx = freeze i64 poison'
+		'poison_intrinsic': '%idx = call i64 @llvm.ctpop.i64(i64 poison)'
 	} {
 		text.write_string('define void @bad_${name}(i64 %arg, ptr %out) { store i8 17, ptr %out\n ${instruction}\n %p = getelementptr i8, ptr %out, i64 %idx\n ret void }\n')
 	}

@@ -99,7 +99,7 @@ loads/stores also require their complete stored size and explicit alignment.
 An index may also be a pure integer SSA expression built from scalar arguments,
 defined integer literals, literal-lane extraction from a direct integer vector
 argument, add/subtract/multiply, signed/unsigned division and remainder, shifts,
-AND/OR/XOR, scalar integer comparisons/selects, and trunc/zext/sext. Integer widths are i1..i64
+AND/OR/XOR, scalar integer comparisons/selects/freezes, and trunc/zext/sext. Integer widths are i1..i64
 and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
 ordinary scalar evaluators. Oversized shifts, left-shift wrap promises, right-shift
 exactness and OR disjointness are checked before writes. Poison and negative/out-of-range final indices
@@ -115,18 +115,24 @@ separate from its i1 result width. Zero-extend a boolean for a positive 0/1
 offset: a direct i1 true GEP index is negative and rejects under this profile.
 Floating, pointer and vector comparisons remain outside address expressions.
 Integer selects use a scalar i1 condition and matching i1..i64 value types.
-Literal poison is admitted in the expression graph; undef remains unsupported.
+Literal poison is admitted in the expression graph; undef is admitted only as
+the direct operand of a freeze.
 Poison propagates through ordinary nodes, but a select ignores poison in its
 unselected value. A poison condition or chosen value poisons the result. Every
 GEP expression is marked as an independent root, so a poisoned root still rejects
 even if another select ignores the same node. Immediate arithmetic errors and
 the existing poison-division profile errors remain unmaskable anywhere in the
 graph. Selects choose values, not whether earlier IR arithmetic executes.
+Scalar integer freeze preserves defined values and makes the same stable zero
+choice for poison/direct undef as ordinary execution. It cannot repair an
+independently checked poisoned GEP root or an immediate arithmetic error. Undef
+in arithmetic or select dependencies still rejects, including when that same
+constant was previously cached as a direct freeze source.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
 most 32 levels including leaves and cached subexpressions. Unrelated arithmetic
-does not consume this graph budget. Loads, PHIs, freeze,
+does not consume this graph budget. Loads, PHIs,
 dynamic lane selection and constructed/loaded vector dependencies reject as
 address expressions. These operations keep their ordinary non-address support.
 Every call evaluates the graph from immutable argument words into a fixed stack
@@ -162,6 +168,14 @@ conditions, nested selects, literal and computed poison, poisoned conditions,
 and ordinary values across i1..i64 against defined LLVM oracle values/tags.
 Separate controls check independently cached GEP roots, one-past bounds, cold
 poison, unmaskable division errors and exact cached-condition depth boundaries.
+
+`tests/ios/air-memory-freeze-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks defined
+values and explicit zero choices across i1..i64, including poison arithmetic,
+selects, comparisons, nested freezes and direct undef. Defined native targets
+run only for accepted addresses; arbitrary native freeze choices are checked
+with choice-independent properties. All three APIs verify prewrite refusals
+and consistent address/value use. Controls cover independent roots, immediate
+errors, cold blocks, one-past bounds, undef cache isolation and depth boundaries.
 
 Preflight caches the index source, width and stride. Every call resolves all
 indexed GEPs and accesses, including cold blocks, before any AIR instruction or
