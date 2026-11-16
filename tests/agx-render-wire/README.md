@@ -21,6 +21,13 @@ offset `0x6d`, full-width values, every copied field, the removed legacy word,
 reserved tails, backward branches, attachment markers and guarded unaligned
 writes. The 12.3 records ignore the additional address and keep their sizes.
 
+Fragment checks add 6,000 complete 13.5 command images through the production
+converter. Nonzero scratch words, every metadata field, following tail words
+and full-width counters distinguish the scratch slot at `0x8c8` from the new
+reserved word at `0x8cc`. The third parameter-block getter must return `0x4b8`.
+The native builder currently initializes these scratch/reserved words to zero;
+these synthetic cases exercise conversion semantics, not a hardware workload.
+
 The existing G13 layout tests independently check the work-command offsets
 used by the initializer's pointers. These host tests do not exercise allocation,
 locking, job preparation, firmware interpretation or multi-cluster rendering.

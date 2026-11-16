@@ -447,6 +447,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(base, 'fw/compute.rs'))!, read(os.join_path(base, 'fw/job.rs'))!, read(os.join_path(base, 'object.rs'))!,
 		read(os.join_path(base, 'event.rs'))!, read(os.join_path(base, 'fw/types.rs'))!, read(os.join_path(base, 'fw/workqueue.rs'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/compute.v'))!)!
+	check_fragment_tail_local(read(os.join_path(repo, 'kernel/gpu/agx/fw/fragment.v'))!)!
+	check_fragment_tail_reference(read(os.join_path(base, 'fw/fragment.rs'))!,
+		read(os.join_path(base, 'fw/job.rs'))!, read(os.join_path(repo, 'kernel/gpu/agx/fw/fragment.v'))!)!
 	check_vertex_cluster_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/microseq.v'))!)!
 	check_vertex_cluster_reference(read(os.join_path(base, 'queue/render.rs'))!,
@@ -770,6 +773,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Firmware 13.5 auxiliary framebuffer tail defaults',
 		'Firmware 12.3 padding and 13.5 single-cluster vertex-start marker',
 		'Firmware 13.5 start/finalize share the source-derived compute flag word',
+		'Firmware 13.5 fragment third-parameter offset and separate scratch/reserved/metadata words follow the selected source-layout model',
 		'Firmware 13.5 shared per-queue command/start counters']
 }
 

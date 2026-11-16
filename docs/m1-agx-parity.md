@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [compute finalizer command flag](m1-agx-compute-finalize.md)
-(2026-11-16). The [versioned single-cluster vertex start](m1-agx-vertex-marker.md),
+Latest offline increment: [13.5 fragment parameter and scratch offsets](m1-agx-fragment-tail.md)
+(2026-11-16). The [compute finalizer command flag](m1-agx-compute-finalize.md),
+[versioned single-cluster vertex start](m1-agx-vertex-marker.md),
 [G13 submissions after device loss](m1-agx-submit-device.md),
 [zero-length BIND before BO lookup](m1-agx-bind-zero.md),
 [timestamp-object validation and lookup order](m1-agx-timestamp-bind.md),

@@ -228,9 +228,10 @@ fn check_v13_5_command_repacking() {
 	assert object_u32(voidptr(&fragment_new), 0x770) == fragment.unk_758_flag
 	assert object_u32(voidptr(&fragment_new), 0x888) == fragment.busy_flag
 	assert object_u32(voidptr(&fragment_new), 0x88c) == fragment.tvb_overflow_count
-	// Struct7 gains a four-byte prefix; its first legacy word follows it.
-	assert object_u32(voidptr(&fragment_new), 0x8c8) == 0
-	assert object_u32(voidptr(&fragment_new), 0x8cc) == fragment.unk_pointee
+	// The reserved word follows the scratch word, before metadata.
+	assert object_u32(voidptr(&fragment_new), 0x8c8) == fragment.unk_pointee
+	assert object_u32(voidptr(&fragment_new), 0x8cc) == 0
+	assert (fw.g13_fragment_job_params_3_offset_for(.v13_5_partial) or { 0 }) == 0x4b8
 	assert object_u64(voidptr(&fragment_new), 0x918) == fragment.cur_ts
 	assert object_u64(voidptr(&fragment_new), 0x920) == fragment.start_ts
 	assert object_u64(voidptr(&fragment_new), 0x928) == fragment.end_ts

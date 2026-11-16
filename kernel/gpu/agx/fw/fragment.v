@@ -267,7 +267,7 @@ pub fn g13_fragment_job_params_2_offset_for(abi hw.FirmwareAbi) ?u64 {
 }
 
 pub fn g13_fragment_job_params_3_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x4b0 } .v13_5_partial { 0x4a8 } else { none } }
+	return match abi { .v12_3 { 0x4b0 } .v13_5_partial { 0x4b8 } else { none } }
 }
 
 pub fn g13_fragment_unk_758_flag_offset_for(abi hw.FirmwareAbi) ?u64 {
@@ -314,19 +314,21 @@ pub fn make_g13_fragment_v13_5(legacy &G13RunFragment, counter u64) G13RunFragme
 	g13_put_u64(voidptr(&out), 0x0c0, 0x100000)
 	g13_copy_bytes(voidptr(&out), 0x0c8, voidptr(legacy), 0x0b8, 0x128)
 	g13_copy_bytes(voidptr(&out), 0x1f0, voidptr(legacy), 0x1e0, 0x1d8)
-	// Struct1 is 0xe0 at both Ventura and the pinned m1n1 12.3 definition.
+	// The final 0x10 bytes of this parameter block are zero padding; the next
+	// block starts at 0x4b8, after its complete 0xf0-byte extent.
 	g13_copy_bytes(voidptr(&out), 0x3c8, voidptr(legacy), 0x3c0, 0x0e0)
-	// Struct3 gains a 0x10 register prefix, the larger AuxFBInfo, and one tail
-	// pointer. Copy its three stable regions around those insertions.
+	// The third block gains the larger AuxFBInfo and one tail word. Copy its
+	// stable regions around those insertions.
 	g13_copy_bytes(voidptr(&out), 0x4b8, voidptr(legacy), 0x4b0, 0x220)
 	g13_copy_bytes(voidptr(&out), 0x6d8, voidptr(legacy), 0x6d0, 0x010)
 	g13_put_u64(voidptr(&out), 0x6e8, 0x100000)
 	g13_copy_bytes(voidptr(&out), 0x6f0, voidptr(legacy), 0x6e0, 0x080)
-	// The command tail is grouped as flags/busy, Struct6, Struct7, then
-	// timestamps. Struct7 gains a four-byte prefix at 13.5.
+	// Preserve the scratch word before the new 13.3 reserved word. Metadata
+	// follows that insertion; the scratch word itself must not move into it.
 	g13_copy_bytes(voidptr(&out), 0x770, voidptr(legacy), 0x760, 0x11c)
 	g13_copy_bytes(voidptr(&out), 0x88c, voidptr(legacy), 0x87c, 0x03c)
-	g13_copy_bytes(voidptr(&out), 0x8cc, voidptr(legacy), 0x8b8, 0x034)
+	g13_copy_bytes(voidptr(&out), 0x8c8, voidptr(legacy), 0x8b8, 0x004)
+	g13_copy_bytes(voidptr(&out), 0x8d0, voidptr(legacy), 0x8bc, 0x030)
 	// Copy through client_sequence. Ventura's two additional timestamp words
 	// and trailing flags remain zero-initialised after it.
 	g13_copy_bytes(voidptr(&out), 0x900, voidptr(legacy), 0x8ec, 0x041)
