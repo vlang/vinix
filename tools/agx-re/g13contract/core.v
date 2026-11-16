@@ -580,6 +580,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(asahi_linux, 'drivers/dma-buf/dma-fence.c'))!)!
 	manager := read(os.join_path(base, 'gpu.rs'))!
 	workqueue := read(os.join_path(base, 'workqueue.rs'))!
+	check_render_retirement_reference(workqueue, read(os.join_path(base, 'queue/render.rs'))!)!
 	require_order(workqueue, ['let last_wptr = inner.pending[completed_commands - 1].inner.wptr()',
 		'raw.cpu_freeptr.store(last_wptr, Ordering::Release)'], 'Asahi workqueue retirement')!
 	recover := section(manager, '    fn recover(&self)', '    /// Return the packed GPU', 'Asahi recovery')!
@@ -590,6 +591,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(ack, ['raw.flags.halt_count.load', 'DeviceControlMsg::ver::GrowTVBAck',
 		'halt_count: U64(halt_count)'], 'Asahi TVB halt counter')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	check_render_retirement_local(local)!
 	retirement := section(local, 'fn (mut mgr GpuManager) retire_g13_subqueue_locked(',
 		'fn build_g13_attachments(', 'Vinix workqueue retirement')!
 	require_order(retirement, ['sequence <= queue.retired_sequence', 'katomic.sync()',

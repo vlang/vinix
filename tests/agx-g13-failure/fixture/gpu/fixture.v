@@ -171,12 +171,22 @@ mut:
 	fragment_ring_slot u32
 	vertex_retirement_sequence u64
 	fragment_retirement_sequence u64
+	retirement_published bool
+	vertex_retirement_published bool
+	fragment_retirement_published bool
+	retirement_failed bool
+	quarantined bool
 	error G13JobError
 	submitted bool
 	released bool
 	vertex_stamp_value u32
 	fragment_stamp_value u32
 	tvb_size_bytes u64
+	pending_counted bool
+	completion_result RetirementTestResult
+	completion_result_ready bool
+	completion fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
+	completion_data voidptr
 }
 
 struct G13ComputeJobResources {
@@ -282,6 +292,7 @@ pub fn run_checks() {
 	check_publishers()
 	check_barrier_publishers()
 	check_retirement()
+	check_render_retirement()
 	check_recovery()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80

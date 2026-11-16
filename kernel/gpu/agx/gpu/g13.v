@@ -269,6 +269,9 @@ pub mut:
 	vertex_ring_slot u32
 	fragment_ring_slot u32
 	retirement_published bool
+	vertex_retirement_published bool
+	fragment_retirement_published bool
+	retirement_failed bool
 	released                bool
 	completion              fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
 	completion_data         voidptr
@@ -1129,6 +1132,40 @@ fn (mut mgr GpuManager) retire_g13_subqueue_locked(resources &G13QueueResources,
 	katomic.store(mut &state.cpu_freeptr, slot)
 	queue.retired_sequence = sequence
 	return true
+}
+
+// Caller holds mgr.lock. Each firmware workqueue returns its own completed
+// ring entries, even while the other render stage still owns shared backing.
+// Return 0 while waiting, 1 after both retirements, -1 for a completed failure.
+fn (mut mgr GpuManager) retire_g13_render_stages_locked(mut job G13RenderJobResources) int {
+	if job.retirement_published { return 1 }
+	vertex_done := job.vertex_retirement_published || job.quarantined
+		|| event.stamp_value_completed(job.vertex_event_slot, job.vertex_stamp_value)
+	fragment_done := job.fragment_retirement_published || job.quarantined
+		|| event.stamp_value_completed(job.fragment_event_slot, job.fragment_stamp_value)
+	// A partial protocol failure must not trigger a callback that releases
+	// captures still used by the other stage. Report it once both are done;
+	// the existing quarantined path can then retry physical retirement.
+	if job.retirement_failed && !job.quarantined {
+		return if vertex_done && fragment_done { -1 } else { 0 }
+	}
+	if vertex_done && !job.vertex_retirement_published {
+		if !mgr.retire_g13_subqueue_locked(job.queue, 0, job.vertex_retirement_sequence, job.vertex_ring_slot) {
+			job.retirement_failed = true
+			return if fragment_done { -1 } else { 0 }
+		}
+		job.vertex_retirement_published = true
+	}
+	if fragment_done && !job.fragment_retirement_published {
+		if !mgr.retire_g13_subqueue_locked(job.queue, 1, job.fragment_retirement_sequence, job.fragment_ring_slot) {
+			job.retirement_failed = true
+			return if vertex_done { -1 } else { 0 }
+		}
+		job.fragment_retirement_published = true
+	}
+	if !job.vertex_retirement_published || !job.fragment_retirement_published { return 0 }
+	job.retirement_published = true
+	return 1
 }
 
 fn build_g13_attachments(count u32,
@@ -2176,19 +2213,13 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 			}
 			continue
 		}
-		if !job.quarantined && (!event.stamp_value_completed(job.vertex_event_slot, job.vertex_stamp_value)
-			|| !event.stamp_value_completed(job.fragment_event_slot, job.fragment_stamp_value)) {
-			continue
-		}
 		mut owned := unsafe { job }
-		if !owned.retirement_published {
-			if !mgr.retire_g13_subqueue_locked(owned.queue, 0, owned.vertex_retirement_sequence, owned.vertex_ring_slot)
-				|| !mgr.retire_g13_subqueue_locked(owned.queue, 1, owned.fragment_retirement_sequence, owned.fragment_ring_slot) {
-				owned.quarantined = true
-				complete_g13_render_job(mut owned, false)
-				continue
-			}
-			owned.retirement_published = true
+		retirement := mgr.retire_g13_render_stages_locked(mut owned)
+		if retirement == 0 { continue }
+		if retirement < 0 {
+			owned.quarantined = true
+			complete_g13_render_job(mut owned, false)
+			continue
 		}
 		owned.completion_result = read_g13_render_result(owned)
 		owned.completion_result_ready = true

@@ -19,6 +19,7 @@ const packet_helpers = [
 ]
 
 const helpers = [
+	'gpu__agx__gpu__GpuManager__retire_g13_render_stages_locked',
 	'gpu__agx__gpu__write_g13_timestamp_pair',
 	'gpu__agx__gpu__GpuManager__prepare_g13_render_job',
 	'gpu__agx__gpu__GpuManager__prepare_g13_compute_job',
@@ -167,6 +168,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name.ends_with('retire_g13_render_stages_locked') { return 'i64' }
 	if name == 'gpu__agx__gpu__write_g13_timestamp_pair' { return 'void' }
 	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_render_job' { return '__v_option_gpu__agx__gpu__G13RenderJobResourcesptr' }
 	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_compute_job' { return '__v_option_gpu__agx__gpu__G13ComputeJobResourcesptr' }
