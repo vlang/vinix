@@ -295,7 +295,14 @@ Here `sx`/`sy` are the actual group width/height, clipped at a partial grid edge
 They supply the normalized grid dimensions, actual clipped group dimensions,
 and requested group dimensions respectively; a scalar receives the x component.
 Grid position and grid size must use matching types when both are declared.
-Actual and requested group size must likewise match each other.
+`air.thread_position_in_threadgroup`, `air.threadgroup_position_in_grid` and
+`air.threadgroups_per_grid` accept the same uint/uint3 forms. They supply the
+local position, group position and group counts, respectively; scalars receive x.
+Local positions use the requested group dimensions for their modulo, group
+positions use those dimensions for division, and counts round each grid axis up
+to cover partial groups. Local position, actual size and requested group size
+must use matching types when declared together. Group positions/counts may use
+scalar projections independently of the grid-position and local-position types.
 The sizes are captured with each dispatch and supplied afresh to each invocation,
 so a prepared pipeline can index output using the current grid dimensions.
 Builtins have no buffer location and do not
@@ -326,6 +333,16 @@ backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.
 The size semantics follow the
 [Metal Shading Language specification](https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf).
+
+`tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR group-coordinates` checks
+all eight geometry semantics together in reusable scalar, uint3 and mixed
+pipelines. Tiled addresses reconstruct global positions from local positions,
+group positions and requested group sizes. Independent group/local enumeration
+checks every returned lane, explicitly counts group origins, and verifies all
+output padding. Both selectors, partial groups on every axis, maximum grids,
+snapshot offsets, late bounds refusal, invalid metadata/types/duplicates and
+local-position/size family mismatches run in both hashing modes with two drained
+runtimes per mode. Threadgroup coordinates add no shared memory or barriers.
 
 `tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR builtins` runs the focused
 Objective-C checks with normal and deterministic Swift hashing. Each mode

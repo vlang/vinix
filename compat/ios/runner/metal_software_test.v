@@ -60,6 +60,10 @@ fn sm_sampler_worker(api SMSamplerAPI, device u64, descriptor u64) {
 }
 fn test_software_metal_samplers() {
 	$if !ios_metal_software ? { return }
+	if os.args.len == 2 && os.args[1] == '--software-metal-group-coordinates' {
+		sm_test_group_coordinates_focus()!
+		exit(0)
+	}
 	if os.args.len == 2 && os.args[1] == '--software-metal-sizes' {
 		sm_test_geometry_sizes_focus()!
 		exit(0)
@@ -4082,6 +4086,152 @@ fn sm_test_multigrid_focus() ! {
 		objc_release(output); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool); objc_stop()
 	}
 	line := 'IOS-SOFTWARE-METAL-MULTIGRIDS: ${complete} completed dispatches, ${invocations} successful invocations, ${failed} cold/poison command failures, ${coordinates} independently enumerated coordinates, ${geometry} geometry/budget controls, ${cases.len} first/edge group fixtures, both selectors, 2D/3D partial groups and two drained runtimes PASS\n'
+	os.write_file(out + '/result.txt', line)!; print(line)
+}
+fn sm_group_coordinate_vector(variant int, arg int) bool {
+	return arg != 1 && (variant == 0 || (variant == 2 && (arg == 0 || arg == 2)))
+}
+fn sm_test_group_coordinates_focus() ! {
+	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR')
+	sm_grid_check(base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/'), 'external coordinate output')
+	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/group-coordinates' } else { '/normal/group-coordinates' }
+	sm_grid_check(!os.exists(out), 'fresh coordinate output'); os.mkdir_all(out)!
+	semantics := ['air.thread_position_in_grid', 'air.thread_index_in_threadgroup', 'air.threads_per_grid', 'air.threads_per_threadgroup', 'air.dispatch_threads_per_threadgroup', 'air.thread_position_in_threadgroup', 'air.threadgroup_position_in_grid', 'air.threadgroups_per_grid']
+	args := ['gid', 'local', 'grid', 'actual', 'requested', 'lid', 'group', 'groups']
+	bad := ['half', 'wide', 'float', 'vec2', 'vec4', 'float_vector', 'pointer', 'address_space', 'spoof', 'location', 'access', 'size', 'alignment', 'buffer_size', 'unused', 'opaque', 'duplicate']
+	mut names := ['vector_coords', 'scalar_coords', 'mixed_coords']
+	mut source := strings.new_builder(65536); source.write_string('target datalayout = "e-p:64:64"\n')
+	for variant in 0 .. 3 {
+		source.write_string('define void @${names[variant]}(')
+		for a, arg in args { source.write_string('${if a == 0 { '' } else { ', ' }}${if sm_group_coordinate_vector(variant, a) { '<3 x i32>' } else { 'i32' }} %${arg}') }
+		source.write_string(', ptr addrspace(1) %out) {\n')
+		mut values := []string{}
+		for a, arg in args {
+			if sm_group_coordinate_vector(variant, a) { for lane in 0 .. 3 { source.write_string('%${arg}${lane} = extractelement <3 x i32> %${arg}, i32 ${lane}\n'); values << '%${arg}${lane}' } } else { values << '%${arg}' }
+		}
+		if variant == 0 {
+			for lane in 0 .. 3 { source.write_string('%origin${lane} = mul nuw nsw i32 %group${lane}, %requested${lane}\n %global${lane} = add nuw nsw i32 %origin${lane}, %lid${lane}\n') }
+		} else if variant == 1 { source.write_string('%origin = mul nuw nsw i32 %group, %requested\n %global = add nuw nsw i32 %origin, %lid\n') }
+		if variant != 1 {
+			prefix := if variant == 0 { 'global' } else { 'gid' }
+			source.write_string('%zy = mul nuw nsw i32 %${prefix}2, %grid1\n %row = add nuw nsw i32 %zy, %${prefix}1\n %start = mul nuw nsw i32 %row, %grid0\n %index = add nuw nsw i32 %start, %${prefix}0\n')
+		} else { source.write_string('%index = add i32 %global, 0\n') }
+		source.write_string('%record = mul nuw nsw i32 %index, 32\n')
+		for lane, value in values { source.write_string('%i${lane} = add nuw nsw i32 %record, ${lane}\n %p${lane} = getelementptr i32, ptr addrspace(1) %out, i32 %i${lane}\n store i32 ${value}, ptr addrspace(1) %p${lane}, align 4\n') }
+		source.write_string('ret void }\n')
+	}
+	for semantic in 0 .. 3 { for kind in bad {
+		name := 'bad_${semantic}_${kind}'; names << name
+		typ := match kind { 'half' { 'i16' } 'wide' { 'i64' } 'float' { 'float' } 'vec2' { '<2 x i32>' } 'vec4' { '<4 x i32>' } 'float_vector' { '<3 x float>' } 'pointer', 'address_space' { 'ptr' } else { 'i32' } }
+		source.write_string('define void @${name}(${typ} %value, i32 %other, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n ret void }\n')
+	} }
+	for family in 0 .. 4 {
+		name := 'mismatch_${family}'; names << name
+		source.write_string('define void @${name}(${if family % 2 == 0 { '<3 x i32>' } else { 'i32' }} %a, ${if family % 2 == 0 { 'i32' } else { '<3 x i32>' }} %b, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n ret void }\n')
+	}
+	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
+	for i, name in names {
+		n := i * 20
+		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n !${n + 1} = !{}\n')
+		if i < 3 {
+			source.write_string('!${n + 2} = !{'); for a in 0 .. 9 { source.write_string('${if a == 0 { '' } else { ', ' }}!${n + 11 - a}') }; source.write_string('}\n')
+			for a, semantic in semantics { source.write_string('!${n + 3 + a} = !{i32 ${a}, !"${semantic}", !"air.arg_type_name", !"${if sm_group_coordinate_vector(i, a) { 'uint3' } else { 'uint' }}"}\n') }
+			source.write_string('!${n + 11} = !{i32 8, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
+		} else {
+			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
+			if i < 3 + bad.len * 3 {
+				semantic := semantics[5 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
+				extra := match kind {
+					'spoof' { ', !"air.arg_type_name", !"int"' }
+					'location' { ', !"air.location_index", i32 0, i32 1' }
+					'access' { ', !"air.read"' }
+					'size' { ', !"air.arg_type_size", i32 4' }
+					'alignment' { ', !"air.arg_type_align_size", i32 4' }
+					'buffer_size' { ', !"air.buffer_size", i32 4' }
+					'address_space' { ', !"air.address_space", i32 0' }
+					'unused' { ', !"air.arg_unused"' }
+					'opaque' { ', !"air.unknown_tail", i32 9' }
+					else { '' }
+				}
+				source.write_string('!${n + 3} = !{i32 0, !"${semantic}"${extra}}\n !${n + 4} = !{i32 1, !"${if kind == 'duplicate' { semantic } else { semantics[1] }}"}\n')
+			} else {
+				family := i - 3 - bad.len * 3
+				source.write_string('!${n + 3} = !{i32 0, !"${semantics[5]}"}\n !${n + 4} = !{i32 1, !"${semantics[if family < 2 { 3 } else { 4 }]}"}\n')
+			}
+		}
+	}
+	os.write_file(out + '/input.ll', source.str())!
+	r := os.exec(['/opt/homebrew/opt/llvm/bin/llvm-as', out + '/input.ll', '-o', out + '/input.bc'])
+	os.write_file(out + '/assemble.log', r.output)!; sm_grid_check(r.exit_code == 0, r.output)
+	code := os.read_bytes(out + '/input.bc')!; bytes := sm_library_code_fixture(names, code, true, true, true)
+	defer { unsafe { code.free(); bytes.free() } }
+	mut rows := os.create(out + '/comparisons.txt')!; defer { rows.close() }
+	mut complete := 0; mut invocations := u64(0); mut rejected := 0; mut failed := 0
+	for cycle in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
+		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'coordinate library')
+		queue := sm_send(device, c'newCommandQueue'); output := sm_test_buffer(device, 4096 * 128 + 32, 0); op := sm_send(output, c'contents')
+		for name in names[3..] {
+			mut error_slot := u64(0)
+			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
+			sm_grid_check(sm_send(error_slot, c'code') == 3, 'coordinate pipeline diagnostic'); rejected++
+		}
+		for variant in 0 .. 3 {
+			pipeline := sm_test_compute_pipeline(device, library, names[variant], unsafe { nil }); sm_grid_check(pipeline != 0, names[variant])
+			grids := if variant != 1 { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{7, 5, 3}, SoftwareMetalSize{16, 16, 16}, SoftwareMetalSize{1, 5, 3}, SoftwareMetalSize{5, 1, 7}] } else { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{7, 1, 1}, SoftwareMetalSize{17, 1, 1}, SoftwareMetalSize{256, 1, 1}, SoftwareMetalSize{4096, 1, 1}] }
+			groups := if variant != 1 { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{3, 2, 2}, SoftwareMetalSize{4, 4, 4}] } else { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{3, 1, 1}, SoftwareMetalSize{256, 1, 1}] }
+			for grouped in [false, true] { for grid in grids { for group in groups {
+				if grid.width * grid.height * grid.depth * (if grouped { group.width * group.height * group.depth } else { u64(1) }) > 4096 { continue }
+				s := sm_multigrid_extent(SoftwareMetalMultigridCase{grouped, grid, group, false})
+				command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+				unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+				sm_test_compute_buffer(encoder, output, 16, 7)
+				sm_grid_dispatch(encoder, if grouped { c'dispatchThreadgroups:threadsPerThreadgroup:' } else { c'dispatchThreads:threadsPerThreadgroup:' }, grid, group)
+				sm_test_compute_offset(encoder, 20, 7); sm_call(encoder, c'endEncoding'); unsafe { C.memset(voidptr(op), 0xcc, 4096 * 128 + 32) }
+				mut expected := []u32{len: 4096 * 32 + 8, init: 0xcccccccc}
+				// Count origins explicitly; the runtime uses division of (extent - 1).
+				mut nx := u64(0); mut ny := u64(0); mut nz := u64(0)
+				for x := u64(0); x < s.width; x += group.width { nx++ }
+				for y := u64(0); y < s.height; y += group.height { ny++ }
+				for z := u64(0); z < s.depth; z += group.depth { nz++ }
+				for gz in u64(0) .. nz { for gy in u64(0) .. ny { for gx in u64(0) .. nx {
+					mut sx := u64(0); mut sy := u64(0); mut sz := u64(0)
+					for lx in u64(0) .. group.width { if gx * group.width + lx < s.width { sx++ } }
+					for ly in u64(0) .. group.height { if gy * group.height + ly < s.height { sy++ } }
+					for lz in u64(0) .. group.depth { if gz * group.depth + lz < s.depth { sz++ } }
+					mut local := u64(0)
+					for lz in u64(0) .. sz { for ly in u64(0) .. sy { for lx in u64(0) .. sx {
+						x := gx * group.width + lx; y := gy * group.height + ly; z := gz * group.depth + lz
+						index := int((z * s.height + y) * s.width + x) * 32 + 4
+						values := [x, y, z, local, s.width, s.height, s.depth, sx, sy, sz, group.width, group.height, group.depth, lx, ly, lz, gx, gy, gz, nx, ny, nz]!
+						mut lane := 0
+						for a in 0 .. 8 {
+							start := if a == 0 { 0 } else if a == 1 { 3 } else { 4 + (a - 2) * 3 }
+							for v in 0 .. if sm_group_coordinate_vector(variant, a) { 3 } else { 1 } { expected[index + lane] = u32(values[start + v]); lane++ }
+						}
+						local++
+					} } }
+				} } }
+				sm_call(command, c'commit'); sm_grid_check(sm_send(command, c'status') == 4, 'coordinate completion')
+				for j, value in expected { if unsafe { *(&u32(op + u64(j * 4))) } != value { panic('coordinate case ${complete} variant ${variant} word ${j}') } }
+				unsafe { expected.free() }; complete++; invocations += s.width * s.height * s.depth
+				rows.writeln('${cycle} ${variant} ${grouped} ${s.width},${s.height},${s.depth} ${group.width},${group.height},${group.depth} PASS')!
+			} } }
+			if variant == 0 {
+				short := sm_test_buffer(device, 16 + 104 * 128, 0); sp := sm_send(short, c'contents'); length := sm_send(short, c'length')
+				command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+				unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+				sm_test_compute_buffer(encoder, short, 16, 7); sm_grid_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', SoftwareMetalSize{7, 5, 3}, SoftwareMetalSize{3, 2, 2})
+				sm_call(encoder, c'endEncoding'); unsafe { C.memset(voidptr(sp), 0xcc, usize(length)) }; objc_release(short)
+				sm_call(command, c'commit'); sm_grid_check(sm_send(command, c'status') == 5 && sm_send(command, c'error') != 0, 'coordinate prewrite failure')
+				for j in u64(0) .. length { sm_grid_check(unsafe { *(&u8(sp + j)) } == 0xcc, 'coordinate output untouched') }; failed++
+			}
+			objc_release(pipeline)
+		}
+		objc_release(output); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool)
+		sm_grid_check(ios_runtime.live == 0 && ios_runtime.objects.len == 0, 'drained coordinate runtime'); objc_stop()
+	}
+	line := 'IOS-SOFTWARE-METAL-GROUP-COORDINATES: ${complete} dispatches, ${invocations} checked invocations, ${rejected} rejected pipelines, ${failed} prewrite bounds failures, all eight geometry builtins, scalar/uint3/mixed projections, tiled addresses, both selectors, partial groups and two drained runtimes PASS\n'
 	os.write_file(out + '/result.txt', line)!; print(line)
 }
 // One pipeline per shape, reused across dispatch sizes; expected records come
