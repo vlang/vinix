@@ -1007,6 +1007,23 @@ Existing 256-node and 32-level bounds count all sources and cached heights.
 in both directions, native LLVM bits, nonmutating validation, ordinary/prepared
 write ordering, freeze/poison/undef controls and exact graph boundaries.
 
+Fixed 1..16-lane integer vectors support ordinary direct `llvm.pext.vNiW`
+and `llvm.pdep.vNiW` calls for i1..i64 lanes. Extraction gathers selected bits
+into consecutive low positions; deposition scatters low bits into selected
+positions. Positions are visited from low to high and unused bits are zero.
+Each operand and result has the exact same vector type. Source poison remains
+lane-local even with a zero mask; any undef input lane rejects the executed
+call. Source freeze repairs indeterminate lanes, while result freeze cannot
+hide earlier undef errors. Calls share existing construction, source-plus-result
+lane work, declaration attributes and cache identity checks. Integer, mixed,
+void and memory execution accept the calls, including pure integer address
+graphs with all-source observation, conservative prewrite validation and
+existing node/depth bounds. Scalable vectors, malformed overloads and nonzero
+call flags remain excluded. `tests/ios/air-vector-bit-permutation.v` compares
+native LLVM and an independent bit-position oracle, ordinary/prepared address
+execution, scalar round trips, both source states, cache collisions and shared
+work/storage bounds.
+
 Fixed 1..16-lane half/float vectors support unflagged `fpext`
 (half to float) and `fptrunc` (float to half), retaining the lane count. They
 reuse scalar integer-based conversion: widening is exact for finite values;
