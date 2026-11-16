@@ -1405,7 +1405,15 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now binds that restriction, its exact directory list and full control graph
     into every format-7 host receipt. A fresh signed x86 run and all fifty-nine
     retention refusals pass, including both retained directory-policy omissions.
-    Global metadata/search and OS-loader reads remain outside its claim. Complete
+    The required format-7 path still leaves metadata/search and OS-loader reads
+    outside its claim. A separate
+    [metadata-read qualifier](tests/packages/wine-metadata-closed-replay.md)
+    now reproduces all four roles with exact file/ancestor metadata permissions
+    and rechecked metadata-only aliases to pinned images. Its combined policy
+    passes sixty runtime denials and sixteen allowed controls, including
+    direct/symlink/Data-volume `stat` refusals. Twenty-six policy and three
+    admission refusals also pass. Mandatory metadata integration and complete
+    existence/search/metadata coverage remain open. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader

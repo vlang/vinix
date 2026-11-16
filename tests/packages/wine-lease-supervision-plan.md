@@ -5447,3 +5447,63 @@ bytes keep their prior scope. Full ABI/library/search closure and bootstrap/
 hermetic admission remain unqualified. Owned ARM/GUI, broader lifetime/mapping
 controls, redistribution, defaults and complete roadmap 14 acceptance remain
 open. No kernel, guest or product-default behavior changes.
+
+## Exact metadata-read permissions during host replay (2026-11-16)
+
+Commit `547342132` adds a [metadata-read qualifier](wine-metadata-closed-replay.md)
+requiring complete original format-7 host admission before and after replay.
+`winemetaclosure` keeps the file-data and directory policy intact, then limits
+`file-read-metadata` to exact admitted files/ancestors, metadata-only pinned-image
+aliases and the existing OS-root/device exceptions. The sorted metadata list
+and aliases are derived and rechecked; no Homebrew directory prefix is granted.
+Image aliases must resolve to ordinary images pinned by the original host graph.
+Symlink targets are recorded, with bounded image-directory listings, candidate
+counts and discovery generations. The main file and all three policy sources
+have embedded guards, repeated before publication; non-production builds refuse.
+
+Fixture, controller, producer and retainer all pass. Captured and unrestricted
+external-object linking reproduce each original executable. Each role passes
+four allowed controls and fifteen denials, including two allowed `stat` calls
+and seven denied `stat` calls. The latter cover an unlisted file and directory
+through direct/symlink/Data-volume paths plus an installed SDK stub, requiring
+ordinary types unrestricted and exact EPERM/EACCES markers under restriction.
+This is sixty combined runtime denials and sixteen allowed controls, including
+twenty-eight new metadata denials and eight allowed metadata controls. Existing
+file/directory denials, exact hidden-object link refusal, observed load/image
+hashes and UUIDs, capability bytes and successful outputs remain checked.
+The production control runner passes twenty-six unsafe/list/bound/alias
+refusals and three wrong-checker/incomplete/old-format admission refusals,
+plus deterministic projection and unchanged data permissions for metadata aliases.
+
+The complete checkpoint is `/Users/alex/.cache/vwmetaclosed-20261116-01`, with
+final source in `source-final-02`, tools `replay-final-02` and `controls-final-02`,
+four passing `fixture-02`, `controller-02`, `producer-02`, `retainer-02` outputs
+and `controls-02`. Full revision/patch, selected source snapshots, generated
+programs, raw commands/environments/exits, policies and receipts remain outside
+Git. `validation.txt` distinguishes preliminary repository-root diagnostics,
+the initial frozen candidate and final passing tools. The initial policy refused
+exec at the linker's aliases; the first alias-aware frozen candidate reached
+dyld and refused LLVM's opt alias. A separate preliminary invocation refused at
+its embedded policy-source guard after an edit. All failures are retained;
+the final exact image-alias projection fixes those paths without weakening
+the original checker or granting arbitrary prefix access.
+
+The complete original format-7 bundle remains
+`/Users/alex/.cache/vwhostdir-20261116-01`, with its original checker, all four
+host builds, selected compiler/LLVM/SDK and original namespaces still required.
+Its inventory and all earlier bundles are unchanged. This additive qualifier
+does not claim a new guest run or alter required host receipt format 7.
+The new typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-metadata-closed-20261116-01.inventory.json`,
+SHA-256 `7302cfff044ef6ce35e37d2e6aca69dc32984a2ed32f24f69b6c331ce7d58990`.
+Complete recording and independent comparison both pass for bytes, sizes,
+types, modes and link targets. Their logs are beside the receipt; the complete
+new workspace remains frozen after recording.
+
+The qualified operation is `file-read-metadata`/`stat` during this replay.
+Other existence/search/metadata operations, ancestor entry names, OS-root/device
+exceptions, writes/network, helper startup/inherited state and OS loader/cache
+bytes retain their previous scope. Full SDK/ABI/library/search, bootstrap and
+hermetic admission remain open, along with mandatory metadata-policy integration,
+owned ARM/GUI, broader lifetime/mapping controls, redistribution and defaults.
+No kernel, guest or product-default behavior changes.

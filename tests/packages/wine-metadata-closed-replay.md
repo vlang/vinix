@@ -21,9 +21,10 @@ metadata list is recomputed from those inputs. Linker invocation and dyld use
 symlinked Homebrew image paths. For each pinned ordinary image, the parent lists
 its canonical directory's names (bounded at 4,096) and selects only names that
 resolve to that image, including corresponding existing `/opt/homebrew/opt/`
-aliases. At most 128 image alias paths and 128 symlink nodes are admitted, with
-at most sixteen expansions per path. Every resolved image must belong to the
-original host input map. Exact paths and parents receive metadata permission
+aliases. At most 128 image alias paths and 128 symlink nodes are admitted;
+discovery stops above sixteen generations of newly expanded paths.
+Every resolved image must belong to the original host input map.
+Exact paths and parents receive metadata permission
 only; symlink targets and resolved images are recorded and recomputed after
 replay. The extra metadata alias list is bounded at 128 paths. Aliases do not
 acquire data-read permissions. Combined file/alias lists
