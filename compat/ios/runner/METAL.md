@@ -1,11 +1,21 @@
 # Software Metal backend
 
+Prepared pipelines execute ternary `air.clamp.vNf32` for fixed 1..16-lane
+float32 vectors. Each lane uses AIR max then min, including numeric NaN
+preference and first-argument signed-zero ties. Reversed ordered bounds
+produce poison in that lane; freeze and lazy selection retain the existing
+state rules. All three vectors require the exact result type and ordinary
+pure calls. Keys 61764..61779 append sixteen identities; the vector cache
+has 61,780 entries and the scalar cache remains 2,179. The dedicated clamp
+image checks numeric bounds, NaNs, signed zeros and repaired domain poison
+before its independent RGBA8 readback oracle.
+
 Prepared pipelines execute binary `air.fmin.vNf32` and `air.fmax.vNf32`
 for fixed 1..16-lane float32 vectors. Numeric lanes take precedence over a
 NaN; numeric ties retain the first argument, including opposite signed zeros.
 A dedicated image checks coordinate extrema, both first-zero signs
 and NaN preference in both lanes before its independent RGBA8 oracle. Keys
-61732..61763 append 32 AIR identities, for 61,764 vector entries; scalar
+61732..61763 append 32 AIR identities, for 61,780 vector entries; scalar
 entries remain 2,179. Exact binary signatures, all operand types, pure calls,
 state/freeze rules and existing resource bounds remain required. Half, scalable,
 fast spellings and floating address projections remain excluded.
@@ -15,7 +25,7 @@ float32 vectors. The existing fused evaluator adds the exact product and
 addend before one nearest rounding with ties to even. A two-lane image check
 combines an independent coordinate affine result with alternating-sign fused
 cancellation bits before its RGBA8 oracle. Keys 61716..61731 append sixteen
-AIR identities, for 61,764 vector entries; scalar entries remain 2,179. Exact
+AIR identities, for 61,780 vector entries; scalar entries remain 2,179. Exact
 matching types for all three vector arguments are checked, including cached
 calls. Existing poison/undef, freezes, budgets and ownership rules apply. Half,
 fast spellings and floating address projections remain excluded.
@@ -28,9 +38,9 @@ subnormals. Round uses half ties away from zero; rint and sqrt use nearest
 rounding with ties to even. A two-lane coordinate fixture checks every family
 and both signs against independent scalar expressions before its RGBA8 oracle.
 AIR keys 61604..61715 append without moving LLVM keys; the vector cache has
-61,764 entries and the scalar cache remains 2,179. Exact vector signatures,
+61,780 entries and the scalar cache remains 2,179. Exact vector signatures,
 ordinary pure calls and existing state/work/slot rules apply. The admitted AIR
-vector families are these unary operations, FMA and float min/max. Half and
+vector families are these unary operations, FMA, float min/max and clamp. Half and
 fast overloads remain excluded; floating address projections reject.
 
 Prepared pipelines execute ternary `air.clamp.f32` as AIR max then min, with
