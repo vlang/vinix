@@ -339,6 +339,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_submission_device_loss()
 	check_submission_lookup_order()
 	check_missing_queue_submission_failures()
 	check_missing_syncobj_submission_failures()

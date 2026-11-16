@@ -1223,7 +1223,9 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	output_result, output_syncs := agxsubmission.stage_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 { return output_result }
 	manager := gpu.get_global_manager() or { return -19 }
-	if manager.hw_config.gpu_gen != .g13 || manager.state != .running { return -95 }
+	mut state_manager := unsafe { manager }
+	status := state_manager.g13_submission_status()
+	if status != 0 { return status }
 	f.lock.acquire()
 	mut unqueued_fence := &syncobj.DmaFence(unsafe { nil })
 	mut unqueued_failure := 0

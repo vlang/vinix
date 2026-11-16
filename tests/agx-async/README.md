@@ -7,6 +7,17 @@ staging, payload validation, sync objects, completion finish/discard, pending
 poller, manager-locked registration and queue dispatch guard. GPU allocation,
 publication, completion and shutdown are injected services. It executes no GPU.
 
+Submission device-state checks run 57,400 cases with the real locked snapshot.
+Error/stopped returns ENODEV before job preparation or output publication;
+unsupported generations and idle/starting retain EOPNOTSUPP. Compute/render,
+input-sync and result combinations preserve pending output-fence identity/status,
+result bytes and references on refusal, and release staging storage. Earlier
+header/queue/OOM/copy/command/sync failures retain precedence. Callbacks inject
+loss during unlocked copying or immediately before the manager lock. Healthy
+G13 controls complete and drain their jobs. The state lock is released before
+file mutation. These schedules do not qualify native state visibility or later
+loss races; the legacy staging order and modern flat-command ABI still differ.
+
 Queue lookup order checks require an absent queue to return ENOENT before
 command allocation, user copies, payload validation or sync lookup. Header
 validation retains its precedence. An exact copy callback removes a queue

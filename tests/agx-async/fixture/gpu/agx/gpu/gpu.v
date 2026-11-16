@@ -7,6 +7,8 @@ import gpu.agx.mmu
 import klock
 
 pub enum State {
+	idle
+	starting
 	running
 	error
 	stopped
@@ -124,8 +126,10 @@ pub mut:
 }
 
 __global test_async_gpu_manager GpuManager
+__global manager_available = true
 
 pub fn reset() {
+	manager_available = true
 	assert test_async_gpu_manager.g13_compute_jobs.len == 0 && test_async_gpu_manager.g13_render_jobs.len == 0
 	unsafe {
 		test_async_gpu_manager.g13_compute_jobs.free()
@@ -142,7 +146,11 @@ pub fn reset() {
 	test_async_gpu_manager.released_order.flags |= .noslices
 }
 
-pub fn get_global_manager() ?&GpuManager { return unsafe { &test_async_gpu_manager } }
+pub fn available(value bool) { manager_available = value }
+pub fn get_global_manager() ?&GpuManager {
+	if !manager_available { return none }
+	return unsafe { &test_async_gpu_manager }
+}
 
 pub fn (job &G13ComputeJobResources) timestamp_values() ComputeValues { return ComputeValues{} }
 

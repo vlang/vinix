@@ -168,6 +168,17 @@ pub fn get_global_manager() ?&GpuManager {
 	return global_gpu_mgr
 }
 
+// A lost device is distinct from an unsupported backend or startup state.
+// Release the state lock before the file mutation lock or fallible job work.
+pub fn (mut mgr GpuManager) g13_submission_status() int {
+	mgr.lock.acquire()
+	status := if mgr.state == .error || mgr.state == .stopped { -19 }
+		else if mgr.hw_config.gpu_gen != .g13 || mgr.state != .running { -95 }
+		else { 0 }
+	mgr.lock.release()
+	return status
+}
+
 // Match Asahi's global-query crash snapshot. Shutdown publishes stopped under
 // this lock; release it before formatting or copying to userspace. A failure
 // after the snapshot may race with a successful query, as with is_crashed().

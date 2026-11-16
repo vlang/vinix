@@ -21,7 +21,6 @@ fn main() {
 	assert object_source.count(allocation) == 1
 	os.write_file(object_path, object_source.replace(allocation, 'memory.malloc_syncobj_fallible(sizeof(SyncObj))'))!
 	os.mkdir_all('${scratch}/aarch64')!
-	os.cp_all('${repo}/tests/agx-g13-failure/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/aarch64/timer', '${scratch}/aarch64/timer', false)!
 	for path in ['drm/ioctl', 'gpu/agx/command', 'gpu/agx/compute', 'gpu/agx/render',
 		'gpu/agx/submission'] {
@@ -39,6 +38,7 @@ fn main() {
 	g13 := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	errors := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v')!
 	os.write_file('${scratch}/gpu/agx/gpu/production.v', 'module gpu\n' +
+		section(gpu, 'pub fn (mut mgr GpuManager) g13_submission_status(', 'pub fn (mut mgr GpuManager) can_query_global_params(')! +
 		section(gpu, 'pub fn (mut mgr GpuManager) queue_g13_submission(', '__global (')! +
 		section(g13, 'pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(', '// Caller holds the manager lock during shutdown.')! +
 		section(errors, 'pub struct G13JobError {', 'fn g13_error_at_stamp(')!)!

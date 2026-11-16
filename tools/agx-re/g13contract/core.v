@@ -441,6 +441,8 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_submit_device_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
+	check_submit_device_reference(read(os.join_path(base, 'queue/mod.rs'))!)!
 	check_timestamp_bind_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!)!
 	check_timestamp_bind_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'gpu.rs'))!,
 		read(os.join_path(base, 'gem.rs'))!, read(os.join_path(base, 'mmu.rs'))!)!
@@ -717,6 +719,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
+		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',
 		'Zero-length BIND rejects before BO lookup, including SINGLE_PAGE, while legacy zero-encoded UNBIND_ALL retains its operation semantics',
 		'Timestamp BIND ignores input output-handles, checks sum overflow before BO lookup and empty ranges after it; UNBIND resolves missing names before manager availability and preserves retained owners',
 		'Global GET_PARAMS rejects error/stopped devices with ENODEV before formatting/copying, using a released manager-lock snapshot',
