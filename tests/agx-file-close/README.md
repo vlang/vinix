@@ -101,3 +101,12 @@ busy admission, replacement, UNBIND_ALL, GEM_CLOSE and failed close/retry.
 The production array reservation runs against fallible host malloc; ASan shadow
 checks that every successful raw reservation is freed after final close.
 The TLB fixture independently checks exact production survivor PTE words.
+
+BIND replacement runs 27,000 additional ioctl checks. Exact, partial and
+multi-BO overlaps preserve outside leaves/permissions and other VMs while the
+new mapping changes backing, permissions and SINGLE_PAGE mode. Same-BO retries
+retain exact owner counts. Metadata/table-preparation OOM precedes mutation;
+failed old invalidation prevents installation, and failed new invalidation
+retains the new owner through retry/close. Fresh BIND also uses fallible array
+reservation, with checked geometric growth and ASan-verified release. Busy VMs
+refuse overlapping replacement while fresh mappings remain admissible.

@@ -343,21 +343,27 @@ fn (mut f GpuFile) close_object_handle(handle u32) int {
 	return if success { 0 } else { -5 }
 }
 
-// Reserve a complete replacement array before a range unbind takes any new
+// Reserve a complete replacement array before a range mutation takes any new
 // BO references or changes PTEs. Records move; their existing owners do not.
 fn (mut f GpuFile) reserve_mapping_slots_locked(extra int) bool {
 	if extra < 0 { return false }
 	needed := u64(f.mappings.len) + u64(extra)
 	if needed <= u64(f.mappings.cap) { return true }
 	if needed > 0x7fff_ffff || needed > ~u64(0) / sizeof(GpuMapping) { return false }
-	bytes := needed * sizeof(GpuMapping)
+	// Fresh binds also use this path; keep growth amortized and fallible.
+	mut capacity := needed
+	if u64(f.mappings.cap) <= 0x3fff_ffff {
+		doubled := u64(f.mappings.cap) * 2
+		if doubled > capacity && doubled <= ~u64(0) / sizeof(GpuMapping) { capacity = doubled }
+	}
+	bytes := capacity * sizeof(GpuMapping)
 	storage := memory.malloc_packed_fallible(bytes) @[freed]
 	if storage == unsafe { nil } { return false }
 	mut replacement := []GpuMapping{}
 	unsafe {
 		replacement.data = storage
 		replacement.len = f.mappings.len
-		replacement.cap = int(needed)
+		replacement.cap = int(capacity)
 		replacement.flags = .noslices
 		if f.mappings.len != 0 { C.memcpy(storage, f.mappings.data, u64(f.mappings.len) * sizeof(GpuMapping)) }
 	}
@@ -367,9 +373,7 @@ fn (mut f GpuFile) reserve_mapping_slots_locked(extra int) bool {
 	return true
 }
 
-// The file lock and idle-VM gate protect every fragment. The original owner
-// becomes the removed interval's tombstone; each surviving piece owns one ref.
-fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
+fn (f &GpuFile) mapping_survivor_count_locked(vm_id u32, addr u64, size u64) int {
 	end := addr + size // The ioctl validated this full VA range before lookup.
 	mut fragments := 0
 	for mapping in f.mappings {
@@ -378,8 +382,17 @@ fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
 		if mapping.addr < addr { fragments++ }
 		if mapping.addr + mapping.size > end { fragments++ }
 		// Disjoint mappings can straddle only the two ends of the request.
-		if fragments > 2 { return -22 }
+		if fragments > 2 { return -1 }
 	}
+	return fragments
+}
+
+// The file lock and idle-VM gate protect every fragment. The original owner
+// becomes the removed interval's tombstone; each surviving piece owns one ref.
+fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
+	end := addr + size
+	fragments := f.mapping_survivor_count_locked(vm_id, addr, size)
+	if fragments < 0 { return -22 }
 	if !f.reserve_mapping_slots_locked(fragments) { return -12 }
 	original_count := f.mappings.len
 	mut flush_ok := true
@@ -732,12 +745,32 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				gem.unref(obj)
 				return -5
 			}
+			mut replacing := false
 			for mapping in f.mappings {
 				if mapping.vm_id == request.vm_id
 					&& ranges_overlap(mapping.addr, mapping.size, request.addr, request.range) {
-					gem.unref(obj)
-					return -16 // EBUSY
+					replacing = true
+					break
 				}
+			}
+			if replacing && (request.vm_id >= mmu.uat_num_contexts
+				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0) {
+				gem.unref(obj)
+				return -16 // EBUSY: replacement must not remove pages used by jobs.
+			}
+			fragments := f.mapping_survivor_count_locked(request.vm_id, request.addr, request.range)
+			if fragments < 0 { gem.unref(obj); return -22 }
+			if !f.reserve_mapping_slots_locked(fragments + 1) {
+				gem.unref(obj)
+				return -12
+			}
+			if !pt.prepare_map_range(request.addr, request.range) {
+				gem.unref(obj)
+				return -12
+			}
+			if replacing {
+				retired := f.unbind_range_locked(request.vm_id, request.addr, request.range)
+				if retired != 0 { gem.unref(obj); return retired }
 			}
 			mapped := if request.flags & ioctl.asahi_bind_single_page != 0 {
 				pt.map_repeated_page(request.addr, obj.phys_addr + request.offset, request.range, protection)

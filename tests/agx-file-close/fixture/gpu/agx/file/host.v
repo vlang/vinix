@@ -161,6 +161,7 @@ pub fn run_checks() {
 	assert stopped_vm.destroyed && table_releases == 4 && closing_count == 0
 	check_repeated_bindings()
 	check_unbind_ranges()
+	check_bind_replacements()
 	check_create_sizes()
 	check_bind_order()
 	check_bind_vm_lookup()

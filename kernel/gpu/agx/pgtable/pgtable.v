@@ -141,13 +141,14 @@ fn (pt &UatPgtable) invalidate_range_locked(address u64, size u64) {
 }
 
 // Allocate a single 16KB-aligned page table page.
-// pmm_alloc already zeroes the contiguous, aligned memory.
+// Allocation failure propagates to VM/map admission; never panic on user OOM.
+// The fallible allocator still zeroes the contiguous, aligned memory.
 pub fn alloc_table_page() ?&u64 {
-	ptr := memory.pmm_alloc_aligned(kernel_pages_per_uat_page, kernel_pages_per_uat_page)
-	if ptr == 0 {
+	ptr := memory.pmm_alloc_aligned_fallible(kernel_pages_per_uat_page, kernel_pages_per_uat_page)
+	if ptr == unsafe { nil } {
 		return none
 	}
-	return ptr
+	return unsafe { &u64(ptr) }
 }
 
 // Free a 16 KiB page table page.
@@ -351,6 +352,20 @@ fn (mut pt UatPgtable) map_page_locked(iova u64, phys u64, prot u64) bool {
 			descriptor |= uat_pte_ng
 		}
 		*pte_ptr = descriptor
+	}
+	return true
+}
+
+// Prepare intermediate tables without changing leaf mappings or invalidating
+// translations. Empty tables remain owned until destroy, including on failure.
+// A later map of this aligned range cannot allocate while the owner excludes
+// concurrent table destruction; unmap only clears leaves and retains topology.
+pub fn (mut pt UatPgtable) prepare_map_range(iova u64, size u64) bool {
+	if size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova { return false }
+	pt.lock.acquire()
+	defer { pt.lock.release() }
+	for offset := u64(0); offset < size; offset += uat_pgsz {
+		_ = pt.get_pte(iova + offset, true) or { return false }
 	}
 	return true
 }

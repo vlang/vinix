@@ -2,6 +2,9 @@
 import os
 
 const helpers = [
+	'pgtable__alloc_table_page',
+	'gpu__agx__file__GpuFile__mapping_survivor_count_locked',
+	'pgtable__UatPgtable__prepare_map_range',
 	'gpu__agx__file__GpuFile__reserve_mapping_slots_locked',
 	'gpu__agx__file__GpuFile__unbind_range_locked',
 	'bo__create_size_error',
@@ -107,7 +110,9 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'pgtable__alloc_table_page' { return '__v_option_u64ptr' }
 	if name.ends_with('GpuFile__unbind_range_locked') { return 'i64' }
+	if name.ends_with('GpuFile__mapping_survivor_count_locked') { return 'i64' }
 	if name == 'bo__create_size_error' { return 'i64' }
 	if name == 'vm__bind_backing_size' { return 'u64' }
 	if name in ['file__reserve_fd', 'file__fdnum_install_reserved_fd', 'file__fdnum_create_from_reserved_resource', 'file__fdnum_create_from_fd', 'drm__create_sync_file_fd_at'] { return '__v_option_i64' }

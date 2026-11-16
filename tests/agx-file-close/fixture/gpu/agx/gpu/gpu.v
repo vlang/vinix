@@ -47,6 +47,7 @@ __global test_gpu_manager GpuManager
 __global timestamp_unmaps = 0
 __global stop_callback fn () = unsafe { nil }
 __global failed_mapping_flushes = 0
+__global mapping_flush_failure_after = int(-1)
 __global mapping_flushes = 0
 __global stops_finished = 0
 __global timestamp_maps = 0
@@ -119,7 +120,8 @@ pub fn stop_during_mapping_lock() {
 	klock.wait_once(unsafe { &test_gpu_manager.lock }, finish_stop)
 }
 
-pub fn fail_flushes(count int) { failed_mapping_flushes = count }
+pub fn fail_flushes(count int) { failed_mapping_flushes = count; mapping_flush_failure_after = -1 }
+pub fn fail_flush_after(successes int) { mapping_flush_failure_after = successes }
 pub fn flushes() int { return mapping_flushes }
 
 pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bool {
@@ -128,6 +130,8 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 	assert slot != 0 && addr != 0 && size != 0
 	mapping_flushes++
 	if mgr.state == .stopped { return false }
+	if mapping_flush_failure_after == 0 { mapping_flush_failure_after = -1; return false }
+	if mapping_flush_failure_after > 0 { mapping_flush_failure_after-- }
 	if failed_mapping_flushes > 0 { failed_mapping_flushes--; return false }
 	return true
 }

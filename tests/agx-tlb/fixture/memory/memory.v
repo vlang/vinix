@@ -11,7 +11,7 @@ __global remaining = int(-1)
 
 pub fn fail_after(count int) { remaining = count }
 
-pub fn pmm_alloc_aligned(pages u64, alignment u64) &u64 {
+pub fn pmm_alloc_aligned_fallible(pages u64, alignment u64) &u64 {
 	if remaining == 0 { return unsafe { nil } }
 	if remaining > 0 { remaining-- }
 	boundary := alignment * 16384

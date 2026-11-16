@@ -12,6 +12,8 @@ pub mut:
 	maps int
 	unmaps int
 	reject_map bool
+	reject_prepare bool
+	prepares int
 	destroyed bool
 	last_protection u64
 	last_phys u64
@@ -21,6 +23,13 @@ pub mut:
 	last_unmap_addr u64
 	watch_start u64
 	leaves [32]u64
+	protections [32]u64
+}
+
+pub fn (mut pt UatPgtable) prepare_map_range(addr u64, size u64) bool {
+	assert !pt.destroyed
+	pt.prepares++
+	return !pt.reject_prepare
 }
 
 fn (mut pt UatPgtable) watch_map(addr u64, phys u64, size u64, repeated bool) {
@@ -29,6 +38,7 @@ fn (mut pt UatPgtable) watch_map(addr u64, phys u64, size u64, repeated bool) {
 		va := pt.watch_start + u64(i) * uat_pgsz
 		if va >= addr && va - addr < size {
 			pt.leaves[i] = phys + if repeated { u64(0) } else { va - addr }
+			pt.protections[i] = pt.last_protection
 		}
 	}
 }
@@ -58,7 +68,7 @@ pub fn (mut pt UatPgtable) unmap(addr u64, size u64) {
 	if pt.watch_start != 0 {
 		for i in 0 .. 32 {
 			va := pt.watch_start + u64(i) * uat_pgsz
-			if va >= addr && va - addr < size { pt.leaves[i] = 0 }
+			if va >= addr && va - addr < size { pt.leaves[i] = 0; pt.protections[i] = 0 }
 		}
 	}
 }

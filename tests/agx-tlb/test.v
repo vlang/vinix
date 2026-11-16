@@ -287,7 +287,63 @@ fn test_partial_unmap_survivors() {
 	println('AGX partial unmap PTEs: 100 cycles of head/tail/middle/full cuts preserve exact contiguous/repeated RO/WO/RW survivor leaves across L3 boundaries before TLBI and free every table')
 }
 
+fn test_bind_preparation() {
+	for _ in 0 .. 100 {
+		memory.fail_after(0)
+		if _ := pgtable.new_pgtable(39, 48) { panic('root OOM must be fallible') }
+		memory.fail_after(-1)
+		assert memory.live_pages() == 0
+		for repeated in [false, true]! {
+			mut pt := pgtable.new_pgtable(39, 48) or { panic('prepare table') }
+			address := (u64(1) << 25) - pgtable.uat_pgsz
+			physical := u64(0x400000)
+			first := pt.get_pte(address, true) or { panic('original leaf') }
+			tlb.observe(first, unsafe { nil }); pt.bind_tlb(23); expect_asid(23, 0)
+			assert pt.map(address, physical, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_ro)
+			old_word := physical | pgtable.gpu_prot_gpu_shared_ro | pgtable.uat_pte_page | pgtable.uat_pte_ng
+			expect_asid(23, old_word)
+			before := memory.live_pages()
+			memory.fail_after(0)
+			assert !pt.prepare_map_range(address, 3 * pgtable.uat_pgsz)
+			assert memory.live_pages() == before && unsafe { *first } == old_word && tlb.calls().len == 0
+			// Attach the next L3 table, then fail at the following boundary.
+			span := u64(2050) * pgtable.uat_pgsz
+			memory.fail_after(1)
+			assert !pt.prepare_map_range(address, span)
+			assert memory.live_pages() == before + 1 && unsafe { *first } == old_word && tlb.calls().len == 0
+			prepared := pt.get_pte(address + pgtable.uat_pgsz, false) or { panic('retained empty table') }
+			assert unsafe { *prepared } == 0
+			memory.fail_after(-1)
+			assert pt.prepare_map_range(address, span) && unsafe { *first } == old_word && tlb.calls().len == 0
+			// Clearing old leaves retains topology. Both final map paths must
+			// finish with the physical allocator now forced to fail every call.
+			memory.fail_after(0)
+			pt.unmap(address, pgtable.uat_pgsz); expect_asid(23, 0)
+			new_physical := u64(0x800000)
+			if repeated { assert pt.map_repeated_page(address, new_physical, span, pgtable.gpu_prot_gpu_shared_wo) }
+			else { assert pt.map(address, new_physical, span, pgtable.gpu_prot_gpu_shared_wo) }
+			expect_asid(23, new_physical | pgtable.gpu_prot_gpu_shared_wo | pgtable.uat_pte_page | pgtable.uat_pte_ng)
+			for index := u64(0); index < 2050; index++ {
+				pte := pt.get_pte(address + index * pgtable.uat_pgsz, false) or { panic('prepared replacement leaf') }
+				phys := new_physical + if repeated { u64(0) } else { index * pgtable.uat_pgsz }
+				assert unsafe { *pte } == phys | pgtable.gpu_prot_gpu_shared_wo | pgtable.uat_pte_page | pgtable.uat_pte_ng
+			}
+			for invalid in [[address, u64(0)]!, [address + 1, pgtable.uat_pgsz]!, [address, pgtable.uat_pgsz + 1]!,
+				[~u64(0) & ~pgtable.uat_pg_mask, 2 * pgtable.uat_pgsz]!]! {
+				assert !pt.prepare_map_range(invalid[0], invalid[1]) && tlb.calls().len == 0
+			}
+			memory.fail_after(-1)
+			pt.unmap(address, span); expect_asid(23, 0)
+			pt.unbind_tlb(); expect_asid(23, 0); tlb.observe(unsafe { nil }, unsafe { nil })
+			pgtable.destroy(pt); unsafe { free(pt) }
+			assert memory.live_pages() == 0
+		}
+	}
+	println('AGX BIND preparation: 100 cycles of fallible root/table allocation, preserved old leaves on partial preparation failure, retained empty tables, allocation-free contiguous/repeated replacement across L3 boundaries and complete destruction passed')
+}
+
 fn main() {
+	test_bind_preparation()
 	test_partial_unmap_survivors()
 	test_repeated_pages()
 	test_user_mappings()

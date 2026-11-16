@@ -33,6 +33,13 @@ Every surviving production PTE retains its physical address and permission word;
 only the requested hole is cleared before TLBI. Final destruction returns all
 host page-table allocations.
 
+BIND preparation adds a hundred sanitizer cycles. Actual root/table OOM returns
+failure; a later L3 failure preserves old leaves and retains earlier empty
+tables under their root. After complete preparation, forcing every allocation
+to fail still permits both contiguous and repeated replacement across the full
+prepared span. Preparation emits no TLBI or leaf writes. Final destruction
+releases all tables. Run this suite with `--sanitize` as described above.
+
 The source-reference gate independently checks the actual instructions,
 barriers, root-publication order, bind permission selection and GPU UAT
 permission encodings against Omarchy's Asahi-derived driver:
