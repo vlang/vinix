@@ -5328,3 +5328,58 @@ OS loader/cache bytes, complete ABI/library/search/read closure and bootstrap/
 hermetic admission remain unqualified. Owned ARM/GUI, broader lifetime/mapping
 controls and default activation remain open. No guest/kernel/default behavior
 changes.
+
+## Exact ancestor-directory permissions during host replay (2026-11-16)
+
+Commit `c0fa37138` adds a separate [directory-read replay qualifier](wine-directory-closed-replay.md).
+It requires the exact original format-6 host checker's complete admission before
+replay and after all controls. `winedirclosure` retains the existing ordinary-file
+data policy but replaces its global directory-type permission with exact parent
+literals derived from admitted files. Root `/` is included; parent directories
+are deduplicated and sorted, with expansion stopped above 32,768 distinct paths.
+A directory permission requires both directory type and one of these exact
+paths. No captured/ancestor prefix admits arbitrary descendant enumeration.
+The main file and both policy modules have embedded guards checked again before
+the new receipt is published.
+
+Fixture, controller, producer and retainer all pass against the complete final
+format-6 checkpoint above. Captured and unrestricted external-object linking
+reproduce each original executable. The existing file controls remain required:
+one captured-file read, four EPERM/EACCES refusals and an external-object link
+reaching its exact named refusal with exit 1 and no executable. New controls
+require captured-directory enumeration to return `response.txt`, while a separate
+directory's direct, symlink and Data-volume paths enumerate a known marker
+unrestricted and fail with EPERM/EACCES, exit 79 and the exact marker when
+restricted. The four role results therefore cover thirty-two runtime denials and
+eight allowed reads, with four identical captured and four identical
+counterfactual link baselines. Observed file loads/images, capability bytes,
+successful outputs, directory types, control marker/aliases, policy and original
+proof/archive/checker/self hashes are rechecked before publication.
+
+The production control runner passes twenty policy refusals, including unsafe/
+repeated paths, list bounds and bounded ancestor expansion, plus deterministic
+exact-parent projection and absence of the global directory rule. Three CLI
+cases reject a wrong checker, incomplete original host bundle and old-format
+proof without replay receipts. All explicit checks remain active under `-prod`.
+
+The complete checkpoint is `/Users/alex/.cache/vwdirclosed-20261116-01`, retaining
+frozen `source-final` and imports, feature patch/revision, generated programs,
+raw commands/environments/exit records, exact policies and the four passing role
+directories `fixture`, `controller`, `producer` and `retainer`. Final tools are
+`replay-final` and `controls-final`; `controls` retains policy/admission outcomes.
+`validation.txt` distinguishes the preliminary repository-root tools and source
+copies from final guarded executables. The complete original format-6 checkpoint,
+selected namespaces and all historical bundles/checkers remain required and
+unchanged; this additive step claims no new guest result or mandatory-format
+change. Its typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-directory-closed-20261116-01.inventory.json`,
+SHA-256 `bba0b0af6475d726519011ffe42272a063d7c5da7a4290e433d103e4bbb3c480`.
+Complete inventory recording and independent comparison both pass.
+
+Global metadata/name-based searches remain allowed, and ancestor directories
+can expose entry names. The broad `/usr/lib` and `/System/Library` data exceptions,
+exact device literals, writes/network, helper startup/inherited state and OS
+loader/cache bytes retain their previous scope. Full metadata/search, ABI,
+compiler and hermetic admission remain unqualified. Mandatory directory-policy
+integration, owned ARM/GUI, broader lifetime/mapping controls and default
+activation remain open. No kernel, guest or product-default behavior changes.

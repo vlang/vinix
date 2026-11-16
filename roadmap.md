@@ -1397,8 +1397,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     permissions and full control graph are mandatory in all qualification host
     records; consistently resealed extra permissions refuse. The original
     [standalone qualifier](tests/packages/wine-read-closed-replay.md) retains its
-    format-5 contract. Directory/search and OS-loader reads remain outside this
-    restriction's claim. Complete
+    format-5 contract. An additive
+    [directory-read qualifier](tests/packages/wine-directory-closed-replay.md)
+    reproduces all four roles with exact ancestor-directory permissions, thirty-two
+    runtime denials and eight allowed controls. Mandatory integration of that
+    directory restriction remains open; global metadata/search and OS-loader
+    reads remain outside its claim. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader
