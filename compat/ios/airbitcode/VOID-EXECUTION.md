@@ -1,5 +1,17 @@
 # Void-return scalar execution
 
+Fixed `llvm.vector.insert` calls support matching i1..i64/half/float base and
+inserted element formats with up to 16 result lanes. Integer-only execution
+excludes floating formats. Every third-argument i64 constant offset aligns to
+the inserted count and keeps the full window in range. Exact declaration immarg
+placement is selected per family: third parameter for insertion, second for
+existing immediate families. Both scalar and memory scanners share this policy.
+One call costs one step, one existing result slot and 2*base_count + inserted_count
+work units. The vector cache has 61,604 entries, with new keys 52628..61603; the
+scalar cache remains 2,154. Existing slots, snapshots and cleanup retain ownership.
+Maintained tests cover overwritten poison/undef, surrounding lanes, input/result
+freezes, discarded void results, loop reuse and existing resource bounds.
+
 Fixed `llvm.vector.extract` calls support matching i1..i64/half/float element
 formats with up to 16 source lanes. Integer-only execution excludes floating
 formats. Every call requires a defined aligned in-range i64 constant offset,

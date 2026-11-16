@@ -1,5 +1,23 @@
 # Bounded memory execution
 
+`llvm.vector.insert` replaces an aligned window in a fixed 1..16-lane integer,
+half or float base with a vector of the same element format. The result matches
+the base type. Every third-argument i64 offset must be a defined constant,
+a multiple of the inserted count, with the entire window in range; cache hits
+do not skip this check. Declaration validation selects the exact third-parameter
+immarg slot. Existing second-parameter families retain their exact slot rules.
+Calls cost one step, one result slot and 2*base_count + inserted_count validation
+work units. Keys 52628..61603 append 8,976 identities without moving old keys.
+
+Insertion preserves raw bits and deferred lane state, removes overwritten base
+state and leaves surrounding lanes unchanged. Integer addresses use existing
+packed shuffle selectors, rebased selectors and projections, including unequal
+source counts. Invalid result selectors remain poison through freezes and reject
+before writes. Existing graph bounds, cache and ownership apply. Maintained
+insertion checkers cover all shapes/offsets/formats, native scalar insertions,
+state, both memory APIs, third-argument attributes, cache-hit offset refusals,
+loop reuse and exact/exceeded resource bounds. Scalable vectors remain excluded.
+
 `llvm.vector.extract` copies a fixed subvector from a 1..16-lane integer,
 half or float vector. Both overloads must name matching element formats and
 the result must fit in the source. The i64 offset must be a defined constant,

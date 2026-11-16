@@ -1,5 +1,15 @@
 # Software Metal backend
 
+AIR `llvm.vector.insert` supports fixed integer/half/float windows in vectors
+of up to 16 lanes. Its third argument is an aligned in-range i64 constant;
+declaration validation checks the exact third-parameter immarg. Insertion removes
+overwritten state and preserves surrounding bits/state. Prepared software pipelines
+may project integer results into bounded addresses. The size fixture inserts a
+four-lane sequence window, extracts it again and checks coordinate reconstruction,
+float payloads, half subnormals and defined odd-width lanes amid undef. Maintained
+insertion checkers cover native comparisons, all fixed shapes/offsets, source
+states and loop reuse. Native GPU execution and Fortnite launch remain unverified.
+
 AIR `llvm.vector.extract` executes fixed integer/half/float subvector copies
 from vectors of up to 16 lanes. Each i64 constant offset must align to the result
 count and keep the full result in range. Copies preserve raw bits and lane state;
