@@ -8,6 +8,7 @@ enum MemoryIndexKind {
 	literal
 	lane
 	binary
+	compare
 	cast
 }
 
@@ -120,6 +121,14 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 					b.nodes[rhs].height
 				}
 			}
+		} else if (code == 9 || code == 28) && bits == 1 && op.operands_count == 2 {
+			left := b.p.operands[op.operands_start]
+			right := b.p.operands[op.operands_start + 1]
+			if left.type_index != right.type_index || op.opcode < 32 || op.opcode > 41 || op.flags & ~b.p.integer_compare_flag_mask(op) != 0 { return error('AIR memory index: integer comparison type/predicate/flags') }
+			source_bits := b.p.integer_bits(left.type_index)!
+			lhs := b.expression(left, producer, depth + 1)!
+			rhs := b.expression(right, producer, depth + 1)!
+			node = MemoryIndexNode{ kind: .compare, bits: bits, source_bits: source_bits, opcode: op.opcode, flags: op.flags, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height } }
 		} else if code == 3 && op.opcode <= 2 {
 			b.p.scalar_cast_profile(op, true)!
 			source := b.p.operands[op.operands_start]
@@ -175,6 +184,9 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			}
 			.binary {
 				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{ value: values[node.left] }, IntegerValue{ value: values[node.right] })!
+			}
+			.compare {
+				value = integer_compare_flags(node.opcode, node.flags, node.source_bits, IntegerValue{ value: values[node.left] }, IntegerValue{ value: values[node.right] })!
 			}
 			.cast {
 				value = scalar_integer_cast(node.opcode, node.flags, node.source_bits, node.bits, IntegerValue{ value: values[node.left] })!

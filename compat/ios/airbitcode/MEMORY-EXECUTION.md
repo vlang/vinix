@@ -99,7 +99,7 @@ loads/stores also require their complete stored size and explicit alignment.
 An index may also be a pure integer SSA expression built from scalar arguments,
 defined integer literals, literal-lane extraction from a direct integer vector
 argument, add/subtract/multiply, signed/unsigned division and remainder, shifts,
-AND/OR/XOR, and trunc/zext/sext. Integer widths are i1..i64
+AND/OR/XOR, scalar integer comparisons, and trunc/zext/sext. Integer widths are i1..i64
 and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
 ordinary scalar evaluators. Oversized shifts, left-shift wrap promises, right-shift
 exactness and OR disjointness are checked before writes. Poison and negative/out-of-range final indices
@@ -109,6 +109,11 @@ Zero divisors and signed minimum divided/remaindered by -1 reject as undefined
 arithmetic. `exact` division with a nonzero remainder rejects as poison. These
 checks also apply to cold/unused index expressions, even if execution would not
 visit their block. Unrelated division keeps ordinary dynamic error behavior.
+All ten scalar `icmp` predicates are supported, including `samesign` (different
+operand signs produce poison). A comparison keeps its source integer width
+separate from its i1 result width. Zero-extend a boolean for a positive 0/1
+offset: a direct i1 true GEP index is negative and rejects under this profile.
+Floating, pointer and vector comparisons remain outside address expressions.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -134,6 +139,13 @@ i128 arithmetic avoid executing original-width undefined operations in the
 reference; separate tags identify zero/overflow, exactness poison and bounds.
 Flagged native memory targets run only for accepted addresses. Both execution
 APIs and validation alone must agree and preserve output on refusal.
+
+`tests/ios/air-memory-compare-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares every
+predicate, i1..i64 source width, samesign/unflagged form and direct-i1/zext-i64
+address form with LLVM. The reference uses unflagged comparisons and a defined
+sign-bit test; flagged native targets run only after a nonpoison bounded index
+is established. Both execution APIs and validation alone check full output
+preservation on refusal. Graph limits, cold-block checking and snapshots apply.
 
 Preflight caches the index source, width and stride. Every call resolves all
 indexed GEPs and accesses, including cold blocks, before any AIR instruction or

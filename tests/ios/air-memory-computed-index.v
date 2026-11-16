@@ -157,7 +157,9 @@ fn control_cases(assembler string, root string) ! {
 	text.write_string('target datalayout = "e-p:64:64"\n')
 	for name, instruction in {
 		'load':     '%idx = load i64, ptr %out'
-		'comparison': '%v = icmp eq i64 %arg, 0\n %idx = zext i1 %v to i64'
+		'floating_comparison': '%v = fcmp oeq float 0.0, 0.0\n %idx = zext i1 %v to i64'
+		'pointer_comparison': '%v = icmp eq ptr %out, null\n %idx = zext i1 %v to i64'
+		'vector_comparison': '%v = icmp eq <2 x i64> zeroinitializer, zeroinitializer\n %first = extractelement <2 x i1> %v, i32 0\n %idx = zext i1 %first to i64'
 		'select':   '%idx = select i1 true, i64 %arg, i64 0'
 		'freeze':   '%idx = freeze i64 %arg'
 		'pointer_integer': '%idx = ptrtoint ptr %out to i64'
@@ -189,6 +191,7 @@ fn control_cases(assembler string, root string) ! {
 	for name, body in {
 		'cold':  'store i8 17, ptr %out\n br i1 true, label %exit, label %cold\ncold: %idx = mul i64 %arg, 2\n %p = getelementptr i8, ptr %out, i64 %idx\n store i8 42, ptr %p\n br label %exit\nexit: ret void'
 		'cold_division': 'store i8 17, ptr %out\n br i1 true, label %exit, label %cold\ncold: %divisor = sub i64 %arg, 64\n %idx = udiv i64 0, %divisor\n %p = getelementptr i8, ptr %out, i64 %idx\n store i8 42, ptr %p\n br label %exit\nexit: ret void'
+		'cold_comparison': 'store i8 17, ptr %out\n br i1 true, label %exit, label %cold\ncold: %v = shl i64 %arg, 57\n %cmp = icmp samesign eq i64 %v, 0\n %idx = zext i1 %cmp to i64\n %p = getelementptr i8, ptr %out, i64 %idx\n store i8 42, ptr %p\n br label %exit\nexit: ret void'
 		'alias': 'store i64 0, ptr %out, align 1\n %idx = udiv exact i64 %arg, 1\n %p = getelementptr i8, ptr %out, i64 %idx\n store i64 %arg, ptr %p, align 1\n ret void'
 	} {
 		text.write_string('define void @${name}(i64 %arg, ptr %out) { ${body} }\n')
@@ -238,8 +241,8 @@ fn control_cases(assembler string, root string) ! {
 		}
 		guards++
 	}
-	assert guards == 9
-	for name in ['depth_31', 'nodes_256', 'cold', 'cold_division'] {
+	assert guards == 11
+	for name in ['depth_31', 'nodes_256', 'cold', 'cold_division', 'cold_comparison'] {
 		plan := p.prepare_memory_function(ir, stream, pools, bodies, fi(ir, name))!
 		mut bytes := []u8{len: 128, init: 0xcc}
 		mut value := [u64(0)]
@@ -249,7 +252,7 @@ fn control_cases(assembler string, root string) ! {
 		untouched(bytes)
 		plan.run(mut bs, plan.steps())!
 		assert bytes[0] == 17
-		if name in ['cold', 'cold_division'] {
+		if name in ['cold', 'cold_division', 'cold_comparison'] {
 			for i in 0 .. bytes.len { bytes[i] = 0xcc }
 			value[0] = 64
 			if _ := plan.validate(bs, plan.steps()) { panic('cold bounds') }
