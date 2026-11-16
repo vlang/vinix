@@ -155,6 +155,10 @@ Signed/unsigned saturating addition/subtraction (`llvm.sadd.sat`, `llvm.uadd.sat
 clamps to the corresponding integer limit; it does not itself produce poison.
 Poison in either input still propagates, and both dependency heights count
 toward the shared graph limits.
+Signed/unsigned saturating left shifts (`llvm.sshl.sat`, `llvm.ushl.sat`) also
+accept matching i1..i64 value/amount operands. Valid shifts clamp overflow;
+amounts at or above the width produce poison even when the input is zero.
+Amounts are width-truncated unsigned words, without modulo reduction.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -255,6 +259,11 @@ depth limits, cold blocks, independent roots and malformed call/flag metadata.
 all 256 saturating add/sub overloads with defined native LLVM operations. It
 covers signed/unsigned limits, direct/masked indices, poison on either side,
 computed wrap poison, select/freeze and both cached dependency depth boundaries.
+
+`tests/ios/air-memory-saturating-shift-index.v LLVM_AS FRESH_EXTERNAL_DIR` uses
+a defined LLVM oracle with oversized amounts replaced before native shifts.
+Separate checks model poison and cover select/freeze, both dependency depth
+boundaries, cold zero overshifts and independent GEP roots through all three APIs.
 
 ## Prepared memory functions
 
