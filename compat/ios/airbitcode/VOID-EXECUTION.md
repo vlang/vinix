@@ -164,11 +164,18 @@ scalar execution keeps its existing argument restrictions. Reduction results
 use ordinary scalar SSA slots, without consuming vector construction storage.
 Each call costs one execution step and N+1 units of shared validation lane
 work. Exact declaration identities, signatures, attributes and existing budgets
-remain checked. Floating reductions, nonordinary flags, scalable vectors and
-reduction dependencies in pure address graphs remain excluded.
+remain checked. Floating reductions, nonordinary flags and scalable vectors
+remain excluded. Pure integer address graphs also accept these reductions,
+with complete source observation before writes, including inactive GEP roots
+and results discarded by scalar select/freeze. Existing 256-node/32-level
+bounds count all source projections and cached heights. Loaded values, PHIs
+and floating dependencies remain excluded from address graphs.
 `tests/ios/air-vector-reduction.v` checks native LLVM values, independent
 arithmetic/extrema, all-lane states and freezing, ordinary/prepared stores,
 loop reuse, malformed metadata, cache separation and exact shared limits.
+`tests/ios/air-memory-vector-reduction-index.v` checks native LLVM results,
+nonmutating address validation, ordinary/prepared write ordering, all-source
+poison/undef and freeze controls, nested reductions and exact graph limits.
 
 Fixed 1..16-lane integer vectors also support ordinary direct `llvm.clmul.vNiW`
 calls for i1..i64 lanes. Multiplication combines polynomial terms with XOR

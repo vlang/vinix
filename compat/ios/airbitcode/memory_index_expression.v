@@ -33,6 +33,7 @@ enum MemoryIndexKind {
 	intrinsic_funnel
 	intrinsic_overflow_field
 	cast
+	integer_reduction
 }
 
 struct MemoryIndexNode {
@@ -300,6 +301,8 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			if b.nodes[rhs].height > height { height = b.nodes[rhs].height }
 			if b.nodes[cond].height > height { height = b.nodes[cond].height }
 			node = MemoryIndexNode{kind: .select_value, bits: bits, left: lhs, right: rhs, condition: cond, height: height + 1}
+		} else if code == 34 && vector_reduction_call(b.ir, op) {
+			node = b.reduction_node(op, producer, depth)!
 		} else if code == 34 {
 			// The earlier call also passes the enclosing memory profile's bounded
 			// declaration attribute/duplicate checks. Recheck call identity here.
@@ -492,6 +495,14 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.projected_extract {
 				if undefs[node.left] { return error('AIR memory index: selected undef lane') }
 				value = IntegerValue{value: values[node.left], poison: poisons[node.left]}
+			}
+			.integer_reduction {
+				// Contiguous observations have already rejected every undef lane.
+				mut source := ScalarVectorValue{}
+				for lane in 0 .. int(node.value) {
+					source.lanes[lane] = IntegerValue{value: values[node.left + lane], poison: poisons[node.left + lane]}
+				}
+				value = reduced_integer_vector(unsafe { IntegerVectorReduction(node.opcode) }, source, node.bits, int(node.value))!
 			}
 			.binary {
 				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!
