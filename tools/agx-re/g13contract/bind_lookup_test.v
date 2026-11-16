@@ -7,7 +7,8 @@ fn test_bind_lookup_guard_requires_shape_validation_and_locked_private_check() {
 	repo := g13layout.repo_root()
 	local := read(repo + '/kernel/gpu/agx/file/file.v')!
 	pure := read(repo + '/kernel/gpu/agx/vm/vm.v')!
-	reference := 'pub(crate) fn do_gem_bind( mmu::UAT_PGMSK; let bo = gem::Object::lookup_handle(file, data.handle)?;\n' +
+	reference := 'pub(crate) fn do_gem_bind_unbind( if data.range == 0 { return Err(EINVAL); } Self::do_gem_bind(device, vm_id, data, file)\n' +
+		'pub(crate) fn do_gem_bind( mmu::UAT_PGMSK; let bo = gem::Object::lookup_handle(file, data.handle)?;\n' +
 		'data.addr.checked_add(data.range); end_off as usize > bo.size(); .user_range.is_superset(range.clone()); Must specify read or write;\n' +
 		'guard.get(vm_id).ok_or(ENOENT)?; kernel_range.overlaps(range);\npub(crate) fn do_gem_unbind(\n' +
 		'if data.offset != 0 { return Err(EINVAL) }; mmu::UAT_PGMSK; .user_range.is_superset(range.clone()); return Err(EINVAL);\n' +
@@ -19,6 +20,8 @@ fn test_bind_lookup_guard_requires_shape_validation_and_locked_private_check() {
 		if _ := check_bind_vm_lookup_contract(local.replace(token, ''), pure, reference) { assert false, token }
 	}
 	if _ := check_bind_vm_lookup_contract(local, pure.replace('request, 0, 0', 'request, 1, 2'), reference) { assert false }
+	if _ := check_bind_vm_lookup_contract(local, pure.replace('&& request.range != 0', ''), reference) { assert false }
+	if _ := check_bind_vm_lookup_contract(local, pure, reference.replace('if data.range == 0', '')) { assert false }
 	if _ := check_bind_vm_lookup_contract(local, pure, reference.replace('ENOENT', 'EINVAL')) { assert false }
 	if _ := check_bind_vm_lookup_contract(local, pure.replace('request.flags & ~', 'request.flags != 0 && request.flags & ~'), reference) { assert false }
 	lookup := 'obj := f.objects.get_ref(request.handle) or { return -2 }'

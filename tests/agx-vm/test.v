@@ -32,6 +32,12 @@ fn check_bind_shapes() {
 	assert agxvm.bind_backing_size(&repeated) == repeated.range
 	mut header := bind_request()
 	assert agxvm.valid_bind_header(&header)
+	for flags in [ioctl.asahi_bind_read, ioctl.asahi_bind_write,
+		ioctl.asahi_bind_read | ioctl.asahi_bind_write,
+		ioctl.asahi_bind_read | ioctl.asahi_bind_single_page]! {
+		mut empty := header; empty.flags = flags; empty.range = 0
+		assert !agxvm.valid_bind_header(&empty) && !agxvm.valid_bind_shape(&empty)
+	}
 	header.flags = 0
 	assert agxvm.valid_bind_header(&header) && !agxvm.valid_bind_shape(&header)
 	header = bind_request(); header.addr = agxvm.address_space_end

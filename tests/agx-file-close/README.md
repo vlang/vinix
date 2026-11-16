@@ -141,3 +141,11 @@ unchanged failure outputs and final close. BO references return to their origina
 counts after failures/unbind and every allocated fixture BO is freed. GPU mapping
 services are injected; firmware cache safety and in-flight retention are not
 qualified by these host cases.
+
+Zero-length BIND runs 432,600 further ioctl checks. Existing/missing BO and VM
+names, permissions/SINGLE_PAGE, global/private addresses and offsets all return
+EINVAL without a BO lookup. Existing mappings, owners, PTE/flush counts and
+request fields stay unchanged. Controls preserve empty UNBIND refusal, nonempty
+SINGLE_PAGE BIND and the legacy zero-range UNBIND_ALL encoding. The pure VM
+fixture also rejects empty BIND headers. This matches the packaged operation
+dispatcher before BO lookup; other legacy/modern ABI differences remain open.

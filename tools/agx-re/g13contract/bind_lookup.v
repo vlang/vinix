@@ -20,8 +20,12 @@ fn check_bind_vm_lookup_contract(local string, pure string, reference string) ! 
 	require(local_bind.count('f.find_vm(') == 1, 'BIND must not probe a VM before its BO')!
 	header := section(pure, 'pub fn valid_bind_header(', 'pub fn valid_bind_shape(', 'Native pre-BO header')!
 	require_order(header, ['request.extensions == 0', 'request.op == ioctl.asahi_bind_op_bind',
+		'request.range != 0',
 		'request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write | ioctl.asahi_bind_single_page) == 0',
 		'(request.addr | request.range | request.offset) & page_mask == 0'], 'BIND header checks alignment and supported flag bits')!
+	dispatch := section(reference, 'pub(crate) fn do_gem_bind_unbind(', 'pub(crate) fn do_gem_bind(', 'Packaged nonempty bind dispatch')!
+	require_order(dispatch, ['if data.range == 0', 'return Err(EINVAL)',
+		'Self::do_gem_bind(device, vm_id, data, file)'], 'Packaged zero-length BIND rejects before BO lookup')!
 	require(!header.contains('valid_user_range(') && !header.contains('request.flags != 0'), 'Global ranges and nonzero permissions follow BO lookup')!
 	for op in ['ioctl.asahi_bind_op_unbind {', 'ioctl.asahi_bind_op_unbind_all {'] {
 		part := bind.all_after(op)

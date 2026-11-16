@@ -53,10 +53,11 @@ pub fn valid_user_range(address u64, size u64, kernel_start u64, kernel_end u64)
 	return address >= kernel_end || end <= kernel_start
 }
 
-// BIND alignment and supported flag bits precede BO lookup. Global ranges and
-// the requirement for a read/write permission are checked after BO lookup.
+// Nonempty BIND ranges, alignment and supported flag bits precede BO lookup.
+// Global ranges and required read/write permissions follow BO lookup.
 pub fn valid_bind_header(request &ioctl.DrmAsahiGemBind) bool {
 	return request.extensions == 0 && request.op == ioctl.asahi_bind_op_bind
+		&& request.range != 0
 		&& request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write | ioctl.asahi_bind_single_page) == 0
 		&& (request.addr | request.range | request.offset) & page_mask == 0
 }

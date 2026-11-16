@@ -717,6 +717,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
+		'Zero-length BIND rejects before BO lookup, including SINGLE_PAGE, while legacy zero-encoded UNBIND_ALL retains its operation semantics',
 		'Timestamp BIND ignores input output-handles, checks sum overflow before BO lookup and empty ranges after it; UNBIND resolves missing names before manager availability and preserves retained owners',
 		'Global GET_PARAMS rejects error/stopped devices with ENODEV before formatting/copying, using a released manager-lock snapshot',
 		'Global GET_PARAMS treats size as an input bound, shares one bounded prefix copy, permits zero-byte queries and preserves fault output/header semantics',

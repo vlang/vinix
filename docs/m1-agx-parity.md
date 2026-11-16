@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [timestamp-object validation and lookup order](m1-agx-timestamp-bind.md)
-(2026-11-16). The [global parameter queries after device loss](m1-agx-param-device.md),
+Latest offline increment: [zero-length BIND before BO lookup](m1-agx-bind-zero.md)
+(2026-11-16). The [timestamp-object validation and lookup order](m1-agx-timestamp-bind.md),
+[global parameter queries after device loss](m1-agx-param-device.md),
 [global GET_PARAMS copy behavior](m1-agx-param-copy.md),
 [BIND overlap replacement and preparation](m1-agx-bind-replacement.md),
 [UNBIND ranges and surviving mappings](m1-agx-unbind-range.md),
@@ -150,7 +151,7 @@ These are implementation gaps, not items certified by a passing source gate.
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
 | Event publication capacity | One-event publication now applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. The separate 127-ticket preparation table and whole-batch admission remain different. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
-| VM binding | Vinix uses individual contiguous bindings with strict overlap rejection. The reference has batched, extensible VM operations, mapping replacement/splitting, scatter backing and integration with DRM GPUVM/reservation fences. |
+| VM binding | Vinix uses individual contiguous/repeated binds with idle overlap replacement and range splitting. Batched extensible operations, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
 | GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
 | Timestamp UAPI | The reference's per-command timestamp objects and current compact command fields are not wired through Vinix's legacy command interface. |
 | M1 family | The native path configures base M1/t8103. The reference also supports t6000/t6001/t6002 M1 Pro/Max/Ultra, including clustering and multiple dies. |
