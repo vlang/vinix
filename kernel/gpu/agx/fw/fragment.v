@@ -216,8 +216,8 @@ pub mut:
 	cur_ts                     u64
 	start_ts                   u64
 	end_ts                     u64
-	// Two opaque user-timestamp pointer words; all three legacy fields stay
-	// zero in native preparation and occupy the reference's full 16 bytes.
+	// Opaque carrier for the reference's 16-byte user-timestamp pointer pair.
+	// Legacy callers keep it zero; timestamp-aware preparation populates it.
 	unk_914                    u32
 	unk_918                    u64
 	unk_920                    u32

@@ -29,6 +29,12 @@ const g13_tvb_max_blocks_nomemless = g13_tvb_max_blocks / u32(3)
 const g13_tvb_max_pages = g13_tvb_max_blocks * fw.g13_tvb_pages_per_block
 const g13_tvb_initial_blocks = u32(8)
 
+fn write_g13_timestamp_pair(destination voidptr, pair [2]u64) {
+	// Fixed-array parameters lower to C pointers; sizeof(pair) would copy
+	// only one destination on this compiler.
+	unsafe { C.memcpy(destination, &pair[0], sizeof(u64) * 2) }
+}
+
 fn write_g13_timestamp(destination voidptr, v13_5 bool, legacy &fw.G13MicroseqTimestamp,
 	unknown_timestamp_address u64) u64 {
 	unsafe {
@@ -1301,6 +1307,14 @@ fn complete_g13_render_job(mut job G13RenderJobResources, successful bool) {
 // submit_g13_render_job() transfers both queue batches to firmware.
 pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	input &agxrender.Command) ?&G13RenderJobResources {
+	return mgr.prepare_g13_render_job_with_timestamps(resources, input, [2]u64{}, [2]u64{})
+}
+
+// The caller retains every nonzero destination's mapping through retirement.
+// File timestamp captures supply those owners; raw addresses do not pin them.
+pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G13QueueResources,
+	input &agxrender.Command, vertex_user_timestamps [2]u64,
+	fragment_user_timestamps [2]u64) ?&G13RenderJobResources {
 	if resources == unsafe { nil } || resources.released || resources.quarantined || resources.vm == unsafe { nil }
 		|| !resources.vm.active || resources.channel_mask & g13_queue_channel_vertex == 0
 		|| resources.channel_mask & g13_queue_channel_fragment == 0
@@ -1380,15 +1394,17 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	job.barrier = mgr.alloc_g13_buffer_with_protection(sizeof(fw.G13BarrierCommand), pgtable.gpu_prot_fw_private_rw) or { return none }
 	job.vertex = mgr.alloc_g13_buffer_with_protection(vertex_size, pgtable.gpu_prot_gpu_ro_fw_private_rw) or { return none }
 	job.fragment = mgr.alloc_g13_buffer_with_protection(fragment_size, pgtable.gpu_prot_gpu_ro_fw_private_rw) or { return none }
+	vertex_timestamps := input.has_result || vertex_user_timestamps[0] != 0 || vertex_user_timestamps[1] != 0
+	fragment_timestamps := input.has_result || fragment_user_timestamps[0] != 0 || fragment_user_timestamps[1] != 0
 	vertex_microsequence_size := if v13_5 {
-		if input.has_result { u64(0x290) } else { u64(0x218) }
+		if vertex_timestamps { u64(0x290) } else { u64(0x218) }
 	} else {
-		if input.has_result { u64(0x260) } else { u64(0x1f8) }
+		if vertex_timestamps { u64(0x260) } else { u64(0x1f8) }
 	}
 	fragment_microsequence_size := if v13_5 {
-		if input.has_result { u64(0x2e0) } else { u64(0x268) }
+		if fragment_timestamps { u64(0x2e0) } else { u64(0x268) }
 	} else {
-		if input.has_result { u64(0x2a0) } else { u64(0x238) }
+		if fragment_timestamps { u64(0x2a0) } else { u64(0x238) }
 	}
 	job.vertex_microsequence = mgr.alloc_g13_buffer_with_protection(vertex_microsequence_size, pgtable.gpu_prot_fw_private_rw) or { return none }
 	job.fragment_microsequence = mgr.alloc_g13_buffer_with_protection(fragment_microsequence_size, pgtable.gpu_prot_fw_private_rw) or { return none }
@@ -1668,6 +1684,8 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 			C.memcpy(voidptr(vertex), &vertex_v13_5, sizeof(fw.G13RunVertexV135))
 			C.memcpy(voidptr(fragment), &fragment_v13_5, sizeof(fw.G13RunFragmentV135))
 		}
+		write_g13_timestamp_pair(voidptr(u64(job.vertex.cpu_address()) + vertex_user_ts_offset), vertex_user_timestamps)
+		write_g13_timestamp_pair(voidptr(u64(job.fragment.cpu_address()) + fragment_user_ts_offset), fragment_user_timestamps)
 	}
 
 	vertex_start := fw.G13MicroseqStartVertex{
@@ -1695,7 +1713,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	vertex_offset += write_g13_start_vertex(unsafe { voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset) },
 		v13_5, unsafe { &vertex_start }, vertex_counter, resources.notifier.va + u64(0xa8))
 	unsafe {
-		if input.has_result {
+		if vertex_timestamps {
 			vertex_ts_start := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp | (u32(1) << 31)
 				cur_ts: job.vertex.va + vertex_cur_ts_offset
@@ -1713,7 +1731,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		}
 		C.memcpy(voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset), voidptr(&vertex_wait), sizeof(fw.G13MicroseqSimpleOp))
 		vertex_offset += sizeof(fw.G13MicroseqSimpleOp)
-		if input.has_result {
+		if vertex_timestamps {
 			vertex_ts_end := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp
 				cur_ts: job.vertex.va + vertex_cur_ts_offset
@@ -1775,7 +1793,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		mut fragment_offset := u64(0)
 		fragment_offset += write_g13_start_fragment(voidptr(job.fragment_microsequence.phys + higher_half + fragment_offset),
 			v13_5, &fragment_start, fragment_counter, resources.notifier.va + u64(0xa8))
-		if input.has_result {
+		if fragment_timestamps {
 			fragment_ts_start := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp | (u32(1) << 31)
 				cur_ts: job.fragment.va + fragment_cur_ts_offset
@@ -1793,7 +1811,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 		}
 		C.memcpy(voidptr(job.fragment_microsequence.phys + higher_half + fragment_offset), voidptr(&fragment_wait), sizeof(fw.G13MicroseqSimpleOp))
 		fragment_offset += sizeof(fw.G13MicroseqSimpleOp)
-		if input.has_result {
+		if fragment_timestamps {
 			fragment_ts_end := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp
 				cur_ts: job.fragment.va + fragment_cur_ts_offset
@@ -2306,6 +2324,13 @@ fn complete_g13_compute_job(mut job G13ComputeJobResources, successful bool) {
 // completion and explicitly publish it with submit_g13_compute_job().
 pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources,
 	ctx &mmu.UatContext, input &agxcompute.Command) ?&G13ComputeJobResources {
+	return mgr.prepare_g13_compute_job_with_timestamps(resources, ctx, input, [2]u64{})
+}
+
+// Destination mappings remain caller-owned until the job has retired.
+pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G13QueueResources,
+	ctx &mmu.UatContext, input &agxcompute.Command,
+	user_timestamps [2]u64) ?&G13ComputeJobResources {
 	if resources == unsafe { nil } || resources.released || resources.quarantined || ctx == unsafe { nil }
 		|| !ctx.active || ctx.id == 0 || input.flags & ~agxcompute.supported_flags != 0
 		|| resources.channel_mask & g13_queue_channel_compute == 0
@@ -2357,10 +2382,11 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 	mut user_context := unsafe { ctx }
 	job.preempt = user_context.alloc_driver_buffer_aligned(preempt_size, false, fw.g13_tvb_page_size) or { return none }
 	job.command = mgr.alloc_g13_buffer_with_protection(compute_size, pgtable.gpu_prot_gpu_ro_fw_private_rw) or { return none }
+	compute_timestamps := input.has_result || user_timestamps[0] != 0 || user_timestamps[1] != 0
 	logical_microsequence_size := if v13_5 {
-		if input.has_result { u64(0x268) } else { u64(0x1f0) }
+		if compute_timestamps { u64(0x268) } else { u64(0x1f0) }
 	} else {
-		if input.has_result { u64(0x228) } else { u64(0x1c0) }
+		if compute_timestamps { u64(0x228) } else { u64(0x1c0) }
 	}
 	job.explicit_barriers.offset = g13_barrier_tail_offset(logical_microsequence_size)
 	job.microsequence = mgr.alloc_g13_buffer_with_protection(job.explicit_barriers.offset + g13_barrier_tail_size, pgtable.gpu_prot_fw_private_rw) or { return none }
@@ -2435,6 +2461,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 			run_v13_5 := fw.make_g13_compute_v13_5(run, compute_counter)
 			C.memcpy(voidptr(run), &run_v13_5, sizeof(fw.G13RunComputeV135))
 		}
+		write_g13_timestamp_pair(voidptr(u64(job.command.cpu_address()) + compute_user_ts_offset), user_timestamps)
 
 		start := fw.G13MicroseqStartCompute{
 			header: fw.g13_useq_start_compute
@@ -2453,7 +2480,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 		mut micro_offset := u64(0)
 		micro_offset += write_g13_start_compute(voidptr(job.microsequence.phys + higher_half + micro_offset),
 			v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter, resources.notifier.va + u64(0xa8))
-		if input.has_result {
+		if compute_timestamps {
 			start_timestamp := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp | (u32(1) << 31)
 				cur_ts: job.command.va + compute_cur_ts_offset
@@ -2471,7 +2498,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 		}
 		C.memcpy(voidptr(job.microsequence.phys + higher_half + micro_offset), voidptr(&wait), sizeof(fw.G13MicroseqSimpleOp))
 		micro_offset += sizeof(fw.G13MicroseqSimpleOp)
-		if input.has_result {
+		if compute_timestamps {
 			end_timestamp := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp
 				cur_ts: job.command.va + compute_cur_ts_offset

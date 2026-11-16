@@ -19,6 +19,9 @@ const packet_helpers = [
 ]
 
 const helpers = [
+	'gpu__agx__gpu__write_g13_timestamp_pair',
+	'gpu__agx__gpu__GpuManager__prepare_g13_render_job',
+	'gpu__agx__gpu__GpuManager__prepare_g13_compute_job',
 	'gpu__agx__file__GpuFile__reap_detached_timestamp_objects_locked',
 	'gpu__agx__file__GpuFile__reap_orphaned_g13_queues_locked',
 	'gpu__agx__file__GpuFile__find_vm',
@@ -164,6 +167,9 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'gpu__agx__gpu__write_g13_timestamp_pair' { return 'void' }
+	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_render_job' { return '__v_option_gpu__agx__gpu__G13RenderJobResourcesptr' }
+	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_compute_job' { return '__v_option_gpu__agx__gpu__G13ComputeJobResourcesptr' }
 	if name in ['gpu__agx__file__GpuFile__reap_detached_timestamp_objects_locked', 'gpu__agx__file__GpuFile__release_g13_timestamp', 'gpu__agx__file__GpuFile__release_g13_timestamps'] { return 'void' }
 	if name == 'gpu__agx__file__GpuFile__capture_g13_timestamp' { return 'multi_return_i64_gpu__agx__file__G13TimestampCapture' }
 	if name == 'gpu__agx__file__GpuFile__capture_g13_timestamps' { return 'i64' }

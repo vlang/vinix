@@ -441,6 +441,7 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_timestamp_inputs_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
 	check_timestamp_capture_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/timestamps.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_timestamp_capture_reference(read(os.join_path(base, 'queue/common.rs'))!,
@@ -768,7 +769,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'fw.make_g13_compute_v13_5(run, compute_counter)',
 		'v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter,'],
 		'Vinix shared command/start counters')!
-	return ['Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
+	return ['Resolved timestamp pairs populate versioned native commands and independently select vertex/fragment/compute instructions while legacy callers provide empty pairs',
+		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
 		'host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',
 		'Zero-length BIND rejects before BO lookup, including SINGLE_PAGE, while legacy zero-encoded UNBIND_ALL retains its operation semantics',
