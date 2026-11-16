@@ -9,6 +9,7 @@ enum MemoryIndexKind {
 	poison
 	lane
 	dynamic_lane
+	constant_lane
 	binary
 	compare
 	select_value
@@ -49,7 +50,37 @@ struct MemoryIndexBuilder {
 	scope  int
 mut:
 	nodes []MemoryIndexNode
-	cache map[u64]int // Low two bits: scalar result, pair value, pair flag.
+	cache map[u64]int // Low two bits: scalar, pair value/flag, constant vector.
+}
+
+// A cached literal vector is a contiguous group of ordinary scalar leaf nodes.
+// Its first leaf also retains the undef mask, ignored by leaf evaluation.
+fn (mut b MemoryIndexBuilder) constant_lanes(source IRTypedOperand, bits u32, count int) !int {
+	b.p.constant_vector_profile(b.stream, b.pools, b.bodies, b.scope, source, true, 16)!
+	key := (u64(source.number) << 2) | 3
+	if cached := b.cache[key] { return cached }
+	if count > max_memory_index_nodes - b.nodes.len { return error('AIR memory index: constant lane node limit') }
+	c := b.p.extracted_constant(b.pools, b.bodies, b.scope, source)!
+	base := b.nodes.len
+	mut undef := u64(0)
+	for i in 0 .. count {
+		mut lane := c
+		mut word := u64(0)
+		if c.kind == .data { word = b.pools.words[c.words_start + i] & constant_mask(bits) }
+		else {
+			if c.kind == .aggregate {
+				numbers := ir_values(b.stream, b.stream.records[c.record])
+				value := b.pools.lookup(c.scope, numbers[i])!
+				lane = b.pools.constants[value.constant_index]
+			}
+			if lane.kind == .undef { undef |= u64(1) << u32(i) }
+			else { word = extracted_scalar_value(b.pools, lane, bits)!.value }
+		}
+		b.nodes << MemoryIndexNode{kind: if lane.kind == .poison { MemoryIndexKind.poison } else { MemoryIndexKind.literal }, bits: bits, value: word}
+	}
+	b.nodes[base] = MemoryIndexNode{...b.nodes[base], flags: undef}
+	b.cache[key] = base
+	return base
 }
 
 fn (b MemoryIndexBuilder) argument(source IRTypedOperand) !int {
@@ -298,26 +329,32 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			if element != operand.type_index || lane_bits != bits {
 				return error('AIR memory index: integer argument lane required')
 			}
-			argument := b.argument(source)!
 			lane_operand := b.p.operands[op.operands_start + 1]
 			lane_width := b.p.integer_bits(lane_operand.type_index)!
-			mut fixed_lane := -1
-			if lane_operand.number < scope.base_id {
-				lane_value := b.pools.lookup(b.scope, lane_operand.number)!
-				if lane_value.kind == .constant {
-					c := b.pools.constants[lane_value.constant_index]
-					if c.kind in [.zero, .integer] && !c.splat {
-						lane := b.pools.scalar_bits(lane_value.constant_index)! & constant_mask(lane_width)
-						if lane < u64(count) { fixed_lane = int(lane) }
+			if source.number < scope.base_id && b.pools.lookup(b.scope, source.number)!.kind == .constant {
+				base := b.constant_lanes(source, bits, count)!
+				lhs := b.expression(lane_operand, producer, depth + 1)!
+				node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: lhs, right: base, value: u64(count), flags: b.nodes[base].flags, height: 1 + b.nodes[lhs].height}
+			} else {
+				argument := b.argument(source)!
+				mut fixed_lane := -1
+				if lane_operand.number < scope.base_id {
+					lane_value := b.pools.lookup(b.scope, lane_operand.number)!
+					if lane_value.kind == .constant {
+						c := b.pools.constants[lane_value.constant_index]
+						if c.kind in [.zero, .integer] && !c.splat {
+							lane := b.pools.scalar_bits(lane_value.constant_index)! & constant_mask(lane_width)
+							if lane < u64(count) { fixed_lane = int(lane) }
+						}
 					}
 				}
-			}
-			if fixed_lane >= 0 {
-				// Preserve the single-node cost of a defined literal lane.
-				node = MemoryIndexNode{kind: .lane, bits: bits, argument: argument, lane: fixed_lane}
-			} else {
-				lhs := b.expression(lane_operand, producer, depth + 1)!
-				node = MemoryIndexNode{kind: .dynamic_lane, bits: bits, argument: argument, left: lhs, value: u64(count), height: 1 + b.nodes[lhs].height}
+				if fixed_lane >= 0 {
+					// Preserve the single-node cost of a defined literal lane.
+					node = MemoryIndexNode{kind: .lane, bits: bits, argument: argument, lane: fixed_lane}
+				} else {
+					lhs := b.expression(lane_operand, producer, depth + 1)!
+					node = MemoryIndexNode{kind: .dynamic_lane, bits: bits, argument: argument, left: lhs, value: u64(count), height: 1 + b.nodes[lhs].height}
+				}
 			}
 		} else {
 			return error('AIR memory index: unsupported expression dependency')
@@ -357,6 +394,16 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 					IntegerValue{poison: true}
 				} else {
 					IntegerValue{value: bindings[node.argument].values[int(values[node.left])] & constant_mask(node.bits)}
+				}
+			}
+			.constant_lane {
+				if poisons[node.left] || values[node.left] >= node.value {
+					value = IntegerValue{poison: true}
+				} else {
+					lane := int(values[node.left])
+					if node.flags & (u64(1) << u32(lane)) != 0 { return error('AIR memory index: selected undef lane') }
+					chosen := node.right + lane
+					value = IntegerValue{value: values[chosen], poison: poisons[chosen]}
 				}
 			}
 			.binary {

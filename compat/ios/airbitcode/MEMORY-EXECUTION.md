@@ -97,9 +97,9 @@ nonwrapping profile. An unused indexed pointer may be one past the binding;
 loads/stores also require their complete stored size and explicit alignment.
 
 An index may also be a pure integer SSA expression built from scalar arguments,
-defined integer literals, extraction from a direct integer vector argument using
-a supported pure integer lane selector, add/subtract/multiply, signed/unsigned
-division and remainder, shifts,
+defined integer literals, extraction from a direct integer vector argument or
+literal vector using a supported pure integer lane selector, add/subtract/multiply,
+signed/unsigned division and remainder, shifts,
 AND/OR/XOR, scalar integer comparisons/selects/freezes, unary bit intrinsics,
 and trunc/zext/sext. Integer widths are i1..i64
 and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
@@ -215,9 +215,22 @@ Poison or a selector outside the vector yields poison without reading a lane.
 Select/freeze can suppress/repair it; independent poisoned GEP roots still fail
 before writes. A direct undef selector requires freeze first. Computed selectors
 add their dependency height plus one extraction level and share the node budget.
-Defined in-range literal extractions retain their former single-leaf cost.
+Defined in-range literal argument-lane extractions retain their single-leaf cost.
 Literal out-of-range/poison selectors now follow the same repairable poison path.
-The source must still be a direct 1..16-lane integer vector argument.
+The source may be a direct 1..16-lane integer vector argument or a supported
+literal integer vector. Constant vectors validate all lanes and retain a cached
+contiguous scalar-leaf table, charged one graph node per lane. Each extraction
+adds its selector dependency and one level/node. Zero/data/aggregate/splat,
+poison and undef constants retain ordinary lane semantics. Only a selected undef
+lane errors, even under select/freeze; poison or out-of-range selectors skip
+that check and produce poison. Unselected undef/poison lanes do not affect a
+defined lane. Constructed and loaded vector sources still reject in addresses.
+
+`tests/ios/air-memory-constant-lane-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares
+constant lane selection against defined native LLVM extracts. It checks all
+i1..i64 lane widths, lengths 1..16, selector widths 1/32/64, mixed defined/poison/
+undef lanes, lazy lane errors, scalar select/freeze, exact graph limits, shared
+constant tables, independent/cold roots and malformed constant metadata.
 
 `tests/ios/air-memory-dynamic-lane-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, six selector widths, vector lengths 1/2/3/16,

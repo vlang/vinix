@@ -165,7 +165,7 @@ fn controls(assembler string, root string) !int {
  mut text := strings.new_builder(32768)
  text.write_string('target datalayout = "e-p:64:64"\n')
  args := '(<3 x i32> %v, i32 %s, i1 %c, ptr %out)'
- kinds := ['root_before', 'root_after', 'cold_bad', 'cold_good', 'load', 'phi', 'undef', 'invalid_ignored', 'constructed', 'literal', 'nested', 'binding']
+ kinds := ['root_before', 'root_after', 'cold_bad', 'cold_good', 'load', 'phi', 'undef', 'invalid_ignored', 'constructed', 'loaded', 'nested', 'binding']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
@@ -173,7 +173,8 @@ fn controls(assembler string, root string) !int {
   if kind == 'load' { text.write_string('%selector = load i32, ptr %out, align 1\n') }
   if kind == 'invalid_ignored' { text.write_string('%bad = udiv i32 1, 0\n %selector = select i1 false, i32 %bad, i32 0\n') }
   if kind == 'constructed' { text.write_string('%vec = insertelement <3 x i32> %v, i32 0, i32 0\n') }
-  source := if kind == 'constructed' { '%vec' } else if kind == 'literal' { 'zeroinitializer' } else { '%v' }
+  if kind == 'loaded' { text.write_string('%vec = load <3 x i32>, ptr %out, align 1\n') }
+  source := if kind in ['constructed', 'loaded'] { '%vec' } else { '%v' }
   selector := if kind in ['load', 'phi', 'invalid_ignored'] { '%selector' } else if kind == 'undef' { 'undef' } else if kind in ['root_before', 'root_after', 'cold_bad', 'cold_good'] { '3' } else { '%s' }
   text.write_string('%r = extractelement <3 x i32> ${source}, i32 ${selector}\n')
   if kind == 'root_before' { text.write_string('%badp = getelementptr i8, ptr %out, i32 %r\n') }
@@ -208,7 +209,7 @@ fn controls(assembler string, root string) !int {
   f := fi(ir, kind)
   mut actual := []u8{len: 64, init: 0xcc}; words := [u64(2), 0, 1]; sv := [u64(0)]; cv := [u64(1)]
   mut bindings := [airbitcode.IRMemoryBinding{values: words}, airbitcode.IRMemoryBinding{values: sv}, airbitcode.IRMemoryBinding{values: cv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  unsupported := kind in ['load', 'phi', 'undef', 'constructed', 'literal']
+  unsupported := kind in ['load', 'phi', 'undef', 'constructed', 'loaded']
   if unsupported {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported lane dependency: ' + kind) }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported lane ran') }; untouched(actual)
