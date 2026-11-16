@@ -5507,3 +5507,70 @@ bytes retain their previous scope. Full SDK/ABI/library/search, bootstrap and
 hermetic admission remain open, along with mandatory metadata-policy integration,
 owned ARM/GUI, broader lifetime/mapping controls, redistribution and defaults.
 No kernel, guest or product-default behavior changes.
+
+## Required host replay metadata permissions (2026-11-16)
+
+Commit `e0bcf6e5a` integrates the qualified metadata policy into required
+format-8 [host receipts](wine-host-required-check.md). Inner replay format 3
+requires the recomputed exact metadata list, policy, `metadata-aliases.json`
+and every metadata control record. Shared `winemetaimages` derives bounded
+metadata-only aliases from the already-admitted ordinary image pins, checks
+the selected linker's explicit image pin, records symlink targets and resolves
+every alias to a pinned ordinary image. It adds no image hashes: preceding
+mandatory Mach-O admission and the final host input/blob pass still check
+current bytes. The metadata and alias projectors are embedded, pinned and
+retained in every role. Copied evidence keeps the original recorded namespace.
+
+Fresh fixture, controller, producer and retainer builds all pass. Each requires
+identical captured and unrestricted external-object links, one allowed file
+read, one allowed directory enumeration, two allowed `stat` calls, four denied
+data reads, three denied directory enumerations, seven denied `stat` calls and
+one exact restricted hidden-object link refusal. This is sixty combined runtime
+denials and sixteen allowed controls, including twenty-eight metadata denials
+and eight allowed metadata controls. The SDK-denied graph and its sixteen
+runtime denials remain mandatory too. Temporary probe aliases are removed
+before admission of the ordinary retained evidence tree.
+
+Host controls pass real/copied baselines, real entries and all sixty-two named
+resealed refusals. Seven new cases cover a consistently resealed extra metadata
+permission/list, globally allowed metadata, altered alias evidence, changed
+allowed/denied `stat` logs, old host format 7 and old inner replay format 2.
+The existing extra-file case consistently reseals the directory and metadata
+projections as well. Fresh PE and owned-runtime production pass. All thirty-two
+receipt mutations pass through preflight and actual controller with the original
+ten-second bound unchanged, before guest/retention work. Eighteen startup/pre-sign
+refusals pass. Signed x86 holder-SIGKILL/collection passes in 103.863 seconds,
+with producer admission before signing and both host bindings after the guest.
+Four retention partitions pass complete real/copied baselines and 16/15/15/15
+exact refusals. The independent coverage checker confirms all sixty-one cases;
+producer/controller metadata-alias omissions reach the original missing-artifact
+gate without retained output. Every qualification phase exits successfully.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostmeta-20261116-01`, with
+frozen `source-final`, builder `wine-host-build`, four `host-*` builds and
+`host-controls`, `pe`, `prepared`, `receipt-controls`, `startup`, `native`,
+`retention-p0..p3` and `partition-check.log`. `qualify.v` and its phase argv,
+selected-environment, exit and raw output records preserve orchestration;
+the retention partitions run concurrently only after all preceding phases.
+`validation.txt` distinguishes the preliminary repository-root probe and its
+compiler notice from final frozen tools. Sixteen selected source/document/
+policy files match the repository byte-for-byte before the feature commit.
+The complete original format-7 checkpoint and standalone metadata qualifier,
+compiler/LLVM/SDK, distribution/notices, tested kernel/loader and historical
+source namespaces remain independently required and unchanged.
+
+The external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-metadata-20261116-01.inventory.json`,
+SHA-256 `e567c4a6acfd82a3318c2063c642ed8ca01d9abdb4be3f3424cb5428b39f1df9`.
+Complete recording and independent comparison both pass for bytes, sizes,
+types, modes and link targets. Their logs are beside the receipt. The fixed
+auditor remains in the original format-6 bundle; the complete new checkpoint
+was frozen before recording and remains unchanged.
+
+The qualified metadata operation is `file-read-metadata`/`stat` during replay.
+Other existence/search/metadata operations, ancestor entry names, OS-root/device
+exceptions, writes/network, helper startup/inherited state and OS loader/cache
+bytes retain their previous scope. Full SDK/ABI/library/search and bootstrap/
+hermetic admission remain unqualified. Owned ARM/GUI, broader lifetime/mapping
+controls, redistribution, defaults and complete roadmap 14 acceptance remain
+open. Kernel and product defaults do not change.
