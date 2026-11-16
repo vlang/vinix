@@ -8,10 +8,10 @@ fn (mut b MemoryIndexBuilder) vector_bit_intrinsic_source(source IRTypedOperand,
 	// duplicate overload identities. Recheck the direct call and source here.
 	b.p.vector_float_intrinsic_profile(b.ir, b.stream, b.pools, b.bodies, b.scope, producer, op, false, 32)!
 	id, count, bits := vector_float_intrinsic_name(b.ir.functions[op.callee_function].name)!
-	if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz] { return error('AIR memory index: unsupported vector intrinsic dependency') }
+	if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .iabs] { return error('AIR memory index: unsupported vector intrinsic dependency') }
 	// The immediate belongs to this call, even when its declaration or source
 	// table has already been cached. Source freezing does not change the flag.
-	zero_poison := if scalar_integer_zero_count(id) { b.p.vector_zero_count_flag(b.ir, b.pools, b.scope, op)! } else { u64(0) }
+	poison_flag := if id == .iabs { b.p.vector_integer_abs_flag(b.ir, b.pools, b.scope, op)! } else if scalar_integer_zero_count(id) { b.p.vector_zero_count_flag(b.ir, b.pools, b.scope, op)! } else { u64(0) }
 	key := memory_index_key(source.number, 3)
 	if cached := b.cache[key] {
 		node := b.nodes[cached]
@@ -31,7 +31,7 @@ fn (mut b MemoryIndexBuilder) vector_bit_intrinsic_source(source IRTypedOperand,
 	for lane in 0 .. count {
 		lane_height := b.nodes[parents[lane]].height + 1
 		if lane_height > height { height = lane_height }
-		b.nodes << MemoryIndexNode{kind: .projected_intrinsic, bits: bits, intrinsic: id, value: zero_poison, left: parents[lane], height: lane_height}
+		b.nodes << MemoryIndexNode{kind: .projected_intrinsic, bits: bits, intrinsic: id, value: poison_flag, left: parents[lane], height: lane_height}
 	}
 	if height > max_memory_index_depth - depth { return error('AIR memory index: vector intrinsic graph depth') }
 	index := b.nodes.len

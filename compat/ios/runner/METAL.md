@@ -457,9 +457,19 @@ the width for zero; true yields lane-local poison. Every call revalidates its
 flag before table cache lookup. Source poison and eager whole-vector undef keep
 their established rules; source freeze may create zero and result freeze may
 repair the resulting poison. Existing POD nodes retain the flag, with unchanged
-arrays, ownership and graph limits. Other vector intrinsic families remain
-excluded. The image shader checks both flags in a separate address dependency
-and red-channel readback, including frozen poison from trailing-zero count at x=0.
+arrays, ownership and graph limits. The image shader checks both flags in a
+separate address dependency and red-channel readback, including frozen poison
+from trailing-zero count at x=0.
+Pure vector `llvm.abs` also feeds addresses across i1..i64 and 1..16 lanes.
+Its call-local defined i1 flag preserves the signed minimum with false and
+produces lane-local poison with true. Other values yield magnitude bits. Source
+poison and eager whole-vector undef retain their established rules; source
+freeze repairs inputs to zero and result freeze may repair minimum poison.
+The existing intrinsic table stores the validated flag, with unchanged storage,
+ownership and graph limits. The image shader evaluates both minimum flags in a
+separate bounded address root, freezes the poisoned minimum lane, and mixes the
+computed offset into independently checked red-channel readback. Other vector
+intrinsic families remain excluded from address dependencies.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

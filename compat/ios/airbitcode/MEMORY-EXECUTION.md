@@ -415,12 +415,26 @@ Source freeze may repair undef/poison to zero, which can itself produce poison
 under a true flag; result freeze may repair zero-count poison. Extraction bounds
 remain independent. The existing intrinsic table stores each call's flag in its
 POD nodes, with no new array, node kind, owner or limit change. Declaration
-attributes retain the second-parameter immarg policy. Other vector intrinsic
-families remain excluded here.
+attributes retain the second-parameter immarg policy.
 `tests/ios/air-memory-vector-zero-count-index.v LLVM_AS FRESH_EXTERNAL_DIR`
 checks both operations/flags at every width, source/result recovery, call-local
 flag isolation/guards and exact cached graph limits with LLVM and independent
 division-based count oracles.
+
+Vector `llvm.abs` also supplies address lanes across fixed 1..16-lane i1..i64
+operands. The call-local `is_int_min_poison` flag must be an exact defined i1
+constant. False preserves the signed minimum bit pattern; true produces
+lane-local poison for that value. Other negative inputs yield their positive
+magnitude bits. Source poison stays lane-local, while undef remains an eager
+whole-vector error before extraction, selects or result freeze. Source freeze
+repairs indeterminate lanes to zero; result freeze may repair minimum poison.
+The existing unary intrinsic table and scalar abs evaluator retain each call's
+flag, with unchanged storage, ownership, extraction bounds and graph limits.
+Other vector intrinsic families remain excluded from address dependencies.
+`tests/ios/air-memory-vector-abs-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks both
+flags, all widths, minimum/negative inputs, poison/undef, source/result recovery,
+call-local flag isolation and cached graph boundaries against defined native
+LLVM references and an independent unsigned magnitude oracle.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result
