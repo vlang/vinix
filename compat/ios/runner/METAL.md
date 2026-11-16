@@ -270,19 +270,38 @@ vector operations. A store validates every lane before writing; poison or undef
 rejects the complete store while preceding instructions remain visible. Byte
 counts use stored size, whereas vector GEP strides use allocation size. Explicit
 alignment, permissions, bounds and all-block preflight apply. Non-byte-aligned
-lanes, scalable vectors, vector arguments/returns and vector PHIs remain outside
+lanes, scalable vectors, vector returns and vector PHIs remain outside
 this profile. The software dispatch limit remains one invocation. Deferred
 Objective-C checks cover raw integer/floating vector transfers and poison/undef/
 freeze behavior; this adds no rendering or GPU support.
 
-Every argument requires explicit `air.buffer` metadata, a unique location
+Every buffer argument requires explicit `air.buffer` metadata, a unique location
 in slots 0..30 with count one, address space 1 or 2, and read/write/read_write
 access matching the body. Space 2 is readonly. Conditional/unused arguments,
-unknown attribute tails, structures and builtins reject. Declared and actual
+unknown attribute tails, structures and other builtin forms reject. Declared and actual
 minimum buffer extents are combined; alignment must not exceed the virtual
 buffer base alignment of 256 bytes. Pipeline creation returns an owned state
 retaining its function/library/device, leaves a success error slot untouched,
 and uses the library NSError path for unsupported/invalid input.
+
+The single-invocation profile also accepts `air.thread_position_in_grid` as
+an i32 scalar (`uint`) or fixed `<3 x i32>` (`uint3`), and
+`air.thread_index_in_threadgroup` as an i32 scalar. These values are all zero
+for the supported 1x1x1 grid/group. Builtins have no buffer location and do not
+require encoder buffer bindings. Each semantic may appear once; metadata can
+carry an argument name and matching type name, or omit those names. Pointer,
+floating, other widths/counts, duplicate semantics, buffer/access/size/alignment
+properties, unused/conditional arguments and opaque tails reject. Arbitrary
+by-value uniforms, other builtins and larger grids remain unsupported. Builtin
+words are passed through the memory API's typed value bindings and captured
+before execution; library, pipeline and buffer ownership are unchanged.
+See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
+
+`tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR builtins` runs the focused
+Objective-C checks with normal and deterministic Swift hashing. Each mode
+executes six deferred scalar/uint3/unnamed builtin dispatches across two drained
+runtimes and refuses 38 invalid builtin pipelines. Sparse/reordered metadata,
+output offsets, caller-reference release and untouched padding are covered.
 
 Forward-only branches/switches and matching scalar/overflow-pair PHIs are supported.
 Conditional branches require scalar i1 and distinct destinations; all targets

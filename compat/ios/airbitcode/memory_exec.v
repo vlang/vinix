@@ -2,12 +2,14 @@
 module airbitcode
 
 // A virtual buffer base is aligned as declared by the caller. Offsets are byte
-// offsets into data, never host pointers. Buffers are borrowed and never freed.
+// offsets into data, never host pointers. Buffer bytes and value words are
+// borrowed for the call and never freed by the interpreter.
 pub struct IRMemoryBinding {
 pub:
 	offset u64
 	base_alignment u64 = 1
 	writable bool
+	values []u64 // Scalar/vector raw lane bits; empty for a buffer binding.
 pub mut:
 	data []u8
 }
@@ -18,12 +20,15 @@ pub mut:
 	minimum_size u64
 	readable bool
 	writable bool
+	value_bits u32 // Zero for a buffer argument.
+	value_lanes int
 }
 pub struct IRMemoryProfile {
 	accesses []IRMemoryAccess
 	max_phis int
 	move_bytes int // Largest admitted move/copy; one scratch allocation per run.
 	vector_results int
+	value_arguments bool
 pub:
 	steps int // Static instructions, switch comparisons and memory-intrinsic bytes.
 	arguments []IRMemoryArgument
@@ -129,11 +134,25 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	if count > 64 || scope >= pools.scopes.len || pools.scopes[scope].arguments_count != count { return error('AIR memory execution: argument count') }
 	mut arguments := []IRMemoryArgument{len: count}
 	mut keep := false
+	mut value_arguments := false
 	defer { if !keep { unsafe { arguments.free() } } }
 	for i in 0 .. count {
 		typ := p.gep_type(ir.references[sig.refs_start + 1 + i])!
-		if typ.kind != .pointer_t || typ.address_space > 2 { return error('AIR memory execution: pointer argument profile') }
-		arguments[i].address_space = typ.address_space
+		if typ.kind == .pointer_t {
+			if typ.address_space > 2 { return error('AIR memory execution: pointer argument profile') }
+			arguments[i].address_space = typ.address_space
+		} else {
+			index := ir.references[sig.refs_start + 1 + i]
+			if typ.kind == .vector_t {
+				_, bits, lanes := p.scalar_vector_type(index, true, 16)!
+				arguments[i].value_bits = bits
+				arguments[i].value_lanes = lanes
+			} else {
+				arguments[i].value_bits = p.execution_bits(index, true)!
+				arguments[i].value_lanes = 1
+			}
+			value_arguments = true
+		}
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 || ir_values(stream, raw)[6] != 0 { return error('AIR memory execution: function attributes') }
@@ -393,7 +412,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		} else if p.operands[op.operands_start + 1].type_index != op.source_type { return error('AIR memory execution: store type') }
 	}
 	keep = true
-	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, vector_results: vector_results, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
+	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, vector_results: vector_results, value_arguments: value_arguments, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
 }
 pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
@@ -412,6 +431,11 @@ fn (p IRTypedProgram) execute_memory_function(ir IRModule, stream Stream, pools 
 	if bindings.len != profile.arguments.len || profile.steps > step_limit { return error('AIR memory execution: binding count/budget') }
 	for i, b in bindings {
 		a := profile.arguments[i]
+		if a.value_bits != 0 {
+			if b.values.len != a.value_lanes || b.data.len != 0 || b.offset != 0 || b.base_alignment != 1 || b.writable { return error('AIR memory execution: value binding shape/options') }
+			continue
+		}
+		if b.values.len != 0 { return error('AIR memory execution: buffer binding required') }
 		if b.data.len > 64 * 1024 * 1024 || b.offset > u64(b.data.len) || b.base_alignment == 0 || b.base_alignment & (b.base_alignment - 1) != 0 || b.base_alignment < a.alignment || b.offset % a.alignment != 0 || a.minimum_size > u64(b.data.len) - b.offset || (a.writable && !b.writable) || (a.address_space == 2 && b.writable) { return error('AIR memory execution: bounds/alignment/permission') }
 	}
 	// Actual borrowed slices can alias even when their virtual arguments differ.
@@ -424,10 +448,15 @@ fn (p IRTypedProgram) execute_memory_function(ir IRModule, stream Stream, pools 
 		if gap < u64(access.bytes) { return error('AIR memory execution: disjoint memcpy ranges required') }
 	}
 	scope := function + 1; s := bodies.scopes[scope]
-	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: scope, binary32: true, limit: step_limit, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}, vectors: []ScalarVectorValue{len: profile.vector_results}}
+	mut bound_arguments := []ScalarVectorValue{len: if profile.value_arguments { profile.arguments.len } else { 0 }}
+	for i, a in profile.arguments {
+		if a.value_bits == 0 { continue }
+		for lane in 0 .. a.value_lanes { bound_arguments[i].lanes[lane] = IntegerValue{value: bindings[i].values[lane] & constant_mask(a.value_bits)} }
+	}
+	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: scope, binary32: true, limit: step_limit, bound_arguments: bound_arguments, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}, vectors: []ScalarVectorValue{len: profile.vector_results}}
 	mut pending := []IntegerValue{len: profile.max_phis}
 	mut move_buffer := []u8{len: profile.move_bytes}
-	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free(); move_buffer.free() } }
+	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free(); move_buffer.free(); bound_arguments.free() } }
 	m.seed_vector_slots(stream)!
 	mut block_index := s.blocks_start; mut previous := -1
 	for {

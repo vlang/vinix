@@ -66,7 +66,7 @@ fn (m &IntegerMachine) extract_constant_lane(stream Stream, op IRTypedInstructio
 	source := m.p.operands[op.operands_start]
 	vector := m.p.types[source.type_index]
 	if index.value >= vector.count { return IntegerValue{poison: true} }
-	if source.number >= m.bodies.scopes[m.scope].base_id {
+	if source.number >= m.bodies.scopes[m.scope].base_id || m.pools.lookup(m.scope, source.number)!.kind == .argument {
 		v := m.read_vector(stream, source)!
 		if v.undef & (u16(1) << u32(index.value)) != 0 { return error('AIR vector: selected undef lane') }
 		return v.lanes[int(index.value)]

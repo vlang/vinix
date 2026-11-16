@@ -4,13 +4,14 @@ module main
 import airbitcode
 
 // An experimental CPU interpreter, never a native Metal/GPU pipeline. Parsed
-// indexes borrow the retained library's immutable bytes. Only direct scalar
-// buffer arguments, bounded constant GEPs and a single invocation are supported.
+// indexes borrow the retained library's immutable bytes. Buffer pointers and
+// uint/uint3 invocation builtins use bounded constant GEPs and one invocation.
 struct SoftwareMetalKernelArgument {
 	slot int
 	alignment u64
 	minimum_size u64
 	writable bool
+	value_lanes int // Nonzero for a supported invocation builtin, supplied as zero.
 }
 struct SoftwareMetalKernel {
 	stream airbitcode.Stream
@@ -58,18 +59,34 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 	mut arguments := []SoftwareMetalKernelArgument{len: prepared.argument_count()}
 	defer { if !keep { unsafe { arguments.free() } } }
 	mut slots := u32(0)
+	mut builtins := u8(0)
 	for arg in entries.arguments[entry.arguments_start..entry.arguments_start + entry.arguments_count] {
+		a := prepared.argument(int(arg.index))!
+		if arg.kind in ['air.thread_position_in_grid', 'air.thread_index_in_threadgroup'] {
+			bit := if arg.kind == 'air.thread_position_in_grid' { u8(1) } else { u8(2) }
+			typ := program.types[arg.type_index]
+			vector := typ.kind == .vector_t
+			if builtins & bit != 0 || arg.opaque_attributes || arg.condition >= 0 || arg.unused || arg.has_location || arg.has_address_space || arg.has_size || arg.has_alignment || arg.has_buffer_size || arg.access != .unspecified || a.value_bits != 32 || (vector && (bit != 1 || a.value_lanes != 3)) || (!vector && (typ.kind != .integer_t || a.value_lanes != 1)) || (arg.type_name.len != 0 && arg.type_name != if vector { 'uint3' } else { 'uint' }) { return error('Software Metal requires uint/uint3 invocation builtin metadata') }
+			// scalar_vector_type admits floating lanes as well; builtins do not.
+			if vector {
+				element := program.references[typ.refs_start]
+				if program.types[element].kind != .integer_t { return error('Software Metal requires integer invocation coordinates') }
+			}
+			builtins |= bit
+			arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: -1, value_lanes: a.value_lanes}
+			continue
+		}
 		if arg.kind != 'air.buffer' || arg.opaque_attributes || arg.condition >= 0 || arg.unused || !arg.has_location || arg.location_count != 1 || arg.location >= 31 || !arg.has_address_space || arg.address_space !in [u32(1), 2]! || arg.access !in [.read, .write, .read_write]! || (arg.address_space == 2 && arg.access != .read) { return error('Software Metal requires explicit scalar buffer metadata') }
 		if slots & (u32(1) << arg.location) != 0 { return error('Software Metal buffer slots overlap') }
 		slots |= u32(1) << arg.location
-		a := prepared.argument(int(arg.index))!
+		if a.value_bits != 0 { return error('Software Metal buffer pointer required') }
 		if (a.writable && arg.access == .read) || (a.readable && arg.access == .write) { return error('Software Metal buffer access disagrees with body') }
 		alignment := if arg.has_alignment && arg.alignment > a.alignment { arg.alignment } else { a.alignment }
 		mut minimum := a.minimum_size
 		if arg.has_size && arg.size > minimum { minimum = arg.size }
 		if arg.has_buffer_size && arg.buffer_size > minimum { minimum = arg.buffer_size }
 		if alignment > 256 || minimum > software_metal_max_buffer { return error('Software Metal buffer requirements exceed profile') }
-		arguments[int(arg.index)] = SoftwareMetalKernelArgument{int(arg.location), alignment, minimum, arg.access != .read}
+		arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: int(arg.location), alignment: alignment, minimum_size: minimum, writable: arg.access != .read}
 	}
 	keep = true
 	return SoftwareMetalKernel{stream, ir, pools, bodies, program, prepared, function, arguments}
@@ -228,6 +245,7 @@ fn sm_compute_validate(state &SoftwareMetalComputeBindings) {
 	if state.pipeline == 0 { panic('iOS: Metal compute dispatch requires a pipeline') }
 	kernel := obj_header(state.pipeline).metal_kernel
 	for arg in kernel.arguments {
+		if arg.value_lanes != 0 { continue }
 		if state.buffers[arg.slot] == 0 { panic('iOS: Metal compute dispatch requires every buffer binding') }
 		b := obj_header(state.buffers[arg.slot]); offset := state.offsets[arg.slot]
 		if !sm_range(sm_buffer_length(b), offset, arg.minimum_size) || offset % arg.alignment != 0 { panic('iOS: Metal compute binding bounds/alignment') }
@@ -251,8 +269,15 @@ fn sm_compute_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, grou
 fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	k := obj_header(state.pipeline).metal_kernel
 	mut bindings := []airbitcode.IRMemoryBinding{cap: k.arguments.len}
-	defer { unsafe { bindings.free() } }
+	mut has_values := false
+	for arg in k.arguments { if arg.value_lanes != 0 { has_values = true } }
+	builtin_words := []u64{len: if has_values { 3 } else { 0 }}
+	defer { unsafe { bindings.free(); builtin_words.free() } }
 	for arg in k.arguments {
+		if arg.value_lanes != 0 {
+			bindings << airbitcode.IRMemoryBinding{values: builtin_words[..arg.value_lanes]}
+			continue
+		}
 		buffer := obj_header(state.buffers[arg.slot])
 		// vbytes borrows storage; freeing bindings must never free its data.
 		bindings << airbitcode.IRMemoryBinding{data: unsafe { (&u8(sm_storage_base(buffer))).vbytes(int(sm_buffer_length(buffer))) }, offset: state.offsets[arg.slot], base_alignment: 256, writable: arg.writable}

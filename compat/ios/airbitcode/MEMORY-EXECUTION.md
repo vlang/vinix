@@ -1,7 +1,7 @@
 # Bounded memory execution
 
-`run_memory_function` executes a defined ordinary void function with pointer
-arguments, forward control flow, scalar/vector loads/stores, scalar binary operations,
+`run_memory_function` executes a defined ordinary void function with buffer and
+typed value arguments, forward control flow, scalar/vector loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, bounded constant GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
@@ -9,7 +9,7 @@ Scalar `extractelement` may also read supported fixed constant/constructed/loade
 vectors. Fixed 1..16-lane vector memory accesses accept byte-aligned integer
 widths i8/i16/i24/i32/i40/i48/i56/i64 and half/float. Lanes occupy consecutive
 little-endian bytes and preserve raw floating bits. Non-byte-aligned lanes,
-scalable vectors, vector arguments/returns and vector PHIs remain unsupported.
+scalable vectors, vector returns and vector PHIs remain unsupported.
 This memory profile supersedes the loaded-vector exclusions in the individual
 vector-operation sections below; scalar/void API exclusions still apply.
 
@@ -48,6 +48,40 @@ integer-pointer casts,
 loops, atomics, volatile accesses, general calls or aggregate loads/stores
 are rejected. The separate scalar/void APIs retain their existing profiles.
 
+## Value arguments
+
+Memory functions accept up to 64 interleaved buffer pointers and scalar/vector
+values. Scalars are i1..i64, half or float; fixed vectors have 1..16 lanes of
+those types, including non-byte-aligned integers. Argument values are raw bits,
+without input poison/undef tags. `IRMemoryArgument.value_bits` is zero for a
+buffer, otherwise it reports the lane width and `value_lanes` reports one for a
+scalar or the declared vector count. The declaration still determines the type.
+
+Bind a value with `IRMemoryBinding{values: words}`: exactly one u64 per lane,
+empty data, zero offset, base alignment one and writable false. Each word is
+masked to its declared lane width. Buffer bindings require empty values and keep
+their existing data/bounds/alignment/permission checks. All bindings are validated
+before writes, then all values are captured into execution-owned snapshots before
+the first instruction. Caller arrays are borrowed only for the call; changing
+them affects the next run, and aliasing output cannot alter the captured values.
+The snapshot array is allocated only when value arguments exist and freed on
+every execution exit. Materialization is bounded by 64 arguments and 16 lanes;
+operation lane-work and result limits remain unchanged.
+
+Vector arguments compose with the existing vector operations and extraction.
+Integer/FP scalar arguments use the same raw-bit evaluator as the scalar API.
+Both ordinary and prepared memory execution support values. The standalone
+integer/scalar/void signatures retain their vector-argument exclusions. This
+memory support supersedes argument exclusions in older operation sections below.
+Vector memory stores still require byte-aligned lanes. Pointer values cannot be
+supplied as integers, and nonliteral GEP indices remain unsupported.
+
+`tests/ios/air-memory-values.v` compares 35,904 mixed scalar/vector cases with
+native LLVM through both APIs, including all widths/counts, masking and explicit
+floating edge bits. It checks 16,830 invalid value/buffer bindings before writes,
+unsupported input shapes, dynamic GEP/inttoptr rejection, aliased snapshots,
+bufferless functions, 256 branch/PHI inputs and 256 alternating poison/recovery calls.
+
 ## Prepared memory functions
 
 `p.prepare_memory_function(ir, stream, pools, bodies, function)` validates the
@@ -70,7 +104,7 @@ Every prepared execution still checks the current binding count, sizes, offsets,
 alignment, permissions, address-space restrictions, step limit and actual
 backing-address overlap for memcpy. These checks run before any writes, including
 for inactive memcpy instructions. Execution allocates fresh scalar/vector/PHI/
-move scratch and releases it on success or error; values and failures do not
+move/value-argument scratch and releases it on success or error; values and failures do not
 persist between runs. The operation semantics and execution engine are shared
 with the ordinary API. The software Metal pipeline owns this preparation and
 reuses it when deferred dispatch snapshots execute.

@@ -14,7 +14,11 @@ fn vector_operation_shape(p IRTypedProgram, op IRTypedInstruction, arity int) ! 
 fn (p IRTypedProgram) vector_source_profile(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, source IRTypedOperand, mixed bool, remaining int) !int {
 	_, _, count := p.scalar_vector_type(source.type_index, mixed, remaining)!
 	s := bodies.scopes[scope]
-	if source.number < s.base_id { return p.constant_vector_profile(stream, pools, bodies, scope, source, mixed, remaining)! }
+	if source.number < s.base_id {
+		value := pools.lookup(scope, source.number)!
+		if value.kind == .argument && value.type_index == source.type_index { return count }
+		return p.constant_vector_profile(stream, pools, bodies, scope, source, mixed, remaining)!
+	}
 	slot := u64(source.number) - s.base_id
 	if slot >= u64(s.results_count) || s.results_start < 0 || s.results_start > bodies.results.len || slot >= u64(bodies.results.len - s.results_start) { return error('AIR vector: source result slot') }
 	producer := bodies.results[s.results_start + int(slot)]
@@ -26,7 +30,7 @@ fn (p IRTypedProgram) vector_source_profile(stream Stream, pools IRConstantPools
 fn (p IRTypedProgram) vector_extract_profile(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, scope int, index int, op IRTypedInstruction, mixed bool, remaining int) !int {
 	vector_operation_shape(p, op, 2)!
 	source := p.operands[op.operands_start]
-	if source.number < bodies.scopes[scope].base_id { return p.constant_extract_profile(stream, pools, bodies, scope, op, mixed, remaining)! }
+	if source.number < bodies.scopes[scope].base_id && pools.lookup(scope, source.number)!.kind != .argument { return p.constant_extract_profile(stream, pools, bodies, scope, op, mixed, remaining)! }
 	element, _, _ := p.scalar_vector_type(source.type_index, mixed, remaining)!
 	if op.result_type != element { return error('AIR vector: extract result type') }
 	p.integer_bits(p.operands[op.operands_start + 1].type_index)!
@@ -62,7 +66,14 @@ fn (m &IntegerMachine) read_vector(stream Stream, source IRTypedOperand) !Scalar
 		if !value.vector || value.value >= u64(m.vectors.len) { return error('AIR vector: vector slot required') }
 		return m.vectors[int(value.value)]
 	}
-	c := m.p.extracted_constant(m.pools, m.bodies, m.scope, source)!
+	argument_value := m.pools.lookup(m.scope, source.number)!
+	if argument_value.kind == .argument {
+		slot := u64(source.number) - m.pools.module_values
+		if argument_value.type_index != source.type_index || slot >= u64(m.bound_arguments.len) { return error('AIR memory execution: vector argument slot') }
+		return m.bound_arguments[int(slot)]
+	}
+	if argument_value.kind != .constant || argument_value.type_index != source.type_index { return error('AIR vector: matching constant required') }
+	c := m.pools.constants[argument_value.constant_index]
 	_, bits, count := m.p.scalar_vector_type(source.type_index, m.binary32, 16)!
 	mut result := ScalarVectorValue{}
 	for i in 0 .. count {

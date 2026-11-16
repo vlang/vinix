@@ -216,6 +216,7 @@ struct IntegerMachine {
 	bodies IRFunctionBodies
 	scope int
 	arguments []u64
+	bound_arguments []ScalarVectorValue // Memory API's typed scalar/vector values.
 	limit int
 	binary32 bool
 mut:
@@ -242,6 +243,10 @@ fn (m &IntegerMachine) read(operand_index int) !IntegerValue {
 	value := m.pools.lookup(m.scope, operand.number)!
 	if value.kind == .argument {
 		slot := u64(operand.number) - m.pools.module_values
+		if m.bound_arguments.len != 0 {
+			if slot >= u64(m.bound_arguments.len) { return error('AIR memory execution: value argument slot') }
+			return m.bound_arguments[int(slot)].lanes[0]
+		}
 		if slot >= u64(m.arguments.len) { return error('AIR integer: argument slot') }
 		return IntegerValue{value: m.arguments[int(slot)] & constant_mask(bits)}
 	}

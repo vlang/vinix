@@ -60,6 +60,10 @@ fn sm_sampler_worker(api SMSamplerAPI, device u64, descriptor u64) {
 }
 fn test_software_metal_samplers() {
 	$if !ios_metal_software ? { return }
+	if os.args.len == 2 && os.args[1] == '--software-metal-builtins' {
+		sm_test_builtin_memory_focus()!
+		exit(0)
+	}
 	if os.args.len == 2 && os.args[1] == '--software-metal-vector-memory' {
 		sm_test_vector_memory_focus()!
 		exit(0)
@@ -3905,6 +3909,90 @@ fn sm_saturating_reference(id string, width int, a u64, b u64) u64 {
 	if right < 0 && left > maximum + right { return u64(maximum) }
 	if right > 0 && left < minimum + right { return u64(minimum) & mask }
 	return u64(left - right) & mask
+}
+fn sm_test_builtin_memory_focus() ! {
+	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR')
+	assert base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/')
+	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/builtins' } else { '/normal/builtins' }
+	assert !os.exists(out); os.mkdir_all(out)!
+	names := ['scalar', 'vector', 'unnamed', 'half', 'wide', 'float', 'float_vector', 'vec2', 'vec4', 'index_vector', 'location', 'access', 'size', 'alignment', 'buffer_size', 'address_space', 'duplicate', 'unknown', 'spoof', 'unused', 'opaque', 'pointer']
+	mut source := strings.new_builder(32768)
+	source.write_string('target datalayout = "e-p:64:64"\n')
+	for name in names {
+		t := if name in ['vector', 'float_vector'] { if name == 'vector' { '<3 x i32>' } else { '<3 x float>' } } else if name == 'vec2' { '<2 x i32>' } else if name == 'vec4' { '<4 x i32>' } else if name == 'half' { 'i16' } else if name == 'wide' { 'i64' } else if name == 'float' { 'float' } else if name in ['pointer', 'address_space'] { 'ptr' } else { 'i32' }
+		index_type := if name == 'index_vector' { '<3 x i32>' } else { 'i32' }
+		source.write_string('define void @${name}(${t} %gid, ptr addrspace(1) %out, ${index_type} %local) {\n')
+		if name == 'vector' {
+			for lane in 0 .. 3 { source.write_string('%v${lane} = extractelement <3 x i32> %gid, i32 ${lane}\n %p${lane} = getelementptr i8, ptr addrspace(1) %out, i64 ${lane * 4}\n store i32 %v${lane}, ptr addrspace(1) %p${lane}, align 4\n') }
+			source.write_string('%r = add i32 %local, 17\n %p = getelementptr i8, ptr addrspace(1) %out, i64 12\n store i32 %r, ptr addrspace(1) %p, align 4\n')
+		} else if name in ['scalar', 'unnamed'] {
+			source.write_string('%r = add i32 %gid, %local\n store i32 %r, ptr addrspace(1) %out, align 4\n %v = add i32 %r, 7\n %p = getelementptr i8, ptr addrspace(1) %out, i64 4\n store i32 %v, ptr addrspace(1) %p, align 4\n')
+		} else { source.write_string('store i32 99, ptr addrspace(1) %out, align 4\n') }
+		source.write_string('ret void }\n')
+	}
+	source.write_string('!air.kernel = !{')
+	for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 10}') }
+	source.write_string('}\n')
+	for i, name in names {
+		n := i * 10
+		type_name := if name == 'spoof' { 'int' } else if name in ['vector', 'float_vector', 'vec2', 'vec4'] { 'uint3' } else { 'uint' }
+		semantic := if name == 'unknown' { 'air.unknown_builtin' } else { 'air.thread_position_in_grid' }
+		local_semantic := if name == 'duplicate' { 'air.thread_position_in_grid' } else { 'air.thread_index_in_threadgroup' }
+		extra := match name {
+			'location' { ', !"air.location_index", i32 0, i32 1' }
+			'access' { ', !"air.read"' }
+			'size' { ', !"air.arg_type_size", i32 4' }
+			'alignment' { ', !"air.arg_type_align_size", i32 4' }
+			'buffer_size' { ', !"air.buffer_size", i32 4' }
+			'address_space' { ', !"air.address_space", i32 0' }
+			'unused' { ', !"air.arg_unused"' }
+			'opaque' { ', !"air.unknown_tail", i32 9' }
+			else { '' }
+		}
+		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n !${n + 1} = !{}\n !${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 3} = !{i32 0, !"${semantic}"${if name == 'unnamed' { '' } else { ', !"air.arg_type_name", !"'+type_name+'"' }}${extra}}\n !${n + 4} = !{i32 1, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n !${n + 5} = !{i32 2, !"${local_semantic}", !"air.arg_type_name", !"uint"}\n')
+	}
+	os.write_file(out + '/input.ll', source.str())!
+	result := os.exec(['/opt/homebrew/opt/llvm/bin/llvm-as', out + '/input.ll', '-o', out + '/input.bc'])
+	os.write_file(out + '/assemble.log', result.output)!; assert result.exit_code == 0, result.output
+	code := os.read_bytes(out + '/input.bc')!
+	bytes := sm_library_code_fixture(names, code, true, true, true)
+	defer { unsafe { code.free(); bytes.free() } }
+	for _ in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
+		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); assert library != 0
+		queue := sm_send(device, c'newCommandQueue')
+		for name in names[3..] {
+			mut error_slot := u64(0)
+			assert sm_test_compute_pipeline(device, library, name, &error_slot) == 0, name
+			sm_library_check_error(error_slot, 3)
+		}
+		output := sm_test_buffer(device, 64, 0); ptr := sm_send(output, c'contents')
+		command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+		for i, name in names[..3] {
+			mut error_slot := u64(0x1234)
+			pipeline := sm_test_compute_pipeline(device, library, name, &error_slot)
+			if pipeline == 0 { eprintln('builtin ${name}: ' + string_text(sm_send(error_slot, c'localizedDescription'))); exit(1) }
+			assert error_slot == 0x1234
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+			sm_test_compute_buffer(encoder, output, u64(4 + i * 20), 7)
+			sm_test_compute_dispatch(encoder, if i == 1 { c'dispatchThreadgroups:threadsPerThreadgroup:' } else { c'dispatchThreads:threadsPerThreadgroup:' }, 1)
+			objc_release(pipeline)
+		}
+		sm_call(encoder, c'endEncoding'); unsafe { C.memset(voidptr(ptr), 0xcc, 64) }
+		objc_release(output); objc_release(library); objc_release(device)
+		for i in 0 .. 64 { assert unsafe { *(&u8(ptr + u64(i))) } == 0xcc }
+		sm_call(command, c'commit'); assert sm_send(command, c'status') == 4
+		for i in 0 .. 64 {
+			mut expected := u8(0xcc)
+			for shape in 0 .. 3 {
+				start := 4 + shape * 20; size := if shape == 1 { 16 } else { 8 }
+				if i >= start && i < start + size { expected = if shape == 1 && i == start + 12 { u8(17) } else if shape != 1 && i == start + 4 { u8(7) } else { u8(0) } }
+			}
+			assert unsafe { *(&u8(ptr + u64(i))) } == expected
+		}
+		objc_release(queue); objc_pool_pop(pool); objc_stop()
+	}
+	println('IOS-SOFTWARE-METAL-BUILTINS: 6 scalar/uint3/unnamed deferred dispatches with sparse reordered buffer metadata, 38 invalid builtin pipelines, caller-reference release, padding and two drained runtimes PASS')
 }
 fn sm_vector_memory_fixture(mut source strings.Builder, name string) {
 	parts := name.split('_'); t := parts[1]; mode := parts[2]; v := '<2 x ${t}>'
