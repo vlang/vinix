@@ -55,6 +55,28 @@ pub const drm_syncobj_wait_all = u32(1) << 0
 pub const drm_syncobj_wait_for_submit = u32(1) << 1
 pub const drm_syncobj_wait_available = u32(1) << 2
 pub const drm_syncobj_wait_deadline = u32(1) << 3
+pub const sync_ioc_file_info = u32(0xc0383e04)
+
+// include/uapi/linux/sync_file.h. These fixed-width layouts are shared by
+// native and compat callers; sync_fence_info is a userspace array address.
+pub struct SyncFileInfo {
+pub mut:
+	name [32]u8
+	status i32
+	flags u32
+	num_fences u32
+	pad u32
+	sync_fence_info u64
+}
+
+pub struct SyncFenceInfo {
+pub mut:
+	obj_name [32]u8
+	driver_name [32]u8
+	status i32
+	flags u32
+	timestamp_ns u64
+}
 // These UAPI flags intentionally reuse fcntl's O_CLOEXEC/O_RDWR values.
 pub const drm_cloexec = u32(0o2000000)
 pub const drm_rdwr = u32(0o2)
@@ -676,6 +698,7 @@ pub fn validate_asahi_25_layouts() bool {
 		&& sizeof(DrmPrimeHandle) == 12 && sizeof(DrmSyncobjCreate) == 8
 		&& sizeof(DrmSyncobjDestroy) == 8 && sizeof(DrmSyncobjHandle) == 16
 		&& sizeof(DrmSyncobjWait) == 40 && sizeof(DrmSyncobjArray) == 16
+		&& sizeof(SyncFileInfo) == 56 && sizeof(SyncFenceInfo) == 80
 		&& sizeof(DrmAsahiParamsGlobal) == 432
 		&& sizeof(DrmAsahiGetParams) == 32 && sizeof(DrmAsahiVmCreate) == 32
 		&& sizeof(DrmAsahiVmDestroy) == 16 && sizeof(DrmAsahiGemCreate) == 32

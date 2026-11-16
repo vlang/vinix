@@ -12,6 +12,7 @@ pub fn new_private_stub(timestamp_ns u64) ?&DmaFence {
 	if allocation == unsafe { nil } { return none }
 	mut fence := unsafe { &DmaFence(allocation) }
 	unsafe { *fence = DmaFence{ timestamp_ns: timestamp_ns } }
+	fence.private_stub = true
 	katomic.store(mut &fence.signaled, true)
 	return fence
 }

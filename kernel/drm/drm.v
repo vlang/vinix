@@ -207,6 +207,11 @@ fn (mut this SyncFileResource) write(_handle voidptr, _buf voidptr, _loc u64, _c
 }
 
 fn (mut this SyncFileResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	if u32(request) == ioctl.sync_ioc_file_info {
+		result := sync_file_info_ioctl(this.fence, u64(argp))
+		if result < 0 { errno.set(u64(-result)); return none }
+		return result
+	}
 	return resource.default_ioctl(handle, request, argp)
 }
 

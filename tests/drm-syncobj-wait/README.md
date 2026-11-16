@@ -118,3 +118,14 @@ execution or kernel heap usage. Vinix still polls through its scheduler; Linux
 uses sleeping waits and fence callbacks. Timeline waits and deadline scheduling
 hints remain separate work. These tests do not qualify multi-CPU races or
 syscall restart after actual userspace signal delivery.
+
+Sync-file `FILE_INFO` cases run the production wrapper and query helper with
+the 56-byte header and 80-byte leaf record. They check allocation-free count
+queries, large capacities, reserved fields, status and first timestamps,
+private stub/queue provenance, signed sequence formatting and truncation.
+Bounded output copies model null pointers, partial array/header faults,
+overlapping ranges and input mutation between outputs. Completion and final
+descriptor close between copies test coherent snapshots and wrapper ownership;
+source replacement/removal leaves the exported leaf intact. All temporary
+detail owners must be freed on success and every error. This covers current
+single-leaf exports; merge, containers and deadline ioctls remain separate work.

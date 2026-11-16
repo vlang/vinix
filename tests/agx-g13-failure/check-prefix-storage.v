@@ -14,6 +14,12 @@ const helpers = [
 	'drm__SyncobjResource__unref',
 	'drm__SyncFileResource__unref',
 	'drm__SyncFileResource__poll_status',
+	'drm__SyncFileResource__ioctl',
+	'drm__sync_file_info_ioctl',
+	'drm__sync_info_names',
+	'drm__sync_name_append',
+	'drm__sync_name_number',
+	'syncobj__snapshot',
 	'syncobj__poll_fence',
 	'syncobj__cancel_fence_event',
 	'syncobj__DmaFence__notify_events_locked',
@@ -80,6 +86,11 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'syncobj__snapshot' { return 'syncobj__FenceSnapshot' }
+	if name == 'drm__SyncFileResource__ioctl' { return '__v_option_i64' }
+	if name == 'drm__sync_file_info_ioctl' { return 'i64' }
+	if name == 'drm__sync_info_names' { return 'void' }
+	if name in ['drm__sync_name_append', 'drm__sync_name_number'] { return 'u32' }
 	if name == 'drm__SyncFileResource__poll_status' { return 'i64' }
 	if name in ['syncobj__cancel_fence_event', 'syncobj__DmaFence__notify_events_locked'] { return 'void' }
 	if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd'] { return '__v_option_i64' }
@@ -130,6 +141,14 @@ fn check(source string) ! {
 	for name in helpers {
 		body := function_body(source, name)!
 		mut allocation_scan := body
+		if name == 'drm__sync_file_info_ioctl' {
+			owned := 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo))'
+			if body.count(owned) != 1 { return error('sync-file info must have exactly one fallible detail allocation') }
+			allocation_scan = body.replace(owned, 'owned_sync_file_detail')
+		}
+		if name == 'drm__sync_name_number' && !body.contains('u8 digits[20]') {
+			return error('sync-file decimal formatting must use fixed stack storage')
+		}
 		if name.ends_with('WorkQueueEvents__retain') {
 			owned := 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock))'
 			if body.count(owned) != 1 { return error('prepared backlog must have exactly one owned overflow allocation site') }
@@ -222,6 +241,7 @@ fn selftest() ! {
 		kind := result_type(name)
 		ending := if kind == 'void' { 'return;' } else if kind == 'bool' { 'return true;' } else { 'return (' + kind + '){0};' }
 		owned := if name.ends_with('WorkQueueEvents__retain') { 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));\n' }
+			else if name == 'drm__sync_file_info_ioctl' { 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));\n' }
 			else if name.ends_with('WorkQueueEvents__release') { 'memory__free((void*)(block));\n' }
 			else if name == 'drm__new_syncobj_wait_buffer' { 'memory__malloc_packed_fallible(geometry.bytes);\n' }
 			else if name == 'drm__new_syncobj_handle_buffer' { 'memory__malloc_packed_fallible(geometry.captures_offset);\n' }
@@ -234,7 +254,7 @@ fn selftest() ! {
 			}
 			else if name == 'drm__SyncobjWaitBuffer__free_owned' { 'memory__free(buffer->allocation);\n' } else { '' }
 		captures := if name in ['drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal'] { '' } else { 'syncobj__FenceCapture captures[64];\n' }
-		fixture += kind + ' ' + name + '(void) {\n' + owned + ' u32 handles[64];\n void* objects[64];\n ' + captures + ' void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
+		fixture += kind + ' ' + name + '(void) {\n' + owned + ' u8 digits[20];\n u32 handles[64];\n void* objects[64];\n ' + captures + ' void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
 	}
 	check(fixture)!
 	for name in helpers {
@@ -246,6 +266,10 @@ fn selftest() ! {
 		}
 	}
 	for broken in ['', fixture + fixture,
+		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', ''),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', 'memory__malloc_packed_fallible(1);'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo)); memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));'),
+		fixture.replace('u8 digits[20];', 'u8* digits;'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', ''),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', 'memory__malloc_packed_fallible(1);'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock)); memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));'),

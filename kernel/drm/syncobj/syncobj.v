@@ -30,6 +30,7 @@ pub mut:
 	lock     klock.Lock
 	waiters  []&FenceWaiter
 mut:
+	private_stub bool
 	poll_events &FenceEvent = unsafe { nil }
 }
 
