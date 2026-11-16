@@ -200,7 +200,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	mut call_alignments := [16]MemoryCallAlignmentCache{}
 	mut memory_steps := 0
 	mut move_bytes := 0
-	mut expressions := MemoryIndexBuilder{p: p, stream: stream, pools: pools, bodies: bodies, scope: scope}
+	mut expressions := MemoryIndexBuilder{ir: ir, p: p, stream: stream, pools: pools, bodies: bodies, scope: scope}
 	expressions.nodes.flags |= .noslices
 	defer { unsafe { expressions.cache.free(); if !keep { expressions.nodes.free() } } }
 	for index in s.instructions_start .. s.instructions_start + s.instructions_count {

@@ -12,6 +12,7 @@ enum MemoryIndexKind {
 	compare
 	select_value
 	freeze_value
+	intrinsic
 	cast
 }
 
@@ -28,12 +29,14 @@ struct MemoryIndexNode {
 	right       int = -1
 	condition   int = -1
 	height      int = 1
+	intrinsic   ScalarIntrinsic
 mut:
 	root        bool // Independently checked GEP, even when reused by a select.
 }
 
 // Transient cache; nodes transfer to the private profile only on success.
 struct MemoryIndexBuilder {
+	ir     IRModule // Borrowed only during preflight.
 	p      IRTypedProgram
 	stream Stream
 	pools  IRConstantPools
@@ -156,6 +159,14 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			if b.nodes[rhs].height > height { height = b.nodes[rhs].height }
 			if b.nodes[cond].height > height { height = b.nodes[cond].height }
 			node = MemoryIndexNode{kind: .select_value, bits: bits, left: lhs, right: rhs, condition: cond, height: height + 1}
+		} else if code == 34 {
+			// The earlier call also passes the enclosing memory profile's bounded
+			// declaration attribute/duplicate checks. Recheck call identity here.
+			b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, op, b.scope)!
+			id := scalar_intrinsic_name(b.ir.functions[op.callee_function].name)!
+			if id !in [.ctpop, .bitreverse, .bswap] { return error('AIR memory index: unsupported intrinsic dependency') }
+			lhs := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
+			node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, left: lhs, height: 1 + b.nodes[lhs].height}
 		} else if code == 58 {
 			b.p.scalar_unary_profile(op, true, false)!
 			lhs := b.expression_source(b.p.operands[op.operands_start], producer, depth + 1, true)!
@@ -225,6 +236,9 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.select_value {
 				chosen := if values[node.condition] & 1 != 0 { node.left } else { node.right }
 				value = IntegerValue{value: values[chosen], poison: poisons[node.condition] || poisons[chosen]}
+			}
+			.intrinsic {
+				value = if poisons[node.left] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
 			}
 			.freeze_value {
 				// Match IntegerMachine.read_frozen's stable zero choice.

@@ -324,6 +324,8 @@ geometry lanes can also feed bounded integer add/subtract/multiply,
 signed/unsigned division/remainder, scalar integer comparisons/selects/freezes, bitwise
 AND/OR/XOR, left/logical-right/arithmetic-right shifts and width casts
 to form a checked buffer index, including a flattened multidimensional position.
+Scalar population count, bit reversal and byte swap intrinsics may also feed
+these indices, with the existing declaration and poison checks.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
@@ -341,6 +343,8 @@ then forms row/pixel addresses with flagged shifts and disjoint OR.
 An integer samesign comparison of x against grid width selects the final address
 or poison, followed by a scalar freeze. Prevalidation and execution preserve the
 same defined address; poison/direct undef freezes choose zero.
+Two bit reversal calls then preserve that address while exercising intrinsic
+dependencies in the image pipeline.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.

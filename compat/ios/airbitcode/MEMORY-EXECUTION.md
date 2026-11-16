@@ -99,7 +99,8 @@ loads/stores also require their complete stored size and explicit alignment.
 An index may also be a pure integer SSA expression built from scalar arguments,
 defined integer literals, literal-lane extraction from a direct integer vector
 argument, add/subtract/multiply, signed/unsigned division and remainder, shifts,
-AND/OR/XOR, scalar integer comparisons/selects/freezes, and trunc/zext/sext. Integer widths are i1..i64
+AND/OR/XOR, scalar integer comparisons/selects/freezes, unary bit intrinsics,
+and trunc/zext/sext. Integer widths are i1..i64
 and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
 ordinary scalar evaluators. Oversized shifts, left-shift wrap promises, right-shift
 exactness and OR disjointness are checked before writes. Poison and negative/out-of-range final indices
@@ -128,6 +129,13 @@ choice for poison/direct undef as ordinary execution. It cannot repair an
 independently checked poisoned GEP root or an immediate arithmetic error. Undef
 in arithmetic or select dependencies still rejects, including when that same
 constant was previously cached as a direct freeze source.
+Address expressions also accept scalar `llvm.ctpop`, `llvm.bitreverse` and
+`llvm.bswap` calls. Population count and bit reversal accept i1..i64; byte swap
+retains the scalar profile's i16/i32/i48/i64 widths. Direct declaration identity,
+signature, attributes and duplicate checks remain required by preflight.
+These nodes propagate poison and compose with select/freeze. Other intrinsic
+dependencies and ordinary calls remain outside the address graph. Intrinsic
+nodes reuse the shared depth/node budget and allocate nothing during execution.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -201,6 +209,12 @@ snapshots, readonly address spaces and default prepared objects.
 defined native LLVM overflow intrinsics before invoking flagged native targets.
 It covers all 64 widths, vector-coordinate flattening, integer casts, poison,
 cold bounds, aliased argument snapshots and exact graph node/depth boundaries.
+
+`tests/ios/air-memory-bit-intrinsic-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares
+all 132 admitted unary bit overloads with native LLVM, through validation and
+ordinary/prepared execution. Six patterns cover direct/masked values, literal
+and computed poison, freeze and select suppression; refusals preserve all bytes.
+Each overload also checks exact cached depth acceptance/refusal boundaries.
 
 ## Prepared memory functions
 
