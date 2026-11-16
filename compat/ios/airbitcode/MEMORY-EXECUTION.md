@@ -484,12 +484,31 @@ overshift poison. Extraction bounds remain independent of result freeze.
 The existing two-input table dispatches these operations to the poison-aware
 scalar shift helper before the ordinary scalar intrinsic dispatcher. Node
 layout, fixed arrays, ownership, free paths and graph limits remain unchanged.
-Other vector intrinsic families remain excluded from address dependencies.
 `tests/ios/air-memory-vector-saturating-shift-index.v LLVM_AS FRESH_EXTERNAL_DIR`
 checks both families at every width, boundary counts, both source states,
 freezes, prewrite refusals and prior graph/call controls. Native LLVM references
 substitute a defined zero amount for overshifts; V models the original poison
 separately and checks defined results with independent checked doubling.
+
+Vector `llvm.fshl` and `llvm.fshr` also supply address lanes for three matching
+fixed 1..16-lane i1..i64 inputs. Amounts are width-truncated and reduced modulo
+the lane width. A zero count selects the left word for fshl and the right word
+for fshr. All three inputs are observed: poison in any input propagates to its
+lane, including an otherwise unused word at zero count; undef in any input is
+an eager whole-vector error before extraction, unchosen selects or cold blocks.
+Source/result freezes retain their existing recovery rules and extraction bounds.
+
+The shared intrinsic builder validates four lane counts of work and adds one
+fixed 16-int array for third projections. Existing POD result nodes store that
+projection in their condition field, with -1 retained for other intrinsic calls.
+Cached height includes all three operands. The existing evaluator checks their
+states before scalar funnel evaluation. No node kind, managed array, owner or
+free path is added; graph limits remain 256 nodes/32 levels. Other vector
+intrinsic families remain excluded from addresses.
+`tests/ios/air-memory-vector-funnel-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
+both directions, all widths, modulo/zero counts, three independent source
+states, the third input's cached depth and exact node boundaries, call guards
+and exact byte preservation against native LLVM and per-bit selection oracles.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result

@@ -497,8 +497,17 @@ a defined overshift; result freeze may repair its poison while preserving
 extraction bounds. Existing two-input nodes dispatch to the poison-aware scalar
 shift helper, with unchanged storage, ownership and limits. A fourth image
 kernel checks signed/unsigned shifts through x=63, including frozen i32 overshift
-poison for x>=32, using independent pixel expectations. Other vector intrinsic
-families remain excluded from address dependencies.
+poison for x>=32, using independent pixel expectations.
+Pure vector funnel shifts also feed addresses. `llvm.fshl` and `llvm.fshr`
+accept three matching 1..16-lane i1..i64 inputs and reduce width-truncated counts
+modulo the lane width. Zero selects opposite input words for the two directions.
+All three sources participate in lane-local poison and eager undef checks;
+freezes and extraction bounds retain their rules. One additional fixed builder
+array holds third projections in existing POD fields. Cached depth accounts for
+all three sources, with unchanged runtime arrays, ownership and graph limits.
+A fifth image kernel checks both directions with different data words and
+counts 32..95, mixing independently checked funnel bits into its address root
+and red channel. Other vector intrinsic families remain excluded from addresses.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

@@ -509,7 +509,10 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			}
 			.projected_intrinsic {
 				if undefs[node.left] { return error('AIR vector intrinsic: undef source lane') }
-				if node.right >= 0 {
+				if node.condition >= 0 {
+					if undefs[node.right] || undefs[node.condition] { return error('AIR vector intrinsic: undef source lane') }
+					value = if poisons[node.left] || poisons[node.right] || poisons[node.condition] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_funnel_value(node.intrinsic, node.bits, values[node.left], values[node.right], values[node.condition])!} }
+				} else if node.right >= 0 {
 					if undefs[node.right] { return error('AIR vector intrinsic: undef source lane') }
 					value = if poisons[node.left] || poisons[node.right] { IntegerValue{poison: true} } else if scalar_integer_saturating_shift(node.intrinsic) { scalar_integer_saturating_shift_value(node.intrinsic, node.bits, values[node.left], values[node.right])! } else { IntegerValue{value: scalar_intrinsic_value(node.intrinsic, node.bits, values[node.left], values[node.right])!} }
 				} else {

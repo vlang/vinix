@@ -6,10 +6,11 @@ fn (mut b MemoryIndexBuilder) vector_bit_intrinsic_source(source IRTypedOperand,
 	op := b.p.instructions[producer]
 	// The enclosing memory profile already bounds declaration attributes and
 	// duplicate overload identities. Recheck the direct call and source here.
-	b.p.vector_float_intrinsic_profile(b.ir, b.stream, b.pools, b.bodies, b.scope, producer, op, false, 48)!
+	b.p.vector_float_intrinsic_profile(b.ir, b.stream, b.pools, b.bodies, b.scope, producer, op, false, 64)!
 	id, count, bits := vector_float_intrinsic_name(b.ir.functions[op.callee_function].name)!
-	if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .iabs, .smin, .smax, .umin, .umax, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat] { return error('AIR memory index: unsupported vector intrinsic dependency') }
-	binary := scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id)
+	if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .iabs, .smin, .smax, .umin, .umax, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .fshl, .fshr] { return error('AIR memory index: unsupported vector intrinsic dependency') }
+	funnel := scalar_integer_funnel(id)
+	binary := scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) || funnel
 	// The immediate belongs to this call, even when its declaration or source
 	// table has already been cached. Source freezing does not change the flag.
 	poison_flag := if id == .iabs { b.p.vector_integer_abs_flag(b.ir, b.pools, b.scope, op)! } else if scalar_integer_zero_count(id) { b.p.vector_zero_count_flag(b.ir, b.pools, b.scope, op)! } else { u64(0) }
@@ -21,12 +22,14 @@ fn (mut b MemoryIndexBuilder) vector_bit_intrinsic_source(source IRTypedOperand,
 	}
 	mut parents := [16]int{}
 	mut seconds := [16]int{}
+	mut thirds := [16]int{}
 	for lane in 0 .. count {
 		if b.nodes.len >= max_memory_index_nodes { return error('AIR memory index: intrinsic selector node limit') }
 		selector := b.nodes.len
 		b.nodes << MemoryIndexNode{kind: .literal, bits: 32, value: u64(lane)}
 		parents[lane] = b.project_vector_lane(b.p.operands[op.operands_start + 1], selector, producer, depth + 1)!
 		if binary { seconds[lane] = b.project_vector_lane(b.p.operands[op.operands_start + 2], selector, producer, depth + 1)! }
+		if funnel { thirds[lane] = b.project_vector_lane(b.p.operands[op.operands_start + 3], selector, producer, depth + 1)! }
 	}
 	if count + 1 > max_memory_index_nodes - b.nodes.len { return error('AIR memory index: vector intrinsic table limit') }
 	base := b.nodes.len
@@ -34,8 +37,9 @@ fn (mut b MemoryIndexBuilder) vector_bit_intrinsic_source(source IRTypedOperand,
 	for lane in 0 .. count {
 		mut lane_height := b.nodes[parents[lane]].height + 1
 		if binary && b.nodes[seconds[lane]].height + 1 > lane_height { lane_height = b.nodes[seconds[lane]].height + 1 }
+		if funnel && b.nodes[thirds[lane]].height + 1 > lane_height { lane_height = b.nodes[thirds[lane]].height + 1 }
 		if lane_height > height { height = lane_height }
-		b.nodes << MemoryIndexNode{kind: .projected_intrinsic, bits: bits, intrinsic: id, value: poison_flag, left: parents[lane], right: if binary { seconds[lane] } else { -1 }, height: lane_height}
+		b.nodes << MemoryIndexNode{kind: .projected_intrinsic, bits: bits, intrinsic: id, value: poison_flag, left: parents[lane], right: if binary { seconds[lane] } else { -1 }, condition: if funnel { thirds[lane] } else { -1 }, height: lane_height}
 	}
 	if height > max_memory_index_depth - depth { return error('AIR memory index: vector intrinsic graph depth') }
 	index := b.nodes.len
