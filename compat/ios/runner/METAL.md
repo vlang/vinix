@@ -477,8 +477,18 @@ POD nodes store the second projection, using one additional fixed 16-int builder
 array. Cached height accounts for both inputs; runtime storage, ownership and
 graph limits remain unchanged. An additional image kernel checks signed negative
 bounds and unsigned clamping in a bounded address root and red-channel readback,
-alongside the existing image fixture. Other vector intrinsic families remain
-excluded from addresses.
+alongside the existing image fixture.
+Pure vector signed/unsigned saturating addition and subtraction also feeds
+addresses. `llvm.sadd.sat`, `uadd.sat`, `ssub.sat` and `usub.sat` accept matching
+1..16-lane i1..i64 inputs. Signed overflow clamps to a signed endpoint; unsigned
+overflow clamps to the maximum and unsigned underflow to zero. Both input
+vectors compute before extraction, with eager undef and lane-local poison.
+Source/result freezes retain their behavior. Existing two-input POD nodes and
+the scalar dispatcher handle saturation with unchanged storage, ownership and
+graph limits. A third image kernel mixes signed/unsigned clamp results into a
+bounded address root and independently checked red-channel readback. Earlier
+image fixtures remain checked. Other vector intrinsic families remain excluded
+from address dependencies.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

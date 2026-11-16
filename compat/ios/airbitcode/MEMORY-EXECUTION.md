@@ -450,12 +450,27 @@ existing POD result node stores the second projection in its right field; unary
 calls keep that field at -1. Cached table height includes both operands. The
 existing evaluator checks both undef/poison states and uses the scalar integer
 extremum helper. No node kind, managed array, owner, lifetime or free path is
-added; limits remain 256 nodes/32 levels. Other vector intrinsic families remain
-excluded from address dependencies.
+added; limits remain 256 nodes/32 levels.
 `tests/ios/air-memory-vector-minmax-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all four operations, widths, operand states, source/result freezes, both input
 depth boundaries, cached selectors and exact node limits against defined native
 LLVM references and an independent sign-partition comparison oracle.
+
+Vector `llvm.sadd.sat`, `llvm.uadd.sat`, `llvm.ssub.sat` and `llvm.usub.sat`
+also supply address lanes for matching fixed 1..16-lane i1..i64 inputs. Signed
+overflow clamps to the corresponding signed endpoint; unsigned addition clamps
+to the unsigned maximum and unsigned subtraction clamps to zero. Saturation
+itself produces defined values. Poison from either input stays lane-local and
+undef in either remains an eager whole-vector error. Source/result freezes,
+extraction bounds and the existing pure composition rules retain their behavior.
+The existing two-input intrinsic table and scalar intrinsic dispatcher handle
+these operations with unchanged node layout, arrays, ownership and graph limits.
+Other vector intrinsic families remain excluded from address dependencies.
+`tests/ios/air-memory-vector-saturating-index.v LLVM_AS FRESH_EXTERNAL_DIR`
+checks all four operations at every width, both operand states, source/result
+freezes, ten explicit clamp boundaries and the earlier graph/call controls
+against defined native LLVM, checked signed margins and a two-limb unsigned
+addition oracle.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result
