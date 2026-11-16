@@ -42,6 +42,7 @@ mut:
 pub mut:
 	state State = .running
 	hw_config Config
+	g13_timestamp TimestampAllocator
 }
 
 __global test_gpu_manager GpuManager

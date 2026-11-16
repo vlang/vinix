@@ -19,6 +19,7 @@ const packet_helpers = [
 ]
 
 const helpers = [
+	'gpu__agx__file__GpuFile__reap_detached_timestamp_objects_locked',
 	'gpu__agx__file__GpuFile__reap_orphaned_g13_queues_locked',
 	'gpu__agx__file__GpuFile__find_vm',
 	'gpu__agx__file__GpuFile__find_owned_vm',
@@ -163,6 +164,14 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name in ['gpu__agx__file__GpuFile__reap_detached_timestamp_objects_locked', 'gpu__agx__file__GpuFile__release_g13_timestamp', 'gpu__agx__file__GpuFile__release_g13_timestamps'] { return 'void' }
+	if name == 'gpu__agx__file__GpuFile__capture_g13_timestamp' { return 'multi_return_i64_gpu__agx__file__G13TimestampCapture' }
+	if name == 'gpu__agx__file__GpuFile__capture_g13_timestamps' { return 'i64' }
+	if name == 'gpu__agx__file__G13TimestampReferences__addresses' { return '_v_ret_Array_fixed_u64_2' }
+	if name == 'file__GpuFile__capture_g13_timestamp' { return 'multi_return_i64_file__G13TimestampCapture' }
+	if name == 'file__GpuFile__capture_g13_timestamps' { return 'i64' }
+	if name == 'file__G13TimestampReferences__addresses' { return '_v_ret_Array_fixed_u64_2' }
+	if name in ['file__GpuFile__release_g13_timestamp', 'file__GpuFile__release_g13_timestamps', 'file__GpuFile__reap_detached_timestamp_objects_locked'] { return 'void' }
 	if name == 'submission__decode_packet' { return 'multi_return_i64_u32' }
 	if name == 'submission__packet_barrier' { return 'u32' }
 	if name == 'submission__packet_attachments' { return '_v_ret_Array_fixed_command__Attachment_16' }
@@ -445,14 +454,38 @@ fn selftest() ! {
 	println('G13 prefix storage checker selftest: PASS')
 }
 
-fn check_packet(source string) ! {
-	for name in packet_helpers {
+const timestamp_helpers = [
+	'file__GpuFile__capture_g13_timestamp',
+	'file__GpuFile__release_g13_timestamp',
+	'file__GpuFile__capture_g13_timestamps',
+	'file__GpuFile__release_g13_timestamps',
+	'file__G13TimestampReferences__addresses',
+	'file__GpuFile__reap_detached_timestamp_objects_locked',
+]
+
+fn check_temporary_storage(source string, names []string) ! {
+	for name in names {
 		body := function_body(source, name)!
 		for allocation in ['memdup', 'HEAP(', 'malloc', 'calloc', 'realloc', '__new_array',
 			'new_array_from', 'array_clone', 'array_slice'] {
-			if body.contains(allocation) { return error(name + ': unexpected packet allocation: ' + allocation) }
+			if body.contains(allocation) { return error(name + ': unexpected temporary allocation: ' + allocation) }
 		}
 	}
+}
+
+fn check_packet(source string) ! { check_temporary_storage(source, packet_helpers)! }
+
+fn timestamp_selftest() ! {
+	mut fixture := ''
+	for name in timestamp_helpers { fixture += result_type(name) + ' ' + name + '(void) {\nreturn;\n}\n' }
+	check_temporary_storage(fixture, timestamp_helpers)!
+	for name in timestamp_helpers {
+		for allocation in ['memdup(', 'HEAP(', 'malloc(', 'calloc(', 'realloc(', '__new_array(', 'new_array_from(', 'array_clone(', 'array_slice('] {
+			broken := fixture.replace(name + '(void) {', name + '(void) {\n' + allocation + ');')
+			if _ := check_temporary_storage(broken, timestamp_helpers) { return error('timestamp storage selftest accepted ' + name + ': ' + allocation) }
+		}
+	}
+	println('Timestamp capture storage checker selftest: PASS')
 }
 
 fn packet_selftest() ! {
@@ -469,13 +502,18 @@ fn packet_selftest() ! {
 }
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--timestamp-capture' {
+		check_temporary_storage(os.read_file(os.args[2]) or { eprintln(err); exit(1) }, timestamp_helpers) or { eprintln(err); exit(1) }
+		println('Timestamp capture storage: ${timestamp_helpers.len} live helpers have no temporary allocations')
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--packet-input' {
 		check_packet(os.read_file(os.args[2]) or { eprintln(err); exit(1) }) or { eprintln(err); exit(1) }
 		println('Packet input storage: ${packet_helpers.len} live helpers have no temporary allocations')
 		return
 	}
 	if os.args.len != 2 { eprintln('Usage: check-prefix-storage GENERATED_ARM_C | --selftest'); exit(2) }
-	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; packet_selftest() or { eprintln(err); exit(1) }; return }
+	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; packet_selftest() or { eprintln(err); exit(1) }; timestamp_selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
 	println('G13 submission/mapping storage: ${helpers.len} live helpers contain no temporary allocations; only checked owned overflow, request, syncobj/alias, transport/box and retained private completion allocation sites are permitted')

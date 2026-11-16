@@ -5,7 +5,24 @@ import gpu.agx.pgtable
 
 pub const uat_num_contexts = 64
 
-pub struct UatManager {}
+pub struct UatManager {
+pub mut:
+	timestamp_map_calls int
+	timestamp_unmap_calls int
+	timestamp_reject bool
+}
+
+pub fn (mgr &UatManager) map_kernel(va u64, phys u64, size u64, prot u64) bool {
+	assert gpu.timestamp_lock_held() && va != 0 && phys != 0 && size == 0x4000
+	assert prot == pgtable.gpu_prot_fw_shared_rw
+	mut owned := unsafe { mgr }; owned.timestamp_map_calls++
+	return !mgr.timestamp_reject
+}
+
+pub fn (mgr &UatManager) unmap_kernel(va u64, size u64) {
+	assert gpu.timestamp_lock_held() && va != 0 && size == 0x4000
+	mut owned := unsafe { mgr }; owned.timestamp_unmap_calls++
+}
 
 pub struct UatContext {
 pub mut:

@@ -462,6 +462,8 @@ fn (mut mgr GpuManager) alloc_g13_shared_buffer(size u64) ?SharedBuffer {
 // physical backing remains owned by the per-file GEM handle for the complete
 // lifetime of this mapping.
 pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) ?u64 {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
 	if mgr.hw_config.gpu_gen != .g13 || phys & pgtable.uat_pg_mask != 0 || size == 0
 		|| size & pgtable.uat_pg_mask != 0 || uat_mgr == unsafe { nil } {
 		return none
@@ -476,6 +478,8 @@ pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) ?u64 {
 }
 
 pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(va u64, size u64) {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
 	if va < alloc.g13_timestamp_start || va >= alloc.g13_timestamp_end || size == 0
 		|| size > alloc.g13_timestamp_end - va {
 		return

@@ -55,6 +55,9 @@ struct TimestampObject {
 	va   u64
 	size u64
 	obj  &gem.GemObject = unsafe { nil }
+mut:
+	references u64
+	detached bool
 }
 
 struct G13SubmissionQueue {
@@ -178,6 +181,11 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 // itself, which completions still point at.
 pub fn (mut f GpuFile) close() bool {
 	f.lock.acquire()
+	// Timestamp captures can precede the submission's VM pin. They keep the
+	// file and its mapping owners alive even after namespace removal.
+	for object in f.timestamp_objects {
+		if object.references != 0 { f.lock.release(); return false }
+	}
 	for vm_id := u32(1); vm_id < mmu.uat_num_contexts; vm_id++ {
 		if katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
 			// Completion callbacks still own this file. The worker retries its
@@ -187,6 +195,10 @@ pub fn (mut f GpuFile) close() bool {
 		}
 	}
 	manager := gpu.get_global_manager() or { unsafe { nil } }
+	if manager == unsafe { nil } && f.timestamp_objects.len != 0 {
+		f.lock.release()
+		return false
+	}
 	if manager != unsafe { nil } {
 		mut gpu_manager := unsafe { manager }
 		for ownership in f.g13_queues {
@@ -933,7 +945,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 			mut found := TimestampObject{}
 			mut found_index := -1
 			for index, object in f.timestamp_objects {
-				if object.id == request.object_handle {
+				if object.id == request.object_handle && !object.detached {
 					found = object
 					found_index = index
 					break
@@ -942,6 +954,11 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 			if found_index < 0 {
 				f.lock.release()
 				return -2
+			}
+			if found.references != 0 {
+				f.timestamp_objects[found_index].detached = true
+				f.lock.release()
+				return 0
 			}
 			// Keep the existing mapping owner installed if its manager is
 			// unavailable. Missing names, including zero, still return ENOENT.
@@ -1095,6 +1112,7 @@ fn reap_open_detached_g13_queues() {
 		owned.lock.acquire()
 		owned.reap_detached_g13_queues_locked()
 		owned.reap_orphaned_g13_queues_locked()
+		owned.reap_detached_timestamp_objects_locked()
 		owned.reap_detached_vms_locked()
 		owned.lock.release()
 	}

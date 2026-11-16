@@ -9,7 +9,7 @@ fn section(source string, start string, end string) !string {
 
 fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
-	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] == '--file-source')
+	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--timestamp-source', '--gpu-source'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-close-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -18,11 +18,11 @@ fn main() {
 	for name in ['katomic'] {
 		os.cp_all('${repo}/tests/agx-g13-failure/fixture/${name}', '${scratch}/${name}', false)!
 	}
-	for path in ['drm/ioctl', 'gpu/agx/bo', 'gpu/agx/vm', 'gpu/agx/params'] {
+	for path in ['drm/ioctl', 'drm/asahi', 'gpu/agx/bo', 'gpu/agx/vm', 'gpu/agx/params'] {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!
 	}
-	source := os.read_file(if os.args.len == 3 { os.args[2] } else { '${repo}/kernel/gpu/agx/file/file.v' })!
+	source := os.read_file(if os.args.len == 3 && os.args[1] == '--file-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/file.v' })!
 	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
 		section(source, 'struct G13SubmissionQueue {', '@[heap]\nstruct G13SubmitCompletion {')! +
@@ -42,13 +42,17 @@ fn main() {
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'fn discard_g13_completion(')!
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp('${repo}/kernel/gpu/agx/file/closing.v', '${scratch}/gpu/agx/file/closing.v')!
-	gpu_source := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
+	os.cp(if os.args.len == 3 && os.args[1] == '--timestamp-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/timestamps.v' }, '${scratch}/gpu/agx/file/timestamp_capture_production.v')!
+	gpu_source := os.read_file(if os.args.len == 3 && os.args[1] == '--gpu-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' })!
 	g13_source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
-	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\nimport katomic\n' +
+	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\nimport katomic\nimport gpu.agx.alloc\nimport gpu.agx.pgtable\n' +
 		section(g13_source, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) can_query_global_params(', 'pub fn new_gpu_manager(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) queue_file_retirement(', 'fn (mut mgr GpuManager) reap_file_resources(')! +
-		section(gpu_source, 'pub fn (mut mgr GpuManager) flush_g13_file_mapping(', '// Publish a G13 UAT invalidation through')!)!
+		section(gpu_source, 'pub fn (mut mgr GpuManager) flush_g13_file_mapping(', '// Publish a G13 UAT invalidation through')! +
+		section(gpu_source, 'pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(', 'fn alloc_fixed_buffer(')!
+			.replace('unmap_g13_timestamp_buffer', 'checked_timestamp_unmap')
+			.replace('map_g13_timestamp_buffer', 'checked_timestamp_map'))!
 	mmu_source := os.read_file('${repo}/kernel/gpu/agx/mmu/mmu.v')!
 	os.write_file('${scratch}/gpu/agx/mmu/identity.v', 'module mmu\nimport klock\nimport gpu.agx.vm as agxvm\n' +
 		section(mmu_source, '__global context_identity_lock', '// Driver-owned backing')!)!
@@ -69,6 +73,14 @@ fn main() {
 	build.run()
 	build.wait()
 	if build.code != 0 { exit(build.code) }
+	if output := os.getenv_opt('AGX_CLOSE_TEST_C') {
+		assert output.ends_with('.c')
+		flags := build.args.clone()
+		mut cflags := flags.clone(); cflags[cflags.len - 2] = output
+		mut generated := os.new_process(os.getenv_opt('V') or { 'v' })
+		generated.set_args(cflags); generated.run(); generated.wait()
+		if generated.code != 0 { exit(generated.code) }
+	}
 	if output := os.getenv_opt('AGX_CLOSE_TEST_BINARY') { os.cp('${scratch}/test', output)! }
 	mut check := os.new_process('${scratch}/test')
 	check.run()

@@ -441,6 +441,10 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_timestamp_capture_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/timestamps.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
+	check_timestamp_capture_reference(read(os.join_path(base, 'queue/common.rs'))!,
+		read(os.join_path(base, 'queue/render.rs'))!, read(os.join_path(base, 'queue/compute.rs'))!, read(os.join_path(base, 'file.rs'))!)!
 	check_orphan_queue_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_orphan_queue_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'queue/mod.rs'))!)!
@@ -764,7 +768,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'fw.make_g13_compute_v13_5(run, compute_counter)',
 		'v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter,'],
 		'Vinix shared command/start counters')!
-	return ['host workqueue retirement pointer and wrap-safe publication',
+	return ['Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
+		'host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',
 		'Zero-length BIND rejects before BO lookup, including SINGLE_PAGE, while legacy zero-encoded UNBIND_ALL retains its operation semantics',
 		'Timestamp BIND ignores input output-handles, checks sum overflow before BO lookup and empty ranges after it; UNBIND resolves missing names before manager availability and preserves retained owners',

@@ -26,6 +26,9 @@ struct TimestampObject {
 	va   u64
 	size u64
 	obj  &gem.GemObject = unsafe { nil }
+mut:
+	references u64
+	detached bool
 }
 
 struct Objects {
@@ -169,6 +172,8 @@ pub fn run_checks() {
 	check_global_params()
 	check_global_params_device()
 	check_timestamp_bindings()
+	check_timestamp_captures()
+	gpu.check_timestamp_serialization()
 	check_zero_bind_ranges()
 	check_create_sizes()
 	check_bind_order()

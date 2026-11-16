@@ -6,6 +6,7 @@ pub const uat_pg_mask = u64(0x3fff)
 pub const gpu_prot_gpu_shared_rw = u64(1)
 pub const gpu_prot_gpu_shared_ro = u64(2)
 pub const gpu_prot_gpu_shared_wo = u64(3)
+pub const gpu_prot_fw_shared_rw = u64(9)
 
 pub struct UatPgtable {
 pub mut:
