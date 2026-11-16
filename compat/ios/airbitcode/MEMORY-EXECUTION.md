@@ -150,6 +150,11 @@ minimum-poison flag. The signed minimum remains unchanged with a false flag,
 and produces poison with a true flag. Other negative inputs become positive.
 Poison propagation, select/freeze repair, independent root checks and declaration
 immarg validation retain the same rules as zero-count intrinsics.
+Signed/unsigned saturating addition/subtraction (`llvm.sadd.sat`, `llvm.uadd.sat`,
+`llvm.ssub.sat`, `llvm.usub.sat`) accept matching i1..i64 operands. Overflow
+clamps to the corresponding integer limit; it does not itself produce poison.
+Poison in either input still propagates, and both dependency heights count
+toward the shared graph limits.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -245,6 +250,11 @@ Validation and both execution APIs preserve every output byte on refusal.
 settings across i1..i64 using a defined false-flag LLVM oracle and separate
 poison checks. It covers signed minima, computed poison, select/freeze, cached
 depth limits, cold blocks, independent roots and malformed call/flag metadata.
+
+`tests/ios/air-memory-saturating-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares
+all 256 saturating add/sub overloads with defined native LLVM operations. It
+covers signed/unsigned limits, direct/masked indices, poison on either side,
+computed wrap poison, select/freeze and both cached dependency depth boundaries.
 
 ## Prepared memory functions
 

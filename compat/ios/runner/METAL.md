@@ -332,6 +332,8 @@ Signed/unsigned integer min/max can clamp indices using two checked expression
 dependencies, with poison propagated from either input.
 Integer absolute value also feeds indices, with a validated constant i1
 signed-minimum poison flag and the same select/freeze handling.
+Signed/unsigned saturating add/subtract also feed indices, clamping arithmetic
+overflow while preserving poison from either input.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
@@ -355,6 +357,8 @@ Leading/trailing zero counts then form a self-XOR zero offset. The trailing
 count uses a true zero-poison flag and freeze, including at the zero pixel index.
 Signed maximum with zero and unsigned minimum with 16383 then clamp the address.
 Negation followed by integer absolute value restores the clamped address.
+Unsigned saturating overflow and subtraction form a zero offset, followed by
+signed saturating addition/subtraction that preserve the final address.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.
