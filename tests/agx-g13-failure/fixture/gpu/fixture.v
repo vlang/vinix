@@ -194,6 +194,7 @@ mut:
 struct G13ComputeJobResources {
 mut:
 	command SharedBuffer
+	timestamps SharedBuffer
 	microsequence SharedBuffer
 	explicit_barriers G13CommandBarriers
 	context &Context = unsafe { nil }
@@ -201,8 +202,17 @@ mut:
 	event_slot u32
 	stamp_value u32
 	submitted bool
+	quarantined bool
+	pending_counted bool
+	retirement_sequence u64
+	ring_slot u32
+	retirement_published bool
 	released bool
 	error G13JobError
+	completion fn (&G13ComputeJobResources, bool, voidptr) = unsafe { nil }
+	completion_data voidptr
+	completion_result fw.G13JobTimestamps
+	completion_ready bool
 }
 
 fn (mut mgr GpuManager) ring_device_control() bool {
@@ -295,6 +305,7 @@ pub fn run_checks() {
 	check_barrier_publishers()
 	check_retirement()
 	check_render_retirement()
+	check_compute_retirement()
 	check_recovery()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80

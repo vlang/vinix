@@ -6,11 +6,12 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [render event admission credit](m1-agx-event-credits.md)
-(2026-11-16). Completed stages return event-window credit before shared backing
-cleanup, retaining their event tickets and physical counters for peer barriers.
-Modern ioctl/Mesa integration and remaining stage backing/event destruction
-are incomplete. The
+Latest offline increment: [compute event admission credit](m1-agx-compute-credits.md)
+(2026-11-16). Completed compute work returns event-window credit before backing
+cleanup, including refused cleanup and quarantine retries. Physical ticket and
+backing ownership remain retained. Modern ioctl/Mesa integration and remaining
+stage backing/event destruction are incomplete. The
+[render event admission credit](m1-agx-event-credits.md),
 [render-stage timestamp ownership](m1-agx-stage-timestamps.md),
 [independent render ring retirement](m1-agx-render-retirement.md),
 [native AGX error publication](m1-agx-native-errors.md),

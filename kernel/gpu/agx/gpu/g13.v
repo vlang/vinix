@@ -2700,7 +2700,10 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 		}
 		mut owned := unsafe { job }
 		if !owned.retirement_published {
-			if !mgr.retire_g13_subqueue_locked(owned.queue, 2, owned.retirement_sequence, owned.ring_slot) {
+			mut queue := unsafe { owned.queue }
+			if !mgr.retire_g13_subqueue_locked(owned.queue, 2, owned.retirement_sequence, owned.ring_slot)
+				|| !queue.subqueues[2].events.record_completion(owned.event_slot, owned.stamp_value) {
+				mgr.state = .error
 				owned.quarantined = true
 				complete_g13_compute_job(mut owned, false)
 				continue

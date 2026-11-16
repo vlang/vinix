@@ -19,6 +19,7 @@ const packet_helpers = [
 ]
 
 const helpers = [
+	'gpu__agx__gpu__GpuManager__reap_g13_compute_jobs',
 	'gpu__agx__event__WorkQueueEvents__record_completion',
 	'gpu__agx__file__g13_render_stage_completed',
 	'gpu__agx__file__GpuFile__release_g13_timestamp_pair',
@@ -171,6 +172,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name.ends_with('GpuManager__reap_g13_compute_jobs') { return 'void' }
 	if name.ends_with('g13_render_stage_completed') || name.ends_with('release_g13_timestamp_pair') { return 'void' }
 	if name.ends_with('retire_g13_render_stages_locked') { return 'i64' }
 	if name == 'gpu__agx__gpu__write_g13_timestamp_pair' { return 'void' }

@@ -47,6 +47,14 @@ fn run_checks() int {
 		.replace('read_g13_render_result', 'retirement_test_result')
 		.replace('complete_g13_render_job', 'checked_complete_g13_render_job')
 		.replace('end_g13_operation_locked', 'retirement_test_end')
+	production += (section(submissions, 'fn complete_g13_compute_job(', '// Construct one byte-exact') or { panic(err) })
+		.replace('complete_g13_compute_job', 'checked_complete_g13_compute_job')
+	production += (section(submissions, 'fn (mut mgr GpuManager) reap_g13_compute_jobs()', '// Firmware is stopped before this is called, so no completion flush') or { panic(err) })
+		.replace('reap_g13_compute_jobs', 'checked_reap_g13_compute_jobs')
+		.replace('free_g13_compute_job_locked', 'compute_retirement_free')
+		.replace('complete_g13_compute_job', 'checked_complete_g13_compute_job')
+		.replace('end_g13_operation_locked', 'compute_retirement_end')
+	production += section(submissions, 'pub fn (job &G13ComputeJobResources) timestamp_values()', 'pub fn (mut mgr GpuManager) create_g13_queue_resources(') or { panic(err) }
 	production += section(submissions, 'fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(', '// Caller holds mgr.lock. Idle queues') or { panic(err) }
 	production += section(submissions, 'const g13_tvb_max_size', 'fn write_g13_timestamp(') or { panic(err) }
 	os.write_file('${scratch}/gpu/production.v', production) or { panic(err) }
