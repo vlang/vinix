@@ -10,7 +10,8 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 	require_order(importer, ['request.flags & ~ioctl.drm_syncobj_fd_to_handle_import_sync_file',
 		'if request.flags == 0', 'syncobj_from_fd(request.fd) or { return -22 }',
 		'request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }', 'return 0',
-		'syncobj.lookup(u64(handle), request.handle)', 'sync_file_fence_from_fd(request.fd)', 'syncobj.replace_fence(obj, fence)'],
+		'sync_file_fence_from_fd(request.fd) or { return -22 }',
+		'syncobj.lookup(u64(handle), request.handle) or { return -2 }', 'syncobj.replace_fence(obj, fence)'],
 		'Opaque import creates a handle while sync-file import replaces a fence')!
 	link := section(objects, 'pub fn import_syncobj(', '// Prepared entries', 'Vinix alias ownership')!
 	require_order(link, ['if owner == 0 || obj == unsafe { nil }',
@@ -44,4 +45,9 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 	require_order(linux_import, ['fd_file(f)->f_op != &drm_syncobj_file_fops', 'return -EINVAL',
 		'syncobj = fd_file(f)->private_data', 'drm_syncobj_get(syncobj)',
 		'xa_alloc(&file_private->syncobj_xa, handle, syncobj, xa_limit_32b,'], 'Linux same-object alias import')!
+	linux_fence_import := section(reference, 'static int drm_syncobj_import_sync_file_fence(',
+		'static int drm_syncobj_export_sync_file(', 'Linux binary fence import validation')!
+	require_order(linux_fence_import, ['fence = sync_file_get_fence(fd)', 'if (!fence)', 'return -EINVAL',
+		'syncobj = drm_syncobj_find(file_private, handle)', 'if (!syncobj)', 'return -ENOENT',
+		'drm_syncobj_replace_fence(syncobj, fence)'], 'Linux fence descriptor before destination lookup and publication')!
 }

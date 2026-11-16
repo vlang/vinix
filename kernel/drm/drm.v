@@ -1025,8 +1025,12 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 		request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }
 		return 0
 	}
-	obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
-	fence := sync_file_fence_from_fd(request.fd) or { return -9 }
+	// Linux resolves the transport first. Even when both inputs are invalid,
+	// an invalid sync-file is EINVAL; only a valid fence with no target is ENOENT.
+	// Fence metadata remains retained after the descriptor lookup releases its
+	// reference, including across destination destruction/reuse before lookup.
+	fence := sync_file_fence_from_fd(request.fd) or { return -22 }
+	obj := syncobj.lookup(u64(handle), request.handle) or { return -2 }
 	syncobj.replace_fence(obj, fence)
 	return 0
 }

@@ -89,6 +89,17 @@ file-layer concurrency testing. Its atomic decrement snapshots the value before
 comparing because direct comparisons of generic mutable parameters can compare
 the address in the host compiler.
 
+Binary sync-file import checks follow descriptor-first Linux validation:
+invalid or wrong-type descriptors return EINVAL even with a missing destination;
+a valid sync-file with no destination returns ENOENT. Failures preserve request
+fields, the old fence, timeline membership and captures. Successful imports
+publish through aliases, preserve completed/error fence identity, leave old GPU
+work untouched and discard previous timeline lookup membership. Scripted last-FD
+close and destination destruction/reuse during descriptor lookup distinguish
+the required order from an early destination snapshot. A 4,096-import loop
+checks that binary imports create no handles or allocations. These are host
+ownership/interleaving checks, with native object/fence retention unchanged.
+
 These deterministic interleavings do not exercise actual kernel threads, GPU
 execution or kernel heap usage. Vinix still polls through its scheduler; Linux
 uses sleeping waits and fence callbacks. Timeline waits and deadline scheduling
