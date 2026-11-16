@@ -320,7 +320,8 @@ by-value uniforms and other builtins remain unsupported. Builtin
 words are passed through the memory API's typed value bindings and captured
 before execution; library, pipeline and buffer ownership are unchanged.
 A scalar builtin can directly index a supported single-index GEP. Extracted
-geometry lanes can also feed bounded integer add/subtract/multiply, bitwise
+geometry lanes can also feed bounded integer add/subtract/multiply,
+signed/unsigned division/remainder, bitwise
 AND/OR/XOR, left/logical-right/arithmetic-right shifts and width casts
 to form a checked buffer index, including a flattened multidimensional position.
 Only argument/literal dependencies are admitted; general SSA indices remain
@@ -335,7 +336,8 @@ padding across two drained runtimes per mode. Negative pipelines check each
 size semantic's types, metadata restrictions, duplicates and family mismatches.
 A single image pipeline also writes RGBA8 pixels for four image dimensions;
 existing buffer-backed textures expose the exact pixels through `getBytes`.
-The image kernel forms row/pixel addresses with flagged shifts and disjoint OR.
+The image kernel decomposes a linear address with remainder and exact division,
+then forms row/pixel addresses with flagged shifts and disjoint OR.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.

@@ -99,7 +99,7 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 			return error('AIR memory index: decoded expression required')
 		}
 		code := b.stream.records[inst.record].code
-		if code == 2 && (op.opcode <= 2 || (op.opcode >= 7 && op.opcode <= 12)) && op.operands_count == 2 {
+		if code == 2 && op.opcode <= 12 && op.operands_count == 2 {
 			left := b.p.operands[op.operands_start]
 			right := b.p.operands[op.operands_start + 1]
 			if left.type_index != operand.type_index || right.type_index != operand.type_index || op.flags & ~integer_binary_flag_mask(op.opcode) != 0 {
