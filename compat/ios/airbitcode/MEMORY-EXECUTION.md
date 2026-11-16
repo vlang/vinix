@@ -465,12 +465,31 @@ undef in either remains an eager whole-vector error. Source/result freezes,
 extraction bounds and the existing pure composition rules retain their behavior.
 The existing two-input intrinsic table and scalar intrinsic dispatcher handle
 these operations with unchanged node layout, arrays, ownership and graph limits.
-Other vector intrinsic families remain excluded from address dependencies.
 `tests/ios/air-memory-vector-saturating-index.v LLVM_AS FRESH_EXTERNAL_DIR`
 checks all four operations at every width, both operand states, source/result
 freezes, ten explicit clamp boundaries and the earlier graph/call controls
 against defined native LLVM, checked signed margins and a two-limb unsigned
 addition oracle.
+
+Vector `llvm.sshl.sat` and `llvm.ushl.sat` also supply address lanes for matching
+fixed 1..16-lane i1..i64 values and amounts. Each amount is width-truncated and
+interpreted as unsigned. Counts below the width produce a saturating signed or
+unsigned left shift; counts at or above the width produce lane-local poison,
+including shifts of zero. Counts never reduce modulo the width. Source poison
+also propagates lane-locally; undef in either source remains an eager error.
+Source freeze repairs indeterminate inputs but does not repair a defined
+overshift. Result freeze or a scalar freeze after a valid extraction may repair
+overshift poison. Extraction bounds remain independent of result freeze.
+
+The existing two-input table dispatches these operations to the poison-aware
+scalar shift helper before the ordinary scalar intrinsic dispatcher. Node
+layout, fixed arrays, ownership, free paths and graph limits remain unchanged.
+Other vector intrinsic families remain excluded from address dependencies.
+`tests/ios/air-memory-vector-saturating-shift-index.v LLVM_AS FRESH_EXTERNAL_DIR`
+checks both families at every width, boundary counts, both source states,
+freezes, prewrite refusals and prior graph/call controls. Native LLVM references
+substitute a defined zero amount for overshifts; V models the original poison
+separately and checks defined results with independent checked doubling.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result

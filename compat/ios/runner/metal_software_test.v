@@ -4463,6 +4463,51 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
  ret void }
 
 ')
+	names << 'image_satshift'
+	source.write_string('declare <1 x i32> @llvm.sshl.sat.v1i32(<1 x i32>, <1 x i32>)
+declare <1 x i32> @llvm.ushl.sat.v1i32(<1 x i32>, <1 x i32>)
+define void @image_satshift(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
+ %x = extractelement <3 x i32> %gid, i32 0
+ %y = extractelement <3 x i32> %gid, i32 1
+ %w = extractelement <3 x i32> %grid, i32 0
+ %h = extractelement <3 x i32> %grid, i32 1
+ %amount = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
+ %signed_raw = call <1 x i32> @llvm.sshl.sat.v1i32(<1 x i32> <i32 -3>, <1 x i32> %amount)
+ %unsigned_raw = call <1 x i32> @llvm.ushl.sat.v1i32(<1 x i32> <i32 3>, <1 x i32> %amount)
+ %signed_fixed = freeze <1 x i32> %signed_raw
+ %unsigned_fixed = freeze <1 x i32> %unsigned_raw
+ %signed_value = extractelement <1 x i32> %signed_fixed, i32 0
+ %unsigned_value = extractelement <1 x i32> %unsigned_fixed, i32 0
+ %signed_hi = lshr i32 %signed_value, 26
+ %signed_lo = and i32 %signed_value, 31
+ %unsigned_hi = lshr i32 %unsigned_value, 26
+ %unsigned_lo = and i32 %unsigned_value, 31
+ %signed_bits = xor i32 %signed_hi, %signed_lo
+ %unsigned_bits = xor i32 %unsigned_hi, %unsigned_lo
+ %weighted_unsigned = shl i32 %unsigned_bits, 1
+ %mixed_bits = xor i32 %signed_bits, %weighted_unsigned
+ %offset = and i32 %mixed_bits, 63
+ %root = getelementptr i8, ptr addrspace(1) %out, i32 %offset
+ %row = shl i32 %y, 6
+ %index = add i32 %row, %x
+ %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
+ %red = mul i32 %x, 3
+ %mixed = xor i32 %red, %offset
+ %r = and i32 %mixed, 255
+ %gg = mul i32 %y, 5
+ %g0 = and i32 %gg, 255
+ %g = shl i32 %g0, 8
+ %wh = add i32 %w, %h
+ %bb = mul i32 %wh, 7
+ %b0 = and i32 %bb, 255
+ %b = shl i32 %b0, 16
+ %rg = or i32 %r, %g
+ %rgb = or i32 %rg, %b
+ %rgba = or i32 %rgb, 4278190080
+ store i32 %rgba, ptr addrspace(1) %p, align 4
+ ret void }
+
+')
 	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
 	for i, name in names {
 		n := i * 20
@@ -4476,7 +4521,7 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
 			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
 		} else {
 			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
-			if i == 2 || name in ['image_minmax', 'image_saturating'] {
+			if i == 2 || name in ['image_minmax', 'image_saturating', 'image_satshift'] {
 				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
 			} else if i < 3 + bad.len * 3 {
 				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
@@ -4510,7 +4555,7 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
 		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
 		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
 		queue := sm_send(device, c'newCommandQueue')
-		for name in names[3..names.len - 2] {
+		for name in names[3..names.len - 3] {
 			mut error_slot := u64(0)
 			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
 			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
@@ -4562,7 +4607,7 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
 			objc_release(pipeline)
 		}
 		objc_release(output)
-		for image_name in [names[2], names[names.len - 2], names.last()] {
+		for image_name in [names[2], names[names.len - 3], names[names.len - 2], names.last()] {
 		pipeline := sm_test_compute_pipeline(device, library, image_name, unsafe { nil }); sm_grid_check(pipeline != 0, 'image pipeline')
 		for shape in [SoftwareMetalSize{7, 5, 1}, SoftwareMetalSize{17, 3, 1}, SoftwareMetalSize{32, 8, 1}, SoftwareMetalSize{64, 64, 1}] {
 			length := 512 + shape.height * 256; buffer := sm_test_buffer(device, length, 0); bp := sm_send(buffer, c'contents')
@@ -4589,7 +4634,17 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
 					mut low := x
 					for low % 2 == 0 { trailing++; low /= 2 }
 				}
-				color := [if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				mut shift_bits := u8(0)
+				if x < 32 {
+					mut unsigned_value := u64(3); mut signed_value := i64(-3)
+					for _ in u64(0) .. x {
+						unsigned_value = if unsigned_value > 2147483647 { u64(4294967295) } else { unsigned_value * 2 }
+						signed_value = if signed_value < -1073741824 { i64(-2147483648) } else { signed_value * 2 }
+					}
+					signed_word := u64(u32(signed_value))
+					shift_bits = u8(((signed_word / 67108864) ^ (signed_word % 32) ^ (((unsigned_value / 67108864) ^ (unsigned_value % 32)) * 2)) & 63)
+				}
+				color := [if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
 				for lane in 0 .. 4 {
 					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
 					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]

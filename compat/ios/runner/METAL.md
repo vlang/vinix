@@ -487,8 +487,18 @@ Source/result freezes retain their behavior. Existing two-input POD nodes and
 the scalar dispatcher handle saturation with unchanged storage, ownership and
 graph limits. A third image kernel mixes signed/unsigned clamp results into a
 bounded address root and independently checked red-channel readback. Earlier
-image fixtures remain checked. Other vector intrinsic families remain excluded
-from address dependencies.
+image fixtures remain checked.
+Pure vector signed/unsigned saturating left shifts also feed addresses.
+`llvm.sshl.sat` and `llvm.ushl.sat` accept matching 1..16-lane i1..i64 values and
+unsigned width-truncated amounts. Counts below the width saturate normally;
+counts at or above it produce lane-local poison, including shifts of zero.
+Source poison and eager undef retain their rules. Source freeze cannot repair
+a defined overshift; result freeze may repair its poison while preserving
+extraction bounds. Existing two-input nodes dispatch to the poison-aware scalar
+shift helper, with unchanged storage, ownership and limits. A fourth image
+kernel checks signed/unsigned shifts through x=63, including frozen i32 overshift
+poison for x>=32, using independent pixel expectations. Other vector intrinsic
+families remain excluded from address dependencies.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
