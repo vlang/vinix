@@ -163,6 +163,7 @@ pub fn run_checks() {
 	check_unbind_ranges()
 	check_bind_replacements()
 	check_global_params()
+	check_global_params_device()
 	check_create_sizes()
 	check_bind_order()
 	check_bind_vm_lookup()

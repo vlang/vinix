@@ -168,6 +168,15 @@ pub fn get_global_manager() ?&GpuManager {
 	return global_gpu_mgr
 }
 
+// Match Asahi's global-query crash snapshot. Shutdown publishes stopped under
+// this lock; release it before formatting or copying to userspace. A failure
+// after the snapshot may race with a successful query, as with is_crashed().
+pub fn (mut mgr GpuManager) can_query_global_params() bool {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	return mgr.state != .error && mgr.state != .stopped
+}
+
 pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKit,
 	secondary_rtk &rtkit.RTKit) ?&GpuManager {
 	if res.firmware_role_count == 0 || res.firmware_role_count > 2 {

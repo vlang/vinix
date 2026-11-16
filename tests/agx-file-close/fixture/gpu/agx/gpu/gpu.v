@@ -34,7 +34,7 @@ pub mut:
 
 pub struct G17QueueResources {}
 
-enum State { running stopped }
+pub enum State { idle starting running error stopped }
 pub struct GpuManager {
 mut:
 	lock klock.Lock
@@ -152,6 +152,16 @@ pub fn get_global_manager() ?&GpuManager {
 
 pub fn available(value bool) { manager_available = value }
 pub fn lookups() int { return manager_lookups }
+
+pub fn set_query_state(state State) { test_gpu_manager.state = state }
+pub fn query_lock_held() bool { return test_gpu_manager.lock.is_held() }
+
+fn fail_query() { test_gpu_manager.state = .error }
+
+pub fn fail_before_query_lock() {
+	assert test_gpu_manager.state == .running
+	klock.before_once(unsafe { &test_gpu_manager.lock }, fail_query)
+}
 
 pub fn stop_on_next_lookup(callback fn ()) { stop_callback = callback }
 

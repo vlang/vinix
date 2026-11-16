@@ -38,6 +38,7 @@ fn main() {
 	os.cp('${repo}/kernel/gpu/agx/file/closing.v', '${scratch}/gpu/agx/file/closing.v')!
 	gpu_source := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
 	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\n' +
+		section(gpu_source, 'pub fn (mut mgr GpuManager) can_query_global_params(', 'pub fn new_gpu_manager(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) queue_file_retirement(', 'fn (mut mgr GpuManager) reap_file_resources(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) flush_g13_file_mapping(', '// Publish a G13 UAT invalidation through')!)!
 	mmu_source := os.read_file('${repo}/kernel/gpu/agx/mmu/mmu.v')!

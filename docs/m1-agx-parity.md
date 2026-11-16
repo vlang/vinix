@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [global GET_PARAMS copy behavior](m1-agx-param-copy.md)
-(2026-11-16). The [BIND overlap replacement and preparation](m1-agx-bind-replacement.md),
+Latest offline increment: [global parameter queries after device loss](m1-agx-param-device.md)
+(2026-11-16). The [global GET_PARAMS copy behavior](m1-agx-param-copy.md),
+[BIND overlap replacement and preparation](m1-agx-bind-replacement.md),
 [UNBIND ranges and surviving mappings](m1-agx-unbind-range.md),
 [GEM-create size errors](m1-agx-gem-size.md),
 [repeated single-page bindings](m1-agx-single-page.md),

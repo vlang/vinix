@@ -121,3 +121,12 @@ The response formatter and user-copy service are injected, so these cases
 qualify copy bounds/error behavior, not response contents, the modern ABI or
 native page-fault handling. The fake backend shares the helper and is checked
 by source gates/builds; this fixture does not execute a fake GPU guest.
+
+Another 32,800 GET_PARAMS cases run the real manager state snapshot. Error and
+stopped states return ENODEV before formatting/copying, including zero-length
+queries and invalid pointers; malformed headers still return EINVAL first.
+Idle, starting and running states retain ordinary copy behavior. Deterministic
+callbacks switch to error before state-lock acquisition or complete an in-progress
+shutdown holding that lock. All paths release it; formatting asserts it is free.
+The snapshot does not serialize the subsequent user copy with later device loss.
+These injected lock schedules do not qualify native multi-CPU crash publication.

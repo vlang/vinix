@@ -12,6 +12,7 @@ __global parameter_builds = 0
 // handler and shared checked-copy helper execute unchanged.
 fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 	_ = manager
+	assert !gpu.query_lock_held(), 'GET_PARAMS must release the manager lock before formatting/copying'
 	parameter_builds++
 	mut value := ioctl.DrmAsahiParamsGlobal{}
 	unsafe { C.memset(&value, 0xa7, sizeof(ioctl.DrmAsahiParamsGlobal)) }
@@ -20,6 +21,7 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 
 fn check_global_params() {
 	gpu.available(true)
+	gpu.set_running(true)
 	supported := u64(sizeof(ioctl.DrmAsahiParamsGlobal))
 	assert supported + 64 <= 1024
 	mut cases := 0
@@ -86,4 +88,71 @@ fn check_global_params() {
 		}
 	}
 	println('AGX GET_PARAMS copies: ${cases} ioctl checks; zero/null queries, bounded aligned/unaligned prefixes, oversized inputs, unchanged headers/tails, partial EFAULT output and header/device precedence passed')
+}
+
+fn check_global_params_device() {
+	mut file := GpuFile{}
+	mut cases := 0
+	supported := u64(sizeof(ioctl.DrmAsahiParamsGlobal))
+	for _ in 0 .. 200 {
+		for state in [gpu.State.idle, .starting, .running, .error, .stopped]! {
+			for size in [u64(0), 1, supported, ~u64(0)]! {
+				for invalid_pointer in [false, true]! {
+					gpu.available(true); gpu.set_query_state(state)
+					mut buffer := [1024]u8{}
+					assert supported <= u64(sizeof(buffer))
+					pointer := if invalid_pointer { ~u64(0) } else { u64(unsafe { &buffer[0] }) }
+					mut request := ioctl.DrmAsahiGetParams{ pointer: pointer, size: size }
+					before := request; builds := parameter_builds; lookups := gpu.lookups()
+					usercopy.configure(u64(unsafe { &buffer[0] }), sizeof(buffer), -1)
+					lost := state in [.error, .stopped]
+					expected := if lost { -19 } else if invalid_pointer && size != 0 { -14 } else { 0 }
+					result := file.ioctl_get_params(unsafe { &request })
+					assert result == expected, 'GET_PARAMS device expected ${expected}, got ${result}'
+					assert request == before && gpu.lookups() == lookups + 1
+					assert !gpu.query_lock_held()
+					assert parameter_builds == builds + if lost { 0 } else { 1 }
+					assert usercopy.calls() == if lost { 0 } else { 1 }
+					for i := u64(0); i < u64(sizeof(buffer)); i++ {
+						count := if size < supported { size } else { supported }
+						assert buffer[i] == if !lost && !invalid_pointer && i < count { u8(0xa7) } else { u8(0) }
+					}
+					cases++
+					// Header rejection still precedes device lookup even after loss.
+					for invalid in 0 .. 3 {
+						mut bad := before
+						match invalid {
+							0 { bad.extensions = 1 }
+							1 { bad.pad = 1 }
+							else { bad.param_group = 1 }
+						}
+						saved := bad; at_lookup := gpu.lookups(); at_build := parameter_builds
+						usercopy.configure(0, 0, 0)
+						assert file.ioctl_get_params(unsafe { &bad }) == -22 && bad == saved
+						assert gpu.lookups() == at_lookup && parameter_builds == at_build && usercopy.calls() == 0
+						assert !gpu.query_lock_held(); cases++
+					}
+				}
+			}
+		}
+		// A transition after manager lookup but before acquiring its state lock
+		// must win over even an invalid pointer or a zero-byte copy.
+		for size in [u64(0), supported]! {
+			for shutdown in [false, true]! {
+				gpu.set_running(true)
+				before_stops := gpu.stop_count()
+				if shutdown { gpu.stop_during_mapping_lock() } else { gpu.fail_before_query_lock() }
+				mut request := ioctl.DrmAsahiGetParams{ pointer: ~u64(0), size: size }
+				before := request; builds := parameter_builds
+				usercopy.configure(0, 0, 0)
+				assert file.ioctl_get_params(unsafe { &request }) == -19
+				assert request == before && parameter_builds == builds && usercopy.calls() == 0
+				assert !gpu.query_lock_held()
+				assert gpu.stop_count() == before_stops + if shutdown { 1 } else { 0 }
+				cases++
+			}
+		}
+	}
+	gpu.set_running(true)
+	println('AGX GET_PARAMS device loss: ${cases} ioctl checks; error/stopped ENODEV before formatting/copying, zero/invalid-pointer precedence, unchanged outputs, live-state controls, unlocked copies and deterministic failure/shutdown lock transitions passed')
 }

@@ -598,6 +598,8 @@ pub fn (f &GpuFile) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
 		return -22 // EINVAL
 	}
 	manager := gpu.get_global_manager() or { return -19 }
+	mut gpu_manager := unsafe { manager }
+	if !gpu_manager.can_query_global_params() { return -19 }
 	params := make_global_params(manager)
 	return agxparams.copy_global(request, unsafe { &params })
 }
