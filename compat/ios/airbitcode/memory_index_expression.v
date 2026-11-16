@@ -8,6 +8,7 @@ enum MemoryIndexKind {
 	literal
 	poison
 	lane
+	dynamic_lane
 	binary
 	compare
 	select_value
@@ -300,17 +301,24 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			argument := b.argument(source)!
 			lane_operand := b.p.operands[op.operands_start + 1]
 			lane_width := b.p.integer_bits(lane_operand.type_index)!
-			lane_value := b.pools.lookup(b.scope, lane_operand.number)!
-			if lane_value.kind != .constant {
-				return error('AIR memory index: literal lane required')
+			mut fixed_lane := -1
+			if lane_operand.number < scope.base_id {
+				lane_value := b.pools.lookup(b.scope, lane_operand.number)!
+				if lane_value.kind == .constant {
+					c := b.pools.constants[lane_value.constant_index]
+					if c.kind in [.zero, .integer] && !c.splat {
+						lane := b.pools.scalar_bits(lane_value.constant_index)! & constant_mask(lane_width)
+						if lane < u64(count) { fixed_lane = int(lane) }
+					}
+				}
 			}
-			c := b.pools.constants[lane_value.constant_index]
-			if c.kind !in [.zero, .integer] || c.splat {
-				return error('AIR memory index: defined lane required')
+			if fixed_lane >= 0 {
+				// Preserve the single-node cost of a defined literal lane.
+				node = MemoryIndexNode{kind: .lane, bits: bits, argument: argument, lane: fixed_lane}
+			} else {
+				lhs := b.expression(lane_operand, producer, depth + 1)!
+				node = MemoryIndexNode{kind: .dynamic_lane, bits: bits, argument: argument, left: lhs, value: u64(count), height: 1 + b.nodes[lhs].height}
 			}
-			lane := b.pools.scalar_bits(lane_value.constant_index)! & constant_mask(lane_width)
-			if lane >= u64(count) { return error('AIR memory index: lane outside argument') }
-			node = MemoryIndexNode{ kind: .lane, bits: bits, argument: argument, lane: int(lane) }
 		} else {
 			return error('AIR memory index: unsupported expression dependency')
 		}
@@ -341,6 +349,15 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.copy_value { value = IntegerValue{value: values[node.left], poison: poisons[node.left]} }
 			.lane {
 				value = IntegerValue{ value: bindings[node.argument].values[node.lane] & constant_mask(node.bits) }
+			}
+			.dynamic_lane {
+				// Lane selectors are unsigned. Check the full word before narrowing
+				// to int or reading a lane; invalid selection produces poison.
+				value = if poisons[node.left] || values[node.left] >= node.value {
+					IntegerValue{poison: true}
+				} else {
+					IntegerValue{value: bindings[node.argument].values[int(values[node.left])] & constant_mask(node.bits)}
+				}
 			}
 			.binary {
 				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!

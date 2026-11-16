@@ -97,8 +97,9 @@ nonwrapping profile. An unused indexed pointer may be one past the binding;
 loads/stores also require their complete stored size and explicit alignment.
 
 An index may also be a pure integer SSA expression built from scalar arguments,
-defined integer literals, literal-lane extraction from a direct integer vector
-argument, add/subtract/multiply, signed/unsigned division and remainder, shifts,
+defined integer literals, extraction from a direct integer vector argument using
+a supported pure integer lane selector, add/subtract/multiply, signed/unsigned
+division and remainder, shifts,
 AND/OR/XOR, scalar integer comparisons/selects/freezes, unary bit intrinsics,
 and trunc/zext/sext. Integer widths are i1..i64
 and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
@@ -199,8 +200,8 @@ the 256-node bound earlier than the former fused direct-call extraction.
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
 most 32 levels including leaves and cached subexpressions. Unrelated arithmetic
-does not consume this graph budget. Loads, PHIs,
-dynamic lane selection and constructed/loaded vector dependencies reject as
+does not consume this graph budget. Loads, PHIs and
+constructed/loaded vector dependencies reject as
 address expressions. These operations keep their ordinary non-address support.
 Every call evaluates the graph from immutable argument words into a fixed stack
 array before resolving addresses, including in cold blocks and unused GEPs.
@@ -208,6 +209,23 @@ The graph is owned/freed with the profile; its build cache is transient and free
 on success/error. No expression node allocates during execution.
 Evaluation uses an additional fixed 256-entry poison array alongside value words.
 Selects include all three dependency heights in the shared depth limit.
+
+Dynamic lane selectors are unsigned words masked to their own i1..i64 width.
+Poison or a selector outside the vector yields poison without reading a lane.
+Select/freeze can suppress/repair it; independent poisoned GEP roots still fail
+before writes. A direct undef selector requires freeze first. Computed selectors
+add their dependency height plus one extraction level and share the node budget.
+Defined in-range literal extractions retain their former single-leaf cost.
+Literal out-of-range/poison selectors now follow the same repairable poison path.
+The source must still be a direct 1..16-lane integer vector argument.
+
+`tests/ios/air-memory-dynamic-lane-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
+all integer lane widths, six selector widths, vector lengths 1/2/3/16,
+computed/poison/frozen selectors, masking, select/freeze recovery, and exact
+prewrite refusal across validation and ordinary/prepared execution. Defined
+native LLVM extracts provide the lane oracle; invalid native extracts are
+never executed. It also checks cached depth/node limits, independent/cold roots,
+binding shape, and unsupported or immediately invalid selector dependencies.
 
 `tests/ios/air-memory-bitwise-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks all
 i1..i64 widths with a defined LLVM oracle. It selects safe shift amounts before

@@ -352,7 +352,16 @@ Pair inserts replace the data or flag field independently, including partial
 and complete poison repair. Both the base and replacement are validated and
 count toward depth, even when extracting an untouched field. PHIs and loaded
 dependencies remain unsupported in addresses.
-Only argument/literal dependencies are admitted; general SSA indices remain
+Direct integer vector arguments also accept dynamic lane selectors built from
+the supported pure integer expressions. Selectors use unsigned width-masked
+words; poison or out-of-range selection yields poison before any lane read.
+Scalar select/freeze can recover it. Direct undef selectors, memory-dependent
+selectors, and constructed/loaded vector sources remain unsupported in addresses.
+Each computed selector contributes its height plus one extraction level; valid
+literal lanes retain their single-leaf cost. The RGBA size shader exercises a
+computed x-modulo-three selector; its red channel exposes the selected x/y/z
+coordinate to independent image readback checks.
+Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
 
