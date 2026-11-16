@@ -2,6 +2,9 @@
 import os
 
 const helpers = [
+	'gpu__agx__gpu__g13_tile_info',
+	'gpu__agx__gpu__g13_div_round_up',
+	'gpu__agx__gpu__g13_align_u32',
 	'cpu__read_ctr_el0',
 	'cpu__clean_invalidate_data_cache_line',
 	'cpu__clean_invalidate_data_cache_to_poc',
@@ -132,6 +135,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'gpu__agx__gpu__g13_tile_info' { return '__v_option_gpu__agx__gpu__G13TileInfo' }
+	if name in ['gpu__agx__gpu__g13_div_round_up', 'gpu__agx__gpu__g13_align_u32'] { return 'u32' }
 	if name in ['cpu__read_ctr_el0', 'bo__Table__mmap_attributes', 'gpu__agx__file__GpuFile__mmap_attributes', 'gpu__agx__file__mmap_attributes_handle'] { return 'u64' }
 	if name in ['cpu__clean_invalidate_data_cache_line', 'cpu__clean_invalidate_data_cache_to_poc'] { return 'void' }
 	if name == 'fw__g13_timestamp_user_ts_offset_for' { return '__v_option_u64' }

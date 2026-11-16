@@ -441,6 +441,7 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	_ = tiling_reference_v(read(os.join_path(base, 'queue/render.rs'))!, read(os.join_path(base, 'util.rs'))!)!
 	check_cpu_cache_local(read(os.join_path(repo, 'kernel/drm/gem/gem.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/bo/bo.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/driver/driver.v'))!, read(os.join_path(repo, 'kernel/memory/ram_cache_arm64.v'))!,
@@ -797,6 +798,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Firmware 13.5 fragment preserves declared parameter padding; the recursive field model includes source-derived auxiliary defaults',
 		'Firmware timestamp instructions bind the source-derived optional user pair inside each retained command for all three engines and both phases',
 		'Firmware start/finalize record fields, insertions and reserved defaults follow the selected source-layout model',
+		'Base M1 tiling formulas, bounds, single-cluster specialization and packed parameter words are accepted by the restricted source-expression model',
 		'Native GEM WRITEBACK selects matching CPU aliases; whole-BO VMAs and cache restoration precede backing reuse',
 		'Firmware 12.3/13.5 fragment sizes, depth insertion, firmware pointers, scratch/metadata and complete common tail follow the selected source-layout model',
 		'Firmware 13.5 shared per-queue command/start counters']
