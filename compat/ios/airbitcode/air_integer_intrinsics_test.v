@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_integer_intrinsic_identity() {
-	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2166
+	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2168
 	for i, name in ['air.popcount.i32', 'air.reverse_bits.i32'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert slot == i && id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }
@@ -14,6 +14,20 @@ fn test_air_integer_intrinsic_identity() {
 		if _ := scalar_intrinsic_name(name) { assert false, name }
 	}
 	println('AIR-INTEGER-NAMES: two exact i32 names, separate appended slots, unary identity and unsupported width/vector/family/spelling guards PASS')
+}
+
+fn test_air_integer_multiply_high_identity() {
+	for i, name in ['air.mul_hi.s.i32', 'air.mul_hi.u.i32'] {
+		id, slot := air_integer_intrinsic(name)!
+		assert slot == 12 + i && id == if i == 0 { ScalarIntrinsic.smulh } else { ScalarIntrinsic.umulh }
+		assert scalar_intrinsic_name(name)! == id && scalar_intrinsic_arity(id) == 2 && scalar_integer_mulh(id)
+		assert scalar_integer_intrinsic_width(name, id)! == 32
+		if _ := scalar_integer_intrinsic_width(name, .ctpop) { assert false }
+	}
+	for name in ['air.mul_hi.i32', 'air.mul_hi.s.i16', 'air.mul_hi.s.i64', 'air.mul_hi.u.i64', 'air.mul_hi.s.i032', 'air.mul_hi.u.i+32', 'air.mul_hi.s.v2i32', 'air.mul_hi.u.f32', 'air.mul_hi.u.i32.spoof', 'air.smulh.i32', 'air.umulh.i32', 'air.mul_hi.x.i32'] {
+		if _ := scalar_intrinsic_name(name) { assert false, name }
+	}
+	println('AIR-MULTIPLY-HIGH-NAMES: two exact signed/unsigned i32 names, appended slots, binary identity and width/vector/family/spelling guards PASS')
 }
 
 fn test_air_integer_saturating_identity() {

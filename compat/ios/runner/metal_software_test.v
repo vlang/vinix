@@ -4401,6 +4401,8 @@ fn sm_test_geometry_sizes_focus() ! {
  declare <1 x i32> @llvm.umin.v1i32(<1 x i32>, <1 x i32>)
  declare <1 x i32> @llvm.umax.v1i32(<1 x i32>, <1 x i32>)\n declare <1 x i32> @llvm.ctpop.v1i32(<1 x i32>)\n declare <1 x i32> @llvm.bitreverse.v1i32(<1 x i32>)\n declare <1 x i32> @llvm.bswap.v1i32(<1 x i32>)\n declare i32 @air.popcount.i32(i32) #0
  declare i32 @air.reverse_bits.i32(i32) #0
+ declare i32 @air.mul_hi.s.i32(i32,i32) #0
+ declare i32 @air.mul_hi.u.i32(i32,i32) #0
  declare i32 @air.add_sat.s.i32(i32,i32) #0
  declare i32 @air.sub_sat.s.i32(i32,i32) #0
  declare i32 @air.add_sat.u.i32(i32,i32) #0
@@ -5269,7 +5271,15 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %ulane = extractelement <2 x i8> %vu, i32 1
  %coordinate8 = sub i8 %ulane, 127
  %coordinate = zext i8 %coordinate8 to i32
- %offset0 = xor i8 %sh, %uh
+ %air_signed = call i32 @air.mul_hi.s.i32(i32 %x, i32 4294967295)
+ %air_unsigned = call i32 @air.mul_hi.u.i32(i32 %x, i32 4294967295)
+ %air_sh = trunc i32 %air_signed to i8
+ %air_uh = trunc i32 %air_unsigned to i8
+ %same_s = icmp eq i8 %sh, %air_sh
+ %same_u = icmp eq i8 %uh, %air_uh
+ %checked_sh = select i1 %same_s, i8 %air_sh, i8 poison
+ %checked_uh = select i1 %same_u, i8 %air_uh, i8 poison
+ %offset0 = xor i8 %checked_sh, %checked_uh
  %offset1 = xor i8 %slane, %ulane
  %offset8 = xor i8 %offset0, %offset1
  %offset = zext i8 %offset8 to i32

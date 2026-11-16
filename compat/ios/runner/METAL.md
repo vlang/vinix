@@ -1,5 +1,13 @@
 # Software Metal backend
 
+Prepared pipelines execute scalar `air.mul_hi.s.i32` and `air.mul_hi.u.i32`
+using the existing signed/unsigned multiply-high evaluators. Separate appended
+cache entries permit LLVM/AIR coexistence. The multiply-high image fixture
+compares both AIR results with its existing LLVM results before RGBA8 readback;
+the independent pixel and padding checks remain. Native references widen to
+i64, multiply, shift and truncate. Other AIR widths/vectors remain excluded;
+declaration, state and prewrite guards retain their existing rules.
+
 Prepared pipelines execute scalar `air.add_sat.s.i32`, `air.sub_sat.s.i32`,
 `air.add_sat.u.i32` and `air.sub_sat.u.i32` using the existing signed/unsigned
 saturating evaluators. Defined overflow/underflow clamps to the integer range.

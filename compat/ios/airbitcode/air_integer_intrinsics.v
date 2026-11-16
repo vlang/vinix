@@ -19,6 +19,8 @@ fn air_integer_intrinsic(name string) !(ScalarIntrinsic, int) {
 		'air.sub_sat.s.i32' { ScalarIntrinsic.ssub_sat, 9 }
 		'air.add_sat.u.i32' { ScalarIntrinsic.uadd_sat, 10 }
 		'air.sub_sat.u.i32' { ScalarIntrinsic.usub_sat, 11 }
+		'air.mul_hi.s.i32' { ScalarIntrinsic.smulh, 12 }
+		'air.mul_hi.u.i32' { ScalarIntrinsic.umulh, 13 }
 		else { return error('AIR intrinsic: unsupported AIR integer overload') }
 	}
 }
