@@ -58,6 +58,9 @@ fn (mut this SyncobjResource) unlink(_handle voidptr) ? {}
 fn (mut this SyncobjResource) grow(_handle voidptr, _new_size u64) ? {}
 
 fn create_syncobj_fd(obj &syncobj.SyncObj) ?int {
+	mut reservation := file.FdReservation{}
+	file.reserve_fd(unsafe { nil }, unsafe { &reservation }) or { return none }
+	defer { file.cancel_fd_reservation(unsafe { &reservation }) }
 	allocation := memory.malloc_packed_fallible(sizeof(SyncobjResource))
 	if allocation == unsafe { nil } { errno.set(errno.enomem); return none }
 	mut wrapper := unsafe { &SyncobjResource(allocation) }
@@ -74,7 +77,7 @@ fn create_syncobj_fd(obj &syncobj.SyncObj) ?int {
 	mut res := wrapper.box
 	// fd_create_from_resource takes a reference and releases it on failure;
 	// table installation failure also closes the newly created description.
-	return file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_cloexec, 0, false)
+	return file.fdnum_create_from_reserved_resource(unsafe { &reservation }, mut res, resource.o_cloexec)
 }
 
 fn syncobj_from_fd(fdnum int) ?&syncobj.SyncObj {

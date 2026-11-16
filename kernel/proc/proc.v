@@ -247,6 +247,10 @@ pub mut:
 	// grown under fds_lock, and freed when it is reaped. Held inline it made
 	// every process 10 KiB, which the allocator rounds up to four pages.
 	fds                      []voidptr
+	// file.FdReservation nodes borrowed from active callers, under fds_lock.
+	// Reservations occupy numbers but never expose a descriptor to lookup,
+	// close, fork snapshots or /proc. New processes start with an empty chain.
+	fds_reserved             voidptr
 	children                 []&Process
 	children_lock            klock.Lock
 	// All child state changes wake every waiter regardless of child count.

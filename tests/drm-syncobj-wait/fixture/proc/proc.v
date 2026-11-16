@@ -1,9 +1,20 @@
 @[has_globals]
 module proc
 
+import klock
+
+pub const max_fds = 32
+pub const initial_fds = 4
+pub const rlimit_nofile = 0
+pub struct RLimit { pub mut: cur u64 }
+
 pub struct Process {
 pub mut:
 	shared_pending_signals u64
+	fds_lock klock.Lock
+	fds []voidptr
+	fds_reserved voidptr
+	rlimits [1]RLimit
 }
 
 pub struct Thread {
@@ -19,7 +30,10 @@ __global wait_capture_thread = Thread{}
 __global wait_capture_process = Process{}
 
 pub fn reset() {
-	wait_capture_process = Process{}
+	assert wait_capture_process.fds_reserved == unsafe { nil }
+	for fd in wait_capture_process.fds { assert fd == unsafe { nil } }
+	unsafe { wait_capture_process.fds.free() }
+	wait_capture_process = Process{ fds: unsafe { []voidptr{len: initial_fds} }, rlimits: [RLimit{ cur: u64(max_fds) }]! }
 	wait_capture_thread = Thread{ process: unsafe { &wait_capture_process } }
 }
 

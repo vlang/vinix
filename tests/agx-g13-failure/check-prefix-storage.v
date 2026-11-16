@@ -11,6 +11,15 @@ const helpers = [
 	'drm__syncobj_from_fd',
 	'drm__create_syncobj_fd',
 	'drm__create_sync_file_fd',
+	'drm__create_sync_file_fd_at',
+	'file__fd_number_reserved_locked',
+	'file__reserve_fd',
+	'file__remove_fd_reservation_locked',
+	'file__cancel_fd_reservation',
+	'file__fdnum_install_reserved_fd',
+	'file__fdnum_create_from_reserved_resource',
+	'file__fdnum_create_from_fd',
+	'file__fdnum_create_pair',
 	'drm__SyncobjResource__unref',
 	'drm__SyncFileResource__unref',
 	'drm__SyncFileResource__poll_status',
@@ -90,6 +99,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name in ['file__reserve_fd', 'file__fdnum_install_reserved_fd', 'file__fdnum_create_from_reserved_resource', 'file__fdnum_create_from_fd', 'drm__create_sync_file_fd_at'] { return '__v_option_i64' }
+	if name == 'file__cancel_fd_reservation' { return 'void' }
 	if name == 'submission__stage_sync_array' { return 'multi_return_i64_submission__SyncArray' }
 	if name == 'syncobj__get_timeline_fence' { return '__v_option_syncobj__DmaFenceptr' }
 	if name == 'syncobj__snapshot' { return 'syncobj__FenceSnapshot' }
@@ -194,7 +205,7 @@ fn check(source string) ! {
 			if body.count(owned) != 1 { return error('opaque import must have one fallible alias link allocation') }
 			allocation_scan = body.replace(owned, 'owned_alias_link_allocation')
 		}
-		if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd'] {
+		if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd_at'] {
 			kind := if name == 'drm__create_syncobj_fd' { 'SyncobjResource' } else { 'SyncFileResource' }
 			for owned in ['memory__malloc_packed_fallible(sizeof(drm__' + kind + '))',
 				'memory__malloc_packed_fallible(sizeof(resource__Resource))'] {
@@ -254,7 +265,7 @@ fn selftest() ! {
 			else if name == 'syncobj__new_private_stub' { 'memory__malloc_packed_fallible(sizeof(syncobj__DmaFence)); array_new(sizeof(syncobj__FenceWaiter*), 0, 0);\n' }
 			else if name == 'syncobj__new_syncobj_with_flags' { 'memory__malloc_packed_fallible(sizeof(syncobj__SyncObj)); array_new(sizeof(syncobj__TimelinePoint), 0, 0);\n' }
 			else if name == 'syncobj__import_syncobj' { 'memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle));\n' }
-			else if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd'] {
+			else if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd_at'] {
 				wrapper_kind := if name == 'drm__create_syncobj_fd' { 'SyncobjResource' } else { 'SyncFileResource' }
 				'memory__malloc_packed_fallible(sizeof(drm__' + wrapper_kind + ')); memory__malloc_packed_fallible(sizeof(resource__Resource));\n'
 			}

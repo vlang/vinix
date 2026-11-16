@@ -148,3 +148,16 @@ unsigned boundary values. Exact matches still win; later closer publication,
 reset and handle reuse leave an already staged fence intact. Lookups allocate
 nothing and release the object lock. These cases qualify this selection rule,
 not cumulative Linux fence chains, retired-point pruning or timeline wait UAPI.
+
+Export reservation checks execute native reservation, descriptor-create and
+pair-create functions against the fixture Process table. Reservations remain
+invisible to lookup/close while excluding ordinary opens, specific duplicates
+and pairs. The fixture models table growth and its failure; native kernel
+budget/slab behavior is not executed. Stack descriptions in primitive checks
+are borrowed test values, with table entries cleared before scope exit.
+DRM cases use real wrapper/box/description fixture owners and check release
+after failed adoption, full-table/OOM precedence, branch-specific missing-source
+errors, stable outputs and recovery of the lowest slot. Three sync-file private
+creation failure expectations now use Linux's EINVAL; opaque construction still
+reports ENOMEM. Native source/C lifetime review covers stack nodes, process
+fork/exit/exec and unlock-before-release; these fixtures do not qualify CPU races.

@@ -967,6 +967,10 @@ fn ioctl_syncobj_destroy(handle voidptr, data voidptr) int {
 }
 
 pub fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
+	return create_sync_file_fd_at(fence, unsafe { nil })
+}
+
+fn create_sync_file_fd_at(fence &syncobj.DmaFence, reservation &file.FdReservation) ?int {
 	if fence == unsafe { nil } {
 		return none
 	}
@@ -988,6 +992,9 @@ pub fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 	unsafe { *(&voidptr(&wrapper.box)) = box }
 	unsafe { *wrapper.box = resource.Resource(wrapper) }
 	mut res := wrapper.box
+	if reservation != unsafe { nil } {
+		return file.fdnum_create_from_reserved_resource(reservation, mut res, resource.o_cloexec)
+	}
 	return file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_cloexec, 0, false)
 }
 
@@ -1016,13 +1023,20 @@ fn ioctl_syncobj_handle_to_fd(handle voidptr, data voidptr) int {
 	if request.flags & ~ioctl.drm_syncobj_handle_to_fd_export_sync_file != 0 || request.pad != 0 {
 		return -22
 	}
-	obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
 	if request.flags == 0 {
+		obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
 		request.fd = i32(create_syncobj_fd(obj) or { return -int(errno.get()) })
 		return 0
 	}
+	// Linux reserves the number before sync-file source lookup. A full table
+	// wins over missing handles/fences; private sync-file creation failure is
+	// EINVAL. Opaque export instead resolves its object before reservation.
+	mut reservation := file.FdReservation{}
+	file.reserve_fd(unsafe { nil }, unsafe { &reservation }) or { return -int(errno.get()) }
+	defer { file.cancel_fd_reservation(unsafe { &reservation }) }
+	obj := syncobj.lookup(u64(handle), request.handle) or { return -2 }
 	fence := syncobj.get_fence(obj) or { return -22 }
-	fdnum := create_sync_file_fd(fence) or { return -int(errno.get()) }
+	fdnum := create_sync_file_fd_at(fence, unsafe { &reservation }) or { return -22 }
 	request.fd = i32(fdnum)
 	return 0
 }

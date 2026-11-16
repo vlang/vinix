@@ -869,7 +869,7 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 		// one past its end, which the table grows to hold.
 		mut i := oldfd
 		for ; i < limit && i < process.fds.len; i++ {
-			if process.fds[i] == unsafe { nil } {
+			if process.fds[i] == unsafe { nil } && !fd_number_reserved_locked(process, i) {
 				process.fds[i] = voidptr(fd)
 				return i
 			}
@@ -883,6 +883,10 @@ pub fn fdnum_create_from_fd(_process &proc.Process, fd &FD, oldfd int, specific 
 	} else {
 		if oldfd >= limit {
 			errno.set(errno.ebadf)
+			return none
+		}
+		if fd_number_reserved_locked(process, oldfd) {
+			errno.set(errno.ebusy)
 			return none
 		}
 		if oldfd >= process.fds.len && !grow_fd_table(mut process, oldfd) {
@@ -913,6 +917,7 @@ pub fn fdnum_create_pair(_process &proc.Process, first &FD, second &FD, numbers 
 	mut second_num := -1
 	for number in 0 .. limit {
 		if number < process.fds.len && process.fds[number] != unsafe { nil } { continue }
+		if fd_number_reserved_locked(process, number) { continue }
 		if first_num < 0 { first_num = number } else { second_num = number; break }
 	}
 	if second_num < 0 || (second_num >= process.fds.len && !grow_fd_table(mut process, second_num)) {

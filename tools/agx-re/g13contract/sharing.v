@@ -4,8 +4,10 @@ module g13contract
 fn check_sharing_contract(drm string, transport string, objects string, reference string) ! {
 	export := section(drm, 'fn ioctl_syncobj_handle_to_fd(', 'fn ioctl_syncobj_fd_to_handle(', 'Vinix syncobj export')!
 	require_order(export, ['request.flags & ~ioctl.drm_syncobj_handle_to_fd_export_sync_file',
-		'syncobj.lookup(u64(handle), request.handle)', 'if request.flags == 0', 'create_syncobj_fd(obj)',
-		'syncobj.get_fence(obj)', 'create_sync_file_fd(fence)'], 'Opaque export must transport the object, including empty objects')!
+		'if request.flags == 0', 'syncobj.lookup(u64(handle), request.handle) or { return -22 }', 'create_syncobj_fd(obj)',
+		'file.reserve_fd(', 'defer { file.cancel_fd_reservation(', 'syncobj.lookup(u64(handle), request.handle) or { return -2 }',
+		'syncobj.get_fence(obj)', 'create_sync_file_fd_at(fence, unsafe { &reservation }) or { return -22 }'],
+		'Opaque export resolves its object first; sync-file reserves before source lookup')!
 	importer := section(drm, 'fn ioctl_syncobj_fd_to_handle(', 'fn ioctl_syncobj_wait(', 'Vinix syncobj import')!
 	require_order(importer, ['request.flags & ~ioctl.drm_syncobj_fd_to_handle_import_sync_file',
 		'if request.flags == 0', 'syncobj_from_fd(request.fd) or { return -22 }',
@@ -21,12 +23,12 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 	require(!link.contains('new_syncobj(') && !link.contains('get_fence(') && !link.contains('replace_fence('),
 		'Import must preserve mutable identity instead of cloning a fence')!
 	fd := section(transport, 'fn create_syncobj_fd(', 'fn syncobj_from_fd(', 'Vinix opaque descriptor')!
-	require_order(fd, ['memory.malloc_packed_fallible(sizeof(SyncobjResource))',
+	require_order(fd, ['file.reserve_fd(', 'defer { file.cancel_fd_reservation(', 'memory.malloc_packed_fallible(sizeof(SyncobjResource))',
 		'if allocation == unsafe { nil }', '*wrapper = SyncobjResource{ object: obj }',
 		'memory.malloc_packed_fallible(sizeof(resource.Resource))', 'if box == unsafe { nil }',
 		'memory.free(allocation)', '*(&voidptr(&wrapper.box)) = box',
 		'*wrapper.box = resource.Resource(wrapper)',
-		'file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_cloexec, 0, false)'],
+		'file.fdnum_create_from_reserved_resource(unsafe { &reservation }, mut res, resource.o_cloexec)'],
 		'CLOEXEC transport ownership must pass to the file-layer constructor')!
 	require(fd.count('memory.free(') == 1 && !fd.contains('fd.unref('), 'Only private box failure may free the wrapper directly')!
 	require_order(transport, ['fn syncobj_from_fd(', 'file.fd_from_fdnum(', 'defer { fd.unref() }',

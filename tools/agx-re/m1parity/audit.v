@@ -158,7 +158,7 @@ pub fn audit(inputs Inputs) !Report {
 	require_clean(inputs.packages, [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD'])!
 	require_clean(inputs.asahi, ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h',
 		'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'drivers/gpu/drm/scheduler/sched_fence.c', 'rust/kernel/drm/sched.rs', 'rust/kernel/dma_fence.rs',
-		'drivers/dma-buf/dma-fence.c', 'drivers/dma-buf/dma-fence-chain.c', 'drivers/dma-buf/sync_file.c', 'include/uapi/linux/sync_file.h', 'drivers/gpu/drm/drm_syncobj.c', 'include/uapi/drm/drm.h'])!
+		'drivers/dma-buf/dma-fence.c', 'drivers/dma-buf/dma-fence-chain.c', 'drivers/dma-buf/sync_file.c', 'include/uapi/linux/sync_file.h', 'drivers/gpu/drm/drm_syncobj.c', 'include/uapi/drm/drm.h', 'fs/file.c'])!
 	require_clean(inputs.m1n1, ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx'])!
 	pin := package_pin(os.read_file(os.join_path(inputs.packages, package_path))!)!
 	mut revisions := map[string]string{}
@@ -177,11 +177,12 @@ pub fn audit(inputs Inputs) !Report {
 	mut sources := []Source{}
 	for role, paths in {
 		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/gem',
+			'kernel/file/reservation.v', 'kernel/file/file.v', 'kernel/proc/proc.v',
 			'kernel/drm/drm.v', 'kernel/drm/sync_file_info.v', 'kernel/drm/sync_file_deadline.v', 'kernel/drm/syncobj_fd.v', 'kernel/drm/wait_storage.v', 'tools/agx-re/m1parity',
 			'tools/agx-re/audit_m1_parity.v', 'tools/agx-re/g13contract', 'tools/agx-re/g13layout']
 		'asahi':    ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h',
 			'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'drivers/gpu/drm/scheduler/sched_fence.c', 'rust/kernel/drm/sched.rs', 'rust/kernel/dma_fence.rs',
-			'drivers/dma-buf/dma-fence.c', 'drivers/dma-buf/dma-fence-chain.c', 'drivers/dma-buf/sync_file.c', 'include/uapi/linux/sync_file.h', 'drivers/gpu/drm/drm_syncobj.c', 'include/uapi/drm/drm.h']
+			'drivers/dma-buf/dma-fence.c', 'drivers/dma-buf/dma-fence-chain.c', 'drivers/dma-buf/sync_file.c', 'include/uapi/linux/sync_file.h', 'drivers/gpu/drm/drm_syncobj.c', 'include/uapi/drm/drm.h', 'fs/file.c']
 		'packages': [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD']
 		'm1n1':     ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx']
 	} {

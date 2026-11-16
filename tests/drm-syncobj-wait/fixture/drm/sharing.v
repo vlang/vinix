@@ -80,19 +80,21 @@ pub fn run_sharing_checks() {
 		assert ioctl_syncobj_fd_to_handle(voidptr(33), &request) == -22; checks++
 		assert request.handle == 777
 		if _ := sync_file_fence_from_fd(number) { assert false }
-		// Failures preserve outputs/namespace and propagate constructor/table errno.
+		// Linux maps private sync-file creation failure to EINVAL; opaque
+		// construction retains ENOMEM. Number reservation failure is EMFILE.
 		for flags in [u32(0), 1]! {
 			for position in 0 .. 2 {
 				memory.fail_in(position)
 				request = ioctl.DrmSyncobjHandle{ handle: original, flags: flags, fd: -123 }
-				assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == -12; checks++
+				assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == if flags == 0 { -12 } else { -22 }; checks++
 				assert request.fd == -123 && memory.outstanding() == 4 && file.outstanding() == 2,
 					'flags ${flags} allocation ${position}: fd ${request.fd}, owners ${memory.outstanding()}, descriptions ${file.outstanding()}'
 			}
 			for stage in 1 .. 3 {
 				file.fail_at(stage)
 				request = ioctl.DrmSyncobjHandle{ handle: original, flags: flags, fd: -123 }
-				assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == if stage == 1 { -12 } else { -24 }; checks++
+				assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == if stage == 2 { -24 } else if flags == 0 { -12 } else { -22 }; checks++
+				file.clear_failure()
 				assert request.fd == -123 && file.outstanding() == 2
 				assert memory.outstanding() == 4, 'flags ${flags} file stage ${stage} owners ${memory.outstanding()}'
 			}

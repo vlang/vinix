@@ -35,6 +35,10 @@ fn main() {
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/katomic', '${scratch}/katomic', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/event', '${scratch}/event', false)!
+	os.cp('${repo}/kernel/file/reservation.v', '${scratch}/file/reservation.v')!
+	native_file := os.read_file('${repo}/kernel/file/file.v')!
+	os.write_file('${scratch}/file/table.v', 'module file\nimport proc\nimport errno\n' +
+		section(native_file, 'pub fn fdnum_create_from_fd(', '// Make room in a descriptor table')!)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
 	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport stat\nimport klock\nimport memory\nimport event.eventstruct\n' +
 		section(source, 'struct SyncFileResource {', '// A PRIME fd')! +
@@ -62,7 +66,7 @@ fn main() {
 	process_source := os.read_file('${repo}/kernel/proc/proc.v')!
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
-	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks(); drm.run_sync_file_info_checks(); drm.run_sync_file_deadline_checks(); drm.run_timeline_boundary_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks(); drm.run_sync_file_info_checks(); drm.run_sync_file_deadline_checks(); drm.run_timeline_boundary_checks(); drm.run_export_reservation_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	arguments := ['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
