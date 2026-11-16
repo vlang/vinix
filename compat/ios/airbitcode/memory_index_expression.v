@@ -334,6 +334,8 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			b.p.scalar_unary_profile(op, true, false)!
 			lhs := b.expression_source(b.p.operands[op.operands_start], producer, depth + 1, true)!
 			node = MemoryIndexNode{kind: .freeze_value, bits: bits, left: lhs, height: 1 + b.nodes[lhs].height}
+		} else if code == 3 && b.p.scalar_vector_bitcast(op) {
+			node = b.packed_bitcast_node(op, producer, depth)!
 		} else if code == 3 && op.opcode <= 2 {
 			b.p.scalar_cast_profile(op, true)!
 			source := b.p.operands[op.operands_start]

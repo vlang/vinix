@@ -1004,12 +1004,25 @@ undef error. A scalar round trip can therefore spread poison to other lanes.
 Each cast costs one executed step and source plus result lane work. Only a
 vector result consumes a shared construction slot; scalar packs use existing
 scalar result storage. Integer-only execution accepts integer shapes; mixed,
-void and memory APIs also accept half/float shapes. These casts remain excluded
-from pure address graphs. Existing argument, load/store, return and PHI
-restrictions remain in force. `tests/ios/air-scalar-vector-bitcast.v` checks
+void and memory APIs also accept half/float shapes. Pure integer versions may
+feed bounded address graphs; floating dependencies remain excluded. Existing
+argument, load/store, return and PHI restrictions remain in force. `tests/ios/air-scalar-vector-bitcast.v` checks
 every shape in both directions against native LLVM and an independent bit
 model, freeze/poison/undef behavior, ordinary/prepared write ordering, strict
 budgets, loop reuse, metadata guards and shared work/storage boundaries.
+
+Pure integer scalar/vector bitcasts can feed memory offsets through supported
+scalar expressions and vector lane projections, including arguments, literals,
+freeze, insertions, shuffles, arithmetic and selects. A scalar split shares its
+complete result table across selectors. Packing observes every input lane
+before producing a scalar; a later select or freeze cannot hide undef errors.
+Scalar undef requires a direct source freeze. Every GEP root is validated
+before writes, including inactive blocks and roots reused after freeze. Loaded
+values, PHIs and floating dependencies remain outside pure address graphs.
+Existing 256-node and 32-level bounds count all sources and cached heights.
+`tests/ios/air-memory-scalar-vector-bitcast-index.v` checks every integer shape
+in both directions, native LLVM bits, nonmutating validation, ordinary/prepared
+write ordering, freeze/poison/undef controls and exact graph boundaries.
 
 Fixed 1..16-lane half/float vectors support unflagged `fpext`
 (half to float) and `fptrunc` (float to half), retaining the lane count. They

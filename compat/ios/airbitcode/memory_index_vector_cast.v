@@ -6,6 +6,7 @@ module airbitcode
 fn (mut b MemoryIndexBuilder) vector_cast_source(source IRTypedOperand, producer int, depth int) !MemoryIndexVectorSource {
 	if depth >= max_memory_index_depth { return error('AIR memory index: vector cast depth limit') }
 	op := b.p.instructions[producer]
+	if op.opcode == 11 && b.p.scalar_vector_bitcast(op) { return b.split_bitcast_source(source, producer, depth)! }
 	if op.opcode == 11 { return b.vector_bitcast_source(source, producer, depth)! }
 	b.p.vector_integer_cast_profile(b.stream, b.pools, b.bodies, b.scope, producer, op, 32)!
 	_, bits, count := b.p.scalar_vector_type(source.type_index, false, 16)!
