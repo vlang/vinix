@@ -4399,6 +4399,12 @@ fn sm_test_geometry_sizes_focus() ! {
  declare <2 x i64> @air.reverse_bits.v2i64(<2 x i64>)
  declare <2 x i64> @llvm.ctpop.v2i64(<2 x i64>)
  declare <2 x i64> @llvm.bitreverse.v2i64(<2 x i64>)
+ declare <2 x i64> @air.clz.v2i64(<2 x i64>,i1)
+ declare <2 x i64> @air.ctz.v2i64(<2 x i64>,i1)
+ declare <2 x i64> @llvm.ctlz.v2i64(<2 x i64>,i1 immarg)
+ declare <2 x i64> @llvm.cttz.v2i64(<2 x i64>,i1 immarg)
+ declare <1 x i64> @air.clz.v1i64(<1 x i64>,i1)
+ declare <1 x i64> @air.ctz.v1i64(<1 x i64>,i1)
  declare <2 x i32> @air.popcount.v2i32(<2 x i32>)
  declare <2 x i32> @air.reverse_bits.v2i32(<2 x i32>)
  declare <2 x i32> @llvm.ctpop.v2i32(<2 x i32>)
@@ -4512,7 +4518,51 @@ fn sm_test_geometry_sizes_focus() ! {
  %wide_ok0 = extractelement <2 x i1> %wide_same,i32 0
  %wide_ok1 = extractelement <2 x i1> %wide_same,i32 1
  %wide_ok = and i1 %wide_ok0,%wide_ok1
- %bits_ok = and i1 %old_bits_ok,%wide_ok
+ %bits_previous_ok = and i1 %old_bits_ok,%wide_ok
+ %zc64_high = or i64 %wide_high,9223372036854775808
+ %zc64_input0 = insertelement <2 x i64> zeroinitializer,i64 %wide_x,i32 0
+ %zc64_input = insertelement <2 x i64> %zc64_input0,i64 %zc64_high,i32 1
+ %zc64_zero = icmp eq <2 x i64> %zc64_input,zeroinitializer
+ %zc64_x_zero = icmp eq i32 %x,0
+%zc64_clz = call <2 x i64> @air.clz.v2i64(<2 x i64> %zc64_input,i1 false)
+ %zc64_clz_ref = call <2 x i64> @llvm.ctlz.v2i64(<2 x i64> %zc64_input,i1 false)
+ %zc64_clz_raw = call <2 x i64> @air.clz.v2i64(<2 x i64> %zc64_input,i1 true)
+ %zc64_clz_frozen = freeze <2 x i64> %zc64_clz_raw
+ %zc64_clz_freeze_expected = select <2 x i1> %zc64_zero,<2 x i64> zeroinitializer,<2 x i64> %zc64_clz_ref
+ %zc64_clz_small = extractelement <2 x i32> %count_clz_ref,i32 0
+ %zc64_clz_small64 = zext i32 %zc64_clz_small to i64
+ %zc64_clz_plus32 = add i64 %zc64_clz_small64,32
+%zc64_clz_expected0 = or i64 %zc64_clz_plus32,0
+ %zc64_clz_expected1 = or i64 0,0
+%zc64_clz_expect0 = insertelement <2 x i64> zeroinitializer,i64 %zc64_clz_expected0,i32 0
+ %zc64_clz_expected = insertelement <2 x i64> %zc64_clz_expect0,i64 %zc64_clz_expected1,i32 1
+ %zc64_clz_same0 = icmp eq <2 x i64> %zc64_clz,%zc64_clz_ref
+ %zc64_clz_same1 = icmp eq <2 x i64> %zc64_clz,%zc64_clz_expected
+ %zc64_clz_same2 = icmp eq <2 x i64> %zc64_clz_frozen,%zc64_clz_freeze_expected
+ %zc64_clz_both = and <2 x i1> %zc64_clz_same0,%zc64_clz_same1
+ %zc64_clz_same = and <2 x i1> %zc64_clz_both,%zc64_clz_same2
+%zc64_ctz = call <2 x i64> @air.ctz.v2i64(<2 x i64> %zc64_input,i1 false)
+ %zc64_ctz_ref = call <2 x i64> @llvm.cttz.v2i64(<2 x i64> %zc64_input,i1 false)
+ %zc64_ctz_raw = call <2 x i64> @air.ctz.v2i64(<2 x i64> %zc64_input,i1 true)
+ %zc64_ctz_frozen = freeze <2 x i64> %zc64_ctz_raw
+ %zc64_ctz_freeze_expected = select <2 x i1> %zc64_zero,<2 x i64> zeroinitializer,<2 x i64> %zc64_ctz_ref
+ %zc64_ctz_small = extractelement <2 x i32> %count_ctz_ref,i32 0
+ %zc64_ctz_small64 = zext i32 %zc64_ctz_small to i64
+ %zc64_ctz_plus32 = add i64 %zc64_ctz_small64,32
+%zc64_ctz_expected0 = select i1 %zc64_x_zero,i64 64,i64 %zc64_ctz_small64
+ %zc64_ctz_expected1 = select i1 %zc64_x_zero,i64 63,i64 %zc64_ctz_plus32
+%zc64_ctz_expect0 = insertelement <2 x i64> zeroinitializer,i64 %zc64_ctz_expected0,i32 0
+ %zc64_ctz_expected = insertelement <2 x i64> %zc64_ctz_expect0,i64 %zc64_ctz_expected1,i32 1
+ %zc64_ctz_same0 = icmp eq <2 x i64> %zc64_ctz,%zc64_ctz_ref
+ %zc64_ctz_same1 = icmp eq <2 x i64> %zc64_ctz,%zc64_ctz_expected
+ %zc64_ctz_same2 = icmp eq <2 x i64> %zc64_ctz_frozen,%zc64_ctz_freeze_expected
+ %zc64_ctz_both = and <2 x i1> %zc64_ctz_same0,%zc64_ctz_same1
+ %zc64_ctz_same = and <2 x i1> %zc64_ctz_both,%zc64_ctz_same2
+%zc64_same = and <2 x i1> %zc64_clz_same,%zc64_ctz_same
+ %zc64_ok0 = extractelement <2 x i1> %zc64_same,i32 0
+ %zc64_ok1 = extractelement <2 x i1> %zc64_same,i32 1
+ %zc64_ok = and i1 %zc64_ok0,%zc64_ok1
+ %bits_ok = and i1 %bits_previous_ok,%zc64_ok
 
 
  %bit_source = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
@@ -4526,7 +4576,15 @@ fn sm_test_geometry_sizes_focus() ! {
  %fixed_trailing = freeze <1 x i32> %trailing_lanes
  %leading_value = extractelement <1 x i32> %leading_lanes, i32 0
  %trailing_value = extractelement <1 x i32> %fixed_trailing, i32 0
- %zero_counts = add i32 %leading_value, %trailing_value
+ %bit_source64 = zext <1 x i32> %bit_source to <1 x i64>
+ %leading_lanes64 = call <1 x i64> @air.clz.v1i64(<1 x i64> %bit_source64,i1 false)
+ %trailing_lanes64 = call <1 x i64> @air.ctz.v1i64(<1 x i64> %bit_source64,i1 true)
+ %fixed_trailing64 = freeze <1 x i64> %trailing_lanes64
+ %zc64_leading = extractelement <1 x i64> %leading_lanes64,i32 0
+ %zc64_trailing = extractelement <1 x i64> %fixed_trailing64,i32 0
+ %zc64_sum = add i64 %zc64_leading,%zc64_trailing
+ %zc64_adjusted = sub i64 %zc64_sum,32
+ %zero_counts = trunc i64 %zc64_adjusted to i32
  %zero_root = getelementptr i8, ptr addrspace(1) %out, i32 %zero_counts
  %negative_x = sub i32 0, %x
  %abs_input = insertelement <2 x i32> <i32 0, i32 2147483648>, i32 %negative_x, i32 0
