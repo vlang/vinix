@@ -1018,6 +1018,44 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	return 0
 }
 
+// Caller holds file.lock. An accepted submission pins the entire VM until its
+// aggregate node and callbacks have stopped reading the queue. Keep detached
+// queues in the ownership arrays through that pin and failed invalidations.
+fn (mut f GpuFile) reap_detached_g13_queues_locked() {
+	manager := gpu.get_global_manager() or { return }
+	mut gpu_manager := unsafe { manager }
+	for i := f.queues.len - 1; i >= 0; i-- {
+		mut q := unsafe { f.queues[i] }
+		if !q.detached { continue }
+		mut owner_index := -1
+		for index, ownership in f.g13_queues {
+			if ownership.queue_id == q.id { owner_index = index; break }
+		}
+		if owner_index < 0 { continue }
+		ownership := f.g13_queues[owner_index]
+		if ownership.vm_id == 0 || ownership.vm_id >= mmu.uat_num_contexts
+			|| katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0 { continue }
+		if !gpu_manager.release_g13_queue_resources(ownership.resources) { continue }
+		q.destroy()
+		f.queues.delete(i)
+		f.g13_queues.delete(owner_index)
+	}
+}
+
+// The registry lock pins each open file against release_handle without a new
+// reference or allocation. The worker calls this outside the manager lock;
+// files already removed from the registry use the ordinary closing-file path.
+fn reap_open_detached_g13_queues() {
+	file_map_lock.acquire()
+	for _, file in file_map {
+		mut owned := unsafe { file }
+		owned.lock.acquire()
+		owned.reap_detached_g13_queues_locked()
+		owned.lock.release()
+	}
+	file_map_lock.release()
+}
+
 pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int {
 	request := unsafe { data }
 	if request.extensions != 0 || request.pad != 0 {
@@ -1025,7 +1063,7 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 	}
 	f.lock.acquire()
 	for i, mut q in f.queues {
-		if q.id == request.queue_id {
+		if q.id == request.queue_id && !q.detached {
 			mut resources := &gpu.G17QueueResources(unsafe { nil })
 			mut g13_resources := &gpu.G13QueueResources(unsafe { nil })
 			mut g17_index := -1
@@ -1044,18 +1082,20 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 					break
 				}
 			}
+			if g13_resources != unsafe { nil } {
+				// Namespace removal succeeds independently of live jobs or a
+				// temporarily unavailable manager. Retained ownership is retried
+				// by the worker, or by close after the Handle is released.
+				q.detached = true
+				f.reap_detached_g13_queues_locked()
+				f.lock.release()
+				return 0
+			}
 			manager := gpu.get_global_manager() or {
 				f.lock.release()
 				return -19
 			}
 			mut gpu_manager := unsafe { manager }
-			// A G13 queue cannot disappear while a retained firmware job still
-			// references its rings, notifier, TVB, or VM context.
-			if g13_resources != unsafe { nil }
-				&& !gpu_manager.release_g13_queue_resources(g13_resources) {
-				f.lock.release()
-				return -16 // EBUSY (or quarantined after a failed UAT flush)
-			}
 			if resources != unsafe { nil } {
 				gpu_manager.release_g17_queue_resources(resources)
 			}
@@ -1201,7 +1241,7 @@ fn (mut f GpuFile) submission_queue_exists(queue_id u32) bool {
 	f.lock.acquire()
 	defer { f.lock.release() }
 	for queue in f.queues {
-		if queue.id == queue_id { return true }
+		if queue.id == queue_id && !queue.detached { return true }
 	}
 	return false
 }
@@ -1250,7 +1290,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	mut queue_caps := u32(0)
 	mut queue_found := false
 	for queue in f.queues {
-		if queue.id == request.queue_id {
+		if queue.id == request.queue_id && !queue.detached {
 			queue_found = true
 			vm_id = queue.vm_id; queue_caps = queue.caps; break
 		}

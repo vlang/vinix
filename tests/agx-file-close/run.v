@@ -9,6 +9,7 @@ fn section(source string, start string, end string) !string {
 
 fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
+	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] == '--file-source')
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-close-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -21,13 +22,14 @@ fn main() {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!
 	}
-	source := os.read_file('${repo}/kernel/gpu/agx/file/file.v')!
+	source := os.read_file(if os.args.len == 3 { os.args[2] } else { '${repo}/kernel/gpu/agx/file/file.v' })!
 	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
 		section(source, 'pub fn release_handle(', 'pub fn new_gpu_file(')! +
 		section(source, 'fn (mut f GpuFile) mmap_attributes(', '// Caller holds file.lock')! +
 		section(source, 'fn lookup_file(', 'pub fn close_gem_handle(')! +
 		section(source, 'pub fn mmap_attributes_handle(', 'fn ioctl_get_params_handler(')! +
+		section(source, 'fn (mut f GpuFile) submission_queue_exists(', '// Copy userspace input')! +
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
 		section(source, 'fn (mut f GpuFile) retire_mapping_locked(', '// Reserve a nonzero per-open queue ID.')! +
 		section(source, 'fn (f &GpuFile) find_vm(', '// Firmware may retain both UAT translations')! +

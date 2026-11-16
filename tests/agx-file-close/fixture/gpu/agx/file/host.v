@@ -178,5 +178,6 @@ pub fn run_checks() {
 	check_identity_lookups()
 	check_queue_priorities()
 	check_cpu_mapping_policy()
+	check_detached_queues()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

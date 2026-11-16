@@ -11,6 +11,7 @@ import memory
 import usercopy
 
 struct LogicalQueue {
+	detached bool
 	id    u32
 	vm_id u32 = 1
 	caps  u32 = 5
@@ -56,6 +57,10 @@ fn (file &GpuFile) find_vm(id u32) ?&mmu.UatContext {
 __global file_reaps = 0
 
 fn reap_closed_files() { file_reaps++ }
+
+// The file-close fixture executes the actual registry/file/resource reaper.
+// Here the production pending worker checks only service ordering.
+fn reap_open_detached_g13_queues() {}
 
 fn new_file() &GpuFile {
 	ctx := &mmu.UatContext{}
@@ -339,6 +344,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_detached_submission_ownership()
 	check_submission_device_loss()
 	check_submission_lookup_order()
 	check_missing_queue_submission_failures()

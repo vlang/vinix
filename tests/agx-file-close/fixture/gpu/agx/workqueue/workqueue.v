@@ -7,6 +7,7 @@ pub mut:
 	id u32
 	priority u32
 	caps u32
+	detached bool
 	destroyed bool
 	pooled bool
 }

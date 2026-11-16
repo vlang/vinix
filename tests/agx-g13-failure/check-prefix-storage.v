@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'gpu__agx__file__GpuFile__reap_detached_g13_queues_locked',
+	'gpu__agx__file__reap_open_detached_g13_queues',
 	'gpu__agx__gpu__g13_tile_info',
 	'gpu__agx__gpu__g13_div_round_up',
 	'gpu__agx__gpu__g13_align_u32',
@@ -135,6 +137,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name in ['gpu__agx__file__GpuFile__reap_detached_g13_queues_locked', 'gpu__agx__file__reap_open_detached_g13_queues'] { return 'void' }
 	if name == 'gpu__agx__gpu__g13_tile_info' { return '__v_option_gpu__agx__gpu__G13TileInfo' }
 	if name in ['gpu__agx__gpu__g13_div_round_up', 'gpu__agx__gpu__g13_align_u32'] { return 'u32' }
 	if name in ['cpu__read_ctr_el0', 'bo__Table__mmap_attributes', 'gpu__agx__file__GpuFile__mmap_attributes', 'gpu__agx__file__mmap_attributes_handle'] { return 'u64' }

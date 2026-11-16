@@ -59,6 +59,9 @@ __global queue_attempts = 0
 __global live_queues = 0
 __global reject_queue = false
 __global quarantine_next = false
+__global queue_release_watch fn () = unsafe { nil }
+
+pub fn watch_queue_release(callback fn ()) { queue_release_watch = callback }
 
 pub fn queue_creates() int { return queue_attempts }
 pub fn active_queues() int { return live_queues }
@@ -169,6 +172,7 @@ pub fn fail_before_query_lock() {
 pub fn stop_on_next_lookup(callback fn ()) { stop_callback = callback }
 
 pub fn (mut mgr GpuManager) release_g13_queue_resources(queue &G13QueueResources) bool {
+	if queue_release_watch != unsafe { nil } { queue_release_watch() }
 	mut owned := unsafe { queue }
 	owned.calls++
 	if owned.released { return true }

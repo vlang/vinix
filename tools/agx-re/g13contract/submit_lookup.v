@@ -5,7 +5,7 @@ fn check_submit_lookup_order_contract(local string, reference string) ! {
 	probe := section(local, 'fn (mut f GpuFile) submission_queue_exists(',
 		'pub fn (mut f GpuFile) ioctl_submit(', 'Native queue presence probe')!
 	require_order(probe, ['f.lock.acquire()', 'defer { f.lock.release() }', 'for queue in f.queues',
-		'if queue.id == queue_id { return true }', 'return false'], 'Serialized allocation-free queue probe')!
+		'if queue.id == queue_id && !queue.detached { return true }', 'return false'], 'Serialized allocation-free queue probe')!
 	for token in ['memory.', 'usercopy.', 'return queue', 'f.queues <<', 'f.queues.delete'] {
 		require(!probe.contains(token), 'Queue probe must not stage, mutate or return a borrowed queue pointer')!
 	}

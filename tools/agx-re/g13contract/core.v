@@ -441,6 +441,10 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_queue_detach_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/workqueue/workqueue.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
+	check_queue_detach_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'queue/mod.rs'))!)!
 	_ = tiling_reference_v(read(os.join_path(base, 'queue/render.rs'))!, read(os.join_path(base, 'util.rs'))!)!
 	check_cpu_cache_local(read(os.join_path(repo, 'kernel/drm/gem/gem.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/bo/bo.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
@@ -800,6 +804,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Firmware start/finalize record fields, insertions and reserved defaults follow the selected source-layout model',
 		'Base M1 tiling formulas, bounds, single-cluster specialization and packed parameter words are accepted by the restricted source-expression model',
 		'Native GEM WRITEBACK selects matching CPU aliases; whole-BO VMAs and cache restoration precede backing reuse',
+		'G13 QUEUE_DESTROY hides the namespace immediately while aggregate VM pins and failed invalidations retain physical queue ownership',
 		'Firmware 12.3/13.5 fragment sizes, depth insertion, firmware pointers, scratch/metadata and complete common tail follow the selected source-layout model',
 		'Firmware 13.5 shared per-queue command/start counters']
 }

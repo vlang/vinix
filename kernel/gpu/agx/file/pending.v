@@ -340,5 +340,6 @@ fn process_pending_submissions() {
 
 pub fn service_file_work() {
 	process_pending_submissions()
+	reap_open_detached_g13_queues()
 	reap_closed_files()
 }

@@ -37,6 +37,7 @@ pub mut:
 	vm_id          u32
 	priority       u32
 	caps           u32
+	detached       bool // userspace name removed; accepted jobs may still own backing
 	slots          [max_job_slots]&WorkItem
 	next_slot      u32
 	completed_slot u32
