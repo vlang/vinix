@@ -20,6 +20,7 @@ pub fn malloc_syncobj_fallible(size u64) voidptr {
 }
 
 pub fn outstanding() int { return live_nodes }
+pub fn attempts() int { return allocation_calls }
 
 pub fn fail_next(value bool) { fail_node = value }
 

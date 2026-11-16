@@ -18,7 +18,7 @@ fn check_missing_queue_submission_failures() {
 			assert submit(mut file, queue, false, unsafe { nil }, unsafe { nil }, true) == -2, 'missing queue must return ENOENT'
 		}
 		memory.fail_at(0)
-		assert submit(mut file, 3, false, unsafe { nil }, unsafe { nil }, true) == -12
+		assert submit(mut file, 3, false, unsafe { nil }, unsafe { nil }, true) == -2
 		memory.fail_at(-1)
 		// A present queue with invalid internal VM state remains EINVAL.
 		file.queues[0] = LogicalQueue{ id: 1, vm_id: 0 }
@@ -32,7 +32,7 @@ fn check_missing_queue_submission_failures() {
 		for value in bytes { assert value == 0xa5 }
 	}
 	file.objects = Objects{}
-	println('AGX missing queue: 1400 ioctl checks; ENOENT for absent queues, EINVAL for present invalid VM state, allocation precedence, returned storage, unchanged result bytes and zero published work passed')
+	println('AGX missing queue: 1400 ioctl checks; ENOENT for absent queues before allocation, EINVAL for present invalid VM state, returned storage, unchanged result bytes and zero published work passed')
 }
 
 fn check_missing_syncobj_submission_failures() {

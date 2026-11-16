@@ -1073,7 +1073,19 @@ fn (mut f GpuFile) install_g13_batch_completion(mut pending G13PendingSubmission
 	return 0
 }
 
-// Snapshot all user input before backend locks. Large batches use fallible
+// Match Asahi's queue lookup before fallible command/sync staging. This probe
+// borrows no queue pointer across user copies; the backend rechecks under its
+// mutation lock before using the queue, VM or resource graph.
+fn (mut f GpuFile) submission_queue_exists(queue_id u32) bool {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	for queue in f.queues {
+		if queue.id == queue_id { return true }
+	}
+	return false
+}
+
+// Copy userspace input without holding backend locks. Large batches use fallible
 // owned heap storage rather than putting 64 command payloads on a kernel stack.
 pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	request := unsafe { data }
@@ -1082,6 +1094,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		|| request.in_sync_count > max_submission_syncs || request.out_sync_count > max_submission_syncs
 		|| (request.in_sync_count != 0 && request.in_syncs == 0)
 		|| (request.out_sync_count != 0 && request.out_syncs == 0) { return -22 }
+	if !f.submission_queue_exists(request.queue_id) { return -2 }
 	stage_bytes := u64(request.command_count) * sizeof(agxsubmission.Command)
 	stage_storage := memory.malloc_packed_fallible(stage_bytes) @[freed]
 	if stage_storage == unsafe { nil } { return -12 }

@@ -7,6 +7,14 @@ staging, payload validation, sync objects, completion finish/discard, pending
 poller, manager-locked registration and queue dispatch guard. GPU allocation,
 publication, completion and shutdown are injected services. It executes no GPU.
 
+Queue lookup order checks require an absent queue to return ENOENT before
+command allocation, user copies, payload validation or sync lookup. Header
+validation retains its precedence. An exact copy callback removes a queue
+after the early probe, acquires the file lock to prove copying is unlocked,
+and checks that backend revalidation returns staging storage without touching
+results, output fences or GPU jobs. The probe retains no queue pointer; these
+checks do not qualify Linux's retained-queue behavior during concurrent destroy.
+
 Mapping cleanup is injected in this fixture. A refused retry must return EIO
 before preparing or queuing jobs, preserve input/output fence identities, and
 release staging storage. After the gate clears, the same submission completes.
