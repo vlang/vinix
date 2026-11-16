@@ -41,7 +41,7 @@ fn test_canonicalize_encodings_snapshots_and_states() {
 }
 fn test_canonicalize_names_keys_and_guards() {
 	assert scalar_canonicalize_cache_base == 2024 && scalar_intrinsic_cache_slots == 2179
-	assert vector_canonicalize_cache_base == 34752 && vector_float_intrinsic_slots == 61716
+	assert vector_canonicalize_cache_base == 34752 && vector_float_intrinsic_slots == 61732
 	for bits in [u32(16), 32]! {
 		assert scalar_intrinsic_name('llvm.canonicalize.f${bits}')! == .canonicalize
 		assert scalar_intrinsic_arity(.canonicalize) == 1 && !scalar_integer_intrinsic(.canonicalize)

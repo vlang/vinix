@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_vector_unary_names_and_keys() {
-	assert vector_air_unary_cache_base == 61604 && vector_float_intrinsic_slots == 61716 && scalar_intrinsic_cache_slots == 2179
+	assert vector_air_unary_cache_base == 61604 && vector_float_intrinsic_slots == 61732 && scalar_intrinsic_cache_slots == 2179
 	mut seen := [112]bool{}
 	for operation, id in [ScalarIntrinsic.fabs, .floor, .ceil, .trunc, .sqrt, .round, .rint]! { for count in 1 .. 17 {
 		name := 'air.${id}.v${count}f32'
@@ -20,7 +20,7 @@ fn test_air_vector_unary_names_and_keys() {
 		}
 		if _, _, _ := vector_float_intrinsic_name('air.fast_${operation}.v2f32') { assert false }
 	}
-	for name in ['air.roundeven.v2f32','air.nearbyint.v2f32','air.fma.v2f32','air.clamp.v2f32','air.copysign.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false } }
+	for name in ['air.roundeven.v2f32','air.nearbyint.v2f32','air.fma.v2f16','air.clamp.v2f32','air.copysign.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false } }
 	for id in [ScalarIntrinsic.copysign, .fma, .air_fmin, .air_clamp]! { if _ := air_vector_unary_key(id, 2, 32) { assert false } }
 	for bits in [u32(16),64]! { if _ := air_vector_unary_key(.sqrt, 2, bits) { assert false } }
 	for count in [0,17]! { if _ := air_vector_unary_key(.sqrt, count, 32) { assert false } }

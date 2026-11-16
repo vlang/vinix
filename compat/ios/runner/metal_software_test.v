@@ -5192,6 +5192,7 @@ declare <2 x float> @air.trunc.v2f32(<2 x float>) #0
 declare <2 x float> @air.sqrt.v2f32(<2 x float>) #0
 declare <2 x float> @air.round.v2f32(<2 x float>) #0
 declare <2 x float> @air.rint.v2f32(<2 x float>) #0
+declare <2 x float> @air.fma.v2f32(<2 x float>, <2 x float>, <2 x float>) #0
 declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
@@ -5397,7 +5398,20 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  %air_rint_ok1 = fcmp oeq float %air_rint1, %ties
  %air_rint_ok = and i1 %air_rint_ok0, %air_rint_ok1
  %air_unary_ok6 = and i1 %air_unary_ok5, %air_rint_ok
- %float_ok = and i1 %air_unary_ok6, true
+ %air_fma_x0 = insertelement <2 x float> zeroinitializer, float %xf, i32 0
+ %air_fma_x = insertelement <2 x float> %air_fma_x0, float %fa, i32 1
+ %air_fma_y0 = insertelement <2 x float> zeroinitializer, float 1.5, i32 0
+ %air_fma_y = insertelement <2 x float> %air_fma_y0, float bitcast (i32 1065353214 to float), i32 1
+ %air_fma_z0 = insertelement <2 x float> zeroinitializer, float %yf, i32 0
+ %air_fma_z = insertelement <2 x float> %air_fma_z0, float %fc, i32 1
+ %air_fma = call <2 x float> @air.fma.v2f32(<2 x float> %air_fma_x, <2 x float> %air_fma_y, <2 x float> %air_fma_z)
+ %air_fma0 = extractelement <2 x float> %air_fma, i32 0
+ %air_fma1 = extractelement <2 x float> %air_fma, i32 1
+ %air_fma_word = bitcast float %air_fma1 to i32
+ %air_fma_ok0 = fcmp oeq float %air_fma0, %affine_expected
+ %air_fma_ok1 = icmp eq i32 %air_fma_word, %fused_expected
+ %air_fma_ok = and i1 %air_fma_ok0, %air_fma_ok1
+ %float_ok = and i1 %air_unary_ok6, %air_fma_ok
  %coordinate = or i32 %x, 0
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate

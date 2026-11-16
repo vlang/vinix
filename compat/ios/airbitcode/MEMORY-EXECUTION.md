@@ -1,5 +1,19 @@
 # Bounded memory execution
 
+Ternary `air.fma.vNf32` accepts three matching fixed 1..16-lane float32
+vectors. It reuses the existing fused evaluator: the exact product and addend
+are combined before one nearest rounding with ties to even. All three sources
+are observed. Lane poison propagates; any unfrozen undef source lane refuses,
+including when another source is poison. Existing source/result freezes,
+discarded poison, scalar extraction, vector-PHI slots and cleanup are reused.
+Keys 61716..61731 append sixteen AIR identities, separate from LLVM, for
+61,732 vector entries. Scalar entries remain 2,179. Exact signatures, all
+three argument types and ordinary pure call metadata remain checked even
+after cache hits. Work uses the established source/result charges, one result
+slot and one executed step per call. Invalid profiles reject before writes;
+runtime state failures preserve earlier stores. Half, fast spellings and
+floating address projections remain excluded.
+
 Fixed 1..16-lane float32 vectors accept unary `air.fabs.vNf32`,
 `air.floor.vNf32`, `air.ceil.vNf32`, `air.trunc.vNf32`, `air.sqrt.vNf32`,
 `air.round.vNf32` and `air.rint.vNf32`. These reuse the LLVM lane evaluators:
@@ -9,10 +23,11 @@ Poison stays local to its lane; any unfrozen undef source lane refuses. Freezes,
 discarded poison and scalar extraction retain existing rules. Exact vector
 argument/result types, ordinary calls, pure attributes and duplicate checks
 remain required, including after cache hits. Keys 61604..61715 append 112 AIR
-identities, separate from LLVM, for 61,716 vector entries. Scalar entries stay
+identities, separate from LLVM, for 61,732 vector entries. Scalar entries stay
 2,179. One call uses one existing result slot/step and the established vector
-source/result work charges. Half, scalable, fast and other AIR vector families
-remain excluded; floating address projections reject. Existing owners and
+source/result work charges. The admitted AIR vector families are these unary
+operations and FMA. Half, scalable and fast overloads remain excluded; floating
+address projections reject. Existing owners and
 cleanup paths are reused. Invalid profiles reject before writes; runtime state
 failures retain earlier stores.
 
