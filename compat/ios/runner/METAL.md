@@ -1,5 +1,13 @@
 # Software Metal backend
 
+Prepared pipelines execute ternary `air.fma.f32` through the existing exact
+float32 fused multiply-add evaluator. The canonicalization image checks a
+coordinate-dependent affine value and alternating cancellation signs whose
+nonzero result distinguishes fused execution from a separately rounded product.
+The independent RGBA8 pixel/padding oracle remains. Exact float32 signatures,
+ordinary calls and pure declaration attributes are required; half/vector and
+unknown AIR spellings remain excluded.
+
 Prepared pipelines also execute unary `air.sqrt.f32`, `air.round.f32` and
 `air.rint.f32`. The existing square-root and rounding evaluators give nearest
 square roots, half ties away from zero for round, and half ties to even for rint,

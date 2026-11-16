@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_float_names_slots_and_existing_evaluators() {
-	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2175
+	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2176
 	ids := [ScalarIntrinsic.fabs, .floor, .ceil, .trunc, .sqrt, .round, .rint]!
 	for i, name in ['air.fabs.f32', 'air.floor.f32', 'air.ceil.f32', 'air.trunc.f32', 'air.sqrt.f32', 'air.round.f32', 'air.rint.f32'] {
 		id, slot := air_float_intrinsic(name)!
@@ -27,4 +27,19 @@ fn test_air_float_names_slots_and_existing_evaluators() {
 		assert scalar_intrinsic_value(.rint, 32, sign|0x40200000, 0)! == sign|0x40000000
 	}
 	println('AIR-FLOAT-NAMES: seven exact f32 names, appended slots, unary identities, bit/rounding/root boundaries and width/vector/family/spelling guards PASS')
+}
+
+fn test_air_float_fma_name_slot_and_ternary_identity() {
+	id, slot := air_float_intrinsic('air.fma.f32')!
+	assert id == .fma && slot == 7 && scalar_air_float_cache_base + slot == 2175
+	assert scalar_intrinsic_name('air.fma.f32')! == id && scalar_intrinsic_arity(id) == 3
+	assert !scalar_integer_intrinsic(id)
+	if _, _ := air_integer_intrinsic('air.fma.f32') { assert false }
+	for name in ['air.fma.f16','air.fma.f64','air.fma.v2f32','air.fma.i32','air.fma.f032','air.fma.f+32','air.fma.f32.spoof','air.fast_fma.f32','air.fmuladd.f32'] {
+		if _ := scalar_intrinsic_name(name) { assert false, name }
+	}
+	assert scalar_fma(32, 0x3f800001, 0x3f7ffffe, 0xbf800000)! == 0xa8800000
+	assert scalar_fma(32, 0x7f7fffff, 0x40000000, 0xff7fffff)! == 0x7f7fffff
+	assert scalar_fma(32, 1, 0x3f000000, 1)! == 2
+	println('AIR-FMA-NAME: exact f32 ternary identity, appended slot, fused cancellation/overflow/underflow and unsupported overload/name guards PASS')
 }

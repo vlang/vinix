@@ -5181,6 +5181,7 @@ declare float @air.trunc.f32(float) #0
 declare float @air.sqrt.f32(float) #0
 declare float @air.round.f32(float) #0
 declare float @air.rint.f32(float) #0
+declare float @air.fma.f32(float, float, float) #0
 declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
@@ -5271,7 +5272,20 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  %math_pair1 = and i1 %negative_round_ok, %rint_ok
  %math_pair2 = and i1 %math_pair0, %math_pair1
  %math_ok = and i1 %math_pair2, %negative_rint_ok
- %float_ok = and i1 %float_old_ok, %math_ok
+ %float_unary_ok = and i1 %float_old_ok, %math_ok
+ %yf = uitofp i32 %y to float
+ %affine = call float @air.fma.f32(float %xf, float 1.5, float %yf)
+ %affine_product = fmul float %xf, 1.5
+ %affine_expected = fadd float %affine_product, %yf
+ %affine_ok = fcmp oeq float %affine, %affine_expected
+ %fa = select i1 %odd, float bitcast (i32 3212836865 to float), float bitcast (i32 1065353217 to float)
+ %fc = select i1 %odd, float 1.0, float -1.0
+ %fused = call float @air.fma.f32(float %fa, float bitcast (i32 1065353214 to float), float %fc)
+ %fused_word = bitcast float %fused to i32
+ %fused_expected = select i1 %odd, i32 679477248, i32 2826960896
+ %fused_ok = icmp eq i32 %fused_word, %fused_expected
+ %fma_ok = and i1 %affine_ok, %fused_ok
+ %float_ok = and i1 %float_unary_ok, %fma_ok
  %coordinate = or i32 %x, 0
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate

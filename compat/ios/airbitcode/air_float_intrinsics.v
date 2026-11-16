@@ -13,6 +13,7 @@ fn air_float_intrinsic(name string) !(ScalarIntrinsic, int) {
 		'air.sqrt.f32' { ScalarIntrinsic.sqrt, 4 }
 		'air.round.f32' { ScalarIntrinsic.round, 5 }
 		'air.rint.f32' { ScalarIntrinsic.rint, 6 }
+		'air.fma.f32' { ScalarIntrinsic.fma, 7 }
 		else { return error('AIR intrinsic: unsupported AIR float overload') }
 	}
 }

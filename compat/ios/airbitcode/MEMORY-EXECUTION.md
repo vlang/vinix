@@ -1,11 +1,23 @@
 # Bounded memory execution
 
+Ternary `air.fma.f32` accepts three float32 arguments and returns float32
+through the existing exact fused multiply-add evaluator. It adds the exact
+product to the addend before one nearest rounding with ties to even, independent
+of the host rounding mode. Signed zeros, subnormals, infinities, canonical NaNs
+and poison/undef/freezes retain the existing FMA rules. Slot 2175 appends one AIR
+identity, for 2,176 scalar declaration-cache entries without moving earlier keys;
+LLVM/AIR calls may coexist. Exact signatures, each call and all three operand
+types are checked even after a cache hit. Unsupported declaration/call metadata
+and bounds reject before writes. Runtime poison/undef value failures retain
+earlier completed stores; result freeze and lazy selection keep existing rules.
+Half/vector overloads, unknown AIR spellings and floating addresses remain excluded.
+
 Unary `air.sqrt.f32`, `air.round.f32` and `air.rint.f32` reuse the existing
 float32 root and rounding evaluators. Square root rounds once to nearest with
 ties to even and preserves negative zero; negative nonzero inputs and NaNs
 produce the established positive canonical NaN. Round takes half ties away
 from zero; rint takes half ties to even. Results are independent of the host
-rounding mode. Keys 2172..2174 append three identities, for 2,175 scalar cache
+rounding mode. Keys 2172..2174 append three identities, for 2,176 scalar cache
 entries, preserving previous LLVM/AIR keys. Exact signatures, ordinary direct
 calls, pure attributes, duplicate checks, state/freeze rules, prewrite validation
 and existing work/step/ownership limits remain. Fast forms, other AIR widths,
@@ -15,7 +27,7 @@ Scalar `air.fabs.f32`, `air.floor.f32`, `air.ceil.f32` and `air.trunc.f32`
 accept one float32 argument and return float32 through the existing evaluators.
 `fabs` clears only the sign bit, including NaN payloads; the rounding operations
 use the existing positive canonical NaN policy and preserve infinities and signed
-zeros. Keys 2168..2171 append four AIR identities, for 2,175 scalar cache entries;
+zeros. Keys 2168..2171 append four AIR identities, for 2,176 scalar cache entries;
 earlier LLVM and AIR identities remain stable and may coexist. Exact names,
 signatures, pure declaration attributes and ordinary direct calls are required.
 Poison, undef, freezes, executed-step budgets and result-slot ownership retain
@@ -41,7 +53,7 @@ Scalar `air.clz.i32` and `air.ctz.i32` accept an i32 value and a defined
 constant-false i1 flag. They reuse the leading/trailing-zero evaluators and
 return 32 for zero. True, runtime, undef and poison flags reject, including
 after a declaration cache hit. Keys 2160..2161 append two AIR identities;
-the scalar cache has 2,175 entries. LLVM/AIR declarations may coexist.
+the scalar cache has 2,176 entries. LLVM/AIR declarations may coexist.
 Pure count results may feed bounded addresses. Existing immarg placement,
 call metadata, state, preflight, depth/work and ownership checks remain.
 
@@ -57,7 +69,7 @@ Scalar `air.popcount.i32` and `air.reverse_bits.i32` use the existing population
 count and bit-reversal evaluators, including bounded address projections. AIR
 and LLVM spellings have separate declaration identities and may coexist in one
 function. Keys 2154..2155 append without moving earlier entries; the scalar cache
-now has 2,175 slots. Exact signatures, direct-call metadata, pure declaration
+now has 2,176 slots. Exact signatures, direct-call metadata, pure declaration
 attributes (including function-level `mustprogress`) and duplicate checks remain
 required. Other AIR widths/vectors and
 general external calls remain excluded. Both memory paths share existing
@@ -142,7 +154,7 @@ the input factor. Every input has the same element type and result_count/factor
 lanes. Raw bits and selected poison/undef tags are preserved without observing
 unchosen lanes. Exact ordinary direct calls use one existing result slot, one
 executed step and 2*result_count lane-work units. Keys 40000..41715 append
-1,716 identities without moving earlier families; scalar entries stay 2,175.
+1,716 identities without moving earlier families; scalar entries stay 2,176.
 
 Pure integer addresses use packed shuffle selectors, lane rebasing and bounded
 projected-shuffle choices among all inputs. Invalid selectors poison the final

@@ -42,6 +42,6 @@ fn test_scalar_fma_exact_values_and_single_rounding() {
 	if _ := scalar_fma(64, 0, 0, 0) { assert false, 'unsupported FMA precision' }
 	if _ := scalar_intrinsic_value(.fma, 32, 0, 0) { assert false, 'binary evaluator accepted ternary operation' }
 	if _ := scalar_intrinsic_value(.fmuladd, 32, 0, 0) { assert false, 'binary evaluator accepted optional ternary operation' }
-	for name in ['llvm.fma.f64', 'llvm.fma.v2f32', 'llvm.fmuladd.f64', 'llvm.fmuladd.v2f32', 'air.fma.f32'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported FMA name' } }
+	for name in ['llvm.fma.f64', 'llvm.fma.v2f32', 'llvm.fmuladd.f64', 'llvm.fmuladd.v2f32', 'air.fast_fma.f32'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported FMA name' } }
 	println('AIR-SCALAR-FMA: ${count} exact cancellation/overflow/underflow/zero/infinity/NaN results, six distinguishing unfused controls and arity/name/precision guards PASS')
 }
