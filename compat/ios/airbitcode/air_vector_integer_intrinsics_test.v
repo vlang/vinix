@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_vector_integer_names_and_cache() {
-	assert vector_air_integer_cache_base == 61780 && vector_float_intrinsic_slots == 61972 && scalar_intrinsic_cache_slots == 2179
+	assert vector_air_integer_cache_base == 61780 && vector_float_intrinsic_slots == 62004 && scalar_intrinsic_cache_slots == 2179
 	mut seen := [32]bool{}
 	for operation, id in [ScalarIntrinsic.smulh, .umulh]! { for count in 1 .. 17 {
 		name := 'air.mul_hi.${if operation == 0 { 's' } else { 'u' }}.v${count}i32'
@@ -109,4 +109,30 @@ fn test_air_vector_bit_names_and_cache() {
 	for value in seen { assert value }
 	if _ := air_vector_integer_key(.bswap, 2, 32) { assert false }
 	println('AIR-VECTOR-BIT-NAMES: 32 appended i32 popcount/reverse_bits identities, stable previous keys, unary signatures, exact names/widths/counts and namespace guards PASS')
+}
+
+fn test_air_vector_zero_count_names_and_cache() {
+	mut seen := [32]bool{}
+	for operation, id in [ScalarIntrinsic.ctlz, .cttz]! {
+		family := if id == .ctlz { 'clz' } else { 'ctz' }
+		for count in 1 .. 17 {
+			name := 'air.${family}.v${count}i32'
+			parsed, n, bits := vector_float_intrinsic_name(name)!
+			assert parsed == id && n == count && bits == 32 && scalar_intrinsic_arity(id) == 2
+			key := air_vector_intrinsic_key(id, count, bits)!
+			assert key == 61972 + operation * 16 + count - 1 && !seen[key - 61972]
+			seen[key - 61972] = true
+			assert vector_float_intrinsic_key(id, count, bits)! < 61604
+			if _ := scalar_intrinsic_name(name) { assert false }
+			if _, _, _ := air_vector_float_name(name) { assert false }
+			if _ := air_vector_float_key(id, count, bits) { assert false }
+		}
+		for suffix in ['i32','v0i32','v01i32','v17i32','v999999999999999999i32','v2i1','v2i16','v2i31','v2i33','v2i64','v2i032','v2i+32','v2f32','v2i32.spoof','nxv2i32','s.v2i32','u.v2i32'] {
+			if _, _, _ := vector_float_intrinsic_name('air.${family}.${suffix}') { assert false }
+		}
+		for bits in [u32(0),1,16,31,33,64,65]! { if _ := air_vector_intrinsic_key(id, 2, bits) { assert false } }
+		for count in [0,17]! { if _ := air_vector_intrinsic_key(id, count, 32) { assert false } }
+	}
+	for value in seen { assert value }
+	println('AIR-VECTOR-ZERO-COUNT-NAMES: 32 appended i32 clz/ctz identities, stable previous keys, binary flag signatures and exact names/widths/counts/namespaces PASS')
 }

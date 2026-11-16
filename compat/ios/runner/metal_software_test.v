@@ -4399,6 +4399,12 @@ fn sm_test_geometry_sizes_focus() ! {
  declare <2 x i32> @air.reverse_bits.v2i32(<2 x i32>)
  declare <2 x i32> @llvm.ctpop.v2i32(<2 x i32>)
  declare <2 x i32> @llvm.bitreverse.v2i32(<2 x i32>)
+ declare <1 x i32> @air.clz.v1i32(<1 x i32>,i1)
+ declare <1 x i32> @air.ctz.v1i32(<1 x i32>,i1)
+ declare <2 x i32> @air.clz.v2i32(<2 x i32>,i1)
+ declare <2 x i32> @air.ctz.v2i32(<2 x i32>,i1)
+ declare <2 x i32> @llvm.ctlz.v2i32(<2 x i32>,i1 immarg)
+ declare <2 x i32> @llvm.cttz.v2i32(<2 x i32>,i1 immarg)
  declare <1 x i32> @llvm.ctlz.v1i32(<1 x i32>, i1 immarg)\n declare <1 x i32> @llvm.cttz.v1i32(<1 x i32>, i1 immarg)
  declare <1 x i32> @llvm.abs.v1i32(<1 x i32>, i1 immarg)
  declare <2 x i32> @llvm.abs.v2i32(<2 x i32>, i1 immarg)
@@ -4443,15 +4449,38 @@ fn sm_test_geometry_sizes_focus() ! {
  %bits_same = and <2 x i1> %bits_same0, %bits_roundtrip_same
  %bits_ok0 = extractelement <2 x i1> %bits_same, i32 0
  %bits_ok1 = extractelement <2 x i1> %bits_same, i32 1
- %bits_ok = and i1 %bits_ok0, %bits_ok1
+ %bits_original_ok = and i1 %bits_ok0, %bits_ok1
+ %count_clz = call <2 x i32> @air.clz.v2i32(<2 x i32> %bits_input,i1 false)
+ %count_ctz = call <2 x i32> @air.ctz.v2i32(<2 x i32> %bits_input,i1 false)
+ %count_clz_ref = call <2 x i32> @llvm.ctlz.v2i32(<2 x i32> %bits_input,i1 false)
+ %count_ctz_ref = call <2 x i32> @llvm.cttz.v2i32(<2 x i32> %bits_input,i1 false)
+ %count_clz_raw = call <2 x i32> @air.clz.v2i32(<2 x i32> %bits_input,i1 true)
+ %count_ctz_raw = call <2 x i32> @air.ctz.v2i32(<2 x i32> %bits_input,i1 true)
+ %count_clz_frozen = freeze <2 x i32> %count_clz_raw
+ %count_ctz_frozen = freeze <2 x i32> %count_ctz_raw
+ %count_zero = icmp eq <2 x i32> %bits_input,zeroinitializer
+ %count_clz_expected = select <2 x i1> %count_zero,<2 x i32> zeroinitializer,<2 x i32> %count_clz_ref
+ %count_ctz_expected = select <2 x i1> %count_zero,<2 x i32> zeroinitializer,<2 x i32> %count_ctz_ref
+ %count_same0 = icmp eq <2 x i32> %count_clz,%count_clz_ref
+ %count_same1 = icmp eq <2 x i32> %count_ctz,%count_ctz_ref
+ %count_same2 = icmp eq <2 x i32> %count_clz_frozen,%count_clz_expected
+ %count_same3 = icmp eq <2 x i32> %count_ctz_frozen,%count_ctz_expected
+ %count_same4 = and <2 x i1> %count_same0,%count_same1
+ %count_same5 = and <2 x i1> %count_same2,%count_same3
+ %count_same = and <2 x i1> %count_same4,%count_same5
+ %count_ok0 = extractelement <2 x i1> %count_same,i32 0
+ %count_ok1 = extractelement <2 x i1> %count_same,i32 1
+ %count_ok = and i1 %count_ok0,%count_ok1
+ %bits_ok = and i1 %bits_original_ok,%count_ok
+
  %bit_source = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
  %pop_lanes = call <1 x i32> @air.popcount.v1i32(<1 x i32> %bit_source)
  %reverse_lanes = call <1 x i32> @air.reverse_bits.v1i32(<1 x i32> %pop_lanes)
  %swapped_lanes = call <1 x i32> @llvm.bswap.v1i32(<1 x i32> %reverse_lanes)
  %bit_value = extractelement <1 x i32> %swapped_lanes, i32 0
  %bit_root = getelementptr i8, ptr addrspace(1) %out, i32 %bit_value
- %leading_lanes = call <1 x i32> @llvm.ctlz.v1i32(<1 x i32> %bit_source, i1 false)
- %trailing_lanes = call <1 x i32> @llvm.cttz.v1i32(<1 x i32> %bit_source, i1 true)
+ %leading_lanes = call <1 x i32> @air.clz.v1i32(<1 x i32> %bit_source, i1 false)
+ %trailing_lanes = call <1 x i32> @air.ctz.v1i32(<1 x i32> %bit_source, i1 true)
  %fixed_trailing = freeze <1 x i32> %trailing_lanes
  %leading_value = extractelement <1 x i32> %leading_lanes, i32 0
  %trailing_value = extractelement <1 x i32> %fixed_trailing, i32 0

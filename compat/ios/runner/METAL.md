@@ -1,10 +1,18 @@
 # Software Metal backend
 
+Prepared pipelines execute `air.clz.vNi32` and `air.ctz.vNi32` for fixed
+1..16-lane i32 vectors plus a call-local literal i1 flag. With a false flag,
+zero produces 32; with a true flag, zero produces poison in that lane. The
+existing count, freeze, strict undef and checked address rules apply. Keys
+61972..62003 append 32 separate AIR identities; the vector cache has 62,004
+entries and scalar entries remain 2,179. Flag type and literal value are
+validated on every call, including declaration cache hits.
+
 Prepared pipelines execute unary `air.popcount.vNi32` and
 `air.reverse_bits.vNi32` for matching fixed 1..16-lane i32 vectors, using
 the existing population count and bit reversal evaluators. Keys 61940..61971
 append 32 identities without moving earlier AIR or LLVM keys. The vector
-cache has 61,972 entries; scalar entries remain 2,179. Exact declarations,
+cache has 62,004 entries; scalar entries remain 2,179. Exact declarations,
 source types, pure calls, poison/undef/freeze, checked address projections
 and shared resource limits retain their existing rules.
 
@@ -12,7 +20,7 @@ Prepared pipelines execute `air.min.s.vNi32`, `air.max.s.vNi32`,
 `air.min.u.vNi32` and `air.max.u.vNi32` for matching fixed 1..16-lane i32
 vectors. The existing evaluator compares lanes with signed or unsigned
 interpretation. Keys 61876..61939 append 64 identities; the vector cache has
-61,972 entries and the scalar cache remains 2,179. Exact declarations, both
+62,004 entries and the scalar cache remains 2,179. Exact declarations, both
 source types, pure calls, lane state, checked integer projections and shared
 resource limits retain their existing rules. The min/max image checks all
 four AIR vectors against LLVM and comparison/select expectations, including
@@ -23,7 +31,7 @@ Prepared pipelines execute signed and unsigned `air.add_sat.s.vNi32`,
 for matching fixed 1..16-lane i32 vectors. Existing arithmetic clamps signed
 overflow to the signed endpoint, unsigned overflow to the maximum, and unsigned
 underflow to zero. Keys 61812..61875 append 64 identities; the vector cache
-has 61,972 entries and the scalar cache remains 2,179. Exact signatures, both
+has 62,004 entries and the scalar cache remains 2,179. Exact signatures, both
 source types, pure calls, poison/undef/freeze, address projection and resource
 limits retain their existing rules. The saturating image compares all four
 AIR vectors with LLVM results, checks both signed clamp directions and uses
@@ -33,7 +41,7 @@ Prepared pipelines execute binary `air.mul_hi.s.vNi32` and
 `air.mul_hi.u.vNi32` for matching fixed 1..16-lane i32 vectors. The existing
 integer evaluator returns the upper 32 product bits with signed or unsigned
 interpretation. Separate keys 61780..61811 preserve AIR/LLVM coexistence; the
-vector cache has 61,972 entries and the scalar cache remains 2,179. Exact
+vector cache has 62,004 entries and the scalar cache remains 2,179. Exact
 signatures, both source types, pure calls, lane state and existing bounds
 remain required. Prepared integer address projections use the same checked
 results. Other AIR integer vector widths remain excluded.
@@ -46,7 +54,7 @@ preference and first-argument signed-zero ties. Reversed ordered bounds
 produce poison in that lane; freeze and lazy selection retain the existing
 state rules. All three vectors require the exact result type and ordinary
 pure calls. Keys 61764..61779 append sixteen identities; the vector cache
-has 61,972 entries and the scalar cache remains 2,179. The dedicated clamp
+has 62,004 entries and the scalar cache remains 2,179. The dedicated clamp
 image checks numeric bounds, NaNs, signed zeros and repaired domain poison
 before its independent RGBA8 readback oracle.
 
@@ -55,7 +63,7 @@ for fixed 1..16-lane float32 vectors. Numeric lanes take precedence over a
 NaN; numeric ties retain the first argument, including opposite signed zeros.
 A dedicated image checks coordinate extrema, both first-zero signs
 and NaN preference in both lanes before its independent RGBA8 oracle. Keys
-61732..61763 append 32 AIR identities, for 61,972 vector entries; scalar
+61732..61763 append 32 AIR identities, for 62,004 vector entries; scalar
 entries remain 2,179. Exact binary signatures, all operand types, pure calls,
 state/freeze rules and existing resource bounds remain required. Half, scalable,
 fast spellings and floating address projections remain excluded.
@@ -65,7 +73,7 @@ float32 vectors. The existing fused evaluator adds the exact product and
 addend before one nearest rounding with ties to even. A two-lane image check
 combines an independent coordinate affine result with alternating-sign fused
 cancellation bits before its RGBA8 oracle. Keys 61716..61731 append sixteen
-AIR identities, for 61,972 vector entries; scalar entries remain 2,179. Exact
+AIR identities, for 62,004 vector entries; scalar entries remain 2,179. Exact
 matching types for all three vector arguments are checked, including cached
 calls. Existing poison/undef, freezes, budgets and ownership rules apply. Half,
 fast spellings and floating address projections remain excluded.
@@ -78,7 +86,7 @@ subnormals. Round uses half ties away from zero; rint and sqrt use nearest
 rounding with ties to even. A two-lane coordinate fixture checks every family
 and both signs against independent scalar expressions before its RGBA8 oracle.
 AIR keys 61604..61715 append without moving LLVM keys; the vector cache has
-61,972 entries and the scalar cache remains 2,179. Exact vector signatures,
+62,004 entries and the scalar cache remains 2,179. Exact vector signatures,
 ordinary pure calls and existing state/work/slot rules apply. The admitted AIR
 floating vector families are these unary operations, FMA, float min/max and clamp. Half and
 fast overloads remain excluded; floating address projections reject.
