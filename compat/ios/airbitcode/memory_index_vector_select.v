@@ -18,19 +18,19 @@ fn (b MemoryIndexBuilder) vector_index_producer(source IRTypedOperand, before in
 }
 
 // Keep the established freeze-only representation and costs when no select
-// occurs in the source chain. Only freezes may lead to a nested vector select.
-fn (b MemoryIndexBuilder) vector_select_source(source IRTypedOperand, before int, depth int) !bool {
+// or insertion occurs in the source chain. Only freezes may lead to either.
+fn (b MemoryIndexBuilder) vector_projection_source(source IRTypedOperand, before int, depth int) !bool {
 	if depth >= max_memory_index_depth { return error('AIR memory index: vector source depth limit') }
 	producer := b.vector_index_producer(source, before)!
 	if producer < 0 { return false }
 	inst := b.bodies.instructions[producer]
 	if inst.record < 0 || inst.record >= b.stream.records.len { return error('AIR memory index: vector source record') }
 	code := b.stream.records[inst.record].code
-	if code in [u64(5), 29] { return true }
+	if code in [u64(5), 7, 29] { return true }
 	if code != 58 { return false }
 	op := b.p.instructions[producer]
 	b.p.vector_freeze_profile(b.stream, b.pools, b.bodies, b.scope, producer, op, true, 16)!
-	return b.vector_select_source(b.p.operands[op.operands_start], producer, depth + 1)!
+	return b.vector_projection_source(b.p.operands[op.operands_start], producer, depth + 1)!
 }
 
 // Scalar lane projections keep undef deferred until the final extraction.
@@ -61,7 +61,7 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 		inst := b.bodies.instructions[producer]
 		if op.status != .decoded || inst.scope != b.scope || !inst.has_result || inst.next_value != source.number || inst.record < 0 || inst.record >= b.stream.records.len || op.is_volatile { return error('AIR memory index: decoded vector projection required') }
 		code := b.stream.records[inst.record].code
-		if code == 58 && !b.vector_select_source(source, before, depth)! {
+		if code == 58 && !b.vector_projection_source(source, before, depth)! {
 			vector := b.frozen_vector_source(source, before, depth)!
 			node = MemoryIndexNode{kind: if vector.base >= 0 { MemoryIndexKind.constant_lane } else { MemoryIndexKind.dynamic_lane }, bits: bits, opcode: 2 | u32(vector.frozen), argument: vector.argument, left: selector, right: vector.base, condition: vector.node, value: u64(count), flags: vector.undef, height: 1 + if vector.height > b.nodes[selector].height { vector.height } else { b.nodes[selector].height }}
 		} else if code == 58 {
@@ -80,6 +80,8 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 			if b.nodes[right].height > height { height = b.nodes[right].height }
 			if b.nodes[cond].height > height { height = b.nodes[cond].height }
 			node = MemoryIndexNode{kind: .projected_select, bits: bits, left: left, right: right, condition: cond, height: height + 1}
+		} else if code == 7 {
+			node = b.project_vector_insert(source, selector, producer, depth)!
 		} else { return error('AIR memory index: unsupported vector projection dependency') }
 	}
 	if b.nodes.len >= max_memory_index_nodes || node.height > max_memory_index_depth - depth { return error('AIR memory index: projection graph limit') }

@@ -12,6 +12,7 @@ enum MemoryIndexKind {
 	constant_lane
 	vector_source
 	projected_select
+	projected_insert
 	projected_freeze
 	projected_extract
 	binary
@@ -344,7 +345,7 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 				lhs := b.expression(lane_operand, producer, depth + 1)!
 				node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: lhs, right: base, value: u64(count), flags: b.nodes[base].flags, height: 1 + b.nodes[lhs].height}
 			} else if source.number >= scope.base_id {
-				if b.vector_select_source(source, producer, depth + 1)! {
+				if b.vector_projection_source(source, producer, depth + 1)! {
 					selector := b.expression(lane_operand, producer, depth + 1)!
 					lane := b.project_vector_lane(source, selector, producer, depth + 1)!
 					node = MemoryIndexNode{kind: .projected_extract, bits: bits, left: lane, height: 1 + b.nodes[lane].height}
@@ -437,6 +438,19 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 					chosen := if values[node.condition] & 1 != 0 { node.left } else { node.right }
 					value = IntegerValue{value: values[chosen], poison: poisons[chosen]}
 					undef_lane = undefs[chosen]
+				}
+			}
+			.projected_insert {
+				// Invalid insertion poisons the entire vector, including lanes
+				// other than the replacement. Extraction bounds take precedence.
+				if poisons[node.lane] || values[node.lane] >= node.value || poisons[node.condition] || values[node.condition] >= node.value {
+					value = IntegerValue{poison: true}
+				} else if values[node.lane] == values[node.condition] {
+					undef_lane = node.flags == 1
+					value = if undef_lane { IntegerValue{} } else { IntegerValue{value: values[node.right], poison: poisons[node.right]} }
+				} else {
+					value = IntegerValue{value: values[node.left], poison: poisons[node.left]}
+					undef_lane = undefs[node.left]
 				}
 			}
 			.projected_freeze {

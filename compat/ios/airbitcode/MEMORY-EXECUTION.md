@@ -239,14 +239,15 @@ are validated before execution; scalar select cannot conceal unsupported sources
 or an independently poisoned GEP root. No owned field or runtime heap array is added.
 
 Vector sources also accept nested vector selects with a scalar i1 condition.
-Arms may be direct integer vector arguments, supported constants, freezes or
-further scalar-condition selects. Both arms and the condition are validated,
-even for literal conditions. Undef in an unchosen vector arm remains unobserved;
+Arms may be direct integer vector arguments, supported constants, freezes,
+insertions or further scalar-condition selects. Both arms and the condition
+are validated even for literal conditions. Undef in an unchosen vector arm remains unobserved;
 a chosen undef lane errors at the final extraction, even under a later scalar
 select/freeze. A source vector freeze may repair it first. Poison conditions
 produce poison lanes and may be repaired by a source vector freeze. Invalid
 extraction selectors still produce poison before lane access. Vector conditions,
-loads, PHIs and other constructions remain excluded from these address graphs.
+loads, PHIs and other unsupported constructions remain excluded from these
+address graphs.
 
 Private scalar projections defer lane undef until the final extraction. Select
 propagates only the chosen tag; source freeze repairs tags after selector checks.
@@ -255,6 +256,27 @@ array is added. Cache keys reserve nine low bits for scalar/pair/source tags
 0..3 and per-selector projection tags 4..259. Existing ownership/free paths and
 256-node/32-level limits remain. All projected source/selector/condition heights
 count, including cache hits; freeze-only paths retain their previous costs.
+
+`insertelement` also supplies projected address lanes. It accepts the same pure
+vector sources and i1..i64 replacement values and insertion indices. A valid
+insertion overwrites one lane and preserves all other lane states. Literal undef
+replacements stay deferred until a final extraction; overwriting an undef lane
+repairs it, and unobserved undef replacements do not error. A poison or unsigned
+out-of-range insertion index poisons the entire vector. A later valid insertion
+can repair one lane, and a vector freeze can repair all lanes before extraction.
+Invalid extraction indices remain poison through a source freeze. An undef
+insertion index rejects, as do immediate errors in any source, replacement or
+index dependency, including ignored lanes and inactive blocks.
+
+Insertion projections use the existing POD nodes, selector-keyed cache and
+fixed stack arrays, adding no owned field or successful-path allocation. Source,
+replacement, insertion-index and extraction-selector heights all count toward
+the existing limits, including cached subtrees.
+`tests/ios/air-memory-vector-insert-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
+all 64 lane/insertion widths, lane repair, poison/undef, nested insertion/select/
+freeze composition, exact graph limits,
+cache isolation and all three memory APIs. Older constructed-source rejection
+fixtures use unsupported shuffles; retained historical evidence is unchanged.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result
