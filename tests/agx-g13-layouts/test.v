@@ -155,8 +155,8 @@ fn check_channel_offsets() {
 }
 
 fn check_v13_5_command_repacking() {
-	assert (fw.g13_compute_active_size(.v13_5_partial) or { 0 }) == 0x320
-	assert (fw.g13_vertex_active_size(.v13_5_partial) or { 0 }) == 0x61c
+	assert (fw.g13_compute_active_size(.v13_5_partial) or { 0 }) == 0x31c
+	assert (fw.g13_vertex_active_size(.v13_5_partial) or { 0 }) == 0x608
 	assert (fw.g13_fragment_active_size(.v12_3) or { 0 }) == 0x930
 	assert (fw.g13_fragment_active_size(.v13_5_partial) or { 0 }) == 0x96c
 

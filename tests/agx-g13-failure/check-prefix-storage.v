@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'fw__make_g13_vertex_v13_5',
+	'fw__make_g13_compute_v13_5',
 	'fw__make_g13_fragment_v13_5',
 	'fw__g13_microseq_finalize_compute_v13_5',
 	'gpu__agx__gpu__write_g13_start_vertex',
@@ -118,6 +120,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'fw__make_g13_vertex_v13_5' { return 'fw__G13RunVertexV135' }
+	if name == 'fw__make_g13_compute_v13_5' { return 'fw__G13RunComputeV135' }
 	if name == 'fw__make_g13_fragment_v13_5' { return 'fw__G13RunFragmentV135' }
 	if name == 'fw__g13_microseq_finalize_compute_v13_5' { return 'fw__G13MicroseqFinalizeComputeV135' }
 	if name == 'gpu__agx__gpu__write_g13_start_vertex' { return 'u64' }

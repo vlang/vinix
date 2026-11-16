@@ -13,7 +13,8 @@ pub const g13_compute_job_params_2_offset = u64(0x1f4)
 pub const g13_compute_cur_ts_offset = u64(0x2a8)
 pub const g13_compute_start_ts_offset = u64(0x2b0)
 pub const g13_compute_end_ts_offset = u64(0x2b8)
-pub const g13_compute_v13_5_size = u64(0x320)
+pub const g13_compute_v12_3_size = u64(0x2dc)
+pub const g13_compute_v13_5_size = u64(0x31c)
 pub const g13_compute_v13_5_flag_offset = u64(0x305)
 
 @[packed]
@@ -85,7 +86,7 @@ pub mut:
 @[packed]
 pub struct G13RunComputeV135 {
 pub mut:
-	bytes [0x320]u8
+	bytes [0x31c]u8
 }
 
 pub fn g13_compute_active_size(abi hw.FirmwareAbi) ?u64 {
@@ -126,23 +127,21 @@ pub fn g13_compute_end_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
 
 // Repack the fields produced by the 12.3 builder into the 13.5 command. New
 // timestamp scratch fields start at zero. The queue supplies the shared
-// command counter; ComputeInfo shrank by 0x10 and ComputeInfo2 gained a
-// four-byte prefix.
+// command counter. Both parameter blocks keep their sizes: the second gains
+// a zero prefix and drops its old final word. Preserve all common padding
+// and the tail through unk_2d8, excluding implicit aggregate tail padding.
 pub fn make_g13_compute_v13_5(legacy &G13RunCompute, counter u64) G13RunComputeV135 {
 	mut out := G13RunComputeV135{}
 	g13_copy_bytes(voidptr(&out), 0x000, voidptr(legacy), 0x000, 0x004)
 	g13_put_u64(voidptr(&out), 0x004, counter)
-	g13_copy_bytes(voidptr(&out), 0x00c, voidptr(legacy), 0x004, 0x014)
-	g13_copy_bytes(voidptr(&out), 0x020, voidptr(legacy), 0x018, 0x050)
-	g13_copy_bytes(voidptr(&out), 0x070, voidptr(legacy), 0x068, 0x150)
-	g13_copy_bytes(voidptr(&out), 0x1f0, voidptr(legacy), 0x1e8, 0x00c)
+	g13_copy_bytes(voidptr(&out), 0x00c, voidptr(legacy), 0x004, 0x1f0)
 	g13_copy_bytes(voidptr(&out), 0x200, voidptr(legacy), 0x1f4, 0x05c)
-	g13_copy_bytes(voidptr(&out), 0x25c, voidptr(legacy), 0x254, 0x07d)
+	g13_copy_bytes(voidptr(&out), 0x25c, voidptr(legacy), 0x254, 0x085)
 	return out
 }
 
 pub fn validate_g13_compute_layouts() bool {
 	return sizeof(G13ComputeJobParameters1) == 0x160
 		&& sizeof(G13ComputeJobParameters2) == 0x60
-		&& sizeof(G13RunCompute) == 0x2dc && sizeof(G13RunComputeV135) == g13_compute_v13_5_size
+		&& sizeof(G13RunCompute) == g13_compute_v12_3_size && sizeof(G13RunComputeV135) == g13_compute_v13_5_size
 }
