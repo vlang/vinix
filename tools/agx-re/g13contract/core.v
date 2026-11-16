@@ -455,6 +455,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_fragment_tail_reference(read(os.join_path(base, 'fw/fragment.rs'))!,
 		read(os.join_path(base, 'fw/job.rs'))!, read(os.join_path(base, 'queue/render.rs'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/fragment.v'))!)!
+	check_microseq_field_reference(read(os.join_path(base, 'fw/microseq.rs'))!,
+		read(os.join_path(base, 'queue/render.rs'))!, read(os.join_path(base, 'queue/compute.rs'))!)!
 	check_timestamp_pair_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/microseq.v'))!)!
 	check_timestamp_pair_reference(timestamp_pair_model(read(os.join_path(base, 'fw/microseq.rs'))!,
@@ -788,6 +790,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Firmware 13.5 vertex/compute command extents and complete common fields follow the recursive source-layout model',
 		'Firmware 13.5 fragment preserves declared parameter padding; the recursive field model includes source-derived auxiliary defaults',
 		'Firmware timestamp instructions bind the source-derived optional user pair inside each retained command for all three engines and both phases',
+		'Firmware start/finalize record fields, insertions and reserved defaults follow the selected source-layout model',
 		'Firmware 12.3/13.5 fragment sizes, depth insertion, firmware pointers, scratch/metadata and complete common tail follow the selected source-layout model',
 		'Firmware 13.5 shared per-queue command/start counters']
 }
