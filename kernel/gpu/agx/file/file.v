@@ -343,6 +343,73 @@ fn (mut f GpuFile) close_object_handle(handle u32) int {
 	return if success { 0 } else { -5 }
 }
 
+// Reserve a complete replacement array before a range unbind takes any new
+// BO references or changes PTEs. Records move; their existing owners do not.
+fn (mut f GpuFile) reserve_mapping_slots_locked(extra int) bool {
+	if extra < 0 { return false }
+	needed := u64(f.mappings.len) + u64(extra)
+	if needed <= u64(f.mappings.cap) { return true }
+	if needed > 0x7fff_ffff || needed > ~u64(0) / sizeof(GpuMapping) { return false }
+	bytes := needed * sizeof(GpuMapping)
+	storage := memory.malloc_packed_fallible(bytes) @[freed]
+	if storage == unsafe { nil } { return false }
+	mut replacement := []GpuMapping{}
+	unsafe {
+		replacement.data = storage
+		replacement.len = f.mappings.len
+		replacement.cap = int(needed)
+		replacement.flags = .noslices
+		if f.mappings.len != 0 { C.memcpy(storage, f.mappings.data, u64(f.mappings.len) * sizeof(GpuMapping)) }
+	}
+	mut old := unsafe { f.mappings }
+	f.mappings = replacement
+	unsafe { old.free() }
+	return true
+}
+
+// The file lock and idle-VM gate protect every fragment. The original owner
+// becomes the removed interval's tombstone; each surviving piece owns one ref.
+fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
+	end := addr + size // The ioctl validated this full VA range before lookup.
+	mut fragments := 0
+	for mapping in f.mappings {
+		if mapping.vm_id != vm_id || mapping.retiring
+			|| !ranges_overlap(mapping.addr, mapping.size, addr, size) { continue }
+		if mapping.addr < addr { fragments++ }
+		if mapping.addr + mapping.size > end { fragments++ }
+		// Disjoint mappings can straddle only the two ends of the request.
+		if fragments > 2 { return -22 }
+	}
+	if !f.reserve_mapping_slots_locked(fragments) { return -12 }
+	original_count := f.mappings.len
+	mut flush_ok := true
+	for i := original_count - 1; i >= 0; i-- {
+		mapping := f.mappings[i]
+		if mapping.vm_id != vm_id || !ranges_overlap(mapping.addr, mapping.size, addr, size) { continue }
+		if !mapping.retiring {
+			mapping_end := mapping.addr + mapping.size
+			cut_start := if mapping.addr > addr { mapping.addr } else { addr }
+			cut_end := if mapping_end < end { mapping_end } else { end }
+			if mapping.addr < cut_start {
+				gem.ref_obj(mapping.obj)
+				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle: mapping.handle,
+					addr: mapping.addr, size: cut_start - mapping.addr, obj: mapping.obj }
+			}
+			if cut_end < mapping_end {
+				gem.ref_obj(mapping.obj)
+				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle: mapping.handle,
+					addr: cut_end, size: mapping_end - cut_end, obj: mapping.obj }
+			}
+			f.mappings[i].addr = cut_start
+			f.mappings[i].size = cut_end - cut_start
+		}
+		// A prior tombstone retries its full recorded range, without unmapping
+		// again or releasing backing before the invalidation completes.
+		if !f.retire_mapping_locked(i) { flush_ok = false }
+	}
+	return if flush_ok { 0 } else { -5 }
+}
+
 // Reserve a nonzero per-open queue ID. Failed queue construction may leave a
 // hole, so wraparound also checks live IDs instead of assuming monotonic IDs
 // can never be exhausted.
@@ -703,14 +770,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {
 				return -16 // EBUSY: firmware may still dereference this mapping
 			}
-			for i, mapping in f.mappings {
-				if mapping.vm_id == request.vm_id && mapping.addr == request.addr
-					&& mapping.size == request.range {
-					flush_ok := f.retire_mapping_locked(i)
-					return if flush_ok { 0 } else { -5 }
-				}
-			}
-			return -22
+			return f.unbind_range_locked(request.vm_id, request.addr, request.range)
 		}
 		ioctl.asahi_bind_op_unbind_all {
 			ctx := f.find_vm(request.vm_id) or { return -2 }

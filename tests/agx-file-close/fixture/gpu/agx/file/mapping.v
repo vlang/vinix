@@ -59,7 +59,7 @@ fn check_mapping_retirement() {
 		}
 		assert file.ioctl_gem_bind(unbind(1, 0x4000)) == 0
 		assert object.references == 1 && file.mappings.len == 0 && pt.unmaps == 1
-		assert file.ioctl_gem_bind(unbind(1, 0x4000)) == -22
+		assert file.ioctl_gem_bind(unbind(1, 0x4000)) == 0
 		assert file.close() && vm.destroyed && gem.live() == 0
 
 		// A failed BIND keeps the just-published object's reference, too.

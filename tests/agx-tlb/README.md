@@ -27,6 +27,12 @@ injected table-allocation failure rolls back the written leaf before TLBI.
 Unaligned addresses and wrapping ranges refuse without invalidation, and
 destroy releases every table allocation after each cycle.
 
+Another hundred cycles remove head, tail, middle and complete ranges from
+contiguous and repeated mappings with RO/WO/RW permissions across L3 boundaries.
+Every surviving production PTE retains its physical address and permission word;
+only the requested hole is cleared before TLBI. Final destruction returns all
+host page-table allocations.
+
 The source-reference gate independently checks the actual instructions,
 barriers, root-publication order, bind permission selection and GPU UAT
 permission encodings against Omarchy's Asahi-derived driver:

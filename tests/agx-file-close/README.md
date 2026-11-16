@@ -90,3 +90,14 @@ injected constructor or change output fields; valid sizes retain allocation
 failure behavior. Successful fixture objects are removed and released exactly
 once, returning the live count to zero. Huge successful objects have metadata
 only in this fixture; they do not qualify physical-memory admission/accounting.
+
+Range UNBIND runs 14,600 ioctl checks across 200 cycles. Already unmapped VA
+ranges succeed; requests can cross holes and several BOs or preserve head,
+tail and middle fragments. Contiguous and SINGLE_PAGE observations preserve
+every leaf outside the cut, and another VM is unaffected. Fault injection
+checks reservation OOM before any refs/PTE changes, three retained fragment
+owners after failed flush, progress on other overlaps, full tombstone retry,
+busy admission, replacement, UNBIND_ALL, GEM_CLOSE and failed close/retry.
+The production array reservation runs against fallible host malloc; ASan shadow
+checks that every successful raw reservation is freed after final close.
+The TLB fixture independently checks exact production survivor PTE words.

@@ -253,7 +253,42 @@ fn test_repeated_pages() {
 	println('AGX repeated PTEs: 100 cycles of exact alias leaves, RO/WO/RW, L3 boundary crossing, contiguous controls, partial rollback before one TLBI, invalid geometry and complete table release passed')
 }
 
+fn test_partial_unmap_survivors() {
+	for _ in 0 .. 100 {
+		for repeated in [false, true]! {
+			for mode in [pgtable.gpu_prot_gpu_shared_ro, pgtable.gpu_prot_gpu_shared_wo, pgtable.gpu_prot_gpu_shared_rw]! {
+				for cut in [[u64(0), 1]!, [u64(7), 8]!, [u64(2), 5]!, [u64(0), 8]!]! {
+					mut pt := pgtable.new_pgtable(39, 48) or { panic('partial unmap table') }
+					address := (u64(1) << 25) - pgtable.uat_pgsz
+					physical := u64(0x400000)
+					first := pt.get_pte(address, true) or { panic('partial unmap PTE') }
+					tlb.observe(first, unsafe { nil }); pt.bind_tlb(22); expect_asid(22, 0)
+					if repeated { assert pt.map_repeated_page(address, physical, 8 * pgtable.uat_pgsz, mode) }
+					else { assert pt.map(address, physical, 8 * pgtable.uat_pgsz, mode) }
+					first_word := physical | mode | pgtable.uat_pte_page | pgtable.uat_pte_ng
+					expect_asid(22, first_word)
+					pt.unmap(address + cut[0] * pgtable.uat_pgsz, (cut[1] - cut[0]) * pgtable.uat_pgsz)
+					expect_asid(22, if cut[0] == 0 { u64(0) } else { first_word })
+					for index := u64(0); index < 8; index++ {
+						pte := pt.get_pte(address + index * pgtable.uat_pgsz, false) or { panic('survivor PTE') }
+						phys := physical + if repeated { u64(0) } else { index * pgtable.uat_pgsz }
+						expected := if index >= cut[0] && index < cut[1] { u64(0) }
+							else { phys | mode | pgtable.uat_pte_page | pgtable.uat_pte_ng }
+						assert unsafe { *pte } == expected
+					}
+					pt.unmap(address, 8 * pgtable.uat_pgsz); expect_asid(22, 0)
+					pt.unbind_tlb(); expect_asid(22, 0); tlb.observe(unsafe { nil }, unsafe { nil })
+					pgtable.destroy(pt); unsafe { free(pt) }
+					assert memory.live_pages() == 0
+				}
+			}
+		}
+	}
+	println('AGX partial unmap PTEs: 100 cycles of head/tail/middle/full cuts preserve exact contiguous/repeated RO/WO/RW survivor leaves across L3 boundaries before TLBI and free every table')
+}
+
 fn main() {
+	test_partial_unmap_survivors()
 	test_repeated_pages()
 	test_user_mappings()
 	test_root_publication_and_reuse()

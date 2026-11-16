@@ -18,6 +18,19 @@ pub mut:
 	last_size u64
 	repeated bool
 	last_unmap_size u64
+	last_unmap_addr u64
+	watch_start u64
+	leaves [32]u64
+}
+
+fn (mut pt UatPgtable) watch_map(addr u64, phys u64, size u64, repeated bool) {
+	if pt.watch_start == 0 { return }
+	for i in 0 .. 32 {
+		va := pt.watch_start + u64(i) * uat_pgsz
+		if va >= addr && va - addr < size {
+			pt.leaves[i] = phys + if repeated { u64(0) } else { va - addr }
+		}
+	}
 }
 
 pub fn (mut pt UatPgtable) map(addr u64, phys u64, size u64, protection u64) bool {
@@ -25,6 +38,7 @@ pub fn (mut pt UatPgtable) map(addr u64, phys u64, size u64, protection u64) boo
 	pt.maps++
 	pt.last_protection = protection
 	pt.last_phys = phys; pt.last_size = size; pt.repeated = false
+	if !pt.reject_map { pt.watch_map(addr, phys, size, false) }
 	return !pt.reject_map
 }
 
@@ -32,6 +46,7 @@ pub fn (mut pt UatPgtable) map_repeated_page(addr u64, phys u64, size u64, prote
 	assert !pt.destroyed, 'repeated map through a destroyed VM page table'
 	pt.maps++; pt.last_protection = protection
 	pt.last_phys = phys; pt.last_size = size; pt.repeated = true
+	if !pt.reject_map { pt.watch_map(addr, phys, size, true) }
 	return !pt.reject_map
 }
 
@@ -39,4 +54,11 @@ pub fn (mut pt UatPgtable) unmap(addr u64, size u64) {
 	assert !pt.destroyed, 'unmap through a destroyed VM page table'
 	pt.unmaps++
 	pt.last_unmap_size = size
+	pt.last_unmap_addr = addr
+	if pt.watch_start != 0 {
+		for i in 0 .. 32 {
+			va := pt.watch_start + u64(i) * uat_pgsz
+			if va >= addr && va - addr < size { pt.leaves[i] = 0 }
+		}
+	}
 }

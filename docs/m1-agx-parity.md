@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [GEM-create size errors](m1-agx-gem-size.md)
-(2026-11-16). The [repeated single-page bindings](m1-agx-single-page.md),
+Latest offline increment: [UNBIND ranges and surviving mappings](m1-agx-unbind-range.md)
+(2026-11-16). The [GEM-create size errors](m1-agx-gem-size.md),
+[repeated single-page bindings](m1-agx-single-page.md),
 [BIND buffer lookup order](m1-agx-bind-bo-order.md),
 [bind VM lookup and global validation](m1-agx-bind-vm-lookup.md),
 [submit queue lookup before staging](m1-agx-submit-lookup-order.md),

@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'gpu__agx__file__GpuFile__reserve_mapping_slots_locked',
+	'gpu__agx__file__GpuFile__unbind_range_locked',
 	'bo__create_size_error',
 	'vm__bind_backing_size',
 	'pgtable__UatPgtable__map_repeated_page',
@@ -105,6 +107,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name.ends_with('GpuFile__unbind_range_locked') { return 'i64' }
 	if name == 'bo__create_size_error' { return 'i64' }
 	if name == 'vm__bind_backing_size' { return 'u64' }
 	if name in ['file__reserve_fd', 'file__fdnum_install_reserved_fd', 'file__fdnum_create_from_reserved_resource', 'file__fdnum_create_from_fd', 'drm__create_sync_file_fd_at'] { return '__v_option_i64' }
@@ -166,6 +169,11 @@ fn check(source string) ! {
 	for name in helpers {
 		body := function_body(source, name)!
 		mut allocation_scan := body
+		if name.ends_with('GpuFile__reserve_mapping_slots_locked') {
+			owned := 'memory__malloc_packed_fallible(bytes)'
+			if body.count(owned) != 1 { return error('mapping splits require exactly one checked owned array reservation') }
+			allocation_scan = body.replace(owned, 'owned_mapping_table_reservation')
+		}
 		if name == 'drm__sync_file_info_ioctl' {
 			owned := 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo))'
 			if body.count(owned) != 1 { return error('sync-file info must have exactly one fallible detail allocation') }
@@ -266,6 +274,7 @@ fn selftest() ! {
 		kind := result_type(name)
 		ending := if kind == 'void' { 'return;' } else if kind == 'bool' { 'return true;' } else { 'return (' + kind + '){0};' }
 		owned := if name.ends_with('WorkQueueEvents__retain') { 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));\n' }
+			else if name.ends_with('GpuFile__reserve_mapping_slots_locked') { 'memory__malloc_packed_fallible(bytes);\n' }
 			else if name == 'drm__sync_file_info_ioctl' { 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));\n' }
 			else if name.ends_with('WorkQueueEvents__release') { 'memory__free((void*)(block));\n' }
 			else if name == 'drm__new_syncobj_wait_buffer' { 'memory__malloc_packed_fallible(geometry.bytes);\n' }
@@ -291,6 +300,9 @@ fn selftest() ! {
 		}
 	}
 	for broken in ['', fixture + fixture,
+		fixture.replace('memory__malloc_packed_fallible(bytes);', ''),
+		fixture.replace('memory__malloc_packed_fallible(bytes);', 'memory__malloc_packed_fallible(1);'),
+		fixture.replace('memory__malloc_packed_fallible(bytes);', 'memory__malloc_packed_fallible(bytes); memory__malloc_packed_fallible(bytes);'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', ''),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', 'memory__malloc_packed_fallible(1);'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo)); memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));'),
