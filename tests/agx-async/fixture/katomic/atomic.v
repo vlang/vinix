@@ -14,7 +14,11 @@ pub fn store[T](mut target T, value T) { target = value }
 
 pub fn inc[T](mut target T) { target++ }
 
-pub fn dec[T](mut target T) {
-	assert target > 0
+pub fn dec[T](mut target T) bool {
+	// Snapshot the value: the host compiler can compare a generic mut
+	// parameter's address when it appears directly in a comparison.
+	before := target
+	assert before > 0
 	target--
+	return before > 1
 }

@@ -13,9 +13,9 @@ fn test_namespace_guards_reject_fixed_caps_wrap_and_stale_links() {
 		'drm_syncobj_get(syncobj);\nxa_unlock(&file_private->syncobj_xa);\nEXPORT_SYMBOL(drm_syncobj_find)'
 	check_namespace_contract(objects, reference)!
 	for token in ['if handle == ~u32(0) { return none }', 'if cursor.handle > handle { break }',
-		'obj.namespace_next = unsafe { cursor }', 'previous.namespace_next = obj',
-		'previous.namespace_next = cursor.namespace_next', 'cursor.namespace_next = nil',
-		'previous.namespace_next = next'] {
+		'e.next = unsafe { cursor }', 'previous.next = e',
+		'previous.next = cursor.next', 'cursor.next = nil',
+		'previous.next = next', 'if removed.allocated', 'if cursor.allocated', 'next := unsafe { retired.next }'] {
 		if _ := check_namespace_contract(objects.replace(token, ''), reference) { assert false, token }
 	}
 	if _ := check_namespace_contract(objects + '\nconst syncobj_max_objects = u32(1024)\n', reference) { assert false }

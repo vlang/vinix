@@ -17,12 +17,13 @@ fn test_creation_guards_reject_early_publication_and_unsafe_failure_cleanup() {
 	check_create_contract(drm, objects, reference)!
 	for token in ['memory.malloc_packed_fallible(sizeof(SyncObj))', 'if !published {',
 		'memory.free(voidptr(obj.fence))', 'memory.free(allocation)',
-		'obj.fence = new_private_stub(now_ns()) or { return none }', 'syncobj_lock.release()',
-		'obj.handle = handle', 'published = true'] {
+		'obj.fence = new_private_stub(now_ns()) or { return none }',
+		'obj.namespace = SyncobjHandle{ owner: owner, object: obj }',
+		'insert_handle(unsafe { &obj.namespace }) or { return none }', 'published = true'] {
 		if _ := check_create_contract(drm, objects.replace(token, ''), reference) { assert false, token }
 	}
 	if _ := check_create_contract(drm, objects.replace('published = true', 'destroy(owner, handle)\npublished = true'), reference) { assert false }
-	if _ := check_create_contract(drm, objects.replace('obj.handle = handle', 'syncobj_head = obj\nobj.handle = handle'), reference) { assert false }
+	if _ := check_create_contract(drm, objects.replace('published = true', 'syncobj_head = obj\npublished = true'), reference) { assert false }
 	if _ := check_create_contract(drm.replace('request.handle = obj.handle', ''), objects, reference) { assert false }
 	if _ := check_create_contract(drm, objects, reference.replace('drm_syncobj_create(&syncobj, flags, NULL);', '')) { assert false }
 }

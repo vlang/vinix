@@ -15,13 +15,14 @@ __global metadata_object_size = u64(0)
 __global metadata_fence_size = u64(0)
 __global metadata_objects = 0
 __global metadata_fences = 0
+__global metadata_aliases = 0
 __global wait_storage_last_request = u64(0)
 __global wait_storage_free_check fn (voidptr, u64) = unsafe { nil }
 __global metadata_free_check fn (voidptr, u64) = unsafe { nil }
 __global failure_action fn () = unsafe { nil }
 
 pub fn reset() {
-	assert wait_storage_live == 0 && wait_storage_live_bytes == 0 && metadata_objects == 0 && metadata_fences == 0
+	assert wait_storage_live == 0 && wait_storage_live_bytes == 0 && metadata_objects == 0 && metadata_fences == 0 && metadata_aliases == 0
 	wait_storage_calls = 0; wait_storage_frees = 0
 	allocation_attempts = 0
 	wait_storage_fail_next = false; wait_storage_last_request = 0
@@ -40,6 +41,7 @@ pub fn configure_metadata(objects u64, fences u64) {
 }
 pub fn object_count() int { return metadata_objects }
 pub fn fence_count() int { return metadata_fences }
+pub fn alias_count() int { return metadata_aliases }
 pub fn fence_bytes() u64 { return u64(metadata_fences) * metadata_fence_size }
 pub fn attempts() int { return allocation_attempts }
 pub fn calls() int { return wait_storage_calls }
@@ -61,6 +63,8 @@ pub fn malloc_fence_fallible(size u64) voidptr {
 	assert size == metadata_fence_size
 	return allocate(size, 2)
 }
+
+pub fn malloc_alias_fallible(size u64) voidptr { return allocate(size, 3) }
 
 fn allocate(size u64, kind u8) voidptr {
 	allocation_attempts++
@@ -87,6 +91,7 @@ fn allocate(size u64, kind u8) voidptr {
 			allocation_kinds[index] = kind
 			if kind == 1 { metadata_objects++ }
 			else if kind == 2 { metadata_fences++ }
+			else if kind == 3 { metadata_aliases++ }
 			else { wait_storage_live++; wait_storage_live_bytes += size }
 			return buffer
 		}
@@ -107,6 +112,7 @@ pub fn free(buffer voidptr) {
 			allocation_kinds[index] = 0
 			if kind == 1 { metadata_objects-- }
 			else if kind == 2 { metadata_fences-- }
+			else if kind == 3 { metadata_aliases-- }
 			else { wait_storage_frees++; wait_storage_live--; wait_storage_live_bytes -= size }
 			return
 		}
@@ -129,5 +135,5 @@ pub fn release_retained_fences(size u64) {
 			free(buffer)
 		}
 	}
-	assert wait_storage_live == 0 && wait_storage_live_bytes == 0 && metadata_objects == 0 && metadata_fences == 0
+	assert wait_storage_live == 0 && wait_storage_live_bytes == 0 && metadata_objects == 0 && metadata_fences == 0 && metadata_aliases == 0
 }

@@ -210,8 +210,8 @@ fn (mut this SyncFileResource) unref(_handle voidptr) ? {
 		return
 	}
 	unsafe {
-		free(voidptr(this.box))
-		free(voidptr(this))
+		memory.free(voidptr(this.box))
+		memory.free(voidptr(this))
 	}
 }
 
@@ -954,24 +954,25 @@ pub fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 	if fence == unsafe { nil } {
 		return none
 	}
-	mut wrapper := &SyncFileResource{
-		fence: unsafe { fence }
+	allocation := memory.malloc_packed_fallible(sizeof(SyncFileResource))
+	if allocation == unsafe { nil } { errno.set(errno.enomem); return none }
+	mut wrapper := unsafe { &SyncFileResource(allocation) }
+	unsafe { *wrapper = SyncFileResource{
+		fence: fence
 		status: if syncobj.is_signaled(fence) { file.pollin } else { 0 }
+	} }
+	box := memory.malloc_packed_fallible(sizeof(resource.Resource))
+	if box == unsafe { nil } {
+		memory.free(allocation)
+		errno.set(errno.enomem)
+		return none
 	}
-	wrapper.box = &resource.Resource(unsafe { wrapper }) @[freed]
+	// A direct &Resource(voidptr) conversion boxes the pointer in V. Reinterpret
+	// the pointer slot to adopt this already allocated interface storage.
+	unsafe { *(&voidptr(&wrapper.box)) = box }
+	unsafe { *wrapper.box = resource.Resource(wrapper) }
 	mut res := wrapper.box
-	mut fd := file.fd_create_from_resource(mut res, resource.o_cloexec) or {
-		unsafe {
-			free(voidptr(wrapper.box))
-			free(voidptr(wrapper))
-		}
-		return none
-	}
-	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
-		fd.unref()
-		return none
-	}
-	return fdnum
+	return file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_cloexec, 0, false)
 }
 
 // Resolve only fds created by create_sync_file_fd. The interface type check
@@ -996,12 +997,16 @@ fn ioctl_syncobj_handle_to_fd(handle voidptr, data voidptr) int {
 		return -14
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjHandle(data) }
-	if request.flags != ioctl.drm_syncobj_handle_to_fd_export_sync_file || request.pad != 0 {
+	if request.flags & ~ioctl.drm_syncobj_handle_to_fd_export_sync_file != 0 || request.pad != 0 {
 		return -22
 	}
 	obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
+	if request.flags == 0 {
+		request.fd = i32(create_syncobj_fd(obj) or { return -int(errno.get()) })
+		return 0
+	}
 	fence := syncobj.get_fence(obj) or { return -22 }
-	fdnum := create_sync_file_fd(fence) or { return -24 }
+	fdnum := create_sync_file_fd(fence) or { return -int(errno.get()) }
 	request.fd = i32(fdnum)
 	return 0
 }
@@ -1010,10 +1015,15 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 	if handle == unsafe { nil } || data == unsafe { nil } {
 		return -14
 	}
-	request := unsafe { &ioctl.DrmSyncobjHandle(data) }
-	if request.flags != ioctl.drm_syncobj_fd_to_handle_import_sync_file || request.pad != 0
+	mut request := unsafe { &ioctl.DrmSyncobjHandle(data) }
+	if request.flags & ~ioctl.drm_syncobj_fd_to_handle_import_sync_file != 0 || request.pad != 0
 		|| request.fd < 0 {
 		return -22
+	}
+	if request.flags == 0 {
+		obj := syncobj_from_fd(request.fd) or { return -22 }
+		request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }
+		return 0
 	}
 	obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
 	fence := sync_file_fence_from_fd(request.fd) or { return -9 }

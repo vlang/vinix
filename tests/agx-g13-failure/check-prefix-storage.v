@@ -4,6 +4,15 @@ import os
 const helpers = [
 	'drm__ioctl_syncobj_create',
 	'syncobj__new_syncobj_with_flags',
+	'syncobj__insert_handle',
+	'syncobj__import_syncobj',
+	'drm__ioctl_syncobj_handle_to_fd',
+	'drm__ioctl_syncobj_fd_to_handle',
+	'drm__syncobj_from_fd',
+	'drm__create_syncobj_fd',
+	'drm__create_sync_file_fd',
+	'drm__SyncobjResource__unref',
+	'drm__SyncFileResource__unref',
 	'syncobj__next_namespace_handle',
 	'syncobj__lookup',
 	'syncobj__destroy',
@@ -67,12 +76,14 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd'] { return '__v_option_i64' }
+	if name in ['drm__SyncobjResource__unref', 'drm__SyncFileResource__unref'] { return '__v_option' }
 	if name == 'drm__syncobj_wait_geometry' { return '__v_option_drm__SyncobjWaitGeometry' }
 	if name in ['drm__new_syncobj_wait_buffer', 'drm__new_syncobj_handle_buffer'] { return '__v_option_drm__SyncobjWaitBuffer' }
 	if name == 'drm__SyncobjWaitBuffer__free_owned' { return 'void' }
-	if name in ['drm__ioctl_syncobj_create', 'drm__ioctl_syncobj_wait', 'drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal'] { return 'i64' }
-	if name in ['syncobj__new_syncobj', 'syncobj__new_syncobj_with_flags', 'syncobj__lookup'] { return '__v_option_syncobj__SyncObjptr' }
-	if name == 'syncobj__next_namespace_handle' { return '__v_option_u32' }
+	if name in ['drm__ioctl_syncobj_create', 'drm__ioctl_syncobj_wait', 'drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal', 'drm__ioctl_syncobj_handle_to_fd', 'drm__ioctl_syncobj_fd_to_handle'] { return 'i64' }
+	if name in ['syncobj__new_syncobj', 'syncobj__new_syncobj_with_flags', 'syncobj__lookup', 'drm__syncobj_from_fd'] { return '__v_option_syncobj__SyncObjptr' }
+	if name in ['syncobj__next_namespace_handle', 'syncobj__insert_handle', 'syncobj__import_syncobj'] { return '__v_option_u32' }
 	if name == 'syncobj__destroy_owner' { return 'void' }
 	if name == 'syncobj__new_private_stub' { return '__v_option_syncobj__DmaFenceptr' }
 	if name == 'syncobj__captured_fence' { return '__v_option_syncobj__DmaFenceptr' }
@@ -147,6 +158,19 @@ fn check(source string) ! {
 			}
 			allocation_scan = body.replace(owned, 'owned_syncobj_preparation_allocation')
 		}
+		if name == 'syncobj__import_syncobj' {
+			owned := 'memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle))'
+			if body.count(owned) != 1 { return error('opaque import must have one fallible alias link allocation') }
+			allocation_scan = body.replace(owned, 'owned_alias_link_allocation')
+		}
+		if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd'] {
+			kind := if name == 'drm__create_syncobj_fd' { 'SyncobjResource' } else { 'SyncFileResource' }
+			for owned in ['memory__malloc_packed_fallible(sizeof(drm__' + kind + '))',
+				'memory__malloc_packed_fallible(sizeof(resource__Resource))'] {
+				if body.count(owned) != 1 { return error('export must have exactly one fallible wrapper and one fallible box allocation') }
+				allocation_scan = allocation_scan.replace(owned, 'owned_transport_allocation')
+			}
+		}
 		if name == 'drm__SyncobjWaitBuffer__free_owned' &&
 			(body.count('memory__free(buffer->allocation)') != 1 || body.count('memory__free(') != 1) {
 			return error('large wait storage must have exactly one matching owner free site')
@@ -197,6 +221,11 @@ fn selftest() ! {
 			else if name == 'drm__new_syncobj_handle_buffer' { 'memory__malloc_packed_fallible(geometry.captures_offset);\n' }
 			else if name == 'syncobj__new_private_stub' { 'memory__malloc_packed_fallible(sizeof(syncobj__DmaFence)); array_new(sizeof(syncobj__FenceWaiter*), 0, 0);\n' }
 			else if name == 'syncobj__new_syncobj_with_flags' { 'memory__malloc_packed_fallible(sizeof(syncobj__SyncObj)); array_new(sizeof(syncobj__TimelinePoint), 0, 0);\n' }
+			else if name == 'syncobj__import_syncobj' { 'memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle));\n' }
+			else if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd'] {
+				wrapper_kind := if name == 'drm__create_syncobj_fd' { 'SyncobjResource' } else { 'SyncFileResource' }
+				'memory__malloc_packed_fallible(sizeof(drm__' + wrapper_kind + ')); memory__malloc_packed_fallible(sizeof(resource__Resource));\n'
+			}
 			else if name == 'drm__SyncobjWaitBuffer__free_owned' { 'memory__free(buffer->allocation);\n' } else { '' }
 		captures := if name in ['drm__ioctl_syncobj_reset', 'drm__ioctl_syncobj_signal'] { '' } else { 'syncobj__FenceCapture captures[64];\n' }
 		fixture += kind + ' ' + name + '(void) {\n' + owned + ' u32 handles[64];\n void* objects[64];\n ' + captures + ' void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
@@ -234,6 +263,13 @@ fn selftest() ! {
 		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__SyncObj));', 'memory__malloc_packed_fallible(1);'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__SyncObj));', 'memory__malloc_packed_fallible(sizeof(syncobj__SyncObj)); memory__malloc_packed_fallible(sizeof(syncobj__SyncObj));'),
 		fixture.replace('array_new(sizeof(syncobj__TimelinePoint), 0, 0)', 'array_new(sizeof(syncobj__TimelinePoint), 0, 1)'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle));', ''),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle));', 'memory__malloc_packed_fallible(1);'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle));', 'memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle)); memory__malloc_packed_fallible(sizeof(syncobj__SyncobjHandle));'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__SyncobjResource));', ''),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__SyncFileResource));', 'memory__malloc_packed_fallible(1);'),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(resource__Resource));', ''),
+		fixture.replace('memory__malloc_packed_fallible(sizeof(resource__Resource));', 'memory__malloc_packed_fallible(sizeof(resource__Resource)); memory__malloc_packed_fallible(sizeof(resource__Resource));'),
 		fixture.replace('memory__free(buffer->allocation);', ''),
 		fixture.replace('memory__free(buffer->allocation);', 'memory__free(buffer);'),
 		fixture.replace('memory__free(buffer->allocation);', 'memory__free(buffer->allocation); memory__free(buffer->allocation);'),
@@ -259,5 +295,5 @@ fn main() {
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
-	println('G13 submission/mapping storage: sixty-two live helpers contain no temporary allocations; only owned overflow-block, checked wait/reset storage, syncobj preparation and retained private completion allocation sites are permitted')
+	println('G13 submission/mapping storage: ${helpers.len} live helpers contain no temporary allocations; only checked owned overflow, request, syncobj/alias, transport/box and retained private completion allocation sites are permitted')
 }

@@ -73,6 +73,22 @@ tagged explicitly rather than inferred from size. Request allocation/free and
 fault counters remain independent of retained object/fence metadata. The
 native kernel source and retained generated kernel C use the real allocator.
 
+Opaque descriptor cases execute the production export/import handlers and both
+resource wrappers against a reference-counted descriptor fixture. Imports add
+names for the same mutable object, across files and repeatedly within one file.
+Shared SIGNAL/RESET, stable sync-file snapshots, pending first-publication
+captures, source namespace close, alias destruction/reuse, duplicated transport
+descriptors and last-descriptor close during lookup are checked. Both wrapper
+allocations, both interface-box allocations, file construction, descriptor
+installation and alias allocation have failure coverage with unchanged outputs
+and exact owner counts. A 4,096-import case verifies complete link retirement.
+Only detached imported links are reclaimed natively; objects/fences stay retained.
+`DRM_SYNCOBJ_WAIT_TEST_C` optionally retains the host generated C externally.
+The descriptor fixture checks ownership contracts; it does not replace native
+file-layer concurrency testing. Its atomic decrement snapshots the value before
+comparing because direct comparisons of generic mutable parameters can compare
+the address in the host compiler.
+
 These deterministic interleavings do not exercise actual kernel threads, GPU
 execution or kernel heap usage. Vinix still polls through its scheduler; Linux
 uses sleeping waits and fence callbacks. Timeline waits and deadline scheduling

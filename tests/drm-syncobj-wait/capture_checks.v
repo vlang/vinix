@@ -19,12 +19,12 @@ pub fn assert_unpublished_allocation_for_checks(allocation voidptr, size u64) {
 	mut cursor := unsafe { syncobj_head }
 	mut count := 0
 	for cursor != unsafe { nil } {
-		count++; assert count <= memory.object_count(), 'namespace cycle'
-		for address in [u64(cursor), u64(cursor.fence)]! {
+		count++; assert count <= memory.object_count() + memory.alias_count(), 'namespace cycle'
+		for address in [u64(cursor), u64(cursor.object), u64(cursor.object.fence)]! {
 			assert address < u64(allocation) || address - u64(allocation) >= size,
 				'freeing metadata still reachable through a published handle'
 		}
-		cursor = unsafe { cursor.namespace_next }
+		cursor = unsafe { cursor.next }
 	}
 	syncobj_lock.release()
 }
@@ -40,7 +40,7 @@ pub fn assert_namespace_for_checks(expected int) {
 		assert cursor.owner != 0 && cursor.handle != 0
 		owner = cursor.owner; handle = cursor.handle
 		count++; assert count <= expected, 'namespace cycle/count'
-		cursor = unsafe { cursor.namespace_next }
+		cursor = unsafe { cursor.next }
 	}
 	assert count == expected
 	syncobj_lock.release()
@@ -79,7 +79,7 @@ pub fn assert_pending_captures_for_checks(obj &SyncObj, expected int) {
 
 pub fn free_object_metadata_for_checks(obj &SyncObj) {
 	assert_no_captures_for_checks(obj)
-	assert obj.namespace_next == unsafe { nil }, 'retired object retained a namespace link'
+	assert obj.namespace.next == unsafe { nil }, 'retired object retained a namespace link'
 	// Fixture-only disposal after namespace removal and all synchronous users.
 	unsafe { obj.timeline_points.free() }
 	memory.free(voidptr(obj))

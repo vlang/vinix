@@ -441,6 +441,10 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_sharing_contract(read(os.join_path(repo, 'kernel/drm/drm.v'))!,
+		read(os.join_path(repo, 'kernel/drm/syncobj_fd.v'))!,
+		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
+		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!)!
 	check_namespace_contract(read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!)!
 	check_create_contract(read(os.join_path(repo, 'kernel/drm/drm.v'))!,

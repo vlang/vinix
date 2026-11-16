@@ -10,7 +10,7 @@ fn main() {
 	os.mkdir_all('${scratch}/drm')!
 	os.cp_all('${repo}/kernel/drm/syncobj', '${scratch}/drm/syncobj', false)!
 	os.cp('${repo}/tests/drm-fence/checks.v', '${scratch}/drm/syncobj/checks.v')!
-	for name in ['katomic', 'sched', 'time'] {
+	for name in ['katomic', 'sched', 'time', 'memory'] {
 		os.cp_all('${repo}/tests/agx-async/fixture/${name}', '${scratch}/${name}', false)!
 	}
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!

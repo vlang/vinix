@@ -36,22 +36,31 @@ struct TimelinePoint {
 	fence &DmaFence = unsafe { nil }
 }
 
+// Handles name an object; imported handles share the same mutable object.
+// The first entry is embedded. Imports own only separately allocated links.
+struct SyncobjHandle {
+mut:
+	owner u64
+	handle u32
+	object &SyncObj = unsafe { nil }
+	next &SyncobjHandle = unsafe { nil }
+	allocated bool
+}
+
 pub struct SyncObj {
 pub mut:
+	// Creation's handle only; resolve imported names through lookup().
 	handle u32
 	fence  &DmaFence = unsafe { nil }
 	lock   klock.Lock
 mut:
-	owner           u64
 	timeline_points []TimelinePoint
 	pending_captures &FenceCapture = unsafe { nil }
-	// Namespace links and the published owner/handle keys are protected by
-	// syncobj_lock. Unlinking never retires object/fence snapshot metadata.
-	namespace_next &SyncObj = unsafe { nil }
+	namespace SyncobjHandle
 }
 
 __global (
-	syncobj_head &SyncObj = unsafe { nil }
+	syncobj_head &SyncobjHandle = unsafe { nil }
 	syncobj_lock  klock.Lock
 )
 
@@ -209,7 +218,8 @@ pub fn new_syncobj_with_flags(owner u64, signaled bool) ?&SyncObj {
 	allocation := memory.malloc_packed_fallible(sizeof(SyncObj))
 	if allocation == unsafe { nil } { return none }
 	mut obj := unsafe { &SyncObj(allocation) }
-	unsafe { *obj = SyncObj{ owner: owner } }
+	unsafe { *obj = SyncObj{} }
+	obj.namespace = SyncobjHandle{ owner: owner, object: obj }
 	mut published := false
 	defer {
 		if !published {
@@ -221,32 +231,54 @@ pub fn new_syncobj_with_flags(owner u64, signaled bool) ?&SyncObj {
 	if signaled {
 		obj.fence = new_private_stub(now_ns()) or { return none }
 	}
-	syncobj_lock.acquire()
-	defer {
-		syncobj_lock.release()
+	insert_handle(unsafe { &obj.namespace }) or { return none }
+	published = true
+	return obj
+}
+
+// Add a new name for the same mutable sync object, not a fence snapshot.
+pub fn import_syncobj(owner u64, obj &SyncObj) ?u32 {
+	if owner == 0 || obj == unsafe { nil } { return none }
+	allocation := memory.malloc_packed_fallible(sizeof(SyncobjHandle))
+	if allocation == unsafe { nil } { return none }
+	mut entry := unsafe { &SyncobjHandle(allocation) }
+	unsafe { *entry = SyncobjHandle{ owner: owner, object: obj, allocated: true } }
+	return insert_handle(entry) or {
+		// The namespace lock is released before failure cleanup.
+		memory.free(allocation)
+		return none
 	}
+}
+
+// Prepared entries transfer into the namespace under its lock. Keys stay
+// immutable until unlink; callers never borrow an entry pointer from lookup.
+fn insert_handle(entry &SyncobjHandle) ?u32 {
+	syncobj_lock.acquire()
+	defer { syncobj_lock.release() }
+	mut e := unsafe { entry }
+	owner := e.owner
 
 	// Sorted owner/handle order lets one pass find the lowest nonzero free
 	// handle without a fixed table or auxiliary namespace allocations.
-	mut previous := &SyncObj(unsafe { nil })
+	mut previous := &SyncobjHandle(unsafe { nil })
 	mut cursor := unsafe { syncobj_head }
 	for cursor != unsafe { nil } && cursor.owner < owner {
 		previous = unsafe { cursor }
-		cursor = unsafe { cursor.namespace_next }
+		cursor = unsafe { cursor.next }
 	}
 	mut handle := u32(1)
 	for cursor != unsafe { nil } && cursor.owner == owner {
 		if cursor.handle > handle { break }
 		handle = next_namespace_handle(handle) or { return none }
 		previous = unsafe { cursor }
-		cursor = unsafe { cursor.namespace_next }
+		cursor = unsafe { cursor.next }
 	}
-	obj.handle = handle
-	obj.namespace_next = unsafe { cursor }
-	published = true
-	if previous == unsafe { nil } { syncobj_head = obj }
-	else { unsafe { previous.namespace_next = obj } }
-	return obj
+	e.handle = handle
+	if !e.allocated { unsafe { e.object.handle = handle } }
+	e.next = unsafe { cursor }
+	if previous == unsafe { nil } { syncobj_head = e }
+	else { unsafe { previous.next = e } }
+	return handle
 }
 
 // Look up a sync object by its owner and per-open handle.
@@ -260,8 +292,8 @@ pub fn lookup(owner u64, handle u32) ?&SyncObj {
 	mut cursor := unsafe { syncobj_head }
 	for cursor != unsafe { nil } {
 		if cursor.owner > owner || (cursor.owner == owner && cursor.handle > handle) { break }
-		if cursor.owner == owner && cursor.handle == handle { return unsafe { cursor } }
-		cursor = unsafe { cursor.namespace_next }
+		if cursor.owner == owner && cursor.handle == handle { return unsafe { cursor.object } }
+		cursor = unsafe { cursor.next }
 	}
 	return none
 }
@@ -270,21 +302,25 @@ pub fn lookup(owner u64, handle u32) ?&SyncObj {
 pub fn destroy(owner u64, handle u32) bool {
 	if owner == 0 || handle == 0 { return false }
 	syncobj_lock.acquire()
-	defer { syncobj_lock.release() }
-	mut previous := &SyncObj(unsafe { nil })
+	mut previous := &SyncobjHandle(unsafe { nil })
 	mut cursor := unsafe { syncobj_head }
+	mut removed := &SyncobjHandle(unsafe { nil })
 	for cursor != unsafe { nil } {
 		if cursor.owner > owner || (cursor.owner == owner && cursor.handle > handle) { break }
 		if cursor.owner == owner && cursor.handle == handle {
-			if previous == unsafe { nil } { syncobj_head = unsafe { cursor.namespace_next } }
-			else { unsafe { previous.namespace_next = cursor.namespace_next } }
-			unsafe { cursor.namespace_next = nil }
-			return true
+			if previous == unsafe { nil } { syncobj_head = unsafe { cursor.next } }
+			else { unsafe { previous.next = cursor.next } }
+			unsafe { cursor.next = nil }
+			removed = unsafe { cursor }
+			break
 		}
 		previous = unsafe { cursor }
-		cursor = unsafe { cursor.namespace_next }
+		cursor = unsafe { cursor.next }
 	}
-	return false
+	syncobj_lock.release()
+	if removed == unsafe { nil } { return false }
+	if removed.allocated { memory.free(voidptr(removed)) }
+	return true
 }
 
 // Final DRM-file release drops the complete handle namespace. Objects stay
@@ -295,20 +331,31 @@ pub fn destroy_owner(owner u64) {
 		return
 	}
 	syncobj_lock.acquire()
-	mut previous := &SyncObj(unsafe { nil })
+	mut previous := &SyncobjHandle(unsafe { nil })
 	mut cursor := unsafe { syncobj_head }
+	mut retired := &SyncobjHandle(unsafe { nil })
 	for cursor != unsafe { nil } && cursor.owner < owner {
 		previous = unsafe { cursor }
-		cursor = unsafe { cursor.namespace_next }
+		cursor = unsafe { cursor.next }
 	}
 	for cursor != unsafe { nil } && cursor.owner == owner {
-		next := unsafe { cursor.namespace_next }
+		next := unsafe { cursor.next }
 		if previous == unsafe { nil } { syncobj_head = unsafe { next } }
-		else { unsafe { previous.namespace_next = next } }
-		unsafe { cursor.namespace_next = nil }
+		else { unsafe { previous.next = next } }
+		if cursor.allocated {
+			unsafe { cursor.next = retired }
+			retired = unsafe { cursor }
+		} else { unsafe { cursor.next = nil } }
 		cursor = unsafe { next }
 	}
 	syncobj_lock.release()
+	// Only detached alias links are owned here. Object/fence metadata remains
+	// valid for captures, other namespaces and exported opaque descriptors.
+	for retired != unsafe { nil } {
+		next := unsafe { retired.next }
+		memory.free(voidptr(retired))
+		retired = unsafe { next }
+	}
 }
 
 // Atomically replace the fence inside a sync object.

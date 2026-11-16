@@ -26,14 +26,23 @@ fn main() {
 		assert body.count(pair[0]) == 1
 		os.write_file(path, body.replace(pair[0], pair[1]))!
 	}
+	object_path := '${scratch}/drm/syncobj/syncobj.v'
+	object_source := os.read_file(object_path)!
+	alias_site := 'memory.malloc_packed_fallible(sizeof(SyncobjHandle))'
+	assert object_source.count(alias_site) == 1
+	os.write_file(object_path, object_source.replace(alias_site, 'memory.malloc_alias_fallible(sizeof(SyncobjHandle))'))!
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/katomic', '${scratch}/katomic', false)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
-	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\n' +
+	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport stat\nimport klock\nimport memory\nimport event.eventstruct\n' +
+		section(source, 'struct SyncFileResource {', '// A PRIME fd')! +
+		section(source, 'fn (mut this SyncFileResource) mmap(', '__global (')! +
 		section(source, 'fn ioctl_syncobj_create(', 'fn create_prime_fd(')! +
+		section(source, 'fn ioctl_syncobj_destroy(', 'fn ioctl_syncobj_wait(')! +
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
 	os.write_file('${scratch}/drm/production.v', production)!
+	os.cp('${repo}/kernel/drm/syncobj_fd.v', '${scratch}/drm/syncobj_fd.v')!
 	os.write_file('${scratch}/drm/registration.v', 'module drm\nimport drm.ioctl\n' +
 		section(source, 'struct DrmIoctlLayout {', 'fn common_ioctl_layout(')! +
 		section(source, 'fn common_ioctl_layout(', 'fn ioctl_layout(')!)!
@@ -42,15 +51,24 @@ fn main() {
 	process_source := os.read_file('${repo}/kernel/proc/proc.v')!
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
-	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
-	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
+	arguments := ['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
 		'-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
-		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v'])
+		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v']
+	build.set_args(arguments)
 	build.run()
 	build.wait()
 	if build.code != 0 { exit(build.code) }
+	if output := os.getenv_opt('DRM_SYNCOBJ_WAIT_TEST_C') {
+		assert output.ends_with('.c')
+		mut cargs := arguments.clone()
+		cargs[cargs.len - 2] = output
+		mut generated := os.new_process(os.getenv_opt('V') or { 'v' })
+		generated.set_args(cargs); generated.run(); generated.wait()
+		if generated.code != 0 { exit(generated.code) }
+	}
 	if output := os.getenv_opt('DRM_SYNCOBJ_WAIT_TEST_BINARY') { os.cp('${scratch}/test', output)! }
 	mut check := os.new_process('${scratch}/test')
 	check.run()

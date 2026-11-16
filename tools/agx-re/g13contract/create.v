@@ -11,19 +11,19 @@ fn check_create_contract(drm string, objects string, reference string) ! {
 		'CREATE must neither roll back by numeric handle nor initialize after publication')!
 	wrapper := section(objects, 'pub fn new_syncobj(owner u64)', '// Complete private initialization', 'Vinix legacy empty creation')!
 	require(wrapper.contains('return new_syncobj_with_flags(owner, false)'), 'Legacy creation must remain empty')!
-	create := section(objects, 'pub fn new_syncobj_with_flags(', '// Look up a sync object', 'Vinix private creation')!
+	create := section(objects, 'pub fn new_syncobj_with_flags(', '// Add a new name', 'Vinix private creation')!
 	require_order(create, ['if owner == 0', 'return none',
 		'memory.malloc_packed_fallible(sizeof(SyncObj))', 'if allocation == unsafe { nil } { return none }',
-		'&SyncObj(allocation)', '*obj = SyncObj{ owner: owner }', 'mut published := false',
+		'&SyncObj(allocation)', '*obj = SyncObj{}',
+		'obj.namespace = SyncobjHandle{ owner: owner, object: obj }', 'mut published := false',
 		'defer {', 'if !published {', 'if obj.fence != unsafe { nil } { memory.free(voidptr(obj.fence)) }',
 		'memory.free(allocation)', 'if signaled {', 'obj.fence = new_private_stub(now_ns()) or { return none }',
-		'syncobj_lock.acquire()', 'defer {', 'syncobj_lock.release()',
-		'mut handle := u32(1)', 'next_namespace_handle(handle) or { return none }',
-		'obj.handle = handle', 'obj.namespace_next = unsafe { cursor }', 'published = true', 'syncobj_head = obj', 'return obj'],
+		'insert_handle(unsafe { &obj.namespace }) or { return none }', 'published = true', 'return obj'],
 		'Vinix private initialization, unlocked failure cleanup and complete publication')!
 	require(create.count('memory.malloc_packed_fallible(') == 1 && create.count('new_private_stub(') == 1
-		&& create.count('published = true') == 1 && create.count('syncobj_head = obj') == 1
-		&& !create.contains('destroy('), 'Creation must transfer ownership only once, without handle rollback')!
+		&& create.count('published = true') == 1 && create.count('insert_handle(') == 1
+		&& !create.contains('syncobj_head =') && !create.contains('destroy('),
+		'Creation must transfer ownership only once through the locked entry installer, without handle rollback')!
 	ref_create := section(reference, 'int drm_syncobj_create(', 'EXPORT_SYMBOL(drm_syncobj_create)', 'Linux private creation')!
 	require_order(ref_create, ['kzalloc_obj(struct drm_syncobj)', 'if (!syncobj)', 'return -ENOMEM',
 		'if (flags & DRM_SYNCOBJ_CREATE_SIGNALED)', 'drm_syncobj_assign_null_handle(syncobj)',

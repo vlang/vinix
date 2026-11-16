@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [syncobj namespaces beyond the fixed table](m1-agx-syncobj-namespace.md)
-(2026-11-16). The [fallible syncobj creation before publication](m1-agx-syncobj-create.md),
+Latest offline increment: [opaque syncobj descriptor sharing](m1-agx-syncobj-sharing.md)
+(2026-11-16). The [syncobj namespaces beyond the fixed table](m1-agx-syncobj-namespace.md),
+[fallible syncobj creation before publication](m1-agx-syncobj-create.md),
 [binary syncobj SIGNAL](m1-agx-syncobj-signal.md),
 [binary syncobj reset](m1-agx-syncobj-reset.md),
 [binary wait storage beyond 64 handles](m1-agx-wait-storage.md),
