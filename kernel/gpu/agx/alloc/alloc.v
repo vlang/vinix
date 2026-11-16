@@ -114,7 +114,7 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 			va: va
 			size: aligned_size
 			in_use: true
-		}
+		} @[freed]
 		h.allocations << a
 		return va
 	}
@@ -126,7 +126,7 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 		va: va
 		size: aligned_size
 		in_use: true
-	}
+	} @[freed]
 	h.allocations << a
 
 	return va
@@ -181,6 +181,9 @@ fn (mut h HeapAllocator) gc_locked() {
 			if a.va + a.size == h.top && !a.in_use {
 				h.top = a.va
 				h.allocations.delete(idx)
+				// The heap lock excludes every metadata reader. Unlink before
+				// freeing; interior records remain owned until GC reaches them.
+				unsafe { free(a) }
 				progress = true
 				idx--
 				continue
@@ -191,7 +194,9 @@ fn (mut h HeapAllocator) gc_locked() {
 }
 
 // Return the total number of bytes currently in use (allocated and not freed).
-pub fn (h &HeapAllocator) used() u64 {
+pub fn (mut h HeapAllocator) used() u64 {
+	h.lock.acquire()
+	defer { h.lock.release() }
 	mut total := u64(0)
 	for a in h.allocations {
 		if a.in_use {
@@ -203,7 +208,9 @@ pub fn (h &HeapAllocator) used() u64 {
 
 // Return the number of bytes remaining between the allocation frontier
 // and the end of the managed region.
-pub fn (h &HeapAllocator) available() u64 {
+pub fn (mut h HeapAllocator) available() u64 {
+	h.lock.acquire()
+	defer { h.lock.release() }
 	if h.top >= h.end {
 		return 0
 	}

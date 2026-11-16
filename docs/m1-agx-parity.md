@@ -6,12 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [completion before deferred cleanup](m1-agx-completion-order.md)
-(2026-11-17). Render and compute publish their hardware result before backing
-disposal. Refused cleanup retains the graph without changing successful work
-into a failure; callback state is consumed once and render results stay cached.
-Modern ioctl/Mesa integration and remaining stage backing/event destruction
-are incomplete. The [compute event admission credit](m1-agx-compute-credits.md),
+Latest offline increment: [GPU heap metadata reclamation](m1-agx-heap-records.md)
+(2026-11-17). GC now frees unlinked allocation records and serializes metadata
+readers. A measured 10,000-cycle host retention of 320,000 bytes is eliminated;
+native slab rates remain unmeasured. Modern ioctl/Mesa integration and remaining
+stage backing/event destruction are incomplete. The
+[completion before deferred cleanup](m1-agx-completion-order.md),
+[compute event admission credit](m1-agx-compute-credits.md),
 [render event admission credit](m1-agx-event-credits.md),
 [render-stage timestamp ownership](m1-agx-stage-timestamps.md),
 [independent render ring retirement](m1-agx-render-retirement.md),
