@@ -14,6 +14,8 @@ fn air_float_intrinsic(name string) !(ScalarIntrinsic, int) {
 		'air.round.f32' { ScalarIntrinsic.round, 5 }
 		'air.rint.f32' { ScalarIntrinsic.rint, 6 }
 		'air.fma.f32' { ScalarIntrinsic.fma, 7 }
+		'air.fmin.f32' { ScalarIntrinsic.air_fmin, 8 }
+		'air.fmax.f32' { ScalarIntrinsic.air_fmax, 9 }
 		else { return error('AIR intrinsic: unsupported AIR float overload') }
 	}
 }

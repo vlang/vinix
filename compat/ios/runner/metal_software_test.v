@@ -5182,6 +5182,8 @@ declare float @air.sqrt.f32(float) #0
 declare float @air.round.f32(float) #0
 declare float @air.rint.f32(float) #0
 declare float @air.fma.f32(float, float, float) #0
+declare float @air.fmin.f32(float, float) #0
+declare float @air.fmax.f32(float, float) #0
 declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
@@ -5285,7 +5287,33 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  %fused_expected = select i1 %odd, i32 679477248, i32 2826960896
  %fused_ok = icmp eq i32 %fused_word, %fused_expected
  %fma_ok = and i1 %affine_ok, %fused_ok
- %float_ok = and i1 %float_unary_ok, %fma_ok
+ %float_before_extrema_ok = and i1 %float_unary_ok, %fma_ok
+ %low = call float @air.fmin.f32(float %xf, float %yf)
+ %high = call float @air.fmax.f32(float %xf, float %yf)
+ %less = fcmp olt float %xf, %yf
+ %low_expected = select i1 %less, float %xf, float %yf
+ %high_expected = select i1 %less, float %yf, float %xf
+ %low_ok = fcmp oeq float %low, %low_expected
+ %high_ok = fcmp oeq float %high, %high_expected
+ %prefer_low = call float @air.fmin.f32(float bitcast (i32 2143289344 to float), float %xf)
+ %prefer_high = call float @air.fmax.f32(float %yf, float bitcast (i32 2143289344 to float))
+ %prefer_low_ok = fcmp oeq float %prefer_low, %xf
+ %prefer_high_ok = fcmp oeq float %prefer_high, %yf
+ %first_zero = select i1 %odd, float bitcast (i32 2147483648 to float), float 0.0
+ %second_zero = select i1 %odd, float 0.0, float bitcast (i32 2147483648 to float)
+ %zero_low = call float @air.fmin.f32(float %first_zero, float %second_zero)
+ %zero_high = call float @air.fmax.f32(float %first_zero, float %second_zero)
+ %first_zero_word = bitcast float %first_zero to i32
+ %zero_low_word = bitcast float %zero_low to i32
+ %zero_high_word = bitcast float %zero_high to i32
+ %zero_low_ok = icmp eq i32 %zero_low_word, %first_zero_word
+ %zero_high_ok = icmp eq i32 %zero_high_word, %first_zero_word
+ %extrema_pair0 = and i1 %low_ok, %high_ok
+ %extrema_pair1 = and i1 %prefer_low_ok, %prefer_high_ok
+ %extrema_pair2 = and i1 %zero_low_ok, %zero_high_ok
+ %extrema_pair3 = and i1 %extrema_pair0, %extrema_pair1
+ %extrema_ok = and i1 %extrema_pair2, %extrema_pair3
+ %float_ok = and i1 %float_before_extrema_ok, %extrema_ok
  %coordinate = or i32 %x, 0
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate

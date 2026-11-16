@@ -1,5 +1,13 @@
 # Software Metal backend
 
+Prepared pipelines execute binary `air.fmin.f32` and `air.fmax.f32`. These
+prefer the numeric argument to a NaN and preserve the first argument on numeric
+ties, including opposite signed zeros. Separate AIR IDs preserve the existing
+LLVM extrema behavior. The canonicalization image checks coordinate extrema,
+NaN preference and both first-zero signs before the independent RGBA8 oracle.
+Exact float32 signatures and ordinary pure calls are required; other AIR widths,
+vectors, fast spellings and floating addresses remain excluded.
+
 Prepared pipelines execute ternary `air.fma.f32` through the existing exact
 float32 fused multiply-add evaluator. The canonicalization image checks a
 coordinate-dependent affine value and alternating cancellation signs whose

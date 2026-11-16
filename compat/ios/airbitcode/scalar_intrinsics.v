@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow fptosi_sat fptoui_sat canonicalize smulh umulh vector_reverse vector_splice_left vector_splice_right vector_interleave2 vector_interleave3 vector_interleave4 vector_interleave5 vector_interleave6 vector_interleave7 vector_interleave8 stepvector active_lane_mask vector_extract vector_insert }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow fptosi_sat fptoui_sat canonicalize smulh umulh vector_reverse vector_splice_left vector_splice_right vector_interleave2 vector_interleave3 vector_interleave4 vector_interleave5 vector_interleave6 vector_interleave7 vector_interleave8 stepvector active_lane_mask vector_extract vector_insert air_fmin air_fmax }
 // Validation remains the caller's responsibility. This evaluates only decoded,
 // admitted intrinsics; it never calls the declaration or a host function pointer.
 fn (m &IntegerMachine) intrinsic_value(ir IRModule, op IRTypedInstruction) !IntegerValue {
@@ -23,7 +23,7 @@ fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	if vector_interleave_intrinsic(id) { return 2 + int(id) - int(ScalarIntrinsic.vector_interleave2) }
 	if scalar_integer_overflow(id) || scalar_integer_mulh(id) { return 2 }
 	if id in [.fma, .fmuladd, .fshl, .fshr, .vector_splice_left, .vector_splice_right, .vector_insert]! { return 3 }
-	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { 2 } else { 1 }
+	return if id in [.air_fmin, .air_fmax, .copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	if name.starts_with('air.') && name.ends_with('.f32') { id, _ := air_float_intrinsic(name)!; return id }
@@ -210,6 +210,7 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if scalar_integer_zero_count(id) { return error('AIR intrinsic: zero counts require poison-aware evaluation') }
 	if scalar_integer_intrinsic(id) { return scalar_integer_intrinsic_value(id, bits, a)! }
 	if bits !in [u32(16), 32]! { return error('AIR intrinsic: floating width') }
+	if id in [.air_fmin, .air_fmax]! { return scalar_air_float_extremum(id, bits, a, b)! }
 	if id == .canonicalize { return canonical_float(bits, a) }
 	if id in [.fma, .fmuladd]! { return error('AIR intrinsic: three multiply-add arguments required') }
 	if id == .is_fpclass {
