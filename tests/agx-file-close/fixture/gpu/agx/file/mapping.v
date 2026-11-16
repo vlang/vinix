@@ -157,7 +157,7 @@ fn check_mapping_retirement() {
 	raced.objects.table.add_created(race_object)
 	destroying_vm_file = &raced
 	klock.before_once(unsafe { &raced.lock }, destroy_before_bind)
-	assert raced.ioctl_gem_bind(bind(7, 1, 0x4000)) == -22
+	assert raced.ioctl_gem_bind(bind(7, 1, 0x4000)) == -2
 	assert race_pt.destroyed && race_pt.maps == 0 && raced.mappings.len == 0
 	assert race_object.references == 1 && raced.close() && gem.live() == 0
 	destroying_vm_file = unsafe { nil }

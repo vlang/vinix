@@ -62,3 +62,10 @@ queue output IDs, allocation counters, live VM/queue identities and resource
 counts unchanged. A successful queue/VM destruction followed by a repeated
 request checks removed identities without double teardown. Fixture cleanup
 frees successful logical queue metadata only after every consumer is gone.
+
+Binding VM lookup cases cover BIND, UNBIND and UNBIND_ALL. Invalid operation
+fields and global VA ranges return EINVAL before lookup; well-formed missing,
+removed or foreign-file VM names return ENOENT. A found VM's private reservation
+and page-table state are checked under the mutation lock. Failures preserve
+live mappings, BO references, PTE and firmware-flush counts and neighboring VMs.
+This does not qualify the full packaged bind ABI or BO-versus-VM error ordering.

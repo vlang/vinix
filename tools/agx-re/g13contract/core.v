@@ -441,6 +441,8 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_bind_vm_lookup_contract(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/vm/vm.v'))!, read(os.join_path(base, 'file.rs'))!)!
 	check_submit_lookup_order_contract(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(base, 'file.rs'))!)!
 	check_identity_lookup_contract(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(base, 'file.rs'))!)!
 	check_asahi_sync_lookup_contract(read(os.join_path(repo, 'kernel/gpu/agx/submission/submission.v'))!,
@@ -696,6 +698,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
+		'Bind operations validate global fields before absent-VM ENOENT and check the private reservation under the VM mutation lock',
 		'Missing submit queues precede command/sync staging, with no borrowed queue across copies and locked backend revalidation',
 		'Absent VM/queue identities return ENOENT during VM destroy, queue create/destroy and submission without confusing invalid internal VM state',
 		'VM-private BO domains reject foreign/recreated VMs, import, kernel timestamp mapping and PRIME export before publication',

@@ -2,6 +2,7 @@
 import os
 
 const helpers = [
+	'vm__valid_bind_shape',
 	'gpu__agx__file__GpuFile__submission_queue_exists',
 	'drm__ioctl_syncobj_create',
 	'syncobj__new_syncobj_with_flags',

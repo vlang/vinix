@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [submit queue lookup before staging](m1-agx-submit-lookup-order.md)
-(2026-11-16). The [VM and queue identity lookup errors](m1-agx-identity-lookup.md),
+Latest offline increment: [bind VM lookup and global validation](m1-agx-bind-vm-lookup.md)
+(2026-11-16). The [submit queue lookup before staging](m1-agx-submit-lookup-order.md),
+[VM and queue identity lookup errors](m1-agx-identity-lookup.md),
 [submission syncobj lookup errors](m1-agx-sync-lookup.md),
 [descriptor reservation during export](m1-agx-export-reservation.md),
 [timeline lookup at UINT64_MAX](m1-agx-timeline-boundary.md),

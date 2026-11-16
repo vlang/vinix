@@ -20,7 +20,27 @@ fn bind_request() ioctl.DrmAsahiGemBind {
 	}
 }
 
+fn check_bind_shapes() {
+	for base in [bind_request(), ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind, addr: agxvm.user_start, range: agxvm.page_size },
+		ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, handle: 7 }] {
+		assert agxvm.valid_bind_shape(&base)
+		mut request := base; request.vm_id = ~u32(0)
+		assert agxvm.valid_bind_shape(&request)
+		request.extensions = 1; assert !agxvm.valid_bind_shape(&request)
+		request = base; request.op = ~u32(0); assert !agxvm.valid_bind_shape(&request)
+		request = base; request.addr = agxvm.address_space_end; assert !agxvm.valid_bind_shape(&request)
+		request = base; request.range = ~u64(0); assert !agxvm.valid_bind_shape(&request)
+		if base.op != ioctl.asahi_bind_op_unbind_all {
+			request = base; request.addr = 0x100000000
+			assert agxvm.valid_bind_shape(&request)
+			assert !agxvm.valid_bind_request(&request, 0x100000000, 0x120000000)
+		}
+	}
+	println('AGX bind shapes: VM-independent operation/global-range checks and deferred private-hole validation passed')
+}
+
 fn main() {
+	check_bind_shapes()
 	mut identities := agxvm.IdentityPool{}
 	for expected := u64(1); expected < 10001; expected++ {
 		assert (identities.allocate() or { panic('identity') }) == expected

@@ -622,10 +622,11 @@ pub fn (mut f GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) 
 
 pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	request := unsafe { data }
+	if !agxvm.valid_bind_shape(request) { return -22 }
 	// Keep VM/page-table and handle lookup stable through mapping mutation.
 	f.lock.acquire()
 	defer { f.lock.release() }
-	ctx := f.find_vm(request.vm_id) or { return -22 }
+	ctx := f.find_vm(request.vm_id) or { return -2 }
 	if ctx.pgtable == unsafe { nil }
 		|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) {
 		return -22

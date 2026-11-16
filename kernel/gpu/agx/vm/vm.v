@@ -56,6 +56,12 @@ pub fn valid_user_range(address u64, size u64, kernel_start u64, kernel_end u64)
 // Validate fields according to their operation before either backend looks up
 // a BO or changes mappings. In particular, UNBIND_ALL names a BO by handle and
 // does not carry a VA range.
+pub fn valid_bind_shape(request &ioctl.DrmAsahiGemBind) bool {
+	// An empty reservation excludes no addresses. Validate the global range
+	// and operation fields before looking up the VM's actual reservation.
+	return valid_bind_request(request, 0, 0)
+}
+
 pub fn valid_bind_request(request &ioctl.DrmAsahiGemBind, kernel_start u64,
 	kernel_end u64) bool {
 	if request.extensions != 0 {
