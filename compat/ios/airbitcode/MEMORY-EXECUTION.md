@@ -1,5 +1,23 @@
 # Bounded memory execution
 
+`llvm.get.active.lane.mask` accepts fixed 1..16-lane i1 results and two
+matching scalar i1..i64 arguments. Lane j is true when mathematical base+j
+is below the unsigned limit; overflow lanes are false. Exact canonical names,
+signatures, direct identity and call metadata are checked. A call costs one
+executed step, one result slot and result_count validation work units. Keys
+42628..43651 append 1,024 identities; previous keys retain their values.
+Poison arguments poison every lane. A vector freeze chooses zero for these
+lanes; unfrozen scalar undef arguments remain outside execution.
+
+Pure integer addresses use existing scalar comparison/subtraction/AND and
+packed selector nodes. The distance calculation uses i64 after argument
+normalization, so tiny argument widths do not narrow lane numbers. Invalid
+selectors remain poison through vector freezes and reject before writes.
+The existing graph bounds, caches and ownership apply. The maintained
+`tests/ios/air-active-mask.v` compares both memory APIs and scalar/integer
+results against independent widened-add LLVM references; its controls checker
+covers state, loop reuse and admission limits.
+
 `llvm.stepvector` generates fixed 1..16-lane i8..i64 vectors containing
 0, 1, 2, ... . It is an ordinary direct zero-argument intrinsic: the operand
 list contains only the callee and the signature contains only its result.

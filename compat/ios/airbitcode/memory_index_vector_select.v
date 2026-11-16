@@ -105,6 +105,8 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 			node = b.project_vector_splice(source, selector, producer, depth)!
 		} else if code == 34 && op.callee_function >= 0 && op.callee_function < b.ir.functions.len && b.ir.functions[op.callee_function].name.starts_with('llvm.vector.interleave') {
 			node = b.project_vector_interleave(source, selector, producer, depth)!
+		} else if code == 34 && op.callee_function >= 0 && op.callee_function < b.ir.functions.len && b.ir.functions[op.callee_function].name.starts_with('llvm.get.active.lane.mask.') {
+			node = b.project_active_mask(selector, producer, depth)!
 		} else if code == 34 && op.callee_function >= 0 && op.callee_function < b.ir.functions.len && b.ir.functions[op.callee_function].name.starts_with('llvm.stepvector.') {
 			node = b.project_vector_step(source, selector, producer)!
 		} else if code == 34 {

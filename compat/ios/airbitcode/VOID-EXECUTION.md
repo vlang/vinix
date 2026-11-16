@@ -1,5 +1,15 @@
 # Void-return scalar execution
 
+Fixed 1..16-lane `llvm.get.active.lane.mask` calls accept matching i1..i64
+scalar base/limit arguments and produce i1 lanes. Mathematical addition is
+used: overflow cannot reactivate lanes. Poison propagates to all lanes and
+vector freezes repair poison; scalar undef arguments require a prior scalar
+freeze. Scalar/integer, discarded void and memory execution use the same
+owned result slots, including vector-PHI loops. One executed step and
+result_count validation work units are charged. Keys 42628..43651 append
+1,024 identities, bringing the vector cache to 43,652 entries; the scalar
+cache remains 2,154. Existing work, slot and graph bounds remain.
+
 Fixed 1..16-lane i8..i64 `llvm.stepvector` calls construct defined lane numbers
 without source operands. Exact direct zero-argument signatures are required;
 missing arguments to older intrinsic families remain invalid. Calls cost one

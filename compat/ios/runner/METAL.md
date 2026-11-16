@@ -1,5 +1,14 @@
 # Software Metal backend
 
+AIR `llvm.get.active.lane.mask` executes fixed i1 masks of up to 16 lanes
+from matching i1..i64 scalar base/limit arguments. Lanes beyond the unsigned
+limit, including those beyond integer overflow, are false. Prepared software
+pipelines can project these masks into bounded addresses. The size fixture
+checks i1/i8/i32/i64 arguments, coordinate calculations and RGBA8 readback.
+The maintained active-mask reference and controls programs cover all admitted
+widths/counts, state and loop slot reuse. This extends CPU software Metal;
+native GPU execution and Fortnite launch remain unverified.
+
 AIR `llvm.stepvector` generates fixed 1..16-lane i8..i64 index sequences in
 prepared software pipelines. The zero-argument call path retains exact direct
 declaration, signature and metadata validation. Generated indices may feed
