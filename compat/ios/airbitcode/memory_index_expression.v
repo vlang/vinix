@@ -16,6 +16,7 @@ enum MemoryIndexKind {
 	shuffle_selector
 	shuffle_lane
 	projected_shuffle
+	projected_binary
 	projected_freeze
 	projected_extract
 	binary
@@ -488,6 +489,12 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			}
 			.binary {
 				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!
+			}
+			.projected_binary {
+				// Vector arithmetic observes every operand lane, even when an
+				// extraction or later select would ignore its result.
+				if undefs[node.left] || undefs[node.right] { return error('AIR vector: undef binary lane') }
+				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{value: values[node.left], poison: poisons[node.left]}, IntegerValue{value: values[node.right], poison: poisons[node.right]})!
 			}
 			.compare {
 				value = integer_compare_flags(node.opcode, node.flags, node.source_bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!

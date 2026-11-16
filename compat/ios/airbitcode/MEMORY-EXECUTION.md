@@ -240,7 +240,7 @@ or an independently poisoned GEP root. No owned field or runtime heap array is a
 
 Vector sources also accept nested vector selects with a scalar i1 condition.
 Arms may be direct integer vector arguments, supported constants, freezes,
-insertions, shuffles or further scalar-condition selects. Both arms and the condition
+insertions, shuffles, integer arithmetic or further scalar-condition selects. Both arms and the condition
 are validated even for literal conditions. Undef in an unchosen vector arm remains unobserved;
 a chosen undef lane errors at the final extraction, even under a later scalar
 select/freeze. A source vector freeze may repair it first. Poison conditions
@@ -276,7 +276,7 @@ the existing limits, including cached subtrees.
 all 64 lane/insertion widths, lane repair, poison/undef, nested insertion/select/
 freeze composition, exact graph limits,
 cache isolation and all three memory APIs. Older constructed-source rejection
-fixtures use unsupported vector arithmetic; retained historical evidence is unchanged.
+fixtures use unsupported vector casts; retained historical evidence is unchanged.
 
 `shufflevector` supplies address lanes from the same pure integer vector
 sources. Its result may independently contain 1..16 lanes, matching the inputs'
@@ -285,7 +285,7 @@ undef entries produce poison lanes. Selected source undef stays deferred until
 final extraction or repair by a source freeze/insertion. Both complete sources
 and every mask entry validate, even when unselected. Normalized entries must
 match the original mask constant; negative integer entries cannot impersonate
-poison tags. Vector arithmetic, loaded/PHI sources and vector conditions remain
+poison tags. Floating arithmetic, vector casts, loaded/PHI sources and vector conditions remain
 excluded from address graphs.
 
 Two existing POD words pack the sixteen mask bytes, with 255 reserved for
@@ -298,6 +298,27 @@ node/depth budgets, including cache hits. No owned field or runtime array is
 added. `tests/ios/air-memory-vector-shuffle-index.v LLVM_AS FRESH_EXTERNAL_DIR`
 checks both-source permutations, broadcasts, resized results, upper mask bytes,
 poison/undef and frozen/unfrozen selection, exact limits and malformed masks.
+
+Integer vector binary operations also feed pure addresses: add/sub/mul,
+unsigned/signed division and remainder, shifts, and/or/xor, including the
+existing nuw/nsw/exact/disjoint promises. Every operand lane is evaluated.
+Any undef lane, invalid division/remainder or poison division operand rejects
+the address dependency before writes, including ignored lanes, invalid extracts,
+later unchosen selects and result freezes. Other poison remains lane-local and
+may be ignored by extraction or repaired with a result vector freeze. Freezing
+the sources first repairs their indeterminate lanes before arithmetic, but does
+not suppress errors introduced by the arithmetic itself.
+
+Each binary instruction builds one contiguous table of all result lanes and
+caches POD metadata under the existing vector tag. Static selectors project
+both full operands; binary nodes reject undef and use the existing integer
+evaluator. Dynamic extraction reads the table through the existing constant-lane
+node. Metadata retains the maximum height across every lane, with all dependencies
+charged to the 256-node/32-level limits, including cache hits. Two fixed 16-int
+builder arrays hold temporary indices; no owned field or runtime array is added.
+`tests/ios/air-memory-vector-binary-index.v LLVM_AS FRESH_EXTERNAL_DIR` covers
+all widths, thirteen opcodes/thirty flag variants, whole-vector errors and
+lane-local poison, source/result freezing and exact cached graph boundaries.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result
