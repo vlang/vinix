@@ -60,6 +60,7 @@ fn sm_sampler_worker(api SMSamplerAPI, device u64, descriptor u64) {
 }
 fn test_software_metal_samplers() {
 	$if !ios_metal_software ? { return }
+	if os.args.len == 2 && os.args[1] == '--software-metal-indirect' { sm_test_indirect_focus()!; exit(0) }
 	if os.args.len == 2 && os.args[1] == '--software-metal-group-coordinates' {
 		sm_test_group_coordinates_focus()!
 		exit(0)
@@ -4086,6 +4087,64 @@ fn sm_test_multigrid_focus() ! {
 		objc_release(output); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool); objc_stop()
 	}
 	line := 'IOS-SOFTWARE-METAL-MULTIGRIDS: ${complete} completed dispatches, ${invocations} successful invocations, ${failed} cold/poison command failures, ${coordinates} independently enumerated coordinates, ${geometry} geometry/budget controls, ${cases.len} first/edge group fixtures, both selectors, 2D/3D partial groups and two drained runtimes PASS\n'
+	os.write_file(out + '/result.txt', line)!; print(line)
+}
+type SMIndirectDispatch = fn (u64, &char, u64, u64, SoftwareMetalSize)
+fn sm_test_indirect(encoder u64, buffer u64, offset u64, group SoftwareMetalSize) {
+	unsafe { SMIndirectDispatch(voidptr(C.ios_objc_msgsend))(encoder, c'dispatchThreadgroupsWithIndirectBuffer:indirectBufferOffset:threadsPerThreadgroup:', buffer, offset, group) }
+}
+fn sm_test_indirect_focus() ! {
+	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR')
+	sm_grid_check(base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/'), 'external indirect output')
+	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/indirect' } else { '/normal/indirect' }
+	sm_grid_check(!os.exists(out), 'fresh indirect output'); os.mkdir_all(out)!
+	source := 'target datalayout = "e-p:64:64"\ndefine void @run(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) { %x = extractelement <3 x i32> %gid, i32 0\n %y = extractelement <3 x i32> %gid, i32 1\n %z = extractelement <3 x i32> %gid, i32 2\n %w = extractelement <3 x i32> %grid, i32 0\n %h = extractelement <3 x i32> %grid, i32 1\n %zy = mul i32 %z, %h\n %row = add i32 %zy, %y\n %start = mul i32 %row, %w\n %index = add i32 %start, %x\n %p = getelementptr i32, ptr addrspace(1) %out, i32 %index\n %v = add i32 %index, 17\n store i32 %v, ptr addrspace(1) %p, align 4\n ret void }\ndefine void @seed(ptr addrspace(1) %out) { store i32 7, ptr addrspace(1) %out, align 4\n %y = getelementptr i32, ptr addrspace(1) %out, i32 1\n store i32 3, ptr addrspace(1) %y, align 4\n %z = getelementptr i32, ptr addrspace(1) %out, i32 2\n store i32 2, ptr addrspace(1) %z, align 4\n ret void }\n!air.kernel = !{!0, !10}\n!0 = !{ptr @run, !1, !2}\n!1 = !{}\n!2 = !{!5, !4, !3}\n!3 = !{i32 0, !"air.thread_position_in_grid"}\n!4 = !{i32 1, !"air.threads_per_grid"}\n!5 = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n!10 = !{ptr @seed, !1, !11}\n!11 = !{!12}\n!12 = !{i32 0, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n'
+	os.write_file(out + '/input.ll', source)!
+	r := os.exec(['/opt/homebrew/opt/llvm/bin/llvm-as', out + '/input.ll', '-o', out + '/input.bc'])
+	os.write_file(out + '/assemble.log', r.output)!; sm_grid_check(r.exit_code == 0, r.output)
+	code := os.read_bytes(out + '/input.bc')!; bytes := sm_library_code_fixture(['run', 'seed'], code, true, true, true)
+	defer { unsafe { code.free(); bytes.free() } }
+	mut rows := os.create(out + '/comparisons.txt')!; defer { rows.close() }
+	mut complete := 0; mut failed := 0; mut empty := 0; mut rejected := 0; mut invocations := u64(0)
+	for cycle in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
+		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); queue := sm_send(device, c'newCommandQueue')
+		pipeline := sm_test_compute_pipeline(device, library, 'run', unsafe { nil }); seed := sm_test_compute_pipeline(device, library, 'seed', unsafe { nil })
+		sm_grid_check(pipeline != 0 && seed != 0, 'indirect pipelines')
+		for mode in 0 .. 16 {
+			group := if mode < 9 { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{3, 2, 2}, SoftwareMetalSize{4, 4, 4}]![mode % 3] } else { SoftwareMetalSize{1, 1, 1} }
+			counts := if mode < 9 { [u32(7), 3, 2]! } else if mode == 9 { [u32(4096), 1, 1]! } else if mode < 13 { [if mode == 10 { u32(0) } else { ~u32(0) }, if mode == 11 { u32(0) } else { u32(1) }, if mode == 12 { u32(0) } else { u32(1) }]! } else { [if mode == 13 { u32(4097) } else if mode == 14 { ~u32(0) } else { u32(7) }, u32(1), u32(1)]! }
+			arguments := sm_test_buffer(device, 64, 0); ap := sm_send(arguments, c'contents'); input := sm_test_buffer(device, 12, 0); ip := sm_send(input, c'contents')
+			output := sm_test_buffer(device, if mode == 15 { u64(28) } else { u64(16416) }, 0); op := sm_send(output, c'contents'); length := sm_send(output, c'length')
+			command := sm_send(queue, c'commandBuffer')
+			if mode >= 3 && mode < 6 { blit := sm_send(command, c'blitCommandEncoder'); sm_test_copy(blit, input, 0, arguments, 16, 12); sm_call(blit, c'endEncoding') }
+			if mode >= 6 && mode < 9 {
+				writer := sm_send(command, c'computeCommandEncoder'); unsafe { SMSet(voidptr(C.ios_objc_msgsend))(writer, c'setComputePipelineState:', seed) }
+				sm_test_compute_buffer(writer, arguments, 16, 7); sm_grid_dispatch(writer, c'dispatchThreads:threadsPerThreadgroup:', SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{1, 1, 1}); sm_call(writer, c'endEncoding')
+			}
+			encoder := sm_send(command, c'computeCommandEncoder'); unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+			sm_test_compute_buffer(encoder, output, 16, 7)
+			if mode == 0 { for bad in 0 .. 6 {
+				child := C.fork(); sm_grid_check(child >= 0, 'indirect fork')
+				if child == 0 { C.close(1); C.close(2); sm_test_indirect(encoder, if bad == 3 { u64(0) } else { arguments }, if bad == 0 { u64(1) } else if bad == 1 { u64(56) } else if bad == 2 { ~u64(0) } else { u64(16) }, SoftwareMetalSize{if bad == 4 { u64(0) } else if bad == 5 { u64(257) } else { u64(1) }, 1, 1}); C._exit(0) }
+				mut status := 0; sm_grid_check(C.waitpid(child, &status, 0) == child && status == 256, 'indirect encoding refusal'); rejected++
+			} }
+			sm_test_indirect(encoder, arguments, 16, group); sm_test_compute_offset(encoder, 20, 7); sm_call(encoder, c'endEncoding')
+			unsafe { C.memset(voidptr(ap), 0xcc, 64); C.memcpy(voidptr(ip), &counts[0], 12); C.memset(voidptr(op), 0xcc, usize(length)) }
+			if mode < 3 || mode >= 9 { unsafe { C.memcpy(voidptr(ap + 16), &counts[0], 12) } }
+			objc_release(arguments); objc_release(input); objc_release(output)
+			sm_call(command, c'commit')
+			bad := mode >= 13; zero := mode >= 10 && mode < 13
+			sm_grid_check(sm_send(command, c'status') == if bad { u64(5) } else { u64(4) }, 'indirect completion')
+			n := if bad || zero { u64(0) } else { u64(counts[0]) * u64(counts[1]) * u64(counts[2]) * group.width * group.height * group.depth }
+			for j in 0 .. int(length / 4) { expected := if j >= 4 && u64(j - 4) < n { u32(j - 4 + 17) } else { u32(0xcccccccc) }; if unsafe { *(&u32(op + u64(j * 4))) } != expected { panic('indirect case ${mode} word ${j}') } }
+			if bad { failed++ } else if zero { empty++ } else { complete++; invocations += n }
+			rows.writeln('${cycle} ${mode} PASS')!
+		}
+		objc_release(seed); objc_release(pipeline); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool)
+		sm_grid_check(ios_runtime.live == 0 && ios_runtime.objects.len == 0, 'drained indirect runtime'); objc_stop()
+	}
+	line := 'IOS-SOFTWARE-METAL-INDIRECT: ${complete} dispatches, ${invocations} invocations, ${empty} empty grids, ${failed} deferred failures, ${rejected} encoding refusals, CPU/blit/compute counts, retained buffers and two drained runtimes PASS\n'
 	os.write_file(out + '/result.txt', line)!; print(line)
 }
 fn sm_group_coordinate_vector(variant int, arg int) bool {

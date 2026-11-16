@@ -30,7 +30,9 @@ Implemented Objective-C API:
   `setBytes:length:atIndex:`, `setBufferOffset:atIndex:`,
   `setBuffers:offsets:withRange:`,
   `dispatchThreads:threadsPerThreadgroup:`,
-  `dispatchThreadgroups:threadsPerThreadgroup:`, `endEncoding`.
+  `dispatchThreadgroups:threadsPerThreadgroup:`,
+  `dispatchThreadgroupsWithIndirectBuffer:indirectBufferOffset:threadsPerThreadgroup:`,
+  `endEncoding`.
 - Buffer: `contents`, `length`, `device`, `storageMode`, `cpuCacheMode`,
   `newTextureWithDescriptor:offset:bytesPerRow:`.
 - Queue: `commandBuffer`, `device`.
@@ -485,7 +487,7 @@ conditions. Literal metadata and duplicate values reject before stores. Deferred
 dispatches check scalar/pair PHIs, case/default tags and overflowing results;
 a 65-case pipeline rejects. Loops and general SSA buffer indexes remain excluded.
 
-Both compute dispatch selectors accept nonempty 1D, 2D and 3D grids and
+Both direct compute dispatch selectors accept nonempty 1D, 2D and 3D grids and
 threadgroups. Each dispatch permits at most 4,096 invocations and 256 threads
 per group in total. `dispatchThreadgroups` multiplies group counts by group
 dimensions after checking the complete volumes; `dispatchThreads` uses the exact
@@ -496,6 +498,24 @@ The conservative per-function step bound multiplied by invocation count must
 not exceed 1,000,000. The reported thread execution width is one, maximum group
 size is 256 and static threadgroup memory is zero. Loops, memory-dependent indexes, texture access,
 barriers and threadgroup memory remain outside this profile.
+Indirect dispatch retains a same-device buffer and a four-byte-aligned offset
+covering three UInt32 group counts (12 bytes). It captures the requested group
+dimensions and ordinary pipeline/buffer bindings at encoding, then reads counts
+once when the command executes, after preceding blits or compute operations.
+Any zero count produces no invocations. Nonzero counts pass the existing volume
+and instruction limits before any invocation writes; invalid counts or output
+addresses fail the command. Earlier commands retain their effects. Encoding
+validates the group dimensions and the instruction cost of at least one group,
+even if the eventual counts are zero. Indirect command buffers and indirect
+`dispatchThreads` are not supported.
+
+`tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR indirect` checks counts
+supplied after encoding by the CPU, a prior blit and a prior compute dispatch;
+3D grids, maximum work, zero axes, deferred volume/bounds failures, encoding
+offset/range/group refusals, retained resources and output offset snapshots run
+in both hashing modes with two drained runtimes each. The ABI follows
+[Apple's indirect dispatch layout](https://developer.apple.com/documentation/metal/mtldispatchthreadgroupsindirectarguments).
+
 Setting a buffer accepts nil to clear a slot; dispatch requires every argument
 to have an in-bounds, aligned binding from the queue's device. Encoding checks
 state and resource requirements before recording work.

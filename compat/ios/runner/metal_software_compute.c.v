@@ -164,8 +164,11 @@ mut:
 	grid_threads u64
 	grid_size SoftwareMetalSize
 	group_size SoftwareMetalSize
+	indirect_buffer u64
+	indirect_offset u64
 }
 fn sm_compute_bindings_free(state &SoftwareMetalComputeBindings) {
+	objc_release(state.indirect_buffer)
 	objc_release(state.pipeline)
 	for buffer in state.buffers { objc_release(buffer) }
 	C.free(state)
@@ -352,6 +355,22 @@ fn sm_compute_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, grou
 	h := sm_compute_active(encoder)
 	sm_compute_validate(h.metal_compute)
 	plan := sm_compute_grid_plan(ctext(u64(selector)) == 'dispatchThreadgroups:threadsPerThreadgroup:', grid, group, obj_header(h.metal_compute.pipeline).metal_kernel.prepared.steps()) or { panic('iOS: ' + err.msg()) }
+	sm_compute_record(h, plan, 0, 0)
+}
+fn sm_compute_indirect(encoder u64, selector &char, buffer u64, offset u64, group SoftwareMetalSize) {
+	C.ios_objc_initialize_lock()
+	defer { C.ios_objc_initialize_unlock() }
+	h := sm_compute_active(encoder)
+	sm_compute_validate(h.metal_compute)
+	b := sm_check(buffer, 'VinixSoftwareMTLBuffer')
+	device := obj_header(obj_header(h.fields[0]).fields[0]).fields[0]
+	if b.fields[0] != device || offset % 4 != 0 || !sm_range(sm_buffer_length(b), offset, 12) { panic('iOS: invalid Metal indirect dispatch buffer/offset') }
+	// Validate the known group and one-group instruction cost now. Counts remain
+	// deferred so earlier copies or compute commands can produce them.
+	plan := sm_compute_grid_plan(true, SoftwareMetalSize{1, 1, 1}, group, obj_header(h.metal_compute.pipeline).metal_kernel.prepared.steps()) or { panic('iOS: ' + err.msg()) }
+	sm_compute_record(h, plan, buffer, offset)
+}
+fn sm_compute_record(h &ObjHeader, plan SoftwareMetalComputeGrid, indirect u64, offset u64) {
 	mut command := obj_header(h.fields[0]).software_metal
 	if command.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	mut snapshot := unsafe { &SoftwareMetalComputeBindings(C.malloc(sizeof(SoftwareMetalComputeBindings))) }
@@ -360,12 +379,22 @@ fn sm_compute_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, grou
 	snapshot.grid_threads = plan.threads
 	snapshot.grid_size = plan.grid
 	snapshot.group_size = plan.group
+	snapshot.indirect_buffer = objc_retain(indirect)
+	snapshot.indirect_offset = offset
 	objc_retain(snapshot.pipeline)
 	for buffer in snapshot.buffers { objc_retain(buffer) }
 	command.ops << SoftwareMetalCopy{compute: snapshot}
 }
 fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	k := obj_header(state.pipeline).metal_kernel
+	mut plan := SoftwareMetalComputeGrid{state.grid_threads, state.grid_size, state.group_size}
+	if state.indirect_buffer != 0 {
+		b := obj_header(state.indirect_buffer)
+		mut counts := [3]u32{}
+		unsafe { C.memcpy(&counts[0], voidptr(sm_storage_base(b) + state.indirect_offset), 12) }
+		if counts[0] == 0 || counts[1] == 0 || counts[2] == 0 { return }
+		plan = sm_compute_grid_plan(true, SoftwareMetalSize{u64(counts[0]), u64(counts[1]), u64(counts[2])}, state.group_size, k.prepared.steps())!
+	}
 	mut bindings := []airbitcode.IRMemoryBinding{cap: k.arguments.len}
 	mut has_values := false
 	for arg in k.arguments { if arg.value_lanes != 0 { has_values = true } }
@@ -384,9 +413,8 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	// All invocation addresses, even in cold blocks or the last partial group,
 	// must be valid before the first invocation writes. No AIR value is executed
 	// by this pass; arithmetic poison retains ordinary partial-write behavior.
-	plan := SoftwareMetalComputeGrid{state.grid_threads, state.grid_size, state.group_size}
 	for pass in 0 .. 2 {
-		for position in u64(0) .. state.grid_threads {
+		for position in u64(0) .. plan.threads {
 			if has_values {
 				words := plan.builtin_words(position)
 				for lane in 0 .. 24 { builtin_words[lane] = words[lane] }
@@ -412,5 +440,6 @@ fn sm_compute_start(device u64, command u64) {
 	sm_method(encoder, c'setBufferOffset:atIndex:', u64(unsafe { voidptr(sm_compute_set_offset) }), c'v32@0:8Q16Q24')
 	sm_method(encoder, c'setBuffers:offsets:withRange:', u64(unsafe { voidptr(sm_compute_set_buffers) }), c'v48@0:8r^@16r^Q24{_NSRange=QQ}32')
 	for selector in [c'dispatchThreadgroups:threadsPerThreadgroup:', c'dispatchThreads:threadsPerThreadgroup:']! { sm_method(encoder, selector, u64(unsafe { voidptr(sm_compute_dispatch) }), c'v64@0:8{MTLSize=QQQ}16{MTLSize=QQQ}40') }
+	sm_method(encoder, c'dispatchThreadgroupsWithIndirectBuffer:indirectBufferOffset:threadsPerThreadgroup:', u64(unsafe { voidptr(sm_compute_indirect) }), c'v56@0:8@16Q24{MTLSize=QQQ}32')
 	sm_method(encoder, c'endEncoding', u64(unsafe { voidptr(sm_end) }), c'v16@0:8')
 }
