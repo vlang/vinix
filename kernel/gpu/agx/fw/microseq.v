@@ -300,10 +300,12 @@ pub fn g13_microseq_start_compute_v13_5(legacy &G13MicroseqStartCompute,
 	return out
 }
 
-pub fn g13_microseq_finalize_compute_v13_5(legacy &G13MicroseqFinalizeCompute) G13MicroseqFinalizeComputeV135 {
+pub fn g13_microseq_finalize_compute_v13_5(legacy &G13MicroseqFinalizeCompute,
+	flag_address u64) G13MicroseqFinalizeComputeV135 {
 	mut out := G13MicroseqFinalizeComputeV135{}
 	g13_copy_bytes(voidptr(&out), 0, voidptr(legacy), 0, 0x18)
 	g13_copy_bytes(voidptr(&out), 0x18, voidptr(legacy), 0x1c, 0x48)
+	g13_put_u64(voidptr(&out), 0x6d, flag_address)
 	return out
 }
 

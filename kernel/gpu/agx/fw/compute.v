@@ -14,6 +14,7 @@ pub const g13_compute_cur_ts_offset = u64(0x2a8)
 pub const g13_compute_start_ts_offset = u64(0x2b0)
 pub const g13_compute_end_ts_offset = u64(0x2b8)
 pub const g13_compute_v13_5_size = u64(0x320)
+pub const g13_compute_v13_5_flag_offset = u64(0x305)
 
 @[packed]
 pub struct G13ComputeJobParameters1 {

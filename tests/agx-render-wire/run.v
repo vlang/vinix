@@ -21,6 +21,7 @@ fn main() {
 	initializer := section(prepare, 'vertex_start := fw.G13MicroseqStartVertex{', 'mut vertex_offset :=')!
 	production := 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.hw\n' +
 		section(source, 'fn write_g13_start_vertex(', 'fn write_g13_finalize_vertex(')! +
+		section(source, 'fn write_g13_start_compute(', 'struct G13EventResources {')! +
 		'fn encode(destination voidptr, v13_5 bool, sample Sample) u64 {\n' +
 		'job := sample.job; buffer := sample.buffer; mgr := sample.manager; vertex_queue := sample.queue; ctx := sample.context; resources := sample.resources; input := sample.input; vertex_attachments := sample.attachments\n' +
 		'abi := if v13_5 { hw.FirmwareAbi.v13_5_partial } else { hw.FirmwareAbi.v12_3 }\n' +
@@ -30,7 +31,7 @@ fn main() {
 		'vertex_unk_buf_0_offset := fw.g13_vertex_unk_buf_0_offset_for(abi) or { panic("job offset") }\n' + initializer +
 		'return write_g13_start_vertex(destination, v13_5, unsafe { &vertex_start }, sample.counter, sample.notifier)\n}\n'
 	os.write_file('${scratch}/gpu/production.v', production)!
-	os.write_file('${scratch}/main.v', 'import gpu\nfn main() { gpu.run_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import gpu\nfn main() { gpu.run_checks(); gpu.run_compute_finalize_checks() }\n')!
 	mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals']
 	$if arm64 {
 		flags << ['-exclude', '${repo}/kernel/klock/klock_amd64.v', '-exclude', '${repo}/kernel/katomic/katomic_amd64.v']

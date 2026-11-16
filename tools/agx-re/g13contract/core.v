@@ -441,6 +441,12 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_compute_flag_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/fw/microseq.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/fw/compute.v'))!)!
+	check_compute_flag_reference(read(os.join_path(base, 'queue/compute.rs'))!, read(os.join_path(base, 'fw/microseq.rs'))!,
+		read(os.join_path(base, 'fw/compute.rs'))!, read(os.join_path(base, 'fw/job.rs'))!, read(os.join_path(base, 'object.rs'))!,
+		read(os.join_path(base, 'event.rs'))!, read(os.join_path(base, 'fw/types.rs'))!, read(os.join_path(base, 'fw/workqueue.rs'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/fw/compute.v'))!)!
 	check_vertex_cluster_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/microseq.v'))!)!
 	check_vertex_cluster_reference(read(os.join_path(base, 'queue/render.rs'))!,
@@ -720,7 +726,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, unsafe { &vertex_start }, vertex_counter,', 'v13_5, &fragment_start, fragment_counter,',
 		'compute_counter := owned_queue.command_counter.reserve(1, v13_5)',
 		'fw.make_g13_compute_v13_5(run, compute_counter)',
-		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
+		'v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',
@@ -763,6 +769,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Device-wide firmware queue/notifier identity distinct from userspace handles',
 		'Firmware 13.5 auxiliary framebuffer tail defaults',
 		'Firmware 12.3 padding and 13.5 single-cluster vertex-start marker',
+		'Firmware 13.5 start/finalize share the source-derived compute flag word',
 		'Firmware 13.5 shared per-queue command/start counters']
 }
 

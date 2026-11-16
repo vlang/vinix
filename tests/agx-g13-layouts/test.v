@@ -370,9 +370,11 @@ fn check_v13_5_microsequences() {
 		job_params_2: 0x8182_8384_8586_8788
 		restart_branch_offset: -0x2345
 	}
-	final_compute_new := fw.g13_microseq_finalize_compute_v13_5(&final_compute)
+	final_compute_new := fw.g13_microseq_finalize_compute_v13_5(&final_compute,
+		0xffff_ffa0_1234_0305)
 	assert object_u64(voidptr(&final_compute_new), 0x18) == final_compute.job_params_2
 	assert i32(object_u32(voidptr(&final_compute_new), 0x58)) == final_compute.restart_branch_offset
+	assert object_u64(voidptr(&final_compute_new), 0x6d) == 0xffff_ffa0_1234_0305
 }
 
 fn main() {

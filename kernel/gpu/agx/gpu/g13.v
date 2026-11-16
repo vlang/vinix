@@ -108,10 +108,10 @@ fn write_g13_start_compute(destination voidptr, v13_5 bool,
 }
 
 fn write_g13_finalize_compute(destination voidptr, v13_5 bool,
-	legacy &fw.G13MicroseqFinalizeCompute) u64 {
+	legacy &fw.G13MicroseqFinalizeCompute, flag_address u64) u64 {
 	unsafe {
 		if v13_5 {
-			value := fw.g13_microseq_finalize_compute_v13_5(legacy)
+			value := fw.g13_microseq_finalize_compute_v13_5(legacy, flag_address)
 			C.memcpy(destination, &value, sizeof(fw.G13MicroseqFinalizeComputeV135))
 			return sizeof(fw.G13MicroseqFinalizeComputeV135)
 		}
@@ -2429,7 +2429,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 		}
 		mut micro_offset := u64(0)
 		micro_offset += write_g13_start_compute(voidptr(job.microsequence.phys + higher_half + micro_offset),
-			v13_5, &start, job.command.va + u64(0x305), compute_counter, resources.notifier.va + u64(0xa8))
+			v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter, resources.notifier.va + u64(0xa8))
 		if input.has_result {
 			start_timestamp := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp | (u32(1) << 31)
@@ -2472,7 +2472,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 			has_attachments: if input.attachment_count != 0 { u32(1) } else { u32(0) }
 		}
 		micro_offset += write_g13_finalize_compute(voidptr(job.microsequence.phys + higher_half + micro_offset),
-			v13_5, &finalize)
+			v13_5, &finalize, job.command.va + fw.g13_compute_v13_5_flag_offset)
 		retire := fw.G13MicroseqSimpleOp{
 			header: fw.g13_useq_retire_stamp
 		}

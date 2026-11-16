@@ -2,6 +2,7 @@
 import os
 
 const helpers = [
+	'fw__g13_microseq_finalize_compute_v13_5',
 	'gpu__agx__gpu__write_g13_start_vertex',
 	'fw__g13_microseq_start_vertex_v13_5',
 	'gpu__agx__gpu__GpuManager__g13_submission_status',
@@ -116,6 +117,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'fw__g13_microseq_finalize_compute_v13_5' { return 'fw__G13MicroseqFinalizeComputeV135' }
 	if name == 'gpu__agx__gpu__write_g13_start_vertex' { return 'u64' }
 	if name == 'fw__g13_microseq_start_vertex_v13_5' { return 'fw__G13MicroseqStartVertexV135' }
 	if name.ends_with('GpuManager__g13_submission_status') { return 'i64' }

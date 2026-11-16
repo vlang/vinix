@@ -15,6 +15,12 @@ destination alignments. Guard bytes cover the entire buffer outside each write.
 also guards the writer and version converter against temporary allocations;
 native C must keep the initializer and conversion result on the stack.
 
+Compute checks add 8,000 byte-exact start/finalize pairs using the real native
+writers. They cover the shared 13.5 command-flag pointer at unaligned finalize
+offset `0x6d`, full-width values, every copied field, the removed legacy word,
+reserved tails, backward branches, attachment markers and guarded unaligned
+writes. The 12.3 records ignore the additional address and keep their sizes.
+
 The existing G13 layout tests independently check the work-command offsets
 used by the initializer's pointers. These host tests do not exercise allocation,
 locking, job preparation, firmware interpretation or multi-cluster rendering.
