@@ -4770,6 +4770,14 @@ declare <2 x i32> @llvm.sadd.sat.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @llvm.ssub.sat.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @llvm.uadd.sat.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @llvm.usub.sat.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i64> @air.add_sat.s.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.sadd.sat.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @air.add_sat.u.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.uadd.sat.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @air.sub_sat.s.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.ssub.sat.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @air.sub_sat.u.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.usub.sat.v2i64(<2 x i64>,<2 x i64>)
 define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
  %x = extractelement <3 x i32> %gid, i32 0
  %y = extractelement <3 x i32> %gid, i32 1
@@ -4816,7 +4824,41 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
  %air_ok = and <2 x i1> %air_ok4, %air_ok5
  %air_lane0 = extractelement <2 x i1> %air_ok, i32 0
  %air_lane1 = extractelement <2 x i1> %air_ok, i32 1
- %air_all = and i1 %air_lane0, %air_lane1
+ %w64_x = zext i32 %x to i64
+ %w64_sinput = insertelement <2 x i64> <i64 0,i64 -9223372036854775808>,i64 %w64_x,i32 0
+ %w64_uinput = insertelement <2 x i64> <i64 0,i64 -1>,i64 %w64_x,i32 0
+ %w64_input = insertelement <2 x i64> zeroinitializer,i64 %w64_x,i32 0
+ %w64_low_us = zext i32 %llvm_us to i64
+ %w64_expect_us = insertelement <2 x i64> zeroinitializer,i64 %w64_low_us,i32 0
+ %w64_sa = call <2 x i64> @air.add_sat.s.v2i64(<2 x i64> %w64_sinput,<2 x i64> <i64 9223372036854775807,i64 -1>)
+ %w64_sa_ref = call <2 x i64> @llvm.sadd.sat.v2i64(<2 x i64> %w64_sinput,<2 x i64> <i64 9223372036854775807,i64 -1>)
+ %w64_sa_same = icmp eq <2 x i64> %w64_sa,%w64_sa_ref
+ %w64_sa_endpoint = icmp eq <2 x i64> %w64_sa,<i64 9223372036854775807,i64 -9223372036854775808>
+ %w64_sa_ok = and <2 x i1> %w64_sa_same,%w64_sa_endpoint
+ %w64_ua = call <2 x i64> @air.add_sat.u.v2i64(<2 x i64> %w64_uinput,<2 x i64> <i64 -1,i64 1>)
+ %w64_ua_ref = call <2 x i64> @llvm.uadd.sat.v2i64(<2 x i64> %w64_uinput,<2 x i64> <i64 -1,i64 1>)
+ %w64_ua_same = icmp eq <2 x i64> %w64_ua,%w64_ua_ref
+ %w64_ua_endpoint = icmp eq <2 x i64> %w64_ua,<i64 -1,i64 -1>
+ %w64_ua_ok = and <2 x i1> %w64_ua_same,%w64_ua_endpoint
+ %w64_ss = call <2 x i64> @air.sub_sat.s.v2i64(<2 x i64> <i64 -9223372036854775808,i64 9223372036854775807>,<2 x i64> <i64 1,i64 -1>)
+ %w64_ss_ref = call <2 x i64> @llvm.ssub.sat.v2i64(<2 x i64> <i64 -9223372036854775808,i64 9223372036854775807>,<2 x i64> <i64 1,i64 -1>)
+ %w64_ss_same = icmp eq <2 x i64> %w64_ss,%w64_ss_ref
+ %w64_ss_endpoint = icmp eq <2 x i64> %w64_ss,<i64 -9223372036854775808,i64 9223372036854775807>
+ %w64_ss_ok = and <2 x i1> %w64_ss_same,%w64_ss_endpoint
+ %w64_us = call <2 x i64> @air.sub_sat.u.v2i64(<2 x i64> %w64_input,<2 x i64> <i64 3,i64 1>)
+ %w64_us_ref = call <2 x i64> @llvm.usub.sat.v2i64(<2 x i64> %w64_input,<2 x i64> <i64 3,i64 1>)
+ %w64_us_same = icmp eq <2 x i64> %w64_us,%w64_us_ref
+ %w64_us_endpoint = icmp eq <2 x i64> %w64_us,%w64_expect_us
+ %w64_us_ok = and <2 x i1> %w64_us_same,%w64_us_endpoint
+ %w64_add_ok = and <2 x i1> %w64_sa_ok,%w64_ua_ok
+ %w64_sub_ok = and <2 x i1> %w64_ss_ok,%w64_us_ok
+ %w64_ok = and <2 x i1> %w64_add_ok,%w64_sub_ok
+ %w64_ok0 = extractelement <2 x i1> %w64_ok,i32 0
+ %w64_ok1 = extractelement <2 x i1> %w64_ok,i32 1
+ %w64_all = and i1 %w64_ok0,%w64_ok1
+ %air_all32 = and i1 %air_lane0, %air_lane1
+ %air_all = and i1 %air_all32,%w64_all
+ %w64_us0 = extractelement <2 x i64> %w64_us,i32 0
  %air_sa0 = extractelement <2 x i32> %air_sa, i32 0
  %air_ua0 = extractelement <2 x i32> %air_ua, i32 0
  %air_ss0 = extractelement <2 x i32> %air_ss, i32 0
@@ -4826,7 +4868,8 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
  %ss = select i1 %air_all, i32 %air_ss0, i32 poison
  %us = select i1 %air_all, i32 %air_us0, i32 poison
  %below = icmp ult i32 %x, 3
- %restored = add i32 %air_us0, 3
+ %w64_restored = add i64 %w64_us0,3
+ %restored = trunc i64 %w64_restored to i32
  %coordinate = select i1 %below, i32 %x, i32 %restored
  %sa_hi = lshr i32 %sa, 26
  %ua_hi = lshr i32 %ua, 26
