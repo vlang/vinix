@@ -127,6 +127,7 @@ fn test_vector_rounding_names_states_and_cache() {
 	for bits in [u32(16), 32]! { for count in 1 .. 17 { key := vector_float_intrinsic_key(.canonicalize, count, bits)!; assert key >= 34752 && key < 34784 && !seen[key]; seen[key] = true } }
 	for id in [ScalarIntrinsic.smulh, .umulh]! { for bits in u32(1) .. 65 { for count in 1 .. 17 { key := vector_float_intrinsic_key(id, count, bits)!; assert key >= 34784 && key < 36832 && !seen[key]; seen[key] = true } } }
 	for format in 0 .. 66 { for count in 1 .. 17 { key := vector_reverse_key(count, format)!; assert key >= 36832 && key < 37888 && !seen[key]; seen[key] = true } }
+	for id in [ScalarIntrinsic.vector_splice_left, .vector_splice_right]! { for format in 0 .. 66 { for count in 1 .. 17 { key := vector_splice_key(id, count, format)!; assert key >= 37888 && key < 40000 && !seen[key]; seen[key] = true } } }
 	for slot in seen { assert slot }
 	for name in ['llvm.floor.f32', 'llvm.floor.v0f16', 'llvm.floor.v01f32', 'llvm.floor.v17f16', 'llvm.floor.v99999999999999999999f16', 'llvm.floor.v2f64', 'llvm.floor.v2bf16', 'llvm.floor.v2f016', 'llvm.floor.v2f32.spoof', 'llvm.floor.nxv2f32', 'llvm.roundeven.vf32', 'llvm.nearbyint.v2i32', 'llvm.sin.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
 	for id in [ScalarIntrinsic.fabs, .sqrt, .fma]! { if _ := rounding_intrinsic_vector(id, ScalarVectorValue{}, 32, 1) { assert false, 'family' } }
@@ -134,5 +135,5 @@ fn test_vector_rounding_names_states_and_cache() {
 	for count in [0, 17] { if _ := rounding_intrinsic_vector(.floor, ScalarVectorValue{}, 16, count) { assert false, 'count' } }
 	for tag in [IntegerValue{aggregate: true}, IntegerValue{vector: true}] { mut source := ScalarVectorValue{}; source.lanes[0] = tag; if _ := rounding_intrinsic_vector(.floor, source, 32, 1) { assert false, 'scalar tag' } }
 	assert checks == 22848
-	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 37888 floating/integer/conversion overload/cache identities and family/shape/name/tag guards PASS')
+	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 40000 floating/integer/conversion overload/cache identities and family/shape/name/tag guards PASS')
 }

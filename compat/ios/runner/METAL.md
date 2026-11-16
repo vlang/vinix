@@ -1,5 +1,16 @@
 # Software Metal backend
 
+AIR `llvm.vector.splice.left` and `.right` execute fixed 1..16-lane
+i1..i64/half/float windows with scalar i32 runtime offsets. Raw lane bits,
+selected poison and deferred undef survive copying. Invalid offsets produce
+poison; bounded integer address preflight rejects invalid offsets or extraction
+selectors before writes. The software size fixture composes dynamic left/right
+splices for coordinates, half and float, checking raw NaN payloads, subnormal
+and zero bits through queued RGBA8 buffer/texture readback.
+`tests/ios/air-vector-splice.v` checks both execution paths and resource limits
+against an independently expanded, inlined native LLVM reference. This extends
+CPU software Metal execution; native GPU and Fortnite launch remain unverified.
+
 AIR `llvm.vector.reverse` supports fixed 1..16-lane i1..i64/half/float vectors
 through the prepared compute path. Raw lane bits, signaling NaNs and deferred
 poison/undef state are preserved. Integer projections also feed bounded

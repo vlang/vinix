@@ -1,5 +1,17 @@
 # Void-return scalar execution
 
+Fixed 1..16-lane i1..i64/half/float `llvm.vector.splice.left` and `.right`
+calls concatenate two same-typed vectors and copy a shifted window with a
+runtime scalar i32 offset. Offsets above N produce vector poison. Raw lane bits
+and selected poison/undef tags remain intact, including signaling NaNs;
+unselected indeterminate lanes may be discarded. A scalar undef offset still
+requires a direct freeze before use. Integer-only execution excludes floating
+lanes. Calls share existing 4,096 result slots, one executed step per call and
+the 1,000,000-unit lane-work budget (3*N per splice). Canonical overload keys
+37888..39999 distinguish both directions and all 66 formats at counts 1..16.
+`tests/ios/air-vector-splice.v` checks scalar/integer execution, vector-PHI loop
+slot reuse, state/freeze behavior, metadata and exact/exceeded resource limits.
+
 Fixed 1..16-lane i1..i64/half/float `llvm.vector.reverse` calls copy lanes in
 reverse order, preserving raw encodings and poison/undef state. They defer
 undef observation, so unused undef results may be discarded and source/result

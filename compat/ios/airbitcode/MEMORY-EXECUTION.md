@@ -1,5 +1,25 @@
 # Bounded memory execution
 
+`llvm.vector.splice.left` and `.right` support fixed 1..16-lane
+i1..i64/half/float vectors and an unsigned scalar i32 runtime offset. Left
+selects the N-lane window starting at offset in the concatenated sources;
+right starts at N-offset. Offsets above N poison every result lane. Raw bits
+and selected poison/undef tags are copied without observing discarded lanes.
+Source/result freezes and later insertions retain ordinary vector behavior.
+
+Pure integer addresses use a bounded splice-selector node, existing lane
+rebasing and projected-shuffle nodes. Invalid offsets/selectors reject before
+writes; a result freeze may repair the offset poison while an invalid final
+extraction remains poison. Selected undef stays deferred until observed. Both
+sources and the offset contribute graph height; existing node/depth and
+loaded/PHI/floating address exclusions remain. Calls use one result slot and
+3*N validation work. Keys 37888..39999 append 2,112 overload identities; integer
+and floating formats with equal widths remain distinct. Metadata, declarations,
+budgets and signature checks remain strict. `tests/ios/air-vector-splice.v`
+checks both memory APIs, shifted bindings, raw values, states and boundaries.
+Its native reference expands splices to extract/select/insert operations and
+inlines them before code generation to avoid unsupported native splice shapes.
+
 `llvm.vector.reverse` supports fixed 1..16-lane i1..i64/half/float vectors.
 The source and result have exactly the same type. Reversal copies raw lane
 bits and permutes poison/undef tags, preserving floating NaN payloads and

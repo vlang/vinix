@@ -14,6 +14,7 @@ enum MemoryIndexKind {
 	projected_select
 	projected_insert
 	shuffle_selector
+	splice_selector
 	shuffle_lane
 	projected_shuffle
 	projected_binary
@@ -479,6 +480,14 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 					packed := if lane < 8 { node.value } else { node.flags }
 					selected := (packed >> u32((lane % 8) * 8)) & 255
 					value = if selected == 255 { IntegerValue{poison: true} } else { IntegerValue{value: selected} }
+				}
+			}
+			.splice_selector {
+				if poisons[node.left] || poisons[node.right] || values[node.left] >= u64(node.source_bits) || values[node.right] > u64(node.source_bits) {
+					value = IntegerValue{poison: true}
+				} else {
+					start := if node.opcode == 0 { values[node.right] } else { u64(node.source_bits) - values[node.right] }
+					value = IntegerValue{value: values[node.left] + start}
 				}
 			}
 			.shuffle_lane {
