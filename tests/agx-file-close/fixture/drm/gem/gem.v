@@ -18,6 +18,14 @@ pub mut:
 	phys_addr u64 = 0x200000
 	owned bool
 	vm_private_identity u64
+	pte_extra u64
+}
+
+pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool) ?&GemObject {
+	mut object := create_aligned(size, alignment) or { return none }
+	object.vm_private_identity = identity
+	object.pte_extra = if writeback { u64(0) } else { u64(0x10) }
+	return object
 }
 
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {

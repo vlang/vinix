@@ -90,6 +90,28 @@ pub fn (table &Table) mmap_page(page u64) voidptr {
 	return unsafe { nil }
 }
 
+// Match the authorized object's direct-map policy for every userspace alias.
+pub fn (table &Table) mmap_attributes(offset u64) u64 {
+	for object in table.mmap_objects {
+		base := gem.create_mmap_offset(object)
+		if offset >= base && offset - base < object.size { return object.pte_extra }
+	}
+	return 0
+}
+
+// A VMA records one cache policy. It must stay inside a single authorized BO,
+// even when another authorized object has the immediately following offset.
+pub fn (table &Table) valid_mmap_range(offset u64, length u64) bool {
+	if length == 0 || offset > ~u64(0) - length { return false }
+	for object in table.mmap_objects {
+		base := gem.create_mmap_offset(object)
+		if offset >= base && offset - base < object.size {
+			return length <= object.size - (offset - base)
+		}
+	}
+	return false
+}
+
 pub fn (table &Table) contains(object &gem.GemObject) bool {
 	for candidate in table.objects {
 		if voidptr(candidate) == voidptr(object) {

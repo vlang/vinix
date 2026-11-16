@@ -25,6 +25,9 @@ fn main() {
 	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
 		section(source, 'pub fn release_handle(', 'pub fn new_gpu_file(')! +
+		section(source, 'fn (mut f GpuFile) mmap_attributes(', '// Caller holds file.lock')! +
+		section(source, 'fn lookup_file(', 'pub fn close_gem_handle(')! +
+		section(source, 'pub fn mmap_attributes_handle(', 'fn ioctl_get_params_handler(')! +
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
 		section(source, 'fn (mut f GpuFile) retire_mapping_locked(', '// Reserve a nonzero per-open queue ID.')! +
 		section(source, 'fn (f &GpuFile) find_vm(', '// Firmware may retain both UAT translations')! +

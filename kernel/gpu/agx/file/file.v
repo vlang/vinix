@@ -276,6 +276,18 @@ fn (mut f GpuFile) mmap_page(page u64) voidptr {
 	return f.objects.mmap_page(page)
 }
 
+fn (mut f GpuFile) mmap_attributes(offset u64) u64 {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	return f.objects.mmap_attributes(offset)
+}
+
+fn (mut f GpuFile) valid_mmap_range(offset u64, length u64) bool {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	return f.objects.valid_mmap_range(offset, length)
+}
+
 // Caller holds file.lock and has excluded in-flight jobs from this VM. Once
 // PTEs are removed, retries invalidate the same range without unmapping it
 // again. The mapping's existing object reference is released only after the
@@ -677,9 +689,8 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	}
 	size_error := agxbo.create_size_error(request.size)
 	if size_error != 0 { return size_error }
-	obj := if private_identity != 0 {
-		gem.create_aligned_private(request.size, pgtable.uat_pgsz, private_identity) or { return -12 }
-	} else { gem.create_aligned(request.size, pgtable.uat_pgsz) or { return -12 } }
+	obj := gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,
+		request.flags & ioctl.asahi_gem_writeback != 0) or { return -12 }
 	f.objects.add_created(obj)
 	request.handle = obj.handle
 	return 0
@@ -1345,6 +1356,19 @@ pub fn mmap_handle(_dev &drm.DrmDevice, handle voidptr, page u64, _flags int) vo
 	f := lookup_file(handle) or { return unsafe { nil } }
 	mut file := unsafe { f }
 	return file.mmap_page(page)
+}
+
+pub fn mmap_attributes_handle(_dev &drm.DrmDevice, handle voidptr, offset u64) u64 {
+	f := lookup_file(handle) or { return 0 }
+	mut file := unsafe { f }
+	return file.mmap_attributes(offset)
+}
+
+pub fn retain_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64,
+	length u64) bool {
+	f := lookup_file(handle) or { return false }
+	mut file := unsafe { f }
+	return file.valid_mmap_range(offset, length)
 }
 
 fn ioctl_get_params_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {

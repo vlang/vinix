@@ -45,23 +45,31 @@ pub fn create(size u64) ?&GemObject {
 // Create a GEM object with a physical and size alignment suitable for the
 // target device. AGX callers require 16 KiB alignment on either kernel granule.
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
-	return create_object(size, alignment, false, 0)
+	return create_object(size, alignment, false, 0, 0)
 }
 
 // Set the private reservation identity before the object becomes visible in
 // any handle table. Only its owning VM may bind it, and PRIME cannot export it.
 pub fn create_aligned_private(size u64, alignment u64, identity u64) ?&GemObject {
 	if identity == 0 { return none }
-	return create_object(size, alignment, false, identity)
+	return create_object(size, alignment, false, identity, 0)
+}
+
+// AGX CPU mappings are Normal Non-Cacheable unless WRITEBACK was requested.
+// Select both the direct-map and future userspace attributes before publishing
+// the object. Other GEM constructors retain their existing cacheable policy.
+pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool) ?&GemObject {
+	$if !arm64 { if !writeback { return none } }
+	return create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached })
 }
 
 // Metadata for a host-owned resource. The driver installs its physical
 // aperture after RESOURCE_MAP_BLOB succeeds; the PMM never owns those pages.
 pub fn create_external(size u64) ?&GemObject {
-	return create_object(size, page_size, true, 0)
+	return create_object(size, page_size, true, 0, 0)
 }
 
-fn create_object(size u64, alignment u64, external bool, private_identity u64) ?&GemObject {
+fn create_object(size u64, alignment u64, external bool, private_identity u64, pte_extra u64) ?&GemObject {
 	if size == 0 {
 		return none
 	}
@@ -108,6 +116,14 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64) ?
 		if !external { memory.pmm_free(phys, pages) }
 		return none
 	}
+	$if arm64 {
+		if pte_extra & memory.pte_uncached != 0 {
+			if !memory.set_ram_direct_map_uncached(u64(phys), aligned_size, true) {
+				memory.pmm_free(phys, pages)
+				return none
+			}
+		}
+	}
 
 	mmap_off := next_mmap_offset
 	next_mmap_offset += aligned_size
@@ -115,6 +131,7 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64) ?
 	mut obj := &GemObject{
 		handle:      handle
 		external:    external
+		pte_extra:   pte_extra
 		vm_private_identity: private_identity
 		size:        aligned_size
 		refcount:    1
@@ -133,12 +150,18 @@ pub fn destroy(obj &GemObject) {
 	if obj == unsafe { nil } {
 		return
 	}
-
 	gem_objects_lock.acquire()
 	if obj.handle < gem_max_handles {
 		gem_objects[obj.handle] = unsafe { nil }
 	}
 	gem_objects_lock.release()
+	$if arm64 {
+		if obj.phys_addr != 0 && !obj.external && obj.pte_extra & memory.pte_uncached != 0 {
+			if !memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false) {
+				panic('GEM direct-map cache policy could not be restored')
+			}
+		}
+	}
 
 	if obj.phys_addr != 0 && !obj.external {
 		pages := obj.size / page_size

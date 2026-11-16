@@ -6,7 +6,7 @@ fn check_private_bo_local(file string, bo string, mmu string, gem string, drm st
 		'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(', 'Vinix private BO creation')!
 	require_order(create, ['f.lock.acquire()', 'defer { f.lock.release() }',
 		'vm := f.find_vm(request.vm_id)', 'if vm.identity == 0', 'private_identity = vm.identity',
-		'gem.create_aligned_private(request.size, pgtable.uat_pgsz, private_identity)',
+		'gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,',
 		'f.objects.add_created(obj)'], 'Vinix private BO creation')!
 	require(create.count('f.lock.acquire()') == 1 && create.count('f.lock.release()') == 1,
 		'Private BO VM lookup must remain locked through publication')!
@@ -27,7 +27,7 @@ fn check_private_bo_local(file string, bo string, mmu string, gem string, drm st
 	constructor := section(gem, 'pub fn create_aligned_private(',
 		'// Metadata for a host-owned resource.', 'Vinix private GEM constructor')!
 	require_order(constructor, ['if identity == 0', 'return none',
-		'create_object(size, alignment, false, identity)'], 'Vinix private GEM constructor')!
+		'create_object(size, alignment, false, identity, 0)'], 'Vinix private GEM constructor')!
 	require_order(gem, ['pub:\n\tvm_private_identity u64', 'fn create_object(',
 		'vm_private_identity: private_identity', 'gem_objects[handle] = obj'], 'Vinix immutable GEM domain publication')!
 	prime := section(drm, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(', 'Vinix private PRIME refusal')!

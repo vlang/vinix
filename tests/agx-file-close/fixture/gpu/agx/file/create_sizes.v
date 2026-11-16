@@ -44,6 +44,7 @@ fn check_create_sizes() {
 				object := file.objects.table.remove(request.handle) or { panic('created size object') }
 				assert object.size == (size + mask) & ~mask && object.references == 1
 				assert object.vm_private_identity == if vm_id == 0 { u64(0) } else { vm.identity }
+				assert object.pte_extra == if flags & ioctl.asahi_gem_writeback != 0 { u64(0) } else { u64(0x10) }
 				assert request.size == size && request.handle != 0xfeed && !file.lock.is_held()
 				gem.unref(object)
 				assert gem.live() == 0

@@ -177,6 +177,8 @@ pub fn audit(inputs Inputs) !Report {
 	mut sources := []Source{}
 	for role, paths in {
 		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/gem',
+			'kernel/memory/ram_cache_arm64.v', 'kernel/memory/virtual_arm64.v', 'kernel/aarch64/cpu/data_cache.v',
+			'kernel/memory/mmap/mmap.v', 'kernel/resource/cache.v',
 			'kernel/file/reservation.v', 'kernel/file/file.v', 'kernel/proc/proc.v',
 			'kernel/drm/drm.v', 'kernel/drm/sync_file_info.v', 'kernel/drm/sync_file_deadline.v', 'kernel/drm/syncobj_fd.v', 'kernel/drm/wait_storage.v', 'tools/agx-re/m1parity',
 			'tools/agx-re/audit_m1_parity.v', 'tools/agx-re/g13contract', 'tools/agx-re/g13layout']

@@ -41,6 +41,8 @@ fn (objects &Objects) get_ref(handle u32) ?&gem.GemObject { object_ref_lookups++
 fn (objects &Objects) contains(object &gem.GemObject) bool { return objects.table.contains(object) }
 fn (mut objects Objects) remove(handle u32) ?&gem.GemObject { return objects.table.remove(handle) }
 fn (mut objects Objects) add_created(object &gem.GemObject) { objects.table.add_created(object) }
+fn (objects &Objects) mmap_attributes(offset u64) u64 { return objects.table.mmap_attributes(offset) }
+fn (objects &Objects) valid_mmap_range(offset u64, length u64) bool { return objects.table.valid_mmap_range(offset, length) }
 
 fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
 	assert ctx.pgtable != unsafe { nil } && !ctx.destroyed
@@ -175,5 +177,6 @@ pub fn run_checks() {
 	check_private_objects()
 	check_identity_lookups()
 	check_queue_priorities()
+	check_cpu_mapping_policy()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

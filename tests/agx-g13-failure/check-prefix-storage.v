@@ -2,6 +2,16 @@
 import os
 
 const helpers = [
+	'cpu__read_ctr_el0',
+	'cpu__clean_invalidate_data_cache_line',
+	'cpu__clean_invalidate_data_cache_to_poc',
+	'memory__set_ram_direct_map_uncached',
+	'bo__Table__mmap_attributes',
+	'bo__Table__valid_mmap_range',
+	'gpu__agx__file__GpuFile__mmap_attributes',
+	'gpu__agx__file__GpuFile__valid_mmap_range',
+	'gpu__agx__file__mmap_attributes_handle',
+	'gpu__agx__file__retain_mmap_range_handle',
 	'fw__g13_timestamp_user_ts_offset_for',
 	'fw__g13_microseq_timestamp_v13_5',
 	'fw__make_g13_vertex_v13_5',
@@ -122,6 +132,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name in ['cpu__read_ctr_el0', 'bo__Table__mmap_attributes', 'gpu__agx__file__GpuFile__mmap_attributes', 'gpu__agx__file__mmap_attributes_handle'] { return 'u64' }
+	if name in ['cpu__clean_invalidate_data_cache_line', 'cpu__clean_invalidate_data_cache_to_poc'] { return 'void' }
 	if name == 'fw__g13_timestamp_user_ts_offset_for' { return '__v_option_u64' }
 	if name == 'fw__g13_microseq_timestamp_v13_5' { return 'fw__G13MicroseqTimestampV135' }
 	if name == 'fw__make_g13_vertex_v13_5' { return 'fw__G13RunVertexV135' }

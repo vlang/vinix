@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [complete start/finalize field comparison](m1-agx-microseq-fields.md)
-(2026-11-16). The [timestamp instruction pair binding](m1-agx-timestamp-pair.md),
+Latest offline increment: [GEM WRITEBACK and CPU cache policy](m1-agx-gem-cache.md)
+(2026-11-16). The [complete start/finalize field comparison](m1-agx-microseq-fields.md),
+[timestamp instruction pair binding](m1-agx-timestamp-pair.md),
 [complete fragment fields and auxiliary defaults](m1-agx-fragment-fields.md),
 [vertex/compute common fields](m1-agx-work-tails.md),
 [fragment layouts and depth insertion](m1-agx-fragment-layout.md),
