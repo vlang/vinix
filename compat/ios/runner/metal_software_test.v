@@ -4463,11 +4463,60 @@ fn sm_test_geometry_sizes_focus() ! {
 		source.write_string('define void @${name}(<3 x i32> %a, i32 %b, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n ret void }\n')
 	}
 	names << 'image_minmax'
-	source.write_string('define void @image_minmax(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
+	source.write_string('declare <2 x i32> @air.min.s.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @air.min.u.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @air.max.s.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @air.max.u.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.smin.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.smax.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.umin.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.umax.v2i32(<2 x i32>, <2 x i32>)
+define void @image_minmax(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
  %x = extractelement <3 x i32> %gid, i32 0
  %y = extractelement <3 x i32> %gid, i32 1
  %w = extractelement <3 x i32> %grid, i32 0
  %h = extractelement <3 x i32> %grid, i32 1
+ %air_negative = or i32 %x, 2147483648
+ %air_input0 = insertelement <2 x i32> zeroinitializer, i32 %x, i32 0
+ %air_input = insertelement <2 x i32> %air_input0, i32 %air_negative, i32 1
+ %air_smin = call <2 x i32> @air.min.s.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %air_smax = call <2 x i32> @air.max.s.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %air_umin = call <2 x i32> @air.min.u.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %air_umax = call <2 x i32> @air.max.u.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %llvm_smin = call <2 x i32> @llvm.smin.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %llvm_smax = call <2 x i32> @llvm.smax.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %llvm_umin = call <2 x i32> @llvm.umin.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %llvm_umax = call <2 x i32> @llvm.umax.v2i32(<2 x i32> %air_input, <2 x i32> <i32 7, i32 7>)
+ %below_seven = icmp ult i32 %x, 7
+ %low_expected = select i1 %below_seven, i32 %x, i32 7
+ %high_expected = select i1 %below_seven, i32 7, i32 %x
+ %expected_low0 = insertelement <2 x i32> <i32 0, i32 7>, i32 %low_expected, i32 0
+ %expected_smin = insertelement <2 x i32> %expected_low0, i32 %air_negative, i32 1
+ %expected_high0 = insertelement <2 x i32> <i32 0, i32 7>, i32 %high_expected, i32 0
+ %expected_umax = insertelement <2 x i32> %expected_high0, i32 %air_negative, i32 1
+ %same_smin = icmp eq <2 x i32> %air_smin, %llvm_smin
+ %same_smax = icmp eq <2 x i32> %air_smax, %llvm_smax
+ %same_umin = icmp eq <2 x i32> %air_umin, %llvm_umin
+ %same_umax = icmp eq <2 x i32> %air_umax, %llvm_umax
+ %order_smin = icmp eq <2 x i32> %air_smin, %expected_smin
+ %order_smax = icmp eq <2 x i32> %air_smax, %expected_high0
+ %order_umin = icmp eq <2 x i32> %air_umin, %expected_low0
+ %order_umax = icmp eq <2 x i32> %air_umax, %expected_umax
+ %ok0 = and <2 x i1> %same_smin, %same_smax
+ %ok1 = and <2 x i1> %same_umin, %same_umax
+ %ok2 = and <2 x i1> %order_smin, %order_smax
+ %ok3 = and <2 x i1> %order_umin, %order_umax
+ %ok4 = and <2 x i1> %ok0, %ok1
+ %ok5 = and <2 x i1> %ok2, %ok3
+ %ok = and <2 x i1> %ok4, %ok5
+ %ok_lane0 = extractelement <2 x i1> %ok, i32 0
+ %ok_lane1 = extractelement <2 x i1> %ok, i32 1
+ %order_ok = and i1 %ok_lane0, %ok_lane1
+ %air_low = extractelement <2 x i32> %air_smin, i32 0
+ %air_high = extractelement <2 x i32> %air_smax, i32 0
+ %air_unsigned_low = extractelement <2 x i32> %air_umin, i32 0
+ %coordinate_sum = add i32 %air_low, %air_high
+ %coordinate = sub i32 %coordinate_sum, 7
  %input = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
  %signed_low = call <1 x i32> @llvm.smin.v1i32(<1 x i32> %input, <1 x i32> <i32 -1>)
  %signed_high = call <1 x i32> @llvm.smax.v1i32(<1 x i32> %signed_low, <1 x i32> <i32 -2>)
@@ -4476,12 +4525,16 @@ fn sm_test_geometry_sizes_focus() ! {
  %signed_lane = extractelement <1 x i32> %signed_high, i32 0
  %unsigned_lane = extractelement <1 x i32> %unsigned_high, i32 0
  %signed_bits = and i32 %signed_lane, 63
- %offset = xor i32 %signed_bits, %unsigned_lane
- %root = getelementptr i8, ptr addrspace(1) %out, i32 %offset
+ %offset_raw = xor i32 %signed_bits, %unsigned_lane
+ %address_offset = and i32 %air_unsigned_low, 63
+ %root = getelementptr i8, ptr addrspace(1) %out, i32 %address_offset
  %row = shl i32 %y, 6
  %capped_x = call i32 @air.min.s.i32(i32 %x, i32 2147483647)
  %bounded_x = call i32 @air.max.u.i32(i32 %capped_x, i32 0)
- %index = add i32 %row, %bounded_x
+ %coordinate_ok = icmp eq i32 %coordinate, %bounded_x
+ %all_ok = and i1 %coordinate_ok, %order_ok
+ %offset = select i1 %all_ok, i32 %offset_raw, i32 poison
+ %index = add i32 %row, %coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
  %mixed = xor i32 %red, %offset
