@@ -5250,3 +5250,81 @@ Required-receipt integration of this broader restriction remains open, along wit
 complete ABI/library/search/read closure, OS loader/cache bytes, bootstrap/hermetic
 admission, owned ARM/GUI, broader lifetime/mapping controls and default activation.
 No kernel, guest or product-default behavior changes.
+
+## Required ordinary file-data replay permissions (2026-11-16)
+
+Commit `998113440` makes [ordinary file-data replay permissions](wine-host-required-check.md)
+mandatory in format-6 host receipts. The producer, controller and full retainer
+now require `read-closed/receipt.json`, its exact capability map and policy,
+all extracted members and outputs, and every child command/environment/exit and
+LLD execution record. `winereadhost` reconstructs the permissions from captured
+members, pinned ordinary images and one derived control response, preserving
+original recorded paths for copied evidence. A consistently resealed capability
+map and policy cannot add the external control object. Both implementation and
+policy-projector sources are embedded, pinned and retained in host input blobs.
+The existing SDK-denied replay and all earlier source/header/image/link/SDK
+requirements remain mandatory. Historical format-5 checkers, bundles and the
+standalone qualifier retain their original contracts.
+
+All four final host roles build and admit successfully with twenty new runtime
+denial controls and four allowed reads. Captured replay and unrestricted external-
+object linking each reproduce the original executable. The hidden-object link
+must instead reach its exact `cannot open`/`Operation not permitted` refusal
+under restriction, exit 1 and leave no executable. Host controls pass real and
+unchanged copied baselines, actual fixture/controller/producer entrypoints and
+all forty-eight exact resealed refusals. Twelve new cases cover a weakened or
+expanded policy, altered execution/environment/exit records, unrelated read/link
+results, changed output/member bytes, linked evidence and an old format-5 proof.
+
+The initial candidate passed those host controls, startup checks, a signed guest
+run and all fifty-seven retention refusals, but exceeded the receipt suite's
+unchanged ten-second per-command limit. The first timeout occurred with four
+retention workers active; a separate serial run also timed out on a different
+case. Both failures and the entire candidate remain preserved. The new projection
+was rehashing each large linker image twice after mandatory Mach-O admission had
+already checked the same bytes. Final code reuses those verified image hashes,
+independently checks replay UUIDs and permissions, and retains the existing
+current-byte and retained-blob checks. No evidence or time bound is waived.
+
+Fresh builds from a new frozen source namespace pass all thirty-two receipt
+controls within the original ten-second limit, before final guest/retention work
+starts. All eighteen startup/pre-sign refusals also pass. The fresh signed x86
+holder-SIGKILL/collection run passes in **100.004 seconds**, with producer
+admission before signing and both producer/controller bindings re-admitted after
+the guest. Four final retention partitions pass real/copied baselines and
+15/14/14/14 exact refusals; the partition checker confirms all fifty-seven unique
+assigned cases. The two new cases omit the producer/controller `read-closed`
+receipt from retained input maps and cannot create retained output. All previous
+fifty-five named gates remain intact.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostread-20261116-01`, retaining
+both candidates, all timing failures, sources/imports, generated programs,
+complete host graphs/byte stores, signed evidence, raw outcomes and feature
+patch/revision. Final source is `source-final-02`, builder is `wine-host-build-02`,
+and host roles are `host-fixture-02`, `host-controller-02`, `host-producer-02` and
+`host-retainer-02`. Final results are `host-controls-02`, `pe-02`, `prepared-02`,
+`receipt-controls-final`, `startup-02`, `native-02` and `retention-final-p0` through
+`retention-final-p3`. `validation.txt` distinguishes all preliminary and final
+tools/results and records required historical namespaces. The typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-read-closed-20261116-01.inventory.json`,
+SHA-256 `ba8e284df76e57cee22fa329f1a82f2dbc5b1c4480276b805128103a854bd176`.
+Complete inventory recording and independent comparison both pass.
+
+Inventory recording exposed a FIFO left by the timed-out candidate before its
+normal cleanup ran. Following the existing receipt runner's retirement policy,
+the stopped empty IPC node's original `lstat` metadata was saved and the node
+retired; all failure logs, arguments and candidate records remain. Commit
+`a4a71cbe0` also fixes the inventory scanner to require a regular node before
+opening contents. Its new two-second FIFO-refusal test and regular-file/symlink
+baseline pass. The inventory format and complete regular-file byte checks stay
+unchanged; original inventory tools are preserved. Final sealing uses frozen
+`inventory-source` and `workspace-inventory-final`, with the repair patch and
+node-test results retained alongside both host candidates.
+
+This closes required-receipt integration and fresh signed x86 qualification for
+the narrow ordinary file-data restriction. Directory/metadata reads, explicit
+OS-root/device exceptions, writes/network, helper startup and inherited state,
+OS loader/cache bytes, complete ABI/library/search/read closure and bootstrap/
+hermetic admission remain unqualified. Owned ARM/GUI, broader lifetime/mapping
+controls and default activation remain open. No guest/kernel/default behavior
+changes.
