@@ -136,6 +136,11 @@ signature, attributes and duplicate checks remain required by preflight.
 These nodes propagate poison and compose with select/freeze. Other intrinsic
 dependencies and ordinary calls remain outside the address graph. Intrinsic
 nodes reuse the shared depth/node budget and allocate nothing during execution.
+Leading/trailing zero counts (`llvm.ctlz`/`llvm.cttz`) also accept i1..i64 and
+require a defined constant i1 zero-poison flag. A false flag returns the width
+for zero; a true flag produces poison for zero. Select/freeze may suppress or
+repair that poison, while independent GEP roots still reject it. The validated
+flag is cached in the node; declaration immarg and attribute checks remain.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -215,6 +220,11 @@ all 132 admitted unary bit overloads with native LLVM, through validation and
 ordinary/prepared execution. Six patterns cover direct/masked values, literal
 and computed poison, freeze and select suppression; refusals preserve all bytes.
 Each overload also checks exact cached depth acceptance/refusal boundaries.
+
+`tests/ios/air-memory-zero-count-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks both
+zero-poison flags across all 128 overloads, with a defined false-flag LLVM oracle
+and separate poison checks. It covers cached depth limits, cold poison/freeze,
+independent roots, dynamic flag rejection and malformed call metadata.
 
 ## Prepared memory functions
 

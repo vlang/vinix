@@ -164,9 +164,15 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			// declaration attribute/duplicate checks. Recheck call identity here.
 			b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, op, b.scope)!
 			id := scalar_intrinsic_name(b.ir.functions[op.callee_function].name)!
-			if id !in [.ctpop, .bitreverse, .bswap] { return error('AIR memory index: unsupported intrinsic dependency') }
+			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz] { return error('AIR memory index: unsupported intrinsic dependency') }
+			mut zero_poison := u64(0)
+			if scalar_integer_zero_count(id) {
+				// scalar_intrinsic_call requires an exact defined i1 immediate.
+				flag := b.pools.lookup(b.scope, b.p.operands[op.operands_start + 2].number)!
+				zero_poison = b.pools.scalar_bits(flag.constant_index)!
+			}
 			lhs := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
-			node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, left: lhs, height: 1 + b.nodes[lhs].height}
+			node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, value: zero_poison, left: lhs, height: 1 + b.nodes[lhs].height}
 		} else if code == 58 {
 			b.p.scalar_unary_profile(op, true, false)!
 			lhs := b.expression_source(b.p.operands[op.operands_start], producer, depth + 1, true)!
@@ -238,7 +244,7 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 				value = IntegerValue{value: values[chosen], poison: poisons[node.condition] || poisons[chosen]}
 			}
 			.intrinsic {
-				value = if poisons[node.left] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
+				value = if poisons[node.left] { IntegerValue{poison: true} } else if scalar_integer_zero_count(node.intrinsic) { scalar_integer_zero_count_value(node.intrinsic, node.bits, values[node.left], node.value)! } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
 			}
 			.freeze_value {
 				// Match IntegerMachine.read_frozen's stable zero choice.

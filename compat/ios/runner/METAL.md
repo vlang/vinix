@@ -326,6 +326,8 @@ AND/OR/XOR, left/logical-right/arithmetic-right shifts and width casts
 to form a checked buffer index, including a flattened multidimensional position.
 Scalar population count, bit reversal and byte swap intrinsics may also feed
 these indices, with the existing declaration and poison checks.
+Leading/trailing zero counts also feed indices with a validated constant i1
+zero-poison flag; their poison results compose with select/freeze.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
@@ -345,6 +347,8 @@ or poison, followed by a scalar freeze. Prevalidation and execution preserve the
 same defined address; poison/direct undef freezes choose zero.
 Two bit reversal calls then preserve that address while exercising intrinsic
 dependencies in the image pipeline.
+Leading/trailing zero counts then form a self-XOR zero offset. The trailing
+count uses a true zero-poison flag and freeze, including at the zero pixel index.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.
