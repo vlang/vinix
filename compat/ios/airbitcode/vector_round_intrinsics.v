@@ -20,6 +20,7 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('llvm.clmul.v') { count, bits := vector_integer_overload(name, 12)!; return ScalarIntrinsic.clmul, count, bits }
 	if name.starts_with('llvm.pext.v') || name.starts_with('llvm.pdep.v') { count, bits := vector_integer_overload(name, 11)!; return if name[6] == `e` { ScalarIntrinsic.pext } else { ScalarIntrinsic.pdep }, count, bits }
 	if name.starts_with('llvm.fptosi.sat.v') || name.starts_with('llvm.fptoui.sat.v') {
 		id, count, _, dest := vector_saturating_cast_name(name)!
@@ -54,6 +55,10 @@ fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
+	if id == .clmul {
+		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
+		return vector_clmul_cache_base + int(bits - 1) * 16 + count - 1
+	}
 	if scalar_integer_bit_permutation(id) {
 		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
 		return 22208 + int(id == .pdep) * 1024 + int(bits - 1) * 16 + count - 1

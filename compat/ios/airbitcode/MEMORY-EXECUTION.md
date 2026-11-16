@@ -1007,6 +1007,20 @@ Existing 256-node and 32-level bounds count all sources and cached heights.
 in both directions, native LLVM bits, nonmutating validation, ordinary/prepared
 write ordering, freeze/poison/undef controls and exact graph boundaries.
 
+Fixed 1..16-lane integer vectors also support ordinary direct `llvm.clmul.vNiW`
+calls for i1..i64 lanes. Multiplication combines polynomial terms with XOR
+instead of carries, retaining the low W bits. Both operands and result must
+have exactly the same vector type. Poison remains local to its lane even with
+a zero multiplier; any executed undef operand lane rejects the call. Source
+freeze repairs indeterminate lanes, while result freeze cannot hide earlier
+errors. Integer, mixed, void and memory APIs accept the calls, including pure
+integer address graphs with eager observation of all sources and conservative
+prewrite checks. Existing construction/work and node/depth bounds apply.
+Scalable vectors, malformed overloads, wider lanes and nonordinary call flags
+remain excluded. `tests/ios/air-vector-clmul.v` checks native LLVM and independent
+polynomial coefficients, both operand states, source/result freezing, loop
+reuse, ordinary/prepared memory, cache identities and exact shared limits.
+
 Fixed 1..16-lane integer vectors support ordinary direct `llvm.pext.vNiW`
 and `llvm.pdep.vNiW` calls for i1..i64 lanes. Extraction gathers selected bits
 into consecutive low positions; deposition scatters low bits into selected
