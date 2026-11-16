@@ -179,7 +179,7 @@ fn main() {
     text.write_string('%p = getelementptr i8, ptr %out, ${if mode == 7 { 'i64' } else { typ }} %idx\n store i8 42, ptr %p\n ret void }\n')
    }
    // Cache each smaller subtree before extending either dependency. The
-   // call and extraction each count, although lowered to one private node.
+   // call and extraction each consume a private node and a depth level.
    for right in [false, true] { for padding in [1, 2] {
     text.write_string('define void @depth_${field}_${padding}_${right}(i${width} %a, ptr %out) { %base = add i${width} %a, 0\n')
     if padding == 2 { text.write_string('%base2 = add i${width} %base, 0\n') }
@@ -190,16 +190,15 @@ fn main() {
     }
     text.write_string('ret void }\n')
    } }
-   for kind in ['cold', 'root', 'pair_select', 'pair_freeze', 'pair_zero', 'loaded', 'undef'] {
+   for kind in ['cold', 'root', 'pair_insert', 'pair_freeze', 'pair_flag_insert', 'loaded', 'undef'] {
     text.write_string('define void @guard_${field}_${kind}(i${width} %a, i${width} %b, ptr %out) { store i8 17, ptr %out\n')
     if kind == 'cold' { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
     if kind == 'loaded' { text.write_string('%loaded = load i${width}, ptr %out, align 1\n') }
-    if kind != 'pair_zero' {
-     text.write_string('%pair = call ${pair} ${intrinsic}(i${width} ${if kind in ['cold', 'root'] { 'poison' } else if kind == 'undef' { 'undef' } else if kind == 'loaded' { '%loaded' } else { '%a' }}, i${width} %b)\n')
-    }
-    if kind == 'pair_select' { text.write_string('%flow = select i1 true, ${pair} %pair, ${pair} zeroinitializer\n') }
+    text.write_string('%pair = call ${pair} ${intrinsic}(i${width} ${if kind in ['cold', 'root'] { 'poison' } else if kind == 'undef' { 'undef' } else if kind == 'loaded' { '%loaded' } else { '%a' }}, i${width} %b)\n')
+    if kind == 'pair_insert' { text.write_string('%flow = insertvalue ${pair} %pair, i${width} %a, 0\n') }
+    if kind == 'pair_flag_insert' { text.write_string('%flow = insertvalue ${pair} %pair, i1 false, 1\n') }
     if kind == 'pair_freeze' { text.write_string('%flow = freeze ${pair} %pair\n') }
-    text.write_string('%r = extractvalue ${pair} ${if kind == 'pair_zero' { 'zeroinitializer' } else if kind in ['pair_select', 'pair_freeze'] { '%flow' } else { '%pair' }}, ${field}\n %p = getelementptr i8, ptr %out, ${typ} %r\n')
+    text.write_string('%r = extractvalue ${pair} ${if kind in ['pair_insert', 'pair_flag_insert', 'pair_freeze'] { '%flow' } else { '%pair' }}, ${field}\n %p = getelementptr i8, ptr %out, ${typ} %r\n')
     if kind == 'root' { text.write_string('%fixed = freeze ${typ} %r\n %safe = getelementptr i8, ptr %out, ${typ} %fixed\n') }
     if kind == 'cold' { text.write_string('br label %exit\n exit:\n') }
     text.write_string('ret void }\n')
@@ -239,7 +238,7 @@ fn main() {
     depth := p.prepare_memory_function(ir, stream, pools, bodies, fi(ir, 'depth_${field}_1_${right}'))!; depth.free()
     if _ := p.prepare_memory_function(ir, stream, pools, bodies, fi(ir, 'depth_${field}_2_${right}')) { panic('cached overflow depth') }; controls++
    }
-   for kind in ['cold', 'root', 'pair_select', 'pair_freeze', 'pair_zero', 'loaded', 'undef'] {
+   for kind in ['cold', 'root', 'pair_insert', 'pair_freeze', 'pair_flag_insert', 'loaded', 'undef'] {
     f := fi(ir, 'guard_${field}_${kind}')
     mut actual := []u8{len: 64, init: 0xcc}; av := [u64(0)]; mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
     if kind in ['cold', 'root'] {

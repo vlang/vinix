@@ -169,14 +169,22 @@ Carry-less multiplication (`llvm.clmul`) and parallel bit extraction/deposition
 retain the low N polynomial-product bits. Extraction packs selected bits into
 low positions; deposition scatters low bits into selected positions. Both input
 dependencies and poison flags are checked under the same graph limits.
-Direct `extractvalue` fields from signed/unsigned checked add/subtract/multiply
+`extractvalue` fields from signed/unsigned checked add/subtract/multiply
 (`llvm.*.with.overflow`) also accept i1..i64 operands. Field zero is the wrapped
 value; field one is the i1 overflow flag. Arithmetic overflow is defined, while
-poison in either input poisons either extracted field. A checked call and its
-extraction lower to one scalar node, using two depth levels. Both operands and
-their cached heights are checked. Aggregate select/freeze/insert, aggregate
-constants and loaded operands remain unsupported address dependencies; scalar
-select/freeze may handle an extracted field normally.
+poison in either input poisons either extracted field. Pair selects may choose
+between checked calls, nested pair selects and zero/poison pair constants. A
+poison condition poisons the selected field; poison in an unselected pair does
+not. Both branches and the condition are validated, and all three cached heights
+count. Aggregate freeze/insert, undef pairs, PHIs and loaded operands remain
+unsupported address dependencies; scalar select/freeze may handle an extracted
+field normally.
+
+Pair fields are projected into scalar nodes, with separate cache keys for the
+value field, overflow field and ordinary scalar results. Each projected pair
+operation/constant and each extraction consumes a node/depth level. Calls plus
+extractions still consume two levels. This separate representation can reach
+the 256-node bound earlier than the former fused direct-call extraction.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -300,6 +308,12 @@ calls. It checks direct/masked/zero-extended indices, poison in either operand,
 computed poison, scalar select/freeze, cached depth through either input, cold
 and independent poison roots, and unsupported aggregate/load dependencies.
 Validation, ordinary and prepared execution preserve every byte on refusal.
+
+`tests/ios/air-memory-pair-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares
+both selected fields across all 384 checked-arithmetic overloads with defined
+native LLVM calls/selects. It checks nested selects, zero/poison pairs, poison
+conditions, scalar freeze, computed conditions, both shared-field extraction
+orders, exact node/depth limits, cold/independent roots and unsupported inputs.
 
 ## Prepared memory functions
 
