@@ -137,7 +137,8 @@ mut:
 	offsets [31]u64
 	inline_slots u32
 	grid_threads u64
-	group_threads u64
+	grid_size SoftwareMetalSize
+	group_size SoftwareMetalSize
 }
 fn sm_compute_bindings_free(state &SoftwareMetalComputeBindings) {
 	objc_release(state.pipeline)
@@ -259,34 +260,64 @@ fn sm_compute_validate(state &SoftwareMetalComputeBindings) {
 		if !sm_range(sm_buffer_length(b), offset, arg.minimum_size) || offset % arg.alignment != 0 { panic('iOS: Metal compute binding bounds/alignment') }
 	}
 }
-// Normalize both selectors without multiplying untrusted dimensions. Only a
-// one-dimensional grid is admitted; the final dispatchThreads group may be partial.
-fn sm_compute_grid(groups bool, grid SoftwareMetalSize, group SoftwareMetalSize, steps int) !u64 {
-	if grid.width == 0 || grid.height != 1 || grid.depth != 1 || group.width == 0 || group.width > software_metal_max_compute_group || group.height != 1 || group.depth != 1 {
-		return error('software Metal requires a nonempty 1D grid and 1..256 threads per group')
+struct SoftwareMetalComputeGrid {
+	threads u64
+	grid SoftwareMetalSize
+	group SoftwareMetalSize
+}
+fn sm_compute_volume(size SoftwareMetalSize, limit u64) !u64 {
+	mut volume := u64(1)
+	for axis in [size.width, size.height, size.depth]! {
+		if axis == 0 || axis > limit / volume { return error('software Metal compute dimension product exceeds profile') }
+		volume *= axis
 	}
-	if grid.width > software_metal_max_compute_threads / (if groups { group.width } else { u64(1) }) {
-		return error('software Metal compute invocation limit')
+	return volume
+}
+// Check volumes before multiplying any untrusted dimensions. dispatchThreads
+// may produce partial groups along any of the three axes.
+fn sm_compute_grid_plan(groups bool, grid SoftwareMetalSize, group SoftwareMetalSize, steps int) !SoftwareMetalComputeGrid {
+	if grid.width == 0 || grid.height == 0 || grid.depth == 0 || group.width == 0 || group.height == 0 || group.depth == 0 {
+		return error('software Metal requires nonempty compute dimensions')
 	}
-	threads := grid.width * (if groups { group.width } else { u64(1) })
+	group_volume := sm_compute_volume(group, software_metal_max_compute_group) or { return error('software Metal compute group limit') }
+	grid_volume := sm_compute_volume(grid, software_metal_max_compute_threads) or { return error('software Metal compute invocation limit') }
+	if groups && grid_volume > software_metal_max_compute_threads / group_volume { return error('software Metal compute invocation limit') }
+	threads := grid_volume * (if groups { group_volume } else { u64(1) })
 	if steps < 1 || steps > software_metal_max_compute_steps || threads > u64(software_metal_max_compute_steps / steps) {
 		return error('software Metal compute dispatch instruction budget')
 	}
-	return threads
+	return SoftwareMetalComputeGrid{threads, if groups { SoftwareMetalSize{grid.width * group.width, grid.height * group.height, grid.depth * group.depth} } else { grid }, group}
+}
+fn sm_compute_grid(groups bool, grid SoftwareMetalSize, group SoftwareMetalSize, steps int) !u64 {
+	return sm_compute_grid_plan(groups, grid, group, steps)!.threads
+}
+// The plan is private, immutable and validated when the dispatch is recorded.
+// Local indices use the actual edge-group width/height, with x varying fastest.
+fn (plan SoftwareMetalComputeGrid) coordinates(position u64) [4]u64 {
+	x := position % plan.grid.width
+	y := position / plan.grid.width % plan.grid.height
+	z := position / (plan.grid.width * plan.grid.height)
+	lx := x % plan.group.width; ly := y % plan.group.height; lz := z % plan.group.depth
+	remaining_x := plan.grid.width - (x - lx)
+	remaining_y := plan.grid.height - (y - ly)
+	sx := if remaining_x < plan.group.width { remaining_x } else { plan.group.width }
+	sy := if remaining_y < plan.group.height { remaining_y } else { plan.group.height }
+	return [x, y, z, (lz * sy + ly) * sx + lx]!
 }
 fn sm_compute_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, group SoftwareMetalSize) {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	h := sm_compute_active(encoder)
 	sm_compute_validate(h.metal_compute)
-	threads := sm_compute_grid(ctext(u64(selector)) == 'dispatchThreadgroups:threadsPerThreadgroup:', grid, group, obj_header(h.metal_compute.pipeline).metal_kernel.prepared.steps()) or { panic('iOS: ' + err.msg()) }
+	plan := sm_compute_grid_plan(ctext(u64(selector)) == 'dispatchThreadgroups:threadsPerThreadgroup:', grid, group, obj_header(h.metal_compute.pipeline).metal_kernel.prepared.steps()) or { panic('iOS: ' + err.msg()) }
 	mut command := obj_header(h.fields[0]).software_metal
 	if command.ops.len >= 65536 { panic('iOS: software Metal command limit') }
 	mut snapshot := unsafe { &SoftwareMetalComputeBindings(C.malloc(sizeof(SoftwareMetalComputeBindings))) }
 	if snapshot == unsafe { nil } { panic('iOS: cannot allocate Metal compute dispatch') }
 	unsafe { *snapshot = *h.metal_compute }
-	snapshot.grid_threads = threads
-	snapshot.group_threads = group.width
+	snapshot.grid_threads = plan.threads
+	snapshot.grid_size = plan.grid
+	snapshot.group_size = plan.group
 	objc_retain(snapshot.pipeline)
 	for buffer in snapshot.buffers { objc_retain(buffer) }
 	command.ops << SoftwareMetalCopy{compute: snapshot}
@@ -311,9 +342,13 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	// All invocation addresses, even in cold blocks or the last partial group,
 	// must be valid before the first invocation writes. No AIR value is executed
 	// by this pass; arithmetic poison retains ordinary partial-write behavior.
+	plan := SoftwareMetalComputeGrid{state.grid_threads, state.grid_size, state.group_size}
 	for pass in 0 .. 2 {
 		for position in u64(0) .. state.grid_threads {
-			if has_values { builtin_words[0] = position; builtin_words[3] = position % state.group_threads }
+			if has_values {
+				words := plan.coordinates(position)
+				for lane in 0 .. 4 { builtin_words[lane] = words[lane] }
+			}
 			if pass == 0 { k.prepared.validate(bindings, k.prepared.steps())! }
 			else { k.prepared.run(mut bindings, k.prepared.steps())! }
 		}

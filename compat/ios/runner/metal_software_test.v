@@ -64,6 +64,10 @@ fn test_software_metal_samplers() {
 		sm_test_grid_memory_focus()!
 		exit(0)
 	}
+	if os.args.len == 2 && os.args[1] == '--software-metal-multigrids' {
+		sm_test_multigrid_focus()!
+		exit(0)
+	}
 	if os.args.len == 4 && os.args[1] == '--software-metal-grid-reject' {
 		objc_start(); sm_test_grid_reject_case(os.args[2].int(), os.args[3]); exit(0)
 	}
@@ -2673,7 +2677,7 @@ fn sm_test_compute_reject(mode int, cycle int, path string) {
 	// Execute the rejection itself, without inheriting initialized Objective-C
 	// or sanitizer state through fork. Require the precise runtime diagnostic.
 	result := os.exec([os.executable(), '--software-metal-compute-reject', mode.str(), path])
-	expected := ['software Metal compute invocation limit', 'Metal compute dispatch requires every buffer binding', 'Metal compute binding bounds/alignment', 'Metal compute binding bounds/alignment', 'Metal compute buffer index exceeds profile', 'Metal compute encoding has ended', 'Metal encoder requires an uncommitted buffer with no active encoder', 'Metal commit requires ended encoders and an uncommitted buffer', 'invalid Metal compute buffer/offset', 'Metal compute dispatch requires a pipeline', 'software Metal requires a nonempty 1D grid and 1..256 threads per group', 'Metal compute binding bounds/alignment', 'Metal compute binding bounds/alignment', 'Metal compute binding bounds/alignment'][mode]
+	expected := ['software Metal compute invocation limit', 'Metal compute dispatch requires every buffer binding', 'Metal compute binding bounds/alignment', 'Metal compute binding bounds/alignment', 'Metal compute buffer index exceeds profile', 'Metal compute encoding has ended', 'Metal encoder requires an uncommitted buffer with no active encoder', 'Metal commit requires ended encoders and an uncommitted buffer', 'invalid Metal compute buffer/offset', 'Metal compute dispatch requires a pipeline', 'software Metal compute group limit', 'Metal compute binding bounds/alignment', 'Metal compute binding bounds/alignment', 'Metal compute binding bounds/alignment'][mode]
 	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR'); assert base.len > 0
 	os.write_file('${base}/compute-reject-${os.getpid()}-${cycle}-${mode}.log', result.output) or { panic(err) }
 	assert result.exit_code == 1 && result.output.contains('iOS: ' + expected) && !result.output.contains('ERROR: AddressSanitizer') && !result.output.contains('runtime error:'), 'invalid compute state/range: mode=${mode} exit=${result.exit_code} output=${result.output}'
@@ -3923,6 +3927,155 @@ fn sm_grid_check(ok bool, detail string) {
 fn sm_grid_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, group SoftwareMetalSize) {
 	unsafe { SMComputeDispatch(voidptr(C.ios_objc_msgsend))(encoder, selector, grid, group) }
 }
+struct SoftwareMetalMultigridCase {
+	groups bool
+	grid SoftwareMetalSize
+	group SoftwareMetalSize
+	last bool
+}
+fn sm_multigrid_extent(c SoftwareMetalMultigridCase) SoftwareMetalSize {
+	return if c.groups { SoftwareMetalSize{c.grid.width * c.group.width, c.grid.height * c.group.height, c.grid.depth * c.group.depth} } else { c.grid }
+}
+fn sm_multigrid_region(c SoftwareMetalMultigridCase) (SoftwareMetalSize, SoftwareMetalSize) {
+	s := sm_multigrid_extent(c)
+	o := if c.last { SoftwareMetalSize{(s.width - 1) / c.group.width * c.group.width, (s.height - 1) / c.group.height * c.group.height, (s.depth - 1) / c.group.depth * c.group.depth} } else { SoftwareMetalSize{} }
+	return o, SoftwareMetalSize{if s.width - o.width < c.group.width { s.width - o.width } else { c.group.width }, if s.height - o.height < c.group.height { s.height - o.height } else { c.group.height }, if s.depth - o.depth < c.group.depth { s.depth - o.depth } else { c.group.depth }}
+}
+fn sm_test_multigrid_focus() ! {
+	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR')
+	sm_grid_check(base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/'), 'external multidimensional output')
+	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/multigrids' } else { '/normal/multigrids' }
+	sm_grid_check(!os.exists(out), 'fresh multidimensional output'); os.mkdir_all(out)!
+	mut rows := os.create(out + '/comparisons.txt')!; defer { rows.close() }
+	mut cases := []SoftwareMetalMultigridCase{}
+	for groups in [false, true] {
+		for grid in [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{1, 5, 1}, SoftwareMetalSize{5, 1, 3}, SoftwareMetalSize{5, 3, 1}, SoftwareMetalSize{7, 5, 3}, SoftwareMetalSize{4, 4, 4}, SoftwareMetalSize{16, 8, 4}, SoftwareMetalSize{16, 16, 16}, SoftwareMetalSize{1, 4096, 1}, SoftwareMetalSize{1, 1, 4096}] {
+			for group in [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{2, 2, 2}, SoftwareMetalSize{3, 2, 2}, SoftwareMetalSize{4, 4, 4}, SoftwareMetalSize{16, 16, 1}, SoftwareMetalSize{1, 4, 8}, SoftwareMetalSize{8, 1, 4}, SoftwareMetalSize{3, 5, 7}] {
+				if grid.width * grid.height * grid.depth * (if groups { group.width * group.height * group.depth } else { u64(1) }) > 4096 { continue }
+				for last in [false, true] {
+					c := SoftwareMetalMultigridCase{groups, grid, group, last}; s := sm_multigrid_extent(c)
+					if last && s.width <= group.width && s.height <= group.height && s.depth <= group.depth { continue }
+					cases << c
+				}
+			}
+		}
+	}
+	mut source := strings.new_builder(262144); mut names := []string{}
+	source.write_string('target datalayout = "e-p:64:64"\n')
+	mut coordinates := 0
+	for i, c in cases {
+		name := 'shape_${i}'; names << name
+		origin, size := sm_multigrid_region(c)
+		args := if i % 2 == 0 { '<3 x i32> %gid, i32 %local, ptr addrspace(1) %out' } else { 'ptr addrspace(1) %out, i32 %local, <3 x i32> %gid' }
+		source.write_string('define void @${name}(${args}) {\n')
+		for lane, pair in [[origin.width, size.width]!, [origin.height, size.height]!, [origin.depth, size.depth]!] {
+			source.write_string('%v${lane} = extractelement <3 x i32> %gid, i32 ${lane}\n %lo${lane} = icmp uge i32 %v${lane}, ${pair[0]}\n %hi${lane} = icmp ult i32 %v${lane}, ${pair[0] + pair[1]}\n %in${lane} = and i1 %lo${lane}, %hi${lane}\n')
+		}
+		source.write_string('%xy = and i1 %in0, %in1\n %selected = and i1 %xy, %in2\n br i1 %selected, label %write, label %exit\nwrite: %a = insertelement <4 x i32> zeroinitializer, i32 %v0, i32 0\n %b = insertelement <4 x i32> %a, i32 %v1, i32 1\n %c = insertelement <4 x i32> %b, i32 %v2, i32 2\n %d = insertelement <4 x i32> %c, i32 %local, i32 3\n %p = getelementptr <4 x i32>, ptr addrspace(1) %out, i32 %local\n store <4 x i32> %d, ptr addrspace(1) %p, align 4\n br label %exit\nexit: ret void }\n')
+		// Independent group/local nested enumeration checks every point and index.
+		s := sm_multigrid_extent(c); count := s.width * s.height * s.depth
+		plan := sm_compute_grid_plan(c.groups, c.grid, c.group, 1)!
+		sm_grid_check(plan.threads == count && plan.grid == s && plan.group == c.group, 'normalized dimensions')
+		mut seen := []bool{len: int(count)}
+		for gz in u64(0) .. (s.depth + c.group.depth - 1) / c.group.depth { for gy in u64(0) .. (s.height + c.group.height - 1) / c.group.height { for gx in u64(0) .. (s.width + c.group.width - 1) / c.group.width {
+			mut local := u64(0)
+			for lz in u64(0) .. c.group.depth { for ly in u64(0) .. c.group.height { for lx in u64(0) .. c.group.width {
+				x := gx * c.group.width + lx; y := gy * c.group.height + ly; z := gz * c.group.depth + lz
+				if x >= s.width || y >= s.height || z >= s.depth { continue }
+				linear := (z * s.height + y) * s.width + x
+				words := plan.coordinates(linear)
+				sm_grid_check(words == [x, y, z, local]! && !seen[int(linear)], 'coordinate/local enumeration')
+				seen[int(linear)] = true; local++; coordinates++
+			} } }
+		} } }
+		for visited in seen { sm_grid_check(visited, 'coordinate coverage') }; unsafe { seen.free() }
+	}
+	for name in ['multicold', 'multiscalar', 'multipoison'] {
+		names << name
+		if name == 'multiscalar' {
+			source.write_string('define void @${name}(i32 %gid, i32 %local, ptr addrspace(1) %out) { %p = getelementptr i32, ptr addrspace(1) %out, i32 %local\n store i32 %gid, ptr addrspace(1) %p, align 4\n ret void }\n')
+		} else if name == 'multicold' {
+			source.write_string('define void @${name}(<3 x i32> %gid, i32 %local, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n br i1 true, label %exit, label %cold\ncold: %p = getelementptr i8, ptr addrspace(1) %out, i32 %local\n store i8 42, ptr addrspace(1) %p\n br label %exit\nexit: ret void }\n')
+		} else {
+			source.write_string('define void @${name}(<3 x i32> %gid, i32 %local, ptr addrspace(1) %out) { %p = getelementptr i32, ptr addrspace(1) %out, i32 %local\n %bad = icmp eq i32 %local, 5\n %v = select i1 %bad, i32 poison, i32 42\n store i32 %v, ptr addrspace(1) %p, align 4\n ret void }\n')
+		}
+	}
+	source.write_string('!air.kernel = !{')
+	for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 10}') }; source.write_string('}\n')
+	for i, name in names {
+		n := i * 10; reordered := i < cases.len && i % 2 == 1
+		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n !${n + 1} = !{}\n !${n + 2} = !{!${n + 5}, !${n + 3}, !${n + 4}}\n !${n + 3} = !{i32 ${if reordered { 2 } else { 0 }}, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.thread_index_in_threadgroup"}\n !${n + 5} = !{i32 ${if reordered { 0 } else { 2 }}, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
+	}
+	os.write_file(out + '/input.ll', source.str())!
+	r := os.exec(['/opt/homebrew/opt/llvm/bin/llvm-as', out + '/input.ll', '-o', out + '/input.bc'])
+	os.write_file(out + '/assemble.log', r.output)!; sm_grid_check(r.exit_code == 0, r.output)
+	code := os.read_bytes(out + '/input.bc')!; bytes := sm_library_code_fixture(names, code, true, true, true)
+	defer { unsafe { code.free(); bytes.free() } }
+	mut geometry := 0
+	for field in 0 .. 6 { for bad in [u64(0), ~u64(0)] {
+		mut axes := [u64(1), 1, 1, 1, 1, 1]!; axes[field] = bad
+		for groups in [false, true] { if _ := sm_compute_grid_plan(groups, SoftwareMetalSize{axes[0], axes[1], axes[2]}, SoftwareMetalSize{axes[3], axes[4], axes[5]}, 1) { panic('multigrid invalid dimension') }; geometry++ }
+	} }
+	for group in [SoftwareMetalSize{16, 16, 2}, SoftwareMetalSize{1, 257, 1}, SoftwareMetalSize{1, 1, 257}] {
+		if _ := sm_compute_grid_plan(false, SoftwareMetalSize{1, 1, 1}, group, 1) { panic('multigrid group volume') }; geometry++
+	}
+	for groups in [false, true] {
+		if _ := sm_compute_grid_plan(groups, SoftwareMetalSize{16, 16, 17}, SoftwareMetalSize{1, 1, 1}, 1) { panic('multigrid volume') }; geometry++
+		if _ := sm_compute_grid_plan(groups, SoftwareMetalSize{2, 2, 2}, SoftwareMetalSize{1, 1, 1}, 125001) { panic('multigrid step budget') }; geometry++
+		sm_grid_check(sm_compute_grid_plan(groups, SoftwareMetalSize{2, 2, 2}, SoftwareMetalSize{1, 1, 1}, 125000)!.threads == 8, 'multigrid exact step budget'); geometry++
+	}
+	sm_grid_check(sm_compute_grid_plan(true, SoftwareMetalSize{16, 16, 2}, SoftwareMetalSize{2, 2, 2}, 1)!.threads == 4096, 'multigrid exact group product'); geometry++
+	if _ := sm_compute_grid_plan(true, SoftwareMetalSize{16, 16, 3}, SoftwareMetalSize{2, 2, 2}, 1) { panic('multigrid group product') }; geometry++
+	mut complete := 0; mut failed := 0; mut invocations := u64(0)
+	for cycle in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
+		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'multigrid library')
+		queue := sm_send(device, c'newCommandQueue'); output := sm_test_buffer(device, 4112, 0); p := sm_send(output, c'contents')
+		for i, c in cases {
+			pipeline := sm_test_compute_pipeline(device, library, names[i], unsafe { nil }); sm_grid_check(pipeline != 0, 'multigrid pipeline')
+			command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+			sm_test_compute_buffer(encoder, output, 8, 7)
+			sm_grid_dispatch(encoder, if c.groups { c'dispatchThreadgroups:threadsPerThreadgroup:' } else { c'dispatchThreads:threadsPerThreadgroup:' }, c.grid, c.group)
+			sm_test_compute_offset(encoder, 12, 7); sm_call(encoder, c'endEncoding'); objc_release(pipeline)
+			unsafe { C.memset(voidptr(p), 0xcc, 4112) }; sm_call(command, c'commit')
+			sm_grid_check(sm_send(command, c'status') == 4, 'multigrid completion')
+			origin, size := sm_multigrid_region(c); count := size.width * size.height * size.depth
+			for word in 0 .. 1028 {
+				mut expected := u32(0xcccccccc)
+				if word >= 2 && u64((word - 2) / 4) < count {
+					local := u64((word - 2) / 4)
+					values := [origin.width + local % size.width, origin.height + local / size.width % size.height, origin.depth + local / (size.width * size.height), local]!
+					expected = u32(values[(word - 2) % 4])
+				}
+				if unsafe { *(&u32(p + u64(word * 4))) } != expected { panic('multigrid case ${i} word ${word}') }
+			}
+			s := sm_multigrid_extent(c); invocations += s.width * s.height * s.depth; complete++
+			rows.writeln('${cycle} ${i} ${c.groups} grid=${c.grid.width},${c.grid.height},${c.grid.depth} group=${c.group.width},${c.group.height},${c.group.depth} last=${c.last} PASS')!
+		}
+		for name in ['multicold', 'multiscalar', 'multipoison'] {
+			pipeline := sm_test_compute_pipeline(device, library, name, unsafe { nil }); sm_grid_check(pipeline != 0, name)
+			command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+			buffer := sm_test_buffer(device, if name == 'multicold' { u64(12) } else { u64(72) }, 0); bp := sm_send(buffer, c'contents')
+			sm_test_compute_buffer(encoder, buffer, 8, 7)
+			grid := if name == 'multiscalar' { SoftwareMetalSize{3, 2, 2} } else if name == 'multicold' { SoftwareMetalSize{3, 3, 3} } else { SoftwareMetalSize{2, 2, 2} }
+			group := if name == 'multiscalar' { grid } else { SoftwareMetalSize{2, 2, 2} }
+			sm_grid_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', grid, group); sm_call(encoder, c'endEncoding')
+			unsafe { C.memset(voidptr(bp), 0xcc, if name == 'multicold' { usize(12) } else { usize(72) }) }
+			objc_release(pipeline); objc_release(buffer); sm_call(command, c'commit')
+			good := name == 'multiscalar'; sm_grid_check(sm_send(command, c'status') == if good { u64(4) } else { u64(5) }, name + ' status')
+			if good { complete++; invocations += 12 } else { sm_grid_check(sm_send(command, c'error') != 0, 'multigrid error'); failed++ }
+			for j in 0 .. if name == 'multicold' { 3 } else { 18 } {
+				expected := if good && j >= 2 && j < 14 { u32((j - 2) % 3) } else if name == 'multipoison' && j >= 2 && j < 7 { u32(42) } else { u32(0xcccccccc) }
+				if unsafe { *(&u32(bp + u64(j * 4))) } != expected { panic('multigrid ${name} word ${j}') }
+			}
+		}
+		objc_release(output); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool); objc_stop()
+	}
+	line := 'IOS-SOFTWARE-METAL-MULTIGRIDS: ${complete} completed dispatches, ${invocations} successful invocations, ${failed} cold/poison command failures, ${coordinates} independently enumerated coordinates, ${geometry} geometry/budget controls, ${cases.len} first/edge group fixtures, both selectors, 2D/3D partial groups and two drained runtimes PASS\n'
+	os.write_file(out + '/result.txt', line)!; print(line)
+}
 fn sm_test_grid_reject_case(mode int, path string) {
 	device := metal_create_system_default_device()
 	bytes := os.read_bytes(path) or { panic(err) }
@@ -3933,7 +4086,7 @@ fn sm_test_grid_reject_case(mode int, path string) {
 	unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
 	input := sm_test_buffer(device, 32, 0); output := sm_test_buffer(device, 32, 0)
 	sm_test_compute_buffer(encoder, input, 0, 3); sm_test_compute_buffer(encoder, output, 0, 7)
-	grid := SoftwareMetalSize{if mode == 0 { u64(4097) } else if mode == 3 { u64(4096) } else if mode == 4 { ~u64(0) } else { u64(1) }, if mode == 2 { u64(2) } else { u64(1) }, 1}
+	grid := SoftwareMetalSize{if mode == 0 { u64(4097) } else if mode == 3 { u64(4096) } else if mode == 4 { ~u64(0) } else { u64(1) }, if mode == 2 { u64(0) } else { u64(1) }, 1}
 	group := SoftwareMetalSize{if mode == 1 { u64(257) } else if mode == 4 { u64(256) } else { u64(1) }, 1, 1}
 	sm_grid_dispatch(encoder, if mode == 4 { c'dispatchThreadgroups:threadsPerThreadgroup:' } else { c'dispatchThreads:threadsPerThreadgroup:' }, grid, group)
 }
@@ -3981,7 +4134,7 @@ fn sm_test_grid_memory_focus() ! {
 	code := os.read_bytes(out + '/input.bc')!; bytes := sm_library_code_fixture(names, code, true, true, true)
 	defer { unsafe { code.free(); bytes.free() } }
 	os.write_file_array(out + '/reject.metallib', bytes)!
-	for mode, diagnostic in ['compute invocation limit', 'requires a nonempty 1D grid', 'requires a nonempty 1D grid', 'compute dispatch instruction budget', 'compute invocation limit'] {
+	for mode, diagnostic in ['compute invocation limit', 'compute group limit', 'requires nonempty compute dimensions', 'compute dispatch instruction budget', 'compute invocation limit'] {
 		rejected := os.exec([os.executable(), '--software-metal-grid-reject', mode.str(), out + '/reject.metallib'])
 		os.write_file(out + '/reject-${mode}.log', rejected.output)!
 		sm_grid_check(rejected.exit_code == 1 && rejected.output.contains('iOS: software Metal ' + diagnostic) && !rejected.output.contains('ERROR: AddressSanitizer') && !rejected.output.contains('runtime error:'), 'encoding rejection ${mode}: ${rejected.output}')
@@ -3996,7 +4149,7 @@ fn sm_test_grid_memory_focus() ! {
 		} else { sm_grid_check(!valid, 'geometry refusal') }
 		geometry++
 	} } }
-	for field in 0 .. 4 { for bad in [u64(0), 2, ~u64(0)] {
+	for field in 0 .. 4 { for bad in [u64(0), ~u64(0)] {
 		grid := SoftwareMetalSize{1, if field == 0 { bad } else { u64(1) }, if field == 1 { bad } else { u64(1) }}
 		group := SoftwareMetalSize{1, if field == 2 { bad } else { u64(1) }, if field == 3 { bad } else { u64(1) }}
 		if _ := sm_compute_grid(false, grid, group, 1) { panic('grid dimensions') }; geometry++
