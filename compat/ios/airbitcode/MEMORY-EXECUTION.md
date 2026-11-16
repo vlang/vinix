@@ -229,14 +229,37 @@ Repeated freezes preserve defined lanes and independently choose stable zero for
 poison/undef lanes before extraction. This does not repair an invalid or poisoned
 extraction selector; an outer scalar freeze may do so. Original constant tables
 retain their unfrozen state in cache, so an unfrozen consumer still sees poison
-or a selected-undef error. Other constructions and loaded vectors still reject.
+or a selected-undef error. Unsupported constructions and loaded vectors still reject.
 
 Vector argument leaves and each source freeze use private POD metadata nodes
 under the existing vector cache tag. Source and selector heights both count
 plus one extraction level, including cached subtrees. Argument literal lanes on
 the existing direct path retain their cost. All source operations and branches
 are validated before execution; scalar select cannot conceal unsupported sources
-or an independently poisoned GEP root. No owned field or runtime array is added.
+or an independently poisoned GEP root. No owned field or runtime heap array is added.
+
+Vector sources also accept nested vector selects with a scalar i1 condition.
+Arms may be direct integer vector arguments, supported constants, freezes or
+further scalar-condition selects. Both arms and the condition are validated,
+even for literal conditions. Undef in an unchosen vector arm remains unobserved;
+a chosen undef lane errors at the final extraction, even under a later scalar
+select/freeze. A source vector freeze may repair it first. Poison conditions
+produce poison lanes and may be repaired by a source vector freeze. Invalid
+extraction selectors still produce poison before lane access. Vector conditions,
+loads, PHIs and other constructions remain excluded from these address graphs.
+
+Private scalar projections defer lane undef until the final extraction. Select
+propagates only the chosen tag; source freeze repairs tags after selector checks.
+A new fixed 256-entry bool array stores these internal tags; no runtime heap
+array is added. Cache keys reserve nine low bits for scalar/pair/source tags
+0..3 and per-selector projection tags 4..259. Existing ownership/free paths and
+256-node/32-level limits remain. All projected source/selector/condition heights
+count, including cache hits; freeze-only paths retain their previous costs.
+
+`tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
+all integer lane widths, lazy arm selection, nested selects, source/result
+freezes, condition poison, invalid selectors, cache isolation, exact graph limits
+and unsupported or immediately invalid source/condition dependencies.
 
 `tests/ios/air-memory-vector-freeze-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, direct arguments and constant lane states, repeated

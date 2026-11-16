@@ -11,6 +11,9 @@ enum MemoryIndexKind {
 	dynamic_lane
 	constant_lane
 	vector_source
+	projected_select
+	projected_freeze
+	projected_extract
 	binary
 	compare
 	select_value
@@ -51,14 +54,18 @@ struct MemoryIndexBuilder {
 	scope  int
 mut:
 	nodes []MemoryIndexNode
-	cache map[u64]int // Low two bits: scalar, pair value/flag, vector source.
+	cache map[u64]int // Low nine bits: scalar/pair/source, or lane projection.
+}
+
+fn memory_index_key(number u32, tag u64) u64 {
+	return (u64(number) << 9) | tag
 }
 
 // A cached literal vector is a contiguous group of ordinary scalar leaf nodes.
 // Its first leaf also retains the undef mask, ignored by leaf evaluation.
 fn (mut b MemoryIndexBuilder) constant_lanes(source IRTypedOperand, bits u32, count int) !int {
 	b.p.constant_vector_profile(b.stream, b.pools, b.bodies, b.scope, source, true, 16)!
-	key := (u64(source.number) << 2) | 3
+	key := memory_index_key(source.number, 3)
 	if cached := b.cache[key] { return cached }
 	if count > max_memory_index_nodes - b.nodes.len { return error('AIR memory index: constant lane node limit') }
 	c := b.p.extracted_constant(b.pools, b.bodies, b.scope, source)!
@@ -122,7 +129,7 @@ fn (mut b MemoryIndexBuilder) pair_field_source(operand IRTypedOperand, before i
 		if producer < scope.instructions_start || producer >= before || producer >= b.p.instructions.len || producer >= b.bodies.instructions.len || b.p.instructions[producer].result_type != operand.type_index { return error('AIR memory index: earlier typed pair required') }
 	} else if v.pooled.type_index != operand.type_index { return error('AIR memory index: pair operand type') }
 	if producer < 0 && v.pooled.kind == .constant && b.pools.constants[v.pooled.constant_index].kind == .undef && !frozen { return error('AIR memory index: undef pair requires direct freeze') }
-	key := (u64(operand.number) << 2) | (u64(field) + 1)
+	key := memory_index_key(operand.number, u64(field) + 1)
 	if cached := b.cache[key] {
 		if b.nodes[cached].height > max_memory_index_depth - depth { return error('AIR memory index: pair expression depth limit') }
 		return cached
@@ -209,7 +216,7 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 	if producer < 0 && v.pooled.kind == .constant && b.pools.constants[v.pooled.constant_index].kind == .undef && !frozen {
 		return error('AIR memory index: undef requires direct freeze')
 	}
-	key := u64(operand.number) << 2
+	key := memory_index_key(operand.number, 0)
 	if cached := b.cache[key] {
 		if b.nodes[cached].height > max_memory_index_depth - depth {
 			return error('AIR memory index: expression depth limit')
@@ -337,9 +344,15 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 				lhs := b.expression(lane_operand, producer, depth + 1)!
 				node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: lhs, right: base, value: u64(count), flags: b.nodes[base].flags, height: 1 + b.nodes[lhs].height}
 			} else if source.number >= scope.base_id {
-				vector := b.frozen_vector_source(source, producer, depth + 1)!
-				lhs := b.expression(lane_operand, producer, depth + 1)!
-				node = MemoryIndexNode{kind: if vector.base >= 0 { MemoryIndexKind.constant_lane } else { MemoryIndexKind.dynamic_lane }, bits: bits, argument: vector.argument, left: lhs, right: vector.base, condition: vector.node, value: u64(count), flags: vector.undef, opcode: u32(vector.frozen), height: 1 + if vector.height > b.nodes[lhs].height { vector.height } else { b.nodes[lhs].height }}
+				if b.vector_select_source(source, producer, depth + 1)! {
+					selector := b.expression(lane_operand, producer, depth + 1)!
+					lane := b.project_vector_lane(source, selector, producer, depth + 1)!
+					node = MemoryIndexNode{kind: .projected_extract, bits: bits, left: lane, height: 1 + b.nodes[lane].height}
+				} else {
+					vector := b.frozen_vector_source(source, producer, depth + 1)!
+					lhs := b.expression(lane_operand, producer, depth + 1)!
+					node = MemoryIndexNode{kind: if vector.base >= 0 { MemoryIndexKind.constant_lane } else { MemoryIndexKind.dynamic_lane }, bits: bits, argument: vector.argument, left: lhs, right: vector.base, condition: vector.node, value: u64(count), flags: vector.undef, opcode: u32(vector.frozen), height: 1 + if vector.height > b.nodes[lhs].height { vector.height } else { b.nodes[lhs].height }}
+				}
 			} else {
 				argument := b.argument(source)!
 				mut fixed_lane := -1
@@ -383,8 +396,10 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![256]u64 {
 	mut values := [256]u64{}
 	mut poisons := [256]bool{}
+	mut undefs := [256]bool{} // Deferred only within vector-source projections.
 	for i, node in profile.index_nodes {
 		mut value := IntegerValue{ value: node.value }
+		mut undef_lane := false
 		match node.kind {
 			.literal {}
 			.vector_source {} // Validated source metadata; extraction reads its lanes.
@@ -408,10 +423,30 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 				} else {
 					lane := int(values[node.left])
 					undef := node.flags & (u64(1) << u32(lane)) != 0
-					if undef && node.opcode == 0 { return error('AIR memory index: selected undef lane') }
+					if undef && node.opcode & 1 == 0 {
+						if node.opcode & 2 == 0 { return error('AIR memory index: selected undef lane') }
+						undef_lane = true
+					}
 					chosen := node.right + lane
-					value = if node.opcode == 1 && (undef || poisons[chosen]) { IntegerValue{} } else { IntegerValue{value: values[chosen], poison: poisons[chosen]} }
+					value = if node.opcode & 1 != 0 && (undef || poisons[chosen]) { IntegerValue{} } else { IntegerValue{value: values[chosen], poison: poisons[chosen]} }
 				}
+			}
+			.projected_select {
+				if poisons[node.condition] { value = IntegerValue{poison: true} }
+				else {
+					chosen := if values[node.condition] & 1 != 0 { node.left } else { node.right }
+					value = IntegerValue{value: values[chosen], poison: poisons[chosen]}
+					undef_lane = undefs[chosen]
+				}
+			}
+			.projected_freeze {
+				value = if poisons[node.right] || values[node.right] >= node.value { IntegerValue{poison: true} }
+				else if poisons[node.left] || undefs[node.left] { IntegerValue{} }
+				else { IntegerValue{value: values[node.left]} }
+			}
+			.projected_extract {
+				if undefs[node.left] { return error('AIR memory index: selected undef lane') }
+				value = IntegerValue{value: values[node.left], poison: poisons[node.left]}
 			}
 			.binary {
 				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!
@@ -450,6 +485,7 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 		if value.poison && node.root { return error('AIR memory index: poison expression') }
 		values[i] = value.value
 		poisons[i] = value.poison
+		undefs[i] = undef_lane
 	}
 	return values
 }

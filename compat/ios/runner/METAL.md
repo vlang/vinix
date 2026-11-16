@@ -371,9 +371,18 @@ Earlier vector freezes of direct arguments or literal vectors also feed
 addresses. They preserve defined lanes and choose stable zero for poison/undef
 lanes before extraction. Repeated freezes are supported; they do not repair an
 invalid extraction selector or other unfrozen consumers of a cached table.
-Source and selector depths share the existing graph limits. Other constructed
-or loaded vector sources remain outside address expressions. The image shader
+Source and selector depths share the existing graph limits. Unsupported constructions
+and loaded vector sources remain outside address expressions. The image shader
 freezes an undef lane in its permutation vector before the observable readback.
+Vector selects with a scalar i1 condition may also supply address lanes.
+Supported arguments/constants, freezes and nested selects may feed either arm.
+Only the selected arm supplies lane undef/poison; chosen undef errors at final
+extraction unless a source vector freeze repairs it first. Scalar recovery after
+extraction cannot conceal undef errors. Poison conditions produce poison lanes.
+Both arms and conditions remain fully validated and charged to the graph limits.
+Vector conditions, loads, PHIs and other constructions remain excluded. The
+image shader chooses between two different permutations using x parity, then
+freezes the selection; independent red-channel readback observes both choices.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

@@ -32,7 +32,7 @@ fn (mut b MemoryIndexBuilder) frozen_vector_source(source IRTypedOperand, before
 		base := b.constant_lanes(source, bits, count)!
 		return MemoryIndexVectorSource{node: base, base: base, undef: b.nodes[base].flags}
 	}
-	key := (u64(source.number) << 2) | 3
+	key := memory_index_key(source.number, 3)
 	if cached := b.cache[key] {
 		node := b.nodes[cached]
 		if node.height > max_memory_index_depth - depth { return error('AIR memory index: cached vector depth limit') }
