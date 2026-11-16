@@ -222,7 +222,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		}
 		if code == 34 && vector_reduction_call(ir, op) {
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR vector reduction: result slot') }
-			work, key, attributes := p.vector_reduction_profile(ir, stream, pools, bodies, scope, index, op, max_integer_execution_steps - vector_work)!
+			work, key, attributes := p.scalar_vector_reduction_profile(ir, stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)!
 			if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector reduction: duplicate reserved declaration') }
 			if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, false)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
 			vector_work += work

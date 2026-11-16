@@ -136,7 +136,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			reduction_call := code == 34 && vector_reduction_call(ir, op)
 			if reduction_call {
 				if !inst.has_result { return error('AIR vector reduction: scalar result required') }
-				work, key, attributes := p.vector_reduction_profile(ir, stream, pools, bodies, scope, index, op, max_integer_execution_steps - vector_work)!
+				work, key, attributes := p.scalar_vector_reduction_profile(ir, stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 				if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector reduction: duplicate reserved declaration') }
 				if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, false)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
 				vector_work += work; first_operand++

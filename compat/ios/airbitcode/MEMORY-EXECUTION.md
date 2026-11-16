@@ -1007,6 +1007,25 @@ Existing 256-node and 32-level bounds count all sources and cached heights.
 in both directions, native LLVM bits, nonmutating validation, ordinary/prepared
 write ordering, freeze/poison/undef controls and exact graph boundaries.
 
+Floating minimum/maximum reductions support ordinary direct
+`llvm.vector.reduce.fminimum.vNf16/f32` and `fmaximum` calls for fixed 1..16
+lanes. They return one matching half/float scalar, propagate NaNs and order
+negative zero below positive zero. A single lane retains its raw bits; larger
+reductions use the existing preferred quiet NaN choice. Every input lane is
+observed: poison poisons the scalar result and executed undef rejects, even
+after earlier poison or a later result freeze. Source freeze repairs lanes;
+scalar result freeze repairs poison to zero. Mixed, void and memory execution
+accept these calls, with existing literal/construction/argument/load sources
+where admitted. Integer-only execution and floating address dependencies remain
+excluded. Calls cost one step and N+1 validation lane-work units, with scalar
+SSA results consuming no vector construction slot. Canonical overloads, exact
+type/declaration identities, attributes and shared limits remain checked.
+Fast-math flags, scalable vectors, wider formats and other floating reduction
+families remain excluded. `tests/ios/air-vector-float-reduction.v` checks native
+LLVM finite bits/NaN classes, exhaustive half and deterministic float sweeps,
+signed zeros, poison/undef/freezing, scalar/ordinary/prepared execution,
+metadata guards and exact shared storage/work limits.
+
 Integer vector reductions support ordinary direct `llvm.vector.reduce.add`,
 `mul`, `and`, `or`, `xor`, `smin`, `smax`, `umin` and `umax` calls with canonical
 `.vNiW` overloads, 1..16 lanes and i1..i64 elements. The result is scalar iW;
@@ -1020,7 +1039,7 @@ scalar execution keeps its existing argument restrictions. Reduction results
 use ordinary scalar SSA slots, without consuming vector construction storage.
 Each call costs one execution step and N+1 units of shared validation lane
 work. Exact declaration identities, signatures, attributes and existing budgets
-remain checked. Floating reductions, nonordinary flags and scalable vectors
+remain checked. Other reductions, nonordinary flags and scalable vectors
 remain excluded. Pure integer address graphs also accept these reductions,
 with complete source observation before writes, including inactive GEP roots
 and results discarded by scalar select/freeze. Existing 256-node/32-level
