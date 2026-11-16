@@ -12,10 +12,22 @@ import tests.packages.winemetaclosure
 import tests.packages.winemetaimages
 import tests.packages.winequeryhost
 import tests.packages.winequeryclosure
+import tests.packages.winequeryprobe
+import tests.packages.winexattr
 
 $if macos {
 	#include <sys/clonefile.h>
 	fn C.clonefile(&char, &char, i32) i32
+	#include <sys/xattr.h>
+	fn C.setxattr(&char, &char, voidptr, uint, u32, int) int
+	fn C.removexattr(&char, &char, int) int
+}
+
+struct NativeContent {
+mut:
+	format int
+	namespace string
+	objects map[string]winexattr.Object
 }
 
 struct Proof {
@@ -84,6 +96,19 @@ fn invoke(tool string, directory string, log string) !(int, string) {
 	return child.code, text
 }
 
+fn build_private(tool string, compiler string, directory string, log string) ! {
+	command := [tool, 'build', 'fixture', compiler, directory]
+	os.write_file(log + '.argv.json', json2.encode(command))!
+	mut child := os.new_process(tool)
+	defer { child.close() }
+	child.set_args(command[1..]); child.set_redirect_stdio_merged(); child.run()
+	C.close(child.stdio_fd[0]); child.stdio_fd[0] = -1
+	text := child.stdout_slurp(); child.wait()
+	os.write_file(log, text)!
+	os.write_file(log + '.exit.json', json2.encode({'exit': child.code}))!
+	if child.code != 0 { return error('private native host fixture failed: ' + text) }
+}
+
 fn entry(directory string, role string, log string) ! {
 	mut child := os.new_process(directory + '/program')
 	defer { child.close() }
@@ -134,13 +159,39 @@ fn check() ! {
 		'directory-map', 'directory-policy', 'directory-allowed', 'directory-denied', 'directory-marker', 'old-read-format', 'old-directory-replay-format',
 		'metadata-map', 'metadata-policy', 'metadata-aliases', 'metadata-allowed', 'metadata-denied', 'old-metadata-format', 'old-metadata-replay-format',
 		'query-policy', 'query-extra-execution', 'query-execution', 'query-counterfactual-policy', 'query-fixture', 'query-allowed', 'query-denied',
-		'query-counterfactual', 'query-output', 'query-temporary', 'old-query-format', 'old-query-replay-format'] {
+		'query-counterfactual', 'query-output', 'query-temporary', 'old-query-format', 'old-query-replay-format',
+		'xattr-empty', 'xattr-omitted-target', 'xattr-extra-target', 'xattr-forged-value', 'xattr-linked', 'old-xattr-format', 'old-xattr-replay-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-query-format' {
+		if name == 'old-xattr-format' {
+			proof.format = 9
+			expected = 'host build declaration differs'
+		} else if name == 'old-xattr-replay-format' {
+			file := 'read-closed/receipt.json'
+			mut read := json2.decode[HostRead](os.read_file(dir + '/' + file)!)!
+			read.format = 4
+			os.write_file(dir + '/' + file, json2.encode(read))!; changed << file
+			expected = 'read-closed capability declaration differs'
+		} else if name == 'xattr-linked' {
+			file := dir + '/read-closed/xattr-content.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'read-closed evidence must be bounded and ordinary'
+		} else if name in ['xattr-empty', 'xattr-omitted-target', 'xattr-extra-target', 'xattr-forged-value'] {
+			file := 'read-closed/xattr-content.json'
+			before := os.read_file(dir + '/' + file)!
+			mut native := json2.decode[NativeContent](before)!
+			if name == 'xattr-omitted-target' { native.objects.delete(native.objects.keys()[0]) }
+			if name == 'xattr-extra-target' { native.objects['/unlisted'] = winexattr.Object{kind: 'regular'} }
+			if name == 'xattr-forged-value' && !before.contains(winequeryprobe.value.bytes().hex()) { return error('native fixture value absent') }
+			text := if name == 'xattr-empty' { '{}' } else if name == 'xattr-forged-value' {
+				before.replace_once(winequeryprobe.value.bytes().hex(), '00')
+			} else { json2.encode(native) + '\n' }
+			os.write_file(dir + '/' + file, text)!; changed << file
+			expected = 'read-closed native xattr content differs'
+		} else if name == 'old-query-format' {
 			proof.format = 8
 			expected = 'host build declaration differs'
 		} else if name in ['query-policy', 'query-extra-execution', 'old-query-replay-format'] {
@@ -455,8 +506,36 @@ fn check() ! {
 		if status == 0 || !text.contains(expected) { return error('host control did not refuse at its named check: ' + name) }
 		passed << name
 	}
+	// Native mutations use a freshly built private namespace, never the caller's
+	// original graph or any historical input. Ordinary bytes stay unchanged.
+	private := out + '/native-fixture'
+	original_proof := json2.decode[Proof](os.read_file(original + '/host-build.json')!)!
+	build_private(tool, original_proof.compiler, private, out + '/native-build.log')!
+	query := json2.decode[winequeryhost.Declaration](os.read_file(private + '/read-closed/query.json')!)!
+	for name in ['xattr-live-file', 'xattr-live-directory', 'xattr-live-added'] {
+		path := query.attributes.paths[if name == 'xattr-live-directory' { 1 } else { 0 }]
+		before := if name == 'xattr-live-directory' { '' } else { digest(path)! }
+		attribute := if name == 'xattr-live-added' { winequeryprobe.key + '-extra' } else { winequeryprobe.key }
+		$if macos {
+			value := 'WINE XATTR PROB?\n'
+			if C.setxattr(path.str, attribute.str, value.str, uint(value.len), 0, 0) != 0 { return error('native mutation setup failed') }
+			status, text := invoke(tool, private, out + '/' + name + '.log') or {
+				if name == 'xattr-live-added' { C.removexattr(path.str, attribute.str, 0) }
+				else { C.setxattr(path.str, attribute.str, winequeryprobe.value.str, uint(winequeryprobe.value.len), 0, 0) }
+				return err
+			}
+			restored := if name == 'xattr-live-added' { C.removexattr(path.str, attribute.str, 0) }
+				else { C.setxattr(path.str, attribute.str, winequeryprobe.value.str, uint(winequeryprobe.value.len), 0, 0) }
+			if restored != 0 { return error('native fixture restoration failed') }
+			if status == 0 || !text.contains('read-closed native xattr content differs') { return error('native mutation did not reach content gate') }
+		} $else { return error('native mutation requires macOS') }
+		if name != 'xattr-live-directory' && digest(path)! != before { return error('native mutation changed ordinary bytes') }
+		restored_code, _ := invoke(tool, private, out + '/' + name + '-restored.log')!
+		if restored_code != 0 { return error('restored native baseline refused') }
+		passed << name
+	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline seventy-four exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline eighty-four exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

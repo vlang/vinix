@@ -14,6 +14,7 @@ import tests.packages.winedirclosure
 import tests.packages.winemetaclosure
 import tests.packages.winemetaimages
 import tests.packages.winequeryhost
+import tests.packages.winexattr
 
 $if macos {
 	#include <dlfcn.h>
@@ -33,7 +34,7 @@ struct Execution {
 }
 
 struct Proof {
-	format int = 4
+	format int = 5
 	recorded_directory string
 	builder string
 	archive_sha256 string
@@ -52,6 +53,24 @@ fn record(path string) !string {
 	st := os.lstat(path)!
 	if st.get_filetype() != .regular || st.size > 8 * 1024 * 1024 { return error('read-closed evidence must be bounded and ordinary') }
 	return os.read_file(path)
+}
+
+struct NativeAttributes {
+	format int
+	namespace string
+	objects map[string]winexattr.Object
+}
+
+// Copies bind the original replay namespace, including native attributes.
+// The independent metadata projection determines every target; stored rows
+// cannot add permissions or silently omit an object.
+fn native_attributes(metadata []string, namespace string) !string {
+	mut unique := map[string]bool{}
+	for path in metadata { unique[os.real_path(path)] = true }
+	objects := winexattr.capture(unique.keys())!
+	text := json2.encode(NativeAttributes{format: 1, namespace: namespace, objects: objects}) + '\n'
+	if text.len > 8 * 1024 * 1024 { return error('read-closed native xattr content exceeds host bound') }
+	return text
 }
 
 fn environment(directory string, trace bool) map[string]string {
@@ -281,6 +300,7 @@ pub fn finish(host string, builder string) ! {
 	invoke(builder, ['hidden-closed'], directory, 'hidden-closed')!
 	images, text := observations(record(directory + '/captured-closed.log')!, baseline)!
 	winequeryhost.verify_live(query)!
+	os.write_file(directory + '/xattr-content.json', native_attributes(metadata, host)!)!
 	os.write_file(directory + '/receipt.json', json2.encode(Proof{recorded_directory: host, builder: builder,
 		archive_sha256: digest(host + '/link-inputs.tar')!, output_sha256: digest(host + '/program')!,
 		policy: policy, directories: dirs, metadata: metadata, capabilities: caps, loads: winemacholink.loads(text, archive)!, images: images}) + '\n')!
@@ -301,7 +321,7 @@ pub fn admit(host string, recorded string, builder string) ! {
 	policy := winequeryhost.policy(query, caps.keys(), extra)!
 	dirs := winedirclosure.directories(caps.keys())!
 	metadata := winemetaclosure.paths(caps.keys(), extra)!
-	if proof.format != 4 || proof.recorded_directory != recorded || proof.builder != builder
+	if proof.format != 5 || proof.recorded_directory != recorded || proof.builder != builder
 		|| proof.directories != dirs || proof.metadata != metadata
 		|| proof.capabilities != caps || proof.policy != policy || record(directory + '/policy.sb')! != policy {
 		return error('read-closed capability declaration differs')
@@ -320,6 +340,9 @@ pub fn admit(host string, recorded string, builder string) ! {
 	}
 	if json2.decode[winemetaimages.Aliases](record(directory + '/metadata-aliases.json')!)! != aliases {
 		return error('read-closed metadata aliases differ')
+	}
+	if record(directory + '/xattr-content.json')! != native_attributes(metadata, recorded)! {
+		return error('read-closed native xattr content differs')
 	}
 	if proof.archive_sha256 != digest(host + '/link-inputs.tar')! || proof.output_sha256 != digest(host + '/program')! {
 		return error('read-closed host pins differ')
@@ -392,7 +415,7 @@ pub fn admit(host string, recorded string, builder string) ! {
 pub fn artifacts(host string) ![]string {
 	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!
 	mut names := ['receipt.json', 'policy.sb', 'uncaptured-object.o', 'replay/link-inputs/captured-program',
-		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker', 'metadata-aliases.json']
+		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker', 'metadata-aliases.json', 'xattr-content.json']
 	for mode in modes { names << mode + '.exec.json' }
 	mut logs := ['captured-closed', 'hidden-unrestricted', 'hidden-closed', 'allowed-read', 'denied-read-0', 'denied-read-1', 'denied-read-2', 'denied-read-3',
 		'allowed-directory', 'denied-directory-0', 'denied-directory-1', 'denied-directory-2', 'allowed-metadata-0', 'allowed-metadata-1']

@@ -33,9 +33,11 @@ values remain distinct. Limits are 2,048 targets, 256 attributes per target,
 aggregate raw name/value bytes per observation, and 64 MiB per receipt. Target
 manifests must be ordinary nonempty files no larger than 1 MiB. Symlinks,
 noncanonical/duplicate paths, FIFOs, devices and unsupported nodes refuse.
-Copies that lose native attributes fail this check even if ordinary file bytes
-match; this differs deliberately from the serialized probe evidence in the
-[required format-9 host receipt](wine-host-required-check.md).
+Replacing a target with a copy that loses native attributes fails this check
+even if ordinary file bytes match. Required
+[format-10 host admission](wine-host-required-check.md) uses the shared reader
+on original recorded paths when admitting copied evidence; this standalone CLI
+checks its explicit canonical targets.
 
 `wine-xattr-content-check.v CONTENT FRESH_OUTPUT` exercises binary/empty native
 baselines, restoration after each mutation and 35 refusal cases: same-size and
@@ -55,9 +57,10 @@ Alias spellings collapse to their canonical targets. OS-root/device subpath
 exceptions, directory entry names and other paths outside that explicit set
 are not covered. The new checker does not modify historical fixtures.
 
-This tool supplements ordinary byte inventories. It does not pin every
-attribute readable by the host sandbox, grant publisher authentication or
-integrate live xattr content into required host receipts. Existing verifiers,
+This standalone tool supplements ordinary byte inventories. Required host
+receipts separately integrate its shared reader for live native admission.
+Neither pins every attribute readable by the host sandbox or grants publisher
+authentication. Existing verifiers,
 complete original bundles and compiler/SDK/image namespaces remain required.
 Broader query/search/metadata and loader closure, owned ARM/GUI, redistribution
 and default activation remain open.

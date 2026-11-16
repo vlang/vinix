@@ -1,6 +1,6 @@
 # Required Wine qualification host receipts
 
-The producer, native controller and full retainer now admit format-9 host-build
+The producer, native controller and full retainer now admit format-10 host-build
 receipts before qualification work. Build each with `wine-host-build.v`; launch
 its `program` in the original build directory. A bare or relocated executable,
 linked receipt, wrong role or unsupported format refuses before creating
@@ -14,11 +14,11 @@ and checks its role and executable hash. The producer and controller must also
 use the compiler bound by their host receipts for guest source generation.
 The original bootstrap builder remains a separately pinned input.
 
-Format 9 retains captured Mach-O link/replay/load evidence for the
+Format 10 retains captured Mach-O link/replay/load evidence for the
 actual running executable. Every archive member, replay artifact and receipt
 belongs to the host output graph; the selected linker and observed ordinary
 host images belong to its input graph and byte store. Missing rows cannot be
-waived by the producer, controller or full retainer. Original format-2/3/4/5/6/7/8 checkers
+waived by the producer, controller or full retainer. Original format-2/3/4/5/6/7/8/9 checkers
 and their complete historical bundles retain their earlier contract.
 
 It also requires `sdk-graph.json`, recomputed SDK stub identities and declared
@@ -60,7 +60,15 @@ anchored temporary-output pattern with seven lowercase hexadecimal characters.
 temporary controls and 27 query child records are mandatory. Native builds seed
 and check known xattrs; admission validates serialized observations and ordinary
 fixture bytes, allowing unchanged copies whose filesystem drops native xattrs.
-Full xattr content, other search/metadata operations, OS-root/device exceptions, writes/network,
+Inner format 5 additionally requires `xattr-content.json`, with all native
+attribute names/values on the independently derived canonical metadata set.
+`XATTR_SHOWCOMPRESSION` includes compression metadata hidden by default APIs.
+The embedded/pinned shared reader bounds native reads, holds descriptors and
+requires two matching complete observations. Admission compares the canonical
+receipt to live original-namespace attributes; unchanged copied graphs still
+require those original targets. A copy's native attributes cannot replace them.
+These quiescent observations do not establish an atomic filesystem snapshot.
+Remaining xattr coverage, other search/metadata operations, OS-root/device exceptions, writes/network,
 helper startup and OS loader/cache bytes retain their previous scope.
 Full ABI/library/search closure remains open.
 
@@ -83,7 +91,7 @@ alter its receipt hash or omit a host artifact input. The real controller must
 refuse each before signing/build output; an empty requested directory is allowed.
 Producer host admission runs before signing and is repeated after the guest.
 
-The full owned-retention runner now requires sixty-three refusals after real and
+The full owned-retention runner now requires sixty-five refusals after real and
 unchanged copied baselines. Five host-binding cases change producer/controller
 binding hashes, omit host receipt rows from their input maps or link the native
 binding record. All mutation writes target private copies. Existing 44 cases
@@ -102,7 +110,8 @@ Two further cases omit `read-closed/policy.sb` from producer/controller maps,
 requiring the directory policy to remain in both retained host graphs.
 Two further cases omit `read-closed/metadata-aliases.json` from those maps.
 Two further cases omit `read-closed/query.json` from those maps.
-Alternatively `--partition=0/4` through `--partition=3/4` divide all 63 cases
+Two further cases omit `read-closed/xattr-content.json` from those maps.
+Alternatively `--partition=0/4` through `--partition=3/4` divide all 65 cases
 without weakening either baseline. Use a separate output directory for each;
 `wine-retention-partitions-check.v PREFIX` verifies their exact assigned case
 lists, both baselines and complete unique coverage from `PREFIX0` through `PREFIX3`.

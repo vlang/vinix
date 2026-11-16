@@ -20,7 +20,7 @@ $if macos {
 }
 
 const clang = '/opt/homebrew/opt/llvm/bin/clang'
-const scope = 'selected host V/C sources, resource headers, observed tool images, captured Mach-O replay/load evidence, SDK source/reexport declarations, installed CLT SDK read-denied replay and exact ordinary file-data/ancestor-directory and file-read-metadata permissions plus bounded existence/xattr queries and execution-query exceptions; complete xattr content and other query/search/metadata closure, system loader/cache and hermetic build admission remain unqualified'
+const scope = 'selected host V/C sources, resource headers, observed tool images, captured Mach-O replay/load evidence, SDK source/reexport declarations, installed CLT SDK read-denied replay and exact ordinary file-data/ancestor-directory and file-read-metadata permissions plus bounded existence/xattr queries and execution-query exceptions and bounded native xattr content on canonical metadata targets; remaining xattr/sandbox coverage and other query/search/metadata closure, system loader/cache and hermetic build admission remain unqualified'
 
 struct Proof {
 	format int
@@ -102,6 +102,7 @@ pub fn verify_self() ! {
 		os.dir(@FILE) + '/../winequeryclosure/policy.v': $embed_file('../winequeryclosure/policy.v').to_string()
 		os.dir(@FILE) + '/../winequeryprobe/query.v': $embed_file('../winequeryprobe/query.v').to_string()
 		os.dir(@FILE) + '/../winequeryhost/query.v': $embed_file('../winequeryhost/query.v').to_string()
+		os.dir(@FILE) + '/../winexattr/content.v': $embed_file('../winexattr/content.v').to_string()
 	} { if digest(path)! != sha256.hexhash(text) { return error('compiled host builder source differs: ' + path) } }
 }
 
@@ -109,7 +110,7 @@ pub fn admit(directory string) ! {
 	verify_self()!
 	proof := json2.decode[Proof](record(directory + '/host-build.json')!)!
 	root := os.real_path(os.dir(@FILE) + '/../../..')
-	if proof.format != 9 || proof.scope != scope || proof.root != root || !os.is_abs_path(proof.directory)
+	if proof.format != 10 || proof.scope != scope || proof.root != root || !os.is_abs_path(proof.directory)
 		|| proof.sdk != selected_sdk()! || os.real_path(proof.compiler) != proof.compiler { return error('host build declaration differs') }
 	base := v_command(root, proof.directory, proof.compiler, proof.role)!
 	mut discover := base.clone(); discover.insert(1, ['-print-watched-files', '-dump-files', proof.directory + '/sources-before.txt'])
@@ -144,7 +145,7 @@ pub fn admit(directory string) ! {
 		root + '/tests/packages/wineheaders/headers.v', root + '/tests/packages/winecsource/closure.v'] {
 		if path !in proof.inputs { return error('host required input is missing') }
 	}
-	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v', root + '/tests/packages/winesdkdeny/replay.v', root + '/tests/packages/winereadclosure/policy.v', root + '/tests/packages/winereadhost/replay.v', root + '/tests/packages/winedirclosure/policy.v', root + '/tests/packages/winemetaclosure/policy.v', root + '/tests/packages/winemetaimages/images.v', root + '/tests/packages/winequeryclosure/policy.v', root + '/tests/packages/winequeryprobe/query.v', root + '/tests/packages/winequeryhost/query.v'] {
+	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v', root + '/tests/packages/winesdkdeny/replay.v', root + '/tests/packages/winereadclosure/policy.v', root + '/tests/packages/winereadhost/replay.v', root + '/tests/packages/winedirclosure/policy.v', root + '/tests/packages/winemetaclosure/policy.v', root + '/tests/packages/winemetaimages/images.v', root + '/tests/packages/winequeryclosure/policy.v', root + '/tests/packages/winequeryprobe/query.v', root + '/tests/packages/winequeryhost/query.v', root + '/tests/packages/winexattr/content.v'] {
 		if path !in proof.inputs { return error('host required input is missing') }
 	}
 	if proof.inputs.len != proof.blobs.len { return error('host retained input map differs') }
@@ -185,7 +186,7 @@ pub fn build(role string, compiler string, requested string) ! {
 		root + '/tests/packages/wineheaders/headers.v', root + '/tests/packages/winecsource/closure.v'] {
 		inputs[path] = digest(path)!
 	}
-	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v', root + '/tests/packages/winesdkdeny/replay.v', root + '/tests/packages/winereadclosure/policy.v', root + '/tests/packages/winereadhost/replay.v', root + '/tests/packages/winedirclosure/policy.v', root + '/tests/packages/winemetaclosure/policy.v', root + '/tests/packages/winemetaimages/images.v', root + '/tests/packages/winequeryclosure/policy.v', root + '/tests/packages/winequeryprobe/query.v', root + '/tests/packages/winequeryhost/query.v'] { inputs[path] = digest(path)! }
+	for path in [root + '/tests/packages/winemacholink/link.v', root + '/tests/packages/winelink/link.v', root + '/tests/packages/winesdk/stubs.v', root + '/tests/packages/winesdkdeny/replay.v', root + '/tests/packages/winereadclosure/policy.v', root + '/tests/packages/winereadhost/replay.v', root + '/tests/packages/winedirclosure/policy.v', root + '/tests/packages/winemetaclosure/policy.v', root + '/tests/packages/winemetaimages/images.v', root + '/tests/packages/winequeryclosure/policy.v', root + '/tests/packages/winequeryprobe/query.v', root + '/tests/packages/winequeryhost/query.v', root + '/tests/packages/winexattr/content.v'] { inputs[path] = digest(path)! }
 	mut discover := base.clone(); discover.insert(1, ['-print-watched-files', '-dump-files', directory + '/sources-before.txt'])
 	winehostimages.invoke_v(discover, directory, directory + '/logs/discover.log')!
 	winesource.capture(directory + '/sources-before.txt', mut inputs)!
@@ -228,7 +229,7 @@ pub fn build(role string, compiler string, requested string) ! {
 	os.write_file(directory + '/inputs-after.json', json2.encode(inputs) + '\n')!
 	mut outputs := map[string]string{}
 	for name in artifacts(directory)! { outputs[name] = digest(directory + '/' + name)! }
-	os.write_file(directory + '/host-build.json', json2.encode(Proof{format: 9, scope: scope, role: role, root: root, directory: directory, compiler: tool, builder: os.real_path(os.executable()), sdk: sdk, inputs: inputs, outputs: outputs, blobs: blobs}) + '\n')!
+	os.write_file(directory + '/host-build.json', json2.encode(Proof{format: 10, scope: scope, role: role, root: root, directory: directory, compiler: tool, builder: os.real_path(os.executable()), sdk: sdk, inputs: inputs, outputs: outputs, blobs: blobs}) + '\n')!
 	admit(directory)!
 	println('WINE HOST BUILD PASS ' + role + ': ' + directory + '/program')
 }

@@ -60,7 +60,7 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires seventy-four exact resealed refusals. Cases cover omitted parsed
+then requires eighty-four exact refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
@@ -89,11 +89,16 @@ execution permission, changed temporary-query declaration, partial policy and
 attribute fixture, altered allowed/denied/isolation/output results, changed
 temporary marker, old host format 8 and old inner replay format 3.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 9
+Ten native-content cases cover missing/added targets, forged values/declarations,
+linked evidence, old outer/inner formats and live file/directory/additional-name
+mutations on a newly built private fixture. Each native mutation restores
+admission and preserves ordinary file bytes.
+
+The [required host receipt boundary](wine-host-required-check.md) uses format 10
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2/3/4/5/6/7/8 bundles and their original
+retainer also retains its own graph. Original format-1/2/3/4/5/6/7/8/9 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
@@ -180,6 +185,18 @@ all query records are mandatory. Builds seed and check known native attributes;
 admission checks their serialized observations rather than requiring live
 attributes to survive copying. Complete xattr content and the remaining
 search, loader, bootstrap and hermetic boundaries remain open.
+
+Format 10 adds inner replay format 5 and mandatory `read-closed/xattr-content.json`.
+The exact canonical metadata target set is reconstructed independently; every
+native attribute name/value returned with `XATTR_SHOWCOMPRESSION` is pinned,
+including hidden compression metadata. Both capture and admission use two
+matching bounded observations with the shared `winexattr` module. Its source is
+embedded, pinned and retained. The host receipt is limited to 8 MiB.
+Copies bind native content in the original recorded namespace; native attributes
+on copied fixture files are not substituted for those original targets. Missing,
+added or changed rows refuse even after resealing output hashes. These are
+quiescent observations rather than an atomic snapshot: change-and-restore races,
+OS-root/device exceptions and paths outside the metadata set remain unqualified.
 
 The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and
