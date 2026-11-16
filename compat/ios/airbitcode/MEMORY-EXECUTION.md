@@ -201,7 +201,7 @@ Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
 most 32 levels including leaves and cached subexpressions. Unrelated arithmetic
 does not consume this graph budget. Loads, PHIs and
-constructed/loaded vector dependencies reject as
+other vector constructions and loaded vector dependencies reject as
 address expressions. These operations keep their ordinary non-address support.
 Every call evaluates the graph from immutable argument words into a fixed stack
 array before resolving addresses, including in cold blocks and unused GEPs.
@@ -222,9 +222,26 @@ literal integer vector. Constant vectors validate all lanes and retain a cached
 contiguous scalar-leaf table, charged one graph node per lane. Each extraction
 adds its selector dependency and one level/node. Zero/data/aggregate/splat,
 poison and undef constants retain ordinary lane semantics. Only a selected undef
-lane errors, even under select/freeze; poison or out-of-range selectors skip
+lane errors, even under scalar select/freeze; poison or out-of-range selectors skip
 that check and produce poison. Unselected undef/poison lanes do not affect a
-defined lane. Constructed and loaded vector sources still reject in addresses.
+defined lane. Earlier vector freezes of these sources also feed addresses.
+Repeated freezes preserve defined lanes and independently choose stable zero for
+poison/undef lanes before extraction. This does not repair an invalid or poisoned
+extraction selector; an outer scalar freeze may do so. Original constant tables
+retain their unfrozen state in cache, so an unfrozen consumer still sees poison
+or a selected-undef error. Other constructions and loaded vectors still reject.
+
+Vector argument leaves and each source freeze use private POD metadata nodes
+under the existing vector cache tag. Source and selector heights both count
+plus one extraction level, including cached subtrees. Argument literal lanes on
+the existing direct path retain their cost. All source operations and branches
+are validated before execution; scalar select cannot conceal unsupported sources
+or an independently poisoned GEP root. No owned field or runtime array is added.
+
+`tests/ios/air-memory-vector-freeze-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
+all integer lane widths, direct arguments and constant lane states, repeated
+freezes, scalar recovery, selector poison/range, frozen/unfrozen cache isolation,
+exact graph limits, cold/independent roots and unsupported source dependencies.
 
 `tests/ios/air-memory-constant-lane-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares
 constant lane selection against defined native LLVM extracts. It checks all

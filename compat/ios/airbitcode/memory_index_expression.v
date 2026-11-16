@@ -10,6 +10,7 @@ enum MemoryIndexKind {
 	lane
 	dynamic_lane
 	constant_lane
+	vector_source
 	binary
 	compare
 	select_value
@@ -50,7 +51,7 @@ struct MemoryIndexBuilder {
 	scope  int
 mut:
 	nodes []MemoryIndexNode
-	cache map[u64]int // Low two bits: scalar, pair value/flag, constant vector.
+	cache map[u64]int // Low two bits: scalar, pair value/flag, vector source.
 }
 
 // A cached literal vector is a contiguous group of ordinary scalar leaf nodes.
@@ -335,6 +336,10 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 				base := b.constant_lanes(source, bits, count)!
 				lhs := b.expression(lane_operand, producer, depth + 1)!
 				node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: lhs, right: base, value: u64(count), flags: b.nodes[base].flags, height: 1 + b.nodes[lhs].height}
+			} else if source.number >= scope.base_id {
+				vector := b.frozen_vector_source(source, producer, depth + 1)!
+				lhs := b.expression(lane_operand, producer, depth + 1)!
+				node = MemoryIndexNode{kind: if vector.base >= 0 { MemoryIndexKind.constant_lane } else { MemoryIndexKind.dynamic_lane }, bits: bits, argument: vector.argument, left: lhs, right: vector.base, condition: vector.node, value: u64(count), flags: vector.undef, opcode: u32(vector.frozen), height: 1 + if vector.height > b.nodes[lhs].height { vector.height } else { b.nodes[lhs].height }}
 			} else {
 				argument := b.argument(source)!
 				mut fixed_lane := -1
@@ -382,6 +387,7 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 		mut value := IntegerValue{ value: node.value }
 		match node.kind {
 			.literal {}
+			.vector_source {} // Validated source metadata; extraction reads its lanes.
 			.poison { value = IntegerValue{poison: true} }
 			.copy_value { value = IntegerValue{value: values[node.left], poison: poisons[node.left]} }
 			.lane {
@@ -401,9 +407,10 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 					value = IntegerValue{poison: true}
 				} else {
 					lane := int(values[node.left])
-					if node.flags & (u64(1) << u32(lane)) != 0 { return error('AIR memory index: selected undef lane') }
+					undef := node.flags & (u64(1) << u32(lane)) != 0
+					if undef && node.opcode == 0 { return error('AIR memory index: selected undef lane') }
 					chosen := node.right + lane
-					value = IntegerValue{value: values[chosen], poison: poisons[chosen]}
+					value = if node.opcode == 1 && (undef || poisons[chosen]) { IntegerValue{} } else { IntegerValue{value: values[chosen], poison: poisons[chosen]} }
 				}
 			}
 			.binary {

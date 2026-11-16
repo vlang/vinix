@@ -357,16 +357,23 @@ dynamic lane selectors built from the supported pure integer expressions.
 Selectors use unsigned width-masked
 words; poison or out-of-range selection yields poison before any lane read.
 Scalar select/freeze can recover it. Direct undef selectors, memory-dependent
-selectors, and constructed/loaded vector sources remain unsupported in addresses.
+selectors, and other constructed/loaded vector sources remain unsupported in addresses.
 Each computed selector contributes its height plus one extraction level; valid
 literal argument lanes retain their single-leaf cost. The RGBA size shader exercises a
 computed x-modulo-three selector; its red channel exposes the selected x/y/z
 coordinate to independent image readback checks.
 Literal vectors cache one scalar leaf per lane in the shared graph budget.
-Selected undef lanes error even under select/freeze; unselected undef and poison
+Unfrozen undef lanes error even under scalar select/freeze; unselected undef and poison
 lanes remain local. Poison/out-of-range selectors produce poison before any
 selected-lane check. The image shader uses a literal vector to permute its
 x/y/z selector before extracting the observable coordinate.
+Earlier vector freezes of direct arguments or literal vectors also feed
+addresses. They preserve defined lanes and choose stable zero for poison/undef
+lanes before extraction. Repeated freezes are supported; they do not repair an
+invalid extraction selector or other unfrozen consumers of a cached table.
+Source and selector depths share the existing graph limits. Other constructed
+or loaded vector sources remain outside address expressions. The image shader
+freezes an undef lane in its permutation vector before the observable readback.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
