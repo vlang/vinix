@@ -38,6 +38,17 @@ pre-padding-fix allocator and a fresh external directory; four compiled variants
 exercise the original gap, wrong initial frontier, preceding-record start and
 destruction of a live prefix.
 
+`--measure-capacity` grows from a warmed two-entry table to 8,192 simultaneous
+records, releases them, then restores the warmed table capacity in the fixture.
+This removes the legitimately owned final buffer from the comparison. The
+pre-capacity-fix source retains 12 discarded buffers / 90,160 malloc bytes;
+the fixed source requires zero additional blocks and bytes. The sanitized suite
+checks 13 growth boundaries, ASan poisoning of all 12 replaced buffers, stable
+allocation pointees and concurrent locked statistics readers. The initial empty
+table has no buffer to retire. `capacity-counterexamples.v` takes the runner,
+pre-capacity-fix allocator and a fresh external directory; four compiled variants
+catch original, missing, late and lost ownership of the pointer buffer.
+
 Sanitizers check eight release masks, delayed interior ownership, suffix-only
 destruction, automatic GC during allocation, idempotence and two concurrent
 statistics readers. Freed-pointer checks query ASan without dereferencing freed
@@ -62,3 +73,13 @@ and requires the remaining GC body, six heap bodies, ten owning declarations,
 nine GPU lifetime bodies and ten event methods to match the pre-padding baseline.
 The native build may omit unused statistics getters; host modes require both.
 Historical checkers and their complete original bundles remain unchanged.
+
+For current construction, `check-capacity.v --host CURRENT_C` also checks the
+stack return, exclusive ownership flag and actual V runtime copy/free/transfer
+path through the actual allocator free. `--selftest CURRENT_C` rejects eight
+constructor, allocation, buffer-free and flag-transfer mutations.
+`--native CURRENT_C BASELINE_C` reconstructs the
+exact pre-capacity constructor, requires six other heap bodies and all ten
+owning declarations, nine GPU lifetime bodies and ten event methods to match.
+`check-padding.v --native` retains its original pre-padding baseline contract;
+its host/selftest modes continue to check the current GC and locked getters.

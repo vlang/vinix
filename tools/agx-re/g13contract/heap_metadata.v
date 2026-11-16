@@ -2,6 +2,10 @@
 module g13contract
 
 fn check_heap_metadata_local(source string) ! {
+ constructor := section(source, 'pub fn new_heap(', '// Checked rounding', 'Heap table ownership')!
+ require_order(constructor, ['mut heap := HeapAllocator{',
+  'heap.allocations.flags |= .noslices', 'return heap'],
+  'Heap table exclusively owns its buffer before the first append')!
  gc := section(source, 'fn (mut h HeapAllocator) gc_locked()', '// Return the total number', 'Heap metadata GC')!
  require_order(gc, ['if a.va + a.size == h.top && !a.in_use',
   'h.top = if idx == 0 { h.start } else {', 'previous := h.allocations[idx - 1]',

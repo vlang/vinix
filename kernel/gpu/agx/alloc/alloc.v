@@ -67,12 +67,16 @@ pub mut:
 
 // Create a new heap allocator managing the VA range [start, end).
 pub fn new_heap(name string, start u64, end u64) HeapAllocator {
-	return HeapAllocator{
+	mut heap := HeapAllocator{
 		name: name
 		start: start
 		end: end
 		top: start
 	}
+	// This table never escapes or has slices. All access holds the heap lock,
+	// so capacity growth can immediately free its previous pointer buffer.
+	heap.allocations.flags |= .noslices
+	return heap
 }
 
 // Checked rounding is local to GPU allocation. A wrapped size or address must

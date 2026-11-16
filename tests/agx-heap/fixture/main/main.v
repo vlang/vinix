@@ -113,6 +113,7 @@ fn check_concurrent_stats() {
 fn main() {
  if os.args.len == 2 && os.args[1] == '--measure' { measure(); return }
  if os.args.len == 2 && os.args[1] == '--measure-padding' { measure_padding(); return }
+ if os.args.len == 2 && os.args[1] == '--measure-capacity' { measure_capacity(); return }
  if os.args.len == 2 && os.args[1] == '--padding-probe' { check_heap_padding_probe(); return }
  if os.args.len == 2 && os.args[1] == '--alignment-probe' { check_heap_alignment_probe(); return }
  if os.args.len == 2 && os.args[1] == '--overflow-probe' { check_heap_overflow_probe(); return }
@@ -121,5 +122,6 @@ fn main() {
  check_concurrent_stats()
  check_heap_bounds()
  check_heap_padding()
+ check_capacity_growth()
  println('AGX heap ownership: PASS')
 }
