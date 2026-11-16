@@ -22,8 +22,8 @@ fn check_render_retirement_local(native string) ! {
  reaper := section(native, 'fn (mut mgr GpuManager) reap_g13_render_jobs()', '// Firmware is stopped before this is called', 'Shared render reaper')!
  require_order(reaper, ['retirement := mgr.retire_g13_render_stages_locked(mut owned)',
   'if retirement == 0 { continue }', 'if retirement < 0 {', 'owned.quarantined = true',
-  'complete_g13_render_job(mut owned, false)', 'continue', 'read_g13_render_result(owned)',
-  'mgr.free_g13_render_job_locked(mut owned, true)', 'complete_g13_render_job(mut owned, owned.error.status == 0)'], 'No shared cleanup or callback before both stages complete')!
+  'complete_g13_render_job(mut owned, false)', 'continue', 'if !owned.completion_result_ready', 'read_g13_render_result(owned)',
+  'complete_g13_render_job(mut owned, owned.error.status == 0)', 'mgr.free_g13_render_job_locked(mut owned, true)'], 'No shared cleanup or callback before both stages complete; completion precedes deferred cleanup')!
  require(!reaper.contains('event.stamp_value_completed('), 'Whole-pass stamp gates must not prevent independent stage retirement')!
  complete := section(native, 'fn complete_g13_render_job(', '// Construct the complete paired', 'Shared callback retirement')!
  require_order(complete, ['job.stage_completion = unsafe { nil }', 'if job.completion == unsafe { nil }',

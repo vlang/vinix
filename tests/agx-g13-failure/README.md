@@ -2,6 +2,19 @@ Compile `run.v` to an external executable and run it with `--sanitize` from
 the repository root. Set `V_C_ERROR_BUG_REPORT_DISABLED=1`, `V` to select the
 compiler, and `AGX_G13_TEST_BINARY` to retain the host executable outside Git.
 
+Completion tests execute both production reapers and callback helpers. Hardware
+completion publishes cached results before backing disposal; refused cleanup
+retains the graph without changing success. Real callback state is freed on
+first invocation, so retry paths exercise callback-data lifetime under ASan.
+Hardware errors and partial render failures remain failures. Compile
+`completion-counterexamples.v` externally and pass the failure runner plus a
+fresh external directory to retain nine compiled negative cases. The production
+queue-release guard also verifies that finished callbacks cannot destroy a queue
+whose command backing is still quarantined, even after file pins end. The native
+`check-completion-order.v` accepts baseline/current ARM generated C and proves
+that only completion ordering and the render result-cache guard differ, while
+queue/VM ownership guards and physical destruction stay unchanged.
+
 The V runner copies the production channel implementation and extracts the
 production compute/render publishers, retirement, recovery, event handler, health check, worker and
 shutdown functions into a temporary host build. It uses the real firmware

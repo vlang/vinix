@@ -12,6 +12,6 @@ fn check_compute_retirement_local(native string) ! {
   'mgr.state = .error', 'owned.quarantined = true', 'complete_g13_compute_job(mut owned, false)', 'continue',
   'owned.retirement_published = true', 'owned.completion_result = owned.timestamp_values()',
   'owned.completion_ready = true', 'mgr.end_g13_operation_locked()',
-  'mgr.free_g13_compute_job_locked(mut owned, true)', 'complete_g13_compute_job(mut owned, owned.error.status == 0)'],
+  'complete_g13_compute_job(mut owned, owned.error.status == 0)', 'mgr.free_g13_compute_job_locked(mut owned, true)'],
   'Compute credit follows completion/ring proof and precedes shared cleanup')!
 }

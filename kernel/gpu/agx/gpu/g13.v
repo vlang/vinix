@@ -2236,20 +2236,23 @@ fn (mut mgr GpuManager) reap_g13_render_jobs() {
 			complete_g13_render_job(mut owned, false)
 			continue
 		}
-		owned.completion_result = read_g13_render_result(owned)
-		owned.completion_result_ready = true
+		if !owned.completion_result_ready {
+			owned.completion_result = read_g13_render_result(owned)
+			owned.completion_result_ready = true
+		}
 		if owned.pending_counted {
 			mgr.end_g13_operation_locked()
 			owned.pending_counted = false
 		}
+		// Firmware completion determines the result. Deferred backing cleanup
+		// retains the graph without turning completed work into a failed job.
+		complete_g13_render_job(mut owned, owned.error.status == 0)
 		if mgr.free_g13_render_job_locked(mut owned, true) {
 			mgr.g13_render_jobs.delete(index)
-			complete_g13_render_job(mut owned, owned.error.status == 0)
-			// The completion was the last user of the job.
+			// Completion and backing cleanup have both released their users.
 			unsafe { free(owned) }
 		} else {
 			owned.quarantined = true
-			complete_g13_render_job(mut owned, false)
 		}
 	}
 	mgr.lock.release()
@@ -2716,14 +2719,15 @@ fn (mut mgr GpuManager) reap_g13_compute_jobs() {
 			mgr.end_g13_operation_locked()
 			owned.pending_counted = false
 		}
+		// Publish the cached hardware result before deferred destruction, as
+		// Asahi's workqueue completion does. Cleanup retries consume no callback.
+		complete_g13_compute_job(mut owned, owned.error.status == 0)
 		if mgr.free_g13_compute_job_locked(mut owned, true) {
 			mgr.g13_compute_jobs.delete(index)
-			complete_g13_compute_job(mut owned, owned.error.status == 0)
-			// The completion was the last user of the job.
+			// Completion and backing cleanup have both released their users.
 			unsafe { free(owned) }
 		} else {
 			owned.quarantined = true
-			complete_g13_compute_job(mut owned, false)
 		}
 	}
 	mgr.lock.release()

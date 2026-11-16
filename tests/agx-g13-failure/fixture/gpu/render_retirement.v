@@ -139,9 +139,11 @@ fn check_render_retirement() {
  check_render_retirement_reverse()
 	check_render_event_credits()
  check_render_reaper_integration()
+ check_render_error_completion()
 }
 
 struct RetirementTestResult { value u32 }
+struct RetirementCompletion { marker u64 = 0xdecaf }
 __global retirement_frees = 0
 __global retirement_reads = 0
 __global retirement_ends = 0
@@ -163,14 +165,21 @@ fn (mut manager GpuManager) retirement_test_end() bool { retirement_ends++; retu
 fn (mut manager GpuManager) retirement_test_free(mut job G13RenderJobResources, invalidate bool) bool {
  assert invalidate && job.vertex_retirement_published && job.fragment_retirement_published,
   'shared backing cannot be freed before both stage retirements'
+ assert job.completion == unsafe { nil } && job.completion_data == unsafe { nil },
+  'completed render callback precedes backing disposal'
  retirement_frees++
  if retirement_refuse_free || manager.state != .running { return false }
  job.released = true
  return true
 }
-fn retirement_callback(job &G13RenderJobResources, success bool, _ voidptr) {
+fn retirement_callback(job &G13RenderJobResources, success bool, data voidptr) {
+ assert data != unsafe { nil }, 'render callback backing must remain one-shot'
+ state := unsafe { &RetirementCompletion(data) }
+ assert state.marker == 0xdecaf
  assert job.completion_result_ready || !success
+ assert !job.released, 'render callback runs while command backing remains owned'
  retirement_callbacks++; retirement_success = success
+ unsafe { free(state) }
 }
 
 fn check_render_reaper_integration() {
@@ -186,8 +195,9 @@ fn check_render_reaper_integration() {
   mut job := &G13RenderJobResources{}
   unsafe { *job = render_retirement_job(&queue, 5, 9) }
   job.submitted = true; job.pending_counted = true; job.completion = retirement_callback
+  job.completion_data = &RetirementCompletion{}
   job.stage_completion = retirement_stage_callback
-  mut manager := GpuManager{g13_render_jobs: [job]}
+  mut manager := GpuManager{g13_render_jobs: [job], g13_queues: [&queue]}
   event.set_completed(110, true); event.set_completed(111, false)
   if mode == 1 { vertex_state.cpu_wptr = 1280 }
   if mode == 3 { queue.subqueues[0].events = event.published_queue(109, 0x100) }
@@ -211,20 +221,50 @@ fn check_render_reaper_integration() {
    assert manager.g13_render_jobs.len == 0 && retirement_success && retirement_callbacks == 1
    assert retirement_reads == 1 && retirement_frees == 1 && retirement_ends == 1
   } else {
-   assert manager.g13_render_jobs.len == 1 && retirement_callbacks == 1 && !retirement_success
+   assert manager.g13_render_jobs.len == 1 && retirement_callbacks == 1
+   assert retirement_success == (mode == 2), 'cleanup refusal preserves successful render completion'
    assert job.quarantined && !job.released
+   assert !manager.checked_release_g13_queue_resources(&queue) && !queue.released,
+    'completed render backing retains queue ownership after submission pins end'
    assert job.stage_completion == unsafe { nil }, 'aggregate callback clears stage callback backing'
    // Retrying cleanup cannot issue the completion callback a second time.
    manager.state = .running; retirement_refuse_free = false
    manager.checked_reap_g13_render_jobs()
    assert manager.g13_render_jobs.len == 0 && retirement_callbacks == 1
    assert retirement_ends == 1 && retirement_frees >= 1
+   assert retirement_reads == 1, 'render cleanup retries retain the first cached result'
   }
   assert vertex_state.cpu_freeptr == 4 && fragment_state.cpu_freeptr == 8
   manager.checked_reap_g13_render_jobs()
   assert retirement_callbacks == 1
+  assert manager.checked_release_g13_queue_resources(&queue) && manager.g13_queues.len == 0,
+   'render cleanup retry permits final queue destruction'
   assert retirement_stages == if mode == 1 || mode == 3 { [0, 0]! } else { [1, 1]! }, 'stage callbacks remain one-shot across quarantine retry'
  }
  retirement_refuse_free = false
  println('G13 render reaper: actual retirement/completion bodies retain shared backing, defer partial-error callbacks and preserve one-shot cleanup retries')
+}
+
+fn check_render_error_completion() {
+ for status in [u32(1), 3, 6] {
+  retirement_callbacks = 0; retirement_reads = 0; retirement_refuse_free = true
+  mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 5, gpu_doneptr: 5}
+  mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 9, gpu_doneptr: 9}
+  mut queue := G13QueueResources{}
+  queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: 5}
+  queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: 9}
+  mut job := &G13RenderJobResources{}
+  unsafe { *job = render_retirement_job(&queue, 5, 9) }
+  job.submitted = true; job.error = G13JobError{status: status}
+  job.completion = retirement_callback; job.completion_data = &RetirementCompletion{}
+  mut manager := GpuManager{g13_render_jobs: [job]}
+  event.set_completed(110, true); event.set_completed(111, true)
+  manager.checked_reap_g13_render_jobs()
+  assert retirement_callbacks == 1 && !retirement_success && job.quarantined,
+   'render hardware errors survive deferred cleanup'
+  retirement_refuse_free = false
+  manager.checked_reap_g13_render_jobs()
+  assert manager.g13_render_jobs.len == 0 && retirement_callbacks == 1 && retirement_reads == 1
+ }
+ println('G13 render completion: three hardware errors remain failures across deferred cleanup')
 }

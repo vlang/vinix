@@ -87,6 +87,7 @@ mut:
 	rings          int
 	g13_compute_jobs []&G13ComputeJobResources
 	g13_render_jobs []&G13RenderJobResources
+	g13_queues []&G13QueueResources
 	auto_ack bool
 	tvb_target u32
 	tvb_calls u32
@@ -121,12 +122,21 @@ mut:
 
 struct G13QueueResources {
 mut:
+	file_references u64
+	mappings_published bool
 	released     bool
 	quarantined bool
 	priority     u32
 	channel_mask u32 = 7
 	subqueues    [3]G13Subqueue
 	render_buffer G13RenderBufferResources
+}
+
+// The production queue-release guard runs before this disposal service. Tests
+// drop every file reference after completion while backing is quarantined.
+fn (mut manager GpuManager) completion_test_free_queue(mut queue G13QueueResources, _ bool) bool {
+ queue.released = true
+ return true
 }
 
 struct Context {

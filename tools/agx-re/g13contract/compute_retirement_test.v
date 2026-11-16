@@ -13,4 +13,7 @@ fn test_compute_retirement_requires_stamp_pipe_credit_and_quarantine_gates() {
   if _ := check_compute_retirement_local(native.replace(token, '')) { assert false, token }
  }
  if _ := check_compute_retirement_local(native.replace('retire_g13_subqueue_locked(owned.queue, 2,', 'retire_g13_subqueue_locked(owned.queue, 1,')) { assert false }
+ completion := 'complete_g13_compute_job(mut owned, owned.error.status == 0)'
+ cleanup := 'if mgr.free_g13_compute_job_locked(mut owned, true) {'
+ if _ := check_compute_retirement_local(native.replace(completion, '').replace(cleanup, cleanup + '\n' + completion)) { assert false }
 }

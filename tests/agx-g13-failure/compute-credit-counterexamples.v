@@ -20,7 +20,7 @@ fn main() {
    '!(queue.subqueues[2].events.record_completion(owned.event_slot, owned.stamp_value) || true)',
    'gpu.GpuManager.compute_retirement_free:', 'completed compute work returns event credit before disposal'],
   ['callback-replay', 'complete', 'job.completion = unsafe { nil }', 'job.completion = job.completion',
-   'gpu.check_compute_retirement_matrix:', 'compute completion consumes its callback exactly once'],
+   'gpu.GpuManager.compute_retirement_free:', 'completed compute callback precedes backing disposal'],
  ]
  mut receipts := []string{}
  for item in variants {

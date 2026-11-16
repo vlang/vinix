@@ -25,7 +25,10 @@ fn compute_retirement_callback(job &G13ComputeJobResources, success bool, data v
  assert data != unsafe { nil }, 'compute callback backing must remain one-shot'
  state := unsafe { &ComputeRetirementCompletion(data) }
  assert state.marker == 0xc0ffee
- if success { assert job.completion_ready && job.timestamp_values() == state.expected }
+ if success {
+  assert !job.released && job.completion_ready && job.timestamp_values() == state.expected,
+   'compute completion publishes cached results before backing disposal'
+ }
  compute_retirement_callbacks++; compute_retirement_success = success
  unsafe { free(state) }
 }
@@ -37,6 +40,8 @@ fn (mut manager GpuManager) compute_retirement_free(mut job G13ComputeJobResourc
  if job.submitted {
   assert job.retirement_published && job.queue.subqueues[2].events.can_submit(1),
    'completed compute work returns event credit before disposal'
+  assert job.completion == unsafe { nil } && job.completion_data == unsafe { nil },
+   'completed compute callback precedes backing disposal'
  }
  compute_retirement_frees++
  if compute_retirement_refuse || manager.state != .running { return false }
@@ -70,7 +75,7 @@ fn check_compute_retirement_matrix() {
     mut timestamps := fw.G13JobTimestamps{start: u64(sequence) + 100, end: u64(sequence) + 200}
     expected_timestamps := timestamps
     mut job := compute_retirement_job(&queue, sequence, baseline + 126 * u32(0x100), &timestamps)
-    mut manager := GpuManager{g13_compute_jobs: [job]}
+    mut manager := GpuManager{g13_compute_jobs: [job], g13_queues: [&queue]}
     event.set_completed(112, false)
     for _ in 0 .. 3 { manager.checked_reap_g13_compute_jobs() }
     assert manager.g13_compute_jobs.len == 1 && compute_retirement_frees == 0
@@ -86,8 +91,10 @@ fn check_compute_retirement_matrix() {
     assert state.cpu_freeptr == u32((sequence - 1) % 1280)
      && state.cpu_wptr == original.cpu_wptr && state.gpu_doneptr == original.gpu_doneptr
     assert compute_retirement_ends == 1 && compute_retirement_callbacks == 1
-    assert compute_retirement_success == !refuse
+    assert compute_retirement_success, 'cleanup refusal preserves successful compute completion'
     if refuse {
+     assert !manager.checked_release_g13_queue_resources(&queue) && !queue.released,
+      'completed compute backing retains queue ownership after submission pins end'
      assert manager.g13_compute_jobs.len == 1 && job.quarantined && !job.released
      assert job.retirement_published && job.completion_ready && !job.pending_counted
      assert job.completion_result == expected_timestamps && job.timestamps.phys == u64(&timestamps)
@@ -105,6 +112,8 @@ fn check_compute_retirement_matrix() {
      manager.checked_reap_g13_compute_jobs()
     }
     assert manager.g13_compute_jobs.len == 0 && compute_retirement_callbacks == 1 && compute_retirement_ends == 1
+    assert manager.checked_release_g13_queue_resources(&queue) && manager.g13_queues.len == 0,
+     'compute cleanup retry permits final queue destruction'
     manager.checked_reap_g13_compute_jobs()
     assert compute_retirement_callbacks == 1
     cases++
@@ -172,6 +181,29 @@ fn check_compute_retirement() {
  check_compute_retirement_failure()
  check_compute_retirement_reverse()
  check_compute_prepared_retirement()
+ check_compute_error_completion()
+}
+
+fn check_compute_error_completion() {
+ for status in [u32(1), 3, 6] {
+  reset_compute_retirement(); compute_retirement_refuse = true
+  mut state := fw.G13WorkQueueRingState{cpu_wptr: 7, gpu_doneptr: 7}
+  mut queue := G13QueueResources{}
+  queue.subqueues[2] = G13Subqueue{state: SharedBuffer{phys: u64(&state)}, command_sequence: 7,
+   events: event.credit_queue(112, 0, 126)}
+  mut timestamps := fw.G13JobTimestamps{start: 42, end: 84}
+  mut job := compute_retirement_job(&queue, 7, 126 * u32(0x100), &timestamps)
+  job.error = G13JobError{status: status}
+  mut manager := GpuManager{g13_compute_jobs: [job]}
+  event.set_completed(112, true)
+  manager.checked_reap_g13_compute_jobs()
+  assert compute_retirement_callbacks == 1 && !compute_retirement_success && job.quarantined,
+   'compute hardware errors survive deferred cleanup'
+  compute_retirement_refuse = false
+  manager.checked_reap_g13_compute_jobs()
+  assert manager.g13_compute_jobs.len == 0 && compute_retirement_callbacks == 1
+ }
+ println('G13 compute completion: three hardware errors remain failures across deferred cleanup')
 }
 
 fn check_compute_prepared_retirement() {
