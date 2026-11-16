@@ -1417,8 +1417,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     control records in every format-8 host receipt. A fresh signed x86 run and
     all sixty-one retention refusals pass, including both metadata-alias input
     omissions. The standalone qualifier keeps its original format-7 contract.
-    Other existence/search/metadata operations and OS-loader reads remain
-    unqualified. Complete
+    An additive [existence/xattr query qualifier](tests/packages/wine-query-closed-replay.md)
+    now passes all four roles with 144 denial controls, 24 allowed controls and
+    sixteen counterfactual/isolation/output controls. It demonstrates and closes
+    unlisted `access(F_OK)` and named `getxattr` reads during that replay, with
+    88 policy and three admission refusals. Explicit existence exceptions cover
+    fixed execution records and a bounded linker temporary-name family.
+    Mandatory query integration and complete xattr-content admission remain open,
+    along with other query/search/metadata operations and OS-loader reads. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader

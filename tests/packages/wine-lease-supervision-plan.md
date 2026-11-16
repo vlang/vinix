@@ -5574,3 +5574,72 @@ bytes retain their previous scope. Full SDK/ABI/library/search and bootstrap/
 hermetic admission remain unqualified. Owned ARM/GUI, broader lifetime/mapping
 controls, redistribution, defaults and complete roadmap 14 acceptance remain
 open. Kernel and product defaults do not change.
+
+## Bounded existence and xattr queries during host replay (2026-11-17)
+
+Commit `519e238b0` adds an [existence/xattr query qualifier](wine-query-closed-replay.md).
+A native survey and every role's counterfactual demonstrate that the existing
+metadata-only policy permits unlisted `access(F_OK)` and returns a known seeded
+value through `getxattr`. `winequeryclosure` preserves the data/metadata policy,
+then restricts existence and xattr reads to exact admitted query paths and the
+existing OS-root/device exceptions. The xattr-only policy must allow existence
+while refusing the value; the existence-only policy must refuse existence.
+These controls distinguish both rules from denials caused by unrelated failures.
+
+The helper's restricted execution records and linker output have three exact
+existence permissions. Kernel diagnostics identify LLD's random temporary as
+another necessary query: an anchored pattern permits only the selected output
+basename plus `.tmp` and seven lowercase hexadecimal digits. No input-directory
+prefix is granted. The host accepts a counted-repeat spelling but does not
+match it; seven explicit character classes pass native controls and linking.
+Malformed, non-hex and overlong lookalikes must fail. A matching temporary name
+permits existence but still refuses xattr reading. All exceptions are recorded
+in the receipt scope and fields and grant no data/metadata/xattr read permission.
+
+Fixture, controller, producer and retainer all pass complete original format-8
+host admission before and after replay. Four captured and four unrestricted
+external-object links reproduce the original executables. Each role requires
+six allowed control children, thirty-six denial children and four counterfactual/
+isolation/output controls: 24, 144 and sixteen respectively across all roles.
+Positive query children require existence, the known attribute value and its
+listed name; six direct/symlink/Data-volume paths must refuse each query with
+EPERM/EACCES after unrestricted baselines succeed. Raw results record operation,
+target, return, error and data; exact order, markers and outcomes are checked.
+Existing data/directory/stat/hidden-link gates, image hashes/UUIDs, archive loads,
+capability bytes, aliases, successful outputs and original proof/archive/checker/
+self hashes remain required. Seven embedded source guards are repeated before
+publication. The production runner passes 88 policy and three original-checker
+admission refusals, with deterministic framing and all checks active under `-prod`.
+
+The complete checkpoint is `/Users/alex/.cache/vwqueryclosed-20261116-01`; its
+start-date namespace is retained across local midnight. Final tools are
+`replay-final-02` and `controls-final-02`, source is `source-final-02`, and passing
+outputs are `fixture-02`, `controller-02`, `producer-02`, `retainer-02` and
+`controls-02`. The frozen tree contains the complete selected custom-module
+import closure; all eighteen files match repository bytes before committing.
+It does not replace original prerequisite bundles. Native API/regex surveys,
+failed replay policies, kernel diagnostics, generated programs and raw records
+remain retained. The first frozen candidate passes functionally; the final
+candidate corrects receipt scope wording to include the bounded exceptions and
+freshly reruns all roles and controls. `validation.txt` distinguishes each stage.
+
+The complete original format-8 checkpoint
+`/Users/alex/.cache/vwhostmeta-20261116-01`, exact checker, four host graphs,
+compiler/LLVM/SDK/image/source namespaces and historical prerequisites remain
+required and unchanged. No new guest result or required-format change is claimed.
+The new external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-query-closed-20261117-01.inventory.json`,
+SHA-256 `202681b9e0dd40d19975bc2c510855dedbaf458e519950b4bff5a9e34211cfbc`.
+Recording and independent comparison pass for bytes, sizes, types, modes and
+link targets; logs are beside the receipt. The complete new workspace remains
+frozen after recording.
+
+`attribute-fixture.json` serializes the controlled key/value/targets, and native
+fixture values are rechecked before publication. The typed inventory audits
+serialized observations, not all native extended attributes at rest. Attribute
+content on admitted paths remains unpinned. Mandatory query integration, other
+query/metadata operations, ancestor entry names, OS-root/device exceptions,
+writes/network, helper startup and OS loader/cache bytes retain their previous
+scope. Full SDK/ABI/library/search and hermetic admission, owned ARM/GUI, broader
+lifetime/mapping coverage, redistribution and default activation remain open.
+No kernel, guest or product-default behavior changes.
