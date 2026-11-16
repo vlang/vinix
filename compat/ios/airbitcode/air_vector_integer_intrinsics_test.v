@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_vector_integer_names_and_cache() {
-	assert vector_air_integer_cache_base == 61780 && vector_float_intrinsic_slots == 62004 && scalar_intrinsic_cache_slots == 2179
+	assert vector_air_integer_cache_base == 61780 && vector_float_intrinsic_slots == 62036 && scalar_intrinsic_cache_slots == 2179
 	mut seen := [32]bool{}
 	for operation, id in [ScalarIntrinsic.smulh, .umulh]! { for count in 1 .. 17 {
 		name := 'air.mul_hi.${if operation == 0 { 's' } else { 'u' }}.v${count}i32'
@@ -97,13 +97,13 @@ fn test_air_vector_bit_names_and_cache() {
 			if _, _, _ := air_vector_float_name(name) { assert false }
 			if _ := air_vector_float_key(id, count, bits) { assert false }
 		}
-		for suffix in ['i32','v0i32','v01i32','v17i32','v999999999999999999i32','v2i1','v2i16','v2i31','v2i33','v2i64','v2i032','v2i+32','v2f32','v2i32.spoof','nxv2i32'] {
+		for suffix in ['i32','v0i32','v01i32','v17i32','v999999999999999999i32','v2i1','v2i16','v2i31','v2i33','v2i032','v2i+32','v2f32','v2i32.spoof','nxv2i32'] {
 			if _, _, _ := vector_float_intrinsic_name('air.${family}.${suffix}') { assert false }
 		}
 		for prefix in ['s.','u.','fast_'] {
 			if _, _, _ := vector_float_intrinsic_name('air.${prefix}${family}.v2i32') { assert false }
 		}
-		for bits in [u32(0),1,16,31,33,64,65]! { if _ := air_vector_intrinsic_key(id, 2, bits) { assert false } }
+		for bits in [u32(0),1,16,31,33,65]! { if _ := air_vector_intrinsic_key(id, 2, bits) { assert false } }
 		for count in [0,17]! { if _ := air_vector_intrinsic_key(id, count, 32) { assert false } }
 	}
 	for value in seen { assert value }
@@ -135,4 +135,34 @@ fn test_air_vector_zero_count_names_and_cache() {
 	}
 	for value in seen { assert value }
 	println('AIR-VECTOR-ZERO-COUNT-NAMES: 32 appended i32 clz/ctz identities, stable previous keys, binary flag signatures and exact names/widths/counts/namespaces PASS')
+}
+
+fn test_air_vector_i64_bit_names_and_cache() {
+	mut seen := [32]bool{}
+	for operation, id in [ScalarIntrinsic.ctpop, .bitreverse]! {
+		family := if id == .ctpop { 'popcount' } else { 'reverse_bits' }
+		for count in 1 .. 17 {
+			name := 'air.${family}.v${count}i64'
+			parsed, n, bits := vector_float_intrinsic_name(name)!
+			assert parsed == id && n == count && bits == 64 && scalar_intrinsic_arity(id) == 1
+			key := air_vector_intrinsic_key(id, count, bits)!
+			assert key == 62004 + operation * 16 + count - 1 && !seen[key - 62004]
+			seen[key - 62004] = true
+			assert air_vector_intrinsic_key(id, count, 32)! == 61940 + operation * 16 + count - 1
+			assert vector_float_intrinsic_key(id, count, bits)! < 61604
+			if _ := scalar_intrinsic_name(name) { assert false }
+			if _, _, _ := air_vector_float_name(name) { assert false }
+			if _ := air_vector_float_key(id, count, bits) { assert false }
+		}
+		for suffix in ['i64','v0i64','v01i64','v17i64','v999999999999999999i64','v2i1','v2i16','v2i63','v2i65','v2i064','v2i+64','v2f64','v2i64.spoof','nxv2i64','s.v2i64','u.v2i64'] {
+			if _, _, _ := vector_float_intrinsic_name('air.${family}.${suffix}') { assert false }
+		}
+		for bits in [u32(0),1,16,31,33,63,65]! { if _ := air_vector_intrinsic_key(id, 2, bits) { assert false } }
+		for count in [0,17]! { if _ := air_vector_intrinsic_key(id, count, 64) { assert false } }
+	}
+	for value in seen { assert value }
+	for id in [ScalarIntrinsic.smulh, .umulh, .sadd_sat, .ssub_sat, .uadd_sat, .usub_sat, .smin, .smax, .umin, .umax, .ctlz, .cttz, .bswap]! {
+		if _ := air_vector_intrinsic_key(id, 2, 64) { assert false }
+	}
+	println('AIR-VECTOR-I64-BIT-NAMES: 32 appended i64 popcount/reverse_bits identities, stable i32/LLVM keys, exact widths/counts/namespaces and other-family i64 refusals PASS')
 }

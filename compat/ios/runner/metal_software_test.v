@@ -4395,6 +4395,10 @@ fn sm_test_geometry_sizes_focus() ! {
 	// channel from the current grid dimensions for every image dispatch.
 	source.write_string('declare <1 x i32> @air.popcount.v1i32(<1 x i32>)
  declare <1 x i32> @air.reverse_bits.v1i32(<1 x i32>)
+ declare <2 x i64> @air.popcount.v2i64(<2 x i64>)
+ declare <2 x i64> @air.reverse_bits.v2i64(<2 x i64>)
+ declare <2 x i64> @llvm.ctpop.v2i64(<2 x i64>)
+ declare <2 x i64> @llvm.bitreverse.v2i64(<2 x i64>)
  declare <2 x i32> @air.popcount.v2i32(<2 x i32>)
  declare <2 x i32> @air.reverse_bits.v2i32(<2 x i32>)
  declare <2 x i32> @llvm.ctpop.v2i32(<2 x i32>)
@@ -4471,7 +4475,45 @@ fn sm_test_geometry_sizes_focus() ! {
  %count_ok0 = extractelement <2 x i1> %count_same,i32 0
  %count_ok1 = extractelement <2 x i1> %count_same,i32 1
  %count_ok = and i1 %count_ok0,%count_ok1
- %bits_ok = and i1 %bits_original_ok,%count_ok
+ %old_bits_ok = and i1 %bits_original_ok,%count_ok
+ %wide_x = zext i32 %x to i64
+ %wide_high = shl i64 %wide_x,32
+ %wide_pair = or i64 %wide_x,%wide_high
+ %wide_seed = xor i64 %wide_pair,9223372039002259456
+ %wide_inverse = xor i64 %wide_seed,-1
+ %wide_input0 = insertelement <2 x i64> zeroinitializer,i64 %wide_seed,i32 0
+ %wide_input = insertelement <2 x i64> %wide_input0,i64 %wide_inverse,i32 1
+ %wide_pop = call <2 x i64> @air.popcount.v2i64(<2 x i64> %wide_input)
+ %wide_rev = call <2 x i64> @air.reverse_bits.v2i64(<2 x i64> %wide_input)
+ %wide_pop_ref = call <2 x i64> @llvm.ctpop.v2i64(<2 x i64> %wide_input)
+ %wide_rev_ref = call <2 x i64> @llvm.bitreverse.v2i64(<2 x i64> %wide_input)
+ %wide_pop_x = extractelement <2 x i32> %bits_pop,i32 0
+ %wide_pop_half = add i32 %wide_pop_x,1
+ %wide_pop_sum = shl i32 %wide_pop_half,1
+ %wide_pop_expected0 = zext i32 %wide_pop_sum to i64
+ %wide_pop_expected1 = sub i64 64,%wide_pop_expected0
+ %wide_pop_vector0 = insertelement <2 x i64> zeroinitializer,i64 %wide_pop_expected0,i32 0
+ %wide_pop_expected = insertelement <2 x i64> %wide_pop_vector0,i64 %wide_pop_expected1,i32 1
+ %wide_rev_x = extractelement <2 x i32> %bits_rev,i32 0
+ %wide_rev_low = zext i32 %wide_rev_x to i64
+ %wide_rev_half = or i64 %wide_rev_low,1
+ %wide_rev_high = shl i64 %wide_rev_half,32
+ %wide_rev_expected0 = or i64 %wide_rev_high,%wide_rev_half
+ %wide_rev_expected1 = xor i64 %wide_rev_expected0,-1
+ %wide_rev_vector0 = insertelement <2 x i64> zeroinitializer,i64 %wide_rev_expected0,i32 0
+ %wide_rev_expected = insertelement <2 x i64> %wide_rev_vector0,i64 %wide_rev_expected1,i32 1
+ %wide_same0 = icmp eq <2 x i64> %wide_pop,%wide_pop_ref
+ %wide_same1 = icmp eq <2 x i64> %wide_rev,%wide_rev_ref
+ %wide_same2 = icmp eq <2 x i64> %wide_pop,%wide_pop_expected
+ %wide_same3 = icmp eq <2 x i64> %wide_rev,%wide_rev_expected
+ %wide_same4 = and <2 x i1> %wide_same0,%wide_same1
+ %wide_same5 = and <2 x i1> %wide_same2,%wide_same3
+ %wide_same = and <2 x i1> %wide_same4,%wide_same5
+ %wide_ok0 = extractelement <2 x i1> %wide_same,i32 0
+ %wide_ok1 = extractelement <2 x i1> %wide_same,i32 1
+ %wide_ok = and i1 %wide_ok0,%wide_ok1
+ %bits_ok = and i1 %old_bits_ok,%wide_ok
+
 
  %bit_source = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
  %pop_lanes = call <1 x i32> @air.popcount.v1i32(<1 x i32> %bit_source)
