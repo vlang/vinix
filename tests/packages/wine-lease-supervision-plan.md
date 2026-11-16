@@ -5724,3 +5724,69 @@ OS-root/device exceptions, writes/network, helper startup and OS loader/cache
 remain outside this claim. Full SDK/ABI/library/search and hermetic admission,
 owned ARM/GUI, broader lifetime/mapping controls, redistribution and default
 activation remain open. No kernel, guest or product-default behavior changes.
+
+## Native host xattr content inventory (2026-11-17)
+
+Implementation `4134f60e4` adds the standalone
+[native content inventory](wine-xattr-content.md) and shared `winexattr` module.
+It captures complete names and values returned by macOS descriptor-based xattr
+APIs on an explicit bounded canonical regular-file/directory set. Names and
+values are hex encoded, preserving binary and empty values. Read errors,
+unsupported nodes and oversized declarations/content refuse. Held descriptors,
+nonblocking/no-follow opens, identity/size checks, repeated name enumeration and
+two matching complete observations detect observed changes. This is not an
+atomic snapshot and does not exclude concurrent change-and-restore races.
+
+The inventory explicitly uses `XATTR_SHOWCOMPRESSION`. An actual
+`ditto --noclone --hfsCompression` fixture proves default enumeration omits
+`com.apple.decmpfs`; the final inventory retains its full value and refuses
+forged compression bytes while ordinary logical file hashes agree. The first
+compression prototype used default cloning and produced no compressed metadata;
+that failed run is retained. Earlier default-API candidates do not establish
+hidden compression coverage. Final sources retain the corrected API options
+and bounded descriptor reads for manifests and receipts.
+
+Production controls pass binary/empty baselines, eight restored native
+baselines and 35 refusals: attribute-only changes with unchanged ordinary
+bytes, added/removed/renamed names, changed node kind, forged declarations and
+values, invalid targets, native name/value/total limits, large/FIFO declarations,
+linked evidence/output and overwrite attempts. Three further controls reject
+non-production publication and altered main/module sources without publishing
+receipts. All conditions remain active under `-prod`.
+
+The original format-9 builder admits fixture, controller, producer and retainer
+before and after read-only native capture/check. Each explicit set contains
+110 canonical metadata targets; aliases collapse to canonical objects. All
+four native content receipts recheck successfully. No historical target
+attribute, original checker or required receipt format changes. This does not
+qualify all paths readable through OS-root/device sandbox exceptions, directory
+entry names or other omitted query/search/metadata inputs. Mandatory live xattr
+integration remains separate; no new guest or product-default result is claimed.
+
+The complete checkpoint is `/Users/alex/.cache/vwxattrcontent-20261117-01`.
+Final tools are `final-03/wine-xattr-content` and
+`final-03/wine-xattr-content-check`, frozen source is `final-03/source-final`,
+and final records are `final-03/controls`. All five selected source/document
+files match the repository before committing, including the unchanged checker
+digest helper. Compile and run argv, selected compiler environment, outcomes,
+raw logs, prototype sources and unsuccessful attempts remain retained.
+The compiler is `/Users/alex/.cache/vinix-wine-build/v/v`; final tools use
+`-prod -gc boehm`. `validation.txt`, the exact feature patch and source revision
+are retained beside the final run. The original required-host checkpoint
+`/Users/alex/.cache/vwhostquery-20261117-01`, original builder/source/host graphs,
+all compiler/LLVM/SDK/image namespaces and historical prerequisites remain
+required and unchanged.
+
+The external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-xattr-content-20261117-01.inventory.json`,
+SHA-256 `97083bc19b8797e328946cb835e422bc63140f68bf490debdae5d4cb563bb6b5`.
+Recording and independent comparison pass using the unchanged fixed auditor
+`/Users/alex/.cache/vwhostread-20261116-01/workspace-inventory-final`; logs are
+beside the receipt. No checkpoint file changes after recording begins. This
+workspace inventory checks ordinary logical bytes, sizes, types, modes and
+links; explicit content receipts separately pin the selected native attributes.
+It does not claim all native attributes in the workspace are inventoried.
+
+Complete xattr/sandbox coverage, broader SDK/ABI/library/search and hermetic
+admission, owned ARM/GUI, lifetime/mapping controls, redistribution and default
+activation remain open.

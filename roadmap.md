@@ -1428,8 +1428,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     all 27 query control records into every format-9 host receipt. A fresh signed
     x86 run and all sixty-three retention refusals pass, including both query
     input omissions. The standalone qualifier keeps its format-8 contract.
-    Complete xattr-content admission remains open, along with other
-    query/search/metadata operations and OS-loader reads. Complete
+    A separate [native xattr-content inventory](tests/packages/wine-xattr-content.md)
+    now captures and rechecks 110 canonical metadata targets for each of the
+    four original host roles, including compression attributes hidden by the
+    default API. All 35 native/declaration/publication refusals and three
+    production/source guards pass. Mandatory live-content integration and
+    complete xattr coverage remain open, along with other query/search/metadata
+    operations and OS-loader reads. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader
