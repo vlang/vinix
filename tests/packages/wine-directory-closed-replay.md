@@ -51,8 +51,8 @@ remain broad data-read exceptions; the three device literals, writes/network,
 helper startup/inherited state and OS loader/shared-cache bytes keep their
 previous scope. This does not establish complete metadata/search, ABI, compiler
 or hermetic admission. This standalone tool keeps its original format-6
-admission contract. Current format-7 [required host receipts](wine-host-required-check.md)
-integrate the directory policy into `winereadhost` inner receipt format 2,
+admission contract. Current format-8 [required host receipts](wine-host-required-check.md)
+integrate the directory policy into `winereadhost` inner receipt format 3,
 requiring the directory list, policy and complete control graph at admission.
 No guest or default behavior changes.
 

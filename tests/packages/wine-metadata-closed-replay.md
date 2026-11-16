@@ -61,5 +61,8 @@ exceptions, writes/network, helper startup/inherited state and OS loader/shared-
 cache bytes retain their previous scope. Receipts record local observations,
 not authenticated trust anchors. Full SDK/ABI/library/search and hermetic
 admission remain open. Preserve complete original prerequisites and the new
-audit bundle with typed inventories outside Git. Required host receipts remain
-format 7; mandatory integration, owned ARM/GUI and defaults are separate gates.
+audit bundle with typed inventories outside Git. This standalone tool keeps
+its original format-7 admission contract. Current format-8
+[required host receipts](wine-host-required-check.md) integrate the same
+metadata policy and bounded image-alias projection into the mandatory replay
+graph. Owned ARM/GUI, defaults and complete metadata/search coverage remain open.

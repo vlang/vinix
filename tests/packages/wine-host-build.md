@@ -60,7 +60,7 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires fifty-five exact resealed refusals. Cases cover omitted parsed
+then requires sixty-two exact resealed refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
@@ -81,12 +81,15 @@ Seven directory cases cover an added directory permission with a consistently
 resealed policy/list, restored global directory permission, changed allowed or
 denied enumeration results, changed control marker, old host format 6 and old
 inner replay format 1.
+Seven metadata cases cover an added metadata permission with a consistently
+resealed policy/list, globally allowed metadata, forged image-alias evidence,
+altered allowed/denied `stat` results, old host format 7 and old inner format 2.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 7
+The [required host receipt boundary](wine-host-required-check.md) uses format 8
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2/3/4/5/6 bundles and their original
+retainer also retains its own graph. Original format-1/2/3/4/5/6/7 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
@@ -146,6 +149,20 @@ output rows. Temporary aliases are removed before the ordinary evidence tree
 is admitted. Copies continue to bind the original directory namespace.
 Global metadata/name searches and the OS-root/device data exceptions remain
 allowed; this does not establish full metadata/search or hermetic admission.
+
+Format 8 extends this graph with inner receipt format 3. `winemetaclosure`
+limits `file-read-metadata` to exact file/ancestor paths and bounded metadata-only
+aliases of pinned ordinary images, retaining the explicit OS-root/device
+exceptions. `winemetaimages` derives image aliases and their symlink targets;
+`metadata-aliases.json`, the recomputed metadata list, policy and every new
+control record are mandatory outputs and retained input rows. These modules
+are embedded, pinned and retained too. Alias projection reuses the preceding
+mandatory image-byte admission; the final input/blob pass still checks bytes.
+Two captured file/directory `stat` controls succeed. Seven unlisted file,
+directory and SDK `stat` controls require unrestricted ordinary types and exact
+permission denials through direct, symlink and Data-volume paths. Copied bundles
+keep their original namespaces. Other existence/search/metadata operations,
+helper startup, OS loader/cache and complete hermetic admission remain open.
 
 The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and

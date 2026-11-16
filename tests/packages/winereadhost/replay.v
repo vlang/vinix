@@ -11,6 +11,8 @@ import tests.packages.winemacholink
 import tests.packages.winehostimages
 import tests.packages.winereadclosure
 import tests.packages.winedirclosure
+import tests.packages.winemetaclosure
+import tests.packages.winemetaimages
 
 $if macos {
 	#include <dlfcn.h>
@@ -30,13 +32,14 @@ struct Execution {
 }
 
 struct Proof {
-	format int = 2
+	format int = 3
 	recorded_directory string
 	builder string
 	archive_sha256 string
 	output_sha256 string
 	policy string
 	directories []string
+	metadata []string
 	capabilities map[string]string
 	loads map[string]string
 	images []winehostimages.Image
@@ -82,6 +85,16 @@ pub fn child() ! {
 	mode := os.args[2]; root := os.args[3]
 	policy := record(root + '/policy.sb')!
 	if mode != 'hidden-unrestricted' { restrict_reads(policy)! }
+	if mode in ['probe-meta-denied', 'probe-meta-allowed'] {
+		if os.args.len != 5 { return error('metadata capability probe path required') }
+		st := os.stat(os.args[4]) or {
+			if mode != 'probe-meta-denied' || err.code() !in [1, 13] { return error('metadata probe failed for unrelated reason') }
+			println('METADATA READ DENIED'); exit(81)
+		}
+		if mode != 'probe-meta-allowed' { return error('metadata probe unexpectedly succeeded') }
+		if st.get_filetype() !in [.regular, .directory] { return error('captured metadata type differs') }
+		println('CAPTURED METADATA ALLOWED'); exit(82)
+	}
 	if mode in ['probe-dir-denied', 'probe-dir-allowed'] {
 		if os.args.len != 5 { return error('directory capability probe path required') }
 		names := os.ls(os.args[4]) or {
@@ -190,6 +203,12 @@ fn probes(directory string) []string {
 		'/Library/Developer/CommandLineTools/SDKs/MacOSX27.2.sdk/usr/lib/libSystem.tbd']
 }
 
+fn metadata_probes(directory string) []string {
+	files := probes(directory)
+	return [files[0], files[1], files[2], directory + '/unlisted-directory',
+		directory + '/unlisted-alias', '/System/Volumes/Data' + directory + '/unlisted-directory', files[3]]
+}
+
 pub fn finish(host string, builder string) ! {
 	directory := host + '/read-closed'
 	os.mkdir_all(directory + '/home')!; os.mkdir_all(directory + '/tmp')!
@@ -202,8 +221,12 @@ pub fn finish(host string, builder string) ! {
 	cwd := directory + '/replay/link-inputs'
 	baseline := json2.decode[winehostimages.Baseline](record(host + '/logs/macho-images-before.json')!)!
 	caps := capabilities(archive, directory, baseline)!
-	policy := winedirclosure.policy(caps.keys())!
+	aliases := winemetaimages.capture(caps, baseline)!
+	extra := winemetaimages.paths(aliases, caps)
+	policy := winemetaclosure.policy(caps.keys(), extra)!
 	dirs := winedirclosure.directories(caps.keys())!
+	metadata := winemetaclosure.paths(caps.keys(), extra)!
+	os.write_file(directory + '/metadata-aliases.json', json2.encode(aliases) + '\n')!
 	os.write_file(directory + '/policy.sb', policy)!
 	os.write_file(cwd + '/hidden-response.txt', hidden_response(archive, directory)!)!
 	os.cp(cwd + '/' + object(archive)!, directory + '/uncaptured-object.o')!
@@ -212,6 +235,9 @@ pub fn finish(host string, builder string) ! {
 	os.rename(cwd + '/program', cwd + '/captured-program')!
 	invoke(builder, ['probe-allowed', cwd + '/' + object(archive)!], directory, 'allowed-read')!
 	invoke(builder, ['probe-dir-allowed', cwd], directory, 'allowed-directory')!
+	for index, path in [cwd + '/' + object(archive)!, cwd] {
+		invoke(builder, ['probe-meta-allowed', path], directory, 'allowed-metadata-' + index.str())!
+	}
 	unlisted := directory + '/unlisted-directory'
 	os.mkdir(unlisted)!
 	os.write_file(unlisted + '/marker', 'directory control\n')!
@@ -220,7 +246,6 @@ pub fn finish(host string, builder string) ! {
 		if os.ls(path)! != ['marker'] { return error('read-closed unrestricted directory baseline differs') }
 		invoke(builder, ['probe-dir-denied', path], directory, 'denied-directory-' + index.str())!
 	}
-	os.rm(dir_alias)!
 	paths := probes(directory)
 	hidden_hash := digest(paths[0])!
 	os.symlink(paths[0], paths[1])!
@@ -229,7 +254,14 @@ pub fn finish(host string, builder string) ! {
 		if index == 3 { digest(path)! }
 		invoke(builder, ['probe-denied', path], directory, 'denied-read-' + index.str())!
 	}
-	os.rm(paths[1])!
+	for index, path in metadata_probes(directory) {
+		st := os.stat(path)!
+		if st.get_filetype() != (if index in [3, 4, 5] { os.FileType.directory } else { os.FileType.regular }) {
+			return error('read-closed unrestricted metadata baseline differs')
+		}
+		invoke(builder, ['probe-meta-denied', path], directory, 'denied-metadata-' + index.str())!
+	}
+	os.rm(paths[1])!; os.rm(dir_alias)!
 	invoke(builder, ['hidden-unrestricted'], directory, 'hidden-unrestricted')!
 	if digest(cwd + '/program')! != digest(host + '/program')! { return error('read-closed unrestricted link baseline differs') }
 	os.rename(cwd + '/program', cwd + '/hidden-baseline')!
@@ -237,7 +269,7 @@ pub fn finish(host string, builder string) ! {
 	images, text := observations(record(directory + '/captured-closed.log')!, baseline)!
 	os.write_file(directory + '/receipt.json', json2.encode(Proof{recorded_directory: host, builder: builder,
 		archive_sha256: digest(host + '/link-inputs.tar')!, output_sha256: digest(host + '/program')!,
-		policy: policy, directories: dirs, capabilities: caps, loads: winemacholink.loads(text, archive)!, images: images}) + '\n')!
+		policy: policy, directories: dirs, metadata: metadata, capabilities: caps, loads: winemacholink.loads(text, archive)!, images: images}) + '\n')!
 	admit(host, host, builder)!
 }
 
@@ -249,12 +281,18 @@ pub fn admit(host string, recorded string, builder string) ! {
 	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!
 	baseline := json2.decode[winehostimages.Baseline](record(host + '/logs/macho-images-before.json')!)!
 	caps := capabilities(archive, original, baseline)!
-	policy := winedirclosure.policy(caps.keys())!
+	aliases := winemetaimages.capture(caps, baseline)!
+	extra := winemetaimages.paths(aliases, caps)
+	policy := winemetaclosure.policy(caps.keys(), extra)!
 	dirs := winedirclosure.directories(caps.keys())!
-	if proof.format != 2 || proof.recorded_directory != recorded || proof.builder != builder
-		|| proof.directories != dirs
+	metadata := winemetaclosure.paths(caps.keys(), extra)!
+	if proof.format != 3 || proof.recorded_directory != recorded || proof.builder != builder
+		|| proof.directories != dirs || proof.metadata != metadata
 		|| proof.capabilities != caps || proof.policy != policy || record(directory + '/policy.sb')! != policy {
 		return error('read-closed capability declaration differs')
+	}
+	if json2.decode[winemetaimages.Aliases](record(directory + '/metadata-aliases.json')!)! != aliases {
+		return error('read-closed metadata aliases differ')
 	}
 	if proof.archive_sha256 != digest(host + '/link-inputs.tar')! || proof.output_sha256 != digest(host + '/program')! {
 		return error('read-closed host pins differ')
@@ -306,16 +344,28 @@ pub fn admit(host string, recorded string, builder string) ! {
 			return error('read-closed read refusal differs')
 		}
 	}
+	for index, path in [original + '/replay/link-inputs/' + object(archive)!, original + '/replay/link-inputs'] {
+		if outcome(directory, original, builder, ['probe-meta-allowed', path], 'allowed-metadata-' + index.str(), 82)! != 'CAPTURED METADATA ALLOWED\n' {
+			return error('read-closed metadata allowed control differs')
+		}
+	}
+	for index, path in metadata_probes(original) {
+		if outcome(directory, original, builder, ['probe-meta-denied', path], 'denied-metadata-' + index.str(), 81)! != 'METADATA READ DENIED\n' {
+			return error('read-closed metadata refusal differs')
+		}
+	}
 	images, text := observations(positive, baseline)!
 	if images != proof.images || winemacholink.loads(text, archive)! != proof.loads { return error('read-closed observations differ') }
 }
 
 pub fn artifacts(host string) ![]string {
 	mut names := ['receipt.json', 'policy.sb', 'uncaptured-object.o', 'replay/link-inputs/captured-program',
-		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker']
+		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker', 'metadata-aliases.json']
 	for mode in modes { names << mode + '.exec.json' }
-	for name in ['captured-closed', 'hidden-unrestricted', 'hidden-closed', 'allowed-read', 'denied-read-0', 'denied-read-1', 'denied-read-2', 'denied-read-3',
-		'allowed-directory', 'denied-directory-0', 'denied-directory-1', 'denied-directory-2'] {
+	mut logs := ['captured-closed', 'hidden-unrestricted', 'hidden-closed', 'allowed-read', 'denied-read-0', 'denied-read-1', 'denied-read-2', 'denied-read-3',
+		'allowed-directory', 'denied-directory-0', 'denied-directory-1', 'denied-directory-2', 'allowed-metadata-0', 'allowed-metadata-1']
+	for index in 0 .. 7 { logs << 'denied-metadata-' + index.str() }
+	for name in logs {
 		for suffix in ['', '.argv.json', '.environment.json', '.exit.json'] { names << name + '.log' + suffix }
 	}
 	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!

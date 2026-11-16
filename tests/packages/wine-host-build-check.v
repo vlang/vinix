@@ -8,6 +8,8 @@ import tests.packages.winesource
 import tests.packages.winecsource
 import tests.packages.winehostimages
 import tests.packages.winedirclosure
+import tests.packages.winemetaclosure
+import tests.packages.winemetaimages
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -49,6 +51,7 @@ mut:
 	output_sha256 string
 	policy string
 	directories []string
+	metadata []string
 	capabilities map[string]string
 	loads map[string]string
 	images []winehostimages.Image
@@ -126,13 +129,39 @@ fn check() ! {
 		'denied-output', 'denied-member', 'denied-linked', 'old-sdk-format',
 		'closed-policy', 'closed-extra-capability', 'closed-execution', 'closed-environment', 'closed-exit',
 		'closed-read', 'closed-allowed', 'closed-hidden', 'closed-output', 'closed-member', 'closed-linked', 'old-denied-format',
-		'directory-map', 'directory-policy', 'directory-allowed', 'directory-denied', 'directory-marker', 'old-read-format', 'old-directory-replay-format'] {
+		'directory-map', 'directory-policy', 'directory-allowed', 'directory-denied', 'directory-marker', 'old-read-format', 'old-directory-replay-format',
+		'metadata-map', 'metadata-policy', 'metadata-aliases', 'metadata-allowed', 'metadata-denied', 'old-metadata-format', 'old-metadata-replay-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-read-format' {
+		if name == 'old-metadata-format' {
+			proof.format = 7
+			expected = 'host build declaration differs'
+		} else if name in ['metadata-map', 'metadata-policy', 'old-metadata-replay-format'] {
+			mut read := json2.decode[HostRead](os.read_file(dir + '/read-closed/receipt.json')!)!
+			if name == 'metadata-map' {
+				path := read.recorded_directory + '/read-closed/uncaptured-object.o'
+				read.metadata << path; read.metadata.sort()
+				read.policy += '(allow file-read-metadata (literal "' + path + '"))\n'
+			} else if name == 'metadata-policy' { read.policy += '(allow file-read-metadata)\n' }
+			else { read.format = 2 }
+			for file in ['read-closed/receipt.json', 'read-closed/policy.sb'] {
+				os.write_file(dir + '/' + file, if file.ends_with('.json') { json2.encode(read) } else { read.policy })!; changed << file
+			}
+			expected = 'read-closed capability declaration differs'
+		} else if name == 'metadata-aliases' {
+			file := 'read-closed/metadata-aliases.json'
+			mut aliases := json2.decode[winemetaimages.Aliases](os.read_file(dir + '/' + file)!)!
+			aliases.images['/unrecorded/image'] = '/unrecorded/target'
+			os.write_file(dir + '/' + file, json2.encode(aliases))!; changed << file
+			expected = 'read-closed metadata aliases differ'
+		} else if name in ['metadata-allowed', 'metadata-denied'] {
+			file := 'read-closed/' + if name == 'metadata-allowed' { 'allowed-metadata-1.log' } else { 'denied-metadata-4.log' }
+			os.write_file(dir + '/' + file, 'unrelated failure\n')!; changed << file
+			expected = if name == 'metadata-allowed' { 'read-closed metadata allowed control differs' } else { 'read-closed metadata refusal differs' }
+		} else if name == 'old-read-format' {
 			proof.format = 6
 			expected = 'host build declaration differs'
 		} else if name in ['directory-map', 'directory-policy', 'old-directory-replay-format'] {
@@ -172,8 +201,11 @@ fn check() ! {
 			if name == 'closed-policy' { read.policy = '(allow default)' }
 			else {
 				read.capabilities[read.recorded_directory + '/read-closed/uncaptured-object.o'] = digest(dir + '/read-closed/uncaptured-object.o')!
-				read.policy = winedirclosure.policy(read.capabilities.keys())!
+				aliases := json2.decode[winemetaimages.Aliases](os.read_file(dir + '/read-closed/metadata-aliases.json')!)!
+				extra := winemetaimages.paths(aliases, read.capabilities)
+				read.policy = winemetaclosure.policy(read.capabilities.keys(), extra)!
 				read.directories = winedirclosure.directories(read.capabilities.keys())!
+				read.metadata = winemetaclosure.paths(read.capabilities.keys(), extra)!
 			}
 			for file in ['read-closed/receipt.json', 'read-closed/policy.sb'] {
 				os.write_file(dir + '/' + file, if file.ends_with('.json') { json2.encode(read) } else { read.policy })!; changed << file
@@ -363,7 +395,7 @@ fn check() ! {
 		passed << name
 	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline fifty-five exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline sixty-two exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }
