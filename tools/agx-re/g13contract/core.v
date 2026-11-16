@@ -773,7 +773,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Firmware 13.5 auxiliary framebuffer tail defaults',
 		'Firmware 12.3 padding and 13.5 single-cluster vertex-start marker',
 		'Firmware 13.5 start/finalize share the source-derived compute flag word',
-		'Firmware 13.5 fragment third-parameter offset and separate scratch/reserved/metadata words follow the selected source-layout model',
+		'Firmware 12.3/13.5 fragment sizes, depth insertion, firmware pointers, scratch/metadata and complete common tail follow the selected source-layout model',
 		'Firmware 13.5 shared per-queue command/start counters']
 }
 

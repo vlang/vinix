@@ -2,27 +2,25 @@ module fw
 
 import gpu.agx.hw
 
-// Byte-exact G13/macOS 12.3 fragment work command.
-//
-// The offsets below are the ones g13.v hands to the microsequence, so firmware
-// dereferences them directly and they are the authority on where each region
-// starts. Both parameter blocks carry trailing bytes that no recovered field
-// names: without them job_params_2 lands at 0x3b8 instead of 0x3c0 and every
-// later offset in the command is eight bytes adrift of the pointers already
-// published to firmware. validate_g13_fragment_layouts() is what catches that.
+// G13/macOS 12.3 fragment carrier. Parameter-block extents and the versioned
+// firmware pointers must follow the packaged Asahi declarations together.
+// The first block includes eight legacy padding bytes; the third ends at
+// depth_dimensions without another padding word. Host layout checks compare
+// the constants with the actual carrier and the selected source-layout model.
 
 pub const g13_fragment_job_params_1_offset = u64(0x78)
 pub const g13_fragment_job_params_2_offset = u64(0x3c0)
 pub const g13_fragment_job_params_3_offset = u64(0x4b0)
-pub const g13_fragment_unk_758_flag_offset = u64(0x760)
-pub const g13_fragment_busy_flag_offset = u64(0x878)
-pub const g13_fragment_overflow_count_offset = u64(0x87c)
-pub const g13_fragment_unk_pointee_offset = u64(0x8b8)
-pub const g13_fragment_unk_buf_0_offset = u64(0x8ec)
-pub const g13_fragment_cur_ts_offset = u64(0x904)
-pub const g13_fragment_start_ts_offset = u64(0x90c)
-pub const g13_fragment_end_ts_offset = u64(0x914)
-pub const g13_fragment_v13_5_size = u64(0x974)
+pub const g13_fragment_unk_758_flag_offset = u64(0x758)
+pub const g13_fragment_busy_flag_offset = u64(0x870)
+pub const g13_fragment_overflow_count_offset = u64(0x874)
+pub const g13_fragment_unk_pointee_offset = u64(0x8b0)
+pub const g13_fragment_unk_buf_0_offset = u64(0x8e4)
+pub const g13_fragment_cur_ts_offset = u64(0x8fc)
+pub const g13_fragment_start_ts_offset = u64(0x904)
+pub const g13_fragment_end_ts_offset = u64(0x90c)
+pub const g13_fragment_v12_3_size = u64(0x930)
+pub const g13_fragment_v13_5_size = u64(0x96c)
 
 @[packed]
 pub struct G13ClearPipelineBinding {
@@ -171,7 +169,6 @@ pub mut:
 	unk_380                      u64
 	unk_388                      u64
 	depth_dimensions             u64
-	unk_398_padding              [8]u8
 }
 
 @[packed]
@@ -219,6 +216,8 @@ pub mut:
 	cur_ts                     u64
 	start_ts                   u64
 	end_ts                     u64
+	// Two opaque user-timestamp pointer words; all three legacy fields stay
+	// zero in native preparation and occupy the reference's full 16 bytes.
 	unk_914                    u32
 	unk_918                    u64
 	unk_920                    u32
@@ -232,7 +231,7 @@ pub mut:
 @[packed]
 pub struct G13RunFragmentV135 {
 pub mut:
-	bytes [0x974]u8
+	bytes [0x96c]u8
 }
 
 // Asahi submit_render derives the number of 2 KiB tile-image blocks from
@@ -271,35 +270,35 @@ pub fn g13_fragment_job_params_3_offset_for(abi hw.FirmwareAbi) ?u64 {
 }
 
 pub fn g13_fragment_unk_758_flag_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x760 } .v13_5_partial { 0x770 } else { none } }
+	return match abi { .v12_3 { g13_fragment_unk_758_flag_offset } .v13_5_partial { 0x770 } else { none } }
 }
 
 pub fn g13_fragment_busy_flag_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x878 } .v13_5_partial { 0x888 } else { none } }
+	return match abi { .v12_3 { g13_fragment_busy_flag_offset } .v13_5_partial { 0x888 } else { none } }
 }
 
 pub fn g13_fragment_overflow_count_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x87c } .v13_5_partial { 0x88c } else { none } }
+	return match abi { .v12_3 { g13_fragment_overflow_count_offset } .v13_5_partial { 0x88c } else { none } }
 }
 
 pub fn g13_fragment_unk_pointee_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x8b8 } .v13_5_partial { 0x8c8 } else { none } }
+	return match abi { .v12_3 { g13_fragment_unk_pointee_offset } .v13_5_partial { 0x8c8 } else { none } }
 }
 
 pub fn g13_fragment_unk_buf_0_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x8ec } .v13_5_partial { 0x900 } else { none } }
+	return match abi { .v12_3 { g13_fragment_unk_buf_0_offset } .v13_5_partial { 0x900 } else { none } }
 }
 
 pub fn g13_fragment_cur_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x904 } .v13_5_partial { 0x918 } else { none } }
+	return match abi { .v12_3 { g13_fragment_cur_ts_offset } .v13_5_partial { 0x918 } else { none } }
 }
 
 pub fn g13_fragment_start_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x90c } .v13_5_partial { 0x920 } else { none } }
+	return match abi { .v12_3 { g13_fragment_start_ts_offset } .v13_5_partial { 0x920 } else { none } }
 }
 
 pub fn g13_fragment_end_ts_offset_for(abi hw.FirmwareAbi) ?u64 {
-	return match abi { .v12_3 { 0x914 } .v13_5_partial { 0x928 } else { none } }
+	return match abi { .v12_3 { g13_fragment_end_ts_offset } .v13_5_partial { 0x928 } else { none } }
 }
 
 pub fn make_g13_fragment_v13_5(legacy &G13RunFragment, counter u64) G13RunFragmentV135 {
@@ -322,16 +321,18 @@ pub fn make_g13_fragment_v13_5(legacy &G13RunFragment, counter u64) G13RunFragme
 	g13_copy_bytes(voidptr(&out), 0x4b8, voidptr(legacy), 0x4b0, 0x220)
 	g13_copy_bytes(voidptr(&out), 0x6d8, voidptr(legacy), 0x6d0, 0x010)
 	g13_put_u64(voidptr(&out), 0x6e8, 0x100000)
-	g13_copy_bytes(voidptr(&out), 0x6f0, voidptr(legacy), 0x6e0, 0x080)
+	g13_copy_bytes(voidptr(&out), 0x6f0, voidptr(legacy), 0x6e0, 0x070)
+	// unk_390_0 is inserted before depth_dimensions, not after it.
+	g13_copy_bytes(voidptr(&out), 0x768, voidptr(legacy), 0x750, 0x008)
 	// Preserve the scratch word before the new 13.3 reserved word. Metadata
 	// follows that insertion; the scratch word itself must not move into it.
-	g13_copy_bytes(voidptr(&out), 0x770, voidptr(legacy), 0x760, 0x11c)
-	g13_copy_bytes(voidptr(&out), 0x88c, voidptr(legacy), 0x87c, 0x03c)
-	g13_copy_bytes(voidptr(&out), 0x8c8, voidptr(legacy), 0x8b8, 0x004)
-	g13_copy_bytes(voidptr(&out), 0x8d0, voidptr(legacy), 0x8bc, 0x030)
-	// Copy through client_sequence. Ventura's two additional timestamp words
-	// and trailing flags remain zero-initialised after it.
-	g13_copy_bytes(voidptr(&out), 0x900, voidptr(legacy), 0x8ec, 0x041)
+	g13_copy_bytes(voidptr(&out), 0x770, voidptr(legacy), 0x758, 0x11c)
+	g13_copy_bytes(voidptr(&out), 0x88c, voidptr(legacy), 0x874, 0x03c)
+	g13_copy_bytes(voidptr(&out), 0x8c8, voidptr(legacy), 0x8b0, 0x004)
+	g13_copy_bytes(voidptr(&out), 0x8d0, voidptr(legacy), 0x8b4, 0x030)
+	// Copy the complete common tail, including both timestamp-pointer pairs,
+	// client_sequence and its following flags. The added 13.x tail stays zero.
+	g13_copy_bytes(voidptr(&out), 0x900, voidptr(legacy), 0x8e4, 0x049)
 	return out
 }
 
@@ -348,7 +349,7 @@ pub fn validate_g13_fragment_layouts() bool {
 		&& sizeof(G13AuxFramebufferInfo) == 0x10
 		&& sizeof(G13FragmentJobParameters1) == 0x348
 		&& sizeof(G13FragmentJobParameters2) == 0xf0
-		&& sizeof(G13FragmentJobParameters3) == 0x2b0
-		&& sizeof(G13RunFragment) == 0x938
+		&& sizeof(G13FragmentJobParameters3) == 0x2a8
+		&& sizeof(G13RunFragment) == g13_fragment_v12_3_size
 		&& sizeof(G13RunFragmentV135) == g13_fragment_v13_5_size
 }

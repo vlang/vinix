@@ -157,7 +157,8 @@ fn check_channel_offsets() {
 fn check_v13_5_command_repacking() {
 	assert (fw.g13_compute_active_size(.v13_5_partial) or { 0 }) == 0x320
 	assert (fw.g13_vertex_active_size(.v13_5_partial) or { 0 }) == 0x61c
-	assert (fw.g13_fragment_active_size(.v13_5_partial) or { 0 }) == 0x974
+	assert (fw.g13_fragment_active_size(.v12_3) or { 0 }) == 0x930
+	assert (fw.g13_fragment_active_size(.v13_5_partial) or { 0 }) == 0x96c
 
 	mut compute := fw.G13RunCompute{
 		tag: 3
@@ -215,6 +216,7 @@ fn check_v13_5_command_repacking() {
 	fragment.job_params_3.aux_fb_info = fw.G13AuxFramebufferInfo{width: 800, height: 600}
 	fragment.job_params_2.tib_blocks = 0x1234_5678
 	fragment.job_params_3.tib_blocks = 0x8765_4321
+	fragment.job_params_3.depth_dimensions = 0x1122_3344_5566_7788
 	fragment_new := fw.make_g13_fragment_v13_5(&fragment, 0xabcdef0100000004)
 	assert object_u32(voidptr(&fragment_new), 0x3f4) == 0x1234_5678
 	assert object_u32(voidptr(&fragment_new), 0x6d0) == 0x8765_4321
@@ -225,6 +227,8 @@ fn check_v13_5_command_repacking() {
 	assert object_u32(voidptr(&fragment_new), 0x6e0) == 800
 	assert object_u32(voidptr(&fragment_new), 0x6e4) == 600
 	assert object_u64(voidptr(&fragment_new), 0x6e8) == 0x100000
+	assert object_u64(voidptr(&fragment_new), 0x760) == 0
+	assert object_u64(voidptr(&fragment_new), 0x768) == fragment.job_params_3.depth_dimensions
 	assert object_u32(voidptr(&fragment_new), 0x770) == fragment.unk_758_flag
 	assert object_u32(voidptr(&fragment_new), 0x888) == fragment.busy_flag
 	assert object_u32(voidptr(&fragment_new), 0x88c) == fragment.tvb_overflow_count
