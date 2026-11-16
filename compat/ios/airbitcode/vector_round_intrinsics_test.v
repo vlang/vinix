@@ -104,6 +104,10 @@ fn test_vector_rounding_names_states_and_cache() {
 		id, n, width := vector_float_intrinsic_name('llvm.clmul.v${count}i${bits}')!; assert id == .clmul && n == count && width == bits
 		key := vector_float_intrinsic_key(id, count, bits)!; assert key >= 24256 && key < 25280 && !seen[key]; seen[key] = true
 	} }
+	for op, name in ['add','mul','and','or','xor','smin','smax','umin','umax'] { for bits in u32(1) .. 65 { for count in 1 .. 17 {
+		id, n, width := vector_reduction_name('llvm.vector.reduce.${name}.v${count}i${bits}')!; assert int(id) == op && n == count && width == bits
+		key := vector_reduction_key(id, count, bits)!; assert key >= 25280 && key < 34496 && !seen[key]; seen[key] = true
+	} } }
 	for slot in seen { assert slot }
 	for name in ['llvm.floor.f32', 'llvm.floor.v0f16', 'llvm.floor.v01f32', 'llvm.floor.v17f16', 'llvm.floor.v99999999999999999999f16', 'llvm.floor.v2f64', 'llvm.floor.v2bf16', 'llvm.floor.v2f016', 'llvm.floor.v2f32.spoof', 'llvm.floor.nxv2f32', 'llvm.roundeven.vf32', 'llvm.nearbyint.v2i32', 'llvm.sin.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
 	for id in [ScalarIntrinsic.fabs, .sqrt, .fma]! { if _ := rounding_intrinsic_vector(id, ScalarVectorValue{}, 32, 1) { assert false, 'family' } }
@@ -111,5 +115,5 @@ fn test_vector_rounding_names_states_and_cache() {
 	for count in [0, 17] { if _ := rounding_intrinsic_vector(.floor, ScalarVectorValue{}, 16, count) { assert false, 'count' } }
 	for tag in [IntegerValue{aggregate: true}, IntegerValue{vector: true}] { mut source := ScalarVectorValue{}; source.lanes[0] = tag; if _ := rounding_intrinsic_vector(.floor, source, 32, 1) { assert false, 'scalar tag' } }
 	assert checks == 22848
-	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 25280 floating/integer/conversion overload/cache identities and family/shape/name/tag guards PASS')
+	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 34496 floating/integer/conversion overload/cache identities and family/shape/name/tag guards PASS')
 }

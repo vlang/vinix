@@ -1007,6 +1007,25 @@ Existing 256-node and 32-level bounds count all sources and cached heights.
 in both directions, native LLVM bits, nonmutating validation, ordinary/prepared
 write ordering, freeze/poison/undef controls and exact graph boundaries.
 
+Integer vector reductions support ordinary direct `llvm.vector.reduce.add`,
+`mul`, `and`, `or`, `xor`, `smin`, `smax`, `umin` and `umax` calls with canonical
+`.vNiW` overloads, 1..16 lanes and i1..i64 elements. The result is scalar iW;
+addition and multiplication wrap at W bits. All source lanes are observed: any
+poison lane poisons the result even with an annihilating operand, and any
+executed undef lane rejects before returning a result. Source freeze repairs
+indeterminate lanes; scalar result freeze chooses zero for poison but cannot
+hide an earlier undef error. Integer, mixed, void and memory execution accept
+these calls. Memory sources may include admitted vector arguments and loads;
+scalar execution keeps its existing argument restrictions. Reduction results
+use ordinary scalar SSA slots, without consuming vector construction storage.
+Each call costs one execution step and N+1 units of shared validation lane
+work. Exact declaration identities, signatures, attributes and existing budgets
+remain checked. Floating reductions, nonordinary flags, scalable vectors and
+reduction dependencies in pure address graphs remain excluded.
+`tests/ios/air-vector-reduction.v` checks native LLVM values, independent
+arithmetic/extrema, all-lane states and freezing, ordinary/prepared stores,
+loop reuse, malformed metadata, cache separation and exact shared limits.
+
 Fixed 1..16-lane integer vectors also support ordinary direct `llvm.clmul.vNiW`
 calls for i1..i64 lanes. Multiplication combines polynomial terms with XOR
 instead of carries, retaining the low W bits. Both operands and result must

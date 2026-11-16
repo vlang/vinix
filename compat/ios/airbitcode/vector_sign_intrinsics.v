@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_clmul_cache_base + 1024
+const vector_float_intrinsic_slots = vector_reduction_cache_base + 9216
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {

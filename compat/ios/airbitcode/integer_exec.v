@@ -133,7 +133,14 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			mut pair_result := false
 			vector_result := p.vector_construction(code, op)
 			scalar_vector_cast := code == 3 && p.scalar_vector_bitcast(op)
-			if code == 34 && !vector_result {
+			reduction_call := code == 34 && vector_reduction_call(ir, op)
+			if reduction_call {
+				if !inst.has_result { return error('AIR vector reduction: scalar result required') }
+				work, key, attributes := p.vector_reduction_profile(ir, stream, pools, bodies, scope, index, op, max_integer_execution_steps - vector_work)!
+				if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector reduction: duplicate reserved declaration') }
+				if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, false)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
+				vector_work += work; first_operand++
+			} else if code == 34 && !vector_result {
 				if !binary32 || !inst.has_result { return error('AIR intrinsic: mixed scalar result required') }
 				key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
 				pair_result = scalar_integer_overflow(scalar_intrinsic_name(ir.functions[op.callee_function].name)!)
@@ -183,6 +190,8 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 					vector_work += if code == 3 { p.vector_cast_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 2 { p.vector_binary_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 7 { p.vector_insert_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 8 { p.vector_shuffle_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 56 { p.vector_fneg_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code == 58 { p.vector_freeze_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else if code in [u64(9), 28]! { p.vector_compare_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! } else { p.vector_select_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)! }
 				}
 				vector_results++
+			} else if reduction_call {
+				// Complete vector source already checked by the reduction profile.
 			} else if code == 26 {
 				if !binary32 || !inst.has_result { return error('AIR overflow: extract shape/index') }
 				p.scalar_pair_extract(op, s.base_id, pools, scope)!
@@ -363,7 +372,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				6 { result = m.extract_constant_lane(stream, op)! }
 				7 { result = m.insert_vector_value(stream, inst, op)! }
 				8 { result = m.shuffle_vector_value(stream, inst, op)! }
-				34 { result = if p.vector_construction(code, op) { m.float_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! } }
+				34 { result = if vector_reduction_call(ir, op) { m.reduction_value(ir, stream, op)! } else if p.vector_construction(code, op) { m.float_intrinsic_vector_value(ir, stream, inst, op)! } else { m.intrinsic_value(ir, op)! } }
 				26 { result = m.extract_pair_value(op)! }
 				27 { result = m.insert_pair_value(op)! }
 				2 { result = if p.types[op.result_type].kind == .vector_t { m.binary_vector_value(stream, inst, op)! } else { m.binary_value(op)! } }
