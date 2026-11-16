@@ -1438,8 +1438,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     host receipts. A fresh signed x86 run and all sixty-five retention refusals
     pass, including both native-content input omissions. Three live mutations
     use a freshly built private fixture and restore admission without changing
-    ordinary file bytes. Complete xattr/sandbox coverage remains open, along
-    with other query/search/metadata operations and OS-loader reads. Complete
+    ordinary file bytes. An additive
+    [symlink-node attribute inventory](tests/packages/wine-link-xattr-content.md)
+    now captures and rechecks 21 canonical-parent alias nodes for each original
+    host role, including each link's literal body and own native attributes.
+    Binary/empty, dangling/cyclic/FIFO-link and restored baselines, 38 exact
+    refusals and four production/source guards pass. Mandatory link-node
+    integration and complete xattr/sandbox coverage remain open, along with
+    other query/search/metadata operations and OS-loader reads. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader

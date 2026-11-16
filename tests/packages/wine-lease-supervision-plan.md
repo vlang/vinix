@@ -5867,3 +5867,73 @@ targets. It does not inventory every native attribute in the workspace.
 Remaining xattr/sandbox and query/search/metadata coverage, SDK/ABI/library and
 hermetic closure, owned ARM/GUI, lifetime/mapping controls, redistribution and
 default activation remain open. No kernel or product-default behavior changes.
+
+## Native symlink-node attribute inventory (2026-11-17)
+
+Implementation `8a8fd23a8` adds the standalone
+[link-node content inventory](wine-link-xattr-content.md) and `winelinkxattr`
+reader. It complements format-10 canonical regular-file/directory content by
+observing a symlink's own attributes and literal body without dereferencing
+the final component. Parent paths must be canonical; duplicate/unsupported
+targets refuse. Names, values and link bodies are hex encoded. Bounds include
+2,048 nodes, 256 attributes per node, 1 MiB per value, 16 MiB aggregate raw
+name/value bytes, a 4,096-byte body and a 64 MiB receipt. Publication is
+exclusive; declaration reads are bounded and nonblocking.
+
+The native survey proves `O_SYMLINK` opens the link vnode and descriptor xattr
+calls return that node's values. Adding `O_NOFOLLOW` produces `ELOOP` on the
+selected macOS profile. The reader instead checks symlink type/device/inode
+against the held descriptor, rechecks names/body/path identity, and requires
+two complete observations to agree. `XATTR_SHOWCOMPRESSION` remains active.
+This is not an atomic snapshot; concurrent change-and-restore races remain
+outside its claim. ResourceFork writes on link nodes refuse with `EPERM` in
+the survey; supported custom attributes supply the real value-limit fixtures.
+
+The final production run passes binary/empty, dangling, cyclic and FIFO-link
+baselines, nine restored native baselines, target independence and 38 exact
+refusals. Mutations change link values/names, retarget or replace a node while
+preserving ordinary target and receipt bytes. Changing only the referenced
+object's data/attributes leaves the link-only receipt valid. Native exact
+name/value limits and restored limit baselines pass. Invalid targets, forged
+receipts, native bounds and declaration/publication errors refuse; FIFO cases
+have a two-second bound. Retired IPC metadata is retained before node removal.
+Refusals require exit code 1 rather than accepting signal exits. Four further
+controls reject non-production use and altered main/reader/limits sources
+without publishing receipts. All checks remain active under `-prod`.
+
+The exact original format-10 builder admits fixture, controller, producer and
+retainer before and after the read-only inventory. Each original alias graph
+projects to 21 canonical-parent link nodes whose literal bodies match its
+admitted declaration. All four new native receipts capture and recheck. No
+historical node, referenced object or target attribute is mutated. Original
+byte, policy, SDK, image and native canonical-target admission remains required.
+
+The complete checkpoint is `/Users/alex/.cache/vwlinkxattr-20261117-01`.
+Final tools are `final-02/wine-link-xattr-content` and
+`final-02/wine-link-xattr-content-check`, frozen source is
+`final-02/source-final`, and final records are `final-02/controls`. All six
+selected source/document files, including the complete custom import closure,
+match repository bytes before commit. The earlier passing candidate is retained;
+the final candidate strengthens exact child exit checks and reruns everything.
+API surveys, prototype binaries, raw logs, exact argv, selected environment,
+validation, feature revision and patch remain retained. The compiler is
+`/Users/alex/.cache/vinix-wine-build/v/v`; final tools use `-prod -gc boehm`.
+The complete original checkpoint `/Users/alex/.cache/vwhostxattr-20261117-01`,
+its original builder/source/host graphs, compiler/LLVM/SDK/image namespaces and
+all historical prerequisites remain required and unchanged.
+
+The external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-link-xattr-content-20261117-01.inventory.json`,
+SHA-256 `8501c014b5dd8ad334ba8bceac834ec663d1a2dc78d9de64e1c629ad56fa93cb`.
+Recording and independent comparison pass using the unchanged fixed auditor
+`/Users/alex/.cache/vwhostread-20261116-01/workspace-inventory-final`; logs are
+beside the receipt. No checkpoint file changes after recording begins. This
+workspace inventory audits ordinary logical bytes/types/modes/sizes/links;
+explicit native receipts separately pin selected node content, not all native
+attributes at rest throughout the workspace.
+
+This is additive qualification: required format-10 receipts, sandbox permissions,
+kernel, guest and product-default behavior do not change. Mandatory link-node
+integration, other readable symlinks, OS-root/device exceptions, directory
+names/search absence, loader/toolchain closure, owned ARM/GUI, redistribution
+and default activation remain open.
