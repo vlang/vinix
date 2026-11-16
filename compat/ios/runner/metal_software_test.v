@@ -5178,6 +5178,9 @@ source.write_string('declare float @air.fabs.f32(float) #0
 declare float @air.floor.f32(float) #0
 declare float @air.ceil.f32(float) #0
 declare float @air.trunc.f32(float) #0
+declare float @air.sqrt.f32(float) #0
+declare float @air.round.f32(float) #0
+declare float @air.rint.f32(float) #0
 declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
@@ -5246,7 +5249,29 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  %trunc_ok = fcmp oeq float %toward, %negative_x
  %float_pair0 = and i1 %fabs_ok, %floor_ok
  %float_pair1 = and i1 %ceil_ok, %trunc_ok
- %float_ok = and i1 %float_pair0, %float_pair1
+ %float_old_ok = and i1 %float_pair0, %float_pair1
+ %square = fmul float %xf, %xf
+ %root = call float @air.sqrt.f32(float %square)
+ %next_x = fadd float %xf, 1.0
+ %parity = and i32 %x, 1
+ %odd = icmp ne i32 %parity, 0
+ %ties = select i1 %odd, float %next_x, float %xf
+ %negative_next_x = fneg float %next_x
+ %negative_ties = fneg float %ties
+ %rounded = call float @air.round.f32(float %fraction)
+ %negative_rounded = call float @air.round.f32(float %negative)
+ %nearest = call float @air.rint.f32(float %fraction)
+ %negative_nearest = call float @air.rint.f32(float %negative)
+ %sqrt_ok = fcmp oeq float %root, %xf
+ %round_ok = fcmp oeq float %rounded, %next_x
+ %negative_round_ok = fcmp oeq float %negative_rounded, %negative_next_x
+ %rint_ok = fcmp oeq float %nearest, %ties
+ %negative_rint_ok = fcmp oeq float %negative_nearest, %negative_ties
+ %math_pair0 = and i1 %sqrt_ok, %round_ok
+ %math_pair1 = and i1 %negative_round_ok, %rint_ok
+ %math_pair2 = and i1 %math_pair0, %math_pair1
+ %math_ok = and i1 %math_pair2, %negative_rint_ok
+ %float_ok = and i1 %float_old_ok, %math_ok
  %coordinate = or i32 %x, 0
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate

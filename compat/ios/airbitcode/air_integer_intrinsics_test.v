@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_integer_intrinsic_identity() {
-	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2172
+	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2175
 	for i, name in ['air.popcount.i32', 'air.reverse_bits.i32'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert slot == i && id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }

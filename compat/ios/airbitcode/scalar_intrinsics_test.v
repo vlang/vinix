@@ -41,7 +41,7 @@ fn test_scalar_intrinsic_square_root() {
 	defer { unsafe { for row in cases { row.free() }; cases.free() } }
 	for row in cases { assert scalar_intrinsic_value(.sqrt, u32(row[0]), row[1], 0)! == row[2], '${row}' }
 	for name in ['llvm.sqrt.f16', 'llvm.sqrt.f32'] { assert scalar_intrinsic_arity(scalar_intrinsic_name(name)!) == 1 }
-	for name in ['llvm.sqrt.f64', 'llvm.sqrt.v2f32', 'air.sqrt.f32', 'llvm.sqrt.f32.spoof'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported square root name' } }
+	for name in ['llvm.sqrt.f64', 'llvm.sqrt.v2f32', 'air.fast_sqrt.f32', 'llvm.sqrt.f32.spoof'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported square root name' } }
 	// Independent multiplication inequalities verify the integer primitive,
 	// including exact squares and their neighbors at the 54-bit bound.
 	for sample in 0 .. 65536 {

@@ -1,5 +1,13 @@
 # Software Metal backend
 
+Prepared pipelines also execute unary `air.sqrt.f32`, `air.round.f32` and
+`air.rint.f32`. The existing square-root and rounding evaluators give nearest
+square roots, half ties away from zero for round, and half ties to even for rint,
+independent of the host rounding mode. The canonicalization image checks square
+roots of coordinate squares and positive/negative half ties before its independent
+RGBA8 pixel/padding oracle. These calls retain the exact float32 profile; fast
+forms, other widths and vectors remain excluded.
+
 Prepared pipelines execute scalar `air.fabs.f32`, `air.floor.f32`,
 `air.ceil.f32` and `air.trunc.f32` using the existing float evaluators.
 The canonicalization image also checks these four operations on coordinate-derived
