@@ -1,5 +1,19 @@
 # Bounded memory execution
 
+`llvm.canonicalize.f16/f32` and fixed 1..16-lane vector overloads execute in
+the scalar, void and both memory APIs. The software target preserves finite
+encodings, subnormals, signed zero and infinity. NaNs retain sign and payload;
+signaling NaNs become quiet by setting only the quiet bit. Integer bit operations
+implement this independently of host floating-point state. Poison propagates per
+lane; observing undef rejects, including an undef lane after poison. Source
+freeze can repair indeterminate lanes before the call. Each call costs one
+execution step; vector calls use the shared construction slots and 2*N lane-work
+units. Declaration keys append two scalar and 32 vector identities, preserving
+all prior keys. Ordinary direct calls, exact types and harmless declaration
+attributes remain required. Fast-math, nondefault denormal modes, double,
+scalable/wider vectors and floating address dependencies remain excluded.
+`tests/ios/air-canonicalize.v` checks exact native LLVM encodings and bounds.
+
 Fixed-vector PHIs support 1..16 matching i1..i64/half/float lanes. The
 executed predecessor selects the incoming vector, preserving its raw bits and
 per-lane poison/undef state without reading unselected values. All selected

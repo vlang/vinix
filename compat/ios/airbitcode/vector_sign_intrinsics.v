@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = number_vector_reduction_cache_base + 128
+const vector_float_intrinsic_slots = vector_canonicalize_cache_base + 32
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -88,6 +88,7 @@ fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right Scala
 fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Stream, inst IRInstruction, op IRTypedInstruction) !IntegerValue {
 	id, count, bits := vector_float_intrinsic_name(ir.functions[op.callee_function].name)!
 	left := m.read_vector(stream, m.p.operands[op.operands_start + 1])!
+	if id == .canonicalize { return m.store_vector_value(inst, canonical_float_vector(left, bits, count)!)! }
 	if scalar_saturating_cast(id) {
 		_, _, source_bits, _ := vector_saturating_cast_name(ir.functions[op.callee_function].name)!
 		return m.store_vector_value(inst, saturating_cast_vector(id, left, source_bits, bits, count)!)!

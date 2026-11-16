@@ -1,5 +1,16 @@
 # Software Metal backend
 
+AIR scalar and fixed 1..16-lane half/float `llvm.canonicalize` calls execute
+through the prepared software compute path. Finite values, subnormals, signed
+zero and infinity retain their bits. NaNs retain sign and payload while
+signaling NaNs become quiet. The integer implementation is independent of host
+FP state; existing poison/undef, direct declaration and bounded-work rules
+apply. Two scalar and 32 vector declaration keys append without changing prior
+identities. The geometry image fixture exercises both scalar formats and vector
+formats, observes the quiet bits, negative zero and a negative subnormal, and
+includes those results in RGBA8 readback. Fast-math, custom denormal modes,
+double and scalable/wider vectors remain excluded.
+
 Fixed-vector PHIs support 1..16 matching i1..i64/half/float lanes. The
 executed predecessor selects the incoming vector, preserving its raw bits and
 per-lane poison/undef state without reading unselected values. All selected

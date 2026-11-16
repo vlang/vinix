@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow fptosi_sat fptoui_sat }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow fptosi_sat fptoui_sat canonicalize }
 // Validation remains the caller's responsibility. This evaluates only decoded,
 // admitted intrinsics; it never calls the declaration or a host function pointer.
 fn (m &IntegerMachine) intrinsic_value(ir IRModule, op IRTypedInstruction) !IntegerValue {
@@ -25,6 +25,7 @@ fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
 	return match name {
 		'llvm.fabs.f16', 'llvm.fabs.f32' { ScalarIntrinsic.fabs }
+		'llvm.canonicalize.f16', 'llvm.canonicalize.f32' { ScalarIntrinsic.canonicalize }
 		'llvm.copysign.f16', 'llvm.copysign.f32' { ScalarIntrinsic.copysign }
 		'llvm.floor.f16', 'llvm.floor.f32' { ScalarIntrinsic.floor }
 		'llvm.ceil.f16', 'llvm.ceil.f32' { ScalarIntrinsic.ceil }
@@ -102,7 +103,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
-	key := if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
+	key := if id == .canonicalize { scalar_canonicalize_cache_base + int(bits == 16) } else if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
 	return key, ir_values(stream, raw)[6], id == .is_fpclass || scalar_integer_poison_flag(id)
 }
 // Accept only harmless function-level properties inherent in these intrinsics.
@@ -201,6 +202,7 @@ fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if scalar_integer_zero_count(id) { return error('AIR intrinsic: zero counts require poison-aware evaluation') }
 	if scalar_integer_intrinsic(id) { return scalar_integer_intrinsic_value(id, bits, a)! }
 	if bits !in [u32(16), 32]! { return error('AIR intrinsic: floating width') }
+	if id == .canonicalize { return canonical_float(bits, a) }
 	if id in [.fma, .fmuladd]! { return error('AIR intrinsic: three multiply-add arguments required') }
 	if id == .is_fpclass {
 		if b > 1023 { return error('AIR intrinsic: classification mask outside ten classes') }

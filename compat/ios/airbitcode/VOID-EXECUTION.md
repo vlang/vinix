@@ -1,5 +1,17 @@
 # Void-return scalar execution
 
+`llvm.canonicalize.f16/f32` and fixed 1..16-lane vector overloads preserve
+finite encodings, subnormals, signed zero and infinities. NaNs retain sign and
+payload, with only a signaling NaN's quiet bit changed. Evaluation uses integer
+bits and ignores host FP state. Poison propagates per lane; observed undef
+rejects, including after poison. Source freezes repair state before the call.
+Calls cost one step; vectors use existing slots and 2*N validation lane-work
+units. Two scalar and 32 vector cache identities append without moving prior
+keys. Exact direct declarations and existing attribute guards apply; fast-math,
+nondefault denormal modes, double, scalable/wider vectors and floating address
+dependencies remain excluded. `tests/ios/air-canonicalize.v` compares exact
+native LLVM encodings, state, metadata and budget boundaries.
+
 Fixed-vector PHIs support 1..16 matching i1..i64/half/float lanes. The
 executed predecessor selects the incoming vector, preserving its raw bits and
 per-lane poison/undef state without reading unselected values. All selected
