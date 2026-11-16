@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'gpu__agx__gpu__write_g13_start_vertex',
+	'fw__g13_microseq_start_vertex_v13_5',
 	'gpu__agx__gpu__GpuManager__g13_submission_status',
 	'gpu__agx__file__GpuFile__ioctl_gem_bind_object',
 	'gpu__agx__gpu__GpuManager__can_query_global_params',
@@ -114,6 +116,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'gpu__agx__gpu__write_g13_start_vertex' { return 'u64' }
+	if name == 'fw__g13_microseq_start_vertex_v13_5' { return 'fw__G13MicroseqStartVertexV135' }
 	if name.ends_with('GpuManager__g13_submission_status') { return 'i64' }
 	if name.ends_with('GpuFile__ioctl_gem_bind_object') { return 'i64' }
 	if name.ends_with('GpuManager__can_query_global_params') { return 'bool' }

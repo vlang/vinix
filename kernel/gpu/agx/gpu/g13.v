@@ -44,14 +44,13 @@ fn write_g13_timestamp(destination voidptr, v13_5 bool, legacy &fw.G13MicroseqTi
 
 fn write_g13_start_vertex(destination voidptr, v13_5 bool,
 	legacy &fw.G13MicroseqStartVertex, counter u64, event_control_buffer u64) u64 {
-	unsafe {
-		if v13_5 {
-			value := fw.g13_microseq_start_vertex_v13_5(legacy, counter, event_control_buffer)
-			C.memcpy(destination, &value, sizeof(fw.G13MicroseqStartVertexV135))
-			return sizeof(fw.G13MicroseqStartVertexV135)
-		}
-		C.memcpy(destination, legacy, sizeof(fw.G13MicroseqStartVertex))
+	if v13_5 {
+		value := fw.g13_microseq_start_vertex_v13_5(legacy, counter, event_control_buffer)
+		value_ptr := unsafe { voidptr(&value) }
+		unsafe { C.memcpy(destination, value_ptr, sizeof(fw.G13MicroseqStartVertexV135)) }
+		return sizeof(fw.G13MicroseqStartVertexV135)
 	}
+	unsafe { C.memcpy(destination, legacy, sizeof(fw.G13MicroseqStartVertex)) }
 	return sizeof(fw.G13MicroseqStartVertex)
 }
 
@@ -1651,31 +1650,33 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 			C.memcpy(voidptr(vertex), &vertex_v13_5, sizeof(fw.G13RunVertexV135))
 			C.memcpy(voidptr(fragment), &fragment_v13_5, sizeof(fw.G13RunFragmentV135))
 		}
+	}
 
-		vertex_start := fw.G13MicroseqStartVertex{
-			header: fw.g13_useq_start_vertex
-			tiling_params: job.vertex.va + vertex_tiling_params_offset
-			job_params_1: job.vertex.va + vertex_job_params_1_offset
-			buffer: buffer.info.va
-			scene: job.scene.scene.va
-			stats: mgr.g13_channels.stats_vertex.va + u64(4)
-			work_queue: vertex_queue.info.va
-			vm_slot: ctx.id
-			unk_38: 1
-			event_generation: u32(resources.firmware_id)
-			buffer_slot: buffer.slot
-			event_sequence: job.vertex_event_sequence
-			unk_pointer: job.vertex.va + vertex_unk_pointee_offset
-			unk_job_buffer: job.vertex.va + vertex_unk_buf_0_offset
-			uuid: input.vertex_command_id
-			attachments: vertex_attachments
-			// This word is padding in the macOS 12.3 microsequence ABI. The
-			// single-cluster marker only occupies it starting with 13.0 beta 4.
-			unk_178: 0
-		}
-		mut vertex_offset := u64(0)
-		vertex_offset += write_g13_start_vertex(voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset),
-			v13_5, &vertex_start, vertex_counter, resources.notifier.va + u64(0xa8))
+	vertex_start := fw.G13MicroseqStartVertex{
+		header: fw.g13_useq_start_vertex
+		tiling_params: job.vertex.va + vertex_tiling_params_offset
+		job_params_1: job.vertex.va + vertex_job_params_1_offset
+		buffer: buffer.info.va
+		scene: job.scene.scene.va
+		stats: mgr.g13_channels.stats_vertex.va + u64(4)
+		work_queue: vertex_queue.info.va
+		vm_slot: ctx.id
+		unk_38: 1
+		event_generation: u32(resources.firmware_id)
+		buffer_slot: buffer.slot
+		event_sequence: job.vertex_event_sequence
+		unk_pointer: job.vertex.va + vertex_unk_pointee_offset
+		unk_job_buffer: job.vertex.va + vertex_unk_buf_0_offset
+		uuid: input.vertex_command_id
+		attachments: vertex_attachments
+		// This word is padding in the macOS 12.3 microsequence ABI. The
+		// single-cluster marker only occupies it starting with 13.0 beta 4.
+		unk_178: if v13_5 { u32(1) } else { u32(0) }
+	}
+	mut vertex_offset := u64(0)
+	vertex_offset += write_g13_start_vertex(unsafe { voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset) },
+		v13_5, unsafe { &vertex_start }, vertex_counter, resources.notifier.va + u64(0xa8))
+	unsafe {
 		if input.has_result {
 			vertex_ts_start := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp | (u32(1) << 31)

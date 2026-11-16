@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [G13 submissions after device loss](m1-agx-submit-device.md)
-(2026-11-16). The [zero-length BIND before BO lookup](m1-agx-bind-zero.md),
+Latest offline increment: [versioned single-cluster vertex start](m1-agx-vertex-marker.md)
+(2026-11-16). The [G13 submissions after device loss](m1-agx-submit-device.md),
+[zero-length BIND before BO lookup](m1-agx-bind-zero.md),
 [timestamp-object validation and lookup order](m1-agx-timestamp-bind.md),
 [global parameter queries after device loss](m1-agx-param-device.md),
 [global GET_PARAMS copy behavior](m1-agx-param-copy.md),
