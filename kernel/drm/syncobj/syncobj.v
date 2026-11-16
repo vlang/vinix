@@ -425,8 +425,9 @@ pub fn add_timeline_point(obj &SyncObj, value u64, fence &DmaFence) bool {
 
 // Resolve a submitted point. An exact match is preferred. If contexts publish
 // timeline points out of order and the requested lower point has not arrived
-// yet, wait on the nearest later fence conservatively. This mirrors the fence
-// chain behaviour Mesa relies on instead of rejecting the submission.
+// yet, wait on the nearest later fence conservatively. Every nonzero u64 point
+// is valid, including UINT64_MAX. This native map is not a cumulative Linux
+// fence chain; chain dependencies and retired-point behavior remain separate.
 pub fn get_timeline_fence(obj &SyncObj, value u64) ?&DmaFence {
 	if obj == unsafe { nil } || value == 0 {
 		return none
@@ -436,13 +437,13 @@ pub fn get_timeline_fence(obj &SyncObj, value u64) ?&DmaFence {
 	defer {
 		o.lock.release()
 	}
-	mut later_value := ~u64(0)
+	mut later_value := u64(0)
 	mut later_fence := &DmaFence(unsafe { nil })
 	for point in o.timeline_points {
 		if point.value == value && point.fence != unsafe { nil } {
 			return unsafe { point.fence }
 		}
-		if point.value > value && point.value < later_value
+		if point.value > value && (later_fence == unsafe { nil } || point.value < later_value)
 			&& point.fence != unsafe { nil } {
 			later_value = point.value
 			later_fence = unsafe { point.fence }

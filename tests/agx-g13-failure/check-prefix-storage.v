@@ -21,6 +21,9 @@ const helpers = [
 	'drm__sync_name_append',
 	'drm__sync_name_number',
 	'syncobj__snapshot',
+	'syncobj__get_timeline_fence',
+	'submission__stage_sync_array',
+	'submission__install_output_syncs',
 	'syncobj__poll_fence',
 	'syncobj__cancel_fence_event',
 	'syncobj__DmaFence__notify_events_locked',
@@ -87,6 +90,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'submission__stage_sync_array' { return 'multi_return_i64_submission__SyncArray' }
+	if name == 'syncobj__get_timeline_fence' { return '__v_option_syncobj__DmaFenceptr' }
 	if name == 'syncobj__snapshot' { return 'syncobj__FenceSnapshot' }
 	if name == 'drm__SyncFileResource__ioctl' { return '__v_option_i64' }
 	if name in ['drm__sync_file_info_ioctl', 'drm__sync_file_deadline_ioctl'] { return 'i64' }

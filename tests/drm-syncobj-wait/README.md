@@ -139,3 +139,12 @@ nothing, write no user bytes and leave status, first timestamps, readiness and
 event generations unchanged. Source teardown and final descriptor close during
 lookup preserve the syscall reference. These checks do not qualify Linux's
 scheduler wrapper metadata/forwarding, fence containers or GPU frequency policy.
+
+Timeline boundary checks execute native Asahi sync-array staging and output
+publication alongside direct point lookup. A `UINT64_MAX` output must satisfy
+a lower input point when it is the nearest submitted successor. An independent
+sorted oracle covers all subsets and insertion permutations of representative
+unsigned boundary values. Exact matches still win; later closer publication,
+reset and handle reuse leave an already staged fence intact. Lookups allocate
+nothing and release the object lock. These cases qualify this selection rule,
+not cumulative Linux fence chains, retired-point pruning or timeline wait UAPI.

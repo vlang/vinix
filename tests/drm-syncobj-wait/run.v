@@ -46,6 +46,14 @@ fn main() {
 	os.cp('${repo}/kernel/drm/syncobj_fd.v', '${scratch}/drm/syncobj_fd.v')!
 	os.cp('${repo}/kernel/drm/sync_file_info.v', '${scratch}/drm/sync_file_info.v')!
 	os.cp('${repo}/kernel/drm/sync_file_deadline.v', '${scratch}/drm/sync_file_deadline.v')!
+	// Execute the native sync-array staging/publication functions without
+	// pulling unrelated render/compute decoding into this focused fixture.
+	submission := os.read_file('${repo}/kernel/gpu/agx/submission/submission.v')!
+	os.mkdir_all('${scratch}/gpu/agx/submission')!
+	os.write_file('${scratch}/gpu/agx/submission/production.v', 'module submission\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\n' +
+		section(submission, 'pub const max_syncs =', 'pub struct SyncArray {')! +
+		section(submission, 'pub struct SyncArray {', 'pub struct Command {')! +
+		section(submission, 'pub fn stage_sync_array(', '// Snapshot one descriptor')!)!
 	os.write_file('${scratch}/drm/registration.v', 'module drm\nimport drm.ioctl\n' +
 		section(source, 'struct DrmIoctlLayout {', 'fn common_ioctl_layout(')! +
 		section(source, 'fn common_ioctl_layout(', 'fn ioctl_layout(')!)!
@@ -54,7 +62,7 @@ fn main() {
 	process_source := os.read_file('${repo}/kernel/proc/proc.v')!
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
-	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks(); drm.run_sync_file_info_checks(); drm.run_sync_file_deadline_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks(); drm.run_sync_file_info_checks(); drm.run_sync_file_deadline_checks(); drm.run_timeline_boundary_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	arguments := ['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
