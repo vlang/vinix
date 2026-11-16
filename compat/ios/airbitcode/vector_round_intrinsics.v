@@ -20,6 +20,7 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('llvm.stepvector.') { count, bits := vector_step_name(name)!; return ScalarIntrinsic.stepvector, count, bits }
 	if name.starts_with('llvm.vector.interleave') { id, count, format := vector_interleave_name(name)!; return id, count, if format < 64 { u32(format + 1) } else if format == 64 { u32(16) } else { u32(32) } }
 	if name.starts_with('llvm.vector.splice.') { id, count, format := vector_splice_name(name)!; return id, count, if format < 64 { u32(format + 1) } else if format == 64 { u32(16) } else { u32(32) } }
 	if name.starts_with('llvm.vector.reverse.') { count, format := vector_reverse_name(name)!; return ScalarIntrinsic.vector_reverse, count, if format < 64 { u32(format + 1) } else if format == 64 { u32(16) } else { u32(32) } }

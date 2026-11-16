@@ -1,5 +1,22 @@
 # Bounded memory execution
 
+`llvm.stepvector` generates fixed 1..16-lane i8..i64 vectors containing
+0, 1, 2, ... . It is an ordinary direct zero-argument intrinsic: the operand
+list contains only the callee and the signature contains only its result.
+Common identity, metadata, declaration and exact arity checks still apply;
+existing intrinsics continue to require all their arguments. Calls use one
+result slot, one executed step and result_count validation work units. Keys
+41716..42627 append 912 identities without moving earlier families.
+
+Pure integer addresses use one existing packed shuffle-selector node to map a
+valid selector to its lane number. Invalid selectors remain poison, including
+through vector freezes, and preflight rejects them before writes. Existing
+height/capacity/cache checks apply. No node kind, owner or profile field is added.
+`tests/ios/air-vector-step.v` checks scalar/integer and both memory APIs, narrow
+selector normalization, constructions, state, arity/metadata, exact/exceeded
+work/storage/graph limits and vector-PHI slot reuse against native LLVM constant
+sequences. Scalable vectors and widths below i8 remain outside the profile.
+
 `llvm.vector.interleave2` through `interleave8` copy equally sized fixed
 i1..i64/half/float vectors into lane order input0[0], input1[0], ...,
 input0[1], input1[1], ... . Result counts stay within 16 and are multiples of

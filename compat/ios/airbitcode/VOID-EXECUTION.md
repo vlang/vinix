@@ -1,5 +1,14 @@
 # Void-return scalar execution
 
+Fixed 1..16-lane i8..i64 `llvm.stepvector` calls construct defined lane numbers
+without source operands. Exact direct zero-argument signatures are required;
+missing arguments to older intrinsic families remain invalid. Calls cost one
+executed step, one shared vector slot and result_count lane-work units.
+The maintained stepvector checker covers scalar/integer results, unused void
+results, insertion/selection/freezes, loop reuse and both sides of the existing
+4,096-slot and 1,000,000-unit validation limits. Keys 41716..42627 append 912
+identities; the vector cache has 42,628 entries and the scalar cache stays 2,154.
+
 `llvm.vector.interleave2` through `interleave8` support fixed i1..i64/half/float
 inputs whose combined result has at most 16 lanes. Calls preserve raw encodings,
 poison and deferred undef; unused indeterminate results can be discarded and

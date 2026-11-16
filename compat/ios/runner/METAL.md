@@ -1,5 +1,15 @@
 # Software Metal backend
 
+AIR `llvm.stepvector` generates fixed 1..16-lane i8..i64 index sequences in
+prepared software pipelines. The zero-argument call path retains exact direct
+declaration, signature and metadata validation. Generated indices may feed
+bounded buffer addresses through existing selector nodes. The size fixture uses
+i8/i9/i32/i64 sequences, including a scalar lane extracted from a one-lane vector,
+for coordinate reconstruction and RGBA8 output checks.
+`tests/ios/air-vector-step.v` checks all admitted widths/counts, state and loop
+reuse against independent native constant sequences. Native GPU execution and
+Fortnite launch remain unverified.
+
 AIR `llvm.vector.interleave2` through `interleave8` execute fixed integer, half
 and float lane interleaves with at most 16 result lanes. Prepared software
 pipelines preserve raw bits and deferred lane state; integer projections may
