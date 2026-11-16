@@ -2,6 +2,7 @@
 import os
 
 const helpers = [
+	'gpu__agx__file__GpuFile__ioctl_gem_bind_object',
 	'gpu__agx__gpu__GpuManager__can_query_global_params',
 	'params__copy_global',
 	'pgtable__alloc_table_page',
@@ -112,6 +113,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name.ends_with('GpuFile__ioctl_gem_bind_object') { return 'i64' }
 	if name.ends_with('GpuManager__can_query_global_params') { return 'bool' }
 	if name == 'params__copy_global' { return 'i64' }
 	if name == 'pgtable__alloc_table_page' { return '__v_option_u64ptr' }

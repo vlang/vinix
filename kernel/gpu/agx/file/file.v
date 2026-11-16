@@ -846,16 +846,18 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 	match request.op {
 		ioctl.asahi_bind_object_op_bind {
 			if request.flags != ioctl.asahi_bind_object_usage_timestamps
-				|| request.object_handle != 0 || request.range == 0
 				|| request.offset & pgtable.uat_pg_mask != 0
-				|| request.range & pgtable.uat_pg_mask != 0 {
+				|| request.range & pgtable.uat_pg_mask != 0
+				|| request.range > ~request.offset {
 				return -22
 			}
+			// object_handle is output-only. Empty ranges are a mapping error
+			// after BO lookup; overflow is a request error before lookup.
 			obj := f.get_object_ref(request.handle) or { return -2 }
 			// Timestamp objects belong to the kernel VM, outside any private
 			// userspace reservation domain.
 			if obj.vm_private_identity != 0 { gem.unref(obj); return -22 }
-			if request.offset > obj.size || request.range > obj.size - request.offset
+			if request.range == 0 || request.offset > obj.size || request.range > obj.size - request.offset
 				|| obj.phys_addr > u64(-1) - request.offset {
 				gem.unref(obj)
 				return -22
@@ -888,25 +890,28 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 		}
 		ioctl.asahi_bind_object_op_unbind {
 			if request.flags != 0 || request.handle != 0 || request.offset != 0
-				|| request.range != 0 || request.object_handle == 0 {
+				|| request.range != 0 {
 				return -22
 			}
-			manager := gpu.get_global_manager() or { return -19 }
 			f.lock.acquire()
 			mut found := TimestampObject{}
-			mut present := false
+			mut found_index := -1
 			for index, object in f.timestamp_objects {
 				if object.id == request.object_handle {
 					found = object
-					f.timestamp_objects.delete(index)
-					present = true
+					found_index = index
 					break
 				}
 			}
-			f.lock.release()
-			if !present {
+			if found_index < 0 {
+				f.lock.release()
 				return -2
 			}
+			// Keep the existing mapping owner installed if its manager is
+			// unavailable. Missing names, including zero, still return ENOENT.
+			manager := gpu.get_global_manager() or { f.lock.release(); return -19 }
+			f.timestamp_objects.delete(found_index)
+			f.lock.release()
 			mut gpu_manager := unsafe { manager }
 			gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)
 			gem.unref(found.obj)

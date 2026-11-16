@@ -130,3 +130,14 @@ callbacks switch to error before state-lock acquisition or complete an in-progre
 shutdown holding that lock. All paths release it; formatting asserts it is free.
 The snapshot does not serialize the subsequent user copy with later device loss.
 These injected lock schedules do not qualify native multi-CPU crash publication.
+
+Timestamp-object validation runs 183,400 ioctl checks. BIND ignores the initial
+output handle, checks offset/range overflow before BO lookup and rejects empty
+ranges after lookup. UNBIND resolves zero/missing/foreign names to ENOENT before
+manager lookup. A found mapping keeps its owner when the manager is unavailable;
+retry removes it once the manager returns. Cases cover private/bounds/header
+refusal, injected mapping OOM, ID wrap, an output field naming a live sibling,
+unchanged failure outputs and final close. BO references return to their original
+counts after failures/unbind and every allocated fixture BO is freed. GPU mapping
+services are injected; firmware cache safety and in-flight retention are not
+qualified by these host cases.
