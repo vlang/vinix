@@ -34,10 +34,11 @@ fn main() {
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/katomic', '${scratch}/katomic', false)!
+	os.cp_all('${repo}/tests/agx-async/fixture/event', '${scratch}/event', false)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
 	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport stat\nimport klock\nimport memory\nimport event.eventstruct\n' +
 		section(source, 'struct SyncFileResource {', '// A PRIME fd')! +
-		section(source, 'fn (mut this SyncFileResource) mmap(', '__global (')! +
+		section(source, 'fn (mut this SyncFileResource) poll_status(', '__global (')! +
 		section(source, 'fn ioctl_syncobj_create(', 'fn create_prime_fd(')! +
 		section(source, 'fn ioctl_syncobj_destroy(', 'fn ioctl_syncobj_wait(')! +
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
@@ -51,7 +52,7 @@ fn main() {
 	process_source := os.read_file('${repo}/kernel/proc/proc.v')!
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
-	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import drm\nfn main() { drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	arguments := ['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',

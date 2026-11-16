@@ -13,6 +13,10 @@ const helpers = [
 	'drm__create_sync_file_fd',
 	'drm__SyncobjResource__unref',
 	'drm__SyncFileResource__unref',
+	'drm__SyncFileResource__poll_status',
+	'syncobj__poll_fence',
+	'syncobj__cancel_fence_event',
+	'syncobj__DmaFence__notify_events_locked',
 	'syncobj__next_namespace_handle',
 	'syncobj__lookup',
 	'syncobj__destroy',
@@ -76,6 +80,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'drm__SyncFileResource__poll_status' { return 'i64' }
+	if name in ['syncobj__cancel_fence_event', 'syncobj__DmaFence__notify_events_locked'] { return 'void' }
 	if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd'] { return '__v_option_i64' }
 	if name in ['drm__SyncobjResource__unref', 'drm__SyncFileResource__unref'] { return '__v_option' }
 	if name == 'drm__syncobj_wait_geometry' { return '__v_option_drm__SyncobjWaitGeometry' }

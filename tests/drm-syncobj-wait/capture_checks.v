@@ -4,6 +4,76 @@ module syncobj
 
 import klock
 import memory
+import event
+import event.eventstruct
+
+pub fn before_fence_lock_for_checks(fence &DmaFence, callback fn ()) {
+	klock.before_once(unsafe { &fence.lock }, callback)
+}
+
+pub fn assert_fence_events_for_checks(fence &DmaFence, expected int) {
+	mut f := unsafe { fence }
+	f.lock.acquire()
+	mut cursor := unsafe { f.poll_events }
+	mut count := 0
+	for cursor != unsafe { nil } {
+		count++
+		assert count <= expected, 'duplicate or cyclic fence event subscription'
+		assert voidptr(cursor.fence) == voidptr(fence) && cursor.event != unsafe { nil }
+		cursor = unsafe { cursor.next }
+	}
+	assert count == expected
+	f.lock.release()
+}
+
+pub fn assert_no_fence_event_in_region_for_checks(fence &DmaFence, allocation voidptr, size u64) {
+	mut f := unsafe { fence }
+	f.lock.acquire()
+	mut cursor := unsafe { f.poll_events }
+	for cursor != unsafe { nil } {
+		for address in [u64(cursor), u64(cursor.event)]! {
+			assert address < u64(allocation) || address - u64(allocation) >= size,
+				'export storage freed while a fence can still notify its event'
+		}
+		cursor = unsafe { cursor.next }
+	}
+	f.lock.release()
+}
+
+pub fn run_fence_event_primitive_checks() {
+	mut fence := DmaFence{}
+	mut nodes := [4096]FenceEvent{}
+	mut events := [4096]eventstruct.Event{}
+	assert !poll_fence(unsafe { nil }, unsafe { &nodes[0] }, unsafe { &events[0] })
+	assert !poll_fence(unsafe { &fence }, unsafe { nil }, unsafe { &events[0] })
+	assert !poll_fence(unsafe { &fence }, unsafe { &nodes[0] }, unsafe { nil })
+	cancel_fence_event(unsafe { nil }, unsafe { nil })
+	for index in 0 .. nodes.len {
+		assert !poll_fence(unsafe { &fence }, unsafe { &nodes[index] }, unsafe { &events[index] })
+		assert !poll_fence(unsafe { &fence }, unsafe { &nodes[index] }, unsafe { &events[index] })
+	}
+	assert_fence_events_for_checks(unsafe { &fence }, 4096)
+	// Head, middle and tail cancellation, then re-registration.
+	for index in [4095, 2048, 0]! {
+		cancel_fence_event(unsafe { &fence }, unsafe { &nodes[index] })
+		cancel_fence_event(unsafe { &fence }, unsafe { &nodes[index] })
+		assert !poll_fence(unsafe { &fence }, unsafe { &nodes[index] }, unsafe { &events[index] })
+	}
+	assert_fence_events_for_checks(unsafe { &fence }, 4096)
+	notifications := event.notifications()
+	signal_error(unsafe { &fence }, -5)
+	assert event.notifications() == notifications + 4096
+	assert_fence_events_for_checks(unsafe { &fence }, 0)
+	for index in 0 .. nodes.len {
+		assert events[index].generation == 1
+		assert nodes[index].fence == unsafe { nil } && nodes[index].next == unsafe { nil } && nodes[index].event == unsafe { nil }
+		assert poll_fence(unsafe { &fence }, unsafe { &nodes[index] }, unsafe { &events[index] })
+		cancel_fence_event(unsafe { &fence }, unsafe { &nodes[index] })
+	}
+	signal(unsafe { &fence })
+	assert event.notifications() == notifications + 4096
+	println('DRM fence events: 4096 borrowed nodes, duplicate registration, head/middle/tail cancellation, single error completion wake, cleared links and no repeated wake passed')
+}
 
 pub fn assert_private_stub_for_checks(fence &DmaFence) {
 	assert fence.queue_context == 0 && fence.waiters.len == 0

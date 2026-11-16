@@ -104,6 +104,7 @@ pub mut:
 	status   int
 	can_mmap bool
 	fence    &syncobj.DmaFence = unsafe { nil }
+	poll_event syncobj.FenceEvent
 	box &resource.Resource = unsafe { nil }
 }
 
@@ -187,6 +188,10 @@ fn (mut this GemPrimeResource) unlink(_handle voidptr) ? {
 fn (mut this GemPrimeResource) grow(_handle voidptr, _new_size u64) ? {
 }
 
+fn (mut this SyncFileResource) poll_status(_access int) int {
+	return if syncobj.poll_fence(this.fence, unsafe { &this.poll_event }, unsafe { &this.event }) { file.pollin } else { 0 }
+}
+
 fn (mut this SyncFileResource) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
@@ -209,6 +214,7 @@ fn (mut this SyncFileResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
+	syncobj.cancel_fence_event(this.fence, unsafe { &this.poll_event })
 	unsafe {
 		memory.free(voidptr(this.box))
 		memory.free(voidptr(this))

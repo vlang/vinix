@@ -29,6 +29,8 @@ pub mut:
 	context  u64
 	lock     klock.Lock
 	waiters  []&FenceWaiter
+mut:
+	poll_events &FenceEvent = unsafe { nil }
 }
 
 struct TimelinePoint {
@@ -86,6 +88,7 @@ pub fn signal(fence &DmaFence) {
 	}
 	f.timestamp_ns = time.monotonic_ns()
 	katomic.store(mut &f.signaled, true)
+	f.notify_events_locked()
 
 	// Wake every registered waiter
 	for mut w in f.waiters {
@@ -116,6 +119,7 @@ pub fn signal_error(fence &DmaFence, err int) {
 	f.error = err
 	f.timestamp_ns = time.monotonic_ns()
 	katomic.store(mut &f.signaled, true)
+	f.notify_events_locked()
 
 	for mut w in f.waiters {
 		if !w.triggered {

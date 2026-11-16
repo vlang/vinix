@@ -100,6 +100,19 @@ the required order from an early destination snapshot. A 4,096-import loop
 checks that binary imports create no handles or allocations. These are host
 ownership/interleaving checks, with native object/fence retention unchanged.
 
+Sync-file poll cases exercise the production readiness method and borrowed
+fence-event subscriptions. Pending exports register lazily without allocation;
+completion (including an error) makes them readable and advances their resource
+event once. Repeated probes, distinct exports, duplicated descriptors, old
+snapshots after replacement and source namespace teardown are covered. Exact
+fence-lock interleavings let signal or final close win before the other, and
+also close the last installed descriptor while a poll lookup keeps it alive.
+Before export storage is freed, a hook rejects any node/event still linked from
+a retained fence. A primitive case registers 4,096 nodes and checks duplicate
+registration, cancellation/re-registration, link clearing and single wakeup.
+The shared async event fixture models locked generation changes; these checks
+do not run a native blocking poll/epoll syscall or scheduler thread.
+
 These deterministic interleavings do not exercise actual kernel threads, GPU
 execution or kernel heap usage. Vinix still polls through its scheduler; Linux
 uses sleeping waits and fence callbacks. Timeline waits and deadline scheduling
