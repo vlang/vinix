@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'fw__g13_timestamp_user_ts_offset_for',
+	'fw__g13_microseq_timestamp_v13_5',
 	'fw__make_g13_vertex_v13_5',
 	'fw__make_g13_compute_v13_5',
 	'fw__make_g13_fragment_v13_5',
@@ -120,6 +122,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'fw__g13_timestamp_user_ts_offset_for' { return '__v_option_u64' }
+	if name == 'fw__g13_microseq_timestamp_v13_5' { return 'fw__G13MicroseqTimestampV135' }
 	if name == 'fw__make_g13_vertex_v13_5' { return 'fw__G13RunVertexV135' }
 	if name == 'fw__make_g13_compute_v13_5' { return 'fw__G13RunComputeV135' }
 	if name == 'fw__make_g13_fragment_v13_5' { return 'fw__G13RunFragmentV135' }

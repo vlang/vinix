@@ -318,12 +318,15 @@ fn check_v13_5_microsequences() {
 	timestamp := fw.G13MicroseqTimestamp{
 		header: 0x8000_0019
 		cur_ts: 0x1111_2222_3333_4444
+		user_ts_pointers: 0xffff_ffa0_1122_5cc
 		uuid: 0x5566_7788
 		pad_30: 0x99aa_bbcc
 	}
 	timestamp_new := fw.g13_microseq_timestamp_v13_5(&timestamp,
 		0xdead_beef_cafe_babe)
 	assert object_u64(voidptr(&timestamp_new), 0x4) == timestamp.cur_ts
+	assert __offsetof(fw.G13MicroseqTimestamp, user_ts_pointers) == 0x24
+	assert object_u64(voidptr(&timestamp_new), 0x24) == timestamp.user_ts_pointers
 	assert object_u64(voidptr(&timestamp_new), 0x2c) == 0xdead_beef_cafe_babe
 	assert object_u32(voidptr(&timestamp_new), 0x34) == timestamp.uuid
 	assert object_u32(voidptr(&timestamp_new), 0x38) == timestamp.pad_30

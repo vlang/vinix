@@ -1346,6 +1346,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	vertex_cur_ts_offset := fw.g13_vertex_cur_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	vertex_start_ts_offset := fw.g13_vertex_start_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	vertex_end_ts_offset := fw.g13_vertex_end_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
+	vertex_user_ts_offset := fw.g13_timestamp_user_ts_offset_for(mgr.hw_config.firmware_abi, fw.g13_useq_pipe_vertex) or { return none }
 	fragment_job_params_1_offset := fw.g13_fragment_job_params_1_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	fragment_job_params_2_offset := fw.g13_fragment_job_params_2_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	fragment_unk_758_flag_offset := fw.g13_fragment_unk_758_flag_offset_for(mgr.hw_config.firmware_abi) or { return none }
@@ -1356,6 +1357,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 	fragment_cur_ts_offset := fw.g13_fragment_cur_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	fragment_start_ts_offset := fw.g13_fragment_start_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	fragment_end_ts_offset := fw.g13_fragment_end_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
+	fragment_user_ts_offset := fw.g13_timestamp_user_ts_offset_for(mgr.hw_config.firmware_abi, fw.g13_useq_pipe_fragment) or { return none }
 
 	job.explicit_barriers.offset = g13_barrier_tail_offset(sizeof(fw.G13InitBufferCommand))
 	job.init_buffer = mgr.alloc_g13_buffer_with_protection(job.explicit_barriers.offset + g13_barrier_tail_size, pgtable.gpu_prot_fw_private_rw) or { return none }
@@ -1684,6 +1686,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				start_ts: job.vertex.va + vertex_start_ts_offset
 				update_ts: job.vertex.va + vertex_start_ts_offset
 				work_queue: vertex_queue.info.va
+				user_ts_pointers: job.vertex.va + vertex_user_ts_offset
 				uuid: input.vertex_command_id
 			}
 			vertex_offset += write_g13_timestamp(voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset),
@@ -1701,6 +1704,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				start_ts: job.vertex.va + vertex_start_ts_offset
 				update_ts: job.vertex.va + vertex_end_ts_offset
 				work_queue: vertex_queue.info.va
+				user_ts_pointers: job.vertex.va + vertex_user_ts_offset
 				uuid: input.vertex_command_id
 			}
 			vertex_offset += write_g13_timestamp(voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset),
@@ -1762,6 +1766,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				start_ts: job.fragment.va + fragment_start_ts_offset
 				update_ts: job.fragment.va + fragment_start_ts_offset
 				work_queue: fragment_queue.info.va
+				user_ts_pointers: job.fragment.va + fragment_user_ts_offset
 				uuid: input.fragment_command_id
 			}
 			fragment_offset += write_g13_timestamp(voidptr(job.fragment_microsequence.phys + higher_half + fragment_offset),
@@ -1779,6 +1784,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job(resources &G13QueueResources,
 				start_ts: job.fragment.va + fragment_start_ts_offset
 				update_ts: job.fragment.va + fragment_end_ts_offset
 				work_queue: fragment_queue.info.va
+				user_ts_pointers: job.fragment.va + fragment_user_ts_offset
 				uuid: input.fragment_command_id
 			}
 			fragment_offset += write_g13_timestamp(voidptr(job.fragment_microsequence.phys + higher_half + fragment_offset),
@@ -2331,6 +2337,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 	compute_cur_ts_offset := fw.g13_compute_cur_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	compute_start_ts_offset := fw.g13_compute_start_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
 	compute_end_ts_offset := fw.g13_compute_end_ts_offset_for(mgr.hw_config.firmware_abi) or { return none }
+	compute_user_ts_offset := fw.g13_timestamp_user_ts_offset_for(mgr.hw_config.firmware_abi, fw.g13_useq_pipe_compute) or { return none }
 	mut user_context := unsafe { ctx }
 	job.preempt = user_context.alloc_driver_buffer_aligned(preempt_size, false, fw.g13_tvb_page_size) or { return none }
 	job.command = mgr.alloc_g13_buffer_with_protection(compute_size, pgtable.gpu_prot_gpu_ro_fw_private_rw) or { return none }
@@ -2437,6 +2444,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 				start_ts: job.command.va + compute_start_ts_offset
 				update_ts: job.command.va + compute_start_ts_offset
 				work_queue: compute_queue.info.va
+				user_ts_pointers: job.command.va + compute_user_ts_offset
 				uuid: input.command_id
 			}
 			micro_offset += write_g13_timestamp(voidptr(job.microsequence.phys + higher_half + micro_offset),
@@ -2454,6 +2462,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job(resources &G13QueueResources
 				start_ts: job.command.va + compute_start_ts_offset
 				update_ts: job.command.va + compute_end_ts_offset
 				work_queue: compute_queue.info.va
+				user_ts_pointers: job.command.va + compute_user_ts_offset
 				uuid: input.command_id
 			}
 			micro_offset += write_g13_timestamp(voidptr(job.microsequence.phys + higher_half + micro_offset),

@@ -1,5 +1,7 @@
 module fw
 
+import gpu.agx.hw
+
 // Exact G13/macOS 12.3 microsequence operations. GPU pointers are encoded as
 // packed u64 values because Apple permits them at unaligned firmware offsets.
 
@@ -43,7 +45,7 @@ pub mut:
 	start_ts   u64
 	update_ts  u64
 	work_queue u64
-	unk_24     u64
+	user_ts_pointers u64
 	uuid       u32
 	pad_30     u32
 }
@@ -246,6 +248,30 @@ pub mut:
 pub struct G13MicroseqFinalizeComputeV135 {
 pub mut:
 	bytes [0x7c]u8
+}
+
+// Timestamp.user_ts_pointers addresses the command's optional pointer pair,
+// even when both entries are zero. It is not a nullable pair address.
+pub fn g13_timestamp_user_ts_offset_for(abi hw.FirmwareAbi, pipe u32) ?u64 {
+	return match abi {
+		.v12_3 {
+			match pipe {
+				g13_useq_pipe_vertex { u64(0x5c4) }
+				g13_useq_pipe_fragment { u64(0x914) }
+				g13_useq_pipe_compute { u64(0x2c0) }
+				else { none }
+			}
+		}
+		.v13_5_partial {
+			match pipe {
+				g13_useq_pipe_vertex { u64(0x5cc) }
+				g13_useq_pipe_fragment { u64(0x930) }
+				g13_useq_pipe_compute { u64(0x2c8) }
+				else { none }
+			}
+		}
+		else { none }
+	}
 }
 
 pub fn g13_microseq_timestamp_v13_5(legacy &G13MicroseqTimestamp,
