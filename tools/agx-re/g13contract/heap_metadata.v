@@ -7,13 +7,16 @@ fn check_heap_metadata_local(source string) ! {
   'heap.allocations.flags |= .noslices', 'return heap'],
   'Heap table exclusively owns its buffer before the first append')!
  gc := section(source, 'fn (mut h HeapAllocator) gc_locked()', '// Return the total number', 'Heap metadata GC')!
- require_order(gc, ['if a.va + a.size == h.top && !a.in_use',
+ require_order(gc, ['mut idx := h.allocations.len - 1', 'for idx >= 0', 'a := h.allocations[idx]',
+  'if !a.in_use {', 'if a.va + a.size == h.top {',
   'h.top = if idx == 0 { h.start } else {', 'previous := h.allocations[idx - 1]',
   'previous.va + previous.size',
-  'h.allocations.delete(idx)', 'unsafe { free(a) }', 'progress = true', 'idx--'],
-  'Only unlinked free suffix records may be destroyed')!
+  'h.allocations.delete(idx)', 'unsafe { free(a) }', 'idx--'],
+  'Every released record is unlinked before destruction while live frontiers remain stable')!
  require(gc.count('free(a)') == 1, 'Heap metadata retires once')!
- release := section(source, 'pub fn (mut h HeapAllocator) release(', '// Compact free allocations', 'Heap release')!
+ require(!gc.contains('break') && !gc.contains('continue') && gc.count('idx--') == 1,
+  'GC visits every original record once, including below live records')!
+ release := section(source, 'pub fn (mut h HeapAllocator) release(', '// Collect every released record', 'Heap release')!
  require(!release.contains('free('), 'Interior metadata stays owned until GC')!
  for method in ['alloc(', 'release(', 'gc()', 'used()', 'available()'] {
   body := section(source, 'pub fn (mut h HeapAllocator) ' + method, '\n}\n', 'Heap metadata reader serialization')!
@@ -28,4 +31,8 @@ fn check_heap_metadata_reference(source string) ! {
  drop := section(source, 'impl Drop for HeapAllocation {', 'impl mm::AllocInner<HeapAllocationInner>', 'Asahi heap owner destruction')!
  require_order(drop, ['let node = self.0.take().unwrap()', 'alloc.with(|a|',
   'garbage.push(node, GFP_KERNEL)', 'Some(node)'], 'Asahi transfers metadata to garbage or drops its owner')!
+ collect := section(source, 'fn collect_garbage(&mut self, mut count: usize)', 'impl Drop for HeapAllocatorInner', 'Asahi garbage collection')!
+ require_order(collect, ['inner.garbage.as_mut()', 'for node in g.drain(0..block)',
+  'inner.total_garbage -= node.size() as usize', 'garbage.clear()'],
+  'Asahi drops collected range nodes independently of higher live allocations')!
 }

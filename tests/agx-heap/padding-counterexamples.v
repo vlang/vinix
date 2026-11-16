@@ -11,9 +11,9 @@ fn main() {
  source := os.read_file(repo + '/kernel/gpu/agx/alloc/alloc.v')!
  variants := [
   ['original-source', os.read_file(os.args[2])!, 'GPU heap GC must reclaim alignment padding and released prefix'],
-  ['wrong-start', source.replace('if idx == 0 { h.start }', 'if idx == 0 { h.start + gpu_page_size }'), 'FAIL: fn main.check_delayed_gc:'],
-  ['preceding-start', source.replace('previous.va + previous.size', 'previous.va'), 'FAIL: fn main.check_delayed_gc:'],
-  ['live-prefix', source.replace('a.va + a.size == h.top && !a.in_use', 'a.va + a.size == h.top'), 'FAIL: fn main.check_delayed_gc:'],
+  ['wrong-start', source.replace('if idx == 0 { h.start }', 'if idx == 0 { h.start + gpu_page_size }'), 'GPU heap GC must reclaim alignment padding and released prefix'],
+  ['preceding-start', source.replace('previous.va + previous.size', 'previous.va'), 'heap.top == start && heap.allocations.len == 0 && heap.used() == 0'],
+  ['live-prefix', source.replace('if !a.in_use {', 'if true {'), 'GC restores reservation frontier including alignment padding'],
  ]
  mut receipts := []string{}
  for item in variants {
@@ -23,7 +23,7 @@ fn main() {
   os.setenv('AGX_HEAP_TEST_C', dir + '/test.c', true)
   os.setenv('AGX_HEAP_TEST_BINARY', dir + '/test', true)
   mut process := os.new_process(os.abs_path(os.args[1]))
-  process.set_args(['--sanitize', '--allocator-source', dir + '/alloc.v'])
+  process.set_args(['--sanitize-padding', '--allocator-source', dir + '/alloc.v'])
   process.set_redirect_stdio(); process.run()
   log := process.stdout_slurp() + process.stderr_slurp(); process.wait()
   os.write_file(dir + '/run.log', log)!

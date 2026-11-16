@@ -31,7 +31,8 @@ the original one-pair loss of 65,536 VA bytes and one record.
 The sanitized suite checks 9,216 combinations of heap-start offsets, three
 alignment choices, all release masks and all six release orders. Its independent
 model saves each reservation frontier before allocation and requires GC to
-restore that frontier, including leading padding. Live prefixes retain their
+restore the frontier above the highest live record, including leading padding.
+All released records are collected, including interiors. Live records retain their
 addresses and metadata; ASan verifies retired records. Allocation-triggered GC
 must recover an entire padded heap. `padding-counterexamples.v` takes the runner,
 pre-padding-fix allocator and a fresh external directory; four compiled variants
@@ -49,8 +50,16 @@ table has no buffer to retire. `capacity-counterexamples.v` takes the runner,
 pre-capacity-fix allocator and a fresh external directory; four compiled variants
 catch original, missing, late and lost ownership of the pointer buffer.
 
-Sanitizers check eight release masks, delayed interior ownership, suffix-only
-destruction, automatic GC during allocation, idempotence and two concurrent
+`--measure-collect` releases 8,192 records below one live allocation. The old
+suffix-only collector reclaims zero records; the current collector reclaims
+8,192 malloc blocks / 262,144 bytes while preserving the pin and frontier.
+Another 288 offset/alignment/four-pin release-order cases test interior deletion,
+later append, highest release, repeated GC and complete reset. Freed interior
+VA gaps still wait for all higher allocations to be released. GC scans all
+tracked records; native runtime cost remains unmeasured.
+
+Sanitizers check eight release masks, deferred ownership until GC, complete
+released-record destruction, automatic GC, idempotence and two concurrent
 statistics readers. Freed-pointer checks query ASan without dereferencing freed
 records. The tests perform no GPU operation, firmware handshake or boot.
 
@@ -65,7 +74,7 @@ ownership, `--selftest CURRENT_C` rejects five guard/allocation mutations, and
 `--native CURRENT_C BASELINE_C` additionally preserves the heap/GPU/event
 lifetime bodies and owning layouts against the pre-bounds baseline. Those
 historical native and GC host proof modes require their original bundles.
-For current GC, compile `check-padding.v`: `--host CURRENT_C` checks exact
+For the historical suffix-only GC, `check-padding.v --host CURRENT_C` checks exact
 stack-only frontier restoration, unlink-before-free and locked readers;
 `--selftest CURRENT_C` rejects eight ownership/locking/frontier/live-prefix
 mutations. `--native CURRENT_C BASELINE_C` restores the exact old frontier line
@@ -81,5 +90,23 @@ constructor, allocation, buffer-free and flag-transfer mutations.
 `--native CURRENT_C BASELINE_C` reconstructs the
 exact pre-capacity constructor, requires six other heap bodies and all ten
 owning declarations, nine GPU lifetime bodies and ten event methods to match.
-`check-padding.v --native` retains its original pre-padding baseline contract;
-its host/selftest modes continue to check the current GC and locked getters.
+Its native mode and all `check-padding.v` modes retain their original contracts
+and require the original complete bundles. Current construction host/selftest
+modes and bounds host/selftest modes remain applicable.
+
+For current GC, `check-collect.v --host CURRENT_C` requires the complete exact
+stack-only descending collector and locked readers. `--selftest CURRENT_C`
+rejects ten ownership, pin, scan, frontier and locking mutations. Native mode
+compares six unchanged heap bodies, ten owning declarations, nine GPU lifetime
+bodies and ten event methods with the pre-collection baseline.
+`collect-counterexamples.v` takes the runner, pre-collection source and a fresh
+external directory; six compiled variants exercise the old source, suffix-only
+collection, stopping at a live record, freeing live records, changing an interior
+frontier and skipping records.
+
+`--sanitize-bounds`, `--sanitize-padding`, `--sanitize-capacity` and
+`--sanitize-collect` execute the named property under ASan/UBSan. Counterexample
+runners use these modes so historical baseline sources reach their intended
+property failure independently of newer GC semantics. The interval-bounds
+negative now fails directly in the overflowing-interval probe. Historical checkers and
+complete original bundles remain unchanged.

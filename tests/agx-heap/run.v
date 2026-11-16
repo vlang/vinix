@@ -3,7 +3,8 @@ import os
 
 fn run_checks() !int {
  assert os.args.len == 2 || (os.args.len == 4 && os.args[2] == '--allocator-source')
- assert os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--sanitize']
+ assert os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect',
+  '--sanitize', '--sanitize-bounds', '--sanitize-padding', '--sanitize-capacity', '--sanitize-collect']
  assert os.user_os() == 'macos', 'retained host allocation measurement uses Darwin malloc statistics'
  // Default nano-zone statistics showed an additional 512-block step during
  // churn. Use the ordinary allocator for this exact live-byte measurement.
@@ -21,7 +22,7 @@ fn run_checks() !int {
  os.cp(repo + '/kernel/lib/math.v', scratch + '/lib/math.v')!
  mut args := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc',
   '-path', scratch + '|@vlib|@vmodules']
- if os.args[1] == '--sanitize' {
+ if os.args[1].starts_with('--sanitize') {
   args << ['-d', 'agx_heap_sanitized', '-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer',
    '-ldflags', '-fsanitize=address,undefined']
  }
@@ -38,7 +39,8 @@ fn run_checks() !int {
  }
  if target := os.getenv_opt('AGX_HEAP_TEST_BINARY') { os.cp(scratch + '/test', target)! }
  mut test := os.new_process(scratch + '/test')
- if os.args[1] in ['--measure', '--measure-padding', '--measure-capacity'] { test.set_args([os.args[1]]) }
+ if os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect'] { test.set_args([os.args[1]]) }
+ if os.args[1].starts_with('--sanitize-') { test.set_args(['--' + os.args[1].all_after('--sanitize-') + '-suite']) }
  test.run(); test.wait(); return test.code
 }
 

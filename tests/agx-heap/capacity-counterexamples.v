@@ -27,7 +27,7 @@ fn main() {
   os.setenv('AGX_HEAP_TEST_C', dir + '/test.c', true)
   os.setenv('AGX_HEAP_TEST_BINARY', dir + '/test', true)
   mut process := os.new_process(os.abs_path(os.args[1]))
-  process.set_args(['--sanitize', '--allocator-source', dir + '/alloc.v'])
+  process.set_args(['--sanitize-capacity', '--allocator-source', dir + '/alloc.v'])
   process.set_redirect_stdio(); process.run()
   log := process.stdout_slurp() + process.stderr_slurp(); process.wait()
   os.write_file(dir + '/run.log', log)!

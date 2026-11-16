@@ -2,7 +2,7 @@ module alloc
 
 // GPU memory allocators for the Apple AGX driver.
 // HeapAllocator: a simple grow-only virtual address heap with garbage
-// collection of freed allocations at the top.
+// collection of released records and freed address space at the top.
 //
 // Three pre-defined VA regions partition the 39-bit GPU address space:
 //   Private  : 0x4000          .. 0x1_0000_0000  (  ~4 GB, GPU-private)
@@ -52,8 +52,8 @@ pub mut:
 
 // --- Grow-only heap allocator ---
 // Allocations are served from `top`, which only moves upward.
-// `free()` marks an allocation as unused.  `gc()` can reclaim
-// contiguous free allocations at the top of the heap.
+// `release()` marks an allocation as unused. GC destroys every released record
+// and reclaims the address suffix above the highest remaining live allocation.
 
 pub struct HeapAllocator {
 pub mut:
@@ -145,11 +145,9 @@ pub fn (mut h HeapAllocator) release(va u64) {
 	}
 }
 
-// Compact free allocations at the top of the heap.
-// Only contiguous free entries ending at `top` can be reclaimed because
-// the heap is grow-only -- we cannot move live allocations. Free records
-// below a live allocation must remain tracked: once the allocations above
-// them are released, they may become part of the reclaimable top suffix.
+// Collect every released record, including below a live allocation. Metadata
+// is no longer needed once released. VA allocation remains grow-only: gaps
+// become available when all higher reservations have also been released.
 pub fn (mut h HeapAllocator) gc() {
 	h.lock.acquire()
 	defer {
@@ -161,35 +159,25 @@ pub fn (mut h HeapAllocator) gc() {
 
 // Internal GC implementation (caller must hold the lock).
 fn (mut h HeapAllocator) gc_locked() {
-	// Repeatedly trim the topmost allocation if it is free
-	mut progress := true
-	for progress {
-		progress = false
-		if h.allocations.len == 0 {
-			break
-		}
-
-		mut idx := h.allocations.len - 1
-		for idx >= 0 {
-			a := h.allocations[idx]
-			// Check if this allocation sits at the top
-			if a.va + a.size == h.top && !a.in_use {
+	// Descending deletion preserves the unvisited prefix and live VA order.
+	mut idx := h.allocations.len - 1
+	for idx >= 0 {
+		a := h.allocations[idx]
+		if !a.in_use {
+			if a.va + a.size == h.top {
 				// Alignment padding belongs to this reservation too. Restore
 				// its original frontier so GC can reach the preceding record.
 				h.top = if idx == 0 { h.start } else {
 					previous := h.allocations[idx - 1]
 					previous.va + previous.size
 				}
-				h.allocations.delete(idx)
-				// The heap lock excludes every metadata reader. Unlink before
-				// freeing; interior records remain owned until GC reaches them.
-				unsafe { free(a) }
-				progress = true
-				idx--
-				continue
 			}
-			break
+			h.allocations.delete(idx)
+			// The lock excludes every metadata reader. Unlink before freeing;
+			// live records keep their addresses even when this is an interior.
+			unsafe { free(a) }
 		}
+		idx--
 	}
 }
 

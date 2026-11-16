@@ -18,7 +18,7 @@ fn main() {
   ['round-overflow', source.replace('value > ~u64(0) - mask', 'false'),
    'GPU heap allocation must match bounded division model'],
   ['interval-overflow', source.replace('address > end || size > end - address', 'false'),
-   'third == second && heap.allocations.len == 2'],
+   'overflowing GPU heap interval must not allocate'],
   ['post-gc-bounds', source.replace(post_gc, post_gc.replace('h.end', '~u64(0)')),
    'GPU heap allocation must match bounded division model'],
  ]
@@ -30,7 +30,7 @@ fn main() {
   os.setenv('AGX_HEAP_TEST_C', dir + '/test.c', true)
   os.setenv('AGX_HEAP_TEST_BINARY', dir + '/test', true)
   mut process := os.new_process(os.abs_path(os.args[1]))
-  process.set_args(['--sanitize', '--allocator-source', dir + '/alloc.v'])
+  process.set_args(['--sanitize-bounds', '--allocator-source', dir + '/alloc.v'])
   process.set_redirect_stdio(); process.run()
   log := process.stdout_slurp() + process.stderr_slurp(); process.wait()
   os.write_file(dir + '/run.log', log)!

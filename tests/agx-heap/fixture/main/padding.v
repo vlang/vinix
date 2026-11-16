@@ -64,12 +64,22 @@ fn check_heap_padding_matrix() {
        heap.gc()
        mut retained := 3
        for retained > 0 && mask & (1 << (retained - 1)) != 0 { retained-- }
-       assert heap.top == frontiers[retained] && heap.allocations.len == retained,
+       assert heap.top == frontiers[retained],
         'GC restores reservation frontier including alignment padding'
        records_are_live(heap.allocations)
-       for index in 0 .. retained { assert heap.allocations[index].va == addresses[index] }
+       mut live_index := 0
+       for index in 0 .. 3 {
+        if mask & (1 << index) == 0 {
+         assert heap.allocations[live_index] == records[index]
+         assert heap.allocations[live_index].va == addresses[index]
+         live_index++
+        }
+       }
+       assert heap.allocations.len == live_index, 'GC collects every released record including interiors'
        $if agx_heap_sanitized ? {
-        for index in retained .. 3 { assert C.__asan_address_is_poisoned(records[index]) != 0 }
+        for index in 0 .. 3 {
+         assert (C.__asan_address_is_poisoned(records[index]) != 0) == (mask & (1 << index) != 0)
+        }
        }
        for index in order { heap.release(addresses[index]) }
        heap.gc(); heap.gc()
@@ -82,7 +92,7 @@ fn check_heap_padding_matrix() {
   }
  }
  assert cases == 9216
- println('AGX heap padding: 9216 alignment/order/release-mask cases restore saved reservation frontiers and preserve live prefixes')
+ println('AGX heap padding: 9216 alignment/order/release-mask cases collect all released records and restore suffix frontiers')
 }
 
 fn check_heap_padding_allocation_gc() {

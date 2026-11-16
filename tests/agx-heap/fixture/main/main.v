@@ -54,11 +54,20 @@ fn check_delayed_gc() {
   heap.gc()
   mut retained := 3
   for retained > 0 && mask & (1 << (retained - 1)) != 0 { retained-- }
-  assert heap.allocations.len == retained && heap.top == heap.start + u64(retained) * alloc.gpu_page_size
+  mut live_index := 0
+  for index in 0 .. 3 {
+   if mask & (1 << index) == 0 {
+    assert heap.allocations[live_index] == records[index]
+    assert heap.allocations[live_index].va == addresses[index]
+    live_index++
+   }
+  }
+  assert heap.allocations.len == live_index && heap.top == heap.start + u64(retained) * alloc.gpu_page_size
   records_are_live(heap.allocations)
   $if agx_heap_sanitized ? {
-   for index in retained .. 3 {
-    assert C.__asan_address_is_poisoned(records[index]) != 0, 'trimmed heap metadata is freed'
+   for index in 0 .. 3 {
+    assert (C.__asan_address_is_poisoned(records[index]) != 0) == (mask & (1 << index) != 0),
+     'every released record is freed and every live record stays owned'
    }
   }
   for address in addresses { heap.release(address) }
@@ -70,7 +79,7 @@ fn check_delayed_gc() {
    for record in records { assert C.__asan_address_is_poisoned(record) != 0, 'each reclaimed record retires once' }
   }
  }
- println('AGX heap: eight release masks retain live interiors and free only trimmed suffix records; repeated GC is idempotent')
+ println('AGX heap: eight release masks free every released record and preserve live addresses; repeated GC is idempotent')
 }
 
 fn check_allocation_gc() {
@@ -114,14 +123,20 @@ fn main() {
  if os.args.len == 2 && os.args[1] == '--measure' { measure(); return }
  if os.args.len == 2 && os.args[1] == '--measure-padding' { measure_padding(); return }
  if os.args.len == 2 && os.args[1] == '--measure-capacity' { measure_capacity(); return }
+ if os.args.len == 2 && os.args[1] == '--measure-collect' { measure_collect(); return }
  if os.args.len == 2 && os.args[1] == '--padding-probe' { check_heap_padding_probe(); return }
  if os.args.len == 2 && os.args[1] == '--alignment-probe' { check_heap_alignment_probe(); return }
  if os.args.len == 2 && os.args[1] == '--overflow-probe' { check_heap_overflow_probe(); return }
+ if os.args.len == 2 && os.args[1] == '--bounds-suite' { check_heap_bounds(); return }
+ if os.args.len == 2 && os.args[1] == '--padding-suite' { check_heap_padding(); return }
+ if os.args.len == 2 && os.args[1] == '--capacity-suite' { check_capacity_growth(); return }
+ if os.args.len == 2 && os.args[1] == '--collect-suite' { check_collect_pins(); return }
  check_delayed_gc()
  check_allocation_gc()
  check_concurrent_stats()
  check_heap_bounds()
  check_heap_padding()
  check_capacity_growth()
+ check_collect_pins()
  println('AGX heap ownership: PASS')
 }

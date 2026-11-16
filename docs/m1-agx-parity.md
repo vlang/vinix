@@ -6,12 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [GPU heap pointer-buffer reclamation](m1-agx-heap-capacity.md)
-(2026-11-17). Each heap exclusively owns its metadata table, allowing capacity
-growth to free the previous pointer buffer while preserving allocation records.
-Host growth to 8,192 records retains zero discarded buffers or additional bytes.
+Latest offline increment: [GPU heap collection below live allocations](m1-agx-heap-collect.md)
+(2026-11-17). GC destroys all released metadata records while preserving live
+addresses and suffix-frontier behavior. One surviving allocation no longer
+pins released records below it; the host sample reclaims 8,192 records.
 Modern ioctl/Mesa integration and remaining stage backing/event destruction
-are incomplete. The [GPU heap alignment-padding reclamation](m1-agx-heap-padding.md),
+are incomplete. The [GPU heap pointer-buffer reclamation](m1-agx-heap-capacity.md),
+[GPU heap alignment-padding reclamation](m1-agx-heap-padding.md),
 [checked GPU heap allocation bounds](m1-agx-heap-bounds.md),
 [GPU heap metadata reclamation](m1-agx-heap-records.md),
 [completion before deferred cleanup](m1-agx-completion-order.md),

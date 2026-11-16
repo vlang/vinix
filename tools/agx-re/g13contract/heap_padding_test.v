@@ -10,7 +10,7 @@ fn test_heap_gc_restores_reservation_frontier_without_moving_live_prefixes() {
   if _ := check_heap_metadata_local(source.replace(token, '')) { assert false, token }
  }
  for pair in [['idx == 0', 'idx == 1'], ['previous.va + previous.size', 'previous.va'],
-  ['if a.va + a.size == h.top && !a.in_use', 'if a.va + a.size == h.top']] {
+  ['if !a.in_use {', 'if true {']] {
   if _ := check_heap_metadata_local(source.replace(pair[0], pair[1])) { assert false, pair[0] }
  }
 }
