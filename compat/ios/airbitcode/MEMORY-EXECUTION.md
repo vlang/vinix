@@ -145,6 +145,11 @@ Signed/unsigned integer min/max (`llvm.smin`, `llvm.smax`, `llvm.umin`,
 `llvm.umax`) accept matching i1..i64 operands. Both dependencies are validated,
 including their full cached subtree heights, and poison in either operand
 poisons the result even when the other value would win the comparison.
+Integer absolute value (`llvm.abs`) accepts i1..i64 with a defined constant i1
+minimum-poison flag. The signed minimum remains unchanged with a false flag,
+and produces poison with a true flag. Other negative inputs become positive.
+Poison propagation, select/freeze repair, independent root checks and declaration
+immarg validation retain the same rules as zero-count intrinsics.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -235,6 +240,11 @@ independent roots, dynamic flag rejection and malformed call metadata.
 and masked indices, both poisoned operands, computed right-hand poison,
 select/freeze handling and cached depth boundaries through either dependency.
 Validation and both execution APIs preserve every output byte on refusal.
+
+`tests/ios/air-memory-abs-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks both flag
+settings across i1..i64 using a defined false-flag LLVM oracle and separate
+poison checks. It covers signed minima, computed poison, select/freeze, cached
+depth limits, cold blocks, independent roots and malformed call/flag metadata.
 
 ## Prepared memory functions
 

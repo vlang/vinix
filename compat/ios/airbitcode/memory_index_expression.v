@@ -165,19 +165,19 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			// declaration attribute/duplicate checks. Recheck call identity here.
 			b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, op, b.scope)!
 			id := scalar_intrinsic_name(b.ir.functions[op.callee_function].name)!
-			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .smin, .smax, .umin, .umax] { return error('AIR memory index: unsupported intrinsic dependency') }
-			mut zero_poison := u64(0)
-			if scalar_integer_zero_count(id) {
+			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs] { return error('AIR memory index: unsupported intrinsic dependency') }
+			mut poison_flag := u64(0)
+			if scalar_integer_poison_flag(id) {
 				// scalar_intrinsic_call requires an exact defined i1 immediate.
 				flag := b.pools.lookup(b.scope, b.p.operands[op.operands_start + 2].number)!
-				zero_poison = b.pools.scalar_bits(flag.constant_index)!
+				poison_flag = b.pools.scalar_bits(flag.constant_index)!
 			}
 			lhs := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
 			if scalar_integer_extremum(id) {
 				rhs := b.expression(b.p.operands[op.operands_start + 2], producer, depth + 1)!
 				node = MemoryIndexNode{kind: .intrinsic_binary, bits: bits, intrinsic: id, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height }}
 			} else {
-				node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, value: zero_poison, left: lhs, height: 1 + b.nodes[lhs].height}
+				node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, value: poison_flag, left: lhs, height: 1 + b.nodes[lhs].height}
 			}
 		} else if code == 58 {
 			b.p.scalar_unary_profile(op, true, false)!
@@ -253,7 +253,7 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 				value = if poisons[node.left] || poisons[node.right] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_extremum_value(node.intrinsic, node.bits, values[node.left], values[node.right])!} }
 			}
 			.intrinsic {
-				value = if poisons[node.left] { IntegerValue{poison: true} } else if scalar_integer_zero_count(node.intrinsic) { scalar_integer_zero_count_value(node.intrinsic, node.bits, values[node.left], node.value)! } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
+				value = if poisons[node.left] { IntegerValue{poison: true} } else if node.intrinsic == .iabs { scalar_integer_abs_value(node.bits, values[node.left], node.value)! } else if scalar_integer_zero_count(node.intrinsic) { scalar_integer_zero_count_value(node.intrinsic, node.bits, values[node.left], node.value)! } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
 			}
 			.freeze_value {
 				// Match IntegerMachine.read_frozen's stable zero choice.
