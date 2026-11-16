@@ -253,7 +253,7 @@ fn controls(assembler_path string, out string) ! {
  }
  for name in ['argument', 'load', 'phi', 'cold', 'float', 'half', 'scalable', 'wide_integer'] {
   mut output := []u8{len: 16, init: 0xcc}; mut bs := if name in ['argument', 'load'] { [airbitcode.IRMemoryBinding{data: output}, airbitcode.IRMemoryBinding{data: output, writable: true}] } else { [airbitcode.IRMemoryBinding{data: output, writable: true}] }
-  if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + name), mut bs, 20) { panic('unsupported binary: ' + name) }; unchanged(output); checks++; unsafe { output.free(); bs.free() }
+  if name == 'phi' { p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + name), mut bs, 20)!; for i, b in output { assert b == if i == 0 { u8(17) } else { u8(0xcc) } } } else { if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + name), mut bs, 20) { panic('unsupported binary: ' + name) }; unchanged(output) }; checks++; unsafe { output.free(); bs.free() }
  }
  assert names.len == 771 && checks == 3092
  os.write_file(out + '/result.txt', 'AIR-VECTOR-BINARY-CONTROLS: ${checks} values/flags, poison/undef, division/remainder, overshifts, source/result freezing, discards, old snapshots, result-shape mutations and unsupported profiles PASS\n')!

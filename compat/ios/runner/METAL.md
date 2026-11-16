@@ -1,5 +1,27 @@
 # Software Metal backend
 
+Fixed-vector PHIs support 1..16 matching i1..i64/half/float lanes. The
+executed predecessor selects the incoming vector, preserving its raw bits and
+per-lane poison/undef state without reading unselected values. All selected
+vectors are copied into a separate execution-owned snapshot buffer before
+any PHI result is assigned. Each vector PHI owns a stable construction slot,
+so simultaneous swaps and loop iterations cannot alias a changing producer.
+Scalar and void APIs accept loop-carried vectors within the existing dynamic
+step budget. Memory APIs keep their forward-only control-flow restriction;
+typed vector arguments, constants, constructions and vector loads may feed
+forward joins. Integer-only execution still excludes floating lanes, and
+vector PHI dependencies remain excluded from precomputed address graphs.
+Each PHI costs one execution step, N*(incoming-count+1) validation lane-work
+units and one of the shared 4,096 vector slots. Snapshot capacity is bounded
+by the number of vector PHIs and is allocated once per call, reused on block
+visits and freed on every exit. Existing declaration cache identities stay
+unchanged. Fast-math PHIs, scalable/wider vectors, vector returns and general
+aggregates remain excluded. This support supersedes PHI exclusions in the
+operation-specific sections below; other profile restrictions still apply.
+`tests/ios/air-vector-phi.v` checks native LLVM branch values and simultaneous
+loop rotations; `air-vector-phi-controls.v` checks void/loaded/argument flow,
+metadata guards, address exclusions and exact work/storage boundaries.
+
 Build the iOS runner with `-d ios_metal_software` to enable a CPU backend for
 shared buffers, shared 2D textures, buffer blits and bounded scalar/vector compute.
 `MTLCreateSystemDefaultDevice` then returns

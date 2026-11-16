@@ -1,5 +1,27 @@
 # Bounded memory execution
 
+Fixed-vector PHIs support 1..16 matching i1..i64/half/float lanes. The
+executed predecessor selects the incoming vector, preserving its raw bits and
+per-lane poison/undef state without reading unselected values. All selected
+vectors are copied into a separate execution-owned snapshot buffer before
+any PHI result is assigned. Each vector PHI owns a stable construction slot,
+so simultaneous swaps and loop iterations cannot alias a changing producer.
+Scalar and void APIs accept loop-carried vectors within the existing dynamic
+step budget. Memory APIs keep their forward-only control-flow restriction;
+typed vector arguments, constants, constructions and vector loads may feed
+forward joins. Integer-only execution still excludes floating lanes, and
+vector PHI dependencies remain excluded from precomputed address graphs.
+Each PHI costs one execution step, N*(incoming-count+1) validation lane-work
+units and one of the shared 4,096 vector slots. Snapshot capacity is bounded
+by the number of vector PHIs and is allocated once per call, reused on block
+visits and freed on every exit. Existing declaration cache identities stay
+unchanged. Fast-math PHIs, scalable/wider vectors, vector returns and general
+aggregates remain excluded. This support supersedes PHI exclusions in the
+operation-specific sections below; other profile restrictions still apply.
+`tests/ios/air-vector-phi.v` checks native LLVM branch values and simultaneous
+loop rotations; `air-vector-phi-controls.v` checks void/loaded/argument flow,
+metadata guards, address exclusions and exact work/storage boundaries.
+
 `run_memory_function` executes a defined ordinary void function with buffer and
 typed value arguments, forward control flow, scalar/vector loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, bounded constant and
@@ -10,7 +32,7 @@ Scalar `extractelement` may also read supported fixed constant/constructed/loade
 vectors. Fixed 1..16-lane vector memory accesses accept byte-aligned integer
 widths i8/i16/i24/i32/i40/i48/i56/i64 and half/float. Lanes occupy consecutive
 little-endian bytes and preserve raw floating bits. Non-byte-aligned lanes,
-scalable vectors, vector returns and vector PHIs remain unsupported.
+scalable vectors and vector returns remain unsupported.
 This memory profile supersedes the loaded-vector exclusions in the individual
 vector-operation sections below; scalar/void API exclusions still apply.
 
@@ -728,7 +750,7 @@ Incoming arguments, earlier GEPs and earlier invariant pointer PHIs may use
 different SSA names. All incoming pointers must be supported and equivalent,
 including on inactive paths; different arguments reject even if their buffers
 alias. These PHIs resolve during preflight and never enter scalar value slots.
-They still cost one executed step and may mix with scalar/pair PHIs in any
+They still cost one executed step and may mix with scalar/pair/vector PHIs in any
 order. General aggregate PHIs, backward edges and loops reject.
 
 Integer `switch` accepts i1..i64 conditions and zero through 64 distinct

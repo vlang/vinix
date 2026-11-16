@@ -5039,6 +5039,54 @@ define void @image_modern_number_reduction(<3 x i32> %gid, <3 x i32> %grid, ptr 
  ret void }
 
 ')
+	names << 'image_vector_phi'
+	source.write_string('define void @image_vector_phi(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
+ %x = extractelement <3 x i32> %gid, i32 0
+ %y = extractelement <3 x i32> %gid, i32 1
+ %w = extractelement <3 x i32> %grid, i32 0
+ %h = extractelement <3 x i32> %grid, i32 1
+ %fx = uitofp i32 %x to float
+ %fy = uitofp i32 %y to float
+ %odd = and i32 %x, 1
+ %condition = icmp ne i32 %odd, 0
+ br i1 %condition, label %left, label %right
+ left:
+ %left0 = insertelement <3 x float> zeroinitializer, float %fx, i32 0
+ %left1 = insertelement <3 x float> %left0, float %fy, i32 1
+ %left2 = insertelement <3 x float> %left1, float 3.0, i32 2
+ br label %join
+ right:
+ %right0 = insertelement <3 x float> zeroinitializer, float %fy, i32 0
+ %right1 = insertelement <3 x float> %right0, float %fx, i32 1
+ %right2 = insertelement <3 x float> %right1, float 7.0, i32 2
+ br label %join
+ join:
+ %tag = phi i32 [5, %left], [11, %right]
+ %v = phi <3 x float> [%left2, %left], [%right2, %right]
+ %sum = call float @llvm.vector.reduce.fadd.v3f32(float 0.0, <3 x float> %v)
+ %value = fptoui float %sum to i32
+ %offset = xor i32 %value, %tag
+ %coordinate = or i32 %x, 0
+ %row = shl i32 %y, 6
+ %index = add i32 %row, %coordinate
+ %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
+ %red = mul i32 %x, 3
+ %mixed = xor i32 %red, %offset
+ %r = and i32 %mixed, 255
+ %gg = mul i32 %y, 5
+ %g0 = and i32 %gg, 255
+ %g = shl i32 %g0, 8
+ %wh = add i32 %w, %h
+ %bb = mul i32 %wh, 7
+ %b0 = and i32 %bb, 255
+ %b = shl i32 %b0, 16
+ %rg = or i32 %r, %g
+ %rgb = or i32 %rg, %b
+ %rgba = or i32 %rgb, 4278190080
+ store i32 %rgba, ptr addrspace(1) %p, align 4
+ ret void }
+
+')
 	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
 	for i, name in names {
 		n := i * 20
@@ -5052,7 +5100,7 @@ define void @image_modern_number_reduction(<3 x i32> %gid, <3 x i32> %grid, ptr 
 			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
 		} else {
 			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
-			if i == 2 || name in ['image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction'] {
+			if i == 2 || name in ['image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction', 'image_vector_phi'] {
 				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
 			} else if i < 3 + bad.len * 3 {
 				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
@@ -5086,7 +5134,7 @@ define void @image_modern_number_reduction(<3 x i32> %gid, <3 x i32> %grid, ptr 
 		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
 		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
 		queue := sm_send(device, c'newCommandQueue')
-		for name in names[3..names.len - 17] {
+		for name in names[3..names.len - 18] {
 			mut error_slot := u64(0)
 			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
 			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
@@ -5138,7 +5186,7 @@ define void @image_modern_number_reduction(<3 x i32> %gid, <3 x i32> %grid, ptr 
 			objc_release(pipeline)
 		}
 		objc_release(output)
-		for image_name in [names[2], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
+		for image_name in [names[2], names[names.len - 18], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
 		pipeline := sm_test_compute_pipeline(device, library, image_name, unsafe { nil }); sm_grid_check(pipeline != 0, 'image pipeline')
 		for shape in [SoftwareMetalSize{7, 5, 1}, SoftwareMetalSize{17, 3, 1}, SoftwareMetalSize{32, 8, 1}, SoftwareMetalSize{64, 64, 1}] {
 			length := 512 + shape.height * 256; buffer := sm_test_buffer(device, length, 0); bp := sm_send(buffer, c'contents')
@@ -5197,7 +5245,7 @@ define void @image_modern_number_reduction(<3 x i32> %gid, <3 x i32> %grid, ptr 
 					match x % 16 { 0 { signed = 0; unsigned = 0 } 1 { signed = 127; unsigned = 255 } 2 { signed = -128; unsigned = 0 } else {} }
 					cast_bits = u8(signed) ^ u8(unsigned)
 				}
-				color := [if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				color := [if image_name == 'image_vector_phi' { u8(x * 3) ^ u8(x + y + if x % 2 != 0 { 3 } else { 7 }) ^ u8(if x % 2 != 0 { 5 } else { 11 }) } else if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
 				for lane in 0 .. 4 {
 					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
 					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]

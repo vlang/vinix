@@ -15,6 +15,7 @@ struct IntegerProfile {
 	return_bits u32
 	max_phis int
 	vector_results int
+	vector_phis int
 }
 fn (p IRTypedProgram) integer_bits(index int) !u32 {
 	if index < 0 || index >= p.types.len { return error('AIR integer: type index') }
@@ -120,6 +121,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 	mut intrinsic_work := 0
 	mut vector_work := 0
 	mut vector_results := 0
+	mut vector_phis := 0
 	for block_index in s.blocks_start .. s.blocks_start + s.blocks_count {
 		block := bodies.blocks[block_index]
 		if block.scope != scope || block.first < s.instructions_start || block.count < 1 || block.first > s.instructions_start + s.instructions_count || block.count > s.instructions_start + s.instructions_count - block.first { return error('AIR integer: block range') }
@@ -181,7 +183,10 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 					_, source_bits, _ := p.scalar_vector_type(p.operands[op.operands_start].type_index, binary32, 16)!
 					if source_bits != destination_bits { return error('AIR vector: little-endian bitcast required') }
 				}
-				if code == 34 {
+				if code == 16 {
+					vector_work += p.vector_phi_profile(stream, pools, bodies, scope, op, binary32, max_integer_execution_steps - vector_work)!
+					vector_phis++
+				} else if code == 34 {
 					work, key, attributes, second_immarg := p.vector_float_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 					if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector intrinsic: duplicate reserved declaration') }
 					if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, second_immarg)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
@@ -230,7 +235,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 		}
 		if phis > max_phis { max_phis = phis }
 	}
-	return IntegerProfile{scope, return_bits, max_phis, vector_results}
+	return IntegerProfile{scope, return_bits, max_phis, vector_results, vector_phis}
 }
 struct IntegerMachine {
 	p IRTypedProgram
@@ -344,12 +349,14 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 	if arguments.len != signature.refs_count - 1 || pools.scopes[profile.scope].arguments_count != arguments.len { return error('AIR integer: argument count') }
 	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: profile.scope, arguments: arguments, limit: step_limit, binary32: binary32, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}, vectors: []ScalarVectorValue{len: profile.vector_results}}
 	mut pending := []IntegerValue{len: profile.max_phis}
-	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free() } }
+	mut snapshots := []ScalarVectorValue{len: profile.vector_phis}
+	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free(); snapshots.free() } }
 	m.seed_vector_slots(stream)!
 	mut block_index := s.blocks_start; mut previous := -1
 	for {
 		block := bodies.blocks[block_index]
 		mut phis := 0
+		mut vector_phis := 0
 		for index in block.first .. block.first + block.count {
 			op := p.instructions[index]
 			if stream.records[bodies.instructions[index].record].code != 16 { break }
@@ -357,10 +364,11 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 			mut incoming := -1
 			for i in 0 .. op.targets_count { if p.targets[op.targets_start + i] == previous { incoming = op.operands_start + i; break } }
 			if incoming < 0 { return error('AIR integer: PHI lacks executed predecessor') }
-			pending[phis] = m.read_flow(incoming)!; phis++
+			pending[phis] = m.read_phi(stream, incoming, mut snapshots, vector_phis)!
+			if pending[phis].vector { vector_phis++ }; phis++
 		}
 		// All incoming PHIs read the previous iteration before any is assigned.
-		for i in 0 .. phis { m.put(bodies.instructions[block.first + i], pending[i]) }
+		for i in 0 .. phis { m.put_phi(bodies.instructions[block.first + i], pending[i], snapshots)! }
 		mut next := -1
 		for index in block.first + phis .. block.first + block.count {
 			m.step()!

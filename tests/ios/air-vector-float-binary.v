@@ -225,7 +225,7 @@ fn focused_controls(assembler_path string, out string) ! {
     'load' { '%v = load volatile <2 x ${t}>, ptr %src, align 1\n %n = fadd <2 x ${t}> %v, zeroinitializer' }
     else { 'br label %body\n body: %v = phi <2 x ${t}> [zeroinitializer, %entry]\n %n = fadd <2 x ${t}> %v, zeroinitializer' }
    }
-   s.write_string('define void @${name}(${signature}) { entry: store i8 17, ptr %out\n ${body}\n ret void }\n'); cases << FloatControl{name: name, guard: true}
+   s.write_string('define void @${name}(${signature}) { entry: store i8 17, ptr %out\n ${body}\n ret void }\n'); cases << FloatControl{name: name, guard: guard != 'phi', discard: guard == 'phi'}
   }
   width := bits(element)
   s.write_string('define i32 @float_loop_${element}(i32 %limit) { entry: br label %body\n body: %i = phi i32 [0, %entry], [%next, %body]\n %sum = phi i32 [0, %entry], [%added, %body]\n %small = trunc i32 %i to i16\n %x = bitcast i${width} ${if width == 16 { '%small' } else { '%i' }} to ${t}\n %a = insertelement <2 x ${t}> poison, ${t} %x, i32 0\n %n = fadd <2 x ${t}> %a, zeroinitializer\n %d = fsub <2 x ${t}> %n, zeroinitializer\n %f = freeze <2 x ${t}> %d\n %v = extractelement <2 x ${t}> %f, i32 0\n %raw = bitcast ${t} %v to i${width}\n %extended = zext i${width} %raw to i64\n %word = trunc i64 %extended to i32\n %added = add i32 %sum, %word\n %next = add i32 %i, 1\n %c = icmp ult i32 %next, %limit\n br i1 %c, label %body, label %done\n done: ret i32 %added }\n')

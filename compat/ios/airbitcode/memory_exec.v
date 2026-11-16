@@ -28,6 +28,7 @@ pub struct IRMemoryProfile {
 	max_phis int
 	move_bytes int // Largest admitted move/copy; one scratch allocation per run.
 	vector_results int
+	vector_phis int
 	value_arguments bool
 	indexed bool
 	index_nodes []MemoryIndexNode
@@ -196,6 +197,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	mut intrinsic_work := 0
 	mut vector_work := 0
 	mut vector_results := 0
+	mut vector_phis := 0
 	mut memory_declarations := [66]int{}
 	mut call_alignments := [16]MemoryCallAlignmentCache{}
 	mut memory_steps := 0
@@ -232,7 +234,10 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if !inst.has_result || inst.next_value < s.base_id || inst.next_value - s.base_id >= u32(s.results_count) { return error('AIR vector: extract result slot') }
 			if code != 6 {
 				if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
-				if code == 34 {
+				if code == 16 {
+					vector_work += p.vector_phi_profile(stream, pools, bodies, scope, op, true, max_integer_execution_steps - vector_work)!
+					vector_phis++
+				} else if code == 34 {
 					work, key, attributes, second_immarg := p.vector_float_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, true, max_integer_execution_steps - vector_work)!
 					if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector intrinsic: duplicate reserved declaration') }
 					if vector_intrinsic_declarations[key] == 0 { intrinsic_work += scalar_intrinsic_attributes_profile(stream, attributes, max_integer_execution_steps - intrinsic_work, second_immarg)!; vector_intrinsic_declarations[key] = op.callee_function + 1 }
@@ -462,7 +467,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		} else if p.operands[op.operands_start + 1].type_index != op.source_type { return error('AIR memory execution: store type') }
 	}
 	keep = true
-	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, vector_results: vector_results, value_arguments: value_arguments, indexed: indexed, index_nodes: expressions.nodes, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
+	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, vector_results: vector_results, vector_phis: vector_phis, value_arguments: value_arguments, indexed: indexed, index_nodes: expressions.nodes, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
 }
 pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
@@ -487,23 +492,27 @@ fn (p IRTypedProgram) execute_memory_function(ir IRModule, stream Stream, pools 
 	}
 	mut m := IntegerMachine{p: p, pools: pools, bodies: bodies, scope: scope, binary32: true, limit: step_limit, bound_arguments: bound_arguments, values: []IntegerValue{len: s.results_count}, known: []bool{len: s.results_count}, vectors: []ScalarVectorValue{len: profile.vector_results}}
 	mut pending := []IntegerValue{len: profile.max_phis}
+	mut snapshots := []ScalarVectorValue{len: profile.vector_phis}
 	mut move_buffer := []u8{len: profile.move_bytes}
-	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free(); move_buffer.free(); bound_arguments.free() } }
+	defer { unsafe { m.values.free(); m.known.free(); m.vectors.free(); pending.free(); snapshots.free(); move_buffer.free(); bound_arguments.free() } }
 	m.seed_vector_slots(stream)!
 	mut block_index := s.blocks_start; mut previous := -1
 	for {
-		block := bodies.blocks[block_index]; mut phis := 0
+		block := bodies.blocks[block_index]; mut phis := 0; mut vector_phis := 0
 		for index in block.first .. block.first + block.count {
 			op := p.instructions[index]
 			if stream.records[bodies.instructions[index].record].code != 16 { break }
 			m.step()!; mut incoming := -1
 			for i in 0 .. op.targets_count { if p.targets[op.targets_start + i] == previous { incoming = op.operands_start + i; break } }
 			if incoming < 0 { return error('AIR memory execution: PHI lacks executed predecessor') }
-			if p.types[op.result_type].kind != .pointer_t { pending[phis] = m.read_flow(incoming)! }
+			if p.types[op.result_type].kind != .pointer_t {
+				pending[phis] = m.read_phi(stream, incoming, mut snapshots, vector_phis)!
+				if pending[phis].vector { vector_phis++ }
+			}
 			phis++
 		}
 		for i in 0 .. phis {
-			if p.types[p.instructions[block.first + i].result_type].kind != .pointer_t { m.put(bodies.instructions[block.first + i], pending[i]) }
+			if p.types[p.instructions[block.first + i].result_type].kind != .pointer_t { m.put_phi(bodies.instructions[block.first + i], pending[i], snapshots)! }
 		}
 		mut next := -1
 		for index in block.first + phis .. block.first + block.count {

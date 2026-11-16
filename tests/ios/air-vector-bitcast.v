@@ -213,7 +213,7 @@ fn controls(assembler_path string, out string) ! {
    }; p.types[ref] = original; break
   }
  }
- for guard in guards { mut output := []u8{len: 24, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bs << airbitcode.IRMemoryBinding{data: output, writable: true} }; if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100) { panic('unsupported bitcast profile: ' + guard) }; unchanged(output); checks++; unsafe { output.free(); bs.free() } }
+ for guard in guards { mut output := []u8{len: 24, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bs << airbitcode.IRMemoryBinding{data: output, writable: true} }; if guard == 'phi' { p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100)!; for i, b in output { assert b == if i == 0 { u8(17) } else { u8(0xcc) } } } else { if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100) { panic('unsupported bitcast profile: ' + guard) }; unchanged(output) }; checks++; unsafe { output.free(); bs.free() } }
  assert checks == 121
  os.write_file(out + '/result.txt', 'AIR-VECTOR-BITCAST-CONTROLS: ${checks} source/result freezes, discards, old snapshots, round trips, fneg/comparison/select composition, poison isolation, loop slot reuse and unsupported profiles PASS\n')!
 }

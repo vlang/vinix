@@ -187,7 +187,7 @@ fn run_batch(assembler_path string, out string, element int) !Counts {
   for i, b in output { assert b == if i == 3 { u8(17) } else if !bad && !mode.starts_with('discard_') && i >= 11 && i < 11 + (bits(element) + 7) / 8 { u8(word >> u32((i - 11) * 8)) } else { u8(0xcc) } }; controls++; unsafe { output.free(); bs.free() }
  }
  for count in [u64(1), 2, 3, 16, 257]! { mut expected_sum := u64(0); for i in u64(0) .. count { expected_sum += if i & 1 != 0 { i } else { u64(7) } }; run := p.run_integer_function(ir, stream, pools, bodies, fi(ir, 'loop'), [count], int(13 * count + 2))!; assert !run.poison && run.value == expected_sum && run.steps == int(13 * count + 2); controls++ }
- for guard in guards { mut output := []u8{len: 16, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bs << airbitcode.IRMemoryBinding{data: output, writable: true} }; if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100) { panic('unsupported profile: ' + guard) }; unchanged(output); controls++; unsafe { output.free(); bs.free() } }
+ for guard in guards { mut output := []u8{len: 16, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bs << airbitcode.IRMemoryBinding{data: output, writable: true} }; if guard == 'phi' { p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100)!; for i, b in output { assert b == if i == 0 { u8(17) } else { u8(0xcc) } } } else { if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100) { panic('unsupported profile: ' + guard) }; unchanged(output) }; controls++; unsafe { output.free(); bs.free() } }
  assert cases.len == 150 && defined + choices + poison + undef == 2300 && scalar == 4600 && metadata == 5400 && budgets == 300 && controls == 28
  return Counts{cases.len, defined, choices, poison, undef, scalar, metadata, controls, budgets}
 }
@@ -261,7 +261,7 @@ fn lane_controls(assembler_path string, out string) ! {
  } }
  for name in ['argument', 'load', 'phi', 'cold'] {
   mut output := []u8{len: 16, init: 0xcc}; mut bs := if name in ['argument', 'load'] { [airbitcode.IRMemoryBinding{data: output}, airbitcode.IRMemoryBinding{data: output, writable: true}] } else { [airbitcode.IRMemoryBinding{data: output, writable: true}] }
-  if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + name), mut bs, 20) { panic('unsupported condition source') }; unchanged(output); checks++; unsafe { output.free(); bs.free() }
+  if name == 'phi' { p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + name), mut bs, 20)!; for i, b in output { assert b == if i == 0 { u8(17) } else { u8(0xcc) } } } else { if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + name), mut bs, 20) { panic('unsupported condition source') }; unchanged(output) }; checks++; unsafe { output.free(); bs.free() }
  }
  assert checks == 389
  os.write_file(out + '/result.txt', 'AIR-VECTOR-LANE-SELECT-CONTROLS: ${checks} mixed-lane poison/undef/freeze/discard, full-buffer failure ordering, condition source/type mutations and unsupported condition profiles PASS\n')!

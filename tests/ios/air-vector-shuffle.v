@@ -175,7 +175,7 @@ fn run_batch(assembler_path string, out string, element int) !Counts {
  for count in [u64(1), 2, 3, 16, 257]! { run := p.run_integer_function(ir, stream, pools, bodies, fi(ir, 'loop'), [count], int(10 * count + 2))!; assert !run.poison && run.value == count * (count - 1) / 2 && run.steps == int(10 * count + 2); controls++ }
  for guard in guards {
   mut output := []u8{len: 16, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bs << airbitcode.IRMemoryBinding{data: output, writable: true} }
-  if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100) { panic('unsupported profile: ' + guard) }; unchanged(output); controls++; unsafe { output.free(); bs.free() }
+  if guard == 'phi' { p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100)!; for i, b in output { assert b == if i == 0 { u8(17) } else { u8(0xcc) } } } else { if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_' + guard), mut bs, 100) { panic('unsupported profile: ' + guard) }; unchanged(output) }; controls++; unsafe { output.free(); bs.free() }
  }
  assert cases.len == 576 && defined + poison + undef == 5184 && scalar == 10368 && metadata == 11520 && budgets == 1152 && controls == 26
  return Counts{cases.len, defined, poison, undef, scalar, metadata, controls, budgets}

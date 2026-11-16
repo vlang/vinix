@@ -217,7 +217,7 @@ fn focused_controls(assembler_path string, out string) ! {
   }
   for guard in guards {
    mut output := []u8{len: 24, init: 0xcc}; mut bindings := [airbitcode.IRMemoryBinding{data: output, writable: true}]; if guard in ['argument', 'load'] { bindings << airbitcode.IRMemoryBinding{data: output, writable: true} }
-   if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_${guard}_${element}'), mut bindings, 100) { panic('unsupported fneg profile: ' + guard) }; unchanged(output); controls++; unsafe { output.free(); bindings.free() }
+   if guard == 'phi' { p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_${guard}_${element}'), mut bindings, 100)!; for i, b in output { assert b == if i == 0 { u8(17) } else { u8(0xcc) } } } else { if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'guard_${guard}_${element}'), mut bindings, 100) { panic('unsupported fneg profile: ' + guard) }; unchanged(output) }; controls++; unsafe { output.free(); bindings.free() }
   }
   for count in [u64(1), 2, 3, 16, 257]! {
    run := p.run_scalar_function(ir, stream, pools, bodies, fi(ir, 'loop_${element}'), [count], int(count * 16 + 2))!; assert !run.poison && run.value == count * (count - 1) / 2 && run.steps == int(count * 16 + 2); controls++
