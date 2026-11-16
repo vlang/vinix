@@ -44,6 +44,8 @@ pub mut:
 }
 
 __global test_gpu_manager GpuManager
+__global manager_available = true
+__global manager_lookups = 0
 __global timestamp_unmaps = 0
 __global stop_callback fn () = unsafe { nil }
 __global failed_mapping_flushes = 0
@@ -137,6 +139,8 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 }
 
 pub fn get_global_manager() ?&GpuManager {
+	manager_lookups++
+	if !manager_available { return none }
 	if stop_callback != unsafe { nil } {
 		callback := stop_callback
 		stop_callback = unsafe { nil }
@@ -145,6 +149,9 @@ pub fn get_global_manager() ?&GpuManager {
 	}
 	return unsafe { &test_gpu_manager }
 }
+
+pub fn available(value bool) { manager_available = value }
+pub fn lookups() int { return manager_lookups }
 
 pub fn stop_on_next_lookup(callback fn ()) { stop_callback = callback }
 

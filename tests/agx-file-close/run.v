@@ -17,12 +17,12 @@ fn main() {
 	for name in ['katomic'] {
 		os.cp_all('${repo}/tests/agx-g13-failure/fixture/${name}', '${scratch}/${name}', false)!
 	}
-	for path in ['drm/ioctl', 'gpu/agx/bo', 'gpu/agx/vm'] {
+	for path in ['drm/ioctl', 'gpu/agx/bo', 'gpu/agx/vm', 'gpu/agx/params'] {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!
 	}
 	source := os.read_file('${repo}/kernel/gpu/agx/file/file.v')!
-	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport gpu.agx.bo as agxbo\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
+	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
 		section(source, 'pub fn release_handle(', 'pub fn new_gpu_file(')! +
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
@@ -31,6 +31,7 @@ fn main() {
 		section(source, 'fn (mut f GpuFile) allocate_timestamp_id_locked(', 'fn (f &GpuFile) find_vm(')! +
 		section(source, 'fn (mut f GpuFile) allocate_queue_id_locked(', 'fn (mut f GpuFile) allocate_timestamp_id_locked(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(')! +
+		section(source, 'pub fn (f &GpuFile) ioctl_get_params(', 'pub fn (mut f GpuFile) ioctl_vm_create(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'pub fn (f &GpuFile) ioctl_get_time(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'fn discard_g13_completion(')!
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!

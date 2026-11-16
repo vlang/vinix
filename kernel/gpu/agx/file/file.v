@@ -10,6 +10,7 @@ import drm.gem
 import drm.ioctl
 import drm.syncobj
 import gpu.agx.bo as agxbo
+import gpu.agx.params as agxparams
 import gpu.agx.mmu
 import gpu.agx.pgtable
 import gpu.agx.submission as agxsubmission
@@ -592,24 +593,13 @@ fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 }
 
 pub fn (f &GpuFile) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
-	mut request := unsafe { data }
+	request := unsafe { data }
 	if request.extensions != 0 || request.param_group != 0 || request.pad != 0 {
 		return -22 // EINVAL
 	}
 	manager := gpu.get_global_manager() or { return -19 }
 	params := make_global_params(manager)
-	supported_size := u64(sizeof(ioctl.DrmAsahiParamsGlobal))
-	copy_size := if request.size < supported_size { request.size } else { supported_size }
-	if request.pointer == 0 || copy_size == 0 {
-		request.size = supported_size
-		return -14 // EFAULT
-	}
-	if !usercopy.copy_to_user(request.pointer, voidptr(&params), copy_size) {
-		request.size = supported_size
-		return -14
-	}
-	request.size = supported_size
-	return 0
+	return agxparams.copy_global(request, unsafe { &params })
 }
 
 pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {

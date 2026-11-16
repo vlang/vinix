@@ -441,6 +441,9 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_params_copy_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/fake/driver.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/params/params.v'))!)!
+	check_params_copy_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(asahi_linux, 'include/uapi/drm/asahi_drm.h'))!)!
 	check_bind_replace_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!)!
 	check_bind_replace_reference(read(os.join_path(base, 'mmu.rs'))!)!
 	check_unbind_range_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!)!
@@ -709,6 +712,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
+		'Global GET_PARAMS treats size as an input bound, shares one bounded prefix copy, permits zero-byte queries and preserves fault output/header semantics',
 		'BIND preallocates fallible mapping/table storage before replacing idle overlaps, preserves survivors and aborts new installation after failed old invalidation',
 		'UNBIND removes intersections across holes/multiple BOs, preallocates surviving fragments, preserves backing through failed invalidation and retries complete tombstones',
 		'GEM-create size validation returns EINVAL for zero and EOVERFLOW for 16 KiB rounding overflow after private VM lookup and before allocation',

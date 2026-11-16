@@ -110,3 +110,14 @@ failed old invalidation prevents installation, and failed new invalidation
 retains the new owner through retry/close. Fresh BIND also uses fallible array
 reservation, with checked geometric growth and ASan-verified release. Busy VMs
 refuse overlapping replacement while fresh mappings remain admissible.
+
+GET_PARAMS runs 33,600 ioctl checks with the production handler and shared
+checked-copy helper. Zero-length queries accept null or invalid pointers;
+aligned and unaligned copies stop at the smaller of the input size and
+supported response size. Partial faults preserve their written prefix, while
+request fields and bytes outside that prefix stay unchanged. Invalid headers
+precede manager lookup; a missing manager precedes formatting or copying.
+The response formatter and user-copy service are injected, so these cases
+qualify copy bounds/error behavior, not response contents, the modern ABI or
+native page-fault handling. The fake backend shares the helper and is checked
+by source gates/builds; this fixture does not execute a fake GPU guest.

@@ -13,6 +13,7 @@ import drm.gem
 import drm.ioctl
 import drm.syncobj
 import gpu.agx.bo as agxbo
+import gpu.agx.params as agxparams
 import gpu.agx.command as agxcommand
 import gpu.agx.compute as agxcompute
 import gpu.agx.render as agxrender
@@ -333,23 +334,12 @@ fn fake_global_params() ioctl.DrmAsahiParamsGlobal {
 
 fn (file &FakeG17File) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
 	_ = file
-	mut request := unsafe { data }
+	request := unsafe { data }
 	if request.extensions != 0 || request.param_group != 0 || request.pad != 0 {
 		return -22
 	}
 	params := fake_global_params()
-	supported_size := u64(sizeof(ioctl.DrmAsahiParamsGlobal))
-	copy_size := if request.size < supported_size { request.size } else { supported_size }
-	if request.pointer == 0 || copy_size == 0 {
-		request.size = supported_size
-		return -14
-	}
-	if !usercopy.copy_to_user(request.pointer, voidptr(&params), copy_size) {
-		request.size = supported_size
-		return -14
-	}
-	request.size = supported_size
-	return 0
+	return agxparams.copy_global(request, unsafe { &params })
 }
 
 fn (mut file FakeG17File) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {

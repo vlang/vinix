@@ -2,6 +2,7 @@
 import os
 
 const helpers = [
+	'params__copy_global',
 	'pgtable__alloc_table_page',
 	'gpu__agx__file__GpuFile__mapping_survivor_count_locked',
 	'pgtable__UatPgtable__prepare_map_range',
@@ -110,6 +111,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'params__copy_global' { return 'i64' }
 	if name == 'pgtable__alloc_table_page' { return '__v_option_u64ptr' }
 	if name.ends_with('GpuFile__unbind_range_locked') { return 'i64' }
 	if name.ends_with('GpuFile__mapping_survivor_count_locked') { return 'i64' }
