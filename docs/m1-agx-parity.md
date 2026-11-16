@@ -6,10 +6,11 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [per-command timestamp retirement](m1-agx-command-timestamps.md)
-(2026-11-16). Completed commands release their timestamp captures while neighboring
-commands retain the aggregate submission. Render vertex/fragment ownership still
-shares a completion point; modern ioctl/Mesa integration remains incomplete. The
+Latest offline increment: [native AGX error publication](m1-agx-native-errors.md)
+(2026-11-16). Explicit 64-bit error slots preserve negative errno values through
+ARM atomics, callbacks and cancellation. Modern ioctl/Mesa integration and
+separate render-stage ownership remain incomplete. The
+[per-command timestamp retirement](m1-agx-command-timestamps.md),
 [pending submission timestamp ownership](m1-agx-pending-timestamps.md),
 [resolved timestamp preparation inputs](m1-agx-timestamp-inputs.md),
 [timestamp capture ownership](m1-agx-timestamp-capture.md),

@@ -1205,8 +1205,8 @@ fn finish_g13_submit(mut state G13SubmitCompletion, successful bool, failure int
 	mut result := if successful { 0 } else { failure }
 	if state.submission != unsafe { nil } {
 		override_error := katomic.load(&state.submission.failure)
-		if override_error != 0 { result = override_error }
-		katomic.store(mut &state.submission.commands[state.command_index].error, result)
+		if override_error != 0 { result = int(override_error) }
+		katomic.store(mut &state.submission.commands[state.command_index].error, i64(result))
 		katomic.store(mut &state.submission.commands[state.command_index].done, true)
 	}
 	discard_g13_completion(mut state)
@@ -1435,7 +1435,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 			owner.release_g13_initial_events(mut pending.initial_events)
 			assert katomic.load(&pending.callbacks_remaining) == 0
 			unqueued_fence = pending.final_fence
-			unqueued_failure = katomic.load(&pending.failure)
+			unqueued_failure = int(katomic.load(&pending.failure))
 			memory.free(storage)
 		}
 	}

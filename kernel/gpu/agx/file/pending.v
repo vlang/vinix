@@ -24,7 +24,7 @@ mut:
 	done        bool
 	callback_finished bool // published after the callback releases its backing
 	timestamps_released bool // worker-owned; independent of user fences
-	error       int
+	error       i64 // explicit width selects the full native ARM atomic routine
 }
 
 struct G13PendingSubmission {
@@ -44,7 +44,7 @@ mut:
 	commands            [64]G13PendingCommand
 	command_count       u32
 	callbacks_remaining u32
-	failure             int
+	failure             i64
 }
 
 __global pending_lock klock.Lock
@@ -94,7 +94,7 @@ fn g13_pending_error(item &G13PendingSubmission) int {
 		command := &item.commands[index]
 		if katomic.load(&command.done) {
 			failure := katomic.load(&command.error)
-			if failure != 0 { return failure }
+			if failure != 0 { return int(failure) }
 		}
 	}
 	return 0
@@ -189,7 +189,7 @@ fn g13_dependencies_ready(dependencies &submission.SyncArray, queue_context u64)
 }
 
 fn cancel_g13_pending(mut item G13PendingSubmission, failure int) {
-	if katomic.load(&item.failure) == 0 { katomic.store(mut &item.failure, failure) }
+	if katomic.load(&item.failure) == 0 { katomic.store(mut &item.failure, i64(failure)) }
 	mut manager := unsafe { item.manager }
 	// Reverse order refunds the newest unpublished event reservations first.
 	for index := int(item.command_count) - 1; index >= 0; index-- {
@@ -226,7 +226,7 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 		cancel_g13_pending(mut item, if failure != 0 {
 			failure
 		} else {
-			katomic.load(&item.failure)
+			int(katomic.load(&item.failure))
 		})
 		return katomic.load(&item.callbacks_remaining) != 0
 	}
@@ -256,7 +256,7 @@ fn poll_g13_pending(mut item G13PendingSubmission) bool {
 	// The last callback can run during publication. Read its error only after
 	// acquiring the zero callback count, before allowing aggregate notification.
 	final_error := g13_pending_error(item)
-	if final_error != 0 { katomic.store(mut &item.failure, final_error) }
+	if final_error != 0 { katomic.store(mut &item.failure, i64(final_error)) }
 	return false
 }
 
@@ -326,7 +326,7 @@ fn process_pending_submissions() {
 				assert item.commands[index].render_job == unsafe { nil }
 			}
 			assert katomic.load(&item.callbacks_remaining) == 0
-			signal_g13_submission_fence(item.final_fence, katomic.load(&item.failure))
+			signal_g13_submission_fence(item.final_fence, int(katomic.load(&item.failure)))
 			// GPU callbacks have dropped their final node access. Release global
 			// timestamp mappings outside manager.lock, while file/VM pins remain.
 			mut owner := unsafe { item.file }
