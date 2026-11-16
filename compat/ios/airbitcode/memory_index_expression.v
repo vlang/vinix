@@ -509,7 +509,12 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			}
 			.projected_intrinsic {
 				if undefs[node.left] { return error('AIR vector intrinsic: undef source lane') }
-				value = if poisons[node.left] { IntegerValue{poison: true} } else if node.intrinsic == .iabs { scalar_integer_abs_value(node.bits, values[node.left], node.value)! } else if scalar_integer_zero_count(node.intrinsic) { scalar_integer_zero_count_value(node.intrinsic, node.bits, values[node.left], node.value)! } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
+				if node.right >= 0 {
+					if undefs[node.right] { return error('AIR vector intrinsic: undef source lane') }
+					value = if poisons[node.left] || poisons[node.right] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_extremum_value(node.intrinsic, node.bits, values[node.left], values[node.right])!} }
+				} else {
+					value = if poisons[node.left] { IntegerValue{poison: true} } else if node.intrinsic == .iabs { scalar_integer_abs_value(node.bits, values[node.left], node.value)! } else if scalar_integer_zero_count(node.intrinsic) { scalar_integer_zero_count_value(node.intrinsic, node.bits, values[node.left], node.value)! } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
+				}
 			}
 			.compare {
 				value = integer_compare_flags(node.opcode, node.flags, node.source_bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!

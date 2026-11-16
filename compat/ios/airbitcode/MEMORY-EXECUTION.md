@@ -436,6 +436,27 @@ flags, all widths, minimum/negative inputs, poison/undef, source/result recovery
 call-local flag isolation and cached graph boundaries against defined native
 LLVM references and an independent unsigned magnitude oracle.
 
+Vector `llvm.smin`, `llvm.smax`, `llvm.umin` and `llvm.umax` also supply address
+lanes for matching fixed 1..16-lane i1..i64 operands. Both input vectors compute
+before extraction. Undef in either input is an eager whole-vector error, even
+in an ignored lane, unchosen select or cold block. Poison in either input
+propagates only to its result lane, even if the other input would win an ordinary
+comparison. Source freeze can repair indeterminate inputs; result freeze may
+repair poison but cannot hide an earlier undef error. Extraction bounds remain.
+
+The shared intrinsic builder validates three lane counts of work (two inputs
+and the result), then projects both sources using fixed 16-int arrays. Each
+existing POD result node stores the second projection in its right field; unary
+calls keep that field at -1. Cached table height includes both operands. The
+existing evaluator checks both undef/poison states and uses the scalar integer
+extremum helper. No node kind, managed array, owner, lifetime or free path is
+added; limits remain 256 nodes/32 levels. Other vector intrinsic families remain
+excluded from address dependencies.
+`tests/ios/air-memory-vector-minmax-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
+all four operations, widths, operand states, source/result freezes, both input
+depth boundaries, cached selectors and exact node limits against defined native
+LLVM references and an independent sign-partition comparison oracle.
+
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result
 freezes, condition poison, invalid selectors, cache isolation, exact graph limits

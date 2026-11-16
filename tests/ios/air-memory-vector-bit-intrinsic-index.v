@@ -184,7 +184,7 @@ fn input_literal(width int, count int, sample int) string {
 }
 fn controls(assembler string, root string) !int {
  mut text := strings.new_builder(131072)
- text.write_string('target datalayout = "e-p:64:64"\n declare <3 x i32> @llvm.ctpop.v3i32(<3 x i32>) #0\n declare <1 x i32> @llvm.ctpop.v1i32(<1 x i32>)\n declare <3 x i32> @llvm.bitreverse.v3i32(<3 x i32>)\n declare <3 x i32> @llvm.bswap.v3i32(<3 x i32>)\n declare <3 x i32> @llvm.smin.v3i32(<3 x i32>, <3 x i32>)\n attributes #0 = { nounwind memory(none) }\n')
+ text.write_string('target datalayout = "e-p:64:64"\n declare <3 x i32> @llvm.ctpop.v3i32(<3 x i32>) #0\n declare <1 x i32> @llvm.ctpop.v1i32(<1 x i32>)\n declare <3 x i32> @llvm.bitreverse.v3i32(<3 x i32>)\n declare <3 x i32> @llvm.bswap.v3i32(<3 x i32>)\n declare <3 x i32> @llvm.uadd.sat.v3i32(<3 x i32>, <3 x i32>)\n attributes #0 = { nounwind memory(none) }\n')
  args := '(<3 x i32> %a, <3 x i32> %b, i32 %j, i1 %c, ptr %out)'
  for over in [false, true] {
   for side in ['source', 'selector', 'freeze', 'nested'] {
@@ -211,7 +211,7 @@ fn controls(assembler string, root string) !int {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_source' { text.write_string('%left = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'unsupported_call' { text.write_string('%left = call <3 x i32> @llvm.smin.v3i32(<3 x i32> %a, <3 x i32> %b)\n') }
+  if kind == 'unsupported_call' { text.write_string('%left = call <3 x i32> @llvm.uadd.sat.v3i32(<3 x i32> %a, <3 x i32> %b)\n') }
   if kind == 'loaded_scalar' { text.write_string('%loaded = load i32, ptr %out, align 1\n %left = insertelement <3 x i32> %a, i32 %loaded, i32 2\n') }
   if kind == 'phi_source' { text.write_string('br label %join\n join: %left = phi <3 x i32> [%a, %entry]\n') }
   if kind == 'insert_repair' { text.write_string('%left = insertelement <3 x i32> <i32 1, i32 undef, i32 3>, i32 2, i32 1\n') }

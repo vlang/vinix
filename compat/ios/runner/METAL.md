@@ -468,8 +468,17 @@ freeze repairs inputs to zero and result freeze may repair minimum poison.
 The existing intrinsic table stores the validated flag, with unchanged storage,
 ownership and graph limits. The image shader evaluates both minimum flags in a
 separate bounded address root, freezes the poisoned minimum lane, and mixes the
-computed offset into independently checked red-channel readback. Other vector
-intrinsic families remain excluded from address dependencies.
+computed offset into independently checked red-channel readback.
+Pure vector signed/unsigned min/max also feeds addresses: `llvm.smin`, `smax`,
+`umin` and `umax` accept two matching 1..16-lane i1..i64 operands. Both sources
+compute before extraction, with eager undef errors and lane-local poison from
+either operand. Source/result freezes retain their established rules. Existing
+POD nodes store the second projection, using one additional fixed 16-int builder
+array. Cached height accounts for both inputs; runtime storage, ownership and
+graph limits remain unchanged. An additional image kernel checks signed negative
+bounds and unsigned clamping in a bounded address root and red-channel readback,
+alongside the existing image fixture. Other vector intrinsic families remain
+excluded from addresses.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

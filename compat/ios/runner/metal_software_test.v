@@ -4328,7 +4328,11 @@ fn sm_test_geometry_sizes_focus() ! {
 	// channel from the current grid dimensions for every image dispatch.
 	source.write_string('declare <1 x i32> @llvm.ctlz.v1i32(<1 x i32>, i1 immarg)\n declare <1 x i32> @llvm.cttz.v1i32(<1 x i32>, i1 immarg)
  declare <1 x i32> @llvm.abs.v1i32(<1 x i32>, i1 immarg)
- declare <2 x i32> @llvm.abs.v2i32(<2 x i32>, i1 immarg)\n declare <1 x i32> @llvm.ctpop.v1i32(<1 x i32>)\n declare <1 x i32> @llvm.bitreverse.v1i32(<1 x i32>)\n declare <1 x i32> @llvm.bswap.v1i32(<1 x i32>)\n declare i32 @llvm.bitreverse.i32(i32)\n declare i32 @llvm.ctlz.i32(i32, i1 immarg)\n declare i32 @llvm.cttz.i32(i32, i1 immarg)\n declare i32 @llvm.smax.i32(i32, i32)\n declare i32 @llvm.umin.i32(i32, i32)\n declare i32 @llvm.abs.i32(i32, i1 immarg)\n declare i32 @llvm.uadd.sat.i32(i32, i32)\n declare i32 @llvm.usub.sat.i32(i32, i32)\n declare i32 @llvm.sadd.sat.i32(i32, i32)\n declare i32 @llvm.ssub.sat.i32(i32, i32)\n declare i32 @llvm.ushl.sat.i32(i32, i32)\n declare i32 @llvm.sshl.sat.i32(i32, i32)\n declare i32 @llvm.fshl.i32(i32, i32, i32)\n declare i32 @llvm.fshr.i32(i32, i32, i32)\n declare i32 @llvm.clmul.i32(i32, i32)\n declare i32 @llvm.pext.i32(i32, i32)\n declare i32 @llvm.pdep.i32(i32, i32)\n declare {i32, i1} @llvm.uadd.with.overflow.i32(i32, i32)\n define void @image_sizes(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) { %x = extractelement <3 x i32> %gid, i32 0\n %y = extractelement <3 x i32> %gid, i32 1\n %w = extractelement <3 x i32> %grid, i32 0\n %h = extractelement <3 x i32> %grid, i32 1\n %lane_seed = urem i32 %x, 3\n %parity = and i32 %x, 1\n %choose = icmp eq i32 %parity, 0\n %selected_lanes = select i1 %choose, <3 x i32> <i32 2, i32 undef, i32 1>, <3 x i32> <i32 1, i32 2, i32 0>\n %patch_lane = urem i32 %y, 3
+ declare <2 x i32> @llvm.abs.v2i32(<2 x i32>, i1 immarg)
+ declare <1 x i32> @llvm.smin.v1i32(<1 x i32>, <1 x i32>)
+ declare <1 x i32> @llvm.smax.v1i32(<1 x i32>, <1 x i32>)
+ declare <1 x i32> @llvm.umin.v1i32(<1 x i32>, <1 x i32>)
+ declare <1 x i32> @llvm.umax.v1i32(<1 x i32>, <1 x i32>)\n declare <1 x i32> @llvm.ctpop.v1i32(<1 x i32>)\n declare <1 x i32> @llvm.bitreverse.v1i32(<1 x i32>)\n declare <1 x i32> @llvm.bswap.v1i32(<1 x i32>)\n declare i32 @llvm.bitreverse.i32(i32)\n declare i32 @llvm.ctlz.i32(i32, i1 immarg)\n declare i32 @llvm.cttz.i32(i32, i1 immarg)\n declare i32 @llvm.smax.i32(i32, i32)\n declare i32 @llvm.umin.i32(i32, i32)\n declare i32 @llvm.abs.i32(i32, i1 immarg)\n declare i32 @llvm.uadd.sat.i32(i32, i32)\n declare i32 @llvm.usub.sat.i32(i32, i32)\n declare i32 @llvm.sadd.sat.i32(i32, i32)\n declare i32 @llvm.ssub.sat.i32(i32, i32)\n declare i32 @llvm.ushl.sat.i32(i32, i32)\n declare i32 @llvm.sshl.sat.i32(i32, i32)\n declare i32 @llvm.fshl.i32(i32, i32, i32)\n declare i32 @llvm.fshr.i32(i32, i32, i32)\n declare i32 @llvm.clmul.i32(i32, i32)\n declare i32 @llvm.pext.i32(i32, i32)\n declare i32 @llvm.pdep.i32(i32, i32)\n declare {i32, i1} @llvm.uadd.with.overflow.i32(i32, i32)\n define void @image_sizes(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) { %x = extractelement <3 x i32> %gid, i32 0\n %y = extractelement <3 x i32> %gid, i32 1\n %w = extractelement <3 x i32> %grid, i32 0\n %h = extractelement <3 x i32> %grid, i32 1\n %lane_seed = urem i32 %x, 3\n %parity = and i32 %x, 1\n %choose = icmp eq i32 %parity, 0\n %selected_lanes = select i1 %choose, <3 x i32> <i32 2, i32 undef, i32 1>, <3 x i32> <i32 1, i32 2, i32 0>\n %patch_lane = urem i32 %y, 3
  %inserted_lanes = insertelement <3 x i32> %selected_lanes, i32 %lane_seed, i32 %patch_lane
  %permuted_lanes = shufflevector <3 x i32> %inserted_lanes, <3 x i32> %selected_lanes, <3 x i32> <i32 5, i32 0, i32 4>
  %frozen_lanes = freeze <3 x i32> %permuted_lanes\n %shifted_lanes = add nuw nsw <3 x i32> %frozen_lanes, <i32 1, i32 1, i32 1>
@@ -4374,6 +4378,42 @@ fn sm_test_geometry_sizes_focus() ! {
 		name := 'mismatch_${family}'; names << name
 		source.write_string('define void @${name}(<3 x i32> %a, i32 %b, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n ret void }\n')
 	}
+	names << 'image_minmax'
+	source.write_string('define void @image_minmax(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
+ %x = extractelement <3 x i32> %gid, i32 0
+ %y = extractelement <3 x i32> %gid, i32 1
+ %w = extractelement <3 x i32> %grid, i32 0
+ %h = extractelement <3 x i32> %grid, i32 1
+ %input = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
+ %signed_low = call <1 x i32> @llvm.smin.v1i32(<1 x i32> %input, <1 x i32> <i32 -1>)
+ %signed_high = call <1 x i32> @llvm.smax.v1i32(<1 x i32> %signed_low, <1 x i32> <i32 -2>)
+ %unsigned_low = call <1 x i32> @llvm.umin.v1i32(<1 x i32> %input, <1 x i32> <i32 7>)
+ %unsigned_high = call <1 x i32> @llvm.umax.v1i32(<1 x i32> %unsigned_low, <1 x i32> <i32 3>)
+ %signed_lane = extractelement <1 x i32> %signed_high, i32 0
+ %unsigned_lane = extractelement <1 x i32> %unsigned_high, i32 0
+ %signed_bits = and i32 %signed_lane, 63
+ %offset = xor i32 %signed_bits, %unsigned_lane
+ %root = getelementptr i8, ptr addrspace(1) %out, i32 %offset
+ %row = shl i32 %y, 6
+ %index = add i32 %row, %x
+ %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
+ %red = mul i32 %x, 3
+ %mixed = xor i32 %red, %offset
+ %r = and i32 %mixed, 255
+ %gg = mul i32 %y, 5
+ %g0 = and i32 %gg, 255
+ %g = shl i32 %g0, 8
+ %wh = add i32 %w, %h
+ %bb = mul i32 %wh, 7
+ %b0 = and i32 %bb, 255
+ %b = shl i32 %b0, 16
+ %rg = or i32 %r, %g
+ %rgb = or i32 %rg, %b
+ %rgba = or i32 %rgb, 4278190080
+ store i32 %rgba, ptr addrspace(1) %p, align 4
+ ret void }
+
+')
 	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
 	for i, name in names {
 		n := i * 20
@@ -4387,7 +4427,7 @@ fn sm_test_geometry_sizes_focus() ! {
 			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
 		} else {
 			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
-			if i == 2 {
+			if i == 2 || name == 'image_minmax' {
 				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
 			} else if i < 3 + bad.len * 3 {
 				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
@@ -4421,7 +4461,7 @@ fn sm_test_geometry_sizes_focus() ! {
 		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
 		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
 		queue := sm_send(device, c'newCommandQueue')
-		for name in names[3..] {
+		for name in names[3..names.len - 1] {
 			mut error_slot := u64(0)
 			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
 			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
@@ -4473,7 +4513,8 @@ fn sm_test_geometry_sizes_focus() ! {
 			objc_release(pipeline)
 		}
 		objc_release(output)
-		pipeline := sm_test_compute_pipeline(device, library, names[2], unsafe { nil }); sm_grid_check(pipeline != 0, 'image pipeline')
+		for image_name in [names[2], names.last()] {
+		pipeline := sm_test_compute_pipeline(device, library, image_name, unsafe { nil }); sm_grid_check(pipeline != 0, 'image pipeline')
 		for shape in [SoftwareMetalSize{7, 5, 1}, SoftwareMetalSize{17, 3, 1}, SoftwareMetalSize{32, 8, 1}, SoftwareMetalSize{64, 64, 1}] {
 			length := 512 + shape.height * 256; buffer := sm_test_buffer(device, length, 0); bp := sm_send(buffer, c'contents')
 			desc := sm_test_descriptor(70, shape.width, shape.height, 0); texture := sm_test_buffer_texture_view(buffer, desc, 256, 256)
@@ -4499,7 +4540,7 @@ fn sm_test_geometry_sizes_focus() ! {
 					mut low := x
 					for low % 2 == 0 { trailing++; low /= 2 }
 				}
-				color := [u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63), u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				color := [if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
 				for lane in 0 .. 4 {
 					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
 					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]
@@ -4507,12 +4548,14 @@ fn sm_test_geometry_sizes_focus() ! {
 				}
 			} }
 			for j, value in expected { if unsafe { *(&u8(bp + u64(j))) } != value { panic('image backing byte ${j}') } }
-			os.write_file_array(out + '/image-${cycle}-${shape.width}x${shape.height}.ppm', ppm)!
+			os.write_file_array(out + '/image-${image_name}-${cycle}-${shape.width}x${shape.height}.ppm', ppm)!
 			unsafe { pixels.free(); expected.free(); ppm.free() }; objc_release(texture)
 			images++; invocations += shape.width * shape.height
-			rows.writeln('${cycle} image ${shape.width}x${shape.height} RGBA8/readback/padding PASS')!
+			rows.writeln('${cycle} ${image_name} ${shape.width}x${shape.height} RGBA8/readback/padding PASS')!
 		}
-		objc_release(pipeline); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool)
+		objc_release(pipeline)
+		}
+		objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool)
 		sm_grid_check(ios_runtime.live == 0 && ios_runtime.objects.len == 0, 'drained size runtime'); objc_stop()
 	}
 	line := 'IOS-SOFTWARE-METAL-SIZES: ${complete} geometry dispatches, ${images} shader images, ${invocations} checked invocations, ${rejected} rejected pipelines, ${failed} prewrite bounds failures, reusable scalar/uint3 size builtins, both selectors, clipped groups, RGBA8 buffer-texture readback and two drained runtimes PASS\n'
