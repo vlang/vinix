@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_float_names_slots_and_existing_evaluators() {
-	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2178
+	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2179
 	ids := [ScalarIntrinsic.fabs, .floor, .ceil, .trunc, .sqrt, .round, .rint]!
 	for i, name in ['air.fabs.f32', 'air.floor.f32', 'air.ceil.f32', 'air.trunc.f32', 'air.sqrt.f32', 'air.round.f32', 'air.rint.f32'] {
 		id, slot := air_float_intrinsic(name)!

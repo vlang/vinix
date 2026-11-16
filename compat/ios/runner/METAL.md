@@ -1,5 +1,14 @@
 # Software Metal backend
 
+Prepared pipelines execute ternary `air.clamp.f32` as AIR max then min, with
+numeric NaN preference and first-argument zero ties. Reversed numeric bounds
+produce poison; NaN bounds do not count as reversed. Existing poison/undef,
+freeze and lazy-select rules apply. The canonicalization image checks clipping
+against an independent comparison/select result, NaN input, both first-zero
+signs and freeze/lazy recovery from invalid bounds before its RGBA8 oracle.
+Only the exact float32 signature and ordinary pure calls are admitted. Floating
+address projections, other widths/vectors and fast spellings remain excluded.
+
 Prepared pipelines execute binary `air.fmin.f32` and `air.fmax.f32`. These
 prefer the numeric argument to a NaN and preserve the first argument on numeric
 ties, including opposite signed zeros. Separate AIR IDs preserve the existing

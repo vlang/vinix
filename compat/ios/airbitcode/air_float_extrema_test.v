@@ -12,7 +12,7 @@ fn air_number_reference(minimum bool, a u32, b u32) u32 {
 }
 
 fn test_air_float_extrema_identity_values_and_first_zero() {
-	assert scalar_intrinsic_cache_slots == 2178
+	assert scalar_intrinsic_cache_slots == 2179
 	for i, name in ['air.fmin.f32', 'air.fmax.f32'] {
 		id, slot := air_float_intrinsic(name)!
 		assert id == if i == 0 { ScalarIntrinsic.air_fmin } else { ScalarIntrinsic.air_fmax }
@@ -21,7 +21,7 @@ fn test_air_float_extrema_identity_values_and_first_zero() {
 		if _, _ := air_integer_intrinsic(name) { assert false }
 		for bits in [u32(16), 64]! { if _ := scalar_intrinsic_value(id, bits, 0, 0) { assert false } }
 	}
-	for name in ['air.fmin.f16','air.fmax.f64','air.fmin.v2f32','air.fmax.i32','air.fmin.f032','air.fmax.f+32','air.fmin.f32.spoof','air.fast_fmin.f32','air.fast_fmax.f32','air.min.f32','air.minnum.f32','air.clamp.f32'] {
+	for name in ['air.fmin.f16','air.fmax.f64','air.fmin.v2f32','air.fmax.i32','air.fmin.f032','air.fmax.f+32','air.fmin.f32.spoof','air.fast_fmin.f32','air.fast_fmax.f32','air.min.f32','air.minnum.f32','air.clamp.f64'] {
 		if _ := scalar_intrinsic_name(name) { assert false, name }
 	}
 	assert scalar_intrinsic_value(.air_fmin, 32, 0, 0x80000000)! == 0

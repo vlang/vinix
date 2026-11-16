@@ -1,5 +1,16 @@
 # Bounded memory execution
 
+Ternary `air.clamp.f32(x, low, high)` composes AIR `fmax(x, low)` then
+`fmin(result, high)`, retaining numeric NaN preference and first-argument zero
+ties. Ordered `low > high` produces poison, representing the Metal specification's
+undefined bounds. NaN bounds do not trigger this comparison. All three input
+states are observed: poison propagates and undef refuses until frozen. Domain
+poison can be frozen or bypassed by a lazy select; an observed result store
+refuses after retaining earlier writes. Slot 2178 appends one identity, for
+2,179 scalar cache entries without moving earlier keys. Exact float32 signatures,
+ordinary calls and pure attributes are required; other widths/vectors and fast
+spellings remain excluded. Floating results cannot project addresses.
+
 Binary `air.fmin.f32` and `air.fmax.f32` prefer the numeric operand to a NaN
 and return the first argument on a numeric tie, including opposite signed zeros.
 Separate appended AIR IDs retain this choice while preserving existing LLVM
@@ -8,7 +19,7 @@ software also treats signaling NaNs as quiet for numeric preference. The Metal
 specification does not support signaling NaNs. Numeric subnormals retain their
 bits. The wrapper normalizes inputs to float32 and reuses the existing number
 evaluator outside zero ties, without host floating arithmetic. Keys 2176..2177
-append two identities, for 2,178 scalar cache entries. Exact names, binary
+append two identities, within 2,179 scalar cache entries. Exact names, binary
 signatures, each call/operand type, pure attributes, duplicate checks and existing
 step/work/state/ownership rules remain. Invalid profiles reject before writes;
 runtime value failures retain earlier stores. Half/vector overloads, fast
@@ -19,7 +30,7 @@ through the existing exact fused multiply-add evaluator. It adds the exact
 product to the addend before one nearest rounding with ties to even, independent
 of the host rounding mode. Signed zeros, subnormals, infinities, canonical NaNs
 and poison/undef/freezes retain the existing FMA rules. Slot 2175 appends one AIR
-identity, for 2,178 scalar declaration-cache entries without moving earlier keys;
+identity, within 2,179 scalar declaration-cache entries without moving earlier keys;
 LLVM/AIR calls may coexist. Exact signatures, each call and all three operand
 types are checked even after a cache hit. Unsupported declaration/call metadata
 and bounds reject before writes. Runtime poison/undef value failures retain
@@ -31,7 +42,7 @@ float32 root and rounding evaluators. Square root rounds once to nearest with
 ties to even and preserves negative zero; negative nonzero inputs and NaNs
 produce the established positive canonical NaN. Round takes half ties away
 from zero; rint takes half ties to even. Results are independent of the host
-rounding mode. Keys 2172..2174 append three identities, for 2,178 scalar cache
+rounding mode. Keys 2172..2174 append three identities, for 2,179 scalar cache
 entries, preserving previous LLVM/AIR keys. Exact signatures, ordinary direct
 calls, pure attributes, duplicate checks, state/freeze rules, prewrite validation
 and existing work/step/ownership limits remain. Fast forms, other AIR widths,
@@ -41,7 +52,7 @@ Scalar `air.fabs.f32`, `air.floor.f32`, `air.ceil.f32` and `air.trunc.f32`
 accept one float32 argument and return float32 through the existing evaluators.
 `fabs` clears only the sign bit, including NaN payloads; the rounding operations
 use the existing positive canonical NaN policy and preserve infinities and signed
-zeros. Keys 2168..2171 append four AIR identities, for 2,178 scalar cache entries;
+zeros. Keys 2168..2171 append four AIR identities, for 2,179 scalar cache entries;
 earlier LLVM and AIR identities remain stable and may coexist. Exact names,
 signatures, pure declaration attributes and ordinary direct calls are required.
 Poison, undef, freezes, executed-step budgets and result-slot ownership retain
@@ -67,7 +78,7 @@ Scalar `air.clz.i32` and `air.ctz.i32` accept an i32 value and a defined
 constant-false i1 flag. They reuse the leading/trailing-zero evaluators and
 return 32 for zero. True, runtime, undef and poison flags reject, including
 after a declaration cache hit. Keys 2160..2161 append two AIR identities;
-the scalar cache has 2,178 entries. LLVM/AIR declarations may coexist.
+the scalar cache has 2,179 entries. LLVM/AIR declarations may coexist.
 Pure count results may feed bounded addresses. Existing immarg placement,
 call metadata, state, preflight, depth/work and ownership checks remain.
 
@@ -83,7 +94,7 @@ Scalar `air.popcount.i32` and `air.reverse_bits.i32` use the existing population
 count and bit-reversal evaluators, including bounded address projections. AIR
 and LLVM spellings have separate declaration identities and may coexist in one
 function. Keys 2154..2155 append without moving earlier entries; the scalar cache
-now has 2,178 slots. Exact signatures, direct-call metadata, pure declaration
+now has 2,179 slots. Exact signatures, direct-call metadata, pure declaration
 attributes (including function-level `mustprogress`) and duplicate checks remain
 required. Other AIR widths/vectors and
 general external calls remain excluded. Both memory paths share existing
@@ -168,7 +179,7 @@ the input factor. Every input has the same element type and result_count/factor
 lanes. Raw bits and selected poison/undef tags are preserved without observing
 unchosen lanes. Exact ordinary direct calls use one existing result slot, one
 executed step and 2*result_count lane-work units. Keys 40000..41715 append
-1,716 identities without moving earlier families; scalar entries stay 2,178.
+1,716 identities without moving earlier families; scalar entries stay 2,179.
 
 Pure integer addresses use packed shuffle selectors, lane rebasing and bounded
 projected-shuffle choices among all inputs. Invalid selectors poison the final

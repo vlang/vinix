@@ -5184,6 +5184,7 @@ declare float @air.rint.f32(float) #0
 declare float @air.fma.f32(float, float, float) #0
 declare float @air.fmin.f32(float, float) #0
 declare float @air.fmax.f32(float, float) #0
+declare float @air.clamp.f32(float, float, float) #0
 declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
@@ -5313,7 +5314,29 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  %extrema_pair2 = and i1 %zero_low_ok, %zero_high_ok
  %extrema_pair3 = and i1 %extrema_pair0, %extrema_pair1
  %extrema_ok = and i1 %extrema_pair2, %extrema_pair3
- %float_ok = and i1 %float_before_extrema_ok, %extrema_ok
+ %float_before_clamp_ok = and i1 %float_before_extrema_ok, %extrema_ok
+ %clipped = call float @air.clamp.f32(float %xf, float 3.0, float 7.0)
+ %below = fcmp olt float %xf, 3.0
+ %above = fcmp ogt float %xf, 7.0
+ %cap = select i1 %above, float 7.0, float %xf
+ %clip_expected = select i1 %below, float 3.0, float %cap
+ %clip_ok = fcmp oeq float %clipped, %clip_expected
+ %nan_clipped = call float @air.clamp.f32(float bitcast (i32 2143289344 to float), float 3.0, float 7.0)
+ %nan_clip_ok = fcmp oeq float %nan_clipped, 3.0
+ %zero_clipped = call float @air.clamp.f32(float %first_zero, float %second_zero, float %first_zero)
+ %zero_clip_word = bitcast float %zero_clipped to i32
+ %zero_clip_ok = icmp eq i32 %zero_clip_word, %first_zero_word
+ %invalid_clip = call float @air.clamp.f32(float %xf, float 7.0, float 3.0)
+ %frozen_clip = freeze float %invalid_clip
+ %frozen_clip_word = bitcast float %frozen_clip to i32
+ %freeze_clip_ok = icmp eq i32 %frozen_clip_word, 0
+ %lazy_clip = select i1 false, float %invalid_clip, float %clipped
+ %lazy_clip_ok = fcmp oeq float %lazy_clip, %clip_expected
+ %clip_pair0 = and i1 %clip_ok, %nan_clip_ok
+ %clip_pair1 = and i1 %zero_clip_ok, %freeze_clip_ok
+ %clip_pair2 = and i1 %clip_pair0, %clip_pair1
+ %clamp_ok = and i1 %clip_pair2, %lazy_clip_ok
+ %float_ok = and i1 %float_before_clamp_ok, %clamp_ok
  %coordinate = or i32 %x, 0
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate
