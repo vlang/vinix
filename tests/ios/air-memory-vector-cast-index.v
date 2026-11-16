@@ -235,12 +235,12 @@ fn controls(assembler string, root string) !int {
   for i in 0 .. if over { 245 } else { 244 } { text.write_string('%v${i} = extractelement <3 x i64> %s, i32 %j\n %p${i} = getelementptr i8, ptr %out, i64 %v${i}\n') }
   text.write_string('ret void }\n')
  }
- kinds := ['defined', 'ignored_undef', 'invalid_undef', 'scalar_freeze_undef', 'result_freeze_undef', 'source_freeze_undef', 'select_ignored_undef', 'poison_neighbor', 'selected_poison', 'result_freeze_poison', 'negative_neighbor', 'selected_negative', 'frozen_negative', 'trunc_neighbor', 'trunc_selected', 'trunc_result_freeze', 'trunc_nsw', 'sign_extension', 'old_after_freeze', 'root_before', 'root_after', 'cache_selectors', 'cold_bad', 'cold_good', 'loaded_source', 'comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector', 'invalid_selector', 'outer_freeze', 'insert_repair', 'shuffle_source', 'binary_source', 'binary_error', 'select_source']
+ kinds := ['defined', 'ignored_undef', 'invalid_undef', 'scalar_freeze_undef', 'result_freeze_undef', 'source_freeze_undef', 'select_ignored_undef', 'poison_neighbor', 'selected_poison', 'result_freeze_poison', 'negative_neighbor', 'selected_negative', 'frozen_negative', 'trunc_neighbor', 'trunc_selected', 'trunc_result_freeze', 'trunc_nsw', 'sign_extension', 'old_after_freeze', 'root_before', 'root_after', 'cache_selectors', 'cold_bad', 'cold_good', 'loaded_source', 'floating_comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector', 'invalid_selector', 'outer_freeze', 'insert_repair', 'shuffle_source', 'binary_source', 'binary_error', 'select_source']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_source' { text.write_string('%left = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'comparison_source' { text.write_string('%cmp = icmp eq <3 x i32> %a, zeroinitializer\n %left = sext <3 x i1> %cmp to <3 x i32>\n') }
+  if kind == 'floating_comparison_source' { text.write_string('%cmp = fcmp oeq <3 x float> zeroinitializer, zeroinitializer\n %left = sext <3 x i1> %cmp to <3 x i32>\n') }
   if kind == 'loaded_scalar' { text.write_string('%loaded = load i32, ptr %out, align 1\n %left = insertelement <3 x i32> %a, i32 %loaded, i32 2\n') }
   if kind == 'phi_source' { text.write_string('br label %join\n join: %left = phi <3 x i32> [%a, %entry]\n') }
   if kind == 'insert_repair' { text.write_string('%left = insertelement <3 x i32> <i32 1, i32 undef, i32 3>, i32 2, i32 1\n') }
@@ -253,7 +253,7 @@ fn controls(assembler string, root string) !int {
   poison := kind in ['poison_neighbor', 'selected_poison', 'result_freeze_poison', 'old_after_freeze', 'root_before', 'root_after']
   truncating := kind.starts_with('trunc_')
   negative := kind in ['negative_neighbor', 'selected_negative', 'frozen_negative']
-  mut left := if undef { '<i32 1, i32 undef, i32 3>' } else if poison { '<i32 1, i32 poison, i32 3>' } else if negative { '<i32 1, i32 2147483648, i32 3>' } else if truncating { if kind == 'trunc_nsw' { '<i64 1, i64 2147483648, i64 3>' } else { '<i64 1, i64 4294967297, i64 3>' } } else if kind in ['loaded_source', 'comparison_source', 'loaded_scalar', 'phi_source', 'insert_repair', 'shuffle_source', 'binary_source', 'binary_error', 'select_source', 'sign_extension'] { '%left' } else { '%a' }
+  mut left := if undef { '<i32 1, i32 undef, i32 3>' } else if poison { '<i32 1, i32 poison, i32 3>' } else if negative { '<i32 1, i32 2147483648, i32 3>' } else if truncating { if kind == 'trunc_nsw' { '<i64 1, i64 2147483648, i64 3>' } else { '<i64 1, i64 4294967297, i64 3>' } } else if kind in ['loaded_source', 'floating_comparison_source', 'loaded_scalar', 'phi_source', 'insert_repair', 'shuffle_source', 'binary_source', 'binary_error', 'select_source', 'sign_extension'] { '%left' } else { '%a' }
   if kind == 'source_freeze_undef' { text.write_string('%sf = freeze <3 x i32> ${left}\n'); left = '%sf' }
   source_bits := if truncating { 64 } else if kind == 'sign_extension' { 1 } else { 32 }; dest_bits := if truncating || kind == 'sign_extension' { 32 } else { 64 }
   operation := if truncating { if kind == 'trunc_nsw' { 'trunc nsw' } else { 'trunc nuw' } } else if negative { 'zext nneg' } else if kind == 'sign_extension' { 'sext' } else { 'zext' }
@@ -283,7 +283,7 @@ fn controls(assembler string, root string) !int {
  for kind in kinds {
   f := fi(ir, kind); mut actual := []u8{len: 64, init: 0xcc}; av := [u64(1), 2, 3]; bv := [u64(4), 5, 6]; jv := [u64(0)]; cv := [u64(1)]
   mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: bv}, airbitcode.IRMemoryBinding{values: jv}, airbitcode.IRMemoryBinding{values: cv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  if kind in ['loaded_source', 'comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector'] {
+  if kind in ['loaded_source', 'floating_comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector'] {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported vector cast') }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported vector cast ran') }; untouched(actual)
   } else {

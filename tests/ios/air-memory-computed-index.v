@@ -159,7 +159,7 @@ fn control_cases(assembler string, root string) ! {
 		'load':     '%idx = load i64, ptr %out'
 		'floating_comparison': '%v = fcmp oeq float 0.0, 0.0\n %idx = zext i1 %v to i64'
 		'pointer_comparison': '%v = icmp eq ptr %out, null\n %idx = zext i1 %v to i64'
-		'vector_comparison': '%v = icmp eq <2 x i64> zeroinitializer, zeroinitializer\n %first = extractelement <2 x i1> %v, i32 0\n %idx = zext i1 %first to i64'
+		'floating_vector_comparison': '%v = fcmp oeq <2 x float> zeroinitializer, zeroinitializer\n %first = extractelement <2 x i1> %v, i32 0\n %idx = zext i1 %first to i64'
 		'intrinsic': '%idx = call i64 @llvm.fptoui.sat.i64.f32(float 0.0)'
 		'float_cast': '%idx = fptoui float 0.0 to i64'
 		'pointer_integer': '%idx = ptrtoint ptr %out to i64'

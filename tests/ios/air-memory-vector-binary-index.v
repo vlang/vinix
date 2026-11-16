@@ -245,19 +245,19 @@ fn controls(assembler string, root string) !int {
   for i in 0 .. if over { 242 } else { 241 } { text.write_string('%v${i} = extractelement <3 x i32> %s, i32 %j\n %p${i} = getelementptr i8, ptr %out, i32 %v${i}\n') }
   text.write_string('ret void }\n')
  }
- kinds := ['defined', 'ignored_undef', 'invalid_undef', 'scalar_freeze_undef', 'result_freeze_undef', 'source_freeze_undef', 'select_ignored_undef', 'poison_neighbor', 'selected_poison', 'result_freeze_poison', 'division_zero', 'division_poison', 'signed_overflow', 'ignored_shift', 'selected_shift', 'old_after_freeze', 'root_before', 'root_after', 'cache_selectors', 'cold_bad', 'cold_good', 'loaded_source', 'comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector', 'invalid_selector', 'outer_freeze', 'insert_repair', 'shuffle_source']
+ kinds := ['defined', 'ignored_undef', 'invalid_undef', 'scalar_freeze_undef', 'result_freeze_undef', 'source_freeze_undef', 'select_ignored_undef', 'poison_neighbor', 'selected_poison', 'result_freeze_poison', 'division_zero', 'division_poison', 'signed_overflow', 'ignored_shift', 'selected_shift', 'old_after_freeze', 'root_before', 'root_after', 'cache_selectors', 'cold_bad', 'cold_good', 'loaded_source', 'floating_comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector', 'invalid_selector', 'outer_freeze', 'insert_repair', 'shuffle_source']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_source' { text.write_string('%left = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'comparison_source' { text.write_string('%unsupported_compare = icmp eq <3 x i32> %a, zeroinitializer\n %left = sext <3 x i1> %unsupported_compare to <3 x i32>\n') }
+  if kind == 'floating_comparison_source' { text.write_string('%unsupported_compare = fcmp oeq <3 x float> zeroinitializer, zeroinitializer\n %left = sext <3 x i1> %unsupported_compare to <3 x i32>\n') }
   if kind == 'loaded_scalar' { text.write_string('%loaded = load i32, ptr %out, align 1\n %left = insertelement <3 x i32> %a, i32 %loaded, i32 2\n') }
   if kind == 'phi_source' { text.write_string('br label %join\n join: %left = phi <3 x i32> [%a, %entry]\n') }
   if kind == 'insert_repair' { text.write_string('%left = insertelement <3 x i32> <i32 1, i32 undef, i32 3>, i32 2, i32 1\n') }
   if kind == 'shuffle_source' { text.write_string('%left = shufflevector <3 x i32> %a, <3 x i32> %b, <3 x i32> <i32 4, i32 0, i32 2>\n') }
   undef := kind in ['ignored_undef', 'invalid_undef', 'scalar_freeze_undef', 'result_freeze_undef', 'source_freeze_undef', 'select_ignored_undef', 'cold_bad']
   poison := kind in ['poison_neighbor', 'selected_poison', 'result_freeze_poison', 'division_poison', 'old_after_freeze', 'root_before', 'root_after']
-  mut left := if undef { '<i32 1, i32 undef, i32 3>' } else if poison { '<i32 1, i32 poison, i32 3>' } else if kind == 'signed_overflow' { '<i32 1, i32 2147483648, i32 3>' } else if kind in ['loaded_source', 'comparison_source', 'loaded_scalar', 'phi_source', 'insert_repair', 'shuffle_source'] { '%left' } else { '%a' }
+  mut left := if undef { '<i32 1, i32 undef, i32 3>' } else if poison { '<i32 1, i32 poison, i32 3>' } else if kind == 'signed_overflow' { '<i32 1, i32 2147483648, i32 3>' } else if kind in ['loaded_source', 'floating_comparison_source', 'loaded_scalar', 'phi_source', 'insert_repair', 'shuffle_source'] { '%left' } else { '%a' }
   if kind == 'source_freeze_undef' { text.write_string('%sf = freeze <3 x i32> ${left}\n'); left = '%sf' }
   right := if kind == 'division_zero' { '<i32 1, i32 0, i32 1>' } else if kind == 'signed_overflow' { '<i32 1, i32 4294967295, i32 1>' } else if kind in ['ignored_shift', 'selected_shift'] { '<i32 0, i32 32, i32 0>' } else { '<i32 1, i32 1, i32 1>' }
   op := if kind in ['division_zero', 'division_poison'] { 'udiv' } else if kind == 'signed_overflow' { 'srem' } else if kind in ['ignored_shift', 'selected_shift'] { 'shl' } else { 'add' }
@@ -286,7 +286,7 @@ fn controls(assembler string, root string) !int {
  for kind in kinds {
   f := fi(ir, kind); mut actual := []u8{len: 64, init: 0xcc}; av := [u64(1), 2, 3]; bv := [u64(4), 5, 6]; jv := [u64(0)]; cv := [u64(1)]
   mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: bv}, airbitcode.IRMemoryBinding{values: jv}, airbitcode.IRMemoryBinding{values: cv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  if kind in ['loaded_source', 'comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector'] {
+  if kind in ['loaded_source', 'floating_comparison_source', 'loaded_scalar', 'phi_source', 'undef_selector'] {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported vector binary') }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported vector binary ran') }; untouched(actual)
   } else {

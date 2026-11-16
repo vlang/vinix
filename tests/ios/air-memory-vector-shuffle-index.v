@@ -226,12 +226,12 @@ fn controls(assembler string, root string) !int {
   for i in 0 .. if over { 251 } else { 250 } { text.write_string('%v${i} = extractelement <3 x i32> %s, i32 %j\n %p${i} = getelementptr i8, ptr %out, i32 %v${i}\n') }
   text.write_string('ret void }\n')
  }
- kinds := ['lazy_undef', 'chosen_undef', 'scalar_ignored_undef', 'scalar_freeze_undef', 'source_freeze', 'invalid_selector', 'outer_freeze', 'poison_mask', 'legacy_mask', 'frozen_mask', 'repaired_poison', 'source_insert', 'nested', 'select_discard', 'cache_selectors', 'root_before', 'root_after', 'cold_bad', 'cold_good', 'loaded_source', 'comparison_source', 'loaded_selector', 'phi_source', 'undef_selector', 'poison_selector', 'ignored_error', 'poison_condition']
+ kinds := ['lazy_undef', 'chosen_undef', 'scalar_ignored_undef', 'scalar_freeze_undef', 'source_freeze', 'invalid_selector', 'outer_freeze', 'poison_mask', 'legacy_mask', 'frozen_mask', 'repaired_poison', 'source_insert', 'nested', 'select_discard', 'cache_selectors', 'root_before', 'root_after', 'cold_bad', 'cold_good', 'loaded_source', 'floating_comparison_source', 'loaded_selector', 'phi_source', 'undef_selector', 'poison_selector', 'ignored_error', 'poison_condition']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_source' { text.write_string('%left = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'comparison_source' { text.write_string('%unsupported_compare = icmp eq <3 x i32> %a, zeroinitializer
+  if kind == 'floating_comparison_source' { text.write_string('%unsupported_compare = fcmp oeq <3 x float> zeroinitializer, zeroinitializer
  %left = sext <3 x i1> %unsupported_compare to <3 x i32>\n') }
   if kind == 'phi_source' { text.write_string('br label %join\n join: %left = phi <3 x i32> [%a, %entry]\n') }
   if kind == 'loaded_selector' { text.write_string('%index = load i32, ptr %out, align 1\n') }
@@ -239,7 +239,7 @@ fn controls(assembler string, root string) !int {
   if kind == 'source_insert' { text.write_string('%left = insertelement <3 x i32> undef, i32 5, i32 0\n') }
   if kind == 'poison_condition' { text.write_string('%left = select i1 poison, <3 x i32> undef, <3 x i32> %b\n') }
   if kind == 'nested' { text.write_string('%left = shufflevector <3 x i32> %a, <3 x i32> %b, <3 x i32> <i32 2, i32 0, i32 4>\n') }
-  left := if kind in ['lazy_undef', 'chosen_undef', 'scalar_ignored_undef', 'scalar_freeze_undef', 'source_freeze', 'cold_bad', 'cold_good', 'poison_mask', 'legacy_mask'] { 'undef' } else if kind in ['loaded_source', 'comparison_source', 'phi_source', 'ignored_error', 'source_insert', 'nested', 'poison_condition'] { '%left' } else { '%a' }
+  left := if kind in ['lazy_undef', 'chosen_undef', 'scalar_ignored_undef', 'scalar_freeze_undef', 'source_freeze', 'cold_bad', 'cold_good', 'poison_mask', 'legacy_mask'] { 'undef' } else if kind in ['loaded_source', 'floating_comparison_source', 'phi_source', 'ignored_error', 'source_insert', 'nested', 'poison_condition'] { '%left' } else { '%a' }
   mask := if kind in ['lazy_undef', 'ignored_error'] { '<i32 3, i32 3, i32 3>' } else if kind == 'legacy_mask' { 'undef' } else if kind in ['poison_mask', 'frozen_mask', 'repaired_poison'] { 'poison' } else if kind == 'nested' { '<i32 2, i32 0, i32 4>' } else { '<i32 0, i32 4, i32 poison>' }
   text.write_string('%raw = shufflevector <3 x i32> ${left}, <3 x i32> %b, <3 x i32> ${mask}\n')
   if kind == 'root_before' { text.write_string('%bad = extractelement <3 x i32> %raw, i32 2\n %bp = getelementptr i8, ptr %out, i32 %bad\n') }
@@ -268,7 +268,7 @@ fn controls(assembler string, root string) !int {
  for kind in kinds {
   f := fi(ir, kind); mut actual := []u8{len: 64, init: 0xcc}; av := [u64(1), 2, 3]; bv := [u64(4), 5, 6]; jv := [u64(0)]; cv := [u64(1)]
   mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: bv}, airbitcode.IRMemoryBinding{values: jv}, airbitcode.IRMemoryBinding{values: cv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  if kind in ['loaded_source', 'comparison_source', 'phi_source', 'loaded_selector', 'undef_selector'] {
+  if kind in ['loaded_source', 'floating_comparison_source', 'phi_source', 'loaded_selector', 'undef_selector'] {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported shuffle') }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported shuffle ran') }; untouched(actual)
   } else {

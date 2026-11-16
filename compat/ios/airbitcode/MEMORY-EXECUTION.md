@@ -115,7 +115,8 @@ All ten scalar `icmp` predicates are supported, including `samesign` (different
 operand signs produce poison). A comparison keeps its source integer width
 separate from its i1 result width. Zero-extend a boolean for a positive 0/1
 offset: a direct i1 true GEP index is negative and rejects under this profile.
-Floating, pointer and vector comparisons remain outside address expressions.
+Floating and pointer comparisons remain outside address expressions. Integer
+vector comparison sources are described below.
 Integer selects use a scalar i1 condition and matching i1..i64 value types.
 Literal poison is admitted in the expression graph; undef is admitted only as
 the direct operand of a freeze.
@@ -276,7 +277,7 @@ the existing limits, including cached subtrees.
 all 64 lane/insertion widths, lane repair, poison/undef, nested insertion/select/
 freeze composition, exact graph limits,
 cache isolation and all three memory APIs. Older constructed-source rejection
-fixtures use unsupported vector comparisons; retained historical evidence is unchanged.
+fixtures use unsupported floating vector comparisons; retained historical evidence is unchanged.
 
 `shufflevector` supplies address lanes from the same pure integer vector
 sources. Its result may independently contain 1..16 lanes, matching the inputs'
@@ -285,7 +286,7 @@ undef entries produce poison lanes. Selected source undef stays deferred until
 final extraction or repair by a source freeze/insertion. Both complete sources
 and every mask entry validate, even when unselected. Normalized entries must
 match the original mask constant; negative integer entries cannot impersonate
-poison tags. Floating operations, vector comparisons, loaded/PHI sources and vector conditions remain
+poison tags. Floating operations, loaded/PHI sources and vector conditions remain
 excluded from address graphs.
 
 Two existing POD words pack the sixteen mask bytes, with 255 reserved for
@@ -327,7 +328,7 @@ source poison stay lane-local; any operand undef rejects the cast dependency,
 including ignored lanes, invalid extracts and later unchosen selects/freezes.
 Source freeze repairs indeterminate operands before casting; result freeze may
 repair cast poison but cannot conceal eager undef errors or an invalid extraction.
-Vector comparisons, floating conversions and bitcasts remain excluded here.
+Floating conversions and bitcasts remain excluded here.
 
 Each cast builds one contiguous result table with POD metadata under the same
 vector cache tag as binary tables. Static selectors project every input lane,
@@ -338,6 +339,28 @@ free paths and graph limits remain. No runtime array or owned field is added.
 `tests/ios/air-memory-vector-cast-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks every
 distinct width pair, flag variants, source/result freezes, eager errors, lane
 poison and exact cached limits against native LLVM and a per-bit oracle.
+
+Integer vector `icmp` also supplies i1 address lanes from matching 1..16-lane
+i1..i64 operands. All ten equality/unsigned/signed predicates accept `samesign`.
+Source poison and different signs under that promise produce lane-local poison.
+Every lane of both operands compares before extraction; any undef rejects the
+address dependency before writes, including ignored lanes, invalid selectors,
+later unchosen selects and result freezes. Freezing sources first repairs their
+indeterminate lanes; freezing results may repair comparison poison. An invalid
+extraction selector remains poison. Supported integer vector operations compose
+on both sides of the comparison and may consume the resulting mask.
+
+One cached contiguous table holds all i1 results. Two fixed 16-int builder arrays
+hold input projection indices. POD metadata retains the table base and maximum
+lane height; source/selector/result heights, including cached subtrees, share
+the existing 256-node/32-level limits. Comparison nodes reject undef then reuse
+the scalar integer comparator with the operand width kept separate from i1.
+Existing graph/cache ownership and free paths remain, with no runtime array or
+owned field added. Floating comparisons and vector conditions remain excluded.
+`tests/ios/air-memory-vector-compare-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
+every integer width/predicate/flag, representative full lane-count coverage,
+both operands' indeterminate lanes, source/result freezes, table reuse and exact
+cached graph limits against native LLVM and an independent signed-order oracle.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result

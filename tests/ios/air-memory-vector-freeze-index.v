@@ -191,17 +191,17 @@ fn controls(assembler string, root string) !int {
   for i in 0 .. if over { 254 } else { 253 } { text.write_string('%v${i} = extractelement <3 x i32> %f, i32 %s\n %p${i} = getelementptr i8, ptr %out, i32 %v${i}\n') }
   text.write_string('ret void }\n')
  }
- kinds := ['poison_before', 'poison_after', 'undef_before', 'undef_after', 'cold_bad', 'cold_good', 'bad_selector', 'outer_freeze', 'loaded_selector', 'loaded_vector', 'comparison_vector', 'phi_vector']
+ kinds := ['poison_before', 'poison_after', 'undef_before', 'undef_after', 'cold_bad', 'cold_good', 'bad_selector', 'outer_freeze', 'loaded_selector', 'loaded_vector', 'floating_comparison_vector', 'phi_vector']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_vector' { text.write_string('%src = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'comparison_vector' { text.write_string('%unsupported_compare = icmp eq <3 x i32> %a, zeroinitializer
+  if kind == 'floating_comparison_vector' { text.write_string('%unsupported_compare = fcmp oeq <3 x float> zeroinitializer, zeroinitializer
  %src = sext <3 x i1> %unsupported_compare to <3 x i32>\n') }
   if kind == 'phi_vector' { text.write_string('br label %join\n join: %src = phi <3 x i32> [%a, %entry]\n') }
   if kind == 'loaded_selector' { text.write_string('%selector = load i32, ptr %out, align 1\n') }
   constant := '<i32 poison, i32 undef, i32 3>'
-  source := if kind in ['loaded_vector', 'comparison_vector', 'phi_vector'] { '%src' } else { constant }
+  source := if kind in ['loaded_vector', 'floating_comparison_vector', 'phi_vector'] { '%src' } else { constant }
   selector := if kind in ['bad_selector', 'outer_freeze'] { '3' } else if kind == 'loaded_selector' { '%selector' } else { '1' }
   bad_lane := if kind.starts_with('poison') { 0 } else { 1 }
   if kind.ends_with('before') { text.write_string('%bad = extractelement <3 x i32> ${constant}, i32 ${bad_lane}\n %bp = getelementptr i8, ptr %out, i32 %bad\n') }
@@ -227,7 +227,7 @@ fn controls(assembler string, root string) !int {
  for kind in kinds {
   f := fi(ir, kind); mut actual := []u8{len: 64, init: 0xcc}; av := [u64(0), 0, 0]; sv := [u64(0)]; cv := [u64(1)]
   mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: sv}, airbitcode.IRMemoryBinding{values: cv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  if kind in ['loaded_selector', 'loaded_vector', 'comparison_vector', 'phi_vector'] {
+  if kind in ['loaded_selector', 'loaded_vector', 'floating_comparison_vector', 'phi_vector'] {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported frozen source') }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported frozen source ran') }; untouched(actual)
   } else {
