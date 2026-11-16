@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [single-leaf sync-file information queries](m1-agx-sync-file-info.md)
-(2026-11-16). The [sync-file completion readiness and wakeups](m1-agx-sync-file-poll.md),
+Latest offline increment: [deadline hints for current sync-file leaves](m1-agx-sync-file-deadline.md)
+(2026-11-16). The [single-leaf information queries](m1-agx-sync-file-info.md),
+[sync-file completion readiness and wakeups](m1-agx-sync-file-poll.md),
 [binary sync-file import validation](m1-agx-sync-file-import.md),
 [opaque syncobj descriptor sharing](m1-agx-syncobj-sharing.md),
 [syncobj namespaces beyond the fixed table](m1-agx-syncobj-namespace.md),

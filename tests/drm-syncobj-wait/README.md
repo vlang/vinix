@@ -128,4 +128,14 @@ overlapping ranges and input mutation between outputs. Completion and final
 descriptor close between copies test coherent snapshots and wrapper ownership;
 source replacement/removal leaves the exported leaf intact. All temporary
 detail owners must be freed on success and every error. This covers current
-single-leaf exports; merge, containers and deadline ioctls remain separate work.
+single-leaf exports; merge and containers remain separate work.
+
+Sync-file `SET_DEADLINE` cases execute the 16-byte write-only request against
+generic, queue and private-stub leaves, both pending and complete. All deadline
+bit patterns are accepted with zero padding; short or faulting copies precede
+pad validation. Malformed command encodings and opaque descriptors remain
+ENOTTY. The current leaves have no deadline callback, so hints allocate
+nothing, write no user bytes and leave status, first timestamps, readiness and
+event generations unchanged. Source teardown and final descriptor close during
+lookup preserve the syscall reference. These checks do not qualify Linux's
+scheduler wrapper metadata/forwarding, fence containers or GPU frequency policy.

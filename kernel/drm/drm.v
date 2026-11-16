@@ -212,6 +212,11 @@ fn (mut this SyncFileResource) ioctl(handle voidptr, request u64, argp voidptr) 
 		if result < 0 { errno.set(u64(-result)); return none }
 		return result
 	}
+	if u32(request) == ioctl.sync_ioc_set_deadline {
+		result := sync_file_deadline_ioctl(u64(argp))
+		if result < 0 { errno.set(u64(-result)); return none }
+		return result
+	}
 	return resource.default_ioctl(handle, request, argp)
 }
 

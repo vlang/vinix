@@ -16,6 +16,7 @@ const helpers = [
 	'drm__SyncFileResource__poll_status',
 	'drm__SyncFileResource__ioctl',
 	'drm__sync_file_info_ioctl',
+	'drm__sync_file_deadline_ioctl',
 	'drm__sync_info_names',
 	'drm__sync_name_append',
 	'drm__sync_name_number',
@@ -88,7 +89,7 @@ const helpers = [
 fn result_type(name string) string {
 	if name == 'syncobj__snapshot' { return 'syncobj__FenceSnapshot' }
 	if name == 'drm__SyncFileResource__ioctl' { return '__v_option_i64' }
-	if name == 'drm__sync_file_info_ioctl' { return 'i64' }
+	if name in ['drm__sync_file_info_ioctl', 'drm__sync_file_deadline_ioctl'] { return 'i64' }
 	if name == 'drm__sync_info_names' { return 'void' }
 	if name in ['drm__sync_name_append', 'drm__sync_name_number'] { return 'u32' }
 	if name == 'drm__SyncFileResource__poll_status' { return 'i64' }
