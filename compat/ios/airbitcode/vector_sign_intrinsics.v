@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_air_fma_cache_base + 16
+const vector_float_intrinsic_slots = vector_air_extrema_cache_base + 32
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -120,6 +120,10 @@ fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Strea
 		return m.store_vector_value(inst, interleaved_vector(sources, factor, count / factor)!)!
 	}
 	left := m.read_vector(stream, m.p.operands[op.operands_start + 1])!
+	if id in [.air_fmin, .air_fmax]! {
+		right := m.read_vector(stream, m.p.operands[op.operands_start + 2])!
+		return m.store_vector_value(inst, air_extrema_vector(id, left, right, bits, count)!)!
+	}
 	if id == .vector_insert {
 		_, source_count, _ := vector_subinsert_name(ir.functions[op.callee_function].name)!
 		right := m.read_vector(stream, m.p.operands[op.operands_start + 2])!

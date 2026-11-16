@@ -5193,6 +5193,8 @@ declare <2 x float> @air.sqrt.v2f32(<2 x float>) #0
 declare <2 x float> @air.round.v2f32(<2 x float>) #0
 declare <2 x float> @air.rint.v2f32(<2 x float>) #0
 declare <2 x float> @air.fma.v2f32(<2 x float>, <2 x float>, <2 x float>) #0
+declare <2 x float> @air.fmin.v2f32(<2 x float>, <2 x float>) #0
+declare <2 x float> @air.fmax.v2f32(<2 x float>, <2 x float>) #0
 declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
@@ -5434,6 +5436,81 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  ret void }
 
 ')
+	names << 'image_air_extrema'
+	source.write_string('define void @image_air_extrema(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
+ %x = extractelement <3 x i32> %gid, i32 0
+ %y = extractelement <3 x i32> %gid, i32 1
+ %w = extractelement <3 x i32> %grid, i32 0
+ %h = extractelement <3 x i32> %grid, i32 1
+ %xf = uitofp i32 %x to float
+ %yf = uitofp i32 %y to float
+ %parity = and i32 %x, 1
+ %odd = icmp ne i32 %parity, 0
+ %first_zero = select i1 %odd, float bitcast (i32 2147483648 to float), float 0.0
+ %second_zero = select i1 %odd, float 0.0, float bitcast (i32 2147483648 to float)
+ %first_zero_word = bitcast float %first_zero to i32
+ %less = fcmp olt float %xf, %yf
+ %low_expected = select i1 %less, float %xf, float %yf
+ %high_expected = select i1 %less, float %yf, float %xf
+ %offset = xor i32 %x, 63
+ %air_extrema_x0 = insertelement <2 x float> zeroinitializer, float %xf, i32 0
+ %air_extrema_x = insertelement <2 x float> %air_extrema_x0, float %first_zero, i32 1
+ %air_extrema_y0 = insertelement <2 x float> zeroinitializer, float %yf, i32 0
+ %air_extrema_y = insertelement <2 x float> %air_extrema_y0, float %second_zero, i32 1
+ %air_vmin = call <2 x float> @air.fmin.v2f32(<2 x float> %air_extrema_x, <2 x float> %air_extrema_y)
+ %air_vmax = call <2 x float> @air.fmax.v2f32(<2 x float> %air_extrema_x, <2 x float> %air_extrema_y)
+ %air_vmin0 = extractelement <2 x float> %air_vmin, i32 0
+ %air_vmax0 = extractelement <2 x float> %air_vmax, i32 0
+ %air_vmin1 = extractelement <2 x float> %air_vmin, i32 1
+ %air_vmax1 = extractelement <2 x float> %air_vmax, i32 1
+ %air_vmin_word = bitcast float %air_vmin1 to i32
+ %air_vmax_word = bitcast float %air_vmax1 to i32
+ %air_vmin_ok = fcmp oeq float %air_vmin0, %low_expected
+ %air_vmax_ok = fcmp oeq float %air_vmax0, %high_expected
+ %air_vmin_zero_ok = icmp eq i32 %air_vmin_word, %first_zero_word
+ %air_vmax_zero_ok = icmp eq i32 %air_vmax_word, %first_zero_word
+ %air_peer = insertelement <2 x float> %air_extrema_x0, float %yf, i32 1
+ %air_nan_min = call <2 x float> @air.fmin.v2f32(<2 x float> <float bitcast (i32 2143289344 to float), float bitcast (i32 2143289344 to float)>, <2 x float> %air_peer)
+ %air_nan_max = call <2 x float> @air.fmax.v2f32(<2 x float> %air_peer, <2 x float> <float bitcast (i32 2143289344 to float), float bitcast (i32 2143289344 to float)>)
+ %air_nan_min0 = extractelement <2 x float> %air_nan_min, i32 0
+ %air_nan_min1 = extractelement <2 x float> %air_nan_min, i32 1
+ %air_nan_max0 = extractelement <2 x float> %air_nan_max, i32 0
+ %air_nan_max1 = extractelement <2 x float> %air_nan_max, i32 1
+ %air_nan_min_ok0 = fcmp oeq float %air_nan_min0, %xf
+ %air_nan_min_ok1 = fcmp oeq float %air_nan_min1, %yf
+ %air_nan_max_ok0 = fcmp oeq float %air_nan_max0, %xf
+ %air_nan_max_ok1 = fcmp oeq float %air_nan_max1, %yf
+ %air_extrema_ok0 = and i1 %air_vmin_ok, %air_vmax_ok
+ %air_extrema_ok1 = and i1 %air_vmin_zero_ok, %air_vmax_zero_ok
+ %air_extrema_ok2 = and i1 %air_nan_min_ok0, %air_nan_min_ok1
+ %air_extrema_ok3 = and i1 %air_nan_max_ok0, %air_nan_max_ok1
+ %air_extrema_ok4 = and i1 %air_extrema_ok0, %air_extrema_ok1
+ %air_extrema_ok5 = and i1 %air_extrema_ok2, %air_extrema_ok3
+ %air_extrema_ok = and i1 %air_extrema_ok4, %air_extrema_ok5
+ %float_ok = and i1 %air_extrema_ok, true
+ %coordinate = or i32 %x, 0
+ %row = shl i32 %y, 6
+ %index = add i32 %row, %coordinate
+ %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
+ %red = mul i32 %x, 3
+ %mixed_raw = xor i32 %red, %offset
+ %mixed = select i1 %float_ok, i32 %mixed_raw, i32 poison
+ %r = and i32 %mixed, 255
+ %gg = mul i32 %y, 5
+ %g0 = and i32 %gg, 255
+ %g = shl i32 %g0, 8
+ %wh = add i32 %w, %h
+ %bb = mul i32 %wh, 7
+ %b0 = and i32 %bb, 255
+ %b = shl i32 %b0, 16
+ %rg = or i32 %r, %g
+ %rgb = or i32 %rg, %b
+ %rgba = or i32 %rgb, 4278190080
+ store i32 %rgba, ptr addrspace(1) %p, align 4
+ ret void }
+
+')
+
 	names << 'image_mulh'
 	source.write_string('declare i8 @llvm.smulh.i8(i8, i8)
 declare i8 @llvm.umulh.i8(i8, i8)
@@ -5952,7 +6029,7 @@ define void @image_subinsert(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %
 			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
 		} else {
 			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
-			if i == 2 || name in ['image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction', 'image_vector_phi', 'image_canonicalize', 'image_mulh', 'image_reverse', 'image_splice', 'image_interleave', 'image_stepvector', 'image_active_mask', 'image_subvector', 'image_subinsert'] {
+			if i == 2 || name in ['image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction', 'image_vector_phi', 'image_canonicalize', 'image_air_extrema', 'image_mulh', 'image_reverse', 'image_splice', 'image_interleave', 'image_stepvector', 'image_active_mask', 'image_subvector', 'image_subinsert'] {
 				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
 			} else if i < 3 + bad.len * 3 {
 				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
@@ -5986,7 +6063,7 @@ define void @image_subinsert(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %
 		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
 		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
 		queue := sm_send(device, c'newCommandQueue')
-		for name in names[3..names.len - 27] {
+		for name in names[3..names.len - 28] {
 			mut error_slot := u64(0)
 			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
 			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
@@ -6038,7 +6115,7 @@ define void @image_subinsert(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %
 			objc_release(pipeline)
 		}
 		objc_release(output)
-		for image_name in [names[2], names[names.len - 27], names[names.len - 26], names[names.len - 25], names[names.len - 24], names[names.len - 23], names[names.len - 22], names[names.len - 21], names[names.len - 20], names[names.len - 19], names[names.len - 18], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
+		for image_name in [names[2], names[names.len - 28], names[names.len - 27], names[names.len - 26], names[names.len - 25], names[names.len - 24], names[names.len - 23], names[names.len - 22], names[names.len - 21], names[names.len - 20], names[names.len - 19], names[names.len - 18], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
 		mut image_error := u64(0)
 		pipeline := sm_test_compute_pipeline(device, library, image_name, &image_error)
 		if pipeline == 0 { panic('software Metal image ${image_name}: ' + string_text(sm_send(image_error, c'localizedDescription'))) }
@@ -6100,7 +6177,7 @@ define void @image_subinsert(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %
 					match x % 16 { 0 { signed = 0; unsigned = 0 } 1 { signed = 127; unsigned = 255 } 2 { signed = -128; unsigned = 0 } else {} }
 					cast_bits = u8(signed) ^ u8(unsigned)
 				}
-				color := [if image_name == 'image_subinsert' { u8(x * 3) ^ u8((x & 15) + if (x & 15) >= 4 && (x & 15) < 8 { 8 } else { 0 }) ^ u8(12 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_subvector' { u8(x * 3) ^ u8(8 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_active_mask' { u8(x * 3) ^ u8(x + (x & 15) < 17) ^ u8(1) } else if image_name == 'image_stepvector' { u8(x * 3) ^ u8((x & 15) ^ 2) } else if image_name in ['image_reverse','image_splice','image_interleave'] { u8(x * 3) ^ u8(x | 1) ^ u8(x) ^ u8((x | 1) << 1) ^ u8(48) } else if image_name == 'image_mulh' { u8(x * 3) ^ u8(if x == 0 { u64(0) } else { u64(255) }) ^ u8(x + 127) ^ u8(if x == 0 { u64(0) } else { x - 1 }) } else if image_name == 'image_canonicalize' { u8(x * 3) ^ u8(x) ^ u8(63) } else if image_name == 'image_vector_phi' { u8(x * 3) ^ u8(x + y + if x % 2 != 0 { 3 } else { 7 }) ^ u8(if x % 2 != 0 { 5 } else { 11 }) } else if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) ^ population }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				color := [if image_name == 'image_subinsert' { u8(x * 3) ^ u8((x & 15) + if (x & 15) >= 4 && (x & 15) < 8 { 8 } else { 0 }) ^ u8(12 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_subvector' { u8(x * 3) ^ u8(8 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_active_mask' { u8(x * 3) ^ u8(x + (x & 15) < 17) ^ u8(1) } else if image_name == 'image_stepvector' { u8(x * 3) ^ u8((x & 15) ^ 2) } else if image_name in ['image_reverse','image_splice','image_interleave'] { u8(x * 3) ^ u8(x | 1) ^ u8(x) ^ u8((x | 1) << 1) ^ u8(48) } else if image_name == 'image_mulh' { u8(x * 3) ^ u8(if x == 0 { u64(0) } else { u64(255) }) ^ u8(x + 127) ^ u8(if x == 0 { u64(0) } else { x - 1 }) } else if image_name in ['image_canonicalize', 'image_air_extrema'] { u8(x * 3) ^ u8(x) ^ u8(63) } else if image_name == 'image_vector_phi' { u8(x * 3) ^ u8(x + y + if x % 2 != 0 { 3 } else { 7 }) ^ u8(if x % 2 != 0 { 5 } else { 11 }) } else if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) ^ population }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
 				for lane in 0 .. 4 {
 					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
 					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]

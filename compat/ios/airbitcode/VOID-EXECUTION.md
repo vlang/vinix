@@ -1,5 +1,20 @@
 # Void-return scalar execution
 
+Binary `air.fmin.vNf32` and `air.fmax.vNf32` accept matching fixed
+1..16-lane float32 vectors and reuse the scalar AIR extrema evaluator per
+lane. A numeric argument takes precedence over NaN; numeric ties retain the
+first argument, including opposite signed zeros. Two NaNs yield the existing
+positive canonical NaN. Both sources are observed: poison propagates locally
+and any unfrozen undef lane refuses, even with a NaN peer. Existing freezes,
+discarded poison, vector-PHI slots and cleanup are reused. Keys 61732..61763
+append 32 AIR identities, separate from LLVM, for 61,764 vector entries;
+scalar entries remain 2,179. LLVM zero ordering is preserved in mixed chains.
+Exact binary signatures, both operand types and ordinary pure call metadata
+remain checked, including after cache hits. One call uses one existing result
+slot/step and the established source/result work charges. Invalid profiles
+reject before writes; runtime state failures retain earlier stores. Half,
+scalable, fast spellings and floating address projections remain excluded.
+
 Ternary `air.fma.vNf32` accepts three matching fixed 1..16-lane float32
 vectors. It reuses the existing fused evaluator: the exact product and addend
 are combined before one nearest rounding with ties to even. All three sources
@@ -7,7 +22,7 @@ are observed. Lane poison propagates; any unfrozen undef source lane refuses,
 including when another source is poison. Existing source/result freezes,
 discarded poison, scalar extraction, vector-PHI slots and cleanup are reused.
 Keys 61716..61731 append sixteen AIR identities, separate from LLVM, for
-61,732 vector entries. Scalar entries remain 2,179. Exact signatures, all
+61,764 vector entries. Scalar entries remain 2,179. Exact signatures, all
 three argument types and ordinary pure call metadata remain checked even
 after cache hits. Work uses the established source/result charges, one result
 slot and one executed step per call. Invalid profiles reject before writes;
@@ -23,12 +38,12 @@ Poison stays local to its lane; any unfrozen undef source lane refuses. Freezes,
 discarded poison and scalar extraction retain existing rules. Exact vector
 argument/result types, ordinary calls, pure attributes and duplicate checks
 remain required, including after cache hits. Keys 61604..61715 append 112 AIR
-identities, separate from LLVM, for 61,732 vector entries. Scalar entries stay
+identities, separate from LLVM, for 61,764 vector entries. Scalar entries stay
 2,179. One call uses one existing result slot/step and the established vector
 source/result work charges. The admitted AIR vector families are these unary
-operations and FMA. Half, scalable and fast overloads remain excluded; floating
-address projections reject. Existing owners and
-cleanup paths are reused. Invalid profiles reject before writes; runtime state
+operations, FMA and float min/max. Half, scalable and fast overloads remain
+excluded; floating address projections reject. Existing owners and cleanup
+paths are reused. Invalid profiles reject before writes; runtime state
 failures retain earlier stores.
 
 Ternary `air.clamp.f32(x, low, high)` composes AIR `fmax(x, low)` then
@@ -136,7 +151,7 @@ the inserted count and keeps the full window in range. Exact declaration immarg
 placement is selected per family: third parameter for insertion, second for
 existing immediate families. Both scalar and memory scanners share this policy.
 One call costs one step, one existing result slot and 2*base_count + inserted_count
-work units. The vector cache has 61,732 entries, with new keys 52628..61603; the
+work units. The vector cache has 61,764 entries, with new keys 52628..61603; the
 scalar cache remains 2,179. Existing slots, snapshots and cleanup retain ownership.
 Maintained tests cover overwritten poison/undef, surrounding lanes, input/result
 freezes, discarded void results, loop reuse and existing resource bounds.
