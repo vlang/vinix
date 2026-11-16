@@ -10,7 +10,7 @@ import usercopy
 struct Guarded {
 mut:
 	before [64]u8
-	commands [64]submission.PacketCommand
+	commands [64]submission.Command
 	after [64]u8
 }
 
@@ -85,14 +85,14 @@ fn check_inputs() {
 		for i in 0 .. 32 {
 			c := storage.commands[i * 2]
 			r := storage.commands[i * 2 + 1]
-			assert c.command.descriptor.cmd_type == ioctl.asahi_cmd_compute, 'compute opcode'
-			assert r.command.descriptor.cmd_type == ioctl.asahi_cmd_render, 'render opcode'
-			assert c.command.descriptor.barriers == [u32(i), ioctl.asahi_barrier_none]!, 'compute barriers'
-			assert r.command.descriptor.barriers == [ioctl.asahi_barrier_none, u32(i + 1)]!, 'render barriers'
-			assert c.command.descriptor.cmd_buffer == 0 && c.command.descriptor.result_offset == 0 && c.command.descriptor.result_size == 0
-			assert r.command.descriptor.cmd_buffer == 0 && r.command.descriptor.result_offset == 0 && r.command.descriptor.result_size == 0
-			expect_compute(&c.command.compute, &computes[i], usc, flush)
-			expect_render(&r.command.render, &renders[i], usc, flush)
+			assert c.descriptor.cmd_type == ioctl.asahi_cmd_compute, 'compute opcode'
+			assert r.descriptor.cmd_type == ioctl.asahi_cmd_render, 'render opcode'
+			assert c.descriptor.barriers == [u32(i), ioctl.asahi_barrier_none]!, 'compute barriers'
+			assert r.descriptor.barriers == [ioctl.asahi_barrier_none, u32(i + 1)]!, 'render barriers'
+			assert c.descriptor.cmd_buffer == 0 && c.descriptor.result_offset == 0 && c.descriptor.result_size == 0
+			assert r.descriptor.cmd_buffer == 0 && r.descriptor.result_offset == 0 && r.descriptor.result_size == 0
+			expect_compute(&c.compute, &computes[i], usc, flush)
+			expect_render(&r.render, &renders[i], usc, flush)
 			assert c.timestamps == [asahi.Timestamps{}, asahi.Timestamps{}, computes[i].ts]!, 'compute timestamp metadata'
 			assert r.timestamps == [renders[i].ts_vtx, renders[i].ts_frag, asahi.Timestamps{}]!, 'render timestamp metadata'
 			assert c.needs_timestamp_objects() && r.needs_timestamp_objects()
@@ -109,7 +109,7 @@ fn check_inputs() {
 				counts[engine] = u32(h.size / sizeof(asahi.Attachment))
 				unsafe { C.memcpy(&attachments[engine], &bytes[offset], h.size) }
 			} else {
-				value := storage.commands[hardware].command
+				value := storage.commands[hardware]
 				if h.cmd_type == asahi.cmd_compute { expect_attachments(value.compute.attachments, value.compute.attachment_count, attachments[2], counts[2]) }
 				else {
 					expect_attachments(value.render.vertex_attachments, value.render.vertex_attachment_count, attachments[0], counts[0])
@@ -122,7 +122,7 @@ fn check_inputs() {
 		expect_guards(&storage)
 		// The staged value owns its bytes after the immutable input is discarded.
 		for i in 0 .. bytes.len { bytes[i] = 0xff }
-		expect_compute(&storage.commands[0].command.compute, &computes[0], usc, flush)
+		expect_compute(&storage.commands[0].compute, &computes[0], usc, flush)
 	}
 	unsafe { bytes.free() }
 }
@@ -135,12 +135,12 @@ fn check_failures() {
 	mut render := asahi.CmdRender{width_px: 1, height_px: 16384, layers: 2048, samples: 4, utile_width_px: 32, utile_height_px: 32}
 	code0, count0 := submission.decode_packet(unsafe { nil }, 0, 0, false, mut storage.commands[..], mut workspace)
 	assert code0 == -22 && count0 == 0
-	mut oversized := [65]submission.PacketCommand{}
+	mut oversized := [65]submission.Command{}
 	oversized_code, oversized_count := submission.decode_packet(unsafe { nil }, 0, 0, false, mut oversized[..], mut workspace)
 	assert oversized_code == -22 && oversized_count == 0
 	for _ in 0 .. 2 { append_record(mut bytes, asahi.cmd_compute, &compute, 64, 0, 0) }
 	capacity_code, capacity_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..1], mut workspace)
-	assert capacity_code == -22 && capacity_count == 0 && storage.commands[1] == submission.PacketCommand{}, 'capacity cannot expose or overwrite prefix'
+	assert capacity_code == -22 && capacity_count == 0 && storage.commands[1] == submission.Command{}, 'capacity cannot expose or overwrite prefix'
 	for kind in [asahi.cmd_compute, asahi.cmd_render] {
 		bytes.clear()
 		append_record(mut bytes, kind, if kind == asahi.cmd_compute { voidptr(&compute) } else { voidptr(&render) }, if kind == asahi.cmd_compute { u16(64) } else { u16(__offsetof(asahi.CmdRender, ts_vtx)) }, 0, 0)

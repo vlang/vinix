@@ -442,6 +442,9 @@ fn check_submission_pipelining(pending string) ! {
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
 	check_timestamp_inputs_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
+	check_pending_timestamps_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/file/submission_timestamps.v'))!)!
+	check_pending_timestamps_reference(read(os.join_path(base, 'queue/compute.rs'))!, read(os.join_path(base, 'queue/render.rs'))!)!
 	check_timestamp_capture_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/timestamps.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_timestamp_capture_reference(read(os.join_path(base, 'queue/common.rs'))!,

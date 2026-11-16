@@ -26,6 +26,16 @@ struct Objects {
 	object &gem.GemObject = unsafe { nil }
 }
 
+struct TimestampObject {
+	id u32
+	va u64
+	size u64
+	obj &gem.GemObject = unsafe { nil }
+mut:
+	references u64
+	detached bool
+}
+
 fn (objects &Objects) find(handle u32) ?&gem.GemObject {
 	if handle == 7 && objects.object != unsafe { nil } { return objects.object }
 	return none
@@ -42,6 +52,7 @@ mut:
 	inflight_by_vm [64]u64
 	detached_vms [64]bool
 	mapping_retry_blocked bool
+	timestamp_objects []TimestampObject
 }
 
 // Mapping/page-table services are injected here; the close fixture exercises
@@ -351,6 +362,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_pending_timestamps()
 	check_detached_submission_ownership()
 	check_detached_vm_submissions()
 	check_submission_device_loss()

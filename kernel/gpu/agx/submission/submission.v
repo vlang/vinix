@@ -6,6 +6,7 @@ module submission
 // All userspace command, payload, attachment, and sync descriptors are copied
 // before a backend acquires its VM or queue locks.
 
+import drm.asahi
 import drm.ioctl
 import drm.syncobj
 import gpu.agx.compute as agxcompute
@@ -30,6 +31,7 @@ pub:
 	descriptor ioctl.DrmAsahiCommand
 	render     agxrender.Command
 	compute    agxcompute.Command
+	timestamps [3]asahi.Timestamps // vertex, fragment, compute; zero for legacy input
 }
 
 // Snapshot sync descriptors and retain the stable sync-object and input-fence

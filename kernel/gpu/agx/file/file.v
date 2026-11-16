@@ -1356,10 +1356,29 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	if sync_result != 0 { return sync_result }
 	output_result, output_syncs := agxsubmission.stage_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 { return output_result }
+	code := f.submit_g13_staged(captured, commands, &input_syncs, &output_syncs, request.result_handle)
+	transferred = code == 0
+	return code
+}
+
+// Both copied input formats share preparation and pending ownership. The
+// caller retains captured on failure; successful registration transfers it.
+// Modern ioctl registration still requires a coordinated UAPI transition.
+fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
+	commands []agxsubmission.Command, input_syncs &agxsubmission.SyncArray,
+	output_syncs &agxsubmission.SyncArray, result_handle u32) int {
+	if commands.len == 0 || commands.len > int(max_g13_submission_commands) { return -22 }
 	manager := gpu.get_global_manager() or { return -19 }
 	mut state_manager := unsafe { manager }
 	status := state_manager.g13_submission_status()
 	if status != 0 { return status }
+	// Captures acquire file.lock independently, before backend preparation.
+	// This outer defer runs after the file-lock defer and pending cancellation.
+	timestamp_code, captured_timestamps := f.new_g13_submission_timestamps(commands)
+	if timestamp_code != 0 { return timestamp_code }
+	timestamps := captured_timestamps
+	mut timestamps_transferred := false
+	defer { if !timestamps_transferred { f.release_g13_submission_timestamps(timestamps) } }
 	f.lock.acquire()
 	mut unqueued_fence := &syncobj.DmaFence(unsafe { nil })
 	mut unqueued_failure := 0
@@ -1384,8 +1403,8 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		if (descriptor.cmd_type == ioctl.asahi_cmd_compute && queue_caps & ioctl.asahi_queue_cap_compute == 0)
 			|| (descriptor.cmd_type == ioctl.asahi_cmd_render && queue_caps & ioctl.asahi_queue_cap_render == 0) { return -22 }
 		if descriptor.result_size != 0 {
-			if request.result_handle == 0 { return -22 }
-			if result_object == unsafe { nil } { result_object = f.objects.find(request.result_handle) or { unsafe { nil } } }
+			if result_handle == 0 { return -22 }
+			if result_object == unsafe { nil } { result_object = f.objects.find(result_handle) or { unsafe { nil } } }
 			if result_object == unsafe { nil } || descriptor.result_offset > result_object.size
 				|| descriptor.result_size > result_object.size - descriptor.result_offset { return -22 }
 		} else if descriptor.result_offset != 0 { return -22 }
@@ -1398,8 +1417,9 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		vm_id: vm_id
 		queue: queue_resources
 		manager: manager
-		dependencies: input_syncs
-		command_count: request.command_count
+		dependencies: *input_syncs
+		command_count: u32(commands.len)
+		timestamps: timestamps
 	} }
 	if !resolve_g13_batch_dependencies(mut pending, commands) { memory.free(storage); return -22 }
 	mut queued := false
@@ -1416,23 +1436,34 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	mut gpu_manager := unsafe { manager }
 	pending.initial_events = gpu_manager.capture_g13_initial_events(queue_resources, pending.initial_barriers) or { return -5 }
-	for index := u32(0); index < request.command_count; index++ {
+	for index := u32(0); index < pending.command_count; index++ {
+		compute_ts := timestamps.addresses(index, 2)
+		vertex_ts := timestamps.addresses(index, 0)
+		fragment_ts := timestamps.addresses(index, 1)
 		if commands[index].descriptor.cmd_type == ioctl.asahi_cmd_compute {
-			pending.commands[index].compute_job = gpu_manager.prepare_g13_compute_job(queue_resources, vm,
-				&commands[index].compute) or { return -12 }
+			pending.commands[index].compute_job = if timestamps.count == 0 {
+				gpu_manager.prepare_g13_compute_job(queue_resources, vm, &commands[index].compute) or { return -12 }
+			} else {
+				gpu_manager.prepare_g13_compute_job_with_timestamps(queue_resources, vm,
+					&commands[index].compute, compute_ts) or { return -12 }
+			}
 		} else {
-			pending.commands[index].render_job = gpu_manager.prepare_g13_render_job(queue_resources,
-				&commands[index].render) or { return -12 }
+			pending.commands[index].render_job = if timestamps.count == 0 {
+				gpu_manager.prepare_g13_render_job(queue_resources, &commands[index].render) or { return -12 }
+			} else {
+				gpu_manager.prepare_g13_render_job_with_timestamps(queue_resources,
+					&commands[index].render, vertex_ts, fragment_ts) or { return -12 }
+			}
 		}
 	}
 	if !install_g13_batch_barriers(mut pending) { return -5 }
 	gpu_manager.release_g13_initial_events(mut pending.initial_events)
 	pending.final_fence = syncobj.new_queue_fence(f.owner_key, timer.get_ns(), queue_resources.fence_context)
-	for index := u32(0); index < request.command_count; index++ {
+	for index := u32(0); index < pending.command_count; index++ {
 		code := f.install_g13_batch_completion(mut pending, index, unsafe { &commands[index] }, result_object)
 		if code != 0 { return code }
 	}
-	if !agxsubmission.install_output_syncs(&output_syncs, pending.final_fence) { return -22 }
+	if !agxsubmission.install_output_syncs(output_syncs, pending.final_fence) { return -22 }
 	katomic.inc(mut &f.inflight_by_vm[vm_id])
 	if !register_g13_pending(mut gpu_manager, pending) {
 		cancel_g13_pending(mut pending, -19)
@@ -1442,7 +1473,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	// Registration transferred the captured queue reference to the worker
 	// node, which also owns the aggregate VM pin acquired above.
-	transferred = true
+	timestamps_transferred = true
 	queued = true
 	return 0
 }

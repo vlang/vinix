@@ -4,7 +4,7 @@ import os
 // Modern packet entry points are intentionally unregistered. Production
 // dead-code elimination omits them; check their exact sanitizer fixture C.
 const packet_helpers = [
-	'submission__PacketCommand__needs_timestamp_objects',
+	'submission__Command__needs_timestamp_objects',
 	'submission__decode_packet',
 	'submission__packet_barrier',
 	'submission__packet_attachments',

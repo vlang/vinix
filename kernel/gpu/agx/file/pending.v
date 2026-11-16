@@ -32,6 +32,7 @@ mut:
 	vm_id               u32
 	queue               &gpu.G13QueueResources = unsafe { nil }
 	manager             &gpu.GpuManager        = unsafe { nil }
+	timestamps          G13SubmissionTimestamps
 	dependencies        submission.SyncArray
 	dependencies_ready  bool
 	admitted            bool // scalar survives publication and immediate metadata retirement
@@ -323,6 +324,10 @@ fn process_pending_submissions() {
 			}
 			assert katomic.load(&item.callbacks_remaining) == 0
 			signal_g13_submission_fence(item.final_fence, katomic.load(&item.failure))
+			// GPU callbacks have dropped their final node access. Release global
+			// timestamp mappings outside manager.lock, while file/VM pins remain.
+			mut owner := unsafe { item.file }
+			owner.release_g13_submission_timestamps(item.timestamps)
 			mut queue := unsafe { item.queue }
 			queue.release_file_reference()
 			katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])

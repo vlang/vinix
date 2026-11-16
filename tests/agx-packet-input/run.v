@@ -34,7 +34,7 @@ fn main() {
 	submission := os.read_file(repo + '/kernel/gpu/agx/submission/submission.v')!
 	start := submission.index('pub struct Command {') or { panic('missing Command') }
 	end := submission.index_after('\n}', start) or { panic('unterminated Command') }
-	os.write_file(scratch + '/gpu/agx/submission/types.v', 'module submission\nimport drm.ioctl\nimport gpu.agx.compute as agxcompute\nimport gpu.agx.render as agxrender\npub const max_commands = u32(64)\n' + submission[start..end + 2] + '\n')!
+	os.write_file(scratch + '/gpu/agx/submission/types.v', 'module submission\nimport drm.asahi\nimport drm.ioctl\nimport gpu.agx.compute as agxcompute\nimport gpu.agx.render as agxrender\npub const max_commands = u32(64)\n' + submission[start..end + 2] + '\n')!
 	os.cp(options['--source'] or { repo + '/kernel/gpu/agx/submission/packet.v' }, scratch + '/gpu/agx/submission/packet.v')!
 	os.cp(repo + '/tests/agx-packet-input/test.v', scratch + '/main.v')!
 	os.write_file(scratch + '/reference.v', model)!

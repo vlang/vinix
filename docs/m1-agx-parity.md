@@ -6,9 +6,11 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [resolved timestamp preparation inputs](m1-agx-timestamp-inputs.md)
-(2026-11-16). Modern submission still needs to transfer captures through actual
-job retirement and complete public ioctl/Mesa integration. The
+Latest offline increment: [pending submission timestamp ownership](m1-agx-pending-timestamps.md)
+(2026-11-16). Copied packet inputs now share native job preparation and transfer
+timestamp captures through pending retirement. Retention is conservative across
+the whole batch; public modern ioctl/Mesa integration remains incomplete. The
+[resolved timestamp preparation inputs](m1-agx-timestamp-inputs.md),
 [timestamp capture ownership](m1-agx-timestamp-capture.md),
 [modern packet command adapter](m1-agx-packet-input.md),
 [failed queue construction cleanup](m1-agx-orphan-queue.md),

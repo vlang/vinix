@@ -9,7 +9,7 @@ fn section(source string, start string, end string) !string {
 
 fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
-	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--pending-source'])
+	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--pending-source', '--timestamp-source'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-async-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -35,6 +35,8 @@ fn main() {
 		section(source, 'fn discard_g13_completion(', 'fn dispatch(')!
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp(if os.args.len == 3 && os.args[1] == '--pending-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/pending.v' }, '${scratch}/gpu/agx/file/pending.v')!
+	os.cp('${repo}/kernel/gpu/agx/file/timestamps.v', '${scratch}/gpu/agx/file/timestamp_capture_production.v')!
+	os.cp(if os.args.len == 3 && os.args[1] == '--timestamp-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/submission_timestamps.v' }, '${scratch}/gpu/agx/file/submission_timestamps.v')!
 	gpu := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
 	g13 := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	errors := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v')!
@@ -53,6 +55,13 @@ fn main() {
 	build.run()
 	build.wait()
 	if build.code != 0 { exit(build.code) }
+	if output := os.getenv_opt('AGX_ASYNC_TEST_C') {
+		assert output.ends_with('.c')
+		mut flags := build.args.clone(); flags[flags.len - 2] = output
+		mut generated := os.new_process(os.getenv_opt('V') or { 'v' })
+		generated.set_args(flags); generated.run(); generated.wait()
+		if generated.code != 0 { exit(generated.code) }
+	}
 	if output := os.getenv_opt('AGX_ASYNC_TEST_BINARY') { os.cp('${scratch}/test', output)! }
 	mut check := os.new_process('${scratch}/test')
 	check.run()

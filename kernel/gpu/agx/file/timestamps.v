@@ -83,8 +83,7 @@ fn (mut f GpuFile) release_g13_timestamps(mut references G13TimestampReferences)
 
 // Resolve each lookup in command order, retaining earlier destinations across
 // concurrent UNBIND. Any failure releases the prefix and clears owned output.
-// Modern submit must transfer this owner through job retirement before using
-// addresses(); the public Mesa 25 ioctl path does not call this helper.
+// Submission staging transfers this owner through pending-job retirement.
 fn (mut f GpuFile) capture_g13_timestamps(input [3]asahi.Timestamps,
 	mut references G13TimestampReferences) int {
 	for pipe in 0 .. 3 {

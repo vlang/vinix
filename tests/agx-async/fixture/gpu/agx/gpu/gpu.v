@@ -62,6 +62,7 @@ pub mut:
 	released    bool
 	quarantined bool
 	marker      u64
+	timestamps [2]u64
 	ordinal     u32
 	barrier_sources [2]u32
 	initial_sources [2]u32
@@ -71,6 +72,8 @@ pub mut:
 
 pub struct G13RenderJobResources {
 pub mut:
+	vertex_timestamps [2]u64
+	fragment_timestamps [2]u64
 	queue       &G13QueueResources = unsafe { nil }
 	error       G13JobError
 	submitted   bool
@@ -124,6 +127,7 @@ pub mut:
 	on_publish            fn () = unsafe { nil }
 	on_admit              fn () = unsafe { nil }
 	admissions            int
+	timestamp_unmaps int
 }
 
 __global test_async_gpu_manager GpuManager
@@ -159,24 +163,40 @@ pub fn (job &G13RenderJobResources) result_values() RenderValues { return Render
 
 pub fn (mut mgr GpuManager) prepare_g13_compute_job(queue &G13QueueResources, ctx &mmu.UatContext,
 	input &compute.Command) ?&G13ComputeJobResources {
+	return mgr.prepare_g13_compute_job_with_timestamps(queue, ctx, input, [2]u64{})
+}
+
+pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(queue &G13QueueResources, ctx &mmu.UatContext,
+	input &compute.Command, timestamps [2]u64) ?&G13ComputeJobResources {
 	if mgr.fail_compute { return none }
 	index := mgr.prepares
 	mgr.prepares++
 	if index == mgr.fail_prepare_at { return none }
-	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr, ordinal: u32(index) }
+	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr, ordinal: u32(index), timestamps: timestamps }
 	mgr.g13_compute_jobs << job
 	return job
 }
 
 pub fn (mut mgr GpuManager) prepare_g13_render_job(queue &G13QueueResources,
 	input &render.Command) ?&G13RenderJobResources {
+	return mgr.prepare_g13_render_job_with_timestamps(queue, input, [2]u64{}, [2]u64{})
+}
+
+pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(queue &G13QueueResources,
+	input &render.Command, vertex_timestamps [2]u64, fragment_timestamps [2]u64) ?&G13RenderJobResources {
 	if mgr.fail_render { return none }
 	index := mgr.prepares
 	mgr.prepares++
 	if index == mgr.fail_prepare_at { return none }
-	job := &G13RenderJobResources{ queue: unsafe { queue }, ordinal: u32(index) }
+	job := &G13RenderJobResources{ queue: unsafe { queue }, ordinal: u32(index), vertex_timestamps: vertex_timestamps, fragment_timestamps: fragment_timestamps }
 	mgr.g13_render_jobs << job
 	return job
+}
+
+pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(va u64, size u64) {
+	assert !mgr.lock.is_held(), 'timestamp release under manager lock'
+	assert va != 0 && size != 0
+	mgr.lock.acquire(); mgr.timestamp_unmaps++; mgr.lock.release()
 }
 
 pub fn (mut mgr GpuManager) set_g13_compute_completion(job &G13ComputeJobResources,

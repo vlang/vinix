@@ -8,15 +8,6 @@ import gpu.agx.compute as agxcompute
 import gpu.agx.packet
 import gpu.agx.render as agxrender
 
-// Decoded modern input, before file-owned timestamp lookup and job creation.
-// Timestamp names must be resolved and retained by a future modern submit
-// handler before dispatch. The registered Mesa 25 path uses Command directly.
-pub struct PacketCommand {
-pub:
-	command Command
-	timestamps [3]asahi.Timestamps // vertex, fragment, compute
-}
-
 // Caller-owned scratch keeps mutable parser state out of V's implicit heap
 // promotion. It is reset for each decode and never retained by the adapter.
 pub struct PacketWorkspace {
@@ -25,7 +16,7 @@ mut:
 	input packet.Command
 }
 
-pub fn (command &PacketCommand) needs_timestamp_objects() bool {
+pub fn (command &Command) needs_timestamp_objects() bool {
 	for timestamps in command.timestamps {
 		if timestamps.start.handle != 0 || timestamps.end.handle != 0 { return true }
 	}
@@ -156,7 +147,7 @@ fn packet_render(input &packet.Command, usc_base u64, flush_stamps bool) agxrend
 // No allocation, userspace access, timestamp lookup or job publication occurs.
 // A failure returns zero usable commands; the caller discards any staged prefix.
 pub fn decode_packet(data voidptr, size u64, usc_base u64, flush_stamps bool,
-	mut staged []PacketCommand, mut workspace PacketWorkspace) (int, u32) {
+	mut staged []Command, mut workspace PacketWorkspace) (int, u32) {
 	if staged.len == 0 || staged.len > int(max_commands) { return -22, 0 }
 	workspace.reader = packet.reader(data, size)
 	input := unsafe { &workspace.input }
@@ -172,13 +163,13 @@ pub fn decode_packet(data voidptr, size u64, usc_base u64, flush_stamps bool,
 			timestamps[0] = input.render.ts_vtx
 			timestamps[1] = input.render.ts_frag
 			Command{descriptor: ioctl.DrmAsahiCommand{cmd_type: ioctl.asahi_cmd_render, barriers: barriers},
-				render: packet_render(input, usc_base, flush_stamps)}
+				render: packet_render(input, usc_base, flush_stamps), timestamps: timestamps}
 		} else {
 			timestamps[2] = input.compute.ts
 			Command{descriptor: ioctl.DrmAsahiCommand{cmd_type: ioctl.asahi_cmd_compute, barriers: barriers},
-				compute: packet_compute(input, usc_base, flush_stamps)}
+				compute: packet_compute(input, usc_base, flush_stamps), timestamps: timestamps}
 		}
-		staged[count] = PacketCommand{command: command, timestamps: timestamps}
+		staged[count] = command
 		count++
 	}
 	return -22, 0
