@@ -1,5 +1,15 @@
 # Bounded memory execution
 
+Scalar `air.popcount.i32` and `air.reverse_bits.i32` use the existing population
+count and bit-reversal evaluators, including bounded address projections. AIR
+and LLVM spellings have separate declaration identities and may coexist in one
+function. Keys 2154..2155 append without moving earlier entries; the scalar cache
+now has 2,156 slots. Exact signatures, direct-call metadata, pure declaration
+attributes (including function-level `mustprogress`) and duplicate checks remain
+required. Other AIR widths/vectors and
+general external calls remain excluded. Both memory paths share existing
+poison/undef, preflight, work and ownership rules.
+
 `llvm.vector.insert` replaces an aligned window in a fixed 1..16-lane integer,
 half or float base with a vector of the same element format. The result matches
 the base type. Every third-argument i64 offset must be a defined constant,
@@ -79,7 +89,7 @@ the input factor. Every input has the same element type and result_count/factor
 lanes. Raw bits and selected poison/undef tags are preserved without observing
 unchosen lanes. Exact ordinary direct calls use one existing result slot, one
 executed step and 2*result_count lane-work units. Keys 40000..41715 append
-1,716 identities without moving earlier families; scalar entries stay 2,154.
+1,716 identities without moving earlier families; scalar entries stay 2,156.
 
 Pure integer addresses use packed shuffle selectors, lane rebasing and bounded
 projected-shuffle choices among all inputs. Invalid selectors poison the final

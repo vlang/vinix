@@ -62,6 +62,9 @@ fn test_scalar_intrinsic_attribute_encodings_and_budget() {
 	stream := Stream{blocks: blocks, records: records, values: values}
 	assert scalar_intrinsic_attributes(stream, 0, 0)! == 0
 	for version in u64(0) .. 3 { values[9] = version << 56; assert scalar_intrinsic_attributes(stream, 1, 64)! > 0 }
+	values[4] = 70 // mustprogress is a function-only property of terminating builtins.
+	for version in u64(0) .. 3 { values[9] = version << 56; assert scalar_intrinsic_attributes(stream, 1, 64)! > 0 }
+	values[4] = 18
 	for bad in [u64(1), u64(3) << 56]! { values[9] = bad; if _ := scalar_intrinsic_attributes(stream, 1, 64) { assert false, 'memory effects/version' } }
 	values[9] = 0; values[3] = 3
 	if _ := scalar_intrinsic_attributes(stream, 1, 64) { assert false, 'string attribute' }

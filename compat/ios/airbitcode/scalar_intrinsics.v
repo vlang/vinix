@@ -106,7 +106,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
-	key := if scalar_integer_mulh(id) { scalar_mulh_cache_base + int(id == .umulh) * 64 + int(bits) - 1 } else if id == .canonicalize { scalar_canonicalize_cache_base + int(bits == 16) } else if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
+	key := if f.name.starts_with('air.') { _, slot := air_integer_intrinsic(f.name)!; scalar_air_integer_cache_base + slot } else if scalar_integer_mulh(id) { scalar_mulh_cache_base + int(id == .umulh) * 64 + int(bits) - 1 } else if id == .canonicalize { scalar_canonicalize_cache_base + int(bits == 16) } else if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
 	return key, ir_values(stream, raw)[6], id == .is_fpclass || scalar_integer_poison_flag(id)
 }
 // Accept only harmless function-level properties inherent in these intrinsics.
@@ -181,7 +181,7 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 			mut cursor := 2
 			for cursor < values.len {
 				work++; if work > limit { return error('AIR intrinsic: attribute work limit') }
-				if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] in [u64(18), 20, 21, 53, 61, 62, 63, 71, 105]! && (memory_none || values[cursor + 1] !in [u64(20), 21, 53]!) { cursor += 2 }
+				if values[cursor] == 0 && cursor + 1 < values.len && values[cursor + 1] in [u64(18), 20, 21, 53, 61, 62, 63, 70, 71, 105]! && (memory_none || values[cursor + 1] !in [u64(20), 21, 53]!) { cursor += 2 }
 				else if memory_none && values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 86 && values[cursor + 2] in [u64(0), u64(1) << 56, u64(2) << 56]! { cursor += 3 } // memory(none), versions 0/1/2
 				else if !memory_none && values[cursor] == 1 && cursor + 2 < values.len && values[cursor + 1] == 86 && values[cursor + 2] in [memory_bits, (u64(1) << 56) | memory_bits, (u64(2) << 56) | memory_bits]! { cursor += 3 } // argmem effects, versions 0/1/2
 				else { return error('AIR intrinsic: unsupported declaration attribute') }

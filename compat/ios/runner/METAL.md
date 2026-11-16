@@ -1,5 +1,13 @@
 # Software Metal backend
 
+Prepared compute pipelines execute the scalar AIR builtins `air.popcount.i32`
+and `air.reverse_bits.i32`, including their use in bounded buffer addresses.
+The existing integer evaluators supply the results. AIR and LLVM declarations
+may coexist through separate appended scalar cache entries. Exact names, types,
+call metadata and pure declaration attributes remain checked. The size fixture
+uses AIR reversal with LLVM reversal for coordinate reconstruction and AIR
+population count in RGBA8 readback. Native GPU execution remains unverified.
+
 `air.dispatch_simdgroups_per_threadgroup` supplies the subgroup count for the
 requested threadgroup dimensions. With this backend's execution width of one,
 it equals the requested width * height * depth, even in a partial edge group.
