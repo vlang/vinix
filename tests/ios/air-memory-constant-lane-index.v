@@ -187,15 +187,15 @@ fn controls(assembler string, root string) !int {
   for i in 0 .. n { previous := if i == 0 { '%s' } else { '%s' + (i - 1).str() }; text.write_string('%s${i} = or i32 ${previous}, 0\n %p${i} = getelementptr i8, ptr %out, i32 %s${i}\n') }
   text.write_string('%v = extractelement ${vector} ${table}, i32 %s${n - 1}\n %wide = zext i32 %v to i64\n %p = getelementptr i8, ptr %out, i64 %wide\n ret void }\n')
  }
- kinds := ['root_before', 'root_after', 'cold_undef', 'cold_defined', 'ignored_undef', 'frozen_undef', 'invalid_undef', 'poison_undef', 'shared', 'scalar_cache', 'loaded_selector', 'loaded_vector', 'cast_vector']
+ kinds := ['root_before', 'root_after', 'cold_undef', 'cold_defined', 'ignored_undef', 'frozen_undef', 'invalid_undef', 'poison_undef', 'shared', 'scalar_cache', 'loaded_selector', 'loaded_vector', 'comparison_vector']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_selector' { text.write_string('%loaded = load i32, ptr %out, align 1\n') }
   if kind == 'loaded_vector' { text.write_string('%vec = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'cast_vector' { text.write_string('%unsupported_cast_wide = zext <3 x i32> zeroinitializer to <3 x i64>
- %vec = trunc <3 x i64> %unsupported_cast_wide to <3 x i32>\n') }
-  value := if kind in ['root_before', 'root_after'] { '<i32 poison, i32 undef, i32 3>' } else if kind in ['invalid_undef', 'poison_undef'] { 'undef' } else if kind in ['loaded_vector', 'cast_vector'] { '%vec' } else { '<i32 2, i32 undef, i32 1>' }
+  if kind == 'comparison_vector' { text.write_string('%unsupported_compare = icmp eq <3 x i32> zeroinitializer, zeroinitializer
+ %vec = sext <3 x i1> %unsupported_compare to <3 x i32>\n') }
+  value := if kind in ['root_before', 'root_after'] { '<i32 poison, i32 undef, i32 3>' } else if kind in ['invalid_undef', 'poison_undef'] { 'undef' } else if kind in ['loaded_vector', 'comparison_vector'] { '%vec' } else { '<i32 2, i32 undef, i32 1>' }
   selector := if kind in ['root_before', 'root_after'] { '0' } else if kind in ['cold_undef', 'ignored_undef', 'frozen_undef'] { '1' } else if kind == 'invalid_undef' { '3' } else if kind == 'poison_undef' { 'poison' } else if kind == 'loaded_selector' { '%loaded' } else { '%s' }
   text.write_string('%v = extractelement <3 x i32> ${value}, i32 ${selector}\n')
   if kind == 'root_before' { text.write_string('%bad = getelementptr i8, ptr %out, i32 %v\n') }
@@ -220,7 +220,7 @@ fn controls(assembler string, root string) !int {
  for kind in kinds {
   f := fi(ir, kind); mut actual := []u8{len: 64, init: 0xcc}; sv := [u64(0)]; cv := [u64(1)]
   mut bindings := [airbitcode.IRMemoryBinding{values: sv}, airbitcode.IRMemoryBinding{values: cv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  if kind in ['loaded_selector', 'loaded_vector', 'cast_vector'] {
+  if kind in ['loaded_selector', 'loaded_vector', 'comparison_vector'] {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported literal address dependency') }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported literal address ran') }; untouched(actual)
   } else {

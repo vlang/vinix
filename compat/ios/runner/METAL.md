@@ -375,7 +375,7 @@ Source and selector depths share the existing graph limits. Unsupported construc
 and loaded vector sources remain outside address expressions. The image shader
 freezes an undef lane in its permutation vector before the observable readback.
 Vector selects with a scalar i1 condition may also supply address lanes.
-Supported arguments/constants, freezes, insertions, shuffles, integer arithmetic and nested selects may feed
+Supported arguments/constants, freezes, insertions, shuffles, integer arithmetic/casts and nested selects may feed
 either arm.
 Only the selected arm supplies lane undef/poison; chosen undef errors at final
 extraction unless a source vector freeze repairs it first. Scalar recovery after
@@ -384,7 +384,7 @@ Both arms and conditions remain fully validated and charged to the graph limits.
 Vector conditions, loads, PHIs and other unsupported constructions remain
 excluded. The image shader chooses between two permutations using x parity,
 patches one lane using y, shuffles across both vectors, freezes, then adds and
-wraps the lane indices with vector arithmetic.
+wraps the lane indices with vector arithmetic, then truncates and zero-extends them.
 Independent red-channel readback observes both sources and insertion choices.
 Pure `insertelement` sources accept i1..i64 replacements and dynamic insertion
 indices. Valid insertion replaces one lane; poison/out-of-range insertion poisons
@@ -401,7 +401,7 @@ remains deferred until extraction or source repair. Both complete sources and
 all original/normalized mask entries validate even when unselected. Packed POD
 mask words and scalar mapping nodes share the existing graph storage and limits;
 no runtime array is added. Invalid extraction indices remain poison through
-source freeze. Vector casts and other unsupported source constructions
+source freeze. Vector comparisons and other unsupported source constructions
 still reject before writes.
 Pure integer vector binary operations use all thirteen scalar opcodes and their
 existing flags. All lanes compute once in a bounded result table before address
@@ -410,7 +410,15 @@ later unchosen address dependencies; other poison remains lane-local. Source
 freeze may repair operands first, and result freeze may repair arithmetic poison
 but cannot suppress immediate errors or invalid extraction indices. Table metadata
 retains every lane's depth, with the existing graph cache, storage ownership and
-limits. Floating arithmetic and vector casts remain outside address graphs.
+limits. Floating operations and vector comparisons remain outside address graphs.
+Pure integer vector trunc/zext/sext preserve lane counts and accept their existing
+nuw/nsw/nneg flags with strict width direction. All input lanes cast once in a
+bounded table. Any undef rejects even in ignored lanes or later unchosen address
+dependencies; promise violations and poison remain lane-local. Source freeze may
+repair operands, and result freeze may repair cast poison, but cannot hide eager
+undef or invalid extraction. A fixed stack index array and POD metadata share
+the existing graph cache, ownership and limits. Floating conversions, bitcasts
+and vector comparisons remain excluded from address graphs.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

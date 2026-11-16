@@ -212,17 +212,17 @@ fn controls(assembler string, root string) !int {
   for i in 0 .. if over { 252 } else { 251 } { text.write_string('%v${i} = extractelement <3 x i32> %s, i32 %j\n %p${i} = getelementptr i8, ptr %out, i32 %v${i}\n') }
   text.write_string('ret void }\n')
  }
- kinds := ['unselected_undef', 'chosen_undef', 'scalar_ignored_undef', 'freeze_selected', 'bad_selector', 'outer_freeze', 'poison_condition', 'frozen_condition', 'root_before', 'root_after', 'cold_bad', 'cold_good', 'cache_selectors', 'loaded_arm', 'cast_arm', 'vector_condition', 'undef_condition', 'invalid_condition']
+ kinds := ['unselected_undef', 'chosen_undef', 'scalar_ignored_undef', 'freeze_selected', 'bad_selector', 'outer_freeze', 'poison_condition', 'frozen_condition', 'root_before', 'root_after', 'cold_bad', 'cold_good', 'cache_selectors', 'loaded_arm', 'comparison_arm', 'vector_condition', 'undef_condition', 'invalid_condition']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_arm' { text.write_string('%other = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'cast_arm' { text.write_string('%unsupported_cast_wide = zext <3 x i32> %a to <3 x i64>
- %other = trunc <3 x i64> %unsupported_cast_wide to <3 x i32>\n') }
+  if kind == 'comparison_arm' { text.write_string('%unsupported_compare = icmp eq <3 x i32> %a, zeroinitializer
+ %other = sext <3 x i1> %unsupported_compare to <3 x i32>\n') }
   if kind == 'frozen_condition' { text.write_string('%condition = freeze i1 undef\n') }
   if kind == 'invalid_condition' { text.write_string('%bad = udiv i1 false, false\n %inner = select i1 %bad, <3 x i32> %a, <3 x i32> %b\n') }
   left := if kind in ['chosen_undef', 'scalar_ignored_undef', 'freeze_selected', 'bad_selector', 'outer_freeze', 'cold_bad', 'cold_good'] { 'undef' } else { '%a' }
-  right := if kind == 'unselected_undef' { 'undef' } else if kind in ['loaded_arm', 'cast_arm'] { '%other' } else if kind == 'invalid_condition' { '%inner' } else { '%b' }
+  right := if kind == 'unselected_undef' { 'undef' } else if kind in ['loaded_arm', 'comparison_arm'] { '%other' } else if kind == 'invalid_condition' { '%inner' } else { '%b' }
   cond := if kind in ['root_before', 'root_after', 'poison_condition'] { 'poison' } else if kind == 'frozen_condition' { '%condition' } else if kind == 'undef_condition' { 'undef' } else { 'true' }
   if kind == 'vector_condition' { text.write_string('%s = select <3 x i1> zeroinitializer, <3 x i32> %a, <3 x i32> %b\n') }
   else { text.write_string('%s = select i1 ${cond}, <3 x i32> ${left}, <3 x i32> ${right}\n') }
@@ -250,7 +250,7 @@ fn controls(assembler string, root string) !int {
  for kind in kinds {
   f := fi(ir, kind); mut actual := []u8{len: 64, init: 0xcc}; av := [u64(1), 2, 3]; bv := [u64(4), 5, 6]; jv := [u64(0)]; cv := [u64(1)]
   mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: bv}, airbitcode.IRMemoryBinding{values: jv}, airbitcode.IRMemoryBinding{values: cv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  if kind in ['loaded_arm', 'cast_arm', 'vector_condition', 'undef_condition'] {
+  if kind in ['loaded_arm', 'comparison_arm', 'vector_condition', 'undef_condition'] {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported vector select') }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported vector select ran') }; untouched(actual)
   } else {
