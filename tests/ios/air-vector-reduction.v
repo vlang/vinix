@@ -214,13 +214,12 @@ fn controls(assembler string,root string) !int {
  };plan.free()
  for name in ['cold','discard_poison','discard_undef','address','floating','loaded'] {
   f2:=fi(ir,name);mut bytes:=[]u8{len:32,init:0xcc};mut bs:=[airbitcode.IRMemoryBinding{data:bytes,writable:true}]
-  if name=='floating' {if _:=p.prepare_memory_function(ir,stream,pools,bodies,f2) {panic(name)};if _:=p.run_memory_function(ir,stream,pools,bodies,f2,mut bs,100) {panic(name)};for b in bytes {assert b==0xcc};checks++}
-  else {pl:=p.prepare_memory_function(ir,stream,pools,bodies,f2)!;for prepared in [false,true] {
+  pl:=p.prepare_memory_function(ir,stream,pools,bodies,f2)!;for prepared in [false,true] {
    for i in 0..bytes.len {bytes[i]=0xcc};pl.validate(bs,pl.steps())!;for b in bytes {assert b==0xcc}
    if prepared {if _:=pl.run(mut bs,pl.steps()) {assert name!='discard_undef'} else {assert name=='discard_undef',err.msg()}} else {if _:=p.run_memory_function(ir,stream,pools,bodies,f2,mut bs,pl.steps()) {assert name!='discard_undef'} else {assert name=='discard_undef',err.msg()}}
    // Loaded lanes observe the preceding marker: 0xcc11 + 0xcccc + 0xcccc.
    value:=u64(0x65a9);for i,b in bytes {assert b==if i==0 {u8(17)} else if name=='address'&&i==1 {u8(42)} else if name=='loaded'&&i in [8,9] {u8(value>>u32((i-8)*8))} else {u8(0xcc)},name};checks++
-  };pl.free()};unsafe{bytes.free();bs.free()}
+  };pl.free();unsafe{bytes.free();bs.free()}
  }
  for count in [u64(1),2,3,7,16,257,513,1024]! {a:=p.run_scalar_function(ir,stream,pools,bodies,fi(ir,'loop'),[count],20000)!;b:=p.run_integer_function(ir,stream,pools,bodies,fi(ir,'loop'),[count],20000)!;assert !a.poison&&!b.poison&&a.value==count*3&&b.value==count*3;checks+=2}
  scope:=bodies.scopes[f+1];mut call:=-1;for i in scope.instructions_start..scope.instructions_start+scope.instructions_count {if stream.records[bodies.instructions[i].record].code==34 {call=i;break}};assert call>=0;saved:=p.instructions[call]
@@ -254,7 +253,7 @@ fn limits(assembler string,root string,storage bool,over bool) ! {
 fn main() {
  assert os.args.len in [3,4];root:=os.abs_path(os.args[2]);assert !os.exists(root)&&!root.starts_with(os.getwd()+'/');os.mkdir_all(root)!
  control_count:=controls(os.args[1],root)!
- assert control_count==118
+ assert control_count==119
  if os.args.len==4 {println('AIR-VECTOR-REDUCTION-CONTROLS: ${control_count} PASS');return}
  mut rows:=os.create(root+'/comparisons.txt')!;defer{rows.close()}
  mut shapes:=0;mut exact:=0;mut poisoned:=0;mut undefined:=0;mut native_checks:=0;mut scalar_checks:=0;mut budgets:=0
@@ -301,6 +300,6 @@ fn main() {
    native.close();p.free();bodies.free();pools.free();ir.free();stream.free();unsafe{data.free()}
   }
  }
- assert shapes==1251&&exact==32526&&poisoned==2502&&undefined==5004&&native_checks==40032&&scalar_checks==80064&&budgets==40032&&control_count==118
+ assert shapes==1251&&exact==32526&&poisoned==2502&&undefined==5004&&native_checks==40032&&scalar_checks==80064&&budgets==40032&&control_count==119
  line:='AIR-VECTOR-REDUCTION: ${shapes} shapes, ${exact} exact/frozen values, ${poisoned} poison stores, ${undefined} strict undef failures, ${native_checks} native/oracle values, ${scalar_checks} scalar/integer checks, ${budgets} short budgets, ${control_count} controls PASS\n';os.write_file(root+'/result.txt',line)!;print(line)
 }

@@ -1024,6 +1024,27 @@ Existing 256-node and 32-level bounds count all sources and cached heights.
 in both directions, native LLVM bits, nonmutating validation, ordinary/prepared
 write ordering, freeze/poison/undef controls and exact graph boundaries.
 
+Ordered floating sum/product reductions support ordinary direct
+`llvm.vector.reduce.fadd.vNf16/f32` and `fmul` calls for fixed 1..16 lanes.
+A matching scalar seed is combined with lanes in increasing index order,
+rounding to the lane format after every operation. Existing IEEE arithmetic
+provides nearest/ties-to-even rounding, gradual underflow, signed zeros,
+infinities and the preferred quiet NaN choice. Seed or source poison poisons
+the result; scalar seed undef and every executed undef vector lane reject.
+Seed poison or an earlier NaN does not hide a later undef lane. Direct seed
+and source freezes repair indeterminate inputs; result freeze repairs poison
+but cannot suppress earlier undef errors. Mixed, void and memory execution
+accept these calls, including earlier scalar results/PHIs as seeds where
+admitted. Integer-only execution and floating address dependencies remain
+excluded. Calls cost one execution step and N+2 validation lane-work units,
+with no vector storage slot for the scalar result. Canonical overloads, exact
+seed/element/result type identity, declarations, attributes and shared limits
+remain checked. Fast-math/reassociation flags and scalable/wider formats
+remain excluded. `tests/ios/air-vector-sequential-reduction.v` compares LLVM
+intrinsics with explicit scalar chains and the interpreter, including half
+sweeps, order-sensitive rounding, seed/lane states, freezes, loop reuse,
+ordinary/prepared memory, metadata guards and exact shared limits.
+
 Floating minimum/maximum reductions support ordinary direct
 `llvm.vector.reduce.fminimum.vNf16/f32` and `fmaximum` calls for fixed 1..16
 lanes. They return one matching half/float scalar, propagate NaNs and order
