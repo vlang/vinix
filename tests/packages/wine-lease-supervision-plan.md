@@ -5643,3 +5643,84 @@ writes/network, helper startup and OS loader/cache bytes retain their previous
 scope. Full SDK/ABI/library/search and hermetic admission, owned ARM/GUI, broader
 lifetime/mapping coverage, redistribution and default activation remain open.
 No kernel, guest or product-default behavior changes.
+
+## Required host replay existence and xattr queries (2026-11-17)
+
+Implementation `44cede764` makes the previously qualified query restriction
+mandatory in format-9 host receipts, with inner replay format 4. Shared
+`winequeryhost` derives exact declarations, partial policies and native controls;
+its source and the unchanged query policy/probe modules are embedded, pinned
+and retained. Existing ordinary data, directory, metadata/alias, SDK, Mach-O
+image/load and final input/blob checks remain required. Image projection reuses
+the preceding mandatory current-byte admission without adding redundant image
+hashes or changing any timeout.
+
+The combined policy grants existence/xattr queries on the admitted file,
+ancestor and bounded image-alias set. Three fixed execution/output paths and
+one anchored temporary-output family with exactly seven lowercase hexadecimal
+characters grant existence only. `query.json`, three partial policies,
+`attribute-fixture.json`, four ordinary temporary markers and every child record
+are mandatory output and retained input rows. Each role requires 27 query
+children: two positive, eighteen unlisted-path refusals, three counterfactual/
+isolation controls, three false temporary names and one matching temporary
+existence-only control. Raw operation, target, return, error and data are
+validated with exact child arguments, environment and exit status.
+
+All four frozen host roles build and admit. Host controls pass real/copied
+baselines, real entry behavior and all 74 resealed refusals. Twelve new cases
+cover policy expansion, an extra consistently resealed execution exception,
+temporary-query declarations, partial policies, fixture declarations, altered
+query results/markers and old outer/inner formats. The existing extra-file
+case also reseals the new projections consistently and still refuses.
+Fresh PE and runtime preparation pass. All 32 owned-receipt mutations pass
+through preflight and actual controller startup with the original ten-second
+per-command bound. All 18 startup/pre-sign refusals pass. The signed x86
+holder-death/collection run passes in 109.161 seconds, with producer admission
+before signing and both host bindings re-admitted after the guest. All 63
+retention refusals pass in partitions 16/16/16/15, each with real/copied
+baselines; independent exact-coverage admission passes. The two new cases omit
+producer/controller `read-closed/query.json` input rows.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostquery-20261117-01`.
+Frozen source is `source-final`, cloned from the original required-metadata
+source with the selected implementation, checker and document files overlaid.
+All eleven selected files compare byte-for-byte with the repository before
+commit. Tools are `wine-host-build` and the six compiled checkers; role outputs
+are `host-fixture`, `host-controller`, `host-producer` and `host-retainer`.
+Passing results are `host-controls`, `pe`, `prepared`, `receipt-controls`,
+`startup`, `native-02`, `retention-p0` through `retention-p3` and
+`partition-check.log`. `qualify.v` and `resume.v` preserve exact commands;
+argv, selected environment, exits and raw logs are retained for every phase.
+`native-02/declaration.json` records kernel, stage, sysroot, GCC, firmware and
+QEMU selections. The selected compiler remains
+`/Users/alex/.cache/vinix-wine-build/v/v`.
+
+The first `native` attempt fails before boot because xorriso exhausts disk
+space; its complete failed evidence remains. The fresh `native-02` retry uses
+unchanged sources and bounds. `reclaim.v` replaces only byte-identical ordinary
+files in these two new trees with verified APFS clones from the historical
+baseline: 362,085,079 bytes per pass, with type, mode, size and all bytes checked
+before replacement. Historical files remain untouched. Initramfs comparisons
+find insufficient identical chunks and make no replacement. Helper sources and
+raw logs remain in the checkpoint; no evidence is deleted.
+
+The complete original required-metadata checkpoint
+`/Users/alex/.cache/vwhostmeta-20261116-01`, additive query checkpoint
+`/Users/alex/.cache/vwqueryclosed-20261116-01`, original verifiers and every
+compiler/LLVM/SDK/image/source namespace and historical prerequisite remain
+required. The new external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-query-20261117-01.inventory.json`.
+SHA-256 `a18935a939044b0678c81e4655aa38332ff9d16e17d4463e564a22a930a37ddb`.
+Recording and independent comparison pass with the unchanged fixed auditor
+`/Users/alex/.cache/vwhostread-20261116-01/workspace-inventory-final`.
+Logs are beside the receipt. No checkpoint file is changed after recording begins.
+
+Builds seed and recheck the known native fixture attributes. Admission validates
+serialized observations and ordinary fixture bytes, allowing unchanged copies
+that do not preserve native attributes. The typed inventory covers logical
+bytes, types, modes, sizes and links, not all native xattrs at rest. Complete
+xattr content, other query/search/metadata closure, ancestor entry names,
+OS-root/device exceptions, writes/network, helper startup and OS loader/cache
+remain outside this claim. Full SDK/ABI/library/search and hermetic admission,
+owned ARM/GUI, broader lifetime/mapping controls, redistribution and default
+activation remain open. No kernel, guest or product-default behavior changes.
