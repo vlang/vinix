@@ -2,7 +2,8 @@
 
 `run_memory_function` executes a defined ordinary void function with buffer and
 typed value arguments, forward control flow, scalar/vector loads/stores, scalar binary operations,
-comparisons, scalar select/casts/freeze, floating negation, bounded constant GEPs,
+comparisons, scalar select/casts/freeze, floating negation, bounded constant and
+direct scalar-argument GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Scalar `extractelement` may also read supported fixed constant/constructed/loaded
@@ -74,13 +75,46 @@ Both ordinary and prepared memory execution support values. The standalone
 integer/scalar/void signatures retain their vector-argument exclusions. This
 memory support supersedes argument exclusions in older operation sections below.
 Vector memory stores still require byte-aligned lanes. Pointer values cannot be
-supplied as integers, and nonliteral GEP indices remain unsupported.
+supplied as integers. A direct scalar integer argument may index a GEP as
+described below; computed SSA indices remain unsupported.
 
 `tests/ios/air-memory-values.v` compares 35,904 mixed scalar/vector cases with
 native LLVM through both APIs, including all widths/counts, masking and explicit
 floating edge bits. It checks 16,830 invalid value/buffer bindings before writes,
-unsupported input shapes, dynamic GEP/inttoptr rejection, aliased snapshots,
+unsupported input shapes, computed GEP/inttoptr rejection, aliased snapshots,
 bufferless functions, 256 branch/PHI inputs and 256 alternating poison/recovery calls.
+
+## Indexed addresses
+
+A single-index GEP may use a direct i1..i64 function argument with a fixed
+pointer base, including an earlier constant GEP. It requires an explicit
+little-endian layout with 64-bit pointer/index widths and a fixed allocation
+stride of at most 64 MiB. Index words are masked to their declared width and
+interpreted as signed; negative values reject. The checked product plus the
+fixed offset must not exceed 64 MiB or the current binding's remaining extent.
+Zero strides are supported. Known inbounds/nusw/nuw flags use the same bounded,
+nonwrapping profile. An unused indexed pointer may be one past the binding;
+loads/stores also require their complete stored size and explicit alignment.
+
+Preflight caches the index argument, width and stride. Every call resolves all
+indexed GEPs and accesses, including cold blocks, before any AIR instruction or
+write. Static argument minimum sizes describe only the fixed base and access
+sizes; callers must also pass the per-call validation. The engine owns one
+offset array for an indexed function, releases it on success and error, and
+uses no such scratch for a static function. Caller buffers and words remain
+borrowed; aliased output cannot change the resolved offsets or captured values.
+
+Indexed pointers are confined to direct ordinary load/store operands. Another
+GEP, pointer PHI/select/freeze/cast/comparison, or memory-intrinsic use rejects
+before writes, including zero-length intrinsic uses. Computed SSA indices,
+multiple dynamic indices and negative argument indices remain outside this
+profile. Existing constant backward and structured paths retain their support.
+
+`tests/ios/air-memory-indexed.v` checks 37,788 exact native cases and 15,460
+invalid inputs through ordinary/prepared execution and validation alone, across
+all 64 index widths, 13 layouts and four flag forms. Controls cover unsupported
+pointer flows, alignment, cold blocks, one-past/64 MiB limits, aliased index
+snapshots, readonly address spaces and default prepared objects.
 
 ## Prepared memory functions
 
@@ -91,7 +125,10 @@ captures its function and indexes internally; execution does not accept a caller
 supplied profile. `argument_count()`, `argument(index)` and `steps()` expose the
 binding requirements and static upper bound on steps. Each argument query returns
 a value copy, so changing it cannot alter the cached requirements. A default
-uninitialized object rejects execution.
+uninitialized object rejects execution and validation.
+`prepared.validate(bindings, step_limit)` checks the current bindings and all indexed addresses without
+executing AIR or writing buffers. It does not evaluate arithmetic poison or
+guarantee a future call whose bindings have changed; `run` repeats the checks.
 
 The prepared object owns only its profile arrays. The program, module, stream,
 constant pools, bodies and backing bitcode are borrowed: they must remain alive
@@ -102,9 +139,10 @@ continues to preflight each call, including the existing mutation checks.
 
 Every prepared execution still checks the current binding count, sizes, offsets,
 alignment, permissions, address-space restrictions, step limit and actual
-backing-address overlap for memcpy. These checks run before any writes, including
-for inactive memcpy instructions. Execution allocates fresh scalar/vector/PHI/
-move/value-argument scratch and releases it on success or error; values and failures do not
+backing-address overlap for memcpy and all indexed addresses. These checks run
+before any writes, including for inactive instructions. Execution allocates fresh
+scalar/vector/PHI/move/value-argument/indexed-offset scratch and releases it on
+success or error; values and failures do not
 persist between runs. The operation semantics and execution engine are shared
 with the ordinary API. The software Metal pipeline owns this preparation and
 reuses it when deferred dispatch snapshots execute.

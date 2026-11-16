@@ -247,7 +247,7 @@ Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, forward-control
 [memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
 scalar binary arithmetic/comparisons/select/casts/fneg/freeze, pointer arguments with
-supported constant GEPs,
+supported constant and direct scalar-argument GEPs,
 explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
 Valid LLVM IR remains a precondition. No source compilation is provided.
@@ -295,6 +295,9 @@ properties, unused/conditional arguments and opaque tails reject. Arbitrary
 by-value uniforms, other builtins and larger grids remain unsupported. Builtin
 words are passed through the memory API's typed value bindings and captured
 before execution; library, pipeline and buffer ownership are unchanged.
+A scalar builtin can directly index a supported single-index GEP; its value
+is zero for this dispatch profile. Extracted uint3 components and other computed
+SSA indices remain unsupported.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
 
 `tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR builtins` runs the focused
@@ -302,6 +305,8 @@ Objective-C checks with normal and deterministic Swift hashing. Each mode
 executes six deferred scalar/uint3/unnamed builtin dispatches across two drained
 runtimes and refuses 38 invalid builtin pipelines. Sparse/reordered metadata,
 output offsets, caller-reference release and untouched padding are covered.
+Scalar/unnamed cases also store through a GEP indexed by the grid-position
+argument.
 
 Forward-only branches/switches and matching scalar/overflow-pair PHIs are supported.
 Conditional branches require scalar i1 and distinct destinations; all targets
@@ -434,13 +439,13 @@ forward blocks. Each tested case costs one additional step; default paths test
 all cases in encoded order. Empty switches still evaluate poison/undef
 conditions. Literal metadata and duplicate values reject before stores. Deferred
 dispatches check scalar/pair PHIs, case/default tags and overflowing results;
-a 65-case pipeline rejects. Loops and dynamic buffer indexes remain excluded.
+a 65-case pipeline rejects. Loops and computed SSA buffer indexes remain excluded.
 
 Both compute dispatch selectors require grid and threadgroup dimensions
 exactly `(1, 1, 1)`. The reported thread execution width and maximum group size
-are one; static threadgroup memory is zero. There are no thread IDs, loops,
-dynamic GEP indexes, general vector operations, texture access, barriers or
-threadgroup memory in this profile.
+are one; static threadgroup memory is zero. Only the zero-valued thread builtins
+described above are supported. Loops, computed GEP indexes, texture access,
+barriers and threadgroup memory remain outside this profile.
 Setting a buffer accepts nil to clear a slot; dispatch requires every argument
 to have an in-bounds, aligned binding from the queue's device. Encoding checks
 state and resource requirements before recording work.
@@ -990,12 +995,23 @@ field offsets and scaled indexes are applied in traversal order. Earlier
 prefixes retain their full extent even if the final pointer is lower.
 The binding offset supplies no extra headroom. Plain, nusw and inbounds forms
 are supported; nuw, zero-stride negative indexes, scalable layouts and
-dynamic/poison/undef/wide indexes reject
+computed/poison/undef/wide indexes reject
 before stores.
 Pipeline buffer extents include every derived/unused pointer and accessed byte;
 dispatch validates the combined extent plus the binding offset before recording.
 Derived access offsets must independently satisfy alignment. Runtime loads and
 stores use the preflighted virtual offsets, never AIR-supplied host addresses.
+
+A single-index GEP may instead use a direct scalar integer argument, with a
+fixed base (possibly an earlier constant GEP) and fixed allocation stride.
+Each execution masks the argument to its width, rejects negative values and
+checks every resolved pointer/access against the current buffer extent and
+alignment before writes, including cold blocks. Offset arithmetic cannot wrap
+or exceed 64 MiB. Unused pointers permit one-past addresses. Indexed pointers
+can feed direct loads/stores only; pointer flow, further GEPs and memory
+intrinsics reject. Static pipeline minimum sizes cover the fixed component;
+execution also checks the resolved per-call addresses. Larger grids remain
+unsupported.
 
 The compute tests assemble synthetic LLVM modules with AIR metadata and check
 Objective-C dispatch ABI and byte results. They do not establish compatibility

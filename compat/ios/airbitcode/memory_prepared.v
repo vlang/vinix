@@ -43,3 +43,11 @@ pub fn (f &IRPreparedMemoryFunction) run(mut bindings []IRMemoryBinding, step_li
 	return f.program.execute_memory_function(f.ir, f.stream, f.pools, f.bodies,
 		f.function, f.profile, mut bindings, step_limit)!
 }
+
+// Check this call's bindings and all indexed addresses without executing AIR.
+// Borrowed value words and buffers must remain valid for this call.
+pub fn (f &IRPreparedMemoryFunction) validate(bindings []IRMemoryBinding, step_limit int) ! {
+	if !f.ready { return error('AIR prepared memory: uninitialized function') }
+	offsets := f.profile.checked_memory_offsets(bindings, step_limit)!
+	unsafe { offsets.free() }
+}

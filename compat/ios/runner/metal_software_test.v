@@ -3926,7 +3926,7 @@ fn sm_test_builtin_memory_focus() ! {
 			for lane in 0 .. 3 { source.write_string('%v${lane} = extractelement <3 x i32> %gid, i32 ${lane}\n %p${lane} = getelementptr i8, ptr addrspace(1) %out, i64 ${lane * 4}\n store i32 %v${lane}, ptr addrspace(1) %p${lane}, align 4\n') }
 			source.write_string('%r = add i32 %local, 17\n %p = getelementptr i8, ptr addrspace(1) %out, i64 12\n store i32 %r, ptr addrspace(1) %p, align 4\n')
 		} else if name in ['scalar', 'unnamed'] {
-			source.write_string('%r = add i32 %gid, %local\n store i32 %r, ptr addrspace(1) %out, align 4\n %v = add i32 %r, 7\n %p = getelementptr i8, ptr addrspace(1) %out, i64 4\n store i32 %v, ptr addrspace(1) %p, align 4\n')
+			source.write_string('%r = add i32 %gid, %local\n %indexed = getelementptr i32, ptr addrspace(1) %out, i32 %gid\n store i32 %r, ptr addrspace(1) %indexed, align 4\n %v = add i32 %r, 7\n %p = getelementptr i8, ptr addrspace(1) %out, i64 4\n store i32 %v, ptr addrspace(1) %p, align 4\n')
 		} else { source.write_string('store i32 99, ptr addrspace(1) %out, align 4\n') }
 		source.write_string('ret void }\n')
 	}

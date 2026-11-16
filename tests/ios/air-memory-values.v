@@ -352,7 +352,7 @@ fn controls(assembler string, root string) ! {
 		'[2 x i32]'] {
 		text.write_string('define void @bad_${i}(${t} %value, ptr %dst) { store i8 17, ptr %dst\n ret void }\n')
 	}
-	text.write_string('define void @dynamic(i32 %index, ptr %dst) { %p = getelementptr i8, ptr %dst, i32 %index\n store i8 17, ptr %p\n ret void }\n')
+	text.write_string('define void @dynamic(i32 %index, ptr %dst) { %next = add i32 %index, 1\n %p = getelementptr i8, ptr %dst, i32 %next\n store i8 17, ptr %p\n ret void }\n')
 	text.write_string('define void @pointer(i64 %value, ptr %dst) { %p = inttoptr i64 %value to ptr\n %v = load i8, ptr %p\n store i8 %v, ptr %dst\n ret void }\n')
 	text.write_string('define void @snapshot(i64 %value, ptr %dst) { store i64 0, ptr %dst, align 1\n %p = getelementptr i8, ptr %dst, i64 8\n store i64 %value, ptr %p, align 1\n ret void }\n')
 	text.write_string('define void @empty(i32 %value) { ret void }\n')
@@ -447,5 +447,5 @@ fn controls(assembler string, root string) ! {
 		output.free()
 		bindings.free()
 	}
-	os.write_file(root + '/result.txt', 'AIR-MEMORY-VALUES-CONTROLS: unsupported shapes, 65 arguments, dynamic GEP/inttoptr refusal, aliased value snapshot, bufferless function, 256 masked branch/PHI cases and 256 alternating poison/recovery calls PASS\n')!
+	os.write_file(root + '/result.txt', 'AIR-MEMORY-VALUES-CONTROLS: unsupported shapes, 65 arguments, computed GEP/inttoptr refusal, aliased value snapshot, bufferless function, 256 masked branch/PHI cases and 256 alternating poison/recovery calls PASS\n')!
 }
