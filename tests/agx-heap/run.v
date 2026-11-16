@@ -3,7 +3,7 @@ import os
 
 fn run_checks() !int {
  assert os.args.len == 2 || (os.args.len == 4 && os.args[2] == '--allocator-source')
- assert os.args[1] in ['--measure', '--sanitize']
+ assert os.args[1] in ['--measure', '--measure-padding', '--sanitize']
  assert os.user_os() == 'macos', 'retained host allocation measurement uses Darwin malloc statistics'
  // Default nano-zone statistics showed an additional 512-block step during
  // churn. Use the ordinary allocator for this exact live-byte measurement.
@@ -38,7 +38,7 @@ fn run_checks() !int {
  }
  if target := os.getenv_opt('AGX_HEAP_TEST_BINARY') { os.cp(scratch + '/test', target)! }
  mut test := os.new_process(scratch + '/test')
- if os.args[1] == '--measure' { test.set_args(['--measure']) }
+ if os.args[1] in ['--measure', '--measure-padding'] { test.set_args([os.args[1]]) }
  test.run(); test.wait(); return test.code
 }
 

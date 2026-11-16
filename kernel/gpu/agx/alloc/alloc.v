@@ -170,7 +170,12 @@ fn (mut h HeapAllocator) gc_locked() {
 			a := h.allocations[idx]
 			// Check if this allocation sits at the top
 			if a.va + a.size == h.top && !a.in_use {
-				h.top = a.va
+				// Alignment padding belongs to this reservation too. Restore
+				// its original frontier so GC can reach the preceding record.
+				h.top = if idx == 0 { h.start } else {
+					previous := h.allocations[idx - 1]
+					previous.va + previous.size
+				}
 				h.allocations.delete(idx)
 				// The heap lock excludes every metadata reader. Unlink before
 				// freeing; interior records remain owned until GC reaches them.

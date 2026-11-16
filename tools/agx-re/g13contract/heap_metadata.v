@@ -3,7 +3,9 @@ module g13contract
 
 fn check_heap_metadata_local(source string) ! {
  gc := section(source, 'fn (mut h HeapAllocator) gc_locked()', '// Return the total number', 'Heap metadata GC')!
- require_order(gc, ['if a.va + a.size == h.top && !a.in_use', 'h.top = a.va',
+ require_order(gc, ['if a.va + a.size == h.top && !a.in_use',
+  'h.top = if idx == 0 { h.start } else {', 'previous := h.allocations[idx - 1]',
+  'previous.va + previous.size',
   'h.allocations.delete(idx)', 'unsafe { free(a) }', 'progress = true', 'idx--'],
   'Only unlinked free suffix records may be destroyed')!
  require(gc.count('free(a)') == 1, 'Heap metadata retires once')!

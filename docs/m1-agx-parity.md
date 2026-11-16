@@ -6,12 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [checked GPU heap allocation bounds](m1-agx-heap-bounds.md)
-(2026-11-17). Requested alignments are validated before applying the page minimum,
-rounding rejects overflow, and complete intervals must fit before and after GC.
-Independent host cases cover sign-extended GPU ranges and `u64` boundaries.
+Latest offline increment: [GPU heap alignment-padding reclamation](m1-agx-heap-padding.md)
+(2026-11-17). GC restores each reservation's original frontier, reclaiming
+alignment gaps and previously stranded released records while preserving live
+prefixes. Host padded churn retains zero VA bytes, records, blocks and bytes.
 Modern ioctl/Mesa integration and remaining stage backing/event destruction
-are incomplete. The [GPU heap metadata reclamation](m1-agx-heap-records.md),
+are incomplete. The [checked GPU heap allocation bounds](m1-agx-heap-bounds.md),
+[GPU heap metadata reclamation](m1-agx-heap-records.md),
 [completion before deferred cleanup](m1-agx-completion-order.md),
 [compute event admission credit](m1-agx-compute-credits.md),
 [render event admission credit](m1-agx-event-credits.md),

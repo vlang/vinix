@@ -22,6 +22,22 @@ the default nano-zone statistics showed an additional 512-block step during chur
 The original source retains exactly 10,000 blocks / 320,000 bytes per sample.
 This measures the production V code on the host; kernel slab rates are unmeasured.
 
+`--measure-padding` samples another 10,000 pairs with different alignments.
+The pre-padding-fix source retains 655,360,000 VA bytes, 10,000 records and
+619,008 malloc bytes (10,004 blocks) in this sample. The fixed source requires
+zero retained VA, records, blocks and bytes. Standalone `--padding-probe` shows
+the original one-pair loss of 65,536 VA bytes and one record.
+
+The sanitized suite checks 9,216 combinations of heap-start offsets, three
+alignment choices, all release masks and all six release orders. Its independent
+model saves each reservation frontier before allocation and requires GC to
+restore that frontier, including leading padding. Live prefixes retain their
+addresses and metadata; ASan verifies retired records. Allocation-triggered GC
+must recover an entire padded heap. `padding-counterexamples.v` takes the runner,
+pre-padding-fix allocator and a fresh external directory; four compiled variants
+exercise the original gap, wrong initial frontier, preceding-record start and
+destruction of a live prefix.
+
 Sanitizers check eight release masks, delayed interior ownership, suffix-only
 destruction, automatic GC during allocation, idempotence and two concurrent
 statistics readers. Freed-pointer checks query ASan without dereferencing freed
@@ -32,10 +48,17 @@ fresh external directory. It retains four compiled negative cases: original
 retention, missing free, early free and double free. Compile `check.v` for host
 and native generated-C checks; `--selftest HOST_C` rejects five ownership/locking
 mutations. `check.v --native CURRENT_C BASELINE_C` retains the earlier
-metadata-reclamation proof for its original bundles. For current bounds code,
+metadata-reclamation proof for its original bundles. For bounds arithmetic,
 compile `check-bounds.v`: `--host CURRENT_C` checks scalar arithmetic and
 ownership, `--selftest CURRENT_C` rejects five guard/allocation mutations, and
 `--native CURRENT_C BASELINE_C` additionally preserves the heap/GPU/event
-lifetime bodies and owning layouts. The native build may omit unused statistics
-getters; `check.v --host` always requires both. Historical proof modes and their
-complete original bundles remain unchanged.
+lifetime bodies and owning layouts against the pre-bounds baseline. Those
+historical native and GC host proof modes require their original bundles.
+For current GC, compile `check-padding.v`: `--host CURRENT_C` checks exact
+stack-only frontier restoration, unlink-before-free and locked readers;
+`--selftest CURRENT_C` rejects eight ownership/locking/frontier/live-prefix
+mutations. `--native CURRENT_C BASELINE_C` restores the exact old frontier line
+and requires the remaining GC body, six heap bodies, ten owning declarations,
+nine GPU lifetime bodies and ten event methods to match the pre-padding baseline.
+The native build may omit unused statistics getters; host modes require both.
+Historical checkers and their complete original bundles remain unchanged.

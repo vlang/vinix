@@ -112,11 +112,14 @@ fn check_concurrent_stats() {
 
 fn main() {
  if os.args.len == 2 && os.args[1] == '--measure' { measure(); return }
+ if os.args.len == 2 && os.args[1] == '--measure-padding' { measure_padding(); return }
+ if os.args.len == 2 && os.args[1] == '--padding-probe' { check_heap_padding_probe(); return }
  if os.args.len == 2 && os.args[1] == '--alignment-probe' { check_heap_alignment_probe(); return }
  if os.args.len == 2 && os.args[1] == '--overflow-probe' { check_heap_overflow_probe(); return }
  check_delayed_gc()
  check_allocation_gc()
  check_concurrent_stats()
  check_heap_bounds()
+ check_heap_padding()
  println('AGX heap ownership: PASS')
 }
