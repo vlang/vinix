@@ -1,5 +1,15 @@
 # Software Metal backend
 
+`air.dispatch_simdgroups_per_threadgroup` supplies the subgroup count for the
+requested threadgroup dimensions. With this backend's execution width of one,
+it equals the requested width * height * depth, even in a partial edge group.
+It accepts ushort/uint scalars and shares the existing duplicate, metadata and
+matching-SIMD-width checks. Slot 28 appends one word to dispatch scratch, which
+now has 29 words. Both direct selectors and indirect dispatch use the recorded
+group dimensions. `tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR
+simd-dispatch` checks all thirteen geometry/SIMD builtins, full/partial groups,
+deferred indirect counts produced by blits, complete readback and refusals.
+
 Compute kernels accept the scalar ushort/uint SIMD arguments below. The CPU
 backend uses one invocation per SIMD group, matching `threadExecutionWidth`.
 
@@ -13,7 +23,7 @@ backend uses one invocation per SIMD group, matching `threadExecutionWidth`.
 Each semantic may appear once, independently of the existing geometry arguments.
 SIMD identities declared together must have matching integer widths. Vectors,
 other scalar widths, mismatched type names and buffer properties reject.
-The existing borrowed dispatch binding array grows from 24 to 28 words; its
+The initial SIMD identities extend the binding array from 24 to 28 words; its
 allocation, reuse and cleanup are unchanged. `tests/ios/metal-software-checks.v
 FRESH_EXTERNAL_DIR simd-builtins` checks all twelve geometry/SIMD arguments,
 SIMD-only kernels, computed addresses, full and partial groups, both direct

@@ -68,8 +68,11 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	link << tls
 	link << ['-L/opt/homebrew/lib', '-lavcodec', '-lswscale', '-lavutil', '-framework', 'AppKit', '-lc++', '-lsqlite3', '-lresolv', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'CoreFoundation', '-pthread', '-lproc', '-lm', '-o', binary]
 	run(out, 'host-link', link, false)
-	host_args := if os.args[2] == 'vector-memory' { [binary, '--software-metal-vector-memory'] } else if os.args[2] == 'builtins' { [binary, '--software-metal-builtins'] } else if os.args[2] == 'grids' { [binary, '--software-metal-grids'] } else if os.args[2] == 'multigrids' { [binary, '--software-metal-multigrids'] } else if os.args[2] == 'indices' { [binary, '--software-metal-indices'] } else if os.args[2] == 'sizes' { [binary, '--software-metal-sizes'] } else if os.args[2] == 'simd-builtins' { [binary, '--software-metal-simd-builtins'] } else if os.args[2] == 'geometry-types' { [binary, '--software-metal-geometry-types'] } else if os.args[2] == 'indirect' { [binary, '--software-metal-indirect'] } else if os.args[2] == 'group-coordinates' { [binary, '--software-metal-group-coordinates'] } else { [binary] }
+	host_args := if os.args[2] == 'vector-memory' { [binary, '--software-metal-vector-memory'] } else if os.args[2] == 'builtins' { [binary, '--software-metal-builtins'] } else if os.args[2] == 'grids' { [binary, '--software-metal-grids'] } else if os.args[2] == 'multigrids' { [binary, '--software-metal-multigrids'] } else if os.args[2] == 'indices' { [binary, '--software-metal-indices'] } else if os.args[2] == 'sizes' { [binary, '--software-metal-sizes'] } else if os.args[2] == 'simd-dispatch' { [binary, '--software-metal-simd-dispatch'] } else if os.args[2] == 'simd-builtins' { [binary, '--software-metal-simd-builtins'] } else if os.args[2] == 'geometry-types' { [binary, '--software-metal-geometry-types'] } else if os.args[2] == 'indirect' { [binary, '--software-metal-indirect'] } else if os.args[2] == 'group-coordinates' { [binary, '--software-metal-group-coordinates'] } else { [binary] }
 	run(out, 'host', host_args, false); run(out, 'host-deterministic', host_args, true)
+	if os.args[2] == 'simd-dispatch' {
+		for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-SIMD-DISPATCH:'), 'missing dispatch SIMD marker' }; return
+	}
 	if os.args[2] == 'simd-builtins' {
 		for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-SIMD-BUILTINS:'), 'missing SIMD builtin marker' }; return
 	}
@@ -135,7 +138,7 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 }
 
 fn main() {
- assert os.args.len == 3 && os.args[2] in ['software', 'default', 'vector-memory', 'builtins', 'grids', 'multigrids', 'indices', 'sizes', 'group-coordinates', 'indirect', 'geometry-types', 'simd-builtins']
+ assert os.args.len == 3 && os.args[2] in ['software', 'default', 'vector-memory', 'builtins', 'grids', 'multigrids', 'indices', 'sizes', 'group-coordinates', 'indirect', 'geometry-types', 'simd-builtins', 'simd-dispatch']
  root := os.real_path(os.getwd()); out := os.abs_path(os.args[1]); captured := root + "/build/ios/fortnite/ns-calendar-checks/toolchain"; old := out + '/toolchain'
  assert !os.exists(out) && !out.starts_with(root + "/")
  os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!
