@@ -1,5 +1,12 @@
 # Void-return scalar execution
 
+Mixed scalar/void execution accepts `air.clz.i32` and `air.ctz.i32` with
+an i32 input and a constant-false i1 flag. Zero returns 32. True/runtime/undef/
+poison flags reject on every call; LLVM's separate true/poison form is unchanged.
+The two appended keys 2160..2161 preserve existing identities. Pure attributes,
+optional exact second-parameter immarg, poison/undef/freeze and discarded
+results retain their existing rules. Integer-only scalar calls remain excluded.
+
 The mixed scalar/void APIs also accept the binary i32 declarations
 `air.min.s.i32`, `air.max.s.i32`, `air.min.u.i32` and `air.max.u.i32`.
 They reuse the LLVM signed/unsigned extrema evaluators, state propagation and
@@ -11,7 +18,7 @@ the same mixed execution rules. The integer-only scalar call exclusion remains.
 The mixed scalar/void APIs accept `air.popcount.i32` and
 `air.reverse_bits.i32` as pure unary i32 builtins. They share the existing LLVM
 evaluators and state behavior while retaining separate declaration-cache keys
-2154..2155, for 2,160 scalar slots. LLVM/AIR declarations may coexist; duplicate
+2154..2155, for 2,162 scalar slots. LLVM/AIR declarations may coexist; duplicate
 AIR identities still reject. Integer-only scalar execution retains its exclusion
 of calls. Other AIR integer overloads and vectors remain excluded.
 The shared attribute scanner admits function-level `mustprogress` on terminating
@@ -25,7 +32,7 @@ placement is selected per family: third parameter for insertion, second for
 existing immediate families. Both scalar and memory scanners share this policy.
 One call costs one step, one existing result slot and 2*base_count + inserted_count
 work units. The vector cache has 61,604 entries, with new keys 52628..61603; the
-scalar cache remains 2,160. Existing slots, snapshots and cleanup retain ownership.
+scalar cache remains 2,162. Existing slots, snapshots and cleanup retain ownership.
 Maintained tests cover overwritten poison/undef, surrounding lanes, input/result
 freezes, discarded void results, loop reuse and existing resource bounds.
 
@@ -36,7 +43,7 @@ including calls sharing a declaration. Copying preserves lane bits and deferred
 state; result slots and vector-PHI snapshots retain existing ownership. Calls
 cost one executed step, one vector slot and source_count + result_count work
 units. Keys 43652..52627 append 8,976 identities; the vector declaration cache
-has 52,628 entries and the scalar cache remains 2,160. Existing limits remain.
+has 52,628 entries and the scalar cache remains 2,162. Existing limits remain.
 The maintained subvector checkers cover discarded void results, scalar/integer
 observations, selected-state freezes, loop slot reuse and exact resource bounds.
 
@@ -48,7 +55,7 @@ freeze. Scalar/integer, discarded void and memory execution use the same
 owned result slots, including vector-PHI loops. One executed step and
 result_count validation work units are charged. Keys 42628..43651 append
 1,024 identities, bringing the vector cache to 43,652 entries; the scalar
-cache remains 2,160. Existing work, slot and graph bounds remain.
+cache remains 2,162. Existing work, slot and graph bounds remain.
 
 Fixed 1..16-lane i8..i64 `llvm.stepvector` calls construct defined lane numbers
 without source operands. Exact direct zero-argument signatures are required;
@@ -57,7 +64,7 @@ executed step, one shared vector slot and result_count lane-work units.
 The maintained stepvector checker covers scalar/integer results, unused void
 results, insertion/selection/freezes, loop reuse and both sides of the existing
 4,096-slot and 1,000,000-unit validation limits. Keys 41716..42627 append 912
-identities; the vector cache has 42,628 entries and the scalar cache stays 2,160.
+identities; the vector cache has 42,628 entries and the scalar cache stays 2,162.
 
 `llvm.vector.interleave2` through `interleave8` support fixed i1..i64/half/float
 inputs whose combined result has at most 16 lanes. Calls preserve raw encodings,

@@ -13,6 +13,8 @@ fn air_integer_intrinsic(name string) !(ScalarIntrinsic, int) {
 		'air.max.s.i32' { ScalarIntrinsic.smax, 3 }
 		'air.min.u.i32' { ScalarIntrinsic.umin, 4 }
 		'air.max.u.i32' { ScalarIntrinsic.umax, 5 }
+		'air.clz.i32' { ScalarIntrinsic.ctlz, 6 }
+		'air.ctz.i32' { ScalarIntrinsic.cttz, 7 }
 		else { return error('AIR intrinsic: unsupported AIR integer overload') }
 	}
 }

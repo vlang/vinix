@@ -98,6 +98,9 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 			if value.kind != .constant { return error('AIR intrinsic: constant immediate required') }
 			constant := pools.constants[value.constant_index]
 			if constant.type_index != argument || constant.splat || constant.kind !in [.zero, .integer]! || pools.scalar_bits(value.constant_index)! > maximum { return error('AIR intrinsic: invalid immediate constant') }
+			// Admit the zero-defined AIR form emitted for clz/ctz. LLVM's
+			// separate true/poison form keeps its existing validation policy.
+			if f.name.starts_with('air.') && scalar_integer_zero_count(id) && pools.scalar_bits(value.constant_index)! != 0 { return error('AIR intrinsic: AIR zero count requires a constant false flag') }
 		} else if id == .is_fpclass {
 			if argument != input { return error('AIR intrinsic: classification input type') }
 		} else if id == .ldexp && i == 1 {

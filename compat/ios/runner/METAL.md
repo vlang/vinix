@@ -1,5 +1,12 @@
 # Software Metal backend
 
+Prepared pipelines execute scalar `air.clz.i32` and `air.ctz.i32` with an i32
+value and constant-false i1 flag. The existing zero-count evaluators return 32
+for zero; other AIR flag forms and widths/vectors remain excluded. Separate
+appended cache entries permit LLVM/AIR coexistence. The size fixture uses both
+calls in its bounded coordinate calculation, preserving independent RGBA8 and
+padding checks. Declaration, immediate, state and prewrite guards remain.
+
 Prepared pipelines execute `air.min.s.i32`, `air.max.s.i32`,
 `air.min.u.i32` and `air.max.u.i32` with the existing signed/unsigned integer
 evaluators. Their separate appended declaration entries allow LLVM/AIR forms
