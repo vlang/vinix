@@ -381,11 +381,12 @@ Only the selected arm supplies lane undef/poison; chosen undef errors at final
 extraction unless a source vector freeze repairs it first. Scalar recovery after
 extraction cannot conceal undef errors. Poison conditions produce poison lanes.
 Both arms and conditions remain fully validated and charged to the graph limits.
-Vector conditions, loads, PHIs and other unsupported constructions remain
+Loads, PHIs and other unsupported constructions remain
 excluded. The image shader chooses between two permutations using x parity,
 patches one lane using y, shuffles across both vectors, freezes, then adds and
 wraps the lane indices with vector arithmetic, truncates them, compares the i1
-lanes against zero, then zero-extends the mask.
+lanes against zero, then uses that mask to select independently between two
+integer vectors.
 Independent red-channel readback observes both sources and insertion choices.
 Pure `insertelement` sources accept i1..i64 replacements and dynamic insertion
 indices. Valid insertion replaces one lane; poison/out-of-range insertion poisons
@@ -428,7 +429,17 @@ violated sign promises remain lane-local. Source freeze may repair operands
 and result freeze may repair comparison poison. Invalid extraction selectors
 remain checked. Two fixed builder arrays, POD result-table metadata and the
 existing graph/cache ownership retain every lane's depth and the same limits.
-Floating comparisons and vector conditions remain unsupported in addresses.
+Floating comparisons remain unsupported in addresses.
+Pure vector selects also accept a matching i1 mask. Each mask lane chooses its
+own arm; poison conditions produce lane-local poison. Chosen arm undef remains
+deferred until extraction or repair by a vector freeze. Every mask lane must be
+defined, so ignored condition undef rejects before writes, including under later
+selects/freezes or invalid extraction. A source mask freeze may repair it first.
+Comparison masks and other admitted pure integer vector operations compose.
+A separate guarded condition table under cache tag 260 checks all mask lanes,
+preserves poison and retains maximum source/selector heights under the existing
+limits. One fixed builder array and existing POD nodes/cache storage add no new
+runtime array, node kind or owner. Loaded/PHI and floating mask dependencies reject.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

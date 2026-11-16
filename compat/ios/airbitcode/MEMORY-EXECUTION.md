@@ -246,15 +246,16 @@ are validated even for literal conditions. Undef in an unchosen vector arm remai
 a chosen undef lane errors at the final extraction, even under a later scalar
 select/freeze. A source vector freeze may repair it first. Poison conditions
 produce poison lanes and may be repaired by a source vector freeze. Invalid
-extraction selectors still produce poison before lane access. Vector conditions,
-loads, PHIs and other unsupported constructions remain excluded from these
+extraction selectors still produce poison before lane access. Loads, PHIs and
+other unsupported constructions remain excluded from these
 address graphs.
 
 Private scalar projections defer lane undef until the final extraction. Select
 propagates only the chosen tag; source freeze repairs tags after selector checks.
 A new fixed 256-entry bool array stores these internal tags; no runtime heap
 array is added. Cache keys reserve nine low bits for scalar/pair/source tags
-0..3 and per-selector projection tags 4..259. Existing ownership/free paths and
+0..3, per-selector projection tags 4..259 and guarded condition tables at 260.
+Existing ownership/free paths and
 256-node/32-level limits remain. All projected source/selector/condition heights
 count, including cache hits; freeze-only paths retain their previous costs.
 
@@ -286,7 +287,7 @@ undef entries produce poison lanes. Selected source undef stays deferred until
 final extraction or repair by a source freeze/insertion. Both complete sources
 and every mask entry validate, even when unselected. Normalized entries must
 match the original mask constant; negative integer entries cannot impersonate
-poison tags. Floating operations, loaded/PHI sources and vector conditions remain
+poison tags. Floating operations and loaded/PHI sources remain
 excluded from address graphs.
 
 Two existing POD words pack the sixteen mask bytes, with 255 reserved for
@@ -356,11 +357,33 @@ lane height; source/selector/result heights, including cached subtrees, share
 the existing 256-node/32-level limits. Comparison nodes reject undef then reuse
 the scalar integer comparator with the operand width kept separate from i1.
 Existing graph/cache ownership and free paths remain, with no runtime array or
-owned field added. Floating comparisons and vector conditions remain excluded.
+owned field added. Floating comparisons remain excluded.
 `tests/ios/air-memory-vector-compare-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 every integer width/predicate/flag, representative full lane-count coverage,
 both operands' indeterminate lanes, source/result freezes, table reuse and exact
 cached graph limits against native LLVM and an independent signed-order oracle.
+
+Vector `select` conditions may also be matching 1..16-lane i1 masks. Each lane
+chooses its own arm; only that arm supplies the lane's undef or poison. A poison
+condition poisons its result lane without observing either arm's state. Chosen
+arm undef remains deferred until extraction or repair by a vector freeze.
+Every condition lane must be defined: any condition undef rejects before writes,
+even in an ignored lane, invalid extraction, cold block, later unchosen select or
+result freeze. Freezing the mask first repairs indeterminate condition lanes.
+Both arms, the entire condition and all immediate dependency errors still
+validate. Pure integer comparison masks and existing vector constructions compose.
+
+A guarded condition table uses cache tag 260, separate from ordinary/frozen
+source snapshots and projection tags. Static selectors project every mask lane,
+then existing extraction guards reject deferred undef while preserving poison.
+Dynamic table reads and the existing projected select node choose the arm.
+One fixed 16-int builder array holds input indices; POD table metadata retains
+maximum lane height. Every source/condition/selector and cached height remains
+charged to the existing graph limits. Runtime arrays, node kinds, ownership and
+free paths are unchanged. Loaded/PHI and floating condition sources reject.
+`tests/ios/air-memory-vector-lane-select-index.v LLVM_AS FRESH_EXTERNAL_DIR`
+checks all widths, mask/arm states, unfrozen and frozen forms, condition-table
+isolation/reuse and exact graph limits against native LLVM and a lane oracle.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result

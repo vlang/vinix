@@ -42,6 +42,7 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 	b.p.integer_bits(element)!
 	producer := b.vector_index_producer(source, before)!
 	// Tags 4..259 identify a projection by its scalar selector node (0..255).
+	// Tag 260 holds a separately guarded vector-condition table.
 	key := memory_index_key(source.number, u64(selector) + 4)
 	if cached := b.cache[key] {
 		if b.nodes[cached].height > max_memory_index_depth - depth { return error('AIR memory index: cached projection depth limit') }
@@ -71,11 +72,16 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 		} else if code in [u64(5), 29] {
 			vector_operation_shape(b.p, op, 3)!
 			condition := b.p.operands[op.operands_start + 2]
-			if b.p.integer_bits(condition.type_index)! != 1 { return error('AIR memory index: scalar vector-select condition required') }
 			b.p.vector_select_profile(b.stream, b.pools, b.bodies, b.scope, producer, op, true, 64)!
 			left := b.project_vector_lane(b.p.operands[op.operands_start], selector, producer, depth + 1)!
 			right := b.project_vector_lane(b.p.operands[op.operands_start + 1], selector, producer, depth + 1)!
-			cond := b.expression(condition, producer, depth + 1)!
+			mut cond := -1
+			if b.p.types[condition.type_index].kind == .vector_t {
+				table := b.vector_condition_source(condition, producer, depth + 1)!
+				if b.nodes.len >= max_memory_index_nodes { return error('AIR memory index: vector condition selector limit') }
+				cond = b.nodes.len
+				b.nodes << MemoryIndexNode{kind: .constant_lane, bits: 1, left: selector, right: table.base, condition: table.node, value: u64(count), height: 1 + if table.height > b.nodes[selector].height { table.height } else { b.nodes[selector].height }}
+			} else { cond = b.expression(condition, producer, depth + 1)! }
 			mut height := b.nodes[left].height
 			if b.nodes[right].height > height { height = b.nodes[right].height }
 			if b.nodes[cond].height > height { height = b.nodes[cond].height }
