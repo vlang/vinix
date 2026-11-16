@@ -1,10 +1,18 @@
 # Bounded memory execution
 
+Scalar `air.min.s.i32`, `air.max.s.i32`, `air.min.u.i32` and
+`air.max.u.i32` use the existing signed/unsigned extrema evaluators. Both
+arguments and the result must be i32; values are normalized before comparison.
+Their pure integer results may feed bounded addresses. Keys 2156..2159 append
+four declaration identities without moving earlier keys. AIR and LLVM forms
+may coexist; duplicate declarations, metadata, attributes, state, work and
+prewrite checks retain their existing rules.
+
 Scalar `air.popcount.i32` and `air.reverse_bits.i32` use the existing population
 count and bit-reversal evaluators, including bounded address projections. AIR
 and LLVM spellings have separate declaration identities and may coexist in one
 function. Keys 2154..2155 append without moving earlier entries; the scalar cache
-now has 2,156 slots. Exact signatures, direct-call metadata, pure declaration
+now has 2,160 slots. Exact signatures, direct-call metadata, pure declaration
 attributes (including function-level `mustprogress`) and duplicate checks remain
 required. Other AIR widths/vectors and
 general external calls remain excluded. Both memory paths share existing
@@ -89,7 +97,7 @@ the input factor. Every input has the same element type and result_count/factor
 lanes. Raw bits and selected poison/undef tags are preserved without observing
 unchosen lanes. Exact ordinary direct calls use one existing result slot, one
 executed step and 2*result_count lane-work units. Keys 40000..41715 append
-1,716 identities without moving earlier families; scalar entries stay 2,156.
+1,716 identities without moving earlier families; scalar entries stay 2,160.
 
 Pure integer addresses use packed shuffle selectors, lane rebasing and bounded
 projected-shuffle choices among all inputs. Invalid selectors poison the final

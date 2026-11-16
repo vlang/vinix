@@ -1,5 +1,12 @@
 # Software Metal backend
 
+Prepared pipelines execute `air.min.s.i32`, `air.max.s.i32`,
+`air.min.u.i32` and `air.max.u.i32` with the existing signed/unsigned integer
+evaluators. Their separate appended declaration entries allow LLVM/AIR forms
+to coexist. The size fixture uses all four calls to clamp and reconstruct
+buffer coordinates before RGBA8 readback. Exact i32 signatures, direct-call
+metadata, pure attributes, state and prewrite bounds remain checked.
+
 Prepared compute pipelines execute the scalar AIR builtins `air.popcount.i32`
 and `air.reverse_bits.i32`, including their use in bounded buffer addresses.
 The existing integer evaluators supply the results. AIR and LLVM declarations
