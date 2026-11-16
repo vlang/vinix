@@ -180,8 +180,15 @@ count. Pair freeze preserves defined value/overflow fields and independently
 chooses zero for poison fields. A direct frozen undef pair also chooses zero;
 undef remains unsupported through ordinary extraction or selection, including
 after its frozen form was cached. Cached constants retain their original poison
-state, so freezing one use never repairs an unfrozen use. Aggregate insert,
-PHIs and loaded operands remain unsupported address dependencies.
+state, so freezing one use never repairs an unfrozen use. Pair `insertvalue`
+replaces field zero (iN data) or one (i1 flag) using a validated literal index.
+Only that field receives the replacement's value/poison; its neighbor retains
+the base field. Inserts can repair one or both fields of a poison pair and
+compose with select/freeze. Both base and replacement dependencies are built
+and evaluated even when extracting an untouched field; both cached heights
+count. Unsupported operands and immediate arithmetic errors still reject.
+PHIs, loaded operands and ordinary undef bases/replacements remain unsupported
+address dependencies; an appropriate direct freeze may repair undef first.
 
 Pair fields are projected into scalar nodes, with separate cache keys for the
 value field, overflow field and ordinary scalar results. Each projected pair
@@ -323,6 +330,12 @@ defined pair freezes and repeated freezes with LLVM over all 384 overloads and
 both fields. It checks the stable zero choice for poison/direct undef, nested
 select/freeze composition, shared fields, cached unfrozen poison/undef uses,
 exact node/depth boundaries and cold frozen/non-frozen roots.
+
+`tests/ios/air-memory-pair-insert-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares
+field replacement with LLVM over all 384 checked-arithmetic overloads. It checks
+partial/full poison repair, both overwrite orders, untouched neighbors, scalar
+replacement poison, select/freeze composition, both shared-field extraction
+orders, exact node/depth limits and rejected ignored dependencies.
 
 ## Prepared memory functions
 

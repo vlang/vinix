@@ -108,8 +108,9 @@ fn (mut b MemoryIndexBuilder) pair_field_source(operand IRTypedOperand, before i
 	} else {
 		op := b.p.instructions[producer]
 		inst := b.bodies.instructions[producer]
-		if op.status != .decoded || inst.scope != b.scope || !inst.has_result || inst.next_value != operand.number || inst.record < 0 || inst.record >= b.stream.records.len || op.operands_start < 0 || op.operands_start > b.p.operands.len || op.operands_count < 1 || op.operands_count > b.p.operands.len - op.operands_start || op.targets_count != 0 || op.indices_count != 0 || op.is_volatile { return error('AIR memory index: decoded pair expression required') }
+		if op.status != .decoded || inst.scope != b.scope || !inst.has_result || inst.next_value != operand.number || inst.record < 0 || inst.record >= b.stream.records.len || op.operands_start < 0 || op.operands_start > b.p.operands.len || op.operands_count < 1 || op.operands_count > b.p.operands.len - op.operands_start || op.targets_count != 0 || op.is_volatile { return error('AIR memory index: decoded pair expression required') }
 		code := b.stream.records[inst.record].code
+		if op.indices_count != 0 && code != 27 { return error('AIR memory index: unexpected pair indices') }
 		if code == 34 {
 			// The enclosing profile already checks bounded attributes/duplicates.
 			b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, op, b.scope)!
@@ -118,6 +119,15 @@ fn (mut b MemoryIndexBuilder) pair_field_source(operand IRTypedOperand, before i
 			lhs := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
 			rhs := b.expression(b.p.operands[op.operands_start + 2], producer, depth + 1)!
 			node = MemoryIndexNode{kind: .intrinsic_overflow_field, bits: bits, source_bits: width, opcode: field, intrinsic: id, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height }}
+		} else if code == 27 && op.flags == 0 {
+			b.p.scalar_pair_insert(op, scope.base_id, b.pools, b.scope)!
+			base := b.pair_field(b.p.operands[op.operands_start], producer, depth + 1, field)!
+			replacement := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
+			chosen := b.p.indices[op.indices_start] == field
+			// Validate/evaluate both dependencies and count both cached heights.
+			// Only the selected field supplies value/poison; right keeps the other
+			// dependency without propagating its poison through the copy node.
+			node = MemoryIndexNode{kind: .copy_value, bits: bits, left: if chosen { replacement } else { base }, right: if chosen { base } else { replacement }, height: 1 + if b.nodes[base].height > b.nodes[replacement].height { b.nodes[base].height } else { b.nodes[replacement].height }}
 		} else if code == 58 && op.flags == 0 {
 			b.p.scalar_pair_freeze(op, scope.base_id, b.pools, b.scope)!
 			lhs := b.pair_field_source(b.p.operands[op.operands_start], producer, depth + 1, field, true)!

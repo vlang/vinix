@@ -233,7 +233,7 @@ fn main() {
     text.write_string('ret void }\n')
    }
    for kind in ['cold', 'root', 'unsupported_branch', 'unsupported_condition', 'cache_poison', 'cache_undef', 'undef_select', 'cold_frozen'] {
-    text.write_string('define void @guard_${field}_${kind}${args} { store i8 17, ptr %out\n')
+    text.write_string('define void @guard_${field}_${kind}${args} { entry: store i8 17, ptr %out\n')
     if kind in ['cold', 'cold_frozen'] { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
     if kind in ['cache_poison', 'cache_undef', 'undef_select'] {
      literal := if kind == 'cache_poison' { 'poison' } else { 'undef' }
@@ -243,7 +243,7 @@ fn main() {
     } else if kind == 'cold_frozen' {
      text.write_string('%fixed = freeze ${pair} poison\n %v = extractvalue ${pair} %fixed, ${field}\n %p = getelementptr i8, ptr %out, ${typ} %v\n store i8 42, ptr %p\n')
     } else {
-     if kind == 'unsupported_branch' { text.write_string('%bad = insertvalue ${pair} poison, i1 false, 1\n') }
+     if kind == 'unsupported_branch' { text.write_string('br label %join\n join: %bad = phi ${pair} [poison, %entry]\n') }
      if kind == 'unsupported_condition' { text.write_string('%bad = load i1, ptr %out\n') }
      text.write_string('%s = select i1 ${if kind == 'unsupported_condition' { '%bad' } else { 'true' }}, ${pair} ${if kind in ['cold', 'root'] { 'poison' } else { 'zeroinitializer' }}, ${pair} ${if kind == 'unsupported_branch' { '%bad' } else { 'zeroinitializer' }}\n %v = extractvalue ${pair} %s, ${field}\n %p = getelementptr i8, ptr %out, ${typ} %v\n')
      if kind == 'root' { text.write_string('%fixed = freeze ${pair} %s\n %good = extractvalue ${pair} %fixed, ${field}\n %q = getelementptr i8, ptr %out, ${typ} %good\n') }

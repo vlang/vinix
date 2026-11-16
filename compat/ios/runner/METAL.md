@@ -348,7 +348,10 @@ including cached depth; only the selected branch contributes its poison state.
 Pair freezes preserve defined fields and choose stable zero for poison or a
 direct undef pair. Freezing a cached source never repairs other unfrozen uses;
 ordinary undef pair dependencies still reject.
-Aggregate insert and PHIs remain unsupported address dependencies.
+Pair inserts replace the data or flag field independently, including partial
+and complete poison repair. Both the base and replacement are validated and
+count toward depth, even when extracting an untouched field. PHIs and loaded
+dependencies remain unsupported in addresses.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
@@ -386,6 +389,8 @@ An aggregate select chooses the checked pair when x is inside the grid and
 chooses a poison pair otherwise, before extracting either field.
 The selected pair is frozen before extraction, preserving defined fields and
 using the same stable zero choice as ordinary pair execution.
+Both fields are then inserted into a poison pair before final extraction,
+checking that partial and complete repair preserve the address and x channel.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.
