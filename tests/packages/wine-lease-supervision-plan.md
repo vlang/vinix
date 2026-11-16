@@ -5188,3 +5188,65 @@ OS loader/cache bytes and bootstrap/hermetic admission remain unqualified.
 The installed SDK is still required for original source checks and unrestricted
 controls. Owned ARM/GUI, broader lifetime/mapping controls and default activation
 remain open. No guest/kernel/default behavior changes.
+
+## Exact ordinary file-data capabilities during host replay (2026-11-16)
+
+Commit `1b2fdcacd` adds a separate [ordinary data-read replay qualifier](wine-read-closed-replay.md).
+It admits the original format-5 host build with its exact pinned checker before
+replay and again after all controls. Its child denies `file-read-data` before LLD
+exec, granting exact literals only for extracted archive members, pinned ordinary
+tool images and one derived control response. The capability map binds all file
+hashes. The policy projector rejects unsafe/repeated paths and unbounded lists;
+no captured-directory prefix admits arbitrary ordinary files.
+
+Directory data reads and metadata lookups remain allowed. `/usr/lib` and
+`/System/Library` are explicit data-read exceptions, as are the three exact
+device paths `/dev/null`, `/dev/random` and `/dev/urandom`. Writes and network
+access remain open. Helper startup, inherited state, complete directory/search
+closure and OS loader/shared-cache bytes remain outside the claim. The receipt
+states this scope rather than asserting complete hermetic admission.
+
+Fixture, controller, producer and retainer all pass against the complete format-5
+checkpoint above, reproducing their original executables under the new policy.
+Each permits a captured-object read and refuses an identical external object's
+direct path, private symlink and Data-volume alias, plus an installed SDK stub.
+Each read refusal requires EPERM/EACCES, exit 77 and its exact marker. A second
+response substitutes only the external object operand: unrestricted linking
+must reproduce identical bytes, then restricted linking must fail with the exact
+`cannot open`/`Operation not permitted` diagnostic naming that object, exit 1
+and no executable. This yields twenty runtime denials and four allowed reads,
+alongside four identical captured and four identical counterfactual link results.
+Observed loads/images, all capability bytes, successful outputs, hidden object/
+alias, policy, original pins and both embedded source guards are rechecked
+before publishing the new receipt.
+
+The production control runner also passes nineteen unsafe/list-policy refusals,
+deterministic literal projection and system-prefix boundary checks. Three CLI
+controls refuse a wrong checker, incomplete original host bundle and old format
+without publishing replay receipts. Existing mandatory format-5 code, historical
+checkers and complete original namespaces/bundles remain required and unchanged.
+No guest rerun is claimed by this additive replay step.
+
+Early policies aborted during dyld shared-cache startup. The kernel log narrowed
+the cause to `file-read-data` on directory `/`; directory-type permission fixes
+startup while the ordinary external-object refusals still pass. A provisional
+Cryptex cache subtree exception did not fix the failure and was removed. The
+initial frozen-source compile lacked a transitive module copy; the corrected
+final build passes. All diagnostic logs, crash reports and preliminary source
+copies remain retained and are distinguished from final tools in `validation.txt`.
+
+The complete checkpoint is `/Users/alex/.cache/vwreadclosed-20261116-01`.
+Final tools are `replay-final` and `controls-final`, using frozen `source-final`.
+The passing role directories are `fixture`, `controller`, `producer` and
+`retainer`; `controls` contains policy/admission outcomes. The checkpoint retains
+selected sources/imports, feature patch/revision, generated programs, complete
+new graphs, raw commands/environments/exit records and the original-bundle pointer.
+Its typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-read-closed-20261116-01.inventory.json`,
+SHA-256 `4fbefb92ddb381c4cd7eab237bfd79fff0d05267d361afcc8aeeef67e782dfb3`.
+Complete inventory recording and independent comparison both pass.
+
+Required-receipt integration of this broader restriction remains open, along with
+complete ABI/library/search/read closure, OS loader/cache bytes, bootstrap/hermetic
+admission, owned ARM/GUI, broader lifetime/mapping controls and default activation.
+No kernel, guest or product-default behavior changes.

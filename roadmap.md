@@ -1390,7 +1390,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     controls and thirty-six resealed host refusals. Its complete record is
     mandatory in producer/controller/retainer graphs, including after the guest.
     The [standalone audit](tests/packages/wine-sdk-denied-replay.md) keeps its
-    historical format-4 contract. Complete
+    historical format-4 contract. An additive
+    [ordinary file-data capability replay](tests/packages/wine-read-closed-replay.md)
+    now reproduces all four host roles with exact captured/tool-file literals,
+    twenty runtime denial controls and four allowed-read controls. Making this
+    broader restriction mandatory remains open; directory/search and OS-loader
+    reads remain outside its claim. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader
