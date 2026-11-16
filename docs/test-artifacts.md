@@ -52,6 +52,13 @@ without creating an archive and does not qualify a launch, replace a historical
 auditor or authorize removing originals. Its selftest also refuses changed
 bytes, links, file/root permissions, hidden additions, missing files, overwrite
 and a receipt inside the source workspace.
+The scanner requires a regular node before opening file contents; FIFOs and
+other unsupported special nodes refuse instead of blocking. `node-selftest
+FRESH_EXTERNAL_DIR` checks a two-second FIFO refusal with no receipt and a
+regular-file/symlink baseline. A stopped test FIFO has no retained byte payload:
+the receipt control runner records its original `lstat` metadata before retiring
+that IPC node. Failed runs may need the same explicit cleanup after their child
+has stopped; keep the metadata and failure logs with the bundle.
 
 An optional trailing `--fast` selects gzip level 1 for large workspaces; the
 literal compression command is retained. This trades compressed size for CPU

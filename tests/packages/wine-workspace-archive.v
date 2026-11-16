@@ -6,6 +6,10 @@ module main
 import crypto.sha256
 import json2
 import os
+import time
+
+#include <sys/stat.h>
+fn C.mkfifo(&char, u32) int
 
 fn digest(path string) !string {
 	mut file := os.open(path)!
@@ -32,7 +36,7 @@ fn inventory(root string, relative string, mut entries []string) ! {
 		entries << 'directory\t' + mode + '\t' + relative
 		mut names := os.ls(path)!; names.sort()
 		for name in names { inventory(root, relative + '/' + name, mut entries)! }
-	} else if os.is_file(path) {
+	} else if os.lstat(path)!.get_filetype() == .regular {
 		entries << 'file\t' + mode + '\t' + os.file_size(path).str() + '\t' + digest(path)! + '\t' + relative
 	} else { return error('workspace contains unsupported node: ' + path) }
 }
@@ -82,6 +86,37 @@ fn invoke(args []string, log string) ! {
 	result := os.exec(args)
 	os.write_file(log, result.output)!
 	if result.exit_code != 0 { return error('workspace archive command failed: ' + log) }
+}
+
+fn node_selftest(root string) ! {
+	if os.exists(root) || os.is_link(root) { return error('node selftest requires fresh external directory') }
+	os.mkdir_all(root + '/input')!
+	os.write_file(root + '/input/payload', 'payload')!
+	os.symlink('payload', root + '/input/link')!
+	pipe := root + '/input/pipe'
+	if C.mkfifo(pipe.str, 0o600) != 0 { return error('cannot create inventory FIFO fixture') }
+	defer { os.rm(pipe) or {} }
+	mut child := os.new_process(os.executable())
+	defer { child.close() }
+	args := ['record-inventory', root + '/input', root + '/must-not-exist.json']
+	os.write_file(root + '/fifo.argv.json', json2.encode([os.executable(), ...args]))!
+	child.set_args(args); child.set_redirect_stdio_merged(); child.run()
+	C.close(child.stdio_fd[0]); child.stdio_fd[0] = -1
+	deadline := time.ticks() + 2000
+	for child.is_alive() {
+		if time.ticks() >= deadline { child.signal_kill(); child.wait(); return error('inventory FIFO refusal blocked') }
+		time.sleep(10 * time.millisecond)
+	}
+	text := child.stdout_slurp(); child.wait()
+	os.write_file(root + '/fifo.log', text)!
+	os.write_file(root + '/fifo.exit.json', json2.encode({'exit': child.code}))!
+	if child.code != 1 || !text.contains('workspace contains unsupported node: ' + pipe)
+		|| os.exists(root + '/must-not-exist.json') { return error('inventory FIFO reached wrong refusal') }
+	os.write_file(root + '/retired-fifo.json', json2.encode(os.lstat(pipe)!))!
+	os.rm(pipe)!
+	invoke([os.executable(), 'record-inventory', root + '/input', root + '/inventory.json'], root + '/record.log')!
+	invoke([os.executable(), 'check-inventory', root + '/input', root + '/inventory.json'], root + '/check.log')!
+	println('WINE INVENTORY NODE PASS bounded FIFO refusal without receipt; regular/link baseline')
 }
 
 fn selftest(root string, checker string) ! {
@@ -151,6 +186,12 @@ fn selftest(root string, checker string) ! {
 fn run() ! {
 	$if prod {} $else { return error('compile workspace archive with -prod') }
 	if digest(@FILE)! != sha256.hexhash($embed_file('wine-workspace-archive.v').to_string()) { return error('compiled workspace archive source differs') }
+	if os.args.len == 3 && os.args[1] == 'node-selftest' {
+		root := os.abs_path(os.args[2])
+		repo := os.real_path(os.dir(@FILE) + '/../..')
+		if root == repo || root.starts_with(repo + '/') { return error('node selftest requires external results') }
+		node_selftest(root)!; return
+	}
 	if os.args.len == 4 && os.args[1] in ['record-inventory', 'check-inventory'] {
 		inventory_receipt(os.abs_path(os.args[2]), os.abs_path(os.args[3]), os.args[1] == 'check-inventory')!
 		println('WINE WORKSPACE INVENTORY PASS complete bytes, sizes, types, modes and link targets; receipt SHA256=' + digest(os.args[3])!)
