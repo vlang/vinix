@@ -1,5 +1,16 @@
 # Software Metal backend
 
+AIR `llvm.vector.interleave2` through `interleave8` execute fixed integer, half
+and float lane interleaves with at most 16 result lanes. Prepared software
+pipelines preserve raw bits and deferred lane state; integer projections may
+feed bounded addresses. The size fixture uses eight integer inputs for its
+coordinate, three float inputs for NaN payload readback and two half inputs for
+negative zero/subnormal/payload checks. Both queued dispatch selectors and
+RGBA8 buffer/texture readback are covered.
+`tests/ios/air-vector-interleave.v` checks all factors, lane counts and element
+formats against independent native LLVM lane copies. Native GPU execution and
+Fortnite launch remain unverified.
+
 AIR `llvm.vector.splice.left` and `.right` execute fixed 1..16-lane
 i1..i64/half/float windows with scalar i32 runtime offsets. Raw lane bits,
 selected poison and deferred undef survive copying. Invalid offsets produce

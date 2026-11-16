@@ -1,5 +1,24 @@
 # Bounded memory execution
 
+`llvm.vector.interleave2` through `interleave8` copy equally sized fixed
+i1..i64/half/float vectors into lane order input0[0], input1[0], ...,
+input0[1], input1[1], ... . Result counts stay within 16 and are multiples of
+the input factor. Every input has the same element type and result_count/factor
+lanes. Raw bits and selected poison/undef tags are preserved without observing
+unchosen lanes. Exact ordinary direct calls use one existing result slot, one
+executed step and 2*result_count lane-work units. Keys 40000..41715 append
+1,716 identities without moving earlier families; scalar entries stay 2,154.
+
+Pure integer addresses use packed shuffle selectors, lane rebasing and bounded
+projected-shuffle choices among all inputs. Invalid selectors poison the final
+extraction before writes; selected undef stays deferred through vector freezes.
+All source dependencies contribute height and capacity, including unchosen
+inputs. Existing loaded-vector/PHI/floating address exclusions and graph limits
+remain. No node kind, owner or profile field is added.
+`tests/ios/air-vector-interleave.v` checks both memory paths, typed and loaded
+sources, shifted views, states, metadata, graph/resource limits and loop reuse
+against independent inlined native LLVM lane copies.
+
 `llvm.vector.splice.left` and `.right` support fixed 1..16-lane
 i1..i64/half/float vectors and an unsigned scalar i32 runtime offset. Left
 selects the N-lane window starting at offset in the concatenated sources;

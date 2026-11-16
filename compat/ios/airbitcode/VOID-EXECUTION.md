@@ -1,5 +1,15 @@
 # Void-return scalar execution
 
+`llvm.vector.interleave2` through `interleave8` support fixed i1..i64/half/float
+inputs whose combined result has at most 16 lanes. Calls preserve raw encodings,
+poison and deferred undef; unused indeterminate results can be discarded and
+freezes repair observed lanes. Integer-only execution excludes floating types.
+All inputs have the same type and their lane counts sum to the result count.
+One existing result slot and 2*result_count validation work units are charged;
+one executed step is charged per call. The maintained interleave checker covers
+scalar/integer APIs, vector-PHI loops and exact/exceeded shared 4,096-slot and
+1,000,000-unit work limits. The vector cache grows to 41,716 distinct entries.
+
 Fixed 1..16-lane i1..i64/half/float `llvm.vector.splice.left` and `.right`
 calls concatenate two same-typed vectors and copy a shifted window with a
 runtime scalar i32 offset. Offsets above N produce vector poison. Raw lane bits

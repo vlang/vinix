@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_splice_cache_base + 2112
+const vector_float_intrinsic_slots = vector_interleave_cache_base + 1716
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -35,10 +35,13 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	if callee.number >= u32(pools.declarations.len) || pools.declarations[int(callee.number)] != f.record || callee.type_index < 0 || callee.type_index >= p.types.len || p.types[callee.type_index].kind != .pointer_t || p.types[callee.type_index].address_space != 0 { return error('AIR vector intrinsic: direct declaration identity') }
 	signature := ir.types[f.signature]; arity := scalar_intrinsic_arity(id)
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 || ir.references[signature.refs_start] != op.result_type { return error('AIR vector intrinsic: signature/arity') }
-	if !mixed && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul, .smulh, .umulh, .vector_reverse, .vector_splice_left, .vector_splice_right]! { return error('AIR vector intrinsic: mixed floating execution required') }
+	if !mixed && !vector_interleave_intrinsic(id) && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul, .smulh, .umulh, .vector_reverse, .vector_splice_left, .vector_splice_right]! { return error('AIR vector intrinsic: mixed floating execution required') }
 	mut work := 0
 	mut conversion_key := -1
-	if id in [.vector_splice_left, .vector_splice_right]! {
+	if vector_interleave_intrinsic(id) {
+		interleave_work, interleave_key := p.vector_interleave_profile(ir, stream, pools, bodies, scope, index, op, mixed, remaining)!
+		work = interleave_work; conversion_key = interleave_key
+	} else if id in [.vector_splice_left, .vector_splice_right]! {
 		splice_work, splice_key := p.vector_splice_profile(ir, stream, pools, bodies, scope, index, op, mixed, remaining)!
 		work = splice_work; conversion_key = splice_key
 	} else if id == .vector_reverse {
@@ -93,6 +96,12 @@ fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right Scala
 }
 fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Stream, inst IRInstruction, op IRTypedInstruction) !IntegerValue {
 	id, count, bits := vector_float_intrinsic_name(ir.functions[op.callee_function].name)!
+	if vector_interleave_intrinsic(id) {
+		factor := scalar_intrinsic_arity(id)
+		mut sources := [8]ScalarVectorValue{}
+		for i in 0 .. factor { sources[i] = m.read_vector(stream, m.p.operands[op.operands_start + i + 1])! }
+		return m.store_vector_value(inst, interleaved_vector(sources, factor, count / factor)!)!
+	}
 	left := m.read_vector(stream, m.p.operands[op.operands_start + 1])!
 	if id in [.vector_splice_left, .vector_splice_right]! {
 		right := m.read_vector(stream, m.p.operands[op.operands_start + 2])!
