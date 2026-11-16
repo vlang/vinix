@@ -224,8 +224,8 @@ fn controls(assembler_path string, out string) !int {
    'double' { '%n = fptoui <2 x double> zeroinitializer to <2 x i64>' }
    'bfloat' { '%n = fptosi <2 x bfloat> zeroinitializer to <2 x i16>' }
    'reshape' { '%n = bitcast <2 x i32> zeroinitializer to <4 x bfloat>' }
-   'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
-   'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }
+   'scalar_source' { '%n = bitcast i128 0 to <2 x i64>' }
+   'scalar_result' { '%n = bitcast <2 x i64> zeroinitializer to i128' }
    'pointer' { '%n = ptrtoint <2 x ptr> zeroinitializer to <2 x i64>' }
    'flagged_int_fp' { '%n = uitofp nneg <2 x i32> zeroinitializer to <2 x float>' }
    else { '%n = fpext nnan <2 x half> zeroinitializer to <2 x float>' }
@@ -268,7 +268,8 @@ fn limits(assembler_path string, out string, storage bool, over bool) ! {
 }
 fn main() {
  assert C.fesetenv(unsafe { voidptr(C.FE_DFL_ENV) }) == 0
- assert os.args.len == 3; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ assert os.args.len in [3, 4]; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ if os.args.len == 4 { count := controls(os.args[1], out + '/controls')!; println('AIR-VECTOR-FLOAT-INT-CONTROLS: ${count} PASS'); return }
  mut total := Counts{}
  for width in 1 .. 65 { c := run_batch(os.args[1], out + '/batch-${width}', width)!; total.values += c.values; total.poison += c.poison; total.choices += c.choices; total.scalar += c.scalar; total.metadata += c.metadata; total.budgets += c.budgets; total.exhaustive += c.exhaustive; total.wide += c.wide; total.corruptions += c.corruptions }
  controls_count := controls(os.args[1], out + '/controls')!; for storage in [false, true] { for over in [false, true] { limits(os.args[1], out + '/${if storage { 'storage' } else { 'work' }}-${if over { 'over' } else { 'boundary' }}', storage, over)! } }

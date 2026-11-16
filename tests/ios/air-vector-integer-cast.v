@@ -190,8 +190,8 @@ fn controls(assembler_path string, out string) ! {
    'float_result' { '%n = uitofp nneg <2 x i32> zeroinitializer to <2 x float>' }
    'bitcast' { '%n = bitcast <2 x i64> zeroinitializer to <2 x double>' }
    'reshape' { '%n = bitcast <4 x i8> zeroinitializer to <2 x bfloat>' }
-   'scalar_source' { '%n = bitcast i32 0 to <2 x i16>' }
-   'scalar_result' { '%n = bitcast <2 x i16> zeroinitializer to i32' }
+   'scalar_source' { '%n = bitcast i128 0 to <2 x i64>' }
+   'scalar_result' { '%n = bitcast <2 x i64> zeroinitializer to i128' }
    else { '%n = ptrtoint <2 x ptr> zeroinitializer to <2 x i64>' }
   }
   s.write_string('define void @guard_${guard}(${sig}) { entry: store i8 17, ptr %out\n ${body}\n ret void }\n')
@@ -222,7 +222,8 @@ fn limits(assembler_path string, out string, storage bool, over bool) ! {
  if over { if _ := p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'memory'), mut bs, 70000) { panic('memory cast limit') } else { assert err.msg() == diagnostic, err.msg() }; unchanged(output); if _ := p.run_void_function(ir, stream, pools, bodies, fi(ir, 'scalar'), [], 70000) { panic('void cast limit') } else { assert err.msg() == diagnostic, err.msg() } } else { assert p.run_memory_function(ir, stream, pools, bodies, fi(ir, 'memory'), mut bs, 70000)!.steps == if storage { 4098 } else { 58406 }; assert output[0] == 17; assert p.run_void_function(ir, stream, pools, bodies, fi(ir, 'scalar'), [], 70000)!.steps == if storage { 4097 } else { 58405 } }
 }
 fn main() {
- assert os.args.len == 3; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ assert os.args.len in [3, 4]; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ if os.args.len == 4 { controls(os.args[1], out + '/controls')!; print(os.read_file(out + '/controls/result.txt')!); return }
  mut shapes := 0; mut native := 0; mut choices := 0; mut poison := 0; mut scalar := 0; mut metadata := 0; mut budgets := 0
  for source in 1 .. 65 { c := run_batch(os.args[1], out + '/batch-${source}', source)!; shapes += c.shapes; native += c.native; choices += c.choices; poison += c.poison; scalar += c.scalar; metadata += c.metadata; budgets += c.budgets }
  controls(os.args[1], out + '/controls')!

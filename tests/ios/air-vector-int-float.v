@@ -194,8 +194,8 @@ fn controls(assembler_path string, out string) ! {
    'fptosi' { '%n = fptosi <2 x double> zeroinitializer to <2 x i32>' }
    'fptoui' { '%n = fptoui <2 x bfloat> zeroinitializer to <2 x i64>' }
    'reshape' { '%n = bitcast <2 x float> zeroinitializer to <4 x bfloat>' }
-   'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
-   'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }
+   'scalar_source' { '%n = bitcast i128 0 to <2 x i64>' }
+   'scalar_result' { '%n = bitcast <2 x i64> zeroinitializer to i128' }
    else { '%n = uitofp nneg <2 x i32> zeroinitializer to <2 x float>' }
   }; s.write_string('define void @guard_${guard}(${signature}) { entry: store i8 17, ptr %out, align 1\n ${body}\n ret void }\n')
  }
@@ -235,7 +235,8 @@ fn limits(assembler_path string, out string, storage bool, over bool) ! {
 }
 fn main() {
  assert C.fesetenv(unsafe { voidptr(C.FE_DFL_ENV) }) == 0
- assert os.args.len == 3; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ assert os.args.len in [3, 4]; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ if os.args.len == 4 { controls(os.args[1], out + '/controls')!; print(os.read_file(out + '/controls/result.txt')!); return }
  mut totals := [u64(0), 0, 0, 0, 0, 0, 0, 0]!
  for width in 1 .. 65 { fields := run_batch(os.args[1], out + '/batch-${width}', width)!.split(' '); assert fields.len == 8; for i, field in fields { totals[i] += field.u64() } }
  controls(os.args[1], out + '/controls')!; for storage in [false, true] { for over in [false, true] { limits(os.args[1], out + '/${if storage { 'storage' } else { 'work' }}-${if over { 'over' } else { 'boundary' }}', storage, over)! } }

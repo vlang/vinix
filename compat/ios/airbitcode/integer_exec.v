@@ -132,6 +132,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			mut first_operand := op.operands_start
 			mut pair_result := false
 			vector_result := p.vector_construction(code, op)
+			scalar_vector_cast := code == 3 && p.scalar_vector_bitcast(op)
 			if code == 34 && !vector_result {
 				if !binary32 || !inst.has_result { return error('AIR intrinsic: mixed scalar result required') }
 				key, attributes, second_immarg := p.scalar_intrinsic_call(ir, stream, pools, op, scope)!
@@ -156,6 +157,13 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 			} else if pair_flow {
 				if !binary32 { return error('AIR overflow: mixed pair control flow required') }
 				p.scalar_pair_flow(op, s.base_id, code != 16, pools, scope)!
+			} else if scalar_vector_cast {
+				if !inst.has_result || ir.data_layout.starts_with('E') { return error('AIR vector: little-endian scalar/vector bitcast result required') }
+				vector_work += p.scalar_vector_bitcast_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
+				if vector_result {
+					if vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
+					vector_results++
+				}
 			} else if code == 6 {
 				if !inst.has_result { return error('AIR vector: extract result required') }
 				vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
@@ -197,7 +205,7 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 						if (fp && op.opcode !in [u32(0), 1, 2, 4, 6]!) || (!fp && op.opcode > 12) { return error('AIR scalar: binary opcode') }
 					} else if (fp && op.opcode > 15) || (!fp && (op.opcode < 32 || op.opcode > 41)) { return error('AIR scalar: predicate') }
 				}
-				3 { if !vector_result { p.scalar_cast_profile(op, binary32)! } }
+				3 { if !vector_result && !scalar_vector_cast { p.scalar_cast_profile(op, binary32)! } }
 				5, 29 { if op.operands_count != 3 { return error('AIR integer: select arity') } }
 				16 { if phis != index - block.first || op.operands_count == 0 || op.targets_count != op.operands_count { return error('AIR integer: PHI grouping/arity') }; phis++ }
 				10 {
@@ -360,7 +368,7 @@ fn (p IRTypedProgram) run_scalar_bits(ir IRModule, stream Stream, pools IRConsta
 				27 { result = m.insert_pair_value(op)! }
 				2 { result = if p.types[op.result_type].kind == .vector_t { m.binary_vector_value(stream, inst, op)! } else { m.binary_value(op)! } }
 				9, 28 { result = if p.types[op.result_type].kind == .vector_t { m.compare_vector_value(stream, inst, op)! } else { m.compare_value(op)! } }
-				3 { result = if p.vector_construction(code, op) { m.cast_vector_value(stream, inst, op)! } else { m.cast_value(op)! } }
+				3 { result = if p.scalar_vector_bitcast(op) { m.scalar_vector_bitcast_value(stream, inst, op)! } else if p.vector_construction(code, op) { m.cast_vector_value(stream, inst, op)! } else { m.cast_value(op)! } }
 				5, 29 { result = if p.types[op.result_type].kind == .vector_t { m.select_vector_value(stream, inst, op)! } else { m.select_value(op)! } }
 				56 { result = if p.vector_construction(code, op) { m.fneg_vector_value(stream, inst, op)! } else { m.fneg_value(op)! } }
 				58 { result = if p.types[op.result_type].kind == .vector_t { m.freeze_vector_value(stream, inst, op)! } else if p.types[op.result_type].kind == .struct_t { m.read_pair_frozen(start)! } else { m.read_frozen(start)! } }

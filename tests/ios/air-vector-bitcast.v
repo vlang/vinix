@@ -179,8 +179,8 @@ fn controls(assembler_path string, out string) ! {
    'double' { '%n = bitcast <2 x i64> zeroinitializer to <2 x double>' }
    'bfloat' { '%n = bitcast <2 x i16> zeroinitializer to <2 x bfloat>' }
    'reshape' { '%n = bitcast <4 x i8> zeroinitializer to <2 x bfloat>' }
-   'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
-   'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }
+   'scalar_source' { '%n = bitcast i128 0 to <2 x i64>' }
+   'scalar_result' { '%n = bitcast <2 x i64> zeroinitializer to i128' }
    'pointer' { '%n = ptrtoint <2 x ptr> zeroinitializer to <2 x i64>' }
    else { '%n = fptosi <2 x double> zeroinitializer to <2 x i32>' }
   }
@@ -230,7 +230,8 @@ fn limits(assembler_path string, out string, storage bool, over bool) ! {
  unsafe { output.free(); bs.free() }
 }
 fn main() {
- assert os.args.len == 3; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ assert os.args.len in [3, 4]; out := os.abs_path(os.args[2]); assert !os.exists(out) && !out.starts_with(os.getwd() + '/'); os.mkdir_all(out)!
+ if os.args.len == 4 { controls(os.args[1], out + '/controls')!; print(os.read_file(out + '/controls/result.txt')!); return }
  run_batch(os.args[1], out + '/batch')!
  controls(os.args[1], out + '/controls')!
  for storage in [false, true] { for over in [false, true] { limits(os.args[1], out + '/${if storage { 'storage' } else { 'work' }}-${if over { 'over' } else { 'boundary' }}', storage, over)! } }

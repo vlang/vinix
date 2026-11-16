@@ -956,7 +956,7 @@ Source freeze chooses zero for indeterminate source lanes; result freeze clears
 whole poison destination lanes and cannot hide an earlier undef error. Results
 retain independent snapshots and share existing construction storage, step and
 source-plus-result work budgets in integer, mixed, void and memory APIs.
-Big-endian lane reshaping, scalar/vector and pointer casts, scalable vectors
+Big-endian lane reshaping, pointer casts, scalable vectors
 and widths beyond i64 remain unsupported.
 `tests/ios/air-memory-vector-integer-bitcast-index.v` checks native LLVM bits,
 scalar APIs, ordinary/prepared memory, address preflight and composed graphs;
@@ -981,7 +981,7 @@ Each cast costs one executed step and source plus result lane work, sharing
 the existing 4,096 construction slots and execution-owned array. Validation
 checks complete sources, including inactive blocks. Existing memory argument,
 load and store profiles remain separate; floating dependencies remain excluded
-from pure address graphs. Scalar/vector casts, pointer casts, other floating
+from pure address graphs. Pointer casts, other floating
 formats, scalable vectors, vector returns and PHIs remain unsupported. Scalar
 and void APIs continue to exclude vector arguments.
 `tests/ios/air-vector-reshape-bitcast.v` checks all supported shape pairs that
@@ -990,6 +990,26 @@ ordinary/prepared memory write ordering, scalar results, snapshots, composition,
 loop reuse and exact shared limits. `tests/ios/air-vector-bitcast.v` retains the
 complete half-encoding and float-pattern checks for the original same-shape
 integer/FP casts.
+
+Scalar/vector bitcasts also support unflagged casts between a scalar and a
+fixed 1..16-lane vector of equal total width, up to 64 bits, using i1..i64,
+half and float. These casts require little-endian layouts, including one-lane
+containers. Lane zero supplies the lowest packed bits without byte padding.
+Raw floating bits retain NaN payloads and signs without floating arithmetic.
+Scalar poison spreads to every split lane; any poison input lane poisons the
+packed scalar. Executed undef inputs reject eagerly, even for discarded
+results. Source freeze repairs individual vector lanes or the whole scalar;
+result freeze clears entire poison result lanes and cannot hide an earlier
+undef error. A scalar round trip can therefore spread poison to other lanes.
+Each cast costs one executed step and source plus result lane work. Only a
+vector result consumes a shared construction slot; scalar packs use existing
+scalar result storage. Integer-only execution accepts integer shapes; mixed,
+void and memory APIs also accept half/float shapes. These casts remain excluded
+from pure address graphs. Existing argument, load/store, return and PHI
+restrictions remain in force. `tests/ios/air-scalar-vector-bitcast.v` checks
+every shape in both directions against native LLVM and an independent bit
+model, freeze/poison/undef behavior, ordinary/prepared write ordering, strict
+budgets, loop reuse, metadata guards and shared work/storage boundaries.
 
 Fixed 1..16-lane half/float vectors support unflagged `fpext`
 (half to float) and `fptrunc` (float to half), retaining the lane count. They
