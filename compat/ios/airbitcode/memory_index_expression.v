@@ -14,6 +14,7 @@ enum MemoryIndexKind {
 	freeze_value
 	intrinsic
 	intrinsic_binary
+	intrinsic_funnel
 	cast
 }
 
@@ -165,7 +166,7 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			// declaration attribute/duplicate checks. Recheck call identity here.
 			b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, op, b.scope)!
 			id := scalar_intrinsic_name(b.ir.functions[op.callee_function].name)!
-			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat] { return error('AIR memory index: unsupported intrinsic dependency') }
+			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .fshl, .fshr] { return error('AIR memory index: unsupported intrinsic dependency') }
 			mut poison_flag := u64(0)
 			if scalar_integer_poison_flag(id) {
 				// scalar_intrinsic_call requires an exact defined i1 immediate.
@@ -173,7 +174,14 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 				poison_flag = b.pools.scalar_bits(flag.constant_index)!
 			}
 			lhs := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
-			if scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) {
+			if scalar_integer_funnel(id) {
+				rhs := b.expression(b.p.operands[op.operands_start + 2], producer, depth + 1)!
+				amount := b.expression(b.p.operands[op.operands_start + 3], producer, depth + 1)!
+				mut height := b.nodes[lhs].height
+				if b.nodes[rhs].height > height { height = b.nodes[rhs].height }
+				if b.nodes[amount].height > height { height = b.nodes[amount].height }
+				node = MemoryIndexNode{kind: .intrinsic_funnel, bits: bits, intrinsic: id, left: lhs, right: rhs, condition: amount, height: height + 1}
+			} else if scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) {
 				rhs := b.expression(b.p.operands[op.operands_start + 2], producer, depth + 1)!
 				node = MemoryIndexNode{kind: .intrinsic_binary, bits: bits, intrinsic: id, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height }}
 			} else {
@@ -248,6 +256,9 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.select_value {
 				chosen := if values[node.condition] & 1 != 0 { node.left } else { node.right }
 				value = IntegerValue{value: values[chosen], poison: poisons[node.condition] || poisons[chosen]}
+			}
+			.intrinsic_funnel {
+				value = if poisons[node.left] || poisons[node.right] || poisons[node.condition] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_funnel_value(node.intrinsic, node.bits, values[node.left], values[node.right], values[node.condition])!} }
 			}
 			.intrinsic_binary {
 				value = if poisons[node.left] || poisons[node.right] { IntegerValue{poison: true} } else if scalar_integer_saturating_shift(node.intrinsic) { scalar_integer_saturating_shift_value(node.intrinsic, node.bits, values[node.left], values[node.right])! } else { IntegerValue{value: if scalar_integer_saturating(node.intrinsic) { scalar_integer_saturating_value(node.intrinsic, node.bits, values[node.left], values[node.right])! } else { scalar_integer_extremum_value(node.intrinsic, node.bits, values[node.left], values[node.right])! }} }

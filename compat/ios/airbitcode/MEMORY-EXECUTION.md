@@ -159,6 +159,11 @@ Signed/unsigned saturating left shifts (`llvm.sshl.sat`, `llvm.ushl.sat`) also
 accept matching i1..i64 value/amount operands. Valid shifts clamp overflow;
 amounts at or above the width produce poison even when the input is zero.
 Amounts are width-truncated unsigned words, without modulo reduction.
+Funnel shifts (`llvm.fshl`, `llvm.fshr`) accept three matching i1..i64 inputs.
+The unsigned amount reduces modulo the width; a zero effective shift chooses
+the left word for fshl and right word for fshr. Identical data words implement
+rotations. Poison in any input propagates, and all three subtree heights count
+toward the shared depth limit.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -264,6 +269,11 @@ computed wrap poison, select/freeze and both cached dependency depth boundaries.
 a defined LLVM oracle with oversized amounts replaced before native shifts.
 Separate checks model poison and cover select/freeze, both dependency depth
 boundaries, cold zero overshifts and independent GEP roots through all three APIs.
+
+`tests/ios/air-memory-funnel-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares i1..i64
+funnel shifts with defined native LLVM calls. It covers modulo/zero amounts,
+non-power-of-two widths, poison in each input, select/freeze, computed amount
+poison and cached depth boundaries through all three dependencies.
 
 ## Prepared memory functions
 

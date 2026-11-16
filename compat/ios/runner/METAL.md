@@ -336,6 +336,8 @@ Signed/unsigned saturating add/subtract also feed indices, clamping arithmetic
 overflow while preserving poison from either input.
 Signed/unsigned saturating left shifts feed indices with both dependencies
 checked; oversized amounts produce poison for select/freeze handling.
+Funnel shifts and rotations also feed indices, validating all three inputs and
+reducing the shift amount modulo the integer width.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
@@ -363,6 +365,8 @@ Unsigned saturating overflow and subtraction form a zero offset, followed by
 signed saturating addition/subtraction that preserve the final address.
 An unsigned saturating shift doubles the address before an exact right shift;
 a signed saturating shift by zero preserves it for the final store.
+Funnel shifts rotate the address left and right by 37, exercising modulo-width
+amounts while preserving the exact address.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.
