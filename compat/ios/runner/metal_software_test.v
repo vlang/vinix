@@ -5957,6 +5957,10 @@ declare <2 x i32> @air.mul_hi.s.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @air.mul_hi.u.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @llvm.smulh.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @llvm.umulh.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i64> @air.mul_hi.s.v2i64(<2 x i64>,<2 x i64>)
+ declare <2 x i64> @air.mul_hi.u.v2i64(<2 x i64>,<2 x i64>)
+ declare <2 x i64> @llvm.smulh.v2i64(<2 x i64>,<2 x i64>)
+ declare <2 x i64> @llvm.umulh.v2i64(<2 x i64>,<2 x i64>)
 define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
  %x = extractelement <3 x i32> %gid, i32 0
  %y = extractelement <3 x i32> %gid, i32 1
@@ -5986,7 +5990,36 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %air_eq = and <2 x i1> %air_eq0, %air_eq1
  %air_ok0 = extractelement <2 x i1> %air_eq, i32 0
  %air_ok1 = extractelement <2 x i1> %air_eq, i32 1
- %air_ok = and i1 %air_ok0, %air_ok1
+%air_ok32 = and i1 %air_ok0, %air_ok1
+ %mh64_x = zext i32 %x to i64
+ %mh64_negative = or i64 %mh64_x,9223372036854775808
+ %mh64_input0 = insertelement <2 x i64> zeroinitializer,i64 %mh64_x,i32 0
+ %mh64_input = insertelement <2 x i64> %mh64_input0,i64 %mh64_negative,i32 1
+ %mh64_s = call <2 x i64> @air.mul_hi.s.v2i64(<2 x i64> %mh64_input,<2 x i64> <i64 -1,i64 -1>)
+ %mh64_u = call <2 x i64> @air.mul_hi.u.v2i64(<2 x i64> %mh64_input,<2 x i64> <i64 -1,i64 -1>)
+ %mh64_s_ref = call <2 x i64> @llvm.smulh.v2i64(<2 x i64> %mh64_input,<2 x i64> <i64 -1,i64 -1>)
+ %mh64_u_ref = call <2 x i64> @llvm.umulh.v2i64(<2 x i64> %mh64_input,<2 x i64> <i64 -1,i64 -1>)
+ %mh64_zero = icmp eq i32 %x,0
+ %mh64_s0 = select i1 %mh64_zero,i64 0,i64 -1
+ %mh64_minus = sub i64 %mh64_x,1
+ %mh64_u0 = select i1 %mh64_zero,i64 0,i64 %mh64_minus
+ %mh64_u1_expected = sub i64 %mh64_negative,1
+ %mh64_s_expected = insertelement <2 x i64> zeroinitializer,i64 %mh64_s0,i32 0
+ %mh64_u_expected0 = insertelement <2 x i64> zeroinitializer,i64 %mh64_u0,i32 0
+ %mh64_u_expected = insertelement <2 x i64> %mh64_u_expected0,i64 %mh64_u1_expected,i32 1
+ %mh64_s_same = icmp eq <2 x i64> %mh64_s,%mh64_s_ref
+ %mh64_u_same = icmp eq <2 x i64> %mh64_u,%mh64_u_ref
+ %mh64_s_formula = icmp eq <2 x i64> %mh64_s,%mh64_s_expected
+ %mh64_u_formula = icmp eq <2 x i64> %mh64_u,%mh64_u_expected
+ %mh64_same = and <2 x i1> %mh64_s_same,%mh64_u_same
+ %mh64_formula = and <2 x i1> %mh64_s_formula,%mh64_u_formula
+ %mh64_ok = and <2 x i1> %mh64_same,%mh64_formula
+ %mh64_ok0 = extractelement <2 x i1> %mh64_ok,i32 0
+ %mh64_ok1 = extractelement <2 x i1> %mh64_ok,i32 1
+ %mh64_all = and i1 %mh64_ok0,%mh64_ok1
+ %mh64_u1 = extractelement <2 x i64> %mh64_u,i32 1
+ %mh64_restored = sub i64 %mh64_u1,9223372036854775807
+ %mh64_coordinate = trunc i64 %mh64_restored to i32
  %air_u1 = extractelement <2 x i32> %air_vu, i32 1
  %air_coordinate = sub i32 %air_u1, 2147483647
  %a = trunc i32 %x to i8
@@ -6015,9 +6048,12 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %offset1 = xor i8 %slane, %ulane
  %offset8 = xor i8 %offset0, %offset1
  %offset_raw = zext i8 %offset8 to i32
+ %mh64_coordinate_same = icmp eq i32 %coordinate,%mh64_coordinate
+ %mh64_matched = and i1 %mh64_all,%mh64_coordinate_same
+ %air_ok = and i1 %air_ok32,%mh64_matched
  %offset = select i1 %air_ok, i32 %offset_raw, i32 poison
  %row = shl i32 %y, 6
- %index = add i32 %row, %coordinate
+ %index = add i32 %row, %mh64_coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
  %mixed = xor i32 %red, %offset
