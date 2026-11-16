@@ -17,8 +17,8 @@ fn (b MemoryIndexBuilder) vector_index_producer(source IRTypedOperand, before in
 	return -1
 }
 
-// Keep the established freeze-only representation and costs when no select
-// or insertion occurs in the source chain. Only freezes may lead to either.
+// Keep the established freeze-only representation and costs when no select,
+// insertion or shuffle occurs in the source chain. Freezes may lead to these.
 fn (b MemoryIndexBuilder) vector_projection_source(source IRTypedOperand, before int, depth int) !bool {
 	if depth >= max_memory_index_depth { return error('AIR memory index: vector source depth limit') }
 	producer := b.vector_index_producer(source, before)!
@@ -26,7 +26,7 @@ fn (b MemoryIndexBuilder) vector_projection_source(source IRTypedOperand, before
 	inst := b.bodies.instructions[producer]
 	if inst.record < 0 || inst.record >= b.stream.records.len { return error('AIR memory index: vector source record') }
 	code := b.stream.records[inst.record].code
-	if code in [u64(5), 7, 29] { return true }
+	if code in [u64(5), 7, 8, 29] { return true }
 	if code != 58 { return false }
 	op := b.p.instructions[producer]
 	b.p.vector_freeze_profile(b.stream, b.pools, b.bodies, b.scope, producer, op, true, 16)!
@@ -82,6 +82,8 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 			node = MemoryIndexNode{kind: .projected_select, bits: bits, left: left, right: right, condition: cond, height: height + 1}
 		} else if code == 7 {
 			node = b.project_vector_insert(source, selector, producer, depth)!
+		} else if code == 8 {
+			node = b.project_vector_shuffle(source, selector, producer, depth)!
 		} else { return error('AIR memory index: unsupported vector projection dependency') }
 	}
 	if b.nodes.len >= max_memory_index_nodes || node.height > max_memory_index_depth - depth { return error('AIR memory index: projection graph limit') }

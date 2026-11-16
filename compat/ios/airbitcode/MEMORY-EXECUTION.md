@@ -240,7 +240,7 @@ or an independently poisoned GEP root. No owned field or runtime heap array is a
 
 Vector sources also accept nested vector selects with a scalar i1 condition.
 Arms may be direct integer vector arguments, supported constants, freezes,
-insertions or further scalar-condition selects. Both arms and the condition
+insertions, shuffles or further scalar-condition selects. Both arms and the condition
 are validated even for literal conditions. Undef in an unchosen vector arm remains unobserved;
 a chosen undef lane errors at the final extraction, even under a later scalar
 select/freeze. A source vector freeze may repair it first. Poison conditions
@@ -276,7 +276,28 @@ the existing limits, including cached subtrees.
 all 64 lane/insertion widths, lane repair, poison/undef, nested insertion/select/
 freeze composition, exact graph limits,
 cache isolation and all three memory APIs. Older constructed-source rejection
-fixtures use unsupported shuffles; retained historical evidence is unchanged.
+fixtures use unsupported vector arithmetic; retained historical evidence is unchanged.
+
+`shufflevector` supplies address lanes from the same pure integer vector
+sources. Its result may independently contain 1..16 lanes, matching the inputs'
+element type. A fixed i32 mask selects across both inputs; poison and legacy
+undef entries produce poison lanes. Selected source undef stays deferred until
+final extraction or repair by a source freeze/insertion. Both complete sources
+and every mask entry validate, even when unselected. Normalized entries must
+match the original mask constant; negative integer entries cannot impersonate
+poison tags. Vector arithmetic, loaded/PHI sources and vector conditions remain
+excluded from address graphs.
+
+Two existing POD words pack the sixteen mask bytes, with 255 reserved for
+poison. A mapping node checks the full unsigned extraction index before any
+shift, then a rebasing node supplies the input lane to both source projections.
+The shuffle node copies only the selected arm's state. Invalid extraction indices
+remain poison through a vector freeze; a valid poison mask entry may be frozen
+to zero. Every mapping, rebasing and source projection counts toward the existing
+node/depth budgets, including cache hits. No owned field or runtime array is
+added. `tests/ios/air-memory-vector-shuffle-index.v LLVM_AS FRESH_EXTERNAL_DIR`
+checks both-source permutations, broadcasts, resized results, upper mask bytes,
+poison/undef and frozen/unfrozen selection, exact limits and malformed masks.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result

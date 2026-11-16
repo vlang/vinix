@@ -375,16 +375,16 @@ Source and selector depths share the existing graph limits. Unsupported construc
 and loaded vector sources remain outside address expressions. The image shader
 freezes an undef lane in its permutation vector before the observable readback.
 Vector selects with a scalar i1 condition may also supply address lanes.
-Supported arguments/constants, freezes, insertions and nested selects may feed
+Supported arguments/constants, freezes, insertions, shuffles and nested selects may feed
 either arm.
 Only the selected arm supplies lane undef/poison; chosen undef errors at final
 extraction unless a source vector freeze repairs it first. Scalar recovery after
 extraction cannot conceal undef errors. Poison conditions produce poison lanes.
 Both arms and conditions remain fully validated and charged to the graph limits.
 Vector conditions, loads, PHIs and other unsupported constructions remain
-excluded. The image shader chooses between two permutations using x parity, then
-patches one lane using y and freezes the result; independent red-channel readback
-observes replaced and untouched lanes from both choices.
+excluded. The image shader chooses between two permutations using x parity,
+patches one lane using y, shuffles across both vectors and freezes the result.
+Independent red-channel readback observes both sources and insertion choices.
 Pure `insertelement` sources accept i1..i64 replacements and dynamic insertion
 indices. Valid insertion replaces one lane; poison/out-of-range insertion poisons
 the entire new vector. A later valid insertion repairs one lane, and source freeze
@@ -393,6 +393,15 @@ remain unobserved until chosen; selected undef errors unless repaired first.
 An undef insertion index and immediate dependency errors still reject before
 writes. Source, replacement and both selector depths share the graph limits;
 projection uses the existing fixed stack storage and cache ownership.
+Pure `shufflevector` address sources use a validated constant i32 mask and may
+resize the result to 1..16 integer lanes. Mask entries select across both inputs;
+poison/legacy-undef mask entries produce poison, while selected source undef
+remains deferred until extraction or source repair. Both complete sources and
+all original/normalized mask entries validate even when unselected. Packed POD
+mask words and scalar mapping nodes share the existing graph storage and limits;
+no runtime array is added. Invalid extraction indices remain poison through
+source freeze. Vector arithmetic and other unsupported source constructions
+still reject before writes.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

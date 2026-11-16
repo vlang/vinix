@@ -13,6 +13,9 @@ enum MemoryIndexKind {
 	vector_source
 	projected_select
 	projected_insert
+	shuffle_selector
+	shuffle_lane
+	projected_shuffle
 	projected_freeze
 	projected_extract
 	binary
@@ -457,6 +460,27 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 				value = if poisons[node.right] || values[node.right] >= node.value { IntegerValue{poison: true} }
 				else if poisons[node.left] || undefs[node.left] { IntegerValue{} }
 				else { IntegerValue{value: values[node.left]} }
+			}
+			.shuffle_selector {
+				if poisons[node.left] || values[node.left] >= u64(node.source_bits) {
+					value = IntegerValue{poison: true}
+				} else {
+					lane := values[node.left]
+					packed := if lane < 8 { node.value } else { node.flags }
+					selected := (packed >> u32((lane % 8) * 8)) & 255
+					value = if selected == 255 { IntegerValue{poison: true} } else { IntegerValue{value: selected} }
+				}
+			}
+			.shuffle_lane {
+				value = IntegerValue{value: values[node.left] % node.value, poison: poisons[node.left]}
+			}
+			.projected_shuffle {
+				if poisons[node.condition] { value = IntegerValue{poison: true} }
+				else {
+					chosen := if values[node.condition] < node.value { node.left } else { node.right }
+					value = IntegerValue{value: values[chosen], poison: poisons[chosen]}
+					undef_lane = undefs[chosen]
+				}
 			}
 			.projected_extract {
 				if undefs[node.left] { return error('AIR memory index: selected undef lane') }

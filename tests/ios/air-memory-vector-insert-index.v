@@ -236,16 +236,16 @@ fn controls(assembler string, root string) !int {
   for i in 0 .. if over { 252 } else { 251 } { text.write_string('%v${i} = extractelement <3 x i32> %s, i32 %j\n %p${i} = getelementptr i8, ptr %out, i32 %v${i}\n') }
   text.write_string('ret void }\n')
  }
- kinds := ['replaced_undef', 'unreplaced_undef', 'ignored_replacement_undef', 'chosen_replacement_undef', 'scalar_ignored_undef', 'source_freeze', 'scalar_freeze', 'invalid_insertion', 'poison_insertion', 'source_freeze_invalid', 'invalid_extraction', 'outer_freeze', 'repair_invalid', 'unrepaired_invalid', 'root_before', 'root_after', 'cold_bad', 'cold_good', 'cache_selectors', 'loaded_base', 'shuffled_base', 'loaded_replacement', 'loaded_index', 'undef_index', 'invalid_replacement', 'invalid_index', 'frozen_cache_before', 'frozen_cache_after']
+ kinds := ['replaced_undef', 'unreplaced_undef', 'ignored_replacement_undef', 'chosen_replacement_undef', 'scalar_ignored_undef', 'source_freeze', 'scalar_freeze', 'invalid_insertion', 'poison_insertion', 'source_freeze_invalid', 'invalid_extraction', 'outer_freeze', 'repair_invalid', 'unrepaired_invalid', 'root_before', 'root_after', 'cold_bad', 'cold_good', 'cache_selectors', 'loaded_base', 'arithmetic_base', 'loaded_replacement', 'loaded_index', 'undef_index', 'invalid_replacement', 'invalid_index', 'frozen_cache_before', 'frozen_cache_after']
  for kind in kinds {
   text.write_string('define void @${kind}${args} { entry: store i8 17, ptr %out\n')
   if kind.starts_with('cold') { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
   if kind == 'loaded_base' { text.write_string('%base = load <3 x i32>, ptr %out, align 1\n') }
-  if kind == 'shuffled_base' { text.write_string('%base = shufflevector <3 x i32> %a, <3 x i32> %a, <3 x i32> zeroinitializer\n') }
+  if kind == 'arithmetic_base' { text.write_string('%base = add <3 x i32> %a, zeroinitializer\n') }
   if kind in ['loaded_replacement', 'loaded_index'] { text.write_string('%loaded = load i32, ptr %out, align 1\n') }
   if kind in ['invalid_replacement', 'invalid_index'] { text.write_string('%bad = udiv i32 1, 0\n') }
   if kind == 'frozen_cache_before' { text.write_string('%uf = freeze i32 undef\n %up = getelementptr i8, ptr %out, i32 %uf\n') }
-  base := if kind in ['replaced_undef', 'unreplaced_undef'] { 'undef' } else if kind in ['loaded_base', 'shuffled_base'] { '%base' } else { '%a' }
+  base := if kind in ['replaced_undef', 'unreplaced_undef'] { 'undef' } else if kind in ['loaded_base', 'arithmetic_base'] { '%base' } else { '%a' }
   replacement := if kind in ['ignored_replacement_undef', 'chosen_replacement_undef', 'scalar_ignored_undef', 'source_freeze', 'scalar_freeze', 'root_before', 'root_after', 'cold_bad', 'cold_good', 'frozen_cache_before', 'frozen_cache_after'] { 'undef' } else if kind == 'loaded_replacement' { '%loaded' } else if kind == 'invalid_replacement' { '%bad' } else { '%d' }
   index := if kind in ['invalid_insertion', 'source_freeze_invalid', 'repair_invalid', 'unrepaired_invalid'] { '3' } else if kind == 'poison_insertion' { 'poison' } else if kind == 'undef_index' { 'undef' } else if kind == 'loaded_index' { '%loaded' } else if kind == 'invalid_index' { '%bad' } else { '%k' }
   text.write_string('%s = insertelement <3 x i32> ${base}, i32 ${replacement}, i32 ${index}\n')
@@ -276,7 +276,7 @@ fn controls(assembler string, root string) !int {
  for kind in kinds {
   f := fi(ir, kind); mut actual := []u8{len: 64, init: 0xcc}; av := [u64(1), 2, 3]; dv := [u64(5)]; jv := [u64(0)]; kv := [u64(0)]
   mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: dv}, airbitcode.IRMemoryBinding{values: jv}, airbitcode.IRMemoryBinding{values: kv}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
-  if kind in ['loaded_base', 'shuffled_base', 'loaded_replacement', 'loaded_index', 'undef_index'] {
+  if kind in ['loaded_base', 'arithmetic_base', 'loaded_replacement', 'loaded_index', 'undef_index'] {
    if _ := p.prepare_memory_function(ir, stream, pools, bodies, f) { panic('unsupported insertion') }
    if _ := p.run_memory_function(ir, stream, pools, bodies, f, mut bindings, 4096) { panic('unsupported insertion ran') }; untouched(actual)
   } else {
