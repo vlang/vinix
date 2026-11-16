@@ -1,10 +1,18 @@
 # Bounded memory execution
 
+Scalar `air.add_sat.s.i32`, `air.sub_sat.s.i32`, `air.add_sat.u.i32` and
+`air.sub_sat.u.i32` reuse the existing signed/unsigned saturating evaluators.
+Both arguments and the result must be i32. Overflow and underflow clamp to
+the corresponding signed limits or unsigned zero/maximum without producing
+poison. Keys 2162..2165 append four identities without moving earlier keys.
+LLVM/AIR forms may coexist, and pure integer results may feed bounded addresses.
+Existing state, declaration, prewrite, depth/work and ownership checks remain.
+
 Scalar `air.clz.i32` and `air.ctz.i32` accept an i32 value and a defined
 constant-false i1 flag. They reuse the leading/trailing-zero evaluators and
 return 32 for zero. True, runtime, undef and poison flags reject, including
 after a declaration cache hit. Keys 2160..2161 append two AIR identities;
-the scalar cache has 2,162 entries. LLVM/AIR declarations may coexist.
+the scalar cache has 2,166 entries. LLVM/AIR declarations may coexist.
 Pure count results may feed bounded addresses. Existing immarg placement,
 call metadata, state, preflight, depth/work and ownership checks remain.
 
@@ -20,7 +28,7 @@ Scalar `air.popcount.i32` and `air.reverse_bits.i32` use the existing population
 count and bit-reversal evaluators, including bounded address projections. AIR
 and LLVM spellings have separate declaration identities and may coexist in one
 function. Keys 2154..2155 append without moving earlier entries; the scalar cache
-now has 2,162 slots. Exact signatures, direct-call metadata, pure declaration
+now has 2,166 slots. Exact signatures, direct-call metadata, pure declaration
 attributes (including function-level `mustprogress`) and duplicate checks remain
 required. Other AIR widths/vectors and
 general external calls remain excluded. Both memory paths share existing
@@ -105,7 +113,7 @@ the input factor. Every input has the same element type and result_count/factor
 lanes. Raw bits and selected poison/undef tags are preserved without observing
 unchosen lanes. Exact ordinary direct calls use one existing result slot, one
 executed step and 2*result_count lane-work units. Keys 40000..41715 append
-1,716 identities without moving earlier families; scalar entries stay 2,162.
+1,716 identities without moving earlier families; scalar entries stay 2,166.
 
 Pure integer addresses use packed shuffle selectors, lane rebasing and bounded
 projected-shuffle choices among all inputs. Invalid selectors poison the final

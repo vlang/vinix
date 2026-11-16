@@ -1,5 +1,13 @@
 # Software Metal backend
 
+Prepared pipelines execute scalar `air.add_sat.s.i32`, `air.sub_sat.s.i32`,
+`air.add_sat.u.i32` and `air.sub_sat.u.i32` using the existing signed/unsigned
+saturating evaluators. Defined overflow/underflow clamps to the integer range.
+Separate appended cache entries allow LLVM/AIR coexistence. The size fixture
+uses all four calls in its bounded buffer-coordinate calculation, preserving
+independent RGBA8 and padding checks. Other AIR widths/vectors remain excluded;
+declaration, state and prewrite guards retain their existing rules.
+
 Prepared pipelines execute scalar `air.clz.i32` and `air.ctz.i32` with an i32
 value and constant-false i1 flag. The existing zero-count evaluators return 32
 for zero; other AIR flag forms and widths/vectors remain excluded. Separate
