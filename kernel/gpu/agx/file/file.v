@@ -603,6 +603,8 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	} else if request.vm_id != 0 {
 		return -22
 	}
+	size_error := agxbo.create_size_error(request.size)
+	if size_error != 0 { return size_error }
 	obj := if private_identity != 0 {
 		gem.create_aligned_private(request.size, pgtable.uat_pgsz, private_identity) or { return -12 }
 	} else { gem.create_aligned(request.size, pgtable.uat_pgsz) or { return -12 } }

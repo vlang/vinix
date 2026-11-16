@@ -7,6 +7,15 @@ module bo
 // mapping cleanup remain one atomic operation.
 
 import drm.gem
+import gpu.agx.vm as agxvm
+
+// Match Asahi's checked_object_size errors before requesting backing storage.
+// The GEM constructor still owns rounding and allocation; a valid size may OOM.
+pub fn create_size_error(size u64) int {
+	if size == 0 { return -22 } // EINVAL
+	if size > ~u64(0) - agxvm.page_mask { return -75 } // EOVERFLOW
+	return 0
+}
 
 pub struct Table {
 mut:

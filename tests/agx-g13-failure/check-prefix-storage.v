@@ -2,6 +2,7 @@
 import os
 
 const helpers = [
+	'bo__create_size_error',
 	'vm__bind_backing_size',
 	'pgtable__UatPgtable__map_repeated_page',
 	'vm__valid_bind_header',
@@ -104,6 +105,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'bo__create_size_error' { return 'i64' }
 	if name == 'vm__bind_backing_size' { return 'u64' }
 	if name in ['file__reserve_fd', 'file__fdnum_install_reserved_fd', 'file__fdnum_create_from_reserved_resource', 'file__fdnum_create_from_fd', 'drm__create_sync_file_fd_at'] { return '__v_option_i64' }
 	if name == 'file__cancel_fd_reservation' { return 'void' }

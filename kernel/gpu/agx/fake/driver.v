@@ -415,6 +415,8 @@ fn (mut file FakeG17File) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	} else if request.vm_id != 0 {
 		return -22
 	}
+	size_error := agxbo.create_size_error(request.size)
+	if size_error != 0 { return size_error }
 	object := gem.create_aligned(request.size, vm_page_size) or { return -12 }
 	file.lock.acquire()
 	file.objects.add_created(object)

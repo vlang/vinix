@@ -441,6 +441,9 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_create_size_local(read(os.join_path(repo, 'kernel/gpu/agx/bo/bo.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/fake/driver.v'))!)!
+	check_create_size_reference(read(os.join_path(base, 'gem.rs'))!, read(os.join_path(base, 'file.rs'))!)!
 	check_single_page_local(read(os.join_path(repo, 'kernel/drm/ioctl/ioctl.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/vm/vm.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/fake/driver.v'))!)!
@@ -702,6 +705,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
+		'GEM-create size validation returns EINVAL for zero and EOVERFLOW for 16 KiB rounding overflow after private VM lookup and before allocation',
 		'SINGLE_PAGE BIND consumes one BO page and repeats its PTE across the complete VA range with rollback/invalidation and retained backing',
 		'BIND resolves its BO and validates size/global fields before VM lookup; unbind and private-window checks retain the mutation lock',
 		'Missing submit queues precede command/sync staging, with no borrowed queue across copies and locked backend revalidation',

@@ -160,6 +160,7 @@ pub fn run_checks() {
 	stopping_file = unsafe { nil }
 	assert stopped_vm.destroyed && table_releases == 4 && closing_count == 0
 	check_repeated_bindings()
+	check_create_sizes()
 	check_bind_order()
 	check_bind_vm_lookup()
 	check_mapping_retirement()

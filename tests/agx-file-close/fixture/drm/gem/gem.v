@@ -4,9 +4,11 @@ module gem
 __global live_objects = 0
 __global next_created_handle = u32(100)
 __global reject_create = false
+__global create_calls = u64(0)
 
 pub fn live() int { return live_objects }
 pub fn fail_creates(reject bool) { reject_create = reject }
+pub fn creates() u64 { return create_calls }
 
 pub struct GemObject {
 pub mut:
@@ -19,6 +21,7 @@ pub mut:
 }
 
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
+	create_calls++
 	if reject_create || size == 0 { return none }
 	next_created_handle++
 	mut object := create(next_created_handle)

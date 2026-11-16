@@ -81,3 +81,12 @@ malformed requests, map allocation failure and failed-flush retirement/close.
 The page-table service is injected here; `tests/agx-tlb` checks the actual
 repeated PTEs and allocation rollback. The fake software GPU explicitly refuses
 SINGLE_PAGE because its CPU resolver requires contiguous backing.
+
+GEM-create size cases run the production ioctl and shared size validator.
+Across 200 cycles, 16,200 requests check zero-size EINVAL, rounding-overflow
+EOVERFLOW, maximum safe sizes, exact 16 KiB rounding, shared/private and writeback
+flags, header/VM precedence and allocator ENOMEM. Invalid sizes never reach the
+injected constructor or change output fields; valid sizes retain allocation
+failure behavior. Successful fixture objects are removed and released exactly
+once, returning the live count to zero. Huge successful objects have metadata
+only in this fixture; they do not qualify physical-memory admission/accounting.
