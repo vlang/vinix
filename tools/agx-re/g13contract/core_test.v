@@ -140,6 +140,15 @@ fn test_event_admission_rejects_missing_spare_and_regressing_completion() {
 		if _ := check_event_admission_contract(broken, reference) { assert false }
 	}
 	if _ := check_event_admission_contract(local, reference.replace('> self.event_count', '>= self.event_count')) { assert false }
+	credit := section(local, 'pub fn (mut queue WorkQueueEvents) record_completion(', 'pub fn (mut queue WorkQueueEvents) release(', 'credit unit')!
+	for token in ['if !queue.owns_slot(slot)', 'ticket.active && ticket.value == value && ticket.published',
+		'if i32(value - queue.completed_value) > 0 { queue.completed_value = value }', 'block = block.next'] {
+		if _ := check_event_admission_contract(local.replace(credit, credit.replace(token, '')), reference) { assert false, token }
+	}
+	for token in ['queue.users--', 'ticket.active = false', 'memory.free(block)', 'release_stamp(slot)',
+		'queue.published_value = value', 'queue.sequence = 0', 'queue.serial = 0', 'ticket.admitted = false'] {
+		if _ := check_event_admission_contract(local.replace(credit, credit.replace_once('return true', token + '; return true')), reference) { assert false, token }
+	}
 }
 
 fn test_prepared_backlog_rejects_fixed_hardware_cap_missing_rollback_and_early_free() {

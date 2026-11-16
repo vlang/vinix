@@ -10,9 +10,11 @@ fn check_render_retirement_local(native string) ! {
   'return if vertex_done && fragment_done { -1 } else { 0 }',
   'if vertex_done && !job.vertex_retirement_published',
   'mgr.retire_g13_subqueue_locked(job.queue, 0, job.vertex_retirement_sequence, job.vertex_ring_slot)',
+  'queue.subqueues[0].events.record_completion(job.vertex_event_slot, job.vertex_stamp_value)',
   'return if fragment_done { -1 } else { 0 }', 'job.vertex_retirement_published = true', 'job.stage_completion(0, job.completion_data)',
   'if fragment_done && !job.fragment_retirement_published',
   'mgr.retire_g13_subqueue_locked(job.queue, 1, job.fragment_retirement_sequence, job.fragment_ring_slot)',
+  'queue.subqueues[1].events.record_completion(job.fragment_event_slot, job.fragment_stamp_value)',
   'return if vertex_done { -1 } else { 0 }', 'job.fragment_retirement_published = true', 'job.stage_completion(1, job.completion_data)',
   'if !job.vertex_retirement_published || !job.fragment_retirement_published { return 0 }',
   'job.retirement_published = true'], 'Separate ring publication and shared completion gate')!
@@ -29,6 +31,9 @@ fn check_render_retirement_local(native string) ! {
 }
 
 fn check_render_retirement_reference(workqueue string, render string) ! {
+ require_order(workqueue, ['fn signal(&self)', 'Some(event) => event.0.current()',
+  'inner.last_completed = Some(value)', 'let mut completed_commands:',
+  'cmd.as_mut().inner_mut().complete()', 'workqueue::system_dfl().enqueue(cmd)'], 'Asahi returns host event credit before deferred command destruction')!
  require_order(workqueue, ['let last_wptr = inner.pending[completed_commands - 1].inner.wptr()',
   'for mut cmd in inner.pending.drain(..completed_commands)', 'cmd.as_mut().inner_mut().complete()',
   'raw.cpu_freeptr.store(last_wptr, Ordering::Release)'], 'Asahi publishes each workqueue completed prefix')!

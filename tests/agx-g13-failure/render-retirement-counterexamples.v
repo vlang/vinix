@@ -32,6 +32,10 @@ fn main() {
    'gpu.check_render_reaper_integration:', 'completed vertex stage publishes its private notification'],
   ['stage-callback-live', 'job.stage_completion = unsafe { nil }', 'job.stage_completion = job.stage_completion',
    'gpu.check_render_reaper_integration:', 'aggregate callback clears stage callback backing'],
+  ['vertex-credit-held', '!queue.subqueues[0].events.record_completion(job.vertex_event_slot, job.vertex_stamp_value)', 'false',
+   'gpu.check_render_event_credits:', 'completed render stage returns event admission credit'],
+  ['fragment-credit-held', '!queue.subqueues[1].events.record_completion(job.fragment_event_slot, job.fragment_stamp_value)', 'false',
+   'gpu.check_render_event_credits:', 'completed render stage returns event admission credit'],
  ]
  mut receipts := []string{}
  for item in variants {

@@ -3,6 +3,7 @@ import gpu.agx.event
 import drm.syncobj
 
 fn main() {
+	check_retained_event_credits()
 	check_prepared_backlog()
 	check_publication_window()
 	check_initial_events()

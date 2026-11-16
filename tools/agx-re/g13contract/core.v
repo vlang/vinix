@@ -286,6 +286,17 @@ fn check_event_admission_contract(local string, reference string) ! {
 	require_order(release, ['if ticket.published != submitted',
 		'if submitted && i32(value - queue.completed_value) > 0 { queue.completed_value = value }',
 		'ticket.active = false', 'queue.users--'], 'Vinix monotonic host event completion')!
+	credit := section(local, 'pub fn (mut queue WorkQueueEvents) record_completion(',
+		'pub fn (mut queue WorkQueueEvents) release(', 'Retained event completion credit')!
+	require_order(credit, ['if !queue.owns_slot(slot)', 'mut block := unsafe { &queue.tickets }',
+		'for block != unsafe { nil }', 'for ticket in block.entries',
+		'ticket.active && ticket.value == value && ticket.published',
+		'if i32(value - queue.completed_value) > 0 { queue.completed_value = value }',
+		'return true', 'block = block.next', 'return false'], 'Only retained published completions return monotonic credit')!
+	for token in ['queue.users--', 'ticket.active = false', 'memory.free(', 'release_stamp(',
+		'block.next =', 'queue.published_value =', 'queue.sequence', 'queue.serial', 'ticket.admitted'] {
+		require(!credit.contains(token), 'Recording completion must preserve owner state: ' + token)!
+	}
 	capacity := section(local, 'pub fn (queue &WorkQueueEvents) can_submit(', '// Call only after the ring publication', 'Vinix event publication')!
 	require_order(capacity, ['queue.users == 0', 'i32(queue.published_value - queue.completed_value) >> 8',
 		'if busy >= 127 { i32(0) } else { i32(127) - busy }', 'return u32(free_slots) > count',
@@ -323,7 +334,7 @@ fn check_prepared_backlog_contract(local string, reference string) ! {
 	require_order(release, ['ticket.published != submitted', 'ticket.active = false',
 		'block.users--', 'queue.users--', 'previous != unsafe { nil } && block.users == 0',
 		'previous.next = block.next', 'memory.free(block)', 'queue.users == 0', 'release_stamp(queue.slot)', 'return true'], 'Vinix unlink-before-free overflow retirement')!
-	for name in ['ticket(', 'resolve_initial(', 'admit(', 'can_publish_batch(', 'can_publish(', 'publish('] {
+	for name in ['ticket(', 'resolve_initial(', 'admit(', 'can_publish_batch(', 'can_publish(', 'publish(', 'record_completion('] {
 		start := local.index(') ' + name) or { return error('missing backlog traversal ' + name) }
 		body := local[start..].all_before('\npub fn ')
 		require(body.contains('block.entries') && body.contains('block = block.next'), 'Every ticket operation must visit overflow blocks: ' + name)!

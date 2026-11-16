@@ -144,6 +144,24 @@ pub fn (queue &WorkQueueEvents) resolve_initial(captured Ticket) (InitialState, 
 	return if found { InitialState.ready } else { InitialState.absent }, latest
 }
 
+// Caller holds manager.lock and has proved this publication completed. Return
+// admission credit independently of cleanup: tickets, overflow storage and the
+// physical stamp stay owned while other render stages or barriers need them.
+pub fn (mut queue WorkQueueEvents) record_completion(slot u32, value u32) bool {
+	if !queue.owns_slot(slot) { return false }
+	mut block := unsafe { &queue.tickets }
+	for block != unsafe { nil } {
+		for ticket in block.entries {
+			if ticket.active && ticket.value == value && ticket.published {
+				if i32(value - queue.completed_value) > 0 { queue.completed_value = value }
+				return true
+			}
+		}
+		block = block.next
+	}
+	return false
+}
+
 pub fn (mut queue WorkQueueEvents) release(slot u32, value u32, submitted bool) bool {
 	if queue.users == 0 || queue.slot != slot { return false }
 	mut previous := &TicketBlock(unsafe { nil })

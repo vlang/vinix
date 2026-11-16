@@ -6,6 +6,10 @@ import gpu.agx.fw
 import katomic
 
 fn render_retirement_job(queue &G13QueueResources, vertex u64, fragment u64) G13RenderJobResources {
+ unsafe {
+  queue.subqueues[0].events = event.published_queue(110, 0x100)
+  queue.subqueues[1].events = event.published_queue(111, 0x200)
+ }
  return G13RenderJobResources{queue: unsafe { queue }, vertex_event_slot: 110, fragment_event_slot: 111,
   vertex_stamp_value: 0x100, fragment_stamp_value: 0x200,
   vertex_retirement_sequence: vertex, fragment_retirement_sequence: fragment,
@@ -133,6 +137,7 @@ fn check_render_retirement() {
  check_render_retirement_matrix()
  check_render_retirement_failure()
  check_render_retirement_reverse()
+	check_render_event_credits()
  check_render_reaper_integration()
 }
 
@@ -169,7 +174,7 @@ fn retirement_callback(job &G13RenderJobResources, success bool, _ voidptr) {
 }
 
 fn check_render_reaper_integration() {
- for mode in 0 .. 3 {
+ for mode in 0 .. 4 {
   retirement_frees = 0; retirement_reads = 0; retirement_ends = 0; retirement_callbacks = 0
   retirement_success = false; retirement_refuse_free = mode == 2
   retirement_stages = [2]int{}
@@ -185,13 +190,15 @@ fn check_render_reaper_integration() {
   mut manager := GpuManager{g13_render_jobs: [job]}
   event.set_completed(110, true); event.set_completed(111, false)
   if mode == 1 { vertex_state.cpu_wptr = 1280 }
+  if mode == 3 { queue.subqueues[0].events = event.published_queue(109, 0x100) }
   manager.checked_reap_g13_render_jobs()
   assert manager.g13_render_jobs.len == 1 && retirement_callbacks == 0 && retirement_frees == 0
    && retirement_reads == 0 && retirement_ends == 0, 'shared backing waits for both stages'
   assert job.pending_counted && !job.released
-  if mode == 1 {
+  if mode == 1 || mode == 3 {
    assert job.retirement_failed && !job.quarantined
    vertex_state.cpu_wptr = 5
+   if mode == 3 { queue.subqueues[0].events = event.published_queue(110, 0x100) }
    manager.checked_reap_g13_render_jobs()
    assert retirement_callbacks == 0 && retirement_frees == 0, 'partial error callback waits for its peer'
   } else {
@@ -216,7 +223,7 @@ fn check_render_reaper_integration() {
   assert vertex_state.cpu_freeptr == 4 && fragment_state.cpu_freeptr == 8
   manager.checked_reap_g13_render_jobs()
   assert retirement_callbacks == 1
-  assert retirement_stages == if mode == 1 { [0, 0]! } else { [1, 1]! }, 'stage callbacks remain one-shot across quarantine retry'
+  assert retirement_stages == if mode == 1 || mode == 3 { [0, 0]! } else { [1, 1]! }, 'stage callbacks remain one-shot across quarantine retry'
  }
  retirement_refuse_free = false
  println('G13 render reaper: actual retirement/completion bodies retain shared backing, defer partial-error callbacks and preserve one-shot cleanup retries')

@@ -3,6 +3,8 @@ import os
 
 fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
+	assert os.args.len == 1 || os.args[1..] == ['--sanitize']
+		|| (os.args.len == 4 && os.args[1] == '--sanitize' && os.args[2] == '--workqueue-source')
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-event-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -14,13 +16,14 @@ fn main() {
 	}
 	os.mkdir_all('${scratch}/gpu/agx/event')!
 	os.cp('${repo}/kernel/gpu/agx/event/event.v', '${scratch}/gpu/agx/event/event.v')!
-	os.cp('${repo}/kernel/gpu/agx/event/workqueue.v', '${scratch}/gpu/agx/event/workqueue.v')!
+	os.cp(if os.args.len == 4 { os.args[3] } else { '${repo}/kernel/gpu/agx/event/workqueue.v' }, '${scratch}/gpu/agx/event/workqueue.v')!
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\npub fn test_cursor(slot u32, value u32) { gpu_event_mgr.stamps[slot].value = value }\npub fn test_completed(mut queue WorkQueueEvents, value u32) { queue.completed_value = value }\n')!
 	os.cp('${repo}/tests/agx-event/test.v', '${scratch}/main.v')!
 	os.cp('${repo}/tests/agx-event/admission.v', '${scratch}/admission.v')!
 	os.cp('${repo}/tests/agx-event/backlog.v', '${scratch}/backlog.v')!
+	os.cp('${repo}/tests/agx-event/retirement.v', '${scratch}/retirement.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
-	mut flags := ['-nocache', '-no-parallel', '-cc', 'cc', '-enable-globals', '-path',
+	mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals', '-path',
 		'${scratch}|@vlib|@vmodules']
 	if '--sanitize' in os.args {
 		flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
@@ -31,6 +34,13 @@ fn main() {
 	build.run()
 	build.wait()
 	if build.code != 0 { exit(build.code) }
+	if output := os.getenv_opt('AGX_EVENT_TEST_C') {
+		assert output.ends_with('.c')
+		mut cflags := flags.clone(); cflags[cflags.len - 2] = output
+		mut generated := os.new_process(os.getenv_opt('V') or { 'v' })
+		generated.set_args(cflags); generated.run(); generated.wait()
+		if generated.code != 0 { exit(generated.code) }
+	}
 	if output := os.getenv_opt('AGX_EVENT_TEST_BINARY') { os.cp('${scratch}/test', output)! }
 	mut test := os.new_process('${scratch}/test')
 	test.run()

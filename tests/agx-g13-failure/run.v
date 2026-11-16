@@ -16,6 +16,12 @@ fn run_checks() int {
 	os.mkdir_all(scratch) or { panic(err) }
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(os.join_path(repo, 'tests/agx-g13-failure/fixture'), scratch, false) or { panic(err) }
+	event_queue := os.read_file('${repo}/kernel/gpu/agx/event/workqueue.v') or { panic(err) }
+	os.write_file('${scratch}/gpu/agx/event/queue.v', 'module event\n' +
+		(section(event_queue, 'pub struct WorkQueueEvents {', 'pub fn (mut queue WorkQueueEvents) retain(') or { panic(err) }) +
+		(section(event_queue, 'pub fn (queue &WorkQueueEvents) owns_slot(', '// Caller holds the manager lock and a physical-slot pin.') or { panic(err) }) +
+		(section(event_queue, 'pub fn (mut queue WorkQueueEvents) record_completion(', 'pub fn (mut queue WorkQueueEvents) release(') or { panic(err) }) +
+		(section(event_queue, 'pub fn (queue &WorkQueueEvents) can_submit(', '// Caller has checked every participating subqueue') or { panic(err) })) or { panic(err) }
 	os.mkdir_all('${scratch}/gpu/agx/channel') or { panic(err) }
 	os.cp('${repo}/kernel/gpu/agx/channel/channel.v', '${scratch}/gpu/agx/channel/channel.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n') or { panic(err) }

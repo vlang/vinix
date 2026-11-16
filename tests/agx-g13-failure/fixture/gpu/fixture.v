@@ -108,6 +108,7 @@ fn maintain_files() {
 
 struct G13Subqueue {
 mut:
+	events event.WorkQueueEvents
 	state  SharedBuffer
 	ring   SharedBuffer
 	info   SharedBuffer

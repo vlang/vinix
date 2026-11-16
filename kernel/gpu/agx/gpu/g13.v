@@ -1151,7 +1151,10 @@ fn (mut mgr GpuManager) retire_g13_render_stages_locked(mut job G13RenderJobReso
 		return if vertex_done && fragment_done { -1 } else { 0 }
 	}
 	if vertex_done && !job.vertex_retirement_published {
-		if !mgr.retire_g13_subqueue_locked(job.queue, 0, job.vertex_retirement_sequence, job.vertex_ring_slot) {
+		mut queue := unsafe { job.queue }
+		if !mgr.retire_g13_subqueue_locked(job.queue, 0, job.vertex_retirement_sequence, job.vertex_ring_slot)
+			|| !queue.subqueues[0].events.record_completion(job.vertex_event_slot, job.vertex_stamp_value) {
+			mgr.state = .error
 			job.retirement_failed = true
 			return if fragment_done { -1 } else { 0 }
 		}
@@ -1159,7 +1162,10 @@ fn (mut mgr GpuManager) retire_g13_render_stages_locked(mut job G13RenderJobReso
 		if job.stage_completion != unsafe { nil } { job.stage_completion(0, job.completion_data) }
 	}
 	if fragment_done && !job.fragment_retirement_published {
-		if !mgr.retire_g13_subqueue_locked(job.queue, 1, job.fragment_retirement_sequence, job.fragment_ring_slot) {
+		mut queue := unsafe { job.queue }
+		if !mgr.retire_g13_subqueue_locked(job.queue, 1, job.fragment_retirement_sequence, job.fragment_ring_slot)
+			|| !queue.subqueues[1].events.record_completion(job.fragment_event_slot, job.fragment_stamp_value) {
+			mgr.state = .error
 			job.retirement_failed = true
 			return if vertex_done { -1 } else { 0 }
 		}

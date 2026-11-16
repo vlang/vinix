@@ -19,6 +19,7 @@ const packet_helpers = [
 ]
 
 const helpers = [
+	'gpu__agx__event__WorkQueueEvents__record_completion',
 	'gpu__agx__file__g13_render_stage_completed',
 	'gpu__agx__file__GpuFile__release_g13_timestamp_pair',
 	'gpu__agx__gpu__GpuManager__retire_g13_render_stages_locked',
