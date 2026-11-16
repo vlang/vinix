@@ -2,6 +2,7 @@
 module file
 
 import gpu.agx.submission
+import katomic
 import memory
 
 // Fallible, bounded storage, owned by the submit caller until registration.
@@ -15,6 +16,20 @@ mut:
 fn (timestamps G13SubmissionTimestamps) addresses(command u32, pipe u32) [2]u64 {
 	if command >= timestamps.count { return [2]u64{} }
 	return unsafe { timestamps.entries[command].addresses(pipe) }
+}
+
+// The worker alone consumes captured entries, outside manager.lock. Another
+// command may still hold this node through callbacks_remaining. Early done
+// publication and client-signaled fences do not prove callback retirement.
+fn release_completed_g13_timestamps(item &G13PendingSubmission) {
+	if item.timestamps.count == 0 { return }
+	mut file := unsafe { item.file }
+	for index := u32(0); index < item.timestamps.count; index++ {
+		mut command := unsafe { &item.commands[index] }
+		if command.timestamps_released || !katomic.load(&command.callback_finished) { continue }
+		unsafe { file.release_g13_timestamps(mut item.timestamps.entries[index]) }
+		command.timestamps_released = true
+	}
 }
 
 // Consume one owner exactly once. The scalar header is copied so cleanup

@@ -7,18 +7,25 @@ import drm.ioctl
 import drm.syncobj
 import gpu.agx.gpu
 import gpu.agx.submission
+import katomic
 import memory
 
 // Enter at the shared copied-input boundary; ioctl registration is separate.
 // Bytes pass through the actual modern parser and canonical adapter first.
 fn submit_timestamp_packet(mut file GpuFile, count u32, bad int, input &syncobj.SyncObj,
  output &syncobj.SyncObj) int {
+	return submit_timestamp_packet_on_queue(mut file, 1, count, bad, input, output)
+}
+
+fn submit_timestamp_packet_on_queue(mut file GpuFile, queue u32, count u32, bad int,
+ input &syncobj.SyncObj, output &syncobj.SyncObj) int {
  mut bytes := []u8{cap: 65536}
  defer { unsafe { bytes.free() } }
  for index := u32(0); index < count; index++ {
   compute := index % 2 == 0
-  ts := asahi.Timestamps{start: asahi.Timestamp{handle: 9, offset: index * 8},
-   end: asahi.Timestamp{handle: if int(index) == bad { u32(999) } else { u32(9) }, offset: index * 8 + 1}}
+  handle := if file.timestamp_objects.len > 1 { file.timestamp_objects[index].id } else { u32(9) }
+  ts := asahi.Timestamps{start: asahi.Timestamp{handle: handle, offset: index * 8},
+   end: asahi.Timestamp{handle: if int(index) == bad { u32(999) } else { handle }, offset: index * 8 + 1}}
   c := asahi.CmdCompute{ts: ts}
   r := asahi.CmdRender{width_px: 32, height_px: 32, layers: 1, samples: 1,
    utile_width_px: 32, utile_height_px: 32, ts_vtx: ts, ts_frag: ts}
@@ -33,7 +40,7 @@ fn submit_timestamp_packet(mut file GpuFile, count u32, bad int, input &syncobj.
  mut workspace := submission.PacketWorkspace{}
  code, decoded := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut commands, mut workspace)
  assert code == 0 && decoded == count
- captured := file.capture_submission_queue(1) or { return -2 }
+ captured := file.capture_submission_queue(queue) or { return -2 }
  in_record := ioctl.DrmAsahiSync{handle: if input == unsafe { nil } { 0 } else { input.handle }}
  out_record := ioctl.DrmAsahiSync{handle: if output == unsafe { nil } { 0 } else { output.handle }}
  in_code, in_syncs := submission.stage_sync_array(file.owner_key, u64(&in_record), if input == unsafe { nil } { 0 } else { 1 }, true)
@@ -134,6 +141,8 @@ fn check_timestamp_failures() {
 
 fn check_pending_timestamps() {
  check_timestamp_retirement()
+ check_command_timestamp_retirement()
+ check_blocked_timestamp_retirement()
  check_timestamp_failures()
  // Repeated immediate completion with maximum-size ownership arrays.
  for _ in 0 .. 64 {
@@ -148,4 +157,102 @@ fn check_pending_timestamps() {
   assert_drained(file)
  }
  println('AGX timestamps: packet-to-pending owners, waits, forged fences, faults, shutdown, rollback and 64 maximum-batch retirement cycles passed')
+}
+
+// Distinct mappings expose per-command release while neighboring commands
+// keep the aggregate node, fence and VM pin alive.
+fn check_command_timestamp_retirement() {
+ for count in [2, 8, 64] {
+  for reverse in [false, true] {
+   gpu.reset()
+   mut file := new_file()
+   mut mgr := gpu.get_global_manager() or { panic('manager') }
+   mut objects := []gem.GemObject{len: count}
+   defer { unsafe { objects.free() } }
+   for index in 0 .. count {
+    file.timestamp_objects << TimestampObject{id: u32(9 + index), va: u64(0x123456780000) + u64(index) * 4096,
+     size: 4096, obj: unsafe { &objects[index] }}
+   }
+   out := output()
+   assert submit_timestamp_packet(mut file, u32(count), -1, unsafe { nil }, out) == 0
+   service_file_work()
+   file.lock.acquire()
+   for index in 0 .. count { file.timestamp_objects[index].detached = true }
+   file.lock.release()
+   // done is written before completion backing is discarded. Even with a
+   // forged aggregate fence, it cannot authorize a timestamp mapping release.
+   for index in 0 .. count { pending_head.commands[index].done = true }
+   syncobj.signal(fence(out))
+   service_file_work()
+   assert mgr.timestamp_unmaps == 0 && file.timestamp_objects.len == count, 'early done and forged fences retain captures'
+   for step in 0 .. count {
+    index := if reverse { count - 1 - step } else { step }
+    if index % 2 == 0 { mgr.finish_compute_at(u32(index), 0) }
+    else { mgr.finish_render_at(u32(index), 0) }
+    assert objects[index].references == 1, 'manager callback only publishes retirement'
+    service_file_work()
+    assert objects[index].references == 0 && mgr.timestamp_unmaps == step + 1, 'completed command releases its own mapping'
+    assert file.timestamp_objects.len == count - step - 1
+    for other in 0 .. count {
+     completed := if reverse { other >= index } else { other <= index }
+     assert objects[other].references == if completed { 0 } else { 1 }, 'neighboring mappings remain owned'
+    }
+    if step + 1 < count {
+     assert pending_count == 1 && file.inflight_by_vm[1] == u64(count - step), 'aggregate owner survives partial completion'
+     service_file_work()
+     assert mgr.timestamp_unmaps == step + 1, 'completed command release is one-shot'
+    }
+   }
+   assert_drained(file)
+  }
+ }
+ println('AGX command timestamps: 148 individual retirements, forward/reverse completion, early-done/forged-fence guards and one-shot mapping release passed')
+}
+
+__global timestamp_stop_target &G13PendingSubmission = unsafe { nil }
+__global timestamp_stop_calls = 0
+
+fn stop_at_blocked_timestamp(value voidptr) {
+ if value != voidptr(&timestamp_stop_target.commands[0].callback_finished) { return }
+ katomic.set_load_hook(unsafe { nil })
+ timestamp_stop_calls++
+ mut manager := gpu.get_global_manager() or { panic('manager') }
+ manager.stop()
+}
+
+fn check_blocked_timestamp_retirement() {
+ gpu.reset()
+ mut file := new_file()
+ mut manager := gpu.get_global_manager() or { panic('manager') }
+ for id := u32(3); id <= 129; id++ {
+  file.queues << LogicalQueue{id: id}
+  file.g13_queues << Ownership{queue_id: id, resources: &gpu.G13QueueResources{id: id}}
+ }
+ for id := u32(1); id <= 128; id++ {
+  assert submit(mut file, id, false, unsafe { nil }, unsafe { nil }, false) == 0
+ }
+ mut objects := [2]gem.GemObject{}
+ for index in 0 .. 2 {
+  file.timestamp_objects << TimestampObject{id: u32(9 + index), va: u64(0x123456780000) + u64(index) * 4096,
+   size: 4096, obj: unsafe { &objects[index] }}
+ }
+ assert submit_timestamp_packet_on_queue(mut file, 129, 2, -1, unsafe { nil }, unsafe { nil }) == 0
+ file.lock.acquire()
+ for index in 0 .. 2 { file.timestamp_objects[index].detached = true }
+ file.lock.release()
+ timestamp_stop_target = pending_tail
+ timestamp_stop_calls = 0
+ katomic.set_load_hook(stop_at_blocked_timestamp)
+ // All 128 queue gates fill before the target. Its poll is short-circuited;
+ // the per-command reaper still runs and observes concurrent stop callbacks.
+ service_file_work()
+ katomic.set_load_hook(unsafe { nil })
+ assert timestamp_stop_calls == 1, 'blocked node still polls timestamp retirements'
+ assert manager.published.len == 128 && pending_count == 129
+ assert file.timestamp_objects.len == 0 && objects[0].references == 0 && objects[1].references == 0
+ assert manager.timestamp_unmaps == 2, 'blocked retired captures release before the next batch poll'
+ service_file_work()
+ assert_drained(file)
+ timestamp_stop_target = unsafe { nil }
+ println('AGX blocked timestamps: 128-queue saturation reaps stop-completed captures while the node remains retained')
 }

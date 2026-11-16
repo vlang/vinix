@@ -9,6 +9,18 @@ fn main() {
  assert !os.exists(state) && !state.starts_with(repo + '/')
  os.mkdir_all(state)!
  variants := [
+  ['blocked-node', 'pending.v', '--pending-source',
+   'release_completed_g13_timestamps(item)', 'if !earlier { release_completed_g13_timestamps(item) }',
+   'file.check_blocked_timestamp_retirement:', 'blocked node still polls timestamp retirements'],
+  ['per-command-worker', 'pending.v', '--pending-source',
+   'release_completed_g13_timestamps(item)', '_ = item',
+   'file.check_command_timestamp_retirement:', 'completed command releases its own mapping'],
+  ['early-done', 'submission_timestamps.v', '--timestamp-source',
+   '!katomic.load(&command.callback_finished)', '!katomic.load(&command.done)',
+   'file.check_command_timestamp_retirement:', 'early done and forged fences retain captures'],
+  ['finished-publication', 'file.v', '--file-source',
+   'katomic.store(mut &submission.commands[command_index].callback_finished, true)', '_ = command_index',
+   'file.check_command_timestamp_retirement:', 'completed command releases its own mapping'],
   ['capture-rollback', 'submission_timestamps.v', '--timestamp-source',
    'if code != 0 { f.release_g13_submission_timestamps(timestamps);', 'if code != 0 {',
    'file.check_timestamp_failures:', 'capture prefix rollback'],

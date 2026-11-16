@@ -22,6 +22,8 @@ mut:
 	wait_for    [2]u32 // command position + 1; zero has no in-batch dependency
 	published   bool
 	done        bool
+	callback_finished bool // published after the callback releases its backing
+	timestamps_released bool // worker-owned; independent of user fences
 	error       int
 }
 
@@ -304,6 +306,7 @@ fn process_pending_submissions() {
 		}
 		earlier := if gate >= 0 { unpublished[gate] } else { blocked_count == 128 }
 		if earlier || poll_g13_pending(mut item) {
+			release_completed_g13_timestamps(item)
 			if gate < 0 && blocked_count < 128 {
 				gate = int(blocked_count)
 				blocked[blocked_count] = voidptr(item.queue)

@@ -19,7 +19,7 @@ fn body(source string, name string) !string {
 
 fn check(source string, prefix string) ! {
  for helper in ['G13SubmissionTimestamps__addresses', 'GpuFile__new_g13_submission_timestamps',
-  'GpuFile__release_g13_submission_timestamps', 'GpuFile__submit_g13_staged'] {
+  'GpuFile__release_g13_submission_timestamps', 'GpuFile__submit_g13_staged', 'release_completed_g13_timestamps', 'discard_g13_completion'] {
   mut text := body(source, prefix + helper)!
   owned := if helper == 'GpuFile__new_g13_submission_timestamps' {
    'memory__malloc_packed_fallible((u64)(commands.len) * sizeof(' + prefix + 'G13TimestampReferences))'
@@ -43,12 +43,12 @@ fn main() {
  prefix := if source.contains('i64 file__GpuFile__submit_g13_staged(') { 'file__' } else { 'gpu__agx__file__' }
  check(source, prefix)!
  for helper in ['G13SubmissionTimestamps__addresses', 'GpuFile__new_g13_submission_timestamps',
-  'GpuFile__release_g13_submission_timestamps', 'GpuFile__submit_g13_staged'] {
+  'GpuFile__release_g13_submission_timestamps', 'GpuFile__submit_g13_staged', 'release_completed_g13_timestamps', 'discard_g13_completion'] {
   original := body(source, prefix + helper)!
   for allocation in ['memdup(0, 16);', 'memory__malloc_packed_fallible(16);', 'array_new(16, 64, 64);'] {
    mutant := source.replace(original, original.replace_once('{', '{ ' + allocation))
    if _ := check(mutant, prefix) { panic('accepted storage mutation: ' + helper) }
   }
  }
- println('AGX pending timestamp storage: 4 production helpers and 12 allocation counterexamples passed')
+ println('AGX pending timestamp storage: 6 production helpers and 18 allocation counterexamples passed')
 }

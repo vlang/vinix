@@ -1181,6 +1181,7 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 
 fn discard_g13_completion(mut state G13SubmitCompletion) {
 	submission := state.submission
+	command_index := state.command_index
 	if state.file != unsafe { nil } && state.vm_id < mmu.uat_num_contexts {
 		katomic.dec(mut &state.file.inflight_by_vm[state.vm_id])
 	}
@@ -1191,9 +1192,13 @@ fn discard_g13_completion(mut state G13SubmitCompletion) {
 	unsafe {
 		free(voidptr(state))
 	}
-	// Last access to the submission: user-visible fences can be signaled by
-	// clients, so only this callback count proves its backing is no longer read.
-	if submission != unsafe { nil } { katomic.dec(mut &submission.callbacks_remaining) }
+	if submission != unsafe { nil } {
+		// Only private callback retirement permits per-command capture release.
+		// done is published earlier, while completion backing is still live.
+		katomic.store(mut &submission.commands[command_index].callback_finished, true)
+		// Last node access: zero permits the worker to free the submission.
+		katomic.dec(mut &submission.callbacks_remaining)
+	}
 }
 
 fn finish_g13_submit(mut state G13SubmitCompletion, successful bool, failure int) {

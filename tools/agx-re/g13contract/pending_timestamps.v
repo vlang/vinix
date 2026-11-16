@@ -17,6 +17,16 @@ fn check_pending_timestamps_local(file string, pending string, owners string) ! 
  // Registration may hand the node to another CPU before returning.
  tail := staged.all_after('timestamps_transferred = true')
  require(!tail.contains('pending.') && !tail.contains('timestamps.'), 'Accepted storage must never be accessed after transfer')!
+ discard := section(file, 'fn discard_g13_completion(', 'fn finish_g13_submit(', 'Private command callback retirement')!
+ require_order(discard, ['command_index := state.command_index', 'free(voidptr(state))',
+  'katomic.store(mut &submission.commands[command_index].callback_finished, true)',
+  'katomic.dec(mut &submission.callbacks_remaining)'], 'Callback backing retires before command ownership publication')!
+ reap := section(owners, 'fn release_completed_g13_timestamps(', '// Consume one owner', 'Completed command timestamp release')!
+ require_order(reap, ['if item.timestamps.count == 0', 'command.timestamps_released || !katomic.load(&command.callback_finished)',
+  'file.release_g13_timestamps(mut item.timestamps.entries[index])', 'command.timestamps_released = true'], 'Each completed command releases once')!
+ require(!reap.contains('command.done') && !reap.contains('final_fence'), 'Early completion and user fences must not release captures')!
+ require_order(pending, ['if earlier || poll_g13_pending(mut item) {', 'release_completed_g13_timestamps(item)',
+  'retained_count++'], 'Retained and FIFO-blocked nodes still reap completed command owners')!
 }
 
 fn check_pending_timestamps_reference(compute string, render string) ! {
