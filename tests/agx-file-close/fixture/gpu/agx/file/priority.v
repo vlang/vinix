@@ -71,7 +71,8 @@ fn check_queue_priorities() {
 		}
 		assert workqueue.active() == 6 && gpu.active_queues() == 6
 		destroy := ioctl.DrmAsahiVmDestroy{ vm_id: 1 }
-		assert file.ioctl_vm_destroy(&destroy) == -16 && !vm.destroyed
+		assert file.ioctl_vm_destroy(&destroy) == 0 && !vm.destroyed
+		assert file.ioctl_vm_destroy(&destroy) == -2
 		close_priority_file(mut file)
 		assert vm.destroyed
 		assert workqueue.active() == 0 && gpu.active_queues() == 0
@@ -110,7 +111,8 @@ fn check_queue_priorities() {
 	skipped_id := retained.allocate_queue_id_locked() or { panic('retained ID reservation') }
 	assert skipped_id == 2
 	destroy_retained := ioctl.DrmAsahiVmDestroy{ vm_id: 1 }
-	assert retained.ioctl_vm_destroy(&destroy_retained) == -16 && !retained_vm.destroyed
+	assert retained.ioctl_vm_destroy(&destroy_retained) == 0 && !retained_vm.destroyed
+	assert retained.ioctl_vm_destroy(&destroy_retained) == -2
 	for _ in 0 .. 2 {
 		assert !retained.close() && !retained_vm.destroyed
 		assert retained.g13_queues.len == 1 && gpu.active_queues() == 1

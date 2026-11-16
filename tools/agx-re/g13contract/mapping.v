@@ -5,7 +5,7 @@ fn check_user_mapping_contract(local string, manager string) ! {
 	retire := section(local, 'fn (mut f GpuFile) retire_mapping_locked(',
 		'// GEM_CLOSE drops', 'Vinix user mapping retirement')!
 	require_order(retire, ['katomic.load(&f.inflight_by_vm[mapping.vm_id])',
-		'f.find_vm(mapping.vm_id)', 'if !mapping.retiring', 'pt.unmap(mapping.addr, mapping.size)',
+		'f.find_owned_vm(mapping.vm_id)', 'if !mapping.retiring', 'pt.unmap(mapping.addr, mapping.size)',
 		'f.mappings[index].retiring = true',
 		'if !flush_firmware_mapping(ctx, mapping.addr, mapping.size, true)',
 		'return false', 'gem.unref(mapping.obj)', 'f.mappings.delete(index)'], 'Vinix retained mapping backing')!

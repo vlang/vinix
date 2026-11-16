@@ -56,13 +56,14 @@ fn check_identity_lookups() {
 		assert workqueue.active() == 1 && gpu.active_queues() == 1 && resources.calls == 0
 		assert file.vms.len == 1 && file.queues.len == 1 && file.g13_queues.len == 1
 		assert voidptr(file.queues[0]) == voidptr(logical) && voidptr(file.g13_queues[0].resources) == voidptr(resources)
-		// Known busy resources keep EBUSY; missing names must not tear them down.
+		// Remove the name while the queue retains the physical context.
 		destroy_vm := ioctl.DrmAsahiVmDestroy{ vm_id: 1 }
-		identity_result(file.ioctl_vm_destroy(&destroy_vm), -16)
+		identity_result(file.ioctl_vm_destroy(&destroy_vm), 0)
+		assert !vm.destroyed && file.detached_vms[1]
+		identity_result(file.ioctl_vm_destroy(&destroy_vm), -2)
 		destroy_queue := ioctl.DrmAsahiQueueDestroy{ queue_id: valid.queue_id }
 		identity_result(file.ioctl_queue_destroy(&destroy_queue), 0)
 		identity_result(file.ioctl_queue_destroy(&destroy_queue), -2)
-		identity_result(file.ioctl_vm_destroy(&destroy_vm), 0)
 		identity_result(file.ioctl_vm_destroy(&destroy_vm), -2)
 		identity_result(file.ioctl_queue_create(&valid), -2)
 		assert vm.destroyed && !neighbor_vm.destroyed && resources.calls == 1
@@ -73,5 +74,5 @@ fn check_identity_lookups() {
 		assert file.close() && neighbor.close() && neighbor_vm.destroyed
 		unsafe { file.vms.free(); file.queues.free(); file.g13_queues.free(); neighbor.vms.free(); neighbor.queues.free() }
 	}
-	println('AGX identity lookup: ${identity_cases} ioctl checks; ENOENT for missing/removed/foreign-file VM and queue identities, validation precedence, unchanged queue IDs and resource counts, EBUSY pins, live neighbor preservation and repeated destruction passed')
+	println('AGX identity lookup: ${identity_cases} ioctl checks; ENOENT for missing/removed/foreign-file VM and queue identities, validation precedence, unchanged queue IDs and resource counts, detached VM owners, live neighbor preservation and repeated destruction passed')
 }

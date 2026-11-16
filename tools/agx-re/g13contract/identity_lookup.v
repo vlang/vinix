@@ -5,8 +5,8 @@ fn check_identity_lookup_contract(local string, reference string) ! {
 	vm := section(local, 'pub fn (mut f GpuFile) ioctl_vm_destroy(',
 		'pub fn (mut f GpuFile) ioctl_gem_create(', 'Native VM destroy lookup')!
 	require_order(vm, ['request.extensions != 0 || request.pad != 0', 'return -22',
-		'f.lock.acquire()', 'defer { f.lock.release() }', 'for i, vm in f.vms',
-		'manager.destroy_context(vm)', 'return 0', 'return -2'], 'Absent VM is ENOENT after validation and locked lookup')!
+		'f.lock.acquire()', 'defer { f.lock.release() }', 'vm := f.find_vm(request.vm_id) or { return -2 }',
+		'f.detached_vms[vm.id] = true', 'f.reap_detached_vms_locked()', 'return 0'], 'Absent VM is ENOENT after validation and locked lookup')!
 	create := section(local, 'pub fn (mut f GpuFile) ioctl_queue_create(',
 		'pub fn (mut f GpuFile) ioctl_queue_destroy(', 'Native queue VM lookup')!
 	require_order(create, ['return -22', 'f.lock.acquire()', 'defer { f.lock.release() }',
@@ -20,7 +20,7 @@ fn check_identity_lookup_contract(local string, reference string) ! {
 	submit := section(local, 'pub fn (mut f GpuFile) ioctl_submit(', 'fn dispatch(', 'Native submit queue lookup')!
 	require_order(submit, ['captured := f.capture_submission_queue(request.queue_id) or { return -2 }',
 		'f.lock.acquire()', 'vm_id := captured.vm_id',
-		'if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }', 'vm := f.find_vm(vm_id)',
+		'if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }', 'vm := f.find_owned_vm(vm_id)',
 		'f.cleanup_closed_mappings_locked(vm_id)'], 'Missing submit queue differs from invalid internal VM state')!
 	for spec in [
 		['vm_destroy', '/// IOCTL: gem_create:', 'vms().remove(data.vm_id as usize)', 'if vm.is_none()', 'Err(ENOENT)'],

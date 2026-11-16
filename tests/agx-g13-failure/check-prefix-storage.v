@@ -2,6 +2,10 @@
 import os
 
 const helpers = [
+	'gpu__agx__file__GpuFile__find_vm',
+	'gpu__agx__file__GpuFile__find_owned_vm',
+	'gpu__agx__file__GpuFile__ioctl_vm_destroy',
+	'gpu__agx__file__GpuFile__reap_detached_vms_locked',
 	'gpu__agx__file__GpuFile__reap_detached_g13_queues_locked',
 	'gpu__agx__file__reap_open_detached_g13_queues',
 	'gpu__agx__gpu__g13_tile_info',
@@ -141,6 +145,9 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name in ['gpu__agx__file__GpuFile__find_vm', 'gpu__agx__file__GpuFile__find_owned_vm'] { return '__v_option_mmu__UatContextptr' }
+	if name == 'gpu__agx__file__GpuFile__ioctl_vm_destroy' { return 'i64' }
+	if name == 'gpu__agx__file__GpuFile__reap_detached_vms_locked' { return 'void' }
 	if name == 'gpu__agx__file__GpuFile__capture_submission_queue' { return '__v_option_gpu__agx__file__G13SubmissionQueue' }
 	if name in ['gpu__agx__file__release_submission_queue', 'gpu__agx__gpu__G13QueueResources__retain_file_reference', 'gpu__agx__gpu__G13QueueResources__release_file_reference'] { return 'void' }
 	if name in ['gpu__agx__file__GpuFile__reap_detached_g13_queues_locked', 'gpu__agx__file__reap_open_detached_g13_queues'] { return 'void' }

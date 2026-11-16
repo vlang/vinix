@@ -40,6 +40,7 @@ mut:
 	vm             &mmu.UatContext = unsafe { nil }
 	objects        Objects
 	inflight_by_vm [64]u64
+	detached_vms [64]bool
 	mapping_retry_blocked bool
 }
 
@@ -50,6 +51,11 @@ fn (mut file GpuFile) cleanup_closed_mappings_locked(_vm_id u32) bool {
 }
 
 fn (file &GpuFile) find_vm(id u32) ?&mmu.UatContext {
+	if id < 64 && file.detached_vms[id] { return none }
+	return file.find_owned_vm(id)
+}
+
+fn (file &GpuFile) find_owned_vm(id u32) ?&mmu.UatContext {
 	if id == 1 { return file.vm }
 	return none
 }
@@ -346,6 +352,7 @@ fn check_mapping_admission() {
 
 pub fn run_checks() {
 	check_detached_submission_ownership()
+	check_detached_vm_submissions()
 	check_submission_device_loss()
 	check_submission_lookup_order()
 	check_missing_queue_submission_failures()

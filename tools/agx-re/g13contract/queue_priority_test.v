@@ -11,7 +11,7 @@ fn test_priority_conversion_and_retained_failure_ownership_reject_drift() {
 	check_queue_priority_local(file, ioctl, gpu)!
 	for token in ['ioctl.asahi_priority_realtime - request.priority',
 		'if manager.hw_config.gpu_gen == .g13 && request.priority > ioctl.asahi_priority_medium { return -22 }',
-		'if ownership.vm_id == request.vm_id { return -16 }',
+		'if ownership.vm_id == vm_id { retained = true; break }',
 		'if ownership.queue_id == candidate {',
 		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: retained }',
 		'unsafe { free(queue) }'] {

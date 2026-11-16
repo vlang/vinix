@@ -10,7 +10,7 @@ fn test_identity_lookup_guard_rejects_errno_collapse_and_lost_presence_check() {
 		'pub(crate) fn queue_destroy( queues().remove(data.queue_id as usize); if queue.is_none() { Err(ENOENT) }\n/// IOCTL: submit:\n' +
 		'pub(crate) fn submit( .queues().get(data.queue_id.try_into()?).ok_or(ENOENT)?;\n/// IOCTL: get_time:'
 	check_identity_lookup_contract(local, reference)!
-	for token in ['return -2 // ENOENT: no VM', 'return -2 // ENOENT: no queue',
+	for token in ['f.detached_vms[vm.id] = true', 'return -2 // ENOENT: no queue',
 		'vm := f.find_vm(request.vm_id) or { return -2 }', 'captured := f.capture_submission_queue(request.queue_id) or { return -2 }',
 		'vm_id := captured.vm_id', 'if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }'] {
 		if _ := check_identity_lookup_contract(local.replace(token, ''), reference) { assert false, token }

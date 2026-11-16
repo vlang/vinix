@@ -79,6 +79,7 @@ pub struct GpuFile {
 pub mut:
 	dev               &drm.DrmDevice = unsafe { nil }
 	vms               []&mmu.UatContext
+	detached_vms      [mmu.uat_num_contexts]bool // names removed; physical owners remain in vms
 	queues            []&workqueue.WorkQueue
 	mappings          []GpuMapping
 	objects           agxbo.Table
@@ -303,7 +304,7 @@ fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 	mapping := f.mappings[index]
 	if mapping.vm_id >= mmu.uat_num_contexts
 		|| katomic.load(&f.inflight_by_vm[mapping.vm_id]) != 0 { return false }
-	ctx := f.find_vm(mapping.vm_id) or { return false }
+	ctx := f.find_owned_vm(mapping.vm_id) or { return false }
 	if ctx.pgtable == unsafe { nil } { return false }
 	if !mapping.retiring {
 		mut pt := unsafe { ctx.pgtable }
@@ -336,7 +337,7 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
 		if mapping.vm_id != vm_id {
 			continue
 		}
-		if !mapping.retiring && f.objects.contains(mapping.obj) {
+		if !f.detached_vms[vm_id] && !mapping.retiring && f.objects.contains(mapping.obj) {
 			continue
 		}
 		if !f.retire_mapping_locked(index) {
@@ -505,6 +506,12 @@ fn (mut f GpuFile) allocate_timestamp_id_locked() ?u32 {
 }
 
 fn (f &GpuFile) find_vm(vm_id u32) ?&mmu.UatContext {
+	if vm_id < mmu.uat_num_contexts && f.detached_vms[vm_id] { return none }
+	return f.find_owned_vm(vm_id)
+}
+
+// Internal owners survive userspace namespace removal. Caller holds file.lock.
+fn (f &GpuFile) find_owned_vm(vm_id u32) ?&mmu.UatContext {
 	for vm in f.vms {
 		if vm.id == vm_id {
 			return unsafe { vm }
@@ -639,6 +646,7 @@ pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	ctx := m.create_context(request.kernel_start, request.kernel_end) or { return -12 }
 	m.bind_context(ctx)
 	f.lock.acquire()
+	f.detached_vms[ctx.id] = false
 	f.vms << ctx
 	f.lock.release()
 	request.vm_id = ctx.id
@@ -650,32 +658,42 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 	if request.extensions != 0 || request.pad != 0 {
 		return -22
 	}
+	if request.vm_id == 0 || request.vm_id >= mmu.uat_num_contexts { return -2 }
 	f.lock.acquire()
 	defer { f.lock.release() }
-	for q in f.queues {
-		if q.vm_id == request.vm_id {
-			return -16 // EBUSY
+	vm := f.find_vm(request.vm_id) or { return -2 }
+	if vm.id == 0 || vm.id >= mmu.uat_num_contexts { return -22 }
+	// Match Asahi's namespace removal independently of retained queue/job
+	// owners. Existing queues keep their VM; new VM-name lookups fail.
+	f.detached_vms[vm.id] = true
+	f.reap_detached_vms_locked()
+	return 0
+}
+
+// Caller holds file.lock. User bindings retire only after accepted jobs are
+// idle; failed invalidation keeps their object and context for a later retry.
+// Queue owners (including failed-create quarantine) retain driver mappings.
+fn (mut f GpuFile) reap_detached_vms_locked() {
+	if uat_mgr == unsafe { nil } { return }
+	for index := f.vms.len - 1; index >= 0; index-- {
+		vm := f.vms[index]
+		vm_id := vm.id
+		if vm_id == 0 || vm_id >= mmu.uat_num_contexts || !f.detached_vms[vm_id] { continue }
+		if katomic.load(&f.inflight_by_vm[vm_id]) != 0 { continue }
+		if !f.cleanup_closed_mappings_locked(vm_id) { continue }
+		mut retained := false
+		for queue in f.queues {
+			if queue.vm_id == vm_id { retained = true; break }
 		}
-	}
-	// Failed construction can retain a quarantined queue without exposing a
-	// userspace queue ID. Close retries its cleanup before releasing this VM.
-	for ownership in f.g13_queues {
-		if ownership.vm_id == request.vm_id { return -16 }
-	}
-	for mapping in f.mappings {
-		if mapping.vm_id == request.vm_id {
-			return -16
+		for ownership in f.g13_queues {
+			if ownership.vm_id == vm_id { retained = true; break }
 		}
+		if retained { continue }
+		mut manager := unsafe { uat_mgr }
+		manager.destroy_context(vm)
+		f.vms.delete(index)
+		f.detached_vms[vm_id] = false
 	}
-	for i, vm in f.vms {
-		if vm.id == request.vm_id {
-			mut manager := unsafe { uat_mgr }
-			manager.destroy_context(vm)
-			f.vms.delete(i)
-			return 0
-		}
-	}
-	return -2 // ENOENT: no VM in this open-file namespace.
 }
 
 pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
@@ -1057,6 +1075,7 @@ fn reap_open_detached_g13_queues() {
 		mut owned := unsafe { file }
 		owned.lock.acquire()
 		owned.reap_detached_g13_queues_locked()
+		owned.reap_detached_vms_locked()
 		owned.lock.release()
 	}
 	file_map_lock.release()
@@ -1094,6 +1113,7 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 				// by the worker, or by close after the Handle is released.
 				q.detached = true
 				f.reap_detached_g13_queues_locked()
+				f.reap_detached_vms_locked()
 				f.lock.release()
 				return 0
 			}
@@ -1314,7 +1334,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	vm_id := captured.vm_id
 	queue_caps := captured.caps
 	if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }
-	vm := f.find_vm(vm_id) or { return -22 }
+	vm := f.find_owned_vm(vm_id) or { return -22 }
 	// Never publish work through an incompletely invalidated mapping. This
 	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
 	if !f.cleanup_closed_mappings_locked(vm_id) { return -5 }

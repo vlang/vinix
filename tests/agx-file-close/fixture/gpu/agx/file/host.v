@@ -47,7 +47,7 @@ fn (objects &Objects) valid_mmap_range(offset u64, length u64) bool { return obj
 fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
 	assert ctx.pgtable != unsafe { nil } && !ctx.destroyed
 	assert addr != 0 && size != 0
-	mut manager := gpu.get_global_manager() or { panic('manager') }
+	mut manager := gpu.get_global_manager() or { return false }
 	return manager.flush_g13_file_mapping(ctx.id, addr, size, unmapped)
 }
 
@@ -60,6 +60,7 @@ mut:
 	g17_queues        []G17QueueOwnership
 	timestamp_objects []TimestampObject
 	vms               []&mmu.UatContext
+	detached_vms      [64]bool
 	mappings          []GpuMapping
 	objects           Objects
 	next_timestamp_id u32 = 1
@@ -179,5 +180,6 @@ pub fn run_checks() {
 	check_queue_priorities()
 	check_cpu_mapping_policy()
 	check_detached_queues()
+	check_detached_vms()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }
