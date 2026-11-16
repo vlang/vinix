@@ -20,6 +20,10 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('llvm.fptosi.sat.v') || name.starts_with('llvm.fptoui.sat.v') {
+		id, count, _, dest := vector_saturating_cast_name(name)!
+		return id, count, dest
+	}
 	if name.starts_with('llvm.sshl.sat.v') || name.starts_with('llvm.ushl.sat.v') {
 		count, bits := vector_integer_overload(name, 15)!
 		return if name[5] == `s` { ScalarIntrinsic.sshl_sat } else { ScalarIntrinsic.ushl_sat }, count, bits

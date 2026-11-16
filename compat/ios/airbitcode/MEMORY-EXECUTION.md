@@ -1030,6 +1030,32 @@ loads/stores remain unsupported. `tests/ios/air-vector-float-int.v` uses defined
 native saturation and separate range tags, including truncation before range
 checks, without executing invalid native casts.
 
+Fixed 1..16-lane half/float vectors also support ordinary direct
+`llvm.fptosi.sat.vNiW.vNf16`/`vNf32` and `llvm.fptoui.sat.vNiW.vNf16`/`vNf32`
+calls, with matching source/result lane counts and i1..i64 results. Conversion
+truncates toward zero and clamps to the signed or unsigned destination limits;
+all NaNs become zero, infinities clamp and negative unsigned inputs become
+zero. Signed i1 has range -1..0. Finite numeric inputs never introduce poison;
+source poison remains lane-local, while any undef source lane rejects the
+executed call, including discarded results. Source freezes repair indeterminate
+inputs; result freezes repair source poison without hiding earlier errors.
+Results retain independent snapshots and compose with existing integer/vector
+operations. Mixed, void and memory APIs share one executed step, source plus
+result lane work and the existing 4,096 construction slots. Integer-only
+execution and pure address graphs continue to reject floating sources. Other
+floating formats, scalable vectors, mismatched counts, fast-math/tail calls,
+call-site attributes and malformed names/signatures reject.
+The two-width conversion family adds 4,096 distinct declaration-cache entries
+after all 18,112 previous entries, preserving their identities. The two existing
+fixed per-profile cache arrays grow by 32 KiB each on the qualified 64-bit host;
+no new managed storage or owner is added. Integer arithmetic reuses the scalar
+saturation evaluator independently of host floating rounding.
+`tests/ios/air-vector-saturating-cast.v` compares direct LLVM vector calls and
+an independent rational oracle, all half encodings at common widths, ordinary/
+prepared memory write ordering, scalar results, overload identity, malformed
+calls, poison/undef/freezes, composition, loops and shared limits.
+See [LLVM saturating conversion semantics](https://llvm.org/docs/LangRef.html#llvm-fptosi-sat-intrinsic).
+
 Fixed 1..16-lane half/float vectors support direct unflagged calls to
 `llvm.fabs.vNf16`/`vNf32` and `llvm.copysign.vNf16`/`vNf32`. Fabs clears
 the sign bit; copysign copies only the second operand's sign bit. Every other
@@ -1117,7 +1143,8 @@ poison-store rules remain in force. Calls cost one step, share scalar/void
 validation and retain the existing intrinsic attribute/call restrictions.
 Each signedness/source/result-width overload has a distinct declaration-cache
 identity, separate from previous floating and integer families. Other floating
-formats, vector/aggregate results and malformed overload names reject.
+formats, aggregate results and malformed overload names reject. Fixed vector
+overloads use the shared vector profile described above.
 
 Floating `fneg` toggles only the sign bit of half/float, preserving zeros,
 subnormals, infinities and NaN payload/quiet bits. Poison propagates; undef

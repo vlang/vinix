@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_sign_intrinsic_slots + 224 + 32 + 192 + 64 + 64 + 2048 + 64 + 15360
+const vector_float_intrinsic_slots = vector_conversion_cache_base + 4096
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -37,7 +37,11 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 || ir.references[signature.refs_start] != op.result_type { return error('AIR vector intrinsic: signature/arity') }
 	if !mixed && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat]! { return error('AIR vector intrinsic: mixed floating execution required') }
 	mut work := 0
-	if scalar_integer_funnel(id) {
+	mut conversion_key := -1
+	if scalar_saturating_cast(id) {
+		cast_work, cast_key := p.vector_saturating_cast_profile(ir, stream, pools, bodies, scope, index, op, remaining)!
+		work = cast_work; conversion_key = cast_key
+	} else if scalar_integer_funnel(id) {
 		work = p.vector_funnel_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
 	} else if scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) {
 		work = p.vector_integer_binary_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, count, bits, remaining)!
@@ -67,7 +71,8 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR vector intrinsic: declaration record') }
-	return work, vector_float_intrinsic_key(id, count, bits)!, ir_values(stream, raw)[6], id in [.is_fpclass, .ctlz, .cttz, .iabs]!
+	key := if conversion_key >= 0 { conversion_key } else { vector_float_intrinsic_key(id, count, bits)! }
+	return work, key, ir_values(stream, raw)[6], id in [.is_fpclass, .ctlz, .cttz, .iabs]!
 }
 fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right ScalarVectorValue, bits u32, count int) !ScalarVectorValue {
 	vector_sign_intrinsic_key(id, count, bits)!
@@ -83,6 +88,10 @@ fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right Scala
 fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Stream, inst IRInstruction, op IRTypedInstruction) !IntegerValue {
 	id, count, bits := vector_float_intrinsic_name(ir.functions[op.callee_function].name)!
 	left := m.read_vector(stream, m.p.operands[op.operands_start + 1])!
+	if scalar_saturating_cast(id) {
+		_, _, source_bits, _ := vector_saturating_cast_name(ir.functions[op.callee_function].name)!
+		return m.store_vector_value(inst, saturating_cast_vector(id, left, source_bits, bits, count)!)!
+	}
 	if id in [.ctpop, .bitreverse, .bswap]! { return m.store_vector_value(inst, integer_intrinsic_vector(id, left, bits, count)!)! }
 	if id == .iabs {
 		flag := m.read(op.operands_start + 2)!

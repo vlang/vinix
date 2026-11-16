@@ -87,6 +87,15 @@ fn test_vector_rounding_names_states_and_cache() {
   key:=vector_float_intrinsic_key(id,count,bits)!;assert key>=11968&&key<16064&&!seen[key];seen[key]=true
  }}}
  for id in [ScalarIntrinsic.sshl_sat,.ushl_sat]!{for bits in u32(1)..65{for n in 1..17{prefix:=if id==.sshl_sat{'sshl.sat'}else{'ushl.sat'};parsed,count,w:=vector_float_intrinsic_name('llvm.${prefix}.v${n}i${bits}')!;assert parsed==id&&count==n&&w==bits;key:=vector_float_intrinsic_key(id,n,bits)!;assert key>=16064&&key<18112&&!seen[key];seen[key]=true}}}
+	for id in [ScalarIntrinsic.fptosi_sat, .fptoui_sat]! { for source in [u32(16), 32]! { for bits in u32(1) .. 65 { for count in 1 .. 17 {
+		prefix := if id == .fptosi_sat { 'fptosi' } else { 'fptoui' }
+		name := 'llvm.${prefix}.sat.v${count}i${bits}.v${count}f${source}'
+		parsed, n, input, output := vector_saturating_cast_name(name)!
+		assert parsed == id && n == count && input == source && output == bits
+		key := vector_saturating_cast_key(id, count, source, bits)!
+		assert key >= 18112 && key < 22208 && !seen[key]; seen[key] = true
+		unsafe { name.free() }
+	} } } }
 	for slot in seen { assert slot }
 	for name in ['llvm.floor.f32', 'llvm.floor.v0f16', 'llvm.floor.v01f32', 'llvm.floor.v17f16', 'llvm.floor.v99999999999999999999f16', 'llvm.floor.v2f64', 'llvm.floor.v2bf16', 'llvm.floor.v2f016', 'llvm.floor.v2f32.spoof', 'llvm.floor.nxv2f32', 'llvm.roundeven.vf32', 'llvm.nearbyint.v2i32', 'llvm.sin.v2f32'] { if _, _, _ := vector_float_intrinsic_name(name) { assert false, name } }
 	for id in [ScalarIntrinsic.fabs, .sqrt, .fma]! { if _ := rounding_intrinsic_vector(id, ScalarVectorValue{}, 32, 1) { assert false, 'family' } }
@@ -94,5 +103,5 @@ fn test_vector_rounding_names_states_and_cache() {
 	for count in [0, 17] { if _ := rounding_intrinsic_vector(.floor, ScalarVectorValue{}, 16, count) { assert false, 'count' } }
 	for tag in [IntegerValue{aggregate: true}, IntegerValue{vector: true}] { mut source := ScalarVectorValue{}; source.lanes[0] = tag; if _ := rounding_intrinsic_vector(.floor, source, 32, 1) { assert false, 'scalar tag' } }
 	assert checks == 22848
-	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 640 floating, 1024 population-count and 1024 bit-reversal and 64 byte-swap and 1024 leading-zero and 1024 trailing-zero and 2048 funnel-shift and 4096 integer-extrema and 1024 integer-abs and 4096 saturating-add/sub and 2048 saturating-shift overload/cache identities and family/shape/name/tag guards PASS')
+	println('AIR-VECTOR-ROUND-STATES: ${checks} lane poison/undef/freeze checks; all 22208 floating/integer/conversion overload/cache identities and family/shape/name/tag guards PASS')
 }
