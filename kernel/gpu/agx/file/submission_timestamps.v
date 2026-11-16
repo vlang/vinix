@@ -26,6 +26,11 @@ fn release_completed_g13_timestamps(item &G13PendingSubmission) {
 	mut file := unsafe { item.file }
 	for index := u32(0); index < item.timestamps.count; index++ {
 		mut command := unsafe { &item.commands[index] }
+		for pipe in 0 .. 2 {
+			if command.stage_timestamps_released[pipe] || !katomic.load(&command.render_stage_finished[pipe]) { continue }
+			unsafe { file.release_g13_timestamp_pair(mut item.timestamps.entries[index], u32(pipe)) }
+			command.stage_timestamps_released[pipe] = true
+		}
 		if command.timestamps_released || !katomic.load(&command.callback_finished) { continue }
 		unsafe { file.release_g13_timestamps(mut item.timestamps.entries[index]) }
 		command.timestamps_released = true

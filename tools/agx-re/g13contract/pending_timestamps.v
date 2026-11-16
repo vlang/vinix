@@ -25,6 +25,14 @@ fn check_pending_timestamps_local(file string, pending string, owners string) ! 
  require_order(reap, ['if item.timestamps.count == 0', 'command.timestamps_released || !katomic.load(&command.callback_finished)',
   'file.release_g13_timestamps(mut item.timestamps.entries[index])', 'command.timestamps_released = true'], 'Each completed command releases once')!
  require(!reap.contains('command.done') && !reap.contains('final_fence'), 'Early completion and user fences must not release captures')!
+ require_order(reap, ['command.stage_timestamps_released[pipe] || !katomic.load(&command.render_stage_finished[pipe])',
+  'file.release_g13_timestamp_pair(mut item.timestamps.entries[index], u32(pipe))',
+  'command.stage_timestamps_released[pipe] = true'], 'Independent private stage ownership release')!
+ stage := section(file, 'fn g13_render_stage_completed(', 'fn g13_render_completed(', 'Private stage callback')!
+ require_order(stage, ['pipe >= 2', 'state.submission == unsafe { nil }',
+  'katomic.store(mut &state.submission.commands[state.command_index].render_stage_finished[pipe], true)'], 'Stage callback only publishes private completion')!
+ require(!stage.contains('release_g13') && !stage.contains('.lock.'), 'Stage callback cannot take file locks or release owners')!
+ require(file.contains('set_g13_render_completion(entry.render_job, g13_render_completed, g13_render_stage_completed, voidptr(completion))'), 'Stage and aggregate callbacks must share installed owner')!
  require_order(pending, ['if earlier || poll_g13_pending(mut item) {', 'release_completed_g13_timestamps(item)',
   'retained_count++'], 'Retained and FIFO-blocked nodes still reap completed command owners')!
 }

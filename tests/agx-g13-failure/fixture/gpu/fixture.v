@@ -186,6 +186,7 @@ mut:
 	completion_result RetirementTestResult
 	completion_result_ready bool
 	completion fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
+	stage_completion fn (u32, voidptr) = unsafe { nil }
 	completion_data voidptr
 }
 

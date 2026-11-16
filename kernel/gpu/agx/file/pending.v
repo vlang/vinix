@@ -23,6 +23,8 @@ mut:
 	published   bool
 	done        bool
 	callback_finished bool // published after the callback releases its backing
+	render_stage_finished [2]bool // private stage notifications; callbacks only publish
+	stage_timestamps_released [2]bool // file-worker owned; one release per stage
 	timestamps_released bool // worker-owned; independent of user fences
 	error       i64 // explicit width selects the full native ARM atomic routine
 }

@@ -18,6 +18,11 @@ fn test_timestamp_owners_require_bounded_capture_and_retirement_before_file_rele
  for token in ['command.timestamps_released || !katomic.load(&command.callback_finished)', 'command.timestamps_released = true'] {
   if _ := check_pending_timestamps_local(file, pending, owners.replace(token, '')) { assert false, token }
  }
+ for token in ['command.stage_timestamps_released[pipe] || !katomic.load(&command.render_stage_finished[pipe])',
+  'file.release_g13_timestamp_pair(mut item.timestamps.entries[index], u32(pipe))', 'command.stage_timestamps_released[pipe] = true'] {
+  if _ := check_pending_timestamps_local(file, pending, owners.replace(token, '')) { assert false, token }
+ }
+ if _ := check_pending_timestamps_local(file.replace('render_stage_finished[pipe], true', 'render_stage_finished[1 - pipe], true'), pending, owners) { assert false }
  for token in ['owner.release_g13_submission_timestamps(item.timestamps)', 'assert katomic.load(&item.callbacks_remaining) == 0'] {
   if _ := check_pending_timestamps_local(file, pending.replace(token, ''), owners) { assert false, token }
  }

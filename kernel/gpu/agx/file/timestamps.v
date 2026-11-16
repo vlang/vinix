@@ -73,11 +73,18 @@ fn (mut f GpuFile) release_g13_timestamp(capture G13TimestampCapture) {
 // holding that lock must defer release to the file worker.
 fn (mut f GpuFile) release_g13_timestamps(mut references G13TimestampReferences) {
 	for pipe in 0 .. 3 {
-		for phase in 0 .. 2 {
-			capture := references.entries[pipe][phase]
-			references.entries[pipe][phase] = G13TimestampCapture{}
-			f.release_g13_timestamp(capture)
-		}
+		f.release_g13_timestamp_pair(mut references, u32(pipe))
+	}
+}
+
+// Each render engine owns only its own pair. Clear before releasing, since
+// detached mapping cleanup can remove the namespace entry on the last owner.
+fn (mut f GpuFile) release_g13_timestamp_pair(mut references G13TimestampReferences, pipe u32) {
+	if pipe >= 3 { return }
+	for phase in 0 .. 2 {
+		capture := references.entries[pipe][phase]
+		references.entries[pipe][phase] = G13TimestampCapture{}
+		f.release_g13_timestamp(capture)
 	}
 }
 

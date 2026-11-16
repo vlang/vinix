@@ -10,10 +10,10 @@ fn check_render_retirement_local(native string) ! {
   'return if vertex_done && fragment_done { -1 } else { 0 }',
   'if vertex_done && !job.vertex_retirement_published',
   'mgr.retire_g13_subqueue_locked(job.queue, 0, job.vertex_retirement_sequence, job.vertex_ring_slot)',
-  'return if fragment_done { -1 } else { 0 }', 'job.vertex_retirement_published = true',
+  'return if fragment_done { -1 } else { 0 }', 'job.vertex_retirement_published = true', 'job.stage_completion(0, job.completion_data)',
   'if fragment_done && !job.fragment_retirement_published',
   'mgr.retire_g13_subqueue_locked(job.queue, 1, job.fragment_retirement_sequence, job.fragment_ring_slot)',
-  'return if vertex_done { -1 } else { 0 }', 'job.fragment_retirement_published = true',
+  'return if vertex_done { -1 } else { 0 }', 'job.fragment_retirement_published = true', 'job.stage_completion(1, job.completion_data)',
   'if !job.vertex_retirement_published || !job.fragment_retirement_published { return 0 }',
   'job.retirement_published = true'], 'Separate ring publication and shared completion gate')!
  require(stages.count('job.retirement_failed = true') == 2, 'Both stage failures must remain sticky')!
@@ -23,6 +23,9 @@ fn check_render_retirement_local(native string) ! {
   'complete_g13_render_job(mut owned, false)', 'continue', 'read_g13_render_result(owned)',
   'mgr.free_g13_render_job_locked(mut owned, true)', 'complete_g13_render_job(mut owned, owned.error.status == 0)'], 'No shared cleanup or callback before both stages complete')!
  require(!reaper.contains('event.stamp_value_completed('), 'Whole-pass stamp gates must not prevent independent stage retirement')!
+ complete := section(native, 'fn complete_g13_render_job(', '// Construct the complete paired', 'Shared callback retirement')!
+ require_order(complete, ['job.stage_completion = unsafe { nil }', 'if job.completion == unsafe { nil }',
+  'job.completion_data = unsafe { nil }', 'callback(job, successful, data)'], 'Clear every stage callback before shared data can retire')!
 }
 
 fn check_render_retirement_reference(workqueue string, render string) ! {

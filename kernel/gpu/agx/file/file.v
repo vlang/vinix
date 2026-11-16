@@ -1212,6 +1212,16 @@ fn finish_g13_submit(mut state G13SubmitCompletion, successful bool, failure int
 	discard_g13_completion(mut state)
 }
 
+// Caller holds manager.lock. The aggregate callback retains state and the
+// pending node until both stages finish; publish only, leaving file-lock work
+// to the worker. No further timestamp access occurs after this stage's stamp.
+fn g13_render_stage_completed(pipe u32, data voidptr) {
+	if data == unsafe { nil } || pipe >= 2 { return }
+	state := unsafe { &G13SubmitCompletion(data) }
+	if state.submission == unsafe { nil } { return }
+	katomic.store(mut &state.submission.commands[state.command_index].render_stage_finished[pipe], true)
+}
+
 fn g13_render_completed(job &gpu.G13RenderJobResources, successful bool, data voidptr) {
 	if data == unsafe { nil } {
 		return
@@ -1297,7 +1307,7 @@ fn (mut f GpuFile) install_g13_batch_completion(mut pending G13PendingSubmission
 	installed := if is_compute {
 		manager.set_g13_compute_completion(entry.compute_job, g13_compute_completed, voidptr(completion))
 	} else {
-		manager.set_g13_render_completion(entry.render_job, g13_render_completed, voidptr(completion))
+		manager.set_g13_render_completion(entry.render_job, g13_render_completed, g13_render_stage_completed, voidptr(completion))
 	}
 	if !installed { discard_g13_completion(mut completion); return -5 }
 	return 0

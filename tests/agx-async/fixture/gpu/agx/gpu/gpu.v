@@ -83,6 +83,8 @@ pub mut:
 	barrier_sources [2]u32
 	initial_sources [2]u32
 	completion  fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
+	stage_completion fn (u32, voidptr) = unsafe { nil }
+	stage_finished [2]bool
 	data        voidptr
 }
 
@@ -267,7 +269,7 @@ pub fn (mut mgr GpuManager) set_g13_render_barriers(job &G13RenderJobResources, 
 }
 
 pub fn (mut mgr GpuManager) set_g13_render_completion(job &G13RenderJobResources,
-	callback fn (&G13RenderJobResources, bool, voidptr), data voidptr) bool {
+	callback fn (&G13RenderJobResources, bool, voidptr), stage_callback fn (u32, voidptr), data voidptr) bool {
 	if mgr.fail_render_callback || job.released || job.submitted || job.completion != unsafe { nil } {
 		return false
 	}
@@ -276,6 +278,7 @@ pub fn (mut mgr GpuManager) set_g13_render_completion(job &G13RenderJobResources
 	if index == mgr.fail_callback_at { return false }
 	unsafe {
 		job.completion = callback
+		job.stage_completion = stage_callback
 		job.data = data
 	}
 	if index == mgr.inspect_callback_at && mgr.on_callback != unsafe { nil } {
@@ -298,6 +301,7 @@ fn (mut mgr GpuManager) complete_compute(job &G13ComputeJobResources, successful
 }
 
 fn (mut mgr GpuManager) complete_render(job &G13RenderJobResources, successful bool) {
+	unsafe { job.stage_completion = nil }
 	if job.completion != unsafe { nil } {
 		callback := job.completion
 		data := job.data
@@ -428,6 +432,22 @@ pub fn (mut mgr GpuManager) finish_render_at(ordinal u32, status u32) {
 		return
 	}
 	panic('no submitted render')
+}
+
+// Separate firmware stages publish only private completion state. Aggregate
+// callbacks and shared job metadata remain owned until finish_render_at/stop.
+pub fn (mut mgr GpuManager) finish_render_stage(ordinal u32, pipe u32) {
+	assert pipe < 2
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	for job in mgr.g13_render_jobs {
+		if !job.submitted || job.ordinal != ordinal { continue }
+		if job.stage_finished[pipe] { return }
+		unsafe { job.stage_finished[pipe] = true }
+		if job.stage_completion != unsafe { nil } { job.stage_completion(pipe, job.data) }
+		return
+	}
+	panic('no submitted render stage')
 }
 
 pub fn (mut mgr GpuManager) stop() {

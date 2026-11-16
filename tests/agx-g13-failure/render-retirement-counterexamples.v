@@ -28,6 +28,10 @@ fn main() {
   ['aggregate-gate', 'if !job.vertex_retirement_published || !job.fragment_retirement_published { return 0 }',
    'if !job.vertex_retirement_published && !job.fragment_retirement_published { return 0 }',
    'gpu.check_render_retirement_matrix:', 'stage completion result'],
+  ['missing-vertex-notification', 'job.stage_completion(0, job.completion_data)', 'job.stage_completion(1, job.completion_data)',
+   'gpu.check_render_reaper_integration:', 'completed vertex stage publishes its private notification'],
+  ['stage-callback-live', 'job.stage_completion = unsafe { nil }', 'job.stage_completion = job.stage_completion',
+   'gpu.check_render_reaper_integration:', 'aggregate callback clears stage callback backing'],
  ]
  mut receipts := []string{}
  for item in variants {

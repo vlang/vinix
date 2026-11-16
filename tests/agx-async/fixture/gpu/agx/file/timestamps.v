@@ -141,6 +141,7 @@ fn check_timestamp_failures() {
 
 fn check_pending_timestamps() {
  check_timestamp_retirement()
+	check_render_stage_timestamps()
  check_command_timestamp_retirement()
  check_blocked_timestamp_retirement()
  check_timestamp_failures()

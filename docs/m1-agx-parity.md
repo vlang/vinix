@@ -6,10 +6,12 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [independent render ring retirement](m1-agx-render-retirement.md)
-(2026-11-16). Vertex and fragment return completed ring entries independently;
-shared backing and callbacks wait for both stages. Modern ioctl/Mesa integration
-and separate render-stage ownership remain incomplete. The
+Latest offline increment: [render-stage timestamp ownership](m1-agx-stage-timestamps.md)
+(2026-11-16). Vertex and fragment release their captured timestamp pairs
+independently through private stage notifications. Shared render backing and
+aggregate callbacks wait for both stages. Modern ioctl/Mesa integration and
+remaining stage backing/event retirement are incomplete. The
+[independent render ring retirement](m1-agx-render-retirement.md),
 [native AGX error publication](m1-agx-native-errors.md),
 [per-command timestamp retirement](m1-agx-command-timestamps.md),
 [pending submission timestamp ownership](m1-agx-pending-timestamps.md),

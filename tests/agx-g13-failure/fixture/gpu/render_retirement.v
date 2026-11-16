@@ -143,6 +143,12 @@ __global retirement_ends = 0
 __global retirement_callbacks = 0
 __global retirement_success = false
 __global retirement_refuse_free = false
+__global retirement_stages = [2]int{}
+
+fn retirement_stage_callback(pipe u32, _ voidptr) {
+ assert pipe < 2
+ retirement_stages[pipe]++
+}
 
 fn retirement_test_result(_ &G13RenderJobResources) RetirementTestResult {
  retirement_reads++
@@ -166,6 +172,7 @@ fn check_render_reaper_integration() {
  for mode in 0 .. 3 {
   retirement_frees = 0; retirement_reads = 0; retirement_ends = 0; retirement_callbacks = 0
   retirement_success = false; retirement_refuse_free = mode == 2
+  retirement_stages = [2]int{}
   mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 5, gpu_doneptr: 5}
   mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 9, gpu_doneptr: 9}
   mut queue := G13QueueResources{}
@@ -174,6 +181,7 @@ fn check_render_reaper_integration() {
   mut job := &G13RenderJobResources{}
   unsafe { *job = render_retirement_job(&queue, 5, 9) }
   job.submitted = true; job.pending_counted = true; job.completion = retirement_callback
+  job.stage_completion = retirement_stage_callback
   mut manager := GpuManager{g13_render_jobs: [job]}
   event.set_completed(110, true); event.set_completed(111, false)
   if mode == 1 { vertex_state.cpu_wptr = 1280 }
@@ -186,7 +194,10 @@ fn check_render_reaper_integration() {
    vertex_state.cpu_wptr = 5
    manager.checked_reap_g13_render_jobs()
    assert retirement_callbacks == 0 && retirement_frees == 0, 'partial error callback waits for its peer'
-  } else { assert vertex_state.cpu_freeptr == 4 && fragment_state.cpu_freeptr == 0 }
+  } else {
+   assert vertex_state.cpu_freeptr == 4 && fragment_state.cpu_freeptr == 0
+   assert retirement_stages == [1, 0]!, 'completed vertex stage publishes its private notification'
+  }
   event.set_completed(111, true)
   manager.checked_reap_g13_render_jobs()
   if mode == 0 {
@@ -195,6 +206,7 @@ fn check_render_reaper_integration() {
   } else {
    assert manager.g13_render_jobs.len == 1 && retirement_callbacks == 1 && !retirement_success
    assert job.quarantined && !job.released
+   assert job.stage_completion == unsafe { nil }, 'aggregate callback clears stage callback backing'
    // Retrying cleanup cannot issue the completion callback a second time.
    manager.state = .running; retirement_refuse_free = false
    manager.checked_reap_g13_render_jobs()
@@ -204,6 +216,7 @@ fn check_render_reaper_integration() {
   assert vertex_state.cpu_freeptr == 4 && fragment_state.cpu_freeptr == 8
   manager.checked_reap_g13_render_jobs()
   assert retirement_callbacks == 1
+  assert retirement_stages == if mode == 1 { [0, 0]! } else { [1, 1]! }, 'stage callbacks remain one-shot across quarantine retry'
  }
  retirement_refuse_free = false
  println('G13 render reaper: actual retirement/completion bodies retain shared backing, defer partial-error callbacks and preserve one-shot cleanup retries')

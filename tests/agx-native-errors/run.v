@@ -61,7 +61,7 @@ fn main() {
  aggregate_field := field(pending, 'G13PendingSubmission', 'failure')!
  production := 'module file\nimport katomic\nstruct G13PendingCommand {\nmut:\n' + command_field + '\ndone bool\n}\nstruct G13PendingSubmission {\nmut:\ncommands [64]G13PendingCommand\ncommand_count u32\n' + aggregate_field + '\n}\nstruct G13SubmitCompletion {\nmut:\nsubmission &G13PendingSubmission = unsafe { nil }\ncommand_index u32\n}\n' +
   section(pending, 'fn g13_pending_error(', 'fn ')! +
-  section(source, 'fn finish_g13_submit(', 'fn g13_render_completed(')! +
+  section(source, 'fn finish_g13_submit(', '\n}\n')! + '\n}\n' +
   '\nfn discard_g13_completion(mut state G13SubmitCompletion) {}\n' +
   'fn command_errno(value int) ' + command_field.fields()[1] + ' { return ' + command_field.fields()[1] + '(value) }\n' +
   'fn aggregate_errno(value int) ' + aggregate_field.fields()[1] + ' { return ' + aggregate_field.fields()[1] + '(value) }\n'

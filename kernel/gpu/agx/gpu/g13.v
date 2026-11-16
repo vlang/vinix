@@ -274,6 +274,7 @@ pub mut:
 	retirement_failed bool
 	released                bool
 	completion              fn (&G13RenderJobResources, bool, voidptr) = unsafe { nil }
+	stage_completion        fn (u32, voidptr) = unsafe { nil }
 	completion_data         voidptr
 	tvb_size_bytes          u64
 	completion_result       G13RenderResultValues
@@ -1155,6 +1156,7 @@ fn (mut mgr GpuManager) retire_g13_render_stages_locked(mut job G13RenderJobReso
 			return if fragment_done { -1 } else { 0 }
 		}
 		job.vertex_retirement_published = true
+		if job.stage_completion != unsafe { nil } { job.stage_completion(0, job.completion_data) }
 	}
 	if fragment_done && !job.fragment_retirement_published {
 		if !mgr.retire_g13_subqueue_locked(job.queue, 1, job.fragment_retirement_sequence, job.fragment_ring_slot) {
@@ -1162,6 +1164,7 @@ fn (mut mgr GpuManager) retire_g13_render_stages_locked(mut job G13RenderJobReso
 			return if vertex_done { -1 } else { 0 }
 		}
 		job.fragment_retirement_published = true
+		if job.stage_completion != unsafe { nil } { job.stage_completion(1, job.completion_data) }
 	}
 	if !job.vertex_retirement_published || !job.fragment_retirement_published { return 0 }
 	job.retirement_published = true
@@ -1329,6 +1332,9 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 }
 
 fn complete_g13_render_job(mut job G13RenderJobResources, successful bool) {
+	// Both callbacks share completion_data. Quarantine retries may visit this
+	// job after the aggregate callback frees that backing.
+	job.stage_completion = unsafe { nil }
 	if job.completion == unsafe { nil } {
 		return
 	}
@@ -1935,8 +1941,10 @@ pub fn (mut mgr GpuManager) release_g13_render_job(job &G13RenderJobResources) {
 // Install the one-shot completion callback before publishing a prepared job.
 // The callback runs with the manager lock held, while the firmware result
 // backing is still valid. It must not call back into GpuManager.
+// Stage notifications share data's owner and may only publish private state;
+// aggregate completion clears them before releasing that owner.
 pub fn (mut mgr GpuManager) set_g13_render_completion(job &G13RenderJobResources,
-	callback fn (&G13RenderJobResources, bool, voidptr), data voidptr) bool {
+	callback fn (&G13RenderJobResources, bool, voidptr), stage_callback fn (u32, voidptr), data voidptr) bool {
 	if job == unsafe { nil } || callback == unsafe { nil } {
 		return false
 	}
@@ -1950,6 +1958,7 @@ pub fn (mut mgr GpuManager) set_g13_render_completion(job &G13RenderJobResources
 		return false
 	}
 	owned.completion = callback
+	owned.stage_completion = stage_callback
 	owned.completion_data = data
 	return true
 }
