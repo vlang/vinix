@@ -34,6 +34,13 @@ fn sm_compute_builtin(kind string) u8 {
 fn sm_compute_builtin_slot(bit u8) int {
 	return match bit { 1 { 0 } 2 { 3 } 4 { 6 } 8 { 9 } 16 { 12 } 32 { 15 } 64 { 18 } 128 { 21 } else { panic('iOS: invalid software Metal builtin') } }
 }
+fn sm_compute_builtin_type(bits u32, lanes int) string {
+	return match bits * 4 + u32(lanes) {
+		65 { 'ushort' } 66 { 'ushort2' } 67 { 'ushort3' }
+		129 { 'uint' } 130 { 'uint2' } 131 { 'uint3' }
+		else { '' }
+	}
+}
 struct SoftwareMetalKernel {
 	stream airbitcode.Stream
 	ir airbitcode.IRModule
@@ -83,25 +90,34 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 	mut builtins := u8(0)
 	mut grid_lanes := 0
 	mut group_lanes := 0
+	mut vector_lanes := 0
+	mut local_bits := u32(0)
+	mut index_bits := u32(0)
 	for arg in entries.arguments[entry.arguments_start..entry.arguments_start + entry.arguments_count] {
 		a := prepared.argument(int(arg.index))!
 		bit := sm_compute_builtin(arg.kind)
 		if bit != 0 {
 			typ := program.types[arg.type_index]
 			vector := typ.kind == .vector_t
-			if builtins & bit != 0 || arg.opaque_attributes || arg.condition >= 0 || arg.unused || arg.has_location || arg.has_address_space || arg.has_size || arg.has_alignment || arg.has_buffer_size || arg.access != .unspecified || a.value_bits != 32 || (vector && (bit == 2 || a.value_lanes != 3)) || (!vector && (typ.kind != .integer_t || a.value_lanes != 1)) || (arg.type_name.len != 0 && arg.type_name != if vector { 'uint3' } else { 'uint' }) { return error('Software Metal requires uint/uint3 invocation builtin metadata') }
+			type_name := sm_compute_builtin_type(a.value_bits, a.value_lanes)
+			if builtins & bit != 0 || arg.opaque_attributes || arg.condition >= 0 || arg.unused || arg.has_location || arg.has_address_space || arg.has_size || arg.has_alignment || arg.has_buffer_size || arg.access != .unspecified || type_name.len == 0 || (vector && (bit == 2 || a.value_lanes < 2 || a.value_lanes > 3)) || (!vector && (typ.kind != .integer_t || a.value_lanes != 1)) || (arg.type_name.len != 0 && arg.type_name != type_name) { return error('Software Metal requires ushort/uint scalar, pair or triple builtin metadata') }
 			// scalar_vector_type admits floating lanes as well; builtins do not.
 			if vector {
 				element := program.references[typ.refs_start]
 				if program.types[element].kind != .integer_t { return error('Software Metal requires integer invocation coordinates') }
+				if vector_lanes != 0 && vector_lanes != a.value_lanes { return error('Software Metal geometry vectors must have matching lane counts') }
+				vector_lanes = a.value_lanes
 			}
+			shape := int(a.value_bits) * 4 + a.value_lanes
 			if bit == 1 || bit == 4 {
-				if grid_lanes != 0 && grid_lanes != a.value_lanes { return error('Software Metal grid position/size types must match') }
-				grid_lanes = a.value_lanes
+				if grid_lanes != 0 && grid_lanes != shape { return error('Software Metal grid position/size types must match') }
+				grid_lanes = shape
 			} else if bit == 8 || bit == 16 || bit == 32 {
-				if group_lanes != 0 && group_lanes != a.value_lanes { return error('Software Metal local position/group size types must match') }
-				group_lanes = a.value_lanes
+				if group_lanes != 0 && group_lanes != shape { return error('Software Metal local position/group size types must match') }
+				group_lanes = shape
 			}
+			if bit == 32 { local_bits = a.value_bits }
+			if bit == 2 { index_bits = a.value_bits }
 			builtins |= bit
 			arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: -1, value_lanes: a.value_lanes, builtin: bit}
 			continue
@@ -118,6 +134,7 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 		if alignment > 256 || minimum > software_metal_max_buffer { return error('Software Metal buffer requirements exceed profile') }
 		arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: int(arg.location), alignment: alignment, minimum_size: minimum, writable: arg.access != .read}
 	}
+	if local_bits != 0 && index_bits != 0 && local_bits != index_bits { return error('Software Metal local position/index widths must match') }
 	keep = true
 	return SoftwareMetalKernel{stream, ir, pools, bodies, program, prepared, function, arguments}
 }

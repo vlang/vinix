@@ -286,25 +286,29 @@ buffer base alignment of 256 bytes. Pipeline creation returns an owned state
 retaining its function/library/device, leaves a success error slot untouched,
 and uses the library NSError path for unsupported/invalid input.
 
-The compute profile also accepts `air.thread_position_in_grid` as
-an i32 scalar (`uint`) or fixed `<3 x i32>` (`uint3`), and
-`air.thread_index_in_threadgroup` as an i32 scalar. Grid positions are the x
-component or full `(x, y, z)` coordinate. Local indices flatten the position
+The compute profile accepts geometry builtins as `ushort`, `ushort2`,
+`ushort3`, `uint`, `uint2` or `uint3` (i16/i32 scalar, pair or triple).
+`air.thread_index_in_threadgroup` is scalar only. Grid positions supply x,
+(x, y) or (x, y, z). Local indices flatten the position
 within the actual threadgroup, with x varying fastest: `(lz * sy + ly) * sx + lx`.
 Here `sx`/`sy` are the actual group width/height, clipped at a partial grid edge.
 `air.threads_per_grid`, `air.threads_per_threadgroup` and
-`air.dispatch_threads_per_threadgroup` also accept `uint` or `uint3`.
+`air.dispatch_threads_per_threadgroup` accept these same six forms.
 They supply the normalized grid dimensions, actual clipped group dimensions,
 and requested group dimensions respectively; a scalar receives the x component.
 Grid position and grid size must use matching types when both are declared.
 `air.thread_position_in_threadgroup`, `air.threadgroup_position_in_grid` and
-`air.threadgroups_per_grid` accept the same uint/uint3 forms. They supply the
+`air.threadgroups_per_grid` accept the same six forms. They supply the
 local position, group position and group counts, respectively; scalars receive x.
 Local positions use the requested group dimensions for their modulo, group
 positions use those dimensions for division, and counts round each grid axis up
 to cover partial groups. Local position, actual size and requested group size
 must use matching types when declared together. Group positions/counts may use
 scalar projections independently of the grid-position and local-position types.
+All declared geometry vectors must have the same lane count. Local position
+and local index must have matching integer widths. Named types must match the
+actual integer width and shape. Dispatch limits keep every supplied dimension
+and index within ushort range; existing interpreter bindings carry raw words.
 The sizes are captured with each dispatch and supplied afresh to each invocation,
 so a prepared pipeline can index output using the current grid dimensions.
 Builtins have no buffer location and do not
@@ -345,6 +349,12 @@ output padding. Both selectors, partial groups on every axis, maximum grids,
 snapshot offsets, late bounds refusal, invalid metadata/types/duplicates and
 local-position/size family mismatches run in both hashing modes with two drained
 runtimes per mode. Threadgroup coordinates add no shared memory or barriers.
+
+The `geometry-types` mode extends that fixture to all six types, scalar/uint3
+mixes, 2D pairs, and explicit width/lane mismatch refusals. Its narrow kernels
+zero-extend values before computing tiled addresses and storing u32 records.
+Negative geometry fixtures now use i8 and one-lane vectors for unsupported forms;
+historical evidence bundles retain their original checker source and results.
 
 `tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR builtins` runs the focused
 Objective-C checks with normal and deterministic Swift hashing. Each mode
