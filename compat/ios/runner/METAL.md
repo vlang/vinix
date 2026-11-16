@@ -1,5 +1,26 @@
 # Software Metal backend
 
+Compute kernels accept the scalar ushort/uint SIMD arguments below. The CPU
+backend uses one invocation per SIMD group, matching `threadExecutionWidth`.
+
+| AIR argument | Supplied value |
+| --- | --- |
+| `air.thread_index_in_simdgroup` | 0 |
+| `air.simdgroup_index_in_threadgroup` | Flattened local index |
+| `air.simdgroups_per_threadgroup` | Actual clipped threadgroup volume |
+| `air.threads_per_simdgroup` | 1 |
+
+Each semantic may appear once, independently of the existing geometry arguments.
+SIMD identities declared together must have matching integer widths. Vectors,
+other scalar widths, mismatched type names and buffer properties reject.
+The existing borrowed dispatch binding array grows from 24 to 28 words; its
+allocation, reuse and cleanup are unchanged. `tests/ios/metal-software-checks.v
+FRESH_EXTERNAL_DIR simd-builtins` checks all twelve geometry/SIMD arguments,
+SIMD-only kernels, computed addresses, full and partial groups, both direct
+dispatch selectors and prewrite bounds failures under ASan/UBSan. This provides
+SIMD identity values; SIMD collectives, barriers, rendering and native GPU
+execution remain unsupported.
+
 AIR `llvm.vector.insert` supports fixed integer/half/float windows in vectors
 of up to 16 lanes. Its third argument is an aligned in-range i64 constant;
 declaration validation checks the exact third-parameter immarg. Insertion removes
@@ -430,7 +451,8 @@ require encoder buffer bindings. Each semantic may appear once; metadata can
 carry an argument name and matching type name, or omit those names. Pointer,
 floating, other widths/counts, duplicate semantics, buffer/access/size/alignment
 properties, unused/conditional arguments and opaque tails reject. Arbitrary
-by-value uniforms and other builtins remain unsupported. Builtin
+by-value uniforms and builtins beyond the geometry and SIMD identities listed
+above remain unsupported. Builtin
 words are passed through the memory API's typed value bindings and captured
 before execution; library, pipeline and buffer ownership are unchanged.
 A scalar builtin can directly index a supported single-index GEP. Extracted

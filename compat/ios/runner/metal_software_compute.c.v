@@ -9,6 +9,8 @@ import airbitcode
 const software_metal_max_compute_threads = u64(4096)
 const software_metal_max_compute_group = u64(256)
 const software_metal_max_compute_steps = 1000000
+const software_metal_simd_width = u64(1)
+const software_metal_builtin_words = 28
 
 struct SoftwareMetalKernelArgument {
 	slot int
@@ -16,23 +18,27 @@ struct SoftwareMetalKernelArgument {
 	minimum_size u64
 	writable bool
 	value_lanes int // Nonzero for a supported invocation builtin.
-	builtin u8 // One bit per supported geometry semantic (all eight fit in u8).
+	builtin u16 // One bit per supported geometry/SIMD semantic.
 }
-fn sm_compute_builtin(kind string) u8 {
+fn sm_compute_builtin(kind string) u16 {
 	return match kind {
-		'air.thread_position_in_grid' { u8(1) }
-		'air.thread_index_in_threadgroup' { u8(2) }
-		'air.threads_per_grid' { u8(4) }
-		'air.threads_per_threadgroup' { u8(8) }
-		'air.dispatch_threads_per_threadgroup' { u8(16) }
-		'air.thread_position_in_threadgroup' { u8(32) }
-		'air.threadgroup_position_in_grid' { u8(64) }
-		'air.threadgroups_per_grid' { u8(128) }
-		else { u8(0) }
+		'air.thread_position_in_grid' { u16(1) }
+		'air.thread_index_in_threadgroup' { u16(2) }
+		'air.threads_per_grid' { u16(4) }
+		'air.threads_per_threadgroup' { u16(8) }
+		'air.dispatch_threads_per_threadgroup' { u16(16) }
+		'air.thread_position_in_threadgroup' { u16(32) }
+		'air.threadgroup_position_in_grid' { u16(64) }
+		'air.threadgroups_per_grid' { u16(128) }
+		'air.thread_index_in_simdgroup' { u16(256) }
+		'air.simdgroup_index_in_threadgroup' { u16(512) }
+		'air.simdgroups_per_threadgroup' { u16(1024) }
+		'air.threads_per_simdgroup' { u16(2048) }
+		else { u16(0) }
 	}
 }
-fn sm_compute_builtin_slot(bit u8) int {
-	return match bit { 1 { 0 } 2 { 3 } 4 { 6 } 8 { 9 } 16 { 12 } 32 { 15 } 64 { 18 } 128 { 21 } else { panic('iOS: invalid software Metal builtin') } }
+fn sm_compute_builtin_slot(bit u16) int {
+	return match bit { 1 { 0 } 2 { 3 } 4 { 6 } 8 { 9 } 16 { 12 } 32 { 15 } 64 { 18 } 128 { 21 } 256 { 24 } 512 { 25 } 1024 { 26 } 2048 { 27 } else { panic('iOS: invalid software Metal builtin') } }
 }
 fn sm_compute_builtin_type(bits u32, lanes int) string {
 	return match bits * 4 + u32(lanes) {
@@ -87,12 +93,13 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 	mut arguments := []SoftwareMetalKernelArgument{len: prepared.argument_count()}
 	defer { if !keep { unsafe { arguments.free() } } }
 	mut slots := u32(0)
-	mut builtins := u8(0)
+	mut builtins := u16(0)
 	mut grid_lanes := 0
 	mut group_lanes := 0
 	mut vector_lanes := 0
 	mut local_bits := u32(0)
 	mut index_bits := u32(0)
+	mut simd_bits := u32(0)
 	for arg in entries.arguments[entry.arguments_start..entry.arguments_start + entry.arguments_count] {
 		a := prepared.argument(int(arg.index))!
 		bit := sm_compute_builtin(arg.kind)
@@ -100,7 +107,7 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 			typ := program.types[arg.type_index]
 			vector := typ.kind == .vector_t
 			type_name := sm_compute_builtin_type(a.value_bits, a.value_lanes)
-			if builtins & bit != 0 || arg.opaque_attributes || arg.condition >= 0 || arg.unused || arg.has_location || arg.has_address_space || arg.has_size || arg.has_alignment || arg.has_buffer_size || arg.access != .unspecified || type_name.len == 0 || (vector && (bit == 2 || a.value_lanes < 2 || a.value_lanes > 3)) || (!vector && (typ.kind != .integer_t || a.value_lanes != 1)) || (arg.type_name.len != 0 && arg.type_name != type_name) { return error('Software Metal requires ushort/uint scalar, pair or triple builtin metadata') }
+			if builtins & bit != 0 || arg.opaque_attributes || arg.condition >= 0 || arg.unused || arg.has_location || arg.has_address_space || arg.has_size || arg.has_alignment || arg.has_buffer_size || arg.access != .unspecified || type_name.len == 0 || (vector && (bit == 2 || bit >= 256 || a.value_lanes < 2 || a.value_lanes > 3)) || (!vector && (typ.kind != .integer_t || a.value_lanes != 1)) || (arg.type_name.len != 0 && arg.type_name != type_name) { return error('Software Metal requires ushort/uint scalar, pair or triple builtin metadata') }
 			// scalar_vector_type admits floating lanes as well; builtins do not.
 			if vector {
 				element := program.references[typ.refs_start]
@@ -118,6 +125,10 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 			}
 			if bit == 32 { local_bits = a.value_bits }
 			if bit == 2 { index_bits = a.value_bits }
+			if bit >= 256 {
+				if simd_bits != 0 && simd_bits != a.value_bits { return error('Software Metal SIMD builtin widths must match') }
+				simd_bits = a.value_bits
+			}
 			builtins |= bit
 			arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: -1, value_lanes: a.value_lanes, builtin: bit}
 			continue
@@ -167,7 +178,7 @@ fn sm_compute_get(pipeline u64, selector &char) u64 {
 	return match ctext(u64(selector)) {
 		'device' { obj_header(obj_header(h.fields[0]).fields[0]).fields[0] }
 		'maxTotalThreadsPerThreadgroup' { software_metal_max_compute_group }
-		'threadExecutionWidth' { u64(1) }
+		'threadExecutionWidth' { software_metal_simd_width }
 		'staticThreadgroupMemoryLength' { u64(0) }
 		else { panic('iOS: unsupported software Metal compute property') }
 	}
@@ -349,7 +360,7 @@ fn (plan SoftwareMetalComputeGrid) coordinates(position u64) [4]u64 {
 	sy := if remaining_y < plan.group.height { remaining_y } else { plan.group.height }
 	return [x, y, z, (lz * sy + ly) * sx + lx]!
 }
-fn (plan SoftwareMetalComputeGrid) builtin_words(position u64) [24]u64 {
+fn (plan SoftwareMetalComputeGrid) builtin_words(position u64) [software_metal_builtin_words]u64 {
 	c := plan.coordinates(position)
 	rx := plan.grid.width - c[0] / plan.group.width * plan.group.width
 	ry := plan.grid.height - c[1] / plan.group.height * plan.group.height
@@ -364,7 +375,11 @@ fn (plan SoftwareMetalComputeGrid) builtin_words(position u64) [24]u64 {
 		c[0] / plan.group.width, c[1] / plan.group.height, c[2] / plan.group.depth,
 		(plan.grid.width - 1) / plan.group.width + 1,
 		(plan.grid.height - 1) / plan.group.height + 1,
-		(plan.grid.depth - 1) / plan.group.depth + 1]!
+		(plan.grid.depth - 1) / plan.group.depth + 1,
+		// The CPU backend executes one invocation per SIMD group. Use the same
+		// width as the pipeline query and the actual clipped threadgroup volume.
+		c[3] % software_metal_simd_width, c[3] / software_metal_simd_width,
+		(sx * sy * sz - 1) / software_metal_simd_width + 1, software_metal_simd_width]!
 }
 fn sm_compute_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, group SoftwareMetalSize) {
 	C.ios_objc_initialize_lock()
@@ -415,7 +430,7 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	mut bindings := []airbitcode.IRMemoryBinding{cap: k.arguments.len}
 	mut has_values := false
 	for arg in k.arguments { if arg.value_lanes != 0 { has_values = true } }
-	mut builtin_words := []u64{len: if has_values { 24 } else { 0 }}
+	mut builtin_words := []u64{len: if has_values { software_metal_builtin_words } else { 0 }}
 	defer { unsafe { bindings.free(); builtin_words.free() } }
 	for arg in k.arguments {
 		if arg.value_lanes != 0 {
@@ -434,7 +449,7 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 		for position in u64(0) .. plan.threads {
 			if has_values {
 				words := plan.builtin_words(position)
-				for lane in 0 .. 24 { builtin_words[lane] = words[lane] }
+				for lane in 0 .. software_metal_builtin_words { builtin_words[lane] = words[lane] }
 			}
 			if pass == 0 { k.prepared.validate(bindings, k.prepared.steps())! }
 			else { k.prepared.run(mut bindings, k.prepared.steps())! }
