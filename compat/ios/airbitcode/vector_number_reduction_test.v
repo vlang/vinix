@@ -29,8 +29,8 @@ fn test_number_reduction_states(){
   source.undef=u16(1)<<u32(target);if _:=reduced_floating_vector(id,source,bits,count) {assert false};checks++
  }if count>1 {mut source:=ScalarVectorValue{};source.lanes[0]=IntegerValue{poison:true};source.undef=u16(1)<<u32(count-1);if _:=reduced_floating_vector(id,source,bits,count) {assert false};checks++}}}}
  assert checks==1148
- for name in ['llvm.vector.reduce.fmin.v0f16','llvm.vector.reduce.fmax.v01f32','llvm.vector.reduce.fmin.v17f32','llvm.vector.reduce.fmax.v2f64','llvm.vector.reduce.fmin.v2i32','llvm.vector.reduce.fmin.nxv2f32','llvm.vector.reduce.fmin.v2f32.spoof','llvm.vector.reduce.fminimum.v2f32','llvm.vector.reduce.fminimumnum.v2f32'] {if _,_,_:=number_vector_reduction_name(name) {assert false,name}}
- for id in [ScalarIntrinsic.floor,.minimumnum,.maxnum]! {if id==.maxnum {continue};if _:=reduced_floating_vector(id,ScalarVectorValue{},32,1) {assert false}}
+ for name in ['llvm.vector.reduce.fmin.v0f16','llvm.vector.reduce.fmax.v01f32','llvm.vector.reduce.fmin.v17f32','llvm.vector.reduce.fmax.v2f64','llvm.vector.reduce.fmin.v2i32','llvm.vector.reduce.fmin.nxv2f32','llvm.vector.reduce.fmin.v2f32.spoof','llvm.vector.reduce.fminimum.v2f32','llvm.vector.reduce.fmaxnum.v2f32'] {if _,_,_:=number_vector_reduction_name(name) {assert false,name}}
+ for id in [ScalarIntrinsic.floor,.fmuladd,.maxnum]! {if id==.maxnum {continue};if _:=reduced_floating_vector(id,ScalarVectorValue{},32,1) {assert false}}
  for bits in [u32(0),1,64]! {if _:=reduced_floating_vector(.minnum,ScalarVectorValue{},bits,1) {assert false}}
  for count in [0,17] {if _:=reduced_floating_vector(.maxnum,ScalarVectorValue{},32,count) {assert false}}
  for tag in [IntegerValue{aggregate:true},IntegerValue{vector:true}] {mut source:=ScalarVectorValue{};source.lanes[0]=tag;if _:=reduced_floating_vector(.minnum,source,32,1) {assert false}}
