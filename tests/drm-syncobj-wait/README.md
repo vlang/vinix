@@ -140,6 +140,15 @@ event generations unchanged. Source teardown and final descriptor close during
 lookup preserve the syscall reference. These checks do not qualify Linux's
 scheduler wrapper metadata/forwarding, fence containers or GPU frequency policy.
 
+Submission lookup checks use the native Asahi sync-array staging function for
+binary/timeline inputs and outputs. Missing, deleted and foreign-owner names
+return ENOENT; an existing empty input or unavailable timeline point returns
+EINVAL. First/middle/last failures leave an empty staged array, with no
+allocation, output publication or unreleased object lock. Per-item copy and
+shape errors keep their precedence over lookup. The async fixture separately
+checks real submit-ioctl propagation, request-storage cleanup, unchanged result
+bytes and zero published work after these failures.
+
 Timeline boundary checks execute native Asahi sync-array staging and output
 publication alongside direct point lookup. A `UINT64_MAX` output must satisfy
 a lower input point when it is the nearest submitted successor. An independent

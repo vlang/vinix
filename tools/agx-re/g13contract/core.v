@@ -441,6 +441,9 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_asahi_sync_lookup_contract(read(os.join_path(repo, 'kernel/gpu/agx/submission/submission.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(asahi_linux, 'rust/kernel/drm/syncobj.rs'))!,
+		read(os.join_path(base, 'file.rs'))!)!
 	check_fd_reservation_contract(read(os.join_path(repo, 'kernel/file/reservation.v'))!,
 		read(os.join_path(repo, 'kernel/file/file.v'))!, read(os.join_path(repo, 'kernel/proc/proc.v'))!)!
 	check_export_reservation_reference(read(os.join_path(asahi_linux, 'drivers/gpu/drm/drm_syncobj.c'))!,

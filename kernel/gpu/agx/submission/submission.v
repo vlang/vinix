@@ -62,7 +62,9 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 				&& item.timeline_value == 0) {
 			return -22, SyncArray{}
 		}
-		object := syncobj.lookup(owner, item.handle) or { return -22, SyncArray{} }
+		// Asahi's SyncObj::lookup_handle returns ENOENT. A found object with
+		// no usable input fence remains EINVAL below.
+		object := syncobj.lookup(owner, item.handle) or { return -2, SyncArray{} }
 		objects[index] = object
 		timeline[index] = item.sync_type == ioctl.asahi_sync_timeline_syncobj
 		timeline_values[index] = item.timeline_value

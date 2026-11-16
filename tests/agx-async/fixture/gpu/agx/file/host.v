@@ -339,6 +339,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_missing_syncobj_submission_failures()
 	check_mapping_admission()
 	check_queued_ioctl_backlog()
 	check_batch_capacity()
