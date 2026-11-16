@@ -5790,3 +5790,80 @@ It does not claim all native attributes in the workspace are inventoried.
 Complete xattr/sandbox coverage, broader SDK/ABI/library/search and hermetic
 admission, owned ARM/GUI, lifetime/mapping controls, redistribution and default
 activation remain open.
+
+## Required host native xattr content (2026-11-17)
+
+Implementation `b7e1bf2ed` makes live native attribute content mandatory in
+format-10 host receipts, with inner replay format 5. The unchanged qualified
+`winexattr` reader is embedded, pinned and retained. Each role reconstructs the
+canonical metadata target set independently and requires exact canonical
+`read-closed/xattr-content.json` bytes, including namespace, object kinds and
+all observed native name/value bytes. `XATTR_SHOWCOMPRESSION` includes hidden
+compression metadata. The host content receipt is bounded to 8 MiB, with all
+shared reader bounds still active. No new sandbox permission is granted.
+
+Capture and admission use two matching bounded native observations with held
+descriptors. Copies still require attributes on the original recorded targets;
+attributes on copied files cannot replace them. Each final role pins 110
+canonical targets. This is a quiescent observation, not an atomic snapshot;
+change-and-restore races remain outside the claim. Canonical objects follow
+aliases to regular files/directories; symlink-node attributes, directory entry
+names, OS-root/device exception trees and other omitted paths are not covered.
+
+All four frozen host roles build and admit. The host control suite passes
+real/copied baselines, fixture/controller/producer entry checks and 84 exact
+refusals. Seven added cases forge empty/omitted/extra content, change native
+values, link evidence or present old outer/inner formats. Three further live
+cases change a file value, directory value or attribute-name set on a freshly
+built private fixture. They reach the native-content gate, preserve ordinary
+file bytes and restore complete admission. No caller graph or historical target
+attribute is mutated. Existing data, directory, metadata/alias, query, SDK,
+Mach-O and final input/blob gates remain mandatory; no image hashing is added.
+
+Fresh PE and runtime preparation pass. The complete fresh receipt retry passes
+all 32 mutations through preflight and actual controller startup with the
+original ten-second per-command limit. All 18 startup/pre-sign refusals pass.
+The signed x86 holder-death/collection run passes in 123.766 seconds, with
+producer admission before signing and both host bindings re-admitted afterward.
+All 65 retention refusals pass in partitions 17/16/16/16, each requiring real
+and unchanged copied baselines; independent exact-coverage admission passes.
+The two new retained-input cases omit producer/controller native-content rows.
+
+The first receipt suite times out at `large-argv.native`; its complete failed
+run remains retained. Read-only diagnostics measure full native captures at
+12–18 ms, and the isolated native command reaches its expected bounded-file
+gate in 5.055022 and 4.768496 seconds. The first diagnostic wrapper uses the
+wrong expected marker; its raw child result remains, and the corrected wrapper
+passes. `receipt-controls-02` reruns the whole suite from fresh output with
+unchanged tested sources and bounds. No failed baseline or timeout is waived.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostxattr-20261117-01`.
+Final source is `source-final`, cloned from the complete required-query source
+with selected implementation/checker/document files overlaid. All ten selected
+files match repository bytes before commit, including the unchanged reader.
+Passing role outputs are `host-fixture`, `host-controller`, `host-producer` and
+`host-retainer`; results are `host-controls`, `pe`, `prepared`,
+`receipt-controls-02`, `startup`, `native` and `retention-p0` through
+`retention-p3`, with `partition-check.log`. Exact top-level commands are in
+`qualify.v` and `resume-02.v`; argv, selected environment, exits, raw logs,
+diagnostics, validation, source revision and exact feature patch are retained.
+`native/declaration.json` records the tested kernel, stage, sysroot, GCC, QEMU
+and firmware. The compiler remains `/Users/alex/.cache/vinix-wine-build/v/v`.
+
+The complete original required-query checkpoint
+`/Users/alex/.cache/vwhostquery-20261117-01`, additive native-content checkpoint
+`/Users/alex/.cache/vwxattrcontent-20261117-01`, original verifiers and all
+compiler/LLVM/SDK/image/source namespaces and historical prerequisites remain
+required and unchanged. The new external inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-xattr-20261117-01.inventory.json`.
+SHA-256 `4e49c132a071d44f71a4c5543666390cedb5445524eaeafc185955a794b2b107`.
+Recording and independent comparison pass with the unchanged fixed auditor
+`/Users/alex/.cache/vwhostread-20261116-01/workspace-inventory-final`.
+Logs are beside the receipt. No checkpoint file changes after recording begins.
+
+The workspace inventory covers ordinary logical bytes, sizes, types, modes and
+links; mandatory native-content receipts separately pin their selected live
+targets. It does not inventory every native attribute in the workspace.
+Remaining xattr/sandbox and query/search/metadata coverage, SDK/ABI/library and
+hermetic closure, owned ARM/GUI, lifetime/mapping controls, redistribution and
+default activation remain open. No kernel or product-default behavior changes.

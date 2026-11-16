@@ -1373,13 +1373,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     alongside the C/header/linker and Clang/LLD image checks. The
     [host controller/producer/retainer builder](tests/packages/wine-host-build.md)
     now retains and admits selected V/C inputs, explicit SDK/resource selection
-    and observed tool images for real host executables, with seventy-four resealed
-    refusals and real entrypoint checks.
+    and observed tool images for real host executables, with eighty-four exact
+    admission refusals and real entrypoint checks.
     [Required host receipts](tests/packages/wine-host-required-check.md) now bind
     all three qualification roles and their retained input graphs, including
     producer admission before signing and both bindings after guest execution.
-    A fresh signed x86 holder-death/collection run, sixty-three retention refusals
-    and eighteen startup/pre-sign refusals pass. Format-9 host receipts require
+    A fresh signed x86 holder-death/collection run, sixty-five retention refusals
+    and eighteen startup/pre-sign refusals pass. Format-10 host receipts require
     captured Mach-O inputs, identical replay and observed file-load coverage for
     every running qualification role. The separate [Mach-O link check](tests/packages/wine-mach-link.md)
     also passes thirty-one refusal controls. The [SDK declaration audit](tests/packages/wine-sdk-check.md)
@@ -1387,7 +1387,7 @@ architectures; broader release/catalog/runtime acceptance remains open.
     qualification roles, with declared reexport coverage across all targets.
     Required [installed-SDK read-denied replay](tests/packages/wine-host-required-check.md)
     reproduces all four host-role executables, with sixteen runtime denial
-    controls and seventy-four resealed host refusals. Its complete record is
+    controls and eighty-four host admission refusals. Its complete record is
     mandatory in producer/controller/retainer graphs, including after the guest.
     The [standalone audit](tests/packages/wine-sdk-denied-replay.md) keeps its
     historical format-4 contract. Required
@@ -1432,9 +1432,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now captures and rechecks 110 canonical metadata targets for each of the
     four original host roles, including compression attributes hidden by the
     default API. All 35 native/declaration/publication refusals and three
-    production/source guards pass. Mandatory live-content integration and
-    complete xattr coverage remain open, along with other query/search/metadata
-    operations and OS-loader reads. Complete
+    production/source guards pass.
+    [Required native-content integration](tests/packages/wine-lease-supervision-plan.md#required-host-native-xattr-content-2026-11-17)
+    now binds those canonical targets and live attribute values in format-10
+    host receipts. A fresh signed x86 run and all sixty-five retention refusals
+    pass, including both native-content input omissions. Three live mutations
+    use a freshly built private fixture and restore admission without changing
+    ordinary file bytes. Complete xattr/sandbox coverage remains open, along
+    with other query/search/metadata operations and OS-loader reads. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader
