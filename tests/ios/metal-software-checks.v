@@ -68,8 +68,12 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 	link << tls
 	link << ['-L/opt/homebrew/lib', '-lavcodec', '-lswscale', '-lavutil', '-framework', 'AppKit', '-lc++', '-lsqlite3', '-lresolv', '-framework', 'Foundation', '-framework', 'UserNotifications', '-framework', 'CoreFoundation', '-pthread', '-lproc', '-lm', '-o', binary]
 	run(out, 'host-link', link, false)
-	host_args := if os.args[2] == 'vector-memory' { [binary, '--software-metal-vector-memory'] } else if os.args[2] == 'builtins' { [binary, '--software-metal-builtins'] } else { [binary] }
+	host_args := if os.args[2] == 'vector-memory' { [binary, '--software-metal-vector-memory'] } else if os.args[2] == 'builtins' { [binary, '--software-metal-builtins'] } else if os.args[2] == 'grids' { [binary, '--software-metal-grids'] } else { [binary] }
 	run(out, 'host', host_args, false); run(out, 'host-deterministic', host_args, true)
+	if os.args[2] == 'grids' {
+		for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-GRIDS:'), 'missing grid check marker' }
+		return
+	}
 	if os.args[2] == 'builtins' {
 		for label in ['host', 'host-deterministic'] { assert os.read_file(out + '/' + label + '.log')!.contains('IOS-SOFTWARE-METAL-BUILTINS: 6 scalar/uint3/unnamed deferred dispatches'), 'missing builtin check marker' }
 		return
@@ -105,7 +109,7 @@ fn run_host_fixture(root string, old string, out string, fixture string) ! {
 }
 
 fn main() {
- assert os.args.len == 3 && os.args[2] in ['software', 'default', 'vector-memory', 'builtins']
+ assert os.args.len == 3 && os.args[2] in ['software', 'default', 'vector-memory', 'builtins', 'grids']
  root := os.real_path(os.getwd()); out := os.abs_path(os.args[1]); captured := root + "/build/ios/fortnite/ns-calendar-checks/toolchain"; old := out + '/toolchain'
  assert !os.exists(out) && !out.starts_with(root + "/")
  os.mkdir_all(out + "/payload")!; os.mkdir_all(out + "/tmp")!

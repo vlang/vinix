@@ -271,7 +271,7 @@ rejects the complete store while preceding instructions remain visible. Byte
 counts use stored size, whereas vector GEP strides use allocation size. Explicit
 alignment, permissions, bounds and all-block preflight apply. Non-byte-aligned
 lanes, scalable vectors, vector returns and vector PHIs remain outside
-this profile. The software dispatch limit remains one invocation. Deferred
+this profile. Software dispatch uses the bounded 1D grid described below. Deferred
 Objective-C checks cover raw integer/floating vector transfers and poison/undef/
 freeze behavior; this adds no rendering or GPU support.
 
@@ -284,19 +284,20 @@ buffer base alignment of 256 bytes. Pipeline creation returns an owned state
 retaining its function/library/device, leaves a success error slot untouched,
 and uses the library NSError path for unsupported/invalid input.
 
-The single-invocation profile also accepts `air.thread_position_in_grid` as
+The compute profile also accepts `air.thread_position_in_grid` as
 an i32 scalar (`uint`) or fixed `<3 x i32>` (`uint3`), and
-`air.thread_index_in_threadgroup` as an i32 scalar. These values are all zero
-for the supported 1x1x1 grid/group. Builtins have no buffer location and do not
+`air.thread_index_in_threadgroup` as an i32 scalar. Grid positions are `x` or
+`(x, 0, 0)` and local indices are `x % threadsPerThreadgroup.width` for the
+supported 1D grid. Builtins have no buffer location and do not
 require encoder buffer bindings. Each semantic may appear once; metadata can
 carry an argument name and matching type name, or omit those names. Pointer,
 floating, other widths/counts, duplicate semantics, buffer/access/size/alignment
 properties, unused/conditional arguments and opaque tails reject. Arbitrary
-by-value uniforms, other builtins and larger grids remain unsupported. Builtin
+by-value uniforms, other builtins and multidimensional grids remain unsupported. Builtin
 words are passed through the memory API's typed value bindings and captured
 before execution; library, pipeline and buffer ownership are unchanged.
-A scalar builtin can directly index a supported single-index GEP; its value
-is zero for this dispatch profile. Extracted uint3 components and other computed
+A scalar builtin can directly index a supported single-index GEP. Extracted
+uint3 components and other computed
 SSA indices remain unsupported.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
 
@@ -441,16 +442,22 @@ conditions. Literal metadata and duplicate values reject before stores. Deferred
 dispatches check scalar/pair PHIs, case/default tags and overflowing results;
 a 65-case pipeline rejects. Loops and computed SSA buffer indexes remain excluded.
 
-Both compute dispatch selectors require grid and threadgroup dimensions
-exactly `(1, 1, 1)`. The reported thread execution width and maximum group size
-are one; static threadgroup memory is zero. Only the zero-valued thread builtins
-described above are supported. Loops, computed GEP indexes, texture access,
+Both compute dispatch selectors accept nonempty 1D grids and threadgroups;
+height and depth must be one. Each dispatch permits at most 4,096 invocations
+and 256 threads per group. `dispatchThreadgroups` multiplies group count by
+group width with checked bounds; `dispatchThreads` uses the exact grid width,
+including a final partial group. Zero dimensions, multidimensional shapes,
+oversized grids/groups and overflowing products reject during encoding.
+The conservative per-function step bound multiplied by invocation count must
+not exceed 1,000,000. The reported thread execution width is one, maximum group
+size is 256 and static threadgroup memory is zero. Loops, computed GEP indexes, texture access,
 barriers and threadgroup memory remain outside this profile.
 Setting a buffer accepts nil to clear a slot; dispatch requires every argument
 to have an in-bounds, aligned binding from the queue's device. Encoding checks
 state and resource requirements before recording work.
 
-Each dispatch snapshots and retains its pipeline, buffer handles and offsets.
+Each dispatch snapshots and retains its pipeline, buffer handles, offsets and
+normalized grid/group widths.
 Later rebindings do not affect it; buffer contents are read at commit. Compute,
 copies and fills share one ordered command array and limit. Aliased compute
 buffers observe ordinary instruction order. Execution borrows buffer bytes
@@ -460,6 +467,23 @@ interpreter failure sets command status 5 and an owned NSError in
 commands are skipped. The domain global is exported from Metal.framework.
 Scheduled/completed notifications and waits still finish.
 Clients must synchronize direct buffer access against submission.
+
+Before its first invocation writes, execution validates the bindings and every
+indexed address for every invocation, including cold blocks and the last partial
+group. Any address failure leaves this dispatch's output untouched; earlier
+commands may already have written. Invocations then run serially in increasing
+grid position, each with fresh interpreter scratch and captured builtin words.
+Arithmetic poison retains partial-write behavior, including earlier invocations.
+There is no GPU concurrency, barrier or inter-thread synchronization support.
+No parallel-memory ordering guarantee is inferred from this serial interpreter.
+
+`tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR grids` runs the focused
+sanitized Objective-C fixture in both hashing modes. It checks scalar/reordered
+buffer arguments, uint3 coordinates, local-index reset, both selectors, partial
+and maximum-size grids, geometry snapshots, deferred buffer reads, padding,
+encoding limits and prewrite address failures across two drained runtimes.
+The [Metal dispatch documentation](https://developer.apple.com/documentation/metal/calculating-threadgroup-and-grid-sizes)
+describes full and partial threadgroups; this implementation executes synthetic AIR on the CPU.
 
 Scalar comparison/select kernels support all ten integer predicates and all
 sixteen half/float predicates. Comparisons produce i1; select chooses between
@@ -1010,8 +1034,8 @@ alignment before writes, including cold blocks. Offset arithmetic cannot wrap
 or exceed 64 MiB. Unused pointers permit one-past addresses. Indexed pointers
 can feed direct loads/stores only; pointer flow, further GEPs and memory
 intrinsics reject. Static pipeline minimum sizes cover the fixed component;
-execution also checks the resolved per-call addresses. Larger grids remain
-unsupported.
+execution also checks the resolved per-call addresses across the admitted grid.
+Grids beyond the limits above remain unsupported.
 
 The compute tests assemble synthetic LLVM modules with AIR metadata and check
 Objective-C dispatch ABI and byte results. They do not establish compatibility

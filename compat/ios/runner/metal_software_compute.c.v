@@ -5,13 +5,18 @@ import airbitcode
 
 // An experimental CPU interpreter, never a native Metal/GPU pipeline. Parsed
 // indexes borrow the retained library's immutable bytes. Buffer pointers and
-// uint/uint3 invocation builtins use bounded constant GEPs and one invocation.
+// uint/uint3 invocation builtins use bounded constant or argument-indexed GEPs.
+const software_metal_max_compute_threads = u64(4096)
+const software_metal_max_compute_group = u64(256)
+const software_metal_max_compute_steps = 1000000
+
 struct SoftwareMetalKernelArgument {
 	slot int
 	alignment u64
 	minimum_size u64
 	writable bool
-	value_lanes int // Nonzero for a supported invocation builtin, supplied as zero.
+	value_lanes int // Nonzero for a supported invocation builtin.
+	builtin u8 // 1: grid position, 2: local thread index.
 }
 struct SoftwareMetalKernel {
 	stream airbitcode.Stream
@@ -73,7 +78,7 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 				if program.types[element].kind != .integer_t { return error('Software Metal requires integer invocation coordinates') }
 			}
 			builtins |= bit
-			arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: -1, value_lanes: a.value_lanes}
+			arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: -1, value_lanes: a.value_lanes, builtin: bit}
 			continue
 		}
 		if arg.kind != 'air.buffer' || arg.opaque_attributes || arg.condition >= 0 || arg.unused || !arg.has_location || arg.location_count != 1 || arg.location >= 31 || !arg.has_address_space || arg.address_space !in [u32(1), 2]! || arg.access !in [.read, .write, .read_write]! || (arg.address_space == 2 && arg.access != .read) { return error('Software Metal requires explicit scalar buffer metadata') }
@@ -119,7 +124,8 @@ fn sm_compute_get(pipeline u64, selector &char) u64 {
 	h := sm_check(pipeline, 'VinixSoftwareMTLComputePipelineState')
 	return match ctext(u64(selector)) {
 		'device' { obj_header(obj_header(h.fields[0]).fields[0]).fields[0] }
-		'maxTotalThreadsPerThreadgroup', 'threadExecutionWidth' { u64(1) }
+		'maxTotalThreadsPerThreadgroup' { software_metal_max_compute_group }
+		'threadExecutionWidth' { u64(1) }
 		'staticThreadgroupMemoryLength' { u64(0) }
 		else { panic('iOS: unsupported software Metal compute property') }
 	}
@@ -130,6 +136,8 @@ mut:
 	buffers [31]u64
 	offsets [31]u64
 	inline_slots u32
+	grid_threads u64
+	group_threads u64
 }
 fn sm_compute_bindings_free(state &SoftwareMetalComputeBindings) {
 	objc_release(state.pipeline)
@@ -251,17 +259,34 @@ fn sm_compute_validate(state &SoftwareMetalComputeBindings) {
 		if !sm_range(sm_buffer_length(b), offset, arg.minimum_size) || offset % arg.alignment != 0 { panic('iOS: Metal compute binding bounds/alignment') }
 	}
 }
+// Normalize both selectors without multiplying untrusted dimensions. Only a
+// one-dimensional grid is admitted; the final dispatchThreads group may be partial.
+fn sm_compute_grid(groups bool, grid SoftwareMetalSize, group SoftwareMetalSize, steps int) !u64 {
+	if grid.width == 0 || grid.height != 1 || grid.depth != 1 || group.width == 0 || group.width > software_metal_max_compute_group || group.height != 1 || group.depth != 1 {
+		return error('software Metal requires a nonempty 1D grid and 1..256 threads per group')
+	}
+	if grid.width > software_metal_max_compute_threads / (if groups { group.width } else { u64(1) }) {
+		return error('software Metal compute invocation limit')
+	}
+	threads := grid.width * (if groups { group.width } else { u64(1) })
+	if steps < 1 || steps > software_metal_max_compute_steps || threads > u64(software_metal_max_compute_steps / steps) {
+		return error('software Metal compute dispatch instruction budget')
+	}
+	return threads
+}
 fn sm_compute_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, group SoftwareMetalSize) {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
 	h := sm_compute_active(encoder)
-	if grid.width != 1 || grid.height != 1 || grid.depth != 1 || group.width != 1 || group.height != 1 || group.depth != 1 { panic('iOS: software Metal supports one compute invocation per dispatch') }
 	sm_compute_validate(h.metal_compute)
+	threads := sm_compute_grid(ctext(u64(selector)) == 'dispatchThreadgroups:threadsPerThreadgroup:', grid, group, obj_header(h.metal_compute.pipeline).metal_kernel.prepared.steps()) or { panic('iOS: ' + err.msg()) }
 	mut command := obj_header(h.fields[0]).software_metal
 	if command.ops.len >= 65536 { panic('iOS: software Metal command limit') }
-	snapshot := unsafe { &SoftwareMetalComputeBindings(C.malloc(sizeof(SoftwareMetalComputeBindings))) }
+	mut snapshot := unsafe { &SoftwareMetalComputeBindings(C.malloc(sizeof(SoftwareMetalComputeBindings))) }
 	if snapshot == unsafe { nil } { panic('iOS: cannot allocate Metal compute dispatch') }
 	unsafe { *snapshot = *h.metal_compute }
+	snapshot.grid_threads = threads
+	snapshot.group_threads = group.width
 	objc_retain(snapshot.pipeline)
 	for buffer in snapshot.buffers { objc_retain(buffer) }
 	command.ops << SoftwareMetalCopy{compute: snapshot}
@@ -271,18 +296,28 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	mut bindings := []airbitcode.IRMemoryBinding{cap: k.arguments.len}
 	mut has_values := false
 	for arg in k.arguments { if arg.value_lanes != 0 { has_values = true } }
-	builtin_words := []u64{len: if has_values { 3 } else { 0 }}
+	mut builtin_words := []u64{len: if has_values { 4 } else { 0 }}
 	defer { unsafe { bindings.free(); builtin_words.free() } }
 	for arg in k.arguments {
 		if arg.value_lanes != 0 {
-			bindings << airbitcode.IRMemoryBinding{values: builtin_words[..arg.value_lanes]}
+			start := if arg.builtin == 1 { 0 } else { 3 }
+			bindings << airbitcode.IRMemoryBinding{values: builtin_words[start..start + arg.value_lanes]}
 			continue
 		}
 		buffer := obj_header(state.buffers[arg.slot])
 		// vbytes borrows storage; freeing bindings must never free its data.
 		bindings << airbitcode.IRMemoryBinding{data: unsafe { (&u8(sm_storage_base(buffer))).vbytes(int(sm_buffer_length(buffer))) }, offset: state.offsets[arg.slot], base_alignment: 256, writable: arg.writable}
 	}
-	k.prepared.run(mut bindings, k.prepared.steps())!
+	// All invocation addresses, even in cold blocks or the last partial group,
+	// must be valid before the first invocation writes. No AIR value is executed
+	// by this pass; arithmetic poison retains ordinary partial-write behavior.
+	for pass in 0 .. 2 {
+		for position in u64(0) .. state.grid_threads {
+			if has_values { builtin_words[0] = position; builtin_words[3] = position % state.group_threads }
+			if pass == 0 { k.prepared.validate(bindings, k.prepared.steps())! }
+			else { k.prepared.run(mut bindings, k.prepared.steps())! }
+		}
+	}
 }
 fn sm_compute_start(device u64, command u64) {
 	for name in [c'VinixSoftwareMTLComputePipelineState', c'VinixSoftwareMTLComputeCommandEncoder']! {
