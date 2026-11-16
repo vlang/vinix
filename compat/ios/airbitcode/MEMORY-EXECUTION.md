@@ -164,6 +164,11 @@ The unsigned amount reduces modulo the width; a zero effective shift chooses
 the left word for fshl and right word for fshr. Identical data words implement
 rotations. Poison in any input propagates, and all three subtree heights count
 toward the shared depth limit.
+Carry-less multiplication (`llvm.clmul`) and parallel bit extraction/deposition
+(`llvm.pext`, `llvm.pdep`) accept matching i1..i64 operands. Carry-less products
+retain the low N polynomial-product bits. Extraction packs selected bits into
+low positions; deposition scatters low bits into selected positions. Both input
+dependencies and poison flags are checked under the same graph limits.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -274,6 +279,12 @@ boundaries, cold zero overshifts and independent GEP roots through all three API
 funnel shifts with defined native LLVM calls. It covers modulo/zero amounts,
 non-power-of-two widths, poison in each input, select/freeze, computed amount
 poison and cached depth boundaries through all three dependencies.
+
+`tests/ios/air-memory-bit-manipulation-index.v LLVM_AS FRESH_EXTERNAL_DIR`
+compares all 192 carry-less multiply/extract/deposit overloads with defined
+native LLVM calls. It covers masks, low-bit truncation, direct/masked indices,
+both poisoned operands, computed poison, select/freeze and cached depth limits
+through either input. All three APIs preserve output on refusal.
 
 ## Prepared memory functions
 
