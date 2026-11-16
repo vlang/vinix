@@ -440,6 +440,18 @@ A separate guarded condition table under cache tag 260 checks all mask lanes,
 preserves poison and retains maximum source/selector heights under the existing
 limits. One fixed builder array and existing POD nodes/cache storage add no new
 runtime array, node kind or owner. Loaded/PHI and floating mask dependencies reject.
+Pure vector population count, bit reversal and byte swap calls also supply
+address lanes. Their canonical fixed-vector overloads retain all existing call,
+declaration, attribute and duplicate checks. Ctpop/bitreverse support i1..i64;
+bswap supports i16/i32/i48/i64. Every lane computes before extraction. Undef
+rejects before writes even in ignored lanes or later unchosen dependencies;
+poison remains lane-local. Source/result freezes and original extraction bounds
+keep their existing behavior. Contiguous cached tables, POD metadata and one
+fixed builder array share the bounded graph and existing ownership/free paths.
+The interpreter uses scalar bit evaluators without invoking declarations.
+Other vector intrinsic families remain unsupported in addresses. The image
+shader exercises ctpop, bitreverse and bswap in a separate bounded address
+root and mixes the computed byte into its independently checked red channel.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).

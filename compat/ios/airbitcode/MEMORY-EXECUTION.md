@@ -385,6 +385,27 @@ free paths are unchanged. Loaded/PHI and floating condition sources reject.
 checks all widths, mask/arm states, unfrozen and frozen forms, condition-table
 isolation/reuse and exact graph limits against native LLVM and a lane oracle.
 
+Pure vector `llvm.ctpop`, `llvm.bitreverse` and `llvm.bswap` calls may also feed
+addresses. Population count and bit reversal accept i1..i64 lanes; byte swap
+accepts i16/i32/i48/i64. Fixed 1..16-lane argument and result types must match
+the canonical overload. Existing direct declaration, signature, call-header,
+attribute and duplicate-overload validation applies. No declaration or external
+function pointer executes: projected nodes reuse the scalar bit evaluator.
+Every input lane computes before extraction, so any undef rejects before writes,
+including ignored lanes, invalid selectors and later unchosen selects/freezes.
+Poison stays lane-local; source freeze repairs operands and result freeze may
+repair poison. Original extraction bounds remain checked.
+
+One contiguous result table per call uses the existing source cache tag and POD
+metadata retaining maximum lane height. A fixed 16-int builder array holds input
+projection indices. Source/result/selector and cached heights retain the existing
+graph limits; ownership, free paths and fixed runtime arrays are unchanged.
+Other vector intrinsic families remain excluded from address graphs.
+`tests/ios/air-memory-vector-bit-intrinsic-index.v LLVM_AS FRESH_EXTERNAL_DIR`
+checks all supported widths/families, representative full lane-count coverage,
+source/result freezing, poison/undef, cached graph limits and malformed calls
+against native LLVM and independent bit/byte oracles.
+
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result
 freezes, condition poison, invalid selectors, cache isolation, exact graph limits

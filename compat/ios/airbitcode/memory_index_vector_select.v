@@ -26,7 +26,7 @@ fn (b MemoryIndexBuilder) vector_projection_source(source IRTypedOperand, before
 	inst := b.bodies.instructions[producer]
 	if inst.record < 0 || inst.record >= b.stream.records.len { return error('AIR memory index: vector source record') }
 	code := b.stream.records[inst.record].code
-	if code in [u64(2), 3, 5, 7, 8, 9, 28, 29] { return true }
+	if code in [u64(2), 3, 5, 7, 8, 9, 28, 29, 34] { return true }
 	if code != 58 { return false }
 	op := b.p.instructions[producer]
 	b.p.vector_freeze_profile(b.stream, b.pools, b.bodies, b.scope, producer, op, true, 16)!
@@ -98,6 +98,9 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 			node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: selector, right: table.base, condition: table.node, value: u64(count), height: 1 + if table.height > b.nodes[selector].height { table.height } else { b.nodes[selector].height }}
 		} else if code in [u64(9), 28] {
 			table := b.vector_compare_source(source, producer, depth + 1)!
+			node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: selector, right: table.base, condition: table.node, value: u64(count), height: 1 + if table.height > b.nodes[selector].height { table.height } else { b.nodes[selector].height }}
+		} else if code == 34 {
+			table := b.vector_bit_intrinsic_source(source, producer, depth + 1)!
 			node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: selector, right: table.base, condition: table.node, value: u64(count), height: 1 + if table.height > b.nodes[selector].height { table.height } else { b.nodes[selector].height }}
 		} else { return error('AIR memory index: unsupported vector projection dependency') }
 	}

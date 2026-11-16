@@ -19,6 +19,7 @@ enum MemoryIndexKind {
 	projected_binary
 	projected_cast
 	projected_compare
+	projected_intrinsic
 	projected_freeze
 	projected_extract
 	binary
@@ -505,6 +506,10 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.projected_compare {
 				if undefs[node.left] || undefs[node.right] { return error('AIR vector: undef comparison lane') }
 				value = integer_compare_flags(node.opcode, node.flags, node.source_bits, IntegerValue{value: values[node.left], poison: poisons[node.left]}, IntegerValue{value: values[node.right], poison: poisons[node.right]})!
+			}
+			.projected_intrinsic {
+				if undefs[node.left] { return error('AIR vector intrinsic: undef source lane') }
+				value = if poisons[node.left] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }
 			}
 			.compare {
 				value = integer_compare_flags(node.opcode, node.flags, node.source_bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!
