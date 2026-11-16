@@ -83,3 +83,15 @@ module paths and the retained toolchain. Dependencies remain referenced; this is
 not hermetic. Native JIT is uninstrumented and leak detection is disabled.
 CPU software Metal only is qualified; no native GPU, guest launch or new Fortnite
 frame is verified.
+
+Subsequent archive recovery — 2026-11-16: after space became available, the
+original bundle passed its unchanged complete inventory again. A fresh archive
+`/Users/alex/Library/Caches/vinix-ios/vector-saturating-index-20261116-r1.recovered.tar.gz`
+passes the full logical-byte/metadata comparison and original before/after
+inventory checks. Archive SHA-256: `3f4fdcb82b5599cb3decd4c86e7400cd1c516e49e782649c0db8cc3ca5b46597`.
+Archive inventory SHA-256: `3edb0e3661c71b0a1af52595c5991008af84f80aa91df3fc9e3183225f0b91fe`.
+The successful audit is under `/Users/alex/Library/Caches/vinix-ios/vector-saturating-index-20261116-r1.recovered.tar.gz.audit`.
+The earlier truncated archive, failed audit and original bundle remain retained.
+This repairs archival preservation for source revision `19c2aac6348a2684f53720a6ebef6354d9b6399f`;
+no execution checks or restoration replay were repeated, and launch qualification
+is unchanged.
