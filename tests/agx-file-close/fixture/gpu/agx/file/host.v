@@ -181,5 +181,6 @@ pub fn run_checks() {
 	check_cpu_mapping_policy()
 	check_detached_queues()
 	check_detached_vms()
+	check_orphaned_queues()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

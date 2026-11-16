@@ -2,6 +2,7 @@
 import os
 
 const helpers = [
+	'gpu__agx__file__GpuFile__reap_orphaned_g13_queues_locked',
 	'gpu__agx__file__GpuFile__find_vm',
 	'gpu__agx__file__GpuFile__find_owned_vm',
 	'gpu__agx__file__GpuFile__ioctl_vm_destroy',
@@ -145,6 +146,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'gpu__agx__file__GpuFile__reap_orphaned_g13_queues_locked' { return 'void' }
 	if name in ['gpu__agx__file__GpuFile__find_vm', 'gpu__agx__file__GpuFile__find_owned_vm'] { return '__v_option_mmu__UatContextptr' }
 	if name == 'gpu__agx__file__GpuFile__ioctl_vm_destroy' { return 'i64' }
 	if name == 'gpu__agx__file__GpuFile__reap_detached_vms_locked' { return 'void' }

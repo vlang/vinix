@@ -1066,6 +1066,25 @@ fn (mut f GpuFile) reap_detached_g13_queues_locked() {
 	}
 }
 
+// Failed construction may retain a GPU graph without installing a logical
+// queue. Retry that graph independently of the file/VM name lifetime, while
+// every published or captured queue keeps its original owner installed.
+// Caller holds file.lock; physical release retains its manager/job guards.
+fn (mut f GpuFile) reap_orphaned_g13_queues_locked() {
+	manager := gpu.get_global_manager() or { return }
+	mut gpu_manager := unsafe { manager }
+	for index := f.g13_queues.len - 1; index >= 0; index-- {
+		ownership := f.g13_queues[index]
+		mut named := false
+		for queue in f.queues {
+			if queue.id == ownership.queue_id { named = true; break }
+		}
+		if named || ownership.resources.has_file_references() { continue }
+		if !gpu_manager.release_g13_queue_resources(ownership.resources) { continue }
+		f.g13_queues.delete(index)
+	}
+}
+
 // The registry lock pins each open file against release_handle without a new
 // reference or allocation. The worker calls this outside the manager lock;
 // files already removed from the registry use the ordinary closing-file path.
@@ -1075,6 +1094,7 @@ fn reap_open_detached_g13_queues() {
 		mut owned := unsafe { file }
 		owned.lock.acquire()
 		owned.reap_detached_g13_queues_locked()
+		owned.reap_orphaned_g13_queues_locked()
 		owned.reap_detached_vms_locked()
 		owned.lock.release()
 	}

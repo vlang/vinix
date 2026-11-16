@@ -441,6 +441,9 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_orphan_queue_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
+	check_orphan_queue_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'queue/mod.rs'))!)!
 	check_vm_detach_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!)!
 	check_vm_detach_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'mmu.rs'))!)!
 	check_queue_reference_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
@@ -812,6 +815,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 QUEUE_DESTROY hides the namespace immediately while queue-specific references and failed invalidations retain physical queue ownership',
 		'Initial G13 queue capture survives namespace removal during staging, transfers its owner to accepted work and drops it after final callbacks before the aggregate VM pin',
 		'VM_DESTROY removes names independently of queues/jobs; existing queues retain physical contexts, idle user mappings retry acknowledged teardown, and contexts retire only after all owners end',
+		'Failed G13 queue construction retries physical cleanup while its file/VM stays open; logical queues and captures remain owned, and only successful release returns the retained queue ID and VM pin',
 		'Firmware 12.3/13.5 fragment sizes, depth insertion, firmware pointers, scratch/metadata and complete common tail follow the selected source-layout model',
 		'Firmware 13.5 shared per-queue command/start counters']
 }
