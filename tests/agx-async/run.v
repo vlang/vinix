@@ -23,7 +23,7 @@ fn main() {
 	os.write_file(object_path, object_source.replace(allocation, 'memory.malloc_syncobj_fallible(sizeof(SyncObj))'))!
 	os.mkdir_all('${scratch}/aarch64')!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/aarch64/timer', '${scratch}/aarch64/timer', false)!
-	for path in ['drm/ioctl', 'gpu/agx/command', 'gpu/agx/compute', 'gpu/agx/render',
+	for path in ['drm/ioctl', 'drm/asahi', 'gpu/agx/packet', 'gpu/agx/command', 'gpu/agx/compute', 'gpu/agx/render',
 		'gpu/agx/submission'] {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!

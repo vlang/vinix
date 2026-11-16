@@ -1,6 +1,23 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 import os
 
+// Modern packet entry points are intentionally unregistered. Production
+// dead-code elimination omits them; check their exact sanitizer fixture C.
+const packet_helpers = [
+	'submission__PacketCommand__needs_timestamp_objects',
+	'submission__decode_packet',
+	'submission__packet_barrier',
+	'submission__packet_attachments',
+	'submission__packet_compute',
+	'submission__packet_render',
+	'packet__reader',
+	'packet__Reader__next',
+	'packet__Reader__read_attachments',
+	'packet__Reader__reject',
+	'packet__Reader__supported',
+	'packet__valid_render',
+]
+
 const helpers = [
 	'gpu__agx__file__GpuFile__reap_orphaned_g13_queues_locked',
 	'gpu__agx__file__GpuFile__find_vm',
@@ -146,6 +163,13 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'submission__decode_packet' { return 'multi_return_i64_u32' }
+	if name == 'submission__packet_barrier' { return 'u32' }
+	if name == 'submission__packet_attachments' { return '_v_ret_Array_fixed_command__Attachment_16' }
+	if name == 'submission__packet_compute' { return 'compute__Command' }
+	if name == 'submission__packet_render' { return 'render__Command' }
+	if name == 'packet__reader' { return 'packet__Reader' }
+	if name in ['packet__Reader__next', 'packet__Reader__reject'] { return 'i64' }
 	if name == 'gpu__agx__file__GpuFile__reap_orphaned_g13_queues_locked' { return 'void' }
 	if name in ['gpu__agx__file__GpuFile__find_vm', 'gpu__agx__file__GpuFile__find_owned_vm'] { return '__v_option_mmu__UatContextptr' }
 	if name == 'gpu__agx__file__GpuFile__ioctl_vm_destroy' { return 'i64' }
@@ -421,9 +445,37 @@ fn selftest() ! {
 	println('G13 prefix storage checker selftest: PASS')
 }
 
+fn check_packet(source string) ! {
+	for name in packet_helpers {
+		body := function_body(source, name)!
+		for allocation in ['memdup', 'HEAP(', 'malloc', 'calloc', 'realloc', '__new_array',
+			'new_array_from', 'array_clone', 'array_slice'] {
+			if body.contains(allocation) { return error(name + ': unexpected packet allocation: ' + allocation) }
+		}
+	}
+}
+
+fn packet_selftest() ! {
+	mut fixture := ''
+	for name in packet_helpers { fixture += result_type(name) + ' ' + name + '(void) {\nreturn;\n}\n' }
+	check_packet(fixture)!
+	for name in packet_helpers {
+		for allocation in ['memdup(', 'HEAP(', 'malloc(', 'calloc(', 'realloc(', '__new_array(', 'new_array_from(', 'array_clone(', 'array_slice('] {
+			broken := fixture.replace(name + '(void) {', name + '(void) {\n' + allocation + ');')
+			if _ := check_packet(broken) { return error('packet storage selftest accepted ' + name + ': ' + allocation) }
+		}
+	}
+	println('Packet input storage checker selftest: PASS')
+}
+
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--packet-input' {
+		check_packet(os.read_file(os.args[2]) or { eprintln(err); exit(1) }) or { eprintln(err); exit(1) }
+		println('Packet input storage: ${packet_helpers.len} live helpers have no temporary allocations')
+		return
+	}
 	if os.args.len != 2 { eprintln('Usage: check-prefix-storage GENERATED_ARM_C | --selftest'); exit(2) }
-	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; return }
+	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; packet_selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
 	println('G13 submission/mapping storage: ${helpers.len} live helpers contain no temporary allocations; only checked owned overflow, request, syncobj/alias, transport/box and retained private completion allocation sites are permitted')

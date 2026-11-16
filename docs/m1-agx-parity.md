@@ -6,8 +6,11 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [failed queue construction cleanup](m1-agx-orphan-queue.md)
-(2026-11-16). The [VM namespace removal and retained ownership](m1-agx-vm-detach.md),
+Latest offline increment: [modern packet command inputs](m1-agx-packet-input.md)
+(2026-11-16). The adapter remains unregistered pending coordinated modern
+ioctl/Mesa integration and timestamp-object resolution. The
+[failed queue construction cleanup](m1-agx-orphan-queue.md),
+[VM namespace removal and retained ownership](m1-agx-vm-detach.md),
 [captured G13 queue ownership](m1-agx-queue-references.md),
 [queue namespace removal](m1-agx-queue-detach.md),
 [base M1 render tiling comparison](m1-agx-tiling.md),
