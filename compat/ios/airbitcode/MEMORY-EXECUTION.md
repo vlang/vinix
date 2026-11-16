@@ -400,11 +400,27 @@ One contiguous result table per call uses the existing source cache tag and POD
 metadata retaining maximum lane height. A fixed 16-int builder array holds input
 projection indices. Source/result/selector and cached heights retain the existing
 graph limits; ownership, free paths and fixed runtime arrays are unchanged.
-Other vector intrinsic families remain excluded from address graphs.
 `tests/ios/air-memory-vector-bit-intrinsic-index.v LLVM_AS FRESH_EXTERNAL_DIR`
 checks all supported widths/families, representative full lane-count coverage,
 source/result freezing, poison/undef, cached graph limits and malformed calls
 against native LLVM and independent bit/byte oracles.
+
+Vector `llvm.ctlz` and `llvm.cttz` likewise supply address lanes across i1..i64.
+Their call-local `is_zero_poison` argument must be an exact defined i1 constant,
+validated on every call, including declaration/source cache hits. False returns
+the lane width for zero; true produces lane-local poison for zero. Source
+poison also stays lane-local. Undef remains an eager whole-vector error, even
+when extraction, an unchosen select or a later freeze would ignore that lane.
+Source freeze may repair undef/poison to zero, which can itself produce poison
+under a true flag; result freeze may repair zero-count poison. Extraction bounds
+remain independent. The existing intrinsic table stores each call's flag in its
+POD nodes, with no new array, node kind, owner or limit change. Declaration
+attributes retain the second-parameter immarg policy. Other vector intrinsic
+families remain excluded here.
+`tests/ios/air-memory-vector-zero-count-index.v LLVM_AS FRESH_EXTERNAL_DIR`
+checks both operations/flags at every width, source/result recovery, call-local
+flag isolation/guards and exact cached graph limits with LLVM and independent
+division-based count oracles.
 
 `tests/ios/air-memory-vector-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks
 all integer lane widths, lazy arm selection, nested selects, source/result

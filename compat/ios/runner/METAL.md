@@ -449,9 +449,17 @@ poison remains lane-local. Source/result freezes and original extraction bounds
 keep their existing behavior. Contiguous cached tables, POD metadata and one
 fixed builder array share the bounded graph and existing ownership/free paths.
 The interpreter uses scalar bit evaluators without invoking declarations.
-Other vector intrinsic families remain unsupported in addresses. The image
-shader exercises ctpop, bitreverse and bswap in a separate bounded address
+The image shader exercises ctpop, bitreverse and bswap in a separate bounded address
 root and mixes the computed byte into its independently checked red channel.
+Pure vector leading/trailing-zero counts also feed addresses. Ctlz/cttz accept
+i1..i64 lanes and a call-local defined i1 `is_zero_poison` literal. False returns
+the width for zero; true yields lane-local poison. Every call revalidates its
+flag before table cache lookup. Source poison and eager whole-vector undef keep
+their established rules; source freeze may create zero and result freeze may
+repair the resulting poison. Existing POD nodes retain the flag, with unchanged
+arrays, ownership and graph limits. Other vector intrinsic families remain
+excluded. The image shader checks both flags in a separate address dependency
+and red-channel readback, including frozen poison from trailing-zero count at x=0.
 Only the listed pure dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
