@@ -98,22 +98,30 @@ loads/stores also require their complete stored size and explicit alignment.
 
 An index may also be a pure integer SSA expression built from scalar arguments,
 defined integer literals, literal-lane extraction from a direct integer vector
-argument, add/subtract/multiply, and trunc/zext/sext. Integer widths are i1..i64
+argument, add/subtract/multiply, shifts, AND/OR/XOR, and trunc/zext/sext. Integer widths are i1..i64
 and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
-ordinary scalar evaluators. Poison and negative/out-of-range final indices
+ordinary scalar evaluators. Oversized shifts, left-shift wrap promises, right-shift
+exactness and OR disjointness are checked before writes. Poison and negative/out-of-range final indices
 reject before writes. Unflagged arithmetic keeps its ordinary modular semantics;
 negative intermediate values are permitted when the final address is valid.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
 most 32 levels including leaves and cached subexpressions. Unrelated arithmetic
-does not consume this graph budget. Loads, PHIs, select/freeze, other arithmetic,
+does not consume this graph budget. Loads, PHIs, select/freeze, division/remainder,
 dynamic lane selection and constructed/loaded vector dependencies reject as
 address expressions. These operations keep their ordinary non-address support.
 Every call evaluates the graph from immutable argument words into a fixed stack
 array before resolving addresses, including in cold blocks and unused GEPs.
 The graph is owned/freed with the profile; its build cache is transient and freed
 on success/error. No expression node allocates during execution.
+
+`tests/ios/air-memory-bitwise-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks all
+i1..i64 widths with a defined LLVM oracle. It selects safe shift amounts before
+evaluating ordinary reference operations, then checks flag promises with wide
+arithmetic, reverse shifts or overlap tests. Native flagged targets run only for
+accepted addresses. Validation alone, prepared and ordinary execution must agree;
+rejected indices preserve the entire output. Existing graph limits still apply.
 
 Preflight caches the index source, width and stride. Every call resolves all
 indexed GEPs and accesses, including cold blocks, before any AIR instruction or

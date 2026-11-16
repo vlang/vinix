@@ -160,7 +160,7 @@ fn control_cases(assembler string, root string) ! {
 		'division': '%idx = udiv i64 %arg, 1'
 		'select':   '%idx = select i1 true, i64 %arg, i64 0'
 		'freeze':   '%idx = freeze i64 %arg'
-		'xor':      '%idx = xor i64 %arg, 0'
+		'remainder': '%idx = urem i64 %arg, 1'
 		'undef':    '%idx = add i64 %arg, undef'
 		'poison':   '%idx = add i64 %arg, poison'
 	} {
