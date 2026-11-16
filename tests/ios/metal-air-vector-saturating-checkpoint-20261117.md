@@ -1,0 +1,32 @@
+# Software Metal AIR vector saturating arithmetic checkpoint — 2026-11-17
+
+Source revision: `d32ca5d2050335f7fb97d1d2a72e87cd3de3063c`.
+
+Prepared compute pipelines now execute `air.add_sat.s.vNi32`, `air.sub_sat.s.vNi32`, `air.add_sat.u.vNi32` and `air.sub_sat.u.vNi32` for matching fixed 1..16-lane i32 vectors. The [AIR declaration builder](https://github.com/vertex-language/air/blob/main/intrinsic.go) supplies signed integer names, vector suffixes, binary signatures and pure attributes; its source is retained with a URL and checksum. These fixtures are synthetic; Apple compiler emission and upstream compiler comparisons were not run.
+
+Existing arithmetic clamps signed overflow to the signed endpoint, unsigned addition overflow to UINT_MAX and unsigned subtraction underflow to zero. The change adds declaration decoding and keys, reusing arithmetic, result slots, poison/undef/freeze handling and checked integer address projections. Keys 61812..61875 append 64 identities, bringing vector entries to 61,876. Scalar entries remain 2,179 and all previous keys stay stable. Exact ordinary direct declarations, matching source/result types, pure attributes, duplicate checks and shared resource limits remain required. The admitted AIR integer vector families are multiply-high and these four saturating operations; other widths remain excluded.
+
+`tests/ios/air-native-vector-saturating.v` passes under ASan/UBSan with LLVM 23.1.5 MCJIT on arm64 Darwin. Native references widen i32 to i64 with sext/zext, add/subtract, compare/select clamp and truncate. Saved LLVM disassembly confirms 64 reference bodies with 64 widened vector arithmetic operations and no calls. A separate V i64 reference also matches every native expected lane. This checks native widened arithmetic, rather than native AIR execution.
+
+- 557,056 native reference lanes are checked through typed and loaded inputs, each with direct and prepared memory execution. Every lane includes all 16² boundary pairs before deterministic/equal/complement samples. Shifted unaligned buffers, upper argument bits, earlier markers, complete output padding and nonmutating validation pass. Another 2,048 native scalar comparisons and 131,072 scalar/integer vector extractions total 133,120 scalar/integer checks.
+- 4,288 scalar/vector address checks include 192 out-of-range vector projection refusals across validation and both memory APIs. There are also 704 call metadata/operand type refusals, 256 short budgets, 4,096 AIR/LLVM vector coexistence cases and 384 short input/output buffer refusals. Sixty negative name/type/arity/definition profiles reject during preparation and direct execution before marker writes.
+- 307 controls cover lane poison, strict observed undef, source/result freeze, lane isolation, address preflight, duplicate declarations, strictfp rejection, vector-PHI reuse and executed budgets. Loops run up to 1,024 visits against independent i64 expectations. Twelve boundary fixtures exercise 4,096 versus 4,097 result slots and 1,000,000 versus 1,000,016 lane-work units across memory/void/scalar APIs; scalar fixtures also check the integer API. No runtime limit was increased.
+- Units cover all 61,876 cache identities and exact signed/vector spelling guards. Scalar saturation passes 1,303,888 independent margin/carry comparisons. Vector saturation passes 2,820,096 value comparisons, a further 1,267,072-pair sweep, 36,864 boundaries and 835,584 poison/undef/freeze checks. Multiply-high, scalar AIR integer, vector clamp/extrema, FMA/unary names, rounding and canonicalization regressions pass. The unchanged vector multiply-high reference passes 278,528 native lanes and 66,560 scalar/integer checks with its controls.
+
+A fresh software Metal host passes normal and deterministic sizes runs: 480 images, 702,732 checked invocations, 212 rejected pipelines and four prewrite bounds failures. Sixteen updated saturating images compare all four AIR vectors with LLVM results and explicit opposite-lane endpoint expectations. Both signed clamp directions, unsigned overflow/underflow, both lanes, clipped groups, repeated dispatches and two drained runtimes per process pass. AIR results supply checked coordinates and pixel data before the independent RGBA8 pixel/padding oracle. Every prior comparison row remains present in both hashing modes. Canonicalization, extrema, clamp and multiply-high kernels are byte-for-byte unchanged.
+
+The first image fixture made addresses depend on the complete comparison graph and exceeded the existing projection limit. Successful `software-direct/` keeps the comparisons in pixel checks and uses a direct AIR result for addressing. Failed `software/` and `software-projected/` runs remain. A checker formatting cleanup also introduced a space in generated LLVM names; failed intermediate reference bundles remain. `reference-complete/` passes with the committed checker. No arithmetic evaluator correction or runtime-limit increase was needed.
+
+Generated C confirms fixed 61,876-entry vector and unchanged 2,179-entry scalar caches, without allocations on successful extended name/key paths. Unsupported-input errors retain boxed-error allocation. Sixty-four i64 entries add 512 bytes; no new evaluator, owner or graph node kind is added. Retained heap was not measured, leak detection was disabled and native JIT instructions are not sanitizer-instrumented.
+
+This extends CPU software Metal. Native GPU execution/rendering and new Fortnite launch/frame evidence remain unverified. No kernel/guest build or broader SIMD/indirect suite was repeated.
+
+Evidence: `/Users/alex/Library/Caches/vinix-ios/air-vector-saturating-20261117-r1`.
+
+Complete archive: `/Users/alex/Library/Caches/vinix-ios/air-vector-saturating-20261117-r1.tar.gz`.
+
+- Archive SHA-256: `86e76ad6d28782faa5a82af681e8c3f04b0ac2bfd84a822f545bb48f74180503`.
+- Typed inventory SHA-256: `73c68789a9043028ffe9447f430e15a213009cbbd91938694dcadc90129975c3`.
+- Source archive SHA-256: `4dabd1488db05e8913fbd580e2b187db2636304942b1ed5d2c2b948b14203334`.
+
+Complete inventory and archive comparison passes for logical bytes, paths, types, permissions and links, including root mode. Originals remain retained. Source pins match the feature commit. Generated C, IR/bitcode, native disassembly, images, commands, binaries and sanitizer logs remain. Toolchain libraries are referenced externally, so the bundle is not hermetic. No restoration replay or evidence deletion is claimed.
