@@ -11,15 +11,14 @@ fn check_queue_detach_local(file string, pending string, workqueue string, manag
 	reap := section(file, 'fn (mut f GpuFile) reap_detached_g13_queues_locked()', '// The registry lock pins', 'G13 detached owner retirement')!
 	require_order(reap, ['manager := gpu.get_global_manager() or { return }',
 		'if !q.detached { continue }', 'ownership.queue_id == q.id',
-		'katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0',
+		'if ownership.resources.has_file_references() { continue }',
 		'if !gpu_manager.release_g13_queue_resources(ownership.resources) { continue }',
-		'q.destroy()', 'f.queues.delete(i)', 'f.g13_queues.delete(owner_index)'], 'Retain owner through aggregate VM pins and failed invalidation')!
+		'q.destroy()', 'f.queues.delete(i)', 'f.g13_queues.delete(owner_index)'], 'Retain owner through queue-specific references and failed invalidation')!
 	registry := section(file, 'fn reap_open_detached_g13_queues()', 'pub fn (mut f GpuFile) ioctl_queue_destroy(', 'Open file reaper pin')!
 	require_order(registry, ['file_map_lock.acquire()', 'for _, file in file_map',
 		'owned.lock.acquire()', 'owned.reap_detached_g13_queues_locked()',
 		'owned.lock.release()', 'file_map_lock.release()'], 'Registry lock pins the file through nested file/manager retirement')!
-	for token in ['if queue.id == queue_id && !queue.detached { return true }',
-		'if queue.id == request.queue_id && !queue.detached {'] { require(file.contains(token), 'Both submission lookups must hide detached queues')! }
+	require(file.contains('if queue.id != queue_id || queue.detached { continue }'), 'Submission capture must hide detached queue names')!
 	service := pending.all_after('pub fn service_file_work()')
 	require_order(service, ['process_pending_submissions()', 'reap_open_detached_g13_queues()', 'reap_closed_files()'], 'Retire aggregate owners before retrying open and closed files')!
 	retire := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Aggregate queue ownership')!

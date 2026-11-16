@@ -9,6 +9,8 @@ __global detach_on_copy_file &GpuFile = unsafe { nil }
 
 fn detach_queue_during_copy() {
 	detach_on_copy_file.lock.acquire()
+	assert detach_on_copy_file.inflight_by_vm[1] == 0, 'capture must preserve idle mapping cleanup and bind admission'
+	assert detach_on_copy_file.g13_queues[0].resources.has_file_references()
 	detach_on_copy_file.queues[0] = LogicalQueue{id: 1, detached: true}
 	detach_on_copy_file.lock.release()
 }
@@ -24,9 +26,10 @@ fn check_detached_submission_ownership() {
 		out := output()
 		assert submit(mut file, 1, false, input, out, false) == 0
 		assert file.inflight_by_vm[1] == 2
+		assert file.g13_queues[0].resources.has_file_references()
 		// The close fixture executes actual QUEUE_DESTROY and its reaper.
 		// Here only its namespace result is injected; pending.v and both
-		// ioctl submission lookups execute their actual native bodies.
+		// ioctl queue capture executes its actual native body.
 		file.queues[0] = LogicalQueue{id: 1, detached: true}
 		attempts := memory.attempts()
 		assert submit(mut file, 1, false, unsafe { nil }, output(), false) == -2
@@ -45,10 +48,14 @@ fn check_detached_submission_ownership() {
 		detach_on_copy_file = file
 		usercopy.before_once(detach_queue_during_copy)
 		old := fence(out)
-		assert submit(mut file, 1, false, unsafe { nil }, out, false) == -2
-		assert voidptr(fence(out)) == voidptr(old)
+		assert submit(mut file, 1, false, unsafe { nil }, out, false) == 0
+		assert voidptr(fence(out)) != voidptr(old)
+		assert file.g13_queues[0].resources.has_file_references()
+		service_file_work()
+		manager.finish_compute(0)
+		service_file_work()
 		assert_drained(file)
 		detach_on_copy_file = unsafe { nil }
 	}
-	println('G13 detached submissions: 200 accepted jobs survive namespace removal and dependencies, refuse new work before staging and after detach during copying, and keep aggregate VM ownership after the last callback until worker retirement')
+	println('G13 detached submissions: 200 accepted jobs and 200 captures survive namespace removal/dependencies and detach during copying; new names reject before staging; queue and aggregate VM ownership survive callbacks until worker retirement')
 }

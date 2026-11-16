@@ -20,6 +20,7 @@ pub mut:
 pub struct G13QueueResources {
 pub mut:
 	queue_id u32
+	file_references u64
 	released bool
 	failures int
 	calls    int
@@ -176,6 +177,7 @@ pub fn (mut mgr GpuManager) release_g13_queue_resources(queue &G13QueueResources
 	mut owned := unsafe { queue }
 	owned.calls++
 	if owned.released { return true }
+	if owned.has_file_references() { return false }
 	if owned.failures != 0 {
 		owned.failures--
 		return false

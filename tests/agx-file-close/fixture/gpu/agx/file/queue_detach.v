@@ -16,6 +16,12 @@ fn check_registry_pin() {
 	queue_release_checks++
 }
 
+fn (mut file GpuFile) submission_queue_exists(id u32) bool {
+	captured := file.capture_submission_queue(id) or { return false }
+	release_submission_queue(captured)
+	return true
+}
+
 fn check_detached_queues() {
 	mut cases := 0
 	for cycle in 0 .. 100 {
@@ -30,6 +36,7 @@ fn check_detached_queues() {
 						g13_queues: [G13QueueOwnership{queue_id: 7, vm_id: 1, resources: unsafe { &resource }}]
 						vms: [unsafe { &vm }]
 					}
+					for _ in 0 .. int(pins) { resource.retain_file_reference() }
 					file.inflight_by_vm[1] = pins
 					key := u64(0x1000_0000 + cycle)
 					file_map[key] = unsafe { &file }
@@ -57,7 +64,10 @@ fn check_detached_queues() {
 					}
 					// A callback ending is insufficient while the aggregate pin
 					// remains; the last worker pass can retire only after zero.
-					file.inflight_by_vm[1] = 0
+					for _ in 0 .. int(pins) { resource.release_file_reference() }
+					// Unrelated accepted work in the same VM must not retain this
+					// queue after its own last submission reference ends.
+					file.inflight_by_vm[1] = 7
 					if !resource.released {
 						reaping_file = unsafe { &file }
 						gpu.watch_queue_release(check_registry_pin)
@@ -67,6 +77,7 @@ fn check_detached_queues() {
 					assert queue.destroyed && resource.released && !vm.destroyed
 					assert file.queues.len == 0 && file.g13_queues.len == 0
 					assert !file_map_lock.is_held() && !file.lock.is_held()
+					file.inflight_by_vm[1] = 0
 					file_map.delete(key)
 					assert file.close() && vm.destroyed
 					cases++
@@ -81,16 +92,18 @@ fn check_detached_queues() {
 	mut vm := mmu.UatContext{id: 1}
 	mut closing := &GpuFile{queues: [unsafe { &queue }], g13_queues: [G13QueueOwnership{queue_id: 9, vm_id: 1, resources: unsafe { &resource }}], vms: [unsafe { &vm }]}
 	closing.inflight_by_vm[1] = 1
+	resource.retain_file_reference()
 	file_map[99] = closing
 	assert closing.ioctl_queue_destroy(&ioctl.DrmAsahiQueueDestroy{queue_id: 9}) == 0
 	device := drm.DrmDevice{}
 	release_handle(&device, voidptr(u64(99)))
 	assert 99 !in file_map && closing_count == 1 && !queue.destroyed
 	closing.inflight_by_vm[1] = 0
+	resource.release_file_reference()
 	reap_closed_files()
 	assert closing_count == 1 && !queue.destroyed && !vm.destroyed
 	reap_closed_files()
 	assert closing_count == 0 && queue.destroyed && vm.destroyed && resource.released
 	assert queue_release_checks > 0 && file_map.len == 0
-	println('G13 queue detach: ${cases} namespace/retirement cases, aggregate VM pins, unavailable manager, invalidation retry, ID isolation, registry/file locking and Handle-close transfer passed')
+	println('G13 queue detach: ${cases} namespace/retirement cases, queue-specific references, unrelated VM pins, unavailable manager, invalidation retry, ID isolation, registry/file locking and Handle-close transfer passed')
 }

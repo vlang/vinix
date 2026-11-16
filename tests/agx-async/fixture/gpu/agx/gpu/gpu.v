@@ -28,6 +28,7 @@ pub struct G13QueueResources {
 pub mut:
 	id          u32
 	fence_context u64
+	file_references u64
 	released    bool
 	quarantined bool
 	initial_events [2]G13InitialEvent

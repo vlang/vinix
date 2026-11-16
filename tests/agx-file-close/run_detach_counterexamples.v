@@ -15,8 +15,8 @@ fn main() {
 	mut receipts := []string{}
 	for name, pair in {
 		'busy-destroy': ['q.detached = true', 'if katomic.load(&f.inflight_by_vm[q.vm_id]) != 0 { f.lock.release(); return -16 }\n\t\t\t\tq.detached = true'],
-		'early-release': ['|| katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0', ''],
-		'visible-name': ['if queue.id == queue_id && !queue.detached { return true }', 'if queue.id == queue_id { return true }'],
+		'vm-wide-retention': ['if ownership.resources.has_file_references() { continue }', 'if katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0 { continue }'],
+		'visible-name': ['if queue.id != queue_id || queue.detached { continue }', 'if queue.id != queue_id { continue }'],
 		'no-retry': ['owned.reap_detached_g13_queues_locked()', '']
 	} {
 		assert source.count(pair[0]) == 1, name

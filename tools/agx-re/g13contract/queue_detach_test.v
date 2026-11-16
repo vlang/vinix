@@ -10,9 +10,8 @@ fn test_queue_detach_guards_require_namespace_visibility_and_owner_ordering() {
 	manager := read(root + '/kernel/gpu/agx/gpu/gpu.v')!
 	check_queue_detach_local(file, pending, workqueue, manager)!
 	for token in ['q.detached = true', 'if !q.detached { continue }',
-		'katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0', 'file_map_lock.acquire()',
-		'if queue.id == queue_id && !queue.detached { return true }',
-		'if queue.id == request.queue_id && !queue.detached {'] {
+		'if ownership.resources.has_file_references() { continue }', 'file_map_lock.acquire()',
+		'if queue.id != queue_id || queue.detached { continue }'] {
 		if _ := check_queue_detach_local(file.replace(token, ''), pending, workqueue, manager) { assert false, token }
 	}
 	if _ := check_queue_detach_local(file, pending.replace('reap_open_detached_g13_queues()', ''), workqueue, manager) { assert false }

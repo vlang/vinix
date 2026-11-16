@@ -57,6 +57,13 @@ struct TimestampObject {
 	obj  &gem.GemObject = unsafe { nil }
 }
 
+struct G13SubmissionQueue {
+	vm_id u32
+	caps u32
+	resources &gpu.G13QueueResources = unsafe { nil }
+	retained bool
+}
+
 @[heap]
 struct G13SubmitCompletion {
 mut:
@@ -1018,9 +1025,9 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	return 0
 }
 
-// Caller holds file.lock. An accepted submission pins the entire VM until its
-// aggregate node and callbacks have stopped reading the queue. Keep detached
-// queues in the ownership arrays through that pin and failed invalidations.
+// Caller holds file.lock. Captured ioctls and accepted submission nodes retain
+// their own queue through staging, callbacks and final aggregate retirement.
+// Unrelated work in the same VM does not postpone this queue's release.
 fn (mut f GpuFile) reap_detached_g13_queues_locked() {
 	manager := gpu.get_global_manager() or { return }
 	mut gpu_manager := unsafe { manager }
@@ -1033,8 +1040,7 @@ fn (mut f GpuFile) reap_detached_g13_queues_locked() {
 		}
 		if owner_index < 0 { continue }
 		ownership := f.g13_queues[owner_index]
-		if ownership.vm_id == 0 || ownership.vm_id >= mmu.uat_num_contexts
-			|| katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0 { continue }
+		if ownership.resources.has_file_references() { continue }
 		if !gpu_manager.release_g13_queue_resources(ownership.resources) { continue }
 		q.destroy()
 		f.queues.delete(i)
@@ -1234,16 +1240,33 @@ fn (mut f GpuFile) install_g13_batch_completion(mut pending G13PendingSubmission
 	return 0
 }
 
-// Match Asahi's queue lookup before fallible command/sync staging. This probe
-// borrows no queue pointer across user copies; the backend rechecks under its
-// mutation lock before using the queue, VM or resource graph.
-fn (mut f GpuFile) submission_queue_exists(queue_id u32) bool {
+// Capture immutable queue state and an owned resource reference before user
+// copies, as Asahi does with its initial Arc clone. Namespace removal can hide
+// the name while this captured submission still uses the original queue.
+fn (mut f GpuFile) capture_submission_queue(queue_id u32) ?G13SubmissionQueue {
 	f.lock.acquire()
 	defer { f.lock.release() }
 	for queue in f.queues {
-		if queue.id == queue_id && !queue.detached { return true }
+		if queue.id != queue_id || queue.detached { continue }
+		for ownership in f.g13_queues {
+			if ownership.queue_id == queue_id && ownership.resources != unsafe { nil }
+				&& queue.vm_id != 0 && queue.vm_id < mmu.uat_num_contexts {
+				mut resources := unsafe { ownership.resources }
+				resources.retain_file_reference()
+				return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, resources: resources, retained: true}
+			}
+		}
+		// Preserve backend/invalid-internal-state validation after staging for
+		// non-G13 or malformed logical queues, without borrowing any resource.
+		return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps}
 	}
-	return false
+	return none
+}
+
+fn release_submission_queue(captured G13SubmissionQueue) {
+	if !captured.retained { return }
+	mut resources := unsafe { captured.resources }
+	resources.release_file_reference()
 }
 
 // Copy userspace input without holding backend locks. Large batches use fallible
@@ -1255,7 +1278,9 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		|| request.in_sync_count > max_submission_syncs || request.out_sync_count > max_submission_syncs
 		|| (request.in_sync_count != 0 && request.in_syncs == 0)
 		|| (request.out_sync_count != 0 && request.out_syncs == 0) { return -22 }
-	if !f.submission_queue_exists(request.queue_id) { return -2 }
+	captured := f.capture_submission_queue(request.queue_id) or { return -2 }
+	mut transferred := false
+	defer { if !transferred { release_submission_queue(captured) } }
 	stage_bytes := u64(request.command_count) * sizeof(agxsubmission.Command)
 	stage_storage := memory.malloc_packed_fallible(stage_bytes) @[freed]
 	if stage_storage == unsafe { nil } { return -12 }
@@ -1286,26 +1311,15 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		// Deliver its notification after dropping file.lock and node backing.
 		if unqueued_fence != unsafe { nil } { signal_g13_submission_fence(unqueued_fence, unqueued_failure) }
 	}
-	mut vm_id := u32(0)
-	mut queue_caps := u32(0)
-	mut queue_found := false
-	for queue in f.queues {
-		if queue.id == request.queue_id && !queue.detached {
-			queue_found = true
-			vm_id = queue.vm_id; queue_caps = queue.caps; break
-		}
-	}
-	if !queue_found { return -2 }
+	vm_id := captured.vm_id
+	queue_caps := captured.caps
 	if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }
 	vm := f.find_vm(vm_id) or { return -22 }
 	// Never publish work through an incompletely invalidated mapping. This
 	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
 	if !f.cleanup_closed_mappings_locked(vm_id) { return -5 }
-	mut queue_resources := &gpu.G13QueueResources(unsafe { nil })
-	for ownership in f.g13_queues {
-		if ownership.queue_id == request.queue_id { queue_resources = ownership.resources; break }
-	}
-	if queue_resources == unsafe { nil } { return -22 }
+	if !captured.retained { return -22 }
+	queue_resources := captured.resources
 	mut result_object := &gem.GemObject(unsafe { nil })
 	for command in commands {
 		descriptor := command.descriptor
@@ -1368,6 +1382,9 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		katomic.dec(mut &f.inflight_by_vm[vm_id])
 		return -19
 	}
+	// Registration transferred the captured queue reference to the worker
+	// node, which also owns the aggregate VM pin acquired above.
+	transferred = true
 	queued = true
 	return 0
 }

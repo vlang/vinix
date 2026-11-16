@@ -18,8 +18,8 @@ fn check_identity_lookup_contract(local string, reference string) ! {
 		'f.lock.acquire()', 'for i, mut q in f.queues', 'q.destroy()', 'return 0',
 		'f.lock.release()', 'return -2'], 'Missing queue destroy releases the lock and returns ENOENT')!
 	submit := section(local, 'pub fn (mut f GpuFile) ioctl_submit(', 'fn dispatch(', 'Native submit queue lookup')!
-	require_order(submit, ['f.lock.acquire()', 'mut queue_found := false', 'for queue in f.queues',
-		'if queue.id == request.queue_id', 'queue_found = true', 'if !queue_found { return -2 }',
+	require_order(submit, ['captured := f.capture_submission_queue(request.queue_id) or { return -2 }',
+		'f.lock.acquire()', 'vm_id := captured.vm_id',
 		'if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }', 'vm := f.find_vm(vm_id)',
 		'f.cleanup_closed_mappings_locked(vm_id)'], 'Missing submit queue differs from invalid internal VM state')!
 	for spec in [

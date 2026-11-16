@@ -39,7 +39,11 @@ const helpers = [
 	'pgtable__UatPgtable__map_repeated_page',
 	'vm__valid_bind_header',
 	'vm__valid_bind_shape',
-	'gpu__agx__file__GpuFile__submission_queue_exists',
+	'gpu__agx__file__GpuFile__capture_submission_queue',
+	'gpu__agx__file__release_submission_queue',
+	'gpu__agx__gpu__G13QueueResources__retain_file_reference',
+	'gpu__agx__gpu__G13QueueResources__release_file_reference',
+	'gpu__agx__gpu__G13QueueResources__has_file_references',
 	'drm__ioctl_syncobj_create',
 	'syncobj__new_syncobj_with_flags',
 	'syncobj__insert_handle',
@@ -137,6 +141,8 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'gpu__agx__file__GpuFile__capture_submission_queue' { return '__v_option_gpu__agx__file__G13SubmissionQueue' }
+	if name in ['gpu__agx__file__release_submission_queue', 'gpu__agx__gpu__G13QueueResources__retain_file_reference', 'gpu__agx__gpu__G13QueueResources__release_file_reference'] { return 'void' }
 	if name in ['gpu__agx__file__GpuFile__reap_detached_g13_queues_locked', 'gpu__agx__file__reap_open_detached_g13_queues'] { return 'void' }
 	if name == 'gpu__agx__gpu__g13_tile_info' { return '__v_option_gpu__agx__gpu__G13TileInfo' }
 	if name in ['gpu__agx__gpu__g13_div_round_up', 'gpu__agx__gpu__g13_align_u32'] { return 'u32' }

@@ -25,11 +25,12 @@ fn main() {
 	source := os.read_file(if os.args.len == 3 { os.args[2] } else { '${repo}/kernel/gpu/agx/file/file.v' })!
 	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
+		section(source, 'struct G13SubmissionQueue {', '@[heap]\nstruct G13SubmitCompletion {')! +
 		section(source, 'pub fn release_handle(', 'pub fn new_gpu_file(')! +
 		section(source, 'fn (mut f GpuFile) mmap_attributes(', '// Caller holds file.lock')! +
 		section(source, 'fn lookup_file(', 'pub fn close_gem_handle(')! +
 		section(source, 'pub fn mmap_attributes_handle(', 'fn ioctl_get_params_handler(')! +
-		section(source, 'fn (mut f GpuFile) submission_queue_exists(', '// Copy userspace input')! +
+		section(source, 'fn (mut f GpuFile) capture_submission_queue(', '// Copy userspace input')! +
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
 		section(source, 'fn (mut f GpuFile) retire_mapping_locked(', '// Reserve a nonzero per-open queue ID.')! +
 		section(source, 'fn (f &GpuFile) find_vm(', '// Firmware may retain both UAT translations')! +
@@ -42,7 +43,9 @@ fn main() {
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp('${repo}/kernel/gpu/agx/file/closing.v', '${scratch}/gpu/agx/file/closing.v')!
 	gpu_source := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
-	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\n' +
+	g13_source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
+	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\nimport katomic\n' +
+		section(g13_source, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) can_query_global_params(', 'pub fn new_gpu_manager(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) queue_file_retirement(', 'fn (mut mgr GpuManager) reap_file_resources(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) flush_g13_file_mapping(', '// Publish a G13 UAT invalidation through')!)!

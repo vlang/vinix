@@ -287,10 +287,26 @@ mut:
 	render_buffer      G13RenderBufferResources
 	command_counter    G13CommandCounter
 	initial_events     [2]G13InitialEvent
+	file_references    u64 // captured ioctls and accepted aggregate submission nodes
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
 	quarantined        bool
 	released           bool
+}
+
+// file.lock serializes acquisition with namespace removal. Metadata outlives
+// stopped physical backing, so error/stop paths can release these references.
+pub fn (mut queue G13QueueResources) retain_file_reference() {
+	katomic.inc(mut &queue.file_references)
+}
+
+pub fn (mut queue G13QueueResources) release_file_reference() {
+	assert katomic.load(&queue.file_references) != 0
+	katomic.dec(mut &queue.file_references)
+}
+
+pub fn (queue &G13QueueResources) has_file_references() bool {
+	return katomic.load(&queue.file_references) != 0
 }
 
 // Caller holds mgr.lock. Asahi QueueInner shares this counter across all
@@ -2776,6 +2792,7 @@ pub fn (mut mgr GpuManager) release_g13_queue_resources(resources &G13QueueResou
 	if owned.released {
 		return true
 	}
+	if owned.has_file_references() { return false }
 	// Quarantine blocks preparation/publication, but idempotent teardown
 	// may retry after an interrupted UAT invalidation.
 	for job in mgr.g13_render_jobs {

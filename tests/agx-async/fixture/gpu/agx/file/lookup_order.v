@@ -83,8 +83,18 @@ fn check_submission_lookup_order() {
 		usercopy.reject(false); memory.fail_at(-1); usercopy.reset_reads()
 		lookup_file = file
 		usercopy.before_once(remove_queue_during_copy)
-		assert submit(mut file, 1, false, unsafe { nil }, output_obj, true) == -2
-		assert usercopy.reads() > 0 && memory.attempts() == 1
+		assert submit(mut file, 1, false, unsafe { nil }, output_obj, true) == 0
+		assert usercopy.reads() > 0 && file.g13_queues[0].resources.has_file_references()
+		service_file_work()
+		mut active := unsafe { manager }
+		active.finish_compute(0)
+		service_file_work()
+		assert syncobj.is_signaled(fence(output_obj))
+		written := unsafe { &ioctl.DrmAsahiResultCompute(&bytes) }
+		assert written.ts_start == 11 && written.ts_end == 22
+		active.published.clear()
+		syncobj.replace_fence(output_obj, old)
+		for i in 0 .. bytes.len { bytes[i] = 0xa5 }
 		lookup_file = unsafe { nil }; file.queues[0] = LogicalQueue{ id: 1 }; cases++
 		assert_drained(file)
 		assert manager.published.len == 0 && result.references == 1
@@ -92,5 +102,5 @@ fn check_submission_lookup_order() {
 		for value in bytes { assert value == 0xa5 }
 	}
 	file.objects = Objects{}
-	println('AGX submission lookup order: ${cases} checks; missing queues precede command OOM, copies, malformed descriptors/payloads and sync lookup; header validation retains precedence; known-queue errors and removal during unlocked copying unwind without publication passed')
+	println('AGX submission lookup order: ${cases} checks; missing queues precede command OOM, copies, malformed descriptors/payloads and sync lookup; header validation retains precedence; retained snapshots survive namespace removal during unlocked copying')
 }

@@ -123,6 +123,7 @@ fn fence(object &syncobj.SyncObj) &syncobj.DmaFence {
 }
 
 fn assert_drained(file &GpuFile) {
+	for ownership in file.g13_queues { assert !ownership.resources.has_file_references() }
 	assert pending_head == unsafe { nil } && pending_tail == unsafe { nil } && pending_count == 0
 	assert file.inflight_by_vm[1] == 0 && memory.outstanding() == 0
 	manager := gpu.get_global_manager() or { panic('manager') }

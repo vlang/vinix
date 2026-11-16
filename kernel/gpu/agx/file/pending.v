@@ -323,6 +323,8 @@ fn process_pending_submissions() {
 			}
 			assert katomic.load(&item.callbacks_remaining) == 0
 			signal_g13_submission_fence(item.final_fence, katomic.load(&item.failure))
+			mut queue := unsafe { item.queue }
+			queue.release_file_reference()
 			katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])
 			memory.free(voidptr(item))
 		}
