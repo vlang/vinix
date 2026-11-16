@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_vector_fma_names_and_cache() {
-	assert vector_air_fma_cache_base == 61716 && vector_float_intrinsic_slots == 62036 && scalar_intrinsic_cache_slots == 2179
+	assert vector_air_fma_cache_base == 61716 && vector_float_intrinsic_slots == 62100 && scalar_intrinsic_cache_slots == 2179
 	for count in 1 .. 17 {
 		name := 'air.fma.v${count}f32'; id, n, bits := vector_float_intrinsic_name(name)!
 		assert id == .fma && n == count && bits == 32 && scalar_intrinsic_arity(id) == 3

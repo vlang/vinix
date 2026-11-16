@@ -4557,7 +4557,15 @@ fn sm_test_geometry_sizes_focus() ! {
 		source.write_string('define void @${name}(<3 x i32> %a, i32 %b, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n ret void }\n')
 	}
 	names << 'image_minmax'
-	source.write_string('declare <2 x i32> @air.min.s.v2i32(<2 x i32>, <2 x i32>)
+	source.write_string('declare <2 x i64> @air.min.s.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @air.min.u.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @air.max.s.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @air.max.u.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.smin.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.smax.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.umin.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i64> @llvm.umax.v2i64(<2 x i64>,<2 x i64>)
+declare <2 x i32> @air.min.s.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @air.min.u.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @air.max.s.v2i32(<2 x i32>, <2 x i32>)
 declare <2 x i32> @air.max.u.v2i32(<2 x i32>, <2 x i32>)
@@ -4611,6 +4619,49 @@ define void @image_minmax(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
  %air_unsigned_low = extractelement <2 x i32> %air_umin, i32 0
  %coordinate_sum = add i32 %air_low, %air_high
  %coordinate = sub i32 %coordinate_sum, 7
+ %wide_x = zext i32 %x to i64
+ %wide_negative = or i64 %wide_x,9223372036854775808
+ %wide_input0 = insertelement <2 x i64> zeroinitializer,i64 %wide_x,i32 0
+ %wide_input = insertelement <2 x i64> %wide_input0,i64 %wide_negative,i32 1
+ %wide_smin = call <2 x i64> @air.min.s.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_smin_ref = call <2 x i64> @llvm.smin.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_smax = call <2 x i64> @air.max.s.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_smax_ref = call <2 x i64> @llvm.smax.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_umin = call <2 x i64> @air.min.u.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_umin_ref = call <2 x i64> @llvm.umin.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_umax = call <2 x i64> @air.max.u.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_umax_ref = call <2 x i64> @llvm.umax.v2i64(<2 x i64> %wide_input,<2 x i64> <i64 7,i64 7>)
+ %wide_low_expected = zext i32 %low_expected to i64
+ %wide_high_expected = zext i32 %high_expected to i64
+ %wide_low_vector = insertelement <2 x i64> <i64 0,i64 7>,i64 %wide_low_expected,i32 0
+ %wide_high_vector = insertelement <2 x i64> <i64 0,i64 7>,i64 %wide_high_expected,i32 0
+ %wide_smin_expected = insertelement <2 x i64> %wide_low_vector,i64 %wide_negative,i32 1
+ %wide_umax_expected = insertelement <2 x i64> %wide_high_vector,i64 %wide_negative,i32 1
+ %wide_smin_same = icmp eq <2 x i64> %wide_smin,%wide_smin_ref
+ %wide_smin_order = icmp eq <2 x i64> %wide_smin,%wide_smin_expected
+ %wide_smin_ok = and <2 x i1> %wide_smin_same,%wide_smin_order
+ %wide_smax_same = icmp eq <2 x i64> %wide_smax,%wide_smax_ref
+ %wide_smax_order = icmp eq <2 x i64> %wide_smax,%wide_high_vector
+ %wide_smax_ok = and <2 x i1> %wide_smax_same,%wide_smax_order
+ %wide_umin_same = icmp eq <2 x i64> %wide_umin,%wide_umin_ref
+ %wide_umin_order = icmp eq <2 x i64> %wide_umin,%wide_low_vector
+ %wide_umin_ok = and <2 x i1> %wide_umin_same,%wide_umin_order
+ %wide_umax_same = icmp eq <2 x i64> %wide_umax,%wide_umax_ref
+ %wide_umax_order = icmp eq <2 x i64> %wide_umax,%wide_umax_expected
+ %wide_umax_ok = and <2 x i1> %wide_umax_same,%wide_umax_order
+ %wide_same0 = and <2 x i1> %wide_smin_ok,%wide_smax_ok
+ %wide_same1 = and <2 x i1> %wide_umin_ok,%wide_umax_ok
+ %wide_same = and <2 x i1> %wide_same0,%wide_same1
+ %wide_ok0 = extractelement <2 x i1> %wide_same,i32 0
+ %wide_ok1 = extractelement <2 x i1> %wide_same,i32 1
+ %wide_values_ok = and i1 %wide_ok0,%wide_ok1
+ %wide_low = extractelement <2 x i64> %wide_smin,i32 0
+ %wide_high = extractelement <2 x i64> %wide_smax,i32 0
+ %wide_sum = add i64 %wide_low,%wide_high
+ %wide_coordinate = sub i64 %wide_sum,7
+ %wide_coordinate32 = trunc i64 %wide_coordinate to i32
+ %wide_coordinate_ok = icmp eq i32 %wide_coordinate32,%coordinate
+ %wide_ok = and i1 %wide_values_ok,%wide_coordinate_ok
  %input = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
  %signed_low = call <1 x i32> @llvm.smin.v1i32(<1 x i32> %input, <1 x i32> <i32 -1>)
  %signed_high = call <1 x i32> @llvm.smax.v1i32(<1 x i32> %signed_low, <1 x i32> <i32 -2>)
@@ -4626,9 +4677,10 @@ define void @image_minmax(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
  %capped_x = call i32 @air.min.s.i32(i32 %x, i32 2147483647)
  %bounded_x = call i32 @air.max.u.i32(i32 %capped_x, i32 0)
  %coordinate_ok = icmp eq i32 %coordinate, %bounded_x
- %all_ok = and i1 %coordinate_ok, %order_ok
+ %old_ok = and i1 %coordinate_ok, %order_ok
+ %all_ok = and i1 %old_ok,%wide_ok
  %offset = select i1 %all_ok, i32 %offset_raw, i32 poison
- %index = add i32 %row, %coordinate
+ %index = add i32 %row, %wide_coordinate32
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
  %mixed = xor i32 %red, %offset
