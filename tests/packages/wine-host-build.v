@@ -5,9 +5,14 @@ module main
 import os
 import tests.packages.winehostbuild
 import tests.packages.winesdkdeny
+import tests.packages.winereadhost
 
 fn main() {
 	winehostbuild.verify_self() or { eprintln(err); exit(1) }
+	if os.args.len >= 2 && os.args[1] == 'read-replay-child' {
+		winereadhost.child() or { eprintln(err); exit(1) }
+		return
+	}
 	if os.args.len >= 2 && os.args[1] == 'sdk-replay-child' {
 		winesdkdeny.child() or { eprintln(err); exit(1) }
 		return

@@ -1,6 +1,6 @@
 # Required Wine qualification host receipts
 
-The producer, native controller and full retainer now admit format-5 host-build
+The producer, native controller and full retainer now admit format-6 host-build
 receipts before qualification work. Build each with `wine-host-build.v`; launch
 its `program` in the original build directory. A bare or relocated executable,
 linked receipt, wrong role or unsupported format refuses before creating
@@ -14,11 +14,11 @@ and checks its role and executable hash. The producer and controller must also
 use the compiler bound by their host receipts for guest source generation.
 The original bootstrap builder remains a separately pinned input.
 
-Format 5 retains captured Mach-O link/replay/load evidence for the
+Format 6 retains captured Mach-O link/replay/load evidence for the
 actual running executable. Every archive member, replay artifact and receipt
 belongs to the host output graph; the selected linker and observed ordinary
 host images belong to its input graph and byte store. Missing rows cannot be
-waived by the producer, controller or full retainer. Original format-2/3/4 checkers
+waived by the producer, controller or full retainer. Original format-2/3/4/5 checkers
 and their complete historical bundles retain their earlier contract.
 
 It also requires `sdk-graph.json`, recomputed SDK stub identities and declared
@@ -36,6 +36,17 @@ observed loads/images and retained bytes are checked at every shared admission.
 The restriction implementation is embedded and pinned with the host builder.
 This covers installed SDK reads during LLD replay; other filesystem/network
 access, bootstrap and OS loader/cache bytes remain unqualified.
+
+It also requires ordinary file-data capability replay in `read-closed/`. Shared
+admission reconstructs the exact literal permissions from captured members,
+pinned ordinary images and one derived control response; an added permission
+refuses even after resealing the policy and capability map. Both successful
+links must reproduce the running executable. One allowed read, four denied reads
+and a denied external-object link must reach their named gates. Policy/module
+sources, all replay/control artifacts and execution records join the mandatory
+graphs and byte stores. Directory/metadata reads, OS-root/device exceptions,
+writes/network, helper startup and OS loader/cache bytes remain outside this
+restriction's ordinary-file scope. Full ABI/library/search closure remains open.
 
 Prepared builds contain `host-producer.json`; native runs contain
 `host-controller.json`. Each binds the host receipt hash, directory, compiler,
@@ -56,7 +67,7 @@ alter its receipt hash or omit a host artifact input. The real controller must
 refuse each before signing/build output; an empty requested directory is allowed.
 Producer host admission runs before signing and is repeated after the guest.
 
-The full owned-retention runner now requires fifty-five refusals after real and
+The full owned-retention runner now requires fifty-seven refusals after real and
 unchanged copied baselines. Five host-binding cases change producer/controller
 binding hashes, omit host receipt rows from their input maps or link the native
 binding record. All mutation writes target private copies. Existing 44 cases
@@ -69,7 +80,9 @@ Two further cases omit the SDK graph from producer/controller input maps;
 `--host-sdk-only` runs these with both baselines.
 Two more omit `sdk-denied/receipt.json` from producer/controller retained input
 maps; `--host-sdk-denied-only` runs these with both baselines.
-Alternatively `--partition=0/4` through `--partition=3/4` divide all 55 cases
+Two more omit `read-closed/receipt.json` from those maps; `--host-read-only`
+retains both baselines while selecting this pair.
+Alternatively `--partition=0/4` through `--partition=3/4` divide all 57 cases
 without weakening either baseline. Use a separate output directory for each;
 `wine-retention-partitions-check.v PREFIX` verifies their exact assigned case
 lists, both baselines and complete unique coverage from `PREFIX0` through `PREFIX3`.

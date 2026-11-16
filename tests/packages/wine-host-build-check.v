@@ -7,6 +7,7 @@ import json2
 import tests.packages.winesource
 import tests.packages.winecsource
 import tests.packages.winehostimages
+import tests.packages.winereadclosure
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -37,6 +38,19 @@ mut:
 	linker string
 	linker_sha256 string
 	loads map[string]string
+}
+
+struct HostRead {
+mut:
+	format int
+	recorded_directory string
+	builder string
+	archive_sha256 string
+	output_sha256 string
+	policy string
+	capabilities map[string]string
+	loads map[string]string
+	images []winehostimages.Image
 }
 
 fn digest(path string) !string { return winesource.file_digest(path) }
@@ -108,13 +122,64 @@ fn check() ! {
 		'old-format', 'link-output', 'link-loads', 'link-environment', 'link-argv', 'link-extracted',
 		'link-input', 'link-namespace', 'linked-link-receipt', 'sdk-graph', 'sdk-linked', 'sdk-input', 'old-link-format',
 		'denied-policy', 'denied-execution', 'denied-environment', 'denied-exit', 'denied-read', 'denied-installed',
-		'denied-output', 'denied-member', 'denied-linked', 'old-sdk-format'] {
+		'denied-output', 'denied-member', 'denied-linked', 'old-sdk-format',
+		'closed-policy', 'closed-extra-capability', 'closed-execution', 'closed-environment', 'closed-exit',
+		'closed-read', 'closed-allowed', 'closed-hidden', 'closed-output', 'closed-member', 'closed-linked', 'old-denied-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-sdk-format' {
+		if name == 'old-denied-format' {
+			proof.format = 5
+			expected = 'host build declaration differs'
+		} else if name == 'closed-linked' {
+			file := dir + '/read-closed/receipt.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'read-closed evidence must be bounded and ordinary'
+		} else if name == 'closed-policy' || name == 'closed-extra-capability' {
+			mut read := json2.decode[HostRead](os.read_file(dir + '/read-closed/receipt.json')!)!
+			if name == 'closed-policy' { read.policy = '(allow default)' }
+			else {
+				read.capabilities[read.recorded_directory + '/read-closed/uncaptured-object.o'] = digest(dir + '/read-closed/uncaptured-object.o')!
+				read.policy = winereadclosure.policy(read.capabilities.keys())!
+			}
+			for file in ['read-closed/receipt.json', 'read-closed/policy.sb'] {
+				os.write_file(dir + '/' + file, if file.ends_with('.json') { json2.encode(read) } else { read.policy })!; changed << file
+			}
+			expected = 'read-closed capability declaration differs'
+		} else if name == 'closed-execution' {
+			file := 'read-closed/captured-closed.exec.json'
+			mut exec := json2.decode[map[string]json2.Any](os.read_file(dir + '/' + file)!)!
+			exec['policy'] = json2.Any('')
+			os.write_file(dir + '/' + file, json2.encode(exec))!; changed << file
+			expected = 'read-closed execution record differs'
+		} else if name == 'closed-environment' {
+			file := 'read-closed/captured-closed.log.environment.json'
+			mut env := read_map(dir + '/' + file)!; env['SDKROOT'] = '/unrecorded'
+			os.write_file(dir + '/' + file, json2.encode(env))!; changed << file
+			expected = 'read-closed child invocation differs'
+		} else if name == 'closed-exit' {
+			file := 'read-closed/hidden-closed.log.exit.json'
+			os.write_file(dir + '/' + file, json2.encode({'exit': 0}))!; changed << file
+			expected = 'read-closed child invocation differs'
+		} else if name in ['closed-read', 'closed-allowed', 'closed-hidden'] {
+			file := 'read-closed/' + match name {
+				'closed-read' { 'denied-read-1.log' }
+				'closed-allowed' { 'allowed-read.log' }
+				else { 'hidden-closed.log' }
+			}
+			os.write_file(dir + '/' + file, 'unrelated failure\n')!; changed << file
+			expected = match name {
+				'closed-read' { 'read-closed read refusal differs' }
+				'closed-allowed' { 'read-closed allowed control differs' }
+				else { 'read-closed hidden refusal differs' }
+			}
+		} else if name == 'closed-output' || name == 'closed-member' {
+			file := 'read-closed/replay/link-inputs/' + if name == 'closed-output' { 'captured-program' } else { 'version.txt' }
+			os.write_file(dir + '/' + file, 'changed replay bytes')!; changed << file
+			expected = if name == 'closed-output' { 'read-closed replay output differs' } else { 'read-closed captured member differs' }
+		} else if name == 'old-sdk-format' {
 			proof.format = 4
 			expected = 'host build declaration differs'
 		} else if name == 'denied-linked' {
@@ -267,7 +332,7 @@ fn check() ! {
 		passed << name
 	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline thirty-six exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline forty-eight exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

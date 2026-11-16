@@ -60,7 +60,7 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires thirty-six exact resealed refusals. Cases cover omitted parsed
+then requires forty-eight exact resealed refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
@@ -73,12 +73,16 @@ Ten further cases cover the required SDK-denied replay: weakened policy,
 disabled restriction in the execution record, added environment input, successful
 negative-control exit, unrelated read/link failures, changed replay/member bytes,
 a linked receipt and the old SDK-graph-only host format.
+Twelve more cover ordinary file-data capability replay: a weakened policy,
+an added hidden-object permission with a consistently resealed policy, changed
+execution/environment/exit records, unrelated allowed/denied read or hidden-link
+results, altered output/member bytes, linked evidence and the old format 5.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 5
+The [required host receipt boundary](wine-host-required-check.md) uses format 6
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2/3/4 bundles and their original
+retainer also retains its own graph. Original format-1/2/3/4/5 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
@@ -105,6 +109,27 @@ format-4 contract. This restriction covers LLD's installed CLT SDK reads;
 other filesystem/network access, helper startup and OS library/cache bytes remain
 outside that restriction's claim. Installed SDK source checks and unrestricted
 controls still require the original SDK.
+
+Format 6 additionally requires `read-closed/receipt.json`, its policy, exact
+capability map and complete replay/control graph. `winereadhost` recomputes the
+capabilities from captured members, pinned ordinary images and the single derived
+control response, including their original recorded paths when admitting copies.
+The serialized map cannot grant another file even if the receipt and policy are
+resealed consistently. A child applies the policy before LLD exec: captured replay
+and unrestricted hidden-object linking must both match the original executable;
+captured-object reading must succeed, while four external/SDK reads and restricted
+hidden-object linking must reach their exact refusal gates. The temporary symlink
+is removed after probing, preserving an ordinary retained evidence tree.
+Both the host replay module and policy projector are embedded, pinned and retained.
+All child commands, environments, exits, execution records, outputs and extracted
+members are mandatory output rows and are checked at admission. Directory/metadata
+reads, OS-root/device exceptions, writes, networking, helper startup and OS cache/
+loader bytes retain the [standalone qualifier's narrow scope](wine-read-closed-replay.md).
+Full library/ABI/search closure and hermetic admission remain unqualified.
+Image hashes in this projection reuse the preceding mandatory Mach-O image
+admission. The final host input and retained-blob pass still rehashes those bytes;
+the new projection independently checks replay UUIDs and the exact permission set
+without two additional reads of every large linker image.
 
 The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and

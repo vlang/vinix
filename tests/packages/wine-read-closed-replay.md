@@ -52,9 +52,11 @@ bytes, both successful outputs, hidden object/alias and policy, repeats full
 original host admission, and rechecks original proof/archive/checker/self hashes
 and both embedded source guards. Receipts record local observations, not an
 authenticated trust anchor. Preserve the full new directory and original host
-bundle with typed inventories outside Git. Current mandatory host receipts keep
-their format-5 SDK-denied contract; integrating this broader data-read restriction
-remains a separate gate. No guest or default behavior changes.
+bundle with typed inventories outside Git. This standalone tool keeps its original
+format-5 admission contract. Current format-6 [required host receipts](wine-host-required-check.md)
+integrate the same narrow data-read restriction through `winereadhost`, with
+recomputed capabilities and every replay/control artifact mandatory in the host
+graph. No guest or default behavior changes.
 
 The production control runner checks nineteen unsafe/list-policy refusals,
 deterministic literal projection and system-prefix boundaries, then rejects a

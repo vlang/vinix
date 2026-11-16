@@ -122,8 +122,8 @@ fn admit(retainer string, run string, prepared string, out string, log string) !
 	return child.code
 }
 fn check() ! {
-	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] !in ['--host-link-only', '--host-sdk-only', '--host-sdk-denied-only', '--partition=0/4', '--partition=1/4', '--partition=2/4', '--partition=3/4']) {
-		return error('usage: CHECK RETAINER RUN PREPARED FRESH_OUTPUT [--host-link-only|--host-sdk-only|--host-sdk-denied-only|--partition=N/4]')
+	if os.args.len !in [5, 6] || (os.args.len == 6 && os.args[5] !in ['--host-link-only', '--host-sdk-only', '--host-sdk-denied-only', '--host-read-only', '--partition=0/4', '--partition=1/4', '--partition=2/4', '--partition=3/4']) {
+		return error('usage: CHECK RETAINER RUN PREPARED FRESH_OUTPUT [--host-link-only|--host-sdk-only|--host-sdk-denied-only|--host-read-only|--partition=N/4]')
 	}
 	retainer := os.real_path(os.args[1]); run := os.real_path(os.args[2]); prepared := os.real_path(os.args[3]); out := os.abs_path(os.args[4])
 	if os.exists(out) || os.is_link(out) { return error('fresh output required') }
@@ -146,13 +146,16 @@ fn check() ! {
 	link_cases := ['bridge-host-link-input', 'controller-host-link-input']
 	sdk_cases := ['bridge-host-sdk-input', 'controller-host-sdk-input']
 	denied_cases := ['bridge-host-sdk-denied-input', 'controller-host-sdk-denied-input']
+	read_cases := ['bridge-host-read-input', 'controller-host-read-input']
 	if os.args.len == 6 && os.args[5] == '--host-link-only' { cases = link_cases.clone() }
 	else if os.args.len == 6 && os.args[5] == '--host-sdk-only' { cases = sdk_cases.clone() }
 	else if os.args.len == 6 && os.args[5] == '--host-sdk-denied-only' { cases = denied_cases.clone() }
+	else if os.args.len == 6 && os.args[5] == '--host-read-only' { cases = read_cases.clone() }
 	else {
 		cases << link_cases
 		cases << sdk_cases
 		cases << denied_cases
+		cases << read_cases
 		// Four disjoint partitions cover the full fixed list. Every invocation
 		// still requires both baselines and its original named refusal gates.
 		if os.args.len == 6 {
@@ -184,7 +187,7 @@ fn check() ! {
 				replace(dir + '/generated-before-boot.json', json2.encode(generated))!
 			}
 			expected = 'host build binding record differs'
-		} else if name in ['bridge-host-input', 'controller-host-input', 'bridge-host-link-input', 'controller-host-link-input', 'bridge-host-sdk-input', 'controller-host-sdk-input', 'bridge-host-sdk-denied-input', 'controller-host-sdk-denied-input'] {
+		} else if name in ['bridge-host-input', 'controller-host-input', 'bridge-host-link-input', 'controller-host-link-input', 'bridge-host-sdk-input', 'controller-host-sdk-input', 'bridge-host-sdk-denied-input', 'controller-host-sdk-denied-input', 'bridge-host-read-input', 'controller-host-read-input'] {
 			bridge := name.starts_with('bridge-')
 			binding := read_map(if bridge { selected + '/host-producer.json' } else { dir + '/host-controller.json' })!
 			for file in if bridge { ['inputs-before-build.json', 'inputs-verified.json'] } else { ['inputs-before-build.json', 'inputs.json', 'inputs-verified.json'] } {
@@ -192,6 +195,7 @@ fn check() ! {
 				mut inputs := read_map(path)!
 				artifact := if name.ends_with('-link-input') {
 					if bridge { '/host-link.json' } else { '/link-inputs.tar' }
+				} else if name.ends_with('-read-input') { '/read-closed/receipt.json'
 				} else if name.ends_with('-sdk-denied-input') { '/sdk-denied/receipt.json'
 				} else if name.ends_with('-sdk-input') { '/sdk-graph.json' } else { '/host-build.json' }
 				if binding['directory'] + artifact !in inputs { return error('host artifact omission fixture absent') }
