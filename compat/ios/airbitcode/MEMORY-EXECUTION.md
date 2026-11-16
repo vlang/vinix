@@ -1,5 +1,24 @@
 # Bounded memory execution
 
+`llvm.vector.extract` copies a fixed subvector from a 1..16-lane integer,
+half or float vector. Both overloads must name matching element formats and
+the result must fit in the source. The i64 offset must be a defined constant,
+a multiple of the result count, with the entire window in range. It is checked
+on every call, including declaration-cache hits. Exact direct signatures,
+metadata and parameter-two immarg rules apply. Calls cost one executed step,
+one existing result slot and source_count + result_count validation work units.
+Keys 43652..52627 append 8,976 identities without moving earlier families.
+
+Copying preserves raw bits, poison and deferred undef only in selected lanes.
+Source/result freezes retain their normal behavior; unselected indeterminate
+lanes can be discarded. Integer addresses use existing packed shuffle selectors
+and projections. Invalid result selectors remain poison through freezes and
+reject before writes. Existing node/depth/cache bounds and cleanup apply.
+`tests/ios/air-subvector.v` covers all fixed shapes, aligned offsets and formats,
+both memory APIs, selector widths and native scalar extract/insert references.
+Its controls checker covers call-local offset rejection, state, loop reuse and
+both sides of graph/work/storage limits. Scalable vectors remain excluded.
+
 `llvm.get.active.lane.mask` accepts fixed 1..16-lane i1 results and two
 matching scalar i1..i64 arguments. Lane j is true when mathematical base+j
 is below the unsigned limit; overflow lanes are false. Exact canonical names,

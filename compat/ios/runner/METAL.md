@@ -1,5 +1,14 @@
 # Software Metal backend
 
+AIR `llvm.vector.extract` executes fixed integer/half/float subvector copies
+from vectors of up to 16 lanes. Each i64 constant offset must align to the result
+count and keep the full result in range. Copies preserve raw bits and lane state;
+integer projections may feed bounded addresses. The size fixture reconstructs
+coordinates from a four-lane window of a sixteen-lane sequence and checks float
+payloads, half subnormals and odd integer widths in RGBA8 readback. Maintained
+subvector reference and controls checkers cover all fixed shapes, aligned offsets,
+state and loop reuse. Native GPU execution and Fortnite launch remain unverified.
+
 AIR `llvm.get.active.lane.mask` executes fixed i1 masks of up to 16 lanes
 from matching i1..i64 scalar base/limit arguments. Lanes beyond the unsigned
 limit, including those beyond integer overflow, are false. Prepared software

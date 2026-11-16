@@ -1,5 +1,16 @@
 # Void-return scalar execution
 
+Fixed `llvm.vector.extract` calls support matching i1..i64/half/float element
+formats with up to 16 source lanes. Integer-only execution excludes floating
+formats. Every call requires a defined aligned in-range i64 constant offset,
+including calls sharing a declaration. Copying preserves lane bits and deferred
+state; result slots and vector-PHI snapshots retain existing ownership. Calls
+cost one executed step, one vector slot and source_count + result_count work
+units. Keys 43652..52627 append 8,976 identities; the vector declaration cache
+has 52,628 entries and the scalar cache remains 2,154. Existing limits remain.
+The maintained subvector checkers cover discarded void results, scalar/integer
+observations, selected-state freezes, loop slot reuse and exact resource bounds.
+
 Fixed 1..16-lane `llvm.get.active.lane.mask` calls accept matching i1..i64
 scalar base/limit arguments and produce i1 lanes. Mathematical addition is
 used: overflow cannot reactivate lanes. Poison propagates to all lanes and

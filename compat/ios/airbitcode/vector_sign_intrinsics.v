@@ -2,7 +2,7 @@
 module airbitcode
 
 const vector_sign_intrinsic_slots = 64
-const vector_float_intrinsic_slots = vector_active_mask_cache_base + 1024
+const vector_float_intrinsic_slots = vector_subvector_cache_base + 8976
 
 // Parse canonical overloads without allocating substrings or formatted names.
 fn vector_sign_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
@@ -35,10 +35,13 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	if callee.number >= u32(pools.declarations.len) || pools.declarations[int(callee.number)] != f.record || callee.type_index < 0 || callee.type_index >= p.types.len || p.types[callee.type_index].kind != .pointer_t || p.types[callee.type_index].address_space != 0 { return error('AIR vector intrinsic: direct declaration identity') }
 	signature := ir.types[f.signature]; arity := scalar_intrinsic_arity(id)
 	if signature.kind != .function_t || signature.vararg || signature.refs_count != arity + 1 || signature.refs_start < 0 || signature.refs_start > ir.references.len || signature.refs_count > ir.references.len - signature.refs_start || op.operands_count != arity + 1 || ir.references[signature.refs_start] != op.result_type { return error('AIR vector intrinsic: signature/arity') }
-	if !mixed && !vector_interleave_intrinsic(id) && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul, .smulh, .umulh, .vector_reverse, .vector_splice_left, .vector_splice_right, .stepvector, .active_lane_mask]! { return error('AIR vector intrinsic: mixed floating execution required') }
+	if !mixed && !vector_interleave_intrinsic(id) && id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .fshl, .fshr, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul, .smulh, .umulh, .vector_reverse, .vector_splice_left, .vector_splice_right, .stepvector, .active_lane_mask, .vector_extract]! { return error('AIR vector intrinsic: mixed floating execution required') }
 	mut work := 0
 	mut conversion_key := -1
-	if id == .active_lane_mask {
+	if id == .vector_extract {
+		sub_work, sub_key := p.vector_subvector_profile(ir, stream, pools, bodies, scope, index, op, mixed, remaining)!
+		work = sub_work; conversion_key = sub_key
+	} else if id == .active_lane_mask {
 		mask_work, mask_key := p.vector_active_mask_profile(ir, op, remaining)!
 		work = mask_work; conversion_key = mask_key
 	} else if id == .stepvector {
@@ -87,7 +90,7 @@ fn (p IRTypedProgram) vector_float_intrinsic_profile(ir IRModule, stream Stream,
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR vector intrinsic: declaration record') }
 	key := if conversion_key >= 0 { conversion_key } else { vector_float_intrinsic_key(id, count, bits)! }
-	return work, key, ir_values(stream, raw)[6], id in [.is_fpclass, .ctlz, .cttz, .iabs]!
+	return work, key, ir_values(stream, raw)[6], id in [.is_fpclass, .ctlz, .cttz, .iabs, .vector_extract]!
 }
 fn sign_intrinsic_vector(id ScalarIntrinsic, left ScalarVectorValue, right ScalarVectorValue, bits u32, count int) !ScalarVectorValue {
 	vector_sign_intrinsic_key(id, count, bits)!
@@ -118,6 +121,11 @@ fn (mut m IntegerMachine) float_intrinsic_vector_value(ir IRModule, stream Strea
 		right := m.read_vector(stream, m.p.operands[op.operands_start + 2])!
 		amount := m.read(op.operands_start + 3)!
 		return m.store_vector_value(inst, spliced_vector(id, left, right, count, amount)!)!
+	}
+	if id == .vector_extract {
+		_, source_count, _ := vector_subvector_name(ir.functions[op.callee_function].name)!
+		offset := m.read(op.operands_start + 2)!
+		return m.store_vector_value(inst, extracted_subvector(left, count, source_count, int(offset.value))!)!
 	}
 	if id == .vector_reverse { return m.store_vector_value(inst, reversed_vector(left, count)!)! }
 	if id == .canonicalize { return m.store_vector_value(inst, canonical_float_vector(left, bits, count)!)! }
