@@ -13,6 +13,7 @@ import tests.packages.winereadclosure
 import tests.packages.winedirclosure
 import tests.packages.winemetaclosure
 import tests.packages.winemetaimages
+import tests.packages.winequeryhost
 
 $if macos {
 	#include <dlfcn.h>
@@ -32,7 +33,7 @@ struct Execution {
 }
 
 struct Proof {
-	format int = 3
+	format int = 4
 	recorded_directory string
 	builder string
 	archive_sha256 string
@@ -83,8 +84,13 @@ fn restrict_reads(policy string) ! {
 pub fn child() ! {
 	if os.args.len < 4 { return error('read replay child mode and root required') }
 	mode := os.args[2]; root := os.args[3]
-	policy := record(root + '/policy.sb')!
+	policy := record(root + '/' + winequeryhost.policy_file(mode))!
 	if mode != 'hidden-unrestricted' { restrict_reads(policy)! }
+	if winequeryhost.is_query(mode) {
+		if os.args.len != (if mode == 'probe-query-denied' { 6 } else { 5 }) { return error('query probe path/operation required') }
+		winequeryhost.child(mode, if mode == 'probe-query-denied' { os.args[4] } else { '' }, os.args.last())!
+		return
+	}
 	if mode in ['probe-meta-denied', 'probe-meta-allowed'] {
 		if os.args.len != 5 { return error('metadata capability probe path required') }
 		st := os.stat(os.args[4]) or {
@@ -223,7 +229,9 @@ pub fn finish(host string, builder string) ! {
 	caps := capabilities(archive, directory, baseline)!
 	aliases := winemetaimages.capture(caps, baseline)!
 	extra := winemetaimages.paths(aliases, caps)
-	policy := winemetaclosure.policy(caps.keys(), extra)!
+	query := winequeryhost.declaration(directory, cwd + '/' + object(archive)!, caps.keys(), extra)!
+	policy := winequeryhost.policy(query, caps.keys(), extra)!
+	winequeryhost.prepare(directory, query)!
 	dirs := winedirclosure.directories(caps.keys())!
 	metadata := winemetaclosure.paths(caps.keys(), extra)!
 	os.write_file(directory + '/metadata-aliases.json', json2.encode(aliases) + '\n')!
@@ -242,13 +250,18 @@ pub fn finish(host string, builder string) ! {
 	os.mkdir(unlisted)!
 	os.write_file(unlisted + '/marker', 'directory control\n')!
 	dir_alias := directory + '/unlisted-alias'; os.symlink(unlisted, dir_alias)!
+	paths := probes(directory)
+	os.symlink(paths[0], paths[1])!
+	winequeryhost.seed(directory, query)!
+	for control in winequeryhost.controls(directory, cwd + '/' + object(archive)!) {
+		winequeryhost.baseline(control)!
+		invoke(builder, control.arguments(), directory, control.name)!
+	}
 	for index, path in [unlisted, dir_alias, '/System/Volumes/Data' + unlisted] {
 		if os.ls(path)! != ['marker'] { return error('read-closed unrestricted directory baseline differs') }
 		invoke(builder, ['probe-dir-denied', path], directory, 'denied-directory-' + index.str())!
 	}
-	paths := probes(directory)
 	hidden_hash := digest(paths[0])!
-	os.symlink(paths[0], paths[1])!
 	for index, path in paths {
 		if index < 3 && digest(path)! != hidden_hash { return error('read-closed unrestricted read baseline differs') }
 		if index == 3 { digest(path)! }
@@ -267,6 +280,7 @@ pub fn finish(host string, builder string) ! {
 	os.rename(cwd + '/program', cwd + '/hidden-baseline')!
 	invoke(builder, ['hidden-closed'], directory, 'hidden-closed')!
 	images, text := observations(record(directory + '/captured-closed.log')!, baseline)!
+	winequeryhost.verify_live(query)!
 	os.write_file(directory + '/receipt.json', json2.encode(Proof{recorded_directory: host, builder: builder,
 		archive_sha256: digest(host + '/link-inputs.tar')!, output_sha256: digest(host + '/program')!,
 		policy: policy, directories: dirs, metadata: metadata, capabilities: caps, loads: winemacholink.loads(text, archive)!, images: images}) + '\n')!
@@ -283,13 +297,26 @@ pub fn admit(host string, recorded string, builder string) ! {
 	caps := capabilities(archive, original, baseline)!
 	aliases := winemetaimages.capture(caps, baseline)!
 	extra := winemetaimages.paths(aliases, caps)
-	policy := winemetaclosure.policy(caps.keys(), extra)!
+	query := winequeryhost.declaration(original, original + '/replay/link-inputs/' + object(archive)!, caps.keys(), extra)!
+	policy := winequeryhost.policy(query, caps.keys(), extra)!
 	dirs := winedirclosure.directories(caps.keys())!
 	metadata := winemetaclosure.paths(caps.keys(), extra)!
-	if proof.format != 3 || proof.recorded_directory != recorded || proof.builder != builder
+	if proof.format != 4 || proof.recorded_directory != recorded || proof.builder != builder
 		|| proof.directories != dirs || proof.metadata != metadata
 		|| proof.capabilities != caps || proof.policy != policy || record(directory + '/policy.sb')! != policy {
 		return error('read-closed capability declaration differs')
+	}
+	if json2.decode[winequeryhost.Declaration](record(directory + '/query.json')!)! != query {
+		return error('read-closed query declaration differs')
+	}
+	for name, expected in query.policies {
+		if record(directory + '/' + name)! != expected { return error('read-closed query policy differs') }
+	}
+	if json2.decode[winequeryhost.Fixture](record(directory + '/attribute-fixture.json')!)! != query.attributes {
+		return error('read-closed query fixture differs')
+	}
+	for path in [...winequeryhost.lookalikes(directory), winequeryhost.temporary(directory)] {
+		if record(path)! != winequeryhost.marker { return error('read-closed query fixture differs') }
 	}
 	if json2.decode[winemetaimages.Aliases](record(directory + '/metadata-aliases.json')!)! != aliases {
 		return error('read-closed metadata aliases differ')
@@ -355,20 +382,26 @@ pub fn admit(host string, recorded string, builder string) ! {
 		}
 	}
 	images, text := observations(positive, baseline)!
+	for control in winequeryhost.controls(original, original + '/replay/link-inputs/' + object(archive)!) {
+		result := outcome(directory, original, builder, control.arguments(), control.name, control.code())!
+		winequeryhost.validate(control, result) or { return error('read-closed query control differs') }
+	}
 	if images != proof.images || winemacholink.loads(text, archive)! != proof.loads { return error('read-closed observations differ') }
 }
 
 pub fn artifacts(host string) ![]string {
+	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!
 	mut names := ['receipt.json', 'policy.sb', 'uncaptured-object.o', 'replay/link-inputs/captured-program',
 		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker', 'metadata-aliases.json']
 	for mode in modes { names << mode + '.exec.json' }
 	mut logs := ['captured-closed', 'hidden-unrestricted', 'hidden-closed', 'allowed-read', 'denied-read-0', 'denied-read-1', 'denied-read-2', 'denied-read-3',
 		'allowed-directory', 'denied-directory-0', 'denied-directory-1', 'denied-directory-2', 'allowed-metadata-0', 'allowed-metadata-1']
 	for index in 0 .. 7 { logs << 'denied-metadata-' + index.str() }
+	names << winequeryhost.files()
+	for control in winequeryhost.controls(host + '/read-closed', host + '/read-closed/replay/link-inputs/' + object(archive)!) { logs << control.name }
 	for name in logs {
 		for suffix in ['', '.argv.json', '.environment.json', '.exit.json'] { names << name + '.log' + suffix }
 	}
-	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!
 	for path, _ in archive.members { names << 'replay/' + path }
 	return names.map('read-closed/' + it)
 }

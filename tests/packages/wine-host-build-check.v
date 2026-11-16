@@ -10,6 +10,8 @@ import tests.packages.winehostimages
 import tests.packages.winedirclosure
 import tests.packages.winemetaclosure
 import tests.packages.winemetaimages
+import tests.packages.winequeryhost
+import tests.packages.winequeryclosure
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -130,13 +132,66 @@ fn check() ! {
 		'closed-policy', 'closed-extra-capability', 'closed-execution', 'closed-environment', 'closed-exit',
 		'closed-read', 'closed-allowed', 'closed-hidden', 'closed-output', 'closed-member', 'closed-linked', 'old-denied-format',
 		'directory-map', 'directory-policy', 'directory-allowed', 'directory-denied', 'directory-marker', 'old-read-format', 'old-directory-replay-format',
-		'metadata-map', 'metadata-policy', 'metadata-aliases', 'metadata-allowed', 'metadata-denied', 'old-metadata-format', 'old-metadata-replay-format'] {
+		'metadata-map', 'metadata-policy', 'metadata-aliases', 'metadata-allowed', 'metadata-denied', 'old-metadata-format', 'old-metadata-replay-format',
+		'query-policy', 'query-extra-execution', 'query-execution', 'query-counterfactual-policy', 'query-fixture', 'query-allowed', 'query-denied',
+		'query-counterfactual', 'query-output', 'query-temporary', 'old-query-format', 'old-query-replay-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-metadata-format' {
+		if name == 'old-query-format' {
+			proof.format = 8
+			expected = 'host build declaration differs'
+		} else if name in ['query-policy', 'query-extra-execution', 'old-query-replay-format'] {
+			mut read := json2.decode[HostRead](os.read_file(dir + '/read-closed/receipt.json')!)!
+			if name == 'query-policy' { read.policy += '(allow file-test-existence file-read-xattr)\n' }
+			else if name == 'old-query-replay-format' { read.format = 3 }
+			else {
+				file := 'read-closed/query.json'
+				mut query := json2.decode[winequeryhost.Declaration](os.read_file(dir + '/' + file)!)!
+				path := read.recorded_directory + '/read-closed/uncaptured-object.o'
+				query.execution_queries << path
+				grant := winequeryclosure.writes([path])!
+				query.policies['existence-policy.sb'] += grant
+				read.policy += grant
+				os.write_file(dir + '/' + file, json2.encode(query))!; changed << file
+				os.write_file(dir + '/read-closed/existence-policy.sb', query.policies['existence-policy.sb'])!; changed << 'read-closed/existence-policy.sb'
+			}
+			for file in ['read-closed/receipt.json', 'read-closed/policy.sb'] {
+				os.write_file(dir + '/' + file, if file.ends_with('.json') { json2.encode(read) } else { read.policy })!; changed << file
+			}
+			expected = 'read-closed capability declaration differs'
+		} else if name == 'query-execution' {
+			file := 'read-closed/query.json'
+			mut query := json2.decode[winequeryhost.Declaration](os.read_file(dir + '/' + file)!)!
+			query.temporary_queries = '(allow file-test-existence)\n'
+			os.write_file(dir + '/' + file, json2.encode(query))!; changed << file
+			expected = 'read-closed query declaration differs'
+		} else if name == 'query-counterfactual-policy' {
+			file := 'read-closed/xattr-policy.sb'
+			os.write_file(dir + '/' + file, '(allow default)\n')!; changed << file
+			expected = 'read-closed query policy differs'
+		} else if name == 'query-fixture' {
+			file := 'read-closed/attribute-fixture.json'
+			mut fixture := json2.decode[winequeryhost.Fixture](os.read_file(dir + '/' + file)!)!
+			fixture.value = 'forged'
+			os.write_file(dir + '/' + file, json2.encode(fixture))!; changed << file
+			expected = 'read-closed query fixture differs'
+		} else if name == 'query-temporary' {
+			file := 'read-closed/replay/link-inputs/program.tmp000000g'
+			os.write_file(dir + '/' + file, 'changed fixture\n')!; changed << file
+			expected = 'read-closed query fixture differs'
+		} else if name in ['query-allowed', 'query-denied', 'query-counterfactual', 'query-output'] {
+			file := 'read-closed/' + match name {
+				'query-allowed' { 'allowed-query-0.log' }
+				'query-denied' { 'denied-query-0-getxattr.log' }
+				'query-counterfactual' { 'xattr-isolated.log' }
+				else { 'output-query-only.log' }
+			}
+			os.write_file(dir + '/' + file, 'unrelated failure\n')!; changed << file
+			expected = 'read-closed query control differs'
+		} else if name == 'old-metadata-format' {
 			proof.format = 7
 			expected = 'host build declaration differs'
 		} else if name in ['metadata-map', 'metadata-policy', 'old-metadata-replay-format'] {
@@ -203,7 +258,13 @@ fn check() ! {
 				read.capabilities[read.recorded_directory + '/read-closed/uncaptured-object.o'] = digest(dir + '/read-closed/uncaptured-object.o')!
 				aliases := json2.decode[winemetaimages.Aliases](os.read_file(dir + '/read-closed/metadata-aliases.json')!)!
 				extra := winemetaimages.paths(aliases, read.capabilities)
-				read.policy = winemetaclosure.policy(read.capabilities.keys(), extra)!
+				previous := json2.decode[winequeryhost.Declaration](os.read_file(dir + '/read-closed/query.json')!)!
+				query := winequeryhost.declaration(read.recorded_directory + '/read-closed', previous.attributes.paths[0], read.capabilities.keys(), extra)!
+				read.policy = winequeryhost.policy(query, read.capabilities.keys(), extra)!
+				os.write_file(dir + '/read-closed/query.json', json2.encode(query))!; changed << 'read-closed/query.json'
+				for name, policy_text in query.policies {
+					os.write_file(dir + '/read-closed/' + name, policy_text)!; changed << 'read-closed/' + name
+				}
 				read.directories = winedirclosure.directories(read.capabilities.keys())!
 				read.metadata = winemetaclosure.paths(read.capabilities.keys(), extra)!
 			}
@@ -395,7 +456,7 @@ fn check() ! {
 		passed << name
 	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline sixty-two exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline seventy-four exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }
