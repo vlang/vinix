@@ -13,6 +13,7 @@ enum MemoryIndexKind {
 	select_value
 	freeze_value
 	intrinsic
+	intrinsic_binary
 	cast
 }
 
@@ -164,7 +165,7 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			// declaration attribute/duplicate checks. Recheck call identity here.
 			b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, op, b.scope)!
 			id := scalar_intrinsic_name(b.ir.functions[op.callee_function].name)!
-			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz] { return error('AIR memory index: unsupported intrinsic dependency') }
+			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .smin, .smax, .umin, .umax] { return error('AIR memory index: unsupported intrinsic dependency') }
 			mut zero_poison := u64(0)
 			if scalar_integer_zero_count(id) {
 				// scalar_intrinsic_call requires an exact defined i1 immediate.
@@ -172,7 +173,12 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 				zero_poison = b.pools.scalar_bits(flag.constant_index)!
 			}
 			lhs := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
-			node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, value: zero_poison, left: lhs, height: 1 + b.nodes[lhs].height}
+			if scalar_integer_extremum(id) {
+				rhs := b.expression(b.p.operands[op.operands_start + 2], producer, depth + 1)!
+				node = MemoryIndexNode{kind: .intrinsic_binary, bits: bits, intrinsic: id, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height }}
+			} else {
+				node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, value: zero_poison, left: lhs, height: 1 + b.nodes[lhs].height}
+			}
 		} else if code == 58 {
 			b.p.scalar_unary_profile(op, true, false)!
 			lhs := b.expression_source(b.p.operands[op.operands_start], producer, depth + 1, true)!
@@ -242,6 +248,9 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.select_value {
 				chosen := if values[node.condition] & 1 != 0 { node.left } else { node.right }
 				value = IntegerValue{value: values[chosen], poison: poisons[node.condition] || poisons[chosen]}
+			}
+			.intrinsic_binary {
+				value = if poisons[node.left] || poisons[node.right] { IntegerValue{poison: true} } else { IntegerValue{value: scalar_integer_extremum_value(node.intrinsic, node.bits, values[node.left], values[node.right])!} }
 			}
 			.intrinsic {
 				value = if poisons[node.left] { IntegerValue{poison: true} } else if scalar_integer_zero_count(node.intrinsic) { scalar_integer_zero_count_value(node.intrinsic, node.bits, values[node.left], node.value)! } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }

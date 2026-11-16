@@ -141,6 +141,10 @@ require a defined constant i1 zero-poison flag. A false flag returns the width
 for zero; a true flag produces poison for zero. Select/freeze may suppress or
 repair that poison, while independent GEP roots still reject it. The validated
 flag is cached in the node; declaration immarg and attribute checks remain.
+Signed/unsigned integer min/max (`llvm.smin`, `llvm.smax`, `llvm.umin`,
+`llvm.umax`) accept matching i1..i64 operands. Both dependencies are validated,
+including their full cached subtree heights, and poison in either operand
+poisons the result even when the other value would win the comparison.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -225,6 +229,12 @@ Each overload also checks exact cached depth acceptance/refusal boundaries.
 zero-poison flags across all 128 overloads, with a defined false-flag LLVM oracle
 and separate poison checks. It covers cached depth limits, cold poison/freeze,
 independent roots, dynamic flag rejection and malformed call metadata.
+
+`tests/ios/air-memory-minmax-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares all
+256 scalar min/max overloads with defined native LLVM calls. It checks direct
+and masked indices, both poisoned operands, computed right-hand poison,
+select/freeze handling and cached depth boundaries through either dependency.
+Validation and both execution APIs preserve every output byte on refusal.
 
 ## Prepared memory functions
 
