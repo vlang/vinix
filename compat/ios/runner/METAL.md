@@ -290,6 +290,14 @@ an i32 scalar (`uint`) or fixed `<3 x i32>` (`uint3`), and
 component or full `(x, y, z)` coordinate. Local indices flatten the position
 within the actual threadgroup, with x varying fastest: `(lz * sy + ly) * sx + lx`.
 Here `sx`/`sy` are the actual group width/height, clipped at a partial grid edge.
+`air.threads_per_grid`, `air.threads_per_threadgroup` and
+`air.dispatch_threads_per_threadgroup` also accept `uint` or `uint3`.
+They supply the normalized grid dimensions, actual clipped group dimensions,
+and requested group dimensions respectively; a scalar receives the x component.
+Grid position and grid size must use matching types when both are declared.
+Actual and requested group size must likewise match each other.
+The sizes are captured with each dispatch and supplied afresh to each invocation,
+so a prepared pipeline can index output using the current grid dimensions.
 Builtins have no buffer location and do not
 require encoder buffer bindings. Each semantic may appear once; metadata can
 carry an argument name and matching type name, or omit those names. Pointer,
@@ -304,6 +312,20 @@ to form a checked buffer index, including a flattened multidimensional position.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
+
+`tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR sizes` checks reusable
+scalar and uint3 pipelines under normal and deterministic hashing. Independent
+group/local enumeration checks every builtin lane, both dispatch selectors,
+partial and oversized groups, maximum grids, buffer offsets and untouched
+padding across two drained runtimes per mode. Negative pipelines check each
+size semantic's types, metadata restrictions, duplicates and family mismatches.
+A single image pipeline also writes RGBA8 pixels for four image dimensions;
+existing buffer-backed textures expose the exact pixels through `getBytes`.
+The fixture preserves shader output as external PPM files and verifies all
+backing-buffer padding. This uses CPU buffer stores and texture aliasing;
+AIR texture arguments/intrinsics and GPU rendering remain unsupported.
+The size semantics follow the
+[Metal Shading Language specification](https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf).
 
 `tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR builtins` runs the focused
 Objective-C checks with normal and deterministic Swift hashing. Each mode

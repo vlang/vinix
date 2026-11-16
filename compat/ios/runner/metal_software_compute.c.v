@@ -16,7 +16,20 @@ struct SoftwareMetalKernelArgument {
 	minimum_size u64
 	writable bool
 	value_lanes int // Nonzero for a supported invocation builtin.
-	builtin u8 // 1: grid position, 2: local thread index.
+	builtin u8 // Bit identity: grid position, local index, grid/actual/requested size.
+}
+fn sm_compute_builtin(kind string) u8 {
+	return match kind {
+		'air.thread_position_in_grid' { u8(1) }
+		'air.thread_index_in_threadgroup' { u8(2) }
+		'air.threads_per_grid' { u8(4) }
+		'air.threads_per_threadgroup' { u8(8) }
+		'air.dispatch_threads_per_threadgroup' { u8(16) }
+		else { u8(0) }
+	}
+}
+fn sm_compute_builtin_slot(bit u8) int {
+	return match bit { 1 { 0 } 2 { 3 } 4 { 6 } 8 { 9 } 16 { 12 } else { panic('iOS: invalid software Metal builtin') } }
 }
 struct SoftwareMetalKernel {
 	stream airbitcode.Stream
@@ -65,17 +78,26 @@ fn sm_kernel(data []u8, name string) !SoftwareMetalKernel {
 	defer { if !keep { unsafe { arguments.free() } } }
 	mut slots := u32(0)
 	mut builtins := u8(0)
+	mut grid_lanes := 0
+	mut group_lanes := 0
 	for arg in entries.arguments[entry.arguments_start..entry.arguments_start + entry.arguments_count] {
 		a := prepared.argument(int(arg.index))!
-		if arg.kind in ['air.thread_position_in_grid', 'air.thread_index_in_threadgroup'] {
-			bit := if arg.kind == 'air.thread_position_in_grid' { u8(1) } else { u8(2) }
+		bit := sm_compute_builtin(arg.kind)
+		if bit != 0 {
 			typ := program.types[arg.type_index]
 			vector := typ.kind == .vector_t
-			if builtins & bit != 0 || arg.opaque_attributes || arg.condition >= 0 || arg.unused || arg.has_location || arg.has_address_space || arg.has_size || arg.has_alignment || arg.has_buffer_size || arg.access != .unspecified || a.value_bits != 32 || (vector && (bit != 1 || a.value_lanes != 3)) || (!vector && (typ.kind != .integer_t || a.value_lanes != 1)) || (arg.type_name.len != 0 && arg.type_name != if vector { 'uint3' } else { 'uint' }) { return error('Software Metal requires uint/uint3 invocation builtin metadata') }
+			if builtins & bit != 0 || arg.opaque_attributes || arg.condition >= 0 || arg.unused || arg.has_location || arg.has_address_space || arg.has_size || arg.has_alignment || arg.has_buffer_size || arg.access != .unspecified || a.value_bits != 32 || (vector && (bit == 2 || a.value_lanes != 3)) || (!vector && (typ.kind != .integer_t || a.value_lanes != 1)) || (arg.type_name.len != 0 && arg.type_name != if vector { 'uint3' } else { 'uint' }) { return error('Software Metal requires uint/uint3 invocation builtin metadata') }
 			// scalar_vector_type admits floating lanes as well; builtins do not.
 			if vector {
 				element := program.references[typ.refs_start]
 				if program.types[element].kind != .integer_t { return error('Software Metal requires integer invocation coordinates') }
+			}
+			if bit == 1 || bit == 4 {
+				if grid_lanes != 0 && grid_lanes != a.value_lanes { return error('Software Metal grid position/size types must match') }
+				grid_lanes = a.value_lanes
+			} else if bit == 8 || bit == 16 {
+				if group_lanes != 0 && group_lanes != a.value_lanes { return error('Software Metal actual/requested group size types must match') }
+				group_lanes = a.value_lanes
 			}
 			builtins |= bit
 			arguments[int(arg.index)] = SoftwareMetalKernelArgument{slot: -1, value_lanes: a.value_lanes, builtin: bit}
@@ -304,6 +326,18 @@ fn (plan SoftwareMetalComputeGrid) coordinates(position u64) [4]u64 {
 	sy := if remaining_y < plan.group.height { remaining_y } else { plan.group.height }
 	return [x, y, z, (lz * sy + ly) * sx + lx]!
 }
+fn (plan SoftwareMetalComputeGrid) builtin_words(position u64) [15]u64 {
+	c := plan.coordinates(position)
+	rx := plan.grid.width - c[0] / plan.group.width * plan.group.width
+	ry := plan.grid.height - c[1] / plan.group.height * plan.group.height
+	rz := plan.grid.depth - c[2] / plan.group.depth * plan.group.depth
+	sx := if rx < plan.group.width { rx } else { plan.group.width }
+	sy := if ry < plan.group.height { ry } else { plan.group.height }
+	sz := if rz < plan.group.depth { rz } else { plan.group.depth }
+	return [c[0], c[1], c[2], c[3], u64(0), 0,
+		plan.grid.width, plan.grid.height, plan.grid.depth, sx, sy, sz,
+		plan.group.width, plan.group.height, plan.group.depth]!
+}
 fn sm_compute_dispatch(encoder u64, selector &char, grid SoftwareMetalSize, group SoftwareMetalSize) {
 	C.ios_objc_initialize_lock()
 	defer { C.ios_objc_initialize_unlock() }
@@ -327,11 +361,11 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	mut bindings := []airbitcode.IRMemoryBinding{cap: k.arguments.len}
 	mut has_values := false
 	for arg in k.arguments { if arg.value_lanes != 0 { has_values = true } }
-	mut builtin_words := []u64{len: if has_values { 4 } else { 0 }}
+	mut builtin_words := []u64{len: if has_values { 15 } else { 0 }}
 	defer { unsafe { bindings.free(); builtin_words.free() } }
 	for arg in k.arguments {
 		if arg.value_lanes != 0 {
-			start := if arg.builtin == 1 { 0 } else { 3 }
+			start := sm_compute_builtin_slot(arg.builtin)
 			bindings << airbitcode.IRMemoryBinding{values: builtin_words[start..start + arg.value_lanes]}
 			continue
 		}
@@ -346,8 +380,8 @@ fn sm_compute_execute(state &SoftwareMetalComputeBindings) ! {
 	for pass in 0 .. 2 {
 		for position in u64(0) .. state.grid_threads {
 			if has_values {
-				words := plan.coordinates(position)
-				for lane in 0 .. 4 { builtin_words[lane] = words[lane] }
+				words := plan.builtin_words(position)
+				for lane in 0 .. 15 { builtin_words[lane] = words[lane] }
 			}
 			if pass == 0 { k.prepared.validate(bindings, k.prepared.steps())! }
 			else { k.prepared.run(mut bindings, k.prepared.steps())! }

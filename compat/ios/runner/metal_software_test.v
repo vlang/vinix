@@ -60,6 +60,10 @@ fn sm_sampler_worker(api SMSamplerAPI, device u64, descriptor u64) {
 }
 fn test_software_metal_samplers() {
 	$if !ios_metal_software ? { return }
+	if os.args.len == 2 && os.args[1] == '--software-metal-sizes' {
+		sm_test_geometry_sizes_focus()!
+		exit(0)
+	}
 	if os.args.len == 2 && os.args[1] == '--software-metal-grids' {
 		sm_test_grid_memory_focus()!
 		exit(0)
@@ -4078,6 +4082,176 @@ fn sm_test_multigrid_focus() ! {
 		objc_release(output); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool); objc_stop()
 	}
 	line := 'IOS-SOFTWARE-METAL-MULTIGRIDS: ${complete} completed dispatches, ${invocations} successful invocations, ${failed} cold/poison command failures, ${coordinates} independently enumerated coordinates, ${geometry} geometry/budget controls, ${cases.len} first/edge group fixtures, both selectors, 2D/3D partial groups and two drained runtimes PASS\n'
+	os.write_file(out + '/result.txt', line)!; print(line)
+}
+// One pipeline per shape, reused across dispatch sizes; expected records come
+// from independent group/local enumeration rather than the runtime's flattening.
+fn sm_test_geometry_sizes_focus() ! {
+	base := os.getenv('VINIX_METAL_COMPUTE_CHECK_DIR')
+	sm_grid_check(base.len > 0 && !os.abs_path(base).starts_with(os.getwd() + '/'), 'external size output')
+	out := base + if os.getenv('SWIFT_DETERMINISTIC_HASHING') == '1' { '/deterministic/sizes' } else { '/normal/sizes' }
+	sm_grid_check(!os.exists(out), 'fresh size output'); os.mkdir_all(out)!
+	semantics := ['air.thread_position_in_grid', 'air.thread_index_in_threadgroup', 'air.threads_per_grid', 'air.threads_per_threadgroup', 'air.dispatch_threads_per_threadgroup']
+	bad := ['half', 'wide', 'float', 'vec2', 'vec4', 'float_vector', 'pointer', 'address_space', 'spoof', 'location', 'access', 'size', 'alignment', 'buffer_size', 'unused', 'opaque', 'duplicate']
+	mut names := ['vector_sizes', 'scalar_sizes', 'image_sizes']
+	mut source := strings.new_builder(65536)
+	source.write_string('target datalayout = "e-p:64:64"\n')
+	for vector in [true, false] {
+		name := if vector { names[0] } else { names[1] }; typ := if vector { '<3 x i32>' } else { 'i32' }
+		source.write_string('define void @${name}(${typ} %gid, i32 %local, ${typ} %grid, ${typ} %actual, ${typ} %requested, ptr addrspace(1) %out) {\n')
+		mut values := []string{}
+		for arg in ['gid', 'grid', 'actual', 'requested'] {
+			if vector { for lane in 0 .. 3 { source.write_string('%${arg}${lane} = extractelement <3 x i32> %${arg}, i32 ${lane}\n'); values << '%${arg}${lane}' } } else { values << '%${arg}' }
+			if arg == 'gid' { values << '%local' }
+		}
+		if vector {
+			source.write_string('%zy = mul nuw nsw i32 %gid2, %grid1\n %row = add nuw nsw i32 %zy, %gid1\n %start = mul nuw nsw i32 %row, %grid0\n %index = add nuw nsw i32 %start, %gid0\n')
+		} else { source.write_string('%index = add i32 %gid, 0\n') }
+		for i, value in values { source.write_string('%record${i} = insertelement <16 x i32> ${if i == 0 { 'zeroinitializer' } else { '%record' + (i - 1).str() }}, i32 ${value}, i32 ${i}\n') }
+		source.write_string('%p = getelementptr <16 x i32>, ptr addrspace(1) %out, i32 %index\n store <16 x i32> %record${values.len - 1}, ptr addrspace(1) %p, align 4\n ret void }\n')
+	}
+	// RGBA8 pixels use a padded 256-byte row. The same shader derives its blue
+	// channel from the current grid dimensions for every image dispatch.
+	source.write_string('define void @image_sizes(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) { %x = extractelement <3 x i32> %gid, i32 0\n %y = extractelement <3 x i32> %gid, i32 1\n %w = extractelement <3 x i32> %grid, i32 0\n %h = extractelement <3 x i32> %grid, i32 1\n %row = mul nuw nsw i32 %y, 64\n %index = add nuw nsw i32 %row, %x\n %p = getelementptr i32, ptr addrspace(1) %out, i32 %index\n %rr = mul i32 %x, 3\n %r = and i32 %rr, 255\n %gg = mul i32 %y, 5\n %g0 = and i32 %gg, 255\n %g = shl i32 %g0, 8\n %wh = add i32 %w, %h\n %bb = mul i32 %wh, 7\n %b0 = and i32 %bb, 255\n %b = shl i32 %b0, 16\n %rg = or i32 %r, %g\n %rgb = or i32 %rg, %b\n %rgba = or i32 %rgb, 4278190080\n store i32 %rgba, ptr addrspace(1) %p, align 4\n ret void }\n')
+	for semantic in 0 .. 3 { for kind in bad {
+		name := 'bad_${semantic}_${kind}'; names << name
+		typ := match kind { 'half' { 'i16' } 'wide' { 'i64' } 'float' { 'float' } 'vec2' { '<2 x i32>' } 'vec4' { '<4 x i32>' } 'float_vector' { '<3 x float>' } 'pointer', 'address_space' { 'ptr' } else { 'i32' } }
+		source.write_string('define void @${name}(${typ} %value, i32 %other, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n ret void }\n')
+	} }
+	for family in 0 .. 2 {
+		name := 'mismatch_${family}'; names << name
+		source.write_string('define void @${name}(<3 x i32> %a, i32 %b, ptr addrspace(1) %out) { store i8 17, ptr addrspace(1) %out\n ret void }\n')
+	}
+	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
+	for i, name in names {
+		n := i * 20
+		source.write_string('!${n} = !{ptr @${name}, !${n + 1}, !${n + 2}}\n !${n + 1} = !{}\n')
+		if i < 2 {
+			source.write_string('!${n + 2} = !{!${n + 8}, !${n + 7}, !${n + 6}, !${n + 5}, !${n + 4}, !${n + 3}}\n')
+			for a, semantic in semantics {
+				typ := if i == 0 && a != 1 { 'uint3' } else { 'uint' }
+				source.write_string('!${n + 3 + a} = !{i32 ${a}, !"${semantic}", !"air.arg_type_name", !"${typ}"}\n')
+			}
+			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
+		} else {
+			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
+			if i == 2 {
+				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
+			} else if i < 3 + bad.len * 3 {
+				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
+				extra := match kind {
+					'spoof' { ', !"air.arg_type_name", !"int"' }
+					'location' { ', !"air.location_index", i32 0, i32 1' }
+					'access' { ', !"air.read"' }
+					'size' { ', !"air.arg_type_size", i32 4' }
+					'alignment' { ', !"air.arg_type_align_size", i32 4' }
+					'buffer_size' { ', !"air.buffer_size", i32 4' }
+					'address_space' { ', !"air.address_space", i32 0' }
+					'unused' { ', !"air.arg_unused"' }
+					'opaque' { ', !"air.unknown_tail", i32 9' }
+					else { '' }
+				}
+				source.write_string('!${n + 3} = !{i32 0, !"${semantic}"${extra}}\n !${n + 4} = !{i32 1, !"${if kind == 'duplicate' { semantic } else { 'air.thread_index_in_threadgroup' }}"}\n')
+			} else {
+				family := i - 3 - bad.len * 3
+				source.write_string('!${n + 3} = !{i32 0, !"${if family == 0 { semantics[0] } else { semantics[3] }}"}\n !${n + 4} = !{i32 1, !"${if family == 0 { semantics[2] } else { semantics[4] }}"}\n')
+			}
+		}
+	}
+	os.write_file(out + '/input.ll', source.str())!
+	r := os.exec(['/opt/homebrew/opt/llvm/bin/llvm-as', out + '/input.ll', '-o', out + '/input.bc'])
+	os.write_file(out + '/assemble.log', r.output)!; sm_grid_check(r.exit_code == 0, r.output)
+	code := os.read_bytes(out + '/input.bc')!; bytes := sm_library_code_fixture(names, code, true, true, true)
+	defer { unsafe { code.free(); bytes.free() } }
+	mut rows := os.create(out + '/comparisons.txt')!; defer { rows.close() }
+	mut complete := 0; mut invocations := u64(0); mut rejected := 0; mut images := 0; mut failed := 0
+	for cycle in 0 .. 2 {
+		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
+		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
+		queue := sm_send(device, c'newCommandQueue')
+		for name in names[3..] {
+			mut error_slot := u64(0)
+			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
+			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
+		}
+		output := sm_test_buffer(device, 4096 * 64 + 32, 0); op := sm_send(output, c'contents')
+		for vector in [true, false] {
+			pipeline := sm_test_compute_pipeline(device, library, if vector { names[0] } else { names[1] }, unsafe { nil }); sm_grid_check(pipeline != 0, 'size pipeline')
+			grids := if vector { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{7, 5, 3}, SoftwareMetalSize{16, 16, 16}, SoftwareMetalSize{1, 5, 3}, SoftwareMetalSize{5, 1, 7}] } else { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{7, 1, 1}, SoftwareMetalSize{17, 1, 1}, SoftwareMetalSize{256, 1, 1}, SoftwareMetalSize{4096, 1, 1}] }
+			groups := if vector { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{3, 2, 2}, SoftwareMetalSize{4, 4, 4}] } else { [SoftwareMetalSize{1, 1, 1}, SoftwareMetalSize{3, 1, 1}, SoftwareMetalSize{256, 1, 1}] }
+			for grouped in [false, true] { for grid in grids { for group in groups {
+				if grid.width * grid.height * grid.depth * (if grouped { group.width * group.height * group.depth } else { u64(1) }) > 4096 { continue }
+				s := sm_multigrid_extent(SoftwareMetalMultigridCase{grouped, grid, group, false})
+				command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+				unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+				sm_test_compute_buffer(encoder, output, 16, 7)
+				sm_grid_dispatch(encoder, if grouped { c'dispatchThreadgroups:threadsPerThreadgroup:' } else { c'dispatchThreads:threadsPerThreadgroup:' }, grid, group)
+				sm_test_compute_offset(encoder, 20, 7); sm_call(encoder, c'endEncoding')
+				unsafe { C.memset(voidptr(op), 0xcc, 4096 * 64 + 32) }
+				mut expected := []u32{len: 4096 * 16 + 8, init: 0xcccccccc}
+				for gz in u64(0) .. (s.depth + group.depth - 1) / group.depth { for gy in u64(0) .. (s.height + group.height - 1) / group.height { for gx in u64(0) .. (s.width + group.width - 1) / group.width {
+					mut sx := u64(0); mut sy := u64(0); mut sz := u64(0)
+					for lx in u64(0) .. group.width { if gx * group.width + lx < s.width { sx++ } }
+					for ly in u64(0) .. group.height { if gy * group.height + ly < s.height { sy++ } }
+					for lz in u64(0) .. group.depth { if gz * group.depth + lz < s.depth { sz++ } }
+					mut local := u64(0)
+					for lz in u64(0) .. sz { for ly in u64(0) .. sy { for lx in u64(0) .. sx {
+						x := gx * group.width + lx; y := gy * group.height + ly; z := gz * group.depth + lz
+						index := int((z * s.height + y) * s.width + x) * 16 + 4
+						values := if vector { [x, y, z, local, s.width, s.height, s.depth, sx, sy, sz, group.width, group.height, group.depth] } else { [x, local, s.width, sx, group.width] }
+						for lane in 0 .. 16 { expected[index + lane] = if lane < values.len { u32(values[lane]) } else { u32(0) } }
+						unsafe { values.free() }; local++
+					} } }
+				} } }
+				sm_call(command, c'commit'); sm_grid_check(sm_send(command, c'status') == 4, 'size completion')
+				for j, value in expected { if unsafe { *(&u32(op + u64(j * 4))) } != value { panic('size record ${complete} word ${j}') } }
+				unsafe { expected.free() }; complete++; invocations += s.width * s.height * s.depth
+				rows.writeln('${cycle} ${vector} ${grouped} ${s.width},${s.height},${s.depth} ${group.width},${group.height},${group.depth} PASS')!
+			} } }
+			if vector {
+				short := sm_test_buffer(device, 16 + 104 * 64, 0); sp := sm_send(short, c'contents'); length := sm_send(short, c'length')
+				command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+				unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+				sm_test_compute_buffer(encoder, short, 16, 7)
+				sm_grid_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', SoftwareMetalSize{7, 5, 3}, SoftwareMetalSize{3, 2, 2})
+				sm_call(encoder, c'endEncoding'); unsafe { C.memset(voidptr(sp), 0xcc, usize(length)) }; objc_release(short)
+				sm_call(command, c'commit'); sm_grid_check(sm_send(command, c'status') == 5 && sm_send(command, c'error') != 0, 'size prewrite failure')
+				for j in u64(0) .. length { sm_grid_check(unsafe { *(&u8(sp + j)) } == 0xcc, 'size prewrite output untouched') }; failed++
+			}
+			objc_release(pipeline)
+		}
+		objc_release(output)
+		pipeline := sm_test_compute_pipeline(device, library, names[2], unsafe { nil }); sm_grid_check(pipeline != 0, 'image pipeline')
+		for shape in [SoftwareMetalSize{7, 5, 1}, SoftwareMetalSize{17, 3, 1}, SoftwareMetalSize{32, 8, 1}, SoftwareMetalSize{64, 64, 1}] {
+			length := 512 + shape.height * 256; buffer := sm_test_buffer(device, length, 0); bp := sm_send(buffer, c'contents')
+			desc := sm_test_descriptor(70, shape.width, shape.height, 0); texture := sm_test_buffer_texture_view(buffer, desc, 256, 256)
+			sm_grid_check(texture != 0, 'image texture')
+			command := sm_send(queue, c'commandBuffer'); encoder := sm_send(command, c'computeCommandEncoder')
+			unsafe { SMSet(voidptr(C.ios_objc_msgsend))(encoder, c'setComputePipelineState:', pipeline) }
+			sm_test_compute_buffer(encoder, buffer, 256, 7); sm_grid_dispatch(encoder, c'dispatchThreads:threadsPerThreadgroup:', shape, SoftwareMetalSize{3, 2, 1})
+			sm_call(encoder, c'endEncoding'); unsafe { C.memset(voidptr(bp), 0xcc, usize(length)) }; objc_release(buffer)
+			sm_call(command, c'commit'); sm_grid_check(sm_send(command, c'status') == 4, 'image completion')
+			mut pixels := []u8{len: int(shape.width * shape.height * 4)}
+			sm_test_read(texture, SoftwareMetalRegion{width: shape.width, height: shape.height, depth: 1}, 0, u64(pixels.data), shape.width * 4)
+			mut expected := []u8{len: int(length), init: 0xcc}; mut ppm := 'P6\n${shape.width} ${shape.height}\n255\n'.bytes()
+			for y in u64(0) .. shape.height { for x in u64(0) .. shape.width {
+				color := [u8(x * 3), u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				for lane in 0 .. 4 {
+					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
+					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]
+					if lane < 3 { ppm << pixels[int((y * shape.width + x) * 4) + lane] }
+				}
+			} }
+			for j, value in expected { if unsafe { *(&u8(bp + u64(j))) } != value { panic('image backing byte ${j}') } }
+			os.write_file_array(out + '/image-${cycle}-${shape.width}x${shape.height}.ppm', ppm)!
+			unsafe { pixels.free(); expected.free(); ppm.free() }; objc_release(texture)
+			images++; invocations += shape.width * shape.height
+			rows.writeln('${cycle} image ${shape.width}x${shape.height} RGBA8/readback/padding PASS')!
+		}
+		objc_release(pipeline); objc_release(queue); objc_release(library); objc_release(device); objc_pool_pop(pool)
+		sm_grid_check(ios_runtime.live == 0 && ios_runtime.objects.len == 0, 'drained size runtime'); objc_stop()
+	}
+	line := 'IOS-SOFTWARE-METAL-SIZES: ${complete} geometry dispatches, ${images} shader images, ${invocations} checked invocations, ${rejected} rejected pipelines, ${failed} prewrite bounds failures, reusable scalar/uint3 size builtins, both selectors, clipped groups, RGBA8 buffer-texture readback and two drained runtimes PASS\n'
 	os.write_file(out + '/result.txt', line)!; print(line)
 }
 fn sm_test_computed_index_focus() ! {
