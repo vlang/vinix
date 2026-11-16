@@ -4505,6 +4505,14 @@ fn sm_test_geometry_sizes_focus() ! {
 declare <1 x i32> @llvm.uadd.sat.v1i32(<1 x i32>, <1 x i32>)
 declare <1 x i32> @llvm.ssub.sat.v1i32(<1 x i32>, <1 x i32>)
 declare <1 x i32> @llvm.usub.sat.v1i32(<1 x i32>, <1 x i32>)
+declare <2 x i32> @air.add_sat.s.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @air.add_sat.u.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @air.sub_sat.s.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @air.sub_sat.u.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.sadd.sat.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.ssub.sat.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.uadd.sat.v2i32(<2 x i32>, <2 x i32>)
+declare <2 x i32> @llvm.usub.sat.v2i32(<2 x i32>, <2 x i32>)
 define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
  %x = extractelement <3 x i32> %gid, i32 0
  %y = extractelement <3 x i32> %gid, i32 1
@@ -4515,10 +4523,54 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
  %unsigned_add = call <1 x i32> @llvm.uadd.sat.v1i32(<1 x i32> %input, <1 x i32> <i32 4294967295>)
  %signed_sub = call <1 x i32> @llvm.ssub.sat.v1i32(<1 x i32> <i32 2147483648>, <1 x i32> <i32 1>)
  %unsigned_sub = call <1 x i32> @llvm.usub.sat.v1i32(<1 x i32> %input, <1 x i32> <i32 3>)
- %sa = extractelement <1 x i32> %signed_add, i32 0
- %ua = extractelement <1 x i32> %unsigned_add, i32 0
- %ss = extractelement <1 x i32> %signed_sub, i32 0
- %us = extractelement <1 x i32> %unsigned_sub, i32 0
+ %llvm_sa = extractelement <1 x i32> %signed_add, i32 0
+ %llvm_ua = extractelement <1 x i32> %unsigned_add, i32 0
+ %llvm_ss = extractelement <1 x i32> %signed_sub, i32 0
+ %llvm_us = extractelement <1 x i32> %unsigned_sub, i32 0
+ %air_input = insertelement <2 x i32> <i32 0, i32 -2147483648>, i32 %x, i32 0
+ %air_unsigned_input = insertelement <2 x i32> <i32 0, i32 -1>, i32 %x, i32 0
+ %air_sub_input = insertelement <2 x i32> zeroinitializer, i32 %x, i32 0
+ %air_sa = call <2 x i32> @air.add_sat.s.v2i32(<2 x i32> %air_input, <2 x i32> <i32 2147483647, i32 -1>)
+ %air_ua = call <2 x i32> @air.add_sat.u.v2i32(<2 x i32> %air_unsigned_input, <2 x i32> <i32 -1, i32 1>)
+ %air_ss = call <2 x i32> @air.sub_sat.s.v2i32(<2 x i32> <i32 -2147483648, i32 2147483647>, <2 x i32> <i32 1, i32 -1>)
+ %air_us = call <2 x i32> @air.sub_sat.u.v2i32(<2 x i32> %air_sub_input, <2 x i32> <i32 3, i32 1>)
+ %llvm_sa2 = call <2 x i32> @llvm.sadd.sat.v2i32(<2 x i32> %air_input, <2 x i32> <i32 2147483647, i32 -1>)
+ %llvm_ua2 = call <2 x i32> @llvm.uadd.sat.v2i32(<2 x i32> %air_unsigned_input, <2 x i32> <i32 -1, i32 1>)
+ %llvm_ss2 = call <2 x i32> @llvm.ssub.sat.v2i32(<2 x i32> <i32 -2147483648, i32 2147483647>, <2 x i32> <i32 1, i32 -1>)
+ %llvm_us2 = call <2 x i32> @llvm.usub.sat.v2i32(<2 x i32> %air_sub_input, <2 x i32> <i32 3, i32 1>)
+ %expect_sa = insertelement <2 x i32> <i32 0, i32 -2147483648>, i32 %llvm_sa, i32 0
+ %expect_ua = insertelement <2 x i32> <i32 0, i32 -1>, i32 %llvm_ua, i32 0
+ %expect_ss = insertelement <2 x i32> <i32 0, i32 2147483647>, i32 %llvm_ss, i32 0
+ %expect_us = insertelement <2 x i32> zeroinitializer, i32 %llvm_us, i32 0
+ %air_same_sa = icmp eq <2 x i32> %air_sa, %llvm_sa2
+ %air_same_ua = icmp eq <2 x i32> %air_ua, %llvm_ua2
+ %air_same_ss = icmp eq <2 x i32> %air_ss, %llvm_ss2
+ %air_same_us = icmp eq <2 x i32> %air_us, %llvm_us2
+ %air_endpoint_sa = icmp eq <2 x i32> %air_sa, %expect_sa
+ %air_endpoint_ua = icmp eq <2 x i32> %air_ua, %expect_ua
+ %air_endpoint_ss = icmp eq <2 x i32> %air_ss, %expect_ss
+ %air_endpoint_us = icmp eq <2 x i32> %air_us, %expect_us
+ %air_ok0 = and <2 x i1> %air_same_sa, %air_same_ua
+ %air_ok1 = and <2 x i1> %air_same_ss, %air_same_us
+ %air_ok2 = and <2 x i1> %air_endpoint_sa, %air_endpoint_ua
+ %air_ok3 = and <2 x i1> %air_endpoint_ss, %air_endpoint_us
+ %air_ok4 = and <2 x i1> %air_ok0, %air_ok1
+ %air_ok5 = and <2 x i1> %air_ok2, %air_ok3
+ %air_ok = and <2 x i1> %air_ok4, %air_ok5
+ %air_lane0 = extractelement <2 x i1> %air_ok, i32 0
+ %air_lane1 = extractelement <2 x i1> %air_ok, i32 1
+ %air_all = and i1 %air_lane0, %air_lane1
+ %air_sa0 = extractelement <2 x i32> %air_sa, i32 0
+ %air_ua0 = extractelement <2 x i32> %air_ua, i32 0
+ %air_ss0 = extractelement <2 x i32> %air_ss, i32 0
+ %air_us0 = extractelement <2 x i32> %air_us, i32 0
+ %sa = select i1 %air_all, i32 %air_sa0, i32 poison
+ %ua = select i1 %air_all, i32 %air_ua0, i32 poison
+ %ss = select i1 %air_all, i32 %air_ss0, i32 poison
+ %us = select i1 %air_all, i32 %air_us0, i32 poison
+ %below = icmp ult i32 %x, 3
+ %restored = add i32 %air_us0, 3
+ %coordinate = select i1 %below, i32 %x, i32 %restored
  %sa_hi = lshr i32 %sa, 26
  %ua_hi = lshr i32 %ua, 26
  %ss_hi = lshr i32 %ss, 26
@@ -4528,9 +4580,10 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
  %constant = xor i32 %first, %ss_bits
  %mixed_offset = xor i32 %constant, %us
  %offset = and i32 %mixed_offset, 63
- %root = getelementptr i8, ptr addrspace(1) %out, i32 %offset
+ %address_offset = and i32 %air_us0, 63
+ %root = getelementptr i8, ptr addrspace(1) %out, i32 %address_offset
  %row = shl i32 %y, 6
- %index = add i32 %row, %x
+ %index = add i32 %row, %coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
  %mixed = xor i32 %red, %offset
