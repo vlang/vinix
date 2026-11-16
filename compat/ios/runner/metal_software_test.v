@@ -5174,7 +5174,11 @@ define void @image_modern_number_reduction(<3 x i32> %gid, <3 x i32> %grid, ptr 
 
 ')
 	names << 'image_canonicalize'
-	source.write_string('declare float @llvm.canonicalize.f32(float)
+source.write_string('declare float @air.fabs.f32(float) #0
+declare float @air.floor.f32(float) #0
+declare float @air.ceil.f32(float) #0
+declare float @air.trunc.f32(float) #0
+declare float @llvm.canonicalize.f32(float)
 declare half @llvm.canonicalize.f16(half)
 declare <2 x float> @llvm.canonicalize.v2f32(<2 x float>)
 declare <2 x half> @llvm.canonicalize.v2f16(<2 x half>)
@@ -5228,12 +5232,28 @@ define void @image_canonicalize(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1
  %flags3 = or i32 %flags0, %flags1
  %flags = or i32 %flags2, %flags3
  %offset = xor i32 %flags, %x
+ %xf = uitofp i32 %x to float
+ %fraction = fadd float %xf, 0.5
+ %negative = fneg float %fraction
+ %absolute = call float @air.fabs.f32(float %negative)
+ %down = call float @air.floor.f32(float %absolute)
+ %up = call float @air.ceil.f32(float %negative)
+ %toward = call float @air.trunc.f32(float %negative)
+ %negative_x = fneg float %xf
+ %fabs_ok = fcmp oeq float %absolute, %fraction
+ %floor_ok = fcmp oeq float %down, %xf
+ %ceil_ok = fcmp oeq float %up, %negative_x
+ %trunc_ok = fcmp oeq float %toward, %negative_x
+ %float_pair0 = and i1 %fabs_ok, %floor_ok
+ %float_pair1 = and i1 %ceil_ok, %trunc_ok
+ %float_ok = and i1 %float_pair0, %float_pair1
  %coordinate = or i32 %x, 0
  %row = shl i32 %y, 6
  %index = add i32 %row, %coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
- %mixed = xor i32 %red, %offset
+ %mixed_raw = xor i32 %red, %offset
+ %mixed = select i1 %float_ok, i32 %mixed_raw, i32 poison
  %r = and i32 %mixed, 255
  %gg = mul i32 %y, 5
  %g0 = and i32 %gg, 255

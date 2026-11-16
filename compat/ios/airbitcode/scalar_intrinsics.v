@@ -26,6 +26,7 @@ fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
+	if name.starts_with('air.') && name.ends_with('.f32') { id, _ := air_float_intrinsic(name)!; return id }
 	return match name {
 		'llvm.fabs.f16', 'llvm.fabs.f32' { ScalarIntrinsic.fabs }
 		'llvm.canonicalize.f16', 'llvm.canonicalize.f32' { ScalarIntrinsic.canonicalize }
@@ -109,7 +110,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
-	key := if f.name.starts_with('air.') { _, slot := air_integer_intrinsic(f.name)!; scalar_air_integer_cache_base + slot } else if scalar_integer_mulh(id) { scalar_mulh_cache_base + int(id == .umulh) * 64 + int(bits) - 1 } else if id == .canonicalize { scalar_canonicalize_cache_base + int(bits == 16) } else if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
+	key := if f.name.starts_with('air.') && !integer { _, slot := air_float_intrinsic(f.name)!; scalar_air_float_cache_base + slot } else if f.name.starts_with('air.') { _, slot := air_integer_intrinsic(f.name)!; scalar_air_integer_cache_base + slot } else if scalar_integer_mulh(id) { scalar_mulh_cache_base + int(id == .umulh) * 64 + int(bits) - 1 } else if id == .canonicalize { scalar_canonicalize_cache_base + int(bits == 16) } else if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
 	return key, ir_values(stream, raw)[6], id == .is_fpclass || scalar_integer_poison_flag(id)
 }
 // Accept only harmless function-level properties inherent in these intrinsics.

@@ -1,5 +1,13 @@
 # Software Metal backend
 
+Prepared pipelines execute scalar `air.fabs.f32`, `air.floor.f32`,
+`air.ceil.f32` and `air.trunc.f32` using the existing float evaluators.
+The canonicalization image also checks these four operations on coordinate-derived
+positive and negative fractions before RGBA8 readback. Native LLVM references
+cover raw float encodings, typed and loaded inputs, declaration coexistence and
+rounding environments. This is CPU software Metal; native GPU execution and a
+new Fortnite launch/frame remain unverified.
+
 Prepared pipelines execute scalar `air.mul_hi.s.i32` and `air.mul_hi.u.i32`
 using the existing signed/unsigned multiply-high evaluators. Separate appended
 cache entries permit LLVM/AIR coexistence. The multiply-high image fixture

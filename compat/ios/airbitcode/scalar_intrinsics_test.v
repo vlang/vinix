@@ -21,7 +21,7 @@ fn test_scalar_intrinsic_bits_and_rounding() {
 	defer { unsafe { for row in cases { row.free() }; cases.free() } }
 	for row in cases { assert scalar_intrinsic_value(unsafe { ScalarIntrinsic(row[0]) }, u32(row[1]), row[2], row[3])! == row[4], '${row}' }
 	if _ := scalar_intrinsic_value(.fabs, 64, 0, 0) { assert false, 'unsupported precision' }
-	for name in ['air.fabs.f32', 'llvm.fabs.f64', 'llvm.fabs.v2f32', 'llvm.sin.f32', 'llvm.fabs.f32.spoof'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported name' } }
+	for name in ['air.fabs.f64', 'llvm.fabs.f64', 'llvm.fabs.v2f32', 'llvm.sin.f32', 'llvm.fabs.f32.spoof'] { if _ := scalar_intrinsic_name(name) { assert false, 'unsupported name' } }
 	println('AIR-SCALAR-INTRINSIC-VALUES: ${cases.len} exact sign/payload/rounding/zero/subnormal/infinity/NaN patterns and unsupported name/width guards PASS')
 }
 
