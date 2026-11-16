@@ -12,7 +12,6 @@ module alloc
 // Translated from the Asahi Linux alloc.rs allocator code.
 
 import klock
-import lib
 
 // --- GPU page size (must match pgtable.uat_pgsz) ---
 pub const gpu_page_size = u64(16384)
@@ -76,50 +75,42 @@ pub fn new_heap(name string, start u64, end u64) HeapAllocator {
 	}
 }
 
-// Allocate `size` bytes aligned to `align` from the heap.
-// Returns the GPU virtual address of the allocation, or none on failure.
-// Both `size` and the returned address are rounded/aligned to `align`
-// (which itself must be a power of two and >= gpu_page_size).
+// Checked rounding is local to GPU allocation. A wrapped size or address must
+// never become a successful reservation in the sign-extended firmware ranges.
+fn checked_heap_align_up(value u64, alignment u64) ?u64 {
+	if alignment == 0 || (alignment & (alignment - 1)) != 0 { return none }
+	mask := alignment - 1
+	if value > ~u64(0) - mask { return none }
+	return (value + mask) & ~mask
+}
+
+fn heap_allocation_address(top u64, end u64, size u64, alignment u64) ?u64 {
+	address := checked_heap_align_up(top, alignment) or { return none }
+	if address > end || size > end - address { return none }
+	return address
+}
+
+// Zero alignment selects the page minimum. Nonzero alignments must be powers
+// of two, as in Asahi. The size and complete aligned interval must fit.
 pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 	h.lock.acquire()
 	defer {
 		h.lock.release()
 	}
 
-	// Ensure minimum page-size alignment
+	if size == 0 || (align != 0 && (align & (align - 1)) != 0) { return none }
 	actual_align := if align < gpu_page_size { gpu_page_size } else { align }
-	aligned_size := lib.align_up(size, actual_align)
-
-	if aligned_size == 0 {
-		return none
-	}
-
-	// Align the current top pointer upward
-	aligned_top := lib.align_up(h.top, actual_align)
-
-	// Check if there is enough room
-	if aligned_top + aligned_size > h.end {
-		// Try garbage-collecting first, then re-check
+	aligned_size := checked_heap_align_up(size, actual_align) or { return none }
+	va := heap_allocation_address(h.top, h.end, aligned_size, actual_align) or {
+		// A completed suffix can make room, including after address-rounding
+		// overflow. Re-run the same checked bounds after GC changes the top.
 		h.gc_locked()
-		aligned_top2 := lib.align_up(h.top, actual_align)
-		if aligned_top2 + aligned_size > h.end {
-			C.printf(c'gpu alloc %s: out of VA space (need 0x%llx, avail 0x%llx)\n', h.name.str, aligned_size, h.end - aligned_top2)
+		heap_allocation_address(h.top, h.end, aligned_size, actual_align) or {
+			available := if h.top < h.end { h.end - h.top } else { u64(0) }
+			C.printf(c'gpu alloc %s: out of VA space (need 0x%llx, avail 0x%llx)\n', h.name.str, aligned_size, available)
 			return none
 		}
-		// Use the post-GC pointer
-		va := aligned_top2
-		h.top = va + aligned_size
-
-		a := &Allocation{
-			va: va
-			size: aligned_size
-			in_use: true
-		} @[freed]
-		h.allocations << a
-		return va
 	}
-
-	va := aligned_top
 	h.top = va + aligned_size
 
 	a := &Allocation{

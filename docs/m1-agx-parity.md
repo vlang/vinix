@@ -6,11 +6,12 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [GPU heap metadata reclamation](m1-agx-heap-records.md)
-(2026-11-17). GC now frees unlinked allocation records and serializes metadata
-readers. A measured 10,000-cycle host retention of 320,000 bytes is eliminated;
-native slab rates remain unmeasured. Modern ioctl/Mesa integration and remaining
-stage backing/event destruction are incomplete. The
+Latest offline increment: [checked GPU heap allocation bounds](m1-agx-heap-bounds.md)
+(2026-11-17). Requested alignments are validated before applying the page minimum,
+rounding rejects overflow, and complete intervals must fit before and after GC.
+Independent host cases cover sign-extended GPU ranges and `u64` boundaries.
+Modern ioctl/Mesa integration and remaining stage backing/event destruction
+are incomplete. The [GPU heap metadata reclamation](m1-agx-heap-records.md),
 [completion before deferred cleanup](m1-agx-completion-order.md),
 [compute event admission credit](m1-agx-compute-credits.md),
 [render event admission credit](m1-agx-event-credits.md),

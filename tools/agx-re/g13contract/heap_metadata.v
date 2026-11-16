@@ -13,7 +13,7 @@ fn check_heap_metadata_local(source string) ! {
   body := section(source, 'pub fn (mut h HeapAllocator) ' + method, '\n}\n', 'Heap metadata reader serialization')!
   require_order(body, ['h.lock.acquire()', 'defer {', 'h.lock.release()'], 'All readers serialize with metadata destruction')!
  }
- require(source.count('} @[freed]') == 2, 'Both metadata constructors retain their verified-free annotations')!
+ require(source.count('} @[freed]') == 1, 'The shared metadata constructor retains its verified-free annotation')!
 }
 
 fn check_heap_metadata_reference(source string) ! {
