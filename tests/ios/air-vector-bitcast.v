@@ -203,11 +203,13 @@ fn controls(assembler_path string, out string) ! {
   for index in scope.instructions_start .. scope.instructions_start + scope.instructions_count {
    op := p.instructions[index]; if stream.records[bodies.instructions[index].record].code != 3 || p.types[op.result_type].kind != .vector_t { continue }
    ref := p.references[p.types[op.result_type].refs_start]; original := p.types[ref]
-   same_category := if source < 64 { airbitcode.IRType{...original, kind: .integer_t, bits: u32(width)} } else { airbitcode.IRType{...original, kind: if width == 16 { .half_t } else { .float_t }} }
+   // Equal-width integer bitcasts are supported. Keep this mutation invalid
+   // with an unequal total width; floating-to-floating remains unsupported.
+   same_category := if source < 64 { airbitcode.IRType{...original, kind: .integer_t, bits: u32(width + 1)} } else { airbitcode.IRType{...original, kind: if width == 16 { .half_t } else { .float_t }} }
    wrong_width := if source < 64 { airbitcode.IRType{...original, kind: if width == 16 { .float_t } else { .half_t }} } else { airbitcode.IRType{...original, bits: if width == 16 { u32(32) } else { u32(16) }} }
    for variant, changed in [same_category, wrong_width, airbitcode.IRType{...original, kind: .double_t}, airbitcode.IRType{...original, kind: .bfloat_t}, airbitcode.IRType{...original, kind: .pointer_t}] {
     p.types[ref] = changed; mut output := []u8{len: 24, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]
-    if _ := p.run_memory_function(ir, stream, pools, bodies, function, mut bs, 100) { panic('bitcast lane type mutation admitted') } else { if variant < 2 { assert err.msg() == 'AIR vector: integer/floating bitcast shape', err.msg() } }; unchanged(output); checks++; unsafe { output.free(); bs.free() }
+    if _ := p.run_memory_function(ir, stream, pools, bodies, function, mut bs, 100) { panic('bitcast lane type mutation admitted') } else { if variant < 2 { assert err.msg() == if variant == 0 && source < 64 { 'AIR vector: integer bitcast shape' } else { 'AIR vector: integer/floating bitcast shape' }, err.msg() } }; unchanged(output); checks++; unsafe { output.free(); bs.free() }
    }; p.types[ref] = original; break
   }
  }

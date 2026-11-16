@@ -161,6 +161,11 @@ fn (p IRTypedProgram) integer_profile(ir IRModule, stream Stream, pools IRConsta
 				vector_work += p.vector_extract_profile(stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 			} else if vector_result {
 				if !inst.has_result || vector_results >= max_vector_update_results { return error('AIR vector: update result limit') }
+				if code == 3 && op.opcode == 11 && ir.data_layout.starts_with('E') && op.operands_count == 1 {
+					_, destination_bits, _ := p.scalar_vector_type(op.result_type, binary32, 16)!
+					_, source_bits, _ := p.scalar_vector_type(p.operands[op.operands_start].type_index, binary32, 16)!
+					if source_bits != destination_bits { return error('AIR vector: little-endian bitcast required') }
+				}
 				if code == 34 {
 					work, key, attributes, second_immarg := p.vector_float_intrinsic_profile(ir, stream, pools, bodies, scope, index, op, binary32, max_integer_execution_steps - vector_work)!
 					if vector_intrinsic_declarations[key] != 0 && vector_intrinsic_declarations[key] != op.callee_function + 1 { return error('AIR vector intrinsic: duplicate reserved declaration') }

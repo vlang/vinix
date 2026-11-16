@@ -329,7 +329,7 @@ source poison stay lane-local; any operand undef rejects the cast dependency,
 including ignored lanes, invalid extracts and later unchosen selects/freezes.
 Source freeze repairs indeterminate operands before casting; result freeze may
 repair cast poison but cannot conceal eager undef errors or an invalid extraction.
-Floating conversions and bitcasts remain excluded here.
+Floating conversions and floating bitcasts remain excluded here.
 
 Each cast builds one contiguous result table with POD metadata under the same
 vector cache tag as binary tables. Static selectors project every input lane,
@@ -340,6 +340,20 @@ free paths and graph limits remain. No runtime array or owned field is added.
 `tests/ios/air-memory-vector-cast-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks every
 distinct width pair, flag variants, source/result freezes, eager errors, lane
 poison and exact cached limits against native LLVM and a per-bit oracle.
+
+Integer vector bitcasts also feed pure address graphs. Equal-total-width
+1..16-lane i1..i64 shapes use little-endian packed bit positions, including
+non-byte widths and lanes spanning multiple inputs. All source lanes are
+observed before any result: even unused undef lanes or cold/unchosen address
+dependencies reject before writes. Poison affects each overlapping result lane;
+source/result/scalar freezes and invalid extraction selectors retain their
+existing rules. One fixed 16-int builder array collects projections; existing
+scalar observation nodes hold a contiguous source table, and POD bitcast nodes
+read only validated bit positions. The cached result table retains the maximum
+height across all source lanes. Existing 256-node/32-level bounds, graph/cache
+ownership and fixed runtime arrays remain; no new owner or free path is added.
+The maintained integer-bitcast index checker covers cache reuse, exact graph
+limits, eager errors, rejected dependency kinds and malformed operations.
 
 Integer vector `icmp` also supplies i1 address lanes from matching 1..16-lane
 i1..i64 operands. All ten equality/unsigned/signed predicates accept `samesign`.
@@ -908,12 +922,29 @@ and feed other supported vector operations, including another integer cast.
 Each cast costs one executed step and charges source plus result count to
 shared lane work. Results share the existing 4,096 static construction slots
 and execution-owned allocation. Integer, mixed, void and memory APIs use the
-same integer-vector rules. Vector reshaping, pointer casts, arguments/returns,
+same integer-vector rules. Pointer casts, arguments/returns,
 PHIs, loads/stores, scalable vectors and
 widths beyond i64 remain unsupported. `tests/ios/air-vector-integer-cast.v`
 checks every width pair and flag variant against native LLVM, explicit freeze
 choices and poison failures, plus source/result freezing, composition, loop
 reuse, unsupported profiles and exact shared storage/work limits.
+
+Fixed integer vectors also support unflagged `bitcast` between any two
+1..16-lane i1..i64 shapes with equal total bit width. On little-endian layouts,
+lane zero supplies the lowest packed bits, without padding for non-byte widths.
+Packing, splitting and boundaries crossing source lanes preserve all defined
+bits. A destination lane is poison if any overlapping source lane is poison;
+any undef source lane rejects the executed cast, including discarded results.
+Source freeze chooses zero for indeterminate source lanes; result freeze clears
+whole poison destination lanes and cannot hide an earlier undef error. Results
+retain independent snapshots and share existing construction storage, step and
+source-plus-result work budgets in integer, mixed, void and memory APIs.
+Big-endian lane reshaping, scalar/vector and pointer casts, floating reshaping,
+scalable vectors and widths beyond i64 remain unsupported.
+`tests/ios/air-memory-vector-integer-bitcast-index.v` checks native LLVM bits,
+scalar APIs, ordinary/prepared memory, address preflight and composed graphs;
+the unit suite checks every supported shape pair. See
+[LLVM bitcast semantics](https://llvm.org/docs/LangRef.html#bitcast-to-instruction).
 
 Fixed vectors support raw `bitcast` between i16/half and i32/float
 with unchanged lane count (1..16), in either direction. Every bit is preserved,
@@ -927,7 +958,7 @@ arithmetic, comparisons, selects, shuffles and extraction. Each cast costs
 one executed step and source plus result lane work, sharing the existing
 4,096 construction slots and execution-owned array. Mixed, void and memory
 execution support these casts; the integer-only API rejects floating lanes.
-Other lane formats, vector reshaping, scalar/vector casts, pointer casts,
+Other floating lane formats, floating reshaping, scalar/vector casts, pointer casts,
 scalable vectors, vector arguments/returns,
 PHIs and loads/stores remain unsupported. `tests/ios/air-vector-bitcast.v`
 checks exact native LLVM bits, complete half encodings, raw float patterns,

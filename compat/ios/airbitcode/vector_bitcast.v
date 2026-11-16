@@ -12,6 +12,7 @@ fn (p IRTypedProgram) vector_cast_profile(stream Stream, pools IRConstantPools, 
 	element, source_bits, source_count := p.scalar_vector_type(source.type_index, mixed, 16)!
 	floating_source := p.types[element].kind in [.half_t, .float_t]!
 	floating_result := p.types[dest].kind in [.half_t, .float_t]!
+	if !floating_source && !floating_result { return p.vector_integer_bitcast_profile(stream, pools, bodies, scope, index, op, remaining)! }
 	if !mixed || source_count != count || source_bits != dest_bits || floating_source == floating_result { return error('AIR vector: integer/floating bitcast shape') }
 	return count + p.vector_source_profile(stream, pools, bodies, scope, index, source, mixed, remaining - count)!
 }
@@ -32,6 +33,11 @@ fn (mut m IntegerMachine) cast_vector_value(stream Stream, inst IRInstruction, o
 	if op.opcode in [u32(5), 6]! { return m.int_float_vector_value(stream, inst, op)! }
 	if op.opcode in [u32(7), 8]! { return m.precision_cast_vector_value(stream, inst, op)! }
 	if op.opcode != 11 { return m.cast_integer_vector_value(stream, inst, op)! }
+	dest, _, _ := m.p.scalar_vector_type(op.result_type, m.binary32, 16)!
+	if m.p.types[dest].kind == .integer_t {
+		element, _, _ := m.p.scalar_vector_type(m.p.operands[op.operands_start].type_index, m.binary32, 16)!
+		if m.p.types[element].kind == .integer_t { return m.integer_bitcast_vector_value(stream, inst, op)! }
+	}
 	source := m.read_vector(stream, m.p.operands[op.operands_start])!
 	_, bits, count := m.p.scalar_vector_type(op.result_type, m.binary32, 16)!
 	return m.store_vector_value(inst, bitcast_vector(source, bits, count)!)!

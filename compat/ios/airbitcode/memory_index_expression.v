@@ -18,6 +18,7 @@ enum MemoryIndexKind {
 	projected_shuffle
 	projected_binary
 	projected_cast
+	projected_bitcast
 	projected_compare
 	projected_intrinsic
 	projected_freeze
@@ -502,6 +503,19 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			.projected_cast {
 				if undefs[node.left] { return error('AIR vector: undef integer cast lane') }
 				value = scalar_integer_cast(node.opcode, node.flags, node.source_bits, node.bits, IntegerValue{value: values[node.left], poison: poisons[node.left]})!
+			}
+			.projected_bitcast {
+				// Source observations already rejected undef. Bit positions and
+				// the contiguous source table are bounded by the builder.
+				mut word := u64(0)
+				mut poison := false
+				for bit in u32(0) .. node.bits {
+					position := node.value + bit
+					input := node.left + int(position / node.source_bits)
+					word |= ((values[input] >> (position % node.source_bits)) & 1) << bit
+					poison = poison || poisons[input]
+				}
+				value = IntegerValue{value: word, poison: poison}
 			}
 			.projected_compare {
 				if undefs[node.left] || undefs[node.right] { return error('AIR vector: undef comparison lane') }
