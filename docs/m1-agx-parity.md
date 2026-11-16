@@ -6,8 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [vertex/compute extents and complete common fields](m1-agx-work-tails.md)
-(2026-11-16). The [fragment layouts and depth insertion](m1-agx-fragment-layout.md),
+Latest offline increment: [complete fragment fields and auxiliary defaults](m1-agx-fragment-fields.md)
+(2026-11-16). The [vertex/compute common fields](m1-agx-work-tails.md),
+[fragment layouts and depth insertion](m1-agx-fragment-layout.md),
 [13.5 parameter and scratch offsets](m1-agx-fragment-tail.md),
 [compute finalizer command flag](m1-agx-compute-finalize.md),
 [versioned single-cluster vertex start](m1-agx-vertex-marker.md),

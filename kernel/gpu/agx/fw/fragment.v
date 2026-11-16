@@ -313,9 +313,9 @@ pub fn make_g13_fragment_v13_5(legacy &G13RunFragment, counter u64) G13RunFragme
 	g13_put_u64(voidptr(&out), 0x0c0, 0x100000)
 	g13_copy_bytes(voidptr(&out), 0x0c8, voidptr(legacy), 0x0b8, 0x128)
 	g13_copy_bytes(voidptr(&out), 0x1f0, voidptr(legacy), 0x1e0, 0x1d8)
-	// The final 0x10 bytes of this parameter block are zero padding; the next
-	// block starts at 0x4b8, after its complete 0xf0-byte extent.
-	g13_copy_bytes(voidptr(&out), 0x3c8, voidptr(legacy), 0x3c0, 0x0e0)
+	// Preserve the complete 0xf0-byte block, including its declared padding.
+	// The next parameter block starts immediately after it at 0x4b8.
+	g13_copy_bytes(voidptr(&out), 0x3c8, voidptr(legacy), 0x3c0, 0x0f0)
 	// The third block gains the larger AuxFBInfo and one tail word. Copy its
 	// stable regions around those insertions.
 	g13_copy_bytes(voidptr(&out), 0x4b8, voidptr(legacy), 0x4b0, 0x220)

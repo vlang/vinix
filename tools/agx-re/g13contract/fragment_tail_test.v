@@ -8,6 +8,7 @@ fn test_fragment_tail_local_preserves_scratch_and_leaves_reserved_word_empty() {
 	local := os.read_file(g13layout.repo_root() + '/kernel/gpu/agx/fw/fragment.v')!
 	check_fragment_tail_local(local)!
 	for old, changed in {'.v13_5_partial { 0x4b8 }': '.v13_5_partial { 0x4a8 }',
+		'0x3c8, voidptr(legacy), 0x3c0, 0x0f0)': '0x3c8, voidptr(legacy), 0x3c0, 0x0e0)',
 		'0x8c8, voidptr(legacy), 0x8b0, 0x004)': '0x8cc, voidptr(legacy), 0x8b0, 0x004)',
 		'0x8d0, voidptr(legacy), 0x8b4, 0x030)': '',
 		'0x768, voidptr(legacy), 0x750, 0x008)': '',
@@ -18,4 +19,16 @@ fn test_fragment_tail_local_preserves_scratch_and_leaves_reserved_word_empty() {
 		if _ := check_fragment_tail_local(local.replace(old, changed)) { assert false, old }
 	}
 	if _ := check_fragment_tail_local(local + '\nunk_398_padding\n') { assert false }
+}
+
+fn test_fragment_auxiliary_default_is_derived_from_one_literal() {
+	prefix := 'let aux_fb_info = AuxFBInfo {\nunk3: U64('
+	suffix := '),\n};\ntry_init!(fw::fragment::raw::RunFragment {\n'
+	assert fragment_work_aux_value(prefix + '0x100000' + suffix)! == 0x100000
+	assert fragment_work_aux_value(prefix + '0x8000000012345678' + suffix)! == 0x8000000012345678
+	assert fragment_work_aux_value(prefix + '0x100000' + suffix + 'unk3: U64(0)')! == 0x100000
+	for broken in [prefix + '1 << 20' + suffix, prefix + '0x100000),\nunk3: U64(0' + suffix,
+		prefix + '-1' + suffix, prefix + '0x100000', suffix] {
+		if _ := fragment_work_aux_value(broken) { assert false, broken }
+	}
 }

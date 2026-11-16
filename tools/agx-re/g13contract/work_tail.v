@@ -18,6 +18,15 @@ pub:
 	new_size int
 	counter_offset int
 	fields []WorkFieldSpan
+	defaults []WorkFieldDefault
+}
+
+pub struct WorkFieldDefault {
+pub:
+	name string
+	offset int
+	size int
+	value u64
 }
 
 fn work_tail_record(source string, name string) !string {
@@ -61,8 +70,13 @@ fn work_tail_fields(defs g13layout.Definitions, name string, path string, old_ba
 fn work_tail_contract(defs g13layout.Definitions, record string, kind string) !WorkTailContract {
 	old := defs.lay_out(record, g13layout.Target{ version: 'V12_3' })!
 	newer := defs.lay_out(record, g13layout.Target{ version: 'V13_5' })!
-	return WorkTailContract{ kind, int(old.size), int(newer.size), int(compute_flag_member(newer, 'counter')!),
-		work_tail_fields(defs, record, '', 0, 0)! }
+	return WorkTailContract{
+		kind: kind
+		old_size: int(old.size)
+		new_size: int(newer.size)
+		counter_offset: int(compute_flag_member(newer, 'counter')!)
+		fields: work_tail_fields(defs, record, '', 0, 0)!
+	}
 }
 
 // This selected source model uses the packed alias representation guards in
@@ -73,10 +87,15 @@ pub fn work_tail_contracts(vertex string, compute string, job string) ![]WorkTai
 }
 
 pub fn work_tail_layout_report(vertex string, compute string, job string) !string {
-	mut lines := ['Selected G13 vertex/compute source-layout model; packed aliases, not a compiled Rust oracle']
-	for contract in work_tail_contracts(vertex, compute, job)! {
+	return work_tail_report(work_tail_contracts(vertex, compute, job)!)
+}
+
+pub fn work_tail_report(contracts []WorkTailContract) string {
+	mut lines := ['Selected G13 work-command source-layout model; packed aliases, not a compiled Rust oracle']
+	for contract in contracts {
 		lines << '${contract.kind}: 12.3 size=0x${contract.old_size:x}; 13.5 size=0x${contract.new_size:x}; counter=0x${contract.counter_offset:x}'
 		for field in contract.fields { lines << '  ${field.name}: 0x${field.old_offset:x} -> 0x${field.new_offset:x}, size=0x${field.size:x}' }
+		for field in contract.defaults { lines << '  new ${field.name}: 0x${field.offset:x}, size=0x${field.size:x}, value=0x${field.value:x}' }
 	}
 	return lines.join('\n') + '\n'
 }

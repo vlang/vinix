@@ -2,17 +2,43 @@
 module g13contract
 
 import g13layout
+import strconv
 
 fn fragment_tail_definitions(fragment string, job string) !g13layout.Definitions {
 	mut normalized := ''
 	for name in ['BackgroundProgram', 'EotProgram', 'ArrayAddr', 'AuxFBInfo',
 		'JobParameters1', 'JobParameters2', 'JobParameters3', 'RunFragment'] {
-		normalized += compute_flag_record(fragment, name)!
+		normalized += work_tail_record(fragment, name)!
 	}
 	for name in ['EncoderParams', 'JobMeta', 'TimestampPointers'] {
-		normalized += compute_flag_record(job, name)!
+		normalized += work_tail_record(job, name)!
 	}
 	return g13layout.parse(normalized)
+}
+
+fn fragment_work_aux_value(render string) !u64 {
+	initializer := section(render, 'let aux_fb_info =', 'try_init!(fw::fragment::raw::RunFragment', 'Asahi fragment auxiliary default')!
+	marker := 'unk3: U64('
+	require(initializer.count(marker) == 1, 'Asahi auxiliary default must be one scalar U64 literal')!
+	value := initializer.all_after(marker).all_before(')').trim_space()
+	return strconv.parse_uint(value, 0, 64)
+}
+
+pub fn fragment_work_contract(fragment string, job string, render string) !WorkTailContract {
+	defs := fragment_tail_definitions(fragment, job)!
+	common := work_tail_contract(defs, 'RunFragment', 'fragment')!
+	target := g13layout.Target{ version: 'V13_5' }
+	command := defs.lay_out('RunFragment', target)!
+	aux := defs.lay_out('AuxFBInfo', target)!
+	value := fragment_work_aux_value(render)!
+	mut defaults := []WorkFieldDefault{}
+	for parent in ['job_params1', 'job_params3'] {
+		name := if parent == 'job_params1' { 'JobParameters1' } else { 'JobParameters3' }
+		parameters := defs.lay_out(name, target)!
+		offset := compute_flag_member(command, parent)! + compute_flag_member(parameters, 'aux_fb_info')! + compute_flag_member(aux, 'unk3')!
+		defaults << WorkFieldDefault{ parent + '.aux_fb_info.unk3', int(offset), 8, value }
+	}
+	return WorkTailContract{ ...common, defaults: defaults }
 }
 
 // Selected source-layout model; packed pointer/integer/event representation
@@ -39,7 +65,8 @@ fn check_fragment_tail_local(fragment string) ! {
 	require_order(getter, ['.v12_3 { 0x4b0 }', '.v13_5_partial { 0x4b8 }', 'else { none }'], 'Native versioned third parameter offset')!
 	convert := section(fragment, 'pub fn make_g13_fragment_v13_5(',
 		'pub fn g13_store_pipeline_binding(', 'Native fragment tail conversion')!
-	require_order(convert, ['0x4b8, voidptr(legacy), 0x4b0, 0x220)',
+	require_order(convert, ['0x3c8, voidptr(legacy), 0x3c0, 0x0f0)',
+		'0x4b8, voidptr(legacy), 0x4b0, 0x220)',
 		'0x6f0, voidptr(legacy), 0x6e0, 0x070)',
 		'0x768, voidptr(legacy), 0x750, 0x008)',
 		'0x770, voidptr(legacy), 0x758, 0x11c)',
@@ -56,8 +83,12 @@ fn check_fragment_tail_local(fragment string) ! {
 	}
 }
 
-fn check_fragment_tail_reference(fragment string, job string, local string) ! {
+fn check_fragment_tail_reference(fragment string, job string, render string, local string) ! {
 	defs := fragment_tail_definitions(fragment, job)!
+	contract := fragment_work_contract(fragment, job, render)!
+	require(contract.fields.len > 100 && contract.defaults.len == 2, 'Unexpected fragment field graph')!
+	require(contract.defaults[0].offset == 0xc0 && contract.defaults[1].offset == 0x6e8
+		&& contract.defaults[0].value == 0x100000 && contract.defaults[1].value == 0x100000, 'Asahi fragment auxiliary defaults moved')!
 	for version in ['V12_3', 'V13_5'] {
 		target := g13layout.Target{ version: version }
 		layout := defs.lay_out('RunFragment', target)!

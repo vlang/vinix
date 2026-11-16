@@ -1,4 +1,4 @@
-# G13 vertex and compute command conversion
+# G13 work-command conversion
 
 Compile the V runner with the AGX host tools on its import path, then supply
 the packaged Asahi Linux checkout. No reference code, firmware or GPU work runs.
@@ -16,16 +16,22 @@ gate guards packed pointer/integer, event and tag aliases. Record, padding,
 array and software-float representations have explicit guards too. This is a
 selected source-layout model, not an independently compiled Rust oracle.
 
-The ASan/UBSan fixture executes real converters for 8,000 complete byte images
+Fragment's two new auxiliary-framebuffer words receive the literal read from
+the reference render builder. Their offsets come from the nested source
+layouts. All other new fields stay zero; the expected map never reads native
+copy ranges or adapts to firmware-module overlays.
+
+The ASan/UBSan fixture executes real converters for 12,000 complete byte images
 with nonzero source patterns, five full-width counters and four guarded source
 alignments. Every common declared byte, including reserved padding, is checked;
-new fields and aggregate padding start zero. Source bytes and guards must remain
-unchanged. This verifies conversion, not the allocating native job initializer,
+new fields use their modeled defaults and aggregate padding stays zero. Source
+bytes and guards must remain unchanged. This verifies conversion, not the allocating native job initializer,
 firmware interpretation or actual GPU addresses/lifetimes.
 
-`--kind vertex|compute` selects one converter. `--fw-overlay PATH` substitutes
-`vertex.v` and/or `compute.v` in a temporary firmware-module copy while keeping
-the same reference-derived expected map, for exact-old-code counterexamples.
+`--kind vertex|compute|fragment` selects one converter; `all` is the default
+and `both` retains the earlier vertex/compute selection. `--fw-overlay PATH`
+substitutes `vertex.v`, `compute.v` and/or `fragment.v` in a temporary firmware
+module copy while keeping the same reference-derived expected map, for exact-old-code counterexamples.
 The model always comes from `--asahi-linux` and is not adapted to an overlay.
 
 Retain outputs with `AGX_WORK_WIRE_BINARY`, `AGX_WORK_WIRE_C`,
