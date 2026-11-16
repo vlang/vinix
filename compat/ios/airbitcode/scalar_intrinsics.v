@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module airbitcode
 
-enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow fptosi_sat fptoui_sat canonicalize }
+enum ScalarIntrinsic { fabs copysign floor ceil trunc round roundeven rint nearbyint minimum maximum sqrt fma ldexp minimumnum maximumnum fmuladd minnum maxnum is_fpclass ctpop bitreverse bswap ctlz cttz fshl fshr smin smax umin umax iabs sadd_sat uadd_sat ssub_sat usub_sat sshl_sat ushl_sat pext pdep clmul sadd_overflow uadd_overflow ssub_overflow usub_overflow smul_overflow umul_overflow fptosi_sat fptoui_sat canonicalize smulh umulh }
 // Validation remains the caller's responsibility. This evaluates only decoded,
 // admitted intrinsics; it never calls the declaration or a host function pointer.
 fn (m &IntegerMachine) intrinsic_value(ir IRModule, op IRTypedInstruction) !IntegerValue {
@@ -18,7 +18,7 @@ fn (m &IntegerMachine) intrinsic_value(ir IRModule, op IRTypedInstruction) !Inte
 	return if a.poison || b.poison || c.poison { IntegerValue{poison: true, aggregate: scalar_integer_overflow(id), flag_poison: scalar_integer_overflow(id)} } else if scalar_integer_overflow(id) { scalar_integer_overflow_value(id, bits, a.value, b.value)! } else if scalar_integer_saturating_shift(id) { scalar_integer_saturating_shift_value(id, bits, a.value, b.value)! } else if id == .iabs { scalar_integer_abs_value(bits, a.value, b.value)! } else if scalar_integer_zero_count(id) { scalar_integer_zero_count_value(id, bits, a.value, b.value)! } else { IntegerValue{value: if id in [.fma, .fmuladd]! { scalar_fma(bits, a.value, b.value, c.value)! } else if scalar_integer_funnel(id) { scalar_integer_funnel_value(id, bits, a.value, b.value, c.value)! } else { scalar_intrinsic_value(id, bits, a.value, b.value)! }} }
 }
 fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
-	if scalar_integer_overflow(id) { return 2 }
+	if scalar_integer_overflow(id) || scalar_integer_mulh(id) { return 2 }
 	if id in [.fma, .fmuladd, .fshl, .fshr]! { return 3 }
 	return if id in [.copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { 2 } else { 1 }
 }
@@ -103,7 +103,7 @@ fn (p IRTypedProgram) scalar_intrinsic_call(ir IRModule, stream Stream, pools IR
 	}
 	raw := stream.records[f.record]
 	if raw.code != 8 || raw.values_count < 10 { return error('AIR intrinsic: function declaration record') }
-	key := if id == .canonicalize { scalar_canonicalize_cache_base + int(bits == 16) } else if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
+	key := if scalar_integer_mulh(id) { scalar_mulh_cache_base + int(id == .umulh) * 64 + int(bits) - 1 } else if id == .canonicalize { scalar_canonicalize_cache_base + int(bits == 16) } else if conversion { scalar_saturating_cast_key(id, bits, p.integer_bits(result)!)! } else if integer { 40 + (int(id) - int(ScalarIntrinsic.ctpop)) * 64 + int(bits) - 1 } else { int(id) * 2 + int(bits == 16) }
 	return key, ir_values(stream, raw)[6], id == .is_fpclass || scalar_integer_poison_flag(id)
 }
 // Accept only harmless function-level properties inherent in these intrinsics.
@@ -192,6 +192,7 @@ fn intrinsic_declaration_attributes(stream Stream, set u64, limit int, immarg_sl
 fn scalar_intrinsic_value(id ScalarIntrinsic, bits u32, a u64, b u64) !u64 {
 	if scalar_saturating_cast(id) { return error('AIR intrinsic: separate conversion widths required') }
 	if scalar_integer_overflow(id) { return error('AIR intrinsic: overflow pair evaluator required') }
+	if scalar_integer_mulh(id) { return scalar_integer_mulh_value(id, bits, a, b)! }
 	if id == .clmul { return scalar_integer_clmul(bits, a, b)! }
 	if scalar_integer_bit_permutation(id) { return scalar_integer_bit_permutation_value(id, bits, a, b)! }
 	if scalar_integer_saturating_shift(id) { return error('AIR intrinsic: saturating shift requires poison-aware evaluation') }

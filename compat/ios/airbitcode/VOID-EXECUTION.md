@@ -1,5 +1,17 @@
 # Void-return scalar execution
 
+Scalar i1..i64 and fixed 1..16-lane integer `llvm.smulh`/`llvm.umulh` calls
+return the high N bits of the full signed/unsigned 2N-bit product. Integer limb
+arithmetic avoids host i128 and signed overflow. Scalar, void and both memory
+APIs accept exact direct declarations; the integer-only API accepts the vector
+forms through its existing intrinsic path. Poison propagates per lane, observed
+undef rejects and source/result freezes retain their existing choices. Calls
+cost one step; vectors use existing slots and 3*N validation lane-work units.
+New cache entries append without shifting prior identities. Pure integer
+address graphs accept both operands under existing node/depth limits.
+`tests/ios/air-multiply-high.v` compares widened native LLVM products and checks
+state, address, metadata, loop reuse and work/storage boundaries.
+
 `llvm.canonicalize.f16/f32` and fixed 1..16-lane vector overloads preserve
 finite encodings, subnormals, signed zero and infinities. NaNs retain sign and
 payload, with only a signaling NaN's quiet bit changed. Evaluation uses integer

@@ -1,5 +1,15 @@
 # Software Metal backend
 
+AIR signed/unsigned multiply-high supports scalar i1..i64 and fixed 1..16-lane
+integer vectors, including pure bounded buffer indexes. It computes the high
+half of the full product with portable integer limb arithmetic. Existing direct
+declaration, poison/undef, work, construction and address bounds apply. Cache
+entries append 128 scalar and 2,048 vector identities without moving prior keys.
+The geometry fixture uses both scalar and vector operations in its red channel
+and reconstructs the output coordinate from a vector unsigned high product.
+`tests/ios/air-multiply-high.v` checks native widened products, both memory paths,
+address rejection before writes, states and resource boundaries.
+
 AIR scalar and fixed 1..16-lane half/float `llvm.canonicalize` calls execute
 through the prepared software compute path. Finite values, subnormals, signed
 zero and infinity retain their bits. NaNs retain sign and payload while

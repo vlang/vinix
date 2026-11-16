@@ -20,6 +20,7 @@ fn vector_round_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return id, count, bits
 }
 fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
+	if name.starts_with('llvm.smulh.v') || name.starts_with('llvm.umulh.v') { count, bits := vector_integer_overload(name, 12)!; return if name[5] == `s` { ScalarIntrinsic.smulh } else { ScalarIntrinsic.umulh }, count, bits }
 	if name.starts_with('llvm.canonicalize.v') { count, bits := vector_float_overload(name, 19)!; return ScalarIntrinsic.canonicalize, count, bits }
 	if name.starts_with('llvm.clmul.v') { count, bits := vector_integer_overload(name, 12)!; return ScalarIntrinsic.clmul, count, bits }
 	if name.starts_with('llvm.pext.v') || name.starts_with('llvm.pdep.v') { count, bits := vector_integer_overload(name, 11)!; return if name[6] == `e` { ScalarIntrinsic.pext } else { ScalarIntrinsic.pdep }, count, bits }
@@ -56,6 +57,10 @@ fn vector_float_intrinsic_name(name string) !(ScalarIntrinsic, int, u32) {
 	return vector_round_intrinsic_name(name)
 }
 fn vector_float_intrinsic_key(id ScalarIntrinsic, count int, bits u32) !int {
+	if scalar_integer_mulh(id) {
+		if count < 1 || count > 16 || bits < 1 || bits > 64 { return error('AIR vector intrinsic: cache shape') }
+		return vector_mulh_cache_base + int(id == .umulh) * 1024 + int(bits - 1) * 16 + count - 1
+	}
 	if id == .canonicalize {
 		if count < 1 || count > 16 || bits !in [u32(16), 32]! { return error('AIR vector intrinsic: cache shape') }
 		return vector_canonicalize_cache_base + int(bits == 16) * 16 + count - 1

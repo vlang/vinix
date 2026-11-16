@@ -1,5 +1,18 @@
 # Bounded memory execution
 
+Signed/unsigned `llvm.smulh` and `llvm.umulh` support scalar i1..i64 and fixed
+1..16-lane vectors. They return the high N bits of the full 2N-bit product.
+Integer limb arithmetic handles i64 without host i128 or signed overflow.
+Operands are masked to N bits; poison propagates and observed undef rejects.
+The scalar, void and both memory APIs admit these calls, and pure address
+graphs admit scalar results and projected integer vector lanes. Both operands
+contribute to cached graph height and the existing 256-node/32-level bounds.
+Calls cost one step; vectors use one construction slot and 3*N validation
+lane-work units. Cache identities append 128 scalar and 2,048 vector entries.
+Exact ordinary direct declarations and existing attribute/type/flag guards
+apply. `tests/ios/air-multiply-high.v` checks widened LLVM products, both memory
+paths, prewrite address failures, states, loops and shared resource limits.
+
 `llvm.canonicalize.f16/f32` and fixed 1..16-lane vector overloads execute in
 the scalar, void and both memory APIs. The software target preserves finite
 encodings, subnormals, signed zero and infinity. NaNs retain sign and payload;

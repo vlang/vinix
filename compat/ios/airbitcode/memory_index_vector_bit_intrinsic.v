@@ -8,9 +8,9 @@ fn (mut b MemoryIndexBuilder) vector_bit_intrinsic_source(source IRTypedOperand,
 	// duplicate overload identities. Recheck the direct call and source here.
 	b.p.vector_float_intrinsic_profile(b.ir, b.stream, b.pools, b.bodies, b.scope, producer, op, false, 64)!
 	id, count, bits := vector_float_intrinsic_name(b.ir.functions[op.callee_function].name)!
-	if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .iabs, .smin, .smax, .umin, .umax, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .fshl, .fshr, .pext, .pdep, .clmul] { return error('AIR memory index: unsupported vector intrinsic dependency') }
+	if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .iabs, .smin, .smax, .umin, .umax, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .fshl, .fshr, .pext, .pdep, .clmul, .smulh, .umulh] { return error('AIR memory index: unsupported vector intrinsic dependency') }
 	funnel := scalar_integer_funnel(id)
-	binary := scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) || scalar_integer_bit_permutation(id) || id == .clmul || funnel
+	binary := scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) || scalar_integer_bit_permutation(id) || id == .clmul || scalar_integer_mulh(id) || funnel
 	// The immediate belongs to this call, even when its declaration or source
 	// table has already been cached. Source freezing does not change the flag.
 	poison_flag := if id == .iabs { b.p.vector_integer_abs_flag(b.ir, b.pools, b.scope, op)! } else if scalar_integer_zero_count(id) { b.p.vector_zero_count_flag(b.ir, b.pools, b.scope, op)! } else { u64(0) }

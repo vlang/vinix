@@ -308,7 +308,7 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			// declaration attribute/duplicate checks. Recheck call identity here.
 			b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, op, b.scope)!
 			id := scalar_intrinsic_name(b.ir.functions[op.callee_function].name)!
-			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .fshl, .fshr, .clmul, .pext, .pdep] { return error('AIR memory index: unsupported intrinsic dependency') }
+			if id !in [.ctpop, .bitreverse, .bswap, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .fshl, .fshr, .clmul, .pext, .pdep, .smulh, .umulh] { return error('AIR memory index: unsupported intrinsic dependency') }
 			mut poison_flag := u64(0)
 			if scalar_integer_poison_flag(id) {
 				// scalar_intrinsic_call requires an exact defined i1 immediate.
@@ -323,7 +323,7 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 				if b.nodes[rhs].height > height { height = b.nodes[rhs].height }
 				if b.nodes[amount].height > height { height = b.nodes[amount].height }
 				node = MemoryIndexNode{kind: .intrinsic_funnel, bits: bits, intrinsic: id, left: lhs, right: rhs, condition: amount, height: height + 1}
-			} else if scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) || id == .clmul || scalar_integer_bit_permutation(id) {
+			} else if scalar_integer_extremum(id) || scalar_integer_saturating(id) || scalar_integer_saturating_shift(id) || id == .clmul || scalar_integer_mulh(id) || scalar_integer_bit_permutation(id) {
 				rhs := b.expression(b.p.operands[op.operands_start + 2], producer, depth + 1)!
 				node = MemoryIndexNode{kind: .intrinsic_binary, bits: bits, intrinsic: id, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height }}
 			} else {
