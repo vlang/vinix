@@ -1373,13 +1373,13 @@ architectures; broader release/catalog/runtime acceptance remains open.
     alongside the C/header/linker and Clang/LLD image checks. The
     [host controller/producer/retainer builder](tests/packages/wine-host-build.md)
     now retains and admits selected V/C inputs, explicit SDK/resource selection
-    and observed tool images for real host executables, with forty-eight resealed
+    and observed tool images for real host executables, with fifty-five resealed
     refusals and real entrypoint checks.
     [Required host receipts](tests/packages/wine-host-required-check.md) now bind
     all three qualification roles and their retained input graphs, including
     producer admission before signing and both bindings after guest execution.
-    A fresh signed x86 holder-death/collection run, fifty-seven retention refusals
-    and eighteen startup/pre-sign refusals pass. Format-6 host receipts require
+    A fresh signed x86 holder-death/collection run, fifty-nine retention refusals
+    and eighteen startup/pre-sign refusals pass. Format-7 host receipts require
     captured Mach-O inputs, identical replay and observed file-load coverage for
     every running qualification role. The separate [Mach-O link check](tests/packages/wine-mach-link.md)
     also passes thirty-one refusal controls. The [SDK declaration audit](tests/packages/wine-sdk-check.md)
@@ -1387,7 +1387,7 @@ architectures; broader release/catalog/runtime acceptance remains open.
     qualification roles, with declared reexport coverage across all targets.
     Required [installed-SDK read-denied replay](tests/packages/wine-host-required-check.md)
     reproduces all four host-role executables, with sixteen runtime denial
-    controls and forty-eight resealed host refusals. Its complete record is
+    controls and fifty-five resealed host refusals. Its complete record is
     mandatory in producer/controller/retainer graphs, including after the guest.
     The [standalone audit](tests/packages/wine-sdk-denied-replay.md) keeps its
     historical format-4 contract. Required
@@ -1400,9 +1400,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     format-5 contract. An additive
     [directory-read qualifier](tests/packages/wine-directory-closed-replay.md)
     reproduces all four roles with exact ancestor-directory permissions, thirty-two
-    runtime denials and eight allowed controls. Mandatory integration of that
-    directory restriction remains open; global metadata/search and OS-loader
-    reads remain outside its claim. Complete
+    runtime denials and eight allowed controls. The
+    [required directory-policy integration](tests/packages/wine-lease-supervision-plan.md#required-host-replay-directory-permissions-2026-11-16)
+    now binds that restriction, its exact directory list and full control graph
+    into every format-7 host receipt. A fresh signed x86 run and all fifty-nine
+    retention refusals pass, including both retained directory-policy omissions.
+    Global metadata/search and OS-loader reads remain outside its claim. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
     activation, ARM owned Wine, fresh owned graphical acceptance and broader

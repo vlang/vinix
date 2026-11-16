@@ -5383,3 +5383,67 @@ loader/cache bytes retain their previous scope. Full metadata/search, ABI,
 compiler and hermetic admission remain unqualified. Mandatory directory-policy
 integration, owned ARM/GUI, broader lifetime/mapping controls and default
 activation remain open. No kernel, guest or product-default behavior changes.
+
+## Required host replay directory permissions (2026-11-16)
+
+Commit `eb0df0f00` integrates the exact ancestor-directory policy into required
+format-7 [host receipts](wine-host-required-check.md), extending the existing
+`read-closed/` graph with inner receipt format 2. Shared admission recomputes the
+sorted, bounded directory list and policy from captured file/tool permissions;
+a consistently resealed extra directory permission still refuses. The policy
+projector is embedded, pinned and retained in every host role. Directory type,
+the unlisted control marker, allowed enumeration and direct/symlink/Data-volume
+denials are checked alongside the existing file-data and captured-link evidence.
+All child invocation records and control artifacts belong to mandatory output
+and retained input maps. Existing verified image hashes are reused here, with
+current-byte checks still required before and after this projection.
+
+Fresh fixture, controller, producer and retainer builds all pass. Each requires
+identical captured and unrestricted hidden-object link outputs, one allowed file
+read, one allowed directory enumeration, four denied file reads, three denied
+directory enumerations and one exact hidden-object link refusal. Across all four
+roles this is thirty-two runtime denials and eight allowed controls; the separate
+installed-SDK graph's sixteen runtime denials remain mandatory too. Host controls
+pass real/copied baselines, real entries and all fifty-five named refusals,
+including broadened/resealed directory policy/list, altered allowed/denied logs,
+changed marker, old host format 6 and old inner replay format 1. The existing
+extra-file case now consistently reseals the matching directory policy/list too.
+
+Fresh PE and owned-runtime production pass. All thirty-two receipt mutations
+pass through preflight and actual controller before guest/retention work, with
+the original ten-second per-command limit unchanged. Eighteen startup/pre-sign
+refusals pass. Signed x86 holder-SIGKILL/collection passes in 106.017 seconds,
+with producer admission before signing and both host bindings re-admitted after
+the guest. Four retention partitions pass both complete real/copied baselines
+and 15/15/15/14 exact refusals. The independent coverage checker confirms all
+fifty-nine cases, including producer/controller directory-policy input omissions
+at the original missing-artifact gate without retained output.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostdir-20261116-01`, retaining
+frozen `source-final`, builder `wine-host-build`, all four `host-*` builds,
+`host-controls`, `pe`, `prepared`, `receipt-controls`, `startup`, `native` and
+`retention-p0..p3`. Final host-control binary is `wine-host-build-check-final`,
+copied identically to the invocation path before testing. Partitions 1..3 use
+their `-parallel.log` files. `parallel-continuation.txt` and `validation.txt`
+record the deliberate parallel continuation and the original sequential
+launcher's later freshness refusal, alongside preliminary module-root compile
+diagnostics and the superseded control binary. No qualification failure or
+timeout was waived. Full feature revision/patch, tools and raw evidence remain
+outside Git. Complete original compiler/LLVM/SDK, distribution/notices, selected
+kernel/loader and historical source namespaces are still required; the original
+format-6 and standalone directory qualifier bundles are unchanged.
+
+The external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-directory-20261116-01.inventory.json`,
+SHA-256 `0d7ea0d278f57ce47b77af5eede5b487eff059263bb4bd391f6a567d742a8100`.
+Complete recording and independent comparison both pass, including bytes,
+sizes, node types, modes and link targets. Their logs are beside the inventory;
+the fixed auditor is retained in the original format-6 bundle. The complete
+new workspace was frozen before recording and remains unchanged.
+
+Global metadata/name searches, ancestor entry names, OS-root/device data
+exceptions, writes/network, helper startup/inherited state and OS loader/cache
+bytes keep their prior scope. Full ABI/library/search closure and bootstrap/
+hermetic admission remain unqualified. Owned ARM/GUI, broader lifetime/mapping
+controls, redistribution, defaults and complete roadmap 14 acceptance remain
+open. No kernel, guest or product-default behavior changes.
