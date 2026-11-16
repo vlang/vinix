@@ -154,17 +154,17 @@ fn untouched(data []u8) {
 
 fn control_cases(assembler string, root string) ! {
 	mut text := strings.new_builder(65536)
-	text.write_string('target datalayout = "e-p:64:64"\n')
+	text.write_string('target datalayout = "e-p:64:64"\n declare i64 @llvm.ctpop.i64(i64)\n')
 	for name, instruction in {
 		'load':     '%idx = load i64, ptr %out'
 		'floating_comparison': '%v = fcmp oeq float 0.0, 0.0\n %idx = zext i1 %v to i64'
 		'pointer_comparison': '%v = icmp eq ptr %out, null\n %idx = zext i1 %v to i64'
 		'vector_comparison': '%v = icmp eq <2 x i64> zeroinitializer, zeroinitializer\n %first = extractelement <2 x i1> %v, i32 0\n %idx = zext i1 %first to i64'
-		'select':   '%idx = select i1 true, i64 %arg, i64 0'
+		'intrinsic': '%idx = call i64 @llvm.ctpop.i64(i64 %arg)'
 		'freeze':   '%idx = freeze i64 %arg'
 		'pointer_integer': '%idx = ptrtoint ptr %out to i64'
 		'undef':    '%idx = add i64 %arg, undef'
-		'poison':   '%idx = add i64 %arg, poison'
+		'poison_freeze': '%idx = freeze i64 poison'
 	} {
 		text.write_string('define void @bad_${name}(i64 %arg, ptr %out) { store i8 17, ptr %out\n ${instruction}\n %p = getelementptr i8, ptr %out, i64 %idx\n ret void }\n')
 	}

@@ -99,7 +99,7 @@ loads/stores also require their complete stored size and explicit alignment.
 An index may also be a pure integer SSA expression built from scalar arguments,
 defined integer literals, literal-lane extraction from a direct integer vector
 argument, add/subtract/multiply, signed/unsigned division and remainder, shifts,
-AND/OR/XOR, scalar integer comparisons, and trunc/zext/sext. Integer widths are i1..i64
+AND/OR/XOR, scalar integer comparisons/selects, and trunc/zext/sext. Integer widths are i1..i64
 and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
 ordinary scalar evaluators. Oversized shifts, left-shift wrap promises, right-shift
 exactness and OR disjointness are checked before writes. Poison and negative/out-of-range final indices
@@ -114,17 +114,27 @@ operand signs produce poison). A comparison keeps its source integer width
 separate from its i1 result width. Zero-extend a boolean for a positive 0/1
 offset: a direct i1 true GEP index is negative and rejects under this profile.
 Floating, pointer and vector comparisons remain outside address expressions.
+Integer selects use a scalar i1 condition and matching i1..i64 value types.
+Literal poison is admitted in the expression graph; undef remains unsupported.
+Poison propagates through ordinary nodes, but a select ignores poison in its
+unselected value. A poison condition or chosen value poisons the result. Every
+GEP expression is marked as an independent root, so a poisoned root still rejects
+even if another select ignores the same node. Immediate arithmetic errors and
+the existing poison-division profile errors remain unmaskable anywhere in the
+graph. Selects choose values, not whether earlier IR arithmetic executes.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
 most 32 levels including leaves and cached subexpressions. Unrelated arithmetic
-does not consume this graph budget. Loads, PHIs, select/freeze,
+does not consume this graph budget. Loads, PHIs, freeze,
 dynamic lane selection and constructed/loaded vector dependencies reject as
 address expressions. These operations keep their ordinary non-address support.
 Every call evaluates the graph from immutable argument words into a fixed stack
 array before resolving addresses, including in cold blocks and unused GEPs.
 The graph is owned/freed with the profile; its build cache is transient and freed
 on success/error. No expression node allocates during execution.
+Evaluation uses an additional fixed 256-entry poison array alongside value words.
+Selects include all three dependency heights in the shared depth limit.
 
 `tests/ios/air-memory-bitwise-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks all
 i1..i64 widths with a defined LLVM oracle. It selects safe shift amounts before
@@ -146,6 +156,12 @@ address form with LLVM. The reference uses unflagged comparisons and a defined
 sign-bit test; flagged native targets run only after a nonpoison bounded index
 is established. Both execution APIs and validation alone check full output
 preservation on refusal. Graph limits, cold-block checking and snapshots apply.
+
+`tests/ios/air-memory-select-index.v LLVM_AS FRESH_EXTERNAL_DIR` checks both
+conditions, nested selects, literal and computed poison, poisoned conditions,
+and ordinary values across i1..i64 against defined LLVM oracle values/tags.
+Separate controls check independently cached GEP roots, one-past bounds, cold
+poison, unmaskable division errors and exact cached-condition depth boundaries.
 
 Preflight caches the index source, width and stride. Every call resolves all
 indexed GEPs and accesses, including cold blocks, before any AIR instruction or

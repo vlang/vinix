@@ -6,9 +6,11 @@ const max_memory_index_depth = 32
 
 enum MemoryIndexKind {
 	literal
+	poison
 	lane
 	binary
 	compare
+	select_value
 	cast
 }
 
@@ -23,7 +25,10 @@ struct MemoryIndexNode {
 	lane        int
 	left        int = -1
 	right       int = -1
+	condition   int = -1
 	height      int = 1
+mut:
+	root        bool // Independently checked GEP, even when reused by a select.
 }
 
 // Transient cache; nodes transfer to the private profile only on success.
@@ -86,10 +91,10 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 			node = MemoryIndexNode{ kind: .lane, bits: bits, argument: b.argument(operand)! }
 		} else if v.pooled.kind == .constant {
 			c := b.pools.constants[v.pooled.constant_index]
-			if c.kind !in [.zero, .integer] || c.splat {
+			if c.kind !in [.zero, .integer, .poison] || c.splat {
 				return error('AIR memory index: defined integer literal required')
 			}
-			node = MemoryIndexNode{ bits: bits, value: b.pools.scalar_bits(v.pooled.constant_index)! & constant_mask(bits) }
+			node = if c.kind == .poison { MemoryIndexNode{kind: .poison, bits: bits} } else { MemoryIndexNode{ bits: bits, value: b.pools.scalar_bits(v.pooled.constant_index)! & constant_mask(bits) } }
 		} else {
 			return error('AIR memory index: argument/literal required')
 		}
@@ -129,6 +134,18 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 			lhs := b.expression(left, producer, depth + 1)!
 			rhs := b.expression(right, producer, depth + 1)!
 			node = MemoryIndexNode{ kind: .compare, bits: bits, source_bits: source_bits, opcode: op.opcode, flags: op.flags, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height } }
+		} else if (code == 5 || code == 29) && op.operands_count == 3 && op.flags == 0 {
+			left := b.p.operands[op.operands_start]
+			right := b.p.operands[op.operands_start + 1]
+			condition := b.p.operands[op.operands_start + 2]
+			if left.type_index != operand.type_index || right.type_index != operand.type_index || b.p.integer_bits(condition.type_index)! != 1 { return error('AIR memory index: scalar select types') }
+			lhs := b.expression(left, producer, depth + 1)!
+			rhs := b.expression(right, producer, depth + 1)!
+			cond := b.expression(condition, producer, depth + 1)!
+			mut height := b.nodes[lhs].height
+			if b.nodes[rhs].height > height { height = b.nodes[rhs].height }
+			if b.nodes[cond].height > height { height = b.nodes[cond].height }
+			node = MemoryIndexNode{kind: .select_value, bits: bits, left: lhs, right: rhs, condition: cond, height: height + 1}
 		} else if code == 3 && op.opcode <= 2 {
 			b.p.scalar_cast_profile(op, true)!
 			source := b.p.operands[op.operands_start]
@@ -171,29 +188,37 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 	return index
 }
 
-// No loads, branch choices, or caller-provided addresses enter this evaluator.
-// Every node is needed by an index; poison is contagious in the admitted DAG.
+// No loads, CFG-dependent values, or caller-provided addresses enter this evaluator.
+// Poison propagates through ordinary nodes; select uses only its chosen value.
+// Immediate arithmetic errors still reject, even in an unselected dependency.
 fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![256]u64 {
 	mut values := [256]u64{}
+	mut poisons := [256]bool{}
 	for i, node in profile.index_nodes {
 		mut value := IntegerValue{ value: node.value }
 		match node.kind {
 			.literal {}
+			.poison { value = IntegerValue{poison: true} }
 			.lane {
 				value = IntegerValue{ value: bindings[node.argument].values[node.lane] & constant_mask(node.bits) }
 			}
 			.binary {
-				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{ value: values[node.left] }, IntegerValue{ value: values[node.right] })!
+				value = integer_binary_flags(node.opcode, node.flags, node.bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!
 			}
 			.compare {
-				value = integer_compare_flags(node.opcode, node.flags, node.source_bits, IntegerValue{ value: values[node.left] }, IntegerValue{ value: values[node.right] })!
+				value = integer_compare_flags(node.opcode, node.flags, node.source_bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] }, IntegerValue{ value: values[node.right], poison: poisons[node.right] })!
+			}
+			.select_value {
+				chosen := if values[node.condition] & 1 != 0 { node.left } else { node.right }
+				value = IntegerValue{value: values[chosen], poison: poisons[node.condition] || poisons[chosen]}
 			}
 			.cast {
-				value = scalar_integer_cast(node.opcode, node.flags, node.source_bits, node.bits, IntegerValue{ value: values[node.left] })!
+				value = scalar_integer_cast(node.opcode, node.flags, node.source_bits, node.bits, IntegerValue{ value: values[node.left], poison: poisons[node.left] })!
 			}
 		}
-		if value.poison { return error('AIR memory index: poison expression') }
+		if value.poison && node.root { return error('AIR memory index: poison expression') }
 		values[i] = value.value
+		poisons[i] = value.poison
 	}
 	return values
 }

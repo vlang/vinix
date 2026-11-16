@@ -77,6 +77,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 		operand := p.operands[term.operand_index]
 		if operand.number >= bodies.scopes[bodies.instructions[index].scope].base_id {
 			expression := expressions.expression(operand, index, 0)!
+			expressions.nodes[expression].root = true
 			return IRMemoryAccess{argument: base.argument, offset: base.offset, index_expression: expression, index_bits: p.integer_bits(operand.type_index)!, index_stride: term.stride}, base.offset
 		}
 		value := pools.lookup(bodies.instructions[index].scope, operand.number)!
