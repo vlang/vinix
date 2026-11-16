@@ -42,7 +42,7 @@ fn test_multiply_high_vectors_names_and_cache() {
 	mut seen := [vector_float_intrinsic_slots]bool{}
 	mut checks := 0; mut states := 0
 	assert scalar_mulh_cache_base == 2026 && scalar_intrinsic_cache_slots == 2154
-	assert vector_mulh_cache_base == 34784 && vector_float_intrinsic_slots == 36832
+	assert vector_mulh_cache_base == 34784 && vector_float_intrinsic_slots == 37888
 	for id in [ScalarIntrinsic.smulh, .umulh]! { for bits in u32(1) .. 65 {
 		assert scalar_intrinsic_name('llvm.${id}.i${bits}')! == id && scalar_integer_intrinsic(id) && scalar_intrinsic_arity(id) == 2
 		for count in 1 .. 17 {

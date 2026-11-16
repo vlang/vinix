@@ -1,5 +1,16 @@
 # Software Metal backend
 
+AIR `llvm.vector.reverse` supports fixed 1..16-lane i1..i64/half/float vectors
+through the prepared compute path. Raw lane bits, signaling NaNs and deferred
+poison/undef state are preserved. Integer projections also feed bounded
+addresses using existing packed shuffle nodes and node/depth guards. Exact
+direct declarations and existing profile limits apply; 1,056 declaration keys
+append without moving earlier identities. The geometry shader reverses its
+integer coordinate vector for addressing and observes reversed float/half
+signaling NaN payloads, negative zero and a subnormal in RGBA8 readback.
+`tests/ios/air-vector-reverse.v` checks native raw results, both memory paths,
+state, source/result freezes, loop reuse and resource boundaries.
+
 AIR signed/unsigned multiply-high supports scalar i1..i64 and fixed 1..16-lane
 integer vectors, including pure bounded buffer indexes. It computes the high
 half of the full product with portable integer limb arithmetic. Existing direct

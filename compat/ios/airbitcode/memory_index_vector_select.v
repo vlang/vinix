@@ -99,6 +99,8 @@ fn (mut b MemoryIndexBuilder) project_vector_lane(source IRTypedOperand, selecto
 		} else if code in [u64(9), 28] {
 			table := b.vector_compare_source(source, producer, depth + 1)!
 			node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: selector, right: table.base, condition: table.node, value: u64(count), height: 1 + if table.height > b.nodes[selector].height { table.height } else { b.nodes[selector].height }}
+		} else if code == 34 && op.callee_function >= 0 && op.callee_function < b.ir.functions.len && b.ir.functions[op.callee_function].name.starts_with('llvm.vector.reverse.') {
+			node = b.project_vector_reverse(source, selector, producer, depth)!
 		} else if code == 34 {
 			table := b.vector_bit_intrinsic_source(source, producer, depth + 1)!
 			node = MemoryIndexNode{kind: .constant_lane, bits: bits, left: selector, right: table.base, condition: table.node, value: u64(count), height: 1 + if table.height > b.nodes[selector].height { table.height } else { b.nodes[selector].height }}

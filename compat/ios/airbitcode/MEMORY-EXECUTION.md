@@ -1,5 +1,21 @@
 # Bounded memory execution
 
+`llvm.vector.reverse` supports fixed 1..16-lane i1..i64/half/float vectors.
+The source and result have exactly the same type. Reversal copies raw lane
+bits and permutes poison/undef tags, preserving floating NaN payloads and
+signaling bits. Undef remains deferred until an observing consumer; source or
+result freezes can repair it. Scalar, void and both memory APIs admit these
+calls; integer-only execution excludes floating lanes. Pure address graphs
+map integer selectors through existing packed shuffle nodes, preserving
+invalid-selector poison, selected undef and later freezes under existing
+node/depth limits. Loaded vectors, PHIs and floating dependencies retain their
+address exclusions. Calls cost one step, one vector slot and 2*N validation
+lane-work units. The 1,056 new declaration identities distinguish integer and
+floating formats with equal widths. Ordinary direct calls and existing
+signature/attribute/flag guards apply. Scalable/wider vectors and vector returns
+remain excluded. `tests/ios/air-vector-reverse.v` checks native raw values,
+address projection, typed/loaded sources, loop reuse and resource boundaries.
+
 Signed/unsigned `llvm.smulh` and `llvm.umulh` support scalar i1..i64 and fixed
 1..16-lane vectors. They return the high N bits of the full 2N-bit product.
 Integer limb arithmetic handles i64 without host i128 or signed overflow.

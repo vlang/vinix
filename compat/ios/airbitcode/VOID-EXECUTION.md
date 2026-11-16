@@ -1,5 +1,19 @@
 # Void-return scalar execution
 
+Fixed 1..16-lane i1..i64/half/float `llvm.vector.reverse` calls copy lanes in
+reverse order, preserving raw encodings and poison/undef state. They defer
+undef observation, so unused undef results may be discarded and source/result
+freezes retain their usual choices. Floating signaling NaNs remain unchanged.
+Scalar, void and both memory APIs accept exact ordinary direct declarations;
+integer-only execution excludes floating lanes. Calls cost one step and use
+one existing vector slot plus 2*N validation lane-work units. The 1,056 new
+cache keys append after earlier families and distinguish integer/half/float
+types. Existing type/flag/attribute, work and construction limits apply.
+Integer projections use existing shuffle-selector nodes in bounded address
+graphs; loaded/PHI/floating address restrictions remain. The maintained
+`tests/ios/air-vector-reverse.v` compares native LLVM raw bits, state, loop reuse,
+typed/loaded source copies and admission/resource limits.
+
 Scalar i1..i64 and fixed 1..16-lane integer `llvm.smulh`/`llvm.umulh` calls
 return the high N bits of the full signed/unsigned 2N-bit product. Integer limb
 arithmetic avoids host i128 and signed overflow. Scalar, void and both memory
