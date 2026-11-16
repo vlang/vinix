@@ -190,15 +190,15 @@ fn main() {
     }
     text.write_string('ret void }\n')
    } }
-   for kind in ['cold', 'root', 'pair_insert', 'pair_freeze', 'pair_flag_insert', 'loaded', 'undef'] {
+   for kind in ['cold', 'root', 'pair_insert', 'pair_poison_insert', 'pair_flag_insert', 'loaded', 'undef'] {
     text.write_string('define void @guard_${field}_${kind}(i${width} %a, i${width} %b, ptr %out) { store i8 17, ptr %out\n')
     if kind == 'cold' { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
     if kind == 'loaded' { text.write_string('%loaded = load i${width}, ptr %out, align 1\n') }
     text.write_string('%pair = call ${pair} ${intrinsic}(i${width} ${if kind in ['cold', 'root'] { 'poison' } else if kind == 'undef' { 'undef' } else if kind == 'loaded' { '%loaded' } else { '%a' }}, i${width} %b)\n')
     if kind == 'pair_insert' { text.write_string('%flow = insertvalue ${pair} %pair, i${width} %a, 0\n') }
     if kind == 'pair_flag_insert' { text.write_string('%flow = insertvalue ${pair} %pair, i1 false, 1\n') }
-    if kind == 'pair_freeze' { text.write_string('%flow = freeze ${pair} %pair\n') }
-    text.write_string('%r = extractvalue ${pair} ${if kind in ['pair_insert', 'pair_flag_insert', 'pair_freeze'] { '%flow' } else { '%pair' }}, ${field}\n %p = getelementptr i8, ptr %out, ${typ} %r\n')
+    if kind == 'pair_poison_insert' { text.write_string('%flow = insertvalue ${pair} %pair, i1 poison, 1\n') }
+    text.write_string('%r = extractvalue ${pair} ${if kind in ['pair_insert', 'pair_flag_insert', 'pair_poison_insert'] { '%flow' } else { '%pair' }}, ${field}\n %p = getelementptr i8, ptr %out, ${typ} %r\n')
     if kind == 'root' { text.write_string('%fixed = freeze ${typ} %r\n %safe = getelementptr i8, ptr %out, ${typ} %fixed\n') }
     if kind == 'cold' { text.write_string('br label %exit\n exit:\n') }
     text.write_string('ret void }\n')
@@ -238,7 +238,7 @@ fn main() {
     depth := p.prepare_memory_function(ir, stream, pools, bodies, fi(ir, 'depth_${field}_1_${right}'))!; depth.free()
     if _ := p.prepare_memory_function(ir, stream, pools, bodies, fi(ir, 'depth_${field}_2_${right}')) { panic('cached overflow depth') }; controls++
    }
-   for kind in ['cold', 'root', 'pair_insert', 'pair_freeze', 'pair_flag_insert', 'loaded', 'undef'] {
+   for kind in ['cold', 'root', 'pair_insert', 'pair_poison_insert', 'pair_flag_insert', 'loaded', 'undef'] {
     f := fi(ir, 'guard_${field}_${kind}')
     mut actual := []u8{len: 64, init: 0xcc}; av := [u64(0)]; mut bindings := [airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{values: av}, airbitcode.IRMemoryBinding{data: actual, writable: true}]
     if kind in ['cold', 'root'] {

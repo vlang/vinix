@@ -176,9 +176,12 @@ poison in either input poisons either extracted field. Pair selects may choose
 between checked calls, nested pair selects and zero/poison pair constants. A
 poison condition poisons the selected field; poison in an unselected pair does
 not. Both branches and the condition are validated, and all three cached heights
-count. Aggregate freeze/insert, undef pairs, PHIs and loaded operands remain
-unsupported address dependencies; scalar select/freeze may handle an extracted
-field normally.
+count. Pair freeze preserves defined value/overflow fields and independently
+chooses zero for poison fields. A direct frozen undef pair also chooses zero;
+undef remains unsupported through ordinary extraction or selection, including
+after its frozen form was cached. Cached constants retain their original poison
+state, so freezing one use never repairs an unfrozen use. Aggregate insert,
+PHIs and loaded operands remain unsupported address dependencies.
 
 Pair fields are projected into scalar nodes, with separate cache keys for the
 value field, overflow field and ordinary scalar results. Each projected pair
@@ -314,6 +317,12 @@ both selected fields across all 384 checked-arithmetic overloads with defined
 native LLVM calls/selects. It checks nested selects, zero/poison pairs, poison
 conditions, scalar freeze, computed conditions, both shared-field extraction
 orders, exact node/depth limits, cold/independent roots and unsupported inputs.
+
+`tests/ios/air-memory-pair-freeze-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares
+defined pair freezes and repeated freezes with LLVM over all 384 overloads and
+both fields. It checks the stable zero choice for poison/direct undef, nested
+select/freeze composition, shared fields, cached unfrozen poison/undef uses,
+exact node/depth boundaries and cold frozen/non-frozen roots.
 
 ## Prepared memory functions
 

@@ -345,7 +345,10 @@ add/subtract/multiply also feed indices. Calls and extractions count as two
 depth levels. Pair selects can choose between checked calls, nested selects and
 zero/poison pair constants. Both branches and the scalar condition are checked,
 including cached depth; only the selected branch contributes its poison state.
-Aggregate freeze/insert and PHIs remain unsupported address dependencies.
+Pair freezes preserve defined fields and choose stable zero for poison or a
+direct undef pair. Freezing a cached source never repairs other unfrozen uses;
+ordinary undef pair dependencies still reject.
+Aggregate insert and PHIs remain unsupported address dependencies.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
@@ -381,6 +384,8 @@ Checked unsigned addition of zero preserves the x channel and supplies an
 overflow flag that selects poison instead of the final address on overflow.
 An aggregate select chooses the checked pair when x is inside the grid and
 chooses a poison pair otherwise, before extracting either field.
+The selected pair is frozen before extraction, preserving defined fields and
+using the same stable zero choice as ordinary pair execution.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.

@@ -67,6 +67,12 @@ fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, dep
 // Project one field through a pure pair graph. Each field has its own cache
 // key; pair nodes and extractvalue each consume a node and a depth level.
 fn (mut b MemoryIndexBuilder) pair_field(operand IRTypedOperand, before int, depth int, field u32) !int {
+	return b.pair_field_source(operand, before, depth, field, false)!
+}
+
+// Only freeze's direct constant operand admits undef. Check before cache lookup
+// so a frozen constant cannot admit undef through another aggregate operation.
+fn (mut b MemoryIndexBuilder) pair_field_source(operand IRTypedOperand, before int, depth int, field u32, frozen bool) !int {
 	if depth >= max_memory_index_depth || field > 1 { return error('AIR memory index: pair field/depth limit') }
 	element := b.p.scalar_overflow_element(operand.type_index)!
 	width := b.p.integer_bits(element)!
@@ -82,6 +88,7 @@ fn (mut b MemoryIndexBuilder) pair_field(operand IRTypedOperand, before int, dep
 		producer = v.instruction
 		if producer < scope.instructions_start || producer >= before || producer >= b.p.instructions.len || producer >= b.bodies.instructions.len || b.p.instructions[producer].result_type != operand.type_index { return error('AIR memory index: earlier typed pair required') }
 	} else if v.pooled.type_index != operand.type_index { return error('AIR memory index: pair operand type') }
+	if producer < 0 && v.pooled.kind == .constant && b.pools.constants[v.pooled.constant_index].kind == .undef && !frozen { return error('AIR memory index: undef pair requires direct freeze') }
 	key := (u64(operand.number) << 2) | (u64(field) + 1)
 	if cached := b.cache[key] {
 		if b.nodes[cached].height > max_memory_index_depth - depth { return error('AIR memory index: pair expression depth limit') }
@@ -90,8 +97,14 @@ fn (mut b MemoryIndexBuilder) pair_field(operand IRTypedOperand, before int, dep
 	if b.nodes.len >= max_memory_index_nodes { return error('AIR memory index: expression node limit') }
 	mut node := MemoryIndexNode{bits: bits}
 	if producer < 0 {
-		pair := b.p.scalar_pair_constant(b.pools, b.scope, operand)!
-		node = MemoryIndexNode{kind: if pair.poison { MemoryIndexKind.poison } else { MemoryIndexKind.literal }, bits: bits}
+		if frozen { b.p.scalar_pair_frozen_constant(b.pools, b.scope, operand)! }
+		// Cache the original poison state; only the freeze node repairs it.
+		if frozen && b.pools.constants[v.pooled.constant_index].kind == .undef {
+			node = MemoryIndexNode{kind: .poison, bits: bits}
+		} else {
+			pair := b.p.scalar_pair_constant(b.pools, b.scope, operand)!
+			node = MemoryIndexNode{kind: if pair.poison { MemoryIndexKind.poison } else { MemoryIndexKind.literal }, bits: bits}
+		}
 	} else {
 		op := b.p.instructions[producer]
 		inst := b.bodies.instructions[producer]
@@ -105,6 +118,10 @@ fn (mut b MemoryIndexBuilder) pair_field(operand IRTypedOperand, before int, dep
 			lhs := b.expression(b.p.operands[op.operands_start + 1], producer, depth + 1)!
 			rhs := b.expression(b.p.operands[op.operands_start + 2], producer, depth + 1)!
 			node = MemoryIndexNode{kind: .intrinsic_overflow_field, bits: bits, source_bits: width, opcode: field, intrinsic: id, left: lhs, right: rhs, height: 1 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height }}
+		} else if code == 58 && op.flags == 0 {
+			b.p.scalar_pair_freeze(op, scope.base_id, b.pools, b.scope)!
+			lhs := b.pair_field_source(b.p.operands[op.operands_start], producer, depth + 1, field, true)!
+			node = MemoryIndexNode{kind: .freeze_value, bits: bits, left: lhs, height: 1 + b.nodes[lhs].height}
 		} else if (code == 5 || code == 29) && op.flags == 0 {
 			b.p.scalar_pair_flow(op, scope.base_id, true, b.pools, b.scope)!
 			lhs := b.pair_field(b.p.operands[op.operands_start], producer, depth + 1, field)!

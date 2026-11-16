@@ -228,7 +228,7 @@ fn main() {
    for kind in ['cold', 'root', 'unsupported_branch', 'unsupported_condition'] {
     text.write_string('define void @guard_${field}_${kind}${args} { store i8 17, ptr %out\n')
     if kind == 'cold' { text.write_string('br i1 true, label %exit, label %cold\n cold:\n') }
-    if kind == 'unsupported_branch' { text.write_string('%bad = freeze ${pair} poison\n') }
+    if kind == 'unsupported_branch' { text.write_string('%bad = insertvalue ${pair} poison, i1 false, 1\n') }
     if kind == 'unsupported_condition' { text.write_string('%bad = load i1, ptr %out\n') }
     text.write_string('%s = select i1 ${if kind == 'unsupported_condition' { '%bad' } else { 'true' }}, ${pair} ${if kind in ['cold', 'root'] { 'poison' } else { 'zeroinitializer' }}, ${pair} ${if kind == 'unsupported_branch' { '%bad' } else { 'zeroinitializer' }}\n %v = extractvalue ${pair} %s, ${field}\n %p = getelementptr i8, ptr %out, ${typ} %v\n')
     if kind == 'root' { text.write_string('%fixed = freeze ${typ} %v\n %q = getelementptr i8, ptr %out, ${typ} %fixed\n') }
