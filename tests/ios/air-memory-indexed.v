@@ -171,7 +171,7 @@ fn indexed_controls(assembler string, root string) ! {
 	} {
 		text.write_string('define void @guard_${name}(i64 %idx, ptr %out) { store i8 17, ptr %out\n %p = getelementptr i8, ptr %out, i64 %idx\n ${tail}\n ret void }\n')
 	}
-	text.write_string('define void @guard_computed(i64 %idx, ptr %out) { store i8 17, ptr %out\n %n = add i64 %idx, 1\n %p = getelementptr i8, ptr %out, i64 %n\n ret void }\ndefine void @guard_multi(i64 %idx, ptr %out) { store i8 17, ptr %out\n %p = getelementptr [4 x i8], ptr %out, i64 %idx, i64 0\n ret void }\n')
+	text.write_string('define void @guard_computed(i64 %idx, ptr %out) { store i8 17, ptr %out\n %n = load i64, ptr %out, align 1\n %p = getelementptr i8, ptr %out, i64 %n\n ret void }\ndefine void @guard_multi(i64 %idx, ptr %out) { store i8 17, ptr %out\n %p = getelementptr [4 x i8], ptr %out, i64 %idx, i64 0\n ret void }\n')
 	text.write_string('define void @store(i64 %idx, ptr %out) { store i8 17, ptr %out\n %p = getelementptr i8, ptr %out, i64 %idx\n store i8 42, ptr %p\n ret void }\ndefine void @aligned(i64 %idx, ptr %out) { store i8 17, ptr %out\n %p = getelementptr i8, ptr %out, i64 %idx\n store i8 42, ptr %p, align 4\n ret void }\ndefine void @unused(i64 %idx, ptr %out) { %p = getelementptr inbounds i8, ptr %out, i64 %idx\n ret void }\n')
 	text.write_string('define void @cold(i64 %idx, ptr %out) { store i8 17, ptr %out\n br i1 true, label %exit, label %cold\ncold: %p = getelementptr i8, ptr %out, i64 %idx\n store i8 42, ptr %p\n br label %exit\nexit: ret void }\n')
 	text.write_string('define void @snapshot(i64 %idx, ptr %out) { store i64 0, ptr %out, align 1\n %p = getelementptr i8, ptr %out, i64 %idx\n store i64 %idx, ptr %p, align 1\n ret void }\n')

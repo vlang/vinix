@@ -247,7 +247,7 @@ Compute pipeline creation parses the selected module and requires a matching
 classic `air.kernel` entry. It accepts only the ordinary void, forward-control
 [memory execution profile](../airbitcode/MEMORY-EXECUTION.md), with
 scalar binary arithmetic/comparisons/select/casts/fneg/freeze, pointer arguments with
-supported constant and direct scalar-argument GEPs,
+supported constant and bounded argument-derived GEPs,
 explicit access alignment and final ret void. Calling convention and LLVM function attributes must be
 zero. This is a bounded interpreter profile, not a general LLVM verifier.
 Valid LLVM IR remains a precondition. No source compilation is provided.
@@ -299,8 +299,10 @@ by-value uniforms and other builtins remain unsupported. Builtin
 words are passed through the memory API's typed value bindings and captured
 before execution; library, pipeline and buffer ownership are unchanged.
 A scalar builtin can directly index a supported single-index GEP. Extracted
-uint3 components and other computed
-SSA indices remain unsupported.
+uint3 lanes can also feed bounded integer add/subtract/multiply and width casts
+to form a checked buffer index, including a flattened multidimensional position.
+Only argument/literal dependencies are admitted; general SSA indices remain
+unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
 
 `tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR builtins` runs the focused
@@ -442,7 +444,7 @@ forward blocks. Each tested case costs one additional step; default paths test
 all cases in encoded order. Empty switches still evaluate poison/undef
 conditions. Literal metadata and duplicate values reject before stores. Deferred
 dispatches check scalar/pair PHIs, case/default tags and overflowing results;
-a 65-case pipeline rejects. Loops and computed SSA buffer indexes remain excluded.
+a 65-case pipeline rejects. Loops and general SSA buffer indexes remain excluded.
 
 Both compute dispatch selectors accept nonempty 1D, 2D and 3D grids and
 threadgroups. Each dispatch permits at most 4,096 invocations and 256 threads
@@ -453,7 +455,7 @@ product is bounded before multiplication. Zero dimensions, oversized volumes
 and overflowing products reject during encoding.
 The conservative per-function step bound multiplied by invocation count must
 not exceed 1,000,000. The reported thread execution width is one, maximum group
-size is 256 and static threadgroup memory is zero. Loops, computed GEP indexes, texture access,
+size is 256 and static threadgroup memory is zero. Loops, memory-dependent indexes, texture access,
 barriers and threadgroup memory remain outside this profile.
 Setting a buffer accepts nil to clear a slot; dispatch requires every argument
 to have an in-bounds, aligned binding from the queue's device. Encoding checks
@@ -499,6 +501,13 @@ The [Metal dispatch documentation](https://developer.apple.com/documentation/met
 describes full and partial threadgroups; this implementation executes synthetic AIR on the CPU.
 The [Metal language specification](https://developer.apple.com/metal/Metal-Shading-Language-Specification.pdf)
 defines local indexing and actual versus dispatch-specified group sizes.
+
+`tests/ios/metal-software-checks.v FRESH_EXTERNAL_DIR indices` checks flattened
+3D buffer copies using extracted grid coordinates, flagged integer arithmetic
+and zext. Independent group/local enumeration supplies expected values. Both
+selectors, partial groups, deferred inputs, output offsets and padding are
+covered. A final-coordinate bounds failure and late index-expression poison
+leave the complete dispatch output untouched before any invocation executes.
 
 Scalar comparison/select kernels support all ten integer predicates and all
 sixteen half/float predicates. Comparisons produce i1; select chooses between
@@ -1034,16 +1043,17 @@ field offsets and scaled indexes are applied in traversal order. Earlier
 prefixes retain their full extent even if the final pointer is lower.
 The binding offset supplies no extra headroom. Plain, nusw and inbounds forms
 are supported; nuw, zero-stride negative indexes, scalable layouts and
-computed/poison/undef/wide indexes reject
+unsupported computed/poison/undef/wide indexes reject
 before stores.
 Pipeline buffer extents include every derived/unused pointer and accessed byte;
 dispatch validates the combined extent plus the binding offset before recording.
 Derived access offsets must independently satisfy alignment. Runtime loads and
 stores use the preflighted virtual offsets, never AIR-supplied host addresses.
 
-A single-index GEP may instead use a direct scalar integer argument, with a
+A single-index GEP may instead use an admitted argument-derived integer expression, with a
 fixed base (possibly an earlier constant GEP) and fixed allocation stride.
-Each execution masks the argument to its width, rejects negative values and
+Each execution masks argument words, evaluates the pure expression with the
+ordinary integer poison rules, rejects negative final values and
 checks every resolved pointer/access against the current buffer extent and
 alignment before writes, including cold blocks. Offset arithmetic cannot wrap
 or exceed 64 MiB. Unused pointers permit one-past addresses. Indexed pointers

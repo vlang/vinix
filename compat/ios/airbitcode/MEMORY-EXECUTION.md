@@ -3,7 +3,7 @@
 `run_memory_function` executes a defined ordinary void function with buffer and
 typed value arguments, forward control flow, scalar/vector loads/stores, scalar binary operations,
 comparisons, scalar select/casts/freeze, floating negation, bounded constant and
-direct scalar-argument GEPs,
+argument-derived GEPs,
 checked overflow-pair operations and a final ret void.
 It accepts i1..i64, half and float memory values.
 Scalar `extractelement` may also read supported fixed constant/constructed/loaded
@@ -76,12 +76,12 @@ integer/scalar/void signatures retain their vector-argument exclusions. This
 memory support supersedes argument exclusions in older operation sections below.
 Vector memory stores still require byte-aligned lanes. Pointer values cannot be
 supplied as integers. A direct scalar integer argument may index a GEP as
-described below; computed SSA indices remain unsupported.
+described below, including the bounded pure expressions listed there.
 
 `tests/ios/air-memory-values.v` compares 35,904 mixed scalar/vector cases with
 native LLVM through both APIs, including all widths/counts, masking and explicit
 floating edge bits. It checks 16,830 invalid value/buffer bindings before writes,
-unsupported input shapes, computed GEP/inttoptr rejection, aliased snapshots,
+unsupported input shapes, loaded GEP/inttoptr rejection, aliased snapshots,
 bufferless functions, 256 branch/PHI inputs and 256 alternating poison/recovery calls.
 
 ## Indexed addresses
@@ -96,7 +96,26 @@ Zero strides are supported. Known inbounds/nusw/nuw flags use the same bounded,
 nonwrapping profile. An unused indexed pointer may be one past the binding;
 loads/stores also require their complete stored size and explicit alignment.
 
-Preflight caches the index argument, width and stride. Every call resolves all
+An index may also be a pure integer SSA expression built from scalar arguments,
+defined integer literals, literal-lane extraction from a direct integer vector
+argument, add/subtract/multiply, and trunc/zext/sext. Integer widths are i1..i64
+and vectors retain the 1..16-lane limit. Known integer wrap/cast flags reuse the
+ordinary scalar evaluators. Poison and negative/out-of-range final indices
+reject before writes. Unflagged arithmetic keeps its ordinary modular semantics;
+negative intermediate values are permitted when the final address is valid.
+
+Preflight builds a private, topologically ordered dependency graph only for
+required index expressions. Its shared node limit is 256 per function, with at
+most 32 levels including leaves and cached subexpressions. Unrelated arithmetic
+does not consume this graph budget. Loads, PHIs, select/freeze, other arithmetic,
+dynamic lane selection and constructed/loaded vector dependencies reject as
+address expressions. These operations keep their ordinary non-address support.
+Every call evaluates the graph from immutable argument words into a fixed stack
+array before resolving addresses, including in cold blocks and unused GEPs.
+The graph is owned/freed with the profile; its build cache is transient and freed
+on success/error. No expression node allocates during execution.
+
+Preflight caches the index source, width and stride. Every call resolves all
 indexed GEPs and accesses, including cold blocks, before any AIR instruction or
 write. Static argument minimum sizes describe only the fixed base and access
 sizes; callers must also pass the per-call validation. The engine owns one
@@ -106,8 +125,8 @@ borrowed; aliased output cannot change the resolved offsets or captured values.
 
 Indexed pointers are confined to direct ordinary load/store operands. Another
 GEP, pointer PHI/select/freeze/cast/comparison, or memory-intrinsic use rejects
-before writes, including zero-length intrinsic uses. Computed SSA indices,
-multiple dynamic indices and negative argument indices remain outside this
+before writes, including zero-length intrinsic uses. General SSA indices,
+multiple dynamic indices and negative final indices remain outside this
 profile. Existing constant backward and structured paths retain their support.
 
 `tests/ios/air-memory-indexed.v` checks 37,788 exact native cases and 15,460
@@ -115,6 +134,11 @@ invalid inputs through ordinary/prepared execution and validation alone, across
 all 64 index widths, 13 layouts and four flag forms. Controls cover unsupported
 pointer flows, alignment, cold blocks, one-past/64 MiB limits, aliased index
 snapshots, readonly address spaces and default prepared objects.
+
+`tests/ios/air-memory-computed-index.v` compares integer expression flags against
+defined native LLVM overflow intrinsics before invoking flagged native targets.
+It covers all 64 widths, vector-coordinate flattening, integer casts, poison,
+cold bounds, aliased argument snapshots and exact graph node/depth boundaries.
 
 ## Prepared memory functions
 
@@ -127,7 +151,8 @@ binding requirements and static upper bound on steps. Each argument query return
 a value copy, so changing it cannot alter the cached requirements. A default
 uninitialized object rejects execution and validation.
 `prepared.validate(bindings, step_limit)` checks the current bindings and all indexed addresses without
-executing AIR or writing buffers. It does not evaluate arithmetic poison or
+executing the AIR body or writing buffers. It evaluates index-expression poison;
+it does not evaluate unrelated arithmetic or
 guarantee a future call whose bindings have changed; `run` repeats the checks.
 
 The prepared object owns only its profile arrays. The program, module, stream,

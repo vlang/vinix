@@ -30,11 +30,12 @@ pub struct IRMemoryProfile {
 	vector_results int
 	value_arguments bool
 	indexed bool
+	index_nodes []MemoryIndexNode
 pub:
 	steps int // Static instructions, switch comparisons and memory-intrinsic bytes.
 	arguments []IRMemoryArgument
 }
-pub fn (profile &IRMemoryProfile) free() { unsafe { profile.arguments.free(); profile.accesses.free() } }
+pub fn (profile &IRMemoryProfile) free() { unsafe { profile.arguments.free(); profile.accesses.free(); profile.index_nodes.free() } }
 struct IRMemoryAccess {
 	argument int = -1
 	comparison u8 // 0: ordinary access; 1/2: precomputed false/true pointer comparison.
@@ -44,10 +45,12 @@ struct IRMemoryAccess {
 	source_argument int = -1 // Set for memmove/memcpy, including zero length.
 	source_offset u64
 	index_argument int = -1
+	index_expression int = -1
 	index_bits u32
 	index_stride u64
 	alignment u64 = 1
 }
+fn (access IRMemoryAccess) indexed() bool { return access.index_argument >= 0 || access.index_expression >= 0 }
 fn (p IRTypedProgram) memory_pointer(pools IRConstantPools, bodies IRFunctionBodies, scope int, operand int, count int, pointers []IRMemoryAccess) !IRMemoryAccess {
 	o := p.operands[operand]
 	if o.type_index < 0 || o.type_index >= p.types.len || p.types[o.type_index].kind != .pointer_t { return error('AIR memory execution: pointer required') }
@@ -60,8 +63,8 @@ fn (p IRTypedProgram) memory_pointer(pools IRConstantPools, bodies IRFunctionBod
 	if v.kind != .argument || o.number < pools.module_values || u64(o.number - pools.module_values) >= u64(count) { return error('AIR memory execution: direct pointer argument required') }
 	return IRMemoryAccess{argument: int(o.number - pools.module_values)}
 }
-fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, layouts IRTypeLayouts, index int, base IRMemoryAccess) !(IRMemoryAccess, u64) {
-	if base.index_argument >= 0 { return error('AIR memory execution: indexed pointer chain unsupported') }
+fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IRFunctionBodies, layouts IRTypeLayouts, index int, base IRMemoryAccess, mut expressions MemoryIndexBuilder) !(IRMemoryAccess, u64) {
+	if base.indexed() { return error('AIR memory execution: indexed pointer chain unsupported') }
 	op := p.instructions[index]
 	plan := p.gep_offset_plan(stream, pools, bodies, layouts, index)!
 	defer { plan.free() }
@@ -72,6 +75,10 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 	if op.operands_count == 2 && plan.terms.len == 1 {
 		term := plan.terms[0]
 		operand := p.operands[term.operand_index]
+		if operand.number >= bodies.scopes[bodies.instructions[index].scope].base_id {
+			expression := expressions.expression(operand, index, 0)!
+			return IRMemoryAccess{argument: base.argument, offset: base.offset, index_expression: expression, index_bits: p.integer_bits(operand.type_index)!, index_stride: term.stride}, base.offset
+		}
 		value := pools.lookup(bodies.instructions[index].scope, operand.number)!
 		if value.kind == .argument {
 			bits := p.integer_bits(operand.type_index)!
@@ -129,7 +136,7 @@ fn (p IRTypedProgram) memory_gep(stream Stream, pools IRConstantPools, bodies IR
 }
 // Narrow execution profile: an ordinary void function, pointer arguments,
 // forward branches/switches/PHIs, scalar and byte-aligned vector loads/stores,
-// literal and direct scalar-argument GEPs, scalar binary operations,
+// literal and bounded argument-derived GEPs, scalar binary operations,
 // comparisons, scalar select/casts/freeze, floating fneg, resolved pointer
 // PHIs/selects/freezes/bitcasts, checked overflow pairs with field
 // extraction/insertion/freeze/select, nonvolatile constant-length memory intrinsics
@@ -192,6 +199,9 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 	mut call_alignments := [16]MemoryCallAlignmentCache{}
 	mut memory_steps := 0
 	mut move_bytes := 0
+	mut expressions := MemoryIndexBuilder{p: p, stream: stream, pools: pools, bodies: bodies, scope: scope}
+	expressions.nodes.flags |= .noslices
+	defer { unsafe { expressions.cache.free(); if !keep { expressions.nodes.free() } } }
 	for index in s.instructions_start .. s.instructions_start + s.instructions_count {
 		inst := bodies.instructions[index]; op := p.instructions[index]
 		if op.is_volatile { return error('AIR memory execution: decoded access required') }
@@ -312,9 +322,9 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 			if ir.data_layout.len == 0 { return error('AIR memory execution: explicit GEP data layout required') }
 			if layouts.entries.len == 0 { layouts = p.type_layouts(ir)! }
 			base := p.fixed_memory_pointer(pools, bodies, scope, op.operands_start, count, pointers)!
-			pointer, extent := p.memory_gep(stream, pools, bodies, layouts, index, base)!
+			pointer, extent := p.memory_gep(stream, pools, bodies, layouts, index, base, mut expressions)!
 			pointers[int(inst.next_value - s.base_id)] = pointer
-			if pointer.index_argument >= 0 {
+			if pointer.indexed() {
 				indexed = true
 				accesses[index - s.instructions_start] = pointer
 			}
@@ -434,7 +444,7 @@ pub fn (p IRTypedProgram) memory_function_profile(ir IRModule, stream Stream, po
 		} else if p.operands[op.operands_start + 1].type_index != op.source_type { return error('AIR memory execution: store type') }
 	}
 	keep = true
-	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, vector_results: vector_results, value_arguments: value_arguments, indexed: indexed, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
+	return IRMemoryProfile{accesses: accesses, max_phis: max_phis, move_bytes: move_bytes, vector_results: vector_results, value_arguments: value_arguments, indexed: indexed, index_nodes: expressions.nodes, steps: s.instructions_count + switch_steps + memory_steps, arguments: arguments}
 }
 pub fn (p IRTypedProgram) run_memory_function(ir IRModule, stream Stream, pools IRConstantPools, bodies IRFunctionBodies, function int, mut bindings []IRMemoryBinding, step_limit int) !IRVoidRun {
 	if step_limit < 1 || step_limit > max_integer_execution_steps { return error('AIR memory execution: budget') }
@@ -549,7 +559,7 @@ fn (p IRTypedProgram) execute_memory_function(ir IRModule, stream Stream, pools 
 			access := profile.accesses[index - s.instructions_start]; binding := access.argument
 			bits, lanes := p.memory_value_shape(op.source_type)!
 			bytes := int((bits + 7) / 8) * lanes
-			relative := if access.index_argument >= 0 { offsets[index - s.instructions_start] } else { access.offset }
+			relative := if access.indexed() { offsets[index - s.instructions_start] } else { access.offset }
 			offset := int(bindings[binding].offset + relative)
 			if p.types[op.source_type].kind == .vector_t {
 				if code == 20 {

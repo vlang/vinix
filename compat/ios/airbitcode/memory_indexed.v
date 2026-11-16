@@ -6,7 +6,7 @@ module airbitcode
 fn (p IRTypedProgram) fixed_memory_pointer(pools IRConstantPools, bodies IRFunctionBodies,
 	scope int, operand int, count int, pointers []IRMemoryAccess) !IRMemoryAccess {
 	access := p.memory_pointer(pools, bodies, scope, operand, count, pointers)!
-	if access.index_argument >= 0 {
+	if access.indexed() {
 		return error('AIR memory execution: indexed pointer flow unsupported')
 	}
 	return access
@@ -39,9 +39,10 @@ fn (profile IRMemoryProfile) checked_memory_offsets(bindings []IRMemoryBinding,
 	mut keep := false
 	defer { if !keep { unsafe { offsets.free() } } }
 	if profile.indexed {
+		values := profile.memory_index_values(bindings)!
 		for i, access in profile.accesses {
-			if access.index_argument < 0 { continue }
-			word := bindings[access.index_argument].values[0] & constant_mask(access.index_bits)
+			if !access.indexed() { continue }
+			word := if access.index_expression >= 0 { values[access.index_expression] } else { bindings[access.index_argument].values[0] & constant_mask(access.index_bits) }
 			if word & (u64(1) << (access.index_bits - 1)) != 0 {
 				return error('AIR memory execution: negative GEP argument outside profile')
 			}
