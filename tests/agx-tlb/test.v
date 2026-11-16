@@ -207,7 +207,54 @@ fn test_range_operands() {
 	assert top.page
 }
 
+fn test_repeated_pages() {
+	for _ in 0 .. 100 {
+		mut pt := pgtable.new_pgtable(39, 48) or { panic('repeated page table') }
+		address := (u64(1) << 25) - pgtable.uat_pgsz
+		physical := u64(0x400000)
+		first := pt.get_pte(address, true) or { panic('first repeated PTE') }
+		tlb.observe(first, unsafe { nil }); pt.bind_tlb(21); expect_asid(21, 0)
+		for mode in [pgtable.gpu_prot_gpu_shared_ro, pgtable.gpu_prot_gpu_shared_wo, pgtable.gpu_prot_gpu_shared_rw]! {
+			for pages in [u64(1), 2, 3, 17]! {
+				assert pt.map_repeated_page(address, physical, pages * pgtable.uat_pgsz, mode)
+				expect_asid(21, physical | mode | pgtable.uat_pte_page | pgtable.uat_pte_ng)
+				for index := u64(0); index < pages; index++ {
+					pte := pt.get_pte(address + index * pgtable.uat_pgsz, false) or { panic('repeated leaf') }
+					assert unsafe { *pte } == physical | mode | pgtable.uat_pte_page | pgtable.uat_pte_ng
+				}
+				pt.unmap(address, pages * pgtable.uat_pgsz); expect_asid(21, 0)
+				for index := u64(0); index < pages; index++ {
+					pte := pt.get_pte(address + index * pgtable.uat_pgsz, false) or { panic('cleared repeated leaf') }
+					assert unsafe { *pte } == 0, 'every repeated alias must be removed'
+				}
+				assert pt.map(address, physical, pages * pgtable.uat_pgsz, mode)
+				expect_asid(21, physical | mode | pgtable.uat_pte_page | pgtable.uat_pte_ng)
+				for index := u64(0); index < pages; index++ {
+					pte := pt.get_pte(address + index * pgtable.uat_pgsz, false) or { panic('contiguous control leaf') }
+					assert unsafe { *pte } == (physical + index * pgtable.uat_pgsz) | mode | pgtable.uat_pte_page | pgtable.uat_pte_ng
+				}
+				pt.unmap(address, pages * pgtable.uat_pgsz); expect_asid(21, 0)
+			}
+		}
+		rollback_address := (u64(1) << 26) - pgtable.uat_pgsz
+		rollback := pt.get_pte(rollback_address, true) or { panic('repeat rollback PTE') }
+		tlb.observe(rollback, unsafe { nil }); memory.fail_after(0)
+		assert !pt.map_repeated_page(rollback_address, physical, 3 * pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw)
+		memory.fail_after(-1); expect_asid(21, 0)
+		assert unsafe { *rollback } == 0
+		for args in [[address + 1, physical, pgtable.uat_pgsz]!, [address, physical + 1, pgtable.uat_pgsz]!, [~u64(0) & ~pgtable.uat_pg_mask, physical, 2 * pgtable.uat_pgsz]!]! {
+			assert !pt.map_repeated_page(args[0], args[1], args[2], pgtable.gpu_prot_gpu_shared_rw)
+			assert tlb.calls().len == 0
+		}
+		pt.unbind_tlb(); expect_asid(21, 0); tlb.observe(unsafe { nil }, unsafe { nil })
+		pgtable.destroy(pt); unsafe { free(pt) }
+		assert memory.live_pages() == 0
+	}
+	println('AGX repeated PTEs: 100 cycles of exact alias leaves, RO/WO/RW, L3 boundary crossing, contiguous controls, partial rollback before one TLBI, invalid geometry and complete table release passed')
+}
+
 fn main() {
+	test_repeated_pages()
 	test_user_mappings()
 	test_root_publication_and_reuse()
 	test_gpu_permissions()

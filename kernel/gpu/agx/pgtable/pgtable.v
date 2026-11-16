@@ -381,6 +381,27 @@ pub fn (mut pt UatPgtable) map(iova u64, phys u64, size u64, prot u64) bool {
 	return true
 }
 
+// Repeat one physical 16 KiB page across a VA range. As with map(), callers
+// own the destination range and size rounds up to a complete UAT page.
+pub fn (mut pt UatPgtable) map_repeated_page(iova u64, phys u64, size u64, prot u64) bool {
+	if size == 0 { return true }
+	if iova & uat_pg_mask != 0 || phys & uat_pg_mask != 0 || size - 1 > ~iova { return false }
+	pt.lock.acquire()
+	defer {
+		// Rollback must be visible before a failed caller drops its BO owner.
+		pt.invalidate_range_locked(iova, size)
+		pt.lock.release()
+	}
+	pages := size / uat_pgsz + if size % uat_pgsz != 0 { u64(1) } else { u64(0) }
+	for i := u64(0); i < pages; i++ {
+		if !pt.map_page_locked(iova + i * uat_pgsz, phys, prot) {
+			for j := u64(0); j < i; j++ { pt.unmap_page_locked(iova + j * uat_pgsz) }
+			return false
+		}
+	}
+	return true
+}
+
 // Change only the access/cache attributes of an existing leaf mapping. The
 // physical page and page-table topology stay intact so firmware can evict any
 // cache lines belonging to the old mapping before it is removed.

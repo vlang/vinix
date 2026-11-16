@@ -57,7 +57,7 @@ pub fn valid_user_range(address u64, size u64, kernel_start u64, kernel_end u64)
 // the requirement for a read/write permission are checked after BO lookup.
 pub fn valid_bind_header(request &ioctl.DrmAsahiGemBind) bool {
 	return request.extensions == 0 && request.op == ioctl.asahi_bind_op_bind
-		&& request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write) == 0
+		&& request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write | ioctl.asahi_bind_single_page) == 0
 		&& (request.addr | request.range | request.offset) & page_mask == 0
 }
 
@@ -69,6 +69,11 @@ pub fn valid_bind_shape(request &ioctl.DrmAsahiGemBind) bool {
 	return valid_bind_request(request, 0, 0)
 }
 
+// SINGLE_PAGE repeats one complete UAT page; the VA range remains independent.
+pub fn bind_backing_size(request &ioctl.DrmAsahiGemBind) u64 {
+	return if request.flags & ioctl.asahi_bind_single_page != 0 { page_size } else { request.range }
+}
+
 pub fn valid_bind_request(request &ioctl.DrmAsahiGemBind, kernel_start u64,
 	kernel_end u64) bool {
 	if request.extensions != 0 {
@@ -76,8 +81,8 @@ pub fn valid_bind_request(request &ioctl.DrmAsahiGemBind, kernel_start u64,
 	}
 	match request.op {
 		ioctl.asahi_bind_op_bind {
-			return request.flags != 0
-				&& request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write) == 0
+			return request.flags & (ioctl.asahi_bind_read | ioctl.asahi_bind_write) != 0
+				&& request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write | ioctl.asahi_bind_single_page) == 0
 				&& request.offset & page_mask == 0
 				&& valid_user_range(request.addr, request.range, kernel_start, kernel_end)
 		}

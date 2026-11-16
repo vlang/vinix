@@ -20,6 +20,13 @@ the PTE and context-table words visible at each invalidation. It checks:
   address between full chunks, including canonical high addresses;
 - all host page-table allocations are released.
 
+One hundred SINGLE_PAGE cycles map 1, 2, 3 and 17 virtual pages to the same
+physical page, with every RO/WO/RW PTE checked across an L3 boundary. Ordinary
+maps still advance physical addresses. All aliases disappear on unmap; an
+injected table-allocation failure rolls back the written leaf before TLBI.
+Unaligned addresses and wrapping ranges refuse without invalidation, and
+destroy releases every table allocation after each cycle.
+
 The source-reference gate independently checks the actual instructions,
 barriers, root-publication order, bind permission selection and GPU UAT
 permission encodings against Omarchy's Asahi-derived driver:

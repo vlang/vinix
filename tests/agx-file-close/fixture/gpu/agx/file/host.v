@@ -159,6 +159,7 @@ pub fn run_checks() {
 	release_handle(&device, voidptr(3))
 	stopping_file = unsafe { nil }
 	assert stopped_vm.destroyed && table_releases == 4 && closing_count == 0
+	check_repeated_bindings()
 	check_bind_order()
 	check_bind_vm_lookup()
 	check_mapping_retirement()

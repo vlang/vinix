@@ -21,6 +21,15 @@ fn bind_request() ioctl.DrmAsahiGemBind {
 }
 
 fn check_bind_shapes() {
+	mut repeated := bind_request()
+	repeated.flags |= ioctl.asahi_bind_single_page
+	repeated.range = 17 * agxvm.page_size
+	assert agxvm.valid_bind_header(&repeated) && agxvm.valid_bind_shape(&repeated)
+	assert agxvm.bind_backing_size(&repeated) == agxvm.page_size
+	repeated.flags = ioctl.asahi_bind_single_page
+	assert agxvm.valid_bind_header(&repeated) && !agxvm.valid_bind_shape(&repeated)
+	repeated.flags = ioctl.asahi_bind_read
+	assert agxvm.bind_backing_size(&repeated) == repeated.range
 	mut header := bind_request()
 	assert agxvm.valid_bind_header(&header)
 	header.flags = 0

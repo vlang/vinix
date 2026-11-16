@@ -444,6 +444,11 @@ fn (mut file FakeG17File) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 		file.lock.release()
 		return -22
 	}
+	// Software resolutions currently require contiguous CPU backing.
+	if request.flags & ioctl.asahi_bind_single_page != 0 {
+		file.lock.release()
+		return -95
+	}
 	file.cleanup_closed_objects_locked()
 	match request.op {
 		ioctl.asahi_bind_op_bind {

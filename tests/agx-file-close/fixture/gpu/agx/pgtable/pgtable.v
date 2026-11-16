@@ -14,16 +14,29 @@ pub mut:
 	reject_map bool
 	destroyed bool
 	last_protection u64
+	last_phys u64
+	last_size u64
+	repeated bool
+	last_unmap_size u64
 }
 
 pub fn (mut pt UatPgtable) map(addr u64, phys u64, size u64, protection u64) bool {
 	assert !pt.destroyed, 'map through a destroyed VM page table'
 	pt.maps++
 	pt.last_protection = protection
+	pt.last_phys = phys; pt.last_size = size; pt.repeated = false
+	return !pt.reject_map
+}
+
+pub fn (mut pt UatPgtable) map_repeated_page(addr u64, phys u64, size u64, protection u64) bool {
+	assert !pt.destroyed, 'repeated map through a destroyed VM page table'
+	pt.maps++; pt.last_protection = protection
+	pt.last_phys = phys; pt.last_size = size; pt.repeated = true
 	return !pt.reject_map
 }
 
 pub fn (mut pt UatPgtable) unmap(addr u64, size u64) {
 	assert !pt.destroyed, 'unmap through a destroyed VM page table'
 	pt.unmaps++
+	pt.last_unmap_size = size
 }

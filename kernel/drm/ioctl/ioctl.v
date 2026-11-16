@@ -345,6 +345,7 @@ pub const asahi_bind_op_unbind = u32(1)
 pub const asahi_bind_op_unbind_all = u32(2)
 pub const asahi_bind_read = u32(1) << 0
 pub const asahi_bind_write = u32(1) << 1
+pub const asahi_bind_single_page = u32(1) << 3
 pub const asahi_bind_object_op_bind = u32(0)
 pub const asahi_bind_object_op_unbind = u32(1)
 pub const asahi_bind_object_usage_timestamps = u32(1) << 0

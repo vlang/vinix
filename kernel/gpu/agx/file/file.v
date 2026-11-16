@@ -631,7 +631,8 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	match request.op {
 		ioctl.asahi_bind_op_bind {
 			obj := f.objects.get_ref(request.handle) or { return -2 }
-			if request.offset > obj.size || request.range > obj.size - request.offset {
+			backing_bytes := agxvm.bind_backing_size(request)
+			if request.offset > obj.size || backing_bytes > obj.size - request.offset {
 				gem.unref(obj)
 				return -22
 			}
@@ -669,7 +670,10 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 					return -16 // EBUSY
 				}
 			}
-			if !pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) {
+			mapped := if request.flags & ioctl.asahi_bind_single_page != 0 {
+				pt.map_repeated_page(request.addr, obj.phys_addr + request.offset, request.range, protection)
+			} else { pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) }
+			if !mapped {
 				gem.unref(obj)
 				return -12
 			}

@@ -2,6 +2,8 @@
 import os
 
 const helpers = [
+	'vm__bind_backing_size',
+	'pgtable__UatPgtable__map_repeated_page',
 	'vm__valid_bind_header',
 	'vm__valid_bind_shape',
 	'gpu__agx__file__GpuFile__submission_queue_exists',
@@ -102,6 +104,7 @@ const helpers = [
 ]
 
 fn result_type(name string) string {
+	if name == 'vm__bind_backing_size' { return 'u64' }
 	if name in ['file__reserve_fd', 'file__fdnum_install_reserved_fd', 'file__fdnum_create_from_reserved_resource', 'file__fdnum_create_from_fd', 'drm__create_sync_file_fd_at'] { return '__v_option_i64' }
 	if name == 'file__cancel_fd_reservation' { return 'void' }
 	if name == 'submission__stage_sync_array' { return 'multi_return_i64_submission__SyncArray' }

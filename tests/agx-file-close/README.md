@@ -73,3 +73,11 @@ then BO identity/size, global range/permissions, VM identity and private window.
 Missing BOs win over later validation failures; all acquired temporary refs are
 returned on VM/private-state rejection. Existing mapping adoption and failed-flush
 retention checks still run. Modern bind batching and ABI differences remain open.
+
+SINGLE_PAGE cases repeat one BO page across a larger VA range with RO, WO and
+RW permissions, including the last complete BO page. Two hundred cycles check
+one retained BO reference per full mapping, full-range unbind, busy pins,
+malformed requests, map allocation failure and failed-flush retirement/close.
+The page-table service is injected here; `tests/agx-tlb` checks the actual
+repeated PTEs and allocation rollback. The fake software GPU explicitly refuses
+SINGLE_PAGE because its CPU resolver requires contiguous backing.
