@@ -60,7 +60,7 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires forty-eight exact resealed refusals. Cases cover omitted parsed
+then requires fifty-five exact resealed refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
@@ -77,12 +77,16 @@ Twelve more cover ordinary file-data capability replay: a weakened policy,
 an added hidden-object permission with a consistently resealed policy, changed
 execution/environment/exit records, unrelated allowed/denied read or hidden-link
 results, altered output/member bytes, linked evidence and the old format 5.
+Seven directory cases cover an added directory permission with a consistently
+resealed policy/list, restored global directory permission, changed allowed or
+denied enumeration results, changed control marker, old host format 6 and old
+inner replay format 1.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 6
+The [required host receipt boundary](wine-host-required-check.md) uses format 7
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2/3/4/5 bundles and their original
+retainer also retains its own graph. Original format-1/2/3/4/5/6 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
@@ -130,6 +134,18 @@ Image hashes in this projection reuse the preceding mandatory Mach-O image
 admission. The final host input and retained-blob pass still rehashes those bytes;
 the new projection independently checks replay UUIDs and the exact permission set
 without two additional reads of every large linker image.
+
+Format 7 extends that same replay graph with inner receipt format 2. Directory
+data reads require both directory type and an exact ancestor of an admitted
+file; the sorted, bounded directory list and policy are recomputed together.
+The `winedirclosure` source is embedded, pinned and retained. Enumeration of the
+captured input directory must succeed; an unlisted marker directory must refuse
+through direct, symlink and Data-volume paths after unrestricted enumeration
+succeeds. Its marker and every child command/environment/exit/log are mandatory
+output rows. Temporary aliases are removed before the ordinary evidence tree
+is admitted. Copies continue to bind the original directory namespace.
+Global metadata/name searches and the OS-root/device data exceptions remain
+allowed; this does not establish full metadata/search or hermetic admission.
 
 The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and

@@ -10,6 +10,7 @@ import tests.packages.winelink
 import tests.packages.winemacholink
 import tests.packages.winehostimages
 import tests.packages.winereadclosure
+import tests.packages.winedirclosure
 
 $if macos {
 	#include <dlfcn.h>
@@ -29,12 +30,13 @@ struct Execution {
 }
 
 struct Proof {
-	format int = 1
+	format int = 2
 	recorded_directory string
 	builder string
 	archive_sha256 string
 	output_sha256 string
 	policy string
+	directories []string
 	capabilities map[string]string
 	loads map[string]string
 	images []winehostimages.Image
@@ -80,6 +82,16 @@ pub fn child() ! {
 	mode := os.args[2]; root := os.args[3]
 	policy := record(root + '/policy.sb')!
 	if mode != 'hidden-unrestricted' { restrict_reads(policy)! }
+	if mode in ['probe-dir-denied', 'probe-dir-allowed'] {
+		if os.args.len != 5 { return error('directory capability probe path required') }
+		names := os.ls(os.args[4]) or {
+			if mode != 'probe-dir-denied' || err.code() !in [1, 13] { return error('directory probe failed for unrelated reason') }
+			println('DIRECTORY READ DENIED'); exit(79)
+		}
+		if mode != 'probe-dir-allowed' { return error('directory probe unexpectedly succeeded') }
+		if 'response.txt' !in names { return error('captured directory contents differ') }
+		println('CAPTURED DIRECTORY ALLOWED'); exit(80)
+	}
 	if mode in ['probe-denied', 'probe-allowed'] {
 		if os.args.len != 5 { return error('read capability probe path required') }
 		os.read_file(os.args[4]) or {
@@ -190,7 +202,8 @@ pub fn finish(host string, builder string) ! {
 	cwd := directory + '/replay/link-inputs'
 	baseline := json2.decode[winehostimages.Baseline](record(host + '/logs/macho-images-before.json')!)!
 	caps := capabilities(archive, directory, baseline)!
-	policy := winereadclosure.policy(caps.keys())!
+	policy := winedirclosure.policy(caps.keys())!
+	dirs := winedirclosure.directories(caps.keys())!
 	os.write_file(directory + '/policy.sb', policy)!
 	os.write_file(cwd + '/hidden-response.txt', hidden_response(archive, directory)!)!
 	os.cp(cwd + '/' + object(archive)!, directory + '/uncaptured-object.o')!
@@ -198,6 +211,16 @@ pub fn finish(host string, builder string) ! {
 	if digest(cwd + '/program')! != digest(host + '/program')! { return error('read-closed replay output differs') }
 	os.rename(cwd + '/program', cwd + '/captured-program')!
 	invoke(builder, ['probe-allowed', cwd + '/' + object(archive)!], directory, 'allowed-read')!
+	invoke(builder, ['probe-dir-allowed', cwd], directory, 'allowed-directory')!
+	unlisted := directory + '/unlisted-directory'
+	os.mkdir(unlisted)!
+	os.write_file(unlisted + '/marker', 'directory control\n')!
+	dir_alias := directory + '/unlisted-alias'; os.symlink(unlisted, dir_alias)!
+	for index, path in [unlisted, dir_alias, '/System/Volumes/Data' + unlisted] {
+		if os.ls(path)! != ['marker'] { return error('read-closed unrestricted directory baseline differs') }
+		invoke(builder, ['probe-dir-denied', path], directory, 'denied-directory-' + index.str())!
+	}
+	os.rm(dir_alias)!
 	paths := probes(directory)
 	hidden_hash := digest(paths[0])!
 	os.symlink(paths[0], paths[1])!
@@ -214,7 +237,7 @@ pub fn finish(host string, builder string) ! {
 	images, text := observations(record(directory + '/captured-closed.log')!, baseline)!
 	os.write_file(directory + '/receipt.json', json2.encode(Proof{recorded_directory: host, builder: builder,
 		archive_sha256: digest(host + '/link-inputs.tar')!, output_sha256: digest(host + '/program')!,
-		policy: policy, capabilities: caps, loads: winemacholink.loads(text, archive)!, images: images}) + '\n')!
+		policy: policy, directories: dirs, capabilities: caps, loads: winemacholink.loads(text, archive)!, images: images}) + '\n')!
 	admit(host, host, builder)!
 }
 
@@ -226,8 +249,10 @@ pub fn admit(host string, recorded string, builder string) ! {
 	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!
 	baseline := json2.decode[winehostimages.Baseline](record(host + '/logs/macho-images-before.json')!)!
 	caps := capabilities(archive, original, baseline)!
-	policy := winereadclosure.policy(caps.keys())!
-	if proof.format != 1 || proof.recorded_directory != recorded || proof.builder != builder
+	policy := winedirclosure.policy(caps.keys())!
+	dirs := winedirclosure.directories(caps.keys())!
+	if proof.format != 2 || proof.recorded_directory != recorded || proof.builder != builder
+		|| proof.directories != dirs
 		|| proof.capabilities != caps || proof.policy != policy || record(directory + '/policy.sb')! != policy {
 		return error('read-closed capability declaration differs')
 	}
@@ -236,6 +261,14 @@ pub fn admit(host string, recorded string, builder string) ! {
 	}
 	for path, member in archive.members {
 		if digest(directory + '/replay/' + path)! != member.sha256 { return error('read-closed captured member differs') }
+	}
+	for path in dirs {
+		if os.lstat(path)!.get_filetype() != .directory { return error('read-closed directory capability type differs') }
+	}
+	if os.lstat(directory + '/unlisted-directory')!.get_filetype() != .directory
+		|| os.ls(directory + '/unlisted-directory')! != ['marker']
+		|| record(directory + '/unlisted-directory/marker')! != 'directory control\n' {
+		return error('read-closed directory control differs')
 	}
 	cwd := directory + '/replay/link-inputs'
 	for name in ['captured-program', 'hidden-baseline'] {
@@ -260,6 +293,14 @@ pub fn admit(host string, recorded string, builder string) ! {
 	if outcome(directory, original, builder, ['probe-allowed', original + '/replay/link-inputs/' + object(archive)!], 'allowed-read', 78)! != 'CAPTURED READ ALLOWED\n' {
 		return error('read-closed allowed control differs')
 	}
+	if outcome(directory, original, builder, ['probe-dir-allowed', original + '/replay/link-inputs'], 'allowed-directory', 80)! != 'CAPTURED DIRECTORY ALLOWED\n' {
+		return error('read-closed directory allowed control differs')
+	}
+	for index, path in [original + '/unlisted-directory', original + '/unlisted-alias', '/System/Volumes/Data' + original + '/unlisted-directory'] {
+		if outcome(directory, original, builder, ['probe-dir-denied', path], 'denied-directory-' + index.str(), 79)! != 'DIRECTORY READ DENIED\n' {
+			return error('read-closed directory refusal differs')
+		}
+	}
 	for index, path in probes(original) {
 		if outcome(directory, original, builder, ['probe-denied', path], 'denied-read-' + index.str(), 77)! != 'DATA READ DENIED\n' {
 			return error('read-closed read refusal differs')
@@ -271,9 +312,10 @@ pub fn admit(host string, recorded string, builder string) ! {
 
 pub fn artifacts(host string) ![]string {
 	mut names := ['receipt.json', 'policy.sb', 'uncaptured-object.o', 'replay/link-inputs/captured-program',
-		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt']
+		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker']
 	for mode in modes { names << mode + '.exec.json' }
-	for name in ['captured-closed', 'hidden-unrestricted', 'hidden-closed', 'allowed-read', 'denied-read-0', 'denied-read-1', 'denied-read-2', 'denied-read-3'] {
+	for name in ['captured-closed', 'hidden-unrestricted', 'hidden-closed', 'allowed-read', 'denied-read-0', 'denied-read-1', 'denied-read-2', 'denied-read-3',
+		'allowed-directory', 'denied-directory-0', 'denied-directory-1', 'denied-directory-2'] {
 		for suffix in ['', '.argv.json', '.environment.json', '.exit.json'] { names << name + '.log' + suffix }
 	}
 	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!

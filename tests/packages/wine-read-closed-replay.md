@@ -53,7 +53,7 @@ original host admission, and rechecks original proof/archive/checker/self hashes
 and both embedded source guards. Receipts record local observations, not an
 authenticated trust anchor. Preserve the full new directory and original host
 bundle with typed inventories outside Git. This standalone tool keeps its original
-format-5 admission contract. Current format-6 [required host receipts](wine-host-required-check.md)
+format-5 admission contract. Current format-7 [required host receipts](wine-host-required-check.md)
 integrate the same narrow data-read restriction through `winereadhost`, with
 recomputed capabilities and every replay/control artifact mandatory in the host
 graph. No guest or default behavior changes.

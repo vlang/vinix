@@ -7,7 +7,7 @@ import json2
 import tests.packages.winesource
 import tests.packages.winecsource
 import tests.packages.winehostimages
-import tests.packages.winereadclosure
+import tests.packages.winedirclosure
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -48,6 +48,7 @@ mut:
 	archive_sha256 string
 	output_sha256 string
 	policy string
+	directories []string
 	capabilities map[string]string
 	loads map[string]string
 	images []winehostimages.Image
@@ -124,13 +125,42 @@ fn check() ! {
 		'denied-policy', 'denied-execution', 'denied-environment', 'denied-exit', 'denied-read', 'denied-installed',
 		'denied-output', 'denied-member', 'denied-linked', 'old-sdk-format',
 		'closed-policy', 'closed-extra-capability', 'closed-execution', 'closed-environment', 'closed-exit',
-		'closed-read', 'closed-allowed', 'closed-hidden', 'closed-output', 'closed-member', 'closed-linked', 'old-denied-format'] {
+		'closed-read', 'closed-allowed', 'closed-hidden', 'closed-output', 'closed-member', 'closed-linked', 'old-denied-format',
+		'directory-map', 'directory-policy', 'directory-allowed', 'directory-denied', 'directory-marker', 'old-read-format', 'old-directory-replay-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-denied-format' {
+		if name == 'old-read-format' {
+			proof.format = 6
+			expected = 'host build declaration differs'
+		} else if name in ['directory-map', 'directory-policy', 'old-directory-replay-format'] {
+			mut read := json2.decode[HostRead](os.read_file(dir + '/read-closed/receipt.json')!)!
+			if name == 'directory-map' {
+				path := read.recorded_directory + '/read-closed/unlisted-directory'
+				read.directories << path; read.directories.sort()
+				read.policy += '(allow file-read-data (require-all (vnode-type DIRECTORY) (literal "' + path + '")))\n'
+			} else if name == 'directory-policy' {
+				read.policy += '(allow file-read-data (vnode-type DIRECTORY))\n'
+			} else { read.format = 1 }
+			for file in ['read-closed/receipt.json', 'read-closed/policy.sb'] {
+				os.write_file(dir + '/' + file, if file.ends_with('.json') { json2.encode(read) } else { read.policy })!; changed << file
+			}
+			expected = 'read-closed capability declaration differs'
+		} else if name in ['directory-allowed', 'directory-denied', 'directory-marker'] {
+			file := 'read-closed/' + match name {
+				'directory-allowed' { 'allowed-directory.log' }
+				'directory-denied' { 'denied-directory-1.log' }
+				else { 'unlisted-directory/marker' }
+			}
+			os.write_file(dir + '/' + file, 'unrelated failure\n')!; changed << file
+			expected = match name {
+				'directory-allowed' { 'read-closed directory allowed control differs' }
+				'directory-denied' { 'read-closed directory refusal differs' }
+				else { 'read-closed directory control differs' }
+			}
+		} else if name == 'old-denied-format' {
 			proof.format = 5
 			expected = 'host build declaration differs'
 		} else if name == 'closed-linked' {
@@ -142,7 +172,8 @@ fn check() ! {
 			if name == 'closed-policy' { read.policy = '(allow default)' }
 			else {
 				read.capabilities[read.recorded_directory + '/read-closed/uncaptured-object.o'] = digest(dir + '/read-closed/uncaptured-object.o')!
-				read.policy = winereadclosure.policy(read.capabilities.keys())!
+				read.policy = winedirclosure.policy(read.capabilities.keys())!
+				read.directories = winedirclosure.directories(read.capabilities.keys())!
 			}
 			for file in ['read-closed/receipt.json', 'read-closed/policy.sb'] {
 				os.write_file(dir + '/' + file, if file.ends_with('.json') { json2.encode(read) } else { read.policy })!; changed << file
@@ -332,7 +363,7 @@ fn check() ! {
 		passed << name
 	}
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline forty-eight exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline fifty-five exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

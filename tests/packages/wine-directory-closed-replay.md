@@ -50,9 +50,11 @@ directories can still expose their entry names. `/usr/lib` and `/System/Library`
 remain broad data-read exceptions; the three device literals, writes/network,
 helper startup/inherited state and OS loader/shared-cache bytes keep their
 previous scope. This does not establish complete metadata/search, ABI, compiler
-or hermetic admission. Current required host receipts keep their format-6
-contract; mandatory directory-permission integration remains separate. No guest
-or default behavior changes.
+or hermetic admission. This standalone tool keeps its original format-6
+admission contract. Current format-7 [required host receipts](wine-host-required-check.md)
+integrate the directory policy into `winereadhost` inner receipt format 2,
+requiring the directory list, policy and complete control graph at admission.
+No guest or default behavior changes.
 
 The production control runner requires twenty policy refusals, including bounded
 ancestor expansion, deterministic exact-parent projection, no global directory
