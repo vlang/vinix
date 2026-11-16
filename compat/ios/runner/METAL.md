@@ -956,30 +956,40 @@ Source freeze chooses zero for indeterminate source lanes; result freeze clears
 whole poison destination lanes and cannot hide an earlier undef error. Results
 retain independent snapshots and share existing construction storage, step and
 source-plus-result work budgets in integer, mixed, void and memory APIs.
-Big-endian lane reshaping, scalar/vector and pointer casts, floating reshaping,
-scalable vectors and widths beyond i64 remain unsupported.
+Big-endian lane reshaping, scalar/vector and pointer casts, scalable vectors
+and widths beyond i64 remain unsupported.
 `tests/ios/air-memory-vector-integer-bitcast-index.v` checks native LLVM bits,
 scalar APIs, ordinary/prepared memory, address preflight and composed graphs;
 the unit suite checks every supported shape pair. See
 [LLVM bitcast semantics](https://llvm.org/docs/LangRef.html#bitcast-to-instruction).
 
-Fixed vectors support raw `bitcast` between i16/half and i32/float
-with unchanged lane count (1..16), in either direction. Every bit is preserved,
-including signed zero, NaN signs/payloads and signaling NaNs; no floating
-arithmetic or NaN quieting occurs. Complete literal/earlier-construction
-sources are validated, including inactive blocks. Poison remains local to
-each lane; any undef source lane rejects at the cast, even for discarded
-results. Source freezes repair indeterminate lanes; result freezes do not
-suppress earlier errors. Independent snapshots compose with supported casts,
-arithmetic, comparisons, selects, shuffles and extraction. Each cast costs
-one executed step and source plus result lane work, sharing the existing
-4,096 construction slots and execution-owned array. Mixed, void and memory
-execution support these casts; the integer-only API rejects floating lanes.
-Other floating lane formats, floating reshaping, scalar/vector casts, pointer casts,
-scalable vectors, vector arguments/returns,
-PHIs and loads/stores remain unsupported. `tests/ios/air-vector-bitcast.v`
-checks exact native LLVM bits, complete half encodings, raw float patterns,
-poison/undef, freezing, composition, snapshots, loops and shared limits.
+Fixed vectors support raw unflagged `bitcast` between any equal-total-width
+1..16-lane shapes using i1..i64, half or float elements. This includes integer/FP
+packing and splitting, half/float reshaping and same-category identity casts.
+Lane reshaping requires a little-endian layout; lane zero occupies the lowest
+packed bits, with no padding at non-byte boundaries. Integer-only execution
+continues to reject floating lanes. Mixed, void and memory APIs preserve every
+raw bit, including signed zero, NaN signs/payloads and signaling NaNs, without
+floating arithmetic or quieting. A destination lane is poison if any overlapping
+source lane is poison. Any undef source lane rejects the executed cast, even
+for discarded results. Source freeze repairs individual input lanes; result
+freeze clears entire poison destination lanes and cannot suppress earlier
+errors. Independent snapshots compose with supported arithmetic, comparison,
+select, insertion, shuffle, extraction and other bitcasts. A round trip through
+wider lanes can spread poison to previously defined neighboring source lanes.
+Each cast costs one executed step and source plus result lane work, sharing
+the existing 4,096 construction slots and execution-owned array. Validation
+checks complete sources, including inactive blocks. Existing memory argument,
+load and store profiles remain separate; floating dependencies remain excluded
+from pure address graphs. Scalar/vector casts, pointer casts, other floating
+formats, scalable vectors, vector returns and PHIs remain unsupported. Scalar
+and void APIs continue to exclude vector arguments.
+`tests/ios/air-vector-reshape-bitcast.v` checks all supported shape pairs that
+include half/float, exact native LLVM bits, payloads, poison overlap, freezes,
+ordinary/prepared memory write ordering, scalar results, snapshots, composition,
+loop reuse and exact shared limits. `tests/ios/air-vector-bitcast.v` retains the
+complete half-encoding and float-pattern checks for the original same-shape
+integer/FP casts.
 
 Fixed 1..16-lane half/float vectors support unflagged `fpext`
 (half to float) and `fptrunc` (float to half), retaining the lane count. They

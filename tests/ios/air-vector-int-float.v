@@ -193,7 +193,7 @@ fn controls(assembler_path string, out string) ! {
    'bfloat' { '%n = sitofp <2 x i16> zeroinitializer to <2 x bfloat>' }
    'fptosi' { '%n = fptosi <2 x double> zeroinitializer to <2 x i32>' }
    'fptoui' { '%n = fptoui <2 x bfloat> zeroinitializer to <2 x i64>' }
-   'reshape' { '%n = bitcast <2 x float> zeroinitializer to <4 x half>' }
+   'reshape' { '%n = bitcast <2 x float> zeroinitializer to <4 x bfloat>' }
    'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
    'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }
    else { '%n = uitofp nneg <2 x i32> zeroinitializer to <2 x float>' }

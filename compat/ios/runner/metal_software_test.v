@@ -4593,6 +4593,51 @@ define void @image_funnel(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
  ret void }
 
 ')
+	names << 'image_float_bitcast'
+	source.write_string('define void @image_float_bitcast(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
+ %x = extractelement <3 x i32> %gid, i32 0
+ %y = extractelement <3 x i32> %gid, i32 1
+ %w = extractelement <3 x i32> %grid, i32 0
+ %h = extractelement <3 x i32> %grid, i32 1
+ %x16 = trunc i32 %x to i16
+ %y16 = trunc i32 %y to i16
+ %hx_bits = or i16 %x16, 31744
+ %hy_bits = or i16 %y16, 32640
+ %hx = bitcast i16 %hx_bits to half
+ %hy = bitcast i16 %hy_bits to half
+ %a = insertelement <2 x half> zeroinitializer, half %hx, i32 0
+ %halves = insertelement <2 x half> %a, half %hy, i32 1
+ %packed = bitcast <2 x half> %halves to <1 x float>
+ %negative = fneg <1 x float> %packed
+ %split = bitcast <1 x float> %negative to <2 x half>
+ %bytes = bitcast <2 x half> %split to <4 x i8>
+ %lane = and i32 %x, 3
+ %byte = extractelement <4 x i8> %bytes, i32 %lane
+ %high = lshr i8 %byte, 6
+ %fold = xor i8 %byte, %high
+ %low = and i8 %fold, 63
+ %offset = zext i8 %low to i32
+ %root = getelementptr i8, ptr addrspace(1) %out, i32 %x
+ %row = shl i32 %y, 6
+ %index = add i32 %row, %x
+ %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
+ %red = mul i32 %x, 3
+ %mixed = xor i32 %red, %offset
+ %r = and i32 %mixed, 255
+ %gg = mul i32 %y, 5
+ %g0 = and i32 %gg, 255
+ %g = shl i32 %g0, 8
+ %wh = add i32 %w, %h
+ %bb = mul i32 %wh, 7
+ %b0 = and i32 %bb, 255
+ %b = shl i32 %b0, 16
+ %rg = or i32 %r, %g
+ %rgb = or i32 %rg, %b
+ %rgba = or i32 %rgb, 4278190080
+ store i32 %rgba, ptr addrspace(1) %p, align 4
+ ret void }
+
+')
 	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
 	for i, name in names {
 		n := i * 20
@@ -4606,7 +4651,7 @@ define void @image_funnel(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
 			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
 		} else {
 			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
-			if i == 2 || name in ['image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast'] {
+			if i == 2 || name in ['image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast'] {
 				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
 			} else if i < 3 + bad.len * 3 {
 				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
@@ -4640,7 +4685,7 @@ define void @image_funnel(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
 		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
 		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
 		queue := sm_send(device, c'newCommandQueue')
-		for name in names[3..names.len - 5] {
+		for name in names[3..names.len - 6] {
 			mut error_slot := u64(0)
 			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
 			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
@@ -4692,7 +4737,7 @@ define void @image_funnel(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
 			objc_release(pipeline)
 		}
 		objc_release(output)
-		for image_name in [names[2], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
+		for image_name in [names[2], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
 		pipeline := sm_test_compute_pipeline(device, library, image_name, unsafe { nil }); sm_grid_check(pipeline != 0, 'image pipeline')
 		for shape in [SoftwareMetalSize{7, 5, 1}, SoftwareMetalSize{17, 3, 1}, SoftwareMetalSize{32, 8, 1}, SoftwareMetalSize{64, 64, 1}] {
 			length := 512 + shape.height * 256; buffer := sm_test_buffer(device, length, 0); bp := sm_send(buffer, c'contents')
@@ -4742,7 +4787,7 @@ define void @image_funnel(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
 					}
 					funnel_bits = u8(((funnel_left / 67108864) ^ (funnel_left % 32) ^ (((funnel_right / 67108864) ^ (funnel_right % 32)) * 2)) & 63)
 				}
-				color := [if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				color := [if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
 				for lane in 0 .. 4 {
 					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
 					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]

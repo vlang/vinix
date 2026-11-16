@@ -13,7 +13,7 @@ fn (p IRTypedProgram) vector_cast_profile(stream Stream, pools IRConstantPools, 
 	floating_source := p.types[element].kind in [.half_t, .float_t]!
 	floating_result := p.types[dest].kind in [.half_t, .float_t]!
 	if !floating_source && !floating_result { return p.vector_integer_bitcast_profile(stream, pools, bodies, scope, index, op, remaining)! }
-	if !mixed || source_count != count || source_bits != dest_bits || floating_source == floating_result { return error('AIR vector: integer/floating bitcast shape') }
+	if !mixed || u32(source_count) * source_bits != u32(count) * dest_bits { return error('AIR vector: integer/floating bitcast shape') }
 	return count + p.vector_source_profile(stream, pools, bodies, scope, index, source, mixed, remaining - count)!
 }
 fn bitcast_vector(source ScalarVectorValue, bits u32, count int) !ScalarVectorValue {
@@ -40,5 +40,20 @@ fn (mut m IntegerMachine) cast_vector_value(stream Stream, inst IRInstruction, o
 	}
 	source := m.read_vector(stream, m.p.operands[op.operands_start])!
 	_, bits, count := m.p.scalar_vector_type(op.result_type, m.binary32, 16)!
+	_, source_bits, source_count := m.p.scalar_vector_type(m.p.operands[op.operands_start].type_index, m.binary32, 16)!
+	if bits != source_bits || count != source_count {
+		return m.store_vector_value(inst, reshaped_bitcast_vector(source, source_bits, source_count, bits, count)!)!
+	}
 	return m.store_vector_value(inst, bitcast_vector(source, bits, count)!)!
+}
+
+fn reshaped_bitcast_vector(source ScalarVectorValue, source_bits u32, source_count int, bits u32, count int) !ScalarVectorValue {
+	// The profile validates integer/half/float types. Reconstruction uses only
+	// their raw bits; signaling NaNs never enter floating arithmetic.
+	integer_vector_bitcast_shape(source_bits, source_count, bits, count)!
+	for lane in 0 .. source_count {
+		if source.undef & (u16(1) << u32(lane)) != 0 { return error('AIR vector: undef bitcast lane') }
+		if source.lanes[lane].aggregate || source.lanes[lane].vector { return error('AIR vector: scalar bitcast lane required') }
+	}
+	return bitcast_integer_vector(source, source_bits, source_count, bits, count)!
 }

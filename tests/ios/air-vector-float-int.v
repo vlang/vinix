@@ -223,7 +223,7 @@ fn controls(assembler_path string, out string) !int {
    'wideint' { '%n = fptosi <2 x float> zeroinitializer to <2 x i65>' }
    'double' { '%n = fptoui <2 x double> zeroinitializer to <2 x i64>' }
    'bfloat' { '%n = fptosi <2 x bfloat> zeroinitializer to <2 x i16>' }
-   'reshape' { '%n = bitcast <2 x i32> zeroinitializer to <4 x i16>' }
+   'reshape' { '%n = bitcast <2 x i32> zeroinitializer to <4 x bfloat>' }
    'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
    'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }
    'pointer' { '%n = ptrtoint <2 x ptr> zeroinitializer to <2 x i64>' }

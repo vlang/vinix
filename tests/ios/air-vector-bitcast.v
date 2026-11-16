@@ -178,7 +178,7 @@ fn controls(assembler_path string, out string) ! {
    'wide' { '%n = bitcast <17 x i32> zeroinitializer to <17 x float>' }
    'double' { '%n = bitcast <2 x i64> zeroinitializer to <2 x double>' }
    'bfloat' { '%n = bitcast <2 x i16> zeroinitializer to <2 x bfloat>' }
-   'reshape' { '%n = bitcast <4 x i8> zeroinitializer to <2 x half>' }
+   'reshape' { '%n = bitcast <4 x i8> zeroinitializer to <2 x bfloat>' }
    'scalar_source' { '%n = bitcast i32 0 to <2 x half>' }
    'scalar_result' { '%n = bitcast <2 x half> zeroinitializer to i32' }
    'pointer' { '%n = ptrtoint <2 x ptr> zeroinitializer to <2 x i64>' }
@@ -204,8 +204,8 @@ fn controls(assembler_path string, out string) ! {
    op := p.instructions[index]; if stream.records[bodies.instructions[index].record].code != 3 || p.types[op.result_type].kind != .vector_t { continue }
    ref := p.references[p.types[op.result_type].refs_start]; original := p.types[ref]
    // Equal-width integer bitcasts are supported. Keep this mutation invalid
-   // with an unequal total width; floating-to-floating remains unsupported.
-   same_category := if source < 64 { airbitcode.IRType{...original, kind: .integer_t, bits: u32(width + 1)} } else { airbitcode.IRType{...original, kind: if width == 16 { .half_t } else { .float_t }} }
+   // with unequal total widths, including floating-to-floating casts.
+   same_category := if source < 64 { airbitcode.IRType{...original, kind: .integer_t, bits: u32(width + 1)} } else { airbitcode.IRType{...original, kind: if width == 16 { .float_t } else { .half_t }} }
    wrong_width := if source < 64 { airbitcode.IRType{...original, kind: if width == 16 { .float_t } else { .half_t }} } else { airbitcode.IRType{...original, bits: if width == 16 { u32(32) } else { u32(16) }} }
    for variant, changed in [same_category, wrong_width, airbitcode.IRType{...original, kind: .double_t}, airbitcode.IRType{...original, kind: .bfloat_t}, airbitcode.IRType{...original, kind: .pointer_t}] {
     p.types[ref] = changed; mut output := []u8{len: 24, init: 0xcc}; mut bs := [airbitcode.IRMemoryBinding{data: output, writable: true}]
