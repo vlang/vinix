@@ -15,6 +15,7 @@ enum MemoryIndexKind {
 	intrinsic
 	intrinsic_binary
 	intrinsic_funnel
+	intrinsic_overflow_field
 	cast
 }
 
@@ -60,6 +61,25 @@ fn (b MemoryIndexBuilder) argument(source IRTypedOperand) !int {
 
 fn (mut b MemoryIndexBuilder) expression(operand IRTypedOperand, before int, depth int) !int {
 	return b.expression_source(operand, before, depth, false)!
+}
+
+// Lower a direct checked-arithmetic call plus extractvalue to one scalar node.
+// Both IR dependencies still count toward depth; aggregate flow is not admitted.
+fn (mut b MemoryIndexBuilder) overflow_field(op IRTypedInstruction, before int, depth int) !MemoryIndexNode {
+	b.p.scalar_pair_extract(op, b.bodies.scopes[b.scope].base_id, b.pools, b.scope)!
+	source := b.p.operands[op.operands_start]
+	pair := b.bodies.lookup(b.pools, b.scope, source.number)!
+	if pair.kind != .instruction || pair.instruction < b.bodies.scopes[b.scope].instructions_start || pair.instruction >= before || pair.instruction >= b.p.instructions.len || pair.instruction >= b.bodies.instructions.len { return error('AIR memory index: direct earlier overflow call required') }
+	call := b.p.instructions[pair.instruction]
+	inst := b.bodies.instructions[pair.instruction]
+	if call.status != .decoded || call.result_type != source.type_index || inst.scope != b.scope || !inst.has_result || inst.next_value != source.number || inst.record < 0 || inst.record >= b.stream.records.len || b.stream.records[inst.record].code != 34 || call.operands_start < 0 || call.operands_start > b.p.operands.len || call.operands_count < 1 || call.operands_count > b.p.operands.len - call.operands_start || call.targets_count != 0 || call.indices_count != 0 || call.is_volatile { return error('AIR memory index: decoded overflow call required') }
+	// The enclosing profile already checks bounded attributes and duplicates.
+	b.p.scalar_intrinsic_call(b.ir, b.stream, b.pools, call, b.scope)!
+	id := scalar_intrinsic_name(b.ir.functions[call.callee_function].name)!
+	if !scalar_integer_overflow(id) { return error('AIR memory index: overflow intrinsic required') }
+	lhs := b.expression(b.p.operands[call.operands_start + 1], pair.instruction, depth + 2)!
+	rhs := b.expression(b.p.operands[call.operands_start + 2], pair.instruction, depth + 2)!
+	return MemoryIndexNode{kind: .intrinsic_overflow_field, bits: b.p.integer_bits(op.result_type)!, source_bits: b.p.integer_bits(b.p.scalar_overflow_element(source.type_index)!)!, opcode: u32(b.p.indices[op.indices_start]), intrinsic: id, left: lhs, right: rhs, height: 2 + if b.nodes[lhs].height > b.nodes[rhs].height { b.nodes[lhs].height } else { b.nodes[rhs].height }}
 }
 
 // Only a direct freeze operand may admit undef. Check this before cache lookup
@@ -116,10 +136,11 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 	} else {
 		op := b.p.instructions[producer]
 		inst := b.bodies.instructions[producer]
-		if op.status != .decoded || op.result_type != operand.type_index || inst.scope != b.scope || !inst.has_result || inst.next_value != operand.number || inst.record < 0 || inst.record >= b.stream.records.len || op.operands_start < 0 || op.operands_start > b.p.operands.len || op.operands_count < 1 || op.operands_count > b.p.operands.len - op.operands_start || op.targets_count != 0 || op.indices_count != 0 || op.is_volatile {
+		if op.status != .decoded || op.result_type != operand.type_index || inst.scope != b.scope || !inst.has_result || inst.next_value != operand.number || inst.record < 0 || inst.record >= b.stream.records.len || op.operands_start < 0 || op.operands_start > b.p.operands.len || op.operands_count < 1 || op.operands_count > b.p.operands.len - op.operands_start || op.targets_count != 0 || op.is_volatile {
 			return error('AIR memory index: decoded expression required')
 		}
 		code := b.stream.records[inst.record].code
+		if op.indices_count != 0 && code != 26 { return error('AIR memory index: unexpected aggregate indices') }
 		if code == 2 && op.opcode <= 12 && op.operands_count == 2 {
 			left := b.p.operands[op.operands_start]
 			right := b.p.operands[op.operands_start + 1]
@@ -187,6 +208,8 @@ fn (mut b MemoryIndexBuilder) expression_source(operand IRTypedOperand, before i
 			} else {
 				node = MemoryIndexNode{kind: .intrinsic, bits: bits, intrinsic: id, value: poison_flag, left: lhs, height: 1 + b.nodes[lhs].height}
 			}
+		} else if code == 26 && op.flags == 0 {
+			node = b.overflow_field(op, producer, depth)!
 		} else if code == 58 {
 			b.p.scalar_unary_profile(op, true, false)!
 			lhs := b.expression_source(b.p.operands[op.operands_start], producer, depth + 1, true)!
@@ -262,6 +285,13 @@ fn (profile IRMemoryProfile) memory_index_values(bindings []IRMemoryBinding) ![2
 			}
 			.intrinsic_binary {
 				value = if poisons[node.left] || poisons[node.right] { IntegerValue{poison: true} } else if scalar_integer_saturating_shift(node.intrinsic) { scalar_integer_saturating_shift_value(node.intrinsic, node.bits, values[node.left], values[node.right])! } else { IntegerValue{value: scalar_intrinsic_value(node.intrinsic, node.bits, values[node.left], values[node.right])!} }
+			}
+			.intrinsic_overflow_field {
+				if poisons[node.left] || poisons[node.right] { value = IntegerValue{poison: true} }
+				else {
+					pair := scalar_integer_overflow_value(node.intrinsic, node.source_bits, values[node.left], values[node.right])!
+					value = IntegerValue{value: if node.opcode == 0 { pair.value } else { u64(pair.overflow) }}
+				}
 			}
 			.intrinsic {
 				value = if poisons[node.left] { IntegerValue{poison: true} } else if node.intrinsic == .iabs { scalar_integer_abs_value(node.bits, values[node.left], node.value)! } else if scalar_integer_zero_count(node.intrinsic) { scalar_integer_zero_count_value(node.intrinsic, node.bits, values[node.left], node.value)! } else { IntegerValue{value: scalar_integer_intrinsic_value(node.intrinsic, node.bits, values[node.left])!} }

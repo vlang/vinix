@@ -340,6 +340,9 @@ Funnel shifts and rotations also feed indices, validating all three inputs and
 reducing the shift amount modulo the integer width.
 Carry-less multiplication and parallel bit extraction/deposition also feed
 indices, checking both inputs and preserving their poison flags.
+Direct value/overflow field extractions from signed/unsigned checked
+add/subtract/multiply also feed indices. Calls and extractions count as two
+depth levels; aggregate flow remains unsupported in address dependencies.
 Only argument/literal dependencies are admitted; general SSA indices remain
 unsupported. The memory profile limits expression graphs to 256 nodes/32 levels.
 See [Apple's thread attributes](https://developer.apple.com/documentation/metal/creating-threads-and-threadgroups).
@@ -371,6 +374,8 @@ Funnel shifts rotate the address left and right by 37, exercising modulo-width
 amounts while preserving the exact address.
 Parallel deposition/extraction with an alternating-bit mask and carry-less
 multiplication by one preserve the address for the final store.
+Checked unsigned addition of zero preserves the x channel and supplies an
+overflow flag that selects poison instead of the final address on overflow.
 The fixture preserves shader output as external PPM files and verifies all
 backing-buffer padding. This uses CPU buffer stores and texture aliasing;
 AIR texture arguments/intrinsics and GPU rendering remain unsupported.

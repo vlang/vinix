@@ -169,6 +169,14 @@ Carry-less multiplication (`llvm.clmul`) and parallel bit extraction/deposition
 retain the low N polynomial-product bits. Extraction packs selected bits into
 low positions; deposition scatters low bits into selected positions. Both input
 dependencies and poison flags are checked under the same graph limits.
+Direct `extractvalue` fields from signed/unsigned checked add/subtract/multiply
+(`llvm.*.with.overflow`) also accept i1..i64 operands. Field zero is the wrapped
+value; field one is the i1 overflow flag. Arithmetic overflow is defined, while
+poison in either input poisons either extracted field. A checked call and its
+extraction lower to one scalar node, using two depth levels. Both operands and
+their cached heights are checked. Aggregate select/freeze/insert, aggregate
+constants and loaded operands remain unsupported address dependencies; scalar
+select/freeze may handle an extracted field normally.
 
 Preflight builds a private, topologically ordered dependency graph only for
 required index expressions. Its shared node limit is 256 per function, with at
@@ -285,6 +293,13 @@ compares all 192 carry-less multiply/extract/deposit overloads with defined
 native LLVM calls. It covers masks, low-bit truncation, direct/masked indices,
 both poisoned operands, computed poison, select/freeze and cached depth limits
 through either input. All three APIs preserve output on refusal.
+
+`tests/ios/air-memory-overflow-index.v LLVM_AS FRESH_EXTERNAL_DIR` compares both
+direct fields of all 384 checked-arithmetic overloads with defined native LLVM
+calls. It checks direct/masked/zero-extended indices, poison in either operand,
+computed poison, scalar select/freeze, cached depth through either input, cold
+and independent poison roots, and unsupported aggregate/load dependencies.
+Validation, ordinary and prepared execution preserve every byte on refusal.
 
 ## Prepared memory functions
 
