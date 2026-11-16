@@ -622,28 +622,35 @@ pub fn (mut f GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) 
 
 pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 	request := unsafe { data }
-	if !agxvm.valid_bind_shape(request) { return -22 }
+	if request.op == ioctl.asahi_bind_op_bind {
+		if !agxvm.valid_bind_header(request) { return -22 }
+	} else if !agxvm.valid_bind_shape(request) { return -22 }
 	// Keep VM/page-table and handle lookup stable through mapping mutation.
 	f.lock.acquire()
 	defer { f.lock.release() }
-	ctx := f.find_vm(request.vm_id) or { return -2 }
-	if ctx.pgtable == unsafe { nil }
-		|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) {
-		return -22
-	}
-	mut pt := unsafe { ctx.pgtable }
-
 	match request.op {
 		ioctl.asahi_bind_op_bind {
 			obj := f.objects.get_ref(request.handle) or { return -2 }
-			if obj.vm_private_identity != 0 && obj.vm_private_identity != ctx.identity {
-				gem.unref(obj)
-				return -22
-			}
 			if request.offset > obj.size || request.range > obj.size - request.offset {
 				gem.unref(obj)
 				return -22
 			}
+			if !agxvm.valid_bind_shape(request) {
+				gem.unref(obj)
+				return -22
+			}
+			// The BO owner must be returned on every VM/private-window failure.
+			ctx := f.find_vm(request.vm_id) or { gem.unref(obj); return -2 }
+			if ctx.pgtable == unsafe { nil }
+				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) {
+				gem.unref(obj)
+				return -22
+			}
+			if obj.vm_private_identity != 0 && obj.vm_private_identity != ctx.identity {
+				gem.unref(obj)
+				return -22
+			}
+			mut pt := unsafe { ctx.pgtable }
 			protection := if request.flags & ioctl.asahi_bind_read != 0 {
 				if request.flags & ioctl.asahi_bind_write != 0 {
 					pgtable.gpu_prot_gpu_shared_rw
@@ -683,6 +690,9 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			return 0
 		}
 		ioctl.asahi_bind_op_unbind {
+			ctx := f.find_vm(request.vm_id) or { return -2 }
+			if ctx.pgtable == unsafe { nil }
+				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
 			if request.vm_id >= mmu.uat_num_contexts
 				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {
 				return -16 // EBUSY: firmware may still dereference this mapping
@@ -697,6 +707,9 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			return -22
 		}
 		ioctl.asahi_bind_op_unbind_all {
+			ctx := f.find_vm(request.vm_id) or { return -2 }
+			if ctx.pgtable == unsafe { nil }
+				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
 			obj := f.objects.get_ref(request.handle) or { return -2 }
 			if request.vm_id >= mmu.uat_num_contexts
 				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {

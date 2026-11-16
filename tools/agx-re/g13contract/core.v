@@ -698,7 +698,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + u64(0x305), compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['host workqueue retirement pointer and wrap-safe publication',
-		'Bind operations validate global fields before absent-VM ENOENT and check the private reservation under the VM mutation lock',
+		'BIND resolves its BO and validates size/global fields before VM lookup; unbind and private-window checks retain the mutation lock',
 		'Missing submit queues precede command/sync staging, with no borrowed queue across copies and locked backend revalidation',
 		'Absent VM/queue identities return ENOENT during VM destroy, queue create/destroy and submission without confusing invalid internal VM state',
 		'VM-private BO domains reject foreign/recreated VMs, import, kernel timestamp mapping and PRIME export before publication',

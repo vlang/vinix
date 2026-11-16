@@ -53,9 +53,16 @@ pub fn valid_user_range(address u64, size u64, kernel_start u64, kernel_end u64)
 	return address >= kernel_end || end <= kernel_start
 }
 
-// Validate fields according to their operation before either backend looks up
-// a BO or changes mappings. In particular, UNBIND_ALL names a BO by handle and
-// does not carry a VA range.
+// BIND alignment and supported flag bits precede BO lookup. Global ranges and
+// the requirement for a read/write permission are checked after BO lookup.
+pub fn valid_bind_header(request &ioctl.DrmAsahiGemBind) bool {
+	return request.extensions == 0 && request.op == ioctl.asahi_bind_op_bind
+		&& request.flags & ~(ioctl.asahi_bind_read | ioctl.asahi_bind_write) == 0
+		&& (request.addr | request.range | request.offset) & page_mask == 0
+}
+
+// Validate operation fields and global VA bounds. UNBIND_ALL names a BO by
+// handle and does not carry a VA range. The private reservation follows VM lookup.
 pub fn valid_bind_shape(request &ioctl.DrmAsahiGemBind) bool {
 	// An empty reservation excludes no addresses. Validate the global range
 	// and operation fields before looking up the VM's actual reservation.

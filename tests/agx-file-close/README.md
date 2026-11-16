@@ -64,8 +64,12 @@ request checks removed identities without double teardown. Fixture cleanup
 frees successful logical queue metadata only after every consumer is gone.
 
 Binding VM lookup cases cover BIND, UNBIND and UNBIND_ALL. Invalid operation
-fields and global VA ranges return EINVAL before lookup; well-formed missing,
+fields and global VA ranges return EINVAL before VM lookup; well-formed missing,
 removed or foreign-file VM names return ENOENT. A found VM's private reservation
 and page-table state are checked under the mutation lock. Failures preserve
 live mappings, BO references, PTE and firmware-flush counts and neighboring VMs.
-This does not qualify the full packaged bind ABI or BO-versus-VM error ordering.
+Additional BIND ordering cases check its alignment/flag header before BO lookup,
+then BO identity/size, global range/permissions, VM identity and private window.
+Missing BOs win over later validation failures; all acquired temporary refs are
+returned on VM/private-state rejection. Existing mapping adoption and failed-flush
+retention checks still run. Modern bind batching and ABI differences remain open.

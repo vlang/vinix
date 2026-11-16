@@ -21,6 +21,23 @@ fn bind_request() ioctl.DrmAsahiGemBind {
 }
 
 fn check_bind_shapes() {
+	mut header := bind_request()
+	assert agxvm.valid_bind_header(&header)
+	header.flags = 0
+	assert agxvm.valid_bind_header(&header) && !agxvm.valid_bind_shape(&header)
+	header = bind_request(); header.addr = agxvm.address_space_end
+	assert agxvm.valid_bind_header(&header) && !agxvm.valid_bind_shape(&header)
+	for invalid in 0 .. 5 {
+		header = bind_request()
+		match invalid {
+			0 { header.extensions = 1 }
+			1 { header.op = ioctl.asahi_bind_op_unbind }
+			2 { header.flags = ~u32(0) }
+			3 { header.addr++ }
+			else { header.offset++ }
+		}
+		assert !agxvm.valid_bind_header(&header)
+	}
 	for base in [bind_request(), ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind, addr: agxvm.user_start, range: agxvm.page_size },
 		ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, handle: 7 }] {
 		assert agxvm.valid_bind_shape(&base)

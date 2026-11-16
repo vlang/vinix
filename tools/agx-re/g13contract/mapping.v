@@ -13,8 +13,9 @@ fn check_user_mapping_contract(local string, manager string) ! {
 		'User mapping retirement must release once after the serialized flush')!
 	bind := section(local, 'pub fn (mut f GpuFile) ioctl_gem_bind(',
 		'pub fn (f &GpuFile) ioctl_get_time(', 'Vinix user mapping ioctl')!
-	require_order(bind, ['f.lock.acquire()', 'defer { f.lock.release() }', 'f.find_vm(request.vm_id)',
-		'ctx.pgtable', 'f.objects.get_ref(request.handle)', 'pt.map(', 'f.mappings << GpuMapping{',
+	require_order(bind, ['f.lock.acquire()', 'defer { f.lock.release() }', 'match request.op',
+		'ioctl.asahi_bind_op_bind {', 'f.objects.get_ref(request.handle)', 'f.find_vm(request.vm_id)',
+		'ctx.pgtable', 'pt.map(', 'f.mappings << GpuMapping{',
 		'if !flush_firmware_mapping(ctx, request.addr, request.range, false)',
 		'pt.unmap(request.addr, request.range)', 'f.mappings[f.mappings.len - 1].retiring = true',
 		'return -5'], 'Vinix bind ownership transfer')!
