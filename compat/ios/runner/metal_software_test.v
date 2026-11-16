@@ -4393,7 +4393,13 @@ fn sm_test_geometry_sizes_focus() ! {
 	}
 	// RGBA8 pixels use a padded 256-byte row. The same shader derives its blue
 	// channel from the current grid dimensions for every image dispatch.
-	source.write_string('declare <1 x i32> @llvm.ctlz.v1i32(<1 x i32>, i1 immarg)\n declare <1 x i32> @llvm.cttz.v1i32(<1 x i32>, i1 immarg)
+	source.write_string('declare <1 x i32> @air.popcount.v1i32(<1 x i32>)
+ declare <1 x i32> @air.reverse_bits.v1i32(<1 x i32>)
+ declare <2 x i32> @air.popcount.v2i32(<2 x i32>)
+ declare <2 x i32> @air.reverse_bits.v2i32(<2 x i32>)
+ declare <2 x i32> @llvm.ctpop.v2i32(<2 x i32>)
+ declare <2 x i32> @llvm.bitreverse.v2i32(<2 x i32>)
+ declare <1 x i32> @llvm.ctlz.v1i32(<1 x i32>, i1 immarg)\n declare <1 x i32> @llvm.cttz.v1i32(<1 x i32>, i1 immarg)
  declare <1 x i32> @llvm.abs.v1i32(<1 x i32>, i1 immarg)
  declare <2 x i32> @llvm.abs.v2i32(<2 x i32>, i1 immarg)
  declare <1 x i32> @llvm.smin.v1i32(<1 x i32>, <1 x i32>)
@@ -4422,9 +4428,25 @@ fn sm_test_geometry_sizes_focus() ! {
  %narrow_lanes = trunc <3 x i32> %wrapped_lanes to <3 x i1>
  %compared_lanes = icmp eq <3 x i1> %narrow_lanes, zeroinitializer
  %widened_lanes = select <3 x i1> %compared_lanes, <3 x i32> <i32 1, i32 0, i32 1>, <3 x i32> <i32 0, i32 1, i32 0>
+ %bits_inverse = xor i32 %x, -1
+ %bits_input0 = insertelement <2 x i32> zeroinitializer, i32 %x, i32 0
+ %bits_input = insertelement <2 x i32> %bits_input0, i32 %bits_inverse, i32 1
+ %bits_pop = call <2 x i32> @air.popcount.v2i32(<2 x i32> %bits_input)
+ %bits_rev = call <2 x i32> @air.reverse_bits.v2i32(<2 x i32> %bits_input)
+ %bits_pop_ref = call <2 x i32> @llvm.ctpop.v2i32(<2 x i32> %bits_input)
+ %bits_rev_ref = call <2 x i32> @llvm.bitreverse.v2i32(<2 x i32> %bits_input)
+ %bits_pop_same = icmp eq <2 x i32> %bits_pop, %bits_pop_ref
+ %bits_rev_same = icmp eq <2 x i32> %bits_rev, %bits_rev_ref
+ %bits_restored = call <2 x i32> @air.reverse_bits.v2i32(<2 x i32> %bits_rev)
+ %bits_roundtrip_same = icmp eq <2 x i32> %bits_restored, %bits_input
+ %bits_same0 = and <2 x i1> %bits_pop_same, %bits_rev_same
+ %bits_same = and <2 x i1> %bits_same0, %bits_roundtrip_same
+ %bits_ok0 = extractelement <2 x i1> %bits_same, i32 0
+ %bits_ok1 = extractelement <2 x i1> %bits_same, i32 1
+ %bits_ok = and i1 %bits_ok0, %bits_ok1
  %bit_source = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
- %pop_lanes = call <1 x i32> @llvm.ctpop.v1i32(<1 x i32> %bit_source)
- %reverse_lanes = call <1 x i32> @llvm.bitreverse.v1i32(<1 x i32> %pop_lanes)
+ %pop_lanes = call <1 x i32> @air.popcount.v1i32(<1 x i32> %bit_source)
+ %reverse_lanes = call <1 x i32> @air.reverse_bits.v1i32(<1 x i32> %pop_lanes)
  %swapped_lanes = call <1 x i32> @llvm.bswap.v1i32(<1 x i32> %reverse_lanes)
  %bit_value = extractelement <1 x i32> %swapped_lanes, i32 0
  %bit_root = getelementptr i8, ptr addrspace(1) %out, i32 %bit_value
@@ -4452,7 +4474,8 @@ fn sm_test_geometry_sizes_focus() ! {
  %mixed_bits = xor i32 %bit_counts, %abs_offset
  %stable_lanes = freeze <3 x i32> %widened_lanes\n %frozen_gid = freeze <3 x i32> %gid\n %channel_lane = extractelement <3 x i32> %stable_lanes, i32 %lane_seed\n %channel_x = extractelement <3 x i32> %frozen_gid, i32 %channel_lane\n %checked = call {i32, i1} @llvm.uadd.with.overflow.i32(i32 %channel_x, i32 0)\n %linear_row = shl nuw nsw i32 %y, 6\n %linear = or disjoint i32 %linear_row, %x\n %column = urem i32 %linear, 64\n %row_offset = sub nuw i32 %linear, %column\n %tile = udiv exact i32 %row_offset, 64\n %row = shl nuw nsw i32 %tile, 6\n %index = or disjoint i32 %row, %column\n %inside = icmp samesign ult i32 %x, %w\n %checked_pair = select i1 %inside, {i32, i1} %checked, {i32, i1} poison\n %frozen_pair = freeze {i32, i1} %checked_pair\n %original_x = extractvalue {i32, i1} %frozen_pair, 0\n %original_flag = extractvalue {i32, i1} %frozen_pair, 1\n %data_pair = insertvalue {i32, i1} poison, i32 %original_x, 0\n %stable_pair = insertvalue {i32, i1} %data_pair, i1 %original_flag, 1\n %checked_x = extractvalue {i32, i1} %stable_pair, 0\n %address_overflow = extractvalue {i32, i1} %stable_pair, 1\n %selected = select i1 %inside, i32 %index, i32 poison\n %fixed = freeze i32 %selected\n %reverse = call i32 @air.reverse_bits.i32(i32 %fixed)\n %restored = call i32 @llvm.bitreverse.i32(i32 %reverse)\n %leading = call i32 @air.clz.i32(i32 %restored, i1 false)\n %trailing = call i32 @air.ctz.i32(i32 %restored, i1 false)\n %frozen = freeze i32 %trailing\n %counts = add i32 %leading, %frozen\n %zero = xor i32 %counts, %counts\n %unclamped = add nuw i32 %restored, %zero\n %nonnegative = call i32 @air.max.s.i32(i32 %unclamped, i32 0)\n %clamped = call i32 @air.min.u.i32(i32 %nonnegative, i32 16383)\n %negative = sub i32 0, %clamped\n %absolute = call i32 @llvm.abs.i32(i32 %negative, i1 true)\n %satmax = call i32 @air.add_sat.u.i32(i32 4294967295, i32 1)\n %satzero = call i32 @air.sub_sat.u.i32(i32 %satmax, i32 4294967295)\n %sataddress = call i32 @air.add_sat.s.i32(i32 %absolute, i32 %satzero)\n %unshifted = call i32 @air.sub_sat.s.i32(i32 %sataddress, i32 0)\n %double = call i32 @llvm.ushl.sat.i32(i32 %unshifted, i32 1)\n %half = lshr exact i32 %double, 1\n %unrotated = call i32 @llvm.sshl.sat.i32(i32 %half, i32 0)\n %rotated = call i32 @llvm.fshl.i32(i32 %unrotated, i32 %unrotated, i32 37)\n %unpermuted = call i32 @llvm.fshr.i32(i32 %rotated, i32 %rotated, i32 37)\n %scattered = call i32 @llvm.pdep.i32(i32 %unpermuted, i32 1431655765)\n %packed = call i32 @llvm.pext.i32(i32 %scattered, i32 1431655765)\n %candidate = call i32 @llvm.clmul.i32(i32 %packed, i32 1)\n %address = select i1 %address_overflow, i32 poison, i32 %candidate\n %p = getelementptr i32, ptr addrspace(1) %out, i32 %address\n %rr = mul i32 %checked_x, 3\n %air_pop = call i32 @air.popcount.i32(i32 %x)
  %air_red = xor i32 %rr, %air_pop
- %mixed_red = xor i32 %air_red, %mixed_bits\n %r = and i32 %mixed_red, 255\n %gg = mul i32 %y, 5\n %g0 = and i32 %gg, 255\n %g = shl i32 %g0, 8\n %wh = add i32 %w, %h\n %bb = mul i32 %wh, 7\n %b0 = and i32 %bb, 255\n %b = shl i32 %b0, 16\n %rg = or i32 %r, %g\n %rgb = or i32 %rg, %b\n %rgba = or i32 %rgb, 4278190080\n store i32 %rgba, ptr addrspace(1) %p, align 4\n ret void }\n')
+ %mixed_red = xor i32 %air_red, %mixed_bits\n %bits_checked_red = select i1 %bits_ok, i32 %mixed_red, i32 poison
+ %r = and i32 %bits_checked_red, 255\n %gg = mul i32 %y, 5\n %g0 = and i32 %gg, 255\n %g = shl i32 %g0, 8\n %wh = add i32 %w, %h\n %bb = mul i32 %wh, 7\n %b0 = and i32 %bb, 255\n %b = shl i32 %b0, 16\n %rg = or i32 %r, %g\n %rgb = or i32 %rg, %b\n %rgba = or i32 %rgb, 4278190080\n store i32 %rgba, ptr addrspace(1) %p, align 4\n ret void }\n')
 	for semantic in 0 .. 3 { for kind in bad {
 		name := 'bad_${semantic}_${kind}'; names << name
 		typ := match kind { 'narrow' { 'i8' } 'wide' { 'i64' } 'float' { 'float' } 'vec1' { '<1 x i32>' } 'vec4' { '<4 x i32>' } 'float_vector' { '<3 x float>' } 'pointer', 'address_space' { 'ptr' } else { 'i32' } }
