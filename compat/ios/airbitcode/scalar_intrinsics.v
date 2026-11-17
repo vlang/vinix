@@ -26,7 +26,7 @@ fn scalar_intrinsic_arity(id ScalarIntrinsic) int {
 	return if id in [.air_fmin, .air_fmax, .copysign, .minimum, .maximum, .ldexp, .minimumnum, .maximumnum, .minnum, .maxnum, .is_fpclass, .ctlz, .cttz, .smin, .smax, .umin, .umax, .iabs, .sadd_sat, .uadd_sat, .ssub_sat, .usub_sat, .sshl_sat, .ushl_sat, .pext, .pdep, .clmul]! { 2 } else { 1 }
 }
 fn scalar_intrinsic_name(name string) !ScalarIntrinsic {
-	if name.starts_with('air.') && name.ends_with('.f32') { id, _ := air_float_intrinsic(name)!; return id }
+	if name.starts_with('air.') && (name.ends_with('.f32') || name.ends_with('.f16')) { id, _ := air_float_intrinsic(name)!; return id }
 	return match name {
 		'llvm.fabs.f16', 'llvm.fabs.f32' { ScalarIntrinsic.fabs }
 		'llvm.canonicalize.f16', 'llvm.canonicalize.f32' { ScalarIntrinsic.canonicalize }

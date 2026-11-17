@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_float_names_slots_and_existing_evaluators() {
-	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2193
+	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2197
 	ids := [ScalarIntrinsic.fabs, .floor, .ceil, .trunc, .sqrt, .round, .rint]!
 	for i, name in ['air.fabs.f32', 'air.floor.f32', 'air.ceil.f32', 'air.trunc.f32', 'air.sqrt.f32', 'air.round.f32', 'air.rint.f32'] {
 		id, slot := air_float_intrinsic(name)!
@@ -10,7 +10,7 @@ fn test_air_float_names_slots_and_existing_evaluators() {
 		assert scalar_intrinsic_arity(id) == 1 && !scalar_integer_intrinsic(id)
 		if _, _ := air_integer_intrinsic(name) { assert false }
 	}
-	for name in ['air.fabs.f16', 'air.floor.f64', 'air.ceil.v2f32', 'air.trunc.i32', 'air.floor.f032', 'air.floor.f+32', 'air.floor.f32.spoof', 'air.fast_floor.f32', 'air.rsqrt.f32', 'air.sin.f32', 'air.sqrt.f16', 'air.sqrt.v2f32', 'air.fast_sqrt.f32', 'air.round.f64', 'air.round.f032', 'air.roundeven.f32', 'air.rint.f16', 'air.rint.f32.spoof'] {
+	for name in ['air.fabs.f64', 'air.floor.f64', 'air.ceil.v2f32', 'air.trunc.i32', 'air.floor.f032', 'air.floor.f+32', 'air.floor.f32.spoof', 'air.fast_floor.f32', 'air.rsqrt.f32', 'air.sin.f32', 'air.sqrt.f16', 'air.sqrt.v2f32', 'air.fast_sqrt.f32', 'air.round.f64', 'air.round.f032', 'air.roundeven.f32', 'air.rint.f16', 'air.rint.f32.spoof'] {
 		if _ := scalar_intrinsic_name(name) { assert false, name }
 	}
 	assert scalar_intrinsic_value(.fabs, 32, 0xff812345, 0)! == 0x7f812345
@@ -42,4 +42,45 @@ fn test_air_float_fma_name_slot_and_ternary_identity() {
 	assert scalar_fma(32, 0x7f7fffff, 0x40000000, 0xff7fffff)! == 0x7f7fffff
 	assert scalar_fma(32, 1, 0x3f000000, 1)! == 2
 	println('AIR-FMA-NAME: exact f32 ternary identity, appended slot, fused cancellation/overflow/underflow and unsupported overload/name guards PASS')
+}
+
+// Rational binary16 oracle, independent of the evaluator's fraction-bit masks.
+fn air_half_unary_reference(id ScalarIntrinsic, raw u64) u64 {
+ if id == .fabs { return raw & 0x7fff }
+ sign := raw & 0x8000; a := raw & 0x7fff
+ if a > 0x7c00 { return 0x7e00 }
+ if a == 0x7c00 || a == 0 { return raw }
+ e := int(a >> 10); shift := if e == 0 { 24 } else { 25 - e }
+ if shift <= 0 { return raw }
+ numerator := if e == 0 { a } else { 1024 + (a & 1023) }; denominator := u64(1) << u32(shift)
+ mut integer := numerator / denominator; remainder := numerator % denominator
+ if (id == .floor && sign != 0 && remainder != 0) || (id == .ceil && sign == 0 && remainder != 0) { integer++ }
+ if integer == 0 { return sign }
+ mut exponent := 0; for (u64(1) << u32(exponent + 1)) <= integer { exponent++ }
+ fraction := if exponent <= 10 { (integer - (u64(1) << u32(exponent))) << u32(10 - exponent) } else { (integer - (u64(1) << u32(exponent))) >> u32(exponent - 10) }
+ return sign | (u64(exponent + 15) << 10) | fraction
+}
+fn test_air_half_unary_names_cache_and_every_encoding() {
+ assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2197
+ mut checks := 0
+ for i, family in ['fabs','floor','ceil','trunc'] {
+  name := 'air.${family}.f16'; id, slot := air_float_intrinsic(name)!
+  old_id, old_slot := air_float_intrinsic('air.${family}.f32')!
+  assert scalar_intrinsic_name(name)! == id && id == old_id && scalar_intrinsic_arity(id) == 1
+  assert scalar_air_float_cache_base + slot == 2193 + i && scalar_air_float_cache_base + old_slot == 2168 + i
+  assert !scalar_integer_intrinsic(id)
+  for raw in 0..65536 {
+   expected := air_half_unary_reference(id,u64(raw))
+   assert scalar_intrinsic_value(id,16,u64(raw)|~u64(0xffff),0)! == expected
+   checks++
+  }
+  for suffix in ['f016','f+16','f16.spoof','v2f16','f64','i16'] {
+   if _ := scalar_intrinsic_name('air.${family}.${suffix}') { assert false }
+  }
+ }
+ for family in ['sqrt','round','rint','fma','fmin','fmax','clamp','fast_fabs','fast_floor'] {
+  if _ := scalar_intrinsic_name('air.${family}.f16') { assert false }
+ }
+ assert checks == 262144
+ println('AIR-HALF-UNARY: four exact identities, stable f32 keys, appended half keys, 262144 independent rational/bit values across every binary16 encoding, high-bit masking and name/family guards PASS')
 }
