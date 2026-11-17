@@ -4617,6 +4617,14 @@ fn sm_test_geometry_sizes_focus() ! {
 	names << 'image_minmax'
 	source.write_string('declare <2 x i64> @air.min.s.v2i64(<2 x i64>,<2 x i64>)
 declare <2 x i64> @air.min.u.v2i64(<2 x i64>,<2 x i64>)
+declare i64 @air.min.s.i64(i64,i64)
+declare i64 @air.max.s.i64(i64,i64)
+declare i64 @air.min.u.i64(i64,i64)
+declare i64 @air.max.u.i64(i64,i64)
+declare i64 @llvm.smin.i64(i64,i64)
+declare i64 @llvm.smax.i64(i64,i64)
+declare i64 @llvm.umin.i64(i64,i64)
+declare i64 @llvm.umax.i64(i64,i64)
 declare <2 x i64> @air.max.s.v2i64(<2 x i64>,<2 x i64>)
 declare <2 x i64> @air.max.u.v2i64(<2 x i64>,<2 x i64>)
 declare <2 x i64> @llvm.smin.v2i64(<2 x i64>,<2 x i64>)
@@ -4720,6 +4728,45 @@ define void @image_minmax(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
  %wide_coordinate32 = trunc i64 %wide_coordinate to i32
  %wide_coordinate_ok = icmp eq i32 %wide_coordinate32,%coordinate
  %wide_ok = and i1 %wide_values_ok,%wide_coordinate_ok
+ %scalar64_parity = and i32 %x,1
+ %scalar64_even = icmp eq i32 %scalar64_parity,0
+ %scalar64_input = select i1 %scalar64_even,i64 %wide_x,i64 %wide_negative
+ %scalar64_signed_less = icmp slt i64 %scalar64_input,7
+ %scalar64_unsigned_less = icmp ult i64 %scalar64_input,7
+ %scalar64_smin_expected = select i1 %scalar64_signed_less,i64 %scalar64_input,i64 7
+ %scalar64_smax_expected = select i1 %scalar64_signed_less,i64 7,i64 %scalar64_input
+ %scalar64_umin_expected = select i1 %scalar64_unsigned_less,i64 %scalar64_input,i64 7
+ %scalar64_umax_expected = select i1 %scalar64_unsigned_less,i64 7,i64 %scalar64_input
+ %scalar64_smin = call i64 @air.min.s.i64(i64 %scalar64_input,i64 7)
+ %scalar64_smax = call i64 @air.max.s.i64(i64 %scalar64_input,i64 7)
+ %scalar64_umin = call i64 @air.min.u.i64(i64 %scalar64_input,i64 7)
+ %scalar64_umax = call i64 @air.max.u.i64(i64 %scalar64_input,i64 7)
+ %scalar64_smin_ref = call i64 @llvm.smin.i64(i64 %scalar64_input,i64 7)
+ %scalar64_smax_ref = call i64 @llvm.smax.i64(i64 %scalar64_input,i64 7)
+ %scalar64_umin_ref = call i64 @llvm.umin.i64(i64 %scalar64_input,i64 7)
+ %scalar64_umax_ref = call i64 @llvm.umax.i64(i64 %scalar64_input,i64 7)
+ %scalar64_smin_same = icmp eq i64 %scalar64_smin,%scalar64_smin_ref
+ %scalar64_smax_same = icmp eq i64 %scalar64_smax,%scalar64_smax_ref
+ %scalar64_umin_same = icmp eq i64 %scalar64_umin,%scalar64_umin_ref
+ %scalar64_umax_same = icmp eq i64 %scalar64_umax,%scalar64_umax_ref
+ %scalar64_smin_order = icmp eq i64 %scalar64_smin,%scalar64_smin_expected
+ %scalar64_smax_order = icmp eq i64 %scalar64_smax,%scalar64_smax_expected
+ %scalar64_umin_order = icmp eq i64 %scalar64_umin,%scalar64_umin_expected
+ %scalar64_umax_order = icmp eq i64 %scalar64_umax,%scalar64_umax_expected
+ %scalar64_same0 = and i1 %scalar64_smin_same,%scalar64_smax_same
+ %scalar64_same1 = and i1 %scalar64_umin_same,%scalar64_umax_same
+ %scalar64_order0 = and i1 %scalar64_smin_order,%scalar64_smax_order
+ %scalar64_order1 = and i1 %scalar64_umin_order,%scalar64_umax_order
+ %scalar64_same = and i1 %scalar64_same0,%scalar64_same1
+ %scalar64_order = and i1 %scalar64_order0,%scalar64_order1
+ %scalar64_values_ok = and i1 %scalar64_same,%scalar64_order
+ %scalar64_sum = add i64 %scalar64_umin,%scalar64_umax
+ %scalar64_restored = sub i64 %scalar64_sum,7
+ %scalar64_positive = and i64 %scalar64_restored,9223372036854775807
+ %scalar64_coordinate = trunc i64 %scalar64_positive to i32
+ %scalar64_coordinate_ok = icmp eq i32 %scalar64_coordinate,%wide_coordinate32
+ %scalar64_checked = and i1 %scalar64_values_ok,%scalar64_coordinate_ok
+ %all_wide_ok = and i1 %wide_ok,%scalar64_checked
  %input = insertelement <1 x i32> zeroinitializer, i32 %x, i32 0
  %signed_low = call <1 x i32> @llvm.smin.v1i32(<1 x i32> %input, <1 x i32> <i32 -1>)
  %signed_high = call <1 x i32> @llvm.smax.v1i32(<1 x i32> %signed_low, <1 x i32> <i32 -2>)
@@ -4736,9 +4783,9 @@ define void @image_minmax(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out
  %bounded_x = call i32 @air.max.u.i32(i32 %capped_x, i32 0)
  %coordinate_ok = icmp eq i32 %coordinate, %bounded_x
  %old_ok = and i1 %coordinate_ok, %order_ok
- %all_ok = and i1 %old_ok,%wide_ok
+ %all_ok = and i1 %old_ok,%all_wide_ok
  %offset = select i1 %all_ok, i32 %offset_raw, i32 poison
- %index = add i32 %row, %wide_coordinate32
+ %index = add i32 %row, %scalar64_coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
  %mixed = xor i32 %red, %offset

@@ -25,6 +25,10 @@ fn air_integer_intrinsic(name string) !(ScalarIntrinsic, int) {
 		'air.mul_hi.u.i32' { ScalarIntrinsic.umulh, 13 }
 		'air.popcount.i64' { ScalarIntrinsic.ctpop, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base }
 		'air.reverse_bits.i64' { ScalarIntrinsic.bitreverse, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 1 }
+		'air.min.s.i64' { ScalarIntrinsic.smin, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 2 }
+		'air.max.s.i64' { ScalarIntrinsic.smax, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 3 }
+		'air.min.u.i64' { ScalarIntrinsic.umin, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 4 }
+		'air.max.u.i64' { ScalarIntrinsic.umax, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 5 }
 		else { return error('AIR intrinsic: unsupported AIR integer overload') }
 	}
 }

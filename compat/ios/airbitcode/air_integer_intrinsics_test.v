@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_integer_intrinsic_identity() {
-	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2181
+	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2185
 	for i, name in ['air.popcount.i32', 'air.reverse_bits.i32'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert slot == i && id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }
@@ -69,14 +69,14 @@ fn test_air_integer_extremum_identity() {
 		assert scalar_integer_intrinsic_width(name, id)! == 32
 		if _ := scalar_integer_intrinsic_width(name, ids[(i + 1) % 4]) { assert false }
 	}
-	for name in ['air.min.i32', 'air.max.i32', 'air.min.s.i16', 'air.max.u.i64', 'air.min.s.i032', 'air.min.s.i+32', 'air.min.s.v2i32', 'air.max.u.f32', 'air.max.u.i32.spoof', 'air.smin.i32', 'air.umax.i32', 'air.min.x.i32'] {
+	for name in ['air.min.i32', 'air.max.i32', 'air.min.s.i16', 'air.min.s.i032', 'air.min.s.i+32', 'air.min.s.v2i32', 'air.max.u.f32', 'air.max.u.i32.spoof', 'air.smin.i32', 'air.umax.i32', 'air.min.x.i32'] {
 		if _ := scalar_intrinsic_name(name) { assert false, name }
 	}
 	println('AIR-INTEGER-EXTREMA-NAMES: four exact signed/unsigned i32 names, appended slots, binary identity and width/vector/family/spelling guards PASS')
 }
 
 fn test_air_i64_bit_intrinsic_identity() {
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2181
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2185
 	for i, name in ['air.popcount.i64', 'air.reverse_bits.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }
@@ -91,8 +91,25 @@ fn test_air_i64_bit_intrinsic_identity() {
 			if _ := scalar_intrinsic_name('air.${family}.${suffix}') { assert false }
 		}
 	}
-	for name in ['air.clz.i64','air.ctz.i64','air.min.s.i64','air.add_sat.u.i64','air.mul_hi.s.i64','air.ctpop.i64','air.fast_popcount.i64'] {
+	for name in ['air.clz.i64','air.ctz.i64','air.add_sat.u.i64','air.mul_hi.s.i64','air.ctpop.i64','air.fast_popcount.i64'] {
 		if _ := scalar_intrinsic_name(name) { assert false }
 	}
 	println('AIR-I64-BIT-NAMES: two appended scalar identities after AIR floats, stable i32/LLVM/vector keys, exact names/widths/arity and namespace guards PASS')
+}
+
+fn test_air_i64_extremum_intrinsic_identity() {
+	ids := [ScalarIntrinsic.smin, .smax, .umin, .umax]!
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2185
+	for i, name in ['air.min.s.i64','air.max.s.i64','air.min.u.i64','air.max.u.i64'] {
+		id, slot := air_integer_intrinsic(name)!
+		assert id == ids[i] && scalar_air_integer_cache_base + slot == 2181 + i
+		assert scalar_intrinsic_name(name)! == id && scalar_intrinsic_arity(id) == 2
+		assert scalar_integer_intrinsic_width(name, id)! == 64
+		if _ := scalar_integer_intrinsic_width(name, ids[(i + 1) % 4]) { assert false }
+		for bad in ['i0','i1','i16','i63','i65','i064','i+64','i64.spoof','f64','v2i64','i64.i64'] {
+			stem := ['air.min.s.','air.max.s.','air.min.u.','air.max.u.'][i]
+			if _ := scalar_intrinsic_name(stem + bad) { assert false }
+		}
+	}
+	println('AIR-I64-EXTREMA-NAMES: four appended scalar min/max identities, stable old integer/float/LLVM/vector keys, exact names/widths/arity and family guards PASS')
 }
