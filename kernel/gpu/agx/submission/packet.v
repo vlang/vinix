@@ -43,7 +43,7 @@ fn packet_attachments(count u32, input [16]packet.Attachment) [16]agxcommand.Att
 	return attachments
 }
 
-fn packet_compute(input &packet.Command, usc_base u64, flush_stamps bool) agxcompute.Command {
+fn packet_compute(input &packet.Command, usc_base u64) agxcompute.Command {
 	return agxcompute.Command{
 		encoder_ptr: input.compute.cdm_ctrl_stream_base
 		encoder_end: input.compute.cdm_ctrl_stream_end
@@ -57,11 +57,10 @@ fn packet_compute(input &packet.Command, usc_base u64, flush_stamps bool) agxcom
 		unk_mask: ~u32(0)
 		attachment_count: input.compute_count
 		attachments: packet_attachments(input.compute_count, input.compute_attachments)
-		flush_stamps: flush_stamps
 	}
 }
 
-fn packet_render(input &packet.Command, usc_base u64, flush_stamps bool) agxrender.Command {
+fn packet_render(input &packet.Command, usc_base u64) agxrender.Command {
 	value := input.render
 	mut flags := agxrender.no_clear_pipeline_textures
 	if value.flags & asahi.render_vertex_scratch != 0 { flags |= agxrender.vertex_spills }
@@ -139,38 +138,48 @@ fn packet_render(input &packet.Command, usc_base u64, flush_stamps bool) agxrend
 		fragment_attachment_count: input.fragment_count
 		vertex_attachments: packet_attachments(input.vertex_count, input.vertex_attachments)
 		fragment_attachments: packet_attachments(input.fragment_count, input.fragment_attachments)
-		flush_stamps: flush_stamps
 	}
 }
 
 // Caller supplies immutable copied bytes, output storage and parser scratch.
 // No allocation, userspace access, timestamp lookup or job publication occurs.
 // A failure returns zero usable commands; the caller discards any staged prefix.
-pub fn decode_packet(data voidptr, size u64, usc_base u64, flush_stamps bool,
+pub fn decode_packet(data voidptr, size u64, usc_base u64,
 	mut staged []Command, mut workspace PacketWorkspace) (int, u32) {
 	if staged.len == 0 || staged.len > int(max_commands) { return -22, 0 }
 	workspace.reader = packet.reader(data, size)
 	input := unsafe { &workspace.input }
 	mut count := u32(0)
+	mut last_render := -1
+	mut last_compute := -1
 	for {
 		code := workspace.reader.next(mut workspace.input)
 		if code < 0 { return code, 0 }
-		if code == 1 { return if count == 0 { -22 } else { 0 }, count }
+		if code == 1 { break }
 		if count >= u32(staged.len) { return -22, 0 }
 		mut timestamps := [3]asahi.Timestamps{}
 		barriers := [packet_barrier(input.header.vdm_barrier), packet_barrier(input.header.cdm_barrier)]!
 		command := if input.header.cmd_type == asahi.cmd_render {
+			last_render = int(count)
 			timestamps[0] = input.render.ts_vtx
 			timestamps[1] = input.render.ts_frag
 			Command{descriptor: ioctl.DrmAsahiCommand{cmd_type: ioctl.asahi_cmd_render, barriers: barriers},
-				render: packet_render(input, usc_base, flush_stamps), timestamps: timestamps}
+				render: packet_render(input, usc_base), timestamps: timestamps}
 		} else {
+			last_compute = int(count)
 			timestamps[2] = input.compute.ts
 			Command{descriptor: ioctl.DrmAsahiCommand{cmd_type: ioctl.asahi_cmd_compute, barriers: barriers},
-				compute: packet_compute(input, usc_base, flush_stamps), timestamps: timestamps}
+				compute: packet_compute(input, usc_base), timestamps: timestamps}
 		}
 		staged[count] = command
 		count++
 	}
-	return -22, 0
+	if count == 0 { return -22, 0 }
+	// The final command of each engine flushes its accumulated stamps. The
+	// render flag is used by both vertex and fragment firmware commands.
+	unsafe {
+		if last_render >= 0 { staged[last_render].render.flush_stamps = true }
+		if last_compute >= 0 { staged[last_compute].compute.flush_stamps = true }
+	}
+	return 0, count
 }

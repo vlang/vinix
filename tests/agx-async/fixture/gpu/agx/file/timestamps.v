@@ -38,7 +38,7 @@ fn submit_timestamp_packet_on_queue(mut file GpuFile, queue u32, count u32, bad 
  mut commands := []submission.Command{len: int(count)}
  defer { unsafe { commands.free() } }
  mut workspace := submission.PacketWorkspace{}
- code, decoded := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut commands, mut workspace)
+ code, decoded := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut commands, mut workspace)
  assert code == 0 && decoded == count
  captured := file.capture_submission_queue(queue) or { return -2 }
  in_record := ioctl.DrmAsahiSync{handle: if input == unsafe { nil } { 0 } else { input.handle }}

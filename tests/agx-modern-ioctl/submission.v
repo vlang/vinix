@@ -113,6 +113,7 @@ pub fn run_modern_submission_checks() {
 		assert_drained(file)
 		cases++
 		assert file.ioctl_modern_submit(unsafe { &request }) == 0
+		assert manager.g13_compute_jobs[0].flush_stamps, 'single compute command must flush stamps'
 		service_file_work()
 		manager.finish_compute(0)
 		service_file_work()
@@ -178,10 +179,11 @@ fn check_modern_timestamp_batch() {
 		ts := asahi.Timestamps{ start: asahi.Timestamp{ handle: 9, offset: u32(index * 32) }, end: asahi.Timestamp{ handle: 9, offset: u32(index * 32 + 8) } }
 		if index % 2 == 0 {
 			compute := asahi.CmdCompute{ ts: ts }
-			append_packet(mut bytes, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)), asahi.barrier_none, asahi.barrier_none)
+			append_packet(mut bytes, asahi.cmd_compute, unsafe { &compute }, u16(__offsetof(asahi.CmdCompute, scs_layout)), 0, 0)
 		} else {
 			render := asahi.CmdRender{ width_px: 32, height_px: 32, layers: 1, samples: 1, utile_width_px: 32, utile_height_px: 32, ts_vtx: ts, ts_frag: ts }
-			append_packet(mut bytes, asahi.cmd_render, unsafe { &render }, u16(sizeof(render)), asahi.barrier_none, asahi.barrier_none)
+			// G13 Mesa sends the render prefix before the high resource words.
+			append_packet(mut bytes, asahi.cmd_render, unsafe { &render }, u16(__offsetof(asahi.CmdRender, bg_eot_rsrc_spec_hi)), 0, 0)
 		}
 	}
 	request := asahi.Submit{ queue_id: 1, cmdbuf: u64(bytes.data), cmdbuf_size: u32(bytes.len) }
@@ -189,8 +191,12 @@ fn check_modern_timestamp_batch() {
 	assert manager.g13_compute_jobs.len == 32 && manager.g13_render_jobs.len == 32
 	assert file.timestamp_objects[0].references == 192
 	for index, job in manager.g13_compute_jobs {
+		assert job.flush_stamps == (index == 31), 'only the final compute command flushes stamps'
 		assert job.timestamps == [u64(0x123456780000) + u64(index * 64),
 			u64(0x123456780008) + u64(index * 64)]!
+	}
+	for index, job in manager.g13_render_jobs {
+		assert job.flush_stamps == (index == 31), 'only the final render command flushes stamps'
 	}
 	detach_timestamp(mut file)
 	service_file_work()

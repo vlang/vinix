@@ -66,6 +66,7 @@ pub mut:
 	marker      u64
 	usc_base    u64
 	timestamps [2]u64
+	flush_stamps bool
 	ordinal     u32
 	barrier_sources [2]u32
 	initial_sources [2]u32
@@ -77,6 +78,7 @@ pub struct G13RenderJobResources {
 pub mut:
 	vertex_timestamps [2]u64
 	fragment_timestamps [2]u64
+	flush_stamps bool
 	queue       &G13QueueResources = unsafe { nil }
 	error       G13JobError
 	submitted   bool
@@ -177,7 +179,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(queue &G13Qu
 	index := mgr.prepares
 	mgr.prepares++
 	if index == mgr.fail_prepare_at { return none }
-	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr, usc_base: input.usc_base, ordinal: u32(index), timestamps: timestamps }
+	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr, usc_base: input.usc_base, ordinal: u32(index), timestamps: timestamps, flush_stamps: input.flush_stamps }
 	mgr.g13_compute_jobs << job
 	return job
 }
@@ -193,7 +195,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(queue &G13Que
 	index := mgr.prepares
 	mgr.prepares++
 	if index == mgr.fail_prepare_at { return none }
-	job := &G13RenderJobResources{ queue: unsafe { queue }, ordinal: u32(index), vertex_timestamps: vertex_timestamps, fragment_timestamps: fragment_timestamps }
+	job := &G13RenderJobResources{ queue: unsafe { queue }, ordinal: u32(index), vertex_timestamps: vertex_timestamps, fragment_timestamps: fragment_timestamps, flush_stamps: input.flush_stamps }
 	mgr.g13_render_jobs << job
 	return job
 }

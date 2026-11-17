@@ -55,7 +55,6 @@ fn check_inputs() {
 		mut attachments := [3][16]asahi.Attachment{}
 		mut counts := [3]u32{}
 		usc := seed
-		flush := iteration % 2 == 0
 		bytes.clear()
 		for i in 0 .. 32 {
 			mut render := asahi.CmdRender{}
@@ -80,7 +79,7 @@ fn check_inputs() {
 			append_record(mut bytes, asahi.cmd_compute, &compute, u16(sizeof(compute)), u16(i), asahi.barrier_none)
 			append_record(mut bytes, asahi.cmd_render, &render, u16(sizeof(render)), asahi.barrier_none, u16(i + 1))
 		}
-		code, count := submission.decode_packet(bytes.data, u64(bytes.len), usc, flush, mut storage.commands[..], mut workspace)
+		code, count := submission.decode_packet(bytes.data, u64(bytes.len), usc, mut storage.commands[..], mut workspace)
 		assert code == 0 && count == 64, 'mixed packet count'
 		for i in 0 .. 32 {
 			c := storage.commands[i * 2]
@@ -91,8 +90,8 @@ fn check_inputs() {
 			assert r.descriptor.barriers == [ioctl.asahi_barrier_none, u32(i + 1)]!, 'render barriers'
 			assert c.descriptor.cmd_buffer == 0 && c.descriptor.result_offset == 0 && c.descriptor.result_size == 0
 			assert r.descriptor.cmd_buffer == 0 && r.descriptor.result_offset == 0 && r.descriptor.result_size == 0
-			expect_compute(&c.compute, &computes[i], usc, flush)
-			expect_render(&r.render, &renders[i], usc, flush)
+			expect_compute(&c.compute, &computes[i], usc, i == 31)
+			expect_render(&r.render, &renders[i], usc, i == 31)
 			assert c.timestamps == [asahi.Timestamps{}, asahi.Timestamps{}, computes[i].ts]!, 'compute timestamp metadata'
 			assert r.timestamps == [renders[i].ts_vtx, renders[i].ts_frag, asahi.Timestamps{}]!, 'render timestamp metadata'
 			assert c.needs_timestamp_objects() && r.needs_timestamp_objects()
@@ -122,7 +121,7 @@ fn check_inputs() {
 		expect_guards(&storage)
 		// The staged value owns its bytes after the immutable input is discarded.
 		for i in 0 .. bytes.len { bytes[i] = 0xff }
-		expect_compute(&storage.commands[0].compute, &computes[0], usc, flush)
+		expect_compute(&storage.commands[0].compute, &computes[0], usc, false)
 	}
 	unsafe { bytes.free() }
 }
@@ -133,49 +132,56 @@ fn check_failures() {
 	mut bytes := []u8{}
 	mut compute := asahi.CmdCompute{}
 	mut render := asahi.CmdRender{width_px: 1, height_px: 16384, layers: 2048, samples: 4, utile_width_px: 32, utile_height_px: 32}
-	code0, count0 := submission.decode_packet(unsafe { nil }, 0, 0, false, mut storage.commands[..], mut workspace)
+	code0, count0 := submission.decode_packet(unsafe { nil }, 0, 0, mut storage.commands[..], mut workspace)
 	assert code0 == -22 && count0 == 0
 	mut oversized := [65]submission.Command{}
-	oversized_code, oversized_count := submission.decode_packet(unsafe { nil }, 0, 0, false, mut oversized[..], mut workspace)
+	oversized_code, oversized_count := submission.decode_packet(unsafe { nil }, 0, 0, mut oversized[..], mut workspace)
 	assert oversized_code == -22 && oversized_count == 0
 	for _ in 0 .. 2 { append_record(mut bytes, asahi.cmd_compute, &compute, 64, 0, 0) }
-	capacity_code, capacity_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..1], mut workspace)
+	capacity_code, capacity_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..1], mut workspace)
 	assert capacity_code == -22 && capacity_count == 0 && storage.commands[1] == submission.Command{}, 'capacity cannot expose or overwrite prefix'
 	for kind in [asahi.cmd_compute, asahi.cmd_render] {
 		bytes.clear()
 		append_record(mut bytes, kind, if kind == asahi.cmd_compute { voidptr(&compute) } else { voidptr(&render) }, if kind == asahi.cmd_compute { u16(64) } else { u16(__offsetof(asahi.CmdRender, ts_vtx)) }, 0, 0)
-		code, count := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..1], mut workspace)
+		// The final record can be a software command with no payload. The
+		// preceding hardware command still flushes its engine's stamps.
+		hardware_size := bytes.len
+		append_record(mut bytes, asahi.set_compute_attachments, unsafe { nil }, 0, asahi.barrier_none, asahi.barrier_none)
+		code, count := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..1], mut workspace)
 		assert code == 0 && count == 1 && !storage.commands[0].needs_timestamp_objects(), 'short zero-extended record'
+		assert storage.commands[0].compute.flush_stamps == (kind == asahi.cmd_compute), 'single compute flush'
+		assert storage.commands[0].render.flush_stamps == (kind == asahi.cmd_render), 'single render flush'
 		for size in 0 .. bytes.len {
-			error_code, error_count := submission.decode_packet(bytes.data, u64(size), 0, false, mut storage.commands[..], mut workspace)
+			if size == hardware_size { continue }
+			error_code, error_count := submission.decode_packet(bytes.data, u64(size), 0, mut storage.commands[..], mut workspace)
 			assert error_code == -22 && error_count == 0, 'truncated packet'
 		}
 		for _ in 0 .. 65 { append_record(mut bytes, asahi.cmd_compute, &compute, 64, 0, 0) }
 		for capacity in [0, 1, 63, 64] {
-			error_code, error_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..capacity], mut workspace)
+			error_code, error_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..capacity], mut workspace)
 			assert error_code == -22 && error_count == 0, 'failed packet has no usable prefix'
 		}
 	}
 	compute.ts.start.offset = ~u32(0)
 	bytes.clear(); append_record(mut bytes, asahi.cmd_compute, &compute, 64, 0, 0)
-	code1, count1 := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..], mut workspace)
+	code1, count1 := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..], mut workspace)
 	assert code1 == 0 && count1 == 1 && !storage.commands[0].needs_timestamp_objects(), 'null timestamp handle ignores offset'
 	compute.ts.end.handle = 1; compute.ts.end.offset = ~u32(0)
 	bytes.clear(); append_record(mut bytes, asahi.cmd_compute, &compute, 64, 0, 0)
-	code2, count2 := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..], mut workspace)
+	code2, count2 := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..], mut workspace)
 	assert code2 == 0 && count2 == 1 && storage.commands[0].needs_timestamp_objects(), 'defer object bounds to resolver'
 	for kind in [u16(9), asahi.cmd_compute, asahi.cmd_render] {
 		bytes.clear(); compute.flags = 1; render.flags = ~u32(0)
 		append_record(mut bytes, kind, if kind == asahi.cmd_render { voidptr(&render) } else { voidptr(&compute) }, if kind == asahi.cmd_render { u16(sizeof(render)) } else { u16(sizeof(compute)) }, 0, 0)
-		error_code, error_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..], mut workspace)
+		error_code, error_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..], mut workspace)
 		assert error_code == -22 && error_count == 0, 'invalid opcode/flags'
 	}
 	compute.flags = 0; compute.ts_end_copies[0].handle = 1
 	bytes.clear(); append_record(mut bytes, asahi.cmd_compute, &compute, u16(sizeof(compute)), 0, 0)
-	tail_code, tail_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..], mut workspace)
+	tail_code, tail_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..], mut workspace)
 	assert tail_code == -22 && tail_count == 0, 'unsupported nonzero extension'
 	bytes.clear(); append_record(mut bytes, asahi.set_compute_attachments, unsafe { nil }, 0, asahi.barrier_none, asahi.barrier_none)
-	software_code, software_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, false, mut storage.commands[..], mut workspace)
+	software_code, software_count := submission.decode_packet(bytes.data, u64(bytes.len), 0, mut storage.commands[..], mut workspace)
 	assert software_code == -22 && software_count == 0, 'software-only packet'
 	expect_guards(&storage)
 	unsafe { bytes.free() }

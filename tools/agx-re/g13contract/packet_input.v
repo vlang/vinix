@@ -7,6 +7,9 @@ pub fn packet_input_auxiliary_reference(queue string, common string) ! {
 		'address: U64(att.pointer)', 'size: cache_lines.try_into()?', 'unk_e: unk_e as u16'], 'modern attachment input contract')!
 	require_order(common, ['fn get_timestamp_object(', 'if timestamp.handle == 0',
 		'return Ok(None);', 'let offset = timestamp.offset;', 'offset.checked_add(8)'], 'timestamp null-handle semantics')!
+	require_order(queue, ['last_render = nr_commands;', 'last_compute = nr_commands;', 'cmdbuf.rewind();',
+		'command_index == last_render,', 'command_index == last_compute,'],
+		'Final render and compute commands request a stamp flush')!
 }
 
 // Select firmware initializers from the reference, not the native adapter.

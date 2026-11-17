@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+The modern packet path accepts the pinned Mesa base-M1 command sizes and
+requests a stamp flush on the final render and final compute command in
+each batch. [Mesa packet and stamp-flush checks](m1-agx-mesa-packets.md)
+
 The native base-M1 DRM device now advertises `DRM_CAP_SYNCOBJ_TIMELINE`.
 Userspace can discover the shared timeline through the standard GET_CAP probe.
 [Timeline capability reporting](m1-agx-timeline-capability.md)

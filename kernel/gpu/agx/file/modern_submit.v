@@ -39,7 +39,7 @@ pub fn (mut f GpuFile) ioctl_modern_submit(data &asahi.Submit) int {
 		commands.flags = .nogrow | .nofree
 	}
 	mut parser := unsafe { &submission.PacketWorkspace(workspace) }
-	code, count := submission.decode_packet(packet, data.cmdbuf_size, captured.usc_base, false, mut commands, mut parser)
+	code, count := submission.decode_packet(packet, data.cmdbuf_size, captured.usc_base, mut commands, mut parser)
 	if code != 0 { return code }
 	unsafe { commands.len = int(count) }
 	result := f.submit_g13_staged(captured, commands, unsafe { &inputs }, unsafe { &outputs }, 0)
