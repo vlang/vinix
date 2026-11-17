@@ -6,7 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [modern cumulative timeline chains](m1-agx-timeline-chain.md)
+Latest increment: [generic DRM timeline QUERY](m1-agx-syncobj-query.md)
+(2026-11-17). Queries distinguish completed progress from the last submitted
+point, snapshot all object identities before output and preserve partial-copy
+ordering. The generic timeline capability remains disabled pending wait,
+signal and transfer. Full parity remains incomplete.
+
+Preceding increment: [modern cumulative timeline chains](m1-agx-timeline-chain.md)
 (2026-11-17). Modern outputs now publish cumulative roots and accept zero,
 duplicate and decreasing points; inputs preserve snapshots and resolve retired
 prefixes. Exported sync-file info unwraps leaves. Legacy interoperability,

@@ -127,6 +127,23 @@ pub fn get_chain_fence(obj &SyncObj, point u64) ?&DmaFence {
 	return cursor
 }
 
+// drm_syncobj_query_ioctl reports either the head's submitted sequence or
+// completed progress in that head's context. An unordered context boundary
+// stops the search. Empty objects and binary fences always report zero.
+pub fn query_timeline_point(obj &SyncObj, last_submitted bool) u64 {
+	fence := get_fence(obj) or { return 0 }
+	if !fence.chain { return 0 }
+	if last_submitted { return fence.seqno }
+	mut last := unsafe { fence }
+	mut cursor := unsafe { fence }
+	for cursor != unsafe { nil } {
+		if !cursor.chain || cursor.chain_context != fence.chain_context { break }
+		last = unsafe { cursor }
+		cursor = chain_previous(cursor)
+	}
+	return if is_signaled(last) { last.seqno } else { last.chain_prev_seqno }
+}
+
 fn chain_prefix_ready(fence &DmaFence) bool {
 	mut cursor := unsafe { fence }
 	for cursor != unsafe { nil } {

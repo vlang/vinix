@@ -22,6 +22,7 @@ pub const drm_ioctl_syncobj_wait = u32(0xc3)
 pub const drm_ioctl_syncobj_reset = u32(0xc4)
 pub const drm_ioctl_syncobj_signal = u32(0xc5)
 pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
+pub const drm_ioctl_syncobj_query = u32(0xcb)
 pub const drm_ioctl_mode_create_dumb = u32(0xb2)
 pub const drm_ioctl_mode_map_dumb = u32(0xb3)
 pub const drm_ioctl_mode_destroy_dumb = u32(0xb4)
@@ -55,6 +56,7 @@ pub const drm_syncobj_wait_all = u32(1) << 0
 pub const drm_syncobj_wait_for_submit = u32(1) << 1
 pub const drm_syncobj_wait_available = u32(1) << 2
 pub const drm_syncobj_wait_deadline = u32(1) << 3
+pub const drm_syncobj_query_last_submitted = u32(1) << 0
 pub const sync_ioc_file_info = u32(0xc0383e04)
 pub const sync_ioc_set_deadline = u32(0x40103e05)
 
@@ -159,6 +161,14 @@ pub mut:
 	handles       u64
 	count_handles u32
 	pad           u32
+}
+
+pub struct DrmSyncobjTimelineArray {
+pub mut:
+	handles       u64
+	points        u64
+	count_handles u32
+	flags         u32
 }
 
 // include/uapi/drm/drm_mode.h. Keep the field order exact: libdrm builds the
