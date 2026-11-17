@@ -447,9 +447,11 @@ fn (mut mgr GpuManager) flush_g13_queue_mappings(resources &G13QueueResources) b
 			|| !mgr.flush_g13_kernel_buffer(&buffer.block_control)
 			|| !mgr.flush_g13_kernel_buffer(&buffer.counter)
 			|| !mgr.flush_g13_kernel_buffer(&buffer.stats)
-			|| !mgr.flush_g13_kernel_buffer(&buffer.kernel_buffer)
-			|| !mgr.flush_g13_uat_range(resources.vm.id, buffer.page_list.va, buffer.page_list.size)
-			|| !mgr.flush_g13_uat_range(resources.vm.id, buffer.block_list.va, buffer.block_list.size) {
+			|| !mgr.flush_g13_kernel_buffer(&buffer.kernel_buffer) {
+			return false
+		}
+		if resources.vm.is_bound() && (!mgr.flush_g13_uat_range(resources.vm.id, buffer.page_list.va, buffer.page_list.size)
+			|| !mgr.flush_g13_uat_range(resources.vm.id, buffer.block_list.va, buffer.block_list.size)) {
 			return false
 		}
 	}
@@ -711,7 +713,7 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 			return false
 		}
 		staged << block
-		if !mgr.flush_g13_uat_range(context.id, block.va, block.size) {
+		if context.is_bound() && !mgr.flush_g13_uat_range(context.id, block.va, block.size) {
 			return false
 		}
 	}
@@ -1397,6 +1399,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		|| mgr.g13_channels == unsafe { nil } || resources.released || resources.quarantined {
 		return none
 	}
+	if uat_mgr == unsafe { nil } || !uat_mgr.bind_context(resources.vm) { return none }
 	mut queue := unsafe { resources }
 	mut job := &G13RenderJobResources{
 		queue: unsafe { resources }
@@ -2406,6 +2409,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 		|| mgr.g13_channels == unsafe { nil } || resources.released || resources.quarantined {
 		return none
 	}
+	if uat_mgr == unsafe { nil } || !uat_mgr.bind_context(ctx) { return none }
 	mut job := &G13ComputeJobResources{
 		context: unsafe { ctx }
 		queue: unsafe { resources }

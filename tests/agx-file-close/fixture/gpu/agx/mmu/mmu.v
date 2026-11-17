@@ -5,8 +5,14 @@ import gpu.agx.pgtable
 
 pub const uat_num_contexts = 64
 
+pub enum UatHandoffAbi {
+	v12_3
+	g17_26_5
+}
+
 pub struct UatManager {
 pub mut:
+	handoff_abi UatHandoffAbi
 	timestamp_map_calls int
 	timestamp_unmap_calls int
 	timestamp_reject bool
@@ -46,12 +52,24 @@ pub fn (mut mgr UatManager) create_context(start u64, end u64) ?&UatContext {
 	ctx := mgr.next_context
 	if ctx == unsafe { nil } { return none }
 	mgr.next_context = unsafe { nil }
+	if ctx.pgtable != unsafe { nil } {
+		mut table := unsafe { ctx.pgtable }
+		table.tlb_bound = false
+	}
 	return unsafe { ctx }
 }
 
-pub fn (mut mgr UatManager) bind_context(ctx &UatContext) {
+pub fn (ctx &UatContext) is_bound() bool {
+	return ctx.pgtable != unsafe { nil } && ctx.pgtable.tlb_bound
+}
+
+pub fn (mut mgr UatManager) bind_context(ctx &UatContext) bool {
 	assert ctx.id != 0 && ctx.vm_id != 0 && !ctx.destroyed
+	if ctx.pgtable == unsafe { nil } { return false }
+	mut table := unsafe { ctx.pgtable }
+	table.tlb_bound = true
 	mgr.vm_binds++
+	return true
 }
 
 pub fn (mut vm_manager UatManager) destroy_context(context &UatContext) {

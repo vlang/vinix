@@ -15,3 +15,9 @@ exists and failure at every shared-buffer, UAT-table/block, metadata and flush
 position. The actual cleanup must release the complete unpublished graph on
 both firmware ABIs. These services use bounded host memory; they do not model
 firmware execution or UAT invalidation transport.
+
+An unbound VM builds and releases the initial TVB without a firmware range
+flush. The teardown fixture preserves its cached PTE through a retained
+cleanup, then retries after first bind and a failed cache flush. Set
+`AGX_TVB_MANAGER_SOURCE` to supply an alternate GPU manager source for the
+teardown negative control.

@@ -201,30 +201,37 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 
 	request.vm_id = 99
 	assert first.ioctl_vm_create(unsafe { &request }) == -12 && request.vm_id == 99
-	assert manager.vm_binds == binds_before + 3
+	assert manager.vm_binds == binds_before
 	manager.next_context = unsafe { &replacement }
 	assert first.ioctl_vm_create(unsafe { &request }) == 0 && request.vm_id == 1
 	assert (first.find_vm(1) or { panic('reused file VM name') }).id == 19
 	assert first.queues[0].vm_id == 17 && !old.destroyed
+	assert !old.is_bound() && !replacement.is_bound()
 
 	mut object := ioctl.DrmAsahiGemCreate{ size: 0x4000, vm_id: 1, flags: ioctl.asahi_gem_vm_private }
 	assert first.ioctl_gem_create(unsafe { &object }) == 0
 	mut bind := ioctl.DrmAsahiGemBind{ vm_id: 1, handle: object.handle, flags: ioctl.asahi_bind_read, range: 0x4000, addr: 0x4000 }
+	flushes := gpu.flushes()
 	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
+	assert gpu.flushes() == flushes && !replacement.is_bound()
 	assert first.mappings[0].vm_id == 19 && first.mappings[0].obj.vm_private_identity == replacement.identity
 	assert old_pt.maps == 0 && new_pt.maps == 1
-	bind.op = ioctl.asahi_bind_op_unbind
-	bind.flags = 0
-	bind.handle = 0
+	unbind := ioctl.DrmAsahiGemBind{ vm_id: 1, op: ioctl.asahi_bind_op_unbind, range: bind.range, addr: bind.addr }
 	first.inflight_by_vm[19] = 1
-	assert first.ioctl_gem_bind(unsafe { &bind }) == -16 && new_pt.unmaps == 0
+	assert first.ioctl_gem_bind(&unbind) == -16 && new_pt.unmaps == 0
 	first.inflight_by_vm[19] = 0
-	assert first.ioctl_gem_bind(unsafe { &bind }) == 0 && new_pt.unmaps == 1 && old_pt.unmaps == 0
+	assert first.ioctl_gem_bind(&unbind) == 0 && new_pt.unmaps == 1 && old_pt.unmaps == 0
+	assert gpu.flushes() == flushes
+	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
+	assert manager.bind_context(&replacement) && replacement.is_bound()
+	assert first.ioctl_gem_bind(&unbind) == 0 && new_pt.unmaps == 2 && old_pt.unmaps == 0
+	assert gpu.flushes() == flushes + 1
 	assert first.close() && second.close()
 	assert old.destroyed && other.destroyed && sibling.destroyed && replacement.destroyed
 	assert gem.live() == 0
 	memory.assert_released()
 	println('AGX VM names: per-file allocation, detached name reuse, failed creation and physical routing through queue, private GEM and VM_BIND passed')
+	println('AGX VM publication: creation and dormant mappings skip firmware invalidation, with acknowledged unbind after publication')
 }
 
 fn check_modern_queue_and_object() {

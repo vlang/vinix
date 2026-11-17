@@ -570,7 +570,7 @@ fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool
 		return false
 	}
 	mut gpu_manager := unsafe { manager }
-	return gpu_manager.flush_g13_file_mapping(ctx.id, addr, size, unmapped)
+	return gpu_manager.flush_g13_file_mapping(ctx.id, addr, size, unmapped, ctx.is_bound())
 }
 
 fn asahi_variant(config &gpu.GpuManager) u32 {
@@ -689,7 +689,7 @@ pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	mut m := unsafe { mgr }
 	mut ctx := m.create_context(request.kernel_start, request.kernel_end) or { return -12 }
 	ctx.vm_id = vm_id
-	m.bind_context(ctx)
+	if m.handoff_abi != .v12_3 { m.bind_context(ctx) }
 	f.detached_vms[ctx.id] = false
 	f.vms << ctx
 	request.vm_id = vm_id

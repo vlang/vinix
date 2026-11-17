@@ -36,6 +36,7 @@ fn checks() !int {
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
 		section(source, 'fn (mut f GpuFile) retire_mapping_locked(', '// Reserve a nonzero per-open queue ID.')! +
 		section(source, 'fn (f &GpuFile) find_vm(', '// Firmware may retain both UAT translations')! +
+		section(source, 'fn flush_firmware_mapping(', 'fn asahi_variant(')! +
 		section(source, 'fn (mut f GpuFile) allocate_timestamp_id_locked(', 'fn (f &GpuFile) find_vm(')! +
 		section(source, 'fn (mut f GpuFile) allocate_queue_id_locked(', 'fn (mut f GpuFile) allocate_timestamp_id_locked(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_vm_create(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(')! +

@@ -47,13 +47,6 @@ fn (mut objects Objects) add_created(object &gem.GemObject) { objects.table.add_
 fn (objects &Objects) mmap_attributes(offset u64) u64 { return objects.table.mmap_attributes(offset) }
 fn (objects &Objects) valid_mmap_range(offset u64, length u64) bool { return objects.table.valid_mmap_range(offset, length) }
 
-fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
-	assert ctx.pgtable != unsafe { nil } && !ctx.destroyed
-	assert addr != 0 && size != 0
-	mut manager := gpu.get_global_manager() or { return false }
-	return manager.flush_g13_file_mapping(ctx.id, addr, size, unmapped)
-}
-
 struct GpuFile {
 mut:
 	lock              klock.Lock

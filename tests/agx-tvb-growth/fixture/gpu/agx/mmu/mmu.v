@@ -6,19 +6,45 @@ pub mut:
 	phys     u64
 	size     u64
 	released bool
+	mapped bool
+	cache_flush_pending bool
+	uncached bool
 }
 
 pub fn (buffer &UatBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
+pub fn (buffer &UatBuffer) needs_cache_flush() bool { return buffer.cache_flush_pending }
 
 pub struct UatContext {
 pub mut:
 	id        u32 = 1
 	active    bool = true
+	bound     bool = true
 	allocated int
 	released  int
 	fail_at   int = -1
 	pool      [32]UatBuffer
 	check     fn () = unsafe { nil }
+}
+
+pub fn (context &UatContext) is_bound() bool { return context.bound }
+
+pub fn (mut context UatContext) reprotect_driver_buffer_uncached(buffer &UatBuffer) bool {
+	mut owned := unsafe { buffer }
+	if owned.mapped { owned.uncached = true }
+	return true
+}
+
+pub fn (mut context UatContext) complete_driver_buffer_cache_flush(buffer &UatBuffer) bool {
+	mut owned := unsafe { buffer }
+	if !owned.mapped || !owned.uncached { return false }
+	owned.cache_flush_pending = false
+	return true
+}
+
+pub fn (mut context UatContext) unmap_driver_buffer(buffer &UatBuffer) bool {
+	mut owned := unsafe { buffer }
+	owned.mapped = false
+	return true
 }
 
 pub fn (mut context UatContext) alloc_driver_buffer_aligned(size u64, private bool, alignment u64) ?&UatBuffer {

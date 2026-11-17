@@ -10,7 +10,8 @@ fn check_vm_detach_local(file string) ! {
 	require(!owned.contains('detached_vms'), 'Physical ownership cannot depend on name visibility')!
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_vm_create(', 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'VM namespace publication')!
 	require_order(create, ['f.lock.acquire()', 'defer { f.lock.release() }', 'if !f.detached_vms[vm.id] { used |= u64(1) << vm.vm_id }',
-		'vm_id := u32(1)', 'm.create_context(', 'ctx.vm_id = vm_id', 'f.detached_vms[ctx.id] = false',
+		'vm_id := u32(1)', 'm.create_context(', 'ctx.vm_id = vm_id', 'if m.handoff_abi != .v12_3 { m.bind_context(ctx) }',
+		'f.detached_vms[ctx.id] = false',
 		'f.vms << ctx', 'request.vm_id = vm_id'], 'VM creation publishes the first available file name under the file lock')!
 	destroy := section(file, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', '// Caller holds file.lock. User bindings', 'VM namespace removal')!
 	require_order(destroy, ['request.extensions != 0 || request.pad != 0', 'return -22',

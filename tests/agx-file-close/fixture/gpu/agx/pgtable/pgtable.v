@@ -11,6 +11,7 @@ pub const gpu_prot_fw_shared_rw = u64(9)
 pub struct UatPgtable {
 pub mut:
 	maps int
+	tlb_bound bool = true
 	unmaps int
 	reject_map bool
 	reject_prepare bool

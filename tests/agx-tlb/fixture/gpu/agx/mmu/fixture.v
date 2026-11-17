@@ -1,6 +1,7 @@
 module mmu
 
 import gpu.agx.pgtable
+import klock
 
 pub const uat_num_contexts = 64
 const ttbr_valid = u64(1)
@@ -26,6 +27,7 @@ pub mut:
 	handoff              voidptr
 	handoff_initialized  bool
 	map_kernel_to_user   bool
+	lock klock.Lock
 }
 
 fn handoff_lock(_h voidptr) {}

@@ -83,7 +83,13 @@ fn test_root_publication_and_reuse() {
 	mut user := pgtable.new_pgtable(39, 48) or { panic('user root') }
 	ctx := mmu.UatContext{ id: 3, pgtable: user }
 	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[3]) })
-	mgr.bind_context(&ctx)
+	assert !ctx.is_bound()
+	assert user.map(0x4000, 0x200000, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw)
+	assert slots[3].ttb0 == 0 && tlb.calls().len == 0
+	mgr.unbind_context(&ctx)
+	assert tlb.calls().len == 0
+	assert mgr.bind_context(&ctx) && ctx.is_bound()
+	assert mgr.bind_context(&ctx) // Additional jobs reuse the published root.
 	bind := tlb.calls()
 	assert bind.len == 1 && !bind[0].all && bind[0].asid == 3
 	assert bind[0].ttb0 == user.l1_phys | (u64(3) << 48) | 1
@@ -100,7 +106,7 @@ fn test_root_publication_and_reuse() {
 	mut next := pgtable.new_pgtable(39, 48) or { panic('replacement root') }
 	next_ctx := mmu.UatContext{ id: 3, pgtable: next }
 	mgr.map_kernel_to_user = true
-	mgr.bind_context(&next_ctx)
+	assert mgr.bind_context(&next_ctx)
 	reuse := tlb.calls()
 	assert reuse.len == 1 && reuse[0].asid == 3
 	assert reuse[0].ttb0 == next.l1_phys | (u64(3) << 48) | 1

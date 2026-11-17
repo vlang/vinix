@@ -655,11 +655,22 @@ pub fn (buffer &UatBuffer) cpu_address() voidptr {
 	return voidptr(buffer.phys + higher_half)
 }
 
-pub fn (mgr &UatManager) bind_context(ctx &UatContext) {
+// Callers serialize publication and removal with VM ownership.
+pub fn (ctx &UatContext) is_bound() bool {
+	return ctx.pgtable != unsafe { nil } && ctx.pgtable.tlb_bound
+}
+
+pub fn (mgr &UatManager) bind_context(ctx &UatContext) bool {
+	// The firmware handoff lock excludes the ASC. The manager lock also
+	// excludes other AP threads, including a different VM's root removal.
+	mut owner := unsafe { mgr }
+	owner.lock.acquire()
+	defer { owner.lock.release() }
 	if !mgr.handoff_initialized || ctx == unsafe { nil } || ctx.pgtable == unsafe { nil }
-		|| ctx.id >= uat_num_contexts {
-		return
+		|| ctx.id == 0 || ctx.id >= uat_num_contexts {
+		return false
 	}
+	if ctx.is_bound() { return true }
 	asid := u64(ctx.id) << ttbr_asid_shift
 	handoff_lock(mgr.handoff)
 	unsafe {
@@ -675,10 +686,13 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) {
 	handoff_unlock(mgr.handoff)
 	mut pt := unsafe { ctx.pgtable }
 	pt.bind_tlb(u8(ctx.id))
+	return true
 }
 
+// Caller holds mgr.lock.
 pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
-	if !mgr.handoff_initialized || ctx == unsafe { nil } || ctx.id >= uat_num_contexts {
+	if !mgr.handoff_initialized || ctx == unsafe { nil } || ctx.id == 0
+		|| ctx.id >= uat_num_contexts || !ctx.is_bound() {
 		return
 	}
 	handoff_lock(mgr.handoff)
@@ -689,10 +703,8 @@ pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
-	if ctx.pgtable != unsafe { nil } {
-		mut pt := unsafe { ctx.pgtable }
-		pt.unbind_tlb()
-	}
+	mut pt := unsafe { ctx.pgtable }
+	pt.unbind_tlb()
 }
 
 // Map a driver-owned allocation into context zero. Lower addresses use TTBR0;

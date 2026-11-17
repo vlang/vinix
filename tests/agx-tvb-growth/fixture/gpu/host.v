@@ -177,36 +177,57 @@ pub fn run_checks() {
 		check_growth(abi, -1, -1, false, false)
 		check_growth(abi, -1, -1, false, true)
 		check_unpublished = false
-		for fail in 0 .. 10 { check_initialization(abi, fail, -1, -1, false) }
-		for fail in 0 .. 5 { check_initialization(abi, -1, fail, -1, false) }
-		for fail in 0 .. 8 { check_initialization(abi, -1, -1, fail, false) }
-		check_initialization(abi, -1, -1, -1, true)
-		check_initialization(abi, -1, -1, -1, false)
+		for fail in 0 .. 10 { check_initialization(abi, fail, -1, -1, false, true) }
+		for fail in 0 .. 5 { check_initialization(abi, -1, fail, -1, false, true) }
+		for fail in 0 .. 8 { check_initialization(abi, -1, -1, fail, false, true) }
+		check_initialization(abi, -1, -1, -1, true, true)
+		check_initialization(abi, -1, -1, -1, false, true)
+		check_initialization(abi, -1, -1, 0, false, false)
 		check_unpublished = true
 	}
 	println('AGX TVB growth: both ABIs, every allocation/flush failure, atomic extension and firmware-owned counters passed')
 	println('AGX initial TVB: eight blocks before any scene, all allocation/flush failures unwind the complete graph on both ABIs passed')
+	println('AGX unbound TVB: eight blocks allocated and released without a firmware range flush on both ABIs')
+	check_teardown_after_first_bind()
 }
 
-fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fail_flush int, metadata_fail bool) {
+fn check_teardown_after_first_bind() {
+	check_unpublished = false
+	mut mgr := GpuManager{ fail_flush_at: 0 }
+	mut context := mmu.UatContext{ bound: false }
+	mut buffer := mmu.UatBuffer{ va: 0x100000, size: 0x20000, mapped: true, cache_flush_pending: true }
+	// A later kernel-buffer failure can retain this graph until another
+	// queue publishes the same VM. Keep its private PTE available for retry.
+	assert mgr.invalidate_g13_driver_buffer(mut context, &buffer)
+	assert buffer.mapped && buffer.cache_flush_pending && !buffer.uncached && mgr.flushes == 0
+	context.bound = true
+	assert !mgr.invalidate_g13_driver_buffer(mut context, &buffer)
+	assert buffer.mapped && buffer.cache_flush_pending && buffer.uncached && mgr.flushes == 1
+	assert mgr.invalidate_g13_driver_buffer(mut context, &buffer)
+	assert !buffer.mapped && !buffer.cache_flush_pending && mgr.flushes == 3
+	println('AGX private TVB: retained dormant PTE survives first bind and a failed flush, then releases on retry')
+}
+
+fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fail_flush int, metadata_fail bool, bound bool) {
 	mut config := hw.t8103_config()
 	config.firmware_abi = abi
 	mut mgr := GpuManager{hw_config: config, fail_shared_at: fail_shared, fail_flush_at: fail_flush}
-	mut context := mmu.UatContext{fail_at: fail_alloc}
+	mut context := mmu.UatContext{fail_at: fail_alloc, bound: bound}
 	mut resources := G13QueueResources{}
 	memory.fail_next(metadata_fail)
 	ok := mgr.initialize_g13_render_buffer(mut resources, &context)
 	memory.fail_next(false)
-	if fail_alloc >= 0 || fail_shared >= 0 || fail_flush >= 0 || metadata_fail {
+	if fail_alloc >= 0 || fail_shared >= 0 || (bound && fail_flush >= 0) || metadata_fail {
 		assert !ok
 		assert !resources.render_buffer.initialized && resources.render_buffer.info.phys == 0
 		assert resources.render_buffer.blocks.len == 0
 	} else {
+		assert mgr.flushes == if bound { 8 } else { 0 }
 		buffer := &resources.render_buffer
 		assert ok && buffer.initialized && buffer.blocks.len == 8
 		assert !buffer.slot_reserved && buffer.active_scenes == 0 && buffer.tail_pointer_cache == unsafe { nil }
 		control := unsafe { &fw.G13BufferBlockControl(buffer.block_control.cpu_address()) }
-		assert control.total == 8 && control.wptr == 8 && mgr.flushes == 8
+		assert control.total == 8 && control.wptr == 8
 		assert context.allocated == 10 && mgr.shared_allocations == 5
 		// The initial non-active counters agree with the block table rather
 		// than waiting until the first frame to populate firmware state.

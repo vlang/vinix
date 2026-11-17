@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 publishes a VM's UAT root during its first render or compute job
+preparation. [Deferred UAT root publication](m1-agx-deferred-uat.md)
+
 Native VM IDs now belong to the open DRM file. A detached name can be reused
 while an old queue retains its hardware context. [VM names](m1-agx-vm-names.md)
 
