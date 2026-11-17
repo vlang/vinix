@@ -597,7 +597,6 @@ fn (mut mgr GpuManager) free_g13_render_buffer_locked(mut buffer G13RenderBuffer
 	}
 	unsafe { buffer.blocks.free() }
 	buffer = G13RenderBufferResources{}
-	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
 }
 
@@ -956,7 +955,6 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 	mgr.free_shared_buffer(mut resources.threshold)
 	mgr.free_shared_buffer(mut resources.notifier_list)
 	mgr.free_shared_buffer(mut resources.context)
-	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
 	return true
 }
@@ -1331,8 +1329,6 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 		mgr.release_g13_scene_slot_locked(mut queue.render_buffer)
 		job.scene_reserved = false
 	}
-	mgr.g13_gpu_readonly.gc()
-	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
 	return true
 }
@@ -2351,8 +2347,6 @@ fn (mut mgr GpuManager) free_g13_compute_job_locked(mut job G13ComputeJobResourc
 		mgr.free_shared_buffer(mut job.microsequence)
 		mgr.free_shared_buffer(mut job.timestamps)
 	}
-	mgr.g13_gpu_readonly.gc()
-	mgr.g13_private.gc()
 	mgr.g13_shared.gc()
 	return true
 }

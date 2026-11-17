@@ -6,16 +6,18 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [unpublished reservation cancellation](m1-agx-heap-cancel.md)
-(2026-11-17). Kernel-buffer mapping failure cancels only its new VA reservation,
-preserving unrelated pending firmware ranges. Eager teardown collection remains
-a separate parity gap. The [G13 allocation-pressure policy](m1-agx-heap-pressure.md)
+Latest offline increment: [deferred private collection during teardown](m1-agx-teardown-gc.md)
+(2026-11-17). Normal G13 job, queue and render-buffer destruction preserves pending
+private ranges until acknowledged prefix collection. Initialization and stopped
+cleanup retain explicit drains. The [unpublished reservation cancellation](m1-agx-heap-cancel.md)
+report retains the mapping-failure correction and its original evidence.
+The [G13 allocation-pressure policy](m1-agx-heap-pressure.md)
 report retains the implicit-GC pressure correction and its original evidence.
 The [returning worker scheduling](m1-agx-worker-reschedule.md) report retains
 the G13/G17/fake scheduler correction and its original evidence. The
 [UAT completion polling](m1-agx-uat-poll.md) report retains the separate
 firmware-control wait correction and its original evidence. Native scheduling,
-eager teardown GC, allocator backing/accounting and native
+deferred context invalidation, allocator backing/accounting and native
 performance remain different or unqualified.
 The [firmware-cache barrier and threshold collection](m1-agx-heap-gc.md) report
 retains the captured-prefix collection comparison and its original evidence.
