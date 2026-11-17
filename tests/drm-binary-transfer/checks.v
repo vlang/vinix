@@ -100,7 +100,8 @@ pub fn run_binary_transfer_checks() {
 			mut request := bt_request(0, flags)
 			mut capture := syncobj.FenceCapture{}
 			syncobj.replace_fence(bt_destination, unsafe { nil })
-			assert syncobj.prepare_capture(bt_destination, unsafe { &capture }, true)
+			syncobj.prepare_capture(bt_destination, unsafe { &capture }, true) or { panic('capture snapshot') }
+			syncobj.arm_capture(unsafe { &capture })
 			before := memory.attempts()
 			assert ioctl_syncobj_transfer(voidptr(11), unsafe { &request }) == 0
 			assert memory.attempts() == before && current(bt_destination) == bt_leaf && sched.polls == 0

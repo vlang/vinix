@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Binary WAIT snapshots every syncobj before registering for new submissions.
+Registration observes the current fence after any transient fence from that
+pass has been cleared. [Binary WAIT capture ordering](m1-agx-binary-wait-capture.md)
+
 Binary and timeline WAIT accept the request sizes from before `deadline_nsec`
 and follow the packaged DRM core's direction and copy rules.
 [DRM syncobj WAIT request framing](m1-agx-wait-wire.md)

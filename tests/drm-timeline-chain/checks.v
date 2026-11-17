@@ -111,7 +111,8 @@ pub fn run_chain_checks() ? {
 	// captures and captured roots across replacement of the sync object.
 	mut obj := SyncObj{}
 	mut capture := FenceCapture{}
-	assert prepare_capture(&obj, &capture, true)
+	prepare_capture(&obj, &capture, true) or { panic('capture snapshot') }
+	arm_capture(&capture)
 	mut first := DmaFence{}
 	n0 := append_chain(&obj, &first, 0)
 	assert captured_fence(&capture)? == n0

@@ -20,7 +20,7 @@ fn reuse_import_destination() {
 	import_fixture_fresh = syncobj.new_syncobj(12) or { panic('reused destination') }
 	assert import_fixture_fresh.handle == import_fixture_target.handle
 	remember_created(import_fixture_fresh)
-	assert syncobj.prepare_capture(import_fixture_fresh, import_fixture_capture, true)
+	syncobj.arm_capture_for_checks(import_fixture_fresh, import_fixture_capture)
 }
 
 fn remove_import_destination() { assert syncobj.destroy(12, import_fixture_target.handle) }
@@ -53,7 +53,7 @@ pub fn run_sync_file_import_checks() {
 		opaque := export_object(11, source.handle, 0)
 		snapshot := export_object(11, source.handle, 1)
 		mut captures := [4]syncobj.FenceCapture{}
-		assert syncobj.prepare_capture(target, unsafe { &captures[0] }, false)
+		syncobj.prepare_capture(target, unsafe { &captures[0] }, false) or { panic('old GPU snapshot') }
 		// Descriptor validation wins when both descriptor and destination are
 		// invalid. A valid sync-file with no destination instead gives ENOENT.
 		attempts := memory.attempts()
@@ -82,7 +82,7 @@ pub fn run_sync_file_import_checks() {
 		// timeline membership without signaling old GPU work or replacing captures.
 		syncobj.replace_fence(target, unsafe { nil })
 		assert syncobj.add_timeline_point(target, 7, old_gpu)
-		assert syncobj.prepare_capture(target, unsafe { &captures[1] }, true)
+		syncobj.arm_capture_for_checks(target, unsafe { &captures[1] })
 		expect_sync_file_import(12, alias, snapshot, 0)
 		assert_fence_identity(target, first)
 		assert voidptr(syncobj.captured_fence(unsafe { &captures[1] }) or { panic('pending publication') }) == voidptr(first)
@@ -108,7 +108,7 @@ pub fn run_sync_file_import_checks() {
 		// a pointer obtained before resolving the transport. Old aliases survive.
 		syncobj.replace_fence(target, unsafe { nil })
 		syncobj.release_capture(unsafe { &captures[1] })
-		assert syncobj.prepare_capture(target, unsafe { &captures[1] }, true)
+		syncobj.arm_capture_for_checks(target, unsafe { &captures[1] })
 		import_fixture_target = target
 		import_fixture_capture = unsafe { &captures[2] }
 		file.when_lookup(reuse_import_destination)
@@ -122,7 +122,7 @@ pub fn run_sync_file_import_checks() {
 		// object's pending capture untouched. No publication may use a stale name.
 		import_fixture_target = import_fixture_fresh
 		syncobj.replace_fence(import_fixture_fresh, unsafe { nil })
-		assert syncobj.prepare_capture(import_fixture_fresh, unsafe { &captures[3] }, true)
+		syncobj.arm_capture_for_checks(import_fixture_fresh, unsafe { &captures[3] })
 		file.when_lookup(remove_import_destination)
 		expect_sync_file_import(12, import_fixture_fresh.handle, snapshot, -2)
 		assert_has_no_fence(import_fixture_fresh)

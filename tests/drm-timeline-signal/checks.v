@@ -165,7 +165,8 @@ pub fn run_timeline_signal_checks() {
 	timeline_signal_target = obj; timeline_signal_input = &input
 	request = prepare_timeline_signal(&input, 2, 0)
 	input.points[0] = 7; input.points[1] = 9
-	assert syncobj.prepare_capture(obj, &capture, true)
+	syncobj.prepare_capture(obj, &capture, true) or { panic('capture snapshot') }
+	syncobj.arm_capture(&capture)
 	klock.before_once(unsafe { &obj.lock }, timeline_signal_replace_during_publish)
 	assert ioctl_syncobj_timeline_signal(voidptr(11), unsafe { &request }) == 0
 	assert syncobj.query_timeline_point(obj, true) == 9

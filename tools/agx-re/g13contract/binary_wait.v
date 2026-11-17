@@ -16,9 +16,11 @@ fn check_binary_wait_contract(local string, reference string) ! {
 		'Binary waits must reject the timeline-only availability flag')!
 	require_order(wait, ['if request.count_handles == 0 { return 0 }', 'usercopy.copy_from_user(',
 		'object := syncobj.lookup(', 'return -2', 'buffer.objects[i] = voidptr(object)', 'defer {', 'syncobj.release_capture(',
-		'if !syncobj.prepare_capture(', 'request.flags & ioctl.drm_syncobj_wait_for_submit != 0',
-		'return -22', 'for {', 'syncobj.captured_fence(', 'syncobj.is_signaled(fence)',
-		'if ready {', 'request.timeout_nsec <= 0', 'sched.reschedule()'],
+		'request.flags & ioctl.drm_syncobj_wait_for_submit != 0', 'mut first := ~u32(0)', 'syncobj.prepare_capture(',
+		'return -22', 'if ready_count == 0 { first = i }', 'if ready_count == request.count_handles ||',
+		'if allow_future {', 'syncobj.arm_capture(', 'for {', 'syncobj.captured_fence(', 'syncobj.is_signaled(fence)',
+		'if !wait_all { request.first_signaled = i; return 0 }', 'if ready_count == request.count_handles {',
+		'request.first_signaled = first', 'request.timeout_nsec <= 0', 'sched.reschedule()'],
 		'Vinix upfront snapshots, submission capture and deferred detachment')!
 	require(wait.count('usercopy.copy_from_user(') == 1 && !wait.contains('usercopy.read_u32(')
 		&& !wait.contains('obj.fence') && !wait.contains('syncobj.get_fence('),
@@ -36,5 +38,6 @@ fn check_binary_wait_contract(local string, reference string) ! {
 	ref_wait := section(reference, 'static signed long drm_syncobj_array_wait_timeout(', '* drm_timeout_abs_to_jiffies', 'Linux wait fence snapshot')!
 	require_order(ref_wait, ['fence = drm_syncobj_fence_get(syncobjs[i])',
 		'DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT |', 'timeout = -EINVAL',
-		'entries[i].fence = fence', 'do {', 'fence = entries[i].fence', 'dma_fence_is_signaled(fence)'], 'Linux stable fence snapshots before waiting')!
+		'entries[i].fence = fence', 'if (signaled_count == count ||', 'drm_syncobj_fence_add_wait(',
+		'do {', 'fence = entries[i].fence', 'dma_fence_is_signaled(fence)'], 'Linux stable fence snapshots before waiting')!
 }

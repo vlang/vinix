@@ -36,7 +36,7 @@ pub fn run_namespace_checks() {
 			// object/fence, while the new identity takes the lowest free number.
 			old := objects[3071]
 			mut capture := syncobj.FenceCapture{}
-			assert syncobj.prepare_capture(old, &capture, true)
+			syncobj.arm_capture_for_checks(old, &capture)
 			assert syncobj.destroy(11, 3072); checks++
 			mut request := ioctl.DrmSyncobjCreate{ flags: ioctl.drm_syncobj_create_signaled }
 			assert ioctl_syncobj_create(voidptr(11), &request) == 0; checks++
@@ -48,7 +48,7 @@ pub fn run_namespace_checks() {
 			assert voidptr(syncobj.captured_fence(&capture) or { panic('old identity capture lost') }) == voidptr(later)
 			assert voidptr(current(fresh)) != voidptr(later)
 			mut fresh_capture := syncobj.FenceCapture{}
-			assert syncobj.prepare_capture(fresh, &fresh_capture, false)
+			syncobj.prepare_capture(fresh, &fresh_capture, false) or { panic('fresh capture') }
 			fresh_fence := current(fresh)
 			syncobj.destroy_owner(11)
 			assert voidptr(syncobj.captured_fence(&capture) or { panic('detached old capture lost on close') }) == voidptr(later)

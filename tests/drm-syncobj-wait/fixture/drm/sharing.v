@@ -62,7 +62,7 @@ pub fn run_sharing_checks() {
 		// Pending captures through aliases see the first publication, even if
 		// another alias immediately resets the shared object afterward.
 		mut capture := syncobj.FenceCapture{}
-		assert syncobj.prepare_capture(syncobj.lookup(22, right) or { panic('alias') }, unsafe { &capture }, true)
+		syncobj.arm_capture_for_checks(syncobj.lookup(22, right) or { panic('alias') }, unsafe { &capture })
 		binary_action(22, left, true); checks++
 		first := current(obj)
 		assert syncobj.is_signaled(first)

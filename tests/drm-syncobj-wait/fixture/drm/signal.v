@@ -110,7 +110,7 @@ pub fn run_signal_checks() {
 		// preserve the first success after a second success replaces the head.
 		syncobj.replace_fence(a, unsafe { nil })
 		mut capture := syncobj.FenceCapture{}
-		assert syncobj.prepare_capture(a, &capture, true)
+		syncobj.arm_capture_for_checks(a, &capture)
 		handles = [a.handle, a.handle, a.handle]!
 		request.handles = unsafe { u64(&handles[0]) }; request.count_handles = 2
 		usercopy.allow(request.handles, sizeof(handles)); time.reset()

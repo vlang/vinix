@@ -1138,23 +1138,37 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 			syncobj.release_capture(unsafe { &buffer.captures[remaining] })
 		}
 	}
-	for i := u32(0); i < request.count_handles; i++ {
-		if !syncobj.prepare_capture(unsafe { &syncobj.SyncObj(buffer.objects[i]) }, unsafe { &buffer.captures[i] },
-			request.flags & ioctl.drm_syncobj_wait_for_submit != 0) { return -22 }
-	}
+	allow_future := request.flags & ioctl.drm_syncobj_wait_for_submit != 0
 	wait_all := request.flags & ioctl.drm_syncobj_wait_all != 0
+	mut ready_count := u32(0)
+	mut first := ~u32(0)
+	for i := u32(0); i < request.count_handles; i++ {
+		fence := syncobj.prepare_capture(unsafe { &syncobj.SyncObj(buffer.objects[i]) },
+			unsafe { &buffer.captures[i] }, allow_future) or { return -22 }
+		if fence != unsafe { nil } && syncobj.is_signaled(fence) {
+			if ready_count == 0 { first = i }
+			ready_count++
+		}
+	}
+	if ready_count == request.count_handles || (!wait_all && ready_count != 0) {
+		request.first_signaled = first
+		return 0
+	}
+	if allow_future {
+		for i := u32(0); i < request.count_handles; i++ {
+			syncobj.arm_capture(unsafe { &buffer.captures[i] })
+		}
+	}
 	for {
-		mut ready_count := u32(0)
-		mut first := u32(0)
+		ready_count = 0
 		for i := u32(0); i < request.count_handles; i++ {
 			fence := syncobj.captured_fence(unsafe { &buffer.captures[i] }) or { continue }
 			if syncobj.is_signaled(fence) {
-				if ready_count == 0 { first = i }
+				if !wait_all { request.first_signaled = i; return 0 }
 				ready_count++
 			}
 		}
-		ready := if wait_all { ready_count == request.count_handles } else { ready_count != 0 }
-		if ready {
+		if ready_count == request.count_handles {
 			request.first_signaled = first
 			return 0
 		}

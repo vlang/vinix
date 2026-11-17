@@ -87,7 +87,7 @@ pub fn run_large_wait_checks() {
 				ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit, 6000, -512, 0); checks++
 			proc.reset(); wait_fixture_mode = 7; sched.reset(scripted)
 			check_large(unsafe { &handles[0] }, count,
-				ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit, 6000, 0, 0); checks++
+				ioctl.drm_syncobj_wait_all | ioctl.drm_syncobj_wait_for_submit, 6000, 0, ~u32(0)); checks++
 			assert sched.polls == 2
 			syncobj.replace_fence(wait_fixture_target, wait_fixture_replacement)
 		}

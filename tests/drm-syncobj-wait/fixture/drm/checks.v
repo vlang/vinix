@@ -8,6 +8,7 @@ import sched
 import usercopy
 import proc
 import memory
+import klock
 
 __global wait_fixture_objects [32]&syncobj.SyncObj
 __global wait_fixture_fences [32]&syncobj.DmaFence
@@ -85,6 +86,12 @@ fn scripted(step u32) {
 			if step == 1 { proc.private_signal(true) }
 			if step == 2 { syncobj.signal(wait_fixture_original) }
 		}
+		12 {
+			if step == 1 {
+				syncobj.replace_fence(wait_fixture_target, wait_fixture_replacement)
+				syncobj.signal(wait_fixture_replacement)
+			}
+		}
 		else {}
 	}
 }
@@ -121,8 +128,33 @@ fn clear() {
 	sched.reset(unsafe { nil })
 }
 
+fn transient_before_arm() {
+	syncobj.replace_fence(wait_fixture_target, wait_fixture_original)
+	syncobj.replace_fence(wait_fixture_target, unsafe { nil })
+}
+
+fn check_submission_gap() {
+	proc.reset()
+	wait_fixture_target = make_object(0)
+	wait_fixture_original = make_fence()
+	syncobj.signal(wait_fixture_original)
+	wait_fixture_replacement = make_fence()
+	other := make_object(0)
+	syncobj.replace_fence(other, make_fence())
+	mut handles := [wait_fixture_target.handle, other.handle]!
+	wait_fixture_mode = 12
+	sched.reset(scripted)
+	// The first object has been snapshotted when WAIT reaches the second.
+	klock.before_once(unsafe { &other.lock }, transient_before_arm)
+	assert check(mut handles, 2, ioctl.drm_syncobj_wait_for_submit, 6000, 0) == 0
+	assert sched.polls == 1 && syncobj.is_signaled(wait_fixture_replacement),
+		'binary WAIT latched a transient submission before registration'
+	clear()
+}
+
 pub fn run_wait_checks() {
 	memory.configure_metadata(sizeof(syncobj.SyncObj), sizeof(syncobj.DmaFence))
+	check_submission_gap()
 	syncobj.run_capture_checks()
 	for _ in 0 .. 200 {
 		proc.reset()
@@ -189,8 +221,13 @@ pub fn run_wait_checks() {
 		syncobj.replace_fence(left, wait_fixture_original); syncobj.replace_fence(right, wait_fixture_replacement)
 		handles = [left.handle, right.handle]!
 		sched.reset(scripted)
-		check(mut handles, 2, ioctl.drm_syncobj_wait_all, 6000, 0)
+		assert check(mut handles, 2, ioctl.drm_syncobj_wait_all, 6000, 0) == ~u32(0)
 		assert sched.polls == 3
+		wait_fixture_original = make_fence()
+		syncobj.replace_fence(left, wait_fixture_original)
+		sched.reset(scripted)
+		assert check(mut handles, 2, ioctl.drm_syncobj_wait_all, 6000, 0) == 1
+		assert sched.polls == 1
 		sched.reset(unsafe { nil })
 		check(mut handles, 2, 0, 1, 0) // readiness wins over expired absolute timeout
 		for scenario in 7 .. 12 {
@@ -226,5 +263,5 @@ pub fn run_wait_checks() {
 		proc.reset()
 		clear()
 	}
-	println('DRM binary waits: ${wait_fixture_waits} checks across 200 cycles; empty/signaled creation, stable fence/object/user-handle snapshots, submission capture, WAIT_ANY/ALL, errors, deadlines, flags and copy faults passed')
+	println('DRM binary waits: ${wait_fixture_waits} checks; stable snapshots, snapshot-before-arm, first submission, WAIT_ANY/ALL, errors, timeouts, flags and copy faults passed')
 }

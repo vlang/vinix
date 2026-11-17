@@ -2,10 +2,14 @@
 module g13contract
 
 fn check_wait_capture_contract(drm string, objects string, captures string, reference string) ! {
-	prepare := section(captures, 'pub fn prepare_capture(', 'pub fn captured_fence(', 'Vinix wait capture registration')!
-	require_order(prepare, ['o.lock.acquire()', 'c.object =', 'c.fence = unsafe { o.fence }',
-		'if c.fence == unsafe { nil } && wait_for_submit {', 'c.next =', 'c.pending = true',
-		'o.pending_captures =', 'o.lock.release()'], 'Vinix atomic snapshot/registration')!
+	prepare := section(captures, 'pub fn prepare_capture(', 'pub fn arm_capture(', 'Vinix initial wait snapshot')!
+	require_order(prepare, ['o.lock.acquire()', 'c.object =', 'fence := unsafe { o.fence }',
+		'c.fence = unsafe { fence }', 'o.lock.release()', '!allow_future', 'return unsafe { fence }'], 'Vinix initial snapshot under publication lock')!
+	require(!prepare.contains('pending_captures') && !prepare.contains('arm_capture('), 'Initial wait snapshots must leave future submissions unarmed')!
+	arm := section(captures, 'pub fn arm_capture(', 'pub fn captured_fence(', 'Vinix wait capture registration')!
+	require_order(arm, ['o.lock.acquire()', 'defer { o.lock.release() }', 'if c.fence != unsafe { nil } || c.pending',
+		'c.fence = unsafe { o.fence }', 'if c.fence != unsafe { nil }', 'c.next =',
+		'c.pending = true', 'o.pending_captures ='], 'Vinix atomic recheck and registration')!
 	read := section(captures, 'pub fn captured_fence(', '// Called with the object lock held.', 'Vinix capture read')!
 	require_order(read, ['o.lock.acquire()', 'defer { o.lock.release() }', 'if capture.fence ==', 'return unsafe { capture.fence }'], 'Vinix locked capture reads')!
 	publish := section(captures, 'fn (mut obj SyncObj) publish_captures_locked(', '// Unlink before', 'Vinix capture publication')!
@@ -21,7 +25,8 @@ fn check_wait_capture_contract(drm string, objects string, captures string, refe
 		'c.next = unsafe { nil }', 'c.fence = unsafe { nil }', 'c.pending = false', 'o.lock.release()'], 'Vinix unlink before stack retirement')!
 	wait := section(drm, 'fn ioctl_syncobj_wait(', 'fn ioctl_syncobj_reset(', 'Vinix signal-interruptible wait')!
 	require_order(wait, ['defer {', 'syncobj.release_capture(', 'syncobj.prepare_capture(',
-		'if ready {', 'request.timeout_nsec <= 0', 'proc.current_thread()',
+		'if ready_count == request.count_handles ||', 'syncobj.arm_capture(', 'for {',
+		'if ready_count == request.count_handles {', 'request.timeout_nsec <= 0', 'proc.current_thread()',
 		'katomic.load(&waiting_thread.must_exit)', 'proc.pending_signals(waiting_thread) & ~waiting_thread.masked_signals',
 		'return -proc.interrupted_errno', 'sched.reschedule()'], 'Vinix wait outcome precedence and signal interruption')!
 	add := section(reference, 'static void drm_syncobj_fence_add_wait(', 'static void drm_syncobj_remove_wait(', 'Linux wait registration')!

@@ -12,24 +12,34 @@ mut:
 	pending bool
 }
 
-// Register a fresh node while taking the initial snapshot under the same
-// lock used by replacement. A missing fence without WAIT_FOR_SUBMIT is invalid.
-pub fn prepare_capture(obj &SyncObj, capture &FenceCapture, wait_for_submit bool) bool {
-	if obj == unsafe { nil } || capture == unsafe { nil } { return false }
+// Take the initial snapshot before allowing publication to borrow this node.
+// A nil snapshot is valid only when the caller may wait for submission.
+pub fn prepare_capture(obj &SyncObj, capture &FenceCapture, allow_future bool) ?&DmaFence {
+	if obj == unsafe { nil } || capture == unsafe { nil } || capture.object != unsafe { nil } { return none }
 	mut o := unsafe { obj }
 	mut c := unsafe { capture }
-	if c.object != unsafe { nil } { return false }
 	o.lock.acquire()
 	c.object = unsafe { obj }
-	c.fence = unsafe { o.fence }
-	if c.fence == unsafe { nil } && wait_for_submit {
-		c.next = unsafe { o.pending_captures }
-		c.pending = true
-		o.pending_captures = unsafe { capture }
-	}
-	valid := c.fence != unsafe { nil } || wait_for_submit
+	fence := unsafe { o.fence }
+	c.fence = unsafe { fence }
 	o.lock.release()
-	return valid
+	if fence == unsafe { nil } && !allow_future { return none }
+	return unsafe { fence }
+}
+
+// Recheck unresolved snapshots under the publication lock before registering.
+pub fn arm_capture(capture &FenceCapture) {
+	if capture == unsafe { nil } || capture.object == unsafe { nil } { return }
+	mut o := unsafe { capture.object }
+	mut c := unsafe { capture }
+	o.lock.acquire()
+	defer { o.lock.release() }
+	if c.fence != unsafe { nil } || c.pending { return }
+	c.fence = unsafe { o.fence }
+	if c.fence != unsafe { nil } { return }
+	c.next = unsafe { o.pending_captures }
+	c.pending = true
+	o.pending_captures = unsafe { capture }
 }
 
 pub fn captured_fence(capture &FenceCapture) ?&DmaFence {
