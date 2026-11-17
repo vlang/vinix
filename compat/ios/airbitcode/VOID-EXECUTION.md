@@ -1,27 +1,33 @@
 # Void-return scalar execution
 
+Scalar `air.mul_hi.s.i64` and `air.mul_hi.u.i64` accept matching i64
+operands/results and return the signed/unsigned high 64 product bits through
+the existing evaluators. Keys 2191..2192 append two identities for 2,193 scalar
+entries without moving earlier keys. State, freezes, discarded results,
+ordinary pure calls and work/step limits retain their rules.
+
 Scalar `air.add_sat.s.i64`, `air.sub_sat.s.i64`, `air.add_sat.u.i64` and
 `air.sub_sat.u.i64` accept matching i64 operands/results. The signed and
 unsigned evaluators retain endpoint clamping and existing state/freezes,
 discarded results, ordinary pure calls and work/step rules. Keys 2187..2190
-append four identities for 2,191 scalar entries without moving earlier keys.
+append four identities for 2,193 scalar entries without moving earlier keys.
 
 Scalar `air.clz.i64` and `air.ctz.i64` accept matching i64 input/results
 and a constant-false i1 flag, returning 64 for zero. Keys 2185..2186 append
-two identities for 2,191 scalar cache entries without moving earlier keys.
+two identities for 2,193 scalar cache entries without moving earlier keys.
 State, freezes, discarded results, ordinary pure calls and work/step limits
 retain their rules. True/runtime/undef/poison flags reject on every call.
 
 Scalar `air.min.s.i64`, `air.max.s.i64`, `air.min.u.i64` and
 `air.max.u.i64` reuse the signed/unsigned extrema evaluators with matching
 i64 operands/results. Keys 2181..2184 append without moving earlier scalar
-or vector identities; the scalar cache has 2,191 entries. Existing ordinary
+or vector identities; the scalar cache has 2,193 entries. Existing ordinary
 pure-call, state, work and executed-step rules apply.
 
 Scalar `air.popcount.i64` and `air.reverse_bits.i64` accept matching i64
 input/results under the existing pure-call and state/work rules. Keys
 2179..2180 append after AIR float identities; earlier scalar/vector keys
-remain stable. The scalar cache has 2,191 entries.
+remain stable. The scalar cache has 2,193 entries.
 
 Binary `air.fmin.vNf32` and `air.fmax.vNf32` accept matching fixed
 1..16-lane float32 vectors and reuse the scalar AIR extrema evaluator per
@@ -31,7 +37,7 @@ positive canonical NaN. Both sources are observed: poison propagates locally
 and any unfrozen undef lane refuses, even with a NaN peer. Existing freezes,
 discarded poison, vector-PHI slots and cleanup are reused. Keys 61732..61763
 append 32 AIR identities, separate from LLVM, for 61,764 vector entries;
-scalar entries remain 2,191. LLVM zero ordering is preserved in mixed chains.
+scalar entries remain 2,193. LLVM zero ordering is preserved in mixed chains.
 Exact binary signatures, both operand types and ordinary pure call metadata
 remain checked, including after cache hits. One call uses one existing result
 slot/step and the established source/result work charges. Invalid profiles
@@ -45,7 +51,7 @@ are observed. Lane poison propagates; any unfrozen undef source lane refuses,
 including when another source is poison. Existing source/result freezes,
 discarded poison, scalar extraction, vector-PHI slots and cleanup are reused.
 Keys 61716..61731 append sixteen AIR identities, separate from LLVM, for
-61,764 vector entries. Scalar entries remain 2,191. Exact signatures, all
+61,764 vector entries. Scalar entries remain 2,193. Exact signatures, all
 three argument types and ordinary pure call metadata remain checked even
 after cache hits. Work uses the established source/result charges, one result
 slot and one executed step per call. Invalid profiles reject before writes;
@@ -62,7 +68,7 @@ discarded poison and scalar extraction retain existing rules. Exact vector
 argument/result types, ordinary calls, pure attributes and duplicate checks
 remain required, including after cache hits. Keys 61604..61715 append 112 AIR
 identities, separate from LLVM, for 61,764 vector entries. Scalar entries stay
-2,191. One call uses one existing result slot/step and the established vector
+2,193. One call uses one existing result slot/step and the established vector
 source/result work charges. The admitted AIR vector families are these unary
 operations, FMA and float min/max. Half, scalable and fast overloads remain
 excluded; floating address projections reject. Existing owners and cleanup
@@ -75,7 +81,7 @@ ties. Ordered `low > high` produces poison, representing the Metal specification
 undefined bounds. NaN bounds do not trigger this comparison. All three input
 states are observed: poison propagates and undef refuses until frozen. Domain
 poison can be discarded, frozen or bypassed by a lazy select. Slot 2178 appends
-one identity, for 2,191 scalar cache entries without moving earlier keys. Exact
+one identity, for 2,193 scalar cache entries without moving earlier keys. Exact
 float32 signatures, ordinary calls and pure attributes are required; other
 widths/vectors and fast spellings remain excluded.
 
@@ -87,7 +93,7 @@ software also treats signaling NaNs as quiet for numeric preference. The Metal
 specification does not support signaling NaNs. Numeric subnormals retain their
 bits. The wrapper normalizes inputs to float32 and reuses the existing number
 evaluator outside zero ties, without host floating arithmetic. Keys 2176..2177
-append two identities, within 2,191 scalar cache entries. Exact names, binary
+append two identities, within 2,193 scalar cache entries. Exact names, binary
 signatures, each call/operand type, pure attributes, duplicate checks and existing
 step/work/state/ownership rules remain. Invalid profiles reject before writes;
 runtime value failures retain earlier stores. Half/vector overloads, fast
@@ -98,7 +104,7 @@ through the existing exact fused multiply-add evaluator. It adds the exact
 product to the addend before one nearest rounding with ties to even, independent
 of the host rounding mode. Signed zeros, subnormals, infinities, canonical NaNs
 and poison/undef/freezes retain the existing FMA rules. Slot 2175 appends one AIR
-identity, within 2,191 scalar declaration-cache entries without moving earlier keys;
+identity, within 2,193 scalar declaration-cache entries without moving earlier keys;
 LLVM/AIR calls may coexist. Exact signatures, each call and all three operand
 types are checked even after a cache hit. Unsupported declaration/call metadata
 and bounds reject before writes. Runtime poison/undef value failures retain
@@ -110,7 +116,7 @@ float32 root and rounding evaluators. Square root rounds once to nearest with
 ties to even and preserves negative zero; negative nonzero inputs and NaNs
 produce the established positive canonical NaN. Round takes half ties away
 from zero; rint takes half ties to even. Results are independent of the host
-rounding mode. Keys 2172..2174 append three identities, for 2,191 scalar cache
+rounding mode. Keys 2172..2174 append three identities, for 2,193 scalar cache
 entries, preserving previous LLVM/AIR keys. Exact signatures, ordinary direct
 calls, pure attributes, duplicate checks, state/freeze rules, prewrite validation
 and existing work/step/ownership limits remain. Fast forms, other AIR widths,
@@ -120,7 +126,7 @@ Scalar `air.fabs.f32`, `air.floor.f32`, `air.ceil.f32` and `air.trunc.f32`
 accept one float32 argument and return float32 through the existing evaluators.
 `fabs` clears only the sign bit, including NaN payloads; the rounding operations
 use the existing positive canonical NaN policy and preserve infinities and signed
-zeros. Keys 2168..2171 append four AIR identities, for 2,191 scalar cache entries;
+zeros. Keys 2168..2171 append four AIR identities, for 2,193 scalar cache entries;
 earlier LLVM and AIR identities remain stable and may coexist. Exact names,
 signatures, pure declaration attributes and ordinary direct calls are required.
 Poison, undef, freezes, executed-step budgets and result-slot ownership retain
@@ -134,6 +140,7 @@ preserve earlier identities and permit LLVM/AIR coexistence. Both arguments
 are observed; poison propagates and scalar undef retains its existing refusal.
 Source/result freezes and discarded poison results keep the same rules.
 Integer-only scalar execution continues to exclude calls.
+Matching scalar i64 forms use separate keys 2191..2192.
 
 Mixed scalar/void execution accepts binary i32 `air.add_sat.s.i32`,
 `air.sub_sat.s.i32`, `air.add_sat.u.i32` and `air.sub_sat.u.i32` calls.
@@ -164,7 +171,7 @@ Matching scalar i64 min/max forms use separate keys 2181..2184.
 The mixed scalar/void APIs accept `air.popcount.i32` and
 `air.reverse_bits.i32` as pure unary i32 builtins. They share the existing LLVM
 evaluators and state behavior while retaining separate declaration-cache keys
-2154..2155, for 2,191 scalar slots. LLVM/AIR declarations may coexist; duplicate
+2154..2155, for 2,193 scalar slots. LLVM/AIR declarations may coexist; duplicate
 AIR identities still reject. Integer-only scalar execution retains its exclusion
 of calls. Scalar i64 population count and bit reversal are also admitted.
 The shared attribute scanner admits function-level `mustprogress` on terminating
@@ -178,7 +185,7 @@ placement is selected per family: third parameter for insertion, second for
 existing immediate families. Both scalar and memory scanners share this policy.
 One call costs one step, one existing result slot and 2*base_count + inserted_count
 work units. The vector cache has 61,764 entries, with new keys 52628..61603; the
-scalar cache remains 2,191. Existing slots, snapshots and cleanup retain ownership.
+scalar cache remains 2,193. Existing slots, snapshots and cleanup retain ownership.
 Maintained tests cover overwritten poison/undef, surrounding lanes, input/result
 freezes, discarded void results, loop reuse and existing resource bounds.
 
@@ -189,7 +196,7 @@ including calls sharing a declaration. Copying preserves lane bits and deferred
 state; result slots and vector-PHI snapshots retain existing ownership. Calls
 cost one executed step, one vector slot and source_count + result_count work
 units. Keys 43652..52627 append 8,976 identities; the vector declaration cache
-has 52,628 entries and the scalar cache remains 2,191. Existing limits remain.
+has 52,628 entries and the scalar cache remains 2,193. Existing limits remain.
 The maintained subvector checkers cover discarded void results, scalar/integer
 observations, selected-state freezes, loop slot reuse and exact resource bounds.
 
@@ -201,7 +208,7 @@ freeze. Scalar/integer, discarded void and memory execution use the same
 owned result slots, including vector-PHI loops. One executed step and
 result_count validation work units are charged. Keys 42628..43651 append
 1,024 identities, bringing the vector cache to 43,652 entries; the scalar
-cache remains 2,191. Existing work, slot and graph bounds remain.
+cache remains 2,193. Existing work, slot and graph bounds remain.
 
 Fixed 1..16-lane i8..i64 `llvm.stepvector` calls construct defined lane numbers
 without source operands. Exact direct zero-argument signatures are required;
@@ -210,7 +217,7 @@ executed step, one shared vector slot and result_count lane-work units.
 The maintained stepvector checker covers scalar/integer results, unused void
 results, insertion/selection/freezes, loop reuse and both sides of the existing
 4,096-slot and 1,000,000-unit validation limits. Keys 41716..42627 append 912
-identities; the vector cache has 42,628 entries and the scalar cache stays 2,191.
+identities; the vector cache has 42,628 entries and the scalar cache stays 2,193.
 
 `llvm.vector.interleave2` through `interleave8` support fixed i1..i64/half/float
 inputs whose combined result has at most 16 lanes. Calls preserve raw encodings,

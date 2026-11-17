@@ -6048,6 +6048,10 @@ declare <2 x i64> @air.mul_hi.s.v2i64(<2 x i64>,<2 x i64>)
  declare <2 x i64> @llvm.smulh.v2i64(<2 x i64>,<2 x i64>)
  declare <2 x i64> @llvm.umulh.v2i64(<2 x i64>,<2 x i64>)
 declare i64 @air.popcount.i64(i64)
+ declare i64 @air.mul_hi.s.i64(i64,i64)
+ declare i64 @air.mul_hi.u.i64(i64,i64)
+ declare i64 @llvm.smulh.i64(i64,i64)
+ declare i64 @llvm.umulh.i64(i64,i64)
  declare i64 @air.reverse_bits.i64(i64)
  declare i64 @llvm.ctpop.i64(i64)
  declare i64 @llvm.bitreverse.i64(i64)
@@ -6131,6 +6135,33 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %scalar64_restored = call i64 @air.reverse_bits.i64(i64 %scalar64_rev)
  %scalar64_x = sub i64 %scalar64_restored,9223372036854775808
  %scalar64_coordinate = trunc i64 %scalar64_x to i32
+ %scalar_mulh_s = call i64 @air.mul_hi.s.i64(i64 %mh64_x,i64 -1)
+ %scalar_mulh_u = call i64 @air.mul_hi.u.i64(i64 %mh64_x,i64 -1)
+ %scalar_mulh_s_high = call i64 @air.mul_hi.s.i64(i64 %mh64_negative,i64 -1)
+ %scalar_mulh_u_high = call i64 @air.mul_hi.u.i64(i64 %mh64_negative,i64 -1)
+ %scalar_mulh_s_ref = call i64 @llvm.smulh.i64(i64 %mh64_x,i64 -1)
+ %scalar_mulh_u_ref = call i64 @llvm.umulh.i64(i64 %mh64_x,i64 -1)
+ %scalar_mulh_s_high_ref = call i64 @llvm.smulh.i64(i64 %mh64_negative,i64 -1)
+ %scalar_mulh_u_high_ref = call i64 @llvm.umulh.i64(i64 %mh64_negative,i64 -1)
+ %scalar_mulh_s_same = icmp eq i64 %scalar_mulh_s,%scalar_mulh_s_ref
+ %scalar_mulh_u_same = icmp eq i64 %scalar_mulh_u,%scalar_mulh_u_ref
+ %scalar_mulh_s_high_same = icmp eq i64 %scalar_mulh_s_high,%scalar_mulh_s_high_ref
+ %scalar_mulh_u_high_same = icmp eq i64 %scalar_mulh_u_high,%scalar_mulh_u_high_ref
+ %scalar_mulh_s_expected = icmp eq i64 %scalar_mulh_s,%mh64_s0
+ %scalar_mulh_u_expected = icmp eq i64 %scalar_mulh_u,%mh64_u0
+ %scalar_mulh_s_high_expected = icmp eq i64 %scalar_mulh_s_high,0
+ %scalar_mulh_u_high_expected = icmp eq i64 %scalar_mulh_u_high,%mh64_u1_expected
+ %scalar_mulh_same0 = and i1 %scalar_mulh_s_same,%scalar_mulh_u_same
+ %scalar_mulh_same1 = and i1 %scalar_mulh_s_high_same,%scalar_mulh_u_high_same
+ %scalar_mulh_exp0 = and i1 %scalar_mulh_s_expected,%scalar_mulh_u_expected
+ %scalar_mulh_exp1 = and i1 %scalar_mulh_s_high_expected,%scalar_mulh_u_high_expected
+ %scalar_mulh_same = and i1 %scalar_mulh_same0,%scalar_mulh_same1
+ %scalar_mulh_expected = and i1 %scalar_mulh_exp0,%scalar_mulh_exp1
+ %scalar_mulh_ok = and i1 %scalar_mulh_same,%scalar_mulh_expected
+ %scalar_mulh_x = sub i64 %scalar_mulh_u_high,9223372036854775807
+ %scalar_mulh_coordinate = trunc i64 %scalar_mulh_x to i32
+ %scalar_mulh_coordinate_same = icmp eq i32 %scalar_mulh_coordinate,%scalar64_coordinate
+ %scalar_mulh_checked = and i1 %scalar_mulh_ok,%scalar_mulh_coordinate_same
 
  %air_u1 = extractelement <2 x i32> %air_vu, i32 1
  %air_coordinate = sub i32 %air_u1, 2147483647
@@ -6165,10 +6196,11 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %mulh_ok = and i1 %air_ok32,%mh64_matched
  %scalar64_coordinate_same = icmp eq i32 %scalar64_coordinate,%mh64_coordinate
  %scalar64_checked = and i1 %scalar64_all,%scalar64_coordinate_same
- %air_ok = and i1 %mulh_ok,%scalar64_checked
+ %air_ok_previous = and i1 %mulh_ok,%scalar64_checked
+ %air_ok = and i1 %air_ok_previous,%scalar_mulh_checked
  %offset = select i1 %air_ok, i32 %offset_raw, i32 poison
  %row = shl i32 %y, 6
- %index = add i32 %row, %scalar64_coordinate
+ %index = add i32 %row, %scalar_mulh_coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
  %mixed = xor i32 %red, %offset

@@ -35,6 +35,8 @@ fn air_integer_intrinsic(name string) !(ScalarIntrinsic, int) {
 		'air.sub_sat.s.i64' { ScalarIntrinsic.ssub_sat, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 9 }
 		'air.add_sat.u.i64' { ScalarIntrinsic.uadd_sat, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 10 }
 		'air.sub_sat.u.i64' { ScalarIntrinsic.usub_sat, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 11 }
+		'air.mul_hi.s.i64' { ScalarIntrinsic.smulh, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 12 }
+		'air.mul_hi.u.i64' { ScalarIntrinsic.umulh, scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base + 13 }
 		else { return error('AIR intrinsic: unsupported AIR integer overload') }
 	}
 }
