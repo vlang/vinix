@@ -137,7 +137,6 @@ pub fn (mut f GpuFile) ioctl_modern_gem_bind_object(data &asahi.GemBindObject) i
 }
 
 pub fn (mut f GpuFile) ioctl_modern_queue_create(data &asahi.QueueCreate) int {
-	if data.render_scs_layout != [u64(0), 0]! { return -22 }
 	mut old := ioctl.DrmAsahiQueueCreate{
 		flags:      data.flags
 		vm_id:      data.vm_id
@@ -145,7 +144,7 @@ pub fn (mut f GpuFile) ioctl_modern_queue_create(data &asahi.QueueCreate) int {
 		queue_id:   data.queue_id
 		queue_caps: ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_compute
 	}
-	code := f.create_queue(unsafe { &old }, data.usc_exec_base)
+	code := f.create_queue(unsafe { &old }, data.usc_exec_base, data.render_scs_layout)
 	mut request := unsafe { data }
 	request.queue_id = old.queue_id
 	return code

@@ -19,16 +19,23 @@ pub mut:
 __global attempts = 0
 __global live = 0
 __global reject_next = false
+__global heap_next = false
+__global last_created &WorkQueue = unsafe { nil }
 
 pub fn creation_attempts() int { return attempts }
 pub fn active() int { return live }
 pub fn fail_next() { reject_next = true }
+pub fn heap_next_record(value bool) { heap_next = value }
+pub fn last_record() &WorkQueue { return last_created }
 
 pub fn new_workqueue(id u32, vm_id u32, priority u32, caps u32) ?&WorkQueue {
 	attempts++
 	if reject_next { reject_next = false; return none }
 	live++
-	return &WorkQueue{ id: id, vm_id: vm_id, priority: priority, caps: caps, pooled: true }
+	queue := &WorkQueue{ id: id, vm_id: vm_id, priority: priority, caps: caps, pooled: true, heap_record: heap_next }
+	heap_next = false
+	last_created = queue
+	return queue
 }
 
 pub fn (mut queue WorkQueue) destroy() {

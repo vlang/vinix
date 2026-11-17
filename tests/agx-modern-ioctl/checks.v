@@ -152,6 +152,7 @@ pub fn run_modern_checks() {
 	check_modern_transport()
 	check_modern_binding()
 	check_modern_queue_and_object()
+	run_modern_scs_checks()
 	assert params.timestamp_ns(24_000_003, 24_000_000) == 1_000_000_125
 	assert params.timestamp_ns(1_000_003, 1_000_000) == 1_000_003_000
 }

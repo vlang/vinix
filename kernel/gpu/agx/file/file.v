@@ -991,11 +991,11 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 }
 
 pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
-	return f.create_queue(data, 0)
+	return f.create_queue(data, 0, [u64(0), 0]!)
 }
 
 // Install immutable queue input before publishing its name under file.lock.
-fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64) int {
+fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, render_scs_layout [2]u64) int {
 	mut request := unsafe { data }
 	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit | ioctl.asahi_queue_cap_compute
 	if request.extensions != 0 || request.flags != 0 || request.pad != 0 || request.priority > ioctl.asahi_priority_realtime
@@ -1003,6 +1003,9 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64) i
 		return -22
 	}
 	manager := gpu.get_global_manager() or { return -19 }
+	// Only G13's modern queue path is qualified here. Other backends retain
+	// their previous refusal of nonzero modern render scratch layouts.
+	if manager.hw_config.gpu_gen != .g13 && render_scs_layout != [u64(0), 0]! { return -22 }
 	// On G13, refuse unsupported HIGH and reserved REALTIME, as in Asahi.
 	// Userspace numbering increases with priority; firmware bands decrease.
 	if manager.hw_config.gpu_gen == .g13 && request.priority > ioctl.asahi_priority_medium { return -22 }
@@ -1062,6 +1065,22 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64) i
 			workqueue.free_workqueue(queue)
 			return -12
 		}
+	}
+	// Asahi reserves render scratch after constructing the queue. G13's
+	// default implementation accepts only zero layouts, so constructor/VM
+	// errors must win over this rejection. No logical name is published.
+	if render_scs_layout != [u64(0), 0]! {
+		mut gpu_manager := unsafe { manager }
+		released := gpu_manager.release_g13_queue_resources(g13_resources)
+		if !released {
+			// Failed invalidation keeps the graph and VM alive through the
+			// existing orphan-owner retry path, independently of this name.
+			f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: g13_resources }
+		}
+		logical.destroy()
+		workqueue.free_workqueue(logical)
+		if released { gpu.free_g13_queue_record(g13_resources) }
+		return -22
 	}
 	f.queues << wq
 	if g17_resources != unsafe { nil } {

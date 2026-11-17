@@ -111,6 +111,8 @@ retains the existing busy-VM policy. Firmware/default/error-path completeness,
 native scheduling, whole-kernel leak rates and hardware execution are unqualified.
 Modern validation precedence is also unfinished: unsupported render-SCS layouts
 are rejected before queue construction, while the reference checks them later.
+The subsequent [render-SCS correction](m1-agx-queue-scs.md) closes that specific
+queue-validation-order gap without qualifying the other remaining behavior.
 
 No GPU access, firmware execution, Vinix/QEMU boot, SSH, deployment or reboot
 occurred. Follow the remaining offline port with hardware acceptance; passing
