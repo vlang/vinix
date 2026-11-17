@@ -52,10 +52,13 @@ fn main() {
 		} else { os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')! }
 	}
 	source := os.read_file(overrides['--file-source'] or { repo + '/kernel/gpu/agx/file/file.v' })!
-	production := 'module file\nimport drm.gem\nimport drm.ioctl\nimport drm.syncobj\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.submission as agxsubmission\nimport katomic\nimport memory\nimport aarch64.timer\n' +
+	submit := section(source, 'fn discard_g13_completion(', 'fn dispatch(')!
+	timer_import := if submit.contains('timer.') { 'import aarch64.timer\n' } else { '' }
+	production := 'module file\nimport drm.gem\nimport drm.ioctl\nimport drm.syncobj\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.submission as agxsubmission\nimport katomic\nimport memory\n' +
+		timer_import +
 		'const max_g13_submission_commands = agxsubmission.max_commands\nconst max_submission_syncs = agxsubmission.max_syncs\n' +
 		section(source, 'struct G13SubmissionQueue {', 'pub struct GpuFile {')! +
-		section(source, 'fn discard_g13_completion(', 'fn dispatch(')!
+		submit
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp(overrides['--modern-source'] or { repo + '/kernel/gpu/agx/file/modern_submit.v' }, scratch + '/gpu/agx/file/modern_submit.v')!
 	os.cp(repo + '/tests/agx-modern-ioctl/submission.v', scratch + '/gpu/agx/file/modern_checks.v')!
@@ -72,6 +75,7 @@ fn main() {
 	g13 := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	errors := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v')!
 	os.write_file('${scratch}/gpu/agx/gpu/production.v', 'module gpu\nimport katomic\n' +
+		section(g13, 'pub fn (mut queue G13QueueResources) next_fence_seqno()', '// file.lock serializes acquisition')! +
 		section(g13, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(gpu, 'pub fn (mut mgr GpuManager) g13_submission_status(', 'pub fn (mut mgr GpuManager) can_query_global_params(')! +
 		section(gpu, 'pub fn (mut mgr GpuManager) queue_g13_submission(', '__global (')! +

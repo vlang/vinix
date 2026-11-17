@@ -32,9 +32,10 @@ whole-kernel/native slab rates.
 The reference runner compiles unchanged pinned scheduler dependency insertion,
 generic dependency-callback readiness and comparator bodies. Xarray/refcount/
 callback plumbing is modeled; the comparator's 64-bit branch is selected. Its
-4,096 outputs must match exactly. Asahi exports scheduler finished fences with
-init32 sequences; Vinix currently uses 64-bit timestamp sequences. Wraparound
-equivalence and complete scheduler behavior remain unqualified.
+4,096 outputs must match exactly for ordered 64-bit contexts. Native G13 now
+uses [wrapping 32-bit fence numbers](../../docs/m1-agx-fence-ordinals.md).
+The reverse-retirement probe tests the wrap while preserving independent
+dependencies.
 
 The historical native and evidence runners below use the
 `f183daa00` checkout. Native preparation pins

@@ -122,6 +122,7 @@ fn check_full_batch(pattern int) {
 	file.objects = Objects{ object: &object }
 	out := output()
 	assert submit_batch(mut file, 64, pattern, 0, unsafe { nil }, out, true) == 0
+	assert fence(out).seqno == 1 && file.g13_queues[0].resources.fence_seqno == 1
 	assert file.inflight_by_vm[1] == 65 && object.references == 65
 	assert pending_count == 1 && memory.outstanding() == 1 && manager.published.len == 0
 	before_notifications := notifications
@@ -175,6 +176,10 @@ fn check_batch_failures() {
 			manager.stop_barrier_at = if mode == 4 { index } else { -1 }
 			out := output()
 			assert submit_batch(mut file, 64, 2, 0, unsafe { nil }, out, false) < 0
+			// A stop during the last successful barrier call can occur just
+			// before fence creation and be observed during callback setup.
+			armed := mode == 1 || mode == 2 || (mode == 4 && index == 63)
+			assert file.g13_queues[0].resources.fence_seqno == if armed { u32(1) } else { u32(0) }
 			assert manager.published.len == 0
 			assert_reverse(manager.released_order, if mode == 0 { index } else { 64 })
 			assert_drained(file)
@@ -254,6 +259,7 @@ fn check_unqueued_notification() {
 	assert submit_batch(mut file, 64, 2, 6, unsafe { nil }, out, true) == -22
 	assert notifications == before + 1 && object.references == 1
 	assert syncobj.get_error(fence(out)) != 0
+	assert fence(out).seqno == 1 && file.g13_queues[0].resources.fence_seqno == 1
 	assert_drained(file)
 	notification_file = unsafe { nil }
 	notification_node = unsafe { nil }

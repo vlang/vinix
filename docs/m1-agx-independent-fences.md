@@ -43,6 +43,9 @@ timeline capability reporting and the matched Mesa image open. Validation
 used injected completion events and excluded the concurrent event-manager
 edit. Hardware execution, deployment and reboot were outside this run.
 
+The follow-up [32-bit fence numbering change](m1-agx-fence-ordinals.md) covers
+the exported counter and verifies independent retirement through wrap.
+
 ```sh
 ASAN_OPTIONS=detect_stack_use_after_return=1 \
   v run tests/agx-async/run.v --audit-dependency-order

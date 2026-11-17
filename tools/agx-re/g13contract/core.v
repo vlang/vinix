@@ -270,8 +270,15 @@ fn check_queue_fence_contract(contexts string, fences string, queue string, subm
 		'mut complete := false', 'Vinix queue fence context')!
 	require_order(create, ['mgr.state != .running', 'syncobj.new_queue_context() or { return none }',
 		'&G13QueueResources{', 'fence_context: fence_context'], 'Vinix queue fence context')!
-	require(submit.contains('syncobj.new_queue_fence(f.owner_key, timer.get_ns(), queue_resources.fence_context)'),
-		'Native output fences must carry the exact physical queue context')!
+	sequence := section(queue, 'pub struct G13QueueResources {', '// file.lock serializes acquisition',
+		'Vinix per-queue fence counter')!
+	require_order(sequence.fields().join(' '), ['fence_seqno u32',
+		'pub fn (mut queue G13QueueResources) next_fence_seqno() u32 {',
+		'queue.fence_seqno++', 'return queue.fence_seqno'], 'Vinix wrapping 32-bit fence sequence')!
+	require_order(submit, ['fn (mut f GpuFile) submit_g13_staged(', 'f.lock.acquire()',
+		'install_g13_batch_barriers(mut pending)', 'mut fence_queue := unsafe { queue_resources }',
+		'syncobj.new_queue_fence(f.owner_key, u64(fence_queue.next_fence_seqno()), queue_resources.fence_context)',
+		'agxsubmission.install_output_syncs'], 'Vinix assigns the retained queue sequence under its file lock')!
 }
 
 fn check_event_admission_contract(local string, reference string) ! {
@@ -668,7 +675,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'value.value_0 = 0', 'value.value_18 = 1'], 'Vinix G13 compute priority')!
 	queue := read(os.join_path(base, 'queue/mod.rs'))!
 	require_order(queue, ['job.add_dependency(fence)?', 'job.commit()?', 'let mut job = job.arm()',
-		'job.push()'], 'Asahi asynchronous dependency scheduling')!
+		'let out_fence = job.fences().finished()', 'job.push()'], 'Asahi asynchronous dependency scheduling')!
 	file_source := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
 	check_queue_priority_local(file_source, read(os.join_path(repo, 'kernel/drm/ioctl/ioctl.v'))!, local)!
 	check_queue_priority_reference(read(os.join_path(asahi_linux, 'include/uapi/drm/asahi_drm.h'))!,
@@ -700,6 +707,13 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(queue, ['let sched = sched::Scheduler::new(', 'let entity = sched::Entity::new(&sched,',
 		'_sched: sched,', 'entity,'], 'Asahi per-user-queue scheduler ownership')!
 	scheduler := read(os.join_path(asahi_linux, 'drivers/gpu/drm/scheduler/sched_entity.c'))!
+	require_order(scheduler, ['atomic_set(&entity->fence_seq, 0);', 'entity->fence_context = dma_fence_context_alloc(2);'],
+		'Asahi per-entity fence counter starts at zero')!
+	sequence := section(read(os.join_path(asahi_linux, 'drivers/gpu/drm/scheduler/sched_fence.c'))!,
+		'void drm_sched_fence_init(', '\n}', 'Asahi scheduler fence allocation')!
+	require_order(sequence, ['unsigned seq;', 'seq = atomic_inc_return(&entity->fence_seq);',
+		'dma_fence_init(&fence->finished', 'entity->fence_context + 1, seq'],
+		'Asahi finished fences carry the incremented unsigned sequence')!
 	dependency_cb := section(scheduler, 'static bool drm_sched_entity_add_dependency_cb(',
 		'static struct dma_fence *', 'Asahi scheduler input dependency callback')!
 	require_order(dependency_cb, ['fence->context == entity->fence_context',

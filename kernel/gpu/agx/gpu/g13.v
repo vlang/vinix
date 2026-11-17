@@ -306,6 +306,14 @@ mut:
 	context_next       &G13QueueResources = unsafe { nil }
 	quarantined        bool
 	released           bool
+	fence_seqno        u32
+}
+
+// The owning file lock serializes fence creation for this retained queue.
+// The scheduler's finished fence starts at one and wraps through zero.
+pub fn (mut queue G13QueueResources) next_fence_seqno() u32 {
+	queue.fence_seqno++
+	return queue.fence_seqno
 }
 
 // file.lock serializes acquisition with namespace removal. Metadata outlives

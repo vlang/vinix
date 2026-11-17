@@ -36,15 +36,15 @@ fn tt_retire_during_allocation() {
 }
 
 fn check_independent_queue_transfer() {
-	for same_seqno in [false, true]! {
+	for sequence in [[u64(10), 11]!, [u64(10), 10]!, [u64(0xffff_ffff), 0]!]! {
 		for reverse in [false, true]! {
 			proc.reset()
 			sched.reset(unsafe { nil })
 			source := make_object(0)
 			destination := make_object(0)
 			context := syncobj.new_queue_context() or { panic('queue fence context') }
-			first := remember_fence(syncobj.new_queue_fence(7, 10, context))
-			second := remember_fence(syncobj.new_queue_fence(7, if same_seqno { u64(10) } else { u64(11) }, context))
+			first := remember_fence(syncobj.new_queue_fence(7, sequence[0], context))
+			second := remember_fence(syncobj.new_queue_fence(7, sequence[1], context))
 			tw_chain(source, first, 1)
 			tw_chain(source, second, 2)
 			tw_chain(source, first, 3)
@@ -68,7 +68,7 @@ fn check_independent_queue_transfer() {
 			tt_retire()
 		}
 	}
-	println('DRM timeline TRANSFER: independent same-queue fences survive merging with either notification order, equal sequences and exact duplicates.')
+	println('DRM timeline TRANSFER: independent same-queue fences survive merging with either notification order, equal or wrapping sequences, and exact duplicates.')
 }
 
 pub fn run_timeline_transfer_checks() {

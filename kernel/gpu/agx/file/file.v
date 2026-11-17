@@ -1522,7 +1522,8 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	}
 	if !install_g13_batch_barriers(mut pending) { return -5 }
 	gpu_manager.release_g13_initial_events(mut pending.initial_events)
-	pending.final_fence = syncobj.new_queue_fence(f.owner_key, timer.get_ns(), queue_resources.fence_context)
+	mut fence_queue := unsafe { queue_resources }
+	pending.final_fence = syncobj.new_queue_fence(f.owner_key, u64(fence_queue.next_fence_seqno()), queue_resources.fence_context)
 	for index := u32(0); index < pending.command_count; index++ {
 		code := f.install_g13_batch_completion(mut pending, index, unsafe { &commands[index] }, result_object)
 		if code != 0 { return code }

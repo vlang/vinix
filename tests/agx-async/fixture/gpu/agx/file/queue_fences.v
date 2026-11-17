@@ -8,23 +8,38 @@ import gpu.agx.gpu
 // Two independent pipes on one producer queue can retire in reverse order
 // in this fixture. A foreign consumer explicitly names both producer fences.
 pub fn audit_dependency_order() {
+	sequences := [[u32(0), 1, 2, 3]!,
+		[u32(0x7fff_fffe), 0x7fff_ffff, 0x8000_0000, 0x8000_0001]!,
+		[u32(0xffff_fffe), 0xffff_ffff, 0, 1]!]!
 	for modern in [false, true]! {
-		syncobj.destroy_owner(1)
-		check_dependency_order(modern)
+		for sequence in sequences {
+			syncobj.destroy_owner(1)
+			check_dependency_order(modern, sequence)
+		}
 	}
 	syncobj.destroy_owner(1)
-	println('Foreign consumer waited for both producer fences during reverse retirement through both ABIs.')
+	println('Foreign consumer waited for both producer fences through both ABIs at initial, signed-boundary and wrapping sequences.')
 }
 
-fn check_dependency_order(modern bool) {
+fn check_dependency_order(modern bool, sequence [4]u32) {
 	gpu.reset()
 	mut file := new_file()
 	mut manager := gpu.get_global_manager() or { panic('manager') }
+	if sequence[0] != 0 {
+		// Seed both queue counters so legacy and modern submission exercise
+		// the boundary without allocating billions of retained fixtures.
+		mut producer := unsafe { file.g13_queues[0].resources }
+		mut consumer := unsafe { file.g13_queues[1].resources }
+		producer.fence_seqno = sequence[0]
+		consumer.fence_seqno = sequence[1]
+	}
 	first, second := output(), output()
 	assert submit(mut file, 1, false, unsafe { nil }, first, false) == 0
 	assert submit_scheduled(mut file, [ScheduledCommand{}], second, false) == 0
-	assert fence(first).context == fence(second).context
-	assert fence(first).seqno < fence(second).seqno
+	context := fence(first).context
+	assert context == fence(second).context
+	assert fence(first).seqno == u64(sequence[1]), 'first fence must carry its unsigned queue ordinal'
+	assert fence(second).seqno == u64(sequence[2]), 'second fence must carry its unsigned queue ordinal'
 
 	if modern {
 		mut records := [65]asahi.Sync{}
@@ -49,6 +64,9 @@ fn check_dependency_order(modern bool) {
 		submit_legacy_dependency_consumer(mut file, first.handle, second.handle)
 	}
 	dependency_count := pending_tail.dependencies.count
+	consumer_fence := pending_tail.final_fence
+	assert consumer_fence.context != context
+	assert consumer_fence.seqno == if sequence[0] == 0 { u64(1) } else { u64(sequence[2]) }
 	service_file_work()
 	assert manager.published_order == [u32(0), 1]
 	assert manager.execute_firmware(1, 0)
@@ -67,6 +85,13 @@ fn check_dependency_order(modern bool) {
 	assert_drained(file)
 	assert !consumer_dispatched, 'foreign consumer dispatched while its first explicit producer fence was pending'
 	assert dependency_count == 2, 'each independent fence must appear once in the captured dependencies'
+
+	assert submit(mut file, 1, false, unsafe { nil }, second, false) == 0
+	assert fence(second).context == context && fence(second).seqno == u64(sequence[3])
+	service_file_work()
+	manager.finish_compute(0)
+	service_file_work()
+	assert_drained(file)
 }
 
 fn submit_legacy_dependency_consumer(mut file GpuFile, first u32, second u32) {
@@ -221,6 +246,7 @@ fn check_recreated_queue_keeps_old_wait() {
 	assert fresh.fence_context != old_context
 	file.g13_queues = [Ownership{ queue_id: 1, resources: fresh }, file.g13_queues[1]]
 	assert submit(mut file, 1, false, a, b, false) == 0
+	assert fence(a).seqno == 1 && fence(b).seqno == 1, 'a replacement queue starts its own sequence'
 	service_file_work()
 	assert manager.published_order == [u32(0)]
 	assert manager.execute_firmware(0, 0)

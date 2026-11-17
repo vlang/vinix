@@ -6,10 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [independent native queue fences](m1-agx-independent-fences.md).
-Both G13 submission ABIs and DRM timeline transfer preserve distinct fences
-from a queue that can retire jobs out of order. Exact duplicate references
-and ordered sequences still reduce.
+Latest increment: [32-bit G13 fence numbering](m1-agx-fence-ordinals.md).
+Both submit ABIs number a queue's finished fences from one and wrap through
+zero. The [independent fence fix](m1-agx-independent-fences.md) continues to
+preserve distinct dependencies across reverse retirement and wrap.
 
 The [pre-hardware audit](m1-agx-prehardware-20261117.md) matched all twelve
 registered modern ioctl words against the packaged C header and identified the
@@ -314,7 +314,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Native G13 registers the legacy interface and twelve modern extensible operations, selected per file. Modern flat packets and combined syncs reach the scheduler. GEM_MADVISE records private-object advice with resident contents; complete request/sync/backing semantics and matched Mesa integration remain incomplete. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Private input copies keep each independent native fence and the latest fence per ordered context. Own-queue native fences are elided. Asahi's 32-bit sequence ordering, full scheduler policy and timeline-chain equivalence remain open. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Finished fences use wrapping 32-bit per-queue numbers. Private input copies keep each independent native fence and the latest fence per ordered context. Own-queue native fences are elided. Asahi's ordered-fence comparison, full scheduler policy and timeline-chain equivalence remain open. |
 | Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
 | VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts; idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and physical-slot capacity still differ. |
 | Failed queue construction | The worker retries unpublished G13 resource graphs independently of Handle/VM-name lifetime. Logical queues and captured references retain ownership; failed invalidation retains the graph. Successful release returns the reserved queue ID and allows final VM retirement. |

@@ -28,6 +28,7 @@ pub struct G13QueueResources {
 pub mut:
 	id          u32
 	fence_context u64
+	fence_seqno u32
 	file_references u64
 	released    bool
 	quarantined bool

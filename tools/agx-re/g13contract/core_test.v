@@ -106,6 +106,8 @@ fn test_queue_fence_contract_rejects_reused_public_or_missing_identity() {
 	if _ := check_queue_fence_contract(contexts, fences.replace('queue_context u64', ''), queue, submit) { assert false }
 	if _ := check_queue_fence_contract(contexts, fences, queue.replace('fence_context: fence_context', 'fence_context: 0'), submit) { assert false }
 	if _ := check_queue_fence_contract(contexts, fences, queue, submit.replace('queue_resources.fence_context)', 'u64(request.queue_id))')) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue.replace('fence_seqno        u32', 'fence_seqno        u64'), submit) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue, submit.replace('u64(fence_queue.next_fence_seqno())', 'timer.get_ns()')) { assert false }
 }
 
 fn test_ring_admission_contract_rejects_gpu_only_space_and_missing_spare() {
