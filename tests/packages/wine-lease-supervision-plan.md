@@ -6076,3 +6076,113 @@ both beside the receipt. No checkpoint file changes after successful recording
 begins. This inventory covers ordinary logical bytes/types/modes/sizes/links;
 explicit native receipts record selected immediate names at observation time.
 It does not audit all native attributes at rest throughout the workspace.
+
+### Required host directory entry names (2026-11-17)
+
+Feature `441554587` makes immediate directory names mandatory in format-12 host
+receipts, with inner replay format 7. The independently reconstructed directory
+capability declaration determines every canonical, deduplicated target. The
+embedded/pinned `winedircontenthost` projection uses the unchanged qualified
+`winedircontent` reader; stored rows never determine the live target set.
+Canonical `read-closed/directory-content.json` binds the original namespace and
+has an 8 MiB bound. Copied graphs recheck original directories rather than
+substituting their own names. The receipt is mandatory in the host output graph
+and both retained producer/controller input maps.
+
+The builder now seals names after all output filenames exist and before outer
+output hashes and complete admission. It reserves the final outer proof and
+directory receipt names first. The earlier replay-only admission moves to that
+complete boundary; all existing checks remain mandatory. No observed name is
+ignored and no dynamic-name exception or extra sandbox permission is added.
+Qualification precreates tool/role parent directories, then writes later output
+under the existing sibling `state` namespace. Any unexpected name change in an
+observed ancestor correctly invalidates admission. Later qualification must
+preserve those names, restore the original namespace or qualify fresh inputs.
+
+Fixture, controller, producer and retainer build and admit successfully, each
+with 54 canonical directories in this layout. All 107 admission/control refusals
+pass: 103 use full host admission, and four retain the earlier private live
+link-helper controls. Eight new receipt/format cases cover empty, omitted or
+extra directories, removed/added names, linked evidence and old outer/inner
+formats. Three live add/remove/rename controls operate on a freshly built
+private fixture, restore admission and preserve ordinary marker bytes. Result
+filenames are reserved before its snapshot. Historical nodes remain read-only.
+
+All 32 owned-receipt mutations pass with the unchanged ten-second per-command
+bound, followed by 18 startup/pre-sign refusals. The fresh signed x86 holder-
+death/collection run passes in 95.282 seconds, including host revalidation after
+the guest. Final retention coverage is 69 exact refusals in partitions
+18/17/17/17, each requiring original and unchanged copied baselines. The two new
+cases omit the producer/controller directory-content input and reach the named
+missing-input gate. The independent checker verifies exact assigned coverage.
+
+The initial concurrent partition 0 stopped at `controller-host-metadata-input`
+because two native directory-name observations differed, before reaching that
+case's intended omission gate. The failure and all raw evidence are retained.
+All four original host graphs then fully re-admitted without changing recorded
+inputs or weakening checks. A fresh complete partition 0 rerun passes alone with
+the same checks and bounds in `state/retention-02-p0`. Prefix aliases
+`state/retention-02-p1` through `p3` point explicitly to the three original
+passing partitions. The unchanged independent checker passes on this composite
+prefix. The original 22 final phase slots, with those successful replacements,
+and four additional post-observation host admissions all pass.
+
+The original checkpoint is `/Users/alex/.cache/vwhostdircontent-20261117-01`;
+its resumed integrity failure is recorded below.
+Frozen `source-final` is an APFS clone of the additive directory checkpoint's
+frozen tree with selected changes overlaid. Eleven selected source/document
+files match repository bytes, including the unchanged native reader. Tools are
+in `tools`, role graphs in `roles/ROLE/host`, and runtime/control evidence, exact
+argv, selected environment, logs, exits, validation, source revision and feature
+patch in `state`. The compiler is `/Users/alex/.cache/vinix-wine-build/v/v`;
+host tools use `-backend c -prod -gc none -manualfree -cflags -fno-lto`.
+
+Complete original checkpoints `/Users/alex/.cache/vwhostlinkxattr-20261117-01`
+and `/Users/alex/.cache/vwdircontent-20261117-01`, their original verifiers and
+compiler/LLVM/SDK/image/source namespaces and earlier prerequisites remain
+required. All prior data, directory, metadata, query, native-attribute, alias,
+SDK, image and final input/blob guards remain mandatory. Matching native passes
+are quiescent observations rather than atomic snapshots; child content/kinds,
+full search/absence and exception-tree coverage remain separate. Loader/toolchain
+closure, owned ARM/GUI, broader lifetime/mapping, redistribution and default
+activation remain open. Kernel and product-default behavior do not change.
+
+The original typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-directory-content-20261117-01.inventory.json`,
+SHA-256 `d054c0239dd8f67572649777238311d23ced1097e03d71eec93c959f7426338a`.
+Its original recording log reports success; the original independent comparison
+log is empty and no comparison process survived the provider-session move.
+The resumed receipt checksum matches the recorded value, but the current bundle
+is incomplete: `roles/controller/host/program`, `roles/producer/host/program`
+and `roles/retainer/host/program` are absent, despite their required output
+hashes in the retained host receipts. The original compiler executable
+`/Users/alex/.cache/vinix-wine-build/v/v` is also absent. These observations do
+not identify when or why those files disappeared. The functional results above
+describe the retained original run, not a fresh qualification of the current
+filesystem. Final sealing and subsequent qualification remain blocked pending
+complete restoration and comparison against the original inventory. No partial
+replacement receipt, missing-file exception or relaxed historical audit is used.
+
+Compatibility fix `50839600b` gives the typed auditor's `mkfifo` declaration
+the native macOS/iOS `u16` mode type while retaining `u32` elsewhere. The current
+compiler builds it in production mode with the same C backend, no-GC/manual-free
+flags and `-fno-lto`. Its `node-selftest` passes the bounded FIFO refusal without
+publication and the regular-file/symlink baseline. The complete inventory
+comparison and every byte/type/mode/size/link check remain unchanged. The
+resumed executable, compilation log and `.nodes.log` are retained under
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-workspace-auditor-resumed-20261117`;
+node fixtures use the `-nodes` suffix. The original empty comparison log is
+preserved, with the fresh comparison in
+`wine-host-directory-content-20261117-01.inventory-check-resumed.log` beside
+the inventory. The complete resumed comparison exits 1 with
+`complete workspace inventory differs`; its log SHA-256 is
+`69e2fb6b20aaa77c7a368e0a9d9d902b13b8bb7d205b1729c7ac1287a3f65edb`.
+The resumed auditor executable SHA-256 is
+`5897905c461a4f31cd598bc7304feb673d243b7e641bd7c04528c666b696002c`.
+A read-only filename search of the retained `~/.cache/vwhost*` checkpoints
+finds fixture programs but no controller/producer/retainer role programs,
+`wine-owned-native-check` executable or compiler named `v`. Its complete path
+list is retained in `wine-host-directory-content-20261117-01.recovery-candidates.txt`
+beside the inventory. This limited search establishes no complete recovery path;
+restoration still requires the original bytes and metadata, followed by the
+unchanged complete comparison and historical qualification checks.

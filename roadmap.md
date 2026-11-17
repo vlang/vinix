@@ -1453,8 +1453,16 @@ architectures; broader release/catalog/runtime acceptance remains open.
     [directory entry-name inventory](tests/packages/wine-directory-content.md)
     now captures and rechecks 50 canonical declared directories per original
     host role. All 37 refusals, three production/source guards, restored live
-    baselines and exact native count/byte limits pass. Mandatory directory-name
-    integration remains open. Complete
+    baselines and exact native count/byte limits pass.
+    [Required directory-name integration](tests/packages/wine-lease-supervision-plan.md#required-host-directory-entry-names-2026-11-17)
+    now binds immediate names on 54 canonical directories per role into format-12
+    host receipts. All 107 admission/control cases, 32 receipt mutations,
+    18 startup refusals, a fresh signed x86 run and 69 retention refusals pass.
+    Observed ancestor names must remain stable; later output uses a preexisting
+    sibling namespace. Final evidence sealing is blocked: the resumed checkpoint
+    lacks required host executables and its pinned compiler executable. The
+    original inventory remains required; retained success logs alone do not
+    requalify the incomplete bundle. Complete
     xattr/sandbox coverage remains open, along with
     other query/search/metadata operations and OS-loader reads. Complete
     Mach-O linker/library closure, OS shared-cache bytes
