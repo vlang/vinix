@@ -3,19 +3,20 @@ module g13contract
 
 fn check_sync_file_deadline_contract(drm string, uapi string, implementation string) ! {
 	dispatch := section(drm, 'fn (mut this SyncFileResource) ioctl(', 'fn (mut this SyncFileResource) unref(', 'Sync-file deadline dispatch')!
-	require_order(dispatch, ['if u32(request) == ioctl.sync_ioc_set_deadline', 'sync_file_deadline_ioctl(u64(argp))',
+	require_order(dispatch, ['if u32(request) == ioctl.sync_ioc_set_deadline', 'sync_file_deadline_ioctl(this.fence, u64(argp))',
 		'errno.set(u64(-result))', 'resource.default_ioctl'], 'Typed deadline dispatch')!
 	require(integer_constant(uapi, 'sync_ioc_set_deadline', 'Deadline command')! == 0x40103e05, 'Deadline command changed')!
 	require_order(section(uapi, 'pub struct SyncSetDeadline {', '\n}', 'Deadline request layout')!,
 		['deadline_ns u64', 'pad u64'], 'Fixed-width deadline fields')!
 	require(uapi.contains('sizeof(SyncSetDeadline) == 16'), 'Deadline layout must be validated')!
-	query := implementation.all_after('fn sync_file_deadline_ioctl(')
+	query := implementation.all_after('fn sync_file_deadline_ioctl(').all_after(') int {')
 	require_order(query, ['mut request := ioctl.SyncSetDeadline{}',
 		'usercopy.copy_from_user(unsafe { &request }, address, sizeof(ioctl.SyncSetDeadline))', 'return -14',
-		'if request.pad != 0 { return -22 }', 'return 0'], 'Copy faults precede reserved-field validation')!
+		'if request.pad != 0 { return -22 }', 'syncobj.set_deadline(fence, i64(request.deadline_ns))',
+		'return 0'], 'Copy and reserved-field validation precede the fence hint')!
 	require(query.count('usercopy.copy_from_user(') == 1 && !query.contains('usercopy.copy_to_user(')
-		&& !query.contains('memory.') && !query.contains('syncobj.') && !query.contains('sched.'),
-		'Current leaves must accept a hint without output, allocation or fence/scheduling effects')!
+		&& !query.contains('memory.') && query.count('syncobj.') == 1 && !query.contains('sched.'),
+		'Forward one hint without allocating, sleeping or copying output')!
 }
 
 fn check_sync_file_deadline_reference(reference string, header string, fences string, rust string, scheduler string) ! {
@@ -32,8 +33,6 @@ fn check_sync_file_deadline_reference(reference string, header string, fences st
 		'Asahi Rust leaf deadline callback changed')!
 	stub := section(fences, 'static const struct dma_fence_ops dma_fence_stub_ops', '\n};', 'Linux stub operations')!
 	require(!stub.contains('.set_deadline'), 'Private stub deadline behavior changed')!
-	// Preserve evidence of the scheduler wrapper behavior that native direct
-	// leaves do not yet implement; accepting hints does not establish its parity.
 	require_order(section(scheduler, 'static void drm_sched_fence_set_deadline_finished(', 'static const struct dma_fence_ops drm_sched_fence_ops_scheduled', 'Linux scheduler deadline forwarding')!,
 		['ktime_before(fence->deadline, deadline)', 'fence->deadline = deadline',
 		'dma_fence_set_deadline(parent, deadline)'], 'Scheduler wrappers retain and forward deadline hints')!

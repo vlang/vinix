@@ -39,6 +39,10 @@ pub fn run_sync_file_deadline_checks() {
 	assert sizeof(ioctl.SyncSetDeadline) == 16 && __offsetof(ioctl.SyncSetDeadline, pad) == 8
 	assert ioctl.sync_ioc_set_deadline == 0x40103e05
 	memory.reset()
+	check_binary_deadlines()
+	check_timeline_deadlines()
+	check_nested_deadlines()
+	println('DRM WAIT deadlines: initial readiness, timeout and validation order, settled captures, future submissions, signed minimum and 2048 nested links passed')
 	for _ in 0 .. 200 {
 		time.reset()
 		for family in 0 .. 3 {
@@ -68,6 +72,8 @@ pub fn run_sync_file_deadline_checks() {
 					assert poll_descriptor(number) == readiness && descriptor_generation(number) == generation
 				}
 				assert memory.attempts() == attempts && memory.outstanding() == live
+				if family == 1 { expect_fence_deadline(fence, i64(u64(1) << 63)) }
+				else { expect_no_fence_deadline(fence) }
 			}
 			for reserved in [u64(1), u64(1) << 63, ~u64(0)]! {
 				request = ioctl.SyncSetDeadline{ deadline_ns: ~u64(0), pad: reserved }
@@ -98,7 +104,7 @@ pub fn run_sync_file_deadline_checks() {
 			usercopy.allow(unsafe { u64(&request) }, sizeof(request))
 			invoke_deadline(number, u64(ioctl.sync_ioc_set_deadline) | (u64(0xdeadbeef) << 32), unsafe { u64(&request) }, 0)
 			assert usercopy.reads == 1 && usercopy.writes == 0
-			// Allocation failure cannot affect a hint with no callback or owner.
+			// Hint forwarding does not need scratch storage.
 			usercopy.allow(unsafe { u64(&request) }, sizeof(request)); memory.fail_next()
 			attempts := memory.attempts()
 			invoke_deadline(number, u64(ioctl.sync_ioc_set_deadline), unsafe { u64(&request) }, 0)
@@ -107,7 +113,7 @@ pub fn run_sync_file_deadline_checks() {
 		}
 		// Only sync-file descriptors accept the command. Opaque descriptors do
 		// not copy the request even when it points to an invalid address.
-		obj := make_object(0); fence := make_fence(); syncobj.replace_fence(obj, fence)
+		obj := make_object(0); fence := make_deadline_fence(); syncobj.replace_fence(obj, fence)
 		opaque := export_object(11, obj.handle, 0)
 		usercopy.allow(0, 0)
 		invoke_deadline(opaque, u64(ioctl.sync_ioc_set_deadline), 0, errno.enotty)
@@ -116,19 +122,24 @@ pub fn run_sync_file_deadline_checks() {
 		// Source teardown cannot change the exported leaf. The lookup reference
 		// protects a final descriptor close before either success or EFAULT.
 		number := export_object(11, obj.handle, 1)
-		syncobj.replace_fence(obj, make_fence()); syncobj.destroy_owner(11)
-		mut request := ioctl.SyncSetDeadline{ deadline_ns: ~u64(0) }
+		replacement := make_deadline_fence()
+		syncobj.replace_fence(obj, replacement); syncobj.destroy_owner(11)
+		mut request := ioctl.SyncSetDeadline{}
 		usercopy.allow(unsafe { u64(&request) }, sizeof(request))
 		invoke_deadline(number, u64(ioctl.sync_ioc_set_deadline), unsafe { u64(&request) }, 0)
 		assert !syncobj.is_signaled(fence)
+		expect_fence_deadline(fence, 0)
 		duplicate := file.duplicate(number)
 		for fdnum in [number, duplicate]! {
 			deadline_close_number = fdnum
+			request.deadline_ns = if fdnum == duplicate { u64(1) << 63 } else { ~u64(0) }
 			usercopy.allow(unsafe { u64(&request) }, sizeof(request))
 			if fdnum == duplicate { usercopy.inject_fault() }
 			file.when_lookup(deadline_close_lookup)
 			invoke_deadline(fdnum, u64(ioctl.sync_ioc_set_deadline), unsafe { u64(&request) }, if fdnum == duplicate { errno.efault } else { u64(0) })
 		}
+		expect_fence_deadline(fence, -1)
+		expect_no_fence_deadline(replacement)
 		deadline_close_number = -1
 		assert file.outstanding() == 0 && memory.outstanding() == 0
 		clear(); memory.release_retained_fences(sizeof(syncobj.DmaFence)); memory.reset()

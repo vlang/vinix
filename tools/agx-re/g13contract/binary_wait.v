@@ -18,7 +18,9 @@ fn check_binary_wait_contract(local string, reference string) ! {
 		'object := syncobj.lookup(', 'return -2', 'buffer.objects[i] = voidptr(object)', 'defer {', 'syncobj.release_capture(',
 		'request.flags & ioctl.drm_syncobj_wait_for_submit != 0', 'mut first := ~u32(0)', 'syncobj.prepare_capture(',
 		'return -22', 'if ready_count == 0 { first = i }', 'if ready_count == request.count_handles ||',
-		'if allow_future {', 'syncobj.arm_capture(', 'for {', 'syncobj.captured_fence(', 'syncobj.is_signaled(fence)',
+		'if allow_future {', 'syncobj.arm_capture(', 'if request.flags & ioctl.drm_syncobj_wait_deadline != 0',
+		'syncobj.captured_fence(', 'syncobj.set_deadline(fence, i64(request.deadline_nsec))',
+		'for {', 'syncobj.captured_fence(', 'syncobj.is_signaled(fence)',
 		'if !wait_all { request.first_signaled = i; return 0 }', 'if ready_count == request.count_handles {',
 		'request.first_signaled = first', 'request.timeout_nsec <= 0', 'sched.reschedule()'],
 		'Vinix upfront snapshots, submission capture and deferred detachment')!
@@ -39,5 +41,6 @@ fn check_binary_wait_contract(local string, reference string) ! {
 	require_order(ref_wait, ['fence = drm_syncobj_fence_get(syncobjs[i])',
 		'DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT |', 'timeout = -EINVAL',
 		'entries[i].fence = fence', 'if (signaled_count == count ||', 'drm_syncobj_fence_add_wait(',
+		'if (deadline)', 'dma_fence_set_deadline(fence, *deadline)',
 		'do {', 'fence = entries[i].fence', 'dma_fence_is_signaled(fence)'], 'Linux stable fence snapshots before waiting')!
 }

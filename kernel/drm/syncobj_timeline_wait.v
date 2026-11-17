@@ -62,8 +62,13 @@ fn ioctl_syncobj_timeline_wait(handle voidptr, data voidptr) int {
 	if allow_future {
 		for index := u32(0); index < count; index++ { syncobj.arm_timeline_capture(unsafe { &captures[index] }) }
 	}
-	// Native leaves have no deadline callback. Like binary WAIT, use absolute
-	// monotonic time and yield to completion/publication workers while blocked.
+	if flags & ioctl.drm_syncobj_wait_deadline != 0 {
+		for index := u32(0); index < count; index++ {
+			if fence := syncobj.captured_timeline_fence(unsafe { &captures[index] }) {
+				syncobj.set_deadline(fence, i64(request.deadline_nsec))
+			}
+		}
+	}
 	for {
 		ready_count = 0
 		for index := u32(0); index < count; index++ {

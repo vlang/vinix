@@ -169,8 +169,13 @@ fn chain_prefix_ready(fence &DmaFence) bool {
 }
 
 fn enqueue_chain(parent &DmaFence) {
-	mut f := unsafe { parent }
 	chain_notify_lock.acquire()
+	enqueue_chain_locked(parent)
+	chain_notify_lock.release()
+}
+
+fn enqueue_chain_locked(parent &DmaFence) {
+	mut f := unsafe { parent }
 	if !f.chain_notify_queued {
 		f.chain_notify_queued = true
 		f.chain_notify_next = unsafe { nil }
@@ -178,7 +183,6 @@ fn enqueue_chain(parent &DmaFence) {
 		else { unsafe { chain_notify_tail.chain_notify_next = parent } }
 		chain_notify_tail = unsafe { parent }
 	}
-	chain_notify_lock.release()
 }
 
 fn (mut f DmaFence) notify_chains_locked() {
@@ -201,7 +205,11 @@ fn drain_chain_notifications() {
 		if chain_notify_head == unsafe { nil } { chain_notify_tail = unsafe { nil } }
 		f.chain_notify_next = unsafe { nil }
 		f.chain_notify_queued = false
+		forward := f.deadline_forward
+		deadline := f.deadline_ns
+		f.deadline_forward = false
 		chain_notify_lock.release()
+		if forward { forward_deadline(f, deadline) }
 		// Completion of the previous root enqueues us again if it is still
 		// pending. No recursive walk or callback is needed on this path.
 		if f.fence_array { if array_ready(f) { complete_array(f) } }

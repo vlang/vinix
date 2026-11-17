@@ -17,6 +17,8 @@ fn check_timeline_wait_contract(drm string, wire string, wait string, capture st
 		'captures_storage := memory.malloc_packed_fallible(', 'defer { memory.free(captures_storage) }',
 		'C.memset(captures_storage, 0,', 'remaining--; syncobj.release_timeline_capture(unsafe { &captures[remaining] })',
 		'syncobj.prepare_timeline_capture(', 'if ready_count == count ||', 'syncobj.arm_timeline_capture(',
+		'if flags & ioctl.drm_syncobj_wait_deadline != 0', 'syncobj.captured_timeline_fence(',
+		'syncobj.set_deadline(fence, i64(request.deadline_nsec))',
 		'for {', 'syncobj.captured_timeline_fence(', 'request.timeout_nsec <= 0', 'proc.pending_signals(', 'sched.reschedule()'],
 		'Timeline WAIT validates snapshots before arming, unlinks before freeing owners and yields with absolute time')!
 	require(wait.count('memory.malloc_packed_fallible(') == 2, 'Exactly two explicit table owners')!

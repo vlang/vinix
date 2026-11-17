@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+DRM WAIT and sync-file requests now propagate deadline hints to captured
+G13 fences. Each queue fence keeps the earliest signed hint.
+[Fence deadline hints](m1-agx-wait-deadlines.md)
+
 DRM syncobj eventfd now notifies a counter when a timeline point becomes
 available or completes. Captured fences retain their notifications through
 handle and descriptor close. [Syncobj eventfd notifications](m1-agx-syncobj-eventfd.md)

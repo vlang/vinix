@@ -16,11 +16,12 @@ fn test_binary_wait_guard_rejects_snapshot_and_flag_regressions() {
 		'syncobjs[i] = drm_syncobj_find();\nret = -ENOENT;\nstatic void drm_syncobj_array_free(\n' +
 		'static signed long drm_syncobj_array_wait_timeout(\nfence = drm_syncobj_fence_get(syncobjs[i]);\n' +
 		'DRM_SYNCOBJ_WAIT_FLAGS_WAIT_FOR_SUBMIT |\ntimeout = -EINVAL;\nentries[i].fence = fence;\n' +
-		'if (signaled_count == count ||\ndrm_syncobj_fence_add_wait();\n' +
+		'if (signaled_count == count ||\ndrm_syncobj_fence_add_wait();\nif (deadline) dma_fence_set_deadline(fence, *deadline);\n' +
 		'do {\nfence = entries[i].fence;\ndma_fence_is_signaled(fence);\n* drm_timeout_abs_to_jiffies'
 	check_binary_wait_contract(local, reference)!
 	for token in ['if request.count_handles == 0 { return 0 }', 'usercopy.copy_from_user(',
-		'syncobj.captured_fence(', 'syncobj.arm_capture(', 'syncobj.release_capture(', 'sched.reschedule()'] {
+		'syncobj.captured_fence(', 'syncobj.arm_capture(', 'syncobj.release_capture(',
+		'syncobj.set_deadline(fence, i64(request.deadline_nsec))', 'sched.reschedule()'] {
 		if _ := check_binary_wait_contract(local.replace(token, ''), reference) { assert false, token }
 	}
 	if _ := check_binary_wait_contract(local.replace('known_flags :=', 'known_flags := ioctl.drm_syncobj_wait_available |'), reference) { assert false }

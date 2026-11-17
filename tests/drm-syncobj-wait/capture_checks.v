@@ -240,3 +240,23 @@ pub fn run_capture_checks() {
 	}
 	println('DRM submission captures: 200 cycles of multi-waiter publication, middle/head/tail removal, nil publication, duplicate registration, idempotent cleanup and exact-lock publication/cancellation races passed')
 }
+pub fn deadline_for_checks(fence &DmaFence) ?i64 {
+	chain_notify_lock.acquire()
+	defer { chain_notify_lock.release() }
+	if !fence.deadline_valid { return none }
+	return fence.deadline_ns
+}
+
+pub fn overlap_deadline_drain_for_checks(fence &DmaFence, later i64, earlier i64) {
+	chain_notify_lock.acquire()
+	assert !chain_notify_draining && chain_notify_head == unsafe { nil }
+	chain_notify_draining = true
+	chain_notify_lock.release()
+	set_deadline(fence, later)
+	set_deadline(fence, earlier)
+	chain_notify_lock.acquire()
+	assert chain_notify_head == fence && chain_notify_tail == fence
+	chain_notify_draining = false
+	chain_notify_lock.release()
+	drain_chain_notifications()
+}

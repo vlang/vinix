@@ -2,16 +2,13 @@
 module drm
 
 import drm.ioctl
+import drm.syncobj
 import usercopy
 
-fn sync_file_deadline_ioctl(address u64) int {
+fn sync_file_deadline_ioctl(fence &syncobj.DmaFence, address u64) int {
 	mut request := ioctl.SyncSetDeadline{}
 	if !usercopy.copy_from_user(unsafe { &request }, address, sizeof(ioctl.SyncSetDeadline)) { return -14 }
 	if request.pad != 0 { return -22 }
-	// Current native leaf fences have no deadline callback, like Asahi's
-	// underlying JobFence and Linux's private stub. Accept the hint without
-	// changing completion, readiness or scheduling. Chains contain only these
-	// leaves, so propagating the hint has the same effect. Future scheduler
-	// wrappers or leaves with callbacks must supply that propagation behavior.
+	syncobj.set_deadline(fence, i64(request.deadline_ns))
 	return 0
 }

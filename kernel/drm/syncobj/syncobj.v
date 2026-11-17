@@ -44,6 +44,10 @@ mut:
 	chain_waiters &ChainWaiter = unsafe { nil }
 	chain_notify_next &DmaFence = unsafe { nil }
 	chain_notify_queued bool
+	// Protected by chain_notify_lock. A valid signed deadline can be zero.
+	deadline_ns i64
+	deadline_valid bool
+	deadline_forward bool
 	fence_array bool
 	array_enabled bool
 	array_pending u32

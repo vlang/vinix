@@ -213,7 +213,7 @@ fn (mut this SyncFileResource) ioctl(handle voidptr, request u64, argp voidptr) 
 		return result
 	}
 	if u32(request) == ioctl.sync_ioc_set_deadline {
-		result := sync_file_deadline_ioctl(u64(argp))
+		result := sync_file_deadline_ioctl(this.fence, u64(argp))
 		if result < 0 { errno.set(u64(-result)); return none }
 		return result
 	}
@@ -1174,6 +1174,13 @@ fn ioctl_syncobj_wait(handle voidptr, data voidptr) int {
 	if allow_future {
 		for i := u32(0); i < request.count_handles; i++ {
 			syncobj.arm_capture(unsafe { &buffer.captures[i] })
+		}
+	}
+	if request.flags & ioctl.drm_syncobj_wait_deadline != 0 {
+		for i := u32(0); i < request.count_handles; i++ {
+			if fence := syncobj.captured_fence(unsafe { &buffer.captures[i] }) {
+				syncobj.set_deadline(fence, i64(request.deadline_nsec))
+			}
 		}
 	}
 	for {
