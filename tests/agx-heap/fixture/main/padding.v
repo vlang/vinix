@@ -45,33 +45,28 @@ fn check_heap_padding_matrix() {
       for order in [[0, 1, 2]!, [0, 2, 1]!, [1, 0, 2]!, [1, 2, 0]!, [2, 0, 1]!, [2, 1, 0]!]! {
        start := alloc.g13_private_start + offset
        mut heap := alloc.new_heap('padding-matrix', start, start + 32 * alloc.gpu_page_size)
+       mut model := new_range_model(heap.start, heap.end)
        aligns := [first_align, second_align, third_align]!
        sizes := [u64(1), alloc.gpu_page_size + 1, 2 * alloc.gpu_page_size + 1]!
        mut addresses := [3]u64{}
-       mut frontiers := [4]u64{}
        mut records := unsafe { [3]&alloc.Allocation{} }
-       frontiers[0] = start
        for index in 0 .. 3 {
-        valid, address, size := heap_bounds_model(heap.top, heap.end, sizes[index], aligns[index] * alloc.gpu_page_size)
-        assert valid
-        addresses[index] = heap.alloc(sizes[index], aligns[index] * alloc.gpu_page_size) or { panic('padding matrix') }
-        assert addresses[index] == address
-        frontiers[index + 1] = address + size
-        records[index] = heap.allocations[index]
+        addresses[index] = reserve_checked(mut heap, mut model, sizes[index], aligns[index] * alloc.gpu_page_size)
+        records[index] = record_at(heap, addresses[index])
        }
-       for index in order { if mask & (1 << index) != 0 { heap.release(addresses[index]) } }
+       for index in order {
+        if mask & (1 << index) != 0 { heap.release(addresses[index]); model.release(addresses[index]) }
+       }
        records_are_live(heap.allocations)
        heap.gc()
-       mut retained := 3
-       for retained > 0 && mask & (1 << (retained - 1)) != 0 { retained-- }
-       assert heap.top == frontiers[retained],
+       model.collect()
+       assert heap.top == model.top(),
         'GC restores reservation frontier including alignment padding'
        records_are_live(heap.allocations)
        mut live_index := 0
        for index in 0 .. 3 {
         if mask & (1 << index) == 0 {
-         assert heap.allocations[live_index] == records[index]
-         assert heap.allocations[live_index].va == addresses[index]
+         assert record_at(heap, addresses[index]) == records[index]
          live_index++
         }
        }
@@ -84,6 +79,7 @@ fn check_heap_padding_matrix() {
        for index in order { heap.release(addresses[index]) }
        heap.gc(); heap.gc()
        assert heap.top == start && heap.allocations.len == 0 && heap.used() == 0
+       unsafe { model.records.free(); heap.allocations.free() }
        cases++
       }
      }

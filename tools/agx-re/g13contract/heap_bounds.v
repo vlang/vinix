@@ -12,12 +12,23 @@ fn check_heap_bounds_local(source string) ! {
  require_order(allocation, ['h.lock.acquire()', 'h.lock.release()',
   'size == 0 || (align != 0 && (align & (align - 1)) != 0)',
   'actual_align := if align < gpu_page_size', 'checked_heap_align_up(size, actual_align) or { return none }',
-  'heap_allocation_address(h.top, h.end, aligned_size, actual_align)', 'h.gc_locked()',
-  'heap_allocation_address(h.top, h.end, aligned_size, actual_align)', 'h.top = va + aligned_size',
-  'a := &Allocation{', '} @[freed]', 'h.allocations << a', 'return va'], 'GPU heap validates before mutation and retries identical bounds after GC')!
+  'h.find_address_locked(h.end, aligned_size, actual_align)', 'h.gc_locked()',
+  'h.find_address_locked(h.end, aligned_size, actual_align)',
+  'if va + aligned_size > h.top { h.top = va + aligned_size }',
+  'a := &Allocation{', '} @[freed]', 'h.allocations << a',
+  'for index > 0 && h.allocations[index - 1].va > va',
+  'h.allocations[index] = h.allocations[index - 1]', 'index--', 'h.allocations[index] = a', 'return va'],
+  'GPU heap validates before mutation, retries identical bounds and preserves sorted ownership after GC')!
  require(allocation.count('a := &Allocation{') == 1 && allocation.count('h.top =') == 1,
   'GPU heap success has one frontier update and one metadata owner')!
  require(!allocation.contains('lib.align_up('), 'GPU heap cannot use unchecked global rounding')!
+ search := section(source, 'fn (h &HeapAllocator) find_address_locked(', '// Zero alignment selects', 'GPU heap best fit')!
+ require_order(search, ['h.start > end', 'cursor := h.start', 'best_span := ~u64(0)',
+  'index <= h.allocations.len', 'h.allocations[index].va < end',
+  'heap_allocation_address(cursor, gap_end, size, alignment)', 'span := gap_end - cursor',
+  'if !found || span < best_span', 'best_address = address', 'best_span = span',
+  'cursor = record.va + record.size', 'if !found { return none }', 'return best_address'],
+  'Every complete gap is checked and ranked by raw span without overlapping deferred owners')!
 }
 
 fn check_heap_bounds_reference(source string) ! {

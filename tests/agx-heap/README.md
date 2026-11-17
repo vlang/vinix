@@ -30,8 +30,8 @@ the original one-pair loss of 65,536 VA bytes and one record.
 
 The sanitized suite checks 9,216 combinations of heap-start offsets, three
 alignment choices, all release masks and all six release orders. Its independent
-model saves each reservation frontier before allocation and requires GC to
-restore the frontier above the highest live record, including leading padding.
+candidate-enumeration model checks placement across leading alignment gaps and
+collected interior holes. GC restores the highest remaining reservation end.
 All released records are collected, including interiors. Live records retain their
 addresses and metadata; ASan verifies retired records. Allocation-triggered GC
 must recover an entire padded heap. `padding-counterexamples.v` takes the runner,
@@ -54,8 +54,8 @@ catch original, missing, late and lost ownership of the pointer buffer.
 suffix-only collector reclaims zero records; the current collector reclaims
 8,192 malloc blocks / 262,144 bytes while preserving the pin and frontier.
 Another 288 offset/alignment/four-pin release-order cases test interior deletion,
-later append, highest release, repeated GC and complete reset. Freed interior
-VA gaps still wait for all higher allocations to be released. GC scans all
+later allocation, highest release, repeated GC and complete reset. Collected
+interior VA gaps are reusable below live allocations. GC and placement scan
 tracked records; native runtime cost remains unmeasured.
 
 Sanitizers check eight release masks, deferred ownership until GC, complete
@@ -68,7 +68,7 @@ fresh external directory. It retains four compiled negative cases: original
 retention, missing free, early free and double free. Compile `check.v` for host
 and native generated-C checks; `--selftest HOST_C` rejects five ownership/locking
 mutations. `check.v --native CURRENT_C BASELINE_C` retains the earlier
-metadata-reclamation proof for its original bundles. For bounds arithmetic,
+metadata-reclamation proof for its original bundles. For historical bounds arithmetic,
 compile `check-bounds.v`: `--host CURRENT_C` checks scalar arithmetic and
 ownership, `--selftest CURRENT_C` rejects five guard/allocation mutations, and
 `--native CURRENT_C BASELINE_C` additionally preserves the heap/GPU/event
@@ -92,21 +92,48 @@ exact pre-capacity constructor, requires six other heap bodies and all ten
 owning declarations, nine GPU lifetime bodies and ten event methods to match.
 Its native mode and all `check-padding.v` modes retain their original contracts
 and require the original complete bundles. Current construction host/selftest
-modes and bounds host/selftest modes remain applicable.
+modes remain applicable. Bounds C proof modes require their original bundles
+because the reservation now calls the best-fit search wrapper.
 
 For current GC, `check-collect.v --host CURRENT_C` requires the complete exact
 stack-only descending collector and locked readers. `--selftest CURRENT_C`
 rejects ten ownership, pin, scan, frontier and locking mutations. Native mode
 compares six unchanged heap bodies, ten owning declarations, nine GPU lifetime
-bodies and ten event methods with the pre-collection baseline.
+bodies and ten event methods with the pre-collection baseline. That native proof
+mode requires its original bundle; current host/selftest modes still check GC.
 `collect-counterexamples.v` takes the runner, pre-collection source and a fresh
 external directory; six compiled variants exercise the old source, suffix-only
 collection, stopping at a live record, freeing live records, changing an interior
 frontier and skipping records.
 
 `--sanitize-bounds`, `--sanitize-padding`, `--sanitize-capacity` and
-`--sanitize-collect` execute the named property under ASan/UBSan. Counterexample
+`--sanitize-collect` and `--sanitize-reuse` execute the named property under ASan/UBSan. Counterexample
 runners use these modes so historical baseline sources reach their intended
 property failure independently of newer GC semantics. The interval-bounds
 negative now fails directly in the overflowing-interval probe. Historical checkers and
 complete original bundles remain unchanged.
+
+The reuse suite includes a full-capacity interior-hole probe, raw-hole ranking
+before alignment padding, and 3,072 fragmented/aligned/deferred-release cases
+against independent candidate enumeration. Pending released records occupy
+their ranges until GC. Pointer rotation preserves VA order without moving
+allocation records. Equal-size holes use the lowest address; DRM MM's equal-size
+tree ordering can differ. Placement scans tracked records; GC also compacts the
+pointer table. Native cost remains unmeasured.
+
+`check-reuse.v --host CURRENT_C` requires checked scalar placement helpers,
+identical pre/post-GC range limits, a monotonic high frontier and stack pointer
+rotation around one explicit record owner. Its selftest rejects twelve bounds,
+retry, ranking, pending-owner, frontier, sorting and allocation mutations. Native
+mode compares six unchanged heap bodies, ten owning layouts, nine GPU lifetime
+bodies and ten event methods against the pre-reuse baseline. Reference mode takes
+Asahi `alloc.rs` and the pinned `drm_mm.c`. `reuse-counterexamples.v` takes the
+heap runner, pre-reuse allocator and a fresh external directory; eight compiled
+variants exercise capacity loss, ranking, ordering and deferred collection.
+
+`tlb-reuse-run.v` always enables ASan/UBSan and combines the production allocator
+and page tables with the existing TLBI fixture. Two hundred uncached global/ASID
+cycles verify old leaves are invalidated before reuse, new mappings name the new
+backing, live pins stay mapped and all page tables are released. Optional
+`AGX_HEAP_TLB_BINARY` and `AGX_HEAP_TLB_C` retain artifacts externally. These tests
+replace privileged instructions and do not execute firmware cache invalidation.

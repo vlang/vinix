@@ -10,7 +10,7 @@ fn test_heap_bounds_require_checked_alignment_and_identical_post_gc_validation()
   'checked_heap_align_up(size, actual_align) or { return none }'] {
   if _ := check_heap_bounds_local(source.replace(token, 'false')) { assert false, token }
  }
- token := '\n\t\theap_allocation_address(h.top, h.end, aligned_size, actual_align) or {'
+ token := '\n\t\th.find_address_locked(h.end, aligned_size, actual_align) or {'
  assert source.count(token) == 1
  if _ := check_heap_bounds_local(source.replace(token, token.replace('h.end', '~u64(0)'))) { assert false }
 }

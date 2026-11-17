@@ -30,50 +30,49 @@ fn check_collect_pins() {
     if first == second || first == third || first == fourth || second == third || second == fourth || third == fourth { continue }
     start := alloc.g13_private_start + offset
     mut heap := alloc.new_heap('collect-pins', start, start + 256 * alloc.gpu_page_size)
+    mut model := new_range_model(heap.start, heap.end)
     mut addresses := [4]u64{}
-    mut ends := [4]u64{}
     mut gaps := unsafe { [4]&alloc.Allocation{} }
     mut pins := unsafe { [4]&alloc.Allocation{} }
     for index in 0 .. 4 {
      // Three pins survive a collection, then append a fourth beyond them.
      if index == 3 {
       heap.gc(); heap.gc()
-      assert heap.allocations.len == 3 && heap.top == ends[2],
+      model.collect()
+      assert heap.allocations.len == 3 && heap.top == model.top(),
        'GC must discard interior records while pins stay live'
       records_are_live(heap.allocations)
-      for pin_index in 0 .. 3 { assert heap.allocations[pin_index] == pins[pin_index] }
+      for pin_index in 0 .. 3 { assert record_at(heap, addresses[pin_index]) == pins[pin_index] }
       $if agx_heap_sanitized ? {
        for gap_index in 0 .. 3 { assert C.__asan_address_is_poisoned(gaps[gap_index]) != 0 }
       }
      }
      size := u64(index + 1) * alloc.gpu_page_size
      align_bytes := alignment * alloc.gpu_page_size
-     valid, expected, rounded := heap_bounds_model(heap.top, heap.end, size, align_bytes)
-     assert valid
-     gap := heap.alloc(size, align_bytes) or { panic('collect gap') }
-     assert gap == expected && heap.top == expected + rounded
-     gaps[index] = heap.allocations[heap.allocations.len - 1]
-     addresses[index] = heap.alloc(1, 0) or { panic('collect pin') }
-     ends[index] = addresses[index] + alloc.gpu_page_size
-     pins[index] = heap.allocations[heap.allocations.len - 1]
-     heap.release(gap)
+     gap := reserve_checked(mut heap, mut model, size, align_bytes)
+     gaps[index] = record_at(heap, gap)
+     addresses[index] = reserve_checked(mut heap, mut model, 1, 0)
+     pins[index] = record_at(heap, addresses[index])
+     heap.release(gap); model.release(gap)
     }
     heap.gc(); heap.gc()
-    assert heap.allocations.len == 4 && heap.top == ends[3], 'GC preserves appended pins and frontier'
+    model.collect()
+    assert heap.allocations.len == 4 && heap.top == model.top(), 'GC preserves appended pins and frontier'
     records_are_live(heap.allocations)
     $if agx_heap_sanitized ? {
-     for gap in gaps { assert C.__asan_address_is_poisoned(gap) != 0 }
+     // Earlier freed metadata can be reused by a later reservation. Only
+     // the newly retired gap is guaranteed not to have been reused yet.
+     assert C.__asan_address_is_poisoned(gaps[3]) != 0
     }
     mut live := [true, true, true, true]!
     for index in [first, second, third, fourth]! {
-     heap.release(addresses[index]); live[index] = false
+     heap.release(addresses[index]); model.release(addresses[index]); live[index] = false
      heap.gc(); heap.gc()
-     mut expected_top := start
+     model.collect()
      mut live_count := 0
      for pin_index in 0 .. 4 {
       if live[pin_index] {
-       expected_top = ends[pin_index]
-       assert heap.allocations[live_count] == pins[pin_index]
+       assert record_at(heap, addresses[pin_index]) == pins[pin_index]
        assert pins[pin_index].va == addresses[pin_index] && pins[pin_index].in_use
        live_count++
       }
@@ -81,12 +80,12 @@ fn check_collect_pins() {
        assert (C.__asan_address_is_poisoned(pins[pin_index]) != 0) == !live[pin_index]
       }
      }
-     assert heap.allocations.len == live_count && heap.top == expected_top,
+     assert heap.allocations.len == live_count && heap.top == model.top(),
       'GC reclaims only the released suffix VA across earlier interior collections'
-     assert heap.used() == u64(live_count) * alloc.gpu_page_size && heap.available() == heap.end - expected_top
+     assert heap.used() == u64(live_count) * alloc.gpu_page_size && heap.available() == heap.end - model.top()
     }
     assert heap.top == start && heap.allocations.len == 0
-    unsafe { heap.allocations.free() }
+    unsafe { heap.allocations.free(); model.records.free() }
     cases++
    } } } }
   }

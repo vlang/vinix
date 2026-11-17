@@ -6,12 +6,14 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [GPU heap collection below live allocations](m1-agx-heap-collect.md)
-(2026-11-17). GC destroys all released metadata records while preserving live
-addresses and suffix-frontier behavior. One surviving allocation no longer
-pins released records below it; the host sample reclaims 8,192 records.
+Latest offline increment: [best-fit GPU virtual-address reuse](m1-agx-heap-reuse.md)
+(2026-11-17). Collected holes can be reused below live reservations without
+lowering the high frontier. Independent placement cases and production
+heap/page-table tests cover lower-hole reuse. Equal-size tie ordering remains
+different from DRM MM and native performance remains unmeasured.
 Modern ioctl/Mesa integration and remaining stage backing/event destruction
-are incomplete. The [GPU heap pointer-buffer reclamation](m1-agx-heap-capacity.md),
+are incomplete. The [GPU heap collection below live allocations](m1-agx-heap-collect.md),
+[GPU heap pointer-buffer reclamation](m1-agx-heap-capacity.md),
 [GPU heap alignment-padding reclamation](m1-agx-heap-padding.md),
 [checked GPU heap allocation bounds](m1-agx-heap-bounds.md),
 [GPU heap metadata reclamation](m1-agx-heap-records.md),

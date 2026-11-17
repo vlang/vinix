@@ -4,7 +4,7 @@ import os
 fn run_checks() !int {
  assert os.args.len == 2 || (os.args.len == 4 && os.args[2] == '--allocator-source')
  assert os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect',
-  '--sanitize', '--sanitize-bounds', '--sanitize-padding', '--sanitize-capacity', '--sanitize-collect']
+  '--sanitize', '--sanitize-bounds', '--sanitize-padding', '--sanitize-capacity', '--sanitize-collect', '--sanitize-reuse']
  assert os.user_os() == 'macos', 'retained host allocation measurement uses Darwin malloc statistics'
  // Default nano-zone statistics showed an additional 512-block step during
  // churn. Use the ordinary allocator for this exact live-byte measurement.

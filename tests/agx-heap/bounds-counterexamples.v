@@ -9,7 +9,7 @@ fn main() {
  assert !os.exists(state) && !state.starts_with(repo + '/')
  os.mkdir_all(state)!
  source := os.read_file(repo + '/kernel/gpu/agx/alloc/alloc.v')!
- post_gc := '\n\t\theap_allocation_address(h.top, h.end, aligned_size, actual_align) or {'
+ post_gc := '\n\t\th.find_address_locked(h.end, aligned_size, actual_align) or {'
  assert source.count(post_gc) == 1
  variants := [
   ['original-source', os.read_file(os.args[2])!, 'invalid GPU heap alignment must not allocate'],

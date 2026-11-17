@@ -1,8 +1,8 @@
 module alloc
 
 // GPU memory allocators for the Apple AGX driver.
-// HeapAllocator: a simple grow-only virtual address heap with garbage
-// collection of released records and freed address space at the top.
+// HeapAllocator: a best-fit virtual address heap with deferred collection
+// of released allocation records.
 //
 // Three pre-defined VA regions partition the 39-bit GPU address space:
 //   Private  : 0x4000          .. 0x1_0000_0000  (  ~4 GB, GPU-private)
@@ -50,8 +50,9 @@ pub mut:
 	in_use bool // false once freed; eligible for GC
 }
 
-// --- Grow-only heap allocator ---
-// Allocations are served from `top`, which only moves upward.
+// --- GPU virtual-address heap allocator ---
+// Allocation records stay in VA order. Best-fit placement can reuse gaps;
+// `top` tracks the highest reservation end, including deferred releases.
 // `release()` marks an allocation as unused. GC destroys every released record
 // and reclaims the address suffix above the highest remaining live allocation.
 
@@ -94,6 +95,36 @@ fn heap_allocation_address(top u64, end u64, size u64, alignment u64) ?u64 {
 	return address
 }
 
+// Caller holds the heap lock. Pending released records still occupy their
+// ranges until GC unlinks them. Rank complete holes before alignment padding;
+// equal-size holes use the lowest VA for deterministic placement.
+fn (h &HeapAllocator) find_address_locked(end u64, size u64, alignment u64) ?u64 {
+	if h.start > end { return none }
+	mut cursor := h.start
+	mut best_address := u64(0)
+	mut best_span := ~u64(0)
+	mut found := false
+	for index := 0; index <= h.allocations.len; index++ {
+		gap_end := if index < h.allocations.len && h.allocations[index].va < end {
+			h.allocations[index].va
+		} else { end }
+		if address := heap_allocation_address(cursor, gap_end, size, alignment) {
+			span := gap_end - cursor
+			if !found || span < best_span {
+				best_address = address
+				best_span = span
+				found = true
+			}
+		}
+		if index < h.allocations.len {
+			record := h.allocations[index]
+			cursor = record.va + record.size
+		}
+	}
+	if !found { return none }
+	return best_address
+}
+
 // Zero alignment selects the page minimum. Nonzero alignments must be powers
 // of two, as in Asahi. The size and complete aligned interval must fit.
 pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
@@ -105,17 +136,17 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 	if size == 0 || (align != 0 && (align & (align - 1)) != 0) { return none }
 	actual_align := if align < gpu_page_size { gpu_page_size } else { align }
 	aligned_size := checked_heap_align_up(size, actual_align) or { return none }
-	va := heap_allocation_address(h.top, h.end, aligned_size, actual_align) or {
-		// A completed suffix can make room, including after address-rounding
-		// overflow. Re-run the same checked bounds after GC changes the top.
+	va := h.find_address_locked(h.end, aligned_size, actual_align) or {
+		// Collect deferred releases only after the first placement attempt.
+		// Retry the same checked range after GC makes its holes available.
 		h.gc_locked()
-		heap_allocation_address(h.top, h.end, aligned_size, actual_align) or {
+		h.find_address_locked(h.end, aligned_size, actual_align) or {
 			available := if h.top < h.end { h.end - h.top } else { u64(0) }
 			C.printf(c'gpu alloc %s: out of VA space (need 0x%llx, avail 0x%llx)\n', h.name.str, aligned_size, available)
 			return none
 		}
 	}
-	h.top = va + aligned_size
+	if va + aligned_size > h.top { h.top = va + aligned_size }
 
 	a := &Allocation{
 		va: va
@@ -123,12 +154,20 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 		in_use: true
 	} @[freed]
 	h.allocations << a
+	// Append retains one explicit owner; rotating pointers avoids an insert
+	// temporary and leaves every separately allocated record at its address.
+	mut index := h.allocations.len - 1
+	for index > 0 && h.allocations[index - 1].va > va {
+		h.allocations[index] = h.allocations[index - 1]
+		index--
+	}
+	h.allocations[index] = a
 
 	return va
 }
 
 // Mark the allocation at `va` as free. The VA region is not immediately
-// reused; call `gc()` to compact free space at the top.
+// reused; call `gc()` to make its range available for placement.
 pub fn (mut h HeapAllocator) release(va u64) {
 	h.lock.acquire()
 	defer {
@@ -146,8 +185,8 @@ pub fn (mut h HeapAllocator) release(va u64) {
 }
 
 // Collect every released record, including below a live allocation. Metadata
-// is no longer needed once released. VA allocation remains grow-only: gaps
-// become available when all higher reservations have also been released.
+// is no longer needed once released. The removed intervals become reusable
+// holes while all live record addresses stay fixed.
 pub fn (mut h HeapAllocator) gc() {
 	h.lock.acquire()
 	defer {
