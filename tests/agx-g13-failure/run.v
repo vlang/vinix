@@ -54,7 +54,9 @@ fn run_checks() int {
 		.replace('free_g13_compute_job_locked', 'compute_retirement_free')
 		.replace('complete_g13_compute_job', 'checked_complete_g13_compute_job')
 		.replace('end_g13_operation_locked', 'compute_retirement_end')
-	production += section(submissions, 'pub fn (job &G13ComputeJobResources) timestamp_values()', 'pub fn (mut mgr GpuManager) create_g13_queue_resources(') or { panic(err) }
+	timestamp_end := if submissions.contains('pub fn free_g13_queue_record(') { 'pub fn free_g13_queue_record(' }
+		else { 'pub fn (mut mgr GpuManager) create_g13_queue_resources(' }
+	production += section(submissions, 'pub fn (job &G13ComputeJobResources) timestamp_values()', timestamp_end) or { panic(err) }
 	production += section(submissions, 'pub fn (queue &G13QueueResources) has_file_references()', '// Caller holds mgr.lock. Asahi QueueInner') or { panic(err) }
 	production += (section(submissions, 'pub fn (mut mgr GpuManager) release_g13_queue_resources(', '// Quarantined backing must retire') or { panic(err) })
 		.replace('release_g13_queue_resources', 'checked_release_g13_queue_resources')

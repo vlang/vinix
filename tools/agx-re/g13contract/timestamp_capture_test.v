@@ -14,7 +14,7 @@ fn test_timestamp_capture_guards_require_retained_owners_and_rollback() {
 		'if !object.detached || object.references != 0 { continue }', 'f.timestamp_objects[index].references--'] {
 		if _ := check_timestamp_capture_local(file, captures.replace(token, ''), gpu) { assert false, token }
 	}
-	for token in ['object.references != 0', 'manager == unsafe { nil } && f.timestamp_objects.len != 0',
+	for token in ['object.references != 0', 'manager == unsafe { nil } && (f.timestamp_objects.len != 0 || f.g13_queues.len != 0)',
 		'f.timestamp_objects[found_index].detached = true', 'owned.reap_detached_timestamp_objects_locked()'] {
 		if _ := check_timestamp_capture_local(file.replace(token, ''), captures, gpu) { assert false, token }
 	}

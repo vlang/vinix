@@ -17,7 +17,7 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		'references.entries[pipe][phase] = capture'], 'Owned output cannot be overwritten; failed prefixes roll back')!
 	close := section(file, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(', 'File timestamp capture ownership')!
 	require_order(close, ['f.lock.acquire()', 'object.references != 0', 'f.lock.release(); return false',
-		'manager == unsafe { nil } && f.timestamp_objects.len != 0', 'return false',
+		'manager == unsafe { nil } && (f.timestamp_objects.len != 0 || f.g13_queues.len != 0)', 'return false',
 		'gpu_manager.unmap_g13_timestamp_buffer(object.va, object.size)', 'gem.unref(object.obj)'], 'Close retains captures and mapped backing without a manager')!
 	unbind := section(file, 'ioctl.asahi_bind_object_op_unbind {', 'pub fn (mut f GpuFile) ioctl_queue_create(', 'Timestamp namespace removal')!
 	require_order(unbind, ['object.id == request.object_handle && !object.detached',

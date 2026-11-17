@@ -7,9 +7,10 @@ fn section(source string, start string, end string) !string {
 	return source[begin..finish]
 }
 
-fn main() {
+fn checks() !int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--timestamp-source', '--gpu-source'])
+		|| (os.args.len == 2 && os.args[1] == '--record-measure')
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-close-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -46,6 +47,7 @@ fn main() {
 	gpu_source := os.read_file(if os.args.len == 3 && os.args[1] == '--gpu-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' })!
 	g13_source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\nimport katomic\nimport gpu.agx.alloc\nimport gpu.agx.pgtable\n' +
+		section(g13_source, 'pub fn free_g13_queue_record(', 'pub fn (mut mgr GpuManager) create_g13_queue_resources(')!.replace('free_g13_queue_record(', 'free_g13_queue_record_real(') +
 		section(g13_source, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) can_query_global_params(', 'pub fn new_gpu_manager(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) queue_file_retirement(', 'fn (mut mgr GpuManager) reap_file_resources(')! +
@@ -64,26 +66,31 @@ fn main() {
 	os.write_file('${scratch}/gpu/agx/fw/priority.v', 'module fw\n@[packed]\n' +
 		section(priority, 'pub struct G13WorkQueuePriority {', '// QueueInfo for G13')! +
 		section(priority, 'pub fn g13_workqueue_priority(', 'pub fn initialize_g13_gpu_context(')!)!
-	os.cp('${repo}/tests/agx-file-close/test.v', '${scratch}/main.v')!
+	for name in ['queue_records.v', 'stats_darwin.c.v'] { os.cp(repo + '/tests/agx-queue-records/' + name, scratch + '/gpu/agx/file/' + name)! }
+	if os.args.len == 2 { os.write_file(scratch + '/main.v', 'import gpu.agx.file\nfn main() { file.measure_queue_records() }\n')! }
+	else { os.cp('${repo}/tests/agx-file-close/test.v', '${scratch}/main.v')! }
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
-	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
+	mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-d', 'queue_records_sanitized', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
 		'-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
-		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v'])
+		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v']
+	if os.args.len == 2 { flags = ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', scratch + '|@vlib|@vmodules', '-o', scratch + '/test', scratch + '/main.v'] }
+	build.set_args(flags)
 	build.run()
 	build.wait()
-	if build.code != 0 { exit(build.code) }
+	if build.code != 0 { return build.code }
 	if output := os.getenv_opt('AGX_CLOSE_TEST_C') {
 		assert output.ends_with('.c')
-		flags := build.args.clone()
-		mut cflags := flags.clone(); cflags[cflags.len - 2] = output
+		mut cflags := build.args.clone(); cflags[cflags.len - 2] = output
 		mut generated := os.new_process(os.getenv_opt('V') or { 'v' })
 		generated.set_args(cflags); generated.run(); generated.wait()
-		if generated.code != 0 { exit(generated.code) }
+		if generated.code != 0 { return generated.code }
 	}
 	if output := os.getenv_opt('AGX_CLOSE_TEST_BINARY') { os.cp('${scratch}/test', output)! }
 	mut check := os.new_process('${scratch}/test')
 	check.run()
 	check.wait()
-	exit(check.code)
+	return check.code
 }
+
+fn main() { code := checks() or { panic(err) }; exit(code) }

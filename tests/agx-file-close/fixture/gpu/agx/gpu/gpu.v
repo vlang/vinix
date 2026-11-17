@@ -28,6 +28,9 @@ pub mut:
 	channel_mask u32
 	vm_address u64
 	pooled bool
+	heap_record bool
+	record_disposed bool
+	context_next &G13QueueResources = unsafe { nil }
 	vertex fw.G13WorkQueuePriority
 	fragment fw.G13WorkQueuePriority
 	compute fw.G13WorkQueuePriority
@@ -189,6 +192,14 @@ pub fn (mut mgr GpuManager) release_g13_queue_resources(queue &G13QueueResources
 }
 
 pub fn (mut mgr GpuManager) release_g17_queue_resources(queue &G17QueueResources) {}
+
+pub fn free_g13_queue_record(resources &G13QueueResources) {
+	if resources.heap_record { free_g13_queue_record_real(resources); return }
+	assert resources.released && !resources.has_file_references() && !resources.record_disposed,
+		'queue metadata disposal must occur once per final owner'
+	// Existing fixtures retain stack/pool records for post-release observations.
+	mut owned := unsafe { resources }; owned.record_disposed = true
+}
 
 pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(address u64, size u64) bool {
 	timestamp_unmaps++

@@ -2769,6 +2769,16 @@ pub fn (job &G13ComputeJobResources) timestamp_values() fw.G13JobTimestamps {
 	return unsafe { *&fw.G13JobTimestamps(job.timestamps.cpu_address()) }
 }
 
+// Caller holds the final file-owner lock, has removed its ownership row and
+// has completed logical queue destruction. Backing release alone leaves this
+// record live for close retries and submission captures.
+pub fn free_g13_queue_record(resources &G13QueueResources) {
+	assert resources != unsafe { nil } && resources.released, 'queue record metadata must wait for backing release'
+	assert !resources.has_file_references(), 'queue record metadata must retain captured references'
+	assert resources.context_next == unsafe { nil }, 'queue record metadata must leave the deferred context list'
+	unsafe { free(resources) }
+}
+
 pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 	channel_mask u32, priority u32, vm &mmu.UatContext) ?&G13QueueResources {
 	if queue_id == 0 || channel_mask == 0 || channel_mask & ~g13_queue_channel_mask != 0
@@ -2794,7 +2804,7 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 		channel_mask: channel_mask
 		priority: priority
 		vm: unsafe { vm }
-	}
+	} @[freed]
 	mut complete := false
 	defer {
 		if !complete {

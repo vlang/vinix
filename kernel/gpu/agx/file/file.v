@@ -186,6 +186,11 @@ pub fn (mut f GpuFile) close() bool {
 	for object in f.timestamp_objects {
 		if object.references != 0 { f.lock.release(); return false }
 	}
+	// Captures can precede the aggregate VM pin, including after shutdown has
+	// already released backing. Keep their metadata owner until the last pin.
+	for ownership in f.g13_queues {
+		if ownership.resources.has_file_references() { f.lock.release(); return false }
+	}
 	for vm_id := u32(1); vm_id < mmu.uat_num_contexts; vm_id++ {
 		if katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
 			// Completion callbacks still own this file. The worker retries its
@@ -195,7 +200,7 @@ pub fn (mut f GpuFile) close() bool {
 		}
 	}
 	manager := gpu.get_global_manager() or { unsafe { nil } }
-	if manager == unsafe { nil } && f.timestamp_objects.len != 0 {
+	if manager == unsafe { nil } && (f.timestamp_objects.len != 0 || f.g13_queues.len != 0) {
 		f.lock.release()
 		return false
 	}
@@ -230,6 +235,11 @@ pub fn (mut f GpuFile) close() bool {
 	}
 	unsafe { f.g17_queues.free() }
 	f.g17_queues = []G17QueueOwnership{}
+	for index := f.g13_queues.len - 1; index >= 0; index-- {
+		ownership := f.g13_queues[index]
+		f.g13_queues.delete(index)
+		gpu.free_g13_queue_record(ownership.resources)
+	}
 	unsafe { f.g13_queues.free() }
 	f.g13_queues = []G13QueueOwnership{}
 	if manager != unsafe { nil } {
@@ -1080,6 +1090,7 @@ fn (mut f GpuFile) reap_detached_g13_queues_locked() {
 		q.destroy()
 		f.queues.delete(i)
 		f.g13_queues.delete(owner_index)
+		gpu.free_g13_queue_record(ownership.resources)
 	}
 }
 
@@ -1099,6 +1110,7 @@ fn (mut f GpuFile) reap_orphaned_g13_queues_locked() {
 		if named || ownership.resources.has_file_references() { continue }
 		if !gpu_manager.release_g13_queue_resources(ownership.resources) { continue }
 		f.g13_queues.delete(index)
+		gpu.free_g13_queue_record(ownership.resources)
 	}
 }
 

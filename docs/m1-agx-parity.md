@@ -6,9 +6,12 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [failed queue-constructor record reclamation](m1-agx-queue-unwind.md)
-(2026-11-17). Safely unwound unreturned records are freed; returned/quarantined
-owners retain their existing lifetimes. The [deferred G13 context invalidation](m1-agx-context-defer.md)
+Latest offline increment: [final G13 queue-record reclamation](m1-agx-queue-records.md)
+(2026-11-17). Close and both file-owner reapers now reclaim released records
+after their last captures and ownership rows are gone. Mapping failures and
+manager absence retain metadata for retry. The [failed queue-constructor record reclamation](m1-agx-queue-unwind.md)
+report retains the separate unreturned-record fix and original evidence.
+The [deferred G13 context invalidation](m1-agx-context-defer.md)
 report retains the release-order snapshot and allocator-borrow evidence.
 Its ownership comparison is corrected: Asahi's context objects transitively
 retain TVB backing and VM allocators. Vinix also retains extra queue graph state.

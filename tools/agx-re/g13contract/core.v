@@ -627,6 +627,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_context_defer_reference(manager)!
 	check_queue_unwind_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
+	check_queue_records_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
 	check_queue_unwind_reference(read(os.join_path(base, 'queue/mod.rs'))!, read(os.join_path(base, 'buffer.rs'))!,
 		read(os.join_path(base, 'fw/workqueue.rs'))!, read(os.join_path(base, 'alloc.rs'))!)!
 	check_heap_gc_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_garbage.v'))!,
