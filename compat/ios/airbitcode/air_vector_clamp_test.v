@@ -10,7 +10,7 @@ fn clamp_reference_number(minimum bool, a u32, b u32) u32 {
 }
 
 fn test_air_vector_clamp_values_states_and_cache() {
-	assert vector_air_clamp_cache_base == 61764 && vector_float_intrinsic_slots == 62228 && scalar_intrinsic_cache_slots == 2187
+	assert vector_air_clamp_cache_base == 61764 && vector_float_intrinsic_slots == 62228 && scalar_intrinsic_cache_slots == 2191
 	edges := [u32(0),0x80000000,1,0x80000001,0x007fffff,0x807fffff,0x00800000,0x80800000,0x3f800000,0xbf800000,0x3f800001,0xbf800001,0x7f7fffff,0xff7fffff,0x7f800000,0xff800000,0x7f800001,0xff800001,0x7fc00000,0xffc00000,0x7fc12345,0xffc12345,0x3f000000,0xbf000000]!
 	mut checks := 0; mut states := 0; mut seen := [16]bool{}
 	for count in 1 .. 17 {

@@ -12,7 +12,7 @@ fn clamp_number_reference(minimum bool, a u32, b u32) u32 {
 
 fn test_air_clamp_identity_domain_and_composition() {
 	id, slot := air_float_intrinsic('air.clamp.f32')!
-	assert id == .air_clamp && slot == 10 && scalar_air_float_cache_base + slot == 2178 && scalar_intrinsic_cache_slots == 2187
+	assert id == .air_clamp && slot == 10 && scalar_air_float_cache_base + slot == 2178 && scalar_intrinsic_cache_slots == 2191
 	assert scalar_intrinsic_name('air.clamp.f32')! == id && scalar_intrinsic_arity(id) == 3 && !scalar_integer_intrinsic(id)
 	if _, _ := air_integer_intrinsic('air.clamp.f32') { assert false }
 	for bits in [u32(16),64]! { if _ := scalar_air_float_clamp(bits,0,0,0) { assert false } }

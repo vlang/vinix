@@ -4825,6 +4825,14 @@ declare <2 x i64> @air.sub_sat.s.v2i64(<2 x i64>,<2 x i64>)
 declare <2 x i64> @llvm.ssub.sat.v2i64(<2 x i64>,<2 x i64>)
 declare <2 x i64> @air.sub_sat.u.v2i64(<2 x i64>,<2 x i64>)
 declare <2 x i64> @llvm.usub.sat.v2i64(<2 x i64>,<2 x i64>)
+declare i64 @air.add_sat.s.i64(i64,i64)
+declare i64 @air.sub_sat.s.i64(i64,i64)
+declare i64 @air.add_sat.u.i64(i64,i64)
+declare i64 @air.sub_sat.u.i64(i64,i64)
+declare i64 @llvm.sadd.sat.i64(i64,i64)
+declare i64 @llvm.ssub.sat.i64(i64,i64)
+declare i64 @llvm.uadd.sat.i64(i64,i64)
+declare i64 @llvm.usub.sat.i64(i64,i64)
 define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
  %x = extractelement <3 x i32> %gid, i32 0
  %y = extractelement <3 x i32> %gid, i32 1
@@ -4904,7 +4912,38 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
  %w64_ok1 = extractelement <2 x i1> %w64_ok,i32 1
  %w64_all = and i1 %w64_ok0,%w64_ok1
  %air_all32 = and i1 %air_lane0, %air_lane1
- %air_all = and i1 %air_all32,%w64_all
+ %air_all_previous = and i1 %air_all32,%w64_all
+ %scalar64_parity = and i32 %x,1
+ %scalar64_odd = icmp ne i32 %scalar64_parity,0
+ %scalar64_sa_left = select i1 %scalar64_odd,i64 -9223372036854775808,i64 %w64_x
+ %scalar64_sa_right = select i1 %scalar64_odd,i64 -1,i64 9223372036854775807
+ %scalar64_sa_expected = select i1 %scalar64_odd,i64 -9223372036854775808,i64 9223372036854775807
+ %scalar64_ss_left = select i1 %scalar64_odd,i64 9223372036854775807,i64 -9223372036854775808
+ %scalar64_ss_right = select i1 %scalar64_odd,i64 -1,i64 1
+ %scalar64_sa = call i64 @air.add_sat.s.i64(i64 %scalar64_sa_left,i64 %scalar64_sa_right)
+ %scalar64_ss = call i64 @air.sub_sat.s.i64(i64 %scalar64_ss_left,i64 %scalar64_ss_right)
+ %scalar64_ua = call i64 @air.add_sat.u.i64(i64 %w64_x,i64 -1)
+ %scalar64_us = call i64 @air.sub_sat.u.i64(i64 %w64_x,i64 3)
+ %scalar64_sa_ref = call i64 @llvm.sadd.sat.i64(i64 %scalar64_sa_left,i64 %scalar64_sa_right)
+ %scalar64_ss_ref = call i64 @llvm.ssub.sat.i64(i64 %scalar64_ss_left,i64 %scalar64_ss_right)
+ %scalar64_ua_ref = call i64 @llvm.uadd.sat.i64(i64 %w64_x,i64 -1)
+ %scalar64_us_ref = call i64 @llvm.usub.sat.i64(i64 %w64_x,i64 3)
+ %scalar64_sa_same = icmp eq i64 %scalar64_sa,%scalar64_sa_ref
+ %scalar64_ss_same = icmp eq i64 %scalar64_ss,%scalar64_ss_ref
+ %scalar64_ua_same = icmp eq i64 %scalar64_ua,%scalar64_ua_ref
+ %scalar64_us_same = icmp eq i64 %scalar64_us,%scalar64_us_ref
+ %scalar64_sa_endpoint = icmp eq i64 %scalar64_sa,%scalar64_sa_expected
+ %scalar64_ss_endpoint = icmp eq i64 %scalar64_ss,%scalar64_ss_left
+ %scalar64_ua_endpoint = icmp eq i64 %scalar64_ua,-1
+ %scalar64_us_endpoint = icmp eq i64 %scalar64_us,%w64_low_us
+ %scalar64_same0 = and i1 %scalar64_sa_same,%scalar64_ss_same
+ %scalar64_same1 = and i1 %scalar64_ua_same,%scalar64_us_same
+ %scalar64_end0 = and i1 %scalar64_sa_endpoint,%scalar64_ss_endpoint
+ %scalar64_end1 = and i1 %scalar64_ua_endpoint,%scalar64_us_endpoint
+ %scalar64_same = and i1 %scalar64_same0,%scalar64_same1
+ %scalar64_endpoints = and i1 %scalar64_end0,%scalar64_end1
+ %scalar64_ok = and i1 %scalar64_same,%scalar64_endpoints
+ %air_all = and i1 %air_all_previous,%scalar64_ok
  %w64_us0 = extractelement <2 x i64> %w64_us,i32 0
  %air_sa0 = extractelement <2 x i32> %air_sa, i32 0
  %air_ua0 = extractelement <2 x i32> %air_ua, i32 0
@@ -4915,7 +4954,7 @@ define void @image_saturating(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) 
  %ss = select i1 %air_all, i32 %air_ss0, i32 poison
  %us = select i1 %air_all, i32 %air_us0, i32 poison
  %below = icmp ult i32 %x, 3
- %w64_restored = add i64 %w64_us0,3
+ %w64_restored = add i64 %scalar64_us,3
  %restored = trunc i64 %w64_restored to i32
  %coordinate = select i1 %below, i32 %x, i32 %restored
  %sa_hi = lshr i32 %sa, 26
