@@ -6,7 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [generic DRM timeline QUERY](m1-agx-syncobj-query.md)
+Latest increment: [generic DRM timeline SIGNAL](m1-agx-timeline-signal.md)
+(2026-11-17). All object/point snapshots and chain reservations precede
+publication. Signals use a permanent completed payload and retain cumulative
+predecessors. Binary completions stay private. Timeline wait/transfer, allocator
+and timestamp policy, reclamation and hardware qualification remain open.
+
+Preceding increment: [generic DRM timeline QUERY](m1-agx-syncobj-query.md)
 (2026-11-17). Queries distinguish completed progress from the last submitted
 point, snapshot all object identities before output and preserve partial-copy
 ordering. The generic timeline capability remains disabled pending wait,

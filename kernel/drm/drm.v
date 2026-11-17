@@ -331,6 +331,9 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 		ioctl.drm_ioctl_syncobj_query {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineArray)), direction: ioctl_write | ioctl_read }
 		}
+		ioctl.drm_ioctl_syncobj_timeline_signal {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineArray)), direction: ioctl_write | ioctl_read }
+		}
 		ioctl.drm_ioctl_mode_create_dumb {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmModeCreateDumb))
@@ -707,6 +710,8 @@ fn (mut this DrmNode) grow(_handle voidptr, _new_size u64) ? {
 // Register a new DRM device backed by the given driver.
 // Returns a reference to the newly created device or none on failure.
 pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
+	// Establish the permanent completion's timestamp during DRM startup.
+	syncobj.shared_timeline_stub()
 	drm_devices_lock.acquire()
 	defer {
 		drm_devices_lock.release()
@@ -817,8 +822,8 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 			return 0
 		}
 		ioctl.drm_cap_syncobj_timeline {
-			// Submission chains and QUERY exist; timeline wait/signal/transfer
-			// must be complete before advertising the generic timeline feature.
+			// Chains, QUERY and timeline SIGNAL exist; wait/transfer must be
+			// complete before advertising the generic timeline feature.
 			cap.value = 0
 			return 0
 		}
@@ -1236,6 +1241,9 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		}
 		ioctl.drm_ioctl_syncobj_query {
 			return ioctl_syncobj_query(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_timeline_signal {
+			return ioctl_syncobj_timeline_signal(handle, data)
 		}
 		else {
 			return none
