@@ -48,6 +48,7 @@ pub mut:
 	va     u64 // GPU virtual address of the allocation
 	size   u64 // Size in bytes (always 16KB-aligned)
 	in_use bool // false once freed; eligible for GC
+	hole_order u64 // Recency rank of the following hole; zero if none
 }
 
 // --- GPU virtual-address heap allocator ---
@@ -63,6 +64,8 @@ pub mut:
 	end         u64 // End of managed VA range (exclusive)
 	top         u64 // Current allocation frontier (grows upward)
 	allocations []&Allocation
+	head_hole_order u64 // Recency rank of the hole before the first record
+	hole_count u64 // Active hole ranks are exactly 1..hole_count
 	lock        klock.Lock
 }
 
@@ -73,6 +76,8 @@ pub fn new_heap(name string, start u64, end u64) HeapAllocator {
 		start: start
 		end: end
 		top: start
+		head_hole_order: if start < end { u64(1) } else { u64(0) }
+		hole_count: if start < end { u64(1) } else { u64(0) }
 	}
 	// This table never escapes or has slices. All access holds the heap lock,
 	// so capacity growth can immediately free its previous pointer buffer.
@@ -97,12 +102,13 @@ fn heap_allocation_address(top u64, end u64, size u64, alignment u64) ?u64 {
 
 // Caller holds the heap lock. Pending released records still occupy their
 // ranges until GC unlinks them. Rank complete holes before alignment padding;
-// equal-size holes use the lowest VA for deterministic placement.
+// equal-size holes use the newest eligible hole, as DRM MM's size tree does.
 fn (h &HeapAllocator) find_address_locked(end u64, size u64, alignment u64) ?u64 {
 	if h.start > end { return none }
 	mut cursor := h.start
 	mut best_address := u64(0)
 	mut best_span := ~u64(0)
+	mut best_order := u64(0)
 	mut found := false
 	for index := 0; index <= h.allocations.len; index++ {
 		gap_end := if index < h.allocations.len && h.allocations[index].va < end {
@@ -110,9 +116,11 @@ fn (h &HeapAllocator) find_address_locked(end u64, size u64, alignment u64) ?u64
 		} else { end }
 		if address := heap_allocation_address(cursor, gap_end, size, alignment) {
 			span := gap_end - cursor
-			if !found || span < best_span {
+			order := if index == 0 { h.head_hole_order } else { h.allocations[index - 1].hole_order }
+			if !found || span < best_span || (span == best_span && order > best_order) {
 				best_address = address
 				best_span = span
+				best_order = order
 				found = true
 			}
 		}
@@ -123,6 +131,22 @@ fn (h &HeapAllocator) find_address_locked(end u64, size u64, alignment u64) ?u64
 	}
 	if !found { return none }
 	return best_address
+}
+
+// Keep recency bounded by the number of current holes, rather than a lifetime
+// sequence counter that could wrap. No hole owns another allocation record.
+fn (mut h HeapAllocator) retire_hole_order_locked(order u64) {
+	if order == 0 { return }
+	if h.head_hole_order > order { h.head_hole_order-- }
+	for mut record in h.allocations {
+		if record.hole_order > order { record.hole_order-- }
+	}
+	h.hole_count--
+}
+
+fn (mut h HeapAllocator) newest_hole_order_locked() u64 {
+	h.hole_count++
+	return h.hole_count
 }
 
 // Zero alignment selects the page minimum. Nonzero alignments must be powers
@@ -147,11 +171,28 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 		}
 	}
 	if va + aligned_size > h.top { h.top = va + aligned_size }
+	mut insertion := 0
+	for insertion < h.allocations.len && h.allocations[insertion].va < va { insertion++ }
+	gap_start := if insertion == 0 { h.start } else {
+		previous := h.allocations[insertion - 1]
+		previous.va + previous.size
+	}
+	gap_end := if insertion == h.allocations.len { h.end } else { h.allocations[insertion].va }
+	old_order := if insertion == 0 { h.head_hole_order } else { h.allocations[insertion - 1].hole_order }
+	h.retire_hole_order_locked(old_order)
+	// DRM MM removes the selected hole, then inserts the leading remainder
+	// before the trailing remainder. Preserve that order even when both fit.
+	leading_order := if va > gap_start { h.newest_hole_order_locked() } else { u64(0) }
+	if insertion == 0 { h.head_hole_order = leading_order } else {
+		h.allocations[insertion - 1].hole_order = leading_order
+	}
+	trailing_order := if va + aligned_size < gap_end { h.newest_hole_order_locked() } else { u64(0) }
 
 	a := &Allocation{
 		va: va
 		size: aligned_size
 		in_use: true
+		hole_order: trailing_order
 	} @[freed]
 	h.allocations << a
 	// Append retains one explicit owner; rotating pointers avoids an insert
@@ -201,8 +242,19 @@ fn (mut h HeapAllocator) gc_locked() {
 	// Descending deletion preserves the unvisited prefix and live VA order.
 	mut idx := h.allocations.len - 1
 	for idx >= 0 {
-		a := h.allocations[idx]
+		mut a := h.allocations[idx]
 		if !a.in_use {
+			h.retire_hole_order_locked(a.hole_order)
+			a.hole_order = 0
+			// Removing a reservation reinserts its coalesced predecessor hole.
+			if idx == 0 {
+				h.retire_hole_order_locked(h.head_hole_order)
+				h.head_hole_order = h.newest_hole_order_locked()
+			} else {
+				mut previous := h.allocations[idx - 1]
+				h.retire_hole_order_locked(previous.hole_order)
+				previous.hole_order = h.newest_hole_order_locked()
+			}
 			if a.va + a.size == h.top {
 				// Alignment padding belongs to this reservation too. Restore
 				// its original frontier so GC can reach the preceding record.

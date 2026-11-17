@@ -85,7 +85,7 @@ fn check_collect_pins() {
      assert heap.used() == u64(live_count) * alloc.gpu_page_size && heap.available() == heap.end - model.top()
     }
     assert heap.top == start && heap.allocations.len == 0
-    unsafe { heap.allocations.free(); model.records.free() }
+    unsafe { heap.allocations.free(); model.records.free(); model.holes.free() }
     cases++
    } } } }
   }

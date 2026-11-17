@@ -29,6 +29,17 @@ fn check_heap_bounds_local(source string) ! {
   'if !found || span < best_span', 'best_address = address', 'best_span = span',
   'cursor = record.va + record.size', 'if !found { return none }', 'return best_address'],
   'Every complete gap is checked and ranked by raw span without overlapping deferred owners')!
+ require_order(search, ['span := gap_end - cursor', 'h.head_hole_order', 'hole_order',
+  'span == best_span && order > best_order', 'best_order = order'],
+  'Equal-size eligible holes follow newest insertion order')!
+ retire := section(source, 'fn (mut h HeapAllocator) retire_hole_order_locked(', 'fn (mut h HeapAllocator) newest_hole_order_locked(', 'GPU heap bounded hole ranks')!
+ require_order(retire, ['if order == 0 { return }', 'h.head_hole_order > order', 'h.head_hole_order--',
+  'for mut record in h.allocations', 'record.hole_order > order', 'record.hole_order--', 'h.hole_count--'],
+  'Retired hole ranks compact without an unbounded sequence counter')!
+ require_order(allocation, ['h.retire_hole_order_locked(old_order)',
+  'leading_order := if va > gap_start', 'h.head_hole_order = leading_order',
+  'trailing_order := if va + aligned_size < gap_end', 'hole_order: trailing_order'],
+  'Split holes insert the leading remainder before the trailing remainder')!
 }
 
 fn check_heap_bounds_reference(source string) ! {

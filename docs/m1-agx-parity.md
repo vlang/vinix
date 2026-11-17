@@ -6,11 +6,15 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [best-fit GPU virtual-address reuse](m1-agx-heap-reuse.md)
-(2026-11-17). Collected holes can be reused below live reservations without
-lowering the high frontier. Independent placement cases and production
-heap/page-table tests cover lower-hole reuse. Equal-size tie ordering remains
-different from DRM MM and native performance remains unmeasured.
+Latest offline increment: [GPU hole insertion history](m1-agx-hole-order.md)
+(2026-11-17). Equal-size eligible holes now prefer the newest insertion, matching
+DRM MM for the same insertion/removal stream. Splitting inserts the leading
+remainder before the trailing remainder; collection reinserts the coalesced
+predecessor hole. Independent history and rank-invariant fixtures pass.
+Vinix's descending collection order still differs from the reference's deferred
+garbage policy, so complete placement histories and native performance remain
+unqualified. The [best-fit GPU virtual-address reuse](m1-agx-heap-reuse.md)
+report retains its original evidence.
 Modern ioctl/Mesa integration and remaining stage backing/event destruction
 are incomplete. The [GPU heap collection below live allocations](m1-agx-heap-collect.md),
 [GPU heap pointer-buffer reclamation](m1-agx-heap-capacity.md),

@@ -132,6 +132,7 @@ fn main() {
  if os.args.len == 2 && os.args[1] == '--capacity-suite' { check_capacity_growth(); return }
  if os.args.len == 2 && os.args[1] == '--collect-suite' { check_collect_pins(); return }
  if os.args.len == 2 && os.args[1] == '--reuse-suite' { check_heap_reuse(); return }
+ if os.args.len == 2 && os.args[1] == '--history-suite' { check_hole_history(); return }
  check_delayed_gc()
  check_allocation_gc()
  check_concurrent_stats()
@@ -140,5 +141,6 @@ fn main() {
  check_capacity_growth()
  check_collect_pins()
  check_heap_reuse()
+ check_hole_history()
  println('AGX heap ownership: PASS')
 }

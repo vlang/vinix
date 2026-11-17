@@ -56,7 +56,7 @@ fn check_reuse_model() {
       for record in model.records { heap.release(record.va) }
       heap.gc(); heap.gc()
       assert heap.top == start && heap.allocations.len == 0 && heap.used() == 0
-      unsafe { heap.allocations.free(); model.records.free() }
+      unsafe { heap.allocations.free(); model.records.free(); model.holes.free() }
       cases++
      }
     }

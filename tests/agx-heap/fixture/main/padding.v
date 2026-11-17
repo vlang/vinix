@@ -79,7 +79,7 @@ fn check_heap_padding_matrix() {
        for index in order { heap.release(addresses[index]) }
        heap.gc(); heap.gc()
        assert heap.top == start && heap.allocations.len == 0 && heap.used() == 0
-       unsafe { model.records.free(); heap.allocations.free() }
+       unsafe { model.records.free(); model.holes.free(); heap.allocations.free() }
        cases++
       }
      }

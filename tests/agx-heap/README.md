@@ -95,12 +95,13 @@ and require the original complete bundles. Current construction host/selftest
 modes remain applicable. Bounds C proof modes require their original bundles
 because the reservation now calls the best-fit search wrapper.
 
-For current GC, `check-collect.v --host CURRENT_C` requires the complete exact
+For GC before hole-history bookkeeping, `check-collect.v --host CURRENT_C` requires the complete exact
 stack-only descending collector and locked readers. `--selftest CURRENT_C`
 rejects ten ownership, pin, scan, frontier and locking mutations. Native mode
 compares six unchanged heap bodies, ten owning declarations, nine GPU lifetime
 bodies and ten event methods with the pre-collection baseline. That native proof
-mode requires its original bundle; current host/selftest modes still check GC.
+mode requires its original bundle. Its host/selftest modes also require the
+original pre-history collector; use `check-history.v` for current GC.
 `collect-counterexamples.v` takes the runner, pre-collection source and a fresh
 external directory; six compiled variants exercise the old source, suffix-only
 collection, stopping at a live record, freeing live records, changing an interior
@@ -117,8 +118,8 @@ The reuse suite includes a full-capacity interior-hole probe, raw-hole ranking
 before alignment padding, and 3,072 fragmented/aligned/deferred-release cases
 against independent candidate enumeration. Pending released records occupy
 their ranges until GC. Pointer rotation preserves VA order without moving
-allocation records. Equal-size holes use the lowest address; DRM MM's equal-size
-tree ordering can differ. Placement scans tracked records; GC also compacts the
+allocation records. Equal-size eligible holes now prefer the newest inserted
+hole, following DRM MM's size-tree order. Placement scans tracked records; GC also compacts the
 pointer table. Native cost remains unmeasured.
 
 `check-reuse.v --host CURRENT_C` requires checked scalar placement helpers,
@@ -137,3 +138,30 @@ cycles verify old leaves are invalidated before reuse, new mappings name the new
 backing, live pins stay mapped and all page tables are released. Optional
 `AGX_HEAP_TLB_BINARY` and `AGX_HEAP_TLB_C` retain artifacts externally. These tests
 replace privileged instructions and do not execute firmware cache invalidation.
+
+`--sanitize-history` runs three targeted newest-hole/split/alignment probes and
+9,216 seeded split/coalesce/deferred-release steps. The independent model keeps
+reservations in creation order and holes in chronological order, enumerates
+candidate addresses and infers containing intervals by pairwise comparisons.
+`--sanitize-history-invariants` also checks every production rank against that
+chronological list after each step. Ranks stay bounded by the number of holes;
+there is no lifetime counter to wrap and no new metadata allocation.
+`history-counterexamples.v` retains eight compiled negatives, including the
+previous allocator, oldest/lowest ties, reversed split ordering, stale coalescing,
+unbounded counts and omitted rank compaction. Each must fail its designated
+runtime assertion; compile failures do not count as rejection.
+
+For current generated C, use `check-history.v --host C`, `--selftest C`,
+`--native C BASELINE_C` or `--reference DRM_MM_C`. Fourteen selftest mutations
+cover ranking, compaction, bounds, coalescing and ownership. Native mode removes
+only the exact scalar GC history block, then requires the original collector
+body to match; owning declarations differ only in three scalar rank fields.
+GPU and event ownership bodies remain unchanged. Current construction checks
+in `check-capacity.v` still apply. The `check-reuse.v` and `check-collect.v`
+native/host proof modes now retain their historical contracts and require their
+original complete bundles; they were not weakened for the new history fields.
+
+The tie rule matches the same insertion/removal stream. Vinix still collects in
+descending VA order, while Asahi drains a count-limited prefix of deferred
+garbage. Full allocation histories can therefore still differ. Tree-backed
+runtime cost, backing/accounting policies and hardware behavior remain unqualified.

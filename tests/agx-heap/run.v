@@ -4,7 +4,7 @@ import os
 fn run_checks() !int {
  assert os.args.len == 2 || (os.args.len == 4 && os.args[2] == '--allocator-source')
  assert os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect',
-  '--sanitize', '--sanitize-bounds', '--sanitize-padding', '--sanitize-capacity', '--sanitize-collect', '--sanitize-reuse']
+  '--sanitize', '--sanitize-bounds', '--sanitize-padding', '--sanitize-capacity', '--sanitize-collect', '--sanitize-reuse', '--sanitize-history', '--sanitize-history-invariants']
  assert os.user_os() == 'macos', 'retained host allocation measurement uses Darwin malloc statistics'
  // Default nano-zone statistics showed an additional 512-block step during
  // churn. Use the ordinary allocator for this exact live-byte measurement.
@@ -26,6 +26,7 @@ fn run_checks() !int {
   args << ['-d', 'agx_heap_sanitized', '-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer',
    '-ldflags', '-fsanitize=address,undefined']
  }
+ if os.args[1] == '--sanitize-history-invariants' { args << ['-d', 'agx_heap_history_invariants'] }
  compiler := os.getenv_opt('V') or { 'v' }
  mut build := os.new_process(compiler)
  mut build_args := args.clone(); build_args << ['-o', scratch + '/test', scratch + '/main']
@@ -40,7 +41,10 @@ fn run_checks() !int {
  if target := os.getenv_opt('AGX_HEAP_TEST_BINARY') { os.cp(scratch + '/test', target)! }
  mut test := os.new_process(scratch + '/test')
  if os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect'] { test.set_args([os.args[1]]) }
- if os.args[1].starts_with('--sanitize-') { test.set_args(['--' + os.args[1].all_after('--sanitize-') + '-suite']) }
+ if os.args[1].starts_with('--sanitize-') {
+  suite := if os.args[1] == '--sanitize-history-invariants' { 'history' } else { os.args[1].all_after('--sanitize-') }
+  test.set_args(['--' + suite + '-suite'])
+ }
  test.run(); test.wait(); return test.code
 }
 
