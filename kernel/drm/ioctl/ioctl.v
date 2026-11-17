@@ -157,6 +157,18 @@ pub mut:
 	deadline_nsec  u64
 }
 
+pub struct DrmSyncobjTimelineWait {
+pub mut:
+	handles        u64
+	points         u64
+	timeout_nsec   i64
+	count_handles  u32
+	flags          u32
+	first_signaled u32
+	pad            u32
+	deadline_nsec  u64
+}
+
 pub struct DrmSyncobjArray {
 pub mut:
 	handles       u64

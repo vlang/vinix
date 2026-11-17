@@ -87,6 +87,7 @@ pub fn add_chain_point(obj &SyncObj, reservation &DmaFence, payload &DmaFence, p
 	o.fence = unsafe { reservation }
 	o.timeline_points.clear()
 	o.publish_captures_locked(reservation)
+	o.publish_timeline_captures_locked(reservation)
 	o.lock.release()
 	return true
 }
@@ -117,6 +118,13 @@ pub fn chain_contained(fence &DmaFence) &DmaFence {
 // fence or a point beyond the head. Point zero preserves the head snapshot.
 pub fn get_chain_fence(obj &SyncObj, point u64) ?&DmaFence {
 	fence := get_fence(obj) or { return none }
+	return find_chain_fence(fence, point)
+}
+
+// Resolve an already captured head without taking the object's lock again.
+// Some(nil) is an available retired prefix; None is not yet submitted.
+fn find_chain_fence(fence &DmaFence, point u64) ?&DmaFence {
+	if fence == unsafe { nil } { return none }
 	if point == 0 { return fence }
 	if !fence.chain || fence.seqno < point { return none }
 	mut cursor := unsafe { fence }

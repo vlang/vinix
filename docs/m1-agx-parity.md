@@ -6,7 +6,14 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [generic DRM timeline SIGNAL](m1-agx-timeline-signal.md)
+Latest increment: [generic DRM timeline WAIT](m1-agx-timeline-wait.md)
+(2026-11-17). Initial point snapshots precede future-point registration;
+captured fences survive reset and name reuse. Every exit detaches borrowed
+captures before freeing storage. All 21,952 pinned Linux poll outcomes match.
+Transfer, native scheduling/deadlines, reclamation and broader driver/hardware
+qualification remain open; the generic timeline capability stays disabled.
+
+Preceding increment: [generic DRM timeline SIGNAL](m1-agx-timeline-signal.md)
 (2026-11-17). All object/point snapshots and chain reservations precede
 publication. Signals use a permanent completed payload and retain cumulative
 predecessors. Binary completions stay private. Timeline wait/transfer, allocator

@@ -70,6 +70,7 @@ pub mut:
 mut:
 	timeline_points []TimelinePoint
 	pending_captures &FenceCapture = unsafe { nil }
+	timeline_captures &TimelineCapture = unsafe { nil }
 	namespace SyncobjHandle
 }
 
@@ -381,6 +382,7 @@ pub fn replace_fence(obj &SyncObj, fence &DmaFence) {
 	// allocations already captured by submissions/waiters remain retained.
 	o.timeline_points.clear()
 	o.publish_captures_locked(fence)
+	o.publish_timeline_captures_locked(fence)
 	o.lock.release()
 }
 

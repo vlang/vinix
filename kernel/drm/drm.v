@@ -322,6 +322,9 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 		ioctl.drm_ioctl_syncobj_wait {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjWait)), direction: ioctl_write | ioctl_read }
 		}
+		ioctl.drm_ioctl_syncobj_timeline_wait {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineWait)), direction: ioctl_write | ioctl_read }
+		}
 		ioctl.drm_ioctl_syncobj_reset {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjArray)), direction: ioctl_write | ioctl_read }
 		}
@@ -822,7 +825,7 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 			return 0
 		}
 		ioctl.drm_cap_syncobj_timeline {
-			// Chains, QUERY and timeline SIGNAL exist; wait/transfer must be
+			// Generic timeline wait/query/signal exist; transfer must be
 			// complete before advertising the generic timeline feature.
 			cap.value = 0
 			return 0
@@ -1232,6 +1235,9 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		}
 		ioctl.drm_ioctl_syncobj_wait {
 			return ioctl_syncobj_wait(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_timeline_wait {
+			return ioctl_syncobj_timeline_wait(handle, data)
 		}
 		ioctl.drm_ioctl_syncobj_reset {
 			return ioctl_syncobj_reset(handle, data)
