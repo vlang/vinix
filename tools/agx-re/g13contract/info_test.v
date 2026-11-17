@@ -13,7 +13,7 @@ fn test_info_guard_rejects_layout_copy_order_status_provenance_and_cleanup_drift
 	for token in ['defer { memory.free(allocation) }', 'if info.num_fences == 0', 'info.num_fences = count',
 		'file_name[offset] = 0', 'mut digits := [20]u8{}', 'u64(-(i64(info.seqno) + 1)) + 1',
 		'C.memset(allocation, 0, bytes)', 'if info.num_fences < count { return -22 }',
-		'cursor = syncobj.chain_previous(cursor)', 'if info.status > 0 { info.status = detail.status }',
+		'cursor = syncobj.unwrap_next(iterator)', 'if info.status > 0 { info.status = detail.status }',
 		'usercopy.copy_to_user(info.sync_fence_info, details, bytes)'] {
 		if _ := check_sync_file_info_contract(drm, uapi, implementation.replace(token, ''), snapshot, stub) { assert false, token }
 	}

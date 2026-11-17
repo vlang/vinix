@@ -38,6 +38,7 @@ pub fn release_chain_reservation(fence &DmaFence) {
 
 fn register_chain_waiter(child &DmaFence, node &ChainWaiter, parent &DmaFence) {
 	if child == unsafe { nil } { return }
+	enable_array(child)
 	mut f := unsafe { child }
 	mut n := unsafe { node }
 	f.lock.acquire()
@@ -68,6 +69,7 @@ fn initialize_chain(node &DmaFence, previous &DmaFence, payload &DmaFence, point
 	f.context = f.chain_context
 	// The reservation is now retained even if completion races publication.
 	f.chain_reserved = false
+	if payload.merge_reserved { unsafe { payload.merge_reserved = false } }
 	register_chain_waiter(previous, unsafe { &f.chain_previous_waiter }, node)
 	register_chain_waiter(payload, unsafe { &f.chain_payload_waiter }, node)
 	// Close the registration/completion race without running the global
@@ -89,6 +91,7 @@ pub fn add_chain_point(obj &SyncObj, reservation &DmaFence, payload &DmaFence, p
 	o.publish_captures_locked(reservation)
 	o.publish_timeline_captures_locked(reservation)
 	o.lock.release()
+	drain_chain_notifications()
 	return true
 }
 
@@ -99,10 +102,10 @@ pub fn chain_previous(fence &DmaFence) &DmaFence {
 	mut cursor := unsafe { fence.chain_prev }
 	for cursor != unsafe { nil } {
 		if cursor.chain {
-			if !katomic.load(&cursor.chain_payload.signaled) { break }
+			if !array_leaf_ready(cursor.chain_payload) { break }
 			cursor = unsafe { cursor.chain_prev }
 		} else {
-			if katomic.load(&cursor.signaled) { cursor = unsafe { nil } }
+			if array_leaf_ready(cursor) { cursor = unsafe { nil } }
 			break
 		}
 	}
@@ -156,8 +159,8 @@ fn chain_prefix_ready(fence &DmaFence) bool {
 	mut cursor := unsafe { fence }
 	for cursor != unsafe { nil } {
 		if katomic.load(&cursor.signaled) { return true }
-		if !cursor.chain { return false }
-		if !katomic.load(&cursor.chain_payload.signaled) { return false }
+		if !cursor.chain { return array_leaf_ready(cursor) }
+		if !array_leaf_ready(cursor.chain_payload) { return false }
 		cursor = unsafe { cursor.chain_prev }
 	}
 	return true
@@ -181,7 +184,8 @@ fn (mut f DmaFence) notify_chains_locked() {
 		mut node := unsafe { f.chain_waiters }
 		f.chain_waiters = unsafe { node.next }
 		node.next = unsafe { nil }
-		enqueue_chain(node.parent)
+		if node.parent.fence_array { array_child_complete(node.parent, f.error) }
+		else { enqueue_chain(node.parent) }
 	}
 }
 
@@ -198,7 +202,8 @@ fn drain_chain_notifications() {
 		chain_notify_lock.release()
 		// Completion of the previous root enqueues us again if it is still
 		// pending. No recursive walk or callback is needed on this path.
-		if (f.chain_prev == unsafe { nil } || katomic.load(&f.chain_prev.signaled))
+		if f.fence_array { if array_ready(f) { complete_array(f) } }
+		else if (f.chain_prev == unsafe { nil } || katomic.load(&f.chain_prev.signaled))
 			&& katomic.load(&f.chain_payload.signaled) { complete_fence(f, 0, true) }
 		chain_notify_lock.acquire()
 	}

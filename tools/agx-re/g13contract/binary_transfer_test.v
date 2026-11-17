@@ -8,8 +8,7 @@ fn check_binary_transfer(drm string, wire string, transfer string, lookup string
 	require_order(drm.all_after('fn common_ioctl_layout('), ['ioctl.drm_ioctl_syncobj_transfer {',
 		'size: u32(sizeof(ioctl.DrmSyncobjTransfer)), direction: ioctl_write | ioctl_read'], 'TRANSFER wire layout')!
 	require_order(drm.all_after('fn core_ioctl('), ['ioctl.drm_ioctl_syncobj_transfer {', 'return ioctl_syncobj_transfer(handle, data)'], 'TRANSFER dispatch')!
-	require_order(transfer, ['request.pad != 0', 'request.dst_point != 0 { return -95 }',
-		'destination := syncobj.lookup(', 'source := find_syncobj_fence(', 'if source.code != 0',
+	require_order(transfer, ['request.pad != 0', 'destination := syncobj.lookup(', 'source := find_syncobj_fence(', 'if source.code != 0',
 		'syncobj.replace_fence(destination, source.fence)'], 'Binary transfer validates before publication and preserves destination identity')!
 	require_order(lookup, ['object := syncobj.lookup(', 'flags & ~ioctl.drm_syncobj_wait_for_submit',
 		'mut capture := unsafe { &syncobj.TimelineCapture(C.__builtin_alloca(sizeof(syncobj.TimelineCapture))) }',
@@ -32,7 +31,7 @@ fn test_binary_transfer_order_stack_lifetime_and_availability() {
 		'flags & ~ioctl.drm_syncobj_wait_for_submit', 'syncobj.shared_timeline_stub()'] {
 		if _ := check_binary_transfer(drm, wire, transfer, lookup.replace(token, '')) { assert false, token }
 	}
-	for token in ['request.pad != 0', 'request.dst_point != 0 { return -95 }', 'if source.code != 0'] {
+	for token in ['request.pad != 0', 'if source.code != 0'] {
 		if _ := check_binary_transfer(drm, wire, transfer.replace(token, ''), lookup) { assert false, token }
 	}
 }

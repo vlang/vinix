@@ -119,7 +119,8 @@ pub fn run_binary_transfer_checks() {
 		request = bt_request(1, 0)
 		assert ioctl_syncobj_transfer(voidptr(11), unsafe { &request }) == -22
 		request = bt_request(0, 0); request.dst_point = 1
-		assert ioctl_syncobj_transfer(voidptr(11), unsafe { &request }) == -95
+		assert ioctl_syncobj_transfer(voidptr(11), unsafe { &request }) == 0
+		assert syncobj.chain_contained(remember_fence(current(bt_destination))) == bt_leaf
 		assert ioctl_syncobj_transfer(unsafe { nil }, unsafe { &request }) == -14
 		assert ioctl_syncobj_transfer(voidptr(11), unsafe { nil }) == -14
 		bt_retire(); cases += 5
@@ -170,7 +171,7 @@ pub fn run_binary_transfer_checks() {
 	mut request := bt_request(7, ioctl.drm_syncobj_wait_for_submit)
 	assert ioctl_syncobj_transfer(voidptr(11), unsafe { &request }) == 0 && sched.polls == 1
 	bt_retire()
-	println('DRM binary TRANSFER: ${cases} counted checks; 32-byte UAPI, lookup/error precedence, zero/positive/retired source points, pending/error chains, destination publication, self-copy, source/destination name reuse, 5s timeout, signals and stack capture cleanup pass. Timeline destinations remain unsupported.')
+	println('DRM binary TRANSFER: ${cases} counted checks; 32-byte UAPI, lookup/error precedence, zero/positive/retired source points, pending/error chains, destination publication, self-copy, source/destination name reuse, 5s timeout, signals and stack capture cleanup pass. Timeline destination path checked separately.')
 }
 
 pub fn run_binary_transfer_trace() {

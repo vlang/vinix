@@ -12,6 +12,13 @@ pub fn load[T](value &T) T {
 
 pub fn store[T](mut target T, value T) { target = value }
 
+pub fn cas[T](mut target T, expected T, desired T) bool {
+	before := target
+	if before != expected { return false }
+	target = desired
+	return true
+}
+
 pub fn inc[T](mut target T) { target++ }
 
 pub fn dec[T](mut target T) bool {

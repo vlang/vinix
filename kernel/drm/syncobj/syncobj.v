@@ -43,6 +43,14 @@ mut:
 	chain_waiters &ChainWaiter = unsafe { nil }
 	chain_notify_next &DmaFence = unsafe { nil }
 	chain_notify_queued bool
+	fence_array bool
+	array_enabled bool
+	array_pending u32
+	array_error i64 = 1
+	array_count u32
+	array_fences &&DmaFence = unsafe { nil }
+	array_waiters &ChainWaiter = unsafe { nil }
+	merge_reserved bool
 }
 
 struct TimelinePoint {
@@ -90,7 +98,7 @@ pub fn new_fence(context u64, seqno u64) &DmaFence {
 // Signal a fence: mark it as signaled and invoke all registered waiters.
 pub fn signal(fence &DmaFence) {
 	if fence == unsafe { nil } { return }
-	if fence.chain { is_signaled(fence); return }
+	if fence.chain || fence.fence_array { is_signaled(fence); return }
 	complete_fence(fence, 0, false)
 	drain_chain_notifications()
 }
@@ -99,7 +107,7 @@ pub fn signal(fence &DmaFence) {
 // given error and wakes all waiters. Used when GPU work fails.
 pub fn signal_error(fence &DmaFence, err int) {
 	if fence == unsafe { nil } { return }
-	if fence.chain { is_signaled(fence); return }
+	if fence.chain || fence.fence_array { is_signaled(fence); return }
 	complete_fence(fence, err, true)
 	drain_chain_notifications()
 }
@@ -139,6 +147,12 @@ pub fn is_signaled(fence &DmaFence) bool {
 		return true // a null fence is considered signaled
 	}
 	if katomic.load(&fence.signaled) { return true }
+	if fence.fence_array {
+		if !array_ready(fence) { return false }
+		complete_array(fence)
+		drain_chain_notifications()
+		return true
+	}
 	if !fence.chain || !chain_prefix_ready(fence) { return false }
 	complete_fence(fence, 0, true)
 	drain_chain_notifications()
@@ -191,7 +205,9 @@ pub fn add_waiter(fence &DmaFence, waiter &FenceWaiter) {
 	if fence == unsafe { nil } {
 		return
 	}
-	if fence.chain { is_signaled(fence) }
+	if fence.chain || fence.fence_array { is_signaled(fence) }
+	enable_array(fence)
+	drain_chain_notifications()
 
 	mut f := unsafe { fence }
 	f.lock.acquire()

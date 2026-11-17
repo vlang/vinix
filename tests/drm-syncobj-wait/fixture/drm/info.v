@@ -226,6 +226,9 @@ pub fn run_sync_file_info_checks() {
 			for seqno in [u64(0), 1, u64(1) << 63, ~u64(0)]! {
 				fence := if queued { remember_fence(syncobj.new_queue_fence(context, seqno,
 					syncobj.new_queue_context() or { panic('format queue') })) } else { remember_fence(syncobj.new_fence(context, seqno)) }
+				// Deliberately corrupt the public identity to exercise formatting;
+				// ordinary queue construction uses its unique queue context.
+				if queued { unsafe { fence.context = context } }
 				syncobj.replace_fence(obj, fence)
 				number := export_object(11, obj.handle, 1)
 				mut header := ioctl.SyncFileInfo{}; mut details := [2]ioctl.SyncFenceInfo{}

@@ -6,7 +6,15 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [DRM transfers to binary syncobjs](m1-agx-binary-transfer.md)
+Latest increment: [DRM timeline destination transfers](m1-agx-timeline-transfer.md)
+(2026-11-17). Transfers flatten chains/arrays, deduplicate pending contexts and
+publish cumulative destination points. Flat-array readiness, errors and sync-file
+records are supported. Queue identities prevent cross-queue dependency loss;
+explicit 64-bit atomic errors preserve ARM signs. All 8,640 comparison outcomes
+match pinned Linux. Reclamation, interoperability and native/hardware qualification
+remain open; the generic timeline capability stays disabled.
+
+Preceding increment: [DRM transfers to binary syncobjs](m1-agx-binary-transfer.md)
 (2026-11-17). Source points transfer as stable fences, with submission waits and
 destination identity retained through name reuse. All 10,752 compared outcomes
 match pinned Linux. An explicit stack capture avoids V's implicit heap copy.

@@ -28,7 +28,7 @@ pub fn new_queue_context() ?u64 {
 }
 
 pub fn new_queue_fence(context u64, seqno u64, queue_context u64) &DmaFence {
-	return &DmaFence{ context: context, seqno: seqno, queue_context: queue_context }
+	return &DmaFence{ context: if queue_context != 0 { queue_context } else { context }, seqno: seqno, queue_context: queue_context }
 }
 
 // Asahi has one DRM scheduler/entity per user queue. Its own fences do not

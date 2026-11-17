@@ -6,6 +6,8 @@ import drm.syncobj
 import memory
 import usercopy
 
+fn C.__builtin_alloca(uint) voidptr
+
 // Append at most 31 bytes. The formatter terminates the file name explicitly;
 // detailed object/driver fields start zeroed, like Linux's kzalloc buffer.
 fn sync_name_append(target &u8, offset u32, text string) u32 {
@@ -38,8 +40,8 @@ fn sync_name_number(target &u8, offset u32, value u64) u32 {
 }
 
 fn sync_info_names(file_name &u8, obj_name &u8, driver_name &u8, info &syncobj.FenceSnapshot) {
-	driver := match info.kind { .chain { 'dma_fence_chain' } .stub { 'stub' } .queue { 'asahi' } .generic { 'vinix' } }
-	timeline := match info.kind { .chain { 'unbound' } .stub { 'stub' } .queue { 'queue' } .generic { 'fence' } }
+	driver := match info.kind { .chain { 'dma_fence_chain' } .fence_array { 'dma_fence_array' } .stub { 'stub' } .queue { 'asahi' } .generic { 'vinix' } }
+	timeline := match info.kind { .chain, .fence_array { 'unbound' } .stub { 'stub' } .queue { 'queue' } .generic { 'fence' } }
 	sync_name_append(obj_name, 0, timeline)
 	sync_name_append(driver_name, 0, driver)
 	mut offset := sync_name_append(file_name, 0, driver)
@@ -64,11 +66,12 @@ fn sync_file_info_ioctl(fence &syncobj.DmaFence, address u64) int {
 	if !usercopy.copy_from_user(unsafe { &info }, address, sizeof(ioctl.SyncFileInfo)) { return -14 }
 	if info.flags != 0 || info.pad != 0 { return -22 }
 	mut count := u32(0)
-	mut cursor := unsafe { fence }
+	mut iterator := unsafe { &syncobj.FenceUnwrap(C.__builtin_alloca(sizeof(syncobj.FenceUnwrap))) }
+	mut cursor := syncobj.unwrap_first(fence, iterator)
 	for cursor != unsafe { nil } {
 		if count == ~u32(0) { return -75 }
 		count++
-		cursor = syncobj.chain_previous(cursor)
+		cursor = syncobj.unwrap_next(iterator)
 	}
 	// Count-only queries ignore the supplied array pointer and allocate nothing.
 	if info.num_fences == 0 {
@@ -82,10 +85,10 @@ fn sync_file_info_ioctl(fence &syncobj.DmaFence, address u64) int {
 		unsafe { C.memset(allocation, 0, bytes) }
 		mut details := unsafe { &ioctl.SyncFenceInfo(allocation) }
 		info.status = 1
-		cursor = unsafe { fence }
+		cursor = syncobj.unwrap_first(fence, iterator)
 		count = 0
 		for cursor != unsafe { nil } {
-			leaf := syncobj.snapshot(syncobj.chain_contained(cursor))
+			leaf := syncobj.snapshot(cursor)
 			mut detail := unsafe { &details[count] }
 			unsafe { *detail = ioctl.SyncFenceInfo{ status: i32(leaf.status), timestamp_ns: leaf.timestamp_ns } }
 			// The root supplies the file name; each record names its leaf.
@@ -93,7 +96,7 @@ fn sync_file_info_ioctl(fence &syncobj.DmaFence, address u64) int {
 			sync_info_names(unsafe { &ignored_name[0] }, unsafe { &detail.obj_name[0] }, unsafe { &detail.driver_name[0] }, unsafe { &leaf })
 			if info.status > 0 { info.status = detail.status }
 			count++
-			cursor = syncobj.chain_previous(cursor)
+			cursor = syncobj.unwrap_next(iterator)
 		}
 		// Copy the array before the header, preserving Linux's partial-output
 		// order when the later copy fails or the two user ranges overlap.

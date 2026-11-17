@@ -828,8 +828,8 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 			return 0
 		}
 		ioctl.drm_cap_syncobj_timeline {
-			// Timeline-destination transfer/merge must be complete before
-			// advertising the generic timeline feature.
+			// Timeline operations exist; keep disabled until the remaining
+			// interoperability and native qualification gaps are resolved.
 			cap.value = 0
 			return 0
 		}

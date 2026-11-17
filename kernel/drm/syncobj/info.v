@@ -6,6 +6,7 @@ pub enum FenceKind {
 	stub
 	queue
 	chain
+	fence_array
 }
 
 pub struct FenceSnapshot {
@@ -37,7 +38,7 @@ pub fn identity(fence &DmaFence) FenceSnapshot {
 		timestamp_ns: if f.signaled { f.timestamp_ns } else { 0 }
 		context: f.context
 		seqno: f.seqno
-		kind: if f.chain { .chain } else if f.private_stub { .stub } else if f.queue_context != 0 { .queue } else { .generic }
+		kind: if f.chain { .chain } else if f.fence_array { .fence_array } else if f.private_stub { .stub } else if f.queue_context != 0 { .queue } else { .generic }
 	}
 	f.lock.release()
 	return result
