@@ -235,6 +235,16 @@ fn check() ! {
 		}
 	}
 	os.write_file(root + '/retired-entry-fifo.json', json2.encode(os.lstat(fifo)!))!; os.rm(fifo)!
+	// The ordinary typed auditor excludes newline path framing. Preserve the
+	// exact original name/metadata and retain the node under a safe name.
+	special := filled + '/quote"-backslash\\-newline\n'
+	os.write_file(root + '/retired-special-entry.json', json2.encode({
+		'original_path_hex': special.bytes().hex(),
+		'metadata_json': json2.encode(os.lstat(special)!),
+		'data_hex': os.read_file(special)!.bytes().hex(),
+		'retained_path': root + '/retired-special-entry'
+	}))!
+	os.rename(special, root + '/retired-special-entry')!
 	require(passed.len == 37, 'complete directory control matrix required')!
 	os.write_file(root + '/result.json', json2.encode(passed))!
 	println('WINE DIRECTORY CONTENT CONTROLS PASS empty/special entries, restored baselines, child independence, exact native limits, ' + passed.len.str() + ' refusals')

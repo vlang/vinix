@@ -54,6 +54,11 @@ excluding signals/timeouts. Three further guards reject non-production use and
 altered main/reader sources, with restored source baselines. Checks use explicit
 errors and remain active under `-prod`.
 
+After the observations, the newline-name fixture is retained under a safe name,
+with its original path hex, metadata and bytes serialized first. This preserves
+the observed name and node while allowing the unchanged ordinary typed auditor
+to retain its existing path-framing restrictions.
+
 With original graphs supplied, the exact original builder must admit every role
 before and after read-only capture/check. Targets come from each admitted inner
 replay's directory declaration, canonicalized and deduplicated. The original
