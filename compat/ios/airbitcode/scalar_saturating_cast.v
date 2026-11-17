@@ -4,7 +4,7 @@ module airbitcode
 // Preserve all existing floating/integer cache identities; conversion overloads
 // have two independent widths and occupy a separate, bounded suffix.
 const scalar_conversion_cache_base = 1768
-const scalar_intrinsic_cache_slots = scalar_air_float_cache_base + 11
+const scalar_intrinsic_cache_slots = scalar_air_i64_integer_cache_base + 2
 
 fn scalar_saturating_cast(id ScalarIntrinsic) bool { return id in [.fptosi_sat, .fptoui_sat]! }
 fn scalar_saturating_cast_overload(name string, id ScalarIntrinsic) !(u32, u32) {

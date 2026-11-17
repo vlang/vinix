@@ -5961,6 +5961,10 @@ declare <2 x i64> @air.mul_hi.s.v2i64(<2 x i64>,<2 x i64>)
  declare <2 x i64> @air.mul_hi.u.v2i64(<2 x i64>,<2 x i64>)
  declare <2 x i64> @llvm.smulh.v2i64(<2 x i64>,<2 x i64>)
  declare <2 x i64> @llvm.umulh.v2i64(<2 x i64>,<2 x i64>)
+declare i64 @air.popcount.i64(i64)
+ declare i64 @air.reverse_bits.i64(i64)
+ declare i64 @llvm.ctpop.i64(i64)
+ declare i64 @llvm.bitreverse.i64(i64)
 define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) {
  %x = extractelement <3 x i32> %gid, i32 0
  %y = extractelement <3 x i32> %gid, i32 1
@@ -6020,6 +6024,28 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %mh64_u1 = extractelement <2 x i64> %mh64_u,i32 1
  %mh64_restored = sub i64 %mh64_u1,9223372036854775807
  %mh64_coordinate = trunc i64 %mh64_restored to i32
+ %scalar64_pop = call i64 @air.popcount.i64(i64 %mh64_negative)
+ %scalar64_rev = call i64 @air.reverse_bits.i64(i64 %mh64_negative)
+ %scalar64_pop_ref = call i64 @llvm.ctpop.i64(i64 %mh64_negative)
+ %scalar64_rev_ref = call i64 @llvm.bitreverse.i64(i64 %mh64_negative)
+ %scalar64_pop32 = call i32 @air.popcount.i32(i32 %x)
+ %scalar64_rev32 = call i32 @llvm.bitreverse.i32(i32 %x)
+ %scalar64_pop_low = zext i32 %scalar64_pop32 to i64
+ %scalar64_pop_expected = add i64 %scalar64_pop_low,1
+ %scalar64_rev_low = zext i32 %scalar64_rev32 to i64
+ %scalar64_rev_hi = shl i64 %scalar64_rev_low,32
+ %scalar64_rev_expected = or i64 %scalar64_rev_hi,1
+ %scalar64_same0 = icmp eq i64 %scalar64_pop,%scalar64_pop_ref
+ %scalar64_same1 = icmp eq i64 %scalar64_rev,%scalar64_rev_ref
+ %scalar64_same2 = icmp eq i64 %scalar64_pop,%scalar64_pop_expected
+ %scalar64_same3 = icmp eq i64 %scalar64_rev,%scalar64_rev_expected
+ %scalar64_refs = and i1 %scalar64_same0,%scalar64_same1
+ %scalar64_formulas = and i1 %scalar64_same2,%scalar64_same3
+ %scalar64_all = and i1 %scalar64_refs,%scalar64_formulas
+ %scalar64_restored = call i64 @air.reverse_bits.i64(i64 %scalar64_rev)
+ %scalar64_x = sub i64 %scalar64_restored,9223372036854775808
+ %scalar64_coordinate = trunc i64 %scalar64_x to i32
+
  %air_u1 = extractelement <2 x i32> %air_vu, i32 1
  %air_coordinate = sub i32 %air_u1, 2147483647
  %a = trunc i32 %x to i8
@@ -6050,10 +6076,13 @@ define void @image_mulh(<3 x i32> %gid, <3 x i32> %grid, ptr addrspace(1) %out) 
  %offset_raw = zext i8 %offset8 to i32
  %mh64_coordinate_same = icmp eq i32 %coordinate,%mh64_coordinate
  %mh64_matched = and i1 %mh64_all,%mh64_coordinate_same
- %air_ok = and i1 %air_ok32,%mh64_matched
+ %mulh_ok = and i1 %air_ok32,%mh64_matched
+ %scalar64_coordinate_same = icmp eq i32 %scalar64_coordinate,%mh64_coordinate
+ %scalar64_checked = and i1 %scalar64_all,%scalar64_coordinate_same
+ %air_ok = and i1 %mulh_ok,%scalar64_checked
  %offset = select i1 %air_ok, i32 %offset_raw, i32 poison
  %row = shl i32 %y, 6
- %index = add i32 %row, %mh64_coordinate
+ %index = add i32 %row, %scalar64_coordinate
  %p = getelementptr i32, ptr addrspace(1) %out, i32 %index
  %red = mul i32 %x, 3
  %mixed = xor i32 %red, %offset

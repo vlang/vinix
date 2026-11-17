@@ -50,9 +50,9 @@ fn scalar_integer_intrinsic_name(name string) !ScalarIntrinsic {
 // parser that might admit signs, leading zeroes, suffixes or other overloads.
 fn scalar_integer_intrinsic_width(name string, id ScalarIntrinsic) !u32 {
 	if name.starts_with('air.') {
-		actual, _ := air_integer_intrinsic(name)!
+		actual, slot := air_integer_intrinsic(name)!
 		if actual != id { return error('AIR intrinsic: AIR integer family mismatch') }
-		return 32
+		return if slot >= scalar_air_i64_integer_cache_base - scalar_air_integer_cache_base { u32(64) } else { u32(32) }
 	}
 	start := match id { .ctpop { 'llvm.ctpop.i'.len } .bitreverse { 'llvm.bitreverse.i'.len } .bswap { 'llvm.bswap.i'.len } .ctlz { 'llvm.ctlz.i'.len } .cttz { 'llvm.cttz.i'.len } .fshl { 'llvm.fshl.i'.len } .fshr { 'llvm.fshr.i'.len } .smin { 'llvm.smin.i'.len } .smax { 'llvm.smax.i'.len } .umin { 'llvm.umin.i'.len } .umax { 'llvm.umax.i'.len } .iabs { 'llvm.abs.i'.len } .sadd_sat { 'llvm.sadd.sat.i'.len } .uadd_sat { 'llvm.uadd.sat.i'.len } .ssub_sat { 'llvm.ssub.sat.i'.len } .usub_sat { 'llvm.usub.sat.i'.len } .sshl_sat { 'llvm.sshl.sat.i'.len } .ushl_sat { 'llvm.ushl.sat.i'.len } .pext { 'llvm.pext.i'.len } .pdep { 'llvm.pdep.i'.len } .smulh { 'llvm.smulh.i'.len } .umulh { 'llvm.umulh.i'.len } .clmul { 'llvm.clmul.i'.len } .sadd_overflow { 'llvm.sadd.with.overflow.i'.len } .uadd_overflow { 'llvm.uadd.with.overflow.i'.len } .ssub_overflow { 'llvm.ssub.with.overflow.i'.len } .usub_overflow { 'llvm.usub.with.overflow.i'.len } .smul_overflow { 'llvm.smul.with.overflow.i'.len } .umul_overflow { 'llvm.umul.with.overflow.i'.len } else { return error('AIR intrinsic: integer family') } }
 	if name.len <= start || name.len > start + 2 || name[start] == `0` { return error('AIR intrinsic: integer overload spelling') }
