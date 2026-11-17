@@ -208,7 +208,7 @@ pub fn populate_g13_globals(mut data G13Globals, config &hw.HwConfig) bool {
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x89ec, ppm_ki_dt)
 	ok = ok && g13_globals_set_t8103_shared_data(mut data, abi)
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x900c, 1)
-	// fault_control remains zero (hard faults), matching the reference default.
+	ok = ok && g13_globals_put_u32(mut data, abi, 0x10e80, config.g13_fault_control)
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x10e84, 1)
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x11020, 40)
 	ok = ok && g13_globals_put_u32(mut data, abi, 0x11024, 10)

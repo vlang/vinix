@@ -127,10 +127,9 @@ fn hwdata_a_for(abi hw.FirmwareAbi) []u8 {
 	return out
 }
 
-fn globals_for(abi hw.FirmwareAbi) []u8 {
-	cfg := config_for(abi)
+fn globals_for(cfg &hw.HwConfig) []u8 {
 	mut data := fw.G13Globals{}
-	assert fw.populate_g13_globals(mut data, &cfg)
+	assert fw.populate_g13_globals(mut data, cfg)
 	mut out := []u8{len: data.bytes.len}
 	for index in 0 .. data.bytes.len {
 		out[index] = data.bytes[index]
@@ -223,8 +222,10 @@ fn check_dropped_field() {
 }
 
 fn check_globals() {
-	old := globals_for(.v12_3)
-	new := globals_for(.v13_5_partial)
+	old_cfg := config_for(.v12_3)
+	new_cfg := config_for(.v13_5_partial)
+	old := globals_for(&old_cfg)
+	new := globals_for(&new_cfg)
 
 	// The nested GlobalsSub writes: 0x5e keeps its position inside sub, 0x66
 	// crosses a field 13.5 inserts there.
@@ -247,6 +248,28 @@ fn check_globals() {
 	new_hws2 := fw.g13_globals_offset(.v13_5_partial, 0x8aa0) or { 0 }
 	for index in 0 .. 16 {
 		assert new[int(new_hws2) + 0x28 + index] == 0xff
+	}
+}
+
+fn check_globals_fault_control() {
+	for index, abi in [hw.FirmwareAbi.v12_3, .v13_5_partial] {
+		offset := [u32(0x10e80), 0x10fd8]![index]
+		cfg := config_for(abi)
+		soft := globals_for(&cfg)
+		assert read_u32(soft, offset) == 0xb
+		assert read_u32(soft, offset + 4) == 1 // do_init
+
+		hard_cfg := hw.HwConfig{
+			...cfg
+			g13_fault_control: 0
+		}
+		hard := globals_for(&hard_cfg)
+		assert read_u32(hard, offset) == 0
+		for position, value in soft {
+			if position != int(offset) {
+				assert value == hard[position]
+			}
+		}
 	}
 }
 
@@ -330,6 +353,7 @@ fn main() {
 	check_power_zone_entry()
 	check_dropped_field()
 	check_globals()
+	check_globals_fault_control()
 	check_hwdata_b()
 	check_initdata()
 	check_unsupported_abi_refused()

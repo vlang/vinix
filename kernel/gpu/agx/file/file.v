@@ -13,6 +13,7 @@ import drm.ioctl
 import drm.asahi
 import drm.syncobj
 import gpu.agx.bo as agxbo
+import gpu.agx.hw
 import gpu.agx.params as agxparams
 import gpu.agx.mmu
 import gpu.agx.pgtable
@@ -591,9 +592,13 @@ fn asahi_revision(config &gpu.GpuManager) u32 {
 
 fn make_global_params(manager &gpu.GpuManager) ioctl.DrmAsahiParamsGlobal {
 	cfg := &manager.hw_config
+	mut features := (u64(cfg.gpu_feat_compat) & ~ioctl.asahi_feat_soft_faults) | ioctl.asahi_feat_gettime
+	if cfg.chip_id == 0x8103 && cfg.g13_fault_control == hw.g13_soft_fault_control {
+		features |= ioctl.asahi_feat_soft_faults
+	}
 	mut params := ioctl.DrmAsahiParamsGlobal{
 		unstable_uabi_version: ioctl.drm_asahi_unstable_uabi_version
-		feat_compat: u64(cfg.gpu_feat_compat) | ioctl.asahi_feat_gettime
+		feat_compat: features
 		feat_incompat: u64(cfg.gpu_feat_incompat)
 		gpu_generation: u32(cfg.gpu_gen)
 		gpu_variant: asahi_variant(manager)

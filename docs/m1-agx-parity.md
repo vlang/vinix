@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Base M1 now selects the packaged soft-fault default in both G13 firmware
+layouts and reports it to Mesa through `GET_PARAMS`.
+[Soft-fault initialization and capability](m1-agx-soft-faults.md)
+
 The modern packet path accepts the pinned Mesa base-M1 command sizes and
 requests a stamp flush on the final render and final compute command in
 each batch. [Mesa packet and stamp-flush checks](m1-agx-mesa-packets.md)

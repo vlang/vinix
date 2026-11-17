@@ -1,5 +1,7 @@
 module hw
 
+pub const g13_soft_fault_control = u32(0xb)
+
 // GPU hardware configuration types
 // Defines chip-specific parameters used throughout the driver
 // Translates hw.rs from the Asahi Linux GPU driver
@@ -156,6 +158,7 @@ pub:
 	preempt3_size         u64
 	compute_preempt1_size u64
 	render_tiling_control u32
+	g13_fault_control     u32
 	// Memory regions
 	shared_region_base     u64
 	shared_region_size     u64

@@ -42,7 +42,7 @@ pub fn ioctl_abi_handle(_dev &drm.DrmDevice, handle voidptr) u32 {
 fn make_modern_global_params(manager &gpu.GpuManager) asahi.ParamsGlobal {
 	legacy := make_global_params(manager)
 	mut value := asahi.ParamsGlobal{
-		features:                       legacy.feat_compat & u64(1) // only SOFT_FAULTS has the same meaning
+		features:                       legacy.feat_compat & ioctl.asahi_feat_soft_faults // same bit in both ABIs
 		gpu_generation:                 legacy.gpu_generation
 		gpu_variant:                    legacy.gpu_variant
 		gpu_revision:                   legacy.gpu_revision

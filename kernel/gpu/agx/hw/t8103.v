@@ -108,6 +108,7 @@ pub fn t8103_config() HwConfig {
 		preempt3_size: 0x20
 		compute_preempt1_size: 0x7f80
 		render_tiling_control: 0xa041
+		g13_fault_control: g13_soft_fault_control
 		shared_region_base: 0x6800000000
 		shared_region_size: 0x140000
 		fw_private_region_base: 0x6800140000
