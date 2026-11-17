@@ -2801,6 +2801,9 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 			if !mgr.free_g13_queue_resources_locked(mut resources, resources.mappings_published) {
 				resources.quarantined = true
 				mgr.g13_queues << resources
+			} else {
+				// No caller or manager owns this unreturned, fully unwound record.
+				unsafe { free(resources) }
 			}
 		}
 	}

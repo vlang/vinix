@@ -41,8 +41,11 @@ Offline validation passed:
   unchanged. No allowance or historical evidence checker was edited.
 
 Vinix retains the whole queue graph and VM through acknowledgement and later
-UAT cleanup. Asahi moves only its context object into the deferred list. Idle
-retention and backing-release timing therefore still differ. If no later
+UAT cleanup. Asahi moves its context object into the deferred list; that object
+transitively retains TVB backing, per-VM allocators and their VM. This ownership
+chain is checked in the [queue-unwind comparison](m1-agx-queue-unwind.md).
+Vinix retains extra queue graph state, so idle retention and backing-release
+timing still differ. If no later
 allocator borrow occurs, queued objects remain reserved until shutdown.
 Published requests without an observed acknowledgement remain quarantined even
 after late completion. These fixtures use host timer, doorbell, UAT and PMM
