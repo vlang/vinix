@@ -54,10 +54,11 @@ fn check_logical_queue_records() {
 		cases++
 	}
 	// An aggregate submission pin retains even a logical-only file queue.
-	queue := &workqueue.WorkQueue{id: 1, vm_id: 1, heap_record: true}
-	mut pinned := GpuFile{queues: [queue]}; pinned.inflight_by_vm[1] = 1
+	queue := &workqueue.WorkQueue{id: 1, vm_id: 65, heap_record: true}
+	mut vm := mmu.UatContext{id: 65, inflight: 1}
+	mut pinned := GpuFile{queues: [queue], vms: [&vm]}
 	assert !pinned.close() && C.__asan_address_is_poisoned(queue) == 0
-	pinned.inflight_by_vm[1] = 0
+	vm.inflight = 0
 	assert pinned.close() && C.__asan_address_is_poisoned(queue) != 0
 	assert cases == 51
 	println('AGX logical queues: 51 native close/detached/shifted-owner cases and aggregate pin retention passed')

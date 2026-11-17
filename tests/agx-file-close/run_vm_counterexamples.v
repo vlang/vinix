@@ -11,11 +11,11 @@ fn main() {
 	source := os.read_file(repo + '/kernel/gpu/agx/file/file.v')!
 	mut receipts := []string{}
 	for name, spec in {
-		'busy-name-removal': ['close', 'f.detached_vms[vm.id] = true', 'if f.queues.len != 0 { return -16 }; f.detached_vms[vm.id] = true', 'file.identity_result:'],
-		'visible-name': ['close', 'if vm_id < mmu.uat_num_contexts && f.detached_vms[vm_id] { return none }', '', 'file.identity_result:'],
+		'busy-name-removal': ['close', 'vm.detached = true', 'if f.queues.len != 0 { return -16 }; vm.detached = true', 'file.identity_result:'],
+		'visible-name': ['close', 'if vm.vm_id == vm_id && !vm.detached', 'if vm.vm_id == vm_id', 'file.identity_result:'],
 		'visible-retirement-lookup': ['close', 'ctx := f.find_owned_vm(mapping.vm_id)', 'ctx := f.find_vm(mapping.vm_id)', 'file.check_detached_vms:'],
 		'lost-queue-owner': ['close', 'if retained { continue }', 'assert retained || !retained', 'file.check_identity_lookups:'],
-		'live-bo-bindings-retained': ['close', '!f.detached_vms[vm_id] && !mapping.retiring', '!mapping.retiring', 'file.check_detached_vms:'],
+		'live-bo-bindings-retained': ['close', '!vm.detached && !mapping.retiring', '!mapping.retiring', 'file.check_detached_vms:'],
 		'no-worker-retry': ['close', 'owned.reap_detached_vms_locked()', '', 'file.check_detached_vms:'],
 		'visible-submit-lookup': ['async', 'vm := f.find_owned_vm(vm_id)', 'vm := f.find_vm(vm_id)', 'file.check_detached_vm_submissions:']
 	} {

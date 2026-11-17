@@ -19,8 +19,8 @@ pub mut:
 	lock klock.Lock
 }
 
-pub fn (manager &UatManager) unbind_context(context &UatContext) {
-	assert context.active && voidptr(manager.contexts[context.id]) == voidptr(context)
+pub fn (mut manager UatManager) unbind_context(context &UatContext) {
+	assert context.active && context.id == 0
 }
 
 pub fn run_checks() {
@@ -33,14 +33,15 @@ pub fn run_checks() {
 
 fn check_contexts() {
 	mut manager := UatManager{}
-	for index in 0 .. uat_num_contexts { manager.contexts[index] = unsafe { nil } }
+	occupied := UatContext{}
+	for index in 1 .. uat_num_contexts { manager.contexts[index] = unsafe { &occupied } }
 	base := u64(0x100000000)
 	for cycle in 0 .. 200 {
 		start := base + u64(cycle % 2) * 0x4000
 		end := start + agxvm.kernel_min_size + u64(cycle % 5) * 0x4000
 		window := agxvm.driver_window(start, end) or { panic('window') }
 		mut context := manager.create_context(start, end) or { panic('context') }
-		assert context.id == 1 && context.active && context.identity != 0
+		assert context.id == 0 && context.active && context.identity != 0
 		assert context.kernel_start == window.start && context.kernel_end == window.end
 		assert context.driver_gpu.start == window.start && context.driver_gpu.end == window.midpoint
 		assert context.driver_private.start == window.midpoint && context.driver_private.end == window.end
@@ -104,7 +105,7 @@ fn check_contexts() {
 			assert address != unsafe { nil } && C.__asan_address_is_poisoned(address) == 0
 		}
 		manager.destroy_context(context)
-		assert manager.contexts[1] == unsafe { nil }
+		assert voidptr(manager.contexts[1]) == voidptr(&occupied)
 		for address in metadata {
 			assert C.__asan_address_is_poisoned(address) != 0, 'VM destruction must release all captured metadata'
 		}
@@ -113,7 +114,7 @@ fn check_contexts() {
 	for failure in 0 .. 3 {
 		match failure { 0 { pgtable.fail_new() } 1 { memory.fail_next() } else { pgtable.fail_dummy() } }
 		if _ := manager.create_context(base, base + agxvm.kernel_min_size) { panic('constructor failure') }
-		assert memory.active() == 0 && pgtable.active() == 0 && manager.contexts[1] == unsafe { nil }
+		assert memory.active() == 0 && pgtable.active() == 0 && voidptr(manager.contexts[1]) == voidptr(&occupied)
 	}
 	before := pgtable.calls()
 	if _ := manager.create_context(base + 1, base + agxvm.kernel_min_size) { panic('invalid window') }

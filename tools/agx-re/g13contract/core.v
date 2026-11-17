@@ -202,13 +202,14 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	require_order(mmu[drop_start..], ['.ttb0.store(0,', '.ttb1.store(0,',
 		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID teardown invalidation')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!
-	local_bind := section(local, 'pub fn (mgr &UatManager) bind_context(', 'pub fn (mgr &UatManager) unbind_context(', 'Vinix UAT bind')!
+	local_bind := section(local, 'pub fn (mgr &UatManager) bind_context(', 'pub fn (mut mgr UatManager) unbind_context(', 'Vinix UAT bind')!
 	require_order(local_bind, ['owner.lock.acquire()', 'defer { owner.lock.release() }', 'if ctx.is_bound() { return true }',
-		'slots[ctx.id].ttb0 =', 'slots[ctx.id].ttb1 =',
-		'handoff_unlock(mgr.handoff)', 'pt.bind_tlb(u8(ctx.id))'], 'Vinix ASID reuse invalidation')!
-	local_unbind := section(local, 'pub fn (mgr &UatManager) unbind_context(', '// Map a driver-owned allocation into context zero.', 'Vinix UAT unbind')!
+		'mgr.contexts[slot] != unsafe { nil }', 'if slot == uat_num_contexts { return false }',
+		'slots[slot].ttb0 =', 'slots[slot].ttb1 =', 'handoff_unlock(mgr.handoff)',
+		'pt.bind_tlb(u8(slot))', 'owner.contexts[slot] = unsafe { ctx }'], 'Vinix ASID reuse invalidation')!
+	local_unbind := section(local, 'pub fn (mut mgr UatManager) unbind_context(', '// Map a driver-owned allocation into context zero.', 'Vinix UAT unbind')!
 	require_order(local_unbind, ['slot := ctx.bound_slot()', 'slot == 0', 'slots[slot].ttb0 = 0', 'slots[slot].ttb1 = 0',
-		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()'], 'Vinix ASID teardown invalidation')!
+		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()', 'mgr.contexts[slot] = unsafe { nil }'], 'Vinix ASID teardown invalidation')!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
 		'ASID invalidation after root publication and removal',

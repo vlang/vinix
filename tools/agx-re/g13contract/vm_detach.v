@@ -3,33 +3,36 @@ module g13contract
 
 fn check_vm_detach_local(file string) ! {
 	visible := section(file, 'fn (f &GpuFile) find_vm(', '// Internal owners survive', 'Visible VM namespace')!
-	require_order(visible, ['vm_id == 0 || vm_id >= mmu.uat_num_contexts', 'for vm in f.vms',
-		'vm.vm_id == vm_id', '!f.detached_vms[vm.id]', 'return unsafe { vm }'], 'Visible names resolve within the file and exclude detached slots')!
+	require_order(visible, ['if vm_id == 0 { return none }', 'for vm in f.vms',
+		'vm.vm_id == vm_id', '!vm.detached', 'return unsafe { vm }'], 'Visible names resolve within the file and exclude detached owners')!
 	owned := section(file, 'fn (f &GpuFile) find_owned_vm(', 'fn ranges_overlap(', 'Physical VM owner')!
 	require_order(owned, ['for vm in f.vms', 'if vm.id == vm_id', 'return unsafe { vm }'], 'Physical lookup remains valid after namespace removal')!
-	require(!owned.contains('detached_vms'), 'Physical ownership cannot depend on name visibility')!
+	require(!owned.contains('vm.detached'), 'Physical ownership cannot depend on name visibility')!
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_vm_create(', 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'VM namespace publication')!
-	require_order(create, ['f.lock.acquire()', 'defer { f.lock.release() }', 'if !f.detached_vms[vm.id] { used |= u64(1) << vm.vm_id }',
-		'vm_id := u32(1)', 'm.create_context(', 'ctx.vm_id = vm_id', 'if m.handoff_abi != .v12_3 { m.bind_context(ctx) }',
-		'f.detached_vms[ctx.id] = false',
-		'f.vms << ctx', 'request.vm_id = vm_id'], 'VM creation publishes the first available file name under the file lock')!
+	require_order(create, ['f.lock.acquire()', 'defer { f.lock.release() }', 'vm_id := u32(1)',
+		'if vm.detached { continue }', 'if vm.vm_id > vm_id { insert_at = index; break }',
+		'for f.find_owned_vm(owner_id) != none', 'if !f.reserve_vm_entry_locked()',
+		'm.create_context(', 'ctx.id = owner_id', 'ctx.vm_id = vm_id',
+		'if m.handoff_abi != .v12_3 && !m.bind_context(ctx)', 'm.destroy_context(ctx)',
+		'f.vms << ctx', 'f.vms[insert_at] = ctx', 'request.vm_id = vm_id'], 'VM creation publishes the first available file name under the file lock')!
+	require(!file.contains('mmu.uat_num_contexts'), 'Software VM owners must be independent of hardware capacity')!
 	destroy := section(file, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', '// Caller holds file.lock. User bindings', 'VM namespace removal')!
 	require_order(destroy, ['request.extensions != 0 || request.pad != 0', 'return -22',
-		'if request.vm_id == 0 || request.vm_id >= mmu.uat_num_contexts { return -2 }',
+		'if request.vm_id == 0 { return -2 }',
 		'f.lock.acquire()', 'defer { f.lock.release() }', 'f.find_vm(request.vm_id) or { return -2 }',
-		'f.detached_vms[vm.id] = true', 'f.reap_detached_vms_locked()', 'return 0'], 'Remove validated names before deferred physical retirement')!
+		'vm.detached = true', 'f.reap_detached_vms_locked()', 'return 0'], 'Remove validated names before deferred physical retirement')!
 	require(!destroy.contains('return -16') && !destroy.contains('destroy_context('), 'Busy owners must not prevent namespace removal or be destroyed directly')!
 	reap := section(file, 'fn (mut f GpuFile) reap_detached_vms_locked()', 'pub fn (mut f GpuFile) ioctl_gem_create(', 'Detached physical VM retirement')!
 	require_order(reap, ['if uat_mgr == unsafe { nil } { return }', 'index := f.vms.len - 1',
-		'vm_id := vm.id', 'vm_id >= mmu.uat_num_contexts || !f.detached_vms[vm_id]',
-		'katomic.load(&f.inflight_by_vm[vm_id]) != 0', 'if !f.cleanup_closed_mappings_locked(vm_id) { continue }',
+		'vm_id := vm.id', 'if !vm.detached || katomic.load(&vm.inflight) != 0',
+		'if !f.cleanup_closed_mappings_locked(vm) { continue }',
 		'for queue in f.queues', 'queue.vm_id == vm_id', 'for ownership in f.g13_queues',
 		'ownership.vm_id == vm_id', 'if retained { continue }', 'manager.destroy_context(vm)',
-		'f.vms.delete(index)', 'f.detached_vms[vm_id] = false'], 'Retire mappings then exclude every job/queue owner before physical context removal')!
+		'f.vms.delete(index)'], 'Retire mappings then exclude every job/queue owner before physical context removal')!
 	for token in ['memory.', 'free(', 'f.vms <<'] { require(!reap.contains(token), 'VM reaper must not allocate, free metadata or grow its ownership array')! }
 	cleanup := section(file, 'fn (mut f GpuFile) cleanup_closed_mappings_locked(', 'fn (mut f GpuFile) close_object_handle(', 'Detached user bindings')!
-	require_order(cleanup, ['katomic.load(&f.inflight_by_vm[vm_id]) != 0',
-		'!f.detached_vms[vm_id] && !mapping.retiring && f.objects.contains(mapping.obj)', 'f.retire_mapping_locked(index)'], 'Every idle detached user mapping retires even while its BO name remains live')!
+	require_order(cleanup, ['katomic.load(&vm.inflight) != 0',
+		'!vm.detached && !mapping.retiring && f.objects.contains(mapping.obj)', 'f.retire_mapping_locked(index)'], 'Every idle detached user mapping retires even while its BO name remains live')!
 	retire := section(file, 'fn (mut f GpuFile) retire_mapping_locked(', '// GEM_CLOSE drops', 'Hidden mapping owner')!
 	require(retire.contains('f.find_owned_vm(mapping.vm_id)'), 'Retained mappings must find their hidden physical VM')!
 	submit := section(file, 'pub fn (mut f GpuFile) ioctl_submit(', 'fn dispatch(', 'Existing queue VM owner')!

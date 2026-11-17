@@ -20,13 +20,13 @@ fn check_queued_ioctl_backlog() {
 		}
 		independent := output()
 		assert submit_scheduled_on_queue(mut file, 2, [ScheduledCommand{ compute: true }], independent, false) == 0
-		assert file.inflight_by_vm[1] == 522 && memory.outstanding() == 9
+		assert file.vm.inflight == 522 && memory.outstanding() == 9
 		service_file_work()
 		assert manager.published_order == [u32(512)], 'a blocked512-job queue must not block another queue'
 		assert manager.execute_firmware(512, 0)
 		manager.retire_firmware(512)
 		service_file_work()
-		assert pending_count == 8 && file.inflight_by_vm[1] == 520 && memory.outstanding() == 8
+		assert pending_count == 8 && file.vm.inflight == 520 && memory.outstanding() == 8
 		syncobj.signal(dependency)
 		service_file_work()
 		for batch in 0 .. 8 {

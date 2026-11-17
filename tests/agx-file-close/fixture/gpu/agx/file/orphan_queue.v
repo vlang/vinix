@@ -12,7 +12,7 @@ __global orphan_release_checks int
 fn check_orphan_release_locks() {
 	assert file_map_lock.is_held() && orphan_reaping_file.lock.is_held()
 	assert orphan_reaping_file.g13_queues.len == 2
-	assert orphan_reaping_file.inflight_by_vm[1] == 7
+	assert orphan_reaping_file.vms[0].inflight == 7
 	orphan_release_checks++
 }
 
@@ -54,7 +54,7 @@ fn check_orphaned_queues() {
 						orphan.release_file_reference()
 						neighbor_resources.retain_file_reference()
 						vm.queue = neighbor_resources
-						file.inflight_by_vm[1] = 7
+						vm.inflight = 7
 						file.next_queue_id = orphan_id
 						assert (file.allocate_queue_id_locked() or { panic('retained ID') }) == 3
 						if remove_vm {
@@ -82,7 +82,7 @@ fn check_orphaned_queues() {
 						reap_open_detached_g13_queues()
 						assert logical.detached && !logical.destroyed && neighbor_resources.calls == 0
 						neighbor_resources.release_file_reference()
-						file.inflight_by_vm[1] = 0
+						vm.inflight = 0
 						reap_open_detached_g13_queues()
 						assert logical.destroyed && neighbor_resources.released && file.g13_queues.len == 0
 						assert vm.destroyed == remove_vm

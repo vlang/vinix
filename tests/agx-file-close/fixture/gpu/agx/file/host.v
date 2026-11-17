@@ -50,13 +50,11 @@ fn (objects &Objects) valid_mmap_range(offset u64, length u64) bool { return obj
 struct GpuFile {
 mut:
 	lock              klock.Lock
-	inflight_by_vm    [64]u64
 	queues            []&workqueue.WorkQueue
 	g13_queues        []G13QueueOwnership
 	g17_queues        []G17QueueOwnership
 	timestamp_objects []TimestampObject
 	vms               []&mmu.UatContext
-	detached_vms      [64]bool
 	mappings          []GpuMapping
 	objects           Objects
 	next_timestamp_id u32 = 1
@@ -73,7 +71,8 @@ __global uat_mgr &mmu.UatManager = unsafe { nil }
 __global stopping_file &GpuFile = unsafe { nil }
 
 fn stop_during_registration() {
-	stopping_file.inflight_by_vm[1] = 0
+	mut vm := unsafe { stopping_file.vms[0] }
+	vm.inflight = 0
 	for ownership in stopping_file.g13_queues {
 		mut queue := unsafe { ownership.resources }
 		queue.released = true
@@ -99,7 +98,7 @@ pub fn run_checks() {
 		mappings:          [GpuMapping{ vm_id: 1, addr: 0x4000, size: 0x4000, obj: &mapped }]
 		timestamp_objects: [TimestampObject{ va: 0x10000, size: 4096, obj: &timestamp }]
 	}
-	file.inflight_by_vm[1] = 1
+	vm_a.inflight = 1
 	key := u64(0x1234)
 	file_map[key] = file
 	device := drm.DrmDevice{}
@@ -108,7 +107,7 @@ pub fn run_checks() {
 	assert queue_a.calls == 0 && !logical.destroyed && !vm_a.destroyed
 	reap_closed_files()
 	assert closing_count == 1 && queue_a.calls == 0
-	file.inflight_by_vm[1] = 0
+	vm_a.inflight = 0
 	reap_closed_files()
 	assert !queue_a.released && queue_b.calls == 0
 	assert !vm_a.destroyed && !vm_b.destroyed && !logical.destroyed && table_releases == 0
@@ -123,10 +122,10 @@ pub fn run_checks() {
 	reap_closed_files()
 	assert table_releases == 1
 	// Concurrent/reentrant polling is rejected without losing the file.
-	mut one := &GpuFile{}
-	mut two := &GpuFile{}
-	one.inflight_by_vm[1] = 1
-	two.inflight_by_vm[1] = 1
+	mut one_vm := mmu.UatContext{ inflight: 1 }
+	mut two_vm := mmu.UatContext{ inflight: 1 }
+	mut one := &GpuFile{vms: [&one_vm]}
+	mut two := &GpuFile{vms: [&two_vm]}
 	file_map[1] = one
 	file_map[2] = two
 	release_handle(&device, voidptr(1))
@@ -138,10 +137,10 @@ pub fn run_checks() {
 	closing_reaper_active = false
 	reap_closed_files()
 	assert closing_count == 2 && table_releases == 1, 'one pass must not spin on busy files'
-	one.inflight_by_vm[1] = 0
+	one_vm.inflight = 0
 	reap_closed_files()
 	assert closing_count == 1 && table_releases == 2 && voidptr(closing_head) == voidptr(two)
-	two.inflight_by_vm[1] = 0
+	two_vm.inflight = 0
 	reap_closed_files()
 	assert closing_count == 0
 	assert closing_head == unsafe { nil } && closing_tail == unsafe { nil } && table_releases == 3
@@ -153,7 +152,7 @@ pub fn run_checks() {
 		g13_queues: [G13QueueOwnership{resources: &stopped_queue}]
 		vms: [&stopped_vm]
 	}
-	stopped_file.inflight_by_vm[1] = 1
+	stopped_vm.inflight = 1
 	file_map[3] = stopped_file
 	stopping_file = stopped_file
 	gpu.stop_on_next_lookup(stop_during_registration)

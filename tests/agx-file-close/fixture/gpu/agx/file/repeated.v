@@ -29,9 +29,9 @@ fn check_repeated_bindings() {
 					assert pt.last_protection == [pgtable.gpu_prot_gpu_shared_ro, pgtable.gpu_prot_gpu_shared_wo, pgtable.gpu_prot_gpu_shared_rw]![index]
 					mut remove := unbind(1, request.addr); remove.range = request.range
 					before := pt.unmaps
-					file.inflight_by_vm[1] = 1
+					vm.inflight = 1
 					assert file.ioctl_gem_bind(&remove) == -16 && object.references == 2 && pt.unmaps == before
-					file.inflight_by_vm[1] = 0
+					vm.inflight = 0
 					assert file.ioctl_gem_bind(&remove) == 0 && object.references == 1 && file.mappings.len == 0
 					assert pt.last_unmap_size == request.range
 					cases += 3
@@ -63,8 +63,8 @@ fn check_repeated_bindings() {
 		assert file.ioctl_gem_bind(&request) == -5 && object.references == 2 && file.mappings[0].retiring; cases++
 		assert pt.last_unmap_size == request.range
 		gpu.fail_flushes(1)
-		assert !file.cleanup_closed_mappings_locked(1) && object.references == 2; cases++
-		assert file.cleanup_closed_mappings_locked(1) && object.references == 1 && file.mappings.len == 0; cases++
+		assert !file.cleanup_closed_mappings_locked(&vm) && object.references == 2; cases++
+		assert file.cleanup_closed_mappings_locked(&vm) && object.references == 1 && file.mappings.len == 0; cases++
 		assert file.close() && vm.destroyed && gem.live() == 0
 		unsafe { file.vms.free(); file.mappings.free() }
 	}

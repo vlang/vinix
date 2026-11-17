@@ -5,6 +5,7 @@ module file
 import drm.syncobj
 import drm.ioctl
 import gpu.agx.gpu
+import gpu.agx.mmu
 import gpu.agx.submission
 import katomic
 import klock
@@ -33,7 +34,7 @@ struct G13PendingSubmission {
 mut:
 	next                &G13PendingSubmission = unsafe { nil }
 	file                &GpuFile              = unsafe { nil }
-	vm_id               u32
+	vm                  &mmu.UatContext = unsafe { nil }
 	queue               &gpu.G13QueueResources = unsafe { nil }
 	manager             &gpu.GpuManager        = unsafe { nil }
 	timestamps          G13SubmissionTimestamps
@@ -328,7 +329,7 @@ fn process_pending_submissions() {
 			owner.release_g13_submission_timestamps(item.timestamps)
 			submission.release_sync_array(item.dependencies)
 			queue.release_file_reference()
-			katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])
+			katomic.dec(mut &item.vm.inflight)
 			memory.free(voidptr(item))
 		}
 	}

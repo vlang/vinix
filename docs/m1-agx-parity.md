@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 VM creation uses a growable per-file namespace. The first job preparation
+assigns a hardware slot. [VM admission and slot assignment](m1-agx-dormant-vms.md)
+
 Final AGX VM teardown now reclaims the host records and both VA heap tables
 after root invalidation. [VM reclamation](m1-agx-vm-release.md)
 

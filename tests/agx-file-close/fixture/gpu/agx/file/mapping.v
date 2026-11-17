@@ -89,21 +89,21 @@ fn check_mapping_retirement() {
 		busy_object := gem.create(7)
 		busy.objects.table.add_created(busy_object)
 		assert busy.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
-		busy.inflight_by_vm[1] = 1
+		busy_vm.inflight = 1
 		assert busy.ioctl_gem_bind(unbind(1, 0x4000)) == -16
 		assert busy.close_object_handle(7) == 0
 		assert busy_object.references == 1 && busy_pt.unmaps == 0
-		assert busy.cleanup_closed_mappings_locked(1)
+		assert busy.cleanup_closed_mappings_locked(&busy_vm)
 		assert !busy.close() && !busy_vm.destroyed
-		busy.inflight_by_vm[1] = 0
+		busy_vm.inflight = 0
 		gpu.fail_flushes(1)
-		assert !busy.cleanup_closed_mappings_locked(1)
+		assert !busy.cleanup_closed_mappings_locked(&busy_vm)
 		assert busy.mappings[0].retiring && busy_object.references == 1
-		busy.inflight_by_vm[1] = 1
+		busy_vm.inflight = 1
 		before := gpu.flushes()
-		assert !busy.cleanup_closed_mappings_locked(1) && gpu.flushes() == before
-		busy.inflight_by_vm[1] = 0
-		assert busy.cleanup_closed_mappings_locked(1) && gem.live() == 0
+		assert !busy.cleanup_closed_mappings_locked(&busy_vm) && gpu.flushes() == before
+		busy_vm.inflight = 0
+		assert busy.cleanup_closed_mappings_locked(&busy_vm) && gem.live() == 0
 		assert busy.close()
 	}
 
@@ -146,7 +146,7 @@ fn check_mapping_retirement() {
 	assert file.close() && gpu.flushes() == before && gem.live() == 0
 	assert first_vm.destroyed && second_vm.destroyed
 	gpu.fail_flushes(0)
-	assert !file.cleanup_closed_mappings_locked(64)
+	assert file.find_owned_vm(64) == none
 	// VM destruction wins before the mutation lock. BIND must re-resolve
 	// the VM inside that lock, before borrowing the page table or GEM.
 	gpu.set_running(true)

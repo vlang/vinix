@@ -9,7 +9,7 @@ fn check_orphan_queue_local(file string, gpu string, worker string) ! {
 		'if named || ownership.resources.has_file_references() { continue }',
 		'if !gpu_manager.release_g13_queue_resources(ownership.resources) { continue }',
 		'f.g13_queues.delete(index)', 'gpu.free_g13_queue_record(ownership.resources)'], 'Exclude every logical/captured owner and delete only after acknowledged release')!
-	for token in ['inflight_by_vm', 'detached_vms', 'queue.detached', 'q.destroy()', 'free(', 'memory.'] {
+	for token in ['.inflight', 'vm.detached', 'queue.detached', 'q.destroy()', 'free(', 'memory.'] {
 		require(!reap.contains(token), 'Unpublished cleanup preserves ownership gates and uses checked metadata disposal')!
 	}
 	registry := section(file, 'fn reap_open_detached_g13_queues()', 'pub fn (mut f GpuFile) ioctl_queue_destroy(', 'Open-file retry ownership')!

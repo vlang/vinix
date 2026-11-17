@@ -73,11 +73,13 @@ pub struct UatContext {
 pub:
 	identity       u64 // non-reused VM-private BO reservation domain
 pub mut:
-	id             u32 // hardware UAT slot
+	id             u32 // internal identity within the owning DRM file
 	pgtable        &pgtable.UatPgtable = unsafe { nil }
 	active         bool
 	lock           klock.Lock
 	vm_id          u32 // userspace name assigned by the owning DRM file
+	detached       bool // protected by the owning file's lock
+	inflight       u64 // atomic callback and aggregate submission pins
 	dummy_phys     u64
 	kernel_start   u64
 	kernel_end     u64
@@ -117,7 +119,7 @@ mut:
 
 pub struct UatManager {
 pub mut:
-	contexts             [uat_num_contexts]&UatContext
+	contexts             [uat_num_contexts]&UatContext // published user roots
 	kernel_lower_pgtable &pgtable.UatPgtable = unsafe { nil }
 	kernel_pgtable       &pgtable.UatPgtable = unsafe { nil }
 	handoff              &UatHandoff = unsafe { nil }
@@ -353,45 +355,38 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 	defer {
 		mgr.lock.release()
 	}
-	for i := u32(1); i < uat_num_contexts; i++ {
-		if mgr.contexts[i] == unsafe { nil } {
-			identity := allocate_context_identity() or { return none }
-			mut pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
-			dummy_pages := pgtable.uat_pgsz / memory.page_size
-			dummy_phys := u64(memory.pmm_alloc_aligned_fallible(dummy_pages, dummy_pages))
-			if dummy_phys == 0 {
-				pgtable.destroy(pt)
-				return none
-			}
-			if !pt.map(uat_unknown_page, dummy_phys, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw) {
-				memory.pmm_free(voidptr(dummy_phys), dummy_pages)
-				pgtable.destroy(pt)
-				return none
-			}
-			mut ctx := &UatContext{
-				id: i
-				identity: identity
-				pgtable: pt
-				active: true
-				dummy_phys: dummy_phys
-				kernel_start: window.start
-				kernel_end: window.end
-				driver_gpu: gpu_alloc.new_heap('uat-user-gpu', window.start, window.midpoint)
-				driver_private: gpu_alloc.new_heap('uat-user-private', window.midpoint, window.end)
-			} @[freed]
-			// Nothing slices the list, so growing it can free the old buffer.
-			ctx.driver_buffers.flags |= .noslices
-			mgr.contexts[i] = ctx
-			return ctx
-		}
+	identity := allocate_context_identity() or { return none }
+	mut pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
+	dummy_pages := pgtable.uat_pgsz / memory.page_size
+	dummy_phys := u64(memory.pmm_alloc_aligned_fallible(dummy_pages, dummy_pages))
+	if dummy_phys == 0 {
+		pgtable.destroy(pt)
+		return none
 	}
-	return none
+	if !pt.map(uat_unknown_page, dummy_phys, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw) {
+		memory.pmm_free(voidptr(dummy_phys), dummy_pages)
+		pgtable.destroy(pt)
+		return none
+	}
+	mut ctx := &UatContext{
+		identity: identity
+		pgtable: pt
+		active: true
+		dummy_phys: dummy_phys
+		kernel_start: window.start
+		kernel_end: window.end
+		driver_gpu: gpu_alloc.new_heap('uat-user-gpu', window.start, window.midpoint)
+		driver_private: gpu_alloc.new_heap('uat-user-private', window.midpoint, window.end)
+	} @[freed]
+	// Nothing slices the list, so growing it can free the old buffer.
+	ctx.driver_buffers.flags |= .noslices
+	return ctx
 }
 
 // Caller holds the final file owner after mappings, queue backing and job
 // captures have retired. The context pointer is consumed by this call.
 pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
-	if ctx == unsafe { nil } || ctx.id == 0 || ctx.id >= uat_num_contexts {
+	if ctx == unsafe { nil } {
 		return
 	}
 	mgr.lock.acquire()
@@ -405,7 +400,6 @@ pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
 	if owned.dummy_phys != 0 {
 		memory.pmm_free(voidptr(owned.dummy_phys), pgtable.uat_pgsz / memory.page_size)
 	}
-	mgr.contexts[ctx.id] = unsafe { nil }
 	unsafe { free(owned) }
 }
 
@@ -673,17 +667,19 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) bool {
 	mut owner := unsafe { mgr }
 	owner.lock.acquire()
 	defer { owner.lock.release() }
-	if !mgr.handoff_initialized || ctx == unsafe { nil } || ctx.pgtable == unsafe { nil }
-		|| ctx.id == 0 || ctx.id >= uat_num_contexts {
+	if !mgr.handoff_initialized || ctx == unsafe { nil } || !ctx.active || ctx.pgtable == unsafe { nil } {
 		return false
 	}
 	if ctx.is_bound() { return true }
-	asid := u64(ctx.id) << ttbr_asid_shift
+	mut slot := u32(1)
+	for slot < uat_num_contexts && mgr.contexts[slot] != unsafe { nil } { slot++ }
+	if slot == uat_num_contexts { return false }
+	asid := u64(slot) << ttbr_asid_shift
 	handoff_lock(mgr.handoff)
 	unsafe {
 		mut slots := mgr.ttbs
-		slots[ctx.id].ttb0 = ctx.pgtable.l1_phys | asid | ttbr_valid
-		slots[ctx.id].ttb1 = if mgr.map_kernel_to_user {
+		slots[slot].ttb0 = ctx.pgtable.l1_phys | asid | ttbr_valid
+		slots[slot].ttb1 = if mgr.map_kernel_to_user {
 			mgr.kernel_pgtable.l1_phys | asid | ttbr_valid
 		} else {
 			u64(0)
@@ -692,12 +688,13 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) bool {
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
 	mut pt := unsafe { ctx.pgtable }
-	pt.bind_tlb(u8(ctx.id))
+	pt.bind_tlb(u8(slot))
+	owner.contexts[slot] = unsafe { ctx }
 	return true
 }
 
 // Caller holds mgr.lock.
-pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
+pub fn (mut mgr UatManager) unbind_context(ctx &UatContext) {
 	if !mgr.handoff_initialized || ctx == unsafe { nil } { return }
 	slot := ctx.bound_slot()
 	if slot == 0 || slot >= uat_num_contexts {
@@ -713,6 +710,7 @@ pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
 	handoff_unlock(mgr.handoff)
 	mut pt := unsafe { ctx.pgtable }
 	pt.unbind_tlb()
+	mgr.contexts[slot] = unsafe { nil }
 }
 
 // Map a driver-owned allocation into context zero. Lower addresses use TTBR0;

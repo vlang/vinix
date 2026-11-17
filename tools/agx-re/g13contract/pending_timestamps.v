@@ -13,7 +13,7 @@ fn check_pending_timestamps_local(file string, pending string, owners string) ! 
   'if code != 0 { f.release_g13_submission_timestamps(timestamps);'], 'Bounded timestamp storage and prefix rollback')!
  require_order(pending, ['assert katomic.load(&item.callbacks_remaining) == 0',
   'signal_g13_submission_fence(item.final_fence', 'owner.release_g13_submission_timestamps(item.timestamps)',
-  'queue.release_file_reference()', 'katomic.dec(mut &item.file.inflight_by_vm', 'memory.free(voidptr(item))'], 'Timestamp retirement precedes file/VM owner release')!
+  'queue.release_file_reference()', 'katomic.dec(mut &item.vm.inflight', 'memory.free(voidptr(item))'], 'Timestamp retirement precedes file/VM owner release')!
  // Registration may hand the node to another CPU before returning.
  tail := staged.all_after('timestamps_transferred = true')
  require(!tail.contains('pending.') && !tail.contains('timestamps.'), 'Accepted storage must never be accessed after transfer')!

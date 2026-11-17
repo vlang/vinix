@@ -10,7 +10,7 @@ fn test_user_mapping_lifetime_gates() {
 	for token in ['if !mapping.retiring', 'f.mappings[index].retiring = true',
 		'if !flush_firmware_mapping(ctx, mapping.addr, mapping.size, true)',
 		'f.mappings[f.mappings.len - 1].retiring = true', 'f.retire_mapping_locked(index)',
-		'if !f.cleanup_closed_mappings_locked(vm_id)'] {
+		'if !f.cleanup_closed_mappings_locked(vm)'] {
 		assert local.contains(token)
 		if _ := check_user_mapping_contract(local.replace(token, ''), manager) { assert false, token }
 	}

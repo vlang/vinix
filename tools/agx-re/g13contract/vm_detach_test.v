@@ -5,15 +5,15 @@ import g13layout
 fn test_vm_detach_guards_require_hidden_names_and_retained_physical_owners() {
 	file := read(g13layout.repo_root() + '/kernel/gpu/agx/file/file.v')!
 	check_vm_detach_local(file)!
-	for token in ['f.detached_vms[ctx.id] = false', 'f.detached_vms[vm.id] = true',
-		'vm.vm_id == vm_id', '!f.detached_vms[vm.id]', 'if retained { continue }',
-		'if !f.cleanup_closed_mappings_locked(vm_id) { continue }', 'f.vms.delete(index)',
-		'f.detached_vms[vm_id] = false', 'owned.reap_detached_vms_locked()',
-		'!f.detached_vms[vm_id] && !mapping.retiring', 'ctx := f.find_owned_vm(mapping.vm_id)',
+	for token in ['ctx.id = owner_id', 'vm.detached = true',
+		'vm.vm_id == vm_id', '&& !vm.detached', 'if retained { continue }',
+		'if !f.cleanup_closed_mappings_locked(vm) { continue }', 'f.vms.delete(index)',
+		'f.vms[insert_at] = ctx', 'owned.reap_detached_vms_locked()',
+		'!vm.detached && !mapping.retiring', 'ctx := f.find_owned_vm(mapping.vm_id)',
 		'vm := f.find_owned_vm(vm_id)'] {
 		if _ := check_vm_detach_local(file.replace(token, '')) { assert false, token }
 	}
-	if _ := check_vm_detach_local(file.replace('f.detached_vms[vm.id] = true', 'return -16')) { assert false }
+	if _ := check_vm_detach_local(file.replace('vm.detached = true', 'return -16')) { assert false }
 }
 
 fn test_vm_detach_reference_requires_namespace_drop_and_independent_queue_owners() {

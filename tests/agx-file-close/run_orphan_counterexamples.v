@@ -18,7 +18,7 @@ fn main() {
 		'ignore-logical-owner': ['if named || ownership.resources.has_file_references() { continue }', 'if (named && false) || ownership.resources.has_file_references() { continue }'],
 		'ignore-reference': ['if named || ownership.resources.has_file_references() { continue }', 'if named { continue }'],
 		'compare-vm-identity': ['if queue.id == ownership.queue_id { named = true; break }', 'if queue.vm_id == ownership.vm_id { named = true; break }'],
-		'vm-wide-retention': ['ownership := f.g13_queues[index]', 'ownership := f.g13_queues[index]\n\t\tif katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0 { continue }'],
+		'vm-wide-retention': ['ownership := f.g13_queues[index]', 'ownership := f.g13_queues[index]\n\t\tvm := f.find_owned_vm(ownership.vm_id) or { unsafe { nil } }; if vm != unsafe { nil } && katomic.load(&vm.inflight) != 0 { continue }'],
 		'forget-failed-release': ['if !gpu_manager.release_g13_queue_resources(ownership.resources) { continue }', '_ = gpu_manager.release_g13_queue_resources(ownership.resources)'],
 		'delete-wrong-owner': ['f.g13_queues.delete(index)', 'f.g13_queues.delete(0)']
 	} {
@@ -38,7 +38,13 @@ fn main() {
 		p.set_args(['--file-source', directory + '/file.v']); p.set_redirect_stdio(); p.run()
 		log := p.stdout_slurp() + p.stderr_slurp(); p.wait()
 		os.write_file(directory + '/run.log', log)!
-		target := if name == 'ignore-logical-owner' { 'file.check_detached_queues:' } else { 'file.check_orphaned_queues:' }
+		target := match name {
+			'ignore-logical-owner' { 'file.check_detached_queues:' }
+			'forget-failed-release', 'delete-wrong-owner' {
+				'gpu.agx.gpu.free_g13_queue_record: assert resources.released'
+			}
+			else { 'file.check_orphaned_queues:' }
+		}
 		assert p.code != 0 && log.contains('FAIL: fn ' + target) && !log.contains('error:'), name + ': ' + log
 		assert os.is_file(directory + '/test'), name + ' must compile before failing'
 		p.close()

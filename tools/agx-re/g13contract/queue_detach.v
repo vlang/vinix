@@ -23,7 +23,7 @@ fn check_queue_detach_local(file string, pending string, workqueue string, manag
 	require_order(service, ['process_pending_submissions()', 'reap_open_detached_g13_queues()', 'reap_closed_files()'], 'Retire aggregate owners before retrying open and closed files')!
 	retire := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Aggregate queue ownership')!
 	require_order(retire, ['assert katomic.load(&item.callbacks_remaining) == 0',
-		'signal_g13_submission_fence(', 'katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])',
+		'signal_g13_submission_fence(', 'katomic.dec(mut &item.vm.inflight)',
 		'memory.free(voidptr(item))'], 'Last aggregate queue use precedes releasing its VM owner')!
 	callback := section(manager, 'fn (mut mgr GpuManager) reap_file_resources()', '// Serialize accepted submissions', 'Worker lock ordering')!
 	require_order(callback, ['mgr.lock.acquire()', 'callback := mgr.file_reaper', 'mgr.lock.release()', 'callback()'], 'Service callback runs outside manager lock')!

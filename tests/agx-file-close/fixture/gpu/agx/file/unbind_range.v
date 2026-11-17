@@ -41,11 +41,11 @@ fn check_unbind_ranges() {
 				original := pt.leaves
 				request := range_request(cut[0], cut[1])
 				before_alloc := memory.calls(); before_flush := gpu.flushes()
-				file.inflight_by_vm[1] = 1
+				vm.inflight = 1
 				assert file.ioctl_gem_bind(&request) == -16
 				assert first.references == 3 && second.references == 3 && pt.unmaps == 0
 				assert memory.calls() == before_alloc && gpu.flushes() == before_flush && pt.leaves == original
-				file.inflight_by_vm[1] = 0; cases++
+				vm.inflight = 0; cases++
 				if repeated && cut[0] == 1 && cut[1] == 17 {
 					gpu.fail_flushes(1)
 					assert file.ioctl_gem_bind(&request) == -5
@@ -111,9 +111,9 @@ fn check_unbind_ranges() {
 			gpu.fail_flushes(1)
 			assert file.ioctl_gem_bind(&inner) == -5 && object.references == 4 && pt.unmaps == 1
 			assert pt.last_unmap_size == request.range; cases++
-			file.inflight_by_vm[1] = 1
+			vm.inflight = 1
 			assert file.ioctl_gem_bind(&inner) == -16 && object.references == 4 && pt.unmaps == 1
-			file.inflight_by_vm[1] = 0; cases++
+			vm.inflight = 0; cases++
 			assert file.ioctl_gem_bind(&inner) == 0 && object.references == 3 && file.mappings.len == 2 && pt.unmaps == 1
 			cases++
 			for index in 0 .. 8 {

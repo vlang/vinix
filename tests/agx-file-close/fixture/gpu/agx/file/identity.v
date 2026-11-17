@@ -59,7 +59,7 @@ fn check_identity_lookups() {
 		// Remove the name while the queue retains the physical context.
 		destroy_vm := ioctl.DrmAsahiVmDestroy{ vm_id: 1 }
 		identity_result(file.ioctl_vm_destroy(&destroy_vm), 0)
-		assert !vm.destroyed && file.detached_vms[1]
+		assert !vm.destroyed && vm.detached
 		identity_result(file.ioctl_vm_destroy(&destroy_vm), -2)
 		destroy_queue := ioctl.DrmAsahiQueueDestroy{ queue_id: valid.queue_id }
 		identity_result(file.ioctl_queue_destroy(&destroy_queue), 0)

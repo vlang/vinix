@@ -14,8 +14,8 @@ fn main() {
 	source := os.read_file(repo + '/kernel/gpu/agx/file/file.v')!
 	mut receipts := []string{}
 	for name, pair in {
-		'busy-destroy': ['q.detached = true', 'if katomic.load(&f.inflight_by_vm[q.vm_id]) != 0 { f.lock.release(); return -16 }\n\t\t\t\tq.detached = true'],
-		'vm-wide-retention': ['if ownership.resources.has_file_references() { continue }', 'if katomic.load(&f.inflight_by_vm[ownership.vm_id]) != 0 { continue }'],
+		'busy-destroy': ['q.detached = true', 'vm := f.find_owned_vm(q.vm_id) or { unsafe { nil } }; if vm != unsafe { nil } && katomic.load(&vm.inflight) != 0 { f.lock.release(); return -16 }\n\t\t\t\tq.detached = true'],
+		'vm-wide-retention': ['if ownership.resources.has_file_references() { continue }', 'vm := f.find_owned_vm(ownership.vm_id) or { unsafe { nil } }; if vm != unsafe { nil } && katomic.load(&vm.inflight) != 0 { continue }'],
 		'visible-name': ['if queue.id != queue_id || queue.detached { continue }', 'if queue.id != queue_id { continue }'],
 		'no-retry': ['owned.reap_detached_g13_queues_locked()', '']
 	} {

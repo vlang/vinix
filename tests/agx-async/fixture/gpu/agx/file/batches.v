@@ -19,10 +19,10 @@ fn on_batch_notification(_ &syncobj.DmaFence) {
 		// Only staged payload storage remains until the last ioctl defer.
 		notification_file.lock.acquire()
 		notification_file.lock.release()
-		assert notification_file.inflight_by_vm[1] == 0 && memory.outstanding() == 1
+		assert notification_file.vm.inflight == 0 && memory.outstanding() == 1
 	} else {
 		assert notification_node.callbacks_remaining == 0
-		assert notification_file.inflight_by_vm[1] == 1
+		assert notification_file.vm.inflight == 1
 	}
 	if notification_object != unsafe { nil } {
 		assert notification_object.references == 1
@@ -40,7 +40,7 @@ fn watch_batch(file &GpuFile, object &gem.GemObject, target &syncobj.DmaFence) {
 
 fn watch_unqueued(data voidptr) {
 	state := unsafe { &G13SubmitCompletion(data) }
-	notification_file = state.file
+	notification_file = state.submission.file
 	notification_object = state.result
 	notification_unqueued = true
 	syncobj.add_waiter(state.submission.final_fence, &syncobj.FenceWaiter{ callback: on_batch_notification })
@@ -111,7 +111,7 @@ fn check_full_batch(pattern int) {
 	out := output()
 	assert submit_batch(mut file, 64, pattern, 0, unsafe { nil }, out, true) == 0
 	assert fence(out).seqno == 1 && file.g13_queues[0].resources.fence_seqno == 1
-	assert file.inflight_by_vm[1] == 65 && object.references == 65
+	assert file.vm.inflight == 65 && object.references == 65
 	assert pending_count == 1 && memory.outstanding() == 1 && manager.published.len == 0
 	before_notifications := notifications
 	watch_batch(file, &object, fence(out))

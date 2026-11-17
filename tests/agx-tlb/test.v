@@ -80,44 +80,42 @@ fn test_root_publication_and_reuse() {
 	tlb.clear()
 
 	mut user := pgtable.new_pgtable(39, 48) or { panic('user root') }
-	ctx := mmu.UatContext{ id: 3, pgtable: user }
-	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[3]) })
+	ctx := mmu.UatContext{ id: 65, pgtable: user }
+	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[1]) })
 	assert !ctx.is_bound() && ctx.bound_slot() == 0
 	assert user.map(0x4000, 0x200000, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw)
-	assert slots[3].ttb0 == 0 && tlb.calls().len == 0
+	assert slots[1].ttb0 == 0 && tlb.calls().len == 0
 	mgr.unbind_context(&ctx)
 	assert tlb.calls().len == 0
-	assert mgr.bind_context(&ctx) && ctx.is_bound() && ctx.bound_slot() == 3
+	assert mgr.bind_context(&ctx) && ctx.is_bound() && ctx.bound_slot() == 1
 	assert mgr.bind_context(&ctx) // Additional jobs reuse the published root.
 	bind := tlb.calls()
-	assert bind.len == 1 && !bind[0].all && bind[0].asid == 3
-	assert bind[0].ttb0 == user.l1_phys | (u64(3) << 48) | 1
+	assert bind.len == 1 && !bind[0].all && bind[0].asid == 1
+	assert bind[0].ttb0 == user.l1_phys | (u64(1) << 48) | 1
 	assert bind[0].ttb1 == 0
 	tlb.clear()
 	mgr.unbind_context(&ctx)
 	unbind := tlb.calls()
-	assert unbind.len == 1 && unbind[0].asid == 3
+	assert unbind.len == 1 && unbind[0].asid == 1
 	assert unbind[0].ttb0 == 0 && unbind[0].ttb1 == 0
 	tlb.clear()
 
 	// The same context number, now naming another root, must invalidate even
 	// when no PTE was changed. Firmware kernel aliases keep the same ASID.
 	mut next := pgtable.new_pgtable(39, 48) or { panic('replacement root') }
-	next_ctx := mmu.UatContext{ id: 3, pgtable: next }
+	next_ctx := mmu.UatContext{ id: 129, pgtable: next }
 	mgr.map_kernel_to_user = true
 	assert mgr.bind_context(&next_ctx)
 	reuse := tlb.calls()
-	assert reuse.len == 1 && reuse[0].asid == 3
-	assert reuse[0].ttb0 == next.l1_phys | (u64(3) << 48) | 1
-	assert reuse[0].ttb1 == upper.l1_phys | (u64(3) << 48) | 1
+	assert reuse.len == 1 && reuse[0].asid == 1
+	assert reuse[0].ttb0 == next.l1_phys | (u64(1) << 48) | 1
+	assert reuse[0].ttb1 == upper.l1_phys | (u64(1) << 48) | 1
 	tlb.clear()
-	// Exercise the published root slot independently of the host index.
-	owner := mmu.UatContext{ id: 21, pgtable: next }
-	assert owner.bound_slot() == 3
-	mgr.unbind_context(&owner)
-	assert owner.bound_slot() == 0 && !owner.is_bound()
+	assert next_ctx.bound_slot() == 1
+	mgr.unbind_context(&next_ctx)
+	assert next_ctx.bound_slot() == 0 && mgr.contexts[1] == unsafe { nil }
 	cleared := tlb.calls()
-	assert cleared.len == 1 && cleared[0].asid == 3
+	assert cleared.len == 1 && cleared[0].asid == 1
 	assert cleared[0].ttb0 == 0 && cleared[0].ttb1 == 0
 	tlb.clear()
 
@@ -139,6 +137,34 @@ fn test_root_publication_and_reuse() {
 	pgtable.destroy(upper)
 	pgtable.destroy(user)
 	pgtable.destroy(next)
+}
+
+fn test_user_slot_capacity() {
+	mut slots := [64]mmu.SlotTtbs{}
+	mut contexts := [64]mmu.UatContext{}
+	mut mgr := mmu.UatManager{
+		handoff_initialized: true
+		ttbs: unsafe { &slots[0] }
+	}
+	for index in 0 .. contexts.len {
+		contexts[index].id = u32(1000 + index)
+		contexts[index].pgtable = pgtable.new_pgtable(39, 48) or { panic('user root') }
+		assert mgr.bind_context(unsafe { &contexts[index] }) == (index < 63)
+	}
+	assert contexts[63].bound_slot() == 0 && slots[0].ttb0 == 0
+	assert tlb.calls().len == 63
+	tlb.clear()
+	mgr.unbind_context(unsafe { &contexts[12] })
+	assert slots[13].ttb0 == 0 && mgr.contexts[13] == unsafe { nil }
+	assert mgr.bind_context(unsafe { &contexts[63] }) && contexts[63].bound_slot() == 13
+	assert tlb.calls().len == 2 && tlb.calls()[0].asid == 13 && tlb.calls()[1].asid == 13
+	tlb.clear()
+	for index in 0 .. contexts.len {
+		mgr.unbind_context(unsafe { &contexts[index] })
+		pgtable.destroy(contexts[index].pgtable)
+		tlb.clear()
+	}
+	println('AGX UAT capacity: 63 published roots, exhaustion and reuse after ASID invalidation passed')
 }
 
 fn test_borrowed_root_destruction() {
@@ -365,6 +391,7 @@ fn main() {
 	test_repeated_pages()
 	test_user_mappings()
 	test_root_publication_and_reuse()
+	test_user_slot_capacity()
 	test_borrowed_root_destruction()
 	test_gpu_permissions()
 	test_range_operands()

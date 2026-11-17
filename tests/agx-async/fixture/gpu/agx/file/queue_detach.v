@@ -9,7 +9,7 @@ __global detach_on_copy_file &GpuFile = unsafe { nil }
 
 fn detach_queue_during_copy() {
 	detach_on_copy_file.lock.acquire()
-	assert detach_on_copy_file.inflight_by_vm[1] == 0, 'capture must preserve idle mapping cleanup and bind admission'
+	assert detach_on_copy_file.vm.inflight == 0, 'capture must preserve idle mapping cleanup and bind admission'
 	assert detach_on_copy_file.g13_queues[0].resources.has_file_references()
 	detach_on_copy_file.queues[0] = LogicalQueue{id: 1, detached: true}
 	detach_on_copy_file.lock.release()
@@ -25,7 +25,7 @@ fn check_detached_submission_ownership() {
 		syncobj.replace_fence(input, dependency)
 		out := output()
 		assert submit(mut file, 1, false, input, out, false) == 0
-		assert file.inflight_by_vm[1] == 2
+		assert file.vm.inflight == 2
 		assert file.g13_queues[0].resources.has_file_references()
 		// The close fixture executes actual QUEUE_DESTROY and its reaper.
 		// Here only its namespace result is injected; pending.v and both
@@ -35,12 +35,12 @@ fn check_detached_submission_ownership() {
 		assert submit(mut file, 1, false, unsafe { nil }, output(), false) == -2
 		assert memory.attempts() == attempts && pending_count == 1
 		service_file_work()
-		assert manager.published.len == 0 && file.inflight_by_vm[1] == 2
+		assert manager.published.len == 0 && file.vm.inflight == 2
 		syncobj.signal(dependency)
 		service_file_work()
 		assert manager.published == [u32(12)] && !syncobj.is_signaled(fence(out))
 		manager.finish_compute(0)
-		assert file.inflight_by_vm[1] == 1, 'aggregate queue owner survives the last callback'
+		assert file.vm.inflight == 1, 'aggregate queue owner survives the last callback'
 		service_file_work()
 		assert syncobj.is_signaled(fence(out))
 		assert_drained(file)

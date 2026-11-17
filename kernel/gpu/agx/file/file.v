@@ -75,8 +75,6 @@ struct G13SubmissionQueue {
 @[heap]
 struct G13SubmitCompletion {
 mut:
-	file          &GpuFile = unsafe { nil }
-	vm_id         u32
 	result        &gem.GemObject = unsafe { nil }
 	result_offset u64
 	submission    &G13PendingSubmission = unsafe { nil }
@@ -86,8 +84,7 @@ mut:
 pub struct GpuFile {
 pub mut:
 	dev               &drm.DrmDevice = unsafe { nil }
-	vms               []&mmu.UatContext
-	detached_vms      [mmu.uat_num_contexts]bool // names removed; physical owners remain in vms
+	vms               []&mmu.UatContext // visible names are in ascending order
 	queues            []&workqueue.WorkQueue
 	mappings          []GpuMapping
 	objects           agxbo.Table
@@ -99,7 +96,6 @@ pub mut:
 	owner_process_id  u32
 	owner_key         u64
 	ioctl_abi         u32 // zero until the first driver request selects a dialect
-	inflight_by_vm    [mmu.uat_num_contexts]u64
 	lock              klock.Lock
 	closing_next      &GpuFile = unsafe { nil }
 	closing_queued    bool
@@ -156,17 +152,15 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 		|| current.process.pid <= 0 {
 		return none
 	}
-	// With one slot per context, this covers every VM the file can own.
-	vms := []&mmu.UatContext{cap: mmu.uat_num_contexts} @[freed]
 	mut f := &GpuFile{
 		dev: unsafe { dev }
 		next_queue_id: 1
 		next_timestamp_id: 1
 		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
-		vms: vms
 	}
 	// Nothing slices these, so growing one can free its old buffer.
+	f.vms.flags |= .noslices
 	f.queues.flags |= .noslices
 	f.mappings.flags |= .noslices
 	f.g17_queues.flags |= .noslices
@@ -189,8 +183,8 @@ pub fn (mut f GpuFile) close() bool {
 	for ownership in f.g13_queues {
 		if ownership.resources.has_file_references() { f.lock.release(); return false }
 	}
-	for vm_id := u32(1); vm_id < mmu.uat_num_contexts; vm_id++ {
-		if katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
+	for vm in f.vms {
+		if katomic.load(&vm.inflight) != 0 {
 			// Completion callbacks still own this file. The worker retries its
 			// close after their final reference is gone.
 			f.lock.release()
@@ -327,10 +321,8 @@ fn (mut f GpuFile) valid_mmap_range(offset u64, length u64) bool {
 // firmware acknowledges invalidation, or after firmware has stopped.
 fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 	mapping := f.mappings[index]
-	if mapping.vm_id >= mmu.uat_num_contexts
-		|| katomic.load(&f.inflight_by_vm[mapping.vm_id]) != 0 { return false }
 	ctx := f.find_owned_vm(mapping.vm_id) or { return false }
-	if ctx.pgtable == unsafe { nil } { return false }
+	if katomic.load(&ctx.inflight) != 0 || ctx.pgtable == unsafe { nil } { return false }
 	if !mapping.retiring {
 		mut pt := unsafe { ctx.pgtable }
 		pt.unmap(mapping.addr, mapping.size)
@@ -348,9 +340,9 @@ fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 // is idle. A close racing an in-flight job leaves the binding retained; the
 // next bind into that VM collects it after completion. CPU mmap authorization
 // holds its own reference independently.
-fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
-	if vm_id >= mmu.uat_num_contexts { return false }
-	if katomic.load(&f.inflight_by_vm[vm_id]) != 0 {
+fn (mut f GpuFile) cleanup_closed_mappings_locked(vm &mmu.UatContext) bool {
+	vm_id := vm.id
+	if katomic.load(&vm.inflight) != 0 {
 		for mapping in f.mappings {
 			if mapping.vm_id == vm_id && mapping.retiring { return false }
 		}
@@ -362,7 +354,7 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm_id u32) bool {
 		if mapping.vm_id != vm_id {
 			continue
 		}
-		if !f.detached_vms[vm_id] && !mapping.retiring && f.objects.contains(mapping.obj) {
+		if !vm.detached && !mapping.retiring && f.objects.contains(mapping.obj) {
 			continue
 		}
 		if !f.retire_mapping_locked(index) {
@@ -380,7 +372,7 @@ fn (mut f GpuFile) close_object_handle(handle u32) int {
 	}
 	mut success := true
 	for vm in f.vms {
-		if !f.cleanup_closed_mappings_locked(vm.id) {
+		if !f.cleanup_closed_mappings_locked(vm) {
 			success = false
 		}
 	}
@@ -532,9 +524,9 @@ fn (mut f GpuFile) allocate_timestamp_id_locked() ?u32 {
 
 // Userspace names belong to the file. Callers hold file.lock.
 fn (f &GpuFile) find_vm(vm_id u32) ?&mmu.UatContext {
-	if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return none }
+	if vm_id == 0 { return none }
 	for vm in f.vms {
-		if vm.vm_id == vm_id && vm.id < mmu.uat_num_contexts && !f.detached_vms[vm.id] {
+		if vm.vm_id == vm_id && !vm.detached {
 			return unsafe { vm }
 		}
 	}
@@ -665,6 +657,33 @@ pub fn (f &GpuFile) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
 	return agxparams.copy_global(request, unsafe { &params })
 }
 
+// V can move the pointer array without moving the VMs captured by jobs.
+fn (mut f GpuFile) reserve_vm_entry_locked() bool {
+	if f.vms.len < f.vms.cap { return true }
+	if f.vms.len == 0x7fff_ffff { return false }
+	capacity := if f.vms.cap == 0 { 8 } else if f.vms.cap <= 0x3fff_ffff {
+		f.vms.cap * 2
+	} else {
+		0x7fff_ffff
+	}
+	storage := memory.malloc_packed_fallible(u64(capacity) * sizeof(&mmu.UatContext)) @[freed]
+	if storage == unsafe { nil } { return false }
+	mut replacement := []&mmu.UatContext{}
+	unsafe {
+		replacement.data = storage
+		replacement.len = f.vms.len
+		replacement.cap = capacity
+		replacement.flags = .noslices
+		if f.vms.len != 0 {
+			C.memcpy(storage, f.vms.data, u64(f.vms.len) * sizeof(&mmu.UatContext))
+		}
+		mut old := f.vms
+		f.vms = replacement
+		old.free()
+	}
+	return true
+}
+
 pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	mut request := unsafe { data }
 	mgr := uat_mgr
@@ -679,19 +698,33 @@ pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	}
 	f.lock.acquire()
 	defer { f.lock.release() }
-	mut used := u64(0)
-	for vm in f.vms {
-		if !f.detached_vms[vm.id] { used |= u64(1) << vm.vm_id }
-	}
 	mut vm_id := u32(1)
-	for vm_id < mmu.uat_num_contexts && used & (u64(1) << vm_id) != 0 { vm_id++ }
-	if vm_id == mmu.uat_num_contexts { return -12 }
+	mut insert_at := f.vms.len
+	for index, vm in f.vms {
+		if vm.detached { continue }
+		if vm.vm_id > vm_id { insert_at = index; break }
+		if vm_id == ~u32(0) { return -12 }
+		vm_id++
+	}
+	// A hidden owner may still use the public name's old internal key.
+	mut owner_id := vm_id
+	for f.find_owned_vm(owner_id) != none {
+		owner_id = if owner_id == ~u32(0) { u32(1) } else { owner_id + 1 }
+	}
+	if !f.reserve_vm_entry_locked() { return -12 }
 	mut m := unsafe { mgr }
 	mut ctx := m.create_context(request.kernel_start, request.kernel_end) or { return -12 }
+	ctx.id = owner_id
 	ctx.vm_id = vm_id
-	if m.handoff_abi != .v12_3 { m.bind_context(ctx) }
-	f.detached_vms[ctx.id] = false
+	if m.handoff_abi != .v12_3 && !m.bind_context(ctx) {
+		m.destroy_context(ctx)
+		return -12
+	}
 	f.vms << ctx
+	for index := f.vms.len - 1; index > insert_at; index-- {
+		f.vms[index] = f.vms[index - 1]
+	}
+	f.vms[insert_at] = ctx
 	request.vm_id = vm_id
 	return 0
 }
@@ -701,14 +734,14 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 	if request.extensions != 0 || request.pad != 0 {
 		return -22
 	}
-	if request.vm_id == 0 || request.vm_id >= mmu.uat_num_contexts { return -2 }
+	if request.vm_id == 0 { return -2 }
 	f.lock.acquire()
 	defer { f.lock.release() }
-	vm := f.find_vm(request.vm_id) or { return -2 }
-	if vm.id == 0 || vm.id >= mmu.uat_num_contexts { return -22 }
+	found := f.find_vm(request.vm_id) or { return -2 }
+	mut vm := unsafe { found }
 	// Match Asahi's namespace removal independently of retained queue/job
 	// owners. Existing queues keep their VM; new VM-name lookups fail.
-	f.detached_vms[vm.id] = true
+	vm.detached = true
 	f.reap_detached_vms_locked()
 	return 0
 }
@@ -721,9 +754,8 @@ fn (mut f GpuFile) reap_detached_vms_locked() {
 	for index := f.vms.len - 1; index >= 0; index-- {
 		vm := f.vms[index]
 		vm_id := vm.id
-		if vm_id == 0 || vm_id >= mmu.uat_num_contexts || !f.detached_vms[vm_id] { continue }
-		if katomic.load(&f.inflight_by_vm[vm_id]) != 0 { continue }
-		if !f.cleanup_closed_mappings_locked(vm_id) { continue }
+		if !vm.detached || katomic.load(&vm.inflight) != 0 { continue }
+		if !f.cleanup_closed_mappings_locked(vm) { continue }
 		mut retained := false
 		for queue in f.queues {
 			if queue.vm_id == vm_id { retained = true; break }
@@ -735,7 +767,6 @@ fn (mut f GpuFile) reap_detached_vms_locked() {
 		mut manager := unsafe { uat_mgr }
 		manager.destroy_context(vm)
 		f.vms.delete(index)
-		f.detached_vms[vm_id] = false
 	}
 }
 
@@ -813,7 +844,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				pgtable.gpu_prot_gpu_shared_wo
 			}
 			vm_slot := ctx.id
-			if !f.cleanup_closed_mappings_locked(vm_slot) {
+			if !f.cleanup_closed_mappings_locked(ctx) {
 				gem.unref(obj)
 				return -5
 			}
@@ -825,7 +856,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 					break
 				}
 			}
-			if replacing && katomic.load(&f.inflight_by_vm[vm_slot]) != 0 {
+			if replacing && katomic.load(&ctx.inflight) != 0 {
 				gem.unref(obj)
 				return -16 // EBUSY: replacement must not remove pages used by jobs.
 			}
@@ -870,7 +901,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			ctx := f.find_vm(request.vm_id) or { return -2 }
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
-			if katomic.load(&f.inflight_by_vm[ctx.id]) != 0 {
+			if katomic.load(&ctx.inflight) != 0 {
 				return -16 // EBUSY: firmware may still dereference this mapping
 			}
 			return f.unbind_range_locked(ctx.id, request.addr, request.range)
@@ -880,7 +911,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
 			obj := f.objects.get_ref(request.handle) or { return -2 }
-			if katomic.load(&f.inflight_by_vm[ctx.id]) != 0 {
+			if katomic.load(&ctx.inflight) != 0 {
 				gem.unref(obj)
 				return -16
 			}
@@ -1242,9 +1273,6 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 fn discard_g13_completion(mut state G13SubmitCompletion) {
 	submission := state.submission
 	command_index := state.command_index
-	if state.file != unsafe { nil } && state.vm_id < mmu.uat_num_contexts {
-		katomic.dec(mut &state.file.inflight_by_vm[state.vm_id])
-	}
 	if state.result != unsafe { nil } {
 		gem.unref(state.result)
 		state.result = unsafe { nil }
@@ -1255,6 +1283,7 @@ fn discard_g13_completion(mut state G13SubmitCompletion) {
 	if submission != unsafe { nil } {
 		// Only private callback retirement permits per-command capture release.
 		// done is published earlier, while completion backing is still live.
+		katomic.dec(mut &submission.vm.inflight)
 		katomic.store(mut &submission.commands[command_index].callback_finished, true)
 		// Last node access: zero permits the worker to free the submission.
 		katomic.dec(mut &submission.callbacks_remaining)
@@ -1347,7 +1376,7 @@ fn g13_result_info(failure &gpu.G13JobError, successful bool) ioctl.DrmAsahiResu
 
 // Caller holds the file lock. A failed setup is unwound by cancel_g13_pending
 // before the node is freed, including callbacks already installed on prior jobs.
-fn (mut f GpuFile) install_g13_batch_completion(mut pending G13PendingSubmission,
+fn install_g13_batch_completion(mut pending G13PendingSubmission,
 	index u32, command &agxsubmission.Command,
 	result_object &gem.GemObject) int {
 	mut manager := unsafe { pending.manager }
@@ -1355,15 +1384,13 @@ fn (mut f GpuFile) install_g13_batch_completion(mut pending G13PendingSubmission
 	is_compute := command.descriptor.cmd_type == ioctl.asahi_cmd_compute
 	if command.descriptor.result_size != 0 { gem.ref_obj(result_object) }
 	mut completion := &G13SubmitCompletion{
-		file: unsafe { &f }
-		vm_id: pending.vm_id
 		result: if command.descriptor.result_size != 0 { unsafe { result_object } } else { unsafe { nil } }
 		result_offset: command.descriptor.result_offset
 		submission: unsafe { &pending }
 		command_index: index
 	} @[freed]
 	katomic.inc(mut &pending.callbacks_remaining)
-	katomic.inc(mut &f.inflight_by_vm[pending.vm_id])
+	katomic.inc(mut &pending.vm.inflight)
 	installed := if is_compute {
 		manager.set_g13_compute_completion(entry.compute_job, g13_compute_completed, voidptr(completion))
 	} else {
@@ -1382,8 +1409,7 @@ fn (mut f GpuFile) capture_submission_queue(queue_id u32) ?G13SubmissionQueue {
 	for queue in f.queues {
 		if queue.id != queue_id || queue.detached { continue }
 		for ownership in f.g13_queues {
-			if ownership.queue_id == queue_id && ownership.resources != unsafe { nil }
-				&& queue.vm_id != 0 && queue.vm_id < mmu.uat_num_contexts {
+			if ownership.queue_id == queue_id && ownership.resources != unsafe { nil } && queue.vm_id != 0 {
 				mut resources := unsafe { ownership.resources }
 				resources.retain_file_reference()
 				return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, usc_base: queue.usc_base, resources: resources, retained: true}
@@ -1469,11 +1495,11 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	}
 	vm_id := captured.vm_id
 	queue_caps := captured.caps
-	if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return -22 }
+	if vm_id == 0 { return -22 }
 	vm := f.find_owned_vm(vm_id) or { return -22 }
 	// Never publish work through an incompletely invalidated mapping. This
 	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
-	if !f.cleanup_closed_mappings_locked(vm_id) { return -5 }
+	if !f.cleanup_closed_mappings_locked(vm) { return -5 }
 	if !captured.retained { return -22 }
 	queue_resources := captured.resources
 	mut result_object := &gem.GemObject(unsafe { nil })
@@ -1493,7 +1519,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	mut pending := unsafe { &G13PendingSubmission(storage) }
 	unsafe { *pending = G13PendingSubmission{
 		file: &f
-		vm_id: vm_id
+		vm: vm
 		queue: queue_resources
 		manager: manager
 		dependencies: pending_inputs
@@ -1540,15 +1566,15 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	mut fence_queue := unsafe { queue_resources }
 	pending.final_fence = syncobj.new_queue_fence(f.owner_key, u64(fence_queue.next_fence_seqno()), queue_resources.fence_context)
 	for index := u32(0); index < pending.command_count; index++ {
-		code := f.install_g13_batch_completion(mut pending, index, unsafe { &commands[index] }, result_object)
+		code := install_g13_batch_completion(mut pending, index, unsafe { &commands[index] }, result_object)
 		if code != 0 { return code }
 	}
 	if !agxsubmission.install_output_syncs(output_syncs, pending.final_fence) { return -22 }
-	katomic.inc(mut &f.inflight_by_vm[vm_id])
+	katomic.inc(mut &pending.vm.inflight)
 	if !register_g13_pending(mut gpu_manager, pending) {
 		cancel_g13_pending(mut pending, -19)
 		assert katomic.load(&pending.callbacks_remaining) == 0
-		katomic.dec(mut &f.inflight_by_vm[vm_id])
+		katomic.dec(mut &pending.vm.inflight)
 		return -19
 	}
 	// Registration transferred the captured queue reference to the worker

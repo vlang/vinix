@@ -35,7 +35,7 @@ fn check_detached_vms() {
 					vm.queue = resources
 					resources.failures = failures
 					for _ in 0 .. int(pins) { resources.retain_file_reference() }
-					file.inflight_by_vm[1] = pins
+					vm.inflight = pins
 					key := u64(0x5000_0000 + cycle)
 					file_map[key] = unsafe { &file }
 					gpu.fail_flushes(failures)
@@ -43,7 +43,7 @@ fn check_detached_vms() {
 					destroy := ioctl.DrmAsahiVmDestroy{vm_id: 1}
 					assert file.ioctl_vm_destroy(&destroy) == 0
 					assert file.ioctl_vm_destroy(&destroy) == -2
-					assert file.detached_vms[1] && !vm.destroyed && !other.destroyed
+					assert vm.detached && !vm.destroyed && !other.destroyed
 					if _ := file.find_vm(1) { panic('detached VM name visible') }
 					owned := file.find_owned_vm(1) or { panic('lost physical VM owner') }
 					assert voidptr(owned) == voidptr(&vm)
@@ -52,7 +52,7 @@ fn check_detached_vms() {
 					// the VM name or changing aggregate job admission.
 					captured := file.capture_submission_queue(create.queue_id) or { panic('queue capture') }
 					assert captured.retained && voidptr(captured.resources) == voidptr(resources)
-					assert file.inflight_by_vm[1] == pins
+					assert vm.inflight == pins
 					release_submission_queue(captured)
 					gpu.available(true)
 					assert file.ioctl_queue_create(&create) == -2
@@ -67,16 +67,15 @@ fn check_detached_vms() {
 						assert !vm.destroyed && !resources.released && pt.unmaps == 0
 					}
 					for _ in 0 .. int(pins) { resources.release_file_reference() }
-					file.inflight_by_vm[1] = 0
+					vm.inflight = 0
 					gpu.available(true)
 					for _ in 0 .. failures + 4 { reap_open_detached_g13_queues() }
 					assert vm.destroyed && resources.released && logical.destroyed
 					assert pt.unmaps == 1 && !other.destroyed && other_pt.unmaps == 0
 					assert object.references == 2 && file.mappings.len == 1
-					assert !file.detached_vms[1] && file.vms.len == 1
+					assert file.vms.len == 1
 					assert file.ioctl_vm_destroy(&destroy) == -2
-					// A reused hardware slot has a fresh reservation identity and
-					// must not inherit the removed name's bitmap state.
+					// A VM taking over the public name has a fresh identity.
 					mut reused_pt := pgtable.UatPgtable{}
 					mut reused := mmu.UatContext{id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &reused_pt}
 					file.vms << &reused
@@ -97,7 +96,7 @@ fn check_detached_vms() {
 	saved := uat_mgr
 	uat_mgr = unsafe { nil }
 	assert file.ioctl_vm_destroy(&ioctl.DrmAsahiVmDestroy{vm_id: 1}) == 0
-	assert file.detached_vms[1] && !idle.destroyed
+	assert idle.detached && !idle.destroyed
 	uat_mgr = saved
 	file.lock.acquire(); file.reap_detached_vms_locked(); file.lock.release()
 	assert idle.destroyed && file.close()
@@ -115,14 +114,14 @@ fn check_detached_vms() {
 	mut resources := unsafe { closing.g13_queues[0].resources }
 	vm.queue = resources
 	resources.retain_file_reference()
-	closing.inflight_by_vm[1] = 1
+	vm.inflight = 1
 	assert closing.ioctl_vm_destroy(&ioctl.DrmAsahiVmDestroy{vm_id: 1}) == 0
 	file_map[99] = closing
 	device := drm.DrmDevice{}
 	release_handle(&device, voidptr(u64(99)))
 	assert closing_count == 1 && !vm.destroyed && pt.unmaps == 0
 	resources.release_file_reference()
-	closing.inflight_by_vm[1] = 0
+	vm.inflight = 0
 	gpu.fail_flushes(1)
 	reap_closed_files()
 	assert closing_count == 1 && !vm.destroyed && object.references == 2

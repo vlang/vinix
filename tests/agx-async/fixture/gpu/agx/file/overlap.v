@@ -81,10 +81,10 @@ fn check_independent_completion_orders() {
 		watch_batch(file, &object, fence(out))
 		service_file_work()
 		assert manager.published_order == [u32(0), 1]
-		assert file.inflight_by_vm[1] == 3 && object.references == 3
+		assert file.vm.inflight == 3 && object.references == 3
 		if compute_first { manager.finish_compute(0) } else { manager.finish_render(0) }
 		service_file_work()
-		assert !syncobj.is_signaled(fence(out)) && file.inflight_by_vm[1] == 2 && object.references == 2
+		assert !syncobj.is_signaled(fence(out)) && file.vm.inflight == 2 && object.references == 2
 		if compute_first { manager.finish_render(0) } else { manager.finish_compute(0) }
 		service_file_work()
 		assert syncobj.is_signaled(fence(out)) && syncobj.get_error(fence(out)) == 0
@@ -226,7 +226,7 @@ fn check_overlap_failure_and_shutdown() {
 	manager.finish_compute(3)
 	service_file_work()
 	assert manager.released_order == [u32(3), 2]
-	assert !syncobj.is_signaled(fence(out)) && file.inflight_by_vm[1] == 2
+	assert !syncobj.is_signaled(fence(out)) && file.vm.inflight == 2
 	manager.finish_render(0)
 	service_file_work()
 	assert syncobj.get_error(fence(out)) == -110

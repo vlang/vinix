@@ -200,7 +200,7 @@ fn check_command_timestamp_retirement() {
      assert objects[other].references == if completed { 0 } else { 1 }, 'neighboring mappings remain owned'
     }
     if step + 1 < count {
-     assert pending_count == 1 && file.inflight_by_vm[1] == u64(count - step), 'aggregate owner survives partial completion'
+     assert pending_count == 1 && file.vm.inflight == u64(count - step), 'aggregate owner survives partial completion'
      service_file_work()
      assert mgr.timestamp_unmaps == step + 1, 'completed command release is one-shot'
     }

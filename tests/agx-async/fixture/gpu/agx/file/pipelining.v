@@ -20,13 +20,13 @@ fn check_later_submission_completes_first() {
 		assert submit_scheduled(mut file, [ScheduledCommand{ compute: render_first }], b, true) == 0
 		service_file_work()
 		assert manager.published_order == [u32(0), 1] && pending_count == 2
-		assert file.inflight_by_vm[1] == 4 && object.references == 3
+		assert file.vm.inflight == 4 && object.references == 3
 		assert manager.execute_firmware(1, 0), 'independent later submission may execute first'
 		manager.retire_firmware(1)
 		service_file_work()
 		assert syncobj.is_signaled(fence(b)) && !syncobj.is_signaled(fence(a))
 		assert pending_count == 1 && memory.outstanding() == 1
-		assert file.inflight_by_vm[1] == 2 && object.references == 2
+		assert file.vm.inflight == 2 && object.references == 2
 		assert manager.execute_firmware(0, 0)
 		manager.retire_firmware(0)
 		service_file_work()
@@ -107,7 +107,7 @@ fn check_pipelined_failure_and_stop() {
 		manager.retire_firmware(0)
 		service_file_work()
 		assert syncobj.get_error(fence(a)) == -110 && !syncobj.is_signaled(fence(b))
-		assert file.inflight_by_vm[1] == 2 && memory.outstanding() == 1
+		assert file.vm.inflight == 2 && memory.outstanding() == 1
 		if stop {
 			manager.stop()
 		} else {
@@ -131,7 +131,7 @@ fn check_full_pipelined_batches() {
 		assert submit_scheduled(mut file, first, a, false) == 0
 		assert submit_scheduled(mut file, second, b, false) == 0
 		service_file_work()
-		assert manager.published.len == 127 && file.inflight_by_vm[1] == 129
+		assert manager.published.len == 127 && file.vm.inflight == 129
 		// Later batch retires first while the original batch retains its node.
 		for index := u32(64); index < 127; index++ {
 			assert manager.execute_firmware(index, 0)
@@ -139,7 +139,7 @@ fn check_full_pipelined_batches() {
 		for index := 126; index >= 64; index-- { manager.retire_firmware(u32(index)) }
 		service_file_work()
 		assert syncobj.is_signaled(fence(b)) && !syncobj.is_signaled(fence(a))
-		assert pending_count == 1 && file.inflight_by_vm[1] == 65
+		assert pending_count == 1 && file.vm.inflight == 65
 		for index := u32(0); index < 64; index++ {
 			assert manager.execute_firmware(index, 0)
 		}
@@ -251,7 +251,7 @@ fn check_failed_input_between_live_submissions() {
 	service_file_work()
 	assert manager.published_order == [u32(0), 1, 2] && manager.released_order.len == 0
 	assert !syncobj.is_signaled(fence(b)) && !syncobj.is_signaled(fence(a))
-	assert pending_count == 3 && file.inflight_by_vm[1] == 6
+	assert pending_count == 3 && file.vm.inflight == 6
 	assert manager.execute_firmware(2, 0)
 	manager.retire_firmware(2)
 	assert manager.execute_firmware(0, 0)

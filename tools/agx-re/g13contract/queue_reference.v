@@ -6,7 +6,7 @@ fn check_queue_reference_local(file string, pending string, gpu string, vfs stri
 	require_order(capture, ['f.lock.acquire()', 'defer { f.lock.release() }',
 		'if queue.id != queue_id || queue.detached { continue }', 'ownership.queue_id == queue_id',
 		'resources.retain_file_reference()', 'return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, usc_base: queue.usc_base, resources: resources, retained: true}'], 'Capture queue identity, immutable USC base and owner under the namespace lock')!
-	for token in ['memory.', 'usercopy.', 'inflight_by_vm', 'return queue'] { require(!capture.contains(token), 'Capture must not allocate, copy, borrow a logical queue or pin VM job admission')! }
+	for token in ['memory.', 'usercopy.', '.inflight', 'return queue'] { require(!capture.contains(token), 'Capture must not allocate, copy, borrow a logical queue or pin VM job admission')! }
 	release := section(file, 'fn release_submission_queue(', '// Copy userspace input', 'Captured queue cleanup')!
 	require_order(release, ['if !captured.retained { return }', 'captured.resources', 'resources.release_file_reference()'], 'Release exactly the owned queue reference')!
 	submit := section(file, 'pub fn (mut f GpuFile) ioctl_submit(', 'fn dispatch(', 'Queue reference transfer')!
@@ -14,15 +14,15 @@ fn check_queue_reference_local(file string, pending string, gpu string, vfs stri
 		'mut transferred := false', 'defer { if !transferred { release_submission_queue(captured) } }',
 		'stage_storage := memory.malloc_packed_fallible', 'agxsubmission.stage_command_array(',
 		'g13_submission_status()', 'f.lock.acquire()', 'vm_id := captured.vm_id',
-		'f.cleanup_closed_mappings_locked(vm_id)', 'if !captured.retained { return -22 }',
-		'queue_resources := captured.resources', 'katomic.inc(mut &f.inflight_by_vm[vm_id])',
-		'if !register_g13_pending(', 'katomic.dec(mut &f.inflight_by_vm[vm_id])',
+		'f.cleanup_closed_mappings_locked(vm)', 'if !captured.retained { return -22 }',
+		'queue_resources := captured.resources', 'katomic.inc(mut &pending.vm.inflight)',
+		'if !register_g13_pending(', 'katomic.dec(mut &pending.vm.inflight)',
 		'return -19', 'transferred = true', 'queued = true'], 'Owned capture survives staging and transfers only with accepted registration')!
 	require(!submit.contains('for queue in f.queues') && !submit.contains('for ownership in f.g13_queues'), 'Captured state must not be resolved again by userspace name')!
-	require(submit.count('katomic.inc(mut &f.inflight_by_vm[vm_id])') == 1 && submit.count('katomic.dec(mut &f.inflight_by_vm[vm_id])') == 1, 'Aggregate VM pin must keep its original registration balance')!
+	require(submit.count('katomic.inc(mut &pending.vm.inflight)') == 1 && submit.count('katomic.dec(mut &pending.vm.inflight)') == 1, 'Aggregate VM pin must keep its original registration balance')!
 	retire := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Last queue reference')!
 	require_order(retire, ['assert katomic.load(&item.callbacks_remaining) == 0', 'signal_g13_submission_fence(',
-		'queue.release_file_reference()', 'katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])', 'memory.free(voidptr(item))'], 'Drop queue owner after final callbacks/fence access, before releasing the file pin')!
+		'queue.release_file_reference()', 'katomic.dec(mut &item.vm.inflight)', 'memory.free(voidptr(item))'], 'Drop queue owner after final callbacks/fence access, before releasing the file pin')!
 	refs := section(gpu, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner', 'Scalar queue references')!
 	require_order(refs, ['katomic.inc(mut &queue.file_references)', 'pub fn (mut queue G13QueueResources) release_file_reference()',
 		'assert katomic.load(&queue.file_references) != 0', 'katomic.dec(mut &queue.file_references)',

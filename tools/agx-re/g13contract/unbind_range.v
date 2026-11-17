@@ -25,7 +25,7 @@ fn check_unbind_range_local(file string) ! {
 		'if !f.retire_mapping_locked(i) { flush_ok = false }', 'return if flush_ok { 0 } else { -5 }'], 'Reserve transient fragments before clipped retirement; retry tombstones without resplitting')!
 	require(unmap.count('gem.ref_obj(') == 2 && !unmap.contains('gem.unref(') && !unmap.contains('pt.map'), 'Survivors retain PTEs and own refs; retirement owns the only release')!
 	ioctl := section(file.all_after('pub fn (mut f GpuFile) ioctl_gem_bind('), 'ioctl.asahi_bind_op_unbind {', 'ioctl.asahi_bind_op_unbind_all {', 'Native idle range dispatch')!
-	require_order(ioctl, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'katomic.load(&f.inflight_by_vm[ctx.id])', 'return -16',
+	require_order(ioctl, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'katomic.load(&ctx.inflight)', 'return -16',
 		'return f.unbind_range_locked(ctx.id, request.addr, request.range)'], 'Range mutation follows VM/private validation and idle gate')!
 }
 

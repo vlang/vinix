@@ -42,7 +42,7 @@ fn check_private_bo_local(file string, bo string, mmu string, gem string, drm st
 		'fn allocate_context_identity()', 'context_identity_lock.acquire()',
 		'defer { context_identity_lock.release() }', 'context_identities.allocate()',
 		'pub fn (mut mgr UatManager) create_context(', 'identity := allocate_context_identity()',
-		'mut ctx := &UatContext{', 'identity: identity', 'mgr.contexts[i] = ctx'], 'Vinix context incarnation')!
+		'mut ctx := &UatContext{', 'identity: identity', 'return ctx'], 'Vinix context incarnation')!
 }
 
 fn check_private_bo_reference(reference string) ! {

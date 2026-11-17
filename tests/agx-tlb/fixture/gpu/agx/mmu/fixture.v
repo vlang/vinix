@@ -16,11 +16,13 @@ pub mut:
 pub struct UatContext {
 pub mut:
 	id      u32
+	active  bool = true
 	pgtable &pgtable.UatPgtable = unsafe { nil }
 }
 
 pub struct UatManager {
 pub mut:
+	contexts             [uat_num_contexts]&UatContext
 	kernel_lower_pgtable &pgtable.UatPgtable = unsafe { nil }
 	kernel_pgtable       &pgtable.UatPgtable = unsafe { nil }
 	ttbs                 &SlotTtbs           = unsafe { nil }

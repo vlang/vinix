@@ -37,6 +37,8 @@ pub struct UatContext {
 pub mut:
 	id u32
 	vm_id u32
+	inflight u64
+	detached bool
 	identity u64
 	pgtable &pgtable.UatPgtable = unsafe { nil }
 	kernel_start u64 = 0x100000000
@@ -71,7 +73,7 @@ pub fn (mut mgr UatManager) bind_context(ctx &UatContext) bool {
 	assert ctx.id != 0 && ctx.vm_id != 0 && !ctx.destroyed
 	if ctx.pgtable == unsafe { nil } { return false }
 	mut table := unsafe { ctx.pgtable }
-	table.tlb_asid = u8(ctx.id)
+	table.tlb_asid = 1
 	table.tlb_bound = true
 	mgr.vm_binds++
 	return true

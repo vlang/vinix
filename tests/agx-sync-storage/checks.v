@@ -245,7 +245,7 @@ fn check_large_sync_backend_lifetimes(mut file GpuFile, bytes []u8, input &synco
 				if mode == 4 {
 					manager.stop()
 				} else if mode == 5 {
-					file.detached_vms[1] = true
+					file.vm.detached = true
 					file.queues[0] = LogicalQueue{ id: 1, detached: true }
 					service_file_work()
 					assert manager.published.len == 0 && memory.outstanding() == 2
@@ -259,7 +259,7 @@ fn check_large_sync_backend_lifetimes(mut file GpuFile, bytes []u8, input &synco
 				assert syncobj.is_signaled(fence(last))
 				assert syncobj.get_error(fence(last)) == if mode == 4 { -19 } else { 0 }
 			}
-			file.detached_vms[1] = false
+			file.vm.detached = false
 			file.queues[0] = LogicalQueue{ id: 1 }
 			assert_drained(file)
 			cases++

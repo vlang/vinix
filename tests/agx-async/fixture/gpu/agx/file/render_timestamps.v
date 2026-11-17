@@ -85,7 +85,7 @@ fn check_render_stage_timestamps() {
       assert timestamp_reference_count(file, peer) == 2, 'active peer retains both timestamp destinations'
       assert manager.timestamp_unmaps == if shared_ids { 0 } else { step + 1 }
       assert manager.g13_render_jobs.len == count && pending_count == 1
-       && pending_head.callbacks_remaining == u32(count) && file.inflight_by_vm[1] == u64(count + 1),
+       && pending_head.callbacks_remaining == u32(count) && file.vm.inflight == u64(count + 1),
        'shared render metadata and aggregate owners remain retained'
       service_file_work()
       assert manager.timestamp_unmaps == if shared_ids { 0 } else { step + 1 }, 'stage mapping release is one-shot'

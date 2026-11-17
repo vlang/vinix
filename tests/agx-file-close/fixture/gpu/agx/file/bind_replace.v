@@ -41,12 +41,12 @@ fn check_bind_replacements() {
 						request.offset = if new_repeat { 31 * pgtable.uat_pgsz } else { pgtable.uat_pgsz }
 						request.flags = flags | if new_repeat { ioctl.asahi_bind_single_page } else { u32(0) }
 						before_alloc := memory.calls(); before_flush := gpu.flushes(); before_prepare := pt.prepares
-						file.inflight_by_vm[1] = 1
+						vm.inflight = 1
 						assert file.ioctl_gem_bind(&request) == -16
 						assert first.references == 3 && second.references == 3 && target.references == 1
 						assert pt.leaves == old_leaves && pt.protections == old_protection
 						assert memory.calls() == before_alloc && gpu.flushes() == before_flush && pt.prepares == before_prepare
-						file.inflight_by_vm[1] = 0; cases++
+						vm.inflight = 0; cases++
 						for _ in 0 .. 2 {
 							assert file.ioctl_gem_bind(&request) == 0, 'BIND must replace idle overlapping mappings'
 							for index in 0 .. 32 {
@@ -126,9 +126,9 @@ fn check_bind_replacements() {
 		assert fresh.ioctl_gem_bind(bind(7, 1, 0x4000)) == -12
 		fresh_pt.reject_prepare = false
 		assert fresh_object.references == 1 && fresh.mappings.len == 0 && fresh_pt.maps == 0; cases++
-		fresh.inflight_by_vm[1] = 1
+		fresh_vm.inflight = 1
 		assert fresh.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0 && fresh_object.references == 2
-		fresh.inflight_by_vm[1] = 0; cases++
+		fresh_vm.inflight = 0; cases++
 		assert fresh.close() && gem.live() == 0
 		memory.assert_released()
 	}

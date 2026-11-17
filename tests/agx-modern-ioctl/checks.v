@@ -87,7 +87,7 @@ fn check_modern_transport() {
 	mut vm := asahi.VmCreate{ kernel_start: 0x100000000, kernel_end: 0x120000000 }
 	usercopy.configure(unsafe { u64(&vm) }, sizeof(vm), -1)
 	assert drm.invoke(&device, 0x1111, asahi.vm_create, sizeof(vm), 3, unsafe { voidptr(&vm) }) == 0 && vm.vm_id == 1
-	assert context.vm_id == 1 && context.id == 55
+	assert context.vm_id == 1 && context.id == 1
 	vm.flags = 1
 	assert drm.invoke(&device, 0x1111, asahi.vm_create, sizeof(vm), 3, unsafe { voidptr(&vm) }) == -22
 	mut mmap := asahi.GemMmapOffset{ handle: 91 }
@@ -165,6 +165,8 @@ pub fn run_modern_checks() {
 	defer { uat_mgr = unsafe { nil } }
 	check_modern_transport()
 	check_file_vm_names(mut manager)
+	check_dormant_vm_capacity(mut manager)
+	check_eager_vm_rollback(mut manager)
 	check_modern_binding()
 	check_modern_queue_and_object()
 	run_advice_checks()
@@ -188,24 +190,24 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 	mut modern := asahi.VmCreate{ kernel_start: request.kernel_start, kernel_end: request.kernel_end }
 	assert second.ioctl_modern_vm_create(unsafe { &modern }) == 0 && modern.vm_id == 1
 	assert first.find_vm(17) == none && second.find_vm(18) == none
-	assert (second.find_vm(1) or { panic('second file VM') }).id == 18
+	assert (second.find_vm(1) or { panic('second file VM') }).id == 1
 	manager.next_context = unsafe { &sibling }
 	assert first.ioctl_vm_create(unsafe { &request }) == 0 && request.vm_id == 2
 
 	mut queue := ioctl.DrmAsahiQueueCreate{ vm_id: 1, queue_caps: ioctl.asahi_queue_cap_compute }
 	assert first.ioctl_queue_create(unsafe { &queue }) == 0
-	assert first.queues[0].vm_id == 17 && first.g13_queues[0].vm_id == 17
+	assert first.queues[0].vm_id == old.id && first.g13_queues[0].vm_id == old.id
 	assert first.ioctl_vm_destroy(&ioctl.DrmAsahiVmDestroy{ vm_id: 1 }) == 0
 	assert first.find_vm(1) == none && !old.destroyed
-	assert (first.find_owned_vm(17) or { panic('old queue VM') }).identity == old.identity
+	assert (first.find_owned_vm(old.id) or { panic('old queue VM') }).identity == old.identity
 
 	request.vm_id = 99
 	assert first.ioctl_vm_create(unsafe { &request }) == -12 && request.vm_id == 99
 	assert manager.vm_binds == binds_before
 	manager.next_context = unsafe { &replacement }
 	assert first.ioctl_vm_create(unsafe { &request }) == 0 && request.vm_id == 1
-	assert (first.find_vm(1) or { panic('reused file VM name') }).id == 19
-	assert first.queues[0].vm_id == 17 && !old.destroyed
+	assert (first.find_vm(1) or { panic('reused file VM name') }).id == replacement.id
+	assert first.queues[0].vm_id == old.id && replacement.id != old.id && !old.destroyed
 	assert !old.is_bound() && !replacement.is_bound()
 
 	mut object := ioctl.DrmAsahiGemCreate{ size: 0x4000, vm_id: 1, flags: ioctl.asahi_gem_vm_private }
@@ -214,12 +216,12 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 	flushes := gpu.flushes()
 	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
 	assert gpu.flushes() == flushes && !replacement.is_bound()
-	assert first.mappings[0].vm_id == 19 && first.mappings[0].obj.vm_private_identity == replacement.identity
+	assert first.mappings[0].vm_id == replacement.id && first.mappings[0].obj.vm_private_identity == replacement.identity
 	assert old_pt.maps == 0 && new_pt.maps == 1
 	unbind := ioctl.DrmAsahiGemBind{ vm_id: 1, op: ioctl.asahi_bind_op_unbind, range: bind.range, addr: bind.addr }
-	first.inflight_by_vm[19] = 1
+	replacement.inflight = 1
 	assert first.ioctl_gem_bind(&unbind) == -16 && new_pt.unmaps == 0
-	first.inflight_by_vm[19] = 0
+	replacement.inflight = 0
 	assert first.ioctl_gem_bind(&unbind) == 0 && new_pt.unmaps == 1 && old_pt.unmaps == 0
 	assert gpu.flushes() == flushes
 	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
@@ -233,6 +235,49 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 	memory.assert_released()
 	println('AGX VM names: per-file allocation, detached name reuse, failed creation and physical routing through queue, private GEM and VM_BIND passed')
 	println('AGX VM publication: creation and dormant mappings skip firmware invalidation, with acknowledged unbind after publication')
+}
+
+fn check_dormant_vm_capacity(mut manager mmu.UatManager) {
+	mut contexts := [96]mmu.UatContext{}
+	mut file := GpuFile{}
+	binds := manager.vm_binds
+	mut request := asahi.VmCreate{kernel_start: 0x100000000, kernel_end: 0x120000000}
+	for index in 0 .. contexts.len {
+		context := unsafe { &contexts[index] }
+		manager.next_context = context
+		if file.vms.len == file.vms.cap {
+			request.vm_id = 0xffffffff
+			memory.fail_allocations(true)
+			assert file.ioctl_modern_vm_create(&request) == -12 && request.vm_id == 0xffffffff
+			memory.fail_allocations(false)
+			assert file.vms.len == index && voidptr(manager.next_context) == voidptr(context)
+		}
+		assert file.ioctl_modern_vm_create(&request) == 0 && request.vm_id == u32(index + 1)
+	}
+	assert file.vms.len == 96 && manager.vm_binds == binds
+	assert file.ioctl_vm_destroy(&ioctl.DrmAsahiVmDestroy{vm_id: 65}) == 0
+	assert contexts[64].destroyed && file.find_vm(65) == none
+	mut replacement := mmu.UatContext{}
+	manager.next_context = unsafe { &replacement }
+	assert file.ioctl_modern_vm_create(&request) == 0 && request.vm_id == 65
+	assert (file.find_vm(66) or { panic('neighbor VM') }).id == 66
+	assert file.close() && replacement.destroyed
+	for context in contexts { assert context.destroyed }
+	memory.assert_released()
+	println('AGX VM admission: 96 dormant file VMs, fallible growth and reuse of public name 65 passed')
+}
+
+fn check_eager_vm_rollback(mut manager mmu.UatManager) {
+	manager.handoff_abi = .g17_26_5
+	defer { manager.handoff_abi = .v12_3 }
+	mut file := GpuFile{}
+	mut context := mmu.UatContext{}
+	manager.next_context = unsafe { &context }
+	mut request := asahi.VmCreate{vm_id: 77, kernel_start: 0x100000000, kernel_end: 0x120000000}
+	assert file.ioctl_modern_vm_create(&request) == -12
+	assert context.destroyed && file.vms.len == 0 && request.vm_id == 77
+	assert file.close()
+	memory.assert_released()
 }
 
 fn check_modern_queue_and_object() {

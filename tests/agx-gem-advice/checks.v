@@ -5,6 +5,7 @@ module file
 import drm
 import drm.asahi
 import drm.gem
+import gpu.agx.mmu
 import klock
 import usercopy
 
@@ -70,7 +71,8 @@ pub fn run_advice_checks() {
 		contents := C.__builtin_alloca(64)
 		unsafe { C.memset(contents, 0x5a, 64); object.phys_addr = u64(contents) }
 		file.objects.add_created(object)
-		file.inflight_by_vm[1] = 9
+		mut vm := mmu.UatContext{inflight: 9}
+		file.vms << &vm
 		for owner in 0 .. 3 { for madv in [u32(0), 1, 2, ~u32(0)]! { for pad in [u32(0), 1]! {
 			unsafe { object.advice_dontneed = madv == 0 }
 			old_advice := object.advice_dontneed
@@ -89,7 +91,7 @@ pub fn run_advice_checks() {
 			for index in 0 .. 64 { assert unsafe { (&u8(contents))[index] } == 0x5a, 'advice must retain resident contents' }
 			cases++
 		} } }
-		file.inflight_by_vm[1] = 0
+		vm.inflight = 0
 		assert file.close() && foreign.close()
 	} }
 	assert cases == 96

@@ -37,7 +37,7 @@ fn check_detached_queues() {
 						vms: [unsafe { &vm }]
 					}
 					for _ in 0 .. int(pins) { resource.retain_file_reference() }
-					file.inflight_by_vm[1] = pins
+					vm.inflight = pins
 					key := u64(0x1000_0000 + cycle)
 					file_map[key] = unsafe { &file }
 					gpu.available(available)
@@ -67,7 +67,7 @@ fn check_detached_queues() {
 					for _ in 0 .. int(pins) { resource.release_file_reference() }
 					// Unrelated accepted work in the same VM must not retain this
 					// queue after its own last submission reference ends.
-					file.inflight_by_vm[1] = 7
+					vm.inflight = 7
 					if !resource.released {
 						reaping_file = unsafe { &file }
 						gpu.watch_queue_release(check_registry_pin)
@@ -77,7 +77,7 @@ fn check_detached_queues() {
 					assert queue.destroyed && resource.released && !vm.destroyed
 					assert file.queues.len == 0 && file.g13_queues.len == 0
 					assert !file_map_lock.is_held() && !file.lock.is_held()
-					file.inflight_by_vm[1] = 0
+					vm.inflight = 0
 					file_map.delete(key)
 					assert file.close() && vm.destroyed
 					cases++
@@ -91,14 +91,14 @@ fn check_detached_queues() {
 	mut resource := gpu.G13QueueResources{queue_id: 9, failures: 1}
 	mut vm := mmu.UatContext{id: 1, vm_id: 1}
 	mut closing := &GpuFile{queues: [unsafe { &queue }], g13_queues: [G13QueueOwnership{queue_id: 9, vm_id: 1, resources: unsafe { &resource }}], vms: [unsafe { &vm }]}
-	closing.inflight_by_vm[1] = 1
+	vm.inflight = 1
 	resource.retain_file_reference()
 	file_map[99] = closing
 	assert closing.ioctl_queue_destroy(&ioctl.DrmAsahiQueueDestroy{queue_id: 9}) == 0
 	device := drm.DrmDevice{}
 	release_handle(&device, voidptr(u64(99)))
 	assert 99 !in file_map && closing_count == 1 && !queue.destroyed
-	closing.inflight_by_vm[1] = 0
+	vm.inflight = 0
 	resource.release_file_reference()
 	reap_closed_files()
 	assert closing_count == 1 && !queue.destroyed && !vm.destroyed

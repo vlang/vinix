@@ -11,9 +11,9 @@ fn detach_vm_during_copy() {
 	// The close fixture executes actual VM_DESTROY. Inject its namespace
 	// result here while the actual submit body owns its captured queue.
 	vm_detach_copy_file.lock.acquire()
-	assert vm_detach_copy_file.inflight_by_vm[1] == 0
+	assert vm_detach_copy_file.vm.inflight == 0
 	assert vm_detach_copy_file.g13_queues[0].resources.has_file_references()
-	vm_detach_copy_file.detached_vms[1] = true
+	vm_detach_copy_file.vm.detached = true
 	vm_detach_copy_file.lock.release()
 }
 
@@ -21,6 +21,9 @@ fn check_detached_vm_submissions() {
 	for _ in 0 .. 200 {
 		gpu.reset()
 		mut file := new_file()
+		file.vm.id = 65
+		file.queues[0] = LogicalQueue{id: 1, vm_id: 65}
+		file.queues[1] = LogicalQueue{id: 2, vm_id: 65}
 		mut manager := gpu.get_global_manager() or { panic('manager') }
 		out := output()
 		vm_detach_copy_file = file

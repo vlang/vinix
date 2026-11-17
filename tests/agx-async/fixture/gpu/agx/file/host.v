@@ -50,25 +50,23 @@ mut:
 	g13_queues     []Ownership
 	vm             &mmu.UatContext = unsafe { nil }
 	objects        Objects
-	inflight_by_vm [64]u64
-	detached_vms [64]bool
 	mapping_retry_blocked bool
 	timestamp_objects []TimestampObject
 }
 
 // Mapping/page-table services are injected here; the close fixture exercises
 // the production retirement helper and ioctl mapping paths.
-fn (mut file GpuFile) cleanup_closed_mappings_locked(_vm_id u32) bool {
+fn (mut file GpuFile) cleanup_closed_mappings_locked(_vm &mmu.UatContext) bool {
 	return !file.mapping_retry_blocked
 }
 
 fn (file &GpuFile) find_vm(id u32) ?&mmu.UatContext {
-	if id < 64 && file.detached_vms[id] { return none }
-	return file.find_owned_vm(id)
+	if id != 1 || file.vm.detached { return none }
+	return unsafe { file.vm }
 }
 
 fn (file &GpuFile) find_owned_vm(id u32) ?&mmu.UatContext {
-	if id == 1 { return file.vm }
+	if id == file.vm.id { return file.vm }
 	return none
 }
 
@@ -143,7 +141,7 @@ fn fence(object &syncobj.SyncObj) &syncobj.DmaFence {
 fn assert_drained(file &GpuFile) {
 	for ownership in file.g13_queues { assert !ownership.resources.has_file_references() }
 	assert pending_head == unsafe { nil } && pending_tail == unsafe { nil } && pending_count == 0
-	assert file.inflight_by_vm[1] == 0 && memory.outstanding() == 0
+	assert file.vm.inflight == 0 && memory.outstanding() == 0
 	manager := gpu.get_global_manager() or { panic('manager') }
 	assert manager.g13_compute_jobs.len == 0 && manager.g13_render_jobs.len == 0
 	assert manager.capture_pins == 0
@@ -162,7 +160,7 @@ fn check_dependencies_and_fifo() {
 	assert submit(mut file, 1, false, input, a, false) == 0
 	assert submit(mut file, 1, false, unsafe { nil }, b, false) == 0
 	assert submit(mut file, 2, false, unsafe { nil }, c, false) == 0
-	assert manager.published.len == 0 && pending_count == 3 && file.inflight_by_vm[1] == 6
+	assert manager.published.len == 0 && pending_count == 3 && file.vm.inflight == 6
 	// Userspace input was stack-owned; worker only sees immutable prepared jobs.
 	assert manager.g13_compute_jobs[0].marker == 0x12340000
 	service_file_work()
@@ -190,18 +188,18 @@ fn check_pair_and_forged_fence() {
 	file.objects = Objects{ object: &object }
 	out := output()
 	assert submit(mut file, 1, true, unsafe { nil }, out, true) == 0
-	assert file.inflight_by_vm[1] == 3 && object.references == 3
+	assert file.vm.inflight == 3 && object.references == 3
 	syncobj.signal(fence(out)) // clients must not drive internal phase/lifetime
 	service_file_work()
 	assert manager.published == [u32(12), 10] && memory.outstanding() == 1
 	service_file_work()
-	assert manager.published == [u32(12), 10] && file.inflight_by_vm[1] == 3
+	assert manager.published == [u32(12), 10] && file.vm.inflight == 3
 	manager.finish_compute(0)
-	assert file.inflight_by_vm[1] == 2 && object.references == 2
+	assert file.vm.inflight == 2 && object.references == 2
 	service_file_work()
 	assert manager.published == [u32(12), 10]
 	manager.finish_render(0)
-	assert file.inflight_by_vm[1] == 1 && object.references == 1
+	assert file.vm.inflight == 1 && object.references == 1
 	service_file_work()
 	assert_drained(file)
 	compute := unsafe { &ioctl.DrmAsahiResultCompute(&result[0]) }

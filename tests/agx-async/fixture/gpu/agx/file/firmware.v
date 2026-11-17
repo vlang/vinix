@@ -56,7 +56,7 @@ fn check_firmware_fragment_and_older_target() {
 	assert manager.execute_firmware(2, 0), 'the first render is sufficient; do not wait for the second'
 	manager.retire_firmware(2)
 	service_file_work()
-	assert !syncobj.is_signaled(fence(out)) && file.inflight_by_vm[1] == 3
+	assert !syncobj.is_signaled(fence(out)) && file.vm.inflight == 3
 	assert manager.execute_firmware(1, 0)
 	manager.retire_firmware(1)
 	service_file_work()
@@ -85,7 +85,7 @@ fn check_published_dependency_failure() {
 		manager.retire_firmware(0)
 		service_file_work()
 		assert manager.released_order.len == 0 && pending_head.callbacks_remaining == 3
-		assert file.inflight_by_vm[1] == 4 && !syncobj.is_signaled(fence(out))
+		assert file.vm.inflight == 4 && !syncobj.is_signaled(fence(out))
 		if stop {
 			manager.stop()
 		} else {
