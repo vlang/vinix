@@ -53,6 +53,8 @@ pub:
 // fixed 0x2c-byte payload. Initialize (0x19) carries an all-zero payload.
 pub const device_control_grow_tvb_ack = u32(0x0d)
 pub const device_control_recover_channel = u32(0x0e)
+pub const device_control_destroy_context_v12_3 = u32(0x17)
+pub const device_control_destroy_context_v13_5 = u32(0x18)
 pub const device_control_initialize_v12_3 = u32(0x19)
 pub const device_control_initialize_v13_5 = u32(0x1a)
 
@@ -98,6 +100,25 @@ pub fn make_device_control_initialize(abi hw.FirmwareAbi) ?FwDeviceControlMsg {
 	return FwDeviceControlMsg{
 		tag: tag
 	}
+}
+
+// DestroyContext with either context ID set to 0xff leaves contexts intact
+// but flushes the coprocessor data cache. Asahi uses both sentinel IDs.
+pub fn make_g13_cache_flush(abi hw.FirmwareAbi) ?FwDeviceControlMsg {
+	context_offset := match abi {
+		.v12_3 { 0x14 }
+		.v13_5_partial { 0x11 }
+		else { return none }
+	}
+	mut message := FwDeviceControlMsg{
+		tag: if abi == .v12_3 { device_control_destroy_context_v12_3 } else { device_control_destroy_context_v13_5 }
+	}
+	unsafe {
+		mut bytes := &u8(&message)
+		bytes[context_offset] = 0xff
+		bytes[context_offset + 1] = 0xff
+	}
+	return message
 }
 
 @[packed]

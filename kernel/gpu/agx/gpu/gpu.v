@@ -437,6 +437,11 @@ fn (mut mgr GpuManager) alloc_shared_buffer(size u64) ?SharedBuffer {
 
 fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64,
 	protection u64) ?SharedBuffer {
+	if protection != pgtable.gpu_prot_fw_private_rw
+		&& protection != pgtable.gpu_prot_fw_shared_rw
+		&& protection != pgtable.gpu_prot_fw_shared_ro
+		&& protection != pgtable.gpu_prot_gpu_ro_fw_private_rw { return none }
+	mgr.collect_g13_heap_garbage_locked()
 	return match protection {
 		pgtable.gpu_prot_fw_private_rw {
 			alloc_buffer_from_heap(mut mgr.g13_private, size, protection, buffer_allocator_g13_private)
