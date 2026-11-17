@@ -6001,3 +6001,78 @@ beside the receipt. No checkpoint file changes after recording begins. This
 inventory covers ordinary logical bytes/types/modes/sizes/links. Explicit
 native receipts separately pin selected live node content; neither claims all
 native attributes at rest throughout the workspace.
+
+### Native host directory entry-name inventory (2026-11-17)
+
+Feature `e0ad65beb`, with fixture-retention fix `e8128f738`, adds the production
+`wine-directory-content.v` capture/check CLI, `winedircontent` reader and native
+controls. Explicit canonical absolute directory targets are opened with
+`O_DIRECTORY`, `O_NOFOLLOW`, `O_NONBLOCK` and `O_CLOEXEC`. Held descriptor identity
+is checked against the path and `fdopendir`/`readdir` enumerates immediate names,
+distinguishing enumeration errors from end-of-stream. Dot entries are excluded;
+other names are hex encoded and sorted without opening or following children.
+Two complete matching passes and final canonical/type/identity checks are
+required. Limits are 2,048 targets, 4,096 names per directory, 16,384 names per
+pass, 255 bytes per name and 1 MiB aggregate raw name bytes. Declaration and
+receipt bounds are 1 MiB and 8 MiB respectively. Observations are quiescent,
+not atomic snapshots; concurrent change-and-restore races remain outside scope.
+
+The main and reader sources are embedded and checked again before publication.
+Receipts bind both sources, the executable and exact declaration bytes. Inputs
+must be ordinary bounded files read through nonblocking no-follow descriptors
+with identity/size checks. Publication is exclusive and outside observed
+directories, avoiding self-created names. Canonical comparison rejects altered,
+unknown/duplicate or trailing receipt content. All checks remain active under
+`-prod`.
+
+The final production run passes empty and populated native baselines, six live
+name/target changes with restored baselines and 37 exact exit-1 refusals. Hidden,
+quoted, backslash, newline, Unicode, directory, dangling/cyclic-link and FIFO
+entries are observed without following children. Changes only to child bytes,
+kinds, link bodies or descendants leave the immediate-name receipt valid.
+Forged receipts, invalid declarations, linked/large/FIFO evidence, overwrites
+and output within observed directories refuse. Native fixtures reach the exact
+per-directory and global entry-count limits and the exact 1 MiB raw-name limit;
+their first increments refuse. Per-directory and raw-byte restorations pass.
+Three further guards reject non-production publication and changed main/reader
+sources, with restored source baselines. FIFO commands have two-second bounds.
+
+The exact original format-11 builder admits fixture, controller, producer and
+retainer before and after read-only capture/check. Canonicalizing each admitted
+inner replay's directory declaration yields 50 targets per role. All four
+native receipts recheck. Original host data, metadata, query, xattr, alias,
+source, SDK and image admission remains mandatory. This additive checkpoint
+changes no required host format, sandbox permissions, kernel or guest behavior.
+Mandatory directory-name integration, full search/absence and exception-tree
+coverage, loader/toolchain closure, owned ARM/GUI, redistribution and default
+activation remain open.
+
+The complete checkpoint is `/Users/alex/.cache/vwdircontent-20261117-01`.
+Final tools, frozen source, controls, guards and validation are in `final-02`.
+All four selected source/document files match repository bytes. Exact argv,
+selected compiler environment, logs, exits, feature revisions and patches are
+retained. The compiler is `/Users/alex/.cache/vinix-wine-build/v/v`; final tools
+use `-backend c -prod -gc boehm`. The complete original checkpoint
+`/Users/alex/.cache/vwhostlinkxattr-20261117-01`, its original checker and all
+compiler/LLVM/SDK/image/source namespaces and historical prerequisites remain
+required and unchanged.
+
+The first inventory attempt correctly refused the native newline-name fixture
+with `unsafe workspace inventory path`; its log remains beside the final
+receipt. The checker now serializes the exact original path hex, metadata and
+bytes before retaining that file under a safe name after observations. Earlier
+private fixture nodes receive the same recorded retirement. FIFO metadata is
+retained before node removal. The entire qualification was rerun in `final-02`;
+no historical verifier or its path-framing rules are weakened.
+
+The external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-directory-content-20261117-01.inventory.json`,
+SHA-256 `bcaf3bb2d8a1afd512b74f13879fbad835b7152e20e93082602f191f6b252fbb`.
+Recording and independent comparison pass using the unchanged fixed auditor
+`/Users/alex/.cache/vwhostread-20261116-01/workspace-inventory-final`; the final
+record log is `wine-directory-content-20261117-01.inventory-record-02.log`, and
+the comparison log is `wine-directory-content-20261117-01.inventory-check.log`,
+both beside the receipt. No checkpoint file changes after successful recording
+begins. This inventory covers ordinary logical bytes/types/modes/sizes/links;
+explicit native receipts record selected immediate names at observation time.
+It does not audit all native attributes at rest throughout the workspace.

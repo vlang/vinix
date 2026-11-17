@@ -1449,7 +1449,12 @@ architectures; broader release/catalog/runtime acceptance remains open.
     format-11 host receipts. All four roles pass; 96 admission/control refusals
     comprise 92 host admissions and four private live production-helper cases.
     A fresh signed x86 holder-death/collection run, 32 receipt mutations,
-    18 startup refusals and all 67 retention refusals pass. Complete
+    18 startup refusals and all 67 retention refusals pass. An additive
+    [directory entry-name inventory](tests/packages/wine-directory-content.md)
+    now captures and rechecks 50 canonical declared directories per original
+    host role. All 37 refusals, three production/source guards, restored live
+    baselines and exact native count/byte limits pass. Mandatory directory-name
+    integration remains open. Complete
     xattr/sandbox coverage remains open, along with
     other query/search/metadata operations and OS-loader reads. Complete
     Mach-O linker/library closure, OS shared-cache bytes
