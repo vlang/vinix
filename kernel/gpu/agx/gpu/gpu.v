@@ -1228,7 +1228,9 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 			mgr.state = .error
 			return false
 		}
-		sched.yield(false)
+		// This request still owns fwctl_lock and must return to complete or
+		// retain its handoff slot. yield(false) abandons the caller on ARM.
+		katomic.sync()
 	}
 	if !uat_mgr.complete_flush(slot) {
 		println('agx: firmware-control UAT handoff did not complete')

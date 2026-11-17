@@ -178,6 +178,7 @@ pub fn audit(inputs Inputs) !Report {
 	for role, paths in {
 		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/gem',
 			'kernel/fs/vfs.v',
+			'kernel/sched/sched_arm64.v',
 			'kernel/memory/ram_cache_arm64.v', 'kernel/memory/virtual_arm64.v', 'kernel/aarch64/cpu/data_cache.v',
 			'kernel/memory/mmap/mmap.v', 'kernel/resource/cache.v',
 			'kernel/file/reservation.v', 'kernel/file/file.v', 'kernel/proc/proc.v',
