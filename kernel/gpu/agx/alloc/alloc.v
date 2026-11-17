@@ -254,6 +254,37 @@ pub fn (mut h HeapAllocator) release(va u64) {
 	}
 }
 
+// Cancel only a live reservation that has never been published to a firmware
+// consumer. The caller must first roll back any partial page-table mapping.
+// Unlike release plus GC, this cannot collect unrelated deferred releases.
+pub fn (mut h HeapAllocator) cancel_unpublished(va u64) {
+	h.lock.acquire()
+	defer { h.lock.release() }
+	for index, record in h.allocations {
+		if record.va != va || !record.in_use { continue }
+		assert record.release_order == 0
+		h.retire_hole_order_locked(record.hole_order)
+		if index == 0 {
+			h.retire_hole_order_locked(h.head_hole_order)
+			h.head_hole_order = h.newest_hole_order_locked()
+		} else {
+			mut previous := h.allocations[index - 1]
+			h.retire_hole_order_locked(previous.hole_order)
+			previous.hole_order = h.newest_hole_order_locked()
+		}
+		if record.va + record.size == h.top {
+			h.top = if index == 0 { h.start } else {
+				previous := h.allocations[index - 1]
+				previous.va + previous.size
+			}
+		}
+		h.allocations.delete(index)
+		// No metadata reader can retain this unpublished record past the lock.
+		unsafe { free(record) }
+		return
+	}
+}
+
 // Collect every released record, including below a live allocation. Metadata
 // is no longer needed once released. The removed intervals become reusable
 // holes while all live record addresses stay fixed.

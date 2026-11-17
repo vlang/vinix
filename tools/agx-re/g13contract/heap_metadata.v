@@ -22,7 +22,7 @@ fn check_heap_metadata_local(source string) ! {
   && gc.count('collect_left--') == 1, 'Each iteration finds one oldest release and retires one bounded item')!
  full := section(source, 'fn (mut h HeapAllocator) gc_locked()', '// Return the count', 'Full metadata GC')!
  require(full.contains('h.collect_garbage_locked(h.garbage_count)'), 'Full GC delegates the complete pending count')!
- release := section(source, 'pub fn (mut h HeapAllocator) release(', '// Collect every released record', 'Heap release')!
+ release := section(source, 'pub fn (mut h HeapAllocator) release(', '\n}\n', 'Heap release')!
  require(!release.contains('free('), 'Interior metadata stays owned until GC')!
  require_order(release, ['if a.va == va && a.in_use', 'a.in_use = false',
   'h.garbage_count++', 'a.release_order = h.garbage_count', 'h.garbage_bytes += a.size'],

@@ -409,8 +409,7 @@ fn alloc_buffer_from_heap(mut heap alloc.HeapAllocator, size u64, protection u64
 	}
 
 	if !uat_mgr.map_kernel(va, phys, aligned_size, protection) {
-		heap.release(va)
-		heap.gc()
+		heap.cancel_unpublished(va)
 		memory.pmm_free(voidptr(phys), pages)
 		return none
 	}

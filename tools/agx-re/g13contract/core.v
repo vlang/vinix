@@ -614,6 +614,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_heap_pressure_local(read(os.join_path(repo, 'kernel/gpu/agx/alloc/alloc.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_heap_pressure_reference(read(os.join_path(base, 'alloc.rs'))!)!
+	check_heap_cancel_local(read(os.join_path(repo, 'kernel/gpu/agx/alloc/alloc.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!)!
+	check_heap_cancel_reference(read(os.join_path(base, 'alloc.rs'))!)!
 	check_heap_gc_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_garbage.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!)!
 	check_heap_gc_reference(manager, read(os.join_path(base, 'fw/channels.rs'))!)!

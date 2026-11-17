@@ -6,10 +6,11 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [G13 allocation-pressure policy](m1-agx-heap-pressure.md)
-(2026-11-17). Private and GPU-read-only heaps preserve pending ranges on
-allocation failure instead of bypassing firmware-cache gates with implicit GC.
-Explicit rollback and eager teardown collection remain separate parity gaps.
+Latest offline increment: [unpublished reservation cancellation](m1-agx-heap-cancel.md)
+(2026-11-17). Kernel-buffer mapping failure cancels only its new VA reservation,
+preserving unrelated pending firmware ranges. Eager teardown collection remains
+a separate parity gap. The [G13 allocation-pressure policy](m1-agx-heap-pressure.md)
+report retains the implicit-GC pressure correction and its original evidence.
 The [returning worker scheduling](m1-agx-worker-reschedule.md) report retains
 the G13/G17/fake scheduler correction and its original evidence. The
 [UAT completion polling](m1-agx-uat-poll.md) report retains the separate
