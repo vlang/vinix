@@ -9,6 +9,7 @@ import gpu.agx.mmu
 import gpu.agx.params
 import gpu.agx.pgtable
 import memory
+import os
 import usercopy
 
 fn check_modern_transport() {
@@ -20,14 +21,22 @@ fn check_modern_transport() {
 	// old compatibility structs and the native table's declarations.
 	sizes := [u32(24), 16, 24, 8, 24, 24, 16, 40, 40, 8, 40, 16]!
 	directions := [u32(1), 3, 3, 1, 1, 3, 3, 3, 3, 1, 1, 3]!
+	mut wire := []u64{}
 	mut modern_entries := 0
 	for entry in driver.ioctls {
 		if entry.abi != modern_ioctl_abi { continue }
+		assert modern_entries < sizes.len
 		assert entry.cmd == 0x40 + u32(modern_entries) && entry.size == sizes[modern_entries]
 		assert entry.direction == directions[modern_entries] && entry.extensible
+		wire << drm.request(entry.cmd, entry.size, entry.direction)
 		modern_entries++
 	}
 	assert modern_entries == 12
+	if path := os.getenv_opt('AGX_ASAHI_WIRE_ORACLE') {
+		reference := (os.read_lines(path) or { panic(err) }).filter(it.starts_with('Asahi ioctl encodings: '))
+		assert reference == ['Asahi ioctl encodings: ${wire}'], 'registered ioctl words differ from the pinned C header'
+		println('AGX modern transport: all 12 registered ioctl words match the pinned C header')
+	}
 	mut modern, mut legacy := GpuFile{}, GpuFile{}
 	file_map[0x1111] = unsafe { &modern }
 	file_map[0x2222] = unsafe { &legacy }

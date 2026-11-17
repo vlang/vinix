@@ -4,6 +4,54 @@ import drm.ioctl
 import drm.syncobj
 import gpu.agx.gpu
 
+// Two independent pipes on one producer queue can retire in reverse order
+// in this fixture. A foreign consumer explicitly names both producer fences.
+pub fn audit_dependency_order() {
+	gpu.reset()
+	mut file := new_file()
+	mut manager := gpu.get_global_manager() or { panic('manager') }
+	first, second := output(), output()
+	assert submit(mut file, 1, false, unsafe { nil }, first, false) == 0
+	assert submit_scheduled(mut file, [ScheduledCommand{}], second, false) == 0
+	assert fence(first).context == fence(second).context
+	assert fence(first).seqno < fence(second).seqno
+
+	inputs := [ioctl.DrmAsahiSync{handle: first.handle}, ioctl.DrmAsahiSync{handle: second.handle}]!
+	compute := ioctl.DrmAsahiCmdCompute{encoder_ptr: 0x12340000}
+	command := ioctl.DrmAsahiCommand{
+		cmd_type: ioctl.asahi_cmd_compute
+		cmd_buffer: u64(&compute)
+		cmd_buffer_size: sizeof(compute)
+		barriers: [ioctl.asahi_barrier_none, ioctl.asahi_barrier_none]!
+	}
+	request := ioctl.DrmAsahiSubmit{
+		queue_id: 2
+		commands: u64(&command)
+		command_count: 1
+		in_syncs: unsafe { u64(&inputs[0]) }
+		in_sync_count: 2
+	}
+	assert file.ioctl_submit(&request) == 0
+	service_file_work()
+	assert manager.published_order == [u32(0), 1]
+	assert manager.execute_firmware(1, 0)
+	manager.retire_firmware(1)
+	service_file_work()
+	assert syncobj.is_signaled(fence(second)) && !syncobj.is_signaled(fence(first))
+	consumer_dispatched := manager.published_order.len == 3
+
+	assert manager.execute_firmware(0, 0)
+	manager.retire_firmware(0)
+	service_file_work()
+	assert manager.published_order == [u32(0), 1, 2]
+	assert manager.execute_firmware(2, 0)
+	manager.retire_firmware(2)
+	service_file_work()
+	assert_drained(file)
+	assert !consumer_dispatched, 'foreign consumer dispatched while its first explicit producer fence was pending'
+	println('Foreign consumer waited for both producer fences during reverse retirement.')
+}
+
 fn check_queue_fence_elision() {
 	// Earlier scenarios have drained their jobs. Retire their handle namespace
 	// before extending the suite; preserve the production 1024-object limit and

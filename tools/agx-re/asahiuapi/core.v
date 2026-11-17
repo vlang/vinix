@@ -127,9 +127,11 @@ pub fn oracle(header string) !string {
 		lines << '}\n'
 	}
 	lines << 'fn main() {'
+	lines << '\tmut wire := []u64{}'
 	for name in ['get_params', 'get_time', 'vm_create', 'vm_destroy', 'vm_bind', 'gem_create',
 		'gem_mmap_offset', 'gem_bind_object', 'queue_create', 'queue_destroy', 'submit', 'gem_madvise'] {
 		lines << '\tassert asahi.${name} == u32(C.DRM_COMMAND_BASE) + u32(C.DRM_ASAHI_${name.to_upper()})'
+		lines << '\twire << linux_ioctl_word(u32(C.DRM_IOCTL_ASAHI_${name.to_upper()}))'
 	}
 	for name in ['cmd_render', 'cmd_compute', 'set_vertex_attachments', 'set_fragment_attachments',
 		'set_compute_attachments', 'barrier_none', 'bind_unbind', 'bind_read', 'bind_write',
@@ -144,6 +146,19 @@ pub fn oracle(header string) !string {
 			lines << '\tassert __offsetof(${name}, ${field.name.to_lower()}) == __offsetof(C.${record.name}, ${field.name}), "${record.name}.${field.name} offset"'
 		}
 	}
+	lines << '\tprintln("Asahi ioctl encodings: " + wire.str())'
 	lines << '\tprintln("Asahi UAPI: ${records(header)!.len} records and every field match the packaged C header")\n}\n'
+	// The pinned drm.h selects the host's ioctl macros. The BSD/macOS
+	// encoding swaps the direction bits for read and write compared to Linux.
+	lines << 'fn linux_ioctl_word(raw u32) u64 {
+		$if linux {
+			return u64(raw)
+		} $else {
+			mut direction := u32(0)
+			if raw & u32(C.IOC_IN) != 0 { direction |= 1 }
+			if raw & u32(C.IOC_OUT) != 0 { direction |= 2 }
+			return u64((direction << 30) | (raw & 0x1fff_ffff))
+		}
+	}'
 	return lines.join('\n')
 }

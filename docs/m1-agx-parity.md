@@ -6,6 +6,11 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Latest pre-hardware check: [fresh Omarchy package and Vinix host audit](m1-agx-prehardware-20261117.md).
+The packaged C header matches all twelve registered modern ioctl words. The
+reverse-retirement probe reproduces a dependency regression in `f183daa00`.
+The DRM timeline capability and bundled Mesa also differ from Omarchy.
+
 Latest increment: [captured scheduler dependency deduplication](m1-agx-job-dependencies.md)
 (2026-11-17). Both G13 ABIs retain the latest native 64-bit fence per context,
 with stable context/tie order and no extra allocation. All 4,096 comparison
@@ -309,7 +314,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Native G13 registers the legacy interface and twelve modern extensible operations, selected per file. Modern flat packets and combined syncs reach the scheduler. GEM_MADVISE records private-object advice with resident contents; complete request/sync/backing semantics and matched Mesa integration remain incomplete. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Private input copies keep the latest native 64-bit fence per context. Own-queue native fences are elided; other inputs wait independently of errno. Asahi scheduler init32 sequence wraparound, full scheduler policy and timeline-chain equivalence remain unverified. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Private input copies keep the latest native 64-bit fence per context. An injected reverse completion can dispatch a foreign consumer before an earlier explicitly named fence signals. Own-queue native fences are elided. Asahi's 32-bit sequence ordering, full scheduler policy and timeline-chain equivalence remain open. |
 | Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
 | VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts; idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and physical-slot capacity still differ. |
 | Failed queue construction | The worker retries unpublished G13 resource graphs independently of Handle/VM-name lifetime. Logical queues and captured references retain ownership; failed invalidation retains the graph. Successful release returns the reserved queue ID and allows final VM retirement. |

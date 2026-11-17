@@ -13,7 +13,13 @@ fn main() {
 	mut measure := ''
 	mut arg := 1
 	for arg < os.args.len {
-		if os.args[arg] in ['--measure-modern-sync', '--measure-zero-sync', '--measure-large-sync', '--measure-chain', '--measure-dependencies', '--trace-dependencies', '--dependency-copy-only'] { measure = os.args[arg]; arg++; continue }
+		if os.args[arg] in ['--measure-modern-sync', '--measure-zero-sync', '--measure-large-sync',
+			'--measure-chain', '--measure-dependencies', '--trace-dependencies', '--dependency-copy-only',
+			'--audit-dependency-order'] {
+			measure = os.args[arg]
+			arg++
+			continue
+		}
 		assert os.args[arg] in ['--file-source', '--pending-source', '--timestamp-source', '--modern-source', '--modern-sync-source', '--sync-storage-source', '--dependency-source'] && arg + 1 < os.args.len
 		overrides[os.args[arg]] = os.args[arg + 1]; arg += 2
 	}
@@ -78,10 +84,11 @@ fn main() {
 		else if measure == '--measure-zero-sync' { 'import gpu.agx.file\nfn main() { file.measure_modern_zero_syncs() }\n' }
 		else if measure == '--measure-large-sync' { 'import gpu.agx.file\nfn main() { file.measure_large_syncs() }\n' }
 		else if measure == '--measure-chain' { 'import gpu.agx.file\nfn main() { file.measure_chain_reservations() }\n' }
+		else if measure == '--audit-dependency-order' { 'import gpu.agx.file\nfn main() { file.audit_dependency_order() }\n' }
 		else { 'import gpu.agx.file\nfn main() { file.run_job_dependency_checks(); file.run_modern_chain_checks(); file.run_large_sync_checks(); file.run_modern_zero_checks(); file.run_modern_submission_checks(); file.run_checks() }\n' })!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut build_flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', '${scratch}|@vlib|@vmodules']
-	if measure == '' || measure == '--dependency-copy-only' { build_flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
+	if measure in ['', '--dependency-copy-only', '--audit-dependency-order'] { build_flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
 	build_flags << ['-o', '${scratch}/test', '${scratch}/main.v']
 	build.set_args(build_flags)
 	build.run()
