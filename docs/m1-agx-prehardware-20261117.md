@@ -4,6 +4,10 @@
 packaged C header. The host probe reproduces a cross-queue dependency regression
 introduced by `f183daa00`. All validation ran on the host.
 
+The [follow-up fix](m1-agx-independent-fences.md) covers both submit ABIs and
+timeline transfer. This report records the results before that correction.
+Use the test sources at `7483aa6a5` to replay the historical comparison.
+
 ## Source revisions
 
 | Input | Revision |

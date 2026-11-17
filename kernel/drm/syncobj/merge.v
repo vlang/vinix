@@ -5,10 +5,13 @@ import memory
 
 fn C.__builtin_alloca(uint) voidptr
 
-// Native Asahi job fences use dma_fence_init64. Containers are unwrapped
-// before sorting, so equal contexts keep the greatest unsigned sequence.
+// Group unwrapped leaves by sequence, with ordered fences newest first.
+// Independently completing fences group only with their exact duplicates.
 fn merge_before(a &DmaFence, b &DmaFence) bool {
-	return a.context < b.context || (a.context == b.context && a.seqno > b.seqno)
+	if a.context != b.context { return a.context < b.context }
+	a_instance := fence_sequence_instance(a)
+	b_instance := fence_sequence_instance(b)
+	return a_instance < b_instance || (a_instance == b_instance && a.seqno > b.seqno)
 }
 
 fn merge_sift(items &&DmaFence, root u32, count u32) {
@@ -35,7 +38,7 @@ fn merge_dedup(items &&DmaFence, count u32) u32 {
 	}
 	mut unique := u32(1)
 	for index := u32(1); index < count; index++ {
-		unsafe { if items[index].context != items[unique - 1].context { items[unique] = items[index]; unique++ } }
+		unsafe { if !same_fence_sequence(items[index], items[unique - 1]) { items[unique] = items[index]; unique++ } }
 	}
 	return unique
 }

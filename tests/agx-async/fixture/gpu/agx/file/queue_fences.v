@@ -1,5 +1,6 @@
 module file
 
+import drm.asahi
 import drm.ioctl
 import drm.syncobj
 import gpu.agx.gpu
@@ -7,6 +8,15 @@ import gpu.agx.gpu
 // Two independent pipes on one producer queue can retire in reverse order
 // in this fixture. A foreign consumer explicitly names both producer fences.
 pub fn audit_dependency_order() {
+	for modern in [false, true]! {
+		syncobj.destroy_owner(1)
+		check_dependency_order(modern)
+	}
+	syncobj.destroy_owner(1)
+	println('Foreign consumer waited for both producer fences during reverse retirement through both ABIs.')
+}
+
+fn check_dependency_order(modern bool) {
 	gpu.reset()
 	mut file := new_file()
 	mut manager := gpu.get_global_manager() or { panic('manager') }
@@ -16,22 +26,29 @@ pub fn audit_dependency_order() {
 	assert fence(first).context == fence(second).context
 	assert fence(first).seqno < fence(second).seqno
 
-	inputs := [ioctl.DrmAsahiSync{handle: first.handle}, ioctl.DrmAsahiSync{handle: second.handle}]!
-	compute := ioctl.DrmAsahiCmdCompute{encoder_ptr: 0x12340000}
-	command := ioctl.DrmAsahiCommand{
-		cmd_type: ioctl.asahi_cmd_compute
-		cmd_buffer: u64(&compute)
-		cmd_buffer_size: sizeof(compute)
-		barriers: [ioctl.asahi_barrier_none, ioctl.asahi_barrier_none]!
+	if modern {
+		mut records := [65]asahi.Sync{}
+		for index in 0 .. records.len {
+			records[index].handle = if index % 2 == 0 { second.handle } else { first.handle }
+		}
+		compute := asahi.CmdCompute{}
+		mut bytes := []u8{}
+		bytes.flags |= .noslices
+		append_packet(mut bytes, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)),
+			asahi.barrier_none, asahi.barrier_none)
+		request := asahi.Submit{
+			queue_id: 2
+			syncs: unsafe { u64(&records[0]) }
+			in_sync_count: u32(records.len)
+			cmdbuf: u64(bytes.data)
+			cmdbuf_size: u32(bytes.len)
+		}
+		assert file.ioctl_modern_submit(unsafe { &request }) == 0
+		unsafe { bytes.free() }
+	} else {
+		submit_legacy_dependency_consumer(mut file, first.handle, second.handle)
 	}
-	request := ioctl.DrmAsahiSubmit{
-		queue_id: 2
-		commands: u64(&command)
-		command_count: 1
-		in_syncs: unsafe { u64(&inputs[0]) }
-		in_sync_count: 2
-	}
-	assert file.ioctl_submit(&request) == 0
+	dependency_count := pending_tail.dependencies.count
 	service_file_work()
 	assert manager.published_order == [u32(0), 1]
 	assert manager.execute_firmware(1, 0)
@@ -49,7 +66,26 @@ pub fn audit_dependency_order() {
 	service_file_work()
 	assert_drained(file)
 	assert !consumer_dispatched, 'foreign consumer dispatched while its first explicit producer fence was pending'
-	println('Foreign consumer waited for both producer fences during reverse retirement.')
+	assert dependency_count == 2, 'each independent fence must appear once in the captured dependencies'
+}
+
+fn submit_legacy_dependency_consumer(mut file GpuFile, first u32, second u32) {
+	inputs := [ioctl.DrmAsahiSync{handle: first}, ioctl.DrmAsahiSync{handle: second}]!
+	compute := ioctl.DrmAsahiCmdCompute{encoder_ptr: 0x12340000}
+	command := ioctl.DrmAsahiCommand{
+		cmd_type: ioctl.asahi_cmd_compute
+		cmd_buffer: u64(&compute)
+		cmd_buffer_size: sizeof(compute)
+		barriers: [ioctl.asahi_barrier_none, ioctl.asahi_barrier_none]!
+	}
+	request := ioctl.DrmAsahiSubmit{
+		queue_id: 2
+		commands: u64(&command)
+		command_count: 1
+		in_syncs: unsafe { u64(&inputs[0]) }
+		in_sync_count: 2
+	}
+	assert file.ioctl_submit(&request) == 0
 }
 
 fn check_queue_fence_elision() {

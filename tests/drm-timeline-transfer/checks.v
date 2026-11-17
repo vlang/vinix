@@ -35,10 +35,47 @@ fn tt_retire_during_allocation() {
 	if tt_complete_other != unsafe { nil } { syncobj.signal_error(tt_complete_other, -5) }
 }
 
+fn check_independent_queue_transfer() {
+	for same_seqno in [false, true]! {
+		for reverse in [false, true]! {
+			proc.reset()
+			sched.reset(unsafe { nil })
+			source := make_object(0)
+			destination := make_object(0)
+			context := syncobj.new_queue_context() or { panic('queue fence context') }
+			first := remember_fence(syncobj.new_queue_fence(7, 10, context))
+			second := remember_fence(syncobj.new_queue_fence(7, if same_seqno { u64(10) } else { u64(11) }, context))
+			tw_chain(source, first, 1)
+			tw_chain(source, second, 2)
+			tw_chain(source, first, 3)
+			mut request := ioctl.DrmSyncobjTransfer{
+				src_handle: source.handle
+				dst_handle: destination.handle
+				dst_point: 9
+			}
+			assert ioctl_syncobj_transfer(voidptr(11), unsafe { &request }) == 0
+			head := remember_fence(current(destination))
+			payload := syncobj.chain_contained(head)
+			tt_track(payload)
+			assert syncobj.array_count_for_checks(payload) == 2, 'timeline transfer must retain both independent fences once'
+			assert !syncobj.is_signaled(head)
+			syncobj.signal(if reverse { second } else { first })
+			assert !syncobj.is_signaled(head)
+			assert syncobj.query_timeline_point(destination, false) == 0
+			syncobj.signal(if reverse { first } else { second })
+			assert syncobj.is_signaled(head)
+			assert syncobj.query_timeline_point(destination, false) == 9
+			tt_retire()
+		}
+	}
+	println('DRM timeline TRANSFER: independent same-queue fences survive merging with either notification order, equal sequences and exact duplicates.')
+}
+
 pub fn run_timeline_transfer_checks() {
 	memory.reset(); memory.configure_metadata(sizeof(syncobj.SyncObj), sizeof(syncobj.DmaFence))
 	proc.reset(); sched.reset(unsafe { nil })
 	syncobj.check_merge_array_protocol(); syncobj.check_large_merge_arrays(); assert memory.outstanding() == 0
+	check_independent_queue_transfer()
 	mut cases := 0
 	for count in [1, 2, 3, 8]! { for duplicate in [false, true]! { for done in [false, true]! {
 		proc.reset(); sched.reset(unsafe { nil })

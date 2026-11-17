@@ -1,10 +1,12 @@
 # Captured scheduler dependencies
 
 G13 copies input records once, then keeps the greatest unsigned sequence for
-each native 64-bit fence context. Nil records disappear; context positions and
-equal-sequence ties keep their first record. Both ABIs use the reduced private
-copy. The original snapshot and pending-storage ownership remain unchanged.
-The scan costs O(records × unique contexts), like Linux's xarray scan.
+each ordered 64-bit fence context. Independent G13 fences reduce only when
+the exact same fence appears again. Nil records disappear, and equal-sequence
+ties keep their first record. Both ABIs use the reduced private copy. The scan
+costs O(records × distinct dependency groups), like Linux's xarray scan.
+The [native fence regression](../../docs/m1-agx-independent-fences.md) covers
+reverse retirement through both ABIs.
 
 ```sh
 v run tests/agx-job-dependencies/run.v host /external/fresh-host
@@ -34,7 +36,9 @@ callback plumbing is modeled; the comparator's 64-bit branch is selected. Its
 init32 sequences; Vinix currently uses 64-bit timestamp sequences. Wraparound
 equivalence and complete scheduler behavior remain unqualified.
 
-Native preparation pins `4755d6b55c6459658fe48fc25b7fbcc0ebf71abb` plus two owned
+The historical native and evidence runners below use the
+`f183daa00` checkout. Native preparation pins
+`4755d6b55c6459658fe48fc25b7fbcc0ebf71abb` plus two owned
 kernel overlays. Create `/external/state`, then run V's
 `native.v prepare|aarch64|x86_64|contracts|allocations /external/state`, building
 architectures sequentially. Existing allowance failures are expected; every

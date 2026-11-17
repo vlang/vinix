@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module submission
 
-// drm_sched_job_add_dependency semantics for native 64-bit fence contexts:
-// skip nil, preserve each context's first position, replace only with a later
-// sequence, and keep the first fence on ties. Only private INPUT copies enter
-// this path; pointers borrow retained metadata, never output reservations.
+import drm.syncobj
+
+// Keep the newest fence in each ordered sequence and the first record on a
+// tie. Independently completing queue fences deduplicate by identity only.
+// The private input copy borrows the captured fence metadata.
 pub fn copy_job_dependencies(source &SyncArray) (int, SyncArray) {
  code, copied := copy_sync_array(source)
  if code != 0 { return code, SyncArray{} }
@@ -16,7 +17,7 @@ pub fn copy_job_dependencies(source &SyncArray) (int, SyncArray) {
   mut replace := true
   for existing := u32(0); existing < count; existing++ {
    previous := if copied.items != unsafe { nil } { unsafe { copied.items[existing].fence } } else { copied.fences[existing] }
-   if previous.context != incoming.fence.context { continue }
+   if !syncobj.same_fence_sequence(previous, incoming.fence) { continue }
    target = existing
    replace = incoming.fence.seqno > previous.seqno
    break

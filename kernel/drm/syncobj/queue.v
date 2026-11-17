@@ -31,6 +31,17 @@ pub fn new_queue_fence(context u64, seqno u64, queue_context u64) &DmaFence {
 	return &DmaFence{ context: if queue_context != 0 { queue_context } else { context }, seqno: seqno, queue_context: queue_context }
 }
 
+// Native G13 jobs on one queue can complete independently. Only another
+// reference to the same fence can replace such a dependency. Other fences
+// use their context to identify the sequence.
+fn fence_sequence_instance(fence &DmaFence) u64 {
+	return if fence.queue_context == 0 { u64(0) } else { u64(voidptr(fence)) }
+}
+
+pub fn same_fence_sequence(a &DmaFence, b &DmaFence) bool {
+	return a.context == b.context && fence_sequence_instance(a) == fence_sequence_instance(b)
+}
+
 // Asahi has one DRM scheduler/entity per user queue. Its own fences do not
 // gate that entity; publication FIFO and explicit firmware dependencies order
 // its jobs. Other queues and generic fences still wait for actual signaling.

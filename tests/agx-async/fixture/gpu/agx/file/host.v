@@ -385,6 +385,7 @@ pub fn run_checks() {
 	check_initial_submission_events()
 	check_input_sync_errors()
 	check_queue_fence_elision()
+	audit_dependency_order()
 	syncobj.check_queue_context_allocator()
 	println('AGX async: ioctl staging, independent queues/FIFO, compute→render phases, forged fences, failure cleanup, enqueue/shutdown races, backpressure and 200 immediate-retirement cycles passed')
 }
