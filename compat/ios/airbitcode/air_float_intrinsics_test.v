@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_float_names_slots_and_existing_evaluators() {
-	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2203
+	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2204
 	ids := [ScalarIntrinsic.fabs, .floor, .ceil, .trunc, .sqrt, .round, .rint]!
 	for i, name in ['air.fabs.f32', 'air.floor.f32', 'air.ceil.f32', 'air.trunc.f32', 'air.sqrt.f32', 'air.round.f32', 'air.rint.f32'] {
 		id, slot := air_float_intrinsic(name)!
@@ -61,7 +61,7 @@ fn air_half_unary_reference(id ScalarIntrinsic, raw u64) u64 {
  return sign | (u64(exponent + 15) << 10) | fraction
 }
 fn test_air_half_unary_names_cache_and_every_encoding() {
- assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2203
+ assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2204
  mut checks := 0
  for i, family in ['fabs','floor','ceil','trunc'] {
   name := 'air.${family}.f16'; id, slot := air_float_intrinsic(name)!
@@ -78,7 +78,7 @@ fn test_air_half_unary_names_cache_and_every_encoding() {
    if _ := scalar_intrinsic_name('air.${family}.${suffix}') { assert false }
   }
  }
- for family in ['clamp','fast_fabs','fast_floor'] {
+ for family in ['fast_fabs','fast_floor'] {
   if _ := scalar_intrinsic_name('air.${family}.f16') { assert false }
  }
  assert checks == 262144
@@ -91,7 +91,7 @@ fn air_sqrt_half_units(raw u64) u64 {
  return if e == 0 { raw } else { (1024 + (raw & 1023)) << u32(e - 1) }
 }
 fn test_air_half_math_names_cache_and_every_encoding() {
- assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2203
+ assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2204
  mut checks := 0
  for i, family in ['sqrt','round','rint'] {
   name := 'air.${family}.f16'; id, slot := air_float_intrinsic(name)!
@@ -134,7 +134,7 @@ fn test_air_half_math_names_cache_and_every_encoding() {
 fn test_air_half_fma_identity_and_all_encoding_identities() {
  id, slot := air_float_intrinsic('air.fma.f16')!
  assert id == .fma && scalar_intrinsic_name('air.fma.f16')! == id && scalar_intrinsic_arity(id) == 3
- assert scalar_air_float_cache_base + slot == 2200 && scalar_intrinsic_cache_slots == 2203
+ assert scalar_air_float_cache_base + slot == 2200 && scalar_intrinsic_cache_slots == 2204
  assert !scalar_integer_intrinsic(id)
  old_id, old_slot := air_float_intrinsic('air.fma.f32')!
  assert old_id == id && scalar_air_float_cache_base + old_slot == 2175

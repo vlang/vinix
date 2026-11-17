@@ -12,7 +12,7 @@ fn air_number_reference(minimum bool, a u32, b u32) u32 {
 }
 
 fn test_air_float_extrema_identity_values_and_first_zero() {
-	assert scalar_intrinsic_cache_slots == 2203
+	assert scalar_intrinsic_cache_slots == 2204
 	for i, name in ['air.fmin.f32', 'air.fmax.f32'] {
 		id, slot := air_float_intrinsic(name)!
 		assert id == if i == 0 { ScalarIntrinsic.air_fmin } else { ScalarIntrinsic.air_fmax }
@@ -56,7 +56,7 @@ fn air_half_number_reference(minimum bool, a u16, b u16) u16 {
  return if (xkey < ykey) == minimum { a } else { b }
 }
 fn test_air_half_extrema_all_encodings_against_boundary_peers() {
- assert scalar_intrinsic_cache_slots == 2203
+ assert scalar_intrinsic_cache_slots == 2204
  for i, name in ['air.fmin.f16','air.fmax.f16'] {
   id, slot := air_float_intrinsic(name)!
   assert id == if i==0 {ScalarIntrinsic.air_fmin}else{ScalarIntrinsic.air_fmax}
