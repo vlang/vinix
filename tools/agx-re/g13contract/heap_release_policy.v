@@ -12,8 +12,8 @@ fn check_heap_release_policy_local(allocator string, manager string) ! {
   'if !h.keep_garbage { h.collect_garbage_locked(1) }', 'return'],
   'Only nondeferred heaps retire their one released owner before unlocking')!
  for line in [
-  "g13_private: alloc.new_heap('g13-private', alloc.g13_private_start, alloc.g13_private_end)",
-  "g13_gpu_readonly: alloc.new_heap('g13-gpu-readonly', alloc.g13_gpu_readonly_start, alloc.g13_gpu_readonly_end)",
+  "g13_private: alloc.new_heap_with_explicit_gc('g13-private', alloc.g13_private_start, alloc.g13_private_end)",
+  "g13_gpu_readonly: alloc.new_heap_with_explicit_gc('g13-gpu-readonly', alloc.g13_gpu_readonly_start, alloc.g13_gpu_readonly_end)",
   "g13_shared: alloc.new_heap_with_garbage('g13-shared', alloc.g13_shared_start, alloc.g13_shared_end, false)",
   "g13_readonly: alloc.new_heap_with_garbage('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end, false)"
  ] { require(manager.contains(line), 'G13 heap policy matches its firmware memory class')! }

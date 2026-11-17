@@ -6,13 +6,15 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [returning worker scheduling](m1-agx-worker-reschedule.md)
-(2026-11-17). G13/G17 event workers and fake dependency waits now use the
-returning scheduler API, preserving later service and failure cleanup. Their
-previous `sched.yield(false)` calls never returned. The
+Latest offline increment: [G13 allocation-pressure policy](m1-agx-heap-pressure.md)
+(2026-11-17). Private and GPU-read-only heaps preserve pending ranges on
+allocation failure instead of bypassing firmware-cache gates with implicit GC.
+Explicit rollback and eager teardown collection remain separate parity gaps.
+The [returning worker scheduling](m1-agx-worker-reschedule.md) report retains
+the G13/G17/fake scheduler correction and its original evidence. The
 [UAT completion polling](m1-agx-uat-poll.md) report retains the separate
 firmware-control wait correction and its original evidence. Native scheduling,
-eager teardown/allocation-pressure GC, allocator backing/accounting and native
+eager teardown GC, allocator backing/accounting and native
 performance remain different or unqualified.
 The [firmware-cache barrier and threshold collection](m1-agx-heap-gc.md) report
 retains the captured-prefix collection comparison and its original evidence.

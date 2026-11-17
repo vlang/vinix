@@ -72,6 +72,7 @@ pub mut:
 	lock        klock.Lock
 mut:
 	keep_garbage bool = true // Fixed at construction; private heaps defer reuse
+	gc_on_pressure bool = true // Firmware-managed heaps require an explicit barrier
 }
 
 // Create a new heap allocator managing the VA range [start, end).
@@ -96,6 +97,14 @@ pub fn new_heap(name string, start u64, end u64) HeapAllocator {
 pub fn new_heap_with_garbage(name string, start u64, end u64, keep_garbage bool) HeapAllocator {
 	mut heap := new_heap(name, start, end)
 	heap.keep_garbage = keep_garbage
+	return heap
+}
+
+// Allocation pressure cannot reclaim firmware-private ranges. Callers must
+// explicitly collect after their lifetime and cache gates authorize reuse.
+pub fn new_heap_with_explicit_gc(name string, start u64, end u64) HeapAllocator {
+	mut heap := new_heap(name, start, end)
+	heap.gc_on_pressure = false
 	return heap
 }
 
@@ -175,6 +184,7 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 	actual_align := if align < gpu_page_size { gpu_page_size } else { align }
 	aligned_size := checked_heap_align_up(size, actual_align) or { return none }
 	va := h.find_address_locked(h.end, aligned_size, actual_align) or {
+		if !h.gc_on_pressure { return none }
 		// Collect deferred releases only after the first placement attempt.
 		// Retry the same checked range after GC makes its holes available.
 		h.gc_locked()
