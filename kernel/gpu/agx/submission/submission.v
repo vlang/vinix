@@ -17,6 +17,14 @@ pub const max_commands = u32(64)
 pub const max_legacy_commands = u32(2)
 pub const max_syncs = u32(64)
 
+pub struct SyncItem {
+pub:
+	object &syncobj.SyncObj = unsafe { nil }
+	fence &syncobj.DmaFence = unsafe { nil }
+	timeline bool
+	timeline_value u64
+}
+
 pub struct SyncArray {
 pub:
 	count           u32
@@ -24,6 +32,14 @@ pub:
 	fences          [64]&syncobj.DmaFence
 	timeline        [64]bool
 	timeline_values [64]u64
+	items           &SyncItem = unsafe { nil } // owned storage for modern lists beyond the inline bound
+}
+
+pub fn (array &SyncArray) item(index u32) SyncItem {
+	assert index < array.count
+	if array.items != unsafe { nil } { return unsafe { array.items[index] } }
+	return SyncItem{object: array.objects[index], fence: array.fences[index],
+		timeline: array.timeline[index], timeline_value: array.timeline_values[index]}
 }
 
 pub struct Command {
@@ -92,12 +108,13 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 
 pub fn install_output_syncs(staged &SyncArray, fence &syncobj.DmaFence) bool {
 	for index := u32(0); index < staged.count; index++ {
-		object := staged.objects[index]
+		item := staged.item(index)
+		object := item.object
 		if object == unsafe { nil } {
 			return false
 		}
-		if staged.timeline[index] {
-			if !syncobj.add_timeline_point(object, staged.timeline_values[index], fence) {
+		if item.timeline {
+			if !syncobj.add_timeline_point(object, item.timeline_value, fence) {
 				return false
 			}
 		} else {

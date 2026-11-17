@@ -14,8 +14,9 @@ fn check_timeline_boundary_contract(objects string, staging string, reference st
 	require_order(staging, ['timeline_values [64]u64', 'pub fn stage_sync_array(',
 		'item.timeline_value == 0', 'if input', 'syncobj.get_timeline_fence(object, item.timeline_value)',
 		'fences[index] = fence'], 'Native Asahi input preserves unsigned point and stable fence')!
-	require_order(staging.all_after('pub fn install_output_syncs('), ['if staged.timeline[index]',
-		'syncobj.add_timeline_point(object, staged.timeline_values[index], fence)'], 'Native Asahi timeline output publication')!
+	require_order(staging.all_after('pub fn install_output_syncs('), ['item := staged.item(index)',
+		'object := item.object', 'if item.timeline',
+		'syncobj.add_timeline_point(object, item.timeline_value, fence)'], 'Native Asahi timeline output publication')!
 	find := section(reference, 'int dma_fence_chain_find_seqno(', 'EXPORT_SYMBOL(dma_fence_chain_find_seqno)', 'Linux timeline lookup boundary')!
 	require_order(find, ['uint64_t seqno', 'if (!seqno)', 'chain->base.seqno < seqno',
 		'return -EINVAL', 'prev_seqno < seqno', 'return 0'], 'Linux unsigned upper-bound lookup')!

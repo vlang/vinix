@@ -247,7 +247,7 @@ fn check_initial_snapshot_contract(initial string, barriers string, workqueue st
 
 fn check_input_dependency_contract(pending string) ! {
 	ready := section(pending, 'fn g13_dependencies_ready(', 'fn cancel_g13_pending(', 'Vinix input dependency readiness')!
-	require_order(ready, ['index < dependencies.count', '!syncobj.queue_dependency_ready(dependencies.fences[index], queue_context)',
+	require_order(ready, ['index < dependencies.count', '!syncobj.queue_dependency_ready(dependencies.item(index).fence, queue_context)',
 		'return false', 'return true'], 'Vinix input dependency readiness')!
 	require(!ready.contains('get_error'), 'Signaled input fence errors must not cancel the dependent submission')!
 	poll := section(pending, 'fn poll_g13_pending(', 'if !item.admitted', 'Vinix input dependency scheduling')!

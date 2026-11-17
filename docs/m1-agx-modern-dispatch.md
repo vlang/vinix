@@ -109,6 +109,8 @@ remain open. Modern input/output arrays keep the native 64-record bound, and
 zero-point timeline outputs return EOPNOTSUPP before publication. VM binding
 retains the existing busy-VM policy. Firmware/default/error-path completeness,
 native scheduling, whole-kernel leak rates and hardware execution are unqualified.
+The subsequent [sync-storage increment](m1-agx-sync-storage.md) removes the
+modern 64-record sync-list bound; complete timeline semantics remain open.
 Modern validation precedence is also unfinished: unsupported render-SCS layouts
 are rejected before queue construction, while the reference checks them later.
 The subsequent [render-SCS correction](m1-agx-queue-scs.md) closes that specific

@@ -13,6 +13,10 @@ pub fn (mut f GpuFile) ioctl_modern_submit(data &asahi.Submit) int {
 	defer { if !transferred { release_submission_queue(captured) } }
 	sync_code, inputs, outputs := submission.stage_packet_syncs(f.owner_key, data.syncs, data.in_sync_count, data.out_sync_count)
 	if sync_code != 0 { return sync_code }
+	defer {
+		submission.release_sync_array(inputs)
+		submission.release_sync_array(outputs)
+	}
 	if data.cmdbuf_size == 0 { return -22 }
 	if data.cmdbuf == 0 || u64(data.cmdbuf_size - 1) > ~data.cmdbuf { return -14 }
 	packet := memory.malloc_packed_fallible(data.cmdbuf_size) @[freed]

@@ -185,7 +185,7 @@ fn enqueue_g13_pending(data voidptr) {
 // DRM scheduler entity; every other input still waits for actual signaling.
 fn g13_dependencies_ready(dependencies &submission.SyncArray, queue_context u64) bool {
 	for index := u32(0); index < dependencies.count; index++ {
-		if !syncobj.queue_dependency_ready(dependencies.fences[index], queue_context) { return false }
+		if !syncobj.queue_dependency_ready(dependencies.item(index).fence, queue_context) { return false }
 	}
 	return true
 }
@@ -333,6 +333,7 @@ fn process_pending_submissions() {
 			// timestamp mappings outside manager.lock, while file/VM pins remain.
 			mut owner := unsafe { item.file }
 			owner.release_g13_submission_timestamps(item.timestamps)
+			submission.release_sync_array(item.dependencies)
 			mut queue := unsafe { item.queue }
 			queue.release_file_reference()
 			katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])

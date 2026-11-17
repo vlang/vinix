@@ -3,7 +3,11 @@ module g13contract
 import g13layout
 
 fn logical_queue_contract(file string, fake string, queue string) ! {
-	require(file.count('workqueue.free_workqueue(') == 5 && fake.count('workqueue.free_workqueue(') == 2, 'All logical queue owner and failure paths dispose metadata')!
+	require(file.count('workqueue.free_workqueue(') == 6 && fake.count('workqueue.free_workqueue(') == 2, 'All logical queue owner and failure paths dispose metadata')!
+	late := section(file, '// Asahi reserves render scratch', '\tf.queues << wq', 'Unpublished render-scratch rejection')!
+	require_order(late, ['release_g13_queue_resources(g13_resources)', 'if !released',
+		'resources: g13_resources', 'logical.destroy()', 'workqueue.free_workqueue(logical)',
+		'if released { gpu.free_g13_queue_record(g13_resources) }', 'return -22'], 'Late rejection retains or disposes every owner before returning')!
 	for code in [file, fake] {
 		require_order(code, ['record := unsafe { ', '.queues.delete(', 'workqueue.free_workqueue(record)'], 'Foreach removal preserves a pointer value before deleting its alias')!
 	}
@@ -21,7 +25,8 @@ fn test_logical_queue_final_owners_and_completion_order() {
 	fake := read(root + '/kernel/gpu/agx/fake/driver.v')!
 	queue := read(root + '/kernel/gpu/agx/workqueue/workqueue.v')!
 	logical_queue_contract(file, fake, queue)!
-	for token in ['record := unsafe { q }', 'workqueue.free_workqueue(record)'] {
+	for token in ['record := unsafe { q }', 'workqueue.free_workqueue(record)',
+		'logical.destroy()', 'workqueue.free_workqueue(logical)'] {
 		if _ := logical_queue_contract(file.replace(token, ''), fake, queue) { assert false, token }
 	}
 	for token in ['record := unsafe { queue }', 'if !queue.is_empty()', 'completion.queue.complete('] {

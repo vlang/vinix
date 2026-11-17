@@ -1432,6 +1432,10 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	mut state_manager := unsafe { manager }
 	status := state_manager.g13_submission_status()
 	if status != 0 { return status }
+	dependency_code, pending_inputs := agxsubmission.copy_sync_array(input_syncs)
+	if dependency_code != 0 { return dependency_code }
+	mut dependencies_transferred := false
+	defer { if !dependencies_transferred { agxsubmission.release_sync_array(pending_inputs) } }
 	// Captures acquire file.lock independently, before backend preparation.
 	// This outer defer runs after the file-lock defer and pending cancellation.
 	timestamp_code, captured_timestamps := f.new_g13_submission_timestamps(commands)
@@ -1477,7 +1481,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 		vm_id: vm_id
 		queue: queue_resources
 		manager: manager
-		dependencies: *input_syncs
+		dependencies: pending_inputs
 		command_count: u32(commands.len)
 		timestamps: timestamps
 	} }
@@ -1534,6 +1538,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	// Registration transferred the captured queue reference to the worker
 	// node, which also owns the aggregate VM pin acquired above.
 	timestamps_transferred = true
+	dependencies_transferred = true
 	queued = true
 	return 0
 }

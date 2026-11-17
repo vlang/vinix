@@ -19,6 +19,9 @@ fn test_timeline_guard_rejects_max_sentinel_signed_values_and_lost_lock_or_stagi
 		if _ := check_timeline_boundary_contract(objects + extra, staging, reference, asahi) { assert false, extra }
 	}
 	if _ := check_timeline_boundary_contract(objects, staging.replace('item.timeline_value', '0'), reference, asahi) { assert false }
+	for token in ['item := staged.item(index)', 'if item.timeline'] {
+		if _ := check_timeline_boundary_contract(objects, staging.replace(token, ''), reference, asahi) { assert false, token }
+	}
 	if _ := check_timeline_boundary_contract(objects, staging, reference.replace('uint64_t', 'int64_t'), asahi) { assert false }
 	if _ := check_timeline_boundary_contract(objects, staging, reference, asahi.replace('chain_find_seqno', 'other')) { assert false }
 }

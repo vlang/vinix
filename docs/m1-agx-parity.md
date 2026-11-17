@@ -6,7 +6,12 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest correction: [validate render scratch after queue construction](m1-agx-queue-scs.md)
+Latest increment: [modern sync lists beyond 64 records](m1-agx-sync-storage.md)
+(2026-11-17). Modern SUBMIT uses checked, fallible spans for larger input/output
+lists; pending work owns an independent dependency copy until retirement.
+Legacy limits, cumulative-chain gaps and allocator-policy differences remain.
+
+Preceding correction: [validate render scratch after queue construction](m1-agx-queue-scs.md)
 (2026-11-17). Modern G13 queue creation now preserves VM/constructor error
 precedence before refusing a nonzero layout. Failed rollback retains its graph,
 VM and ID through the existing orphan retry path; no logical name is published.

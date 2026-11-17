@@ -82,8 +82,8 @@ fn test_input_dependency_contract_rejects_errno_propagation_and_early_release() 
 	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
 	check_input_dependency_contract(pending)!
 	for broken in [pending.replace('index < dependencies.count', 'index < 1'),
-		pending.replace('!syncobj.queue_dependency_ready(dependencies.fences[index], queue_context)', 'false'),
-		pending.replace('return false }\n\t}\n\treturn true', 'return false }\n\t}\n\t_ := syncobj.get_error(dependencies.fences[0])\n\treturn true'),
+		pending.replace('!syncobj.queue_dependency_ready(dependencies.item(index).fence, queue_context)', 'false'),
+		pending.replace('return false }\n\t}\n\treturn true', 'return false }\n\t}\n\t_ := syncobj.get_error(dependencies.item(0).fence)\n\treturn true'),
 		pending.replace('if !g13_dependencies_ready(&item.dependencies, item.queue.fence_context) { return true }', ''),
 		pending.replace('failure := g13_pending_error(item)', 'failure := 0')] {
 		assert broken != pending
