@@ -21,8 +21,7 @@ fn check_sync_file_poll_contract(drm string, objects string, events string, refe
 	require_order(notify, ['f.poll_events = unsafe { node.next }', 'mut target := unsafe { node.event }',
 		'node.fence = unsafe { nil }; node.next = unsafe { nil }; node.event = unsafe { nil }',
 		'event.trigger(mut target, false)'], 'Detach borrowed links before notifying under the completion lock')!
-	for pair in [['pub fn signal(', '// Signal a fence with an error'],
-		['pub fn signal_error(', '// Check whether a fence']] {
+	for pair in [['fn complete_fence(', '// Leaves use a lock-free read.']] {
 		completion := section(objects, pair[0], pair[1], 'Vinix first-completion poll wake')!
 		require_order(completion, ['f.lock.acquire()', 'if f.signaled', 'return',
 			'katomic.store(mut &f.signaled, true)', 'f.notify_events_locked()', 'f.lock.release()'],

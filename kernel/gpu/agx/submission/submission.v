@@ -23,6 +23,7 @@ pub:
 	fence &syncobj.DmaFence = unsafe { nil }
 	timeline bool
 	timeline_value u64
+	chain &syncobj.DmaFence = unsafe { nil } // modern output's reserved chain node
 }
 
 pub struct SyncArray {
@@ -32,6 +33,7 @@ pub:
 	fences          [64]&syncobj.DmaFence
 	timeline        [64]bool
 	timeline_values [64]u64
+	chains          [64]&syncobj.DmaFence
 	items           &SyncItem = unsafe { nil } // owned storage for modern lists beyond the inline bound
 }
 
@@ -39,7 +41,7 @@ pub fn (array &SyncArray) item(index u32) SyncItem {
 	assert index < array.count
 	if array.items != unsafe { nil } { return unsafe { array.items[index] } }
 	return SyncItem{object: array.objects[index], fence: array.fences[index],
-		timeline: array.timeline[index], timeline_value: array.timeline_values[index]}
+		timeline: array.timeline[index], timeline_value: array.timeline_values[index], chain: array.chains[index]}
 }
 
 pub struct Command {
@@ -114,7 +116,9 @@ pub fn install_output_syncs(staged &SyncArray, fence &syncobj.DmaFence) bool {
 			return false
 		}
 		if item.timeline {
-			if !syncobj.add_timeline_point(object, item.timeline_value, fence) {
+			if item.chain != unsafe { nil } {
+				if !syncobj.add_chain_point(object, item.chain, fence, item.timeline_value) { return false }
+			} else if !syncobj.add_timeline_point(object, item.timeline_value, fence) {
 				return false
 			}
 		} else {

@@ -2,14 +2,23 @@
 module submission
 
 import memory
+import drm.syncobj
 
 // Inline lists borrow retained syncobj/fence pointers and need no allocation.
-// Dynamic lists own only their record buffer, never the pointed-to metadata.
+// Modern outputs additionally own unpublished chain reservations. Publication
+// transfers their metadata to the retained fence graph before syscall cleanup.
 pub fn release_sync_array(array SyncArray) {
+	for index := u32(0); index < array.count; index++ {
+		// Taking this by-value array's address for item() boxes the whole inline
+		// record in V's manual-free C. Read the scalar directly instead.
+		chain := if array.items != unsafe { nil } { unsafe { array.items[index].chain } } else { array.chains[index] }
+		syncobj.release_chain_reservation(chain)
+	}
 	if array.items != unsafe { nil } { memory.free(voidptr(array.items)) }
 }
 
-// Pending work must not borrow the syscall's temporary dynamic record buffer.
+// Copy input dependencies only (never output chain reservations). Pending work
+// must not borrow the syscall's temporary dynamic record buffer.
 // Return one independent owner; the caller releases it on failure or transfers
 // it to the pending worker, which releases it after its final dependency read.
 pub fn copy_sync_array(array &SyncArray) (int, SyncArray) {

@@ -11,7 +11,7 @@ fn check_sync_file_info_contract(drm string, uapi string, implementation string,
 		layout := section(uapi, pair[0], pair[1], 'Sync-file UAPI fields')!
 		require_order(layout, pair[2..], 'Sync-file UAPI layout')!
 	}
-	require_order(snapshot, ['f.lock.acquire()', 'status: if !f.signaled { 0 } else if f.error != 0 { f.error } else { 1 }',
+	require_order(snapshot, ['is_signaled(fence)', 'f.lock.acquire()', 'status: if !f.signaled { 0 } else if f.error != 0 { f.error } else { 1 }',
 		'timestamp_ns: if f.signaled { f.timestamp_ns } else { 0 }', 'if f.private_stub { .stub } else if f.queue_context != 0 { .queue }',
 		'f.lock.release()', 'return result'], 'Coherent leaf status/time and private provenance')!
 	require_order(stub, ['fence.private_stub = true', 'katomic.store(mut &fence.signaled, true)'], 'Private stub provenance before publication')!
@@ -21,11 +21,17 @@ fn check_sync_file_info_contract(drm string, uapi string, implementation string,
 		'u64(-(i64(info.seqno) + 1)) + 1', 'file_name[offset] = 0'], 'Bounded signed fence names')!
 	query := implementation.all_after('fn sync_file_info_ioctl(')
 	require_order(query, ['usercopy.copy_from_user(', 'if info.flags != 0 || info.pad != 0 { return -22 }',
-		'state := syncobj.snapshot(fence)', 'if info.num_fences == 0', 'info.status = i32(state.status)',
-		'memory.malloc_packed_fallible(sizeof(ioctl.SyncFenceInfo))', 'if allocation == unsafe { nil } { return -12 }',
-		'defer { memory.free(allocation) }', '*detail = ioctl.SyncFenceInfo{ status: i32(state.status), timestamp_ns: state.timestamp_ns }',
-		'info.status = detail.status', 'usercopy.copy_to_user(info.sync_fence_info, detail, sizeof(ioctl.SyncFenceInfo))',
-		'info.num_fences = 1', 'usercopy.copy_to_user(address, unsafe { &info }, sizeof(ioctl.SyncFileInfo))'],
+		'mut count := u32(0)', 'cursor = syncobj.chain_previous(cursor)',
+		'if info.num_fences == 0', 'info.status = i32(syncobj.snapshot(fence).status)',
+		'if info.num_fences < count { return -22 }', 'bytes := u64(count) * sizeof(ioctl.SyncFenceInfo)',
+		'memory.malloc_packed_fallible(bytes)', 'if allocation == unsafe { nil } { return -12 }',
+		'defer { memory.free(allocation) }', 'C.memset(allocation, 0, bytes)', 'count = 0',
+		'leaf := syncobj.snapshot(syncobj.chain_contained(cursor))',
+		'*detail = ioctl.SyncFenceInfo{ status: i32(leaf.status), timestamp_ns: leaf.timestamp_ns }',
+		'if info.status > 0 { info.status = detail.status }', 'cursor = syncobj.chain_previous(cursor)',
+		'usercopy.copy_to_user(info.sync_fence_info, details, bytes)',
+		'state := syncobj.identity(fence)',
+		'info.num_fences = count', 'usercopy.copy_to_user(address, unsafe { &info }, sizeof(ioctl.SyncFileInfo))'],
 		'Count-only fast path, owned detail cleanup and staged output order')!
 }
 

@@ -136,7 +136,11 @@ pub fn run_modern_submission_checks() {
 	assert_drained(file)
 	request.in_sync_count = 0
 	request.out_sync_count = 1
-	assert file.ioctl_modern_submit(unsafe { &request }) == -95
+	assert file.ioctl_modern_submit(unsafe { &request }) == 0
+	service_file_work()
+	manager.finish_compute(0)
+	service_file_work()
+	assert syncobj.is_signaled(fence(input))
 	assert_drained(file)
 	request.syncs = 0
 	request.out_sync_count = 0

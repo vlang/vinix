@@ -20,6 +20,7 @@ __global wait_storage_last_request = u64(0)
 __global wait_storage_free_check fn (voidptr, u64) = unsafe { nil }
 __global metadata_free_check fn (voidptr, u64) = unsafe { nil }
 __global failure_action fn () = unsafe { nil }
+__global after_allocation fn () = unsafe { nil }
 
 pub fn reset() {
 	assert wait_storage_live == 0 && wait_storage_live_bytes == 0 && metadata_objects == 0 && metadata_fences == 0 && metadata_aliases == 0
@@ -28,11 +29,13 @@ pub fn reset() {
 	wait_storage_fail_next = false; wait_storage_last_request = 0
 	wait_storage_fail_at = -1
 	failure_action = unsafe { nil }
+	after_allocation = unsafe { nil }
 }
 
 pub fn check_before_free(callback fn (voidptr, u64)) { wait_storage_free_check = callback }
 pub fn check_metadata_free(callback fn (voidptr, u64)) { metadata_free_check = callback }
 pub fn when_failing(callback fn ()) { failure_action = callback }
+pub fn after_next_allocation(callback fn ()) { after_allocation = callback }
 pub fn fail_next() { wait_storage_fail_next = true }
 pub fn fail_in(successful_calls int) { wait_storage_fail_at = allocation_attempts + successful_calls + 1 }
 pub fn configure_metadata(objects u64, fences u64) {
@@ -93,6 +96,9 @@ fn allocate(size u64, kind u8) voidptr {
 			else if kind == 2 { metadata_fences++ }
 			else if kind == 3 { metadata_aliases++ }
 			else { wait_storage_live++; wait_storage_live_bytes += size }
+			if after_allocation != unsafe { nil } {
+				callback := after_allocation; after_allocation = unsafe { nil }; callback()
+			}
 			return buffer
 		}
 	}

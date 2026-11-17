@@ -32,6 +32,17 @@ pub mut:
 mut:
 	private_stub bool
 	poll_events &FenceEvent = unsafe { nil }
+	chain bool
+	chain_reserved bool
+	chain_prev &DmaFence = unsafe { nil }
+	chain_payload &DmaFence = unsafe { nil }
+	chain_prev_seqno u64
+	chain_context u64
+	chain_previous_waiter ChainWaiter
+	chain_payload_waiter ChainWaiter
+	chain_waiters &ChainWaiter = unsafe { nil }
+	chain_notify_next &DmaFence = unsafe { nil }
+	chain_notify_queued bool
 }
 
 struct TimelinePoint {
@@ -77,38 +88,25 @@ pub fn new_fence(context u64, seqno u64) &DmaFence {
 
 // Signal a fence: mark it as signaled and invoke all registered waiters.
 pub fn signal(fence &DmaFence) {
-	if fence == unsafe { nil } {
-		return
-	}
-
-	mut f := unsafe { fence }
-	f.lock.acquire()
-	if f.signaled {
-		f.lock.release()
-		return
-	}
-	f.timestamp_ns = time.monotonic_ns()
-	katomic.store(mut &f.signaled, true)
-	f.notify_events_locked()
-
-	// Wake every registered waiter
-	for mut w in f.waiters {
-		if !w.triggered {
-			w.triggered = true
-			w.callback(fence)
-		}
-	}
-
-	f.lock.release()
+	if fence == unsafe { nil } { return }
+	if fence.chain { is_signaled(fence); return }
+	complete_fence(fence, 0, false)
+	drain_chain_notifications()
 }
 
 // Signal a fence with an error code. Marks the fence as signaled with the
 // given error and wakes all waiters. Used when GPU work fails.
 pub fn signal_error(fence &DmaFence, err int) {
-	if fence == unsafe { nil } {
-		return
-	}
+	if fence == unsafe { nil } { return }
+	if fence.chain { is_signaled(fence); return }
+	complete_fence(fence, err, true)
+	drain_chain_notifications()
+}
 
+// Chain propagation queues parents while holding only this fence's lock.
+// The caller drains that queue after unlocking, avoiding nested fence locks
+// and recursive completion on arbitrarily long timelines.
+fn complete_fence(fence &DmaFence, err int, set_error bool) {
 	mut f := unsafe { fence }
 	f.lock.acquire()
 	// A completed fence's result is final. A losing shutdown/error producer
@@ -117,10 +115,11 @@ pub fn signal_error(fence &DmaFence, err int) {
 		f.lock.release()
 		return
 	}
-	f.error = err
+	if set_error { f.error = err }
 	f.timestamp_ns = time.monotonic_ns()
 	katomic.store(mut &f.signaled, true)
 	f.notify_events_locked()
+	f.notify_chains_locked()
 
 	for mut w in f.waiters {
 		if !w.triggered {
@@ -132,12 +131,17 @@ pub fn signal_error(fence &DmaFence, err int) {
 	f.lock.release()
 }
 
-// Check whether a fence has been signaled (lock-free read).
+// Leaves use a lock-free read. A chain can also discover a completed prefix
+// before the notification drainer reaches it.
 pub fn is_signaled(fence &DmaFence) bool {
 	if fence == unsafe { nil } {
 		return true // a null fence is considered signaled
 	}
-	return katomic.load(&fence.signaled)
+	if katomic.load(&fence.signaled) { return true }
+	if !fence.chain || !chain_prefix_ready(fence) { return false }
+	complete_fence(fence, 0, true)
+	drain_chain_notifications()
+	return true
 }
 
 pub fn get_error(fence &DmaFence) int {
@@ -186,6 +190,7 @@ pub fn add_waiter(fence &DmaFence, waiter &FenceWaiter) {
 	if fence == unsafe { nil } {
 		return
 	}
+	if fence.chain { is_signaled(fence) }
 
 	mut f := unsafe { fence }
 	f.lock.acquire()

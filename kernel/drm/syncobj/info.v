@@ -5,6 +5,7 @@ pub enum FenceKind {
 	generic
 	stub
 	queue
+	chain
 }
 
 pub struct FenceSnapshot {
@@ -20,6 +21,15 @@ pub:
 // fence reports zero even if its producer has prepared an error before signal.
 pub fn snapshot(fence &DmaFence) FenceSnapshot {
 	if fence == unsafe { nil } { return FenceSnapshot{} }
+	is_signaled(fence)
+	return identity(fence)
+}
+
+// Names may be queried without enabling/refreshing chain completion (including
+// on a detailed-info validation/allocation failure). Status here is only the
+// already-published state; callers needing readiness use snapshot instead.
+pub fn identity(fence &DmaFence) FenceSnapshot {
+	if fence == unsafe { nil } { return FenceSnapshot{} }
 	mut f := unsafe { fence }
 	f.lock.acquire()
 	result := FenceSnapshot{
@@ -27,7 +37,7 @@ pub fn snapshot(fence &DmaFence) FenceSnapshot {
 		timestamp_ns: if f.signaled { f.timestamp_ns } else { 0 }
 		context: f.context
 		seqno: f.seqno
-		kind: if f.private_stub { .stub } else if f.queue_context != 0 { .queue } else { .generic }
+		kind: if f.chain { .chain } else if f.private_stub { .stub } else if f.queue_context != 0 { .queue } else { .generic }
 	}
 	f.lock.release()
 	return result

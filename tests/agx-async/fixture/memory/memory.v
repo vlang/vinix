@@ -6,6 +6,25 @@ __global fail_node = false
 __global fail_allocation_at = -1
 __global allocation_calls = 0
 __global object_metadata [2048]voidptr
+__global chain_metadata [16384]voidptr
+__global chain_live = 0
+
+// Exact production-site injection distinguishes retained chain metadata from
+// pending job buffers. Reservations still consume the same failure sequence;
+// tests account for their separate allocation/free totals explicitly.
+pub fn malloc_chain_fallible(size u64) voidptr {
+	ptr := malloc_packed_fallible(size)
+	if ptr == unsafe { nil } { return ptr }
+	live_nodes--
+	for index in 0 .. chain_metadata.len {
+		if chain_metadata[index] == unsafe { nil } {
+			chain_metadata[index] = ptr; chain_live++; return ptr
+		}
+	}
+	panic('fixture chain metadata table exhausted')
+}
+
+pub fn outstanding_chains() int { return chain_live }
 
 // Submission fault positions/counters cover job storage. Published syncobj
 // metadata has its own lifetime; CREATE's allocation failures are exercised
@@ -41,6 +60,11 @@ pub fn malloc_packed_fallible(size u64) voidptr {
 }
 
 pub fn free(ptr voidptr) {
+	for index in 0 .. chain_metadata.len {
+		if chain_metadata[index] == ptr && ptr != unsafe { nil } {
+			chain_metadata[index] = unsafe { nil }; chain_live--; unsafe { C.free(ptr) }; return
+		}
+	}
 	for index in 0 .. object_metadata.len {
 		if object_metadata[index] == ptr && ptr != unsafe { nil } {
 			object_metadata[index] = unsafe { nil }; unsafe { C.free(ptr) }; return

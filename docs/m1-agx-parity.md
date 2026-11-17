@@ -6,7 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [modern sync lists beyond 64 records](m1-agx-sync-storage.md)
+Latest increment: [modern cumulative timeline chains](m1-agx-timeline-chain.md)
+(2026-11-17). Modern outputs now publish cumulative roots and accept zero,
+duplicate and decreasing points; inputs preserve snapshots and resolve retired
+prefixes. Exported sync-file info unwraps leaves. Legacy interoperability,
+metadata reclamation, allocator/timestamp policy and hardware qualification remain.
+
+Preceding increment: [modern sync lists beyond 64 records](m1-agx-sync-storage.md)
 (2026-11-17). Modern SUBMIT uses checked, fallible spans for larger input/output
 lists; pending work owns an independent dependency copy until retirement.
 Legacy limits, cumulative-chain gaps and allocator-policy differences remain.

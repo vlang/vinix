@@ -128,7 +128,7 @@ pub fn run_modern_zero_checks() {
 		}
 	}
 	// Zero does not make an empty or missing object a usable input. Output zero
-	// still refuses until native cumulative chains are implemented.
+	// now reserves a cumulative chain without publishing during staging.
 	input := output()
 	mut record := asahi.Sync{ handle: input.handle, sync_type: 1 }
 	code, inputs, outputs := submission.stage_packet_syncs(1, unsafe { u64(&record) }, 1, 0)
@@ -139,8 +139,9 @@ pub fn run_modern_zero_checks() {
 	record.handle = input.handle
 	foreign, _, _ := submission.stage_packet_syncs(2, unsafe { u64(&record) }, 1, 0)
 	assert foreign == -2
-	zero_output, _, _ := submission.stage_packet_syncs(1, unsafe { u64(&record) }, 0, 1)
-	assert zero_output == -95
+	zero_output, _, staged_output := submission.stage_packet_syncs(1, unsafe { u64(&record) }, 0, 1)
+	assert zero_output == 0 && staged_output.item(0).chain != unsafe { nil }
+	submission.release_sync_array(staged_output)
 	assert cases == 160
-	println('AGX zero-point inputs: 160 scheduler cases preserve snapshots, block foreign/generic fences, retain own-queue elision, survive reset/replacement/handle reuse, and ignore input errors; empty/missing/foreign handles and output-zero refusal pass')
+	println('AGX zero-point inputs: 160 scheduler cases preserve snapshots, block foreign/generic fences, retain own-queue elision, survive reset/replacement/handle reuse, and ignore input errors; empty/missing/foreign handles and output-zero reservation cleanup pass')
 }

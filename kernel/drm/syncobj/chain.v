@@ -1,0 +1,182 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+@[has_globals]
+module syncobj
+
+import katomic
+import klock
+import memory
+
+// Embedded in the retained parent, linked under its child's completion lock.
+// Neither registering nor propagating completion allocates storage.
+struct ChainWaiter {
+mut:
+	parent &DmaFence = unsafe { nil }
+	next &ChainWaiter = unsafe { nil }
+}
+
+__global (
+	chain_notify_lock klock.Lock
+	chain_notify_head &DmaFence = unsafe { nil }
+	chain_notify_tail &DmaFence = unsafe { nil }
+	chain_notify_draining bool
+)
+
+// Reserve before publication. Only an unpublished reservation may be freed;
+// published chains retain the existing native fence-metadata lifetime.
+pub fn reserve_chain() ?&DmaFence {
+	context := new_queue_context() or { return none }
+	storage := memory.malloc_packed_fallible(sizeof(DmaFence))
+	if storage == unsafe { nil } { return none }
+	mut fence := unsafe { &DmaFence(storage) }
+	unsafe { *fence = DmaFence{ chain_reserved: true, chain_context: context } }
+	return fence
+}
+
+pub fn release_chain_reservation(fence &DmaFence) {
+	if fence != unsafe { nil } && fence.chain_reserved { memory.free(voidptr(fence)) }
+}
+
+fn register_chain_waiter(child &DmaFence, node &ChainWaiter, parent &DmaFence) {
+	if child == unsafe { nil } { return }
+	mut f := unsafe { child }
+	mut n := unsafe { node }
+	f.lock.acquire()
+	if !f.signaled {
+		n.parent = unsafe { parent }
+		n.next = unsafe { f.chain_waiters }
+		f.chain_waiters = unsafe { node }
+	}
+	f.lock.release()
+}
+
+// Caller owns the fresh reservation and serializes publication. Immutable
+// links are fully initialized before any child can queue this retained parent.
+fn initialize_chain(node &DmaFence, previous &DmaFence, payload &DmaFence, point u64) {
+	mut f := unsafe { node }
+	f.chain = true
+	f.chain_prev = unsafe { previous }
+	f.chain_payload = unsafe { payload }
+	if previous != unsafe { nil } && previous.chain {
+		if point > previous.seqno {
+			f.chain_context = previous.chain_context
+			f.chain_prev_seqno = previous.seqno
+			f.seqno = point
+		} else {
+			f.seqno = previous.seqno
+		}
+	} else { f.seqno = point }
+	f.context = f.chain_context
+	// The reservation is now retained even if completion races publication.
+	f.chain_reserved = false
+	register_chain_waiter(previous, unsafe { &f.chain_previous_waiter }, node)
+	register_chain_waiter(payload, unsafe { &f.chain_payload_waiter }, node)
+	// Close the registration/completion race without running the global
+	// drainer under the sync object's publication lock.
+	if chain_prefix_ready(node) { complete_fence(node, 0, true) }
+}
+
+// Linux drm_syncobj_add_point semantics, including zero, repeated and
+// decreasing points. The payload is a leaf; only the previous link may chain.
+pub fn add_chain_point(obj &SyncObj, reservation &DmaFence, payload &DmaFence, point u64) bool {
+	if obj == unsafe { nil } || reservation == unsafe { nil }
+		|| !reservation.chain_reserved || payload == unsafe { nil } || payload.chain
+		|| payload.chain_reserved { return false }
+	mut o := unsafe { obj }
+	o.lock.acquire()
+	initialize_chain(reservation, o.fence, payload, point)
+	o.fence = unsafe { reservation }
+	o.timeline_points.clear()
+	o.publish_captures_locked(reservation)
+	o.lock.release()
+	return true
+}
+
+// Immutable-link equivalent of dma_fence_chain_walk: skip retired contained
+// leaves, not just containers whose entire earlier prefix has completed.
+pub fn chain_previous(fence &DmaFence) &DmaFence {
+	if fence == unsafe { nil } || !fence.chain { return unsafe { nil } }
+	mut cursor := unsafe { fence.chain_prev }
+	for cursor != unsafe { nil } {
+		if cursor.chain {
+			if !katomic.load(&cursor.chain_payload.signaled) { break }
+			cursor = unsafe { cursor.chain_prev }
+		} else {
+			if katomic.load(&cursor.signaled) { cursor = unsafe { nil } }
+			break
+		}
+	}
+	return cursor
+}
+
+pub fn chain_contained(fence &DmaFence) &DmaFence {
+	if fence == unsafe { nil } { return unsafe { nil } }
+	return if fence.chain { unsafe { fence.chain_payload } } else { unsafe { fence } }
+}
+
+// Some(nil) is a valid already-completed prefix. None means no submitted
+// fence or a point beyond the head. Point zero preserves the head snapshot.
+pub fn get_chain_fence(obj &SyncObj, point u64) ?&DmaFence {
+	fence := get_fence(obj) or { return none }
+	if point == 0 { return fence }
+	if !fence.chain || fence.seqno < point { return none }
+	mut cursor := unsafe { fence }
+	for cursor != unsafe { nil } {
+		if !cursor.chain || cursor.chain_context != fence.chain_context || cursor.chain_prev_seqno < point { break }
+		cursor = chain_previous(cursor)
+	}
+	return cursor
+}
+
+fn chain_prefix_ready(fence &DmaFence) bool {
+	mut cursor := unsafe { fence }
+	for cursor != unsafe { nil } {
+		if katomic.load(&cursor.signaled) { return true }
+		if !cursor.chain { return false }
+		if !katomic.load(&cursor.chain_payload.signaled) { return false }
+		cursor = unsafe { cursor.chain_prev }
+	}
+	return true
+}
+
+fn enqueue_chain(parent &DmaFence) {
+	mut f := unsafe { parent }
+	chain_notify_lock.acquire()
+	if !f.chain_notify_queued {
+		f.chain_notify_queued = true
+		f.chain_notify_next = unsafe { nil }
+		if chain_notify_tail == unsafe { nil } { chain_notify_head = unsafe { parent } }
+		else { unsafe { chain_notify_tail.chain_notify_next = parent } }
+		chain_notify_tail = unsafe { parent }
+	}
+	chain_notify_lock.release()
+}
+
+fn (mut f DmaFence) notify_chains_locked() {
+	for f.chain_waiters != unsafe { nil } {
+		mut node := unsafe { f.chain_waiters }
+		f.chain_waiters = unsafe { node.next }
+		node.next = unsafe { nil }
+		enqueue_chain(node.parent)
+	}
+}
+
+fn drain_chain_notifications() {
+	chain_notify_lock.acquire()
+	if chain_notify_draining { chain_notify_lock.release(); return }
+	chain_notify_draining = true
+	for chain_notify_head != unsafe { nil } {
+		mut f := unsafe { chain_notify_head }
+		chain_notify_head = unsafe { f.chain_notify_next }
+		if chain_notify_head == unsafe { nil } { chain_notify_tail = unsafe { nil } }
+		f.chain_notify_next = unsafe { nil }
+		f.chain_notify_queued = false
+		chain_notify_lock.release()
+		// Completion of the previous root enqueues us again if it is still
+		// pending. No recursive walk or callback is needed on this path.
+		if (f.chain_prev == unsafe { nil } || katomic.load(&f.chain_prev.signaled))
+			&& katomic.load(&f.chain_payload.signaled) { complete_fence(f, 0, true) }
+		chain_notify_lock.acquire()
+	}
+	chain_notify_draining = false
+	chain_notify_lock.release()
+}

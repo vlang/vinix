@@ -18,6 +18,7 @@ mut:
 // polls of the same descriptor share its embedded node and resource event.
 pub fn poll_fence(fence &DmaFence, node &FenceEvent, target &eventstruct.Event) bool {
 	if fence == unsafe { nil } || node == unsafe { nil } || target == unsafe { nil } { return false }
+	if is_signaled(fence) { return true }
 	mut f := unsafe { fence }
 	mut n := unsafe { node }
 	f.lock.acquire()
