@@ -857,7 +857,14 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		file.inflight_jobs++
 		vm_pinned = true
 	}
-	fence := syncobj.new_fence(file.owner_key, timer.get_ns())
+	fence := new_submission_fence() or {
+		if vm_pinned {
+			vm.finish_job()
+			file.inflight_jobs--
+		}
+		file.lock.release()
+		return -12
+	}
 	if !agxsubmission.install_output_syncs(&output_syncs, fence) {
 		if vm_pinned {
 			vm.finish_job()

@@ -88,6 +88,21 @@ fn main() {
 	os.cp(repo + '/tests/drm-binary-transfer/checks.v', scratch + '/drm/binary_transfer_checks.v')!
 	os.cp(repo + '/tests/drm-timeline-transfer/checks.v', scratch + '/drm/timeline_transfer_checks.v')!
 	os.cp(repo + '/tests/drm-timeline-transfer/lifetime.v', scratch + '/drm/syncobj/timeline_transfer_lifetime.v')!
+	if fake_source := os.getenv_opt('DRM_FAKE_FENCE_SOURCE') {
+		os.mkdir_all(scratch + '/fake')!
+		os.cp(fake_source, scratch + '/fake/fence.v')!
+		os.cp(repo + '/tests/agx-fake-fences/checks.v', scratch + '/fake/checks.v')!
+		os.cp(repo + '/tests/agx-fake-fences/context.v', scratch + '/drm/syncobj/fake_context_checks.v')!
+		os.cp_all(repo + '/kernel/gpu/agx/workqueue', scratch + '/gpu/agx/workqueue', false)!
+		os.cp(repo + '/tests/agx-fake-fences/transaction.v', scratch + '/fake/transaction.v')!
+		fake_driver := os.read_file(os.getenv_opt('DRM_FAKE_DRIVER_SOURCE') or { repo + '/kernel/gpu/agx/fake/driver.v' })!
+		fake_transaction := section(fake_driver, '\tmut vm_pinned := false\n', '\tstarted := timer.get_count()')!
+		assert fake_transaction.count('install_output_syncs(&output_syncs,') == 1
+		os.write_file(scratch + '/fake/transaction_production.v', 'module fake\nimport gpu.agx.submission as agxsubmission\n' +
+			'fn (mut file FakeG17File) reserve_output(mut vm FakeG17Vm, render_index int, output_syncs &agxsubmission.SyncArray) int {\n' +
+			fake_transaction.replace('install_output_syncs(&output_syncs,', 'install_output_syncs(output_syncs,') +
+			'\tfile.lock.release()\n\treturn 0\n}\n')!
+	}
 	$if macos {
 		stats := os.read_file(repo + '/tests/agx-queue-records/stats_darwin.c.v')!
 		os.write_file(scratch + '/drm/stats_darwin.c.v', stats.replace('module file', 'module drm'))!
@@ -96,6 +111,11 @@ fn main() {
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
 	os.write_file('${scratch}/main.v', 'import drm\nimport drm.syncobj\nimport os\nfn main() { if os.getenv("DRM_TIMELINE_TRANSFER_MEASURE") == "1" { drm.measure_timeline_transfer(); return }; if os.args.len > 1 && os.args[1] == "--timeline-transfer-trace" { drm.run_timeline_transfer_trace(); return }; if os.getenv("DRM_BINARY_TRANSFER_MEASURE") == "1" { drm.measure_binary_transfer_owners(); return }; if os.args.len > 1 && os.args[1] == "--binary-transfer-trace" { drm.run_binary_transfer_trace(); return }; if os.getenv("DRM_TIMELINE_WAIT_MEASURE") == "1" { drm.measure_timeline_wait_owners(); return }; if os.getenv("DRM_TIMELINE_SIGNAL_MEASURE") == "1" { drm.measure_timeline_signal_failures(); return }; if os.args.len > 1 && os.args[1] == "--timeline-wait-trace" { drm.run_timeline_wait_trace(); return }; if os.args.len > 1 && os.args[1] == "--query-trace" { syncobj.run_query_trace(); return }; if os.args.len > 1 && os.args[1] == "--timeline-signal-trace" { drm.run_timeline_signal_trace(); return }; drm.run_timeline_transfer_checks(); drm.run_binary_transfer_checks(); drm.run_timeline_wait_checks(); drm.run_timeline_signal_checks(); drm.run_query_checks(); drm.run_chain_info_checks(); drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks(); drm.run_sync_file_info_checks(); drm.run_sync_file_deadline_checks(); drm.run_timeline_boundary_checks(); drm.run_export_reservation_checks(); drm.run_sync_lookup_checks() }\n')!
+	if os.getenv_opt('DRM_FAKE_FENCE_SOURCE') != none {
+		main_path := scratch + '/main.v'
+		main_source := os.read_file(main_path)!
+		os.write_file(main_path, 'import fake\n' + main_source.replace('fn main() {', 'fn main() { fake.run_checks();'))!
+	}
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut arguments := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules']

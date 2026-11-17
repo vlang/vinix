@@ -6,7 +6,14 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [DRM timeline destination transfers](m1-agx-timeline-transfer.md)
+Latest correction: [independent fake AGX fence contexts](m1-agx-fake-fences.md)
+(2026-11-17). Fake workers can retire out of order even on one queue; each job
+now gets a unique context so merging preserves every pending dependency.
+Exhaustion unwinds acquired pins before output effects. Sanitized completion
+permutations and transaction regressions pass. Full parity remains incomplete;
+the generic timeline capability stays disabled.
+
+Preceding increment: [DRM timeline destination transfers](m1-agx-timeline-transfer.md)
 (2026-11-17). Transfers flatten chains/arrays, deduplicate pending contexts and
 publish cumulative destination points. Flat-array readiness, errors and sync-file
 records are supported. Queue identities prevent cross-queue dependency loss;
