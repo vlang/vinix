@@ -3,18 +3,27 @@ module g13contract
 
 fn check_sharing_contract(drm string, transport string, objects string, reference string) ! {
 	export := section(drm, 'fn ioctl_syncobj_handle_to_fd(', 'fn ioctl_syncobj_fd_to_handle(', 'Vinix syncobj export')!
-	require_order(export, ['request.flags & ~ioctl.drm_syncobj_handle_to_fd_export_sync_file',
-		'if request.flags == 0', 'syncobj.lookup(u64(handle), request.handle) or { return -22 }', 'create_syncobj_fd(obj)',
-		'file.reserve_fd(', 'defer { file.cancel_fd_reservation(', 'syncobj.lookup(u64(handle), request.handle) or { return -2 }',
-		'syncobj.get_fence(obj)', 'create_sync_file_fd_at(fence, unsafe { &reservation }) or { return -22 }'],
+	require_order(export, ['known_flags := ioctl.drm_syncobj_handle_to_fd_export_sync_file | ioctl.drm_syncobj_handle_to_fd_timeline',
+		'request.flags & ~known_flags != 0 || request.pad != 0',
+		'if request.flags & ioctl.drm_syncobj_handle_to_fd_export_sync_file == 0', 'if request.point != 0 { return -22 }',
+		'syncobj.lookup(u64(handle), request.handle) or { return -22 }', 'create_syncobj_fd(obj)',
+		'file.reserve_fd(', 'defer { file.cancel_fd_reservation(',
+		'point := if request.flags & ioctl.drm_syncobj_handle_to_fd_timeline != 0 { request.point } else { u64(0) }',
+		'source := find_syncobj_fence(u64(handle), request.handle, point, 0)', 'if source.code != 0 { return source.code }',
+		'create_sync_file_fd_at(source.fence, unsafe { &reservation }) or { return -22 }'],
 		'Opaque export resolves its object first; sync-file reserves before source lookup')!
 	importer := section(drm, 'fn ioctl_syncobj_fd_to_handle(', 'fn ioctl_syncobj_wait(', 'Vinix syncobj import')!
-	require_order(importer, ['request.flags & ~ioctl.drm_syncobj_fd_to_handle_import_sync_file',
-		'if request.flags == 0', 'syncobj_from_fd(request.fd) or { return -22 }',
+	require_order(importer, ['known_flags := ioctl.drm_syncobj_fd_to_handle_import_sync_file | ioctl.drm_syncobj_fd_to_handle_timeline',
+		'request.flags & ~known_flags != 0 || request.pad != 0',
+		'if request.flags & ioctl.drm_syncobj_fd_to_handle_import_sync_file == 0', 'if request.point != 0 { return -22 }',
+		'syncobj_from_fd(request.fd) or { return -22 }',
 		'request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }', 'return 0',
 		'sync_file_fence_from_fd(request.fd) or { return -22 }',
-		'syncobj.lookup(u64(handle), request.handle) or { return -2 }', 'syncobj.replace_fence(obj, fence)'],
-		'Opaque import creates a handle while sync-file import replaces a fence')!
+		'syncobj.lookup(u64(handle), request.handle) or { return -2 }',
+		'if request.flags & ioctl.drm_syncobj_fd_to_handle_timeline != 0 && request.point != 0',
+		'syncobj.reserve_chain() or { return -12 }', 'defer { syncobj.release_chain_reservation(chain) }',
+		'syncobj.add_chain_point(obj, chain, fence, request.point)', 'else {', 'syncobj.replace_fence(obj, fence)'],
+		'Opaque import creates a handle while sync-file import publishes a point or replaces the head')!
 	link := section(objects, 'pub fn import_syncobj(', '// Prepared entries', 'Vinix alias ownership')!
 	require_order(link, ['if owner == 0 || obj == unsafe { nil }',
 		'memory.malloc_packed_fallible(sizeof(SyncobjHandle))', 'if allocation == unsafe { nil } { return none }',
@@ -51,5 +60,6 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 		'static int drm_syncobj_export_sync_file(', 'Linux binary fence import validation')!
 	require_order(linux_fence_import, ['fence = sync_file_get_fence(fd)', 'if (!fence)', 'return -EINVAL',
 		'syncobj = drm_syncobj_find(file_private, handle)', 'if (!syncobj)', 'return -ENOENT',
+		'if (point)', 'dma_fence_chain_alloc()', 'return -ENOMEM', 'drm_syncobj_add_point(syncobj, chain, fence, point)',
 		'drm_syncobj_replace_fence(syncobj, fence)'], 'Linux fence descriptor before destination lookup and publication')!
 }

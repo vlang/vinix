@@ -78,10 +78,11 @@ fn initialize_chain(node &DmaFence, previous &DmaFence, payload &DmaFence, point
 }
 
 // Linux drm_syncobj_add_point semantics, including zero, repeated and
-// decreasing points. The payload is a leaf; only the previous link may chain.
+// decreasing points. A sync-file import may contain another retained chain.
+// The completion queue propagates through it without recursive evaluation.
 pub fn add_chain_point(obj &SyncObj, reservation &DmaFence, payload &DmaFence, point u64) bool {
 	if obj == unsafe { nil } || reservation == unsafe { nil }
-		|| !reservation.chain_reserved || payload == unsafe { nil } || payload.chain
+		|| !reservation.chain_reserved || payload == unsafe { nil }
 		|| payload.chain_reserved { return false }
 	mut o := unsafe { obj }
 	o.lock.acquire()

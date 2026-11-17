@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Sync-file import and export now accept the timeline point in the 24-byte
+descriptor request. The original 16-byte requests still accept point-zero
+operations. [Timeline sync-file descriptors](m1-agx-timeline-sync-file.md)
+
 Binary WAIT snapshots every syncobj before registering for new submissions.
 Registration observes the current fence after any transient fence from that
 pass has been cleared. [Binary WAIT capture ordering](m1-agx-binary-wait-capture.md)

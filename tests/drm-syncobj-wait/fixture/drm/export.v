@@ -64,7 +64,7 @@ pub fn run_export_reservation_checks() {
 		for reserved in [u32(1), ~u32(0)]! {
 			request = ioctl.DrmSyncobjHandle{ handle: 0, flags: 1, pad: reserved, fd: -123 }
 			assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == -22; checks++
-			request = ioctl.DrmSyncobjHandle{ handle: 0, flags: 2, fd: -123 }
+			request = ioctl.DrmSyncobjHandle{ handle: 0, flags: 4, fd: -123 }
 			assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == -22; checks++
 		}
 		assert memory.attempts() == attempts

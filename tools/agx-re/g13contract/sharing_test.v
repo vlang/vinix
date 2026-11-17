@@ -15,9 +15,13 @@ fn test_sharing_guards_reject_snapshots_wrong_types_and_double_release() {
 		'xa_alloc(&file_private->syncobj_xa, handle, syncobj, xa_limit_32b,\nstatic int drm_syncobj_import_sync_file_fence(\n' +
 		'fence = sync_file_get_fence(fd);\nif (!fence) return -EINVAL;\n' +
 		'syncobj = drm_syncobj_find(file_private, handle);\nif (!syncobj) return -ENOENT;\n' +
+		'if (point) {\nchain = dma_fence_chain_alloc();\nif (!chain) return -ENOMEM;\n' +
+		'drm_syncobj_add_point(syncobj, chain, fence, point);\n} else {\n' +
 		'drm_syncobj_replace_fence(syncobj, fence);\nstatic int drm_syncobj_export_sync_file('
 	check_sharing_contract(drm, transport, objects, reference)!
-	for token in ['if request.flags == 0', 'create_syncobj_fd(obj)', 'syncobj.import_syncobj(u64(handle), obj)'] {
+	for token in ['if request.flags & ioctl.drm_syncobj_handle_to_fd_export_sync_file == 0',
+		'create_syncobj_fd(obj)', 'syncobj.import_syncobj(u64(handle), obj)',
+		'find_syncobj_fence(u64(handle), request.handle, point, 0)', 'syncobj.release_chain_reservation(chain)'] {
 		if _ := check_sharing_contract(drm.replace(token, ''), transport, objects, reference) { assert false, token }
 	}
 	for token in ['resource.o_cloexec', 'if mut res is SyncobjResource', 'defer { fd.unref() }',

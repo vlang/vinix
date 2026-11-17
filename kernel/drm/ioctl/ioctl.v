@@ -53,7 +53,9 @@ pub const drm_prime_cap_import = u64(1) << 0
 pub const drm_prime_cap_export = u64(1) << 1
 pub const drm_syncobj_create_signaled = u32(1) << 0
 pub const drm_syncobj_fd_to_handle_import_sync_file = u32(1) << 0
+pub const drm_syncobj_fd_to_handle_timeline = u32(1) << 1
 pub const drm_syncobj_handle_to_fd_export_sync_file = u32(1) << 0
+pub const drm_syncobj_handle_to_fd_timeline = u32(1) << 1
 pub const drm_syncobj_wait_all = u32(1) << 0
 pub const drm_syncobj_wait_for_submit = u32(1) << 1
 pub const drm_syncobj_wait_available = u32(1) << 2
@@ -145,6 +147,7 @@ pub mut:
 	flags  u32
 	fd     i32
 	pad    u32
+	point  u64
 }
 
 pub struct DrmSyncobjWait {
@@ -738,7 +741,7 @@ pub mut:
 pub fn validate_asahi_25_layouts() bool {
 	return sizeof(DrmVersion) == 64 && sizeof(DrmGetCap) == 16 && sizeof(DrmGemClose) == 8
 		&& sizeof(DrmPrimeHandle) == 12 && sizeof(DrmSyncobjCreate) == 8
-		&& sizeof(DrmSyncobjDestroy) == 8 && sizeof(DrmSyncobjHandle) == 16
+		&& sizeof(DrmSyncobjDestroy) == 8 && sizeof(DrmSyncobjHandle) == 24
 		&& sizeof(DrmSyncobjWait) == 40 && sizeof(DrmSyncobjArray) == 16
 		&& sizeof(SyncFileInfo) == 56 && sizeof(SyncFenceInfo) == 80
 		&& sizeof(SyncSetDeadline) == 16

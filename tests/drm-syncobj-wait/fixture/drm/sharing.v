@@ -104,7 +104,7 @@ pub fn run_sharing_checks() {
 		assert ioctl_syncobj_fd_to_handle(voidptr(33), &request) == -12; checks++
 		assert request.handle == 777 && memory.alias_count() == 3
 		syncobj.assert_namespace_for_checks(4)
-		for flags in [u32(2), 3, ~u32(0)]! {
+		for flags in [u32(4), 5, ~u32(0)]! {
 			request = ioctl.DrmSyncobjHandle{ handle: original, flags: flags, fd: i32(number) }
 			assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == -22; checks++
 			assert ioctl_syncobj_fd_to_handle(voidptr(33), &request) == -22; checks++

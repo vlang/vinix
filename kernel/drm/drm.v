@@ -317,6 +317,7 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmSyncobjHandle))
 				direction: ioctl_write | ioctl_read
+				extensible: true
 			}
 		}
 		ioctl.drm_ioctl_syncobj_wait {
@@ -1051,10 +1052,12 @@ fn ioctl_syncobj_handle_to_fd(handle voidptr, data voidptr) int {
 		return -14
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjHandle(data) }
-	if request.flags & ~ioctl.drm_syncobj_handle_to_fd_export_sync_file != 0 || request.pad != 0 {
+	known_flags := ioctl.drm_syncobj_handle_to_fd_export_sync_file | ioctl.drm_syncobj_handle_to_fd_timeline
+	if request.flags & ~known_flags != 0 || request.pad != 0 {
 		return -22
 	}
-	if request.flags == 0 {
+	if request.flags & ioctl.drm_syncobj_handle_to_fd_export_sync_file == 0 {
+		if request.point != 0 { return -22 }
 		obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
 		request.fd = i32(create_syncobj_fd(obj) or { return -int(errno.get()) })
 		return 0
@@ -1065,9 +1068,10 @@ fn ioctl_syncobj_handle_to_fd(handle voidptr, data voidptr) int {
 	mut reservation := file.FdReservation{}
 	file.reserve_fd(unsafe { nil }, unsafe { &reservation }) or { return -int(errno.get()) }
 	defer { file.cancel_fd_reservation(unsafe { &reservation }) }
-	obj := syncobj.lookup(u64(handle), request.handle) or { return -2 }
-	fence := syncobj.get_fence(obj) or { return -22 }
-	fdnum := create_sync_file_fd_at(fence, unsafe { &reservation }) or { return -22 }
+	point := if request.flags & ioctl.drm_syncobj_handle_to_fd_timeline != 0 { request.point } else { u64(0) }
+	source := find_syncobj_fence(u64(handle), request.handle, point, 0)
+	if source.code != 0 { return source.code }
+	fdnum := create_sync_file_fd_at(source.fence, unsafe { &reservation }) or { return -22 }
 	request.fd = i32(fdnum)
 	return 0
 }
@@ -1077,11 +1081,12 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 		return -14
 	}
 	mut request := unsafe { &ioctl.DrmSyncobjHandle(data) }
-	if request.flags & ~ioctl.drm_syncobj_fd_to_handle_import_sync_file != 0 || request.pad != 0
-		|| request.fd < 0 {
+	known_flags := ioctl.drm_syncobj_fd_to_handle_import_sync_file | ioctl.drm_syncobj_fd_to_handle_timeline
+	if request.flags & ~known_flags != 0 || request.pad != 0 || request.fd < 0 {
 		return -22
 	}
-	if request.flags == 0 {
+	if request.flags & ioctl.drm_syncobj_fd_to_handle_import_sync_file == 0 {
+		if request.point != 0 { return -22 }
 		obj := syncobj_from_fd(request.fd) or { return -22 }
 		request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }
 		return 0
@@ -1092,7 +1097,13 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 	// reference, including across destination destruction/reuse before lookup.
 	fence := sync_file_fence_from_fd(request.fd) or { return -22 }
 	obj := syncobj.lookup(u64(handle), request.handle) or { return -2 }
-	syncobj.replace_fence(obj, fence)
+	if request.flags & ioctl.drm_syncobj_fd_to_handle_timeline != 0 && request.point != 0 {
+		chain := syncobj.reserve_chain() or { return -12 }
+		defer { syncobj.release_chain_reservation(chain) }
+		if !syncobj.add_chain_point(obj, chain, fence, request.point) { return -22 }
+	} else {
+		syncobj.replace_fence(obj, fence)
+	}
 	return 0
 }
 

@@ -40,6 +40,7 @@ fn account_activity(_ &DrmDevice, _ u32) { activity_calls++ }
 fn drm_ioctl(_ &DrmDevice, cmd u32, data voidptr, _ voidptr) int {
 	return match cmd {
 		ioctl.drm_ioctl_syncobj_wait, ioctl.drm_ioctl_syncobj_timeline_wait { handle_wait(cmd, data) }
+		ioctl.drm_ioctl_syncobj_handle_to_fd, ioctl.drm_ioctl_syncobj_fd_to_handle { handle_descriptor(cmd, data) }
 		else { -95 }
 	}
 }
@@ -117,6 +118,7 @@ pub fn run_checks() {
 	assert copy_ioctl_output(0, unsafe { &buffer[0] }, 12, 0)
 	println('DRM wire: ABI dispatch, direction intersections, legacy metadata fallback, zero extension, unknown-tail echo, bounds and copy faults passed')
 	check_wait_transport()
+	check_descriptor_transport()
 }
 
 fn expect_error(mut node DrmNode, request u64, data voidptr, code u64) {

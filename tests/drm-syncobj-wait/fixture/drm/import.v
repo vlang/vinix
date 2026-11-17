@@ -39,6 +39,7 @@ fn assert_fence_identity(obj &syncobj.SyncObj, fence &syncobj.DmaFence) {
 
 pub fn run_sync_file_import_checks() {
 	memory.reset()
+	run_timeline_sync_file_checks()
 	for _ in 0 .. 200 {
 		source := make_object(0)
 		target := syncobj.new_syncobj(12) or { panic('destination') }
@@ -64,7 +65,7 @@ pub fn run_sync_file_import_checks() {
 		for handle in [target.handle, alias]! {
 			for invalid in [-1, 31, 32, opaque]! { expect_sync_file_import(12, handle, invalid, -22) }
 		}
-		for flags in [u32(2), 3, ~u32(0)]! {
+		for flags in [u32(4), 5, ~u32(0)]! {
 			mut request := ioctl.DrmSyncobjHandle{ handle: target.handle, flags: flags, fd: i32(snapshot) }
 			assert ioctl_syncobj_fd_to_handle(voidptr(12), &request) == -22
 			assert request.handle == target.handle && request.fd == snapshot && request.flags == flags
