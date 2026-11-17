@@ -273,10 +273,9 @@ fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool {
 	return true
 }
 
-// Only the GPU worker consumes nodes. Detach a bounded snapshot, then put
-// retained older nodes BEFORE concurrent appends. Remember both outstanding
-// retirement and unpublished work per queue; only the latter blocks an
-// independent later batch. No pointer to an older node survives this poll.
+// Only one poller consumes nodes. Detach a snapshot, then put retained older
+// nodes before concurrent appends. Each node pins its queue through the poll.
+// Only unpublished work blocks a later batch on that queue.
 fn process_pending_submissions() {
 	pending_lock.acquire()
 	if pending_poll_active || pending_head == unsafe { nil } {
@@ -289,32 +288,26 @@ fn process_pending_submissions() {
 	pending_tail = unsafe { nil }
 	pending_count = 0
 	pending_lock.release()
+	// Clear the queue-local scratch for every queue in this snapshot before
+	// visiting any of them. Concurrent appends join the next snapshot.
+	mut cursor := current
+	for cursor != unsafe { nil } {
+		mut queue := unsafe { cursor.queue }
+		queue.dispatch_blocked_in_poll = false
+		cursor = cursor.next
+	}
 	mut retained_head := &G13PendingSubmission(unsafe { nil })
 	mut retained_tail := &G13PendingSubmission(unsafe { nil })
 	mut retained_count := u64(0)
-	mut blocked := unsafe { [128]voidptr{} }
-	mut unpublished := [128]bool{}
-	mut blocked_count := u32(0)
 	for current != unsafe { nil } {
 		mut item := unsafe { current }
 		current = item.next
 		item.next = unsafe { nil }
-		mut gate := -1
-		for index := u32(0); index < blocked_count; index++ {
-			if blocked[index] == voidptr(item.queue) {
-				gate = int(index)
-				break
-			}
-		}
-		earlier := if gate >= 0 { unpublished[gate] } else { blocked_count == 128 }
+		mut queue := unsafe { item.queue }
+		earlier := queue.dispatch_blocked_in_poll
 		if earlier || poll_g13_pending(mut item) {
 			release_completed_g13_timestamps(item)
-			if gate < 0 && blocked_count < 128 {
-				gate = int(blocked_count)
-				blocked[blocked_count] = voidptr(item.queue)
-				blocked_count++
-			}
-			if gate >= 0 && !g13_pending_dispatch_complete(item) { unpublished[gate] = true }
+			if !g13_pending_dispatch_complete(item) { queue.dispatch_blocked_in_poll = true }
 			if retained_tail == unsafe { nil } {
 				retained_head = item
 			} else {
@@ -334,7 +327,6 @@ fn process_pending_submissions() {
 			mut owner := unsafe { item.file }
 			owner.release_g13_submission_timestamps(item.timestamps)
 			submission.release_sync_array(item.dependencies)
-			mut queue := unsafe { item.queue }
 			queue.release_file_reference()
 			katomic.dec(mut &item.file.inflight_by_vm[item.vm_id])
 			memory.free(voidptr(item))

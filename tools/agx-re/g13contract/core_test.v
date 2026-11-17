@@ -9,7 +9,7 @@ fn test_order_accepts_repeated_tokens() {
 
 fn test_dependency_publication_rejects_callback_waits_and_missing_batch_gate() {
 	source := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
-	poll := section(source, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'test poll')!
+	poll := section(source, 'fn poll_g13_pending(', '\n}\n', 'test poll')!
 	check_dependency_publication(poll)!
 	for broken in [poll + '\nif !katomic.load(&item.commands[0].done) { return true }',
 		poll.replace('if !manager.g13_queue_dispatch_blocked(item.queue)', 'if true'),
@@ -47,12 +47,12 @@ fn test_order_rejects_a_reversed_contract() {
 	}
 }
 
-fn test_submission_pipelining_preserves_initial_guards_and_bounded_fifo() {
+fn test_submission_pipelining_preserves_initial_guards_and_queue_fifo() {
 	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
 	for broken in [pending.replace('item.initial_barriers |= u32(1) << pipe', ''),
-		pending.replace('if gate >= 0 { unpublished[gate] }', 'if gate >= 0 { unpublished[gate] || item.initial_barriers != 0 }'),
-		pending.replace('if gate < 0 && blocked_count < 128', 'if gate < 0'),
+		pending.replace('earlier := queue.dispatch_blocked_in_poll', 'earlier := false'),
+		pending.replace('queue.dispatch_blocked_in_poll = false', ''),
 		pending.replace('!g13_pending_dispatch_complete(item)', 'false'),
 		pending.replace('fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool {',
 			'fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool { _ = item.callbacks_remaining')] {

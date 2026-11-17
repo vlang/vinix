@@ -442,18 +442,21 @@ fn check_submission_pipelining(pending string) ! {
 	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix initial dependencies')!
 	require_order(resolve, ['barrier == ioctl.asahi_barrier_none', 'barrier == 0',
 		'item.initial_barriers |= u32(1) << pipe', 'barrier > counts[pipe]'], 'Vinix initial dependencies')!
-	dispatch := section(pending, 'fn g13_pending_dispatch_complete(', '// Only the GPU worker consumes nodes.', 'Vinix dispatch completion')!
+	dispatch := section(pending, 'fn g13_pending_dispatch_complete(', '\n}\n', 'Vinix dispatch completion')!
 	require_order(dispatch, ['item.commands[index].compute_job != unsafe { nil }',
 		'item.commands[index].render_job != unsafe { nil }', 'return false', 'return true'], 'Vinix dispatch completion')!
 	require(!dispatch.contains('callbacks_remaining') && !dispatch.contains('syncobj.'),
 		'Publication completion must not depend on retirement or a user fence')!
 	drain := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Vinix submission pipelining')!
-	require_order(drain, ['mut unpublished := [128]bool{}', 'current = item.next',
-		'mut gate := -1', 'gate = int(index)', 'if gate >= 0 { unpublished[gate] }',
-		'blocked_count == 128', 'if earlier || poll_g13_pending',
-		'if gate < 0 && blocked_count < 128', '!g13_pending_dispatch_complete(item)',
-		'unpublished[gate] = true', 'retained_tail.next = pending_head', 'pending_head = retained_head'],
-		'Vinix submission pipelining')!
+	require_order(drain, ['pending_poll_active = true', 'mut current := pending_head',
+		'pending_head = unsafe { nil }', 'pending_lock.release()', 'mut cursor := current',
+		'mut queue := unsafe { cursor.queue }', 'queue.dispatch_blocked_in_poll = false',
+		'cursor = cursor.next', 'for current != unsafe { nil }', 'current = item.next',
+		'mut queue := unsafe { item.queue }', 'earlier := queue.dispatch_blocked_in_poll',
+		'if earlier || poll_g13_pending', '!g13_pending_dispatch_complete(item)',
+		'queue.dispatch_blocked_in_poll = true', 'retained_tail.next = pending_head',
+		'pending_head = retained_head', 'pending_poll_active = false'],
+		'Vinix per-queue publication FIFO in the detached poll snapshot')!
 	require(!drain.contains('item.initial_barriers != 0'), 'Initial events must not wait for whole-batch CPU retirement')!
 }
 
@@ -732,7 +735,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(run, ['drm_sched_entity_pop_job(entity)', 'sched->ops->run_job(sched_job)',
 		'drm_sched_fence_scheduled(s_fence, fence)', 'drm_sched_job_done(sched_job, fence->error)'], 'Asahi scheduler completion error origin')!
 	require(!pending.contains('syncobj.wait') && !pending.contains('sched.yield'), 'Vinix dependency poller must not wait')!
-	poll := section(pending, 'fn poll_g13_pending(', '// Only the GPU worker consumes nodes.', 'Vinix batch overlap')!
+	poll := section(pending, 'fn poll_g13_pending(', '\n}\n', 'Vinix batch overlap')!
 	check_dependency_publication(poll)!
 	require_order(poll, ['g13_dependencies_ready(&item.dependencies, item.queue.fence_context)', 'failure := g13_pending_error(item)',
 		'if !item.admitted', 'manager.g13_queue_dispatch_blocked', 'submit_g13_pending(mut manager, mut item)',

@@ -304,9 +304,11 @@ mut:
 	mappings_published bool
 	context_retirement G13ContextRetirement
 	context_next       &G13QueueResources = unsafe { nil }
+	fence_seqno        u32
 	quarantined        bool
 	released           bool
-	fence_seqno        u32
+pub mut:
+	dispatch_blocked_in_poll bool // scratch owned by the single pending-submission poller
 }
 
 // The owning file lock serializes fence creation for this retained queue.

@@ -173,7 +173,7 @@ fn check_pipelined_concurrent_append() {
 	assert_drained(file)
 }
 
-fn check_pipelined_queue_table_pressure() {
+fn check_independent_queue_progress() {
 	gpu.reset()
 	mut file := new_file()
 	mut manager := gpu.get_global_manager() or { panic('manager') }
@@ -181,23 +181,35 @@ fn check_pipelined_queue_table_pressure() {
 		file.queues << LogicalQueue{ id: id }
 		file.g13_queues << Ownership{ queue_id: id, resources: &gpu.G13QueueResources{ id: id } }
 	}
-	for id := u32(1); id <= 129; id++ {
-		assert submit(mut file, id, false, unsafe { nil }, unsafe { nil }, false) == 0
+	input := output()
+	delay := syncobj.new_fence(0, 1)
+	syncobj.replace_fence(input, delay)
+	for id := u32(1); id <= 128; id++ {
+		assert submit(mut file, id, false, input, unsafe { nil }, false) == 0
 	}
+	assert submit(mut file, 129, false, unsafe { nil }, unsafe { nil }, false) == 0
 	assert submit(mut file, 1, false, unsafe { nil }, unsafe { nil }, false) == 0
 	assert submit(mut file, 129, false, unsafe { nil }, unsafe { nil }, false) == 0
+	mut other := new_file()
+	other.owner_key = 2
+	assert submit(mut other, 1, false, unsafe { nil }, unsafe { nil }, false) == 0
 	service_file_work()
-	assert manager.published.len == 129 && manager.published_order[128] == 129
-	assert pending_count == 131, 'a known queue may pipeline even when the table is full'
-	assert manager.execute_firmware(1, 0) // retire queue2 to free a table entry
-	manager.retire_firmware(1)
+	assert manager.published_order == [u32(128), 130, 131], 'unrelated queues must publish while 128 others wait'
+	assert pending_count == 132
 	service_file_work()
-	assert manager.published.len == 131
-	assert manager.published_order[129] == 128 && manager.published_order[130] == 130
-	assert pending_count == 130, 'overflow queues must resume in FIFO order when room returns'
+	assert manager.published_order == [u32(128), 130, 131], 'a later batch on the blocked queue must still wait'
+	syncobj.signal(delay)
+	service_file_work()
+	assert manager.published_order.len == 132 && pending_count == 132
+	for index := u32(0); index < 128; index++ {
+		assert manager.published_order[int(index) + 3] == index
+	}
+	assert manager.published_order[131] == 129, 'the blocked queue resumes in FIFO order'
 	manager.stop()
 	service_file_work()
 	assert_drained(file)
+	assert_drained(other)
+	println('AGX queue progress: independent queues dispatch past 128 blocked queues and FIFO resumes after the input signals.')
 }
 
 fn check_stop_during_later_submission() {
@@ -258,8 +270,8 @@ fn check_submission_pipelining() {
 	check_pipelined_failure_and_stop()
 	check_full_pipelined_batches()
 	check_pipelined_concurrent_append()
-	check_pipelined_queue_table_pressure()
+	check_independent_queue_progress()
 	check_stop_during_later_submission()
 	check_failed_input_between_live_submissions()
-	println('AGX submission pipelining: reverse retirement/VM/result ownership, index-zero/FIFO, partial/concurrent publication, 128-queue saturation, failed input, 12 multi-batch shutdown interleavings and overlapping 64+63 jobs passed')
+	println('AGX submission pipelining: reverse retirement/VM/result ownership, index-zero/FIFO, partial/concurrent publication, independent queue progress, failed input, 12 multi-batch shutdown interleavings and overlapping 64+63 jobs passed')
 }

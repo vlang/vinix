@@ -225,35 +225,32 @@ fn check_blocked_timestamp_retirement() {
  gpu.reset()
  mut file := new_file()
  mut manager := gpu.get_global_manager() or { panic('manager') }
- for id := u32(3); id <= 129; id++ {
-  file.queues << LogicalQueue{id: id}
-  file.g13_queues << Ownership{queue_id: id, resources: &gpu.G13QueueResources{id: id}}
- }
- for id := u32(1); id <= 128; id++ {
-  assert submit(mut file, id, false, unsafe { nil }, unsafe { nil }, false) == 0
- }
+ input := output()
+ syncobj.replace_fence(input, syncobj.new_fence(0, 1))
+ assert submit(mut file, 1, false, input, unsafe { nil }, false) == 0
  mut objects := [2]gem.GemObject{}
  for index in 0 .. 2 {
   file.timestamp_objects << TimestampObject{id: u32(9 + index), va: u64(0x123456780000) + u64(index) * 4096,
    size: 4096, obj: unsafe { &objects[index] }}
  }
- assert submit_timestamp_packet_on_queue(mut file, 129, 2, -1, unsafe { nil }, unsafe { nil }) == 0
+ assert submit_timestamp_packet_on_queue(mut file, 1, 2, -1, unsafe { nil }, unsafe { nil }) == 0
  file.lock.acquire()
  for index in 0 .. 2 { file.timestamp_objects[index].detached = true }
  file.lock.release()
  timestamp_stop_target = pending_tail
  timestamp_stop_calls = 0
  katomic.set_load_hook(stop_at_blocked_timestamp)
- // All 128 queue gates fill before the target. Its poll is short-circuited;
- // the per-command reaper still runs and observes concurrent stop callbacks.
+ // The older same-queue batch is waiting on an input, so the target's
+ // submission poll is skipped. The per-command reaper still runs and
+ // observes concurrent stop callbacks.
  service_file_work()
  katomic.set_load_hook(unsafe { nil })
  assert timestamp_stop_calls == 1, 'blocked node still polls timestamp retirements'
- assert manager.published.len == 128 && pending_count == 129
+ assert manager.published.len == 0 && pending_count == 2
  assert file.timestamp_objects.len == 0 && objects[0].references == 0 && objects[1].references == 0
  assert manager.timestamp_unmaps == 2, 'blocked retired captures release before the next batch poll'
  service_file_work()
  assert_drained(file)
  timestamp_stop_target = unsafe { nil }
- println('AGX blocked timestamps: 128-queue saturation reaps stop-completed captures while the node remains retained')
+ println('AGX blocked timestamps: a FIFO-blocked batch reaps stop-completed captures while its node remains retained')
 }

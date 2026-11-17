@@ -104,9 +104,9 @@ Independent later batches on the same queue now pipeline after older publication
 The new checks run/retire either pipe's later batch first and verify each node's
 VM pin, result references and aggregate fence remain independent. They cover two
 overlapping batches totaling 127 jobs, partial publication, a concurrent append,
-forged user fences, fault/stop, both index-zero bits, and a saturated 128-queue
-lookup with overflow deferral and resumption. External input sync dependencies
-and unpublished predecessors retain FIFO order. Firmware scheduling remains injected.
+forged user fences, fault/stop, both index-zero bits, and dispatch beyond 128
+unrelated blocked queues. The queue with a blocked predecessor resumes in FIFO
+order after the input fence signals. Firmware scheduling remains injected.
 
 Initial-event checks cover idle source subqueues, a dependency on only a later
 command in a batch, immutable targets despite newer accepted work, consumers
