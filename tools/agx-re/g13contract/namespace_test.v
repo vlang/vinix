@@ -15,7 +15,8 @@ fn test_namespace_guards_reject_fixed_caps_wrap_and_stale_links() {
 	for token in ['if handle == ~u32(0) { return none }', 'if cursor.handle > handle { break }',
 		'e.next = unsafe { cursor }', 'previous.next = e',
 		'previous.next = cursor.next', 'cursor.next = nil',
-		'previous.next = next', 'if removed.allocated', 'if cursor.allocated', 'next := unsafe { retired.next }'] {
+		'previous.next = next', 'if removed.allocated', 'if retired.allocated', 'next := unsafe { retired.next }',
+		'retain_syncobj(e.object)', 'release_syncobj(retired.object)'] {
 		if _ := check_namespace_contract(objects.replace(token, ''), reference) { assert false, token }
 	}
 	if _ := check_namespace_contract(objects + '\nconst syncobj_max_objects = u32(1024)\n', reference) { assert false }

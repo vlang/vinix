@@ -8,7 +8,8 @@ fn check_binary_transfer(drm string, wire string, transfer string, lookup string
 	require_order(drm.all_after('fn common_ioctl_layout('), ['ioctl.drm_ioctl_syncobj_transfer {',
 		'size: u32(sizeof(ioctl.DrmSyncobjTransfer)), direction: ioctl_write | ioctl_read'], 'TRANSFER wire layout')!
 	require_order(drm.all_after('fn core_ioctl('), ['ioctl.drm_ioctl_syncobj_transfer {', 'return ioctl_syncobj_transfer(handle, data)'], 'TRANSFER dispatch')!
-	require_order(transfer, ['request.pad != 0', 'destination := syncobj.lookup(', 'source := find_syncobj_fence(', 'if source.code != 0',
+	require_order(transfer, ['request.pad != 0', 'destination := syncobj.lookup_referenced(',
+		'defer { syncobj.release_syncobj(destination) }', 'source := find_syncobj_fence(', 'if source.code != 0',
 		'syncobj.replace_fence(destination, source.fence)'], 'Binary transfer validates before publication and preserves destination identity')!
 	require_order(lookup, ['object := syncobj.lookup(', 'flags & ~ioctl.drm_syncobj_wait_for_submit',
 		'mut capture := unsafe { &syncobj.TimelineCapture(C.__builtin_alloca(sizeof(syncobj.TimelineCapture))) }',

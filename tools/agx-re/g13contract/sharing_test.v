@@ -32,12 +32,12 @@ fn test_sharing_guards_reject_snapshots_wrong_types_and_double_release() {
 	if _ := check_sharing_contract(drm, transport, objects.replace('object: obj, allocated: true', 'object: nil, allocated: true'), reference) { assert false }
 	if _ := check_sharing_contract(drm, transport, objects, reference.replace('syncobj = fd_file(f)->private_data', '')) { assert false }
 	for token in ['sync_file_fence_from_fd(request.fd) or { return -22 }',
-		'syncobj.lookup(u64(handle), request.handle) or { return -2 }', 'syncobj.replace_fence(obj, fence)'] {
+		'syncobj.lookup_referenced(u64(handle), request.handle) or { return -2 }', 'syncobj.replace_fence(obj, fence)'] {
 		if _ := check_sharing_contract(drm.replace(token, ''), transport, objects, reference) { assert false, token }
 	}
 	old_order := drm.replace('fence := sync_file_fence_from_fd(request.fd) or { return -22 }\n' +
-		'\tobj := syncobj.lookup(u64(handle), request.handle) or { return -2 }',
-		'obj := syncobj.lookup(u64(handle), request.handle) or { return -2 }\n' +
+		'\tobj := syncobj.lookup_referenced(u64(handle), request.handle) or { return -2 }',
+		'obj := syncobj.lookup_referenced(u64(handle), request.handle) or { return -2 }\n' +
 		'\tfence := sync_file_fence_from_fd(request.fd) or { return -22 }')
 	assert old_order != drm
 	if _ := check_sharing_contract(old_order, transport, objects, reference) { assert false }

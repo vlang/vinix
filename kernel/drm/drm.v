@@ -350,6 +350,9 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 		ioctl.drm_ioctl_syncobj_timeline_signal {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineArray)), direction: ioctl_write | ioctl_read }
 		}
+		ioctl.drm_ioctl_syncobj_eventfd {
+			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjEventfd)), direction: ioctl_write | ioctl_read, extensible: true }
+		}
 		ioctl.drm_ioctl_mode_create_dumb {
 			DrmIoctlLayout{
 				size: u32(sizeof(ioctl.DrmModeCreateDumb))
@@ -1058,7 +1061,8 @@ fn ioctl_syncobj_handle_to_fd(handle voidptr, data voidptr) int {
 	}
 	if request.flags & ioctl.drm_syncobj_handle_to_fd_export_sync_file == 0 {
 		if request.point != 0 { return -22 }
-		obj := syncobj.lookup(u64(handle), request.handle) or { return -22 }
+		obj := syncobj.lookup_referenced(u64(handle), request.handle) or { return -22 }
+		defer { syncobj.release_syncobj(obj) }
 		request.fd = i32(create_syncobj_fd(obj) or { return -int(errno.get()) })
 		return 0
 	}
@@ -1088,6 +1092,7 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 	if request.flags & ioctl.drm_syncobj_fd_to_handle_import_sync_file == 0 {
 		if request.point != 0 { return -22 }
 		obj := syncobj_from_fd(request.fd) or { return -22 }
+		defer { syncobj.release_syncobj(obj) }
 		request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }
 		return 0
 	}
@@ -1096,7 +1101,8 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 	// Fence metadata remains retained after the descriptor lookup releases its
 	// reference, including across destination destruction/reuse before lookup.
 	fence := sync_file_fence_from_fd(request.fd) or { return -22 }
-	obj := syncobj.lookup(u64(handle), request.handle) or { return -2 }
+	obj := syncobj.lookup_referenced(u64(handle), request.handle) or { return -2 }
+	defer { syncobj.release_syncobj(obj) }
 	if request.flags & ioctl.drm_syncobj_fd_to_handle_timeline != 0 && request.point != 0 {
 		chain := syncobj.reserve_chain() or { return -12 }
 		defer { syncobj.release_chain_reservation(chain) }
@@ -1235,8 +1241,9 @@ fn ioctl_syncobj_signal(handle voidptr, data voidptr) int {
 	defer { buffer.free_owned() }
 	if !usercopy.copy_from_user(buffer.handles, request.handles,
 		u64(request.count_handles) * sizeof(u32)) { return -14 }
+	defer { buffer.release_object_references(request.count_handles) }
 	for i := u32(0); i < request.count_handles; i++ {
-		object := syncobj.lookup(u64(handle), unsafe { buffer.handles[i] }) or { return -2 }
+		object := syncobj.lookup_referenced(u64(handle), unsafe { buffer.handles[i] }) or { return -2 }
 		unsafe { buffer.objects[i] = voidptr(object) }
 	}
 	// Linux allocates one private completion per array entry, including
@@ -1297,6 +1304,9 @@ fn core_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) ?int {
 		}
 		ioctl.drm_ioctl_syncobj_timeline_signal {
 			return ioctl_syncobj_timeline_signal(handle, data)
+		}
+		ioctl.drm_ioctl_syncobj_eventfd {
+			return ioctl_syncobj_eventfd(handle, data)
 		}
 		else {
 			return none

@@ -44,6 +44,7 @@ pub fn run_timeline_boundary_checks() {
 		code, output := stage_timeline(11, obj.handle, ~u64(0), false)
 		assert code == 0 && output.count == 1 && output.timeline_values[0] == ~u64(0)
 		assert submission.install_output_syncs(unsafe { &output }, maximum)
+		submission.release_sync_array(output)
 		attempts := memory.attempts()
 		code_in, captured := stage_timeline(11, obj.handle, ~u64(0) - 1, true)
 		assert code_in == 0, 'MAX must cover the lower input point'

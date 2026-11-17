@@ -25,6 +25,7 @@ pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
 pub const drm_ioctl_syncobj_transfer = u32(0xcc)
 pub const drm_ioctl_syncobj_query = u32(0xcb)
 pub const drm_ioctl_syncobj_timeline_signal = u32(0xcd)
+pub const drm_ioctl_syncobj_eventfd = u32(0xcf)
 pub const drm_ioctl_mode_create_dumb = u32(0xb2)
 pub const drm_ioctl_mode_map_dumb = u32(0xb3)
 pub const drm_ioctl_mode_destroy_dumb = u32(0xb4)
@@ -148,6 +149,15 @@ pub mut:
 	fd     i32
 	pad    u32
 	point  u64
+}
+
+pub struct DrmSyncobjEventfd {
+pub mut:
+	handle u32
+	flags u32
+	point u64
+	fd i32
+	pad u32
 }
 
 pub struct DrmSyncobjWait {

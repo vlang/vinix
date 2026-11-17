@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+DRM syncobj eventfd now notifies a counter when a timeline point becomes
+available or completes. Captured fences retain their notifications through
+handle and descriptor close. [Syncobj eventfd notifications](m1-agx-syncobj-eventfd.md)
+
 Sync-file import and export now accept the timeline point in the 24-byte
 descriptor request. The original 16-byte requests still accept point-zero
 operations. [Timeline sync-file descriptors](m1-agx-timeline-sync-file.md)

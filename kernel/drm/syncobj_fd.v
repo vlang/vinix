@@ -12,8 +12,8 @@ import resource
 import stat
 
 // An opaque descriptor transports the mutable object itself. Its wrapper and
-// interface box follow the open-file lifetime; published object metadata is
-// retained by syncobj independently of handles, captures and descriptors.
+// interface box follow the open-file lifetime and keep the object live for
+// asynchronous notifications even after the last DRM handle closes.
 struct SyncobjResource {
 pub mut:
 	stat stat.Stat
@@ -47,6 +47,7 @@ fn (mut this SyncobjResource) ioctl(_handle voidptr, _request u64, _argp voidptr
 
 fn (mut this SyncobjResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) { return }
+	syncobj.release_syncobj(this.object)
 	unsafe {
 		memory.free(voidptr(this.box))
 		memory.free(voidptr(this))
@@ -74,6 +75,7 @@ fn create_syncobj_fd(obj &syncobj.SyncObj) ?int {
 	// Reinterpret the pointer slot: &Resource(voidptr) would box the pointer.
 	unsafe { *(&voidptr(&wrapper.box)) = box }
 	unsafe { *wrapper.box = resource.Resource(wrapper) }
+	syncobj.retain_syncobj(obj)
 	mut res := wrapper.box
 	// fd_create_from_resource takes a reference and releases it on failure;
 	// table installation failure also closes the newly created description.
@@ -86,6 +88,7 @@ fn syncobj_from_fd(fdnum int) ?&syncobj.SyncObj {
 	mut res := fd.handle.resource
 	if mut res is SyncobjResource {
 		if res.object == unsafe { nil } { return none }
+		syncobj.retain_syncobj(res.object)
 		return unsafe { res.object }
 	}
 	return none

@@ -40,7 +40,9 @@ fn main() {
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/katomic', '${scratch}/katomic', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/event', '${scratch}/event', false)!
+	os.mv('${scratch}/event_block.v', '${scratch}/event/nonblock.v')!
 	os.cp('${repo}/kernel/file/reservation.v', '${scratch}/file/reservation.v')!
+	os.cp('${repo}/kernel/file/eventfd.v', '${scratch}/file/eventfd.v')!
 	native_file := os.read_file('${repo}/kernel/file/file.v')!
 	os.write_file('${scratch}/file/table.v', 'module file\nimport proc\nimport errno\n' +
 		section(native_file, 'pub fn fdnum_create_from_fd(', '// Make room in a descriptor table')!)!
@@ -53,6 +55,7 @@ fn main() {
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
 	os.write_file('${scratch}/drm/production.v', production)!
 	os.cp('${repo}/kernel/drm/syncobj_fd.v', '${scratch}/drm/syncobj_fd.v')!
+	os.cp('${repo}/kernel/drm/syncobj_eventfd.v', '${scratch}/drm/syncobj_eventfd.v')!
 	os.cp('${repo}/kernel/drm/sync_file_info.v', '${scratch}/drm/sync_file_info.v')!
 	os.cp('${repo}/kernel/drm/sync_file_deadline.v', '${scratch}/drm/sync_file_deadline.v')!
 	query_source := os.getenv_opt('DRM_QUERY_SOURCE') or { repo + '/kernel/drm/syncobj_query.v' }
@@ -73,6 +76,9 @@ fn main() {
 		section(submission, 'pub const max_syncs =', 'pub struct SyncArray {')! +
 		section(submission, 'pub struct SyncArray {', 'pub struct Command {')! +
 		section(submission, 'pub fn stage_sync_array(', '// Snapshot one descriptor')!)!
+	os.cp('${repo}/kernel/gpu/agx/submission/sync_storage.v', '${scratch}/gpu/agx/submission/sync_storage.v')!
+	os.cp('${repo}/kernel/gpu/agx/submission/modern.v', '${scratch}/gpu/agx/submission/modern.v')!
+	os.cp_all('${repo}/kernel/drm/asahi', '${scratch}/drm/asahi', false)!
 	os.write_file('${scratch}/drm/registration.v', 'module drm\nimport drm.ioctl\n' +
 		section(source, 'struct DrmIoctlLayout {', 'fn common_ioctl_layout(')! +
 		section(source, 'fn common_ioctl_layout(', 'fn ioctl_layout(')!)!
@@ -98,7 +104,7 @@ fn main() {
 		fake_driver := os.read_file(os.getenv_opt('DRM_FAKE_DRIVER_SOURCE') or { repo + '/kernel/gpu/agx/fake/driver.v' })!
 		fake_transaction := section(fake_driver, '\tmut vm_pinned := false\n', '\tstarted := timer.get_count()')!
 		assert fake_transaction.count('install_output_syncs(&output_syncs,') == 1
-		os.write_file(scratch + '/fake/transaction_production.v', 'module fake\nimport gpu.agx.submission as agxsubmission\n' +
+		os.write_file(scratch + '/fake/transaction_production.v', 'module fake\nimport drm.syncobj\nimport gpu.agx.submission as agxsubmission\n' +
 			'fn (mut file FakeG17File) reserve_output(mut vm FakeG17Vm, render_index int, output_syncs &agxsubmission.SyncArray) int {\n' +
 			fake_transaction.replace('install_output_syncs(&output_syncs,', 'install_output_syncs(output_syncs,') +
 			'\tfile.lock.release()\n\treturn 0\n}\n')!

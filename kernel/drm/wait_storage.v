@@ -33,6 +33,12 @@ mut:
 	captures &syncobj.FenceCapture = unsafe { nil }
 }
 
+fn (buffer &SyncobjWaitBuffer) release_object_references(count u32) {
+	for index := u32(0); index < count; index++ {
+		syncobj.release_syncobj(unsafe { &syncobj.SyncObj(buffer.objects[index]) })
+	}
+}
+
 // Reset needs only handle/object snapshots; no capture nodes are registered.
 fn new_syncobj_handle_buffer(count u32) ?SyncobjWaitBuffer {
 	geometry := syncobj_wait_geometry(u64(count)) or { return none }

@@ -64,6 +64,7 @@ pub fn run_sync_lookup_checks() {
 				items[32].handle = empty.handle
 				staged_empty := check_sync_lookup(unsafe { &items[0] }, 64, 11, input, sizeof(items), if input { -22 } else { 0 })
 				if !input { assert staged_empty.count == 64 && voidptr(staged_empty.objects[32]) == voidptr(empty) }
+				submission.release_sync_array(staged_empty)
 				items[32] = base
 				if timeline && input {
 					items[32].timeline_value = 6
@@ -78,6 +79,7 @@ pub fn run_sync_lookup_checks() {
 				}
 				assert voidptr(current(obj)) == voidptr(fence) && !syncobj.is_signaled(fence)
 				assert !obj.lock.is_held() && !empty.lock.is_held()
+				submission.release_sync_array(valid)
 			}
 		}
 		clear(); memory.release_retained_fences(sizeof(syncobj.DmaFence)); memory.reset()

@@ -3,15 +3,22 @@ module file
 
 import errno
 import katomic
+import klock
 import proc
 import resource
 
 pub const pollin = 1
+pub const pollout = 4
+pub const pollerr = 8
 
 pub struct Handle {
 pub mut:
 	resource resource.Resource
+	l klock.Lock
+	flags int
 }
+
+pub fn eventfd_refs_for_checks(counter &EventFD) int { return counter.refcount }
 
 pub struct FD {
 pub mut:
@@ -82,7 +89,7 @@ pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
 		res.unref(unsafe { nil }) or {}
 		return none
 	}
-	handle := &Handle{ resource: unsafe { res } }
+	handle := &Handle{ resource: unsafe { res }, flags: flags }
 	descriptor_live++
 	return &FD{ handle: handle, flags: flags }
 }

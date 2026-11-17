@@ -4,7 +4,8 @@ module g13contract
 fn check_asahi_sync_lookup_contract(staging string, caller string, rust string, asahi string) ! {
 	stage := section(staging, 'pub fn stage_sync_array(', 'pub fn install_output_syncs(', 'Native sync lookup errors')!
 	require_order(stage, ['item.extensions != 0', 'return -22, SyncArray{}',
-		'object := syncobj.lookup(owner, item.handle) or { return -2, SyncArray{} }',
+		'object := if input {', 'syncobj.lookup(owner, item.handle) or { return -2, SyncArray{} }',
+		'syncobj.lookup_referenced(owner, item.handle) or { return -2, SyncArray{} }',
 		'if input', 'syncobj.get_timeline_fence(object, item.timeline_value)', 'return -22, SyncArray{}',
 		'syncobj.get_fence(object) or { return -22, SyncArray{} }', 'return 0, SyncArray{'],
 		'Missing syncobj is ENOENT after validation; a missing input fence remains EINVAL')!

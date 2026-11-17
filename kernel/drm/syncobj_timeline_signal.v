@@ -17,8 +17,9 @@ fn ioctl_syncobj_timeline_signal(handle voidptr, data voidptr) int {
 	if count > 64 { buffer = new_syncobj_handle_buffer(count) or { return -12 } }
 	defer { buffer.free_owned() }
 	if !usercopy.copy_from_user(buffer.handles, request.handles, u64(count) * sizeof(u32)) { return -14 }
+	defer { buffer.release_object_references(count) }
 	for index := u32(0); index < count; index++ {
-		object := syncobj.lookup(u64(handle), unsafe { buffer.handles[index] }) or { return -2 }
+		object := syncobj.lookup_referenced(u64(handle), unsafe { buffer.handles[index] }) or { return -2 }
 		unsafe { buffer.objects[index] = voidptr(object) }
 	}
 	// Linux resolves every object before reading points, and treats a null

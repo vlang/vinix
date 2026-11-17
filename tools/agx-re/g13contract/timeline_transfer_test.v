@@ -4,7 +4,8 @@ module g13contract
 import g13layout
 
 fn check_timeline_transfer(transfer string, merge string, array string, chain string, fences string, queue string, info string) ! {
-	require_order(transfer, ['destination := syncobj.lookup(', 'source := find_syncobj_fence(', 'if source.code != 0',
+	require_order(transfer, ['destination := syncobj.lookup_referenced(', 'defer { syncobj.release_syncobj(destination) }',
+		'source := find_syncobj_fence(', 'if source.code != 0',
 		'if request.dst_point != 0', 'syncobj.unwrap_merge(source.fence)', 'defer { syncobj.release_merge_reservation(merged) }',
 		'syncobj.reserve_chain()', 'defer { syncobj.release_chain_reservation(chain) }', 'syncobj.add_chain_point(destination, chain, merged, request.dst_point)'], 'Private merge and chain reservations before destination effects')!
 	require_order(merge, ['C.__builtin_alloca(sizeof(FenceUnwrap))', 'unwrap_first(head, cursor)', 'if count == 0 { return merge_stub(timestamp) }',

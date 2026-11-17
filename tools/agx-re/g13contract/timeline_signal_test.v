@@ -11,7 +11,8 @@ fn check_timeline_signal_contract(drm string, wire string, signal string, stub s
 		'return ioctl_syncobj_timeline_signal(handle, data)'], 'Timeline SIGNAL dispatch')!
 	require_order(drm.all_after('pub fn register_driver('), ['syncobj.shared_timeline_stub()', 'drm_devices_lock.acquire()'], 'Permanent completion initialized during DRM startup')!
 	require_order(signal, ['request.flags != 0 || request.count_handles == 0', 'new_syncobj_handle_buffer(count)',
-		'defer { buffer.free_owned() }', 'usercopy.copy_from_user(buffer.handles', 'syncobj.lookup(',
+		'defer { buffer.free_owned() }', 'usercopy.copy_from_user(buffer.handles',
+		'defer { buffer.release_object_references(count) }', 'syncobj.lookup_referenced(',
 		'buffer.objects[index] = voidptr(object)', 'points_storage := memory.malloc_packed_fallible(bytes)',
 		'defer { memory.free(points_storage) }', 'if request.points == 0', 'C.memset(points_storage, 0, bytes)',
 		'usercopy.copy_from_user(points_storage', 'chains_storage := memory.malloc_packed_fallible(',

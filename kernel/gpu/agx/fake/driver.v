@@ -762,6 +762,7 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 		C.printf(c'fake-g17: submit rejected while staging output syncs error=%d count=%u\n', output_result, request.out_sync_count)
 		return output_result
 	}
+	defer { agxsubmission.release_sync_array(output_syncs) }
 	dependency_result := wait_staged_syncs(&input_syncs)
 	if dependency_result != 0 {
 		C.printf(c'fake-g17: submit input dependency failed error=%d\n', dependency_result)
@@ -871,6 +872,8 @@ fn (mut file FakeG17File) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 			file.inflight_jobs--
 		}
 		file.lock.release()
+		// An earlier output can already expose this fence to a waiter.
+		syncobj.signal_error(fence, -22)
 		return -22
 	}
 	started := timer.get_count()

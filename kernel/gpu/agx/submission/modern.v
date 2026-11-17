@@ -16,6 +16,7 @@ mut:
 	timeline_values [64]u64
 	chains          [64]&syncobj.DmaFence
 	items           &SyncItem = unsafe { nil }
+	owns_objects    bool
 }
 
 fn packet_sync_snapshot(array PacketSyncArray) SyncArray {
@@ -27,13 +28,14 @@ fn packet_sync_snapshot(array PacketSyncArray) SyncArray {
 		timeline_values: array.timeline_values
 		chains:          array.chains
 		items:           array.items
+		owns_objects:    array.owns_objects
 	}
 }
 
 // Modern sync records are 16 bytes, without the legacy extensions word.
 // Parse the combined input/output list in wire order before copying packets.
 pub fn stage_packet_syncs(owner u64, pointer u64, in_count u32, out_count u32) (int, SyncArray, SyncArray) {
-	mut inputs, mut outputs := PacketSyncArray{}, PacketSyncArray{}
+	mut inputs, mut outputs := PacketSyncArray{}, PacketSyncArray{owns_objects: true}
 	if in_count > ~u32(0) - out_count { return -75, SyncArray{}, SyncArray{} }
 	count := u64(in_count) + out_count
 	if count == 0 { return 0, SyncArray{}, SyncArray{} }
@@ -65,9 +67,9 @@ pub fn stage_packet_syncs(owner u64, pointer u64, in_count u32, out_count u32) (
 			|| (item.sync_type == ioctl.asahi_sync_syncobj && item.timeline_value != 0) {
 			return -22, SyncArray{}, SyncArray{}
 		}
-		object := syncobj.lookup(owner, item.handle) or { return -2, SyncArray{}, SyncArray{} }
 		timeline := item.sync_type == ioctl.asahi_sync_timeline_syncobj
 		if index < in_count {
+			object := syncobj.lookup(owner, item.handle) or { return -2, SyncArray{}, SyncArray{} }
 			// dma_fence_chain_find_seqno(0) leaves the captured fence intact.
 			// It waits on that snapshot even when the object is later replaced.
 			fence := if timeline {
@@ -85,6 +87,7 @@ pub fn stage_packet_syncs(owner u64, pointer u64, in_count u32, out_count u32) (
 			}
 			inputs.count++
 		} else {
+			object := syncobj.lookup_referenced(owner, item.handle) or { return -2, SyncArray{}, SyncArray{} }
 			out := index - in_count
 			if outputs.items != unsafe { nil } {
 				unsafe { outputs.items[out] = SyncItem{object: object, timeline: timeline, timeline_value: item.timeline_value} }

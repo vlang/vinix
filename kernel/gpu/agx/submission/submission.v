@@ -35,6 +35,7 @@ pub:
 	timeline_values [64]u64
 	chains          [64]&syncobj.DmaFence
 	items           &SyncItem = unsafe { nil } // owned storage for modern lists beyond the inline bound
+	owns_objects    bool // output references keep pending notifications alive until publication
 }
 
 pub fn (array &SyncArray) item(index u32) SyncItem {
@@ -69,6 +70,12 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 	if pointer == 0 || bytes - 1 > ~pointer {
 		return -14, SyncArray{}
 	}
+	mut retained := u32(0)
+	defer {
+		for index := u32(0); index < retained; index++ {
+			syncobj.release_syncobj(objects[index])
+		}
+	}
 	for index := u32(0); index < count; index++ {
 		mut item := ioctl.DrmAsahiSync{}
 		if !usercopy.copy_from_user(voidptr(&item), pointer + u64(index) * sizeof(ioctl.DrmAsahiSync), sizeof(ioctl.DrmAsahiSync)) {
@@ -84,7 +91,11 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 		}
 		// Asahi's SyncObj::lookup_handle returns ENOENT. A found object with
 		// no usable input fence remains EINVAL below.
-		object := syncobj.lookup(owner, item.handle) or { return -2, SyncArray{} }
+		object := if input {
+			syncobj.lookup(owner, item.handle) or { return -2, SyncArray{} }
+		} else {
+			syncobj.lookup_referenced(owner, item.handle) or { return -2, SyncArray{} }
+		}
 		objects[index] = object
 		timeline[index] = item.sync_type == ioctl.asahi_sync_timeline_syncobj
 		timeline_values[index] = item.timeline_value
@@ -97,14 +108,16 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 				syncobj.get_fence(object) or { return -22, SyncArray{} }
 			}
 			fences[index] = fence
-		}
+		} else { retained++ }
 	}
+	retained = 0
 	return 0, SyncArray{
 		count:           count
 		objects:         objects
 		fences:          fences
 		timeline:        timeline
 		timeline_values: timeline_values
+		owns_objects: !input
 	}
 }
 

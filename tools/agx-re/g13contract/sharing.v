@@ -6,7 +6,8 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 	require_order(export, ['known_flags := ioctl.drm_syncobj_handle_to_fd_export_sync_file | ioctl.drm_syncobj_handle_to_fd_timeline',
 		'request.flags & ~known_flags != 0 || request.pad != 0',
 		'if request.flags & ioctl.drm_syncobj_handle_to_fd_export_sync_file == 0', 'if request.point != 0 { return -22 }',
-		'syncobj.lookup(u64(handle), request.handle) or { return -22 }', 'create_syncobj_fd(obj)',
+		'syncobj.lookup_referenced(u64(handle), request.handle) or { return -22 }',
+		'defer { syncobj.release_syncobj(obj) }', 'create_syncobj_fd(obj)',
 		'file.reserve_fd(', 'defer { file.cancel_fd_reservation(',
 		'point := if request.flags & ioctl.drm_syncobj_handle_to_fd_timeline != 0 { request.point } else { u64(0) }',
 		'source := find_syncobj_fence(u64(handle), request.handle, point, 0)', 'if source.code != 0 { return source.code }',
@@ -16,10 +17,11 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 	require_order(importer, ['known_flags := ioctl.drm_syncobj_fd_to_handle_import_sync_file | ioctl.drm_syncobj_fd_to_handle_timeline',
 		'request.flags & ~known_flags != 0 || request.pad != 0',
 		'if request.flags & ioctl.drm_syncobj_fd_to_handle_import_sync_file == 0', 'if request.point != 0 { return -22 }',
-		'syncobj_from_fd(request.fd) or { return -22 }',
+		'syncobj_from_fd(request.fd) or { return -22 }', 'defer { syncobj.release_syncobj(obj) }',
 		'request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }', 'return 0',
 		'sync_file_fence_from_fd(request.fd) or { return -22 }',
-		'syncobj.lookup(u64(handle), request.handle) or { return -2 }',
+		'syncobj.lookup_referenced(u64(handle), request.handle) or { return -2 }',
+		'defer { syncobj.release_syncobj(obj) }',
 		'if request.flags & ioctl.drm_syncobj_fd_to_handle_timeline != 0 && request.point != 0',
 		'syncobj.reserve_chain() or { return -12 }', 'defer { syncobj.release_chain_reservation(chain) }',
 		'syncobj.add_chain_point(obj, chain, fence, request.point)', 'else {', 'syncobj.replace_fence(obj, fence)'],
@@ -36,12 +38,13 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 		'if allocation == unsafe { nil }', '*wrapper = SyncobjResource{ object: obj }',
 		'memory.malloc_packed_fallible(sizeof(resource.Resource))', 'if box == unsafe { nil }',
 		'memory.free(allocation)', '*(&voidptr(&wrapper.box)) = box',
-		'*wrapper.box = resource.Resource(wrapper)',
+		'*wrapper.box = resource.Resource(wrapper)', 'syncobj.retain_syncobj(obj)',
 		'file.fdnum_create_from_reserved_resource(unsafe { &reservation }, mut res, resource.o_cloexec)'],
 		'CLOEXEC transport ownership must pass to the file-layer constructor')!
 	require(fd.count('memory.free(') == 1 && !fd.contains('fd.unref('), 'Only private box failure may free the wrapper directly')!
 	require_order(transport, ['fn syncobj_from_fd(', 'file.fd_from_fdnum(', 'defer { fd.unref() }',
-		'if mut res is SyncobjResource', 'return unsafe { res.object }'], 'Opaque type check while holding descriptor reference')!
+		'if mut res is SyncobjResource', 'syncobj.retain_syncobj(res.object)',
+		'return unsafe { res.object }'], 'Opaque type check and object retention while holding descriptor reference')!
 	file_export := section(drm, 'pub fn create_sync_file_fd(', '// Resolve only fds', 'Vinix sync-file ownership')!
 	require_order(file_export, ['memory.malloc_packed_fallible(sizeof(SyncFileResource))',
 		'memory.malloc_packed_fallible(sizeof(resource.Resource))', 'if box == unsafe { nil }',

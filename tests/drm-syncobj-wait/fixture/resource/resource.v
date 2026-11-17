@@ -8,6 +8,8 @@ import errno
 fn C.__builtin_alloca(size usize) voidptr
 
 pub const o_cloexec = 0o2000000
+pub const o_rdwr = 2
+pub const o_nonblock = 0o4000
 
 pub interface PollableResource {
 mut:

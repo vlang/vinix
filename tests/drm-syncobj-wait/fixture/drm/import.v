@@ -39,6 +39,7 @@ fn assert_fence_identity(obj &syncobj.SyncObj, fence &syncobj.DmaFence) {
 
 pub fn run_sync_file_import_checks() {
 	memory.reset()
+	run_syncobj_eventfd_checks()
 	run_timeline_sync_file_checks()
 	for _ in 0 .. 200 {
 		source := make_object(0)

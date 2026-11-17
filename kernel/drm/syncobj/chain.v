@@ -91,6 +91,7 @@ pub fn add_chain_point(obj &SyncObj, reservation &DmaFence, payload &DmaFence, p
 	o.timeline_points.clear()
 	o.publish_captures_locked(reservation)
 	o.publish_timeline_captures_locked(reservation)
+	o.publish_eventfds_locked()
 	o.lock.release()
 	drain_chain_notifications()
 	return true

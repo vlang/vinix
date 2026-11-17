@@ -1416,6 +1416,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	if sync_result != 0 { return sync_result }
 	output_result, output_syncs := agxsubmission.stage_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 { return output_result }
+	defer { agxsubmission.release_sync_array(output_syncs) }
 	code := f.submit_g13_staged(captured, commands, &input_syncs, &output_syncs, request.result_handle)
 	transferred = code == 0
 	return code

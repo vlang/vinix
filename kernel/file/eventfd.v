@@ -19,11 +19,10 @@ const efd_nonblock = 0o4000
 
 const efd_cloexec = 0o2000000
 
-// UINT64_MAX is reserved as an invalid value by Linux.  The largest counter
-// value an eventfd may contain is therefore UINT64_MAX - 1.
+// Userspace writes stop one short of the kernel-only overflow value.
 const eventfd_counter_max = ~u64(0) - 1
 
-struct EventFD {
+pub struct EventFD {
 mut:
 	stat     stat.Stat
 	refcount int
@@ -38,34 +37,57 @@ mut:
 	box &resource.Resource = unsafe { nil }
 }
 
+pub fn retain_eventfd(number int) ?&EventFD {
+	mut fd := fd_from_fdnum(unsafe { nil }, number) or {
+		errno.set(errno.ebadf)
+		return none
+	}
+	mut res := fd.handle.resource
+	if mut res is EventFD {
+		katomic.inc(mut &res.refcount)
+		fd.unref()
+		return unsafe { res }
+	}
+	fd.unref()
+	errno.set(errno.einval)
+	return none
+}
+
+fn (mut this EventFD) counter_changed_locked() {
+	mut status := if this.counter != 0 { pollin } else { 0 }
+	if this.counter < eventfd_counter_max { status |= pollout }
+	if this.counter > eventfd_counter_max { status |= pollerr }
+	katomic.store(mut &this.status, status)
+	event.trigger(mut this.event, false)
+}
+
+pub fn (mut this EventFD) poll_status(_ int) int {
+	return katomic.load(&this.status)
+}
+
+// A retained counter can be signaled even after its last descriptor closes.
+// Kernel notification saturates and never waits for a userspace reader.
+pub fn (mut this EventFD) notify() {
+	this.l.acquire()
+	if this.counter != ~u64(0) { this.counter++ }
+	this.counter_changed_locked()
+	this.l.release()
+}
+
 fn (mut this EventFD) mmap(_handle voidptr, _page u64, _flags int) voidptr {
 	return unsafe { nil }
 }
 
-// Handle.read()/write() hold the open-description lock while calling into a
-// resource.  A blocking counter must temporarily drop it as well as its own
-// lock, otherwise a writer using a dup of this descriptor could never wake a
-// reader (both descriptors share the same Handle).
-fn eventfd_wait(mut this EventFD, handle_ptr voidptr) bool {
-	mut handle := unsafe { &Handle(handle_ptr) }
+// Character-device I/O bypasses the open-description lock. Snapshot the
+// counter event before unlocking to catch notifications before enrollment.
+fn eventfd_wait(mut this EventFD) bool {
+	generation := event.generation(mut this.event)
 	this.l.release()
-	if handle != unsafe { nil } {
-		handle.l.release()
-	}
-
-	event.await_one(mut this.event, true) or {
-		if handle != unsafe { nil } {
-			handle.l.acquire()
-		}
+	event.await_one_from_generation(mut this.event, true, generation) or {
 		this.l.acquire()
 		return false
 	}
-
-	if handle != unsafe { nil } {
-		handle.l.acquire()
-	}
 	this.l.acquire()
-
 	return true
 }
 
@@ -90,7 +112,7 @@ fn (mut this EventFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 			errno.set(errno.eagain)
 			return none
 		}
-		if !eventfd_wait(mut this, _handle) {
+		if !eventfd_wait(mut this) {
 			errno.set(errno.eintr)
 			return none
 		}
@@ -100,11 +122,7 @@ fn (mut this EventFD) read(_handle voidptr, buf voidptr, _loc u64, count u64) ?i
 	unsafe { C.memcpy(buf, voidptr(&value), sizeof(u64)) }
 
 	this.counter -= value
-	if this.counter == 0 {
-		this.status &= ~pollin
-	}
-	this.status |= pollout
-	event.trigger(mut this.event, false)
+	this.counter_changed_locked()
 
 	return i64(sizeof(u64))
 }
@@ -132,25 +150,19 @@ fn (mut this EventFD) write(_handle voidptr, buf voidptr, _loc u64, count u64) ?
 		this.l.release()
 	}
 
-	for value > eventfd_counter_max - this.counter {
+	for this.counter > eventfd_counter_max || value > eventfd_counter_max - this.counter {
 		if handle != unsafe { nil } && handle.flags & resource.o_nonblock != 0 {
 			errno.set(errno.eagain)
 			return none
 		}
-		if !eventfd_wait(mut this, _handle) {
+		if !eventfd_wait(mut this) {
 			errno.set(errno.eintr)
 			return none
 		}
 	}
 
 	this.counter += value
-	if this.counter != 0 {
-		this.status |= pollin
-	}
-	if this.counter == eventfd_counter_max {
-		this.status &= ~pollout
-	}
-	event.trigger(mut this.event, false)
+	this.counter_changed_locked()
 
 	return i64(sizeof(u64))
 }
@@ -160,6 +172,10 @@ fn (mut this EventFD) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this EventFD) unref(_handle voidptr) ? {
+	this.release()
+}
+
+pub fn (mut this EventFD) release() {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}

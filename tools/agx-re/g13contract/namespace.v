@@ -14,25 +14,26 @@ fn check_namespace_contract(objects string, reference string) ! {
 		'cursor.owner < owner', 'previous = unsafe { cursor }', 'cursor = unsafe { cursor.next }',
 		'mut handle := u32(1)', 'cursor.owner == owner', 'if cursor.handle > handle { break }',
 		'next_namespace_handle(handle) or { return none }', 'e.handle = handle',
-		'if !e.allocated { unsafe { e.object.handle = handle } }', 'e.next = unsafe { cursor }',
+		'if !e.allocated { unsafe { e.object.handle = handle } }', 'retain_syncobj(e.object)', 'e.next = unsafe { cursor }',
 		'syncobj_head = e', 'previous.next = e'], 'Vinix lowest-gap insertion under namespace lock')!
 	lookup := section(objects, 'pub fn lookup(', '// Destroy one object', 'Vinix namespace lookup')!
 	require_order(lookup, ['if owner == 0 || handle == 0', 'syncobj_lock.acquire()',
 		'defer { syncobj_lock.release() }', 'mut cursor := unsafe { syncobj_head }',
-		'cursor.owner > owner', 'cursor.owner == owner && cursor.handle == handle',
+		'cursor.owner > owner', 'cursor.owner == owner && cursor.handle == handle', 'if referenced { retain_syncobj(cursor.object) }',
 		'return unsafe { cursor.object }', 'cursor = unsafe { cursor.next }'], 'Vinix uncapped shared identity lookup')!
 	destroy := section(objects, 'pub fn destroy(', '// Final DRM-file release', 'Vinix exact-object removal')!
 	require_order(destroy, ['syncobj_lock.acquire()',
 		'cursor.owner == owner && cursor.handle == handle', 'syncobj_head = unsafe { cursor.next }',
 		'previous.next = cursor.next', 'cursor.next = nil', 'removed = unsafe { cursor }',
-		'syncobj_lock.release()', 'if removed.allocated { memory.free(voidptr(removed)) }', 'return true'],
+		'syncobj_lock.release()', 'release_syncobj(removed.object)', 'if removed.allocated { memory.free(voidptr(removed)) }', 'return true'],
 		'Vinix unlink before freeing only allocated links')!
 	release := section(objects, 'pub fn destroy_owner(', '// Atomically replace', 'Vinix namespace close')!
 	require_order(release, ['syncobj_lock.acquire()', 'cursor.owner < owner', 'cursor.owner == owner',
 		'next := unsafe { cursor.next }', 'syncobj_head = unsafe { next }',
-		'previous.next = next', 'if cursor.allocated', 'cursor.next = retired',
-		'retired = unsafe { cursor }', 'cursor.next = nil', 'cursor = unsafe { next }',
-		'syncobj_lock.release()', 'next := unsafe { retired.next }', 'memory.free(voidptr(retired))',
+		'previous.next = next', 'cursor.next = retired',
+		'retired = unsafe { cursor }', 'cursor = unsafe { next }',
+		'syncobj_lock.release()', 'next := unsafe { retired.next }', 'retired.next = nil',
+		'release_syncobj(retired.object)', 'if retired.allocated { memory.free(voidptr(retired)) }',
 		'retired = unsafe { next }'], 'Vinix owner-block detach before link retirement')!
 	require(destroy.count('memory.free(') == 1 && release.count('memory.free(') == 1
 		&& !destroy.contains('memory.free(voidptr(cursor.object))') && !release.contains('memory.free(voidptr(cursor.object))'),

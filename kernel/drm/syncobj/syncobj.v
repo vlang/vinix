@@ -32,6 +32,7 @@ pub mut:
 mut:
 	private_stub bool
 	poll_events &FenceEvent = unsafe { nil }
+	eventfd_ready EventfdQueue
 	chain bool
 	chain_reserved bool
 	chain_prev &DmaFence = unsafe { nil }
@@ -79,6 +80,8 @@ mut:
 	timeline_points []TimelinePoint
 	pending_captures &FenceCapture = unsafe { nil }
 	timeline_captures &TimelineCapture = unsafe { nil }
+	eventfd_pending EventfdQueue
+	references int
 	namespace SyncobjHandle
 }
 
@@ -128,6 +131,7 @@ fn complete_fence(fence &DmaFence, err int, set_error bool) {
 	f.timestamp_ns = time.monotonic_ns()
 	katomic.store(mut &f.signaled, true)
 	f.notify_events_locked()
+	f.eventfd_ready.finish_all(true)
 	f.notify_chains_locked()
 
 	for mut w in f.waiters {
@@ -302,6 +306,7 @@ fn insert_handle(entry &SyncobjHandle) ?u32 {
 	}
 	e.handle = handle
 	if !e.allocated { unsafe { e.object.handle = handle } }
+	retain_syncobj(e.object)
 	e.next = unsafe { cursor }
 	if previous == unsafe { nil } { syncobj_head = e }
 	else { unsafe { previous.next = e } }
@@ -310,6 +315,16 @@ fn insert_handle(entry &SyncobjHandle) ?u32 {
 
 // Look up a sync object by its owner and per-open handle.
 pub fn lookup(owner u64, handle u32) ?&SyncObj {
+	return lookup_object(owner, handle, false)
+}
+
+// Hold the namespace reference across an operation that may publish or
+// register a fence. Metadata itself also supports shorter borrowed lookups.
+pub fn lookup_referenced(owner u64, handle u32) ?&SyncObj {
+	return lookup_object(owner, handle, true)
+}
+
+fn lookup_object(owner u64, handle u32, referenced bool) ?&SyncObj {
 	if owner == 0 || handle == 0 {
 		return none
 	}
@@ -319,10 +334,31 @@ pub fn lookup(owner u64, handle u32) ?&SyncObj {
 	mut cursor := unsafe { syncobj_head }
 	for cursor != unsafe { nil } {
 		if cursor.owner > owner || (cursor.owner == owner && cursor.handle > handle) { break }
-		if cursor.owner == owner && cursor.handle == handle { return unsafe { cursor.object } }
+		if cursor.owner == owner && cursor.handle == handle {
+			if referenced { retain_syncobj(cursor.object) }
+			return unsafe { cursor.object }
+		}
 		cursor = unsafe { cursor.next }
 	}
 	return none
+}
+
+pub fn retain_syncobj(obj &SyncObj) {
+	mut o := unsafe { obj }
+	katomic.inc(mut &o.references)
+}
+
+// Once the final name, transport or publisher is gone, a still-unsubmitted
+// point can no longer arrive. Captured registrations now belong to fences.
+pub fn release_syncobj(obj &SyncObj) {
+	if obj == unsafe { nil } { return }
+	mut o := unsafe { obj }
+	if katomic.dec(mut &o.references) { return }
+	o.lock.acquire()
+	mut pending := o.eventfd_pending
+	o.eventfd_pending = EventfdQueue{}
+	o.lock.release()
+	pending.finish_all(false)
 }
 
 // Destroy one object only when it belongs to the calling open file.
@@ -346,6 +382,7 @@ pub fn destroy(owner u64, handle u32) bool {
 	}
 	syncobj_lock.release()
 	if removed == unsafe { nil } { return false }
+	release_syncobj(removed.object)
 	if removed.allocated { memory.free(voidptr(removed)) }
 	return true
 }
@@ -369,18 +406,17 @@ pub fn destroy_owner(owner u64) {
 		next := unsafe { cursor.next }
 		if previous == unsafe { nil } { syncobj_head = unsafe { next } }
 		else { unsafe { previous.next = next } }
-		if cursor.allocated {
-			unsafe { cursor.next = retired }
-			retired = unsafe { cursor }
-		} else { unsafe { cursor.next = nil } }
+		unsafe { cursor.next = retired }
+		retired = unsafe { cursor }
 		cursor = unsafe { next }
 	}
 	syncobj_lock.release()
-	// Only detached alias links are owned here. Object/fence metadata remains
-	// valid for captures, other namespaces and exported opaque descriptors.
+	// Retire every removed namespace reference after dropping the table lock.
 	for retired != unsafe { nil } {
 		next := unsafe { retired.next }
-		memory.free(voidptr(retired))
+		unsafe { retired.next = nil }
+		release_syncobj(retired.object)
+		if retired.allocated { memory.free(voidptr(retired)) }
 		retired = unsafe { next }
 	}
 }
@@ -399,7 +435,9 @@ pub fn replace_fence(obj &SyncObj, fence &DmaFence) {
 	o.timeline_points.clear()
 	o.publish_captures_locked(fence)
 	o.publish_timeline_captures_locked(fence)
+	eventfds := o.publish_eventfds_locked()
 	o.lock.release()
+	if eventfds { drain_chain_notifications() }
 }
 
 // Snapshot a binary syncobj fence under its object lock. Fence allocations

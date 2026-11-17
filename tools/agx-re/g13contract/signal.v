@@ -15,14 +15,15 @@ fn check_signal_contract(drm string, wire string, stub string, reference string,
 		'mut handles := [64]u32{}', 'mut objects := unsafe { [64]voidptr{} }',
 		'new_syncobj_handle_buffer(request.count_handles)', 'return -12', 'defer { buffer.free_owned() }',
 		'usercopy.copy_from_user(buffer.handles, request.handles,', 'u64(request.count_handles) * sizeof(u32)',
-		'return -14', 'for i := u32(0); i < request.count_handles; i++ {',
-		'object := syncobj.lookup(u64(handle), unsafe { buffer.handles[i] }) or { return -2 }',
+		'return -14', 'defer { buffer.release_object_references(request.count_handles) }',
+		'for i := u32(0); i < request.count_handles; i++ {',
+		'object := syncobj.lookup_referenced(u64(handle), unsafe { buffer.handles[i] }) or { return -2 }',
 		'buffer.objects[i] = voidptr(object)', '}',
 		'for i := u32(0); i < request.count_handles; i++ {',
 		'fence := syncobj.new_private_stub(syncobj.now_ns()) or { return -12 }',
 		'syncobj.replace_fence(unsafe { &syncobj.SyncObj(buffer.objects[i]) }, fence)', 'return 0'],
 		'Vinix validation before fresh per-entry completion and OOM prefix preservation')!
-	require(signal.count('usercopy.copy_from_user(') == 1 && signal.count('syncobj.lookup(') == 1
+	require(signal.count('usercopy.copy_from_user(') == 1 && signal.count('syncobj.lookup_referenced(') == 1
 		&& signal.count('syncobj.new_private_stub(') == 1 && !signal.contains('syncobj.signal('),
 		'SIGNAL must replace heads without completing old GPU snapshots')!
 	require_order(stub, ['pub fn new_private_stub(timestamp_ns u64)',

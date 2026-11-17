@@ -46,6 +46,7 @@ fn submit_timestamp_packet_on_queue(mut file GpuFile, queue u32, count u32, bad 
  in_code, in_syncs := submission.stage_sync_array(file.owner_key, u64(&in_record), if input == unsafe { nil } { 0 } else { 1 }, true)
  out_code, out_syncs := submission.stage_sync_array(file.owner_key, u64(&out_record), if output == unsafe { nil } { 0 } else { 1 }, false)
  assert in_code == 0 && out_code == 0
+ defer { submission.release_sync_array(out_syncs) }
  result := file.submit_g13_staged(captured, commands, &in_syncs, &out_syncs, 0)
  if result != 0 { release_submission_queue(captured) }
  return result

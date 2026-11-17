@@ -4,15 +4,18 @@ module submission
 import memory
 import drm.syncobj
 
-// Inline lists borrow retained syncobj/fence pointers and need no allocation.
-// Modern outputs additionally own unpublished chain reservations. Publication
-// transfers their metadata to the retained fence graph before syscall cleanup.
+// Input lists borrow fence snapshots. Outputs own syncobj references and
+// may own private chain reservations until publication transfers them.
 pub fn release_sync_array(array SyncArray) {
 	for index := u32(0); index < array.count; index++ {
 		// Taking this by-value array's address for item() boxes the whole inline
 		// record in V's manual-free C. Read the scalar directly instead.
 		chain := if array.items != unsafe { nil } { unsafe { array.items[index].chain } } else { array.chains[index] }
 		syncobj.release_chain_reservation(chain)
+		if array.owns_objects {
+			object := if array.items != unsafe { nil } { unsafe { array.items[index].object } } else { array.objects[index] }
+			syncobj.release_syncobj(object)
+		}
 	}
 	if array.items != unsafe { nil } { memory.free(voidptr(array.items)) }
 }
