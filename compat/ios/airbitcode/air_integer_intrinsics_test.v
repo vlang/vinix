@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_integer_intrinsic_identity() {
-	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2185
+	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2187
 	for i, name in ['air.popcount.i32', 'air.reverse_bits.i32'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert slot == i && id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }
@@ -54,7 +54,7 @@ fn test_air_integer_zero_count_identity() {
 		assert scalar_integer_zero_count_value(id, 32, 0, 0)!.value == 32
 		if _ := scalar_integer_intrinsic_width(name, .ctpop) { assert false }
 	}
-	for name in ['air.clz.i16', 'air.clz.i64', 'air.ctz.i1', 'air.ctz.i64', 'air.clz.i032', 'air.clz.i+32', 'air.ctz.i32.spoof', 'air.clz.v2i32', 'air.ctz.f32', 'air.clz.s.i32', 'air.cttz.i32'] {
+	for name in ['air.clz.i16', 'air.ctz.i1', 'air.clz.i032', 'air.clz.i+32', 'air.ctz.i32.spoof', 'air.clz.v2i32', 'air.ctz.f32', 'air.clz.s.i32', 'air.cttz.i32'] {
 		if _ := scalar_intrinsic_name(name) { assert false, name }
 	}
 	println('AIR-ZERO-COUNT-NAMES: two exact i32 names, appended slots, i1 flag identity and width/vector/family/spelling guards PASS')
@@ -76,7 +76,7 @@ fn test_air_integer_extremum_identity() {
 }
 
 fn test_air_i64_bit_intrinsic_identity() {
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2185
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2187
 	for i, name in ['air.popcount.i64', 'air.reverse_bits.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }
@@ -91,7 +91,7 @@ fn test_air_i64_bit_intrinsic_identity() {
 			if _ := scalar_intrinsic_name('air.${family}.${suffix}') { assert false }
 		}
 	}
-	for name in ['air.clz.i64','air.ctz.i64','air.add_sat.u.i64','air.mul_hi.s.i64','air.ctpop.i64','air.fast_popcount.i64'] {
+	for name in ['air.add_sat.u.i64','air.mul_hi.s.i64','air.ctpop.i64','air.fast_popcount.i64'] {
 		if _ := scalar_intrinsic_name(name) { assert false }
 	}
 	println('AIR-I64-BIT-NAMES: two appended scalar identities after AIR floats, stable i32/LLVM/vector keys, exact names/widths/arity and namespace guards PASS')
@@ -99,7 +99,7 @@ fn test_air_i64_bit_intrinsic_identity() {
 
 fn test_air_i64_extremum_intrinsic_identity() {
 	ids := [ScalarIntrinsic.smin, .smax, .umin, .umax]!
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2185
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2187
 	for i, name in ['air.min.s.i64','air.max.s.i64','air.min.u.i64','air.max.u.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == ids[i] && scalar_air_integer_cache_base + slot == 2181 + i
@@ -112,4 +112,23 @@ fn test_air_i64_extremum_intrinsic_identity() {
 		}
 	}
 	println('AIR-I64-EXTREMA-NAMES: four appended scalar min/max identities, stable old integer/float/LLVM/vector keys, exact names/widths/arity and family guards PASS')
+}
+
+fn test_air_i64_zero_count_intrinsic_identity() {
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2187
+	for i, name in ['air.clz.i64','air.ctz.i64'] {
+		id, slot := air_integer_intrinsic(name)!
+		assert id == if i == 0 { ScalarIntrinsic.ctlz } else { ScalarIntrinsic.cttz }
+		assert scalar_air_integer_cache_base + slot == 2185 + i
+		assert scalar_intrinsic_name(name)! == id && scalar_intrinsic_arity(id) == 2 && scalar_integer_poison_flag(id)
+		assert scalar_integer_intrinsic_width(name, id)! == 64
+		assert scalar_integer_zero_count_value(id, 64, 0, 0)!.value == 64
+		assert scalar_integer_zero_count_value(id, 64, u64(1) << 63, 0)!.value == if i == 0 { u64(0) } else { u64(63) }
+		if _ := scalar_integer_intrinsic_width(name, .ctpop) { assert false }
+		for suffix in ['i0','i1','i16','i63','i65','i064','i+64','i64.spoof','f64','v2i64','i64.i64'] {
+			stem := if i == 0 { 'air.clz.' } else { 'air.ctz.' }
+			if _ := scalar_intrinsic_name(stem + suffix) { assert false }
+		}
+	}
+	println('AIR-I64-ZERO-COUNT-NAMES: two appended scalar identities, stable old keys, exact names/widths/arity, zero/sign boundaries and family guards PASS')
 }
