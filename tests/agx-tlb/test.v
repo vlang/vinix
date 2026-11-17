@@ -83,12 +83,12 @@ fn test_root_publication_and_reuse() {
 	mut user := pgtable.new_pgtable(39, 48) or { panic('user root') }
 	ctx := mmu.UatContext{ id: 3, pgtable: user }
 	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[3]) })
-	assert !ctx.is_bound()
+	assert !ctx.is_bound() && ctx.bound_slot() == 0
 	assert user.map(0x4000, 0x200000, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw)
 	assert slots[3].ttb0 == 0 && tlb.calls().len == 0
 	mgr.unbind_context(&ctx)
 	assert tlb.calls().len == 0
-	assert mgr.bind_context(&ctx) && ctx.is_bound()
+	assert mgr.bind_context(&ctx) && ctx.is_bound() && ctx.bound_slot() == 3
 	assert mgr.bind_context(&ctx) // Additional jobs reuse the published root.
 	bind := tlb.calls()
 	assert bind.len == 1 && !bind[0].all && bind[0].asid == 3
@@ -112,7 +112,14 @@ fn test_root_publication_and_reuse() {
 	assert reuse[0].ttb0 == next.l1_phys | (u64(3) << 48) | 1
 	assert reuse[0].ttb1 == upper.l1_phys | (u64(3) << 48) | 1
 	tlb.clear()
-	mgr.unbind_context(&next_ctx)
+	// Exercise the published root slot independently of the host index.
+	owner := mmu.UatContext{ id: 21, pgtable: next }
+	assert owner.bound_slot() == 3
+	mgr.unbind_context(&owner)
+	assert owner.bound_slot() == 0 && !owner.is_bound()
+	cleared := tlb.calls()
+	assert cleared.len == 1 && cleared[0].asid == 3
+	assert cleared[0].ttb0 == 0 && cleared[0].ttb1 == 0
 	tlb.clear()
 
 	// A global firmware mapping cannot be evicted by ASID alone.

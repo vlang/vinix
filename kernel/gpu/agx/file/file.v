@@ -570,7 +570,7 @@ fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool
 		return false
 	}
 	mut gpu_manager := unsafe { manager }
-	return gpu_manager.flush_g13_file_mapping(ctx.id, addr, size, unmapped, ctx.is_bound())
+	return gpu_manager.flush_g13_file_mapping(ctx.bound_slot(), addr, size, unmapped)
 }
 
 fn asahi_variant(config &gpu.GpuManager) u32 {

@@ -660,6 +660,11 @@ pub fn (ctx &UatContext) is_bound() bool {
 	return ctx.pgtable != unsafe { nil } && ctx.pgtable.tlb_bound
 }
 
+// Zero denotes a user VM whose roots have not been published.
+pub fn (ctx &UatContext) bound_slot() u32 {
+	return if ctx.is_bound() { u32(ctx.pgtable.tlb_asid) } else { u32(0) }
+}
+
 pub fn (mgr &UatManager) bind_context(ctx &UatContext) bool {
 	// The firmware handoff lock excludes the ASC. The manager lock also
 	// excludes other AP threads, including a different VM's root removal.
@@ -691,15 +696,16 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) bool {
 
 // Caller holds mgr.lock.
 pub fn (mgr &UatManager) unbind_context(ctx &UatContext) {
-	if !mgr.handoff_initialized || ctx == unsafe { nil } || ctx.id == 0
-		|| ctx.id >= uat_num_contexts || !ctx.is_bound() {
+	if !mgr.handoff_initialized || ctx == unsafe { nil } { return }
+	slot := ctx.bound_slot()
+	if slot == 0 || slot >= uat_num_contexts {
 		return
 	}
 	handoff_lock(mgr.handoff)
 	unsafe {
 		mut slots := mgr.ttbs
-		slots[ctx.id].ttb0 = 0
-		slots[ctx.id].ttb1 = 0
+		slots[slot].ttb0 = 0
+		slots[slot].ttb1 = 0
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)

@@ -35,11 +35,13 @@ fn main() {
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\npub fn test_force_refs(slot u32, value u32) u32 { old := gpu_event_mgr.stamps[slot].references; gpu_event_mgr.stamps[slot].references = value; return old }\n')!
 	os.symlink('${repo}/kernel/gpu/agx/fw', '${scratch}/gpu/agx/fw')!
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
-	mut production := 'module gpu\nimport gpu.agx.event\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport klock\n'
+	mut production := 'module gpu\nimport gpu.agx.event\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport katomic\nimport klock\n'
 	production += section(source, 'struct G13SubQueueResources {', 'struct G13RenderBufferResources {')!
 	production += section(source, 'pub struct G13ComputeJobResources {', 'pub struct G13QueueResources {')!
 	for pair in [
+		['pub fn (queue &G13QueueResources) has_file_references(', '// Caller holds mgr.lock. Asahi QueueInner'],
 		['fn (mut mgr GpuManager) g13_ring_has_space_locked(', '// Publish up to two prefix barriers'],
+		['fn (mut mgr GpuManager) retire_g13_render_stages_locked(', 'fn build_g13_attachments('],
 		['fn (mgr &GpuManager) g13_queue_dispatch_blocked_locked(', '// Caller holds the manager lock during shutdown.'],
 		['fn (mut mgr GpuManager) free_g13_render_buffer_locked(', 'fn (mut mgr GpuManager) initialize_g13_render_buffer('],
 		['fn (mut mgr GpuManager) reserve_g13_tvb_slot()', '// Caller holds mgr.lock. No submitted job'],

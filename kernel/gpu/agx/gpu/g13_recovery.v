@@ -41,8 +41,11 @@ fn (mut mgr GpuManager) mark_g13_slot_error_locked(slot u32, wait_value u32, fai
 		if job.submitted && !job.released && job.event_slot == slot
 			&& g13_error_at_stamp(job.stamp_value, wait_value) && !event.stamp_value_completed(slot, job.stamp_value) {
 			mut owned := unsafe { job }
-			owned.error = if failure.status == 4 && owned.context != unsafe { nil }
-				&& owned.context.id != failure.vm_slot { G13JobError{status: 5} } else { failure }
+			owned.error = if failure.status == 4 && owned.vm_slot != failure.vm_slot {
+				G13JobError{status: 5}
+			} else {
+				failure
+			}
 		}
 	}
 	for job in mgr.g13_render_jobs {
@@ -52,8 +55,11 @@ fn (mut mgr GpuManager) mark_g13_slot_error_locked(slot u32, wait_value u32, fai
 			|| (job.fragment_event_slot == slot && g13_error_at_stamp(job.fragment_stamp_value, wait_value)
 				&& !event.stamp_value_completed(slot, job.fragment_stamp_value)) {
 			mut owned := unsafe { job }
-			classified := if failure.status == 4 && owned.context != unsafe { nil }
-				&& owned.context.id != failure.vm_slot { G13JobError{status: 5} } else { failure }
+			classified := if failure.status == 4 && owned.vm_slot != failure.vm_slot {
+				G13JobError{status: 5}
+			} else {
+				failure
+			}
 			// A fault in either stage is the render pass's primary failure.
 			// A later killed dependency must not hide the fault diagnostics.
 			if owned.error.status == 0 || owned.error.status == 5 { owned.error = classified }

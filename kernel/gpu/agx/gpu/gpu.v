@@ -579,10 +579,11 @@ fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext,
 	}
 	// Leave dormant PTEs for the final release. A later kernel-buffer failure
 	// can retain this graph across the VM's first bind and a teardown retry.
-	if !context.is_bound() { return true }
+	vm_slot := context.bound_slot()
+	if vm_slot == 0 { return true }
 	if buffer.needs_cache_flush() {
 		if !context.reprotect_driver_buffer_uncached(buffer)
-			|| !mgr.flush_g13_uat_range(context.id, buffer.va, buffer.size)
+			|| !mgr.flush_g13_uat_range(vm_slot, buffer.va, buffer.size)
 			|| !context.complete_driver_buffer_cache_flush(buffer) {
 			return false
 		}
@@ -590,7 +591,7 @@ fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext,
 	if !context.unmap_driver_buffer(buffer) {
 		return false
 	}
-	return mgr.flush_g13_uat_range(context.id, buffer.va, buffer.size)
+	return mgr.flush_g13_uat_range(vm_slot, buffer.va, buffer.size)
 }
 
 fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {
@@ -1183,12 +1184,12 @@ pub fn (mut mgr GpuManager) ring_device_control() bool {
 // unmapped range may finish without a flush after acquiring that stopped lock;
 // a new bind must still fail. Internal callers already hold manager.lock.
 pub fn (mut mgr GpuManager) flush_g13_file_mapping(slot u32, addr u64, size u64,
-	unmapped bool, bound bool) bool {
+	unmapped bool) bool {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
 	if unmapped && mgr.state == .stopped { return true }
 	// The file lock excludes first publication while an unbound VM is edited.
-	if !bound { return mgr.state == .running }
+	if slot == 0 { return mgr.state == .running }
 	return mgr.flush_g13_uat_range(slot, addr, size)
 }
 

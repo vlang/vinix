@@ -129,20 +129,30 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	require_order(vinix_shared, ['reprotect_kernel', 'flush_g13_uat_range',
 		'cache_flush_pending = false', 'unmap_shared_buffer', 'flush_g13_uat_range'], 'Vinix shared-buffer teardown')!
 	vinix_driver := section(vinix_gpu, 'fn (mut mgr GpuManager) invalidate_g13_driver_buffer', 'fn (mut mgr GpuManager) release_shared_buffer_backing', 'Vinix driver-buffer teardown')!
-	require_order(vinix_driver, ['if !context.is_bound() { return true }', 'reprotect_driver_buffer_uncached', 'flush_g13_uat_range',
-		'complete_driver_buffer_cache_flush', 'unmap_driver_buffer', 'flush_g13_uat_range'], 'Vinix driver-buffer teardown')!
+	require_order(vinix_driver, ['vm_slot := context.bound_slot()', 'if vm_slot == 0 { return true }',
+		'reprotect_driver_buffer_uncached', 'flush_g13_uat_range(vm_slot,',
+		'complete_driver_buffer_cache_flush', 'unmap_driver_buffer', 'flush_g13_uat_range(vm_slot,'], 'Vinix driver-buffer teardown')!
 	results << 'retry-safe reprotect/invalidate/unmap/invalidate teardown'
 	vinix_channel := read(os.join_path(repo, 'kernel/gpu/agx/channel/channel.v'))!
 	enqueue := section(vinix_channel, 'pub fn (mut ch TxChannel) enqueue_with_token', 'pub fn (ch &TxChannel) read_pointer', 'Vinix TX channel')!
 	require_order(enqueue, ['C.memcpy', 'katomic.sync()', 'katomic.store(mut write_ptr'], 'Vinix TX channel publication')!
 	results << 'TX ring entry barrier before write-pointer publication'
 	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
-	for spec in [['render', 'resources.vm', 'G13RenderJobResources'], ['compute', 'ctx', 'G13ComputeJobResources']] {
+	for spec in [['render', 'resources.vm', 'G13RenderJobResources', '7'], ['compute', 'ctx', 'G13ComputeJobResources', '3']] {
 		prepare := section(vinix_jobs, 'pub fn (mut mgr GpuManager) prepare_g13_${spec[0]}_job_with_timestamps(',
-			'mut job := &${spec[2]}{', 'Vinix ${spec[0]} root publication')!
+			'pub fn (mut mgr GpuManager) release_g13_${spec[0]}_job(', 'Vinix ${spec[0]} root publication')!
 		require_order(prepare, ['mgr.lock.acquire()', 'mgr.lock.release()', 'mgr.state != .running',
-			'!uat_mgr.bind_context(${spec[1]})'], 'Publish VM before ${spec[0]} job construction')!
+			'!uat_mgr.bind_context(${spec[1]})', 'mut job := &${spec[2]}{',
+			'vm_slot: ${spec[1]}.bound_slot()', 'vm_slot: job.vm_slot',
+			'flush_g13_uat_range(job.vm_slot,'], 'Publish VM before ${spec[0]} job construction')!
+		require(prepare.count('vm_slot: job.vm_slot') == spec[3].int()
+			&& prepare.count('vm_slot:') == spec[3].int() + 1,
+			'Vinix ${spec[0]} firmware commands must use the job ASID')!
 	}
+	recovery := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_recovery.v'))!
+	require(recovery.count('failure.status == 4 && owned.vm_slot != failure.vm_slot') == 2,
+		'Vinix render and compute recovery must classify faults by the job ASID')!
+	results << 'G13 command, invalidation and fault routing through the published ASID'
 	batch := section(vinix_jobs, 'fn (mut mgr GpuManager) submit_g13_queue_commands(', 'fn (mut mgr GpuManager) submit_g13_queue_command(', 'Vinix batched G13 publisher')!
 	require_order(batch, ['*entry = command_va', 'katomic.sync()', 'katomic.store(mut &state.cpu_wptr',
 		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()', 'katomic.store(mut outer_write'], 'Vinix batched G13 publication')!
@@ -162,8 +172,11 @@ pub fn check_asahi(asahi_linux string) ![]string {
 	channel := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/channel.rs'))!
 	put := section(channel, '    pub(crate) fn put', '    /// Wait for', 'Asahi TX channel')!
 	require_order(put, ['self.ring.ring[self.wptr as usize] = *msg', 'mem::sync()', 'T::set_wptr'], 'Asahi TX channel publication')!
+	workqueue := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/workqueue.rs'))!
+	require(workqueue.contains('WorkError::Fault(info) if info.vm_slot != self.vm_slot => WorkError::Killed'),
+		'Asahi fault routing must use the ASID recorded with the submitted work')!
 	return ['Asahi KernelMapping cache-safe teardown order',
-		'Asahi TX ring barrier before write-pointer publication']
+		'Asahi TX ring barrier before write-pointer publication', 'Asahi submitted work ASID for fault attribution']
 }
 
 // Omarchy ships the Asahi driver in linux-aurora. FWCTL cache maintenance
@@ -194,7 +207,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'slots[ctx.id].ttb0 =', 'slots[ctx.id].ttb1 =',
 		'handoff_unlock(mgr.handoff)', 'pt.bind_tlb(u8(ctx.id))'], 'Vinix ASID reuse invalidation')!
 	local_unbind := section(local, 'pub fn (mgr &UatManager) unbind_context(', '// Map a driver-owned allocation into context zero.', 'Vinix UAT unbind')!
-	require_order(local_unbind, ['!ctx.is_bound()', 'slots[ctx.id].ttb0 = 0', 'slots[ctx.id].ttb1 = 0',
+	require_order(local_unbind, ['slot := ctx.bound_slot()', 'slot == 0', 'slots[slot].ttb0 = 0', 'slots[slot].ttb1 = 0',
 		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()'], 'Vinix ASID teardown invalidation')!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
@@ -941,8 +954,8 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 		'inner.blocks.reserve', 'new_blocks.into_iter()', 'raw.total.store',
 		'raw.wptr.store', 'if inner.active_scenes == 0'], 'Asahi staged TVB extension')!
 	local_growth := section(local, 'fn (mut mgr GpuManager) ensure_g13_tvb_blocks(', '// Asahi Buffer::auto_grow', 'Vinix TVB extension')!
-	require_order(local_growth, ['memory.malloc_packed_fallible', 'for u32(staged.len)',
-		'staged << block', 'if context.is_bound() && !mgr.flush_g13_uat_range', 'for index := u32(old_count)',
+	require_order(local_growth, ['vm_slot := context.bound_slot()', 'memory.malloc_packed_fallible', 'for u32(staged.len)',
+		'staged << block', 'if vm_slot != 0 && !mgr.flush_g13_uat_range(vm_slot,', 'for index := u32(old_count)',
 		'buffer.blocks = staged', 'katomic.store(mut &control.total',
 		'katomic.store(mut &control.wptr', 'if !firmware_active'], 'Vinix staged TVB extension')!
 	reference_scene := section(reference, '    pub(crate) fn new_scene(', '    /// Increment the buffer', 'Asahi scene lifetime')!

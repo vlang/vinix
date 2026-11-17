@@ -26,7 +26,9 @@ pub mut:
 	check     fn () = unsafe { nil }
 }
 
-pub fn (context &UatContext) is_bound() bool { return context.bound }
+pub fn (context &UatContext) bound_slot() u32 {
+	return if context.bound { u32(1) } else { u32(0) }
+}
 
 pub fn (mut context UatContext) reprotect_driver_buffer_uncached(buffer &UatBuffer) bool {
 	mut owned := unsafe { buffer }

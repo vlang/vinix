@@ -38,6 +38,8 @@ fn check_user_mapping_contract(local string, manager string) ! {
 		'// Publish a G13 UAT invalidation through', 'Vinix file flush serialization')!
 	require_order(flush, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
 		'if unmapped && mgr.state == .stopped', 'return true',
-		'if !bound { return mgr.state == .running }',
+		'if slot == 0 { return mgr.state == .running }',
 		'mgr.flush_g13_uat_range(slot, addr, size)'], 'Vinix shutdown-safe file flush')!
+	require(local.contains('gpu_manager.flush_g13_file_mapping(ctx.bound_slot(), addr, size, unmapped)'),
+		'Vinix user mappings must flush the published ASID')!
 }

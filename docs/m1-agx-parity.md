@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 records the published UAT slot in each render and compute job for command
+construction and fault recovery. [Firmware slot routing](m1-agx-job-asid.md)
+
 G13 publishes a VM's UAT root during its first render or compute job
 preparation. [Deferred UAT root publication](m1-agx-deferred-uat.md)
 

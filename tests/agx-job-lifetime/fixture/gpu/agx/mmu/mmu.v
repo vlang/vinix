@@ -11,10 +11,15 @@ pub struct UatContext {
 pub mut:
 	active          bool = true
 	id              u32  = 1
+	slot            u32  = 1
 	releases        int
 	allocations     int
 	fail_allocation bool
 	pool            [64]UatBuffer
+}
+
+pub fn (context &UatContext) bound_slot() u32 {
+	return context.slot
 }
 
 pub fn (mut context UatContext) alloc_driver_buffer_aligned(size u64, private bool, alignment u64) ?&UatBuffer {

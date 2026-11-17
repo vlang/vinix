@@ -77,6 +77,7 @@ mut:
 
 struct G13QueueResources {
 mut:
+	file_references u64
 	initial_events [2]G13InitialEvent
 	subqueues     [3]G13SubQueueResources
 	render_buffer G13RenderBufferResources
@@ -547,20 +548,20 @@ fn check_scene_slots() {
 	assert mgr.retain_g13_scene_slot_locked(mut buffers[0])
 	assert buffers[0].needs_bind, 'canceled first bind must not be mistaken for a published bind'
 	mgr.release_g13_scene_slot_locked(mut buffers[0])
-	mut vm := mmu.UatContext{}
+	mut vm := mmu.UatContext{ id: 17, slot: 6 }
 	mut stale := G13QueueResources{ vm: &vm }
 	mut live := G13QueueResources{ vm: &vm }
 	mgr.g13_queues = [&stale, &live]
 	assert mgr.retain_g13_scene_slot_locked(mut stale.render_buffer)
 	mgr.release_g13_scene_slot_locked(mut stale.render_buffer)
-	assert mgr.g13_tvb_owner_locked(vm.id, stale.render_buffer.slot) == none
+	assert mgr.g13_tvb_owner_locked(vm.slot, stale.render_buffer.slot) == none
 	assert mgr.retain_g13_scene_slot_locked(mut live.render_buffer)
 	stale.render_buffer.slot = live.render_buffer.slot
-	owner := mgr.g13_tvb_owner_locked(vm.id, live.render_buffer.slot) or { panic('live scene owner') }
+	owner := mgr.g13_tvb_owner_locked(vm.slot, live.render_buffer.slot) or { panic('live scene owner') }
 	assert owner == &live.render_buffer
-	assert mgr.g13_tvb_owner_locked(vm.id + 1, live.render_buffer.slot) == none
-	live.released = true
 	assert mgr.g13_tvb_owner_locked(vm.id, live.render_buffer.slot) == none
+	live.released = true
+	assert mgr.g13_tvb_owner_locked(vm.slot, live.render_buffer.slot) == none
 	mgr.release_g13_scene_slot_locked(mut live.render_buffer)
 }
 

@@ -12,6 +12,7 @@ pub struct UatPgtable {
 pub mut:
 	maps int
 	tlb_bound bool = true
+	tlb_asid u8 = 1
 	unmaps int
 	reject_map bool
 	reject_prepare bool

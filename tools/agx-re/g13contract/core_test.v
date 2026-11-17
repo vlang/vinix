@@ -237,10 +237,12 @@ fn test_asahi_contract_requires_teardown_and_publication_order() {
 	os.mkdir_all(directory)!
 	mmu := 'impl Drop for KernelMapping\nis_cached_noncoherent remap_uncached_and_flush unmap_pages tlbi_range\n/// Shared UAT global'
 	channel := '    pub(crate) fn put\nself.ring.ring[self.wptr as usize] = *msg mem::sync() T::set_wptr\n    /// Wait for'
+	workqueue := 'WorkError::Fault(info) if info.vm_slot != self.vm_slot => WorkError::Killed'
 	os.write_file(os.join_path(directory, 'mmu.rs'), mmu)!
 	os.write_file(os.join_path(directory, 'channel.rs'), channel)!
+	os.write_file(os.join_path(directory, 'workqueue.rs'), workqueue)!
 	assert check_asahi(fixture)! == ['Asahi KernelMapping cache-safe teardown order',
-		'Asahi TX ring barrier before write-pointer publication']
+		'Asahi TX ring barrier before write-pointer publication', 'Asahi submitted work ASID for fault attribution']
 	os.write_file(os.join_path(directory, 'mmu.rs'), mmu.replace('unmap_pages tlbi_range', 'tlbi_range unmap_pages'))!
 	if _ := check_asahi(fixture) {
 		assert false
@@ -253,6 +255,13 @@ fn test_asahi_contract_requires_teardown_and_publication_order() {
 		assert false
 	} else {
 		assert err.msg() == "Asahi TX channel publication: missing or out-of-order 'T::set_wptr'"
+	}
+	os.write_file(os.join_path(directory, 'channel.rs'), channel)!
+	os.write_file(os.join_path(directory, 'workqueue.rs'), workqueue.replace('self.vm_slot', 'vm.id'))!
+	if _ := check_asahi(fixture) {
+		assert false
+	} else {
+		assert err.msg() == 'Asahi fault routing must use the ASID recorded with the submitted work'
 	}
 }
 

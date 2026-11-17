@@ -169,6 +169,7 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 
 struct G13RenderJobResources {
 mut:
+	vm_slot             u32
 	queue               &G13QueueResources = unsafe { nil }
 	context             &Context           = unsafe { nil }
 	barrier             SharedBuffer
@@ -203,6 +204,7 @@ mut:
 
 struct G13ComputeJobResources {
 mut:
+	vm_slot u32
 	command SharedBuffer
 	timestamps SharedBuffer
 	microsequence SharedBuffer
@@ -435,11 +437,14 @@ fn check_recovery() {
 			globals: SharedBuffer{phys: u64(&globals), size: sizeof(fw.G13Globals)}
 			fw_status: SharedBuffer{phys: u64(&status)}
 		}
-		mut culprit := G13ComputeJobResources{event_slot: 3, stamp_value: 0x100, submitted: true}
+		mut vm := Context{id: 9}
+		mut culprit := G13ComputeJobResources{event_slot: 3, stamp_value: 0x100, submitted: true,
+			context: &vm, vm_slot: 8}
 		mut other := G13ComputeJobResources{event_slot: 4, stamp_value: 0x100, submitted: true}
 		mut already_done := G13ComputeJobResources{event_slot: 5, stamp_value: 0x100, submitted: true}
 		mut render := G13RenderJobResources{vertex_event_slot: 6, fragment_event_slot: 7,
-			vertex_stamp_value: 0x100, fragment_stamp_value: 0x100, submitted: true}
+			vertex_stamp_value: 0x100, fragment_stamp_value: 0x100, submitted: true,
+			context: &vm, vm_slot: 8}
 		mut mgr := GpuManager{
 			hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
 			g13_channels: &graph
@@ -475,7 +480,7 @@ fn check_recovery() {
 		// Fault details survive resume and a dependency killed on the other stage.
 		mgr.res.fault_valid = true
 		mgr.res.fault = FaultInfo{address: 0x123400, unit_code: 7, reason_code: 2,
-			sideband: 3, level: 1, unknown_5: 2, read: true}
+			sideband: 3, level: 1, unknown_5: 2, read: true, vm_slot: 8}
 		unsafe {
 			pending[0] = fw.G13PendingStamp{info: (u32(6) << shift) | 1, wait_value: 0x100}
 			pending[1] = fw.G13PendingStamp{info: (u32(7) << shift) | 1, wait_value: 0x100}
@@ -489,10 +494,14 @@ fn check_recovery() {
 		assert G13JobError{status: 3}.fence_error() == -110
 		assert G13JobError{status: 5}.fence_error() == -125
 		assert G13JobError{status: 6}.fence_error() == -19
-		other_vm := Context{id: 9}
-		culprit.context = &other_vm
-		mgr.mark_g13_slot_error_locked(3, 0x100, G13JobError{status: 4, vm_slot: 8})
+		// A fault at the software VM's number belongs to another ASID.
+		render.error = G13JobError{}
+		mgr.mark_g13_slot_error_locked(3, 0x100, G13JobError{status: 4, vm_slot: vm.id})
+		mgr.mark_g13_slot_error_locked(6, 0x100, G13JobError{status: 4, vm_slot: vm.id})
 		assert culprit.error.status == 5
+		assert render.error.status == 5
+		mgr.mark_g13_slot_error_locked(3, 0x100, mgr.g13_fault_error(3))
+		assert culprit.error.status == 4 && culprit.error.address == 0x123400
 		// The worker's pre-drain health check must let the queued error own
 		// recovery instead of stopping the ASC before handle_event can run.
 		mut error_header := channel.RingHeader{write_ptr: 1}

@@ -187,6 +187,7 @@ mut:
 }
 
 pub struct G13ComputeJobResources {
+	vm_slot u32
 pub mut:
 	error G13JobError
 	event_slot         u32
@@ -239,6 +240,7 @@ pub:
 }
 
 pub struct G13RenderJobResources {
+	vm_slot u32
 pub mut:
 	error G13JobError
 	vertex_event_slot       u32
@@ -450,8 +452,9 @@ fn (mut mgr GpuManager) flush_g13_queue_mappings(resources &G13QueueResources) b
 			|| !mgr.flush_g13_kernel_buffer(&buffer.kernel_buffer) {
 			return false
 		}
-		if resources.vm.is_bound() && (!mgr.flush_g13_uat_range(resources.vm.id, buffer.page_list.va, buffer.page_list.size)
-			|| !mgr.flush_g13_uat_range(resources.vm.id, buffer.block_list.va, buffer.block_list.size)) {
+		vm_slot := resources.vm.bound_slot()
+		if vm_slot != 0 && (!mgr.flush_g13_uat_range(vm_slot, buffer.page_list.va, buffer.page_list.size)
+			|| !mgr.flush_g13_uat_range(vm_slot, buffer.block_list.va, buffer.block_list.size)) {
 			return false
 		}
 	}
@@ -685,6 +688,7 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 		return false
 	}
 	mut context := unsafe { buffer.context }
+	vm_slot := context.bound_slot()
 	old_count := buffer.blocks.len
 	// Reserve a complete replacement pointer table before allocating GPU
 	// blocks. It is an owned, nonsliced V array over fallible raw backing;
@@ -713,7 +717,7 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 			return false
 		}
 		staged << block
-		if context.is_bound() && !mgr.flush_g13_uat_range(context.id, block.va, block.size) {
+		if vm_slot != 0 && !mgr.flush_g13_uat_range(vm_slot, block.va, block.size) {
 			return false
 		}
 	}
@@ -779,7 +783,7 @@ fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(mut buffer G13RenderBufferResou
 fn (mgr &GpuManager) g13_tvb_owner_locked(vm_slot u32, buffer_slot u32) ?&G13RenderBufferResources {
 	if vm_slot == 0 || buffer_slot >= fw.g13_tvb_slot_count || !mgr.g13_tvb_slots[buffer_slot] { return none }
 	for resources in mgr.g13_queues {
-		if resources.released || resources.vm == unsafe { nil } || resources.vm.id != vm_slot
+		if resources.released || resources.vm == unsafe { nil } || resources.vm.bound_slot() != vm_slot
 			|| !resources.render_buffer.initialized || !resources.render_buffer.slot_reserved
 			|| resources.render_buffer.active_scenes == 0 || resources.render_buffer.slot != buffer_slot { continue }
 		return unsafe { &resources.render_buffer }
@@ -1402,6 +1406,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 	if uat_mgr == unsafe { nil } || !uat_mgr.bind_context(resources.vm) { return none }
 	mut queue := unsafe { resources }
 	mut job := &G13RenderJobResources{
+		vm_slot: resources.vm.bound_slot()
 		queue: unsafe { resources }
 		context: unsafe { resources.vm }
 	}
@@ -1472,7 +1477,6 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 	job.vertex_microsequence = mgr.alloc_g13_buffer_with_protection(vertex_microsequence_size, pgtable.gpu_prot_fw_private_rw) or { return none }
 	job.fragment_microsequence = mgr.alloc_g13_buffer_with_protection(fragment_microsequence_size, pgtable.gpu_prot_fw_private_rw) or { return none }
 
-	ctx := resources.vm
 	buffer := &resources.render_buffer
 	vertex_queue := &resources.subqueues[0]
 	fragment_queue := &resources.subqueues[1]
@@ -1499,7 +1503,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		mut init := &fw.G13InitBufferCommand(job.init_buffer.cpu_address())
 		*init = fw.G13InitBufferCommand{
 			tag: fw.cmd_type_init_buffer
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			buffer_slot: buffer.slot
 			block_count: u32(buffer.blocks.len)
 			buffer: buffer.info.va
@@ -1518,7 +1522,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		mut vertex := &fw.G13RunVertex(job.vertex.cpu_address())
 		*vertex = fw.G13RunVertex{
 			tag: fw.cmd_type_run_vertex
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			notifier: resources.notifier.va
 			buffer_slot: buffer.slot
 			buffer: buffer.info.va
@@ -1590,7 +1594,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		mut fragment := &fw.G13RunFragment(job.fragment.cpu_address())
 		*fragment = fw.G13RunFragment{
 			tag: fw.cmd_type_run_fragment
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			microsequence: job.fragment_microsequence.va
 			microsequence_size: u32(fragment_microsequence_size)
 			notifier: resources.notifier.va
@@ -1759,7 +1763,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		scene: job.scene.scene.va
 		stats: mgr.g13_channels.stats_vertex.va + u64(4)
 		work_queue: vertex_queue.info.va
-		vm_slot: ctx.id
+		vm_slot: job.vm_slot
 		unk_38: 1
 		event_generation: u32(resources.firmware_id)
 		buffer_slot: buffer.slot
@@ -1813,7 +1817,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 			buffer: buffer.info.va
 			stats: mgr.g13_channels.stats_vertex.va + u64(4)
 			work_queue: vertex_queue.info.va
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			unk_pointer: job.vertex.va + vertex_unk_pointee_offset
 			uuid: input.vertex_command_id
 			fw_stamp: event.firmware_stamp_address(job.vertex_event_slot)
@@ -1843,7 +1847,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 			unk_pointer: job.fragment.va + fragment_unk_pointee_offset
 			work_queue: fragment_queue.info.va
 			work_item: job.fragment.va
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			unk_50: 1
 			event_generation: u32(resources.firmware_id)
 			buffer_slot: buffer.slot
@@ -1900,7 +1904,7 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 			busy_flag: job.fragment.va + fragment_busy_flag_offset
 			work_queue: fragment_queue.info.va
 			work_item: job.fragment.va
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			unk_758_flag: job.fragment.va + fragment_unk_758_flag_offset
 			restart_branch_offset: -i32(fragment_offset)
 			has_attachments: if input.fragment_attachment_count != 0 { u32(1) } else { u32(0) }
@@ -1917,12 +1921,12 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 	// From the first flush onward, cancellation must invalidate the complete
 	// graph before its physical backing can be reused.
 	job.mappings_published = true
-	if !mgr.flush_g13_uat_range(ctx.id, job.scene.user_buffer.va, job.scene.user_buffer.size)
-		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.heapmeta.va, job.scene.heapmeta.size)
-		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.tilemap.va, job.scene.tilemap.size)
-		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.tail_pointer_cache.buffer.va, job.scene.tail_pointer_cache.buffer.size)
-		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.preempt.va, job.scene.preempt.size)
-		|| !mgr.flush_g13_uat_range(ctx.id, job.scene.aux_framebuffer.va, job.scene.aux_framebuffer.size)
+	if !mgr.flush_g13_uat_range(job.vm_slot, job.scene.user_buffer.va, job.scene.user_buffer.size)
+		|| !mgr.flush_g13_uat_range(job.vm_slot, job.scene.heapmeta.va, job.scene.heapmeta.size)
+		|| !mgr.flush_g13_uat_range(job.vm_slot, job.scene.tilemap.va, job.scene.tilemap.size)
+		|| !mgr.flush_g13_uat_range(job.vm_slot, job.scene.tail_pointer_cache.buffer.va, job.scene.tail_pointer_cache.buffer.size)
+		|| !mgr.flush_g13_uat_range(job.vm_slot, job.scene.preempt.va, job.scene.preempt.size)
+		|| !mgr.flush_g13_uat_range(job.vm_slot, job.scene.aux_framebuffer.va, job.scene.aux_framebuffer.size)
 		|| !mgr.flush_g13_kernel_buffer(&job.scene.scene)
 		|| !mgr.flush_g13_kernel_buffer(&job.scene.timestamps)
 		|| !mgr.flush_g13_kernel_buffer(&job.init_buffer)
@@ -2411,6 +2415,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 	}
 	if uat_mgr == unsafe { nil } || !uat_mgr.bind_context(ctx) { return none }
 	mut job := &G13ComputeJobResources{
+		vm_slot: ctx.bound_slot()
 		context: unsafe { ctx }
 		queue: unsafe { resources }
 	}
@@ -2471,7 +2476,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 		mut run := &fw.G13RunCompute(job.command.cpu_address())
 		*run = fw.G13RunCompute{
 			tag: fw.cmd_type_run_compute
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			notifier: resources.notifier.va
 			job_params_1: fw.G13ComputeJobParameters1{
 				preempt_buf_1: job.preempt.va
@@ -2531,7 +2536,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 			job_params_1: job.command.va + compute_job_params_1_offset
 			stats: stats_compute
 			work_queue: compute_queue.info.va
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			unk_28: 1
 			event_generation: u32(resources.firmware_id)
 			event_sequence: job.event_sequence
@@ -2577,7 +2582,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 			header: fw.g13_useq_finalize_compute
 			stats: stats_compute
 			work_queue: compute_queue.info.va
-			vm_slot: ctx.id
+			vm_slot: job.vm_slot
 			job_params_2: job.command.va + compute_job_params_2_offset
 			uuid: input.command_id
 			fw_stamp: event.firmware_stamp_address(job.event_slot)
@@ -2598,7 +2603,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 	}
 
 	job.mappings_published = true
-	if !mgr.flush_g13_uat_range(ctx.id, job.preempt.va, job.preempt.size)
+	if !mgr.flush_g13_uat_range(job.vm_slot, job.preempt.va, job.preempt.size)
 		|| !mgr.flush_g13_kernel_buffer(&job.command)
 		|| !mgr.flush_g13_kernel_buffer(&job.microsequence)
 		|| !mgr.flush_g13_kernel_buffer(&job.timestamps) {

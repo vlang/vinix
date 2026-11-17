@@ -224,8 +224,9 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 	assert gpu.flushes() == flushes
 	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
 	assert manager.bind_context(&replacement) && replacement.is_bound()
+	new_pt.tlb_asid = 6
 	assert first.ioctl_gem_bind(&unbind) == 0 && new_pt.unmaps == 2 && old_pt.unmaps == 0
-	assert gpu.flushes() == flushes + 1
+	assert gpu.flushes() == flushes + 1 && gpu.last_flush_slot() == 6
 	assert first.close() && second.close()
 	assert old.destroyed && other.destroyed && sibling.destroyed && replacement.destroyed
 	assert gem.live() == 0

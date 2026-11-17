@@ -194,7 +194,7 @@ pub fn run_checks() {
 fn check_teardown_after_first_bind() {
 	check_unpublished = false
 	mut mgr := GpuManager{ fail_flush_at: 0 }
-	mut context := mmu.UatContext{ bound: false }
+	mut context := mmu.UatContext{ id: 17, bound: false }
 	mut buffer := mmu.UatBuffer{ va: 0x100000, size: 0x20000, mapped: true, cache_flush_pending: true }
 	// A later kernel-buffer failure can retain this graph until another
 	// queue publishes the same VM. Keep its private PTE available for retry.
@@ -212,7 +212,7 @@ fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fai
 	mut config := hw.t8103_config()
 	config.firmware_abi = abi
 	mut mgr := GpuManager{hw_config: config, fail_shared_at: fail_shared, fail_flush_at: fail_flush}
-	mut context := mmu.UatContext{fail_at: fail_alloc, bound: bound}
+	mut context := mmu.UatContext{id: 17, fail_at: fail_alloc, bound: bound}
 	mut resources := G13QueueResources{}
 	memory.fail_next(metadata_fail)
 	ok := mgr.initialize_g13_render_buffer(mut resources, &context)
