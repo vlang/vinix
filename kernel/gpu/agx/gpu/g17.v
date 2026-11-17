@@ -928,7 +928,7 @@ fn g17_event_worker(mut mgr GpuManager) {
 			break
 		}
 		if !serviced {
-			sched.yield(false)
+			sched.reschedule()
 		}
 	}
 	if mgr.state == .error {

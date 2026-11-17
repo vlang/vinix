@@ -15,6 +15,7 @@ fn test_orphan_queue_retry_preserves_logical_and_captured_owners() {
 	}
 	if _ := check_orphan_queue_local(file, gpu.replace('if owned.has_file_references() { return false }', ''), worker) { assert false }
 	if _ := check_orphan_queue_local(file, gpu, worker.replace('mgr.reap_file_resources()', '')) { assert false }
+	if _ := check_orphan_queue_local(file, gpu, worker.replace('sched.reschedule()', 'sched.yield(false)')) { assert false }
 }
 
 fn test_orphan_queue_reference_keeps_fallible_construction_before_publication() {

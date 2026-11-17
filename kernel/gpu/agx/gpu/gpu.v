@@ -1413,7 +1413,7 @@ fn event_worker(mut mgr GpuManager) {
 		mgr.reap_g13_render_jobs()
 		mgr.reap_g13_compute_jobs()
 		mgr.reap_file_resources()
-		sched.yield(false)
+		sched.reschedule()
 	}
 	if mgr.state == .error {
 		// Stop every firmware CPU before failure callbacks release userspace

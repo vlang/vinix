@@ -532,7 +532,7 @@ fn wait_staged_syncs(staged &agxsubmission.SyncArray) int {
 		fence := staged.fences[index]
 		for !syncobj.is_signaled(fence) {
 			syncobj.wait(fence, 1_000_000)
-			sched.yield(false)
+			sched.reschedule()
 		}
 		if syncobj.get_error(fence) != 0 {
 			return -5

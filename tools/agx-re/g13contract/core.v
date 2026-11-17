@@ -616,6 +616,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_heap_gc_reference(manager, read(os.join_path(base, 'fw/channels.rs'))!)!
 	check_uat_poll_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
 		read(os.join_path(repo, 'kernel/sched/sched_arm64.v'))!)!
+	check_worker_scheduling_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g17.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/fake/driver.v'))!,
+		read(os.join_path(repo, 'kernel/sched/sched_arm64.v'))!, read(os.join_path(repo, 'kernel/sched/sched_amd64.v'))!)!
 	retirement := section(local, 'fn (mut mgr GpuManager) retire_g13_subqueue_locked(',
 		'fn build_g13_attachments(', 'Vinix workqueue retirement')!
 	require_order(retirement, ['sequence <= queue.retired_sequence', 'katomic.sync()',

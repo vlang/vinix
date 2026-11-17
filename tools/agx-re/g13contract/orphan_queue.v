@@ -27,7 +27,7 @@ fn check_orphan_queue_local(file string, gpu string, worker string) ! {
 		'mgr.free_g13_queue_resources_locked(', 'owned.quarantined = true', 'return false',
 		'mgr.g13_queues.delete(index)', 'return true'], 'Manager guards its exact jobs and failed invalidation independently of unrelated VM work')!
 	service := section(worker, 'fn event_worker(', '// Shutdown the GPU', 'Worker retry and final stop drain')!
-	require_order(service, ['mgr.reap_file_resources()', 'sched.yield(false)', 'mgr.shutdown()',
+	require_order(service, ['mgr.reap_file_resources()', 'sched.reschedule()', 'mgr.shutdown()',
 		'mgr.reap_file_resources()'], 'Both normal and final worker service retry retained file resources')!
 }
 
