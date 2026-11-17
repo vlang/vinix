@@ -2,7 +2,7 @@
 module g13contract
 
 fn check_heap_metadata_local(source string) ! {
- constructor := section(source, 'pub fn new_heap(', '// Checked rounding', 'Heap table ownership')!
+ constructor := section(source, 'pub fn new_heap(', '\n}\n', 'Heap table ownership')!
  require_order(constructor, ['mut heap := HeapAllocator{',
   'heap.allocations.flags |= .noslices', 'return heap'],
   'Heap table exclusively owns its buffer before the first append')!

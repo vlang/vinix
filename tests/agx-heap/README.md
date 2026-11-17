@@ -165,10 +165,11 @@ in `check-capacity.v` still apply. The `check-reuse.v` and `check-collect.v`
 native/host proof modes now retain their historical contracts and require their
 original complete bundles; they were not weakened for the new history fields.
 
-The tie rule matches the same insertion/removal stream. Collection now follows
-release FIFO order and supports a count limit. Manager collection triggers,
-immediate-drop policy, backing/accounting behavior and native performance remain
-different or unqualified.
+The tie rule matches the same insertion/removal stream. Collection follows
+release FIFO order and supports a count limit. G13 shared and shared-read-only
+heaps now release immediately; private and GPU-read-only heaps retain deferred
+release. Manager collection triggers, backing/accounting behavior and native
+performance remain different or unqualified.
 
 `--sanitize-garbage` runs 19,440 release-permutation/count/offset cases and 10,240
 mixed partial-collection/reuse steps. It compares pending counts, rounded bytes,
@@ -195,3 +196,21 @@ the same binary passed with fake stacks disabled, and a traced variant passed.
 Those diagnostics are retained. Acceptance uses the kernel's manual memory model
 with fake-stack detection enabled and explicit freed-metadata checks. Default
 Boehm/ASan interoperability is not qualified by this fixture.
+
+`--sanitize-policy` checks immediate retirement and interior reuse without GC,
+the ordinary constructor's deferred default, 4,320 policy/offset/release-order
+cases and 20,480 mixed policy/reuse/partial-GC steps. The independent interval,
+FIFO and hole-history model checks pending statistics, bounded ranks and live
+record addresses. ASan verifies that only immediate owners are poisoned on
+release. `--measure-policy` requires zero retained records, blocks and bytes
+across three 10,000-operation runs with no explicit GC. The heap/TLB fixture
+checks 400 cycles across both policies, global mappings and per-ASID mappings.
+
+`policy-counterexamples.v HEAP_RUNNER BASELINE_ALLOCATOR FRESH_EXTERNAL_DIRECTORY`
+rejects seven compiled policy variants at their designated runtime assertions.
+`check-policy.v --host C`, `--selftest C`, `--native C BASELINE_C` and
+`--native-selftest C BASELINE_C` check the construction-time flag, locked one-owner
+collection and direct return without reading retired aliases. Ten host and four
+native C mutations exercise policy forwarding, defaults, class selection and
+ownership gates. Native comparison requires the existing collector and GPU
+unmap, invalidation, rollback and lifetime bodies to match the baseline.

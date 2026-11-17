@@ -70,6 +70,8 @@ pub mut:
 	garbage_count u64 // Deferred releases, ordered 1..garbage_count
 	garbage_bytes u64 // Rounded reservation bytes awaiting collection
 	lock        klock.Lock
+mut:
+	keep_garbage bool = true // Fixed at construction; private heaps defer reuse
 }
 
 // Create a new heap allocator managing the VA range [start, end).
@@ -85,6 +87,15 @@ pub fn new_heap(name string, start u64, end u64) HeapAllocator {
 	// This table never escapes or has slices. All access holds the heap lock,
 	// so capacity growth can immediately free its previous pointer buffer.
 	heap.allocations.flags |= .noslices
+	return heap
+}
+
+// Shared firmware heaps do not retain garbage in Asahi. Keep the ordinary
+// constructor deferred for existing private heaps and select policy explicitly
+// for classes whose release point already follows unmap/invalidation.
+pub fn new_heap_with_garbage(name string, start u64, end u64, keep_garbage bool) HeapAllocator {
+	mut heap := new_heap(name, start, end)
+	heap.keep_garbage = keep_garbage
 	return heap
 }
 
@@ -210,8 +221,9 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 	return va
 }
 
-// Mark the allocation at `va` as free. The VA region is not immediately
-// reused; call `gc()` to make its range available for placement.
+// Release the allocation at va. Deferred heaps reserve it until collection;
+// immediate heaps retire this record before returning. Their pending count
+// is zero on entry, so the one-item collection cannot retire a different owner.
 pub fn (mut h HeapAllocator) release(va u64) {
 	h.lock.acquire()
 	defer {
@@ -226,6 +238,7 @@ pub fn (mut h HeapAllocator) release(va u64) {
 				a.release_order = h.garbage_count
 				h.garbage_bytes += a.size
 			}
+			if !h.keep_garbage { h.collect_garbage_locked(1) }
 			return
 		}
 	}

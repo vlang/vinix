@@ -6,12 +6,14 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [bounded FIFO deferred collection](m1-agx-garbage-fifo.md)
-(2026-11-17). Deferred ranges retire in release order; count-limited collection
-preserves later pending reservations. Garbage statistics expose pending counts
-and rounded bytes. Independent FIFO, hole-history and rank-invariant fixtures
-pass. Manager collection scheduling, optional immediate release, allocator
-backing/accounting and native performance remain different or unqualified.
+Latest offline increment: [shared heap release policy](m1-agx-release-policy.md)
+(2026-11-17). G13 shared and shared-read-only heaps retire released records
+immediately, matching their Asahi classes; private and GPU-read-only heaps
+retain deferred release. Independent policy, FIFO, hole-history and live-owner
+fixtures pass. Manager collection scheduling, allocator backing/accounting and
+native performance remain different or unqualified.
+The [bounded FIFO deferred collection](m1-agx-garbage-fifo.md) report retains
+the count-limited collection and pending-garbage evidence.
 The [GPU hole insertion history](m1-agx-hole-order.md) and
 [best-fit GPU virtual-address reuse](m1-agx-heap-reuse.md) reports retain their
 original evidence.

@@ -13,8 +13,9 @@ fn main() {
  assert !pgtable.is_cached_noncoherent(pgtable.gpu_prot_fw_shared_rw)
  for cycle in 0 .. 100 {
   for global in [false, true]! {
+   for deferred in [false, true]! {
    start := if global { alloc.g13_shared_start } else { u64(0x100000) }
-   mut heap := alloc.new_heap('tlb-reuse', start, start + 4 * alloc.gpu_page_size)
+   mut heap := alloc.new_heap_with_garbage('tlb-reuse', start, start + 4 * alloc.gpu_page_size, deferred)
    mut pt := pgtable.new_pgtable(39, 48) or { panic('page table') }
    pt.non_global = !global
    pt.bind_tlb(7); tlb.clear()
@@ -33,7 +34,11 @@ fn main() {
    assert removed.len == 1 && removed[0].pte == 0 && removed[0].all == global,
     'old translation must be invalidated before heap release and reuse'
    assert pt.translate(pin) or { u64(0) } == old_physical + alloc.gpu_page_size
-   heap.release(low); heap.gc()
+   heap.release(low)
+   if deferred {
+    assert C.__asan_address_is_poisoned(low_record) == 0
+    heap.gc()
+   }
    assert C.__asan_address_is_poisoned(low_record) != 0 && C.__asan_address_is_poisoned(pin_record) == 0,
     'manual-free collection must retire old metadata while preserving the live pin'
    reused := heap.alloc(1, 0) or { panic('reuse') }
@@ -54,7 +59,8 @@ fn main() {
    pgtable.destroy(pt)
    unsafe { free(pt); heap.allocations.free() }
    assert memory.live_pages() == 0
+   }
   }
  }
- println('AGX heap/TLB reuse: 200 global/ASID cycles invalidate old leaves before lower-hole reuse, preserve live pins and release all page tables')
+ println('AGX heap/TLB reuse: 400 policy/global/ASID cycles invalidate old leaves before lower-hole reuse, preserve live pins and release all page tables')
 }

@@ -128,6 +128,7 @@ fn main() {
  if os.args.len == 2 && os.args[1] == '--measure-padding' { measure_padding(); return }
  if os.args.len == 2 && os.args[1] == '--measure-capacity' { measure_capacity(); return }
  if os.args.len == 2 && os.args[1] == '--measure-collect' { measure_collect(); return }
+ if os.args.len == 2 && os.args[1] == '--measure-policy' { measure_release_policy(); return }
  if os.args.len == 2 && os.args[1] == '--padding-probe' { check_heap_padding_probe(); return }
  if os.args.len == 2 && os.args[1] == '--alignment-probe' { check_heap_alignment_probe(); return }
  if os.args.len == 2 && os.args[1] == '--overflow-probe' { check_heap_overflow_probe(); return }
@@ -140,6 +141,8 @@ fn main() {
  if os.args.len == 2 && os.args[1] == '--garbage-suite' { check_garbage(); return }
  if os.args.len == 2 && os.args[1] == '--garbage-probe-suite' { check_garbage_fifo_probe(); return }
  if os.args.len == 2 && os.args[1] == '--garbage-limits-suite' { check_garbage_limits(); return }
+ if os.args.len == 2 && os.args[1] == '--policy-suite' { check_release_policy(); return }
+ if os.args.len == 2 && os.args[1] == '--policy-baseline-suite' { check_immediate_release_probe(); return }
  check_delayed_gc()
  check_allocation_gc()
  check_concurrent_stats()

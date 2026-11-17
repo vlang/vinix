@@ -8,7 +8,7 @@ fn check_heap_bounds_local(source string) ! {
  candidate := section(source, 'fn heap_allocation_address(', '// Zero alignment selects', 'GPU heap interval')!
  require_order(candidate, ['checked_heap_align_up(top, alignment) or { return none }',
   'address > end || size > end - address', 'return address'], 'GPU heap intervals fit by checked subtraction')!
- allocation := section(source, 'pub fn (mut h HeapAllocator) alloc(', '// Mark the allocation', 'GPU heap reservation')!
+ allocation := section(source, 'pub fn (mut h HeapAllocator) alloc(', '// Release the allocation', 'GPU heap reservation')!
  require_order(allocation, ['h.lock.acquire()', 'h.lock.release()',
   'size == 0 || (align != 0 && (align & (align - 1)) != 0)',
   'actual_align := if align < gpu_page_size', 'checked_heap_align_up(size, actual_align) or { return none }',

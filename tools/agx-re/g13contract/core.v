@@ -608,6 +608,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_heap_metadata_reference(read(os.join_path(base, 'alloc.rs'))!)!
 	check_heap_bounds_local(read(os.join_path(repo, 'kernel/gpu/agx/alloc/alloc.v'))!)!
 	check_heap_bounds_reference(read(os.join_path(base, 'alloc.rs'))!)!
+	check_heap_release_policy_local(read(os.join_path(repo, 'kernel/gpu/agx/alloc/alloc.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
+	check_heap_release_policy_reference(read(os.join_path(base, 'alloc.rs'))!, manager)!
 	retirement := section(local, 'fn (mut mgr GpuManager) retire_g13_subqueue_locked(',
 		'fn build_g13_attachments(', 'Vinix workqueue retirement')!
 	require_order(retirement, ['sequence <= queue.retired_sequence', 'katomic.sync()',

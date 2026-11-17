@@ -3,8 +3,8 @@ import os
 
 fn run_checks() !int {
  assert os.args.len == 2 || (os.args.len == 4 && os.args[2] == '--allocator-source')
- assert os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect',
-  '--sanitize', '--sanitize-bounds', '--sanitize-padding', '--sanitize-capacity', '--sanitize-collect', '--sanitize-reuse', '--sanitize-history', '--sanitize-history-invariants', '--sanitize-garbage', '--sanitize-garbage-probe', '--sanitize-garbage-limits']
+ assert os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect', '--measure-policy',
+  '--sanitize', '--sanitize-bounds', '--sanitize-padding', '--sanitize-capacity', '--sanitize-collect', '--sanitize-reuse', '--sanitize-history', '--sanitize-history-invariants', '--sanitize-garbage', '--sanitize-garbage-probe', '--sanitize-garbage-limits', '--sanitize-policy', '--sanitize-policy-baseline']
  assert os.user_os() == 'macos', 'retained host allocation measurement uses Darwin malloc statistics'
  // Default nano-zone statistics showed an additional 512-block step during
  // churn. Use the ordinary allocator for this exact live-byte measurement.
@@ -28,6 +28,8 @@ fn run_checks() !int {
  }
  if os.args[1] == '--sanitize-history-invariants' { args << ['-d', 'agx_heap_history_invariants'] }
  if os.args[1] in ['--sanitize-garbage', '--sanitize-garbage-limits'] { args << ['-d', 'agx_heap_garbage', '-d', 'agx_heap_history_invariants'] }
+ if os.args[1] == '--sanitize-policy' { args << ['-d', 'agx_heap_release_policy', '-d', 'agx_heap_garbage', '-d', 'agx_heap_history_invariants'] }
+ if os.args[1] == '--measure-policy' { args << ['-d', 'agx_heap_release_policy'] }
  compiler := os.getenv_opt('V') or { 'v' }
  mut build := os.new_process(compiler)
  mut build_args := args.clone(); build_args << ['-o', scratch + '/test', scratch + '/main']
@@ -41,7 +43,7 @@ fn run_checks() !int {
  }
  if target := os.getenv_opt('AGX_HEAP_TEST_BINARY') { os.cp(scratch + '/test', target)! }
  mut test := os.new_process(scratch + '/test')
- if os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect'] { test.set_args([os.args[1]]) }
+ if os.args[1] in ['--measure', '--measure-padding', '--measure-capacity', '--measure-collect', '--measure-policy'] { test.set_args([os.args[1]]) }
  if os.args[1].starts_with('--sanitize-') {
   suite := if os.args[1] == '--sanitize-history-invariants' { 'history' } else { os.args[1].all_after('--sanitize-') }
   test.set_args(['--' + suite + '-suite'])

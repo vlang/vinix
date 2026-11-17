@@ -209,8 +209,8 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		allocs: alloc.new_heap('agx-shared', alloc.gpu_shared_start, alloc.gpu_shared_end)
 		g13_private: alloc.new_heap('g13-private', alloc.g13_private_start, alloc.g13_private_end)
 		g13_gpu_readonly: alloc.new_heap('g13-gpu-readonly', alloc.g13_gpu_readonly_start, alloc.g13_gpu_readonly_end)
-		g13_shared: alloc.new_heap('g13-shared', alloc.g13_shared_start, alloc.g13_shared_end)
-		g13_readonly: alloc.new_heap('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end)
+		g13_shared: alloc.new_heap_with_garbage('g13-shared', alloc.g13_shared_start, alloc.g13_shared_end, false)
+		g13_readonly: alloc.new_heap_with_garbage('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end, false)
 		g13_rtkit: alloc.new_heap('g13-rtkit', alloc.g13_rtkit_start, alloc.g13_rtkit_end)
 		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
 	}

@@ -21,6 +21,7 @@ mut:
  records []ModelReservation
  holes []ModelHole // Oldest first, independently of VA order
  pending []u64 // Explicit release FIFO, independent of production ranks
+ keep_garbage bool = true
 }
 
 fn new_range_model(start u64, end u64) HeapRangeModel {
@@ -87,9 +88,14 @@ fn (mut model HeapRangeModel) reserve(size u64, alignment u64) (u64, u64) {
 }
 
 fn (mut model HeapRangeModel) release(address u64) {
- for mut record in model.records {
-  if record.va == address && record.in_use { record.in_use = false; model.pending << address; return }
+ mut selected := -1
+ for index, record in model.records {
+  if record.va == address && record.in_use { selected = index; break }
  }
+ if selected < 0 { return }
+ model.records[selected].in_use = false
+ model.pending << address
+ if !model.keep_garbage { model.collect_count(1) }
 }
 
 fn (mut model HeapRangeModel) collect() {
