@@ -6,6 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Latest offline sign-off: [pre-hardware parity recheck](m1-agx-signoff-20261117.md)
+(2026-11-17), against fresh remote default-branch checkouts. Both committed and
+working-source audits remain **not_equivalent**, with 15 differing selected ABI
+facts. Modern packet components are present but the registered driver still
+uses the legacy ABI. The recheck corrects stale admission/backlog entries below
+and separates G17-only memory limits from the base-M1 requirements.
+
 Latest offline increment: [logical queue-record reclamation](m1-agx-workqueue-records.md)
 (2026-11-17). Native and fake file owners now free logical queue metadata after
 destruction returns and their owner rows are removed. Pending fake completions
@@ -211,22 +218,23 @@ changes retain the existing object ownership model.
 
 ## Remaining differences
 
-These are implementation gaps, not items certified by a passing source gate.
+This inventory distinguishes implemented selected contracts from known gaps
+and unverified behavior. Passing a source gate does not certify a complete row.
 
 | Area | Vinix versus the packaged reference |
 | --- | --- |
 | Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Modern flat-command integration and full admission/backpressure still differ. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Modern flat-command dispatch is missing; complete scheduler-policy equivalence remains unverified. |
 | Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
 | VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts; idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and physical-slot capacity still differ. |
 | Failed queue construction | The worker retries unpublished G13 resource graphs independently of Handle/VM-name lifetime. Logical queues and captured references retain ownership; failed invalidation retains the graph. Successful release returns the reserved queue ID and allows final VM retirement. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
-| Event publication capacity | One-event publication now applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. The separate 127-ticket preparation table and whole-batch admission remain different. |
+| Event publication capacity | Publication applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. Whole-batch readiness checks all three pipes before publication. Preparation grows beyond the inline 127 tickets through owned overflow blocks; it is no longer capped at 127. These selected contracts do not establish complete scheduler equivalence. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix uses individual contiguous/repeated binds with idle overlap replacement and range splitting. Batched extensible operations, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
-| GEM and memory accounting | Purgeable VM-private objects, eviction/madvise, device/client limits and the reference's full reservation-fence behavior are not implemented equivalently. |
-| Timestamp UAPI | The reference's per-command timestamp objects and current compact command fields are not wired through Vinix's legacy command interface. |
+| GEM and memory accounting | The reference registers GEM_MADVISE; Vinix does not. Shmem/scatter backing, purge advice, device/client accounting and full reservation-fence behavior remain different or unqualified. The reference's admission limits and creator-RSS attribution are enabled only for G17, so those limits are not a base-M1 blocker. |
+| Timestamp UAPI | Object binding, capture, per-engine timestamp commands and independent retirement are implemented. Compact timestamp fields still have no registered modern submission endpoint. |
 | M1 family | The native path configures base M1/t8103. The reference also supports t6000/t6001/t6002 M1 Pro/Max/Ultra, including clustering and multiple dies. |
 | Telemetry | Vinix drains auxiliary channels but does not expose the reference's full firmware statistics/debug interface. |
 | Complete wire comparison | Existing tests cover selected InitData and work-command contracts. Every remaining field/default still needs independent comparison; a matching structure size is insufficient. |
