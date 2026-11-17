@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_vector_unary_names_and_keys() {
-	assert vector_air_unary_cache_base == 61604 && vector_float_intrinsic_slots == 62228 && scalar_intrinsic_cache_slots == 2197
+	assert vector_air_unary_cache_base == 61604 && vector_float_intrinsic_slots == 62228 && scalar_intrinsic_cache_slots == 2200
 	mut seen := [112]bool{}
 	for operation, id in [ScalarIntrinsic.fabs, .floor, .ceil, .trunc, .sqrt, .round, .rint]! { for count in 1 .. 17 {
 		name := 'air.${id}.v${count}f32'

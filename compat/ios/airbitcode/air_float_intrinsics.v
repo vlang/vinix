@@ -24,6 +24,9 @@ fn air_float_intrinsic(name string) !(ScalarIntrinsic, int) {
 		'air.floor.f16' { ScalarIntrinsic.floor, scalar_air_half_float_cache_base - scalar_air_float_cache_base + 1 }
 		'air.ceil.f16' { ScalarIntrinsic.ceil, scalar_air_half_float_cache_base - scalar_air_float_cache_base + 2 }
 		'air.trunc.f16' { ScalarIntrinsic.trunc, scalar_air_half_float_cache_base - scalar_air_float_cache_base + 3 }
+		'air.sqrt.f16' { ScalarIntrinsic.sqrt, scalar_air_half_float_cache_base - scalar_air_float_cache_base + 4 }
+		'air.round.f16' { ScalarIntrinsic.round, scalar_air_half_float_cache_base - scalar_air_float_cache_base + 5 }
+		'air.rint.f16' { ScalarIntrinsic.rint, scalar_air_half_float_cache_base - scalar_air_float_cache_base + 6 }
 		else { return error('AIR intrinsic: unsupported AIR float overload') }
 	}
 }

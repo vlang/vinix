@@ -315,9 +315,9 @@ fn scalar_sqrt_root(radicand u64) (u64, u64) {
 fn scalar_intrinsic_sqrt(bits u32, value u64) u64 {
 	sign := u64(1) << (bits - 1); abs := value & (sign - 1)
 	inf := if bits == 16 { u64(0x7c00) } else { u64(0x7f800000) }
-	if abs == 0 { return value } // Preserve negative zero before sign checks.
+	if abs == 0 { return value & sign } // Preserve only the encoded zero's sign.
 	if abs > inf || value & sign != 0 { return if bits == 16 { u64(0x7e00) } else { u64(0x7fc00000) } }
-	if abs == inf { return value }
+	if abs == inf { return abs }
 	mut significand := u64(0); mut exponent := 0
 	fraction_bits := if bits == 16 { 10 } else { 23 }
 	if bits == 16 { finite := binary16_finite(u16(value)); significand = finite.significand; exponent = finite.exponent }

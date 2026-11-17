@@ -116,8 +116,8 @@ fn rejected_profiles(assembler string,root string) !int {
   source:='target datalayout = "e-p:64:64"\n declare float @${name}(float)\n define void @reject(ptr %out) {%r = call float @${name}(float 1.0)\n %bits = bitcast float %r to i32\n %index = and i32 %bits,63\n %p = getelementptr i8,ptr %out,i32 %index\n store i8 17,ptr %p\n ret void }\n'
   rejected_profile(assembler,root+'/address-${op}',source)!;checks++
  }
- for i,name in ['air.fast_sqrt.f32','air.rsqrt.f32','air.sqrt.f64','air.sqrt.v2f32'] {
-  typ:=if i==2{'double'}else if i==3{'<2 x float>'}else{'float'}
+ for i,name in ['air.fast_sqrt.f32','air.rsqrt.f32','air.sqrt.f64','air.sqrt.v2f16'] {
+  typ:=if i==2{'double'}else if i==3{'<2 x half>'}else{'float'}
   source:='target datalayout = "e-p:64:64"\n declare ${typ} @${name}(${typ})\n define void @reject(ptr %out) {store i8 17,ptr %out\n %r = call ${typ} @${name}(${typ} zeroinitializer)\n ret void }\n'
   rejected_profile(assembler,root+'/overload-${i}',source)!;checks++
  }
