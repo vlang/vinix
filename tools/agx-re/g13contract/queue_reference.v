@@ -5,7 +5,7 @@ fn check_queue_reference_local(file string, pending string, gpu string, vfs stri
 	capture := section(file, 'fn (mut f GpuFile) capture_submission_queue(', 'fn release_submission_queue(', 'Owned queue capture')!
 	require_order(capture, ['f.lock.acquire()', 'defer { f.lock.release() }',
 		'if queue.id != queue_id || queue.detached { continue }', 'ownership.queue_id == queue_id',
-		'resources.retain_file_reference()', 'return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, resources: resources, retained: true}'], 'Capture queue identity and owner under the namespace lock')!
+		'resources.retain_file_reference()', 'return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, usc_base: queue.usc_base, resources: resources, retained: true}'], 'Capture queue identity, immutable USC base and owner under the namespace lock')!
 	for token in ['memory.', 'usercopy.', 'inflight_by_vm', 'return queue'] { require(!capture.contains(token), 'Capture must not allocate, copy, borrow a logical queue or pin VM job admission')! }
 	release := section(file, 'fn release_submission_queue(', '// Copy userspace input', 'Captured queue cleanup')!
 	require_order(release, ['if !captured.retained { return }', 'captured.resources', 'resources.release_file_reference()'], 'Release exactly the owned queue reference')!

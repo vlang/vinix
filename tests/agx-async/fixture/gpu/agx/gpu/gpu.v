@@ -62,6 +62,7 @@ pub mut:
 	released    bool
 	quarantined bool
 	marker      u64
+	usc_base    u64
 	timestamps [2]u64
 	ordinal     u32
 	barrier_sources [2]u32
@@ -174,7 +175,7 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(queue &G13Qu
 	index := mgr.prepares
 	mgr.prepares++
 	if index == mgr.fail_prepare_at { return none }
-	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr, ordinal: u32(index), timestamps: timestamps }
+	job := &G13ComputeJobResources{ queue: unsafe { queue }, marker: input.encoder_ptr, usc_base: input.usc_base, ordinal: u32(index), timestamps: timestamps }
 	mgr.g13_compute_jobs << job
 	return job
 }

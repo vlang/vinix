@@ -69,6 +69,7 @@ mut:
 	next_timestamp_id u32 = 1
 	next_queue_id u32 = 1
 	owner_process_id u32 = 7
+	ioctl_abi u32
 	closing_next      &GpuFile = unsafe { nil }
 	closing_queued    bool
 }

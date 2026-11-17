@@ -1189,6 +1189,7 @@ pub fn initialise() {
 		patchlevel: 0
 		features: drm.driver_gem | drm.driver_render | drm.driver_compute
 		ioctls: agx_file.drm_ioctls()
+		ioctl_abi: agx_file.ioctl_abi_handle
 		file_close: agx_file.release_handle
 		gem_close: agx_file.close_gem_handle
 		gem_export: agx_file.gem_export_handler

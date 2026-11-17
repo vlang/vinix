@@ -9,7 +9,7 @@ fn section(source string, start string, end string) !string {
 
 fn checks() !int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
-	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--timestamp-source', '--gpu-source'])
+	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--timestamp-source', '--gpu-source', '--modern-source'])
 		|| (os.args.len == 2 && os.args[1] == '--record-measure')
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-close-${os.getpid()}')
@@ -24,7 +24,8 @@ fn checks() !int {
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!
 	}
 	source := os.read_file(if os.args.len == 3 && os.args[1] == '--file-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/file.v' })!
-	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
+	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport drm.asahi\nimport aarch64.timer\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
+		section(source, 'fn get_or_create_file(', 'pub fn release_handle(')! +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
 		section(source, 'struct G13SubmissionQueue {', '@[heap]\nstruct G13SubmitCompletion {')! +
 		section(source, 'pub fn release_handle(', 'pub fn new_gpu_file(')! +
@@ -40,8 +41,15 @@ fn checks() !int {
 		section(source, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(')! +
 		section(source, 'pub fn (f &GpuFile) ioctl_get_params(', 'pub fn (mut f GpuFile) ioctl_vm_create(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'pub fn (f &GpuFile) ioctl_get_time(')! +
-		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'fn discard_g13_completion(')!
+		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'fn discard_g13_completion(')! +
+		section(source, 'pub fn (f &GpuFile) ioctl_get_time(', 'pub fn (mut f GpuFile) ioctl_gem_bind_object(')! +
+		section(source, 'fn dispatch(', 'fn lookup_file(')! +
+		source[source.index('fn ioctl_get_params_handler(') or { panic('handlers') }..]
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
+	os.cp(if os.args.len == 3 && os.args[1] == '--modern-source' { os.args[2] } else { repo + '/kernel/gpu/agx/file/modern.v' }, scratch + '/gpu/agx/file/modern.v')!
+	for name in ['backend.v', 'checks.v'] { os.cp(repo + '/tests/agx-modern-ioctl/' + name, scratch + '/gpu/agx/file/modern_' + name)! }
+	os.mkdir_all(scratch + '/aarch64/timer')!
+	os.cp(repo + '/tests/agx-modern-ioctl/timer.v', scratch + '/aarch64/timer/timer.v')!
 	os.cp('${repo}/kernel/gpu/agx/file/closing.v', '${scratch}/gpu/agx/file/closing.v')!
 	logical := os.read_file(repo + '/kernel/gpu/agx/workqueue/workqueue.v')!
 	assert logical.contains('\npub fn free_workqueue(')
@@ -62,6 +70,12 @@ fn checks() !int {
 	os.write_file('${scratch}/gpu/agx/mmu/identity.v', 'module mmu\nimport klock\nimport gpu.agx.vm as agxvm\n' +
 		section(mmu_source, '__global context_identity_lock', '// Driver-owned backing')!)!
 	drm_source := os.read_file('${repo}/kernel/drm/drm.v')!
+	os.cp_all(repo + '/tests/drm-wire/fixture/errno', scratch + '/errno', false)!
+	os.cp(repo + '/tests/agx-modern-ioctl/drm.v', scratch + '/drm/modern_fixture.v')!
+	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport usercopy\nimport memory\nimport errno\n' +
+		section(drm_source, 'fn decode_ioctl_cmd(', 'fn common_ioctl_layout(')! +
+		section(drm_source, 'fn ioctl_layout(', '// The node is /dev/dri/')! +
+		section(drm_source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!)!
 	os.write_file('${scratch}/drm/prime.v', 'module drm\nimport drm.gem\nimport drm.ioctl\n' +
 		section(drm_source, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(')!)!
 	priority := os.read_file('${repo}/kernel/gpu/agx/fw/workqueue.v')!

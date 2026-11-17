@@ -15,6 +15,7 @@ struct LogicalQueue {
 	id    u32
 	vm_id u32 = 1
 	caps  u32 = 5
+	usc_base u64 = 0x120000000
 }
 
 struct Ownership {

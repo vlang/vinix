@@ -23,6 +23,13 @@ Asahi and scheduler sources. The generic DRM header supplies the RESET wire ABI.
 Fence-completion and binary-wait checks use the packaged Linux core
 implementations; the audit checks and retains those sources too.
 
+Its selected ABI comparisons describe the retained `drm.ioctl` legacy
+compatibility declarations. Modern `drm.asahi` declarations are retained as
+inputs but require their own wire-oracle/registered-endpoint validation.
+Legacy mismatches alone do not establish a modern endpoint incompatibility;
+the JSON `comparison_scope` makes this explicit. The tool still cannot grant
+a whole-driver sign-off.
+
 The report distinguishes:
 
 - Exact selected facts: normalized DRM command numbers, the barrier sentinel,

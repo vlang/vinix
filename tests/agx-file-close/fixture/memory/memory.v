@@ -11,6 +11,13 @@ __global allocation_count = 0
 
 pub fn fail_allocations(reject bool) { reject_allocations = reject }
 pub fn calls() int { return allocation_calls }
+pub fn outstanding() int {
+	mut live_count := 0
+	for i in 0 .. allocation_count { if C.__asan_address_is_poisoned(allocations[i]) == 0 { live_count++ } }
+	return live_count
+}
+
+pub fn free(pointer voidptr) { unsafe { C.free(pointer) } }
 
 pub fn malloc_packed_fallible(size u64) voidptr {
 	allocation_calls++

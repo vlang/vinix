@@ -6,6 +6,8 @@ import drm.ioctl
 
 pub struct DrmDriver {
 pub:
+	ioctls []DrmIoctl
+	ioctl_abi fn (&DrmDevice, voidptr) u32 = unsafe { nil }
 	gem_export fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 }
@@ -13,6 +15,7 @@ pub:
 pub struct DrmDevice {
 pub:
 	driver &DrmDriver = unsafe { nil }
+	registered bool = true
 }
 
 __global exported &gem.GemObject = unsafe { nil }

@@ -94,6 +94,8 @@ fn test_audit_distinguishes_equal_facts_mismatch_and_unreadable_source() {
 	file := 'pub(crate) const MAX_COMMANDS_PER_SUBMISSION: u32 = 64;'
 	matching := compare_abi(local, reference, submission, file)!
 	assert matching.len == 17 && matching.all(it.matches)
+	assert Report{}.comparison_scope == 'legacy_compatibility_declarations'
+	assert Report{}.markdown().contains('these legacy differences do not establish a modern endpoint incompatibility')
 	assert Report{ comparisons: matching }.exit_code() == 1, 'partial matching facts cannot certify whole parity'
 	assert !Report{}.full_parity_certified && !Report{}.native_gpu_executed
 	changed := compare_abi(local.replace('asahi_barrier_none = u32(0xFFFF)',

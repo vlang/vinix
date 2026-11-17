@@ -15,6 +15,7 @@ pub enum Generation { g13 g17 }
 pub struct Config {
 pub mut:
 	gpu_gen Generation = .g13
+	base_clock_hz u64 = 24_000_000
 }
 
 pub struct G13QueueResources {

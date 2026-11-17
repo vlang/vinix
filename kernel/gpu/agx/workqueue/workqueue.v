@@ -37,6 +37,7 @@ pub mut:
 	vm_id          u32
 	priority       u32
 	caps           u32
+	usc_base       u64 // immutable USC execution base supplied by the modern queue ABI
 	detached       bool // userspace name removed; accepted jobs may still own backing
 	slots          [max_job_slots]&WorkItem
 	next_slot      u32

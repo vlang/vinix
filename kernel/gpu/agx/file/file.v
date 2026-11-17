@@ -2,12 +2,15 @@
 module file
 
 // Per-open DRM state for the Apple GPU. The public structures consumed here
-// are the Mesa 25.0.5 unstable Asahi UAPI in drm.ioctl. G17 command submission
+// include the Mesa 25.0.5 ABI in drm.ioctl and the modern ABI in drm.asahi.
+// Each open file selects one dialect before using overlapping ioctl numbers.
+// G17 command submission
 // stays fail-closed until its HAL300 work-command encoder is complete.
 
 import drm
 import drm.gem
 import drm.ioctl
+import drm.asahi
 import drm.syncobj
 import gpu.agx.bo as agxbo
 import gpu.agx.params as agxparams
@@ -63,6 +66,7 @@ mut:
 struct G13SubmissionQueue {
 	vm_id u32
 	caps u32
+	usc_base u64
 	resources &gpu.G13QueueResources = unsafe { nil }
 	retained bool
 }
@@ -93,6 +97,7 @@ pub mut:
 	next_timestamp_id u32
 	owner_process_id  u32
 	owner_key         u64
+	ioctl_abi         u32 // zero until the first driver request selects a dialect
 	inflight_by_vm    [mmu.uat_num_contexts]u64
 	lock              klock.Lock
 	closing_next      &GpuFile = unsafe { nil }
@@ -111,20 +116,14 @@ fn get_or_create_file(handle voidptr, dev &drm.DrmDevice) ?&GpuFile {
 	key := u64(handle)
 
 	file_map_lock.acquire()
+	defer { file_map_lock.release() }
 	if key in file_map {
-		f := file_map[key] or {
-			file_map_lock.release()
-			return none
-		}
-		file_map_lock.release()
+		f := file_map[key] or { return none }
 		return f
 	}
-	file_map_lock.release()
 
 	f := new_gpu_file(dev, key) or { return none }
-	file_map_lock.acquire()
 	file_map[key] = f
-	file_map_lock.release()
 	return f
 }
 
@@ -992,6 +991,11 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 }
 
 pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
+	return f.create_queue(data, 0)
+}
+
+// Install immutable queue input before publishing its name under file.lock.
+fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64) int {
 	mut request := unsafe { data }
 	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit | ioctl.asahi_queue_cap_compute
 	if request.extensions != 0 || request.flags != 0 || request.pad != 0 || request.priority > ioctl.asahi_priority_realtime
@@ -1013,6 +1017,8 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 	wq := workqueue.new_workqueue(id, request.vm_id, firmware_priority, request.queue_caps) or {
 		return -12
 	}
+	mut logical := unsafe { wq }
+	logical.usc_base = usc_base
 	mut g17_resources := &gpu.G17QueueResources(unsafe { nil })
 	mut g13_resources := &gpu.G13QueueResources(unsafe { nil })
 	if manager.hw_config.gpu_gen == .g17 {
@@ -1346,12 +1352,12 @@ fn (mut f GpuFile) capture_submission_queue(queue_id u32) ?G13SubmissionQueue {
 				&& queue.vm_id != 0 && queue.vm_id < mmu.uat_num_contexts {
 				mut resources := unsafe { ownership.resources }
 				resources.retain_file_reference()
-				return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, resources: resources, retained: true}
+				return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, usc_base: queue.usc_base, resources: resources, retained: true}
 			}
 		}
 		// Preserve backend/invalid-internal-state validation after staging for
 		// non-G13 or malformed logical queues, without borrowing any resource.
-		return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps}
+		return G13SubmissionQueue{vm_id: queue.vm_id, caps: queue.caps, usc_base: queue.usc_base}
 	}
 	return none
 }
@@ -1514,7 +1520,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 }
 
 fn dispatch(handle voidptr, dev &drm.DrmDevice) ?&GpuFile {
-	return get_or_create_file(handle, dev)
+	return dispatch_abi(handle, dev, legacy_ioctl_abi)
 }
 
 fn lookup_file(handle voidptr) ?&GpuFile {
@@ -1628,16 +1634,27 @@ fn ioctl_gem_bind_object_handler(dev &drm.DrmDevice, handle voidptr, data voidpt
 
 pub fn drm_ioctls() []drm.DrmIoctl {
 	return [
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_get_params_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_vm_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: drm.ioctl_write, handler: ioctl_vm_destroy_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_mmap_offset_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: drm.ioctl_write, handler: ioctl_gem_bind_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_queue_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: drm.ioctl_write, handler: ioctl_queue_destroy_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: drm.ioctl_write, handler: ioctl_submit_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_get_time_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_bind_object_handler },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_get_params_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_vm_create_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: drm.ioctl_write, handler: ioctl_vm_destroy_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_create_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_mmap_offset_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: drm.ioctl_write, handler: ioctl_gem_bind_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_queue_create_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: drm.ioctl_write, handler: ioctl_queue_destroy_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: drm.ioctl_write, handler: ioctl_submit_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_get_time_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: ioctl_gem_bind_object_handler, abi: legacy_ioctl_abi },
+		drm.DrmIoctl{ cmd: asahi.get_params, size: u32(sizeof(asahi.GetParams)), direction: drm.ioctl_write, handler: modern_get_params_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.get_time, size: u32(sizeof(asahi.GetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_get_time_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.vm_create, size: u32(sizeof(asahi.VmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_vm_create_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.vm_destroy, size: u32(sizeof(asahi.VmDestroy)), direction: drm.ioctl_write, handler: modern_vm_destroy_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.vm_bind, size: u32(sizeof(asahi.VmBind)), direction: drm.ioctl_write, handler: modern_vm_bind_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.gem_create, size: u32(sizeof(asahi.GemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_gem_create_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.gem_mmap_offset, size: u32(sizeof(asahi.GemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_gem_mmap_offset_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.gem_bind_object, size: u32(sizeof(asahi.GemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_gem_bind_object_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.queue_create, size: u32(sizeof(asahi.QueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_queue_create_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.queue_destroy, size: u32(sizeof(asahi.QueueDestroy)), direction: drm.ioctl_write, handler: modern_queue_destroy_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.submit, size: u32(sizeof(asahi.Submit)), direction: drm.ioctl_write, handler: modern_submit_handler, abi: modern_ioctl_abi, extensible: true },
 	]
 }

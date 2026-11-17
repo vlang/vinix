@@ -9,7 +9,14 @@ fn section(source string, start string, end string) !string {
 
 fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
-	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--pending-source', '--timestamp-source'])
+	mut overrides := map[string]string{}
+	mut measure := false
+	mut arg := 1
+	for arg < os.args.len {
+		if os.args[arg] == '--measure-modern-sync' { measure = true; arg++; continue }
+		assert os.args[arg] in ['--file-source', '--pending-source', '--timestamp-source', '--modern-source', '--modern-sync-source'] && arg + 1 < os.args.len
+		overrides[os.args[arg]] = os.args[arg + 1]; arg += 2
+	}
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-async-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -26,17 +33,23 @@ fn main() {
 	for path in ['drm/ioctl', 'drm/asahi', 'gpu/agx/packet', 'gpu/agx/command', 'gpu/agx/compute', 'gpu/agx/render',
 		'gpu/agx/submission'] {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
-		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!
+		if path == 'gpu/agx/submission' && '--modern-sync-source' in overrides {
+			os.cp_all(repo + '/kernel/' + path, scratch + '/' + path, false)!
+			os.cp(overrides['--modern-sync-source'], scratch + '/' + path + '/modern.v')!
+		} else { os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')! }
 	}
-	source := os.read_file(if os.args.len == 3 && os.args[1] == '--file-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/file.v' })!
+	source := os.read_file(overrides['--file-source'] or { repo + '/kernel/gpu/agx/file/file.v' })!
 	production := 'module file\nimport drm.gem\nimport drm.ioctl\nimport drm.syncobj\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.submission as agxsubmission\nimport katomic\nimport memory\nimport aarch64.timer\n' +
 		'const max_g13_submission_commands = agxsubmission.max_commands\nconst max_submission_syncs = agxsubmission.max_syncs\n' +
 		section(source, 'struct G13SubmissionQueue {', 'pub struct GpuFile {')! +
 		section(source, 'fn discard_g13_completion(', 'fn dispatch(')!
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
-	os.cp(if os.args.len == 3 && os.args[1] == '--pending-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/pending.v' }, '${scratch}/gpu/agx/file/pending.v')!
+	os.cp(overrides['--modern-source'] or { repo + '/kernel/gpu/agx/file/modern_submit.v' }, scratch + '/gpu/agx/file/modern_submit.v')!
+	os.cp(repo + '/tests/agx-modern-ioctl/submission.v', scratch + '/gpu/agx/file/modern_checks.v')!
+	os.cp(repo + '/tests/agx-queue-records/stats_darwin.c.v', scratch + '/gpu/agx/file/stats_darwin.c.v')!
+	os.cp(overrides['--pending-source'] or { repo + '/kernel/gpu/agx/file/pending.v' }, '${scratch}/gpu/agx/file/pending.v')!
 	os.cp('${repo}/kernel/gpu/agx/file/timestamps.v', '${scratch}/gpu/agx/file/timestamp_capture_production.v')!
-	os.cp(if os.args.len == 3 && os.args[1] == '--timestamp-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/submission_timestamps.v' }, '${scratch}/gpu/agx/file/submission_timestamps.v')!
+	os.cp(overrides['--timestamp-source'] or { repo + '/kernel/gpu/agx/file/submission_timestamps.v' }, '${scratch}/gpu/agx/file/submission_timestamps.v')!
 	gpu := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
 	g13 := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	errors := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v')!
@@ -46,12 +59,13 @@ fn main() {
 		section(gpu, 'pub fn (mut mgr GpuManager) queue_g13_submission(', '__global (')! +
 		section(g13, 'pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(', '// Caller holds the manager lock during shutdown.')! +
 		section(errors, 'pub struct G13JobError {', 'fn g13_error_at_stamp(')!)!
-	os.write_file('${scratch}/main.v', 'import gpu.agx.file\nfn main() { file.run_checks() }\n')!
+	os.write_file('${scratch}/main.v', if measure { 'import gpu.agx.file\nfn main() { file.measure_modern_syncs() }\n' }
+		else { 'import gpu.agx.file\nfn main() { file.run_modern_submission_checks(); file.run_checks() }\n' })!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
-	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
-		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
-		'-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
-		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v'])
+	mut build_flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', '${scratch}|@vlib|@vmodules']
+	if !measure { build_flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
+	build_flags << ['-o', '${scratch}/test', '${scratch}/main.v']
+	build.set_args(build_flags)
 	build.run()
 	build.wait()
 	if build.code != 0 { exit(build.code) }

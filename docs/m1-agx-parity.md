@@ -6,14 +6,23 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline sign-off: [pre-hardware parity recheck](m1-agx-signoff-20261117.md)
-(2026-11-17), against fresh remote default-branch checkouts. Both committed and
-working-source audits remain **not_equivalent**, with 15 differing selected ABI
-facts. Modern packet components are present but the registered driver still
-uses the legacy ABI. The recheck corrects stale admission/backlog entries below
-and separates G17-only memory limits from the base-M1 requirements.
+Latest increment: [registered modern native ioctls](m1-agx-modern-dispatch.md)
+(2026-11-17). G13 now registers eleven modern operations alongside its legacy
+interface, with per-file ABI selection, flat-packet submission, combined sync
+records and snapshotted batched VM binding. Queue USC state and timestamp
+objects reach the shared scheduler. Mesa migration, purge advice, complete
+timeline/backing semantics and hardware acceptance remain open.
 
-Latest offline increment: [logical queue-record reclamation](m1-agx-workqueue-records.md)
+The [preceding parity recheck](m1-agx-signoff-20261117.md), on 2026-11-17,
+compared fresh remote default-branch checkouts. Both committed and working-source
+audits reported **not_equivalent**, with 15 differing selected ABI facts before
+the modern registration increment. Those legacy declarations are
+retained for compatibility; the auditor now explicitly scopes that comparison
+and retains the modern declarations separately. The recheck corrected stale
+admission/backlog entries below and separated G17-only memory limits from the
+base-M1 requirements.
+
+Preceding kernel increment: [logical queue-record reclamation](m1-agx-workqueue-records.md)
 (2026-11-17). Native and fake file owners now free logical queue metadata after
 destruction returns and their owner rows are removed. Pending fake completions
 retain their file/VM pins through their last queue access. Host close retention
@@ -223,8 +232,8 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 
 | Area | Vinix versus the packaged reference |
 | --- | --- |
-| Userspace ABI | Vinix exposes the Mesa 25.0.5 unstable ABI. The reference uses extensible ioctl structures, a flat command buffer, synthetic attachment commands and different ioctl numbering. They are incompatible. |
-| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through its legacy ABI. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Modern flat-command dispatch is missing; complete scheduler-policy equivalence remains unverified. |
+| Userspace ABI | Native G13 registers the legacy interface and eleven modern extensible operations, selected per file. Modern flat packets and combined syncs reach the scheduler. GEM_MADVISE is absent; complete modern request/sync/backing semantics and matched Mesa integration remain incomplete. |
+| Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Full scheduler-policy and timeline-chain equivalence remain unverified. |
 | Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
 | VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts; idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and physical-slot capacity still differ. |
 | Failed queue construction | The worker retries unpublished G13 resource graphs independently of Handle/VM-name lifetime. Logical queues and captured references retain ownership; failed invalidation retains the graph. Successful release returns the reserved queue ID and allows final VM retirement. |
@@ -232,9 +241,9 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
 | Event publication capacity | Publication applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. Whole-batch readiness checks all three pipes before publication. Preparation grows beyond the inline 127 tickets through owned overflow blocks; it is no longer capped at 127. These selected contracts do not establish complete scheduler equivalence. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
-| VM binding | Vinix uses individual contiguous/repeated binds with idle overlap replacement and range splitting. Batched extensible operations, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
+| VM binding | Vinix supports legacy single operations and modern strided batches, copied completely before mutation, with sequential-prefix error semantics. Contiguous/repeated backing, idle overlap replacement and range splitting are implemented. Busy-VM refusals, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
 | GEM and memory accounting | The reference registers GEM_MADVISE; Vinix does not. Shmem/scatter backing, purge advice, device/client accounting and full reservation-fence behavior remain different or unqualified. The reference's admission limits and creator-RSS attribution are enabled only for G17, so those limits are not a base-M1 blocker. |
-| Timestamp UAPI | Object binding, capture, per-engine timestamp commands and independent retirement are implemented. Compact timestamp fields still have no registered modern submission endpoint. |
+| Timestamp UAPI | Registered modern SUBMIT now resolves compact per-command timestamp objects into all three engines. Capture, independent retirement and modern nanosecond GET_TIME are implemented. Native firmware execution and units still require hardware acceptance. |
 | M1 family | The native path configures base M1/t8103. The reference also supports t6000/t6001/t6002 M1 Pro/Max/Ultra, including clustering and multiple dies. |
 | Telemetry | Vinix drains auxiliary channels but does not expose the reference's full firmware statistics/debug interface. |
 | Complete wire comparison | Existing tests cover selected InitData and work-command contracts. Every remaining field/default still needs independent comparison; a matching structure size is insufficient. |

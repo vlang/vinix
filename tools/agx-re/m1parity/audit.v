@@ -33,6 +33,7 @@ pub struct Report {
 pub:
 	format_version int = 1
 	verdict        string
+	comparison_scope string = 'legacy_compatibility_declarations'
 	// There is deliberately no full-equivalence success state: these are
 	// selected source contracts, not a proof over the entire two drivers.
 	full_parity_certified bool
@@ -52,6 +53,7 @@ pub fn (report &Report) exit_code() int {
 pub fn (report &Report) markdown() string {
 	mut lines := ['# M1 source parity audit', '',
 		'Verdict: **${report.verdict}**. Full parity is not certified.',
+		'Comparison scope: legacy compatibility declarations in `drm.ioctl`. Modern registered endpoints require separate validation; these legacy differences do not establish a modern endpoint incompatibility.',
 		'No hardware access, boot, reboot or native GPU execution is performed.', '',
 		'## Source revisions', '']
 	for role in ['vinix', 'omarchy', 'packages', 'asahi', 'm1n1'] {
@@ -59,7 +61,7 @@ pub fn (report &Report) markdown() string {
 	}
 	lines << ['', '## Selected ABI facts', '',
 		'DRM command numbers below include base 0x40, not the size/direction encoding of the complete ioctl.',
-		'Layouts below describe scalar fields and offsets; matching them would still not prove matching semantics.',
+		'Layouts below describe legacy compatibility scalar fields and offsets; matching them would still not prove matching semantics.',
 		'', '| Fact | Vinix | Packaged reference | Result |', '| --- | --- | --- | --- |']
 	for comparison in report.comparisons {
 		lines << '| ${comparison.area} | ${comparison.vinix} | ${comparison.reference} | ${if comparison.matches {
@@ -176,7 +178,7 @@ pub fn audit(inputs Inputs) !Report {
 	}
 	mut sources := []Source{}
 	for role, paths in {
-		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/gem',
+		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/asahi', 'kernel/drm/gem',
 			'kernel/fs/vfs.v',
 			'kernel/sched/sched_arm64.v',
 			'kernel/sched/sched_amd64.v',
@@ -234,8 +236,8 @@ pub fn audit(inputs Inputs) !Report {
 		protocol_gates:   gates
 		sources:          sources
 		unverified_areas: [
-			'Complete ABI migration and matched Mesa integration',
-			'Modern flat-command ABI integration and full cross-submission admission/backpressure',
+			'Complete modern ABI semantics, GEM_MADVISE, timeline chains and matched Mesa integration',
+			'Complete flat-command semantics and full cross-submission admission/backpressure',
 			'Complete scheduler dependency/error policy beyond selected own-queue elision and input-errno handling',
 			'VM replacement/splitting, reservation fences and object memory accounting',
 			'Complete render object defaults and scheduler backpressure',
