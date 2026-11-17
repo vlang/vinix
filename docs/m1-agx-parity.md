@@ -6,7 +6,12 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [registered modern native ioctls](m1-agx-modern-dispatch.md)
+Latest correction: [preserve modern timeline input point zero](m1-agx-sync-zero.md)
+(2026-11-17). Zero now waits on the captured fence instead of dropping the
+dependency. Unsigned point-map behavior and cumulative-chain gaps remain
+separate; this correction does not certify full timeline equivalence.
+
+Preceding increment: [registered modern native ioctls](m1-agx-modern-dispatch.md)
 (2026-11-17). G13 now registers eleven modern operations alongside its legacy
 interface, with per-file ABI selection, flat-packet submission, combined sync
 records and snapshotted batched VM binding. Queue USC state and timestamp

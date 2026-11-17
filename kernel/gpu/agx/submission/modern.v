@@ -51,17 +51,12 @@ pub fn stage_packet_syncs(owner u64, pointer u64, in_count u32, out_count u32) (
 			return -95, SyncArray{}, SyncArray{}
 		}
 		if index < in_count {
-			mut fence := &syncobj.DmaFence(unsafe { nil })
-			if timeline && item.timeline_value == 0 {
-				// dma_fence_chain_find_seqno(0) drops the captured fence and
-				// resolves to no dependency, but an empty object is still EINVAL.
-				_ := syncobj.get_fence(object) or { return -22, SyncArray{}, SyncArray{} }
+			// dma_fence_chain_find_seqno(0) leaves the captured fence intact.
+			// It waits on that snapshot even when the object is later replaced.
+			fence := if timeline && item.timeline_value != 0 {
+				syncobj.get_timeline_fence(object, item.timeline_value) or { return -22, SyncArray{}, SyncArray{} }
 			} else {
-				fence = if timeline {
-					syncobj.get_timeline_fence(object, item.timeline_value) or { return -22, SyncArray{}, SyncArray{} }
-				} else {
-					syncobj.get_fence(object) or { return -22, SyncArray{}, SyncArray{} }
-				}
+				syncobj.get_fence(object) or { return -22, SyncArray{}, SyncArray{} }
 			}
 			inputs.objects[index] = object
 			inputs.fences[index] = fence

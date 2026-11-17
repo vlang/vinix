@@ -10,10 +10,10 @@ fn section(source string, start string, end string) !string {
 fn main() {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	mut overrides := map[string]string{}
-	mut measure := false
+	mut measure := ''
 	mut arg := 1
 	for arg < os.args.len {
-		if os.args[arg] == '--measure-modern-sync' { measure = true; arg++; continue }
+		if os.args[arg] in ['--measure-modern-sync', '--measure-zero-sync'] { measure = os.args[arg]; arg++; continue }
 		assert os.args[arg] in ['--file-source', '--pending-source', '--timestamp-source', '--modern-source', '--modern-sync-source'] && arg + 1 < os.args.len
 		overrides[os.args[arg]] = os.args[arg + 1]; arg += 2
 	}
@@ -46,6 +46,7 @@ fn main() {
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp(overrides['--modern-source'] or { repo + '/kernel/gpu/agx/file/modern_submit.v' }, scratch + '/gpu/agx/file/modern_submit.v')!
 	os.cp(repo + '/tests/agx-modern-ioctl/submission.v', scratch + '/gpu/agx/file/modern_checks.v')!
+	os.cp(repo + '/tests/agx-sync-zero/checks.v', scratch + '/gpu/agx/file/zero_checks.v')!
 	os.cp(repo + '/tests/agx-queue-records/stats_darwin.c.v', scratch + '/gpu/agx/file/stats_darwin.c.v')!
 	os.cp(overrides['--pending-source'] or { repo + '/kernel/gpu/agx/file/pending.v' }, '${scratch}/gpu/agx/file/pending.v')!
 	os.cp('${repo}/kernel/gpu/agx/file/timestamps.v', '${scratch}/gpu/agx/file/timestamp_capture_production.v')!
@@ -59,11 +60,12 @@ fn main() {
 		section(gpu, 'pub fn (mut mgr GpuManager) queue_g13_submission(', '__global (')! +
 		section(g13, 'pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(', '// Caller holds the manager lock during shutdown.')! +
 		section(errors, 'pub struct G13JobError {', 'fn g13_error_at_stamp(')!)!
-	os.write_file('${scratch}/main.v', if measure { 'import gpu.agx.file\nfn main() { file.measure_modern_syncs() }\n' }
-		else { 'import gpu.agx.file\nfn main() { file.run_modern_submission_checks(); file.run_checks() }\n' })!
+	os.write_file('${scratch}/main.v', if measure == '--measure-modern-sync' { 'import gpu.agx.file\nfn main() { file.measure_modern_syncs() }\n' }
+		else if measure == '--measure-zero-sync' { 'import gpu.agx.file\nfn main() { file.measure_modern_zero_syncs() }\n' }
+		else { 'import gpu.agx.file\nfn main() { file.run_modern_zero_checks(); file.run_modern_submission_checks(); file.run_checks() }\n' })!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut build_flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', '${scratch}|@vlib|@vmodules']
-	if !measure { build_flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
+	if measure == '' { build_flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
 	build_flags << ['-o', '${scratch}/test', '${scratch}/main.v']
 	build.set_args(build_flags)
 	build.run()
