@@ -26,8 +26,9 @@ fn check_timeline_capability_contract(drm string, native string, fake string) ! 
 	cap := section(drm, 'fn ioctl_get_cap(', 'fn ioctl_gem_close(', 'DRM capability reporting')!
 	require_order(cap, ['ioctl.drm_cap_syncobj_timeline {', 'dev.driver.features & driver_syncobj_timeline != 0',
 		'return 0'], 'DRM timeline capability follows the registered device')!
-	require_order(native, ['if !mgr.init()', 'mut features := drm.driver_gem | drm.driver_render | drm.driver_compute',
-		'if chip_id == 0x8103 {', 'features |= drm.driver_syncobj_timeline', '}',
+	require_order(native, ['if !mgr.init()', 'base_m1 := chip_id == 0x8103',
+		'mut features := drm.driver_gem | drm.driver_render | drm.driver_compute',
+		'if base_m1 {', 'features |= drm.driver_syncobj_timeline', '}',
 		'agx_drm_driver := &drm.DrmDriver{', 'features: features', 'drm.register_driver(agx_drm_driver)'],
 		'Native base M1 enables timeline discovery after firmware initialization')!
 	require(!fake.contains('drm.driver_syncobj_timeline'), 'The fake backend uses a sparse point map')!
@@ -40,6 +41,7 @@ fn test_timeline_capability_is_native_base_m1_only() {
 	fake := read(repo + '/kernel/gpu/agx/fake/driver.v')!
 	check_timeline_capability_contract(drm, native, fake)!
 	if _ := check_timeline_capability_contract(drm.replace('dev.driver.features & driver_syncobj_timeline != 0', 'true'), native, fake) { assert false }
+	if _ := check_timeline_capability_contract(drm, native.replace('base_m1 := chip_id == 0x8103', 'base_m1 := true'), fake) { assert false }
 	if _ := check_timeline_capability_contract(drm, native.replace('features |= drm.driver_syncobj_timeline', ''), fake) { assert false }
 	if _ := check_timeline_capability_contract(drm, native, fake + '\ndrm.driver_syncobj_timeline') { assert false }
 }

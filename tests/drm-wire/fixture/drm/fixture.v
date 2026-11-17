@@ -17,6 +17,12 @@ struct DrmIoctl {
 }
 
 struct DrmDriver {
+	name string
+	desc string
+	date string = default_driver_date
+	major int
+	minor int
+	patchlevel int
 	features  u32
 	ioctls    []DrmIoctl
 	ioctl_abi fn (&DrmDevice, voidptr) u32 = unsafe { nil }
@@ -40,6 +46,7 @@ fn account_activity(_ &DrmDevice, _ u32) { activity_calls++ }
 
 fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, _ voidptr) int {
 	return match cmd {
+		ioctl.drm_ioctl_version { ioctl_version(dev, data) }
 		ioctl.drm_ioctl_get_cap { ioctl_get_cap(dev, data) }
 		ioctl.drm_ioctl_syncobj_wait, ioctl.drm_ioctl_syncobj_timeline_wait { handle_wait(cmd, data) }
 		ioctl.drm_ioctl_syncobj_handle_to_fd, ioctl.drm_ioctl_syncobj_fd_to_handle { handle_descriptor(cmd, data) }
@@ -122,6 +129,7 @@ pub fn run_checks() {
 	check_wait_transport()
 	check_descriptor_transport()
 	check_timeline_capability()
+	check_agx_version()
 }
 
 fn check_timeline_capability() {

@@ -1181,14 +1181,16 @@ pub fn initialise() {
 	mgr.set_file_reaper(agx_file.service_file_work)
 
 	// Step 7: Register the DRM driver after firmware initialization.
+	base_m1 := chip_id == 0x8103
 	mut features := drm.driver_gem | drm.driver_render | drm.driver_compute
-	if chip_id == 0x8103 {
+	if base_m1 {
 		features |= drm.driver_syncobj_timeline
 	}
 	agx_drm_driver := &drm.DrmDriver{
 		name: 'asahi'
-		desc: 'Apple AGX GPU'
-		major: 1
+		desc: if base_m1 { 'Apple AGX Graphics' } else { 'Apple AGX GPU' }
+		date: if base_m1 { '0' } else { drm.default_driver_date }
+		major: if base_m1 { 0 } else { 1 }
 		minor: 0
 		patchlevel: 0
 		features: features

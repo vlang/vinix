@@ -6,6 +6,12 @@ address/undefined-behavior sanitizers. It replaces user copies with bounded
 host fixtures and injected faults. Set `DRM_WIRE_TEST_BINARY` to retain the
 native executable outside Git.
 
+The version probe exercises libdrm's two-call sequence with the native AGX
+driver metadata and the production VERSION handler. It checks M1 and G17
+metadata, bounded text copies, and the Mesa version predicate. Set
+`AGX_DRM_DRIVER_SOURCE` to supply an alternate registration source for a
+negative control.
+
 The node fixture also injects allocator exhaustion, counts live request
 buffers on every exit, and checks error-output copying and fault precedence.
 It uses `-gc none` to match the kernel buffer allocator.

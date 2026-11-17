@@ -40,10 +40,13 @@ pub:
 	extensible bool // Linux DRM size/direction intersections and zero extension
 }
 
+pub const default_driver_date = '20260905'
+
 pub struct DrmDriver {
 pub mut:
 	name           string
 	desc           string
+	date           string = default_driver_date
 	major          int
 	minor          int
 	patchlevel     int
@@ -809,7 +812,7 @@ fn ioctl_version(dev &DrmDevice, data voidptr) int {
 	date_capacity := version.date_len
 	desc_capacity := version.desc_len
 	if !copy_version_field(version.name, name_capacity, dev.driver.name)
-		|| !copy_version_field(version.date, date_capacity, '20260905')
+		|| !copy_version_field(version.date, date_capacity, dev.driver.date)
 		|| !copy_version_field(version.desc, desc_capacity, dev.driver.desc) {
 		return -14
 	}
@@ -817,7 +820,7 @@ fn ioctl_version(dev &DrmDevice, data voidptr) int {
 	version.version_minor = i32(dev.driver.minor)
 	version.version_patchlevel = i32(dev.driver.patchlevel)
 	version.name_len = u64(dev.driver.name.len)
-	version.date_len = 8
+	version.date_len = u64(dev.driver.date.len)
 	version.desc_len = u64(dev.driver.desc.len)
 	return 0
 }

@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+The native base-M1 `DRM_IOCTL_VERSION` reply matches the packaged driver
+identity read by Mesa during device open.
+[DRM version reporting](m1-agx-drm-version.md)
+
 Base M1 now selects the packaged soft-fault default in both G13 firmware
 layouts and reports it to Mesa through `GET_PARAMS`.
 [Soft-fault initialization and capability](m1-agx-soft-faults.md)
