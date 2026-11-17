@@ -5937,3 +5937,67 @@ kernel, guest and product-default behavior do not change. Mandatory link-node
 integration, other readable symlinks, OS-root/device exceptions, directory
 names/search absence, loader/toolchain closure, owned ARM/GUI, redistribution
 and default activation remain open.
+
+### Required host symlink-node xattr content (2026-11-17)
+
+Feature `40adf1ef2` makes symlink-node content mandatory in format-11 host
+receipts, with inner replay format 6. The independently validated metadata-alias
+graph determines canonical-parent node paths and literal bodies. The new
+`winelinkxattrhost` projection uses the unchanged qualified `winelinkxattr`
+held-descriptor reader to capture each link's own native names/values, without
+following the final target. The projection and reader are embedded, pinned and
+retained. Admission recomputes canonical `read-closed/link-xattr-content.json`
+with an 8 MiB bound and the original namespace. Copied graphs still require
+the original nodes; their copied attributes cannot substitute for them.
+
+Fixture, controller, producer and retainer build and admit successfully. Each
+records 21 canonical-parent alias nodes alongside the earlier 110 canonical
+regular-file/directory metadata targets. All 96 admission/control refusals pass:
+92 exercise real host admission, including the earlier three live ordinary
+file/directory cases, and four exercise the production link helper on private
+nodes. Eight new receipt/format cases cover empty, omitted or extra nodes,
+forged values or bodies, linked evidence and old outer/inner formats. The four
+live helper controls change a value, add/remove a name or retarget a private
+link. Every restored baseline admits and referenced file bytes remain unchanged.
+Historical Homebrew aliases remain read-only.
+
+All 32 owned-receipt mutations pass on the first run with the original ten-second
+per-command bound, followed by 18 startup/pre-sign refusals. The fresh signed
+x86 holder-death/collection run passes in 92.705 seconds, including producer
+admission before signing and host revalidation after the guest. All 67 retention
+refusals pass in partitions 17/17/17/16, each with original and unchanged copied
+baselines. The independent checker verifies exact disjoint coverage. Two new
+cases omit the link-content input from the producer/controller retained maps
+and reach the named missing-input refusal.
+
+The complete checkpoint is `/Users/alex/.cache/vwhostlinkxattr-20261117-01`.
+Frozen `source-final` is an APFS clone of the original required-native source
+with selected changes overlaid. Twelve selected source/document files match
+repository bytes, including both unchanged qualified native readers. All 22
+final qualification phases exit zero. Exact argv, selected compiler environment,
+logs, exits, source revision, feature patch and validation remain retained.
+The compiler is `/Users/alex/.cache/vinix-wine-build/v/v`; host tools use
+`-prod -gc none -manualfree -cflags -fno-lto`. All prior data, directory,
+metadata, query, native-content, SDK, image and final input/blob guards remain
+mandatory; no redundant image hashing or extra sandbox permission is added.
+
+Original checkpoints `/Users/alex/.cache/vwhostxattr-20261117-01` and
+`/Users/alex/.cache/vwlinkxattr-20261117-01`, their complete historical bundles,
+compiler/LLVM/SDK/image/source namespaces and earlier prerequisites remain
+required. Historical verifiers retain their original contracts. Matching bounded
+native observations, including `XATTR_SHOWCOMPRESSION`, are quiescent rather than
+atomic; concurrent change-and-restore races remain outside the claim. Other
+readable symlinks, OS-root/device exceptions, directory entry names/search
+absence, loader/toolchain closure, owned ARM/GUI, broader lifetime/mapping,
+redistribution and default activation remain open. Kernel and product-default
+behavior do not change.
+
+The external typed inventory is
+`/Users/alex/Library/Caches/vinix-codex/section14/wine-host-link-xattr-20261117-01.inventory.json`,
+SHA-256 `e61e6406b7af5a86ff7ff9fce3362083b2c13f98f2f4b2b0932d99b999edd90a`.
+Recording and independent comparison pass using the unchanged fixed auditor
+`/Users/alex/.cache/vwhostread-20261116-01/workspace-inventory-final`; logs are
+beside the receipt. No checkpoint file changes after recording begins. This
+inventory covers ordinary logical bytes/types/modes/sizes/links. Explicit
+native receipts separately pin selected live node content; neither claims all
+native attributes at rest throughout the workspace.

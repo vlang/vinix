@@ -1443,8 +1443,14 @@ architectures; broader release/catalog/runtime acceptance remains open.
     now captures and rechecks 21 canonical-parent alias nodes for each original
     host role, including each link's literal body and own native attributes.
     Binary/empty, dangling/cyclic/FIFO-link and restored baselines, 38 exact
-    refusals and four production/source guards pass. Mandatory link-node
-    integration and complete xattr/sandbox coverage remain open, along with
+    refusals and four production/source guards pass.
+    [Required symlink-node integration](tests/packages/wine-lease-supervision-plan.md#required-host-symlink-node-xattr-content-2026-11-17)
+    now binds the declared link nodes, literal bodies and native attributes into
+    format-11 host receipts. All four roles pass; 96 admission/control refusals
+    comprise 92 host admissions and four private live production-helper cases.
+    A fresh signed x86 holder-death/collection run, 32 receipt mutations,
+    18 startup refusals and all 67 retention refusals pass. Complete
+    xattr/sandbox coverage remains open, along with
     other query/search/metadata operations and OS-loader reads. Complete
     Mach-O linker/library closure, OS shared-cache bytes
     and complete hermetic toolchain admission remain separate gates. Default
