@@ -5,8 +5,9 @@ import g13layout
 
 fn check_timeline_wait_contract(drm string, wire string, wait string, capture string, object string, chain string) ! {
 	require(integer_constant(wire, 'drm_ioctl_syncobj_timeline_wait', 'Timeline WAIT opcode')! == 0xca, 'Timeline WAIT opcode')!
-	require_order(drm.all_after('fn common_ioctl_layout('), ['ioctl.drm_ioctl_syncobj_timeline_wait {',
-		'size: u32(sizeof(ioctl.DrmSyncobjTimelineWait)), direction: ioctl_write | ioctl_read'], 'Timeline WAIT registration')!
+	registration := drm.all_after('fn common_ioctl_layout(').all_after('ioctl.drm_ioctl_syncobj_timeline_wait {').all_before('ioctl.drm_ioctl_syncobj_transfer {')
+	require_order(registration, ['size: u32(sizeof(ioctl.DrmSyncobjTimelineWait))',
+		'direction: ioctl_write | ioctl_read', 'extensible: true'], 'Timeline WAIT registration')!
 	require_order(drm.all_after('fn core_ioctl('), ['ioctl.drm_ioctl_syncobj_timeline_wait {',
 		'return ioctl_syncobj_timeline_wait(handle, data)'], 'Timeline WAIT dispatch')!
 	require_order(wait, ['if request.flags & ~known != 0', 'if count == 0 { return 0 }',

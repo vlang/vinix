@@ -1,6 +1,7 @@
 @[has_globals]
 module drm
 
+import drm.ioctl
 import usercopy
 import memory
 import errno
@@ -36,7 +37,12 @@ __global handler_input = u32(0)
 
 fn account_activity(_ &DrmDevice, _ u32) { activity_calls++ }
 
-fn drm_ioctl(_ &DrmDevice, _ u32, _ voidptr, _ voidptr) int { return -95 }
+fn drm_ioctl(_ &DrmDevice, cmd u32, data voidptr, _ voidptr) int {
+	return match cmd {
+		ioctl.drm_ioctl_syncobj_wait, ioctl.drm_ioctl_syncobj_timeline_wait { handle_wait(cmd, data) }
+		else { -95 }
+	}
+}
 
 fn modern_abi(_ &DrmDevice, _ voidptr) u32 { return 2 }
 
@@ -46,11 +52,6 @@ fn handle(_ &DrmDevice, _ voidptr, data voidptr) int {
 	unsafe { *word += 0x100 }
 	handler_calls++
 	return handler_status
-}
-
-fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
-	if cmd == 9 { return DrmIoctlLayout{ size: 24, direction: 3 } }
-	return none
 }
 
 pub fn run_checks() {
@@ -64,7 +65,7 @@ pub fn run_checks() {
 	assert (ioctl_layout(&device, 0x41, 32, 3, 1) or { panic('legacy layout') }).driver_index == 0
 	assert (ioctl_layout(&device, 0x41, 16, 3, 0) or { panic('new layout') }).driver_index == 1
 	assert (ioctl_layout(&device, 0x41, 32, 3, 2) or { panic('extended layout') }).driver_index == 1
-	assert (ioctl_layout(&device, 9, 24, 3, 0) or { panic('metadata fallback') }).driver_index == -1
+	assert (ioctl_layout(&device, 9, 8, ioctl_write, 0) or { panic('metadata fallback') }).driver_index == -1
 	if _ := ioctl_layout(&device, 0x41, 16, 3, 1) {
 		assert false
 	}
@@ -115,6 +116,7 @@ pub fn run_checks() {
 	assert copy_ioctl_input(unsafe { &buffer[0] }, 12, 0, 0) == 0
 	assert copy_ioctl_output(0, unsafe { &buffer[0] }, 12, 0)
 	println('DRM wire: ABI dispatch, direction intersections, legacy metadata fallback, zero extension, unknown-tail echo, bounds and copy faults passed')
+	check_wait_transport()
 }
 
 fn expect_error(mut node DrmNode, request u64, data voidptr, code u64) {

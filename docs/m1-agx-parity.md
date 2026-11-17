@@ -6,9 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [per-queue publication FIFO](m1-agx-queue-poll.md). The file
-worker can visit unrelated queues after the first 128 waiting or retiring
-queues. A batch still waits behind unpublished work on its own queue.
+Binary and timeline WAIT accept the request sizes from before `deadline_nsec`
+and follow the packaged DRM core's direction and copy rules.
+[DRM syncobj WAIT request framing](m1-agx-wait-wire.md)
+
+The file worker can visit unrelated queues after the first 128 waiting or
+retiring queues. A batch still waits behind unpublished work on its own queue.
+[Per-queue publication FIFO](m1-agx-queue-poll.md)
 
 [32-bit G13 fence numbering](m1-agx-fence-ordinals.md) starts each queue's
 finished fence sequence at one and wraps through zero. The

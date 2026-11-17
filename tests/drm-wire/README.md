@@ -10,6 +10,13 @@ The node fixture also injects allocator exhaustion, counts live request
 buffers on every exit, and checks error-output copying and fault precedence.
 It uses `-gc none` to match the kernel buffer allocator.
 
+The production core registration supplies the binary and timeline WAIT
+layouts. The fixture checks the 32- and 40-byte requests that predate
+`deadline_nsec`, plus the full layouts and extended requests. The core
+handler stub reads the deadline and writes `first_signaled` through the
+production UAPI structures. The `drm-syncobj-wait` suite tests the actual
+wait handlers separately.
+
 Coverage includes ABI-specific selection with colliding command numbers,
 metadata-free legacy-driver fallback, direction intersections, kernel buffer
 sizing, zero extension, preserved unknown read/write tails, zeroed read-only

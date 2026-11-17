@@ -320,10 +320,19 @@ fn common_ioctl_layout(cmd u32) ?DrmIoctlLayout {
 			}
 		}
 		ioctl.drm_ioctl_syncobj_wait {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjWait)), direction: ioctl_write | ioctl_read }
+			// Older userspace omits the trailing deadline_nsec field.
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmSyncobjWait))
+				direction: ioctl_write | ioctl_read
+				extensible: true
+			}
 		}
 		ioctl.drm_ioctl_syncobj_timeline_wait {
-			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTimelineWait)), direction: ioctl_write | ioctl_read }
+			DrmIoctlLayout{
+				size: u32(sizeof(ioctl.DrmSyncobjTimelineWait))
+				direction: ioctl_write | ioctl_read
+				extensible: true
+			}
 		}
 		ioctl.drm_ioctl_syncobj_transfer {
 			DrmIoctlLayout{ size: u32(sizeof(ioctl.DrmSyncobjTransfer)), direction: ioctl_write | ioctl_read }
@@ -515,7 +524,14 @@ fn ioctl_layout(dev &DrmDevice, cmd u32, request_size u32, direction u32, abi u3
 		}
 		if private_command { return none }
 	}
-	return common_ioctl_layout(cmd)
+	layout := common_ioctl_layout(cmd) or { return none }
+	if layout.extensible {
+		return DrmIoctlLayout{
+			...layout
+			direction: layout.direction & direction
+		}
+	}
+	return layout
 }
 
 // Linux DRM allocates max(in_size, out_size, driver_size). Unknown input

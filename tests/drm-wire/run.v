@@ -14,10 +14,10 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/drm-wire/fixture', scratch, false)!
+	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
-	mut production := 'module drm\nimport usercopy\nimport memory\nimport errno\n'
-	production += section(source, 'fn decode_ioctl_cmd(', 'fn common_ioctl_layout(')!
-	production += section(source, 'fn ioctl_layout(', '// The node is /dev/dri/')!
+	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
+	production += section(source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')!
 	production += section(source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!
 	os.write_file('${scratch}/drm/production.v', production)!
 	os.cp('${repo}/tests/drm-wire/test.v', '${scratch}/main.v')!
