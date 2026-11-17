@@ -17,6 +17,8 @@ fn main() {
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
+	production += section(source, 'pub const driver_gem', 'pub struct DrmIoctl {')!
+	production += section(source, 'fn ioctl_get_cap(', 'fn ioctl_gem_close(')!
 	production += section(source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')!
 	production += section(source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!
 	os.write_file('${scratch}/drm/production.v', production)!

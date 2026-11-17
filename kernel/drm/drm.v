@@ -27,6 +27,7 @@ pub const driver_gem = u32(0x1)
 pub const driver_dumb_buffer = u32(0x2)
 pub const driver_render = u32(0x8)
 pub const driver_compute = u32(0x10)
+pub const driver_syncobj_timeline = u32(0x20)
 
 pub struct DrmIoctl {
 pub:
@@ -848,9 +849,7 @@ fn ioctl_get_cap(dev &DrmDevice, data voidptr) int {
 			return 0
 		}
 		ioctl.drm_cap_syncobj_timeline {
-			// Timeline operations exist; keep disabled until the remaining
-			// interoperability and native qualification gaps are resolved.
-			cap.value = 0
+			cap.value = u64(dev.driver.features & driver_syncobj_timeline != 0)
 			return 0
 		}
 		else {

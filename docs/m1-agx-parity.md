@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+The native base-M1 DRM device now advertises `DRM_CAP_SYNCOBJ_TIMELINE`.
+Userspace can discover the shared timeline through the standard GET_CAP probe.
+[Timeline capability reporting](m1-agx-timeline-capability.md)
+
 Native G13 legacy and modern submissions now share DRM timeline fence chains.
 Both formats can consume points published by the other format or by DRM. The
 legacy path reserves chain nodes before job preparation.
@@ -42,8 +46,8 @@ dependencies across reverse retirement and wrap.
 
 The [pre-hardware audit](m1-agx-prehardware-20261117.md) matched all twelve
 registered modern ioctl words against the packaged C header and identified the
-reverse-retirement regression in `f183daa00`. The DRM timeline capability and
-bundled Mesa differ from Omarchy. The earlier
+reverse-retirement regression in `f183daa00`. Vinix still bundles a different
+Mesa revision from Omarchy. The earlier
 [dependency qualification](m1-agx-job-dependencies.md) describes the initial
 64-bit reduction and its reference scope.
 

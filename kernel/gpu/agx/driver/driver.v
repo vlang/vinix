@@ -1180,14 +1180,18 @@ pub fn initialise() {
 	gpu.set_global_manager(agx_driver_inst.gpu)
 	mgr.set_file_reaper(agx_file.service_file_work)
 
-	// Step 7: Register DRM driver (name "asahi", features GEM|RENDER|COMPUTE)
+	// Step 7: Register the DRM driver after firmware initialization.
+	mut features := drm.driver_gem | drm.driver_render | drm.driver_compute
+	if chip_id == 0x8103 {
+		features |= drm.driver_syncobj_timeline
+	}
 	agx_drm_driver := &drm.DrmDriver{
 		name: 'asahi'
 		desc: 'Apple AGX GPU'
 		major: 1
 		minor: 0
 		patchlevel: 0
-		features: drm.driver_gem | drm.driver_render | drm.driver_compute
+		features: features
 		ioctls: agx_file.drm_ioctls()
 		ioctl_abi: agx_file.ioctl_abi_handle
 		file_close: agx_file.release_handle

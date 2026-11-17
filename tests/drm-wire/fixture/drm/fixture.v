@@ -17,6 +17,7 @@ struct DrmIoctl {
 }
 
 struct DrmDriver {
+	features  u32
 	ioctls    []DrmIoctl
 	ioctl_abi fn (&DrmDevice, voidptr) u32 = unsafe { nil }
 }
@@ -37,8 +38,9 @@ __global handler_input = u32(0)
 
 fn account_activity(_ &DrmDevice, _ u32) { activity_calls++ }
 
-fn drm_ioctl(_ &DrmDevice, cmd u32, data voidptr, _ voidptr) int {
+fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, _ voidptr) int {
 	return match cmd {
+		ioctl.drm_ioctl_get_cap { ioctl_get_cap(dev, data) }
 		ioctl.drm_ioctl_syncobj_wait, ioctl.drm_ioctl_syncobj_timeline_wait { handle_wait(cmd, data) }
 		ioctl.drm_ioctl_syncobj_handle_to_fd, ioctl.drm_ioctl_syncobj_fd_to_handle { handle_descriptor(cmd, data) }
 		else { -95 }
@@ -119,6 +121,27 @@ pub fn run_checks() {
 	println('DRM wire: ABI dispatch, direction intersections, legacy metadata fallback, zero extension, unknown-tail echo, bounds and copy faults passed')
 	check_wait_transport()
 	check_descriptor_transport()
+	check_timeline_capability()
+}
+
+fn check_timeline_capability() {
+	assert ioctl.drm_cap_syncobj_timeline == 0x14 && sizeof(ioctl.DrmGetCap) == 16
+	compute := driver_gem | driver_render | driver_compute
+	memory.fail_next(true)
+	for index, features in [compute, driver_gem | driver_dumb_buffer, compute | driver_syncobj_timeline]! {
+		driver := DrmDriver{features: features}
+		dev := DrmDevice{driver: unsafe { &driver }}
+		mut node := DrmNode{dev: unsafe { &dev }}
+		mut cap := ioctl.DrmGetCap{capability: ioctl.drm_cap_syncobj_timeline, value: ~u64(0)}
+		assert (node.ioctl(voidptr(1), u64(0xc010640c), unsafe { &cap }) or { panic('GET_CAP timeline probe') }) == 0
+		assert cap.capability == 0x14 && cap.value == if index == 2 { u64(1) } else { u64(0) }
+		cap = ioctl.DrmGetCap{capability: ioctl.drm_cap_syncobj}
+		assert (node.ioctl(voidptr(1), u64(0xc010640c), unsafe { &cap }) or { panic('GET_CAP binary probe') }) == 0
+		assert cap.value == 1
+	}
+	memory.fail_next(false)
+	assert memory.outstanding() == 0
+	println('DRM GET_CAP: timeline discovery follows the device feature and the binary capability is available for all three devices')
 }
 
 fn expect_error(mut node DrmNode, request u64, data voidptr, code u64) {
