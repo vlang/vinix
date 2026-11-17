@@ -13,6 +13,7 @@ struct G13QueueResources {
 mut:
 	context SharedBuffer
 	context_retirement G13ContextRetirement
+	context_next &G13QueueResources = unsafe { nil }
 	released bool
 	render_buffer ContextRenderBuffer
 	subqueues [3]ContextSubqueue
@@ -30,6 +31,9 @@ fn (mut manager GpuManager) invalidate_g13_queue_mappings_locked(mut resources G
 fn (mut manager GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 	if buffer.va == 0 && buffer.phys == 0 { return }
 	assert context_test_queue.released
+	assert context_test_queue.context_next == unsafe { nil }, 'backing release must leave no deferred node link'
+	assert manager.g13_context_head != context_test_queue && manager.g13_context_tail != context_test_queue,
+		'backing release must follow removal of deferred roots'
 	assert context_test_queue.context_retirement == .complete || context_test_unpublished,
 		'context backing must remain owned until acknowledgement or stopped/unpublished teardown'
 	manager.context_backing_calls++

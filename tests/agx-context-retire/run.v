@@ -20,12 +20,13 @@ fn run_checks() !int {
 	assert !os.exists(scratch); os.mkdir_all(scratch)!; defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(repo + '/tests/agx-heap-gc/fixture', scratch, false)!
 	base := os.read_file(scratch + '/gpu/fixture.v')!
-	fields := '\tg13_shared alloc.HeapAllocator\n\tcontext_refuse_map bool\n\tcontext_map_calls int\n\tcontext_backing_calls int\n'
+	fields := '\tg13_shared alloc.HeapAllocator\n\tg13_queues []&G13QueueResources\n\tg13_context_head &G13QueueResources = unsafe { nil }\n\tg13_context_tail &G13QueueResources = unsafe { nil }\n\tcontext_refuse_map bool\n\tcontext_map_calls int\n\tcontext_backing_calls int\n'
 	fixture := base.replace('\tg13_gpu_readonly alloc.HeapAllocator\n', '\tg13_gpu_readonly alloc.HeapAllocator\n' + fields)
-		.replace('assert pc + rc > 0', 'assert context_test_queue.context.mapped')
+		.replace('assert pc + rc > 0', 'assert context_test_queue == unsafe { nil } || context_test_queue.context.mapped')
 	os.write_file(scratch + '/gpu/fixture.v', fixture)!
 	for file in ['types.v', 'wire.v', 'test.v'] { os.cp(repo + '/tests/agx-context-retire/' + file, scratch + '/gpu/' + file)! }
-	os.write_file(scratch + '/main.v', 'import gpu\nfn main() { gpu.check_context_retirement() }\n')!
+	os.cp(repo + '/tests/agx-context-defer/test.v', scratch + '/gpu/defer.v')!
+	os.write_file(scratch + '/main.v', 'import gpu\nfn main() { gpu.check_context_retirement(); gpu.check_context_deferral() }\n')!
 	for name in ['alloc', 'channel', 'fw'] {
 		os.mkdir_all(scratch + '/gpu/agx/' + name)!; filename := if name == 'fw' { 'channels.v' } else { name + '.v' }
 		os.cp(if name == 'fw' { wire } else { repo + '/kernel/gpu/agx/' + name + '/' + filename }, scratch + '/gpu/agx/' + name + '/' + filename)!
@@ -37,7 +38,8 @@ fn run_checks() !int {
 	enum_source := os.read_file(repo + '/kernel/gpu/agx/gpu/g13.v')!
 	production := 'module gpu\n' + section(enum_source, 'enum G13ContextRetirement', '\n')! + '\n' +
 		section(manager, 'struct SharedBuffer {', '// RTKit calls this')! +
-		section(os.read_file(queue)!, 'fn (mut mgr GpuManager) free_g13_queue_resources_locked(', '// Caller holds the manager and subqueue locks.')!
+		section(os.read_file(queue)!, 'fn (mut mgr GpuManager) free_g13_queue_resources_locked(', '// Caller holds the manager and subqueue locks.')! +
+		section(os.read_file(queue)!, 'fn (mut mgr GpuManager) release_all_g13_queue_resources()', '\n}\n')! + '\n}\n'
 	os.write_file(scratch + '/gpu/production.v', production)!
 	os.cp(garbage, scratch + '/gpu/context.v')!
 	os.cp(repo + '/kernel/gpu/agx/gpu/g13_garbage.v', scratch + '/gpu/garbage.v')!

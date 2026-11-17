@@ -47,11 +47,15 @@ fn context_case(abi hw.FirmwareAbi, mode int, initial u32, private_count int, re
 	if mode == 15 { manager.state = .error }
 	if mode == 16 { manager.state = .stopped }
 	manager.lock.acquire()
+	assert !manager.free_g13_queue_resources_locked(mut queue, true), 'context retirement must be deferred until allocator borrow'
+	assert manager.doorbells == 0 && manager.context_map_calls == 0 && manager.context_backing_calls == 0
+	assert queue.context_retirement == .queued && manager.g13_context_head == &queue && manager.g13_context_tail == &queue
+	manager.collect_g13_context_garbage_locked()
 	result := manager.free_g13_queue_resources_locked(mut queue, true)
 	success := mode in [0, 1]!
 	unpublished := mode >= 6
 	assert result == (success && !refuse_map), 'queue release must depend on context acknowledgement and mapping cleanup'
-	assert queue.context_retirement == if success { G13ContextRetirement.complete } else if unpublished { G13ContextRetirement.fresh } else { G13ContextRetirement.pending },
+	assert queue.context_retirement == if success { G13ContextRetirement.complete } else if unpublished { G13ContextRetirement.queued } else { G13ContextRetirement.pending },
 		'publication acceptance must preserve retirement state'
 	assert manager.context_map_calls == if success { 1 } else { 0 }
 	assert manager.context_backing_calls == if result { 1 } else { 0 }
@@ -68,6 +72,8 @@ fn context_case(abi hw.FirmwareAbi, mode int, initial u32, private_count int, re
 		C.__asan_poison_memory_region(&data[0], 64)
 		manager.g13_private.release(pin_p); manager.g13_gpu_readonly.release(pin_r)
 		before := manager.doorbells; manager.context_refuse_map = false
+		assert manager.invalidate_g13_context_locked(mut queue), 'complete UAT retries must skip context bytes and repeated collection'
+		manager.collect_g13_context_garbage_locked()
 		assert manager.free_g13_queue_resources_locked(mut queue, true), 'complete UAT retries must skip context bytes and repeated collection'
 		assert manager.doorbells == before && manager.context_map_calls == 2 && manager.context_backing_calls == 1
 		assert C.__asan_address_is_poisoned(pp) == 0 && C.__asan_address_is_poisoned(rp) == 0, 'complete retries must not collect later releases'
@@ -76,6 +82,8 @@ fn context_case(abi hw.FirmwareAbi, mode int, initial u32, private_count int, re
 		before := manager.doorbells; before_wp := header.write_ptr
 		header.read_ptr = header.write_ptr; manager.state = .running; manager.mode = 0
 		manager.channels.device_ctrl.faulted = 0
+		manager.collect_g13_context_garbage_locked()
+		assert !manager.invalidate_g13_context_locked(mut queue), 'published retirement failure must never replay possibly recycled IDs'
 		assert !manager.free_g13_queue_resources_locked(mut queue, true), 'published retirement failure must never replay possibly recycled IDs'
 		assert manager.doorbells == before && header.write_ptr == before_wp && queue.context.mapped && !queue.released
 		manager.state = .stopped; context_test_unpublished = true
@@ -87,6 +95,7 @@ fn context_case(abi hw.FirmwareAbi, mode int, initial u32, private_count int, re
 		manager.state = .running; manager.mode = 0; manager.hw_config = hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
 		manager.context_refuse_map = false; queue.context.mapped = true
 		queue.context.va = address; queue.context.phys = unsafe { u64(&data[0]) }; queue.context.size = 64
+		manager.collect_g13_context_garbage_locked()
 		assert manager.free_g13_queue_resources_locked(mut queue, true), 'unpublished retirement failure must remain retryable after transport/input repair'
 		assert manager.doorbells == 1 && manager.context_backing_calls == 1
 	}

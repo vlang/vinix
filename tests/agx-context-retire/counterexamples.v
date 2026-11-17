@@ -8,11 +8,13 @@ fn main() {
 	context := os.read_file(repo + '/kernel/gpu/agx/gpu/g13_context.v')!
 	wire := os.read_file(repo + '/kernel/gpu/agx/fw/channels.v')!
 	queue := os.read_file(repo + '/kernel/gpu/agx/gpu/g13.v')!
+	sync_start := context.index('fn (mut mgr GpuManager) invalidate_g13_context_locked(') or { panic('missing synchronous helper') }
+	sync_body := context[sync_start..]
 	variants := [
-		['baseline-queue', '--queue-source', os.read_file(os.args[2])!, 'queue mappings must wait for acknowledged context retirement'],
-		['missing-gate', '--queue-source', queue.replace('!mgr.invalidate_g13_context_locked(mut resources)\n\t\t|| ', ''), 'queue mappings must wait for acknowledged context retirement'],
+		['baseline-queue', '--queue-source', os.read_file(os.args[2])!, 'context retirement must be deferred until allocator borrow'],
+		['missing-gate', '--queue-source', queue.replace('!mgr.defer_g13_context_locked(mut resources)\n\t\t|| ', ''), 'queue mappings must wait for acknowledged context retirement'],
 		['replay-published', '--source', context.replace('if resources.context_retirement == .pending { return false }', ''), 'published retirement failure must never replay possibly recycled IDs'],
-		['lost-complete', '--source', context.replace('if resources.context_retirement == .complete { return true }', ''), 'complete UAT retries must skip context bytes and repeated collection'],
+		['lost-complete', '--source', context[..sync_start] + sync_body.replace('if resources.context_retirement == .complete { return true }', ''), 'complete UAT retries must skip context bytes and repeated collection'],
 		['late-pending', '--source', context.replace('resources.context_retirement = .pending\n', '').replace('if !mgr.ring_device_control() { return false }', 'if !mgr.ring_device_control() { return false }\n\tresources.context_retirement = .pending'), 'publication acceptance must preserve retirement state'],
 		['failed-collection', '--source', context.replace('if !mgr.ring_device_control() { return false }', 'if !mgr.ring_device_control() { mgr.g13_private.collect_garbage(private_count); return false }'), 'only acknowledged context retirement may collect captured private garbage'],
 		['collect-later', '--source', context.replace('mgr.g13_private.collect_garbage(private_count)', 'mgr.g13_private.gc()'), 'captured collection must preserve live and later-released pins'],

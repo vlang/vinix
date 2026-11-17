@@ -103,6 +103,8 @@ mut:
 	g13_channels      &G13ChannelAllocations = unsafe { nil }
 	g13_events        G13EventResources
 	g13_queues        []&G13QueueResources
+	g13_context_head &G13QueueResources = unsafe { nil }
+	g13_context_tail &G13QueueResources = unsafe { nil }
 	g13_queue_ids     G13QueueIds
 	g13_compute_jobs  []&G13ComputeJobResources
 	g13_render_jobs   []&G13RenderJobResources
@@ -440,6 +442,7 @@ fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64,
 		&& protection != pgtable.gpu_prot_fw_shared_rw
 		&& protection != pgtable.gpu_prot_fw_shared_ro
 		&& protection != pgtable.gpu_prot_gpu_ro_fw_private_rw { return none }
+	mgr.collect_g13_context_garbage_locked()
 	mgr.collect_g13_heap_garbage_locked()
 	return match protection {
 		pgtable.gpu_prot_fw_private_rw {

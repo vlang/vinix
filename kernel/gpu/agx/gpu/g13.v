@@ -281,7 +281,7 @@ pub mut:
 	completion_result_ready bool
 }
 
-enum G13ContextRetirement { fresh pending complete }
+enum G13ContextRetirement { fresh queued pending complete }
 
 pub struct G13QueueResources {
 pub:
@@ -303,6 +303,7 @@ mut:
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
 	context_retirement G13ContextRetirement
+	context_next       &G13QueueResources = unsafe { nil }
 	quarantined        bool
 	released           bool
 }
@@ -940,7 +941,7 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 	if resources.released {
 		return true
 	}
-	if invalidate && (!mgr.invalidate_g13_context_locked(mut resources)
+	if invalidate && (!mgr.defer_g13_context_locked(mut resources)
 		|| !mgr.invalidate_g13_queue_mappings_locked(mut resources)) {
 		return false
 	}
@@ -2930,8 +2931,12 @@ fn (mgr &GpuManager) g13_queue_dispatch_blocked_locked(resources &G13QueueResour
 
 // Caller holds the manager lock during shutdown.
 fn (mut mgr GpuManager) release_all_g13_queue_resources() {
+	// Firmware has stopped. Drop the deferred list before bypassing retirement.
+	mgr.g13_context_head = unsafe { nil }
+	mgr.g13_context_tail = unsafe { nil }
 	for index := mgr.g13_queues.len - 1; index >= 0; index-- {
 		mut resources := unsafe { mgr.g13_queues[index] }
+		resources.context_next = unsafe { nil }
 		mgr.free_g13_queue_resources_locked(mut resources, false)
 	}
 	mgr.g13_queues.clear()

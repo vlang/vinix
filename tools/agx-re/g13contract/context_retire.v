@@ -20,7 +20,7 @@ fn check_context_retire_local(wire string, garbage string, queues string) ! {
 	require(!retire.contains('.gc()') && !retire.contains('= .fresh'), 'Failure cannot collect later garbage or reset published retirement')!
 	require(queues.contains('context_retirement G13ContextRetirement'), 'Queue owns one scalar retirement state')!
 	free := section(queues, 'fn (mut mgr GpuManager) free_g13_queue_resources_locked(', '\n}\n', 'Queue lifetime gate')!
-	require_order(free, ['if resources.released', 'if invalidate && (!mgr.invalidate_g13_context_locked(mut resources)',
+	require_order(free, ['if resources.released', 'if invalidate && (!mgr.defer_g13_context_locked(mut resources)',
 		'|| !mgr.invalidate_g13_queue_mappings_locked(mut resources)', 'return false', 'resources.released = true',
 		'mgr.free_shared_buffer(mut resources.context)'], 'Context acknowledgement precedes UAT invalidation and backing release')!
 }

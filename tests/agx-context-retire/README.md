@@ -44,3 +44,9 @@ archive. After commit, `--bind STATE COMMIT` checks exact paths and bytes;
 
 See [the report](../../docs/m1-agx-context-retire.md) for retained evidence,
 conservative published-failure retention and remaining scheduling/parity gaps.
+
+The current runner also exercises the [deferred scheduling tests](../agx-context-defer/README.md):
+normal release requests queue retirement, and the modeled allocator borrow
+drains it before cleanup retries. The original C checker and evidence helper
+above retain their original baseline/current artifact contracts; use the
+deferred scheduling check/evidence helper for the newer increment.

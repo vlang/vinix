@@ -6,10 +6,12 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [acknowledged G13 context retirement](m1-agx-context-retire.md)
-(2026-11-17). Normal queue teardown waits for DestroyContext before UAT cleanup,
-collects captured garbage once and retains ambiguous published failures until
-stopped teardown. Asahi's deferred invalidation scheduling remains different.
+Latest offline increment: [deferred G13 context invalidation](m1-agx-context-defer.md)
+(2026-11-17). Retirement requests now queue in release order; the next allocator
+borrow drains a detached snapshot before heap GC. Vinix still retains the whole
+queue graph/VM through acknowledgement and UAT cleanup, while Asahi retains its
+context object alone. The [acknowledged context retirement](m1-agx-context-retire.md)
+report retains the earlier command, retry and captured-prefix evidence.
 The [deferred private collection during teardown](m1-agx-teardown-gc.md) report
 retains the earlier private-range policy and its evidence. Initialization and
 stopped cleanup retain explicit drains. The [unpublished reservation cancellation](m1-agx-heap-cancel.md)

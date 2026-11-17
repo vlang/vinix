@@ -5,6 +5,46 @@ import gpu.agx.fw
 import aarch64.timer
 import katomic
 
+// Caller holds mgr.lock. The manager/file owners retain every queued object,
+// its mapped context and VM until retirement and UAT cleanup both finish.
+fn (mut mgr GpuManager) append_g13_context_locked(mut resources G13QueueResources) {
+	resources.context_next = unsafe { nil }
+	if mgr.g13_context_tail == unsafe { nil } {
+		mgr.g13_context_head = &resources
+	} else {
+		mgr.g13_context_tail.context_next = &resources
+	}
+	mgr.g13_context_tail = &resources
+}
+
+fn (mut mgr GpuManager) defer_g13_context_locked(mut resources G13QueueResources) bool {
+	if resources.context_retirement == .complete { return true }
+	if resources.context_retirement == .fresh {
+		resources.context_retirement = .queued
+		mgr.append_g13_context_locked(mut resources)
+	}
+	return false
+}
+
+// Match Asahi's swap-before-drain policy: process the release-order snapshot
+// before borrowing an allocator. Unpublished failures remain queued for a
+// later borrow. Published failures remain quarantined and cannot be replayed.
+fn (mut mgr GpuManager) collect_g13_context_garbage_locked() {
+	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13 { return }
+	mut current := mgr.g13_context_head
+	mgr.g13_context_head = unsafe { nil }
+	mgr.g13_context_tail = unsafe { nil }
+	for current != unsafe { nil } {
+		mut resources := current
+		current = resources.context_next
+		resources.context_next = unsafe { nil }
+		if !mgr.invalidate_g13_context_locked(mut resources)
+			&& resources.context_retirement == .queued {
+			mgr.append_g13_context_locked(mut resources)
+		}
+	}
+}
+
 // Caller holds mgr.lock and has excluded every queue user. Keep the context
 // mapped through DestroyContext acknowledgement. A published failure is never
 // replayed: firmware may have consumed it and recycled its context IDs. Such a

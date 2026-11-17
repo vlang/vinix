@@ -15,5 +15,5 @@ fn test_context_acknowledgement_gates_unmapping_and_snapshot_collection() {
 		'resources.context_retirement = .pending', 'mgr.g13_private.collect_garbage(private_count)'] {
 		if _ := check_context_retire_local(wire, garbage.replace(token, ''), queues) { assert false, token }
 	}
-	if _ := check_context_retire_local(wire, garbage, queues.replace('!mgr.invalidate_g13_context_locked(mut resources)\n\t\t|| ', '')) { assert false }
+	if _ := check_context_retire_local(wire, garbage, queues.replace('!mgr.defer_g13_context_locked(mut resources)\n\t\t|| ', '')) { assert false }
 }

@@ -95,5 +95,5 @@ fn (manager &GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext
 fn (manager &GpuManager) invalidate_g13_tpc_locked(mut context mmu.UatContext, _ &TailCache) bool { return context.active && !manager.teardown_refuse }
 fn (manager &GpuManager) invalidate_g13_shared_buffer(mut buffer SharedBuffer) bool { if manager.teardown_refuse { return false }; buffer.mapped = false; return true }
 fn (manager &GpuManager) invalidate_g13_queue_mappings_locked(mut resources G13QueueResources) bool { return !resources.released && !manager.teardown_refuse }
-fn (manager &GpuManager) invalidate_g13_context_locked(mut resources G13QueueResources) bool { return !resources.released && !manager.teardown_refuse }
+fn (manager &GpuManager) defer_g13_context_locked(mut resources G13QueueResources) bool { return !resources.released && !manager.teardown_refuse }
 struct OwnedBuffer { class int record &alloc.Allocation }
