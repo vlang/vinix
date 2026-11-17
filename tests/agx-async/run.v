@@ -13,8 +13,8 @@ fn main() {
 	mut measure := ''
 	mut arg := 1
 	for arg < os.args.len {
-		if os.args[arg] in ['--measure-modern-sync', '--measure-zero-sync', '--measure-large-sync', '--measure-chain'] { measure = os.args[arg]; arg++; continue }
-		assert os.args[arg] in ['--file-source', '--pending-source', '--timestamp-source', '--modern-source', '--modern-sync-source', '--sync-storage-source'] && arg + 1 < os.args.len
+		if os.args[arg] in ['--measure-modern-sync', '--measure-zero-sync', '--measure-large-sync', '--measure-chain', '--measure-dependencies', '--trace-dependencies', '--dependency-copy-only'] { measure = os.args[arg]; arg++; continue }
+		assert os.args[arg] in ['--file-source', '--pending-source', '--timestamp-source', '--modern-source', '--modern-sync-source', '--sync-storage-source', '--dependency-source'] && arg + 1 < os.args.len
 		overrides[os.args[arg]] = os.args[arg + 1]; arg += 2
 	}
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
@@ -38,10 +38,11 @@ fn main() {
 	for path in ['drm/ioctl', 'drm/asahi', 'gpu/agx/packet', 'gpu/agx/command', 'gpu/agx/compute', 'gpu/agx/render',
 		'gpu/agx/submission'] {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
-		if path == 'gpu/agx/submission' && ('--modern-sync-source' in overrides || '--sync-storage-source' in overrides) {
+		if path == 'gpu/agx/submission' {
 			os.cp_all(repo + '/kernel/' + path, scratch + '/' + path, false)!
 			if '--modern-sync-source' in overrides { os.cp(overrides['--modern-sync-source'], scratch + '/' + path + '/modern.v')! }
 			if '--sync-storage-source' in overrides { os.cp(overrides['--sync-storage-source'], scratch + '/' + path + '/sync_storage.v')! }
+			if '--dependency-source' in overrides { os.cp(overrides['--dependency-source'], scratch + '/' + path + '/dependencies.v')! }
 		} else { os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')! }
 	}
 	source := os.read_file(overrides['--file-source'] or { repo + '/kernel/gpu/agx/file/file.v' })!
@@ -55,6 +56,8 @@ fn main() {
 	os.cp(repo + '/tests/agx-sync-zero/checks.v', scratch + '/gpu/agx/file/zero_checks.v')!
 	os.cp(repo + '/tests/agx-sync-storage/checks.v', scratch + '/gpu/agx/file/sync_storage_checks.v')!
 	os.cp(repo + '/tests/drm-timeline-chain/modern_checks.v', scratch + '/gpu/agx/file/timeline_checks.v')!
+	os.cp(repo + '/tests/agx-job-dependencies/checks.v', scratch + '/gpu/agx/file/dependency_checks.v')!
+	os.cp(repo + '/tests/agx-job-dependencies/copy.v', scratch + '/gpu/agx/submission/dependency_checks.v')!
 	os.cp(repo + '/tests/agx-queue-records/stats_darwin.c.v', scratch + '/gpu/agx/file/stats_darwin.c.v')!
 	os.cp(overrides['--pending-source'] or { repo + '/kernel/gpu/agx/file/pending.v' }, '${scratch}/gpu/agx/file/pending.v')!
 	os.cp('${repo}/kernel/gpu/agx/file/timestamps.v', '${scratch}/gpu/agx/file/timestamp_capture_production.v')!
@@ -69,13 +72,16 @@ fn main() {
 		section(g13, 'pub fn (mut mgr GpuManager) g13_queue_dispatch_blocked(', '// Caller holds the manager lock during shutdown.')! +
 		section(errors, 'pub struct G13JobError {', 'fn g13_error_at_stamp(')!)!
 	os.write_file('${scratch}/main.v', if measure == '--measure-modern-sync' { 'import gpu.agx.file\nfn main() { file.measure_modern_syncs() }\n' }
+		else if measure == '--measure-dependencies' { 'import gpu.agx.file\nfn main() { file.measure_job_dependencies() }\n' }
+		else if measure == '--trace-dependencies' { 'import gpu.agx.submission\nfn main() { submission.trace_job_dependencies() }\n' }
+		else if measure == '--dependency-copy-only' { 'import gpu.agx.submission\nfn main() { submission.check_dependency_matrix(false); submission.check_dynamic_dependencies() }\n' }
 		else if measure == '--measure-zero-sync' { 'import gpu.agx.file\nfn main() { file.measure_modern_zero_syncs() }\n' }
 		else if measure == '--measure-large-sync' { 'import gpu.agx.file\nfn main() { file.measure_large_syncs() }\n' }
 		else if measure == '--measure-chain' { 'import gpu.agx.file\nfn main() { file.measure_chain_reservations() }\n' }
-		else { 'import gpu.agx.file\nfn main() { file.run_modern_chain_checks(); file.run_large_sync_checks(); file.run_modern_zero_checks(); file.run_modern_submission_checks(); file.run_checks() }\n' })!
+		else { 'import gpu.agx.file\nfn main() { file.run_job_dependency_checks(); file.run_modern_chain_checks(); file.run_large_sync_checks(); file.run_modern_zero_checks(); file.run_modern_submission_checks(); file.run_checks() }\n' })!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut build_flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', '${scratch}|@vlib|@vmodules']
-	if measure == '' { build_flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
+	if measure == '' || measure == '--dependency-copy-only' { build_flags << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }
 	build_flags << ['-o', '${scratch}/test', '${scratch}/main.v']
 	build.set_args(build_flags)
 	build.run()

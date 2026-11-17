@@ -1432,7 +1432,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	mut state_manager := unsafe { manager }
 	status := state_manager.g13_submission_status()
 	if status != 0 { return status }
-	dependency_code, pending_inputs := agxsubmission.copy_sync_array(input_syncs)
+	dependency_code, pending_inputs := agxsubmission.copy_job_dependencies(input_syncs)
 	if dependency_code != 0 { return dependency_code }
 	mut dependencies_transferred := false
 	defer { if !dependencies_transferred { agxsubmission.release_sync_array(pending_inputs) } }
