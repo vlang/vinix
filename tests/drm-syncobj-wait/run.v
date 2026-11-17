@@ -59,6 +59,10 @@ fn main() {
 	os.cp(timeline_signal_source, scratch + '/drm/syncobj_timeline_signal.v')!
 	timeline_wait_source := os.getenv_opt('DRM_TIMELINE_WAIT_SOURCE') or { repo + '/kernel/drm/syncobj_timeline_wait.v' }
 	os.cp(timeline_wait_source, scratch + '/drm/syncobj_timeline_wait.v')!
+	for name in ['syncobj_find', 'syncobj_transfer'] {
+		source_path := os.getenv_opt('DRM_' + name.to_upper() + '_SOURCE') or { repo + '/kernel/drm/' + name + '.v' }
+		os.cp(source_path, scratch + '/drm/' + name + '.v')!
+	}
 	// Execute the native sync-array staging/publication functions without
 	// pulling unrelated render/compute decoding into this focused fixture.
 	submission := os.read_file('${repo}/kernel/gpu/agx/submission/submission.v')!
@@ -79,6 +83,7 @@ fn main() {
 	os.cp(repo + '/tests/drm-timeline-signal/lifetime.v', scratch + '/drm/syncobj/timeline_signal_lifetime.v')!
 	os.cp(repo + '/tests/drm-timeline-wait/checks.v', scratch + '/drm/timeline_wait_checks.v')!
 	os.cp(repo + '/tests/drm-timeline-wait/lifetime.v', scratch + '/drm/syncobj/timeline_wait_lifetime.v')!
+	os.cp(repo + '/tests/drm-binary-transfer/checks.v', scratch + '/drm/binary_transfer_checks.v')!
 	$if macos {
 		stats := os.read_file(repo + '/tests/agx-queue-records/stats_darwin.c.v')!
 		os.write_file(scratch + '/drm/stats_darwin.c.v', stats.replace('module file', 'module drm'))!
@@ -86,11 +91,11 @@ fn main() {
 	process_source := os.read_file('${repo}/kernel/proc/proc.v')!
 	os.write_file('${scratch}/proc/production.v', 'module proc\nimport katomic\n' +
 		section(process_source, 'pub fn pending_signals(', '// Read-mostly limits')!)!
-	os.write_file('${scratch}/main.v', 'import drm\nimport drm.syncobj\nimport os\nfn main() { if os.getenv("DRM_TIMELINE_WAIT_MEASURE") == "1" { drm.measure_timeline_wait_owners(); return }; if os.getenv("DRM_TIMELINE_SIGNAL_MEASURE") == "1" { drm.measure_timeline_signal_failures(); return }; if os.args.len > 1 && os.args[1] == "--timeline-wait-trace" { drm.run_timeline_wait_trace(); return }; if os.args.len > 1 && os.args[1] == "--query-trace" { syncobj.run_query_trace(); return }; if os.args.len > 1 && os.args[1] == "--timeline-signal-trace" { drm.run_timeline_signal_trace(); return }; drm.run_timeline_wait_checks(); drm.run_timeline_signal_checks(); drm.run_query_checks(); drm.run_chain_info_checks(); drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks(); drm.run_sync_file_info_checks(); drm.run_sync_file_deadline_checks(); drm.run_timeline_boundary_checks(); drm.run_export_reservation_checks(); drm.run_sync_lookup_checks() }\n')!
+	os.write_file('${scratch}/main.v', 'import drm\nimport drm.syncobj\nimport os\nfn main() { if os.getenv("DRM_BINARY_TRANSFER_MEASURE") == "1" { drm.measure_binary_transfer_owners(); return }; if os.args.len > 1 && os.args[1] == "--binary-transfer-trace" { drm.run_binary_transfer_trace(); return }; if os.getenv("DRM_TIMELINE_WAIT_MEASURE") == "1" { drm.measure_timeline_wait_owners(); return }; if os.getenv("DRM_TIMELINE_SIGNAL_MEASURE") == "1" { drm.measure_timeline_signal_failures(); return }; if os.args.len > 1 && os.args[1] == "--timeline-wait-trace" { drm.run_timeline_wait_trace(); return }; if os.args.len > 1 && os.args[1] == "--query-trace" { syncobj.run_query_trace(); return }; if os.args.len > 1 && os.args[1] == "--timeline-signal-trace" { drm.run_timeline_signal_trace(); return }; drm.run_binary_transfer_checks(); drm.run_timeline_wait_checks(); drm.run_timeline_signal_checks(); drm.run_query_checks(); drm.run_chain_info_checks(); drm.run_wait_checks(); drm.run_large_wait_checks(); drm.run_reset_checks(); drm.run_signal_checks(); drm.run_create_checks(); drm.run_namespace_checks(); drm.run_sharing_checks(); drm.run_sync_file_import_checks(); drm.run_sync_file_poll_checks(); drm.run_sync_file_info_checks(); drm.run_sync_file_deadline_checks(); drm.run_timeline_boundary_checks(); drm.run_export_reservation_checks(); drm.run_sync_lookup_checks() }\n')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut arguments := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules']
-	if os.getenv('DRM_TIMELINE_SIGNAL_MEASURE') != '1' && os.getenv('DRM_TIMELINE_WAIT_MEASURE') != '1' {
+	if os.getenv('DRM_TIMELINE_SIGNAL_MEASURE') != '1' && os.getenv('DRM_TIMELINE_WAIT_MEASURE') != '1' && os.getenv('DRM_BINARY_TRANSFER_MEASURE') != '1' {
 		arguments << ['-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined']
 	}
 	arguments << ['-o', '${scratch}/test', '${scratch}/main.v']

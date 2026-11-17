@@ -6,7 +6,14 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest increment: [generic DRM timeline WAIT](m1-agx-timeline-wait.md)
+Latest increment: [DRM transfers to binary syncobjs](m1-agx-binary-transfer.md)
+(2026-11-17). Source points transfer as stable fences, with submission waits and
+destination identity retained through name reuse. All 10,752 compared outcomes
+match pinned Linux. An explicit stack capture avoids V's implicit heap copy.
+Timeline-destination merging remains unsupported and the generic timeline
+capability stays disabled. Full driver/hardware parity remains incomplete.
+
+Preceding increment: [generic DRM timeline WAIT](m1-agx-timeline-wait.md)
 (2026-11-17). Initial point snapshots precede future-point registration;
 captured fences survive reset and name reuse. Every exit detaches borrowed
 captures before freeing storage. All 21,952 pinned Linux poll outcomes match.

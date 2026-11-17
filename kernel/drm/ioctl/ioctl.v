@@ -22,6 +22,7 @@ pub const drm_ioctl_syncobj_wait = u32(0xc3)
 pub const drm_ioctl_syncobj_reset = u32(0xc4)
 pub const drm_ioctl_syncobj_signal = u32(0xc5)
 pub const drm_ioctl_syncobj_timeline_wait = u32(0xca)
+pub const drm_ioctl_syncobj_transfer = u32(0xcc)
 pub const drm_ioctl_syncobj_query = u32(0xcb)
 pub const drm_ioctl_syncobj_timeline_signal = u32(0xcd)
 pub const drm_ioctl_mode_create_dumb = u32(0xb2)
@@ -182,6 +183,16 @@ pub mut:
 	points        u64
 	count_handles u32
 	flags         u32
+}
+
+pub struct DrmSyncobjTransfer {
+pub mut:
+	src_handle u32
+	dst_handle u32
+	src_point u64
+	dst_point u64
+	flags u32
+	pad u32
 }
 
 // include/uapi/drm/drm_mode.h. Keep the field order exact: libdrm builds the
