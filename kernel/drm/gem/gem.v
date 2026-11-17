@@ -24,6 +24,7 @@ pub mut:
 	name        string
 	pte_extra   u64 // identical cache attributes for kernel and user aliases
 	external    bool // host-visible aperture; never returned to the PMM
+	advice_dontneed bool // private BO advice; resident backing is not yet purgeable
 pub:
 	vm_private_identity u64 // zero: shareable; otherwise immutable owning VM identity
 }

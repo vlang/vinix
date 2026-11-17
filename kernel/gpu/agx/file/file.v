@@ -1680,5 +1680,6 @@ pub fn drm_ioctls() []drm.DrmIoctl {
 		drm.DrmIoctl{ cmd: asahi.queue_create, size: u32(sizeof(asahi.QueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_queue_create_handler, abi: modern_ioctl_abi, extensible: true },
 		drm.DrmIoctl{ cmd: asahi.queue_destroy, size: u32(sizeof(asahi.QueueDestroy)), direction: drm.ioctl_write, handler: modern_queue_destroy_handler, abi: modern_ioctl_abi, extensible: true },
 		drm.DrmIoctl{ cmd: asahi.submit, size: u32(sizeof(asahi.Submit)), direction: drm.ioctl_write, handler: modern_submit_handler, abi: modern_ioctl_abi, extensible: true },
+		drm.DrmIoctl{ cmd: asahi.gem_madvise, size: u32(sizeof(asahi.GemMadvise)), direction: drm.ioctl_write | drm.ioctl_read, handler: modern_gem_madvise_handler, abi: modern_ioctl_abi, extensible: true },
 	]
 }

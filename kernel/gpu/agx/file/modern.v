@@ -3,6 +3,7 @@ module file
 
 import drm
 import drm.asahi
+import drm.gem
 import drm.ioctl
 import gpu.agx.gpu
 import gpu.agx.params
@@ -119,6 +120,18 @@ pub fn (mut f GpuFile) ioctl_modern_gem_mmap_offset(data &asahi.GemMmapOffset) i
 	return code
 }
 
+pub fn (mut f GpuFile) ioctl_modern_gem_madvise(data &asahi.GemMadvise) int {
+	if data.pad != 0 || data.madv > 1 { return -22 }
+	f.lock.acquire()
+	object := f.objects.get_ref(data.handle) or { f.lock.release(); return -2 }
+	f.lock.release()
+	defer { gem.unref(object) }
+	retained := gem.advise_private(object, data.madv == 1) or { return -22 }
+	mut request := unsafe { data }
+	request.retained = retained
+	return 0
+}
+
 pub fn (mut f GpuFile) ioctl_modern_gem_bind_object(data &asahi.GemBindObject) int {
 	mut old := ioctl.DrmAsahiGemBindObject{
 		op:            data.op
@@ -226,6 +239,11 @@ fn modern_gem_create_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) i
 fn modern_gem_mmap_offset_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 	mut f := dispatch_abi(handle, dev, modern_ioctl_abi) or { return -19 }
 	return f.ioctl_modern_gem_mmap_offset(unsafe { &asahi.GemMmapOffset(data) })
+}
+
+fn modern_gem_madvise_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {
+	mut f := dispatch_abi(handle, dev, modern_ioctl_abi) or { return -19 }
+	return f.ioctl_modern_gem_madvise(unsafe { &asahi.GemMadvise(data) })
 }
 
 fn modern_gem_bind_object_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {

@@ -6,7 +6,14 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest correction: [independent fake AGX fence contexts](m1-agx-fake-fences.md)
+Latest increment: [GEM advice for resident private objects](m1-agx-gem-advice.md)
+(2026-11-17). The twelfth modern request records private-object advice, returns
+retained contents and preserves reference ownership across handle removal.
+All 20,480 resident transitions match the pinned shmem helper; sanitizer,
+retention and native-build checks pass. Purging/backing integration and full
+driver parity remain incomplete.
+
+Preceding correction: [independent fake AGX fence contexts](m1-agx-fake-fences.md)
 (2026-11-17). Fake workers can retire out of order even on one queue; each job
 now gets a unique context so merging preserves every pending dependency.
 Exhaustion unwinds acquired pins before output effects. Sanitized completion
@@ -294,7 +301,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 
 | Area | Vinix versus the packaged reference |
 | --- | --- |
-| Userspace ABI | Native G13 registers the legacy interface and eleven modern extensible operations, selected per file. Modern flat packets and combined syncs reach the scheduler. GEM_MADVISE is absent; complete modern request/sync/backing semantics and matched Mesa integration remain incomplete. |
+| Userspace ABI | Native G13 registers the legacy interface and twelve modern extensible operations, selected per file. Modern flat packets and combined syncs reach the scheduler. GEM_MADVISE records private-object advice with resident contents; complete request/sync/backing semantics and matched Mesa integration remain incomplete. |
 | Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. Whole-batch ring/event readiness and atomic publication are implemented. Native fences from the same queue are elided; other inputs wait for signaling independently of errno. Full scheduler-policy and timeline-chain equivalence remain unverified. |
 | Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
 | VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts; idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and physical-slot capacity still differ. |
@@ -304,7 +311,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Event publication capacity | Publication applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. Whole-batch readiness checks all three pipes before publication. Preparation grows beyond the inline 127 tickets through owned overflow blocks; it is no longer capped at 127. These selected contracts do not establish complete scheduler equivalence. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
 | VM binding | Vinix supports legacy single operations and modern strided batches, copied completely before mutation, with sequential-prefix error semantics. Contiguous/repeated backing, idle overlap replacement and range splitting are implemented. Busy-VM refusals, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
-| GEM and memory accounting | The reference registers GEM_MADVISE; Vinix does not. Shmem/scatter backing, purge advice, device/client accounting and full reservation-fence behavior remain different or unqualified. The reference's admission limits and creator-RSS attribution are enabled only for G17, so those limits are not a base-M1 blocker. |
+| GEM and memory accounting | Vinix records private-object GEM_MADVISE and reports resident contents. Purge/repopulation, shmem/scatter backing, device/client accounting and full reservation-fence behavior remain different or unqualified. The reference's admission limits and creator-RSS attribution are enabled only for G17, so those limits are not a base-M1 blocker. |
 | Timestamp UAPI | Registered modern SUBMIT now resolves compact per-command timestamp objects into all three engines. Capture, independent retirement and modern nanosecond GET_TIME are implemented. Native firmware execution and units still require hardware acceptance. |
 | M1 family | The native path configures base M1/t8103. The reference also supports t6000/t6001/t6002 M1 Pro/Max/Ultra, including clustering and multiple dies. |
 | Telemetry | Vinix drains auxiliary channels but does not expose the reference's full firmware statistics/debug interface. |

@@ -1,6 +1,8 @@
 @[has_globals]
 module gem
 
+import klock
+
 __global live_objects = 0
 __global next_created_handle = u32(100)
 __global reject_create = false
@@ -19,6 +21,9 @@ pub mut:
 	owned bool
 	vm_private_identity u64
 	pte_extra u64
+	external bool
+	advice_dontneed bool
+	lock klock.Lock
 }
 
 pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool) ?&GemObject {

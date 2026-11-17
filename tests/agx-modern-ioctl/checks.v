@@ -18,8 +18,8 @@ fn check_modern_transport() {
 	device := drm.DrmDevice{ driver: unsafe { &driver } }
 	// Sizes and directions from the packaged header, independently of the
 	// old compatibility structs and the native table's declarations.
-	sizes := [u32(24), 16, 24, 8, 24, 24, 16, 40, 40, 8, 40]!
-	directions := [u32(1), 3, 3, 1, 1, 3, 3, 3, 3, 1, 1]!
+	sizes := [u32(24), 16, 24, 8, 24, 24, 16, 40, 40, 8, 40, 16]!
+	directions := [u32(1), 3, 3, 1, 1, 3, 3, 3, 3, 1, 1, 3]!
 	mut modern_entries := 0
 	for entry in driver.ioctls {
 		if entry.abi != modern_ioctl_abi { continue }
@@ -27,7 +27,7 @@ fn check_modern_transport() {
 		assert entry.direction == directions[modern_entries] && entry.extensible
 		modern_entries++
 	}
-	assert modern_entries == 11
+	assert modern_entries == 12
 	mut modern, mut legacy := GpuFile{}, GpuFile{}
 	file_map[0x1111] = unsafe { &modern }
 	file_map[0x2222] = unsafe { &legacy }
@@ -81,9 +81,10 @@ fn check_modern_transport() {
 	usercopy.configure(unsafe { u64(&mmap) }, sizeof(mmap), -1)
 	assert drm.invoke(&device, 0x1111, asahi.gem_mmap_offset, sizeof(mmap), 3, unsafe { voidptr(&mmap) }) == 0
 	assert mmap.offset == 0xabc000
-	// There is no pretend purge-advice handler in this increment.
+	// Advice now reaches the per-file handle lookup; zero is not a handle.
 	mut advice := asahi.GemMadvise{}
-	assert drm.invoke(&device, 0x1111, asahi.gem_madvise, sizeof(advice), 3, unsafe { voidptr(&advice) }) == -22
+	usercopy.configure(unsafe { u64(&advice) }, sizeof(advice), -1)
+	assert drm.invoke(&device, 0x1111, asahi.gem_madvise, sizeof(advice), 3, unsafe { voidptr(&advice) }) == -2
 	file_map.delete(0x1111)
 	file_map.delete(0x2222)
 	assert modern.close() && legacy.close()
@@ -152,6 +153,7 @@ pub fn run_modern_checks() {
 	check_modern_transport()
 	check_modern_binding()
 	check_modern_queue_and_object()
+	run_advice_checks()
 	run_modern_scs_checks()
 	assert params.timestamp_ns(24_000_003, 24_000_000) == 1_000_000_125
 	assert params.timestamp_ns(1_000_003, 1_000_000) == 1_000_003_000

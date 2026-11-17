@@ -10,7 +10,7 @@ fn section(source string, start string, end string) !string {
 fn checks() !int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--timestamp-source', '--gpu-source', '--modern-source'])
-		|| (os.args.len == 2 && os.args[1] in ['--record-measure', '--scs-measure'])
+		|| (os.args.len == 2 && os.args[1] in ['--record-measure', '--scs-measure', '--advice-measure', '--advice-trace'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-close-${os.getpid()}')
 	os.mkdir_all(scratch)!
@@ -47,6 +47,8 @@ fn checks() !int {
 		source[source.index('fn ioctl_get_params_handler(') or { panic('handlers') }..]
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp(if os.args.len == 3 && os.args[1] == '--modern-source' { os.args[2] } else { repo + '/kernel/gpu/agx/file/modern.v' }, scratch + '/gpu/agx/file/modern.v')!
+	os.cp(os.getenv_opt('AGX_MADVISE_SOURCE') or { repo + '/kernel/drm/gem/advice.v' }, scratch + '/drm/gem/advice.v')!
+	os.cp(repo + '/tests/agx-gem-advice/checks.v', scratch + '/gpu/agx/file/advice_checks.v')!
 	for name in ['backend.v', 'checks.v'] { os.cp(repo + '/tests/agx-modern-ioctl/' + name, scratch + '/gpu/agx/file/modern_' + name)! }
 	os.cp(repo + '/tests/agx-queue-scs/checks.v', scratch + '/gpu/agx/file/scs_checks.v')!
 	os.mkdir_all(scratch + '/aarch64/timer')!
@@ -87,7 +89,7 @@ fn checks() !int {
 	for name in ['queue_records.v', 'stats_darwin.c.v'] { os.cp(repo + '/tests/agx-queue-records/' + name, scratch + '/gpu/agx/file/' + name)! }
 	os.cp(repo + '/tests/agx-workqueue-records/file_records.v', scratch + '/gpu/agx/file/logical_records.v')!
 	if os.args.len == 2 { os.write_file(scratch + '/main.v', 'import gpu.agx.file\nfn main() { file.' +
-		if os.args[1] == '--scs-measure' { 'measure_scs_rejection()' } else { 'measure_queue_records()' } + ' }\n')! }
+		if os.args[1] == '--scs-measure' { 'measure_scs_rejection()' } else if os.args[1] == '--advice-measure' { 'measure_advice()' } else if os.args[1] == '--advice-trace' { 'trace_advice()' } else { 'measure_queue_records()' } + ' }\n')! }
 	else { os.cp('${repo}/tests/agx-file-close/test.v', '${scratch}/main.v')! }
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
 	mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-d', 'queue_records_sanitized', '-cc', 'cc', '-enable-globals',

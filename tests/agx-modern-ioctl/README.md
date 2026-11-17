@@ -1,11 +1,16 @@
 # Modern native Asahi ioctl entry points
 
-The native driver registers the legacy Mesa interface and eleven modern
+The native driver registers the legacy Mesa interface and twelve modern
 operations from the packaged Linux-Aurora header. The first driver request
 that reaches a handler selects its file's dialect, including when that handler
 returns an error. Generic DRM operations do not select a dialect. Canonical
 GET_PARAMS requests distinguish the formats by their size/direction. Selection
 is serialized per file; construction of the file is serialized by the registry.
+
+The twelfth operation is [private-object GEM advice](../agx-gem-advice/README.md).
+It records advice and reports retained resident backing; purge/repopulation and
+full shmem integration remain open. Its maintained runner adds advice ownership,
+copy-fault, resident-state reference comparisons and allocation checks.
 
 Run the production node/table/adapter and mapping cases with
 `v run tests/agx-file-close/run.v`. Run the actual modern packet-to-pending
