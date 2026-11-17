@@ -66,8 +66,11 @@ host bundle, compiler/LLVM/SDK/image namespaces and all historical prerequisites
 remain required. No historical directory entry is changed. Keep complete audit
 bundles outside Git with typed inventories and checksums.
 
-This additive tool keeps required host receipts at format 11 and does not change
-sandbox permissions. Mandatory directory-name integration remains separate.
+The standalone CLI keeps its format-1 receipt and original format-11 audit
+contract. Required [format-12 host receipts](wine-host-required-check.md)
+separately use its reader to pin declared directory names. No sandbox permission
+is added. The required snapshot is sealed after final host output names exist;
+subsequent qualification outputs must not change observed input-directory names.
 Directory names do not establish child content, complete search/absence closure,
 exception-tree coverage, loader/toolchain closure, owned ARM/GUI acceptance,
 redistribution or default activation.

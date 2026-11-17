@@ -16,6 +16,7 @@ import tests.packages.winemetaimages
 import tests.packages.winequeryhost
 import tests.packages.winexattr
 import tests.packages.winelinkxattrhost
+import tests.packages.winedircontenthost
 
 $if macos {
 	#include <dlfcn.h>
@@ -35,7 +36,7 @@ struct Execution {
 }
 
 struct Proof {
-	format int = 6
+	format int = 7
 	recorded_directory string
 	builder string
 	archive_sha256 string
@@ -306,7 +307,18 @@ pub fn finish(host string, builder string) ! {
 	os.write_file(directory + '/receipt.json', json2.encode(Proof{recorded_directory: host, builder: builder,
 		archive_sha256: digest(host + '/link-inputs.tar')!, output_sha256: digest(host + '/program')!,
 		policy: policy, directories: dirs, metadata: metadata, capabilities: caps, loads: winemacholink.loads(text, archive)!, images: images}) + '\n')!
-	admit(host, host, builder)!
+}
+
+// Run after every host output name is present, before the outer output pins.
+pub fn seal_directories(host string) ! {
+	directory := host + '/read-closed'
+	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!
+	baseline := json2.decode[winehostimages.Baseline](record(host + '/logs/macho-images-before.json')!)!
+	caps := capabilities(archive, directory, baseline)!
+	dirs := winedirclosure.directories(caps.keys())!
+	path := directory + '/directory-content.json'
+	os.write_file(path, '')!
+	os.write_file(path, winedircontenthost.capture(dirs, host)!)!
 }
 
 // Called after mandatory Mach-O image admission. The enclosing host verifier
@@ -323,7 +335,7 @@ pub fn admit(host string, recorded string, builder string) ! {
 	policy := winequeryhost.policy(query, caps.keys(), extra)!
 	dirs := winedirclosure.directories(caps.keys())!
 	metadata := winemetaclosure.paths(caps.keys(), extra)!
-	if proof.format != 6 || proof.recorded_directory != recorded || proof.builder != builder
+	if proof.format != 7 || proof.recorded_directory != recorded || proof.builder != builder
 		|| proof.directories != dirs || proof.metadata != metadata
 		|| proof.capabilities != caps || proof.policy != policy || record(directory + '/policy.sb')! != policy {
 		return error('read-closed capability declaration differs')
@@ -347,6 +359,7 @@ pub fn admit(host string, recorded string, builder string) ! {
 		return error('read-closed native xattr content differs')
 	}
 	winelinkxattrhost.admit(directory + '/link-xattr-content.json', aliases.links, recorded)!
+	winedircontenthost.admit(directory + '/directory-content.json', dirs, recorded)!
 	if proof.archive_sha256 != digest(host + '/link-inputs.tar')! || proof.output_sha256 != digest(host + '/program')! {
 		return error('read-closed host pins differ')
 	}
@@ -418,7 +431,7 @@ pub fn admit(host string, recorded string, builder string) ! {
 pub fn artifacts(host string) ![]string {
 	archive := winelink.parse(os.read_bytes(host + '/link-inputs.tar')!)!
 	mut names := ['receipt.json', 'policy.sb', 'uncaptured-object.o', 'replay/link-inputs/captured-program',
-		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker', 'metadata-aliases.json', 'xattr-content.json', 'link-xattr-content.json']
+		'replay/link-inputs/hidden-baseline', 'replay/link-inputs/hidden-response.txt', 'unlisted-directory/marker', 'metadata-aliases.json', 'xattr-content.json', 'link-xattr-content.json', 'directory-content.json']
 	for mode in modes { names << mode + '.exec.json' }
 	mut logs := ['captured-closed', 'hidden-unrestricted', 'hidden-closed', 'allowed-read', 'denied-read-0', 'denied-read-1', 'denied-read-2', 'denied-read-3',
 		'allowed-directory', 'denied-directory-0', 'denied-directory-1', 'denied-directory-2', 'allowed-metadata-0', 'allowed-metadata-1']

@@ -16,6 +16,7 @@ import tests.packages.winequeryprobe
 import tests.packages.winexattr
 import tests.packages.winelinkxattr
 import tests.packages.winelinkxattrhost
+import tests.packages.winedircontenthost
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -101,6 +102,8 @@ fn invoke(tool string, directory string, log string) !(int, string) {
 fn build_private(tool string, compiler string, directory string, log string) ! {
 	command := [tool, 'build', 'fixture', compiler, directory]
 	os.write_file(log + '.argv.json', json2.encode(command))!
+	os.write_file(log, '')!
+	os.write_file(log + '.exit.json', '')!
 	mut child := os.new_process(tool)
 	defer { child.close() }
 	child.set_args(command[1..]); child.set_redirect_stdio_merged(); child.run()
@@ -164,13 +167,39 @@ fn check() ! {
 		'query-counterfactual', 'query-output', 'query-temporary', 'old-query-format', 'old-query-replay-format',
 		'xattr-empty', 'xattr-omitted-target', 'xattr-extra-target', 'xattr-forged-value', 'xattr-linked', 'old-xattr-format', 'old-xattr-replay-format',
 		'link-xattr-empty', 'link-xattr-omitted', 'link-xattr-extra', 'link-xattr-value', 'link-xattr-body', 'link-xattr-linked',
-		'old-link-xattr-format', 'old-link-xattr-replay-format'] {
+		'old-link-xattr-format', 'old-link-xattr-replay-format',
+		'directory-content-empty', 'directory-content-omitted', 'directory-content-extra', 'directory-content-removed-name', 'directory-content-added-name', 'directory-content-linked',
+		'old-directory-content-format', 'old-directory-content-replay-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-link-xattr-format' {
+		if name == 'old-directory-content-format' {
+			proof.format = 11
+			expected = 'host build declaration differs'
+		} else if name == 'old-directory-content-replay-format' {
+			file := 'read-closed/receipt.json'
+			mut read := json2.decode[HostRead](os.read_file(dir + '/' + file)!)!
+			read.format = 6
+			os.write_file(dir + '/' + file, json2.encode(read))!; changed << file
+			expected = 'read-closed capability declaration differs'
+		} else if name == 'directory-content-linked' {
+			file := dir + '/read-closed/directory-content.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'read-closed directory content evidence must be bounded and ordinary'
+		} else if name.starts_with('directory-content-') {
+			file := 'read-closed/directory-content.json'
+			mut content := json2.decode[winedircontenthost.Content](os.read_file(dir + '/' + file)!)!
+			node := os.real_path(original + '/read-closed/replay/link-inputs')
+			if node !in content.directories || content.directories[node].len == 0 { return error('directory name fixture absent') }
+			if name == 'directory-content-omitted' { content.directories.delete(node) }
+			if name == 'directory-content-extra' { content.directories['/unlisted'] = []string{} }
+			if name == 'directory-content-removed-name' { content.directories[node] = []string{} }
+			if name == 'directory-content-added-name' { mut names := content.directories[node].clone(); names << 'unlisted'.bytes().hex(); names.sort(); content.directories[node] = names }
+			os.write_file(dir + '/' + file, if name == 'directory-content-empty' { '{}' } else { json2.encode(content) + '\n' })!; changed << file
+			expected = 'read-closed directory content differs'
+		} else if name == 'old-link-xattr-format' {
 			proof.format = 10
 			expected = 'host build declaration differs'
 		} else if name == 'old-link-xattr-replay-format' {
@@ -539,6 +568,12 @@ fn check() ! {
 	// Native mutations use a freshly built private namespace, never the caller's
 	// original graph or any historical input. Ordinary bytes stay unchanged.
 	private := out + '/native-fixture'
+	name_marker := out + '/private-name-marker'
+	os.write_file(name_marker, 'private name marker\n')!
+	// These result names are outputs of the checks, not changing directory inputs.
+	for name in ['xattr-live-file', 'xattr-live-directory', 'xattr-live-added', 'directory-live-added', 'directory-live-removed', 'directory-live-renamed'] {
+		for suffix in ['.log', '-restored.log'] { os.write_file(out + '/' + name + suffix, '')! }
+	}
 	original_proof := json2.decode[Proof](os.read_file(original + '/host-build.json')!)!
 	build_private(tool, original_proof.compiler, private, out + '/native-build.log')!
 	query := json2.decode[winequeryhost.Declaration](os.read_file(private + '/read-closed/query.json')!)!
@@ -562,6 +597,21 @@ fn check() ! {
 		if name != 'xattr-live-directory' && digest(path)! != before { return error('native mutation changed ordinary bytes') }
 		restored_code, _ := invoke(tool, private, out + '/' + name + '-restored.log')!
 		if restored_code != 0 { return error('restored native baseline refused') }
+		passed << name
+	}
+	for name in ['directory-live-added', 'directory-live-removed', 'directory-live-renamed'] {
+		backup := out + '/private-name-backup'
+		if name == 'directory-live-added' { os.write_file(out + '/private-added', '')! }
+		else if name == 'directory-live-removed' { os.rename(name_marker, os.dir(out) + '/saved-private-name')! }
+		else { os.rename(name_marker, backup)! }
+		status, text := invoke(tool, private, out + '/' + name + '.log')!
+		if name == 'directory-live-added' { os.rm(out + '/private-added')! }
+		else if name == 'directory-live-removed' { os.rename(os.dir(out) + '/saved-private-name', name_marker)! }
+		else { os.rename(backup, name_marker)! }
+		if status != 1 || !text.contains('read-closed directory content differs') { return error('live directory mutation did not reach named gate') }
+		if os.read_file(name_marker)! != 'private name marker\n' { return error('directory mutation changed ordinary bytes') }
+		restored, _ := invoke(tool, private, out + '/' + name + '-restored.log')!
+		if restored != 0 { return error('restored directory baseline refused') }
 		passed << name
 	}
 	// Exercise the same production projection/admission helper on private link
@@ -602,7 +652,7 @@ fn check() ! {
 		}
 	} $else { return error('native link controls require macOS') }
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline ninety-six exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline one hundred seven exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }

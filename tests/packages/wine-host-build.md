@@ -60,7 +60,7 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires ninety-six exact refusals. Cases cover omitted parsed
+then requires one hundred seven admission/control refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
@@ -99,11 +99,11 @@ linked evidence and old outer/inner formats. Four live controls exercise the
 production link admission helper on private nodes, changing values, names and
 bodies, then restoring admission without changing referenced file bytes.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 11
+The [required host receipt boundary](wine-host-required-check.md) uses format 12
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2/3/4/5/6/7/8/9/10 bundles and their original
+retainer also retains its own graph. Original format-1/2/3/4/5/6/7/8/9/10/11 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
@@ -212,6 +212,27 @@ Canonical serialization, original namespace and the 8 MiB host receipt bound
 are required. Copied evidence still rechecks original nodes. No extra policy
 permission is added. Other symlinks, OS-root/device exceptions, directory entry
 names, change-and-restore races and broader hermetic closure remain open.
+
+Format 12 adds inner replay format 7 and mandatory
+`read-closed/directory-content.json`. The independently reconstructed directory
+capability declaration determines the canonical deduplicated target set. The
+embedded/pinned `winedircontenthost` projection uses the unchanged qualified
+`winedircontent` reader to pin immediate names without following children.
+Canonical serialization, original namespace and an 8 MiB receipt bound are
+required. Copied graphs still check original directory names.
+
+The snapshot is sealed after all host output names exist, before outer output
+hashing and complete admission. The proof and native receipt names are reserved
+first; no unknown name is ignored or allowed as a runtime exception. Keep all
+observed input-directory names stable: initialize tool and role parent directories
+before building, and write subsequent qualification output into a preexisting
+sibling directory outside the observed set. New names in any observed ancestor
+correctly invalidate admission. The eight new receipt/format cases and three
+live add/remove/rename cases use real host admission. Together with earlier
+controls, 103 host admissions and four private production link-helper cases
+form the 107-case aggregate. All live name cases restore admission and preserve
+ordinary file bytes. No sandbox permission is added. Quiescent observations do
+not establish atomic snapshots or full search/absence and exception-tree closure.
 
 The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and

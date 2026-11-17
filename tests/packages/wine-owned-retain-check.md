@@ -45,12 +45,12 @@ resource controls with resealed native output maps, plus five
 [required host-receipt controls](wine-host-required-check.md). Mutated files are detached
 before writing. Prepared payloads are private copy-on-write clones on macOS,
 with ordinary copies as fallback; no mutation writes through a link to the baseline.
-The eighteen additional host-map cases omit producer/controller captured-link,
+The twenty additional host-map cases omit producer/controller captured-link,
 SDK graph, SDK-denied and ordinary data-read replay records, directory policies
-and metadata-image-alias/query/native-xattr/link-node graphs. Focused
+and metadata-image-alias/query/native-xattr/link-node/directory-name graphs. Focused
 `--host-link-only`, `--host-sdk-only`, `--host-sdk-denied-only` and
 `--host-read-only` modes each retain both baseline requirements.
-Four `--partition=N/4` runs cover the full 67-case matrix;
+Four `--partition=N/4` runs cover the full 69-case matrix;
 `wine-retention-partitions-check.v PREFIX` verifies exact disjoint coverage.
 
 The existing owned-receipt suite also binds the new shared helper and exercises
