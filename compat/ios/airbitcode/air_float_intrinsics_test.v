@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_float_names_slots_and_existing_evaluators() {
-	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2200
+	assert scalar_air_float_cache_base == 2168 && scalar_intrinsic_cache_slots == 2201
 	ids := [ScalarIntrinsic.fabs, .floor, .ceil, .trunc, .sqrt, .round, .rint]!
 	for i, name in ['air.fabs.f32', 'air.floor.f32', 'air.ceil.f32', 'air.trunc.f32', 'air.sqrt.f32', 'air.round.f32', 'air.rint.f32'] {
 		id, slot := air_float_intrinsic(name)!
@@ -35,7 +35,7 @@ fn test_air_float_fma_name_slot_and_ternary_identity() {
 	assert scalar_intrinsic_name('air.fma.f32')! == id && scalar_intrinsic_arity(id) == 3
 	assert !scalar_integer_intrinsic(id)
 	if _, _ := air_integer_intrinsic('air.fma.f32') { assert false }
-	for name in ['air.fma.f16','air.fma.f64','air.fma.v2f32','air.fma.i32','air.fma.f032','air.fma.f+32','air.fma.f32.spoof','air.fast_fma.f32','air.fmuladd.f32'] {
+	for name in ['air.fma.f64','air.fma.v2f32','air.fma.i32','air.fma.f032','air.fma.f+32','air.fma.f32.spoof','air.fast_fma.f32','air.fmuladd.f32'] {
 		if _ := scalar_intrinsic_name(name) { assert false, name }
 	}
 	assert scalar_fma(32, 0x3f800001, 0x3f7ffffe, 0xbf800000)! == 0xa8800000
@@ -61,7 +61,7 @@ fn air_half_unary_reference(id ScalarIntrinsic, raw u64) u64 {
  return sign | (u64(exponent + 15) << 10) | fraction
 }
 fn test_air_half_unary_names_cache_and_every_encoding() {
- assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2200
+ assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2201
  mut checks := 0
  for i, family in ['fabs','floor','ceil','trunc'] {
   name := 'air.${family}.f16'; id, slot := air_float_intrinsic(name)!
@@ -78,7 +78,7 @@ fn test_air_half_unary_names_cache_and_every_encoding() {
    if _ := scalar_intrinsic_name('air.${family}.${suffix}') { assert false }
   }
  }
- for family in ['fma','fmin','fmax','clamp','fast_fabs','fast_floor'] {
+ for family in ['fmin','fmax','clamp','fast_fabs','fast_floor'] {
   if _ := scalar_intrinsic_name('air.${family}.f16') { assert false }
  }
  assert checks == 262144
@@ -91,7 +91,7 @@ fn air_sqrt_half_units(raw u64) u64 {
  return if e == 0 { raw } else { (1024 + (raw & 1023)) << u32(e - 1) }
 }
 fn test_air_half_math_names_cache_and_every_encoding() {
- assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2200
+ assert scalar_air_half_float_cache_base == 2193 && scalar_intrinsic_cache_slots == 2201
  mut checks := 0
  for i, family in ['sqrt','round','rint'] {
   name := 'air.${family}.f16'; id, slot := air_float_intrinsic(name)!
@@ -129,4 +129,34 @@ fn test_air_half_math_names_cache_and_every_encoding() {
   assert scalar_intrinsic_value(.sqrt,32,raw|~u64(0xffffffff),0)! == expected
  }
  println('AIR-HALF-MATH: three exact identities, stable previous keys, 196608 independent rational/squared-midpoint checks across every binary16 encoding, high-bit masking and name/family guards PASS')
+}
+
+fn test_air_half_fma_identity_and_all_encoding_identities() {
+ id, slot := air_float_intrinsic('air.fma.f16')!
+ assert id == .fma && scalar_intrinsic_name('air.fma.f16')! == id && scalar_intrinsic_arity(id) == 3
+ assert scalar_air_float_cache_base + slot == 2200 && scalar_intrinsic_cache_slots == 2201
+ assert !scalar_integer_intrinsic(id)
+ old_id, old_slot := air_float_intrinsic('air.fma.f32')!
+ assert old_id == id && scalar_air_float_cache_base + old_slot == 2175
+ mut checks := 0
+ for raw in 0..65536 {
+  x := u64(raw); sign := x & 0x8000; expected := if x & 0x7fff > 0x7c00 { u64(0x7e00) } else { x }
+  // Multiplication by one and adding a matching signed zero are exact.
+  for triple in [[x,u64(0x3c00),sign]!,[u64(0x3c00),x,sign]!,[sign,u64(0x3c00),x]!]! {
+   assert scalar_fma(16,triple[0]|~u64(0xffff),triple[1]|~u64(0xffff),triple[2]|~u64(0xffff))! == expected
+   checks++
+  }
+ }
+ assert checks == 196608
+ for bits in [u32(16),32]! {
+  one := if bits==16 {u64(0x3c00)}else{u64(0x3f800000)}
+  assert scalar_fma(bits,0,one,one|~constant_mask(bits))! == one
+ }
+ assert scalar_fma(16,0x3c01,0x3bfe,0xbc00)! == 0x8010
+ assert scalar_fma(16,0x7bff,0x4000,0xfbff)! == 0x7bff
+ assert scalar_fma(16,1,0x3800,1)! == 2
+ for name in ['air.fma.f016','air.fma.f+16','air.fma.f16.spoof','air.fma.v2f16','air.fma.f64','air.fma.i16','air.fast_fma.f16','air.fmuladd.f16'] {
+  if _ := scalar_intrinsic_name(name) { assert false }
+ }
+ println('AIR-HALF-FMA: exact ternary identity, stable prior key, 196608 all-encoding identity/masking checks, half/float addend masking, fused cancellation/overflow/underflow and strict name/family guards PASS')
 }

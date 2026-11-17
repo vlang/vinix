@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_integer_intrinsic_identity() {
-	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2200
+	assert scalar_air_integer_cache_base == 2154 && scalar_intrinsic_cache_slots == 2201
 	for i, name in ['air.popcount.i32', 'air.reverse_bits.i32'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert slot == i && id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }
@@ -76,7 +76,7 @@ fn test_air_integer_extremum_identity() {
 }
 
 fn test_air_i64_bit_intrinsic_identity() {
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2200
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2201
 	for i, name in ['air.popcount.i64', 'air.reverse_bits.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == if i == 0 { ScalarIntrinsic.ctpop } else { ScalarIntrinsic.bitreverse }
@@ -99,7 +99,7 @@ fn test_air_i64_bit_intrinsic_identity() {
 
 fn test_air_i64_extremum_intrinsic_identity() {
 	ids := [ScalarIntrinsic.smin, .smax, .umin, .umax]!
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2200
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2201
 	for i, name in ['air.min.s.i64','air.max.s.i64','air.min.u.i64','air.max.u.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == ids[i] && scalar_air_integer_cache_base + slot == 2181 + i
@@ -115,7 +115,7 @@ fn test_air_i64_extremum_intrinsic_identity() {
 }
 
 fn test_air_i64_zero_count_intrinsic_identity() {
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2200
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2201
 	for i, name in ['air.clz.i64','air.ctz.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == if i == 0 { ScalarIntrinsic.ctlz } else { ScalarIntrinsic.cttz }
@@ -135,7 +135,7 @@ fn test_air_i64_zero_count_intrinsic_identity() {
 
 fn test_air_i64_saturating_intrinsic_identity() {
 	ids := [ScalarIntrinsic.sadd_sat, .ssub_sat, .uadd_sat, .usub_sat]!
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2200
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2201
 	for i, name in ['air.add_sat.s.i64','air.sub_sat.s.i64','air.add_sat.u.i64','air.sub_sat.u.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == ids[i] && scalar_air_integer_cache_base + slot == 2187 + i && scalar_integer_saturating(id)
@@ -157,7 +157,7 @@ fn test_air_i64_saturating_intrinsic_identity() {
 }
 
 fn test_air_i64_multiply_high_intrinsic_identity() {
-	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2200
+	assert scalar_air_i64_integer_cache_base == 2179 && scalar_intrinsic_cache_slots == 2201
 	for i, name in ['air.mul_hi.s.i64','air.mul_hi.u.i64'] {
 		id, slot := air_integer_intrinsic(name)!
 		assert id == if i == 0 { ScalarIntrinsic.smulh } else { ScalarIntrinsic.umulh }

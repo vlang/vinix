@@ -23,7 +23,7 @@ fn scalar_fma(bits u32, a u64, b u64, c u64) !u64 {
 	if x > inf || y > inf || z > inf || (x == inf && y == 0) || (y == inf && x == 0) { return nan }
 	if x == inf || y == inf { return if z == inf && product_sign != addend_sign { nan } else { product_sign | inf } }
 	if z == inf { return addend_sign | inf }
-	if x == 0 || y == 0 { return if z == 0 { product_sign & addend_sign } else { c } }
+	if x == 0 || y == 0 { return if z == 0 { product_sign & addend_sign } else { addend_sign | z } }
 	fraction_bits := if bits == 16 { 10 } else { 23 }; bias := if bits == 16 { 15 } else { 127 }
 	ac, ap := scalar_fma_coefficient(x, fraction_bits, bias)
 	bc, bp := scalar_fma_coefficient(y, fraction_bits, bias)
