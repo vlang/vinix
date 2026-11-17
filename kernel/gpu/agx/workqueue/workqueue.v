@@ -52,12 +52,13 @@ pub fn new_workqueue(id u32, vm_id u32, priority u32, caps u32) ?&WorkQueue {
 		return none
 	}
 
-	return &WorkQueue{
+	queue := &WorkQueue{
 		id:       id
 		vm_id:    vm_id
 		priority: priority
 		caps:     caps
-	}
+	} @[freed]
+	return queue
 }
 
 // Submit a work item to the queue. Returns the slot index on success,
@@ -153,7 +154,8 @@ pub fn (wq &WorkQueue) pending() u32 {
 	return wq.pending_count
 }
 
-// Destroy the work queue and free its ring buffer.
+// Cancel borrowed work items and clear the slots. The owner must stop new
+// submissions and completions before calling this; WorkItems remain borrowed.
 pub fn (mut wq WorkQueue) destroy() {
 	wq.lock.acquire()
 	defer {
@@ -177,4 +179,12 @@ pub fn (mut wq WorkQueue) destroy() {
 
 	wq.pending_count = 0
 
+}
+
+// Reclaim an exclusively owned record after destroy() has returned (including
+// its deferred unlock) and the last owner row has been removed. Async users
+// must have finished their last queue access before the owner calls this.
+pub fn free_workqueue(queue &WorkQueue) {
+	assert queue != unsafe { nil } && queue.pending_count == 0
+	unsafe { free(queue) }
 }

@@ -10,6 +10,9 @@ pub mut:
 	detached bool
 	destroyed bool
 	pooled bool
+	pending_count u32
+	heap_record bool
+	disposed bool
 }
 
 __global attempts = 0
@@ -31,4 +34,13 @@ pub fn (mut queue WorkQueue) destroy() {
 	assert !queue.destroyed
 	queue.destroyed = true
 	if queue.pooled { live-- }
+}
+
+// Older fixtures observe stack/pool objects after removal. New lifetime cases
+// use actual heap records and the extracted production metadata disposer.
+pub fn free_workqueue(queue &WorkQueue) {
+	mut owned := unsafe { queue }
+	assert owned.destroyed && !owned.disposed
+	owned.disposed = true
+	if owned.heap_record { free_workqueue_real(queue) }
 }

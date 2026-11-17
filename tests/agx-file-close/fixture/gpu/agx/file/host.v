@@ -188,5 +188,6 @@ pub fn run_checks() {
 	check_detached_vms()
 	check_orphaned_queues()
 	check_queue_record_reclamation()
+	check_logical_queue_records()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

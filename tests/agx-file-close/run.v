@@ -43,6 +43,9 @@ fn checks() !int {
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'fn discard_g13_completion(')!
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp('${repo}/kernel/gpu/agx/file/closing.v', '${scratch}/gpu/agx/file/closing.v')!
+	logical := os.read_file(repo + '/kernel/gpu/agx/workqueue/workqueue.v')!
+	assert logical.contains('\npub fn free_workqueue(')
+	os.write_file(scratch + '/gpu/agx/workqueue/dispose.v', 'module workqueue\npub fn free_workqueue_real(' + logical.all_after('\npub fn free_workqueue('))!
 	os.cp(if os.args.len == 3 && os.args[1] == '--timestamp-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/timestamps.v' }, '${scratch}/gpu/agx/file/timestamp_capture_production.v')!
 	gpu_source := os.read_file(if os.args.len == 3 && os.args[1] == '--gpu-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' })!
 	g13_source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
@@ -67,6 +70,7 @@ fn checks() !int {
 		section(priority, 'pub struct G13WorkQueuePriority {', '// QueueInfo for G13')! +
 		section(priority, 'pub fn g13_workqueue_priority(', 'pub fn initialize_g13_gpu_context(')!)!
 	for name in ['queue_records.v', 'stats_darwin.c.v'] { os.cp(repo + '/tests/agx-queue-records/' + name, scratch + '/gpu/agx/file/' + name)! }
+	os.cp(repo + '/tests/agx-workqueue-records/file_records.v', scratch + '/gpu/agx/file/logical_records.v')!
 	if os.args.len == 2 { os.write_file(scratch + '/main.v', 'import gpu.agx.file\nfn main() { file.measure_queue_records() }\n')! }
 	else { os.cp('${repo}/tests/agx-file-close/test.v', '${scratch}/main.v')! }
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })

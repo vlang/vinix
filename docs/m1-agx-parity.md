@@ -6,8 +6,14 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [final G13 queue-record reclamation](m1-agx-queue-records.md)
-(2026-11-17). Close and both file-owner reapers now reclaim released records
+Latest offline increment: [logical queue-record reclamation](m1-agx-workqueue-records.md)
+(2026-11-17). Native and fake file owners now free logical queue metadata after
+destruction returns and their owner rows are removed. Pending fake completions
+retain their file/VM pins through their last queue access. Host close retention
+falls from 10,000 records per 10,000 closes to zero. Native slab rates remain
+unmeasured. The [final G13 queue-record reclamation](m1-agx-queue-records.md) report
+retains the separate firmware-resource metadata fix and original evidence
+(2026-11-17). Close and both file-owner reapers reclaim released records
 after their last captures and ownership rows are gone. Mapping failures and
 manager absence retain metadata for retry. The [failed queue-constructor record reclamation](m1-agx-queue-unwind.md)
 report retains the separate unreturned-record fix and original evidence.

@@ -225,6 +225,11 @@ pub fn (mut f GpuFile) close() bool {
 		}
 	}
 	for mut q in f.queues { q.destroy() }
+	for index := f.queues.len - 1; index >= 0; index-- {
+		queue := f.queues[index]
+		f.queues.delete(index)
+		workqueue.free_workqueue(queue)
+	}
 	unsafe { f.queues.free() }
 	f.queues = []&workqueue.WorkQueue{}
 	if manager != unsafe { nil } {
@@ -1025,7 +1030,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 		g17_resources = gpu_manager.create_g17_queue_resources(id, f.owner_process_id, channel_mask, request.priority) or {
 			mut queue := unsafe { wq }
 			queue.destroy()
-			unsafe { free(queue) }
+			workqueue.free_workqueue(queue)
 			return -12
 		}
 	} else if manager.hw_config.gpu_gen == .g13 {
@@ -1048,7 +1053,7 @@ pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
 			}
 			mut queue := unsafe { wq }
 			queue.destroy()
-			unsafe { free(queue) }
+			workqueue.free_workqueue(queue)
 			return -12
 		}
 	}
@@ -1090,6 +1095,7 @@ fn (mut f GpuFile) reap_detached_g13_queues_locked() {
 		q.destroy()
 		f.queues.delete(i)
 		f.g13_queues.delete(owner_index)
+		workqueue.free_workqueue(q)
 		gpu.free_g13_queue_record(ownership.resources)
 	}
 }
@@ -1176,6 +1182,7 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 				gpu_manager.release_g17_queue_resources(resources)
 			}
 			q.destroy()
+			record := unsafe { q }
 			f.queues.delete(i)
 			if g17_index >= 0 {
 				f.g17_queues.delete(g17_index)
@@ -1183,6 +1190,7 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 			if g13_index >= 0 {
 				f.g13_queues.delete(g13_index)
 			}
+			workqueue.free_workqueue(record)
 			f.lock.release()
 			return 0
 		}

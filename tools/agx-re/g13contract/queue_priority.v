@@ -17,11 +17,11 @@ fn check_queue_priority_local(file string, ioctl string, gpu string) ! {
 		'gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm)',
 		'gpu_manager.retained_g13_queue_resources(id, vm)',
 		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: retained }',
-		'queue.destroy()', 'unsafe { free(queue) }', 'return -12',
+		'queue.destroy()', 'workqueue.free_workqueue(queue)', 'return -12',
 		'f.queues << wq', 'request.queue_id = id'], 'Vinix G13 priority and VM borrow lifetime')!
 	require(create.count('f.lock.acquire()') == 1 && create.count('f.lock.release()') == 1,
 		'Queue creation must hold one file lock through VM borrow and publication')!
-	require(create.count('unsafe { free(queue) }') == 2, 'Both unpublished logical queue failure paths must free metadata')!
+	require(create.count('workqueue.free_workqueue(queue)') == 2, 'Both unpublished logical queue failure paths must free metadata')!
 	allocator := section(file, 'fn (mut f GpuFile) allocate_queue_id_locked(',
 		'fn (mut f GpuFile) allocate_timestamp_id_locked(', 'Vinix retained queue ID reservation')!
 	require_order(allocator, ['for ownership in f.g13_queues {',

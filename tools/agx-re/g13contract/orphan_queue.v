@@ -20,7 +20,7 @@ fn check_orphan_queue_local(file string, gpu string, worker string) ! {
 	require_order(create, ['f.lock.acquire()', 'defer { f.lock.release() }',
 		'gpu_manager.retained_g13_queue_resources(id, vm)',
 		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: retained }',
-		'queue.destroy()', 'unsafe { free(queue) }', 'return -12', 'f.queues << wq'], 'Construction adoption and successful publication stay under the same file lock')!
+		'queue.destroy()', 'workqueue.free_workqueue(queue)', 'return -12', 'f.queues << wq'], 'Construction adoption and successful publication stay under the same file lock')!
 	manager := section(gpu, 'pub fn (mut mgr GpuManager) release_g13_queue_resources(', '// Quarantined backing must retire', 'Existing physical release gates')!
 	require_order(manager, ['mgr.lock.acquire()', 'if owned.has_file_references()',
 		'for job in mgr.g13_render_jobs', 'for job in mgr.g13_compute_jobs',

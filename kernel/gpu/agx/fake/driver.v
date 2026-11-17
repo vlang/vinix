@@ -125,10 +125,15 @@ fn (mut file FakeG17File) finish_close_locked() {
 	if file.closed {
 		return
 	}
+	assert file.inflight_jobs == 0
 	for mut queue in file.queues {
 		queue.destroy()
 	}
-	file.queues.clear()
+	for index := file.queues.len - 1; index >= 0; index-- {
+		queue := file.queues[index]
+		file.queues.delete(index)
+		workqueue.free_workqueue(queue)
+	}
 	for mut vm in file.vms {
 		vm.destroy()
 	}
@@ -518,7 +523,9 @@ fn (mut file FakeG17File) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) 
 				return -16
 			}
 			queue.destroy()
+			record := unsafe { queue }
 			file.queues.delete(index)
+			workqueue.free_workqueue(record)
 			file.lock.release()
 			return 0
 		}
