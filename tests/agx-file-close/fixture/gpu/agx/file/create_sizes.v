@@ -15,7 +15,7 @@ fn check_create_sizes() {
 	mut cases := 0
 	for _ in 0 .. 200 {
 		mut pt := pgtable.UatPgtable{}
-		mut vm := mmu.UatContext{ id: 1, identity: mmu.new_identity(), pgtable: unsafe { &pt } }
+		mut vm := mmu.UatContext{ id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: unsafe { &pt } }
 		mut file := GpuFile{ vms: [unsafe { &vm }] }
 		for flags in [u32(0), ioctl.asahi_gem_writeback, ioctl.asahi_gem_vm_private,
 			ioctl.asahi_gem_writeback | ioctl.asahi_gem_vm_private]! {

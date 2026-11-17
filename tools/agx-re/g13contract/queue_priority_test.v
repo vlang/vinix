@@ -13,7 +13,7 @@ fn test_priority_conversion_and_retained_failure_ownership_reject_drift() {
 		'if manager.hw_config.gpu_gen == .g13 && request.priority > ioctl.asahi_priority_medium { return -22 }',
 		'if ownership.vm_id == vm_id { retained = true; break }',
 		'if ownership.queue_id == candidate {',
-		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: retained }',
+		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }',
 		'workqueue.free_workqueue(queue)'] {
 		if _ := check_queue_priority_local(file.replace(token, ''), ioctl, gpu) { assert false, token }
 	}

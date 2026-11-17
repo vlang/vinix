@@ -6,7 +6,7 @@ fn test_vm_detach_guards_require_hidden_names_and_retained_physical_owners() {
 	file := read(g13layout.repo_root() + '/kernel/gpu/agx/file/file.v')!
 	check_vm_detach_local(file)!
 	for token in ['f.detached_vms[ctx.id] = false', 'f.detached_vms[vm.id] = true',
-		'vm_id < mmu.uat_num_contexts && f.detached_vms[vm_id]', 'if retained { continue }',
+		'vm.vm_id == vm_id', '!f.detached_vms[vm.id]', 'if retained { continue }',
 		'if !f.cleanup_closed_mappings_locked(vm_id) { continue }', 'f.vms.delete(index)',
 		'f.detached_vms[vm_id] = false', 'owned.reap_detached_vms_locked()',
 		'!f.detached_vms[vm_id] && !mapping.retiring', 'ctx := f.find_owned_vm(mapping.vm_id)',

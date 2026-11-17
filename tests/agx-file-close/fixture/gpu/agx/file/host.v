@@ -93,8 +93,8 @@ pub fn run_checks() {
 	mut queue_a := gpu.G13QueueResources{ failures: 1 }
 	mut queue_b := gpu.G13QueueResources{ failures: 1 }
 	mut pt := pgtable.UatPgtable{}
-	mut vm_a := mmu.UatContext{ id: 1, pgtable: &pt, queue: &queue_a }
-	mut vm_b := mmu.UatContext{ id: 2, queue: &queue_b }
+	mut vm_a := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &pt, queue: &queue_a }
+	mut vm_b := mmu.UatContext{ id: 2, vm_id: 2, queue: &queue_b }
 	mut logical := workqueue.WorkQueue{}
 	mut mapped := gem.GemObject{}
 	mut timestamp := gem.GemObject{}

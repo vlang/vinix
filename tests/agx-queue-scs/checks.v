@@ -36,7 +36,7 @@ pub fn measure_scs_rejection() {
 		defer { uat_mgr = unsafe { nil } }
 		gpu.available(true)
 		gpu.set_running(true)
-		mut vm := mmu.UatContext{ id: 1 }
+		mut vm := mmu.UatContext{ id: 1, vm_id: 1 }
 		mut file := GpuFile{ vms: [unsafe { &vm }] }
 		file.queues.flags |= .noslices
 		file.g13_queues.flags |= .noslices
@@ -90,7 +90,7 @@ pub fn run_modern_scs_checks() {
 		for layout in [[u64(1), 0]!, [u64(0), ~u64(0)]!, [~u64(0), ~u64(0)]!] {
 			for mode in 0 .. 10 {
 				mut pt := pgtable.UatPgtable{}
-				mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
+				mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
 				mut file := GpuFile{ vms: [unsafe { &vm }] }
 				file.queues.flags |= .noslices
 				file.g13_queues.flags |= .noslices

@@ -13,10 +13,10 @@ fn check_queue_priority_local(file string, ioctl string, gpu string) ! {
 		'ioctl.asahi_priority_realtime - request.priority', '} else { request.priority }',
 		'f.lock.acquire()', 'defer { f.lock.release() }', 'vm := f.find_vm(request.vm_id)',
 		'id := f.allocate_queue_id_locked()',
-		'workqueue.new_workqueue(id, request.vm_id, firmware_priority, request.queue_caps)',
+		'workqueue.new_workqueue(id, vm.id, firmware_priority, request.queue_caps)',
 		'gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm)',
 		'gpu_manager.retained_g13_queue_resources(id, vm)',
-		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: retained }',
+		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }',
 		'queue.destroy()', 'workqueue.free_workqueue(queue)', 'return -12',
 		'f.queues << wq', 'request.queue_id = id'], 'Vinix G13 priority and VM borrow lifetime')!
 	require(create.count('f.lock.acquire()') == 1 && create.count('f.lock.release()') == 1,

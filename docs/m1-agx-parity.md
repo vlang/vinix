@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Native VM IDs now belong to the open DRM file. A detached name can be reused
+while an old queue retains its hardware context. [VM names](m1-agx-vm-names.md)
+
 Native VM creation now allocates one 16 KiB page of backing for the dummy UAT
 mapping. [Dummy page backing](m1-agx-vm-dummy-page.md)
 

@@ -3,16 +3,16 @@ module g13contract
 
 fn check_bind_replace_local(file string, page_table string) ! {
 	bind := section(file, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'ioctl.asahi_bind_op_unbind {', 'Native BIND replacement')!
-	require_order(bind, ['if !f.cleanup_closed_mappings_locked(request.vm_id)', 'mut replacing := false',
-		'replacing = true', 'if replacing && (request.vm_id >= mmu.uat_num_contexts',
-		'katomic.load(&f.inflight_by_vm[request.vm_id])', 'gem.unref(obj)', 'return -16',
-		'fragments := f.mapping_survivor_count_locked(request.vm_id, request.addr, request.range)',
+	require_order(bind, ['vm_slot := ctx.id', 'if !f.cleanup_closed_mappings_locked(vm_slot)', 'mut replacing := false',
+		'replacing = true', 'if replacing && katomic.load(&f.inflight_by_vm[vm_slot])',
+		'gem.unref(obj)', 'return -16',
+		'fragments := f.mapping_survivor_count_locked(vm_slot, request.addr, request.range)',
 		'if fragments < 0 { gem.unref(obj); return -22 }', 'if !f.reserve_mapping_slots_locked(fragments + 1)',
 		'gem.unref(obj)', 'return -12', 'if !pt.prepare_map_range(request.addr, request.range)',
 		'gem.unref(obj)', 'return -12', 'if replacing {',
-		'retired := f.unbind_range_locked(request.vm_id, request.addr, request.range)',
+		'retired := f.unbind_range_locked(vm_slot, request.addr, request.range)',
 		'if retired != 0 { gem.unref(obj); return retired }', 'mapped := if', 'if !mapped',
-		'gem.unref(obj)', 'return -12', 'f.mappings << GpuMapping{', 'obj: obj',
+		'gem.unref(obj)', 'return -12', 'f.mappings << GpuMapping{', 'vm_id: vm_slot', 'obj: obj',
 		'if !flush_firmware_mapping(ctx, request.addr, request.range, false)',
 		'f.mappings[f.mappings.len - 1].retiring = true'],
 		'Prepare transient survivor/new metadata and all tables before old retirement; return temporary new owner on failure')!

@@ -26,7 +26,7 @@ fn check_orphaned_queues() {
 					for remove_vm in [false, true] {
 						gpu.available(true)
 						mut pt := pgtable.UatPgtable{}
-						mut vm := mmu.UatContext{id: 1, pgtable: &pt}
+						mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: &pt}
 						mut file := GpuFile{vms: [&vm]}
 						file.queues.flags |= .noslices
 						file.g13_queues.flags |= .noslices
@@ -99,7 +99,7 @@ fn check_orphaned_queues() {
 	// retry must remove that record before the same worker retires the VM.
 	for cycle in 0 .. 200 {
 		mut pt := pgtable.UatPgtable{}
-		mut vm := mmu.UatContext{id: 1, pgtable: &pt}
+		mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: &pt}
 		mut file := GpuFile{vms: [&vm]}
 		mut request := queue_request(ioctl.asahi_priority_medium, ioctl.asahi_queue_cap_compute)
 		gpu.quarantine_queue()
@@ -120,7 +120,7 @@ fn check_orphaned_queues() {
 	// Interleaved published/failed graphs exercise reverse array deletion,
 	// partial progress and preservation of every surviving logical owner.
 	for cycle in 0 .. 50 {
-		mut vm := mmu.UatContext{id: 1}
+		mut vm := mmu.UatContext{id: 1, vm_id: 1}
 		mut file := GpuFile{vms: [&vm]}
 		file.queues.flags |= .noslices
 		file.g13_queues.flags |= .noslices
@@ -146,7 +146,7 @@ fn check_orphaned_queues() {
 	// Firmware stop may have released physical backing while captured
 	// references still point to retained metadata. Do not drop their owner.
 	gpu.set_running(false)
-	mut vm := mmu.UatContext{id: 1}
+	mut vm := mmu.UatContext{id: 1, vm_id: 1}
 	mut stopped := gpu.G13QueueResources{queue_id: 7, released: true}
 	stopped.retain_file_reference()
 	mut file := GpuFile{vms: [&vm], g13_queues: [G13QueueOwnership{queue_id: 7, vm_id: 1, resources: &stopped}]}

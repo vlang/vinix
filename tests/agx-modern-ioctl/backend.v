@@ -12,13 +12,6 @@ pub fn new_gpu_file(_dev &drm.DrmDevice, _owner u64) ?&GpuFile {
 	return none
 }
 
-pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
-	assert data.extensions == 0 && data.pad == 0
-	mut request := unsafe { data }
-	request.vm_id = 55
-	return 0
-}
-
 pub fn (mut f GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) int {
 	assert data.extensions == 0
 	if data.flags != 0 { return -22 }

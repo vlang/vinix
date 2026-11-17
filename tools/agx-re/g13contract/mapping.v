@@ -21,7 +21,7 @@ fn check_user_mapping_contract(local string, manager string) ! {
 		'return -5'], 'Vinix bind ownership transfer')!
 	require(bind.count('f.lock.acquire()') == 1 && bind.count('f.lock.release()') == 1
 		&& bind.count('f.retire_mapping_locked(i)') == 1
-		&& bind.contains('return f.unbind_range_locked(request.vm_id, request.addr, request.range)')
+		&& bind.contains('return f.unbind_range_locked(ctx.id, request.addr, request.range)')
 		&& !bind.contains('f.get_object_ref('),
 		'Bind/unbind must retain their VM borrow under one file lock')!
 	failure := section(bind, 'if !flush_firmware_mapping(ctx, request.addr, request.range, false)',

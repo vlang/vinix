@@ -81,9 +81,13 @@ fn check_modern_transport() {
 	// Unknown files reach constructor only while the registry lock is held.
 	usercopy.configure(unsafe { u64(&time[0]) }, sizeof(time), -1)
 	assert drm.invoke(&device, 0x3333, asahi.get_time, sizeof(asahi.GetTime), 3, unsafe { voidptr(&time[0]) }) == -19
+	mut context := mmu.UatContext{ id: 55 }
+	mut manager := unsafe { uat_mgr }
+	manager.next_context = unsafe { &context }
 	mut vm := asahi.VmCreate{ kernel_start: 0x100000000, kernel_end: 0x120000000 }
 	usercopy.configure(unsafe { u64(&vm) }, sizeof(vm), -1)
-	assert drm.invoke(&device, 0x1111, asahi.vm_create, sizeof(vm), 3, unsafe { voidptr(&vm) }) == 0 && vm.vm_id == 55
+	assert drm.invoke(&device, 0x1111, asahi.vm_create, sizeof(vm), 3, unsafe { voidptr(&vm) }) == 0 && vm.vm_id == 1
+	assert context.vm_id == 1 && context.id == 55
 	vm.flags = 1
 	assert drm.invoke(&device, 0x1111, asahi.vm_create, sizeof(vm), 3, unsafe { voidptr(&vm) }) == -22
 	mut mmap := asahi.GemMmapOffset{ handle: 91 }
@@ -106,7 +110,7 @@ fn check_modern_binding() {
 	for _ in 0 .. 100 {
 		for stride in [u32(sizeof(asahi.GemBindOp)), u32(sizeof(asahi.GemBindOp) + 8)]! {
 			mut pt := pgtable.UatPgtable{ watch_start: 0x4000 }
-			mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
+			mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
 			mut file := GpuFile{ vms: [unsafe { &vm }] }
 			obj := gem.create(7)
 			file.objects.table.add_created(obj)
@@ -160,6 +164,7 @@ pub fn run_modern_checks() {
 	uat_mgr = unsafe { &manager }
 	defer { uat_mgr = unsafe { nil } }
 	check_modern_transport()
+	check_file_vm_names(mut manager)
 	check_modern_binding()
 	check_modern_queue_and_object()
 	run_advice_checks()
@@ -168,11 +173,65 @@ pub fn run_modern_checks() {
 	assert params.timestamp_ns(1_000_003, 1_000_000) == 1_000_003_000
 }
 
+fn check_file_vm_names(mut manager mmu.UatManager) {
+	binds_before := manager.vm_binds
+	mut first, mut second := GpuFile{}, GpuFile{}
+	mut old_pt, mut new_pt := pgtable.UatPgtable{}, pgtable.UatPgtable{}
+	mut old := mmu.UatContext{ id: 17, identity: mmu.new_identity(), pgtable: unsafe { &old_pt } }
+	mut other := mmu.UatContext{ id: 18, identity: mmu.new_identity() }
+	mut sibling := mmu.UatContext{ id: 20, identity: mmu.new_identity() }
+	mut replacement := mmu.UatContext{ id: 19, identity: mmu.new_identity(), pgtable: unsafe { &new_pt } }
+	mut request := ioctl.DrmAsahiVmCreate{ kernel_start: 0x100000000, kernel_end: 0x120000000 }
+	manager.next_context = unsafe { &old }
+	assert first.ioctl_vm_create(unsafe { &request }) == 0 && request.vm_id == 1
+	manager.next_context = unsafe { &other }
+	mut modern := asahi.VmCreate{ kernel_start: request.kernel_start, kernel_end: request.kernel_end }
+	assert second.ioctl_modern_vm_create(unsafe { &modern }) == 0 && modern.vm_id == 1
+	assert first.find_vm(17) == none && second.find_vm(18) == none
+	assert (second.find_vm(1) or { panic('second file VM') }).id == 18
+	manager.next_context = unsafe { &sibling }
+	assert first.ioctl_vm_create(unsafe { &request }) == 0 && request.vm_id == 2
+
+	mut queue := ioctl.DrmAsahiQueueCreate{ vm_id: 1, queue_caps: ioctl.asahi_queue_cap_compute }
+	assert first.ioctl_queue_create(unsafe { &queue }) == 0
+	assert first.queues[0].vm_id == 17 && first.g13_queues[0].vm_id == 17
+	assert first.ioctl_vm_destroy(&ioctl.DrmAsahiVmDestroy{ vm_id: 1 }) == 0
+	assert first.find_vm(1) == none && !old.destroyed
+	assert (first.find_owned_vm(17) or { panic('old queue VM') }).identity == old.identity
+
+	request.vm_id = 99
+	assert first.ioctl_vm_create(unsafe { &request }) == -12 && request.vm_id == 99
+	assert manager.vm_binds == binds_before + 3
+	manager.next_context = unsafe { &replacement }
+	assert first.ioctl_vm_create(unsafe { &request }) == 0 && request.vm_id == 1
+	assert (first.find_vm(1) or { panic('reused file VM name') }).id == 19
+	assert first.queues[0].vm_id == 17 && !old.destroyed
+
+	mut object := ioctl.DrmAsahiGemCreate{ size: 0x4000, vm_id: 1, flags: ioctl.asahi_gem_vm_private }
+	assert first.ioctl_gem_create(unsafe { &object }) == 0
+	mut bind := ioctl.DrmAsahiGemBind{ vm_id: 1, handle: object.handle, flags: ioctl.asahi_bind_read, range: 0x4000, addr: 0x4000 }
+	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
+	assert first.mappings[0].vm_id == 19 && first.mappings[0].obj.vm_private_identity == replacement.identity
+	assert old_pt.maps == 0 && new_pt.maps == 1
+	bind.op = ioctl.asahi_bind_op_unbind
+	bind.flags = 0
+	bind.handle = 0
+	first.inflight_by_vm[19] = 1
+	assert first.ioctl_gem_bind(unsafe { &bind }) == -16 && new_pt.unmaps == 0
+	first.inflight_by_vm[19] = 0
+	assert first.ioctl_gem_bind(unsafe { &bind }) == 0 && new_pt.unmaps == 1 && old_pt.unmaps == 0
+	assert first.close() && second.close()
+	assert old.destroyed && other.destroyed && sibling.destroyed && replacement.destroyed
+	assert gem.live() == 0
+	memory.assert_released()
+	println('AGX VM names: per-file allocation, detached name reuse, failed creation and physical routing through queue, private GEM and VM_BIND passed')
+}
+
 fn check_modern_queue_and_object() {
 	gpu.available(true)
 	gpu.set_running(true)
 	mut pt := pgtable.UatPgtable{}
-	mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
+	mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
 	mut file := GpuFile{ vms: [unsafe { &vm }] }
 	driver := drm.DrmDriver{ ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle }
 	device := drm.DrmDevice{ driver: unsafe { &driver } }

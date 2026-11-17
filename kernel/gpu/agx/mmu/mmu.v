@@ -73,11 +73,11 @@ pub struct UatContext {
 pub:
 	identity       u64 // non-reused VM-private BO reservation domain
 pub mut:
-	id             u32
+	id             u32 // hardware UAT slot
 	pgtable        &pgtable.UatPgtable = unsafe { nil }
 	active         bool
 	lock           klock.Lock
-	vm_id          u32
+	vm_id          u32 // userspace name assigned by the owning DRM file
 	dummy_phys     u64
 	kernel_start   u64
 	kernel_end     u64
@@ -372,7 +372,6 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				identity: identity
 				pgtable: pt
 				active: true
-				vm_id: i
 				dummy_phys: dummy_phys
 				kernel_start: window.start
 				kernel_end: window.end

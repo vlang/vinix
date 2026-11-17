@@ -35,7 +35,7 @@ fn check_queue_priorities() {
 	assert sizeof(fw.G13WorkQueuePriority) == 0x1c
 	for _ in 0 .. 100 {
 		mut pt := pgtable.UatPgtable{}
-		mut vm := mmu.UatContext{ id: 1, identity: mmu.new_identity(), pgtable: &pt }
+		mut vm := mmu.UatContext{ id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &pt }
 		mut file := GpuFile{ vms: [&vm] }
 		file.queues.flags |= .noslices
 		file.g13_queues.flags |= .noslices
@@ -80,7 +80,7 @@ fn check_queue_priorities() {
 	// Failed host construction and failed GPU preparation leave no installed
 	// queue, release the mutation lock, and allow a later successful retry.
 	mut failed_pt := pgtable.UatPgtable{}
-	mut failed_vm := mmu.UatContext{ id: 1, pgtable: &failed_pt }
+	mut failed_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &failed_pt }
 	mut failed := GpuFile{ vms: [&failed_vm] }
 	failed.queues.flags |= .noslices
 	failed.g13_queues.flags |= .noslices
@@ -99,7 +99,7 @@ fn check_queue_priorities() {
 	// A failed firmware invalidation retains a partially built GPU graph.
 	// No userspace queue is installed, but VM destroy must still see its pin.
 	mut retained_pt := pgtable.UatPgtable{}
-	mut retained_vm := mmu.UatContext{ id: 1, pgtable: &retained_pt }
+	mut retained_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &retained_pt }
 	mut retained := GpuFile{ vms: [&retained_vm] }
 	retained.g13_queues.flags |= .noslices
 	request = queue_request(ioctl.asahi_priority_low, ioctl.asahi_queue_cap_render)
@@ -123,7 +123,7 @@ fn check_queue_priorities() {
 	// Destruction wins before queue creation takes file.lock. No borrowed VM
 	// pointer may reach either constructor after that destruction.
 	mut race_pt := pgtable.UatPgtable{}
-	mut race_vm := mmu.UatContext{ id: 1, pgtable: &race_pt }
+	mut race_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &race_pt }
 	mut raced := GpuFile{ vms: [&race_vm] }
 	destroying_vm_file = &raced
 	klock.before_once(unsafe { &raced.lock }, destroy_before_bind)

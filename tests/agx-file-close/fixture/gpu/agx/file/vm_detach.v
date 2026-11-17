@@ -17,8 +17,8 @@ fn check_detached_vms() {
 					gpu.available(true)
 					mut pt := pgtable.UatPgtable{}
 					mut other_pt := pgtable.UatPgtable{}
-					mut vm := mmu.UatContext{id: 1, identity: mmu.new_identity(), pgtable: &pt}
-					mut other := mmu.UatContext{id: 2, pgtable: &other_pt}
+					mut vm := mmu.UatContext{id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &pt}
+					mut other := mmu.UatContext{id: 2, vm_id: 2, pgtable: &other_pt}
 					mut file := GpuFile{vms: [&vm, &other]}
 					file.vms.flags |= .noslices
 					file.mappings.flags |= .noslices
@@ -78,7 +78,7 @@ fn check_detached_vms() {
 					// A reused hardware slot has a fresh reservation identity and
 					// must not inherit the removed name's bitmap state.
 					mut reused_pt := pgtable.UatPgtable{}
-					mut reused := mmu.UatContext{id: 1, identity: mmu.new_identity(), pgtable: &reused_pt}
+					mut reused := mmu.UatContext{id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &reused_pt}
 					file.vms << &reused
 					assert reused.identity != vm.identity
 					assert (file.find_vm(1) or { panic('reused VM hidden') }).identity == reused.identity
@@ -92,7 +92,7 @@ fn check_detached_vms() {
 		}
 	}
 	// Namespace removal remains possible while the UAT manager is absent.
-	mut idle := mmu.UatContext{id: 1}
+	mut idle := mmu.UatContext{id: 1, vm_id: 1}
 	mut file := GpuFile{vms: [&idle]}
 	saved := uat_mgr
 	uat_mgr = unsafe { nil }
@@ -104,7 +104,7 @@ fn check_detached_vms() {
 	// Handle close transfers a detached VM, queue and failed unmap to the
 	// existing closing list. Retry must resolve its hidden physical owner.
 	mut pt := pgtable.UatPgtable{}
-	mut vm := mmu.UatContext{id: 1, pgtable: &pt}
+	mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: &pt}
 	mut closing := &GpuFile{vms: [&vm]}
 	object := gem.create(7)
 	closing.objects.table.add_created(object)

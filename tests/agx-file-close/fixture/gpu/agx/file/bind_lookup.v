@@ -22,8 +22,8 @@ fn check_bind_vm_lookup() {
 	gpu.set_running(true)
 	for _ in 0 .. 200 {
 		mut pt := pgtable.UatPgtable{}
-		mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
-		mut neighbor_vm := mmu.UatContext{ id: 2 }
+		mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
+		mut neighbor_vm := mmu.UatContext{ id: 2, vm_id: 2 }
 		mut neighbor := GpuFile{ vms: [unsafe { &neighbor_vm }] }
 		mut file := GpuFile{ vms: [unsafe { &vm }] }
 		file.mappings.flags |= .noslices

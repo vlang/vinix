@@ -17,8 +17,8 @@ fn check_private_objects() {
 	gpu.set_running(true)
 	mut first_pt := pgtable.UatPgtable{}
 	mut second_pt := pgtable.UatPgtable{}
-	mut first := mmu.UatContext{ id: 1, identity: mmu.new_identity(), pgtable: &first_pt }
-	mut second := mmu.UatContext{ id: 2, identity: mmu.new_identity(), pgtable: &second_pt }
+	mut first := mmu.UatContext{ id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &first_pt }
+	mut second := mmu.UatContext{ id: 2, vm_id: 2, identity: mmu.new_identity(), pgtable: &second_pt }
 	assert first.identity != 0 && first.identity != second.identity
 	mut file := GpuFile{ vms: [&first, &second] }
 	file.mappings.flags |= .noslices
@@ -55,7 +55,7 @@ fn check_private_objects() {
 	destroy := ioctl.DrmAsahiVmDestroy{ vm_id: 1 }
 	assert file.ioctl_vm_destroy(&destroy) == 0 && first.destroyed
 	mut reused_pt := pgtable.UatPgtable{}
-	mut reused := mmu.UatContext{ id: 1, identity: mmu.new_identity(), pgtable: &reused_pt }
+	mut reused := mmu.UatContext{ id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &reused_pt }
 	assert reused.identity != first.identity && reused.identity != second.identity
 	file.vms << &reused
 	assert file.ioctl_gem_bind(bind(private.handle, 1, 0x4000)) == -22
@@ -90,7 +90,7 @@ fn check_private_objects() {
 	assert file.close() && gem.live() == 0
 	assert reused.destroyed && second.destroyed
 
-	mut empty_scope := mmu.UatContext{ id: 1 }
+	mut empty_scope := mmu.UatContext{ id: 1, vm_id: 1 }
 	mut invalid := GpuFile{ vms: [&empty_scope] }
 	mut request := create_request(1, ioctl.asahi_gem_vm_private)
 	assert invalid.ioctl_gem_create(&request) == -22 && request.handle == 0 && gem.live() == 0
@@ -106,7 +106,7 @@ fn check_private_objects() {
 	gem.fail_creates(false)
 	// VM destruction wins before private-create takes its mutation lock.
 	mut race_pt := pgtable.UatPgtable{}
-	mut race_vm := mmu.UatContext{ id: 1, identity: mmu.new_identity(), pgtable: &race_pt }
+	mut race_vm := mmu.UatContext{ id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &race_pt }
 	mut raced := GpuFile{ vms: [&race_vm] }
 	destroying_vm_file = &raced
 	klock.before_once(unsafe { &raced.lock }, destroy_before_bind)

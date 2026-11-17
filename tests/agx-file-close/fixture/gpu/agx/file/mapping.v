@@ -39,7 +39,7 @@ fn check_mapping_retirement() {
 	gpu.set_running(true)
 	for _ in 0 .. 200 {
 		mut pt := pgtable.UatPgtable{}
-		mut vm := mmu.UatContext{ id: 1, pgtable: &pt }
+		mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &pt }
 		mut file := GpuFile{ vms: [&vm] }
 		file.mappings.flags |= .noslices
 		object := gem.create(7)
@@ -64,7 +64,7 @@ fn check_mapping_retirement() {
 
 		// A failed BIND keeps the just-published object's reference, too.
 		mut failed_pt := pgtable.UatPgtable{}
-		mut failed_vm := mmu.UatContext{ id: 1, pgtable: &failed_pt }
+		mut failed_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &failed_pt }
 		mut failed := GpuFile{ vms: [&failed_vm] }
 		failed.mappings.flags |= .noslices
 		failed_object := gem.create(7)
@@ -83,7 +83,7 @@ fn check_mapping_retirement() {
 		// Busy VMs retain ordinary closed-handle bindings. Pending invalidation
 		// blocks admission even while another job holds a VM pin.
 		mut busy_pt := pgtable.UatPgtable{}
-		mut busy_vm := mmu.UatContext{ id: 1, pgtable: &busy_pt }
+		mut busy_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &busy_pt }
 		mut busy := GpuFile{ vms: [&busy_vm] }
 		busy.mappings.flags |= .noslices
 		busy_object := gem.create(7)
@@ -109,8 +109,8 @@ fn check_mapping_retirement() {
 
 	mut first_pt := pgtable.UatPgtable{}
 	mut second_pt := pgtable.UatPgtable{}
-	mut first_vm := mmu.UatContext{ id: 1, pgtable: &first_pt }
-	mut second_vm := mmu.UatContext{ id: 2, pgtable: &second_pt }
+	mut first_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &first_pt }
+	mut second_vm := mmu.UatContext{ id: 2, vm_id: 2, pgtable: &second_pt }
 	mut file := GpuFile{ vms: [&first_vm, &second_vm] }
 	file.mappings.flags |= .noslices
 	object := gem.create(7)
@@ -151,7 +151,7 @@ fn check_mapping_retirement() {
 	// the VM inside that lock, before borrowing the page table or GEM.
 	gpu.set_running(true)
 	mut race_pt := pgtable.UatPgtable{}
-	mut race_vm := mmu.UatContext{ id: 1, pgtable: &race_pt }
+	mut race_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &race_pt }
 	mut raced := GpuFile{ vms: [&race_vm] }
 	race_object := gem.create(7)
 	raced.objects.table.add_created(race_object)
@@ -165,7 +165,7 @@ fn check_mapping_retirement() {
 	for is_bind in [false, true]! {
 		gpu.set_running(true)
 		mut stop_pt := pgtable.UatPgtable{}
-		mut stop_vm := mmu.UatContext{ id: 1, pgtable: &stop_pt }
+		mut stop_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &stop_pt }
 		mut stopping := GpuFile{ vms: [&stop_vm] }
 		stop_object := gem.create(7)
 		stopping.objects.table.add_created(stop_object)
@@ -191,7 +191,7 @@ fn check_mapping_permissions() {
 	gpu.set_running(true)
 	gpu.fail_flushes(0)
 	mut pt := pgtable.UatPgtable{}
-	mut vm := mmu.UatContext{ id: 1, pgtable: &pt }
+	mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &pt }
 	mut file := GpuFile{ vms: [&vm] }
 	file.mappings.flags |= .noslices
 	object := gem.create(7)

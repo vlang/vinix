@@ -156,9 +156,7 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 		|| current.process.pid <= 0 {
 		return none
 	}
-	// find_vm() reads the VM list without the file lock, so it must never
-	// move: sized for every context there is, as a file cannot have more VMs.
-	// close() frees it.
+	// With one slot per context, this covers every VM the file can own.
 	vms := []&mmu.UatContext{cap: mmu.uat_num_contexts} @[freed]
 	mut f := &GpuFile{
 		dev: unsafe { dev }
@@ -532,9 +530,15 @@ fn (mut f GpuFile) allocate_timestamp_id_locked() ?u32 {
 	return none
 }
 
+// Userspace names belong to the file. Callers hold file.lock.
 fn (f &GpuFile) find_vm(vm_id u32) ?&mmu.UatContext {
-	if vm_id < mmu.uat_num_contexts && f.detached_vms[vm_id] { return none }
-	return f.find_owned_vm(vm_id)
+	if vm_id == 0 || vm_id >= mmu.uat_num_contexts { return none }
+	for vm in f.vms {
+		if vm.vm_id == vm_id && vm.id < mmu.uat_num_contexts && !f.detached_vms[vm.id] {
+			return unsafe { vm }
+		}
+	}
+	return none
 }
 
 // Internal owners survive userspace namespace removal. Caller holds file.lock.
@@ -673,14 +677,22 @@ pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 		|| request.kernel_end > address_limit {
 		return -22
 	}
-	mut m := unsafe { mgr }
-	ctx := m.create_context(request.kernel_start, request.kernel_end) or { return -12 }
-	m.bind_context(ctx)
 	f.lock.acquire()
+	defer { f.lock.release() }
+	mut used := u64(0)
+	for vm in f.vms {
+		if !f.detached_vms[vm.id] { used |= u64(1) << vm.vm_id }
+	}
+	mut vm_id := u32(1)
+	for vm_id < mmu.uat_num_contexts && used & (u64(1) << vm_id) != 0 { vm_id++ }
+	if vm_id == mmu.uat_num_contexts { return -12 }
+	mut m := unsafe { mgr }
+	mut ctx := m.create_context(request.kernel_start, request.kernel_end) or { return -12 }
+	ctx.vm_id = vm_id
+	m.bind_context(ctx)
 	f.detached_vms[ctx.id] = false
 	f.vms << ctx
-	f.lock.release()
-	request.vm_id = ctx.id
+	request.vm_id = vm_id
 	return 0
 }
 
@@ -800,24 +812,24 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			} else {
 				pgtable.gpu_prot_gpu_shared_wo
 			}
-			if !f.cleanup_closed_mappings_locked(request.vm_id) {
+			vm_slot := ctx.id
+			if !f.cleanup_closed_mappings_locked(vm_slot) {
 				gem.unref(obj)
 				return -5
 			}
 			mut replacing := false
 			for mapping in f.mappings {
-				if mapping.vm_id == request.vm_id
+				if mapping.vm_id == vm_slot
 					&& ranges_overlap(mapping.addr, mapping.size, request.addr, request.range) {
 					replacing = true
 					break
 				}
 			}
-			if replacing && (request.vm_id >= mmu.uat_num_contexts
-				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0) {
+			if replacing && katomic.load(&f.inflight_by_vm[vm_slot]) != 0 {
 				gem.unref(obj)
 				return -16 // EBUSY: replacement must not remove pages used by jobs.
 			}
-			fragments := f.mapping_survivor_count_locked(request.vm_id, request.addr, request.range)
+			fragments := f.mapping_survivor_count_locked(vm_slot, request.addr, request.range)
 			if fragments < 0 { gem.unref(obj); return -22 }
 			if !f.reserve_mapping_slots_locked(fragments + 1) {
 				gem.unref(obj)
@@ -828,7 +840,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				return -12
 			}
 			if replacing {
-				retired := f.unbind_range_locked(request.vm_id, request.addr, request.range)
+				retired := f.unbind_range_locked(vm_slot, request.addr, request.range)
 				if retired != 0 { gem.unref(obj); return retired }
 			}
 			mapped := if request.flags & ioctl.asahi_bind_single_page != 0 {
@@ -839,7 +851,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				return -12
 			}
 			f.mappings << GpuMapping{
-				vm_id: request.vm_id
+				vm_id: vm_slot
 				handle: request.handle
 				addr: request.addr
 				size: request.range
@@ -858,26 +870,24 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			ctx := f.find_vm(request.vm_id) or { return -2 }
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
-			if request.vm_id >= mmu.uat_num_contexts
-				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {
+			if katomic.load(&f.inflight_by_vm[ctx.id]) != 0 {
 				return -16 // EBUSY: firmware may still dereference this mapping
 			}
-			return f.unbind_range_locked(request.vm_id, request.addr, request.range)
+			return f.unbind_range_locked(ctx.id, request.addr, request.range)
 		}
 		ioctl.asahi_bind_op_unbind_all {
 			ctx := f.find_vm(request.vm_id) or { return -2 }
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
 			obj := f.objects.get_ref(request.handle) or { return -2 }
-			if request.vm_id >= mmu.uat_num_contexts
-				|| katomic.load(&f.inflight_by_vm[request.vm_id]) != 0 {
+			if katomic.load(&f.inflight_by_vm[ctx.id]) != 0 {
 				gem.unref(obj)
 				return -16
 			}
 			mut flush_ok := true
 			for i := f.mappings.len - 1; i >= 0; i-- {
 				mapping := f.mappings[i]
-				if mapping.vm_id == request.vm_id && voidptr(mapping.obj) == voidptr(obj) {
+				if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj) {
 					if !f.retire_mapping_locked(i) {
 						flush_ok = false
 					}
@@ -1022,7 +1032,7 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 	// Keep the VM and its page table alive until the new queue is installed.
 	vm := f.find_vm(request.vm_id) or { return -2 }
 	id := f.allocate_queue_id_locked() or { return -24 } // EMFILE
-	wq := workqueue.new_workqueue(id, request.vm_id, firmware_priority, request.queue_caps) or {
+	wq := workqueue.new_workqueue(id, vm.id, firmware_priority, request.queue_caps) or {
 		return -12
 	}
 	mut logical := unsafe { wq }
@@ -1063,7 +1073,7 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 			// Failed invalidation may leave a partially built queue borrowing
 			// this VM. Adopt that graph before releasing the file lock.
 			if retained := gpu_manager.retained_g13_queue_resources(id, vm) {
-				f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: retained }
+				f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }
 			}
 			mut queue := unsafe { wq }
 			queue.destroy()
@@ -1080,7 +1090,7 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 		if !released {
 			// Failed invalidation keeps the graph and VM alive through the
 			// existing orphan-owner retry path, independently of this name.
-			f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: request.vm_id, resources: g13_resources }
+			f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: g13_resources }
 		}
 		logical.destroy()
 		workqueue.free_workqueue(logical)
@@ -1097,7 +1107,7 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 	if g13_resources != unsafe { nil } {
 		f.g13_queues << G13QueueOwnership{
 			queue_id: id
-			vm_id: request.vm_id
+			vm_id: vm.id
 			resources: g13_resources
 		}
 	}

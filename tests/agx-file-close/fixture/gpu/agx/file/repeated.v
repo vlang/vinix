@@ -12,7 +12,7 @@ fn check_repeated_bindings() {
 	mut cases := 0
 	for _ in 0 .. 200 {
 		mut pt := pgtable.UatPgtable{}
-		mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
+		mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
 		mut file := GpuFile{ vms: [unsafe { &vm }] }
 		file.mappings.flags |= .noslices
 		object := gem.create(7); file.objects.table.add_created(object)

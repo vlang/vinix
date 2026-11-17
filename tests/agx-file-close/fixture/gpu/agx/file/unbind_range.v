@@ -23,8 +23,8 @@ fn check_unbind_ranges() {
 				[u64(1), 17]!, [u64(0), 20]!, [u64(6), 8]!, [u64(19), 20]!, [u64(0), 6]!]! {
 				mut pt := pgtable.UatPgtable{ watch_start: 0x4000 }
 				mut neighbor := pgtable.UatPgtable{ watch_start: 0x4000 }
-				mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
-				mut other := mmu.UatContext{ id: 2, pgtable: unsafe { &neighbor } }
+				mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
+				mut other := mmu.UatContext{ id: 2, vm_id: 2, pgtable: unsafe { &neighbor } }
 				mut file := GpuFile{ vms: [unsafe { &vm }, unsafe { &other }] }
 				file.mappings.flags |= .noslices
 				mut first := gem.create(7); first.size = 32 * pgtable.uat_pgsz
@@ -79,7 +79,7 @@ fn check_unbind_ranges() {
 			// A middle cut needs two transient survivor owners while a failed
 			// flush retains the original. OOM must precede every visible effect.
 			mut pt := pgtable.UatPgtable{ watch_start: 0x4000 }
-			mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
+			mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
 			mut file := GpuFile{ vms: [unsafe { &vm }] }
 			file.mappings.flags |= .noslices
 			mut object := gem.create(7); object.size = 16 * pgtable.uat_pgsz

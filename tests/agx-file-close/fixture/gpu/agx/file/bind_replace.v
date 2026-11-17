@@ -19,8 +19,8 @@ fn check_bind_replacements() {
 						[u64(0), 20]!, [u64(4), 14]!, [u64(8), 12]!]! {
 						mut pt := pgtable.UatPgtable{ watch_start: 0x4000 }
 						mut neighbor := pgtable.UatPgtable{ watch_start: 0x4000 }
-						mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
-						mut other := mmu.UatContext{ id: 2, pgtable: unsafe { &neighbor } }
+						mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
+						mut other := mmu.UatContext{ id: 2, vm_id: 2, pgtable: unsafe { &neighbor } }
 						mut file := GpuFile{ vms: [unsafe { &vm }, unsafe { &other }] }
 						mut first := gem.create(7); first.size = 32 * pgtable.uat_pgsz
 						mut second := gem.create(8); second.size = first.size; second.phys_addr = 0x800000
@@ -75,7 +75,7 @@ fn check_bind_replacements() {
 	}
 	for _ in 0 .. 200 {
 		mut pt := pgtable.UatPgtable{ watch_start: 0x4000 }
-		mut vm := mmu.UatContext{ id: 1, pgtable: unsafe { &pt } }
+		mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
 		mut file := GpuFile{ vms: [unsafe { &vm }] }
 		mut old := gem.create(7); old.size = 16 * pgtable.uat_pgsz
 		mut target := gem.create(9); target.size = old.size; target.phys_addr = 0xc00000
@@ -115,7 +115,7 @@ fn check_bind_replacements() {
 		memory.assert_released()
 
 		mut fresh_pt := pgtable.UatPgtable{ watch_start: 0x4000 }
-		mut fresh_vm := mmu.UatContext{ id: 1, pgtable: unsafe { &fresh_pt } }
+		mut fresh_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &fresh_pt } }
 		mut fresh := GpuFile{ vms: [unsafe { &fresh_vm }] }
 		fresh_object := gem.create(7); fresh.objects.table.add_created(fresh_object)
 		memory.fail_allocations(true)

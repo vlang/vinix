@@ -30,7 +30,7 @@ fn check_detached_queues() {
 				for available in [false, true] {
 					mut queue := workqueue.WorkQueue{id: 7, vm_id: 1, caps: ioctl.asahi_queue_cap_compute}
 					mut resource := gpu.G13QueueResources{queue_id: 7, failures: failures}
-					mut vm := mmu.UatContext{id: 1}
+					mut vm := mmu.UatContext{id: 1, vm_id: 1}
 					mut file := GpuFile{
 						queues: [unsafe { &queue }]
 						g13_queues: [G13QueueOwnership{queue_id: 7, vm_id: 1, resources: unsafe { &resource }}]
@@ -89,7 +89,7 @@ fn check_detached_queues() {
 	// then retains the exact same hidden owner until aggregate retirement.
 	mut queue := workqueue.WorkQueue{id: 9, vm_id: 1}
 	mut resource := gpu.G13QueueResources{queue_id: 9, failures: 1}
-	mut vm := mmu.UatContext{id: 1}
+	mut vm := mmu.UatContext{id: 1, vm_id: 1}
 	mut closing := &GpuFile{queues: [unsafe { &queue }], g13_queues: [G13QueueOwnership{queue_id: 9, vm_id: 1, resources: unsafe { &resource }}], vms: [unsafe { &vm }]}
 	closing.inflight_by_vm[1] = 1
 	resource.retain_file_reference()
