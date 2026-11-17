@@ -151,6 +151,7 @@ fn check() ! {
 	metadata_cases := ['bridge-host-metadata-input', 'controller-host-metadata-input']
 	query_cases := ['bridge-host-query-input', 'controller-host-query-input']
 	xattr_cases := ['bridge-host-xattr-input', 'controller-host-xattr-input']
+	link_xattr_cases := ['bridge-host-link-xattr-input', 'controller-host-link-xattr-input']
 	if os.args.len == 6 && os.args[5] == '--host-link-only' { cases = link_cases.clone() }
 	else if os.args.len == 6 && os.args[5] == '--host-sdk-only' { cases = sdk_cases.clone() }
 	else if os.args.len == 6 && os.args[5] == '--host-sdk-denied-only' { cases = denied_cases.clone() }
@@ -164,6 +165,7 @@ fn check() ! {
 		cases << metadata_cases
 		cases << query_cases
 		cases << xattr_cases
+		cases << link_xattr_cases
 		// Four disjoint partitions cover the full fixed list. Every invocation
 		// still requires both baselines and its original named refusal gates.
 		if os.args.len == 6 {
@@ -195,7 +197,7 @@ fn check() ! {
 				replace(dir + '/generated-before-boot.json', json2.encode(generated))!
 			}
 			expected = 'host build binding record differs'
-		} else if name in ['bridge-host-input', 'controller-host-input', 'bridge-host-link-input', 'controller-host-link-input', 'bridge-host-sdk-input', 'controller-host-sdk-input', 'bridge-host-sdk-denied-input', 'controller-host-sdk-denied-input', 'bridge-host-read-input', 'controller-host-read-input', 'bridge-host-directory-input', 'controller-host-directory-input', 'bridge-host-metadata-input', 'controller-host-metadata-input', 'bridge-host-query-input', 'controller-host-query-input', 'bridge-host-xattr-input', 'controller-host-xattr-input'] {
+		} else if name in ['bridge-host-input', 'controller-host-input', 'bridge-host-link-input', 'controller-host-link-input', 'bridge-host-sdk-input', 'controller-host-sdk-input', 'bridge-host-sdk-denied-input', 'controller-host-sdk-denied-input', 'bridge-host-read-input', 'controller-host-read-input', 'bridge-host-directory-input', 'controller-host-directory-input', 'bridge-host-metadata-input', 'controller-host-metadata-input', 'bridge-host-query-input', 'controller-host-query-input', 'bridge-host-xattr-input', 'controller-host-xattr-input', 'bridge-host-link-xattr-input', 'controller-host-link-xattr-input'] {
 			bridge := name.starts_with('bridge-')
 			binding := read_map(if bridge { selected + '/host-producer.json' } else { dir + '/host-controller.json' })!
 			for file in if bridge { ['inputs-before-build.json', 'inputs-verified.json'] } else { ['inputs-before-build.json', 'inputs.json', 'inputs-verified.json'] } {
@@ -203,6 +205,7 @@ fn check() ! {
 				mut inputs := read_map(path)!
 				artifact := if name.ends_with('-link-input') {
 					if bridge { '/host-link.json' } else { '/link-inputs.tar' }
+				} else if name.ends_with('-link-xattr-input') { '/read-closed/link-xattr-content.json'
 				} else if name.ends_with('-xattr-input') { '/read-closed/xattr-content.json'
 				} else if name.ends_with('-query-input') { '/read-closed/query.json'
 				} else if name.ends_with('-metadata-input') { '/read-closed/metadata-aliases.json'

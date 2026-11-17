@@ -1,6 +1,6 @@
 # Required Wine qualification host receipts
 
-The producer, native controller and full retainer now admit format-10 host-build
+The producer, native controller and full retainer now admit format-11 host-build
 receipts before qualification work. Build each with `wine-host-build.v`; launch
 its `program` in the original build directory. A bare or relocated executable,
 linked receipt, wrong role or unsupported format refuses before creating
@@ -14,11 +14,11 @@ and checks its role and executable hash. The producer and controller must also
 use the compiler bound by their host receipts for guest source generation.
 The original bootstrap builder remains a separately pinned input.
 
-Format 10 retains captured Mach-O link/replay/load evidence for the
+Format 11 retains captured Mach-O link/replay/load evidence for the
 actual running executable. Every archive member, replay artifact and receipt
 belongs to the host output graph; the selected linker and observed ordinary
 host images belong to its input graph and byte store. Missing rows cannot be
-waived by the producer, controller or full retainer. Original format-2/3/4/5/6/7/8/9 checkers
+waived by the producer, controller or full retainer. Original format-2/3/4/5/6/7/8/9/10 checkers
 and their complete historical bundles retain their earlier contract.
 
 It also requires `sdk-graph.json`, recomputed SDK stub identities and declared
@@ -68,6 +68,12 @@ requires two matching complete observations. Admission compares the canonical
 receipt to live original-namespace attributes; unchanged copied graphs still
 require those original targets. A copy's native attributes cannot replace them.
 These quiescent observations do not establish an atomic filesystem snapshot.
+Inner format 6 additionally requires `link-xattr-content.json`. The independently
+validated alias graph determines every canonical-parent symlink node and literal
+body. Its names/values are read through held link descriptors without following
+final targets. The shared reader/projection sources are embedded, pinned and
+retained. Admission requires the canonical receipt and original namespace;
+copies cannot substitute their own nodes. The host receipt has an 8 MiB bound.
 Remaining xattr coverage, other search/metadata operations, OS-root/device exceptions, writes/network,
 helper startup and OS loader/cache bytes retain their previous scope.
 Full ABI/library/search closure remains open.
@@ -91,7 +97,7 @@ alter its receipt hash or omit a host artifact input. The real controller must
 refuse each before signing/build output; an empty requested directory is allowed.
 Producer host admission runs before signing and is repeated after the guest.
 
-The full owned-retention runner now requires sixty-five refusals after real and
+The full owned-retention runner now requires sixty-seven refusals after real and
 unchanged copied baselines. Five host-binding cases change producer/controller
 binding hashes, omit host receipt rows from their input maps or link the native
 binding record. All mutation writes target private copies. Existing 44 cases
@@ -111,7 +117,8 @@ requiring the directory policy to remain in both retained host graphs.
 Two further cases omit `read-closed/metadata-aliases.json` from those maps.
 Two further cases omit `read-closed/query.json` from those maps.
 Two further cases omit `read-closed/xattr-content.json` from those maps.
-Alternatively `--partition=0/4` through `--partition=3/4` divide all 65 cases
+Two further cases omit `read-closed/link-xattr-content.json` from those maps.
+Alternatively `--partition=0/4` through `--partition=3/4` divide all 67 cases
 without weakening either baseline. Use a separate output directory for each;
 `wine-retention-partitions-check.v PREFIX` verifies their exact assigned case
 lists, both baselines and complete unique coverage from `PREFIX0` through `PREFIX3`.

@@ -55,9 +55,10 @@ Canonical-parent paths collapse duplicate spellings of the same link node;
 their literal bodies must match the admitted alias declaration. Historical
 nodes and attributes are never changed by these controls.
 
-This additive tool does not change required format-10 host receipts or sandbox
-permissions. It supplements their canonical regular-file/directory attribute
-inventory. Mandatory symlink-node integration, other readable symlinks,
+The standalone CLI keeps its format-1 receipt and original format-10 audit
+contract. Required [format-11 host receipts](wine-host-required-check.md)
+separately use its reader to pin declared alias nodes alongside canonical
+regular-file/directory attributes. No sandbox permission is added. Other readable symlinks,
 OS-root/device exceptions, directory names/search absence, loader/toolchain
 closure, owned ARM/GUI and default activation remain open. Original verifiers
 and all complete prerequisite bundles remain required.

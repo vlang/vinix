@@ -60,7 +60,7 @@ the output map. Copied graphs still require the original input namespaces.
 `wine-host-build-check.v HOST_BUILDER FIXTURE_BUILD FRESH_OUTPUT
 [CONTROLLER_BUILD PRODUCER_BUILD]` requires real and unchanged copied baselines,
 executes the fixture and optionally checks both real host program entrypoints,
-then requires eighty-four exact refusals. Cases cover omitted parsed
+then requires ninety-six exact refusals. Cases cover omitted parsed
 imports and observed images, V/C environments and commands, omitted C include
 records, linked receipts, changed retained input bytes, non-executable mode,
 format/scope changes and changed generated C. Every mutation changes only a
@@ -94,11 +94,16 @@ linked evidence, old outer/inner formats and live file/directory/additional-name
 mutations on a newly built private fixture. Each native mutation restores
 admission and preserves ordinary file bytes.
 
-The [required host receipt boundary](wine-host-required-check.md) uses format 10
+Eight link-content cases cover empty/omitted/extra nodes, forged values/bodies,
+linked evidence and old outer/inner formats. Four live controls exercise the
+production link admission helper on private nodes, changing values, names and
+bodies, then restoring admission without changing referenced file bytes.
+
+The [required host receipt boundary](wine-host-required-check.md) uses format 11
 and shared `winehostbuild` admission. Qualification work in the producer,
 controller and retainer requires the matching receipt beside the executable.
 Native and prepared evidence bind the producer/controller host graphs; the full
-retainer also retains its own graph. Original format-1/2/3/4/5/6/7/8/9 bundles and their original
+retainer also retains its own graph. Original format-1/2/3/4/5/6/7/8/9/10 bundles and their original
 checkers keep their historical contract. The builder's own bootstrap, complete
 compiler provenance, unreported inputs/search
 absence, full SDK content and complete Mach-O linker/library closure remain open.
@@ -197,6 +202,16 @@ on copied fixture files are not substituted for those original targets. Missing,
 added or changed rows refuse even after resealing output hashes. These are
 quiescent observations rather than an atomic snapshot: change-and-restore races,
 OS-root/device exceptions and paths outside the metadata set remain unqualified.
+
+Format 11 adds inner replay format 6 and mandatory
+`read-closed/link-xattr-content.json`. The validated alias declaration determines
+the canonical-parent symlink node set and literal bodies. The embedded/pinned
+`winelinkxattrhost` projection checks those bodies and uses the unchanged qualified
+`winelinkxattr` reader for native names/values without following final targets.
+Canonical serialization, original namespace and the 8 MiB host receipt bound
+are required. Copied evidence still rechecks original nodes. No extra policy
+permission is added. Other symlinks, OS-root/device exceptions, directory entry
+names, change-and-restore races and broader hermetic closure remain open.
 
 The historical optional-builder checkpoint is `/Users/alex/.cache/vwhostbuild-20261115-01`, based on
 `d4dd87232`. Final `build-04` admits `fixture-02`, `controller-01` and

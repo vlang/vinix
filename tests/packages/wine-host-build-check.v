@@ -14,6 +14,8 @@ import tests.packages.winequeryhost
 import tests.packages.winequeryclosure
 import tests.packages.winequeryprobe
 import tests.packages.winexattr
+import tests.packages.winelinkxattr
+import tests.packages.winelinkxattrhost
 
 $if macos {
 	#include <sys/clonefile.h>
@@ -160,13 +162,41 @@ fn check() ! {
 		'metadata-map', 'metadata-policy', 'metadata-aliases', 'metadata-allowed', 'metadata-denied', 'old-metadata-format', 'old-metadata-replay-format',
 		'query-policy', 'query-extra-execution', 'query-execution', 'query-counterfactual-policy', 'query-fixture', 'query-allowed', 'query-denied',
 		'query-counterfactual', 'query-output', 'query-temporary', 'old-query-format', 'old-query-replay-format',
-		'xattr-empty', 'xattr-omitted-target', 'xattr-extra-target', 'xattr-forged-value', 'xattr-linked', 'old-xattr-format', 'old-xattr-replay-format'] {
+		'xattr-empty', 'xattr-omitted-target', 'xattr-extra-target', 'xattr-forged-value', 'xattr-linked', 'old-xattr-format', 'old-xattr-replay-format',
+		'link-xattr-empty', 'link-xattr-omitted', 'link-xattr-extra', 'link-xattr-value', 'link-xattr-body', 'link-xattr-linked',
+		'old-link-xattr-format', 'old-link-xattr-replay-format'] {
 		dir := out + '/' + name
 		clone(original, dir)!
 		mut proof := json2.decode[Proof](os.read_file(dir + '/host-build.json')!)!
 		mut changed := []string{}
 		mut expected := ''
-		if name == 'old-xattr-format' {
+		if name == 'old-link-xattr-format' {
+			proof.format = 10
+			expected = 'host build declaration differs'
+		} else if name == 'old-link-xattr-replay-format' {
+			file := 'read-closed/receipt.json'
+			mut read := json2.decode[HostRead](os.read_file(dir + '/' + file)!)!
+			read.format = 5
+			os.write_file(dir + '/' + file, json2.encode(read))!; changed << file
+			expected = 'read-closed capability declaration differs'
+		} else if name == 'link-xattr-linked' {
+			file := dir + '/read-closed/link-xattr-content.json'
+			os.rename(file, file + '-original')!; os.symlink(file + '-original', file)!
+			expected = 'read-closed link xattr evidence must be bounded and ordinary'
+		} else if name in ['link-xattr-empty', 'link-xattr-omitted', 'link-xattr-extra', 'link-xattr-value', 'link-xattr-body'] {
+			file := 'read-closed/link-xattr-content.json'
+			mut content := json2.decode[winelinkxattrhost.Content](os.read_file(dir + '/' + file)!)!
+			node := content.links.keys()[0]; item := content.links[node]
+			if name == 'link-xattr-omitted' { content.links.delete(node) }
+			if name == 'link-xattr-extra' { content.links['/unlisted-link'] = item }
+			if name == 'link-xattr-body' { content.links[node] = winelinkxattr.Link{target_hex: item.target_hex + '00', values: item.values} }
+			if name == 'link-xattr-value' {
+				mut values := item.values.clone(); values['org.vinix.forged'.bytes().hex()] = '00'
+				content.links[node] = winelinkxattr.Link{target_hex: item.target_hex, values: values}
+			}
+			os.write_file(dir + '/' + file, if name == 'link-xattr-empty' { '{}' } else { json2.encode(content) + '\n' })!; changed << file
+			expected = 'read-closed link xattr content differs'
+		} else if name == 'old-xattr-format' {
 			proof.format = 9
 			expected = 'host build declaration differs'
 		} else if name == 'old-xattr-replay-format' {
@@ -534,8 +564,45 @@ fn check() ! {
 		if restored_code != 0 { return error('restored native baseline refused') }
 		passed << name
 	}
+	// Exercise the same production projection/admission helper on private link
+	// nodes. Live Homebrew aliases and all historical graphs remain read-only.
+	link_root := os.real_path(out) + '/private-link-controls'; os.mkdir(link_root)!
+	link_path := link_root + '/link'; target := link_root + '/target'; content_path := link_root + '/content.json'
+	os.write_file(target, 'private target bytes\n')!; os.symlink('target', link_path)!
+	$if macos {
+		key := 'org.vinix.host-link-test'; value := 'LINK VALUE\n'
+		if C.setxattr(link_path.str, key.str, value.str, uint(value.len), 0, C.XATTR_NOFOLLOW) != 0 { return error('private link fixture setup failed') }
+		aliases := {link_path: 'target'}
+		os.write_file(content_path, winelinkxattrhost.capture(aliases, link_root)!)!
+		winelinkxattrhost.admit(content_path, aliases, link_root)!
+		before := digest(target)!
+		for name in ['link-xattr-live-value', 'link-xattr-live-added', 'link-xattr-live-removed', 'link-xattr-live-retarget'] {
+			attribute := if name == 'link-xattr-live-added' { key + '-extra' } else { key }
+			backup := link_root + '/saved-node'
+			if name == 'link-xattr-live-retarget' { os.rename(link_path, backup)!; os.symlink('missing-target', link_path)! }
+			else if name == 'link-xattr-live-removed' {
+				if C.removexattr(link_path.str, key.str, C.XATTR_NOFOLLOW) != 0 { return error('private link removal failed') }
+			} else {
+				changed_value := 'LINK VALU?\n'
+				if C.setxattr(link_path.str, attribute.str, changed_value.str, uint(changed_value.len), 0, C.XATTR_NOFOLLOW) != 0 { return error('private link mutation failed') }
+			}
+			mut refused := false; mut message := ''
+			winelinkxattrhost.admit(content_path, aliases, link_root) or { refused = true; message = err.msg() }
+			if name == 'link-xattr-live-retarget' { os.rm(link_path)!; os.rename(backup, link_path)! }
+			else if name == 'link-xattr-live-added' {
+				if C.removexattr(link_path.str, attribute.str, C.XATTR_NOFOLLOW) != 0 { return error('private link restoration failed') }
+			} else {
+				if C.setxattr(link_path.str, key.str, value.str, uint(value.len), 0, C.XATTR_NOFOLLOW) != 0 { return error('private link restoration failed') }
+			}
+			os.write_file(out + '/' + name + '.log', json2.encode({'refused': json2.Any(refused), 'error': message}))!
+			if !refused || !message.contains(if name == 'link-xattr-live-retarget' { 'read-closed link body differs' } else { 'read-closed link xattr content differs' }) { return error('live link helper did not reach named gate') }
+			if digest(target)! != before { return error('live link mutation changed target bytes') }
+			winelinkxattrhost.admit(content_path, aliases, link_root)!
+			passed << name
+		}
+	} $else { return error('native link controls require macOS') }
 	os.write_file(out + '/result.json', json2.encode(passed) + '\n')!
-	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline eighty-four exact refusals')
+	println('WINE HOST BUILD CONTROLS PASS real baseline copied baseline ninety-six exact refusals')
 }
 
 fn main() { check() or { eprintln(err); exit(1) } }
