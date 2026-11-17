@@ -57,7 +57,8 @@ fn main() {
    assert C.__asan_address_is_poisoned(reused_record) != 0 && C.__asan_address_is_poisoned(pin_record) != 0
    pt.unbind_tlb(); tlb.observe(unsafe { nil }, unsafe { nil }); tlb.clear()
    pgtable.destroy(pt)
-   unsafe { free(pt); heap.allocations.free() }
+   assert C.__asan_address_is_poisoned(pt) != 0, 'destruction must release the table wrapper'
+   unsafe { heap.allocations.free() }
    assert memory.live_pages() == 0
    }
   }

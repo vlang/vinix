@@ -59,7 +59,6 @@ fn test_user_mappings() {
 	assert tlb.calls().len == 0
 	tlb.observe(unsafe { nil }, unsafe { nil })
 	pgtable.destroy(pt)
-	unsafe { free(pt) }
 }
 
 fn test_root_publication_and_reuse() {
@@ -140,12 +139,18 @@ fn test_root_publication_and_reuse() {
 	pgtable.destroy(upper)
 	pgtable.destroy(user)
 	pgtable.destroy(next)
-	unsafe {
-		free(lower)
-		free(upper)
-		free(user)
-		free(next)
-	}
+}
+
+fn test_borrowed_root_destruction() {
+	root := pgtable.alloc_table_page() or { panic('bootloader root') }
+	subtree := pgtable.alloc_table_page() or { panic('bootloader subtree') }
+	unsafe { root[2] = u64(subtree) | pgtable.uat_pte_table }
+	borrowed := pgtable.new_pgtable_with_root(u64(root), 39, 48) or { panic('borrowed root') }
+	pgtable.destroy(borrowed)
+	assert memory.live_pages() == 2
+	assert unsafe { root[2] } == u64(subtree) | pgtable.uat_pte_table
+	pgtable.free_table_page(subtree)
+	pgtable.free_table_page(root)
 }
 
 fn test_gpu_permissions() {
@@ -183,7 +188,6 @@ fn test_gpu_permissions() {
 	pt.unbind_tlb()
 	tlb.clear()
 	pgtable.destroy(pt)
-	unsafe { free(pt) }
 	println('AGX GPU permissions: exact RO/WO/RW leaf words, nine reprotect transitions and visible ASID invalidations passed')
 }
 
@@ -260,7 +264,7 @@ fn test_repeated_pages() {
 			assert tlb.calls().len == 0
 		}
 		pt.unbind_tlb(); expect_asid(21, 0); tlb.observe(unsafe { nil }, unsafe { nil })
-		pgtable.destroy(pt); unsafe { free(pt) }
+		pgtable.destroy(pt)
 		assert memory.live_pages() == 0
 	}
 	println('AGX repeated PTEs: 100 cycles of exact alias leaves, RO/WO/RW, L3 boundary crossing, contiguous controls, partial rollback before one TLBI, invalid geometry and complete table release passed')
@@ -291,7 +295,7 @@ fn test_partial_unmap_survivors() {
 					}
 					pt.unmap(address, 8 * pgtable.uat_pgsz); expect_asid(22, 0)
 					pt.unbind_tlb(); expect_asid(22, 0); tlb.observe(unsafe { nil }, unsafe { nil })
-					pgtable.destroy(pt); unsafe { free(pt) }
+					pgtable.destroy(pt)
 					assert memory.live_pages() == 0
 				}
 			}
@@ -348,7 +352,7 @@ fn test_bind_preparation() {
 			memory.fail_after(-1)
 			pt.unmap(address, span); expect_asid(23, 0)
 			pt.unbind_tlb(); expect_asid(23, 0); tlb.observe(unsafe { nil }, unsafe { nil })
-			pgtable.destroy(pt); unsafe { free(pt) }
+			pgtable.destroy(pt)
 			assert memory.live_pages() == 0
 		}
 	}
@@ -361,6 +365,7 @@ fn main() {
 	test_repeated_pages()
 	test_user_mappings()
 	test_root_publication_and_reuse()
+	test_borrowed_root_destruction()
 	test_gpu_permissions()
 	test_range_operands()
 	assert memory.live_pages() == 0

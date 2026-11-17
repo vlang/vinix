@@ -80,7 +80,7 @@ pub fn check_rollback() {
 		pt.unmap(reused, 3 * alloc.gpu_page_size); pt.unmap(pin, alloc.gpu_page_size)
 		heap.release(reused); heap.release(pin); heap.release(high); heap.gc()
 		tlb.observe(unsafe { nil }, unsafe { nil }); tlb.clear(); pt.unbind_tlb(); pgtable.destroy(pt)
-		unsafe { free(pt); heap.allocations.free() }; assert memory.live_pages() == 0
+		unsafe { heap.allocations.free() }; assert memory.live_pages() == 0
 		active_heap = unsafe { nil }; uat_mgr = unsafe { nil }; cases++
 	} } }
 	assert cases == 128

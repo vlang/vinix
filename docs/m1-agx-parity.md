@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Final AGX VM teardown now reclaims the host records and both VA heap tables
+after root invalidation. [VM reclamation](m1-agx-vm-release.md)
+
 G13 records the published UAT slot in each render and compute job for command
 construction and fault recovery. [Firmware slot routing](m1-agx-job-asid.md)
 

@@ -6,6 +6,8 @@ import gpu.agx.vm as agxvm
 import klock
 import memory
 
+fn C.__asan_address_is_poisoned(voidptr) int
+
 pub const uat_num_contexts = 64
 pub const uat_unknown_page = agxvm.user_end
 
@@ -26,7 +28,7 @@ pub fn run_checks() {
 		memory.set_page_size(granule)
 		check_contexts()
 	}
-	println('AGX VM allocator: 400 native contexts and 2400 shared/private allocations across 16 KiB and 4 KiB PMM granules; one zeroed UAT page of dummy backing per context, alignment, map failures and final release passed')
+	println('AGX VM allocator: 400 native contexts and 3200 shared/private allocations across 16 KiB and 4 KiB PMM granules; dummy backing, failure unwind and final metadata reclamation passed')
 }
 
 fn check_contexts() {
@@ -90,11 +92,22 @@ fn check_contexts() {
 		context.active = false
 		if _ := context.alloc_driver_buffer(1, false) { panic('inactive VM') }
 		context.active = true
+
+		// Residual allocations belong exclusively to this final owner.
+		shared := context.alloc_driver_buffer(1, false) or { panic('shared drain allocation') }
+		private := context.alloc_driver_buffer(1, true) or { panic('private drain allocation') }
+		assert memory.active() == 3
+		metadata := [voidptr(context), voidptr(context.pgtable), context.driver_buffers.data,
+			context.driver_gpu.allocations.data, context.driver_private.allocations.data,
+			voidptr(shared), voidptr(private)]!
+		for address in metadata {
+			assert address != unsafe { nil } && C.__asan_address_is_poisoned(address) == 0
+		}
 		manager.destroy_context(context)
-		assert !context.active && context.dummy_phys == 0 && manager.contexts[1] == unsafe { nil }
-		// Production retains context metadata after destroy. Fixture cleanup is
-		// safe after this final synchronous call; all buffers were released.
-		unsafe { context.driver_buffers.free(); free(context) }
+		assert manager.contexts[1] == unsafe { nil }
+		for address in metadata {
+			assert C.__asan_address_is_poisoned(address) != 0, 'VM destruction must release all captured metadata'
+		}
 		assert memory.active() == 0 && pgtable.active() == 0
 	}
 	for failure in 0 .. 3 {

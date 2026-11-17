@@ -30,7 +30,7 @@ fn main() {
 	os.write_file('${scratch}/gpu/agx/mmu/production.v', production)!
 	os.cp('${repo}/tests/agx-vm-allocator/test.v', '${scratch}/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })
-	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-cc', 'cc', '-enable-globals',
+	build.set_args(['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals',
 		'-path', '${scratch}|@vlib|@vmodules', '-cflags',
 		'-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags',
 		'-fsanitize=address,undefined', '-o', '${scratch}/test', '${scratch}/main.v'])

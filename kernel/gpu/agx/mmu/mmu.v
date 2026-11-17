@@ -167,6 +167,7 @@ pub fn new_manager(ttbs_base u64, handoff_base u64, pagetables_base u64, ias u32
 		// to firmware and are left untouched.
 		if ias != 39 || !upper.clear_external_root_entry(2) {
 			pgtable.destroy(lower)
+			pgtable.destroy(upper)
 			println('uat mmu: invalid G13 reserved TTBR1 geometry')
 			return none
 		}
@@ -377,7 +378,7 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 				kernel_end: window.end
 				driver_gpu: gpu_alloc.new_heap('uat-user-gpu', window.start, window.midpoint)
 				driver_private: gpu_alloc.new_heap('uat-user-private', window.midpoint, window.end)
-			}
+			} @[freed]
 			// Nothing slices the list, so growing it can free the old buffer.
 			ctx.driver_buffers.flags |= .noslices
 			mgr.contexts[i] = ctx
@@ -387,6 +388,8 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 	return none
 }
 
+// Caller holds the final file owner after mappings, queue backing and job
+// captures have retired. The context pointer is consumed by this call.
 pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
 	if ctx == unsafe { nil } || ctx.id == 0 || ctx.id >= uat_num_contexts {
 		return
@@ -398,15 +401,12 @@ pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
 	mgr.unbind_context(ctx)
 	mut owned := unsafe { ctx }
 	owned.release_all_driver_buffers()
-	owned.active = false
-	if owned.pgtable != unsafe { nil } {
-		pgtable.destroy(owned.pgtable)
-	}
+	pgtable.destroy(owned.pgtable)
 	if owned.dummy_phys != 0 {
 		memory.pmm_free(voidptr(owned.dummy_phys), pgtable.uat_pgsz / memory.page_size)
-		owned.dummy_phys = 0
 	}
 	mgr.contexts[ctx.id] = unsafe { nil }
+	unsafe { free(owned) }
 }
 
 // Allocate physically contiguous, CPU-visible memory in the half of Mesa's
@@ -624,10 +624,7 @@ pub fn (mut ctx UatContext) release_driver_buffer(buffer &UatBuffer) {
 		if voidptr(candidate) == voidptr(buffer) {
 			ctx.release_driver_buffer_locked(candidate)
 			ctx.driver_buffers.delete(index)
-			// Its owner lets go of it here, so the record goes as well. Jobs
-			// and render buffers allocate these for every frame.
-			// release_all_driver_buffers() keeps its records, which owners
-			// may still hold.
+			// Jobs and render buffers relinquish each record here.
 			unsafe { free(candidate) }
 			break
 		}
@@ -639,12 +636,17 @@ pub fn (mut ctx UatContext) release_driver_buffer(buffer &UatBuffer) {
 
 fn (mut ctx UatContext) release_all_driver_buffers() {
 	ctx.lock.acquire()
-	for index := ctx.driver_buffers.len - 1; index >= 0; index-- {
-		ctx.release_driver_buffer_locked(ctx.driver_buffers[index])
+	for buffer in ctx.driver_buffers {
+		ctx.release_driver_buffer_locked(buffer)
+		unsafe { free(buffer) }
 	}
-	ctx.driver_buffers.clear()
 	ctx.driver_gpu.gc()
 	ctx.driver_private.gc()
+	unsafe {
+		ctx.driver_buffers.free()
+		ctx.driver_gpu.allocations.free()
+		ctx.driver_private.allocations.free()
+	}
 	ctx.lock.release()
 }
 

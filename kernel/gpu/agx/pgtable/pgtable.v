@@ -166,14 +166,15 @@ pub fn new_pgtable(ias u32, oas u32) ?&UatPgtable {
 	}
 	l1 := alloc_table_page() or { return none }
 
-	return &UatPgtable{
+	table := &UatPgtable{
 		l1: l1
 		l1_phys: u64(l1)
 		ias: ias
 		oas_mask: (u64(1) << oas) - 1
 		non_global: true
 		owns_root: true
-	}
+	} @[freed]
+	return table
 }
 
 // Attach to the firmware/bootloader-reserved TTBR1 root. Callers preserve
@@ -213,12 +214,14 @@ pub fn (mut pt UatPgtable) clear_external_root_entry(index u32) bool {
 	return true
 }
 
-// Destroy a page table, freeing the L1 root and all referenced L2/L3 tables.
+// Destroy an unpublished page table. For a borrowed root, only the host
+// wrapper belongs to the caller.
 pub fn destroy(pt &UatPgtable) {
-	if pt == unsafe { nil } || pt.l1 == unsafe { nil } {
+	if pt == unsafe { nil } {
 		return
 	}
-	if !pt.owns_root {
+	defer { unsafe { free(pt) } }
+	if !pt.owns_root || pt.l1 == unsafe { nil } {
 		return
 	}
 
