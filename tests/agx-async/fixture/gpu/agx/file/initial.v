@@ -76,7 +76,9 @@ fn check_initial_submission_events() {
 	manager = gpu.get_global_manager() or { panic('manager') }
 	kept, rejected, later := output(), output(), output()
 	assert submit_scheduled(mut file, [ScheduledCommand{ compute: true }], kept, false) == 0
-	assert submit_batch(mut file, 64, 2, 6, unsafe { nil }, rejected, false) == -22
+	manager.fail_callback_at = 64
+	assert submit_batch(mut file, 64, 2, 0, unsafe { nil }, rejected, false) == -5
+	manager.fail_callback_at = -1
 	assert submit_scheduled(mut file, [ScheduledCommand{ compute_barrier: 0 }], later, false) == 0
 	service_file_work()
 	assert manager.g13_render_jobs[0].initial_sources[1] == 1

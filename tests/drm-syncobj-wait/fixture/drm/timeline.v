@@ -4,6 +4,7 @@ module drm
 
 import drm.ioctl
 import drm.syncobj
+import file
 import gpu.agx.submission
 import memory
 import usercopy
@@ -33,6 +34,51 @@ fn expect_timeline(obj &syncobj.SyncObj, query u64, expected &syncobj.DmaFence) 
 fn retire_timeline_fixture() {
 	assert memory.outstanding() == 0
 	clear(); memory.release_retained_fences(sizeof(syncobj.DmaFence)); memory.reset()
+}
+
+fn check_g13_legacy_drm_timeline() {
+	obj := make_object(0)
+	target := make_object(0)
+	leaf := make_fence()
+	mut record := ioctl.DrmAsahiSync{handle: obj.handle, sync_type: ioctl.asahi_sync_timeline_syncobj, timeline_value: 5}
+	buffer := unsafe { u64(&record) }
+	usercopy.allow(buffer, sizeof(record))
+	code, staged := submission.stage_g13_sync_array(11, buffer, 1, false)
+	assert code == 0 && submission.install_output_syncs(unsafe { &staged }, leaf)
+	submission.release_sync_array(staged)
+	root := remember_fence(current(obj))
+	mut wait := TimelineWaitInput{handles: [4096]u32{init: obj.handle}, points: [4096]u64{init: 5}}
+	mut request := tw_request(unsafe { &wait }, 1, 0, 0)
+	assert ioctl_syncobj_timeline_wait(voidptr(11), unsafe { &request }) == -62
+	fd := export_timeline_fd(obj, 5, 0)
+	import_timeline_fd(target, fd, 7, 0)
+	imported := remember_fence(current(target))
+	file.close(fd)
+	record.handle = target.handle; record.timeline_value = 7
+	usercopy.allow(buffer, sizeof(record))
+	input_code, input := submission.stage_g13_sync_array(11, buffer, 1, true)
+	assert input_code == 0 && input.item(0).fence == imported
+	assert syncobj.chain_contained(imported) == root
+	syncobj.signal(leaf)
+	usercopy.allow(u64(&wait), sizeof(wait))
+	assert ioctl_syncobj_timeline_wait(voidptr(11), unsafe { &request }) == 0
+	assert syncobj.is_signaled(input.item(0).fence)
+
+	record.timeline_value = 9
+	usercopy.allow(buffer, sizeof(record))
+	output_code, output := submission.stage_g13_sync_array(11, buffer, 1, false)
+	assert output_code == 0 && syncobj.destroy(11, target.handle)
+	reused := make_object(0); assert reused.handle == target.handle
+	assert submission.install_output_syncs(unsafe { &output }, leaf)
+	remember_fence(current(target))
+	assert syncobj.query_timeline_point(target, true) == 9
+	if _ := syncobj.get_fence(reused) { panic('reused handle received captured output') }
+	submission.release_sync_array(output)
+	clear()
+	assert memory.outstanding() == 0
+	memory.release_retained_fences(sizeof(syncobj.DmaFence))
+	memory.reset()
+	println('G13 legacy timelines: DRM wait and sync-file export/import interoperate with staged submissions, and output survives handle reuse')
 }
 
 pub fn run_timeline_boundary_checks() {
@@ -110,4 +156,5 @@ pub fn run_timeline_boundary_checks() {
 	} } } }
 	expect_timeline(unsafe { nil }, 1, unsafe { nil })
 	println('DRM timeline boundary: ${timeline_cases} checks; MAX fallback and exact points, unsigned boundary oracle over all subsets/permutations, actual Asahi output/input staging, stable captures, reset/reuse, no lookup allocation and released locks passed')
+	check_g13_legacy_drm_timeline()
 }

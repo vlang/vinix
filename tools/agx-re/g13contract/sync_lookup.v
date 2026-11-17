@@ -6,11 +6,12 @@ fn check_asahi_sync_lookup_contract(staging string, caller string, rust string, 
 	require_order(stage, ['item.extensions != 0', 'return -22, SyncArray{}',
 		'object := if input {', 'syncobj.lookup(owner, item.handle) or { return -2, SyncArray{} }',
 		'syncobj.lookup_referenced(owner, item.handle) or { return -2, SyncArray{} }',
-		'if input', 'syncobj.get_timeline_fence(object, item.timeline_value)', 'return -22, SyncArray{}',
+		'if input', 'syncobj.get_chain_fence(object, item.timeline_value)', 'return -22, SyncArray{}',
+		'syncobj.get_timeline_fence(object, item.timeline_value)', 'return -22, SyncArray{}',
 		'syncobj.get_fence(object) or { return -22, SyncArray{} }', 'return 0, SyncArray{'],
 		'Missing syncobj is ENOENT after validation; a missing input fence remains EINVAL')!
-	require_order(caller, ['input_syncs := agxsubmission.stage_sync_array(', 'if sync_result != 0 { return sync_result }',
-		'output_syncs := agxsubmission.stage_sync_array(', 'if output_result != 0 { return output_result }'],
+	require_order(caller, ['input_syncs := agxsubmission.stage_g13_sync_array(', 'if sync_result != 0 { return sync_result }',
+		'output_syncs := agxsubmission.stage_g13_sync_array(', 'if output_result != 0 { return output_result }'],
 		'Input/output staging errors must propagate before backend effects')!
 	lookup := section(rust, 'pub fn lookup_handle', '/// Returns the DMA fence', 'Asahi Rust object lookup')!
 	require_order(lookup, ['bindings::drm_syncobj_find(', 'if ptr.is_null()', 'Err(ENOENT)', 'Ok(SyncObj { ptr })'],

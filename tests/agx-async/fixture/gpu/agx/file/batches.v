@@ -88,27 +88,15 @@ fn submit_batch(mut file GpuFile, count u32, pattern int, bad int,
 	if bad == 4 { commands[63].cmd_buffer_size = 0 }
 	in_sync := ioctl.DrmAsahiSync{ handle: if input != unsafe { nil } { input.handle } else { 0 } }
 	out_sync := ioctl.DrmAsahiSync{ handle: if output != unsafe { nil } { output.handle } else { 0 } }
-	mut outputs := [out_sync, out_sync]!
-	if bad == 6 {
-		timeline := syncobj.new_syncobj(1) or { panic('timeline') }
-		assert syncobj.add_timeline_point(timeline, 1, syncobj.new_fence(1, 1))
-		outputs[1] = ioctl.DrmAsahiSync{ handle: timeline.handle, sync_type: ioctl.asahi_sync_timeline_syncobj, timeline_value: 1 }
-	}
 	request := ioctl.DrmAsahiSubmit{
 		queue_id:       1
 		commands:       if bad == 5 { ~u64(0) - 20 } else { unsafe { u64(&commands) } }
 		command_count:  count
 		result_handle:  if results { 7 } else { 0 }
 		in_syncs:       u64(&in_sync)
-		out_syncs:      unsafe { u64(&outputs) }
+		out_syncs:      u64(&out_sync)
 		in_sync_count:  if input != unsafe { nil } { 1 } else { 0 }
-		out_sync_count: if bad == 6 {
-			2
-		} else if output != unsafe { nil } {
-			1
-		} else {
-			0
-		}
+		out_sync_count: if output != unsafe { nil } { 1 } else { 0 }
 	}
 	return file.ioctl_submit(&request)
 }
@@ -253,10 +241,11 @@ fn check_unqueued_notification() {
 	mut object := gem.GemObject{ size: sizeof(results), virt_addr: unsafe { u64(&results) } }
 	file.objects = Objects{ object: &object }
 	manager.inspect_callback_at = 63
+	manager.stop_callback_at = 63
 	manager.on_callback = watch_unqueued
 	out := output()
 	before := notifications
-	assert submit_batch(mut file, 64, 2, 6, unsafe { nil }, out, true) == -22
+	assert submit_batch(mut file, 64, 2, 0, unsafe { nil }, out, true) == -19
 	assert notifications == before + 1 && object.references == 1
 	assert syncobj.get_error(fence(out)) != 0
 	assert fence(out).seqno == 1 && file.g13_queues[0].resources.fence_seqno == 1
@@ -305,5 +294,6 @@ fn check_batches() {
 	check_middle_failure_and_shutdown()
 	check_fake_pair_limit()
 	check_unqueued_notification()
+	check_legacy_timeline()
 	println('AGX batches: four 64-command orderings, per-subqueue barrier bounds, final fence/results, all 64 prepare/barrier/callback/stop failure positions, both allocations, reverse unwind, middle failure and fake pair limit passed')
 }

@@ -23,7 +23,7 @@ pub:
 	fence &syncobj.DmaFence = unsafe { nil }
 	timeline bool
 	timeline_value u64
-	chain &syncobj.DmaFence = unsafe { nil } // modern output's reserved chain node
+	chain &syncobj.DmaFence = unsafe { nil } // reserved timeline output node
 }
 
 pub struct SyncArray {
@@ -53,13 +53,24 @@ pub:
 	timestamps [3]asahi.Timestamps // vertex, fragment, compute; zero for legacy input
 }
 
-// Snapshot sync descriptors and retain the stable sync-object and input-fence
-// pointers needed by backend-specific wait and completion paths.
+// The fake backend's legacy interface uses its sparse timeline map.
 pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, SyncArray) {
+	return stage_legacy_syncs(owner, pointer, count, input, false)
+}
+
+// Native G13 uses the DRM timeline chain in both wire formats.
+pub fn stage_g13_sync_array(owner u64, pointer u64, count u32, input bool) (int, SyncArray) {
+	return stage_legacy_syncs(owner, pointer, count, input, true)
+}
+
+// Snapshot legacy descriptors and retain the output identities and any
+// private chain reservations needed by the publication path.
+fn stage_legacy_syncs(owner u64, pointer u64, count u32, input bool, chain_timeline bool) (int, SyncArray) {
 	mut objects := unsafe { [64]&syncobj.SyncObj{} }
 	mut fences := unsafe { [64]&syncobj.DmaFence{} }
 	mut timeline := [64]bool{}
 	mut timeline_values := [64]u64{}
+	mut chains := unsafe { [64]&syncobj.DmaFence{} }
 	if count > max_syncs {
 		return -22, SyncArray{}
 	}
@@ -73,6 +84,7 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 	mut retained := u32(0)
 	defer {
 		for index := u32(0); index < retained; index++ {
+			syncobj.release_chain_reservation(chains[index])
 			syncobj.release_syncobj(objects[index])
 		}
 	}
@@ -85,7 +97,7 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 			|| (item.sync_type != ioctl.asahi_sync_syncobj
 				&& item.sync_type != ioctl.asahi_sync_timeline_syncobj)
 			|| (item.sync_type == ioctl.asahi_sync_syncobj && item.timeline_value != 0)
-			|| (item.sync_type == ioctl.asahi_sync_timeline_syncobj
+			|| (!chain_timeline && item.sync_type == ioctl.asahi_sync_timeline_syncobj
 				&& item.timeline_value == 0) {
 			return -22, SyncArray{}
 		}
@@ -100,7 +112,9 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 		timeline[index] = item.sync_type == ioctl.asahi_sync_timeline_syncobj
 		timeline_values[index] = item.timeline_value
 		if input {
-			fence := if timeline[index] {
+			fence := if timeline[index] && chain_timeline {
+				syncobj.get_chain_fence(object, item.timeline_value) or { return -22, SyncArray{} }
+			} else if timeline[index] {
 				syncobj.get_timeline_fence(object, item.timeline_value) or {
 					return -22, SyncArray{}
 				}
@@ -110,6 +124,13 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 			fences[index] = fence
 		} else { retained++ }
 	}
+	if chain_timeline && !input {
+		for index := u32(0); index < retained; index++ {
+			if timeline[index] {
+				chains[index] = syncobj.reserve_chain() or { return -12, SyncArray{} }
+			}
+		}
+	}
 	retained = 0
 	return 0, SyncArray{
 		count:           count
@@ -117,6 +138,7 @@ pub fn stage_sync_array(owner u64, pointer u64, count u32, input bool) (int, Syn
 		fences:          fences
 		timeline:        timeline
 		timeline_values: timeline_values
+		chains:         chains
 		owns_objects: !input
 	}
 }

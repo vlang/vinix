@@ -692,7 +692,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'fn dispatch(', 'Vinix async submission ioctl')!
 	require(!ioctl_submit.contains('wait_g13_fence') && !ioctl_submit.contains('syncobj.wait')
 		&& !ioctl_submit.contains('sched.yield'), 'Vinix submission must not wait for dependencies or GPU work')!
-	require_order(ioctl_submit, ['agxsubmission.stage_command_array', 'agxsubmission.stage_sync_array',
+	require_order(ioctl_submit, ['agxsubmission.stage_command_array', 'agxsubmission.stage_g13_sync_array',
 		'f.lock.acquire()', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
 		'gpu_manager.capture_g13_initial_events', 'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
 		'install_g13_batch_barriers',

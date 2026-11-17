@@ -16,7 +16,7 @@ fn check_submit_lookup_order_contract(local string, reference string) ! {
 		'defer { if !transferred { release_submission_queue(captured) } }', 'stage_bytes :=',
 		'stage_storage := memory.malloc_packed_fallible(stage_bytes)',
 		'defer { memory.free(stage_storage) }', 'agxsubmission.stage_command_array(',
-		'agxsubmission.stage_sync_array(', 'f.lock.acquire()', 'vm_id := captured.vm_id',
+		'agxsubmission.stage_g13_sync_array(', 'f.lock.acquire()', 'vm_id := captured.vm_id',
 		'queue_caps := captured.caps', 'vm := f.find_owned_vm(vm_id)', 'queue_resources := captured.resources'],
 		'Header validation, owned early lookup, unlocked staging and locked captured state')!
 	remote := section(reference, 'pub(crate) fn submit(', '/// IOCTL: get_time:', 'Packaged queue lookup order')!

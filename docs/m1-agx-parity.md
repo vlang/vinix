@@ -6,6 +6,11 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Native G13 legacy and modern submissions now share DRM timeline fence chains.
+Both formats can consume points published by the other format or by DRM. The
+legacy path reserves chain nodes before job preparation.
+[G13 timeline interoperability](m1-agx-legacy-chain.md)
+
 DRM WAIT and sync-file requests now propagate deadline hints to captured
 G13 fences. Each queue fence keeps the earliest signed hint.
 [Fence deadline hints](m1-agx-wait-deadlines.md)

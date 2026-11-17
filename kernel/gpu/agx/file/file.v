@@ -1412,12 +1412,12 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	}
 	command_result := agxsubmission.stage_command_array(request.commands, request.command_count, mut commands)
 	if command_result != 0 { return command_result }
-	sync_result, input_syncs := agxsubmission.stage_sync_array(f.owner_key, request.in_syncs, request.in_sync_count, true)
+	sync_result, input_syncs := agxsubmission.stage_g13_sync_array(f.owner_key, request.in_syncs, request.in_sync_count, true)
 	if sync_result != 0 { return sync_result }
-	output_result, output_syncs := agxsubmission.stage_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
+	output_result, output_syncs := agxsubmission.stage_g13_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 { return output_result }
 	defer { agxsubmission.release_sync_array(output_syncs) }
-	code := f.submit_g13_staged(captured, commands, &input_syncs, &output_syncs, request.result_handle)
+	code := f.submit_g13_staged(captured, commands, unsafe { &input_syncs }, unsafe { &output_syncs }, request.result_handle)
 	transferred = code == 0
 	return code
 }
@@ -1449,8 +1449,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	mut unqueued_failure := 0
 	defer {
 		f.lock.release()
-		// Error cleanup may have exposed a prefix of the output sync array.
-		// Deliver its notification after dropping file.lock and node backing.
+		// Notify cancelled output fences after dropping file.lock and node backing.
 		if unqueued_fence != unsafe { nil } { signal_g13_submission_fence(unqueued_fence, unqueued_failure) }
 	}
 	vm_id := captured.vm_id
