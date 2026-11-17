@@ -49,6 +49,7 @@ pub mut:
 	size   u64 // Size in bytes (always 16KB-aligned)
 	in_use bool // false once freed; eligible for GC
 	hole_order u64 // Recency rank of the following hole; zero if none
+	release_order u64 // Deferred FIFO rank; zero while live
 }
 
 // --- GPU virtual-address heap allocator ---
@@ -66,6 +67,8 @@ pub mut:
 	allocations []&Allocation
 	head_hole_order u64 // Recency rank of the hole before the first record
 	hole_count u64 // Active hole ranks are exactly 1..hole_count
+	garbage_count u64 // Deferred releases, ordered 1..garbage_count
+	garbage_bytes u64 // Rounded reservation bytes awaiting collection
 	lock        klock.Lock
 }
 
@@ -219,6 +222,9 @@ pub fn (mut h HeapAllocator) release(va u64) {
 		if a.va == va && a.in_use {
 			unsafe {
 				a.in_use = false
+				h.garbage_count++
+				a.release_order = h.garbage_count
+				h.garbage_bytes += a.size
 			}
 			return
 		}
@@ -239,36 +245,65 @@ pub fn (mut h HeapAllocator) gc() {
 
 // Internal GC implementation (caller must hold the lock).
 fn (mut h HeapAllocator) gc_locked() {
-	// Descending deletion preserves the unvisited prefix and live VA order.
-	mut idx := h.allocations.len - 1
-	for idx >= 0 {
-		mut a := h.allocations[idx]
-		if !a.in_use {
-			h.retire_hole_order_locked(a.hole_order)
-			a.hole_order = 0
-			// Removing a reservation reinserts its coalesced predecessor hole.
-			if idx == 0 {
-				h.retire_hole_order_locked(h.head_hole_order)
-				h.head_hole_order = h.newest_hole_order_locked()
-			} else {
-				mut previous := h.allocations[idx - 1]
-				h.retire_hole_order_locked(previous.hole_order)
-				previous.hole_order = h.newest_hole_order_locked()
-			}
-			if a.va + a.size == h.top {
-				// Alignment padding belongs to this reservation too. Restore
-				// its original frontier so GC can reach the preceding record.
-				h.top = if idx == 0 { h.start } else {
-					previous := h.allocations[idx - 1]
-					previous.va + previous.size
-				}
-			}
-			h.allocations.delete(idx)
-			// The lock excludes every metadata reader. Unlink before freeing;
-			// live records keep their addresses even when this is an interior.
-			unsafe { free(a) }
+	h.collect_garbage_locked(h.garbage_count)
+}
+
+// Return the count and rounded bytes of released but not yet reusable ranges.
+pub fn (mut h HeapAllocator) garbage() (u64, u64) {
+	h.lock.acquire()
+	defer { h.lock.release() }
+	return h.garbage_count, h.garbage_bytes
+}
+
+// Collect at most count deferred releases, oldest first. Other pending ranges
+// remain reserved. The manager's gc() entry point still collects all of them.
+pub fn (mut h HeapAllocator) collect_garbage(count u64) {
+	h.lock.acquire()
+	defer { h.lock.release() }
+	h.collect_garbage_locked(count)
+}
+
+fn (mut h HeapAllocator) collect_garbage_locked(count u64) {
+	mut collect_left := if count < h.garbage_count { count } else { h.garbage_count }
+	for collect_left > 0 {
+		mut idx := 0
+		for idx < h.allocations.len {
+			a := h.allocations[idx]
+			if !a.in_use && a.release_order == 1 { break }
+			idx++
 		}
-		idx--
+		if idx == h.allocations.len { return }
+		mut a := h.allocations[idx]
+		h.retire_hole_order_locked(a.hole_order)
+		a.hole_order = 0
+		// Removing a reservation reinserts its coalesced predecessor hole.
+		if idx == 0 {
+			h.retire_hole_order_locked(h.head_hole_order)
+			h.head_hole_order = h.newest_hole_order_locked()
+		} else {
+			mut previous := h.allocations[idx - 1]
+			h.retire_hole_order_locked(previous.hole_order)
+			previous.hole_order = h.newest_hole_order_locked()
+		}
+		if a.va + a.size == h.top {
+			// Alignment padding belongs to this reservation too. Restore
+			// its original frontier so GC can reach the preceding record.
+			h.top = if idx == 0 { h.start } else {
+				previous := h.allocations[idx - 1]
+				previous.va + previous.size
+			}
+		}
+		h.garbage_count--
+		h.garbage_bytes -= a.size
+		// Compact FIFO ranks instead of using a sequence that can wrap.
+		for mut pending in h.allocations {
+			if pending.release_order > 1 { pending.release_order-- }
+		}
+		h.allocations.delete(idx)
+		// The lock excludes every metadata reader. Unlink before freeing;
+		// live records keep their addresses even when this is an interior.
+		unsafe { free(a) }
+		collect_left--
 	}
 }
 

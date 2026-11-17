@@ -13,7 +13,7 @@ fn main() {
   ['original-source', os.read_file(os.args[2])!, 'GPU heap GC must reclaim alignment padding and released prefix'],
   ['wrong-start', source.replace('if idx == 0 { h.start }', 'if idx == 0 { h.start + gpu_page_size }'), 'GPU heap GC must reclaim alignment padding and released prefix'],
   ['preceding-start', source.replace('previous.va + previous.size', 'previous.va'), 'heap.top == start && heap.allocations.len == 0 && heap.used() == 0'],
-  ['live-prefix', source.replace('if !a.in_use {', 'if true {'), 'GC restores reservation frontier including alignment padding'],
+  ['live-prefix', source.replace('if !a.in_use && a.release_order == 1 { break }', 'if true { break }'), 'GC restores reservation frontier including alignment padding'],
  ]
  mut receipts := []string{}
  for item in variants {

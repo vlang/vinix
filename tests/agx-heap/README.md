@@ -52,7 +52,9 @@ catch original, missing, late and lost ownership of the pointer buffer.
 
 `--measure-collect` releases 8,192 records below one live allocation. The old
 suffix-only collector reclaims zero records; the current collector reclaims
-8,192 malloc blocks / 262,144 bytes while preserving the pin and frontier.
+8,192 malloc blocks / 393,216 bytes for the current record layout while preserving
+the pin and frontier. The fixture queries `malloc_size` before collection rather
+than assuming a historical record size.
 Another 288 offset/alignment/four-pin release-order cases test interior deletion,
 later allocation, highest release, repeated GC and complete reset. Collected
 interior VA gaps are reusable below live allocations. GC and placement scan
@@ -132,12 +134,14 @@ Asahi `alloc.rs` and the pinned `drm_mm.c`. `reuse-counterexamples.v` takes the
 heap runner, pre-reuse allocator and a fresh external directory; eight compiled
 variants exercise capacity loss, ranking, ordering and deferred collection.
 
-`tlb-reuse-run.v` always enables ASan/UBSan and combines the production allocator
+`tlb-reuse-run.v` always enables ASan/UBSan with `-gc none -manualfree`, matching
+the kernel, and combines the production allocator
 and page tables with the existing TLBI fixture. Two hundred uncached global/ASID
 cycles verify old leaves are invalidated before reuse, new mappings name the new
 backing, live pins stay mapped and all page tables are released. Optional
 `AGX_HEAP_TLB_BINARY` and `AGX_HEAP_TLB_C` retain artifacts externally. These tests
 replace privileged instructions and do not execute firmware cache invalidation.
+ASan also verifies collected metadata is poisoned and live pin metadata survives.
 
 `--sanitize-history` runs three targeted newest-hole/split/alignment probes and
 9,216 seeded split/coalesce/deferred-release steps. The independent model keeps
@@ -151,7 +155,7 @@ previous allocator, oldest/lowest ties, reversed split ordering, stale coalescin
 unbounded counts and omitted rank compaction. Each must fail its designated
 runtime assertion; compile failures do not count as rejection.
 
-For current generated C, use `check-history.v --host C`, `--selftest C`,
+For generated C before FIFO collection, use `check-history.v --host C`, `--selftest C`,
 `--native C BASELINE_C` or `--reference DRM_MM_C`. Fourteen selftest mutations
 cover ranking, compaction, bounds, coalescing and ownership. Native mode removes
 only the exact scalar GC history block, then requires the original collector
@@ -161,7 +165,33 @@ in `check-capacity.v` still apply. The `check-reuse.v` and `check-collect.v`
 native/host proof modes now retain their historical contracts and require their
 original complete bundles; they were not weakened for the new history fields.
 
-The tie rule matches the same insertion/removal stream. Vinix still collects in
-descending VA order, while Asahi drains a count-limited prefix of deferred
-garbage. Full allocation histories can therefore still differ. Tree-backed
-runtime cost, backing/accounting policies and hardware behavior remain unqualified.
+The tie rule matches the same insertion/removal stream. Collection now follows
+release FIFO order and supports a count limit. Manager collection triggers,
+immediate-drop policy, backing/accounting behavior and native performance remain
+different or unqualified.
+
+`--sanitize-garbage` runs 19,440 release-permutation/count/offset cases and 10,240
+mixed partial-collection/reuse steps. It compares pending counts, rounded bytes,
+every bounded release rank and every hole rank with an independent pending-address
+FIFO and chronological hole list. Count zero, all six-release permutations,
+oversized counts, duplicate/unknown releases, partial collection, live pins and
+deferred ownership are covered. `--sanitize-garbage-probe` uses only the established
+API so the previous allocator reproduces its descending-VA mismatch at runtime.
+`--sanitize-garbage-limits` isolates bounded collection for compiled negatives.
+
+`garbage-counterexamples.v` rejects ten compiled policy/accounting/rank variants.
+`check-garbage.v --host C`, `--selftest C`, `--native C BASELINE_C`, and
+`--reference ALLOC_RS KVEC_RS DRAIN_RS` check scalar bookkeeping, fifteen C
+mutations, unchanged native ownership and the pinned upstream vector/drop path.
+The historical `check-history.v` contract now also requires its original complete
+bundle; it was not changed for the FIFO collector. Existing heap/padding/collection
+negative generators target the new FIFO selector. The ownership measurement
+checks the actual malloc block size; its original-source case still requires
+10,000 blocks / 320,000 bytes. Padding/collection matrices now check live byte
+counts before dereferencing retained records, catching a removed live owner early.
+
+The old default-Boehm heap/TLB fixture crashed with ASan fake-stack detection;
+the same binary passed with fake stacks disabled, and a traced variant passed.
+Those diagnostics are retained. Acceptance uses the kernel's manual memory model
+with fake-stack detection enabled and explicit freed-metadata checks. Default
+Boehm/ASan interoperability is not qualified by this fixture.

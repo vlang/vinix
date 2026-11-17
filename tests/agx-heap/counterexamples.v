@@ -32,7 +32,11 @@ fn main() {
   os.write_file(dir + '/run.log', log)!
   assert process.code != 0 && log.contains(item[3]) && !log.contains('error:')
    && os.is_file(dir + '/test') && os.is_file(dir + '/test.c'), item[0] + ': ' + log
-  if item[2] == '--measure' { assert log.contains('retained_blocks=10000 retained_bytes=320000') }
+  if item[2] == '--measure' {
+   sample := log.all_after('AGX-HEAP-RECORD bytes=').all_before('\n').u64()
+   assert sample >= 24 && log.contains('retained_blocks=10000 retained_bytes=' + (10000 * sample).str())
+   if item[0] == 'original-source' { assert sample == 32 && log.contains('retained_blocks=10000 retained_bytes=320000') }
+  }
   process.close()
   receipts << item[0] + ' source sha256 ' + sha256.sum(item[1].bytes()).hex()
   println(item[0] + ': compiled; designated heap ownership failure detected')

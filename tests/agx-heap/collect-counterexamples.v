@@ -11,11 +11,13 @@ fn main() {
  source := os.read_file(repo + '/kernel/gpu/agx/alloc/alloc.v')!
  variants := [
   ['original-source', os.read_file(os.args[2])!],
-  ['suffix-only', source.replace('if !a.in_use {', 'if !a.in_use && a.va + a.size == h.top {')],
-  ['live-stop', source.replace('if !a.in_use {', 'if a.in_use { break }\n\t\tif !a.in_use {')],
-  ['free-live', source.replace('if !a.in_use {', 'if true {')],
+  ['suffix-only', source.replace('if !a.in_use && a.release_order == 1 { break }', 'if !a.in_use && a.release_order == 1 && a.va + a.size == h.top { break }')],
+  ['live-stop', source.replace('if !a.in_use && a.release_order == 1 { break }', 'if a.in_use { return }\n\t\t\tif !a.in_use && a.release_order == 1 { break }')],
+  ['free-live', source.replace('if !a.in_use && a.release_order == 1 { break }', 'if true { break }')],
   ['interior-frontier', source.replace('if a.va + a.size == h.top {', 'if true {')],
-  ['skip-record', source.replace('idx--', 'idx -= 2')],
+  // Keep the mutant's scanner in bounds so its failure specifically exposes
+  // skipped deferred owners rather than an unrelated array-index panic.
+  ['skip-record', source.replace('idx++', 'idx += 2; if idx > h.allocations.len { idx = h.allocations.len }')],
  ]
  mut receipts := []string{}
  for item in variants {

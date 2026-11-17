@@ -6,6 +6,9 @@ import gpu.agx.pgtable
 import gpu.agx.tlb
 import memory
 
+#include <sanitizer/asan_interface.h>
+fn C.__asan_address_is_poisoned(voidptr) int
+
 fn main() {
  assert !pgtable.is_cached_noncoherent(pgtable.gpu_prot_fw_shared_rw)
  for cycle in 0 .. 100 {
@@ -17,6 +20,8 @@ fn main() {
    pt.bind_tlb(7); tlb.clear()
    low := heap.alloc(1, 0) or { panic('low') }
    pin := heap.alloc(3 * alloc.gpu_page_size, 0) or { panic('pin') }
+   low_record := heap.allocations[0]
+   pin_record := heap.allocations[1]
    old_physical := u64(0x200000) + u64(cycle) * 8 * alloc.gpu_page_size
    new_physical := old_physical + 4 * alloc.gpu_page_size
    assert pt.map(low, old_physical, alloc.gpu_page_size, pgtable.gpu_prot_fw_shared_rw)
@@ -29,8 +34,12 @@ fn main() {
     'old translation must be invalidated before heap release and reuse'
    assert pt.translate(pin) or { u64(0) } == old_physical + alloc.gpu_page_size
    heap.release(low); heap.gc()
+   assert C.__asan_address_is_poisoned(low_record) != 0 && C.__asan_address_is_poisoned(pin_record) == 0,
+    'manual-free collection must retire old metadata while preserving the live pin'
    reused := heap.alloc(1, 0) or { panic('reuse') }
    assert reused == low && heap.top == heap.end
+   reused_record := heap.allocations[0]
+   assert heap.allocations[1] == pin_record
    tlb.clear()
    assert pt.map(reused, new_physical, alloc.gpu_page_size, pgtable.gpu_prot_fw_shared_rw)
    mapped := tlb.calls()
@@ -40,6 +49,7 @@ fn main() {
    pt.unmap(reused, alloc.gpu_page_size); heap.release(reused)
    pt.unmap(pin, 3 * alloc.gpu_page_size); heap.release(pin); heap.gc()
    assert heap.allocations.len == 0 && heap.top == heap.start
+   assert C.__asan_address_is_poisoned(reused_record) != 0 && C.__asan_address_is_poisoned(pin_record) != 0
    pt.unbind_tlb(); tlb.observe(unsafe { nil }, unsafe { nil }); tlb.clear()
    pgtable.destroy(pt)
    unsafe { free(pt); heap.allocations.free() }

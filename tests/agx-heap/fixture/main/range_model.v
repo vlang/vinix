@@ -20,12 +20,14 @@ struct HeapRangeModel {
 mut:
  records []ModelReservation
  holes []ModelHole // Oldest first, independently of VA order
+ pending []u64 // Explicit release FIFO, independent of production ranks
 }
 
 fn new_range_model(start u64, end u64) HeapRangeModel {
  mut model := HeapRangeModel{start: start, end: end, records: []ModelReservation{cap: 16}}
  model.records.flags |= .noslices
  model.holes.flags |= .noslices
+ model.pending.flags |= .noslices
  if start < end { model.holes << ModelHole{start, end} }
  return model
 }
@@ -85,19 +87,25 @@ fn (mut model HeapRangeModel) reserve(size u64, alignment u64) (u64, u64) {
 }
 
 fn (mut model HeapRangeModel) release(address u64) {
- for mut record in model.records { if record.va == address { record.in_use = false; return } }
+ for mut record in model.records {
+  if record.va == address && record.in_use { record.in_use = false; model.pending << address; return }
+ }
 }
 
 fn (mut model HeapRangeModel) collect() {
- // Match the production collector's descending-VA removal stream, while
- // reservations stay in creation order in this independent model.
- for {
+ model.collect_count(~u64(0))
+}
+
+fn (mut model HeapRangeModel) collect_count(count u64) {
+ mut remaining := count
+ for remaining > 0 && model.pending.len > 0 {
+  address := model.pending[0]
+  model.pending.delete(0)
   mut selected := -1
-  mut highest := u64(0)
   for index, record in model.records {
-   if !record.in_use && (selected < 0 || record.va > highest) { selected = index; highest = record.va }
+   if record.va == address && !record.in_use { selected = index; break }
   }
-  if selected < 0 { break }
+  assert selected >= 0
   record := model.records[selected]
   mut left := model.start
   mut right := model.end
@@ -113,6 +121,7 @@ fn (mut model HeapRangeModel) collect() {
   }
   model.records.delete(selected)
   model.holes << ModelHole{left, right}
+  remaining--
  }
 }
 
@@ -143,6 +152,17 @@ fn check_model_hole_orders(heap &alloc.HeapAllocator, model &HeapRangeModel) {
    end := if index + 1 == heap.allocations.len { heap.end } else { heap.allocations[index + 1].va }
    assert record.hole_order == model.hole_rank(record.va + record.size, end),
     'following rank must match chronological hole history'
+  }
+ }
+ $if agx_heap_garbage ? {
+  assert heap.garbage_count == u64(model.pending.len), 'pending count must match the release FIFO'
+  mut bytes := u64(0)
+  for record in model.records { if !record.in_use { bytes += record.size } }
+  assert heap.garbage_bytes == bytes, 'pending bytes must count rounded reservations'
+  for record in heap.allocations {
+   mut expected := u64(0)
+   for index, address in model.pending { if address == record.va { expected = u64(index + 1); break } }
+   assert record.release_order == expected, 'release ranks must match the bounded pending FIFO'
   }
  }
 }

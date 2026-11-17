@@ -60,7 +60,9 @@ fn check_heap_padding_matrix() {
        records_are_live(heap.allocations)
        heap.gc()
        model.collect()
-       assert heap.top == model.top(),
+       mut expected_used := u64(0)
+       for record in model.records { if record.in_use { expected_used += record.size } }
+       assert heap.top == model.top() && heap.used() == expected_used,
         'GC restores reservation frontier including alignment padding'
        records_are_live(heap.allocations)
        mut live_index := 0
@@ -79,7 +81,7 @@ fn check_heap_padding_matrix() {
        for index in order { heap.release(addresses[index]) }
        heap.gc(); heap.gc()
        assert heap.top == start && heap.allocations.len == 0 && heap.used() == 0
-       unsafe { model.records.free(); model.holes.free(); heap.allocations.free() }
+       unsafe { model.records.free(); model.holes.free(); model.pending.free(); heap.allocations.free() }
        cases++
       }
      }

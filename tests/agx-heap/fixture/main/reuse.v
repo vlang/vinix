@@ -56,7 +56,7 @@ fn check_reuse_model() {
       for record in model.records { heap.release(record.va) }
       heap.gc(); heap.gc()
       assert heap.top == start && heap.allocations.len == 0 && heap.used() == 0
-      unsafe { heap.allocations.free(); model.records.free(); model.holes.free() }
+      unsafe { heap.allocations.free(); model.records.free(); model.holes.free(); model.pending.free() }
       cases++
      }
     }
@@ -69,21 +69,21 @@ fn check_reuse_model() {
 
 fn check_raw_hole_ranking() {
  mut heap := alloc.new_heap('raw-holes', alloc.g13_shared_start, alloc.g13_shared_start + 32 * alloc.gpu_page_size)
- prefix := heap.alloc(7 * alloc.gpu_page_size, 0) or { panic('prefix') }
- wide := heap.alloc(4 * alloc.gpu_page_size, 0) or { panic('wide') }
- middle := heap.alloc(5 * alloc.gpu_page_size, 0) or { panic('middle') }
- narrow := heap.alloc(3 * alloc.gpu_page_size, 0) or { panic('narrow') }
+ prefix := heap.alloc(6 * alloc.gpu_page_size, 0) or { panic('prefix') }
+ wide := heap.alloc(6 * alloc.gpu_page_size, 0) or { panic('wide') }
+ middle := heap.alloc(4 * alloc.gpu_page_size, 0) or { panic('middle') }
+ narrow := heap.alloc(5 * alloc.gpu_page_size, 0) or { panic('narrow') }
  high := heap.alloc(1, 0) or { panic('high') }
  high_record := record_at(heap, high)
  heap.release(wide); heap.release(narrow); heap.gc()
- selected := heap.alloc(1, 2 * alloc.gpu_page_size) or { panic('aligned gap') }
+ selected := heap.alloc(1, 4 * alloc.gpu_page_size) or { panic('aligned gap') }
  assert selected == narrow, 'best fit must rank complete holes before alignment padding'
  assert record_at(heap, high) == high_record && heap.top == high + alloc.gpu_page_size
  for address in [prefix, middle, selected, high]! { heap.release(address) }
  heap.gc()
  assert heap.allocations.len == 0 && heap.top == heap.start
  unsafe { heap.allocations.free() }
- println('AGX heap reuse: raw hole ranking selects the smaller higher gap despite equal aligned residual space')
+ println('AGX heap reuse: raw hole ranking selects the smaller higher gap despite its larger aligned residual span')
 }
 
 fn check_heap_reuse() { check_reuse_probe(); check_raw_hole_ranking(); check_reuse_model() }

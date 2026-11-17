@@ -8,6 +8,7 @@ struct C.malloc_statistics_t {
 }
 
 fn C.malloc_zone_statistics(voidptr, &C.malloc_statistics_t)
+fn C.malloc_size(voidptr) u64
 
 fn live_heap() (u32, u64) {
  mut stats := C.malloc_statistics_t{}

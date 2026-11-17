@@ -16,6 +16,10 @@ fn churn(mut heap alloc.HeapAllocator, count int) {
 }
 
 fn measure() {
+ sample := &alloc.Allocation{}
+ record_bytes := C.malloc_size(sample)
+ unsafe { free(sample) }
+ C.printf(c'AGX-HEAP-RECORD bytes=%llu\n', record_bytes)
  mut heap := alloc.new_heap('measured', alloc.g13_shared_start, alloc.g13_shared_end)
  churn(mut heap, 1000)
  live_heap()
@@ -133,6 +137,9 @@ fn main() {
  if os.args.len == 2 && os.args[1] == '--collect-suite' { check_collect_pins(); return }
  if os.args.len == 2 && os.args[1] == '--reuse-suite' { check_heap_reuse(); return }
  if os.args.len == 2 && os.args[1] == '--history-suite' { check_hole_history(); return }
+ if os.args.len == 2 && os.args[1] == '--garbage-suite' { check_garbage(); return }
+ if os.args.len == 2 && os.args[1] == '--garbage-probe-suite' { check_garbage_fifo_probe(); return }
+ if os.args.len == 2 && os.args[1] == '--garbage-limits-suite' { check_garbage_limits(); return }
  check_delayed_gc()
  check_allocation_gc()
  check_concurrent_stats()
@@ -142,5 +149,6 @@ fn main() {
  check_collect_pins()
  check_heap_reuse()
  check_hole_history()
+ check_garbage()
  println('AGX heap ownership: PASS')
 }

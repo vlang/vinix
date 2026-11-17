@@ -9,13 +9,15 @@ fn measure_collect() {
  for index in 0 .. 8192 { heap.release(heap.start + u64(index) * alloc.gpu_page_size) }
  live_heap()
  before_blocks, before_bytes := live_heap()
+ bytes_per_record := C.malloc_size(heap.allocations[0])
  heap.gc()
  after_blocks, after_bytes := live_heap()
  blocks := i64(before_blocks) - i64(after_blocks)
  bytes := i64(before_bytes) - i64(after_bytes)
  C.printf(c'AGX-HEAP-COLLECT released=8192 retained_records=%lld reclaimed_blocks=%lld reclaimed_bytes=%lld\n',
   heap.allocations.len - 1, blocks, bytes)
- assert heap.allocations.len == 1 && blocks == 8192 && bytes == 262144,
+ assert bytes_per_record >= sizeof(alloc.Allocation)
+ assert heap.allocations.len == 1 && blocks == 8192 && bytes == i64(8192 * bytes_per_record),
   'GPU heap GC must collect released records below live allocations'
  assert heap.allocations[0].va == pin && heap.top == pin + alloc.gpu_page_size
  heap.release(pin); heap.gc()
@@ -39,7 +41,7 @@ fn check_collect_pins() {
      if index == 3 {
       heap.gc(); heap.gc()
       model.collect()
-      assert heap.allocations.len == 3 && heap.top == model.top(),
+      assert heap.allocations.len == 3 && heap.top == model.top() && heap.used() == 3 * alloc.gpu_page_size,
        'GC must discard interior records while pins stay live'
       records_are_live(heap.allocations)
       for pin_index in 0 .. 3 { assert record_at(heap, addresses[pin_index]) == pins[pin_index] }
@@ -85,7 +87,7 @@ fn check_collect_pins() {
      assert heap.used() == u64(live_count) * alloc.gpu_page_size && heap.available() == heap.end - model.top()
     }
     assert heap.top == start && heap.allocations.len == 0
-    unsafe { heap.allocations.free(); model.records.free(); model.holes.free() }
+    unsafe { heap.allocations.free(); model.records.free(); model.holes.free(); model.pending.free() }
     cases++
    } } } }
   }

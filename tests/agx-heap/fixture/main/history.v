@@ -77,7 +77,7 @@ fn check_hole_history_model() {
    for record in model.records { heap.release(record.va); model.release(record.va) }
    heap.gc(); model.collect()
    assert heap.top == start && heap.allocations.len == 0 && model.holes.len == 1
-   unsafe { heap.allocations.free(); model.records.free(); model.holes.free() }
+   unsafe { heap.allocations.free(); model.records.free(); model.holes.free(); model.pending.free() }
   }
  }
  assert cases == 9216

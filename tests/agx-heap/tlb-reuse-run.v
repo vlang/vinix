@@ -15,7 +15,7 @@ fn run_checks() !int {
  os.cp(repo + '/kernel/gpu/agx/tlb/plan.v', scratch + '/gpu/agx/tlb/plan.v')!
  os.write_file(scratch + '/gpu/agx/pgtable/host.v', 'module pgtable\n__global higher_half = u64(0)\n')!
  os.cp(repo + '/tests/agx-heap/tlb-reuse.v', scratch + '/main.v')!
- mut flags := ['-nocache', '-no-parallel', '-cc', 'cc', '-enable-globals', '-path', scratch + '|@vlib|@vmodules',
+ mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', scratch + '|@vlib|@vmodules',
   '-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined']
  mut build := os.new_process(os.getenv_opt('V') or { 'v' })
  mut build_args := flags.clone(); build_args << ['-o', scratch + '/test', scratch + '/main.v']
