@@ -281,6 +281,8 @@ pub mut:
 	completion_result_ready bool
 }
 
+enum G13ContextRetirement { fresh pending complete }
+
 pub struct G13QueueResources {
 pub:
 	queue_id     u32
@@ -300,6 +302,7 @@ mut:
 	file_references    u64 // captured ioctls and accepted aggregate submission nodes
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
+	context_retirement G13ContextRetirement
 	quarantined        bool
 	released           bool
 }
@@ -937,7 +940,8 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut resources G13QueueRe
 	if resources.released {
 		return true
 	}
-	if invalidate && !mgr.invalidate_g13_queue_mappings_locked(mut resources) {
+	if invalidate && (!mgr.invalidate_g13_context_locked(mut resources)
+		|| !mgr.invalidate_g13_queue_mappings_locked(mut resources)) {
 		return false
 	}
 	resources.released = true

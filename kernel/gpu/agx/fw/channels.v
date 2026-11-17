@@ -121,6 +121,33 @@ pub fn make_g13_cache_flush(abi hw.FirmwareAbi) ?FwDeviceControlMsg {
 	return message
 }
 
+// Copy firmware-written context IDs before publishing DestroyContext. The
+// pointer is packed at a four-byte boundary, so write its little-endian bytes
+// rather than issuing an unaligned native u64 store.
+pub fn make_g13_context_invalidate(abi hw.FirmwareAbi, context voidptr, size u64,
+	address u64) ?FwDeviceControlMsg {
+	if context == unsafe { nil } || size < 0x40 || address == 0 { return none }
+	context_offset := match abi {
+		.v12_3 { 0x14 }
+		.v13_5_partial { 0x11 }
+		else { return none }
+	}
+	pointer_offset := if abi == .v12_3 { 0x1c } else { 0x14 }
+	mut message := FwDeviceControlMsg{
+		tag: if abi == .v12_3 { device_control_destroy_context_v12_3 } else { device_control_destroy_context_v13_5 }
+	}
+	unsafe {
+		data := &u8(context)
+		mut bytes := &u8(&message)
+		bytes[8] = data[0x23]
+		bytes[context_offset] = data[0]
+		bytes[context_offset + 1] = data[1]
+		bytes[context_offset + 2] = data[4]
+		for i in 0 .. 8 { bytes[pointer_offset + i] = u8(address >> (8 * i)) }
+	}
+	return message
+}
+
 @[packed]
 pub struct FwRecoverChannel {
 pub mut:

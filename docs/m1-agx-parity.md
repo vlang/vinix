@@ -6,10 +6,13 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
-Latest offline increment: [deferred private collection during teardown](m1-agx-teardown-gc.md)
-(2026-11-17). Normal G13 job, queue and render-buffer destruction preserves pending
-private ranges until acknowledged prefix collection. Initialization and stopped
-cleanup retain explicit drains. The [unpublished reservation cancellation](m1-agx-heap-cancel.md)
+Latest offline increment: [acknowledged G13 context retirement](m1-agx-context-retire.md)
+(2026-11-17). Normal queue teardown waits for DestroyContext before UAT cleanup,
+collects captured garbage once and retains ambiguous published failures until
+stopped teardown. Asahi's deferred invalidation scheduling remains different.
+The [deferred private collection during teardown](m1-agx-teardown-gc.md) report
+retains the earlier private-range policy and its evidence. Initialization and
+stopped cleanup retain explicit drains. The [unpublished reservation cancellation](m1-agx-heap-cancel.md)
 report retains the mapping-failure correction and its original evidence.
 The [G13 allocation-pressure policy](m1-agx-heap-pressure.md)
 report retains the implicit-GC pressure correction and its original evidence.

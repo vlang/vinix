@@ -620,6 +620,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_teardown_gc_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_teardown_gc_reference(read(os.join_path(base, 'alloc.rs'))!, manager)!
+	check_context_retire_local(read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_context.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
+	check_context_retire_reference(manager, read(os.join_path(base, 'fw/channels.rs'))!, read(os.join_path(base, 'fw/workqueue.rs'))!)!
 	check_heap_gc_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_garbage.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!)!
 	check_heap_gc_reference(manager, read(os.join_path(base, 'fw/channels.rs'))!)!
