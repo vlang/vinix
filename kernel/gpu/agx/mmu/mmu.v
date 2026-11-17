@@ -356,13 +356,14 @@ pub fn (mut mgr UatManager) create_context(kernel_start u64, kernel_end u64) ?&U
 		if mgr.contexts[i] == unsafe { nil } {
 			identity := allocate_context_identity() or { return none }
 			mut pt := pgtable.new_pgtable(mgr.ias, mgr.oas) or { return none }
-			dummy_phys := u64(memory.pmm_alloc_aligned_fallible(4, 4))
+			dummy_pages := pgtable.uat_pgsz / memory.page_size
+			dummy_phys := u64(memory.pmm_alloc_aligned_fallible(dummy_pages, dummy_pages))
 			if dummy_phys == 0 {
 				pgtable.destroy(pt)
 				return none
 			}
 			if !pt.map(uat_unknown_page, dummy_phys, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw) {
-				memory.pmm_free(voidptr(dummy_phys), 4)
+				memory.pmm_free(voidptr(dummy_phys), dummy_pages)
 				pgtable.destroy(pt)
 				return none
 			}
@@ -403,7 +404,7 @@ pub fn (mut mgr UatManager) destroy_context(ctx &UatContext) {
 		pgtable.destroy(owned.pgtable)
 	}
 	if owned.dummy_phys != 0 {
-		memory.pmm_free(voidptr(owned.dummy_phys), 4)
+		memory.pmm_free(voidptr(owned.dummy_phys), pgtable.uat_pgsz / memory.page_size)
 		owned.dummy_phys = 0
 	}
 	mgr.contexts[ctx.id] = unsafe { nil }

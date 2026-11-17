@@ -12,6 +12,7 @@ pub mut:
 	unmaps int
 	reject_next bool
 	last_address u64
+	last_physical u64
 	last_size u64
 	last_protection u64
 }
@@ -39,11 +40,12 @@ pub fn destroy(table &UatPgtable) {
 	unsafe { free(table) }
 }
 
-pub fn (mut table UatPgtable) map(address u64, _phys u64, size u64, protection u64) bool {
-	assert address % uat_pgsz == 0 && size % uat_pgsz == 0
+pub fn (mut table UatPgtable) map(address u64, phys u64, size u64, protection u64) bool {
+	assert address % uat_pgsz == 0 && size % uat_pgsz == 0 && phys % uat_pgsz == 0
 	table.maps++
 	if table.reject_next { table.reject_next = false; reject_dummy = false; return false }
 	table.last_address = address
+	table.last_physical = phys
 	table.last_size = size
 	table.last_protection = protection
 	return true

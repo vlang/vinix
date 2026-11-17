@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Native VM creation now allocates one 16 KiB page of backing for the dummy UAT
+mapping. [Dummy page backing](m1-agx-vm-dummy-page.md)
+
 The native base-M1 `DRM_IOCTL_VERSION` reply matches the packaged driver
 identity read by Mesa during device open.
 [DRM version reporting](m1-agx-drm-version.md)

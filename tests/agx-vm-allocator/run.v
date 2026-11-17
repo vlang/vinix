@@ -18,7 +18,9 @@ fn main() {
 	os.symlink('${repo}/kernel/gpu/agx/vm', '${scratch}/gpu/agx/vm')!
 	os.mkdir_all('${scratch}/drm')!
 	os.symlink('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl')!
-	source := os.read_file('${repo}/kernel/gpu/agx/mmu/mmu.v')!
+	source := os.read_file(os.getenv_opt('AGX_VM_ALLOCATOR_MMU_SOURCE') or {
+		'${repo}/kernel/gpu/agx/mmu/mmu.v'
+	})!
 	production := 'module mmu\nimport gpu.agx.vm as agxvm\nimport gpu.agx.alloc as gpu_alloc\nimport gpu.agx.pgtable\nimport klock\nimport memory\n__global higher_half = u64(0)\n' +
 		section(source, 'pub struct UatContext {', '// Driver-owned backing')! +
 		section(source, 'pub struct UatBuffer {', 'pub struct UatManager {')! +

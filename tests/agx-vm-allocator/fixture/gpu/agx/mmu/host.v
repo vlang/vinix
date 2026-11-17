@@ -22,6 +22,14 @@ pub fn (manager &UatManager) unbind_context(context &UatContext) {
 }
 
 pub fn run_checks() {
+	for granule in [u64(0x4000), 0x1000]! {
+		memory.set_page_size(granule)
+		check_contexts()
+	}
+	println('AGX VM allocator: 400 native contexts and 2400 shared/private allocations across 16 KiB and 4 KiB PMM granules; one zeroed UAT page of dummy backing per context, alignment, map failures and final release passed')
+}
+
+fn check_contexts() {
 	mut manager := UatManager{}
 	for index in 0 .. uat_num_contexts { manager.contexts[index] = unsafe { nil } }
 	base := u64(0x100000000)
@@ -36,6 +44,12 @@ pub fn run_checks() {
 		assert context.driver_private.start == window.midpoint && context.driver_private.end == window.end
 		assert context.pgtable.last_address == uat_unknown_page && context.pgtable.last_size == 0x4000
 		assert context.pgtable.last_protection == pgtable.gpu_prot_gpu_shared_rw
+		assert context.dummy_phys != 0 && context.pgtable.last_physical == context.dummy_phys
+		assert memory.backing_size(context.dummy_phys) == 0x4000, 'dummy mapping must own exactly one UAT page'
+		assert memory.active() == 1
+		for offset in 0 .. int(pgtable.uat_pgsz) {
+			assert unsafe { (&u8(context.dummy_phys))[offset] } == 0
+		}
 		for private in [false, true]! {
 			for alignment in [u64(0x4000), 0x8000, 0x10000]! {
 				requested := u64(cycle % 3) * 0x4000 + 1
@@ -91,5 +105,4 @@ pub fn run_checks() {
 	before := pgtable.calls()
 	if _ := manager.create_context(base + 1, base + agxvm.kernel_min_size) { panic('invalid window') }
 	assert pgtable.calls() == before
-	println('AGX VM allocator: 200 native contexts and 1200 shared/private allocations preserve normalized 32 KiB windows, split/alignment, stronger alignment, overflow refusal, allocation/map failures and final backing release')
 }
