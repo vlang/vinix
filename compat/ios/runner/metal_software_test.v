@@ -7009,6 +7009,135 @@ define void @image_air_half_math(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1)
 
 ')
 
+	names << 'image_air_half_extrema'
+	source.write_string('declare half @air.fmin.f16(half,half) #0
+declare half @air.fmax.f16(half,half) #0
+declare half @llvm.minnum.f16(half,half) #0
+declare half @llvm.maxnum.f16(half,half) #0
+define void @image_air_half_extrema(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1) %out) {
+ %x = extractelement <3 x i32> %gid,i32 0
+ %y = extractelement <3 x i32> %gid,i32 1
+ %w = extractelement <3 x i32> %grid,i32 0
+ %h = extractelement <3 x i32> %grid,i32 1
+ %which = and i32 %x,7
+ %s0 = icmp eq i32 %which,0
+ %s1 = icmp eq i32 %which,1
+ %s2 = icmp eq i32 %which,2
+ %s3 = icmp eq i32 %which,3
+ %s4 = icmp eq i32 %which,4
+ %s5 = icmp eq i32 %which,5
+ %s6 = icmp eq i32 %which,6
+ %a_6 = select i1 %s6,i32 31744,i32 31745
+ %a_5 = select i1 %s5,i32 1,i32 %a_6
+ %a_4 = select i1 %s4,i32 48128,i32 %a_5
+ %a_3 = select i1 %s3,i32 15360,i32 %a_4
+ %a_2 = select i1 %s2,i32 32325,i32 %a_3
+ %a_1 = select i1 %s1,i32 32768,i32 %a_2
+ %a_0 = select i1 %s0,i32 0,i32 %a_1
+ %b_6 = select i1 %s6,i32 64512,i32 65093
+ %b_5 = select i1 %s5,i32 32769,i32 %b_6
+ %b_4 = select i1 %s4,i32 15360,i32 %b_5
+ %b_3 = select i1 %s3,i32 32325,i32 %b_4
+ %b_2 = select i1 %s2,i32 15360,i32 %b_3
+ %b_1 = select i1 %s1,i32 0,i32 %b_2
+ %b_0 = select i1 %s0,i32 32768,i32 %b_1
+ %e0_6 = select i1 %s6,i32 64512,i32 32256
+ %e0_5 = select i1 %s5,i32 32769,i32 %e0_6
+ %e0_4 = select i1 %s4,i32 48128,i32 %e0_5
+ %e0_3 = select i1 %s3,i32 15360,i32 %e0_4
+ %e0_2 = select i1 %s2,i32 15360,i32 %e0_3
+ %e0_1 = select i1 %s1,i32 32768,i32 %e0_2
+ %e0_0 = select i1 %s0,i32 0,i32 %e0_1
+ %e1_6 = select i1 %s6,i32 31744,i32 32256
+ %e1_5 = select i1 %s5,i32 1,i32 %e1_6
+ %e1_4 = select i1 %s4,i32 15360,i32 %e1_5
+ %e1_3 = select i1 %s3,i32 15360,i32 %e1_4
+ %e1_2 = select i1 %s2,i32 15360,i32 %e1_3
+ %e1_1 = select i1 %s1,i32 32768,i32 %e1_2
+ %e1_0 = select i1 %s0,i32 0,i32 %e1_1
+ %e2_6 = select i1 %s6,i32 64512,i32 32256
+ %e2_5 = select i1 %s5,i32 32769,i32 %e2_6
+ %e2_4 = select i1 %s4,i32 48128,i32 %e2_5
+ %e2_3 = select i1 %s3,i32 15360,i32 %e2_4
+ %e2_2 = select i1 %s2,i32 15360,i32 %e2_3
+ %e2_1 = select i1 %s1,i32 0,i32 %e2_2
+ %e2_0 = select i1 %s0,i32 32768,i32 %e2_1
+ %e3_6 = select i1 %s6,i32 31744,i32 32256
+ %e3_5 = select i1 %s5,i32 1,i32 %e3_6
+ %e3_4 = select i1 %s4,i32 15360,i32 %e3_5
+ %e3_3 = select i1 %s3,i32 15360,i32 %e3_4
+ %e3_2 = select i1 %s2,i32 15360,i32 %e3_3
+ %e3_1 = select i1 %s1,i32 0,i32 %e3_2
+ %e3_0 = select i1 %s0,i32 32768,i32 %e3_1
+ %ar = trunc i32 %a_0 to i16
+ %br = trunc i32 %b_0 to i16
+ %af = bitcast i16 %ar to half
+ %bf = bitcast i16 %br to half
+ %r0 = call half @air.fmin.f16(half %af,half %bf)
+ %raw0 = bitcast half %r0 to i16
+ %bits0 = zext i16 %raw0 to i32
+ %ok0 = icmp eq i32 %bits0,%e0_0
+ %weighted0 = shl i32 %bits0,0
+ %r1 = call half @air.fmax.f16(half %af,half %bf)
+ %raw1 = bitcast half %r1 to i16
+ %bits1 = zext i16 %raw1 to i32
+ %ok1 = icmp eq i32 %bits1,%e1_0
+ %weighted1 = shl i32 %bits1,1
+ %r2 = call half @air.fmin.f16(half %bf,half %af)
+ %raw2 = bitcast half %r2 to i16
+ %bits2 = zext i16 %raw2 to i32
+ %ok2 = icmp eq i32 %bits2,%e2_0
+ %weighted2 = shl i32 %bits2,2
+ %r3 = call half @air.fmax.f16(half %bf,half %af)
+ %raw3 = bitcast half %r3 to i16
+ %bits3 = zext i16 %raw3 to i32
+ %ok3 = icmp eq i32 %bits3,%e3_0
+ %weighted3 = shl i32 %bits3,3
+ %zero_pair = icmp ult i32 %which,2
+ %llvm_min_expected = select i1 %zero_pair,i32 32768,i32 %e0_0
+ %llvm_max_expected = select i1 %zero_pair,i32 0,i32 %e1_0
+ %llvm_min = call half @llvm.minnum.f16(half %af,half %bf)
+ %llvm_max = call half @llvm.maxnum.f16(half %af,half %bf)
+ %llvm_min_raw = bitcast half %llvm_min to i16
+ %llvm_max_raw = bitcast half %llvm_max to i16
+ %llvm_min_bits = zext i16 %llvm_min_raw to i32
+ %llvm_max_bits = zext i16 %llvm_max_raw to i32
+ %llvm_min_ok = icmp eq i32 %llvm_min_bits,%llvm_min_expected
+ %llvm_max_ok = icmp eq i32 %llvm_max_bits,%llvm_max_expected
+ %llvm_ok = and i1 %llvm_min_ok,%llvm_max_ok
+ %ok01 = and i1 %ok0,%ok1
+ %ok23 = and i1 %ok2,%ok3
+ %air_ok = and i1 %ok01,%ok23
+ %ok = and i1 %air_ok,%llvm_ok
+ %first = xor i32 %weighted0,%weighted1
+ %second = xor i32 %weighted2,%weighted3
+ %packed = xor i32 %first,%second
+ %high = lshr i32 %packed,8
+ %top = lshr i32 %packed,16
+ %fold1 = xor i32 %packed,%high
+ %folded = xor i32 %fold1,%top
+ %color = select i1 %ok,i32 %folded,i32 poison
+ %row = shl i32 %y,6
+ %index = add i32 %row,%x
+ %p = getelementptr i32,ptr addrspace(1) %out,i32 %index
+ %red = mul i32 %x,3
+ %mixed = xor i32 %red,%color
+ %redbyte = and i32 %mixed,255
+ %gg = mul i32 %y,5
+ %g0 = and i32 %gg,255
+ %g = shl i32 %g0,8
+ %wh = add i32 %w,%h
+ %bb = mul i32 %wh,7
+ %b0 = and i32 %bb,255
+ %blue = shl i32 %b0,16
+ %rg = or i32 %redbyte,%g
+ %rgb = or i32 %rg,%blue
+ %rgba = or i32 %rgb,4278190080
+ store i32 %rgba,ptr addrspace(1) %p,align 4
+ ret void }
+
+')
+
 	source.write_string('!air.kernel = !{'); for i in 0 .. names.len { source.write_string('${if i == 0 { '' } else { ', ' }}!${i * 20}') }; source.write_string('}\n')
 	for i, name in names {
 		n := i * 20
@@ -7022,7 +7151,7 @@ define void @image_air_half_math(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1)
 			source.write_string('!${n + 8} = !{i32 5, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
 		} else {
 			source.write_string('!${n + 2} = !{!${n + 5}, !${n + 4}, !${n + 3}}\n !${n + 5} = !{i32 2, !"air.buffer", !"air.location_index", i32 7, i32 1, !"air.address_space", i32 1, !"air.write"}\n')
-			if i == 2 || name in ['image_air_half_fma', 'image_air_half_math', 'image_air_half_unary', 'image_air_zero_count64', 'image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction', 'image_vector_phi', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp', 'image_mulh', 'image_reverse', 'image_splice', 'image_interleave', 'image_stepvector', 'image_active_mask', 'image_subvector', 'image_subinsert'] {
+			if i == 2 || name in ['image_air_half_extrema', 'image_air_half_fma', 'image_air_half_math', 'image_air_half_unary', 'image_air_zero_count64', 'image_minmax', 'image_saturating', 'image_satshift', 'image_funnel', 'image_bitcast', 'image_float_bitcast', 'image_saturating_cast', 'image_scalar_vector_bitcast', 'image_scalar_bitcast_index', 'image_bit_permutation', 'image_clmul', 'image_reduction', 'image_reduction_index', 'image_float_reduction', 'image_sequential_reduction', 'image_number_reduction', 'image_modern_number_reduction', 'image_vector_phi', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp', 'image_mulh', 'image_reverse', 'image_splice', 'image_interleave', 'image_stepvector', 'image_active_mask', 'image_subvector', 'image_subinsert'] {
 				source.write_string('!${n + 3} = !{i32 0, !"air.thread_position_in_grid"}\n !${n + 4} = !{i32 1, !"air.threads_per_grid"}\n')
 			} else if i < 3 + bad.len * 3 {
 				semantic := semantics[2 + (i - 3) / bad.len]; kind := bad[(i - 3) % bad.len]
@@ -7056,7 +7185,7 @@ define void @image_air_half_math(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1)
 		objc_start(); pool := objc_pool_push(); device := metal_create_system_default_device()
 		library := sm_library_bytes(device, bytes.clone(), unsafe { nil }); sm_grid_check(library != 0, 'size library')
 		queue := sm_send(device, c'newCommandQueue')
-		for name in names[3..names.len - 33] {
+		for name in names[3..names.len - 34] {
 			mut error_slot := u64(0)
 			sm_grid_check(sm_test_compute_pipeline(device, library, name, &error_slot) == 0 && error_slot != 0, name)
 			sm_grid_check(sm_send(error_slot, c'code') == 3, 'size pipeline diagnostic'); rejected++
@@ -7108,7 +7237,7 @@ define void @image_air_half_math(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1)
 			objc_release(pipeline)
 		}
 		objc_release(output)
-		for image_name in [names[2], names[names.len - 33], names[names.len - 32], names[names.len - 31], names[names.len - 30], names[names.len - 29], names[names.len - 28], names[names.len - 27], names[names.len - 26], names[names.len - 25], names[names.len - 24], names[names.len - 23], names[names.len - 22], names[names.len - 21], names[names.len - 20], names[names.len - 19], names[names.len - 18], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
+		for image_name in [names[2], names[names.len - 34], names[names.len - 33], names[names.len - 32], names[names.len - 31], names[names.len - 30], names[names.len - 29], names[names.len - 28], names[names.len - 27], names[names.len - 26], names[names.len - 25], names[names.len - 24], names[names.len - 23], names[names.len - 22], names[names.len - 21], names[names.len - 20], names[names.len - 19], names[names.len - 18], names[names.len - 17], names[names.len - 16], names[names.len - 15], names[names.len - 14], names[names.len - 13], names[names.len - 12], names[names.len - 11], names[names.len - 10], names[names.len - 9], names[names.len - 8], names[names.len - 7], names[names.len - 6], names[names.len - 5], names[names.len - 4], names[names.len - 3], names[names.len - 2], names.last()] {
 		mut image_error := u64(0)
 		pipeline := sm_test_compute_pipeline(device, library, image_name, &image_error)
 		if pipeline == 0 { panic('software Metal image ${image_name}: ' + string_text(sm_send(image_error, c'localizedDescription'))) }
@@ -7170,7 +7299,7 @@ define void @image_air_half_math(<3 x i32> %gid,<3 x i32> %grid,ptr addrspace(1)
 					match x % 16 { 0 { signed = 0; unsigned = 0 } 1 { signed = 127; unsigned = 255 } 2 { signed = -128; unsigned = 0 } else {} }
 					cast_bits = u8(signed) ^ u8(unsigned)
 				}
-				color := [if image_name == 'image_air_half_fma' { sm_test_air_half_fma_red(x) } else if image_name == 'image_air_half_math' { sm_test_air_half_math_red(x) } else if image_name == 'image_air_half_unary' { sm_test_air_half_unary_red(x) } else if image_name == 'image_subinsert' { u8(x * 3) ^ u8((x & 15) + if (x & 15) >= 4 && (x & 15) < 8 { 8 } else { 0 }) ^ u8(12 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_subvector' { u8(x * 3) ^ u8(8 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_active_mask' { u8(x * 3) ^ u8(x + (x & 15) < 17) ^ u8(1) } else if image_name == 'image_stepvector' { u8(x * 3) ^ u8((x & 15) ^ 2) } else if image_name in ['image_reverse','image_splice','image_interleave'] { u8(x * 3) ^ u8(x | 1) ^ u8(x) ^ u8((x | 1) << 1) ^ u8(48) } else if image_name == 'image_mulh' { u8(x * 3) ^ u8(if x == 0 { u64(0) } else { u64(255) }) ^ u8(x + 127) ^ u8(if x == 0 { u64(0) } else { x - 1 }) } else if image_name in ['image_air_zero_count64', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp'] { u8(x * 3) ^ u8(x) ^ u8(63) } else if image_name == 'image_vector_phi' { u8(x * 3) ^ u8(x + y + if x % 2 != 0 { 3 } else { 7 }) ^ u8(if x % 2 != 0 { 5 } else { 11 }) } else if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) ^ population }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
+				color := [if image_name == 'image_air_half_extrema' { sm_test_air_half_extrema_red(x) } else if image_name == 'image_air_half_fma' { sm_test_air_half_fma_red(x) } else if image_name == 'image_air_half_math' { sm_test_air_half_math_red(x) } else if image_name == 'image_air_half_unary' { sm_test_air_half_unary_red(x) } else if image_name == 'image_subinsert' { u8(x * 3) ^ u8((x & 15) + if (x & 15) >= 4 && (x & 15) < 8 { 8 } else { 0 }) ^ u8(12 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_subvector' { u8(x * 3) ^ u8(8 + (x & 3)) ^ u8(if x & 1 == 0 { 1 } else { 69 }) ^ u8(1) } else if image_name == 'image_active_mask' { u8(x * 3) ^ u8(x + (x & 15) < 17) ^ u8(1) } else if image_name == 'image_stepvector' { u8(x * 3) ^ u8((x & 15) ^ 2) } else if image_name in ['image_reverse','image_splice','image_interleave'] { u8(x * 3) ^ u8(x | 1) ^ u8(x) ^ u8((x | 1) << 1) ^ u8(48) } else if image_name == 'image_mulh' { u8(x * 3) ^ u8(if x == 0 { u64(0) } else { u64(255) }) ^ u8(x + 127) ^ u8(if x == 0 { u64(0) } else { x - 1 }) } else if image_name in ['image_air_zero_count64', 'image_canonicalize', 'image_air_extrema', 'image_air_clamp'] { u8(x * 3) ^ u8(x) ^ u8(63) } else if image_name == 'image_vector_phi' { u8(x * 3) ^ u8(x + y + if x % 2 != 0 { 3 } else { 7 }) ^ u8(if x % 2 != 0 { 5 } else { 11 }) } else if image_name == 'image_modern_number_reduction' { u8(x * 3) ^ u8(if x > y { x - y } else { y - x }) } else if image_name == 'image_number_reduction' { u8(x * 3) ^ u8(x + y) } else if image_name == 'image_sequential_reduction' { u8(x * 3) ^ u8(1 + x + y) } else if image_name == 'image_float_reduction' { u8(x * 3) ^ u8(if x > y {x} else {y}) } else if image_name in ['image_reduction', 'image_reduction_index'] { u8(x * 3) ^ u8(x + y + shape.width + shape.height) } else if image_name == 'image_clmul' { u8(x * 3) ^ u8(x ^ (x << 1)) } else if image_name == 'image_bit_permutation' { u8(x * 3) ^ u8((x & 1) | ((x >> 1) & 2) | ((x >> 2) & 4) | ((x >> 3) & 8)) } else if image_name == 'image_scalar_bitcast_index' { u8(x * 3) } else if image_name == 'image_scalar_vector_bitcast' { u8(x * 3) ^ u8((u32(x) | u32(2143289344)) >> (u32(x % 4) * 8)) ^ u8(127) } else if image_name == 'image_saturating_cast' { u8(x * 3) ^ cast_bits } else if image_name == 'image_float_bitcast' { u8(x * 3) ^ u8(match x % 4 { 0 { x } 1 { u64(61) } 2 { y ^ 2 } else { u64(60) } }) } else if image_name == 'image_bitcast' { u8(x * 3) ^ u8(if x % 2 == 0 { (x % 32) ^ ((y % 32) * 2) } else { 32 }) } else if image_name == 'image_funnel' { u8(x * 3) ^ funnel_bits } else if image_name == 'image_satshift' { u8(x * 3) ^ shift_bits } else if image_name == 'image_saturating' { u8(x * 3) ^ u8(17 ^ (if x < 3 { u64(0) } else { x - 3 })) } else if image_name == 'image_minmax' { u8(x * 3) ^ (u8(63) ^ u8(if x < 3 { 3 } else if x > 7 { 7 } else { x })) } else { u8(coordinate * 3) ^ bit_value ^ (leading + trailing) ^ u8((x ^ 32) & 63) ^ population }, u8(y * 5), u8((shape.width + shape.height) * 7), u8(255)]!
 				for lane in 0 .. 4 {
 					sm_grid_check(pixels[int((y * shape.width + x) * 4) + lane] == color[lane], 'RGBA8 texture readback')
 					expected[int(256 + y * 256 + x * 4) + lane] = color[lane]
@@ -7621,4 +7750,15 @@ fn sm_test_air_half_fma_red(x u64) u8 {
  values := [u16(0x8010),0x0010,0x7bff,0xfbff,2,0x8000,0x7e00,0x7e00]!
  value := values[int(x & 7)]
  return u8(x * 3) ^ u8(value) ^ u8(value >> 8)
+}
+
+fn sm_test_air_half_extrema_red(x u64) u8 {
+ // Expected AIR results in both operand orders; LLVM uses its own zero ties.
+ minima := [u32(0),0x8000,0x3c00,0x3c00,0xbc00,0x8001,0xfc00,0x7e00]!
+ maxima := [u32(0),0x8000,0x3c00,0x3c00,0x3c00,1,0x7c00,0x7e00]!
+ reverse_minima := [u32(0x8000),0,0x3c00,0x3c00,0xbc00,0x8001,0xfc00,0x7e00]!
+ reverse_maxima := [u32(0x8000),0,0x3c00,0x3c00,0x3c00,1,0x7c00,0x7e00]!
+ i := int(x & 7)
+ packed := minima[i] ^ (maxima[i] << 1) ^ (reverse_minima[i] << 2) ^ (reverse_maxima[i] << 3)
+ return u8(x * 3) ^ u8(packed) ^ u8(packed >> 8) ^ u8(packed >> 16)
 }

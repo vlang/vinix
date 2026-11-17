@@ -2,7 +2,7 @@
 module airbitcode
 
 fn test_air_vector_integer_names_and_cache() {
-	assert vector_air_integer_cache_base == 61780 && vector_float_intrinsic_slots == 62228 && scalar_intrinsic_cache_slots == 2201
+	assert vector_air_integer_cache_base == 61780 && vector_float_intrinsic_slots == 62228 && scalar_intrinsic_cache_slots == 2203
 	mut seen := [32]bool{}
 	for operation, id in [ScalarIntrinsic.smulh, .umulh]! { for count in 1 .. 17 {
 		name := 'air.mul_hi.${if operation == 0 { 's' } else { 'u' }}.v${count}i32'

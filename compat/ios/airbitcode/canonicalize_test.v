@@ -40,7 +40,7 @@ fn test_canonicalize_encodings_snapshots_and_states() {
 	println('AIR-CANONICALIZE-UNIT: ${checks} exact lane/scalar/idempotence checks, exhaustive half, deterministic float, snapshots and ${states} poison/undef/freeze states PASS')
 }
 fn test_canonicalize_names_keys_and_guards() {
-	assert scalar_canonicalize_cache_base == 2024 && scalar_intrinsic_cache_slots == 2201
+	assert scalar_canonicalize_cache_base == 2024 && scalar_intrinsic_cache_slots == 2203
 	assert vector_canonicalize_cache_base == 34752 && vector_float_intrinsic_slots == 62228
 	for bits in [u32(16), 32]! {
 		assert scalar_intrinsic_name('llvm.canonicalize.f${bits}')! == .canonicalize
