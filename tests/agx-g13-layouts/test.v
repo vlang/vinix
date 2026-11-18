@@ -287,14 +287,71 @@ fn check_v13_5_queue_objects() {
 	assert object_u64(queue_info, 0xac) == 0
 	assert object_u32(queue_info, 0xb4) == 0
 	assert queue[0] == 0xa5 && queue[0xb9] == 0xa5
+}
 
-	assert (fw.g13_buffer_scene_active_size(.v13_5_partial) or { 0 }) == 0x48
-	mut scene := []u8{len: 0x48}
-	assert fw.initialize_g13_buffer_scene(scene.data, u64(scene.len), .v13_5_partial,
-		0x1234_5678_9abc_def0, 0x0fed_cba9_8765_4321)
-	assert object_u64(scene.data, 0x18) == 0x1234_5678_9abc_def0
-	assert object_u64(scene.data, 0x24) == 0
-	assert object_u64(scene.data, 0x2c) == 0x0fed_cba9_8765_4321
+fn check_tvb_initializers() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		newer := abi == .v13_5_partial
+		scene_size := if newer { u32(0x48) } else { u32(0x40) }
+		stats_offset := if newer { u32(0x2c) } else { u32(0x24) }
+		assert (fw.g13_buffer_scene_active_size(abi) or { 0 }) == scene_size
+		mut scene := [0x4a]u8{init: u8(0xa5)}
+		scene_data := unsafe { voidptr(&scene[1]) }
+		assert !fw.initialize_g13_buffer_scene(scene_data, scene_size - 1, abi,
+			0x1234_5678_9abc_def0, 0x0fed_cba9_8765_4321)
+		for byte in scene { assert byte == 0xa5 }
+		assert fw.initialize_g13_buffer_scene(scene_data, scene_size, abi,
+			0x1234_5678_9abc_def0, 0x0fed_cba9_8765_4321)
+		assert object_u64(scene_data, 0x18) == 0x1234_5678_9abc_def0
+		assert object_u64(scene_data, stats_offset) == 0x0fed_cba9_8765_4321
+		for offset := u32(0); offset < scene_size; offset += 4 {
+			if offset != 0x18 && offset != 0x1c && offset != stats_offset && offset != stats_offset + 4 {
+				assert object_u32(scene_data, offset) == 0, 'TVB scene default at 0x${offset:x}'
+			}
+		}
+		assert scene[0] == 0xa5 && scene[scene_size + 1] == 0xa5
+		check_tvb_buffer_info(abi)
+	}
+	println('G13 TVB initialization: complete 12.3 and 13.5 info and scene records, short buffers and guard bytes passed')
+}
+
+fn check_tvb_buffer_info(abi hw.FirmwareAbi) {
+	newer := abi == .v13_5_partial
+	size := if newer { u32(0xbc) } else { u32(0xc0) }
+	assert (fw.g13_buffer_info_active_size(abi) or { 0 }) == size
+	mut info := [0xc2]u8{init: u8(0xa5)}
+	data := unsafe { voidptr(&info[1]) }
+	assert !fw.initialize_g13_buffer_info(data, size - 1, abi,
+		0x1111_2222_3333_4444, 0x800, 0x80, 0x5555_6666_7777_8888,
+		0x9999_aaaa_bbbb_cccc, 0x20000, 0xdddd_eeee_ffff_1111, 0x200, 0x40)
+	for byte in info { assert byte == 0xa5 }
+	assert fw.initialize_g13_buffer_info(data, size, abi,
+		0x1111_2222_3333_4444, 0x800, 0x80, 0x5555_6666_7777_8888,
+		0x9999_aaaa_bbbb_cccc, 0x20000, 0xdddd_eeee_ffff_1111, 0x200, 0x40)
+	for offset := u32(0); offset < size; offset += 4 {
+		// Ventura drops the 12.3 word at 0x1c.
+		legacy_offset := if newer && offset >= 0x1c { offset + 4 } else { offset }
+		expected := match legacy_offset {
+			0x0c { ~u32(0) }
+			0x20 { 0x3333_4444 }
+			0x24 { 0x1111_2222 }
+			0x28 { 0x800 }
+			0x30 { 0x80 }
+			0x3c { 0x7777_8888 }
+			0x40 { 0x5555_6666 }
+			0x44 { 0xbbbb_cccc }
+			0x48 { 0x9999_aaaa }
+			0x5c { 0x20000 }
+			0x68 { 0xffff_1111 }
+			0x6c { 0xdddd_eeee }
+			0x80 { 1 }
+			0x84 { 0x200 }
+			0x88 { 0x40 }
+			else { 0 }
+		}
+		assert object_u32(data, offset) == expected, 'TVB info word at 0x${offset:x}'
+	}
+	assert info[0] == 0xa5 && info[size + 1] == 0xa5
 }
 
 fn check_default_queue_priorities() {
@@ -405,6 +462,7 @@ fn main() {
 	check_v13_5_command_repacking()
 	check_fragment_tib_sizing()
 	check_v13_5_queue_objects()
+	check_tvb_initializers()
 	check_default_queue_priorities()
 	check_v13_5_microsequences()
 	println('G13 work-command layout tests passed')

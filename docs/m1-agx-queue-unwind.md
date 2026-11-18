@@ -121,3 +121,29 @@ The evidence archive covers `d8eff76d55dc052e21fde44ef56096d5d72d41f5` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-queue-info-20261119.D2Uk6h/bundle.tar.gz`
 with SHA-256 `49d3acb63fb5803287beb3c978b21a900ce47616e7ab20e3d1f9afb5b8a4862b`.
+
+## TVB buffer and render-scene records
+
+G13 initializes every byte of the TVB info record and the render-scene record
+before publishing either to firmware. The info initializer clears the active
+record before filling its pointers and limits. The Ventura scene initializer
+writes the eight-byte zero field at `0x24`, immediately before the statistics
+pointer at `0x2c`. The queue allocator already clears its backing. The
+initializers now produce the same complete records when given prefilled memory.
+[Pinned TVB info defaults](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/buffer.rs#L365-L400)
+[Pinned render-scene defaults](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/buffer.rs#L658-L679)
+
+The sanitizer regression reproduced stale bytes at the start of the info
+record and in the inserted scene field. It checks the complete records on
+both firmware layouts, including the bytes outside each write and the
+unchanged destination after a short-buffer refusal.
+
+Both kernel builds, 79 source-contract test files and the pinned reference
+checks passed. The TVB growth suite passed its ownership and unwind checks.
+AArch64 generated C shows no allocation in either initializer. The allocation
+scan matched the 176 baseline findings. M1 hardware validation remains open.
+
+The evidence archive covers `9ceb677caa42e29aa70c8d54b20be4601e36ef16` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-tvb-init-20261119.UTXAd6/bundle.tar.gz`
+with SHA-256 `c8371324603ef1680a64c3a21d6f7cfcf99420404c8044c5b64f492df5e376eb`.

@@ -131,6 +131,7 @@ pub fn initialize_g13_buffer_info(data voidptr, size u64, abi hw.FirmwareAbi,
 		return false
 	}
 	unsafe {
+		C.memset(data, 0, required)
 		if abi == .v13_5_partial {
 			mut info := &G13BufferInfoV135(data)
 			info.cur_id = -1
@@ -226,8 +227,9 @@ pub fn initialize_g13_buffer_scene(data voidptr, size u64, abi hw.FirmwareAbi,
 	}
 	unsafe {
 		if abi == .v13_5_partial {
-			// Ventura inserts unk_28 before bm_misc_addr. The new word is zero.
+			// Ventura inserts a zeroed unk_28 immediately before stats.
 			C.memcpy(data, &legacy, 0x24)
+			C.memset(voidptr(u64(data) + 0x24), 0, 8)
 			C.memcpy(voidptr(u64(data) + 0x2c), voidptr(u64(&legacy) + 0x24), 0x1c)
 		} else {
 			C.memcpy(data, &legacy, sizeof(G13BufferScene))
