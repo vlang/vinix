@@ -250,7 +250,9 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 
 fn (mut mgr GpuManager) boot_firmware_role(role u32) bool {
 	return match role {
-		0 { mgr.rtk.boot() }
+		0 {
+			if mgr.hw_config.gpu_gen == .g13 { mgr.rtk.boot_started() } else { mgr.rtk.boot() }
+		}
 		1 {
 			if mgr.firmware_roles == 2 {
 				mgr.secondary_rtk.boot()

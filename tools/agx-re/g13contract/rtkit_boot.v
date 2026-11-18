@@ -1,0 +1,54 @@
+// SPDX-License-Identifier: GPL-2.0-or-later
+module g13contract
+
+import os
+
+fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo string) ! {
+	linux_driver := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/driver.rs'))!
+	require_order(linux_driver, ['regs::Resources::start_cpu(pdev)?', 'gpu::GpuManagerG13V12_3::new',
+		'gpu::GpuManagerG13V13_5::new'], 'Asahi releases the ASC before constructing either G13 firmware ABI')!
+	linux_gpu := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/gpu.rs'))!
+	require_order(linux_gpu.all_after('fn init(&self) -> Result {'),
+		['DeviceControlMsg::ver::Initialize', 'rtk.as_mut().boot()?', 'start_endpoint(EP_FIRMWARE)',
+		'start_endpoint(EP_DOORBELL)'], 'Asahi G13 waits for the already-started ASC before starting application endpoints')!
+	rust := read(os.join_path(asahi_linux, 'rust/kernel/soc/apple/rtkit.rs'))!
+	require_order(rust.all_after('pub fn boot(self:'), ['bindings::apple_rtkit_boot(self.rtk)', 'pub fn start_endpoint'],
+		'Asahi G13 uses the RTKit boot entry point')!
+	linux_boot := section(linux, 'static int apple_rtkit_boot_common(', 'EXPORT_SYMBOL_GPL(apple_rtkit_boot);', 'Asahi RTKit boot')!
+	require_order(linux_boot, ['apple_rtkit_wait(rtk, &rtk->epmap_completion)', 'apple_rtkit_wait(rtk, &rtk->iop_pwr_ack_completion)',
+		'apple_rtkit_set_ap_power_state(rtk, APPLE_RTKIT_PWR_STATE_ON)', 'return apple_rtkit_boot_common(rtk, false);'],
+		'Asahi waits for endpoint and IOP readiness before AP ON without an INIT send')!
+	require(!linux_boot.contains('APPLE_RTKIT_PWR_STATE_INIT'), 'Asahi boot has no IOP INIT wake request')!
+	require(linux.contains('wait_for_completion_interruptible_timeout(c,\n\t\t\t\t\t\t      msecs_to_jiffies(1000))'),
+		'Asahi RTKit uses a one-second completion wait')!
+	power := section(linux, 'static int apple_rtkit_set_ap_power_state(', 'static int apple_rtkit_set_iop_power_state(', 'Asahi AP power request')!
+	require_order(power, ['reinit_completion(&rtk->ap_pwr_ack_completion)', 'APPLE_RTKIT_MGMT_SET_AP_PWR_STATE',
+		'apple_rtkit_wait(rtk, &rtk->ap_pwr_ack_completion)', 'rtk->ap_power_state != state'],
+		'Asahi requires a new AP acknowledgement with the complete requested state')!
+	epmap := section(linux, 'static void apple_rtkit_management_rx_epmap(', 'static void apple_rtkit_management_rx_iop_pwr_ack(', 'Asahi EPMAP')!
+	require(linux.contains('APPLE_RTKIT_MGMT_EPMAP_BASE   GENMASK_ULL(34, 32)'), 'Asahi endpoint map base is three bits')!
+	require_order(epmap, ['reply = FIELD_PREP(APPLE_RTKIT_MGMT_EPMAP_BASE, base)', 'APPLE_RTKIT_MGMT_EPMAP_REPLY_MORE',
+		'apple_rtkit_management_send(rtk, APPLE_RTKIT_MGMT_EPMAP_REPLY, reply)', 'case APPLE_RTKIT_EP_TRACEKIT:',
+		'ret = apple_rtkit_start_ep(rtk, ep)'], 'Asahi echoes the decoded base and starts advertised TraceKit')!
+
+	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
+	role := section(manager, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) start_firmware_endpoint(', 'Vinix RTKit boot dispatch')!
+	require(role.contains('if mgr.hw_config.gpu_gen == .g13 { mgr.rtk.boot_started() } else { mgr.rtk.boot() }'),
+		'Vinix selects the already-started handshake for G13')!
+	require_order(manager.all_after('pub fn (mut mgr GpuManager) init()'), ['mgr.res.start_cpu(role)',
+		'if !mgr.boot_firmware_role(role)', 'return mgr.fail_g13_initialization()', 'mgr.start_firmware_endpoint(role, u8(ep_firmware))'],
+		'Vinix enters the G13 handshake after releasing the ASC and unwinds failures before starting firmware endpoints')!
+	boot := section(transport, 'pub fn (mut rtk RTKit) boot()', '// Only the system endpoints', 'Vinix RTKit handshake')!
+	require_order(boot, ['return rtk.boot_transport(true)', 'return rtk.boot_transport(false)',
+		'if request_wake && !rtk.send_management(msg_set_iop_power, u64(power_state_init))',
+		'mut phase_started := if request_wake { u64(0) } else { timer.get_ns() }',
+		'timer.get_ns() - phase_started >= boot_phase_timeout_ns', 'timer.busywait_us(10)',
+		'reply_group := if request_wake { group } else { block }', 'start_system_endpoints(mut rtk, !request_wake)',
+		'if !request_wake && !endpoint_map_done', 'phase_started = timer.get_ns()',
+		'ap_power_requested && rtk.ap_power_state != power_state_on', 'rtk.ap_power_state = 0',
+		'rtk.send_management(msg_set_ap_power, u64(power_state_on))', 'if !request_wake { phase_started = timer.get_ns() }',
+		'rtk.state = .running'], 'Vinix uses elapsed-time phase budgets, discards stale AP state and requires exact ON')!
+	require(transport.contains('const boot_phase_timeout_ns = u64(1_000_000_000)')
+		&& transport.contains('[ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog, ep_tracekit]!'),
+		'Vinix uses one-second phase deadlines and includes TraceKit in G13 endpoint startup')!
+}

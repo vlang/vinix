@@ -7,3 +7,7 @@ pub fn get_ns() u64 {
 	fake_ns += 1_000_000
 	return fake_ns
 }
+
+pub fn busywait_us(us u64) {
+	fake_ns += us * 1000
+}

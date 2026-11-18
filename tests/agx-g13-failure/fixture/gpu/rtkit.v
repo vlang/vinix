@@ -5,6 +5,7 @@ module gpu
 import apple.mailbox
 import apple.rtkit
 import aarch64.cpu
+import aarch64.timer
 import gpu.agx.alloc
 import gpu.agx.hw
 import gpu.agx.pgtable
@@ -481,7 +482,7 @@ fn check_rtkit_first_buffer_request(abi hw.FirmwareAbi, ep u8, booting bool) {
 		booted := mgr.boot_firmware_role(0)
 		mgr.lock.release()
 		assert booted && transport.protocol_version == 12
-		assert transport.mbox.attempts == 6 && transport.mbox.sent == 6
+		assert transport.mbox.attempts == 5 && transport.mbox.sent == 5
 	} else {
 		for item in [empty, foreign, request]! {
 			assert mgr.handle_role_system_message(0, item)
@@ -521,8 +522,8 @@ fn check_rtkit_first_buffer_request(abi hw.FirmwareAbi, ep u8, booting bool) {
 }
 
 fn fail_first_boot_log_ack() {
-	// Four successful management sends precede the firmware notifications.
-	if rtkit_owner.rtk.mbox.attempts == 4 {
+	// HELLO, EPMAP and STARTEP replies precede the firmware notifications.
+	if rtkit_owner.rtk.mbox.attempts == 3 {
 		assert rtkit_owner.lock.is_held() && rtkit_owner.rtk.lock.is_held()
 		rtkit_owner.rtk.mbox.fail_next_send = true
 	}
@@ -577,7 +578,7 @@ fn check_rtkit_notification_ack_timeout(abi hw.FirmwareAbi, message mailbox.Mbox
 		mailbox.watch_send(unsafe { nil })
 		assert booted
 		assert transport.protocol_version == 12
-		assert transport.mbox.attempts == 7 && transport.mbox.sent == 6
+		assert transport.mbox.attempts == 6 && transport.mbox.sent == 5
 	} else {
 		transport.mbox.fail_next_send = true
 		assert mgr.checked_poll_rtkit_messages()
@@ -588,4 +589,95 @@ fn check_rtkit_notification_ack_timeout(abi hw.FirmwareAbi, message mailbox.Mbox
 	assert transport.state == .running && mgr.state == .running
 	assert mgr.rtkit_buffers.len == 0
 	rtkit_owner = unsafe { nil }
+}
+
+enum RTKitBootCase {
+	delayed
+	early_iop
+	silent
+	no_final_map
+	no_iop_ack
+	stale_ap_ack
+	wrong_ap_ack
+}
+
+fn check_rtkit_started_boot() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for scenario in [RTKitBootCase.delayed, .early_iop, .silent, .no_final_map,
+			.no_iop_ack, .stale_ap_ack, .wrong_ap_ack]! {
+			check_rtkit_boot_transcript(abi, scenario)
+		}
+	}
+	mut wake := rtkit.RTKit{name: 'legacy-wake'}
+	wake.mbox.inject(mailbox.MboxMsg{data0: 0x00100000000c000b})
+	wake.mbox.inject(mailbox.MboxMsg{data0: 0x0088000000000400})
+	wake.mbox.inject(mailbox.MboxMsg{data0: 0x0070000000000020})
+	wake.mbox.inject(mailbox.MboxMsg{data0: 0x00b0000000000020})
+	assert wake.boot()
+	assert wake.mbox.sent == 4
+	assert wake.mbox.sent_at(0).data0 == 0x0060000000000220
+	println('G13 RTKit: 14 started-ASC boot transcripts and one legacy wake transcript')
+}
+
+fn check_rtkit_boot_transcript(abi hw.FirmwareAbi, scenario RTKitBootCase) {
+	mut transport := rtkit.RTKit{name: 'g13-started'}
+	mut mgr := GpuManager{
+		hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+		rtk: unsafe { &transport }
+	}
+	delay := if scenario == .delayed { 620 } else { 0 }
+	if scenario != .silent {
+		transport.mbox.inject(mailbox.MboxMsg{data0: 0x00100000000c000b})
+		transport.mbox.inject(mailbox.MboxMsg{data0: 0x0080002900000002})
+	}
+	if scenario in [.early_iop, .stale_ap_ack]! {
+		transport.mbox.inject(mailbox.MboxMsg{data0: 0x00b0000000000020})
+		transport.mbox.inject(mailbox.MboxMsg{data0: 0x0070000000000220})
+	}
+	if scenario !in [.silent, .no_final_map]! {
+		// Advertise every supported system endpoint plus unknown 0x1f.
+		transport.mbox.inject_after(mailbox.MboxMsg{data0: 0x008800008000051e}, delay)
+		if scenario !in [.early_iop, .no_iop_ack, .stale_ap_ack]! {
+			transport.mbox.inject_after(mailbox.MboxMsg{data0: 0x0070000000000020}, delay)
+		}
+		if scenario in [.delayed, .early_iop, .wrong_ap_ack]! {
+			data := if scenario == .wrong_ap_ack { u64(0x00b0000000000220) } else { u64(0x00b0000000000020) }
+			transport.mbox.inject_after(mailbox.MboxMsg{data0: data}, delay)
+		}
+	}
+
+	start := timer.get_ns()
+	mgr.lock.acquire()
+	booted := mgr.boot_firmware_role(0)
+	mgr.lock.release()
+	elapsed := timer.get_ns() - start
+	assert !transport.lock.is_held()
+	assert booted == (scenario in [.delayed, .early_iop]!)
+	assert transport.state == if booted { rtkit.RTKitState.running } else { .error }
+	if scenario == .silent {
+		assert transport.mbox.attempts == 0
+	} else {
+		assert transport.protocol_version == 12 && transport.endpoints[33]
+		assert transport.mbox.sent_at(0) == mailbox.MboxMsg{data0: 0x00200000000c000c}
+		assert transport.mbox.sent_at(1) == mailbox.MboxMsg{data0: 0x0080000100000001}
+	}
+	if scenario !in [.silent, .no_final_map]! {
+		assert transport.mbox.sent_at(2) == mailbox.MboxMsg{data0: 0x0088000000000000}
+		for index, endpoint in [u64(1), 2, 3, 4, 8, 10]! {
+			assert transport.mbox.sent_at(index + 3) == mailbox.MboxMsg{data0: 0x0050000000000002 | (endpoint << 32)}
+		}
+		if scenario == .no_iop_ack {
+			assert transport.mbox.sent == 9
+		} else {
+			assert transport.mbox.sent == 10
+			assert transport.mbox.sent_at(9) == mailbox.MboxMsg{data0: 0x00b0000000000020}
+		}
+	}
+	if scenario == .delayed {
+		assert elapsed > 1_800_000_000
+	} else if scenario in [.silent, .no_final_map, .no_iop_ack, .stale_ap_ack]! {
+		assert elapsed >= 1_000_000_000 && elapsed < 1_050_000_000
+	} else {
+		assert elapsed < 50_000_000
+	}
 }

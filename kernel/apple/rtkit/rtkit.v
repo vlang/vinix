@@ -7,6 +7,7 @@ module rtkit
 
 import apple.mailbox
 import aarch64.cpu
+import aarch64.timer
 import klock
 import memory
 
@@ -52,7 +53,8 @@ const min_supported_version = u16(11)
 const max_supported_version = u16(12)
 const power_state_on = u16(0x20)
 const power_state_init = u16(0x220)
-const boot_timeout = 10_000_000
+const wake_boot_poll_limit = 10_000_000
+const boot_phase_timeout_ns = u64(1_000_000_000)
 const buffer_request = u8(1)
 const crash_notification = u8(1)
 const syslog_log = u8(5)
@@ -373,10 +375,17 @@ fn (mut rtk RTKit) fail(message &char) bool {
 	return false
 }
 
-// Start an RTKit coprocessor after its ASC CPU has been released. This follows
-// the version negotiation, endpoint-map, and AP/IOP power-state sequence used
-// by current RTKit versions 11 and 12.
+// Request IOP initialization from a client that uses the wake handshake.
 pub fn (mut rtk RTKit) boot() bool {
+	return rtk.boot_transport(true)
+}
+
+// The G13 ASC starts RTKit when the GPU driver releases its CPU.
+pub fn (mut rtk RTKit) boot_started() bool {
+	return rtk.boot_transport(false)
+}
+
+fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 	rtk.lock.acquire()
 	defer {
 		rtk.lock.release()
@@ -391,15 +400,27 @@ pub fn (mut rtk RTKit) boot() bool {
 	C.kprintf(c'rtkit[%.*s]: Starting boot handshake\n', i32(rtk.name.len), rtk.name.str)
 
 	// Wake the IOP. Its acknowledgment may arrive before or after HELLO/EPMAP.
-	if !rtk.send_management(msg_set_iop_power, u64(power_state_init)) {
+	if request_wake && !rtk.send_management(msg_set_iop_power, u64(power_state_init)) {
 		return rtk.fail(c'failed to request IOP initialization')
 	}
 
 	mut endpoint_map_done := false
 	mut ap_power_requested := false
-	for _ in 0 .. boot_timeout {
+	mut phase_started := if request_wake { u64(0) } else { timer.get_ns() }
+	for polls := 0; ; polls++ {
+		if request_wake {
+			if polls >= wake_boot_poll_limit { break }
+		} else if timer.get_ns() - phase_started >= boot_phase_timeout_ns {
+			break
+		}
 		msg := rtk.mbox.recv() or {
-			cpu.wfe()
+			if request_wake {
+				cpu.wfe()
+			} else {
+				// The manager and RTKit locks mask interrupts. Keep the
+				// deadline check runnable even without a mailbox event.
+				timer.busywait_us(10)
+			}
 			continue
 		}
 		ep := mailbox.msg_endpoint(&msg)
@@ -458,14 +479,10 @@ pub fn (mut rtk RTKit) boot() bool {
 					}
 					rtk.endpoints[ep_id] = true
 				}
-				// Echo the group and last bit back verbatim, as Apple does.
-				// Apple's own AP driver then puts a bitmap of the endpoints it
-				// already owns in the low 32 bits, so its first reply sets bit
-				// 0 only for group 0; the more/last convention used here is
-				// what the Linux driver sends and what this port has actually
-				// been run with. Both are accepted, so the difference is left
-				// alone rather than switched on the strength of one binary.
-				mut reply := (u64(group) & epmap_group_mask) << epmap_group_shift
+				// The G13 Linux handshake echoes the three-bit base. Keep
+				// the six-bit echo for clients using the wake handshake.
+				reply_group := if request_wake { group } else { block }
+				mut reply := u64(reply_group) << epmap_group_shift
 				if last {
 					reply |= epmap_last
 				} else {
@@ -475,10 +492,13 @@ pub fn (mut rtk RTKit) boot() bool {
 					return rtk.fail(c'failed to acknowledge endpoint map')
 				}
 				if last {
-					endpoint_map_done = true
-					if !start_system_endpoints(mut rtk) {
+					if !start_system_endpoints(mut rtk, !request_wake) {
 						return rtk.fail(c'failed to start a system endpoint')
 					}
+					if !request_wake && !endpoint_map_done {
+						phase_started = timer.get_ns()
+					}
+					endpoint_map_done = true
 				}
 			}
 			msg_iop_power_ack {
@@ -486,6 +506,9 @@ pub fn (mut rtk RTKit) boot() bool {
 			}
 			msg_ap_power_ack {
 				rtk.ap_power_state = u16(msg.data0 & 0xffff)
+				if !request_wake && ap_power_requested && rtk.ap_power_state != power_state_on {
+					return rtk.fail(c'AP power acknowledgement did not report ON')
+				}
 			}
 			else {
 				C.kprintf(c'rtkit[%.*s]: ignoring management message type 0x%llx\n',
@@ -497,11 +520,17 @@ pub fn (mut rtk RTKit) boot() bool {
 		// to deliver that acknowledgment after the final endpoint-map message.
 		if endpoint_map_done && (rtk.iop_power_state & 0xff) == power_state_on
 			&& !ap_power_requested {
+			if !request_wake {
+				// An acknowledgement from before this request cannot
+				// satisfy the AP transition, even if it reported ON.
+				rtk.ap_power_state = 0
+			}
 			if !rtk.send_management(msg_set_ap_power, u64(power_state_on)) {
 				return rtk.fail(c'failed to request AP power state')
 			}
 			ap_power_requested = true
 			rtk.state = .booting
+			if !request_wake { phase_started = timer.get_ns() }
 		}
 		if endpoint_map_done && (rtk.iop_power_state & 0xff) == power_state_on
 			&& (rtk.ap_power_state & 0xff) == power_state_on {
@@ -704,9 +733,10 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 	return true
 }
 
-fn start_system_endpoints(mut rtk RTKit) bool {
-	system_eps := [ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog]!
+fn start_system_endpoints(mut rtk RTKit, start_tracekit bool) bool {
+	system_eps := [ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog, ep_tracekit]!
 	for ep in system_eps {
+		if ep == ep_tracekit && !start_tracekit { continue }
 		if rtk.endpoints[ep] && !rtk.send_start_endpoint(ep) {
 			return false
 		}
