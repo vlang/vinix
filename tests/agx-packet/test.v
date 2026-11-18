@@ -65,9 +65,24 @@ fn main() {
 	bytes.clear()
 	append_record(mut bytes, 7, unsafe { nil }, 0, asahi.barrier_none, asahi.barrier_none)
 	assert validate(bytes) == -22
-	bytes.clear()
-	append_record(mut bytes, asahi.set_compute_attachments, &attachment, u16(sizeof(attachment)), 0, asahi.barrier_none)
-	assert validate(bytes) == -22, 'software records must not request a barrier'
+	for kind in [asahi.set_vertex_attachments, asahi.set_fragment_attachments, asahi.set_compute_attachments]! {
+		for mask in u32(0) .. u32(4) {
+			bytes.clear()
+			// Index zero can refer to an absent initial event. Preserve the
+			// request for submission-time validation even after hardware commands.
+			append_record(mut bytes, asahi.cmd_compute, &compute, 64, asahi.barrier_none, asahi.barrier_none)
+			append_record(mut bytes, kind, &attachment, u16(sizeof(attachment)),
+				if mask & 1 != 0 { 0 } else { asahi.barrier_none },
+				if mask & 2 != 0 { 0 } else { asahi.barrier_none })
+			attachment_code, attachment_info := packet.validate(bytes.data, u64(bytes.len))
+			assert attachment_code == 0 && attachment_info.compute_count == 1
+			assert attachment_info.attachment_initial_mask == mask
+		}
+		bytes.clear()
+		append_record(mut bytes, asahi.cmd_compute, &compute, 64, asahi.barrier_none, asahi.barrier_none)
+		append_record(mut bytes, kind, &attachment, u16(sizeof(attachment)), asahi.barrier_none, 1)
+		assert validate(bytes) == -22, 'a software record cannot wait for in-batch work'
+	}
 	bytes.clear()
 	attachment.flags = 1
 	append_record(mut bytes, asahi.set_compute_attachments, &attachment, u16(sizeof(attachment)), asahi.barrier_none, asahi.barrier_none)

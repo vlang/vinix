@@ -12,6 +12,37 @@ pub fn packet_input_auxiliary_reference(queue string, common string) ! {
 		'Final render and compute commands request a stamp flush')!
 }
 
+fn check_attachment_initial_reference(queue string) ! {
+	require_order(queue, ['events[SQ_RENDER].push(', 'events[SQ_COMPUTE].push(', 'cmdbuf.rewind();',
+		'[header.vdm_barrier, header.cdm_barrier]', 'if let Some(event) = events[queue_idx].get(*index as usize)',
+		'let queue_job = match header.cmd_type as u32', '_ => return Err(EINVAL)',
+		'} else {', 'assert!(*index == 0);',
+		'uapi::drm_asahi_cmd_type_DRM_ASAHI_SET_VERTEX_ATTACHMENTS =>',
+		'uapi::drm_asahi_cmd_type_DRM_ASAHI_SET_FRAGMENT_ATTACHMENTS =>',
+		'uapi::drm_asahi_cmd_type_DRM_ASAHI_SET_COMPUTE_ATTACHMENTS =>'],
+		'Asahi permits a software zero barrier only for an absent initial event')!
+}
+
+fn check_attachment_initial_local(reader string, decoder string, modern string, submit string) ! {
+	require_order(reader, ['header.cmd_type >= asahi.set_vertex_attachments',
+		'for pipe, barrier in [header.vdm_barrier, header.cdm_barrier]!',
+		'if barrier == 0', 'r.info.attachment_initial_mask |= u32(1) << pipe',
+		'else if barrier != asahi.barrier_none', 'return r.reject()', 'r.read_attachments(', 'continue',
+		'output = Command{ header: header }'], 'Software barriers remain separate from hardware command barriers')!
+	require_order(decoder, ['pub fn (workspace &PacketWorkspace) attachment_initial_mask()',
+		'return workspace.reader.info().attachment_initial_mask', 'workspace.reader = packet.reader(data, size)'],
+		'The decoded software mask comes from a fresh per-packet reader')!
+	require_order(modern, ['submission.decode_packet(', 'if code != 0 { return code }',
+		'f.submit_g13_staged(', 'parser.attachment_initial_mask()'],
+		'Modern submission passes the validated mask to the shared submitter')!
+	require_order(submit, ['request.result_handle, 0)', 'mut initial_mask := attachment_initial_mask',
+		'gpu_manager.capture_g13_initial_events(queue_resources, initial_mask)',
+		'defer { if !initial_events_released { gpu_manager.release_g13_initial_events(initial_events) } }',
+		'for pipe, prior in initial_events.values',
+		'prior.valid && attachment_initial_mask & (u32(1) << pipe) != 0 { return -22 }',
+		'f.bind_g13_submission_vm_locked'], 'Validate software zero references using the retained pre-bind snapshot')!
+}
+
 // Select firmware initializers from the reference, not the native adapter.
 // This deliberately small translator refuses expressions it cannot account for.
 fn packet_initializer(source string, member string) !string {

@@ -164,8 +164,84 @@ pub fn run_modern_submission_checks() {
 	assert_drained(file)
 	assert cases == 700
 	check_modern_device_status(out)
+	check_modern_attachment_barriers(input, out)
 	check_modern_timestamp_batch()
 	println('AGX modern SUBMIT: real packet-to-scheduler compute/render, 16-byte combined syncs, captured USC base, immutable input, reverse completion and 700 copy/OOM/retry/drain cases pass')
+}
+
+fn check_modern_attachment_barriers(input &syncobj.SyncObj, out &syncobj.SyncObj) {
+	records := [asahi.Sync{handle: input.handle}, asahi.Sync{handle: out.handle}]!
+	original := fence(out)
+	previous := syncobj.new_fence(106, 1)
+	defer { syncobj.replace_fence(out, original) }
+	mut packet := []u8{}
+	packet.flags |= .noslices
+	defer { unsafe { packet.free() } }
+	compute := asahi.CmdCompute{}
+	render := asahi.CmdRender{width_px: 32, height_px: 32, layers: 1, samples: 1,
+		utile_width_px: 32, utile_height_px: 32}
+	attachment := asahi.Attachment{pointer: 0x30000, size: 128}
+	for prior in u32(0) .. u32(6) {
+		for mask in u32(0) .. u32(4) {
+			gpu.reset()
+			mut file := new_file()
+			mut manager := gpu.get_global_manager() or { panic('manager') }
+			syncobj.replace_fence(out, previous)
+			packet.clear()
+			engines := if prior >= 4 { u32(3) } else { prior }
+			if engines & 1 != 0 {
+				append_packet(mut packet, asahi.cmd_render, unsafe { &render }, u16(sizeof(render)),
+					asahi.barrier_none, asahi.barrier_none)
+			}
+			if engines & 2 != 0 {
+				append_packet(mut packet, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)),
+					asahi.barrier_none, asahi.barrier_none)
+			}
+			if engines != 0 {
+				request := asahi.Submit{queue_id: 1, cmdbuf: u64(packet.data), cmdbuf_size: u32(packet.len)}
+				assert file.ioctl_modern_submit(unsafe { &request }) == 0
+				if prior != 5 { service_file_work() } // Include accepted work awaiting publication.
+			}
+			if prior == 4 {
+				manager.finish_compute(0)
+				manager.finish_render(0)
+				service_file_work()
+				assert_drained(file)
+			}
+			packet.clear()
+			append_packet(mut packet, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)),
+				asahi.barrier_none, asahi.barrier_none)
+			// Separate software records exercise accumulation in the decoder.
+			append_packet(mut packet, asahi.set_vertex_attachments, unsafe { &attachment }, u16(sizeof(attachment)),
+				if mask & 1 != 0 { 0 } else { asahi.barrier_none }, asahi.barrier_none)
+			append_packet(mut packet, asahi.set_compute_attachments, unsafe { &attachment }, u16(sizeof(attachment)),
+				asahi.barrier_none, if mask & 2 != 0 { 0 } else { asahi.barrier_none })
+			request := asahi.Submit{queue_id: 1, cmdbuf: u64(packet.data), cmdbuf_size: u32(packet.len),
+				syncs: unsafe { u64(&records[0]) }, in_sync_count: 1, out_sync_count: 1}
+			count := manager.prepares
+			sequence := file.g13_queues[0].resources.fence_seqno
+			operations := manager.active_operations
+			slot_attempts := uat_mgr.acquire_attempts
+			code := file.ioctl_modern_submit(unsafe { &request })
+			if prior != 4 && engines & mask != 0 {
+				assert code == -22 && manager.prepares == count
+				assert uat_mgr.acquire_attempts == slot_attempts
+				assert manager.active_operations == operations
+				assert voidptr(fence(out)) == voidptr(previous)
+				assert file.g13_queues[0].resources.fence_seqno == sequence
+			} else {
+				assert code == 0 && manager.prepares == count + 1
+				assert manager.g13_compute_jobs.last().initial_sources == [u32(0), 0]!
+				assert file.g13_queues[0].resources.fence_seqno == sequence + 1
+				assert voidptr(fence(out)) != voidptr(previous)
+			}
+			assert manager.capture_pins == 0
+			manager.stop()
+			service_file_work()
+			assert_drained(file)
+		}
+	}
+	println('G13 attachment barriers: 24 modern ioctl cases cover absent, prepared, published and retired prior engines')
 }
 
 fn check_modern_device_status(out &syncobj.SyncObj) {

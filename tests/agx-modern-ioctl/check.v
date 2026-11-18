@@ -49,11 +49,16 @@ fn check(source string) ! {
 	decode_prefix := 'submission__decode_packet(packet, data->cmdbuf_size, captured.usc_base, '
 	archived_decode := decode_prefix + 'false, &commands, parser)'
 	decode := if submit.contains(archived_decode) { archived_decode } else { decode_prefix + '&commands, parser)' }
+	submit_prefix := 'submit_g13_staged(f, captured, commands, &inputs, &outputs, 0'
+	archived_submit := submit_prefix + ')'
+	staged_submit := if submit.contains(archived_submit) { archived_submit } else {
+		submit_prefix + ', submission__PacketWorkspace__attachment_initial_mask(parser))'
+	}
 	ordered(submit, ['capture_submission_queue(f, data->queue_id)', 'submission__stage_packet_syncs(',
 		'memory__malloc_packed_fallible(data->cmdbuf_size)',
 		'usercopy__copy_from_user(packet, data->cmdbuf, data->cmdbuf_size)',
 		decode,
-		'submit_g13_staged(f, captured, commands, &inputs, &outputs, 0)', 'transferred = result == 0;'])!
+		staged_submit, 'transferred = result == 0;'])!
 	for owner in ['packet', 'workspace', 'storage'] {
 		require(submit.contains('memory__free(' + owner + ');'), 'missing scratch cleanup ' + owner)!
 	}

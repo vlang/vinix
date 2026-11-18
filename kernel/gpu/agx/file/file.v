@@ -1459,7 +1459,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 	output_result, output_syncs := agxsubmission.stage_g13_sync_array(f.owner_key, request.out_syncs, request.out_sync_count, false)
 	if output_result != 0 { return output_result }
 	defer { agxsubmission.release_sync_array(output_syncs) }
-	code := f.submit_g13_staged(captured, commands, unsafe { &input_syncs }, unsafe { &output_syncs }, request.result_handle)
+	code := f.submit_g13_staged(captured, commands, unsafe { &input_syncs }, unsafe { &output_syncs }, request.result_handle, 0)
 	transferred = code == 0
 	return code
 }
@@ -1468,7 +1468,7 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 // caller retains captured on failure; successful registration transfers it.
 fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	commands []agxsubmission.Command, input_syncs &agxsubmission.SyncArray,
-	output_syncs &agxsubmission.SyncArray, result_handle u32) int {
+	output_syncs &agxsubmission.SyncArray, result_handle u32, attachment_initial_mask u32) int {
 	if commands.len == 0 || commands.len > int(max_g13_submission_commands) { return -22 }
 	manager := gpu.get_global_manager() or { return -19 }
 	mut gpu_manager := unsafe { manager }
@@ -1514,7 +1514,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
 	if !f.cleanup_closed_mappings_locked(vm) { return -5 }
 	if !captured.retained { return -22 }
-	mut initial_mask := u32(0)
+	mut initial_mask := attachment_initial_mask
 	for command in commands {
 		descriptor := command.descriptor
 		if (descriptor.cmd_type == ioctl.asahi_cmd_compute && queue_caps & ioctl.asahi_queue_cap_compute == 0)
@@ -1548,6 +1548,11 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	}
 	mut initial_events_released := false
 	defer { if !initial_events_released { gpu_manager.release_g13_initial_events(initial_events) } }
+	// An attachment record has no hardware queue on which to put a barrier.
+	// Index zero is allowed only when its prior target was absent.
+	for pipe, prior in initial_events.values {
+		if prior.valid && attachment_initial_mask & (u32(1) << pipe) != 0 { return -22 }
+	}
 	slot := f.bind_g13_submission_vm_locked(mut gpu_manager, vm)
 	if slot < 0 { return slot }
 	defer { uat_mgr.release_g13_slot(vm, u32(slot)) }

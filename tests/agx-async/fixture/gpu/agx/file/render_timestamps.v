@@ -35,7 +35,7 @@ fn submit_render_timestamps(mut file GpuFile, count int, shared_ids bool, out &s
  assert code == 0
  defer { submission.release_sync_array(outputs) }
  inputs := submission.SyncArray{}
- result := file.submit_g13_staged(captured, commands, &inputs, &outputs, 0)
+ result := file.submit_g13_staged(captured, commands, &inputs, &outputs, 0, 0)
  if result != 0 { release_submission_queue(captured) }
  return result
 }

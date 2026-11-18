@@ -30,6 +30,7 @@ pub struct Info {
 pub mut:
 	render_count  u32
 	compute_count u32
+	attachment_initial_mask u32 // index-zero references on software records
 }
 
 pub struct Reader {
@@ -105,8 +106,14 @@ pub fn (mut r Reader) next(mut output Command) int {
 		if size > r.size - start { return r.reject() }
 		r.offset = start + size
 		if header.cmd_type >= asahi.set_vertex_attachments && header.cmd_type <= asahi.set_compute_attachments {
-			if header.vdm_barrier != asahi.barrier_none || header.cdm_barrier != asahi.barrier_none
-				|| !r.read_attachments(u32(header.cmd_type - asahi.set_vertex_attachments), start, size) {
+			for pipe, barrier in [header.vdm_barrier, header.cdm_barrier]! {
+				if barrier == 0 {
+					r.info.attachment_initial_mask |= u32(1) << pipe
+				} else if barrier != asahi.barrier_none {
+					return r.reject()
+				}
+			}
+			if !r.read_attachments(u32(header.cmd_type - asahi.set_vertex_attachments), start, size) {
 				return r.reject()
 			}
 			continue

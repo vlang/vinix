@@ -888,6 +888,10 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Native hardware-command limit differs')!
 	require_order(queue, ['const SQ_RENDER: usize = 0', 'const SQ_COMPUTE: usize = 1',
 		'events[queue_idx].get(*index as usize)'], 'Asahi subqueue barrier numbering')!
+	check_attachment_initial_reference(queue)!
+	check_attachment_initial_local(read(os.join_path(repo, 'kernel/gpu/agx/packet/packet.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/submission/packet.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/modern_submit.v'))!, ioctl_submit)!
 	barrier_wire := read(os.join_path(base, 'fw/workqueue.rs'))!
 	require_order(barrier_wire, ['pub(crate) struct Barrier {', 'wait_stamp: GpuWeakPointer<FwStamp>',
 		'external_barrier: u32', 'internal_barrier_type: u32', 'padding: Pad<0x1c>'], 'Asahi barrier wire fields')!

@@ -16,6 +16,10 @@ mut:
 	input packet.Command
 }
 
+pub fn (workspace &PacketWorkspace) attachment_initial_mask() u32 {
+	return workspace.reader.info().attachment_initial_mask
+}
+
 pub fn (command &Command) needs_timestamp_objects() bool {
 	for timestamps in command.timestamps {
 		if timestamps.start.handle != 0 || timestamps.end.handle != 0 { return true }
