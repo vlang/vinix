@@ -82,7 +82,7 @@ fn main() {
 	g13 := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	errors := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v')!
 	os.write_file('${scratch}/gpu/agx/gpu/production.v', 'module gpu\nimport drm.syncobj\nimport gpu.agx.mmu\nimport katomic\n' +
-		section(g13, 'pub fn (mut queue G13QueueResources) next_fence_seqno()', '// file.lock serializes acquisition')! +
+		section(g13, 'pub fn (mut queue G13QueueResources) next_fence_seqno()', 'pub fn (mut queue G13QueueResources) retain_file_reference()')! +
 		section(g13, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(g13, 'pub fn (mut mgr GpuManager) start_g13_submission_operation(', 'fn (mut mgr GpuManager) flush_g13_kernel_buffer(')! +
 		section(gpu, 'pub fn (mut mgr GpuManager) g13_submission_status(', 'pub fn (mut mgr GpuManager) can_query_global_params(')! +

@@ -19,8 +19,9 @@ before ringing the doorbell. Missing owners and ordinary allocation
 failures still get an ACK. Fatal growth failures stop publication. During
 an IRQ wait, shutdown can stop the ASC and reclaim the ring. Before
 retrying, the sender checks GPU state and the FIFO deadline under the
-manager lock. RecoverChannel and FwCtl still poll while waiting for their
-ring tokens. [Asahi acknowledgement order](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gpu.rs#L1729-L1758)
+manager lock. This revision used polling for RecoverChannel and FwCtl.
+[Asahi acknowledgement order](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gpu.rs#L1729-L1758)
+[RecoverChannel follow-up](m1-agx-recover-channel.md)
 
 ARM64 and x86-64 builds and all 82 contract test files passed for
 `aab62891a6ca4af6f902fc255a31ca6877ef9263` plus the archived patch.

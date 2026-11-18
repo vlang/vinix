@@ -303,7 +303,7 @@ mut:
 	render_buffer      G13RenderBufferResources
 	command_counter    G13CommandCounter
 	initial_events     [2]G13InitialEvent
-	file_references    u64 // captured ioctls and accepted aggregate submission nodes
+	file_references    u64 // ioctl, aggregate submission and recovery references
 	vm                 &mmu.UatContext = unsafe { nil }
 	mappings_published bool
 	context_retirement G13ContextRetirement
@@ -323,8 +323,9 @@ pub fn (mut queue G13QueueResources) next_fence_seqno() u32 {
 	return queue.fence_seqno
 }
 
-// file.lock serializes acquisition with namespace removal. Metadata outlives
-// stopped physical backing, so error/stop paths can release these references.
+// file.lock serializes ioctl captures with namespace removal. Recovery pins
+// an already-published queue from a live job under manager.lock. Metadata
+// outlives stopped physical backing until these references are released.
 pub fn (mut queue G13QueueResources) retain_file_reference() {
 	katomic.inc(mut &queue.file_references)
 }

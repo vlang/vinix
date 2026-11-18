@@ -8,6 +8,17 @@ pub fn load[T](value &T) T { return unsafe { *value } }
 
 pub fn store[T](mut target T, value T) { target = value }
 
+pub fn inc[T](mut target T) T {
+	previous := target
+	target++
+	return previous
+}
+
+pub fn dec[T](mut target T) bool {
+	target--
+	return target != 0
+}
+
 pub fn cas_acquire[T](mut target T, expected T, value T) bool {
 	if unsafe { *target } != expected { return false }
 	target = value

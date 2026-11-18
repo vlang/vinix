@@ -76,6 +76,7 @@ mut:
 	hw_config      hw.HwConfig
 	channels       GpuChannels
 	g13_channels   &G13ChannelAllocations = unsafe { nil }
+	g13_recovery_queue &G13QueueResources = unsafe { nil }
 	res            Resources
 	lock           klock.Lock
 	firmware_roles u32 = 1
@@ -348,6 +349,7 @@ pub fn run_checks() {
 	check_g13_runtime_transmit()
 	check_g13_batch_pipe_transmit()
 	check_g13_grow_ack_transmit()
+	check_g13_recovery_transmit()
 	check_rtkit_crash_snapshot()
 	check_rtkit_buffer_retries()
 	check_rtkit_syslog()
@@ -584,28 +586,7 @@ fn check_recovery() {
 		assert !mgr.recover_g13_fault(-1, 2)
 		assert status.halted == 1 && status.resume == 0
 	}
-	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
-		mut header := channel.RingHeader{}
-		mut messages := [4]fw.FwRecoverChannel{}
-		mut resources := G13QueueResources{}
-		resources.subqueues[2].info.va = 0x123000
-		mut job := G13ComputeJobResources{queue: &resources, event_slot: 8, stamp_value: 0x100, submitted: true}
-		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
-			g13_compute_jobs: [&job], auto_ack: true}
-		mgr.channels.device_ctrl = channel.new_tx_channel('dc', 1, u64(&header), 1, u64(&messages), 4, 0x30)
-		assert mgr.recover_g13_channel(2, 8, 0x100, 1)
-		assert job.error.status == 7 && job.error.extra == 1
-		assert messages[0] == fw.FwRecoverChannel{tag: if abi == .v12_3 { u32(0x0e) } else { u32(0x0f) },
-			pipe_type: 2, work_queue: 0x123000, event_value: 0x100}
-		assert mgr.rings == 1 && header.read_ptr == header.write_ptr && mgr.trace.len == 0
-		assert !mgr.recover_g13_channel(3, 8, 0x100, 1)
-		mgr.state = .stopped
-		job.error = G13JobError{}
-		assert !mgr.recover_g13_channel(2, 8, 0x100, 1)
-		assert header.write_ptr == 1 && job.error.status == 0
-	}
-	assert sizeof(fw.FwRecoverChannel) == 0x30 && __offsetof(fw.FwRecoverChannel, work_queue) == 8
-	println('G13 recovery: pending stamps, fault isolation, halt/resume, both RecoverChannel tags and completion tokens passed')
+	println('G13 recovery: pending stamps, fault isolation and halt/resume passed')
 }
 
 fn check_retirement() {

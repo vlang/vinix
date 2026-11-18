@@ -26,6 +26,10 @@ GrowTVBAck and RecoverChannel use the device-control tags for the selected
 G13 firmware ABI. GrowTVBAck carries the full halt counter and can use the
 send-empty IRQ. [G13 device-control commands](m1-agx-device-control.md)
 
+RecoverChannel also uses the guarded send-empty path. It retains the queue
+until firmware consumes the command or the ASC stops, and recognizes
+completion after ring wrap. [RecoverChannel transport](m1-agx-recover-channel.md)
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

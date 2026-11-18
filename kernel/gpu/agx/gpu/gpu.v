@@ -108,6 +108,7 @@ mut:
 	g13_queues        []&G13QueueResources
 	g13_context_head &G13QueueResources = unsafe { nil }
 	g13_context_tail &G13QueueResources = unsafe { nil }
+	g13_recovery_queue &G13QueueResources = unsafe { nil }
 	g13_queue_ids     G13QueueIds
 	g13_compute_jobs  []&G13ComputeJobResources
 	g13_render_jobs   []&G13RenderJobResources
@@ -1631,6 +1632,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.release_all_g13_render_jobs()
 	mgr.release_all_g13_compute_jobs()
 	mgr.release_all_g13_queue_resources()
+	mgr.release_g13_recovery_queue_locked()
 	mgr.release_g13_channels()
 	mgr.release_g13_event_resources_locked()
 	mgr.release_all_g17_queue_resources()

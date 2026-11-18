@@ -142,12 +142,21 @@ fn (mut mgr GpuManager) recover_g13_fault(culprit i32, default_status u32) bool 
 	return mgr.recover_g13_fault_locked(culprit, default_status)
 }
 
+// Caller holds mgr.lock. Clear the manager's pointer before dropping the
+// last reference, which can let the file reaper free the queue record.
+fn (mut mgr GpuManager) release_g13_recovery_queue_locked() {
+	if mgr.g13_recovery_queue == unsafe { nil } { return }
+	mut owner := unsafe { mgr.g13_recovery_queue }
+	mgr.g13_recovery_queue = unsafe { nil }
+	owner.release_file_reference()
+}
+
 fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, error_type u32) bool {
 	if pipe_type >= 3 || slot >= event.max_stamps { return false }
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
-	if mgr.state != .running { return false }
-	mut owner := &G13QueueResources(unsafe { nil })
+	if mgr.state != .running || mgr.g13_recovery_queue != unsafe { nil } { return false }
+	mut owner := unsafe { &G13QueueResources(nil) }
 	for job in mgr.g13_compute_jobs {
 		if pipe_type == 2 && job.submitted && !job.released && job.event_slot == slot {
 			owner = unsafe { job.queue }
@@ -167,12 +176,26 @@ fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, 
 	message := fw.make_recover_channel(mgr.hw_config.firmware_abi, pipe_type,
 		owner.subqueues[pipe_type].info.va, value) or { return false }
 	mgr.mark_g13_slot_error_locked(slot, value, G13JobError{status: 7, extra: error_type})
-	token := mgr.channels.device_ctrl.enqueue_with_token(voidptr(&message)) or { return false }
-	if !mgr.ring_device_control() { return false }
+	ticket := mgr.channels.device_ctrl.enqueue_tracked(voidptr(&message)) or { return false }
+	// The published command can still dereference the workqueue. Keep its
+	// backing until consumption or stopped-firmware teardown, even on timeout.
+	owner.retain_file_reference()
+	mgr.g13_recovery_queue = owner
+	sent := mgr.ring_g13_doorbell_locked(doorbell_device_control)
+	if mgr.state != .running { return false }
+	// An overlapping doorbell may have notified this command too. Check
+	// consumption even if this sender reached its own FIFO deadline.
+	if !sent { println('agx: RecoverChannel doorbell send failed') }
 	started := timer.get_ns()
-	for mgr.channels.device_ctrl.read_pointer() != token {
-		if mgr.channels.device_ctrl.has_fault() || timer.get_ns() - started >= u64(1_000_000_000) { return false }
+	for mgr.state == .running {
+		consumed := mgr.channels.device_ctrl.ticket_consumed(ticket) or { break }
+		if consumed {
+			mgr.release_g13_recovery_queue_locked()
+			return true
+		}
+		if timer.get_ns() - started >= u64(1_000_000_000) { break }
 		katomic.sync()
 	}
-	return true
+	if mgr.state == .running { mgr.state = .error }
+	return false
 }

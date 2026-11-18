@@ -37,7 +37,7 @@ fn run_checks() !int {
 	manager := os.read_file(repo + '/kernel/gpu/agx/gpu/gpu.v')!
 	enum_source := os.read_file(repo + '/kernel/gpu/agx/gpu/g13.v')!
 	production := 'module gpu\n' + section(enum_source, 'enum G13ContextRetirement', '\n')! + '\n' +
-		section(manager, 'struct SharedBuffer {', '// RTKit calls this')! +
+		section(manager, 'struct SharedBuffer {', '// The probe owns boot requests')! +
 		section(os.read_file(queue)!, 'fn (mut mgr GpuManager) free_g13_queue_resources_locked(', '// Caller holds the manager and subqueue locks.')! +
 		section(os.read_file(queue)!, 'fn (mut mgr GpuManager) release_all_g13_queue_resources()', '\n}\n')! + '\n}\n'
 	os.write_file(scratch + '/gpu/production.v', production)!

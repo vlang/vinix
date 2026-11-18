@@ -42,7 +42,7 @@ fn run_checks() int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	assert os.args.len == 1 || os.args[1..] == ['--sanitize']
 		|| (os.args.len == 4 && os.args[1] == '--sanitize'
-		&& os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source', '--mailbox-source', '--aic-source'])
+		&& os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source', '--mailbox-source', '--aic-source', '--recovery-source'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-g13-failure-${os.getpid()}')
 	os.mkdir_all(scratch) or { panic(err) }
@@ -96,7 +96,8 @@ fn run_checks() int {
 		.replace('poll_rtkit_messages()', 'checked_poll_rtkit_messages()')
 	production += section(source, 'fn (mut mgr GpuManager) read_g13_fw_log(', '// Shutdown the GPU') or { panic(err) }
 	production += source.all_after('// Shutdown the GPU\n')
-	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')
+	recovery_source := if os.args.len == 4 && os.args[2] == '--recovery-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/g13_recovery.v' }
+	production += (os.read_file(recovery_source) or { panic(err) }).all_after('import aarch64.timer\n')
 	production = production.replace('import sched\n', 'import sched\nimport aarch64.timer\n')
 	production = production.replace('import aarch64.timer\n', 'import aarch64.timer\nimport aarch64.aic\n')
 	submissions := os.read_file(if os.args.len == 4 && os.args[2] == '--g13-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/g13.v' }) or { panic(err) }
@@ -127,7 +128,7 @@ fn run_checks() int {
 	timestamp_end := if submissions.contains('pub fn free_g13_queue_record(') { 'pub fn free_g13_queue_record(' }
 		else { 'pub fn (mut mgr GpuManager) create_g13_queue_resources(' }
 	production += section(submissions, 'pub fn (job &G13ComputeJobResources) timestamp_values()', timestamp_end) or { panic(err) }
-	production += section(submissions, 'pub fn (queue &G13QueueResources) has_file_references()', '// Caller holds mgr.lock. Asahi QueueInner') or { panic(err) }
+	production += section(submissions, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner') or { panic(err) }
 	production += (section(submissions, 'pub fn (mut mgr GpuManager) release_g13_queue_resources(', '// Quarantined backing must retire') or { panic(err) })
 		.replace('release_g13_queue_resources', 'checked_release_g13_queue_resources')
 		.replace('free_g13_queue_resources_locked', 'completion_test_free_queue')

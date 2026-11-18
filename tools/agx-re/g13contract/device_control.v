@@ -31,7 +31,12 @@ fn check_g13_device_control_wire(channels string, initdata string, grow string, 
 		'Vinix passes the full counter and retains shutdown state after waiting')!
 	require_order(recovery.all_after('fn (mut mgr GpuManager) recover_g13_channel('),
 		['fw.make_recover_channel(mgr.hw_config.firmware_abi', 'mgr.mark_g13_slot_error_locked',
-			'mgr.channels.device_ctrl.enqueue_with_token', 'mgr.ring_device_control()',
-			'mgr.channels.device_ctrl.read_pointer() != token'],
-		'Vinix publishes the selected RecoverChannel wire tag and waits for its own acknowledgement')!
+			'mgr.channels.device_ctrl.enqueue_tracked', 'owner.retain_file_reference()',
+			'mgr.g13_recovery_queue = owner', 'sent := mgr.ring_g13_doorbell_locked(doorbell_device_control)',
+			'if mgr.state != .running { return false }', 'mgr.channels.device_ctrl.ticket_consumed(ticket)',
+			'mgr.release_g13_recovery_queue_locked()', 'if mgr.state == .running { mgr.state = .error }'],
+		'Vinix pins the published recovery, checks the device after the IRQ wait and releases the owner on consumption')!
+	require_order(recovery.all_after('fn (mut mgr GpuManager) release_g13_recovery_queue_locked('),
+		['mgr.g13_recovery_queue = unsafe { nil }', 'owner.release_file_reference()'],
+		'Vinix clears the manager pointer before dropping its recovery reference')!
 }

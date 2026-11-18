@@ -54,6 +54,15 @@ pub mut:
 	write_off  u32 // write_ptr offset in the state object
 	faulted    u32 // sticky protocol error, observed by the firmware worker
 	lock       klock.Lock
+mut:
+	published  u64 // host enqueue count, protected by lock
+}
+
+// The index serves callers that serialize producers through completion.
+// The sequence also distinguishes a reused index after the lock was dropped.
+pub struct TxTicket {
+	index    u32
+	sequence u64
 }
 
 // Generic receive channel (firmware -> driver)
@@ -121,6 +130,11 @@ pub fn (mut ch TxChannel) enqueue(data voidptr) bool {
 // this command. Firmware-control requests use this token for synchronous UAT
 // invalidation; regular channels can ignore it through enqueue().
 pub fn (mut ch TxChannel) enqueue_with_token(data voidptr) ?u32 {
+	ticket := ch.enqueue_tracked(data) or { return none }
+	return ticket.index
+}
+
+pub fn (mut ch TxChannel) enqueue_tracked(data voidptr) ?TxTicket {
 	if data == unsafe { nil } || ch.state_phys == 0 || ch.ring_phys == 0
 		|| ch.ring_size < 2 || ch.entry_size == 0 {
 		return none
@@ -162,7 +176,23 @@ pub fn (mut ch TxChannel) enqueue_with_token(data voidptr) ?u32 {
 	// device-observation barrier required by that contract.
 	katomic.sync()
 	katomic.store(mut write_ptr, next_wp)
-	return next_wp
+	ch.published++
+	return TxTicket{index: next_wp, sequence: ch.published}
+}
+
+// A ticket belongs to the issuing channel until it is torn down. All
+// producers on that channel must publish through enqueue_tracked.
+// At most ring_size - 1 entries can be unread, so the unread count can
+// distinguish passage of the ticket even after newer commands wrap the ring.
+pub fn (mut ch TxChannel) ticket_consumed(ticket TxTicket) ?bool {
+	ch.lock.acquire()
+	defer { ch.lock.release() }
+	if ch.state_phys == 0 { return none }
+	read_ptr := ch.read_pointer()
+	write_ptr := unsafe { katomic.load(&u32(ch.state_phys + higher_half + ch.write_off)) }
+	if !ch.validate_pointers(read_ptr, write_ptr) { return none }
+	unread := (u64(write_ptr) + u64(ch.ring_size) - u64(read_ptr)) % u64(ch.ring_size)
+	return ch.published - ticket.sequence >= unread
 }
 
 pub fn (ch &TxChannel) read_pointer() u32 {
