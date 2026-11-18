@@ -116,6 +116,6 @@ fn check_private_objects() {
 	if _ := raced.objects.table.find(request.handle) { panic('creation raced VM destruction') }
 	destroying_vm_file = unsafe { nil }
 	assert raced.close()
-	unsafe { invalid.vms.free() }
+	assert invalid.close() && empty_scope.destroyed
 	println('AGX VM-private objects: owning VM bind, foreign/reused-ID rejection, non-exportable import/timestamp policy, CPU authorization, shared operation, invalid flags/OOM and create/destroy lock race passed')
 }

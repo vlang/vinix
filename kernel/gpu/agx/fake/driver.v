@@ -405,6 +405,8 @@ fn (mut file FakeG17File) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	if request.extensions != 0 || request.pad != 0 || request.flags & ~valid_flags != 0 {
 		return -22
 	}
+	file.lock.acquire()
+	defer { file.lock.release() }
 	if request.flags & ioctl.asahi_gem_vm_private != 0 {
 		file.find_vm(request.vm_id) or { return -22 }
 	} else if request.vm_id != 0 {
@@ -412,10 +414,9 @@ fn (mut file FakeG17File) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	}
 	size_error := agxbo.create_size_error(request.size)
 	if size_error != 0 { return size_error }
+	if !file.objects.reserve_handle_entry() { return -12 }
 	object := gem.create_aligned(request.size, vm_page_size) or { return -12 }
-	file.lock.acquire()
 	file.objects.add_created(object)
-	file.lock.release()
 	request.size = object.size
 	request.handle = object.handle
 	return 0

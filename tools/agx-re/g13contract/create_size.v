@@ -6,16 +6,23 @@ fn check_create_size_local(objects string, file string, fake string) ! {
 	require_order(helper, ['if size == 0 { return -22 }', 'if size > ~u64(0) - agxvm.page_mask { return -75 }', 'return 0'],
 		'Zero size is EINVAL; 16 KiB rounding overflow is EOVERFLOW')!
 	require(!helper.contains('malloc') && !helper.contains('gem.'), 'Size rejection precedes backing/metadata allocation')!
+	reserve := section(objects, 'pub fn (mut table Table) reserve_handle_entry()', '// Nothing slices', 'GEM handle table storage')!
+	require_order(reserve, ['if table.objects.len < table.objects.cap { return true }',
+		'memory.malloc_packed_fallible(u64(capacity) * sizeof(voidptr)) @[freed]',
+		'if storage == unsafe { nil } { return false }', 'C.memcpy(storage, table.objects.data',
+		'table.objects = replacement', 'old.free()'], 'Reserve and copy before replacing the owned handle table')!
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_gem_create(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(', 'Native checked GEM size')!
 	require_order(create, ['request.flags & ~valid_flags != 0', 'f.lock.acquire()', 'defer { f.lock.release() }',
 		'f.find_vm(request.vm_id) or { return -2 }', 'private_identity = vm.identity', '} else if request.vm_id != 0',
 		'size_error := agxbo.create_size_error(request.size)', 'if size_error != 0 { return size_error }',
+		'if !f.objects.reserve_handle_entry() { return -12 }',
 		'gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,',
 		'request.flags & ioctl.asahi_gem_writeback != 0)', 'f.objects.add_created(obj)', 'request.handle = obj.handle'],
 		'Header and private VM lookup precede checked size, constructors and publication')!
 	software := section(fake, 'fn (mut file FakeG17File) ioctl_gem_create(', 'fn (mut file FakeG17File) ioctl_gem_mmap_offset(', 'Fake checked GEM size')!
-	require_order(software, ['file.find_vm(request.vm_id)', '} else if request.vm_id != 0',
+	require_order(software, ['file.lock.acquire()', 'defer { file.lock.release() }', 'file.find_vm(request.vm_id)', '} else if request.vm_id != 0',
 		'size_error := agxbo.create_size_error(request.size)', 'if size_error != 0 { return size_error }',
+		'if !file.objects.reserve_handle_entry() { return -12 }',
 		'gem.create_aligned(request.size, vm_page_size)', 'file.objects.add_created(object)'],
 		'Software backend shares size errors before allocation')!
 }

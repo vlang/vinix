@@ -238,10 +238,67 @@ pub fn run_modern_checks() {
 	check_eager_vm_rollback(mut manager)
 	check_modern_binding()
 	check_modern_queue_and_object()
+	check_gem_handle_storage()
 	run_advice_checks()
 	run_modern_scs_checks()
 	assert params.timestamp_ns(24_000_003, 24_000_000) == 1_000_000_125
 	assert params.timestamp_ns(1_000_003, 1_000_000) == 1_000_003_000
+}
+
+fn create_wire_gem(device &drm.DrmDevice, client u64, modern bool) (int, u32) {
+	if modern {
+		mut request := asahi.GemCreate{size: 0x4001, handle: 0xfeed}
+		usercopy.configure(unsafe { u64(&request) }, sizeof(request), -1)
+		code := drm.invoke(device, client, asahi.gem_create, sizeof(request), 3, unsafe { voidptr(&request) })
+		assert request.size == 0x4001
+		return code, request.handle
+	}
+	mut request := ioctl.DrmAsahiGemCreate{size: 0x4001, handle: 0xfeed}
+	usercopy.configure(unsafe { u64(&request) }, sizeof(request), -1)
+	code := drm.invoke(device, client, ioctl.drm_asahi_gem_create, sizeof(request), 3, unsafe { voidptr(&request) })
+	assert request.size == 0x4001
+	return code, request.handle
+}
+
+fn check_gem_handle_storage() {
+	driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle}
+	device := drm.DrmDevice{driver: unsafe { &driver }}
+	client := u64(0x4c01)
+	memory.assert_released()
+	for modern in [false, true]! {
+		for _ in 0 .. 64 {
+			mut file := GpuFile{ioctl_abi: if modern { modern_ioctl_abi } else { legacy_ioctl_abi }}
+			file_map[client] = unsafe { &file }
+			before := gem.creates()
+			memory.fail_allocations(true)
+			first_error, unchanged := create_wire_gem(&device, client, modern)
+			assert first_error == -12 && unchanged == 0xfeed && gem.creates() == before
+			assert gem.live() == 0 && memory.outstanding() == 0 && !file.lock.is_held()
+			memory.fail_allocations(false)
+			first_code, first := create_wire_gem(&device, client, modern)
+			assert first_code == 0 && memory.outstanding() == 1
+			memory.fail_allocations(true)
+			calls := memory.calls()
+			second_code, second := create_wire_gem(&device, client, modern)
+			assert second_code == 0 && second == first + 1 && memory.calls() == calls
+			growth_error, still_unchanged := create_wire_gem(&device, client, modern)
+			assert growth_error == -12 && still_unchanged == 0xfeed && gem.creates() == before + 2
+			assert gem.live() == 2 && memory.outstanding() == 1 && !file.lock.is_held()
+			memory.fail_allocations(false)
+			third_code, third := create_wire_gem(&device, client, modern)
+			assert third_code == 0 && third == second + 1 && gem.live() == 3
+			assert memory.outstanding() == 1, 'growth must release the previous table'
+			for handle in [first, second, third]! {
+				object := file.objects.get_ref(handle) or { panic('published GEM handle disappeared') }
+				assert object.handle == handle && object.references == 2 && object.size == 0x8000
+				gem.unref(object)
+			}
+			file_map.delete(client)
+			assert file.close() && gem.live() == 0
+			memory.assert_released()
+		}
+	}
+	println('AGX GEM handle storage: 256 first/growth failures across both ABIs preserve request outputs and existing handles. Spare capacity, retries and close release pass.')
 }
 
 fn check_file_vm_names(mut manager mmu.UatManager) {

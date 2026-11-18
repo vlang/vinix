@@ -823,6 +823,7 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	}
 	size_error := agxbo.create_size_error(request.size)
 	if size_error != 0 { return size_error }
+	if !f.objects.reserve_handle_entry() { return -12 }
 	obj := gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,
 		request.flags & ioctl.asahi_gem_writeback != 0) or { return -12 }
 	f.objects.add_created(obj)

@@ -8,6 +8,7 @@ module bo
 
 import drm.gem
 import gpu.agx.vm as agxvm
+import memory
 
 // Match Asahi's checked_object_size errors before requesting backing storage.
 // The GEM constructor still owns rounding and allocation; a valid size may OOM.
@@ -21,6 +22,33 @@ pub struct Table {
 mut:
 	objects      []&gem.GemObject
 	mmap_objects []&gem.GemObject
+}
+
+// Reserve one slot while holding the file lock. GEM creation keeps that lock
+// through publication so it can return ENOMEM before constructing the object.
+pub fn (mut table Table) reserve_handle_entry() bool {
+	if table.objects.len < table.objects.cap { return true }
+	max_capacity := max_int / int(sizeof(voidptr))
+	if table.objects.len >= max_capacity { return false }
+	capacity := if table.objects.cap == 0 { 2 } else if table.objects.cap <= max_capacity / 2 {
+		table.objects.cap * 2
+	} else { max_capacity }
+	storage := memory.malloc_packed_fallible(u64(capacity) * sizeof(voidptr)) @[freed]
+	if storage == unsafe { nil } { return false }
+	mut replacement := []&gem.GemObject{}
+	unsafe {
+		replacement.data = storage
+		replacement.len = table.objects.len
+		replacement.cap = capacity
+		replacement.flags = .noslices
+		if table.objects.len != 0 {
+			C.memcpy(storage, table.objects.data, u64(table.objects.len) * sizeof(voidptr))
+		}
+		mut old := table.objects
+		table.objects = replacement
+		old.free()
+	}
+	return true
 }
 
 // Nothing slices either list, so one that grows can free the buffer it

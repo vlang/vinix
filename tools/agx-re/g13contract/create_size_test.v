@@ -16,6 +16,9 @@ fn test_create_size_guards_reject_wrong_errno_boundary_and_allocation_order() {
 		if _ := check_create_size_local(objects, file.replace(token, ''), fake) { assert false, token }
 		if _ := check_create_size_local(objects, file, fake.replace(token, '')) { assert false, token }
 	}
+	if _ := check_create_size_local(objects, file.replace('if !f.objects.reserve_handle_entry() { return -12 }', ''), fake) { assert false }
+	if _ := check_create_size_local(objects, file, fake.replace('if !file.objects.reserve_handle_entry() { return -12 }', '')) { assert false }
+	if _ := check_create_size_local(objects.replace('old.free()', ''), file, fake) { assert false }
 	check := 'size_error := agxbo.create_size_error(request.size)'
 	early := file.replace(check, '').replace('mut private_identity := u64(0)', check + '\n\tmut private_identity := u64(0)')
 	if _ := check_create_size_local(objects, early, fake) { assert false, 'size check moved before VM lookup' }

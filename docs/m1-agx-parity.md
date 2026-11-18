@@ -645,6 +645,27 @@ The restored archive passed inventory verification for
 `bundle.tar.gz` SHA-256 is
 `e27181112076214ec248873d4f65b225fc84786cf31d20e52747db6528d9d33e`.
 
+AGX `GEM_CREATE` now reserves space in the file's handle table before
+constructing the object. If the first table allocation or later growth
+fails, the ioctl returns `ENOMEM` with the existing handles and request
+fields intact. The native and software backends hold the file lock from
+reservation through publication. The pinned DRM core also reserves its
+handle entry fallibly. Vinix still assigns handle numbers from its global
+GEM table. [Pinned DRM handle creation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L479-L535)
+
+The sanitized ioctl fixture passed 256 injected allocation failures
+across the two native ABIs. It checked creation with spare capacity,
+retry after growth refusal, and release of both replaced and final
+buffers. The CPU-cache fixture, 82 V test files, and both kernel builds
+passed. The allocator scan matched 177 existing findings. The pinned
+source audit remains `not_equivalent`. Validation was offline.
+
+The restored archive passed inventory verification for
+`0bef0ef7aa836c50932ecc82ec50a07c4e106b27` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-handle-storage-20261118.sCpXgC/`.
+`bundle.tar.gz` SHA-256 is
+`516036194cad54d0941ff9c9e058fa19c0237f06eba8b804a33fbcabc067cda5`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 
