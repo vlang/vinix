@@ -48,7 +48,7 @@ fn check_initial_dependencies_hold_followers() {
 			compute_barrier: if pipe == 1 { 0 } else { ioctl.asahi_barrier_none }
 		}
 		assert submit_scheduled(mut file, [initial], b, false) == 0
-		assert pending_tail.initial_barriers == u32(1) << pipe
+		assert pending_tail.commands[0].initial_barriers == u32(1) << pipe
 		assert submit_scheduled(mut file, [ScheduledCommand{ compute: pipe == 1 }], c, false) == 0
 		assert submit_scheduled_on_queue(mut file, 2, [ScheduledCommand{ compute: true }], independent, false) == 0
 		// A client-signaled user fence cannot release an internal dependency.

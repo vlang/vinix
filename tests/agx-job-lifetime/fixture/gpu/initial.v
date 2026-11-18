@@ -69,7 +69,7 @@ fn check_initial_barrier_lifetimes() {
 				producer := initial_job(mut mgr, mut queue, &context, &producer_done, !render_consumer)
 				initial_accept(mut mgr, producer)
 				pipe := if render_consumer { 1 } else { 0 }
-				mut capture := mgr.capture_g13_initial_events(&queue, u32(1) << pipe) or { panic('capture') }
+				capture := mgr.capture_g13_initial_events(&queue, u32(1) << pipe) or { panic('capture') }
 				assert capture.values[pipe].valid && !capture.values[1 - pipe].valid
 				wait := capture.values[pipe].ticket
 				consumer := initial_job(mut mgr, mut queue, &context, &consumer_done, render_consumer)
@@ -95,8 +95,8 @@ fn check_initial_barrier_lifetimes() {
 					assert mgr.set_g13_compute_barriers(consumer.compute, sources)
 					barriers, buffer, self_value = unsafe { &consumer.compute.explicit_barriers }, unsafe { &consumer.compute.microsequence }, consumer.compute.stamp_value
 				}
-				mgr.release_g13_initial_events(mut capture)
-				assert capture.values.all(!it.valid) && barriers.pin_count == 1 && !barriers.publishable(&owner)
+				mgr.release_g13_initial_events(capture)
+				assert barriers.pin_count == 1 && !barriers.publishable(&owner)
 				canceled := mode == 2 || mode == 4 || mode == 6
 				if mode == 0 {
 					assert !mgr.resolve_g13_initial_barriers_locked(mut barriers, mut buffer, &queue, self_value)
@@ -151,7 +151,7 @@ fn check_initial_cancellation_fallback() {
 	initial_accept(mut mgr, older)
 	target := initial_job(mut mgr, mut queue, &context, unsafe { &completions[1] }, false)
 	initial_accept(mut mgr, target)
-	mut capture := mgr.capture_g13_initial_events(&queue, 2) or { panic('capture') }
+	capture := mgr.capture_g13_initial_events(&queue, 2) or { panic('capture') }
 	wait := capture.values[1].ticket
 	consumer := initial_job(mut mgr, mut queue, &context, unsafe { &completions[2] }, true)
 	mut bytes := [4096]u8{}
@@ -162,7 +162,7 @@ fn check_initial_cancellation_fallback() {
 	mut sources := [2]G13BarrierSource{}
 	sources[1] = G13BarrierSource{ initial: capture.values[1] }
 	assert mgr.set_g13_render_barriers(consumer.render, sources)
-	mgr.release_g13_initial_events(mut capture)
+	mgr.release_g13_initial_events(capture)
 	initial_discard(mut mgr, target)
 	future := initial_job(mut mgr, mut queue, &context, unsafe { &completions[3] }, false)
 	future_ticket := queue.subqueues[2].events.ticket(future.compute.event_slot, future.compute.stamp_value) or { panic('future') }
@@ -217,10 +217,10 @@ fn check_initial_acceptance_and_reset() {
 	// Roll back the successful first pin, but do not touch an unused overflowed pipe.
 	fragment_slot := render.render.fragment_event_slot
 	assert event.test_force_refs(fragment_slot, 1) == 1
-	mut only_render := mgr.capture_g13_initial_events(&queue, 1) or { panic('unused overflow must not block') }
-	mgr.release_g13_initial_events(mut only_render)
+	only_render := mgr.capture_g13_initial_events(&queue, 1) or { panic('unused overflow must not block') }
+	mgr.release_g13_initial_events(only_render)
 	assert event.test_force_refs(slot, 1) == ~u32(0)
-	mut capture := mgr.capture_g13_initial_events(&queue, 2) or { panic('capture before reset') }
+	capture := mgr.capture_g13_initial_events(&queue, 2) or { panic('capture before reset') }
 	initial_discard(mut mgr, render)
 	initial_discard(mut mgr, b)
 	initial_discard(mut mgr, a)
@@ -230,8 +230,7 @@ fn check_initial_acceptance_and_reset() {
 	mgr.g13_events.initialized = false
 	assert event.configure_event_manager(0x10000, unsafe { u64(&driver) }, 0x20000, unsafe { u64(&firmware) })
 	fresh := event.reserve_stamp() or { panic('new manager owner') }
-	mgr.release_g13_initial_events(mut capture)
-	assert capture.values.all(!it.valid)
+	mgr.release_g13_initial_events(capture)
 	expect_free_events(127, int(fresh))
 	event.release_stamp(fresh)
 	event.reset_event_manager()
@@ -250,7 +249,7 @@ fn check_initial_compaction() {
 	compute := initial_job(mut mgr, mut queue, &context, unsafe { &completions[1] }, false)
 	initial_accept(mut mgr, render)
 	initial_accept(mut mgr, compute)
-	mut capture := mgr.capture_g13_initial_events(&queue, 3) or { panic('two sources') }
+	capture := mgr.capture_g13_initial_events(&queue, 3) or { panic('two sources') }
 	mut bytes := [4096]u8{}
 	owner := SharedBuffer{ phys: unsafe { u64(&bytes) }, va: 0x100000, size: sizeof(bytes) }
 	bad := initial_job(mut mgr, mut queue, &context, unsafe { &completions[3] }, false)
@@ -271,7 +270,7 @@ fn check_initial_compaction() {
 	mut sources := [2]G13BarrierSource{}
 	for pipe in 0 .. 2 { sources[pipe] = G13BarrierSource{ initial: capture.values[pipe] } }
 	assert mgr.set_g13_render_barriers(consumer.render, sources)
-	mgr.release_g13_initial_events(mut capture)
+	mgr.release_g13_initial_events(capture)
 	initial_discard(mut mgr, render)
 	mut job := unsafe { consumer.render }
 	assert !mgr.resolve_g13_initial_barriers_locked(mut job.explicit_barriers, mut job.init_buffer, &queue, job.vertex_stamp_value)

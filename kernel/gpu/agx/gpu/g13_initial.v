@@ -94,13 +94,14 @@ pub fn (mut mgr GpuManager) capture_g13_initial_events(queue &G13QueueResources,
 	return capture
 }
 
-pub fn (mut mgr GpuManager) release_g13_initial_events(mut capture G13InitialEvents) {
+// Consume the capture's physical pin ownership.
+pub fn (mut mgr GpuManager) release_g13_initial_events(capture G13InitialEvents) {
+	if !capture.values[0].valid && !capture.values[1].valid { return }
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
-	for mut value in capture.values {
+	for value in capture.values {
 		// A stopped manager may have reset/freed its stamp arrays. Never apply
 		// an old capture's release to a newly initialized global manager.
 		if value.valid && mgr.g13_events.initialized { event.release_stamp(value.ticket.slot) }
-		value = G13InitialEvent{}
 	}
 }

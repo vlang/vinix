@@ -5,7 +5,7 @@ fn check_submit_device_local(file string, gpu string) ! {
 	submit := section(file, 'pub fn (mut f GpuFile) ioctl_submit(', 'fn dispatch(', 'Native submission device status')!
 	require_order(submit, ['defer { memory.free(stage_storage) }', 'agxsubmission.stage_command_array(',
 		'agxsubmission.stage_g13_sync_array(', 'manager := gpu.get_global_manager() or { return -19 }',
-		'mut state_manager := unsafe { manager }', 'status := state_manager.g13_submission_status()',
+		'mut gpu_manager := unsafe { manager }', 'status := gpu_manager.g13_submission_status()',
 		'if status != 0 { return status }', 'f.lock.acquire()', 'agxsubmission.install_output_syncs('],
 		'Locked device refusal follows staging with owned-buffer cleanup and precedes file mutation/output publication')!
 	gate := section(gpu, 'pub fn (mut mgr GpuManager) g13_submission_status(',

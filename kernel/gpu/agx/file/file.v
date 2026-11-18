@@ -1472,8 +1472,8 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	output_syncs &agxsubmission.SyncArray, result_handle u32) int {
 	if commands.len == 0 || commands.len > int(max_g13_submission_commands) { return -22 }
 	manager := gpu.get_global_manager() or { return -19 }
-	mut state_manager := unsafe { manager }
-	status := state_manager.g13_submission_status()
+	mut gpu_manager := unsafe { manager }
+	status := gpu_manager.g13_submission_status()
 	if status != 0 { return status }
 	dependency_code, pending_inputs := agxsubmission.copy_job_dependencies(input_syncs)
 	if dependency_code != 0 { return dependency_code }
@@ -1519,10 +1519,13 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
 	if !f.cleanup_closed_mappings_locked(vm) { return -5 }
 	if !captured.retained { return -22 }
+	mut initial_mask := u32(0)
 	for command in commands {
 		descriptor := command.descriptor
 		if (descriptor.cmd_type == ioctl.asahi_cmd_compute && queue_caps & ioctl.asahi_queue_cap_compute == 0)
 			|| (descriptor.cmd_type == ioctl.asahi_cmd_render && queue_caps & ioctl.asahi_queue_cap_render == 0) { return -22 }
+		if descriptor.barriers[0] == 0 { initial_mask |= u32(1) }
+		if descriptor.barriers[1] == 0 { initial_mask |= u32(2) }
 		if descriptor.result_size != 0 {
 			if result_handle == 0 { return -22 }
 			if result_object == unsafe { nil } {
@@ -1534,7 +1537,15 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 				|| descriptor.result_size > result_object.size - descriptor.result_offset { return -22 }
 		} else if descriptor.result_offset != 0 { return -22 }
 	}
-	slot := f.bind_g13_submission_vm_locked(mut state_manager, vm)
+	// Fix the prior event targets while this ioctl owns the queue gate.
+	// The snapshot pins survive either admission wait.
+	initial_events := gpu_manager.capture_g13_initial_events(queue_resources, initial_mask) or {
+		capture_status := gpu_manager.g13_submission_status()
+		return if capture_status != 0 { capture_status } else { -5 }
+	}
+	mut initial_events_released := false
+	defer { if !initial_events_released { gpu_manager.release_g13_initial_events(initial_events) } }
+	slot := f.bind_g13_submission_vm_locked(mut gpu_manager, vm)
 	if slot < 0 { return slot }
 	defer { uat_mgr.release_g13_slot(vm, u32(slot)) }
 	storage := memory.malloc_packed_fallible(sizeof(G13PendingSubmission)) @[freed]
@@ -1554,16 +1565,12 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	defer {
 		if !queued {
 			cancel_g13_pending(mut pending, -5)
-			mut owner := unsafe { pending.manager }
-			owner.release_g13_initial_events(mut pending.initial_events)
 			assert katomic.load(&pending.callbacks_remaining) == 0
 			unqueued_fence = pending.final_fence
 			unqueued_failure = int(katomic.load(&pending.failure))
 			memory.free(storage)
 		}
 	}
-	mut gpu_manager := unsafe { manager }
-	pending.initial_events = gpu_manager.capture_g13_initial_events(queue_resources, pending.initial_barriers) or { return -5 }
 	for index := u32(0); index < pending.command_count; index++ {
 		compute_ts := timestamps.addresses(index, 2)
 		vertex_ts := timestamps.addresses(index, 0)
@@ -1584,8 +1591,9 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 			}
 		}
 	}
-	if !install_g13_batch_barriers(mut pending) { return -5 }
-	gpu_manager.release_g13_initial_events(mut pending.initial_events)
+	if !install_g13_batch_barriers(mut pending, initial_events) { return -5 }
+	gpu_manager.release_g13_initial_events(initial_events)
+	initial_events_released = true
 	mut fence_queue := unsafe { queue_resources }
 	pending.final_fence = syncobj.new_queue_fence(f.owner_key, u64(fence_queue.next_fence_seqno()), queue_resources.fence_context)
 	for index := u32(0); index < pending.command_count; index++ {

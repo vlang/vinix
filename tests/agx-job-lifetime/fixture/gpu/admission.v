@@ -189,7 +189,7 @@ fn check_batch_initial_resolution() {
 	mut completions := [2]Completion{}
 	producer := initial_job(mut mgr, mut queue, &context, unsafe { &completions[0] }, false)
 	initial_accept(mut mgr, producer)
-	mut capture := mgr.capture_g13_initial_events(&queue, 2) or { panic('capture') }
+	capture := mgr.capture_g13_initial_events(&queue, 2) or { panic('capture') }
 	consumer := initial_job(mut mgr, mut queue, &context, unsafe { &completions[1] }, true)
 	mut bytes := [4096]u8{}
 	unsafe {
@@ -199,7 +199,7 @@ fn check_batch_initial_resolution() {
 	mut sources := [2]G13BarrierSource{}
 	sources[1] = G13BarrierSource{ initial: capture.values[1] }
 	assert mgr.set_g13_render_barriers(consumer.render, sources)
-	mgr.release_g13_initial_events(mut capture)
+	mgr.release_g13_initial_events(capture)
 	mut batch := [64]G13SubmissionJob{}
 	batch[0] = consumer
 	assert !mgr.g13_batch_ready(batch, 1), 'an unpublished initial source cannot pass preflight'

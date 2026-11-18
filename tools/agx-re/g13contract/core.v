@@ -257,7 +257,9 @@ fn check_g13_slot_wait(asahi_linux string, repo string, mmu string) ! {
 	require_order(reference_file, ['let ret = queue.lock().submit(', '&vec,', 'objects,'],
 		'Asahi holds the queue mutex through submission')!
 	queue := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/queue/mod.rs'))!
-	require_order(queue, ['let vm_bind = gpu.bind_vm(&self.vm)?', 'let vm_slot = vm_bind.slot()',
+	require_order(queue, ['events[SQ_RENDER].push(', 'self.q_frag.as_ref().and_then(|a| a.wq.event_info())',
+		'events[SQ_COMPUTE].push(', 'self.q_comp.as_ref().and_then(|a| a.wq.event_info())',
+		'let vm_bind = gpu.bind_vm(&self.vm)?', 'let vm_slot = vm_bind.slot()',
 		'let fence: UserFence'], 'Asahi slot admission before the submit fence')!
 	release := section(mmu, 'pub fn (mut mgr UatManager) release_g13_slot(', 'pub fn (mut mgr UatManager) unbind_context(', 'Vinix slot release')!
 	require_order(release, ['mgr.slot_users[slot]--', 'if mgr.slot_users[slot] == 0',
@@ -268,7 +270,10 @@ fn check_g13_slot_wait(asahi_linux string, repo string, mmu string) ! {
 		'queue_resources.submission_gate.generation()', 'f.lock.release()',
 		'queue_resources.submission_gate.wait(generation)', 'f.lock.acquire()',
 		'return -int(errno.erestartsys)', 'defer {', 'queue_resources.submission_gate.leave()',
-		'gem.ref_obj(result_object)', 'slot := f.bind_g13_submission_vm_locked(mut state_manager, vm)',
+		'descriptor.barriers[0] == 0', 'descriptor.barriers[1] == 0', 'gem.ref_obj(result_object)',
+		'gpu_manager.capture_g13_initial_events(queue_resources, initial_mask)',
+		'defer { if !initial_events_released { gpu_manager.release_g13_initial_events(initial_events) } }',
+		'slot := f.bind_g13_submission_vm_locked(mut gpu_manager, vm)',
 		'if slot < 0 { return slot }', 'defer { uat_mgr.release_g13_slot(vm, u32(slot)) }',
 		'prepare_g13_compute_job', 'install_output_syncs'], 'Vinix interruptible G13 admission')!
 	binder := section(file, 'fn (mut f GpuFile) bind_g13_submission_vm_locked(', 'fn dispatch(', 'Vinix VM binder')!
@@ -318,7 +323,7 @@ fn check_initial_snapshot_contract(initial string, barriers string, workqueue st
 		'!mgr.g13_events.initialized', 'mask & (u32(1) << pipe)',
 		'voidptr(last.queue) != voidptr(queue)', 'last.pipe != u32(pipe)', 'owns_slot(last.ticket.slot)', 'event.retain_stamp(last.ticket.slot)',
 		'event.release_stamp(prior.ticket.slot)', 'release_g13_initial_events',
-		'value.valid && mgr.g13_events.initialized', 'value = G13InitialEvent{}'], 'Vinix initial snapshot ownership')!
+		'value.valid && mgr.g13_events.initialized', 'event.release_stamp(value.ticket.slot)'], 'Vinix initial snapshot ownership')!
 	require_order(workqueue, ['serial := queue.serial', 'queue.serial++', 'serial: serial',
 		'resolve_initial(captured Ticket)', 'stamp_value_completed', '!queue.owns_slot(captured.slot)',
 		'i64(entry.serial - captured.serial) > 0', 'if !entry.published', 'InitialState.absent'], 'Vinix stable initial identity')!
@@ -366,7 +371,7 @@ fn check_queue_fence_contract(contexts string, fences string, queue string, subm
 		'pub fn (mut queue G13QueueResources) next_fence_seqno() u32 {',
 		'queue.fence_seqno++', 'return queue.fence_seqno'], 'Vinix wrapping 32-bit fence sequence')!
 	require_order(submit, ['fn (mut f GpuFile) submit_g13_staged(', 'f.lock.acquire()',
-		'install_g13_batch_barriers(mut pending)', 'mut fence_queue := unsafe { queue_resources }',
+		'install_g13_batch_barriers(mut pending,', 'mut fence_queue := unsafe { queue_resources }',
 		'syncobj.new_queue_fence(f.owner_key, u64(fence_queue.next_fence_seqno()), queue_resources.fence_context)',
 		'agxsubmission.install_output_syncs'], 'Vinix assigns the retained queue sequence under its file lock')!
 }
@@ -531,7 +536,7 @@ fn check_ring_admission_contract(local string, reference string) ! {
 fn check_submission_pipelining(pending string) ! {
 	resolve := section(pending, 'fn resolve_g13_batch_dependencies(', 'fn g13_pending_error(', 'Vinix initial dependencies')!
 	require_order(resolve, ['barrier == ioctl.asahi_barrier_none', 'barrier == 0',
-		'item.initial_barriers |= u32(1) << pipe', 'barrier > counts[pipe]'], 'Vinix initial dependencies')!
+		'entry.initial_barriers |= u32(1) << pipe', 'barrier > counts[pipe]'], 'Vinix initial dependencies')!
 	dispatch := section(pending, 'fn g13_pending_dispatch_complete(', '\n}\n', 'Vinix dispatch completion')!
 	require_order(dispatch, ['item.commands[index].compute_job != unsafe { nil }',
 		'item.commands[index].render_job != unsafe { nil }', 'return false', 'return true'], 'Vinix dispatch completion')!
@@ -547,7 +552,7 @@ fn check_submission_pipelining(pending string) ! {
 		'queue.dispatch_blocked_in_poll = true', 'retained_tail.next = pending_head',
 		'pending_head = retained_head', 'pending_poll_active = false'],
 		'Vinix per-queue publication FIFO in the detached poll snapshot')!
-	require(!drain.contains('item.initial_barriers != 0'), 'Initial events must not wait for whole-batch CPU retirement')!
+	require(!drain.contains('initial_barriers'), 'Initial events must not wait for whole-batch CPU retirement')!
 }
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
@@ -783,8 +788,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require(!ioctl_submit.contains('wait_g13_fence') && !ioctl_submit.contains('syncobj.wait')
 		&& !ioctl_submit.contains('sched.yield'), 'Vinix submission must not wait for dependencies or GPU work')!
 	require_order(ioctl_submit, ['agxsubmission.stage_command_array', 'agxsubmission.stage_g13_sync_array',
-		'f.lock.acquire()', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
-		'gpu_manager.capture_g13_initial_events', 'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
+		'f.lock.acquire()', 'gpu_manager.capture_g13_initial_events',
+		'f.bind_g13_submission_vm_locked', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
+		'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
 		'install_g13_batch_barriers',
 		'gpu_manager.release_g13_initial_events', 'agxsubmission.install_output_syncs', 'register_g13_pending'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!

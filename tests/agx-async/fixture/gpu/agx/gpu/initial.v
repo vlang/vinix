@@ -65,13 +65,12 @@ pub fn (mut mgr GpuManager) capture_g13_initial_events(queue &G13QueueResources,
 	return capture
 }
 
-pub fn (mut mgr GpuManager) release_g13_initial_events(mut capture G13InitialEvents) {
-	for mut value in capture.values {
+pub fn (mut mgr GpuManager) release_g13_initial_events(capture G13InitialEvents) {
+	for value in capture.values {
 		if value.valid {
 			assert mgr.capture_pins > 0
 			mgr.capture_pins--
 		}
-		value = G13InitialEvent{}
 	}
 }
 

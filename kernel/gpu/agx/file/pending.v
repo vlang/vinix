@@ -41,8 +41,6 @@ mut:
 	dependencies        submission.SyncArray
 	dependencies_ready  bool
 	admitted            bool // scalar survives publication and immediate metadata retirement
-	initial_barriers    u32 // explicit index-zero dependencies, by subqueue
-	initial_events      gpu.G13InitialEvents
 	final_fence         &syncobj.DmaFence = unsafe { nil }
 	commands            [64]G13PendingCommand
 	command_count       u32
@@ -79,7 +77,6 @@ fn resolve_g13_batch_dependencies(mut item G13PendingSubmission, commands []subm
 			barrier := commands[index].descriptor.barriers[pipe]
 			if barrier == ioctl.asahi_barrier_none { continue }
 			if barrier == 0 {
-				item.initial_barriers |= u32(1) << pipe
 				entry.initial_barriers |= u32(1) << pipe
 				continue
 			}
@@ -105,7 +102,7 @@ fn g13_pending_error(item &G13PendingSubmission) int {
 
 // All source metadata remains caller-owned until this node is queued. The
 // manager reads and pins its event slots while holding its publication lock.
-fn install_g13_batch_barriers(mut item G13PendingSubmission) bool {
+fn install_g13_batch_barriers(mut item G13PendingSubmission, initial gpu.G13InitialEvents) bool {
 	mut manager := unsafe { item.manager }
 	for index := u32(0); index < item.command_count; index++ {
 		command := &item.commands[index]
@@ -114,7 +111,7 @@ fn install_g13_batch_barriers(mut item G13PendingSubmission) bool {
 			dependency := command.wait_for[pipe]
 			if dependency == 0 {
 				if command.initial_barriers & (u32(1) << pipe) != 0 {
-					sources[pipe] = gpu.G13BarrierSource{ initial: item.initial_events.values[pipe] }
+					sources[pipe] = gpu.G13BarrierSource{ initial: initial.values[pipe] }
 				}
 				continue
 			}

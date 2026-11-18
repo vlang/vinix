@@ -50,7 +50,7 @@ fn test_order_rejects_a_reversed_contract() {
 fn test_submission_pipelining_preserves_initial_guards_and_queue_fifo() {
 	pending := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
-	for broken in [pending.replace('item.initial_barriers |= u32(1) << pipe', ''),
+	for broken in [pending.replace('entry.initial_barriers |= u32(1) << pipe', ''),
 		pending.replace('earlier := queue.dispatch_blocked_in_poll', 'earlier := false'),
 		pending.replace('queue.dispatch_blocked_in_poll = false', ''),
 		pending.replace('!g13_pending_dispatch_complete(item)', 'false'),

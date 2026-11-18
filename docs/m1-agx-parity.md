@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 captures prior queue events for index-zero barriers before VM
+admission. [Prior events at admission](m1-agx-prior-event-admission.md)
+
 Queues that share a G13 VM now serialize admission to the UAT slot
 allocator. [Per-VM binding admission](m1-agx-vm-binding-admission.md)
 

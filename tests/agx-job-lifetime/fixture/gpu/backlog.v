@@ -58,7 +58,7 @@ fn check_queued_job_backlog(render bool, stop bool) {
 	mask := if render { u32(1) } else { u32(2) }
 	logical := if render { 0 } else { 1 }
 	physical := if render { 1 } else { 2 }
-	mut capture := mgr.capture_g13_initial_events(&queue, mask) or { panic('backlog capture') }
+	capture := mgr.capture_g13_initial_events(&queue, mask) or { panic('backlog capture') }
 	target := capture.values[logical].ticket
 	for start := 0; start < 512; start += 64 {
 		mut batch := [64]G13SubmissionJob{}
@@ -104,7 +104,7 @@ fn check_queued_job_backlog(render bool, stop bool) {
 	assert completions.all(it.calls == 1) && memory.outstanding() == 0
 	assert mgr.g13_compute_jobs.len == 0 && mgr.g13_render_jobs.len == 0 && mgr.pending == 0 && mgr.batch_pending == 0
 	expect_free_events(127, int(target.slot))
-	mgr.release_g13_initial_events(mut capture)
+	mgr.release_g13_initial_events(capture)
 	expect_free_events(128, -1)
 	event.reset_event_manager()
 }

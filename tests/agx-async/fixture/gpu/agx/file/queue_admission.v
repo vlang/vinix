@@ -2,6 +2,7 @@
 @[has_globals]
 module file
 
+import drm.asahi
 import drm.syncobj
 import errno
 import event
@@ -38,7 +39,7 @@ fn resume_queue_submitter() {
 	mut independent_file := if wait_on_vm_gate { new_file() } else { waiting_file }
 	expected_refs := if wait_on_vm_gate { u64(1) } else { u64(2) }
 	other := output()
-	assert submit_slot_wait_packet(mut independent_file, 2, other) == 0
+	assert submit_slot_wait_packet(mut independent_file, 2, asahi.barrier_none, other) == 0
 	service_file_work()
 	manager.finish_compute(0)
 	service_file_work()
@@ -80,7 +81,7 @@ fn check_admission_scope(vm_scope bool) {
 			gate_slot_attempts = uat_mgr.acquire_attempts
 			event.before_wait(resume_queue_submitter, false)
 			code := if modern {
-				submit_slot_wait_packet(mut file, queue_id, out)
+				submit_slot_wait_packet(mut file, queue_id, asahi.barrier_none, out)
 			} else {
 				submit(mut file, queue_id, false, unsafe { nil }, out, false)
 			}

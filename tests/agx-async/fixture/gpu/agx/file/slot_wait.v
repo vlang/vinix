@@ -70,12 +70,12 @@ fn wake_waiting_submitter() {
 	}
 }
 
-fn submit_slot_wait_packet(mut file GpuFile, queue_id u32, out &syncobj.SyncObj) int {
+fn submit_slot_wait_packet(mut file GpuFile, queue_id u32, cdm_barrier u16, out &syncobj.SyncObj) int {
 	compute := asahi.CmdCompute{cdm_ctrl_stream_base: 0x12340000}
 	mut packet := []u8{}
 	defer { unsafe { packet.free() } }
 	append_packet(mut packet, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)),
-		asahi.barrier_none, asahi.barrier_none)
+		asahi.barrier_none, cdm_barrier)
 	record := asahi.Sync{handle: out.handle}
 	request := asahi.Submit{queue_id: queue_id, syncs: u64(&record), out_sync_count: 1,
 		cmdbuf: u64(packet.data), cmdbuf_size: u32(packet.len)}
@@ -113,7 +113,7 @@ fn check_g13_slot_wait() {
 				event.before_wait(wake_waiting_submitter, reason == .firmware_switch)
 			}
 			code := if modern {
-				submit_slot_wait_packet(mut file, 1, out)
+				submit_slot_wait_packet(mut file, 1, asahi.barrier_none, out)
 			} else {
 				submit(mut file, 1, false, unsafe { nil }, out, true)
 			}
