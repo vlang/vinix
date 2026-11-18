@@ -469,6 +469,55 @@ fn test_child_table_publication() {
 	println('AGX child tables: one barrier before publishing each level, none on failure or reuse')
 }
 
+fn check_reserved_descriptor(level int, kind u64) {
+	owner := pgtable.new_pgtable(39, 48) or { panic('root backing') }
+	mut pt := pgtable.new_pgtable_with_root(owner.l1_phys, 39, 48) or { panic('borrowed root') }
+	address := u64(0xffffffa000004000)
+	span := if level == 1 { u64(1) << 36 } else { u64(1) << 25 }
+	neighbor := address + span
+	page := pgtable.uat_pgsz
+	protection := pgtable.gpu_prot_fw_shared_rw
+	assert pt.map(neighbor, 0x200000, page, protection)
+	neighbor_pte := pt.read_pte(neighbor) or { panic('neighbor leaf') }
+	root_slot := unsafe { &pt.l1[(address >> 36) & 7] }
+	mut descriptor := if level == 1 { root_slot } else {
+		unsafe { &u64(*root_slot & pt.oas_mask & ~pgtable.uat_pg_mask) }
+	}
+	assert unsafe { *descriptor } == 0
+	backing := pgtable.alloc_table_page() or { panic('block backing') }
+	old := u64(backing) | kind
+	unsafe {
+		*descriptor = old
+		backing[2] = 0x600000
+	}
+	before := memory.live_pages()
+	if _ := pt.read_pte(address) { panic('non-table descriptor returned as a leaf') }
+	assert !pt.prepare_map_range(address, page)
+	assert !pt.map(address, 0x400000, page, protection)
+	assert !pt.map_repeated_page(address, 0x400000, page, protection)
+	assert !pt.reprotect(address, page, pgtable.gpu_prot_fw_private_rw)
+	pt.unmap(address, page)
+	assert unsafe { *descriptor } == old, 'non-table intermediate descriptor changed'
+	assert unsafe { backing[0] == 0 && backing[2] == 0x600000 }
+	assert memory.live_pages() == before
+	assert (pt.read_pte(neighbor) or { panic('neighbor leaf lost') }) == neighbor_pte
+
+	pgtable.destroy(pt)
+	pgtable.destroy(owner)
+	assert memory.live_pages() == 1, 'table destruction must preserve non-table backing'
+	pgtable.free_table_page(backing)
+	assert memory.live_pages() == 0
+}
+
+fn test_reserved_descriptors() {
+	for level in [1, 2]! {
+		for kind in [u64(0), 1, 2]! {
+			check_reserved_descriptor(level, kind)
+		}
+	}
+	println('AGX intermediate descriptors: six borrowed TTBR1 cases preserve non-table entries, backing and adjacent leaves')
+}
+
 fn test_preparation_boundaries() {
 	page := pgtable.uat_pgsz
 	root_boundary := u64(1) << 36
@@ -546,6 +595,7 @@ fn test_bind_preparation() {
 
 fn main() {
 	test_child_table_publication()
+	test_reserved_descriptors()
 	test_preparation_boundaries()
 	test_bind_preparation()
 	test_partial_unmap_survivors()

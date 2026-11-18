@@ -265,6 +265,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	check_g13_slot_wait(asahi_linux, repo, local)!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
 		'Child table initialization completes before parent publication and BIND preparation walks each leaf table once',
+		'UAT walks allocate only empty intermediate entries and follow only table descriptors',
 		'G13 kernel mappings finish with TLBI and require slot-64 FwCtl only before a cached mapping is removed',
 		'Only an active ASC slot with the matching published TTBR requires FwCtl before user driver-buffer unmap',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',

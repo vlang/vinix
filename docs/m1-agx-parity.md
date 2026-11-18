@@ -164,6 +164,28 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `c2eea80bbab6a1b4351408cf42af7ed3004c7c9ee27abe6ca6fed75cd8b29dd9`.
 
+G13 UAT follows only table descriptors at L1 and L2 and installs a
+child only when the intermediate entry is zero, matching the pinned
+Asahi rules. Asahi skips subtrees with other descriptor types. Vinix
+skips those entries for unmap and fails mapping preparation, map, and
+reprotection when they reach one.
+[Asahi intermediate descriptor walk](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/pgtable.rs#L660-L720)
+
+Both kernel builds, 82 contract test files, and the TLB, heap, teardown,
+and file-close sanitizer suites passed. Six borrowed TTBR1 cases
+preserved the unsupported descriptors, their backing and adjacent
+leaves. Three compiled controls caught the previous behavior. Both
+type checks appear in linked ARM64 code. The allocation scan reproduced
+178 baseline findings. The full source audit remains `not_equivalent`.
+No hardware tests or reboots ran.
+
+Evidence for `297f1d4e6dc7a0bc26262338dce48d9206db6e10` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-uat-descriptors-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`f8c87d3cff0a3ed7193d8b93207ed9f853514f0335a2d0db11d641431577a349`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

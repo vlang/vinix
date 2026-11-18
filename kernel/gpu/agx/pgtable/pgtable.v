@@ -281,6 +281,7 @@ pub fn destroy(pt &UatPgtable) {
 // Walk the page table for a given IOVA and return a pointer to the leaf PTE.
 // If `allocate` is true, intermediate table levels are created as needed.
 // Complete zeroing each new child before a GPU walk can see its descriptor.
+// A nonzero intermediate descriptor must name a table, even on borrowed roots.
 //
 // Address decomposition for the three 16 KiB UAT levels:
 //   root:   bits [IAS-1:36] (8 entries at 39-bit IAS, 64 at 42-bit IAS)
@@ -305,9 +306,7 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 
 	mut l2_phys := u64(0)
 
-	if l1_entry & uat_pte_valid != 0 {
-		l2_phys = l1_entry & pt.oas_mask & ~uat_pg_mask
-	} else {
+	if l1_entry == 0 {
 		if !allocate {
 			return none
 		}
@@ -317,6 +316,10 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 		unsafe {
 			l1_virt[l1_idx] = l2_phys | uat_pte_valid | uat_pte_table
 		}
+	} else if l1_entry & uat_pte_page == uat_pte_page {
+		l2_phys = l1_entry & pt.oas_mask & ~uat_pg_mask
+	} else {
+		return none
 	}
 
 	// --- Walk L2 ---
@@ -325,15 +328,7 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 
 	mut l3_phys := u64(0)
 
-	if l2_entry & uat_pte_valid != 0 {
-		// Check if this is a table descriptor pointing to L3
-		if l2_entry & uat_pte_table != 0 {
-			l3_phys = l2_entry & pt.oas_mask & ~uat_pg_mask
-		} else {
-			// Block entry at L2 -- return pointer to L2 entry itself
-			return unsafe { &u64(u64(&l2_virt[l2_idx])) }
-		}
-	} else {
+	if l2_entry == 0 {
 		if !allocate {
 			return none
 		}
@@ -343,6 +338,10 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 		unsafe {
 			l2_virt[l2_idx] = l3_phys | uat_pte_valid | uat_pte_table
 		}
+	} else if l2_entry & uat_pte_page == uat_pte_page {
+		l3_phys = l2_entry & pt.oas_mask & ~uat_pg_mask
+	} else {
+		return none
 	}
 
 	// --- Return L3 PTE pointer ---

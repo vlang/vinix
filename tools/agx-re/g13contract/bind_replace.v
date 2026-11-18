@@ -27,17 +27,23 @@ fn check_bind_replace_local(file string, page_table string) ! {
 	require(allocator.contains('memory.pmm_alloc_aligned_fallible(') && !allocator.contains('memory.pmm_alloc_aligned('),
 		'Table OOM must return through the fallible walker rather than panic')!
 	walk := section(page_table, 'pub fn (pt &UatPgtable) get_pte(', '// Map a single', 'Native table walk')!
-	require_order(walk, ['l2_table := alloc_table_page() or { return none }', 'l2_phys = u64(l2_table)',
+	require_order(walk, ['if l1_entry == 0', 'l2_table := alloc_table_page() or { return none }', 'l2_phys = u64(l2_table)',
 		'cpu.dsb_sy()', 'l1_virt[l1_idx] = l2_phys | uat_pte_valid | uat_pte_table',
+		'} else if l1_entry & uat_pte_page == uat_pte_page {', 'l2_phys = l1_entry & pt.oas_mask & ~uat_pg_mask',
+		'} else {\n\t\treturn none\n\t}', 'l2_entry := unsafe', 'if l2_entry == 0',
 		'l3_table := alloc_table_page() or { return none }', 'l3_phys = u64(l3_table)',
-		'cpu.dsb_sy()', 'l2_virt[l2_idx] = l3_phys | uat_pte_valid | uat_pte_table'],
-		'Complete child initialization before publishing either parent descriptor')!
+		'cpu.dsb_sy()', 'l2_virt[l2_idx] = l3_phys | uat_pte_valid | uat_pte_table',
+		'} else if l2_entry & uat_pte_page == uat_pte_page {', 'l3_phys = l2_entry & pt.oas_mask & ~uat_pg_mask',
+		'} else {\n\t\treturn none\n\t}', 'l3_virt := unsafe'],
+		'Publish children after initialization in empty entries and follow only table descriptors')!
 }
 
 fn check_table_preparation_reference(page_table string, mem string) ! {
 	walk := section(page_table, 'fn walk_inner<F>(', 'fn free_table(', 'Packaged page-table walk')!
-	require_order(walk, ['let pt_page = Page::alloc_page(GFP_KERNEL | __GFP_ZERO)?',
+	require_order(walk, ['if upte_val == 0 && alloc', 'let pt_page = Page::alloc_page(GFP_KERNEL | __GFP_ZERO)?',
 		'crate::mem::sync();', 'upte.store(upte_val, Ordering::Relaxed);',
+		'if upte_val & PTE_TYPE_BITS == PTE_TYPE_LEAF_TABLE', 'Ok(Some(upte_val & oas_mask',
+		'Unexpected Table PTE value', 'Ok(None)', 'if pt_addr[level].is_none()',
 		'let count = (((end - iova) >> UAT_PGBIT) as usize).min(max_count)',
 		'let block = 1 << (UAT_PGBIT + UAT_LVBIT);', 'iova = align(iova + 1, block);'],
 		'Asahi synchronizes each zeroed child and walks one span per leaf table')!
