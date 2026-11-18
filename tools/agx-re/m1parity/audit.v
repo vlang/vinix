@@ -160,7 +160,8 @@ pub fn audit(inputs Inputs) !Report {
 	asahi_sources := ['drivers/gpu/drm/asahi', 'include/uapi/drm/asahi_drm.h',
 		'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'drivers/gpu/drm/scheduler/sched_fence.c', 'rust/kernel/drm/sched.rs', 'rust/kernel/dma_fence.rs',
 		'drivers/dma-buf/dma-fence.c', 'drivers/dma-buf/dma-fence-chain.c', 'drivers/dma-buf/sync_file.c', 'include/uapi/linux/sync_file.h', 'drivers/gpu/drm/drm_syncobj.c', 'rust/kernel/drm/syncobj.rs', 'include/uapi/drm/drm.h', 'fs/file.c',
-		'rust/kernel/uaccess.rs', 'rust/kernel/alloc/kvec.rs', 'rust/kernel/alloc/layout.rs']
+		'rust/kernel/uaccess.rs', 'rust/kernel/alloc/kvec.rs', 'rust/kernel/alloc/layout.rs',
+		'drivers/soc/apple/rtkit.c', 'rust/kernel/soc/apple/rtkit.rs']
 	require_clean(inputs.packages, [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD'])!
 	require_clean(inputs.asahi, asahi_sources)!
 	require_clean(inputs.m1n1, ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx'])!
@@ -181,6 +182,7 @@ pub fn audit(inputs Inputs) !Report {
 	mut sources := []Source{}
 	for role, paths in {
 		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/asahi', 'kernel/drm/gem',
+			'kernel/apple/rtkit/rtkit.v',
 			'kernel/fs/vfs.v',
 			'kernel/sched/sched_arm64.v',
 			'kernel/sched/sched_amd64.v',

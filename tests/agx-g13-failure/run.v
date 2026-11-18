@@ -16,6 +16,8 @@ fn run_checks() int {
 	os.mkdir_all(scratch) or { panic(err) }
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(os.join_path(repo, 'tests/agx-g13-failure/fixture'), scratch, false) or { panic(err) }
+	os.mkdir_all('${scratch}/apple/rtkit') or { panic(err) }
+	os.cp('${repo}/kernel/apple/rtkit/rtkit.v', '${scratch}/apple/rtkit/rtkit.v') or { panic(err) }
 	event_queue := os.read_file('${repo}/kernel/gpu/agx/event/workqueue.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/event/queue.v', 'module event\n' +
 		(section(event_queue, 'pub struct WorkQueueEvents {', 'pub fn (mut queue WorkQueueEvents) retain(') or { panic(err) }) +
@@ -26,15 +28,21 @@ fn run_checks() int {
 	os.cp('${repo}/kernel/gpu/agx/channel/channel.v', '${scratch}/gpu/agx/channel/channel.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n') or { panic(err) }
 	source := os.read_file(if os.args.len == 4 && os.args[2] == '--gpu-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' }) or { panic(err) }
-	mut production := 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport gpu.agx.channel\nimport gpu.agx.pgtable\nimport katomic\nimport sched\n__global higher_half = u64(0)\n'
+	mut production := 'module gpu\nimport apple.mailbox\nimport apple.rtkit\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport gpu.agx.channel\nimport gpu.agx.pgtable\nimport katomic\nimport sched\n__global higher_half = u64(0)\n'
 	production += section(source, 'const g13_channel_allocation_count', 'const buffer_allocator_default') or { panic(err) }
 	production += section(source, 'struct G13ChannelAllocations {', '@[inline]\nfn pipe_index') or { panic(err) }
+	production += section(source, 'const buffer_allocator_g13_rtkit', '\n') or { panic(err) }
+	production += '\n'
+	production += section(source, 'fn allocate_rtkit_shmem(', 'struct G13ChannelAllocations {') or { panic(err) }
+	production += (section(source, 'fn (mut mgr GpuManager) release_rtkit_buffers(', 'fn (mut mgr GpuManager) alloc_g13_channel_pair(') or { panic(err) })
+		.replace('release_rtkit_buffers()', 'checked_release_rtkit_buffers()')
 	production += section(source, 'fn (mut mgr GpuManager) alloc_g13_shared_buffer(', '// Timestamp objects are GEM-owned') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) alloc_g13_channel_pair(', '// Map the t8103 firmware') or { panic(err) }
 	production += (section(source, 'fn (mut mgr GpuManager) free_g13_channel_allocations(', 'fn (mut mgr GpuManager) fail_g13_initialization(') or { panic(err) })
 		.replace('release_g13_channels()', 'checked_release_g13_channels()')
 	production += section(source, 'pub fn (mut mgr GpuManager) set_file_reaper(', '// Serialize accepted submissions') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) dequeue_g13_rx(', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
+	production += section(source, 'fn (mut mgr GpuManager) handle_role_system_message(', '// Drain the ASC transport') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) read_g13_fw_log(', '// Shutdown the GPU') or { panic(err) }
 	production += source.all_after('// Shutdown the GPU\n')
 	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')

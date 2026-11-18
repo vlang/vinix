@@ -239,7 +239,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 	mgr.rtkit_buffers.flags |= .noslices
 	if cfg.gpu_gen == .g13 {
 		mgr.rtk.set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)
-		mgr.rtk.set_shmem_resolver(resolve_rtkit_shmem)
+		mgr.rtk.set_shmem_reader(copy_rtkit_shmem)
 	}
 
 	return mgr
@@ -325,8 +325,8 @@ fn (buffer &SharedBuffer) cpu_address() voidptr {
 	return voidptr(buffer.phys + higher_half)
 }
 
-// RTKit calls this while servicing system-endpoint buffer requests. Keep every
-// allocation owned by the manager until the ASC has been stopped.
+// RTKit buffer requests run under mgr.lock during boot and runtime, including
+// the reply publishing the IOVA. Retain the backing until the ASC stops.
 fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
 	if context == unsafe { nil } {
 		return 0
@@ -343,12 +343,11 @@ fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
 	return iova
 }
 
-// RTKit crash logs live in firmware-requested UAT buffers. Resolve only an
-// interval wholly contained in one retained allocation; the crash parser must
-// never follow an arbitrary firmware-provided address through the HHDM.
-fn resolve_rtkit_shmem(context voidptr, iova u64, size u64) voidptr {
-	if context == unsafe { nil } || size == 0 {
-		return unsafe { nil }
+// Keep the backing mapped throughout the copy. The parser runs outside the
+// buffer lock and reads only the private bytes it received here.
+fn copy_rtkit_shmem(context voidptr, iova u64, destination voidptr, size u64) bool {
+	if context == unsafe { nil } || destination == unsafe { nil } || size == 0 {
+		return false
 	}
 	mut mgr := unsafe { &GpuManager(context) }
 	mgr.rtkit_buffer_lock.acquire()
@@ -356,16 +355,17 @@ fn resolve_rtkit_shmem(context voidptr, iova u64, size u64) voidptr {
 		mgr.rtkit_buffer_lock.release()
 	}
 	for buffer in mgr.rtkit_buffers {
-		if iova < buffer.va || size > buffer.size {
+		if buffer.phys == 0 || iova < buffer.va || size > buffer.size {
 			continue
 		}
 		offset := iova - buffer.va
 		if offset > buffer.size - size {
 			continue
 		}
-		return voidptr(buffer.phys + higher_half + offset)
+		unsafe { C.memcpy(destination, voidptr(buffer.phys + higher_half + offset), size) }
+		return true
 	}
-	return unsafe { nil }
+	return false
 }
 
 struct G13ChannelAllocations {
@@ -1335,6 +1335,15 @@ pub fn (mut mgr GpuManager) handle_event() {
 }
 
 fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg) bool {
+	// Only an already-allocated crash log can parse outside the manager
+	// lock. Its reader serializes the snapshot with buffer release.
+	if role == 0 && mgr.hw_config.gpu_gen == .g13
+		&& (mailbox.msg_endpoint(&msg) != rtkit.ep_crashlog || mgr.rtk.system_iovas[rtkit.ep_crashlog] == 0) {
+		mgr.lock.acquire()
+		defer { mgr.lock.release() }
+		if mgr.state != .running { return true }
+		return mgr.rtk.handle_system_message(msg)
+	}
 	return match role {
 		0 { mgr.rtk.handle_system_message(msg) }
 		1 {

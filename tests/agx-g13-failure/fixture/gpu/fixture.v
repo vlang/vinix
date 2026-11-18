@@ -6,6 +6,7 @@ import gpu.agx.fw
 import gpu.agx.hw
 import gpu.agx.alloc
 import gpu.agx.event
+import apple.rtkit
 import katomic
 import klock
 
@@ -40,6 +41,7 @@ mut:
 	phys u64
 	va   u64
 	size u64
+	allocator u32
 }
 
 fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
@@ -89,6 +91,11 @@ mut:
 	g13_shared ChannelTestHeap
 	g13_readonly ChannelTestHeap
 	g13_gpu_readonly ChannelTestHeap
+	g13_rtkit ChannelTestHeap
+	rtkit_buffer_lock klock.Lock
+	rtkit_buffers []SharedBuffer
+	rtk &rtkit.RTKit = unsafe { nil }
+	secondary_rtk &rtkit.RTKit = unsafe { nil }
 	channel_alloc ChannelAllocProbe
 	tvb_target u32
 	tvb_calls u32
@@ -274,7 +281,10 @@ fn (mut mgr GpuManager) stop_firmware_cpus(roles u32) {
 	mgr.trace << 'stop'
 }
 
-fn (mut mgr GpuManager) release_rtkit_buffers() { mgr.trace << 'rtkit' }
+fn (mut mgr GpuManager) release_rtkit_buffers() {
+	if mgr.rtk != unsafe { nil } { mgr.checked_release_rtkit_buffers() }
+	mgr.trace << 'rtkit'
+}
 
 fn (mut mgr GpuManager) release_all_g13_render_jobs() { mgr.trace << 'fail-render' }
 
@@ -317,6 +327,7 @@ pub fn run_checks() {
 	check_fw_log()
 	check_fw_log_allocations()
 	check_g13_receive_shutdown()
+	check_rtkit_crash_snapshot()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10

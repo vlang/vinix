@@ -8,6 +8,7 @@ module rtkit
 import apple.mailbox
 import aarch64.cpu
 import klock
+import memory
 
 // RTKit management message types.
 pub const msg_hello = u8(1)
@@ -86,7 +87,7 @@ pub mut:
 	ap_power_state   u16
 	shmem_context    voidptr
 	shmem_alloc      fn (voidptr, u64) u64 = unsafe { nil }
-	shmem_resolve    fn (voidptr, u64, u64) voidptr = unsafe { nil }
+	shmem_read       fn (voidptr, u64, voidptr, u64) bool = unsafe { nil }
 	system_iovas     [16]u64
 	system_sizes     [16]u64
 	syslog_entries   u32
@@ -114,10 +115,9 @@ pub fn (mut rtk RTKit) set_shmem_allocator(context voidptr,
 	rtk.shmem_alloc = allocator
 }
 
-// Install the optional reverse mapping used to inspect firmware-written
-// system buffers. The allocator's context owns the mappings and their lifetime.
-pub fn (mut rtk RTKit) set_shmem_resolver(resolver fn (voidptr, u64, u64) voidptr) {
-	rtk.shmem_resolve = resolver
+// The client copies a retained system buffer into caller-owned memory.
+pub fn (mut rtk RTKit) set_shmem_reader(reader fn (voidptr, u64, voidptr, u64) bool) {
+	rtk.shmem_read = reader
 }
 
 @[inline]
@@ -158,19 +158,28 @@ fn (rtk &RTKit) dump_crashlog() {
 	iova := rtk.system_iovas[ep_crashlog]
 	allocated := rtk.system_sizes[ep_crashlog]
 	if iova == 0 || allocated < crashlog_header_size || allocated > max_system_buffer_size
-		|| rtk.shmem_resolve == unsafe { nil } {
+		|| rtk.shmem_read == unsafe { nil } {
 		C.kprintf(c'rtkit[%.*s]: crash log buffer is unavailable\n', i32(rtk.name.len), rtk.name.str)
 		return
 	}
-	data := rtk.shmem_resolve(rtk.shmem_context, iova, allocated)
-	if data == unsafe { nil } {
-		C.kprintf(c'rtkit[%.*s]: cannot resolve crash log at 0x%llx\n', i32(rtk.name.len),
-			rtk.name.str, u64(iova))
+	// A crash can arrive during the boot handshake with a spinlock held.
+	// Allocate without reclaim, and never parse a borrowed firmware buffer.
+	pages := (allocated + memory.page_size - 1) / memory.page_size
+	physical := memory.pmm_alloc_nozero_nowait(pages) @[freed]
+	if physical == unsafe { nil } {
+		C.kprintf(c'rtkit[%.*s]: cannot allocate crash log snapshot\n', i32(rtk.name.len), rtk.name.str)
 		return
 	}
+	defer { memory.pmm_free(physical, pages) }
+	data := voidptr(u64(physical) + memory.get_hhdm_offset())
 	// The mailbox notification is firmware's publication event for this shared
 	// memory. Order subsequent CPU loads after observing it.
 	cpu.dmb_ishld()
+	if !rtk.shmem_read(rtk.shmem_context, iova, data, allocated) {
+		C.kprintf(c'rtkit[%.*s]: cannot copy crash log at 0x%llx\n', i32(rtk.name.len),
+			rtk.name.str, iova)
+		return
+	}
 	if crashlog_u32(data, 0) != crashlog_type_header {
 		C.kprintf(c'rtkit[%.*s]: invalid crash log header 0x%llx\n', i32(rtk.name.len),
 			rtk.name.str, u64(crashlog_u32(data, 0)))

@@ -21,8 +21,9 @@ lifetime review and generated C checks passed. Receive copies stay on the
 stack. The allocation scan reported one fewer ARM64 allocation site and
 178 existing allowance discrepancies.
 
-The audit remains `not_equivalent`. RTKit crash-log buffer ownership and
-G17 worker teardown remain open. No hardware tests or reboots occurred.
+At this revision the audit reported `not_equivalent`, with open differences
+in RTKit crash-log buffer ownership and G17 worker teardown. No hardware tests
+or reboots occurred. [RTKit crash-log follow-up](m1-agx-rtkit-snapshot.md)
 
 Evidence is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-rx-lifetime-20261118/`.

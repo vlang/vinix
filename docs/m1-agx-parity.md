@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 RTKit copies the crash log before parsing and serializes system buffer
+requests with shutdown. [RTKit crash-log snapshot](m1-agx-rtkit-snapshot.md)
+
 G13 Event, KTrace and Stats reads hold the manager lock through acknowledgement
 so shutdown can release the rings safely. [Receive ring teardown](m1-agx-rx-lifetime.md)
 

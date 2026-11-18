@@ -116,6 +116,12 @@ fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64, protection u6
 
 fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 	if buffer.phys == 0 { return }
+	if buffer.allocator == buffer_allocator_g13_rtkit {
+		assert mgr.rtkit_buffer_lock.is_held()
+		unsafe { C.free(voidptr(buffer.phys)) }
+		buffer = SharedBuffer{}
+		return
+	}
 	mut probe := &mgr.channel_alloc
 	at := int(buffer.phys - 1)
 	assert probe.sizes[at] == buffer.size && probe.sizes[at] != 0
