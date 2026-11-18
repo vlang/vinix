@@ -1006,6 +1006,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',
+		'G13 completes the IOP wait on acknowledgement and checks live power for application endpoints',
 		'RTKit Syslog, IOReport and OSLog retries reuse the published buffer and reject changed geometry without ending the session',
 		'G13 keeps receiving after initial RTKit buffer setup failure and retains backing on a reply timeout',
 		'G13 RTKit prepares cached CPU RAM for uncached firmware access and reads bounded Syslog records before acknowledgement',

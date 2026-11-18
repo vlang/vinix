@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 advances boot on IOP acknowledgement and checks both power states for
+application endpoint starts and sends. [RTKit IOP acknowledgement](m1-agx-rtkit-iop-ack.md)
+
 Both G13 ABIs continue after discovery reply timeouts and retry an unsent
 endpoint start once. [RTKit management send failures](m1-agx-rtkit-management-send.md)
 

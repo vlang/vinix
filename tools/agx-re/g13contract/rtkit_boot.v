@@ -62,7 +62,7 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 	require(transport.contains('const boot_phase_timeout_ns = u64(1_000_000_000)')
 		&& transport.contains('[ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog, ep_tracekit]!'),
 		'Vinix uses one-second phase deadlines and includes TraceKit in G13 endpoint startup')!
-	require_order(boot, ['rtk.retry_endpoint_start = !request_wake',
+	require_order(boot, ['rtk.firmware_led_boot = !request_wake',
 		'rtk.reply_boot_management(msg_hello_ack, payload, request_wake)',
 		'rtk.reply_boot_management(msg_epmap_reply, reply, request_wake)', 'if !start_system_endpoints',
 		'if !rtk.send_management(msg_set_ap_power, u64(power_state_on))',
@@ -70,6 +70,39 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 	reply := section(transport, 'fn (mut rtk RTKit) reply_boot_management(', 'fn (mut rtk RTKit) fail(', 'Vinix boot reply')!
 	require_order(reply, ['if rtk.send_management(kind, payload)', 'if request_wake {', 'return false',
 		'management reply type 0x%llx timed out', 'return true'], 'Vinix logs and continues past failed G13 discovery replies')!
-	require(transport.contains('return rtk.retry_endpoint_start && rtk.send_management(msg_start_ep, payload)'),
+	require(transport.contains('return rtk.firmware_led_boot && rtk.send_management(msg_start_ep, payload)'),
 		'Vinix retries an unsent endpoint start only on the firmware-led transport')!
+	check_rtkit_iop_confirmation(transport, linux, linux_boot, boot, start)!
+}
+
+fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot string, boot string, start string) ! {
+	ack := section(linux, 'static void apple_rtkit_management_rx_iop_pwr_ack(', 'static void apple_rtkit_management_rx_ap_pwr_ack(', 'Asahi IOP ACK')!
+	require_order(ack, ['rtk->iop_power_state = new_state;', 'complete_all(&rtk->iop_pwr_ack_completion);'],
+		'Asahi stores the IOP state and completes its wait for every acknowledgement')!
+	require(!linux_boot.contains('rtk->iop_power_state'), 'Asahi boot waits for ACK completion without checking the IOP state word')!
+	running := section(linux, 'bool apple_rtkit_is_running(', 'EXPORT_SYMBOL_GPL(apple_rtkit_is_running);', 'Asahi running predicate')!
+	require_order(running, ['if (rtk->crashed)', '(rtk->iop_power_state & 0xff) != APPLE_RTKIT_PWR_STATE_ON',
+		'(rtk->ap_power_state & 0xff) != APPLE_RTKIT_PWR_STATE_ON'], 'Asahi application readiness requires both power low bytes and a live coprocessor')!
+	send := section(linux, 'int apple_rtkit_send_message(', 'EXPORT_SYMBOL_GPL(apple_rtkit_send_message);', 'Asahi application send')!
+	require(start.contains('endpoint >= APPLE_RTKIT_APP_ENDPOINT_START &&\n\t    !apple_rtkit_is_running(rtk)')
+		&& send.contains('ep >= APPLE_RTKIT_APP_ENDPOINT_START &&\n\t    !apple_rtkit_is_running(rtk)'),
+		'Asahi checks current application readiness at both start and send')!
+
+	require_order(boot, ['mut iop_acknowledged := false', 'msg_iop_power_ack {',
+		'rtk.iop_power_state = u16(msg.data0 & 0xffff)', 'iop_acknowledged = true',
+		'iop_ready := if request_wake', '(rtk.iop_power_state & 0xff) == power_state_on',
+		'iop_acknowledged', 'if endpoint_map_done && iop_ready && !ap_power_requested',
+		'rtk.send_management(msg_set_ap_power, u64(power_state_on))',
+		'if ap_power_requested && iop_ready', 'rtk.state = .running', 'rtk.refresh_application_ready()'],
+		'Vinix G13 uses ACK receipt to advance boot and publishes current application readiness after AP acknowledgement')!
+	refresh := section(transport, 'fn (mut rtk RTKit) refresh_application_ready(', '// Handle one RTKit transport message', 'Vinix readiness update')!
+	require_order(refresh, ['katomic.store(mut rtk.application_ready, rtk.state == .running',
+		'(rtk.iop_power_state & 0xff) == power_state_on', '(rtk.ap_power_state & 0xff) == power_state_on'],
+		'Vinix publishes both ON predicates together')!
+	local_start := section(transport, 'pub fn (mut rtk RTKit) start_endpoint(', '// Send a protocol-defined payload', 'Vinix application start')!
+	local_send := section(transport, 'pub fn (mut rtk RTKit) send_message(', 'pub fn (mut rtk RTKit) recv_msg(', 'Vinix application send')!
+	require_order(local_start, ['ep >= app_endpoint_start', 'katomic.load(&rtk.application_ready)',
+		'if !ready', 'return false', 'rtk.send_start_endpoint(ep)'], 'Vinix checks readiness before starting application endpoints')!
+	require_order(local_send, ['ep >= app_endpoint_start', '!katomic.load(&rtk.application_ready)',
+		'return false', 'rtk.mbox.send'], 'Vinix checks readiness before application mailbox writes')!
 }

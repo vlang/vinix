@@ -67,7 +67,7 @@ fn run_checks() int {
 	production += '\n'
 	production += section(source, 'pub const ep_firmware', 'pub const ep_doorbell') or { panic(err) }
 	production += section(source, 'pub const msg_rx_doorbell', 'const msg_address_mask') or { panic(err) }
-	production += section(source, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) send_role_message(') or { panic(err) }
+	production += section(source, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) recv_role_message(') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) recv_role_message(', 'fn (mut mgr GpuManager) stop_firmware_cpus(') or { panic(err) }
 	production += section(source, 'fn allocate_rtkit_shmem(', 'struct G13ChannelAllocations {') or { panic(err) }
 	production += (section(source, 'fn (mut mgr GpuManager) release_rtkit_buffers(', 'fn (mut mgr GpuManager) alloc_g13_channel_pair(') or { panic(err) })

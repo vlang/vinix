@@ -618,6 +618,7 @@ fn check_rtkit_started_boot() {
 	assert wake.mbox.sent_at(0).data0 == 0x0060000000000220
 	println('G13 RTKit: 14 started-ASC boot transcripts and one legacy wake transcript')
 	check_rtkit_management_send_failures()
+	check_rtkit_iop_acknowledgements()
 }
 
 const rtkit_hello_reply = u64(0x00200000000c000c)
@@ -627,6 +628,81 @@ const rtkit_start_syslog = u64(0x0050000200000002)
 const rtkit_ap_on = u64(0x00b0000000000020)
 const rtkit_start_app = u64(0x0050002100000002)
 const rtkit_wake_iop = u64(0x0060000000000220)
+
+fn check_rtkit_application_access(mut mgr GpuManager, allowed bool) {
+	attempts := mgr.rtk.mbox.attempts
+	assert mgr.start_firmware_endpoint(0, 0x21) == allowed
+	assert mgr.send_role_message(0, 0x20, 0x123456789abcdef0) == allowed
+	if allowed {
+		assert mgr.rtk.mbox.attempts == attempts + 2
+		assert mgr.rtk.mbox.sent_at(attempts) == mailbox.MboxMsg{data0: rtkit_start_app}
+		assert mgr.rtk.mbox.sent_at(attempts + 1) == mailbox.MboxMsg{data0: 0x123456789abcdef0, data1: 0x20}
+	} else {
+		assert mgr.rtk.mbox.attempts == attempts
+	}
+}
+
+fn check_rtkit_iop_acknowledgements() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for early in [false, true]! {
+			for iop in [u16(0), 0x0200, 0x0020, 0x0220]! {
+				check_rtkit_iop_transcript(abi, early, iop)
+			}
+		}
+	}
+	mut wake := rtkit.RTKit{name: 'legacy-iop-off'}
+	for word in [u64(0x0070000000000000), 0x00100000000c000b, 0x0088000100000003,
+		rtkit_ap_on]! {
+		wake.mbox.inject(mailbox.MboxMsg{data0: word})
+	}
+	assert !wake.boot()
+	assert wake.mbox.sent == 3 && wake.mbox.sent_at(0).data0 == rtkit_wake_iop
+	assert wake.mbox.sent_at(2).data0 == 0x0088000100000000
+	// Legacy direct sends use the mailbox even before IOP ON.
+	assert wake.send_message(0x20, 0x123456789abcdef0)
+	assert wake.mbox.sent == 4
+	println('G13 RTKit: 16 IOP acknowledgement and application power transcripts and one legacy IOP OFF transcript')
+}
+
+fn check_rtkit_iop_transcript(abi hw.FirmwareAbi, early bool, iop u16) {
+	mut transport := rtkit.RTKit{name: 'g13-iop'}
+	mut mgr := GpuManager{
+		hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+		rtk: unsafe { &transport }
+	}
+	ack := mailbox.MboxMsg{data0: 0x0070000000000000 | u64(iop)}
+	transport.mbox.inject(mailbox.MboxMsg{data0: 0x00100000000c000b})
+	if early { transport.mbox.inject(ack) }
+	transport.mbox.inject(mailbox.MboxMsg{data0: 0x0088000100000003})
+	if !early { transport.mbox.inject(ack) }
+	transport.mbox.inject(mailbox.MboxMsg{data0: rtkit_ap_on})
+	mgr.lock.acquire()
+	assert mgr.boot_firmware_role(0)
+	assert transport.state == .running && transport.iop_power_state == iop
+	assert transport.mbox.sent == 3
+	assert transport.mbox.sent_at(1).data0 == 0x0088000100000000
+	assert transport.mbox.sent_at(2).data0 == rtkit_ap_on
+	check_rtkit_application_access(mut mgr, iop & 0xff == 0x20)
+	mgr.state = .running
+	mgr.lock.release()
+
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0070000000000220})
+	check_rtkit_application_access(mut mgr, true)
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x00b0000000000200})
+	check_rtkit_application_access(mut mgr, false)
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x00b0000000000220})
+	check_rtkit_application_access(mut mgr, true)
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0070000000000000})
+	check_rtkit_application_access(mut mgr, false)
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0070000000000020})
+	check_rtkit_application_access(mut mgr, true)
+	transport.system_iovas[rtkit.ep_crashlog] = 1
+	assert !mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0010000000000000, data1: 1})
+	assert transport.state == .error
+	check_rtkit_application_access(mut mgr, false)
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0070000000000020})
+	check_rtkit_application_access(mut mgr, false)
+}
 
 struct RTKitSendCase {
 	timeouts    u16

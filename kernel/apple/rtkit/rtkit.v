@@ -8,6 +8,7 @@ module rtkit
 import apple.mailbox
 import aarch64.cpu
 import aarch64.timer
+import katomic
 import klock
 import memory
 
@@ -112,7 +113,9 @@ pub mut:
 	// call cannot flood the console during boot.
 	epmap_group_warned bool
 mut:
-	retry_endpoint_start bool
+	firmware_led_boot bool
+	// Publish both power checks together for senders outside the receive lock.
+	application_ready bool
 }
 
 pub fn new_rtkit(mbox_base u64, name string) RTKit {
@@ -372,7 +375,7 @@ fn (mut rtk RTKit) send_start_endpoint(ep u8) bool {
 		return true
 	}
 	// The mailbox reports failure only when neither word was written.
-	return rtk.retry_endpoint_start && rtk.send_management(msg_start_ep, payload)
+	return rtk.firmware_led_boot && rtk.send_management(msg_start_ep, payload)
 }
 
 fn (mut rtk RTKit) reply_boot_management(kind u8, payload u64, request_wake bool) bool {
@@ -413,9 +416,10 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 		return true
 	}
 	rtk.state = .hello_wait
-	rtk.retry_endpoint_start = !request_wake
+	rtk.firmware_led_boot = !request_wake
 	rtk.iop_power_state = 0
 	rtk.ap_power_state = 0
+	rtk.refresh_application_ready()
 	C.kprintf(c'rtkit[%.*s]: Starting boot handshake\n', i32(rtk.name.len), rtk.name.str)
 
 	// Wake the IOP. Its acknowledgment may arrive before or after HELLO/EPMAP.
@@ -424,6 +428,7 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 	}
 
 	mut endpoint_map_done := false
+	mut iop_acknowledged := false
 	mut ap_power_requested := false
 	mut phase_started := if request_wake { u64(0) } else { timer.get_ns() }
 	for polls := 0; ; polls++ {
@@ -522,6 +527,7 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 			}
 			msg_iop_power_ack {
 				rtk.iop_power_state = u16(msg.data0 & 0xffff)
+				iop_acknowledged = true
 			}
 			msg_ap_power_ack {
 				rtk.ap_power_state = u16(msg.data0 & 0xffff)
@@ -535,10 +541,14 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 			}
 		}
 
-		// AP power-up must follow the IOP ON acknowledgment. Firmware is free
-		// to deliver that acknowledgment after the final endpoint-map message.
-		if endpoint_map_done && (rtk.iop_power_state & 0xff) == power_state_on
-			&& !ap_power_requested {
+		// Firmware-led boot waits for the IOP acknowledgement independently
+		// of its state. The wake handshake requires IOP ON at this point.
+		iop_ready := if request_wake {
+			(rtk.iop_power_state & 0xff) == power_state_on
+		} else {
+			iop_acknowledged
+		}
+		if endpoint_map_done && iop_ready && !ap_power_requested {
 			if !request_wake {
 				// An acknowledgement from before this request cannot
 				// satisfy the AP transition, even if it reported ON.
@@ -551,9 +561,9 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 			rtk.state = .booting
 			if !request_wake { phase_started = timer.get_ns() }
 		}
-		if endpoint_map_done && (rtk.iop_power_state & 0xff) == power_state_on
-			&& (rtk.ap_power_state & 0xff) == power_state_on {
+		if ap_power_requested && iop_ready && (rtk.ap_power_state & 0xff) == power_state_on {
 			rtk.state = .running
+			rtk.refresh_application_ready()
 			C.kprintf(c'rtkit[%.*s]: Boot handshake complete\n', i32(rtk.name.len), rtk.name.str)
 			return true
 		}
@@ -666,6 +676,14 @@ fn (rtk &RTKit) dump_syslog_entry(msg u64) {
 		unsafe { &char(&payload[0]) }, unsafe { &char(&payload[syslog_context_size]) })
 }
 
+fn (mut rtk RTKit) refresh_application_ready() {
+	if rtk.firmware_led_boot {
+		katomic.store(mut rtk.application_ready, rtk.state == .running
+			&& (rtk.iop_power_state & 0xff) == power_state_on
+			&& (rtk.ap_power_state & 0xff) == power_state_on)
+	}
+}
+
 // Handle one RTKit transport message addressed to a system endpoint. This is
 // also called after boot so late logs and reports cannot fill the ASC mailbox.
 pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
@@ -676,9 +694,11 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			match kind {
 				msg_iop_power_ack {
 					rtk.iop_power_state = u16(msg.data0 & 0xffff)
+					rtk.refresh_application_ready()
 				}
 				msg_ap_power_ack {
 					rtk.ap_power_state = u16(msg.data0 & 0xffff)
+					rtk.refresh_application_ready()
 				}
 				else {
 					C.kprintf(c'rtkit[%.*s]: ignoring runtime management message 0x%llx\n',
@@ -697,6 +717,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			}
 			C.kprintf(c'rtkit[%.*s]: coprocessor crash notification\n', i32(rtk.name.len),
 				rtk.name.str)
+			katomic.store(mut rtk.application_ready, false)
 			rtk.dump_crashlog()
 			rtk.state = .error
 			return false
@@ -770,16 +791,26 @@ pub fn (mut rtk RTKit) start_endpoint(ep u8) bool {
 			rtk.name.str, u64(ep))
 		return false
 	}
-	if ep >= app_endpoint_start && rtk.state != .running {
-		C.kprintf(c'rtkit[%.*s]: Endpoint %llu requested before RTKit is running\n',
-			i32(rtk.name.len), rtk.name.str, u64(ep))
-		return false
+	if ep >= app_endpoint_start {
+		ready := if rtk.firmware_led_boot {
+			katomic.load(&rtk.application_ready)
+		} else {
+			rtk.state == .running
+		}
+		if !ready {
+			C.kprintf(c'rtkit[%.*s]: Endpoint %llu requested before RTKit is running\n',
+				i32(rtk.name.len), rtk.name.str, u64(ep))
+			return false
+		}
 	}
 	return rtk.send_start_endpoint(ep)
 }
 
 // Send a protocol-defined payload without changing any of its bits.
 pub fn (mut rtk RTKit) send_message(ep u8, data u64) bool {
+	if ep >= app_endpoint_start && rtk.firmware_led_boot && !katomic.load(&rtk.application_ready) {
+		return false
+	}
 	return rtk.mbox.send(mailbox.MboxMsg{
 		data0: data
 		data1: u64(ep)
