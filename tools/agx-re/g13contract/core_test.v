@@ -25,7 +25,7 @@ fn test_batch_publication_rejects_early_visibility_and_lost_transfer_cleanup() {
 	reference := 'frag_sub = Some(wqjob.submit()?); vtx_sub = Some(wqjob.submit()?); comp_sub = Some(wqjob.submit()?); raw.increase(job.notification_count); frag_sub.map(|a| gpu.run_job(a)); vtx_sub.map(|a| gpu.run_job(a)); comp_sub.map(|a| gpu.run_job(a));'
 	check_batch_publication_contract(local, pending, reference)!
 	for token in ['outer.validate_pointers(outer_rp, outer_wp)', 'pipes[pipe].outer_next == outer_rp',
-		'free >= fw.g13_workqueue_entries', 'if !operation_active && !mgr.begin_g13_operation_locked() { return 0 }',
+		'free >= fw.g13_workqueue_entries', 'if !operation_active && !mgr.begin_g13_operation_locked() { return none }',
 		'job.submitted = true',
 		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)'] {
 		assert local.contains(token)

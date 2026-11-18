@@ -11,6 +11,23 @@ import apple.ascmailbox
 
 __global tx_irq_waits = 0
 __global tx_irq_pulses = [2]int{}
+__global tx_contended_mailbox = unsafe { &ascmailbox.Mailbox(nil) }
+
+fn contend_for_send_empty() {
+	timer.watch_busywait(unsafe { nil })
+	assert !kio.aic_irq_masked(575) && !tx_contended_mailbox.lock.is_held()
+	start := timer.get_us()
+	unmasks := kio.aic_unmasks()
+	assert tx_contended_mailbox.send_timed_irq(ascmailbox.MboxMsg{data0: 0x123, data1: 0x21}, 575)
+	assert timer.get_us() - start == 100
+	assert !kio.aic_irq_masked(575) && kio.aic_unmasks() == unmasks
+	_, writes, words := kio.send_result()
+	assert writes == 2 && words == [u64(0x123), 0x21]!
+	// Let the original waiter observe the next empty FIFO.
+	kio.configure_send(tx_contended_mailbox.base, unsafe { &tx_contended_mailbox.lock }, 1)
+	kio.queue_aic_event(575)
+	exception.dispatch()
+}
 
 fn check_asc_mailbox_send() {
 	base := u64(0x206408000)
@@ -117,7 +134,21 @@ fn check_asc_mailbox_send_irq() {
 			assert retry_words == [message.data0, message.data1]!
 		}
 	}
+	start := timer.get_us()
+	unmasks := kio.aic_unmasks()
+	tx_contended_mailbox = unsafe { &box }
+	kio.configure_send(base, unsafe { &box.lock }, 1)
+	timer.watch_busywait(contend_for_send_empty)
+	assert box.send_timed_irq(message, irq)
+	assert timer.get_us() - start == 110
+	assert kio.aic_unmasks() == unmasks + 1 && kio.aic_irq_masked(irq)
+	reads, writes, words := kio.send_result()
+	assert reads == 1 && writes == 2 && words == [message.data0, message.data1]!
+	tx_contended_mailbox = unsafe { nil }
+	kio.configure_send(base, unsafe { &box.lock }, 1)
+	assert box.send_timed_irq(message, irq)
+	assert kio.aic_unmasks() == unmasks + 2 && kio.aic_irq_masked(irq)
 	timer.require_unlocked_waits(unsafe { nil })
 	kio.configure_send(0, unsafe { nil }, 0)
-	println('ASC send-empty IRQ: fast path, delivery, stale IRQ, fallback, masked caller, timeout and retry passed')
+	println('ASC send-empty IRQ: fast path, delivery, stale IRQ, fallback, masked caller, timeout, retry and contention passed')
 }

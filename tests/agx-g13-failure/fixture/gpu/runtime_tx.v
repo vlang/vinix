@@ -117,3 +117,63 @@ fn check_g13_runtime_transmit() {
 	kio.configure_send(0, unsafe { nil }, 0)
 	println('G13 runtime transmit: early IRQ, stale IRQ, masked caller, shutdown and contended deadline passed on both ABIs')
 }
+
+fn stop_during_batch_doorbell() {
+	timer.watch_busywait(unsafe { nil })
+	assert !rtkit_owner.lock.is_held() && !kio.aic_irq_masked(575)
+	rtkit_owner.shutdown()
+	assert kio.aic_irq_masked(575)
+}
+
+fn check_g13_batch_pipe_transmit() {
+	base := u64(0x206408000)
+	mut tx := ascmailbox.new_mailbox(base)
+	mailbox.set_wait_transport(unsafe { &tx })
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		mut transport := rtkit.RTKit{name: 'g13-batch-doorbell'}
+		transport.mbox.inject(mailbox.MboxMsg{data0: 0x00100000000c000b})
+		transport.mbox.inject(mailbox.MboxMsg{data0: 0x0088000100000003})
+		transport.mbox.inject(mailbox.MboxMsg{data0: 0x0070000000000020})
+		transport.mbox.inject(mailbox.MboxMsg{data0: rtkit_ap_on})
+		assert transport.boot_started(0, 0)
+		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
+			rtkit_send_irq: 575, rtk: unsafe { &transport }}
+		rtkit_owner = unsafe { &mgr }
+		kio.require_send_owner(unsafe { &mgr.lock })
+		kio.configure_send(base, unsafe { &tx.lock }, 1)
+		runtime_case = .timely
+		runtime_waits = 0
+		timer.watch_busywait(observe_runtime_wait)
+		mgr.lock.acquire()
+		assert mgr.ring_g13_batch_pipe_locked(3, 2)
+		assert mgr.lock.is_held() && runtime_waits == 1 && kio.aic_irq_masked(575)
+		mgr.lock.release()
+		reads, writes, words := kio.send_result()
+		assert reads == 2 && writes == 2 && words == [u64(0x008300000000000e), 0x21]!
+		// An application doorbell still needs both RTKit power states.
+		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0070000000000000})
+		kio.configure_send(base, unsafe { &tx.lock }, 0)
+		mgr.lock.acquire()
+		assert !mgr.ring_g13_batch_pipe_locked(3, 2)
+		mgr.lock.release()
+		rejected_reads, rejected_writes, _ := kio.send_result()
+		assert rejected_reads == 0 && rejected_writes == 0
+		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0070000000000020})
+		kio.configure_send(base, unsafe { &tx.lock }, 1)
+		timer.watch_busywait(stop_during_batch_doorbell)
+		mgr.lock.acquire()
+		assert !mgr.ring_g13_batch_pipe_locked(3, 2)
+		assert mgr.lock.is_held() && mgr.state == .stopped && kio.aic_irq_masked(575)
+		stopped_reads, stopped_writes, _ := kio.send_result()
+		assert stopped_reads == 1 && stopped_writes == 0
+		assert !mgr.ring_g13_batch_pipe_locked(3, 0)
+		mgr.lock.release()
+		final_reads, final_writes, _ := kio.send_result()
+		assert final_reads == stopped_reads && final_writes == 0
+	}
+	mailbox.set_wait_transport(unsafe { nil })
+	rtkit_owner = unsafe { nil }
+	kio.require_send_owner(unsafe { nil })
+	kio.configure_send(0, unsafe { nil }, 0)
+	println('G13 batch pipe transmit: live application IRQ, encoding, power and shutdown gates passed on both ABIs')
+}

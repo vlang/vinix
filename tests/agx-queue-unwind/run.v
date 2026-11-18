@@ -18,7 +18,7 @@ fn checks() !int {
 	os.cp(repo + '/tests/agx-g13-failure/fixture/klock/lock.v', scratch + '/klock/lock.v')!
 	code := os.read_file(source)!
 	os.write_file(scratch + '/gpu/production.v', 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport gpu.agx.event\nimport gpu.agx.pgtable\nimport drm.syncobj\n' +
-		section(code, 'struct G13QueueIds {', '// The firmware samples pending_submissions')! +
+		section(code, 'struct G13QueueIds {', '// Asahi\'s ordinary submit policy')! +
 		section(code, 'pub fn (mut mgr GpuManager) create_g13_queue_resources(', '// A failed constructor may retain backing')!)!
 	os.write_file(scratch + '/main.v', 'import gpu\nfn main() { gpu.check_queue_unwind(' + measure.str() + ') }\n')!
 	mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', scratch + '|@vlib|@vmodules']

@@ -488,22 +488,33 @@ fn check_batch_publication_contract(local string, pending string, reference stri
 		'comp_sub = Some(wqjob.submit()?)', 'raw.increase(job.notification_count)',
 		'frag_sub.map(|a| gpu.run_job(a))', 'vtx_sub.map(|a| gpu.run_job(a))',
 		'comp_sub.map(|a| gpu.run_job(a))'], 'Asahi fallible preparation before publication')!
-	require_order(local, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+	notify := section(local, 'pub fn (mut mgr GpuManager) submit_g13_batch(', 'fn (mut mgr GpuManager) publish_g13_batch_locked(', 'Vinix batch notification')!
+	require_order(notify, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+		'doorbells := mgr.publish_g13_batch_locked(jobs, count, operation_active)', 'for pipe in [1, 0, 2]!',
+		'doorbells.pipes & (u32(1) << pipe) == 0', 'mgr.ring_g13_batch_pipe_locked(doorbells.priority, u32(pipe))',
+		'if mgr.state == .running { mgr.state = .error }', 'break', 'return if count == 64 { ~u64(0) }'],
+		'Vinix notifies published pipes in reference order using only scalar metadata and preserves stopped state')!
+	require(!notify.all_after('doorbells := mgr.publish_g13_batch_locked(jobs, count, operation_active)').contains('jobs['),
+		'Vinix cannot borrow the submitted job after entering the notification phase')!
+	publish := section(local, 'fn (mut mgr GpuManager) publish_g13_batch_locked(', 'fn append_g13_batch_command(', 'Vinix batch publication')!
+	require_order(publish, [
 		'admit_g13_batch_locked(jobs, count)', 'mut pipes := [3]G13BatchPipe{}', 'mut binds := [64]bool{}',
 		'i32(job.stamp_value - pipes[2].last_value) <= 0',
 		'i32(job.fragment_stamp_value - pipes[1].last_value) <= 0',
 		'.events.can_publish_batch(pipes[pipe].slot, pipes[pipe].values, pipes[pipe].events)',
-		'lock.acquire()', 'outer.validate_pointers(outer_rp, outer_wp)',
+		'lock.acquire()', 'defer {', 'queue.subqueues[pipe].lock.release()',
+		'mgr.channels.pipes[pipe_index(queue.priority, u32(pipe))].lock.release()',
+		'outer.validate_pointers(outer_rp, outer_wp)',
 		'pipes[pipe].outer_next == outer_rp', 'free >= fw.g13_workqueue_entries',
 		'pipes[pipe].count > fw.g13_workqueue_entries - used - 1',
-		'if !operation_active && !mgr.begin_g13_operation_locked() { return 0 }',
+		'if !operation_active && !mgr.begin_g13_operation_locked() { return none }',
 		'katomic.store(mut threshold,', 'append_g13_batch_command(queue, 2', 'job.submitted = true',
 		'job.vertex_ring_slot, job.vertex_retirement_sequence',
 		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()',
 		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)', 'katomic.sync()',
-		'katomic.store(mut write, pipes[pipe].outer_next)', 'mgr.ring_pipe(queue.priority, u32(pipe))',
-		'return if count == 64 { ~u64(0) }'], 'Vinix prepared batch publication')!
-	require(local.count('mgr.ring_pipe(') == 1 && local.count('for pipe in [1, 0, 2]!') == 3,
+		'katomic.store(mut write, pipes[pipe].outer_next)', 'pipe_mask |= u32(1) << pipe',
+		'return G13BatchDoorbells{priority: queue.priority, pipes: pipe_mask}'], 'Vinix prepared batch publication')!
+	require(local.count('mgr.ring_g13_batch_pipe_locked(') == 1 && local.count('for pipe in [1, 0, 2]!') == 3,
 		'Native batch must publish and notify once per participating pipe in reference order')!
 	require(!local.contains('pending_counted') && local.count('mgr.begin_g13_operation_locked()') == 1,
 		'Each native batch owns one operation independent of per-command completion')!
@@ -862,6 +873,11 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_prepared_backlog_contract(read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, workqueue)!
 	check_batch_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_admission.v'))!, pending, queue)!
 	check_batch_publication_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_batch.v'))!, pending, queue)!
+	run_job := section(manager, 'pub(crate) fn run_job(', 'pub(crate) fn start_op(', 'Asahi pipe doorbell')!
+	require_order(run_job, ['let pipe_type = job.pipe_type()', 'let index: usize = job.priority() as usize',
+		'job.run(&mut pipe)', 'self.rtkit.lock()', 'rtk.send_message(',
+		'EP_DOORBELL,', 'MSG_TX_DOORBELL | pipe_type as u64 | ((index as u64) << 2)'],
+		'Asahi publishes the job before sending the selected pipe doorbell')!
 	check_g13_operation_contract(queue, manager, local, ioctl_submit, pending)!
 	check_input_dependency_contract(pending)!
 	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
@@ -1009,6 +1025,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'M1 G13 receives AIC notifications during boot waits and masks the line before boot failure cleanup',
 		'M1 G13 can use the send-empty IRQ for negotiation and private application startup, with FIFO checks before publication',
 		'M1 G13 runtime system replies recheck GPU liveness and the FIFO deadline after an interrupt-assisted wait',
+		'M1 G13 batch doorbells use the guarded send-empty path after releasing all participating ring locks',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',

@@ -798,11 +798,8 @@ pub fn (mut rtk RTKit) handle_system_message_wait(msg mailbox.MboxMsg, wait mail
 // A stopped transport has no reply outstanding. For a guarded wait this
 // decision is made under the same lock as the cancellation check.
 fn (mut rtk RTKit) send_system_reply(ep u8, data u64, wait mailbox.SendWait) bool {
-	if wait.lock == unsafe { nil } {
-		return rtk.send_message(ep, data)
-	}
-	return rtk.mbox.send_timed_wait(mailbox.MboxMsg{data0: data, data1: u64(ep)}, wait)
-		|| !wait.active(wait.context)
+	return rtk.send_message_wait(ep, data, wait)
+		|| (wait.lock != unsafe { nil } && !wait.active(wait.context))
 }
 
 fn start_system_endpoints(mut rtk RTKit, start_tracekit bool) bool {
@@ -849,14 +846,22 @@ pub fn (mut rtk RTKit) send_message(ep u8, data u64) bool {
 	return rtk.send_message_irq(ep, data, 0)
 }
 
-// The same private initializer may use its reserved line for application sends.
+// The private initializer uses its reserved line for application sends.
 pub fn (mut rtk RTKit) send_message_irq(ep u8, data u64, irq u32) bool {
+	return rtk.send_message_wait(ep, data, mailbox.SendWait{irq: irq})
+}
+
+// Runtime sends carrying a guard recheck liveness before retrying the FIFO.
+pub fn (mut rtk RTKit) send_message_wait(ep u8, data u64, wait mailbox.SendWait) bool {
 	if ep >= app_endpoint_start && rtk.firmware_led_boot && !katomic.load(&rtk.application_ready) {
 		return false
 	}
 	message := mailbox.MboxMsg{
 		data0: data
 		data1: u64(ep)
+	}
+	if wait.lock != unsafe { nil } {
+		return rtk.mbox.send_timed_wait(message, wait)
 	}
 	if rtk.firmware_led_boot {
 		boot_irq := rtk.boot_send_irq
@@ -866,8 +871,8 @@ pub fn (mut rtk RTKit) send_message_irq(ep u8, data u64, irq u32) bool {
 			rtk.lock.acquire()
 			return sent
 		}
-		if irq != 0 {
-			return rtk.mbox.send_timed_irq(message, irq)
+		if wait.irq != 0 {
+			return rtk.mbox.send_timed_irq(message, wait.irq)
 		}
 		return rtk.mbox.send_timed(message)
 	}

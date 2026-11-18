@@ -36,19 +36,31 @@ fn (mut mgr GpuManager) kick_firmware() bool {
 	return !mgr.kick_fails
 }
 
-fn (mut mgr GpuManager) ring_pipe(priority u32, pipe u32) bool {
+fn (mut mgr GpuManager) ring_g13_batch_pipe_locked(priority u32, pipe u32) bool {
+	if mgr.state != .running { return false }
+	assert mgr.lock.is_locked()
 	assert priority < 4
+	for ring in mgr.channels.pipes { assert !ring.lock.is_locked() }
 	mgr.doorbells << pipe
 	mut submitted := u32(0)
 	for job in mgr.g13_compute_jobs {
 		if mgr.expected_owned == 0 { assert job.submitted }
 		if job.submitted { assert !job.pending_counted; submitted++ }
+		for ring in job.queue.subqueues { assert !ring.lock.is_locked() }
 	}
 	for job in mgr.g13_render_jobs {
 		if mgr.expected_owned == 0 { assert job.submitted }
 		if job.submitted { assert !job.pending_counted; submitted++ }
+		for ring in job.queue.subqueues { assert !ring.lock.is_locked() }
 	}
 	if mgr.expected_owned != 0 { assert submitted == mgr.expected_owned }
+	if mgr.stop_on_doorbell {
+		// Mirror shutdown while the real mailbox wait has released manager.lock.
+		mgr.state = .stopped
+		mgr.release_all_g13_compute_jobs()
+		mgr.release_all_g13_render_jobs()
+		return false
+	}
 	return mgr.doorbell_fail != int(pipe)
 }
 
@@ -144,6 +156,7 @@ mut:
 	kick_fails bool
 	doorbells []u32
 	doorbell_fail int = -1
+	stop_on_doorbell bool
 	expected_owned u32
 }
 

@@ -39,6 +39,8 @@ pub struct Mailbox {
 pub mut:
 	base u64
 	lock klock.Lock
+mut:
+	send_irq_claimed bool
 }
 
 // With a guard, the caller holds lock and has checked that the transport is
@@ -128,9 +130,24 @@ pub fn (mut mbox Mailbox) send_timed_irq(msg MboxMsg, irq u32) bool {
 	return mbox.send_timed_wait(msg, SendWait{irq: irq})
 }
 
+fn (mut mbox Mailbox) claim_send_irq(irq u32) bool {
+	mbox.lock.acquire()
+	defer { mbox.lock.release() }
+	if mbox.send_irq_claimed || !aic.arm_deferred_send_irq(irq) { return false }
+	mbox.send_irq_claimed = true
+	return true
+}
+
+fn (mut mbox Mailbox) release_send_irq(irq u32) {
+	mbox.lock.acquire()
+	aic.mask_irq(irq)
+	mbox.send_irq_claimed = false
+	mbox.lock.release()
+}
+
 // An IRQ prompts an early FIFO check, with a bounded poll if delivery is delayed.
-// Only one sender may wait on the line. Ordinary polling senders can still use
-// the FIFO because every status check and write pair holds the mailbox lock.
+// One sender owns the line. Concurrent senders continue to poll the FIFO
+// without changing that sender's interrupt mask or pending state.
 pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
 	if mbox.try_send(msg) {
 		return true
@@ -140,9 +157,9 @@ pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
 	mut guard := unsafe { wait.lock }
 	guarded := guard != unsafe { nil }
 	interrupts := if guarded { guard.ints } else { cpu.interrupt_state() }
-	wait_for_irq := irq != 0 && interrupts && aic.arm_deferred_send_irq(irq)
+	wait_for_irq := irq != 0 && interrupts && mbox.claim_send_irq(irq)
 	defer {
-		if wait_for_irq { aic.mask_irq(irq) }
+		if wait_for_irq { mbox.release_send_irq(irq) }
 	}
 	for {
 		elapsed := timer.get_us() - started

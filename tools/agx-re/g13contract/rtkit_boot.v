@@ -126,10 +126,15 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 		'elapsed >= send_timeout_us', 'remaining := send_timeout_us - elapsed', 'timer.busywait_us',
 		'mbox.try_send(msg)', 'return false'], 'Vinix measures a fresh wait only when the FIFO is full')!
 	require_order(timed, ['mbox.try_send(msg)', 'interrupts := if guarded { guard.ints } else { cpu.interrupt_state() }',
-		'irq != 0 && interrupts && aic.arm_deferred_send_irq(irq)',
-		'defer {', 'aic.mask_irq(irq)', 'wait_send_irq(irq, interval)', 'timer.busywait_us(interval)',
+		'irq != 0 && interrupts && mbox.claim_send_irq(irq)',
+		'defer {', 'mbox.release_send_irq(irq)', 'wait_send_irq(irq, interval)', 'timer.busywait_us(interval)',
 		'mbox.try_send(msg)', 'aic.deferred_send_irq_pending(irq)', 'aic.arm_deferred_send_irq(irq)'],
 		'Vinix arms only after a full FIFO and checks space before rearming or publishing')!
+	claim := section(local, 'fn (mut mbox Mailbox) claim_send_irq(', '// An IRQ prompts', 'Vinix send-empty ownership')!
+	require_order(claim, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }',
+		'mbox.send_irq_claimed || !aic.arm_deferred_send_irq(irq)', 'mbox.send_irq_claimed = true',
+		'mbox.lock.acquire()', 'aic.mask_irq(irq)', 'mbox.send_irq_claimed = false', 'mbox.lock.release()'],
+		'Vinix serializes the single IRQ waiter and masks before releasing ownership')!
 	require_order(timed, ['if wait_for_irq {', 'if guarded { guard.release() }', 'wait_send_irq(irq, interval)',
 		'guard.acquire()', 'if !wait.active(wait.context)', 'return false',
 		'timer.get_us() - started > send_timeout_us', 'break', 'mbox.try_send(msg)'],
@@ -150,10 +155,13 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 		'rtk.boot_send_irq = 0', 'rtk.lock.release()'], 'The private boot transport clears the transmit IRQ before returning')!
 	require_order(local_send, ['boot_irq := rtk.boot_send_irq', 'rtk.lock.release()',
 		'rtk.mbox.send_timed_irq(message, boot_irq)', 'rtk.lock.acquire()', 'return sent',
-		'if irq != 0 {', 'return rtk.mbox.send_timed_irq(message, irq)'],
+		'if wait.irq != 0 {', 'return rtk.mbox.send_timed_irq(message, wait.irq)'],
 		'Vinix releases the RTKit lock around boot IRQ-assisted transmit')!
 	require_order(local_send, ['if rtk.firmware_led_boot {', 'return rtk.mbox.send_timed(message)', 'return rtk.mbox.send(message)'],
 		'Vinix selects elapsed-time transmit only for firmware-led G13 RTKit')!
+	require_order(local_send, ['!katomic.load(&rtk.application_ready)', 'return false',
+		'if wait.lock != unsafe { nil }', 'return rtk.mbox.send_timed_wait(message, wait)'],
+		'Vinix checks RTKit readiness before any guarded application send')!
 }
 
 fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot string, boot string, start string) ! {

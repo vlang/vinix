@@ -18,6 +18,10 @@ The base M1 worker can use the same send-empty line for RTKit system replies.
 It checks GPU liveness and the FIFO deadline after reacquiring the manager
 lock. [Runtime system reply transmit IRQ](m1-agx-runtime-tx-irq.md)
 
+The native G13 batch publisher releases its ring locks before sending
+fragment, vertex and compute doorbells. It can use the send-empty IRQ for
+these notifications. [Batch doorbell transmit IRQ](m1-agx-batch-tx-irq.md)
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

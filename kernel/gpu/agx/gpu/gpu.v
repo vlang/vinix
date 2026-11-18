@@ -1319,6 +1319,14 @@ fn (mut mgr GpuManager) ring_pipe(priority u32, cmd_type u32) bool {
 	return mgr.send_doorbell(pipe_doorbell(priority, cmd_type))
 }
 
+// Batch publication has transferred every job and released its ring locks.
+// The manager lock still guards the live FIFO check and may open only to wait.
+fn (mut mgr GpuManager) ring_g13_batch_pipe_locked(priority u32, cmd_type u32) bool {
+	if mgr.state != .running { return false }
+	message := msg_tx_doorbell | u64(pipe_doorbell(priority, cmd_type))
+	return mgr.rtk.send_message_wait(u8(ep_doorbell), message, mgr.g13_rtkit_send_wait_locked())
+}
+
 // Send a firmware-control message via RTKit on the firmware endpoint (0x20).
 pub fn (mut mgr GpuManager) send_fw_msg(message u64, data u64) bool {
 	return mgr.send_fw_msg_to_role(0, message, data)
@@ -1383,6 +1391,16 @@ fn rtkit_transport_running(context voidptr) bool {
 	return mgr.state == .running
 }
 
+fn (mut mgr GpuManager) g13_rtkit_send_wait_locked() mailbox.SendWait {
+	if mgr.rtkit_send_irq == 0 { return mailbox.SendWait{} }
+	return mailbox.SendWait{
+		irq: mgr.rtkit_send_irq
+		lock: unsafe { &mgr.lock }
+		context: voidptr(mgr)
+		active: rtkit_transport_running
+	}
+}
+
 fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg) bool {
 	// Only an already-allocated crash log can parse outside the manager
 	// lock. Its reader serializes the snapshot with buffer release.
@@ -1391,14 +1409,7 @@ fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg
 		mgr.lock.acquire()
 		defer { mgr.lock.release() }
 		if mgr.state != .running { return true }
-		if mgr.rtkit_send_irq == 0 { return mgr.rtk.handle_system_message(msg) }
-		wait := mailbox.SendWait{
-			irq: mgr.rtkit_send_irq
-			lock: unsafe { &mgr.lock }
-			context: voidptr(mgr)
-			active: rtkit_transport_running
-		}
-		return mgr.rtk.handle_system_message_wait(msg, wait)
+		return mgr.rtk.handle_system_message_wait(msg, mgr.g13_rtkit_send_wait_locked())
 	}
 	return match role {
 		0 { mgr.rtk.handle_system_message(msg) }

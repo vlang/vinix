@@ -8,10 +8,10 @@ import gpu.agx.mmu
 
 fn check_batch_publication() {
 	for shape in 0 .. 3 {
-		for failure in 0 .. 24 { check_batch_transaction(shape, failure, 64) }
+		for failure in 0 .. 25 { check_batch_transaction(shape, failure, 64) }
 		for count in [1, 2, 63]! { check_batch_transaction(shape, 0, count) }
 	}
-	println('AGX batch publication: 81 actual transactions of 1/2/63/64 jobs, aggregate operation acquire/reuse/rollback, wrapped rings/stamps, counter wrap, notification failure ownership and actual reapers pass')
+	println('AGX batch publication: 84 actual transactions, aggregate operation ownership, wrapped rings/stamps, notification failure and stop during notification passed')
 }
 
 fn check_batch_transaction(shape int, failure int, job_count int) {
@@ -117,6 +117,7 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		14 { mgr.doorbell_fail = last_pipe }
 		18 { mgr.channels.pipes[last_pipe].write_off = 0x1000 }
 		23 { headers[last_pipe].read_ptr = 0 }
+		24 { mgr.stop_on_doorbell = true }
 		else {}
 	}
 	early_operation := failure == 22 || failure == 23
@@ -157,9 +158,13 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		assert result == if job_count == 64 { ~u64(0) } else { (u64(1) << job_count) - 1 }
 		assert mgr.pending == base_pending + 1 && mgr.kicks == 1
 		assert threshold == old_threshold + u64(job_count) + u64(renders) && counter == old_counter + renders
-		assert mgr.state == if failure == 14 { State.error } else { State.running }
+		assert mgr.state == if failure == 14 { State.error } else if failure == 24 { State.stopped } else { State.running }
 		mut notifications := []u32{}
-		for pipe in [1, 0, 2]! { if counts[pipe] != 0 { notifications << u32(pipe) } }
+		for pipe in [1, 0, 2]! {
+			if counts[pipe] == 0 { continue }
+			notifications << u32(pipe)
+			if failure == 24 || (failure == 14 && pipe == last_pipe) { break }
+		}
 		assert mgr.doorbells == notifications
 		for pipe in 0 .. 3 {
 			assert rings[pipe] == expected[pipe]
@@ -170,16 +175,18 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 			assert messages[pipe][3].is_new == 1 && messages[pipe][3].pipe_type == u32(pipe)
 			assert messages[pipe][3].work_queue_addr == queue.subqueues[pipe].info.va
 		}
-		for index in 0 .. job_count {
-			source := jobs[index]
-			if source.compute != unsafe { nil } { driver[source.compute.event_slot] = source.compute.stamp_value }
-			else { driver[source.render.vertex_event_slot] = source.render.vertex_stamp_value; driver[source.render.fragment_event_slot] = source.render.fragment_stamp_value }
+		if failure != 24 {
+			for index in 0 .. job_count {
+				source := jobs[index]
+				if source.compute != unsafe { nil } { driver[source.compute.event_slot] = source.compute.stamp_value }
+				else { driver[source.render.vertex_event_slot] = source.render.vertex_stamp_value; driver[source.render.fragment_event_slot] = source.render.fragment_stamp_value }
+			}
+			mgr.reap_g13_compute_jobs()
+			mgr.reap_g13_render_jobs()
+			assert mgr.pending == base_pending + 1
+			mgr.finish_g13_submission_operation()
+			assert mgr.pending == base_pending
 		}
-		mgr.reap_g13_compute_jobs()
-		mgr.reap_g13_render_jobs()
-		assert mgr.pending == base_pending + 1
-		mgr.finish_g13_submission_operation()
-		assert mgr.pending == base_pending
 	} else {
 		for index := job_count - 1; index >= 0; index-- { initial_discard(mut mgr, jobs[index]) }
 	}

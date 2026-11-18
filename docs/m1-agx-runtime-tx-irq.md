@@ -13,8 +13,9 @@ deadline before another FIFO attempt. Shutdown masks both mailbox lines
 before stopping the ASC and releasing RTKit backing. If shutdown happens
 during the wait, the worker abandons the scalar reply without another TX
 FIFO read or write. IRQ-masked callers and machines without the IRQ use
-timed polling. Runtime job doorbells, firmware-control sends and the shutdown
-message still use timed polling.
+timed polling. At this revision, runtime job doorbells, firmware-control
+sends and the shutdown message used timed polling.
+[Native batch doorbell follow-up](m1-agx-batch-tx-irq.md)
 
 ARM64 and x86-64 kernel builds and all 82 contract test files passed for
 `2eac72f68706a76a4345a3e40ba29d0bded65d77` plus the archived patch.

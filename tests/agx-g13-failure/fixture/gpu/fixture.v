@@ -340,6 +340,7 @@ pub fn run_checks() {
 	check_g13_receive_order()
 	check_g13_receive_irq()
 	check_g13_runtime_transmit()
+	check_g13_batch_pipe_transmit()
 	check_rtkit_crash_snapshot()
 	check_rtkit_buffer_retries()
 	check_rtkit_syslog()

@@ -30,15 +30,21 @@ fn check_rtkit_snapshot(transport string, manager string, linux string, rust str
 	require_order(receive, ['role == 0 && mgr.hw_config.gpu_gen == .g13',
 		'mailbox.msg_endpoint(&msg) != rtkit.ep_crashlog || mgr.rtk.system_iovas[rtkit.ep_crashlog] == 0',
 		'mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'if mgr.state != .running { return true }',
-		'if mgr.rtkit_send_irq == 0 { return mgr.rtk.handle_system_message(msg) }',
-		'lock: unsafe { &mgr.lock }', 'active: rtkit_transport_running',
-		'return mgr.rtk.handle_system_message_wait(msg, wait)'],
+		'return mgr.rtk.handle_system_message_wait(msg, mgr.g13_rtkit_send_wait_locked())'],
 		'G13 holds the shutdown lock for buffer allocation and passes it through to the guarded reply')!
 	active := section(manager, 'fn rtkit_transport_running(', 'fn (mut mgr GpuManager) handle_role_system_message(', 'Vinix runtime TX liveness')!
 	require(active.contains('return mgr.state == .running'), 'G13 declines TX retry after loss or shutdown')!
+	require_order(active, ['if mgr.rtkit_send_irq == 0 { return mailbox.SendWait{} }', 'irq: mgr.rtkit_send_irq',
+		'lock: unsafe { &mgr.lock }', 'active: rtkit_transport_running'], 'Only a reserved M1 route uses the guarded transmit wait')!
+	pipe := section(manager, 'fn (mut mgr GpuManager) ring_g13_batch_pipe_locked(', '// Send a firmware-control message', 'Vinix batch pipe doorbell')!
+	require(manager.contains('return (priority % 4) << 2 | (cmd_type % 3)'), 'Vinix uses the reference pipe and priority bits')!
+	require_order(pipe, ['if mgr.state != .running { return false }',
+		'msg_tx_doorbell | u64(pipe_doorbell(priority, cmd_type))',
+		'mgr.rtk.send_message_wait(u8(ep_doorbell), message, mgr.g13_rtkit_send_wait_locked())'],
+		'Vinix sends the reference work-pipe selector through the guarded transport')!
 	system_reply := section(transport, 'fn (mut rtk RTKit) send_system_reply(', 'fn start_system_endpoints(', 'Vinix system reply transmit')!
-	require_order(system_reply, ['wait.lock == unsafe { nil }', 'return rtk.send_message(ep, data)',
-		'rtk.mbox.send_timed_wait(mailbox.MboxMsg{data0: data, data1: u64(ep)}, wait)', '|| !wait.active(wait.context)'],
+	require_order(system_reply, ['rtk.send_message_wait(ep, data, wait)',
+		'wait.lock != unsafe { nil } && !wait.active(wait.context)'],
 		'Vinix transmits the scalar reply under the runtime gate and accepts cancellation once stopped')!
 	release := section(manager, 'fn (mut mgr GpuManager) release_rtkit_buffers(', 'fn (mut mgr GpuManager) alloc_g13_channel_pair(', 'Vinix RTKit buffer lifetime')!
 	require_order(release, ['mgr.rtkit_buffer_lock.acquire()', 'mgr.free_shared_buffer(mut mgr.rtkit_buffers[count])',
