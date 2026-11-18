@@ -29,3 +29,26 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `2cdf85e11b6ee7b59fdd0497ac645f1de58621430eaf425a75c22aafac56bbc9`.
 Native M1 firmware validation remains open.
+
+## Inner workqueue write index
+
+Asahi places each command with a host-owned workqueue write cursor. Vinix
+now checks the shared `cpu_wptr` against the next slot after its recorded
+`last_command_slot`. Fresh queues initialize the last slot to 1279, so the
+first valid write index is zero. The compute, paired-render and batch
+publishers all check this before writing any entries. A mismatch moves the
+manager to its error state and leaves the ring contents untouched.
+
+The paired-render and batch regressions reproduced misdirected publication
+on `27597a4768d6baeda0f421654148159350e88b4e`. The updated sanitizer suites
+passed 90 batch transactions and the standalone compute and render cases,
+including wrapped prefixes and in-range index corruption. The context
+retirement and FwCtl fixtures, 79 local contract test files and 122 archived
+reference checks passed. AArch64 and x86-64 production builds passed. The
+allocation scan reproduced the same 176 baseline findings by file and kind.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-workqueue-cursor-20261119.NI24ou/`.
+The `bundle.tar.gz` SHA-256 is
+`b88201965f3dfc453bcf25143444e1023f40cc30788f6a8ac9280ac8937cfddb`.
+Native M1 firmware validation remains open.

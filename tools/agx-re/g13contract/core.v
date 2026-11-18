@@ -574,7 +574,8 @@ fn check_batch_publication_contract(local string, pending string, reference stri
 		'lock.acquire()', 'defer {', 'queue.subqueues[pipe].lock.release()',
 		'mgr.channels.pipes[pipe_index(queue.priority, u32(pipe))].lock.release()',
 		'outer.validate_pointers(outer_rp, outer_wp)',
-		'pipes[pipe].outer_next == outer_rp', 'free >= fw.g13_workqueue_entries',
+		'pipes[pipe].outer_next == outer_rp', 'g13_workqueue_write_matches(inner.last_command_slot, wp)',
+		'free >= fw.g13_workqueue_entries',
 		'pipes[pipe].count > fw.g13_workqueue_entries - used - 1',
 		'if !operation_active && !mgr.begin_g13_operation_locked() { return none }',
 		'katomic.store(mut threshold,', 'append_g13_batch_command(queue, 2', 'job.submitted = true',
@@ -629,16 +630,23 @@ fn check_ring_admission_contract(local string, reference string) ! {
 	require_order(gate, ['retired > published', 'published - retired >= u64(fw.g13_workqueue_entries)',
 		'published > ~u64(0) - u64(count)', 'mgr.state = .error',
 		'u64(fw.g13_workqueue_entries) - 1 - (published - retired) > u64(count)'], 'Vinix host ring capacity')!
+	require_order(reference, ['let mut wptr = inner.wptr;', 'inner.info.ring[wptr as usize]',
+		'raw.cpu_wptr.store(wptr, Ordering::Release)', 'inner.wptr = wptr;'], 'Asahi host write cursor')!
+	require(local.contains('last_command_slot u32 = fw.g13_workqueue_entries - 1')
+		&& gate.contains('return write_ptr == (last_command_slot + 1) % fw.g13_workqueue_entries'), 'Vinix derives the next slot from host state')!
 	compute := section(local, 'fn (mut mgr GpuManager) submit_g13_queue_commands(',
 		'fn (mut mgr GpuManager) publish_g13_compute_job_locked(', 'Vinix compute admission')!
 	require_order(compute, ['mgr.g13_ring_has_space_locked(queue.command_sequence, queue.retired_sequence, command_count)',
-		'inner_done := katomic.load', 'command_count > inner_free', '*entry = command_va',
+		'inner_done := katomic.load', 'g13_workqueue_write_matches(queue.last_command_slot, inner_wp)',
+		'command_count > inner_free', '*entry = command_va',
 		'queue.command_sequence += u64(command_count)', 'katomic.store(mut &state.cpu_wptr'], 'Vinix compute admission')!
 	render := section(local, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(',
 		'// Transfer a prepared render pass', 'Vinix render admission')!
 	require_order(render, ['mgr.g13_ring_has_space_locked(vertex_queue.command_sequence, vertex_queue.retired_sequence, vertex_count)',
 		'mgr.g13_ring_has_space_locked(fragment_queue.command_sequence, fragment_queue.retired_sequence, 2)',
-		'vertex_inner_wp = katomic.load', 'if !valid {', 'vertex_queue.command_sequence += vertex_count'], 'Vinix paired host admission')!
+		'vertex_inner_wp = katomic.load', 'g13_workqueue_write_matches(vertex_queue.last_command_slot, vertex_inner_wp)',
+		'g13_workqueue_write_matches(fragment_queue.last_command_slot, fragment_inner_wp)',
+		'if !valid {', 'vertex_queue.command_sequence += vertex_count'], 'Vinix paired host admission')!
 }
 
 fn check_submission_pipelining(pending string) ! {

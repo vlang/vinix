@@ -19,8 +19,8 @@ fn check_barrier_publishers() {
 			mut vertex_ring := [1280]u64{}
 			mut fragment_ring := [1280]u64{}
 			mut resources := G13QueueResources{}
-			resources.subqueues[0] = G13Subqueue{ state: SharedBuffer{ phys: u64(&vertex_state) }, ring: SharedBuffer{ phys: unsafe { u64(&vertex_ring) } }, info: SharedBuffer{ va: 0x1000 } }
-			resources.subqueues[1] = G13Subqueue{ state: SharedBuffer{ phys: u64(&fragment_state) }, ring: SharedBuffer{ phys: unsafe { u64(&fragment_ring) } }, info: SharedBuffer{ va: 0x2000 } }
+			resources.subqueues[0] = G13Subqueue{ state: SharedBuffer{ phys: u64(&vertex_state) }, ring: SharedBuffer{ phys: unsafe { u64(&vertex_ring) } }, info: SharedBuffer{ va: 0x1000 }, last_command_slot: 1277 }
+			resources.subqueues[1] = G13Subqueue{ state: SharedBuffer{ phys: u64(&fragment_state) }, ring: SharedBuffer{ phys: unsafe { u64(&fragment_ring) } }, info: SharedBuffer{ va: 0x2000 }, last_command_slot: 1278 }
 			mut context := Context{}
 			mut graph := G13ChannelAllocations{}
 			mut mgr := GpuManager{ hw_config: hw.HwConfig{ gpu_gen: .g13 }, g13_channels: &graph }
@@ -92,7 +92,7 @@ fn check_barrier_publishers() {
 			mut state := fw.G13WorkQueueRingState{ cpu_wptr: 1279 }
 			mut ring := [1280]u64{}
 			mut queue := G13QueueResources{}
-			queue.subqueues[2] = G13Subqueue{ state: SharedBuffer{ phys: u64(&state) }, ring: SharedBuffer{ phys: unsafe { u64(&ring) } }, info: SharedBuffer{ va: 0x1000 } }
+			queue.subqueues[2] = G13Subqueue{ state: SharedBuffer{ phys: u64(&state) }, ring: SharedBuffer{ phys: unsafe { u64(&ring) } }, info: SharedBuffer{ va: 0x1000 }, last_command_slot: 1278 }
 			mut mgr := GpuManager{ hw_config: hw.HwConfig{ gpu_gen: .g13 } }
 			mgr.channels.pipes[2] = channel.new_tx_channel('compute', 1, u64(&outer), 1, u64(&messages), 4, 0x30)
 			mut job := G13ComputeJobResources{

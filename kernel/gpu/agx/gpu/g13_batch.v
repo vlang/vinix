@@ -130,7 +130,8 @@ fn (mut mgr GpuManager) publish_g13_batch_locked(jobs [64]G13SubmissionJob, coun
 		if pipes[pipe].outer_next == outer_rp { return none }
 		state := unsafe { &fw.G13WorkQueueRingState(inner.state.cpu_address()) }
 		wp, done, free := katomic.load(&state.cpu_wptr), katomic.load(&state.gpu_doneptr), katomic.load(&state.cpu_freeptr)
-		if wp >= fw.g13_workqueue_entries || done >= fw.g13_workqueue_entries || free >= fw.g13_workqueue_entries {
+		if !g13_workqueue_write_matches(inner.last_command_slot, wp)
+			|| done >= fw.g13_workqueue_entries || free >= fw.g13_workqueue_entries {
 			mgr.state = .error
 			return none
 		}

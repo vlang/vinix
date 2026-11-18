@@ -8,10 +8,10 @@ import gpu.agx.mmu
 
 fn check_batch_publication() {
 	for shape in 0 .. 3 {
-		for failure in 0 .. 26 { check_batch_transaction(shape, failure, 64) }
+		for failure in 0 .. 27 { check_batch_transaction(shape, failure, 64) }
 		for count in [1, 2, 63]! { check_batch_transaction(shape, 0, count) }
 	}
-	println('AGX batch publication: 87 transactions cover write-cursor faults, aggregate operation ownership, wrapped rings and notification failure')
+	println('AGX batch publication: 90 transactions cover inner and outer cursor faults, aggregate operation ownership, wrapped rings and notification failure')
 }
 
 fn check_batch_transaction(shape int, failure int, job_count int) {
@@ -53,6 +53,7 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		queue.subqueues[pipe].ring = SharedBuffer{ phys: unsafe { u64(&rings[pipe]) }, size: 1280 * sizeof(u64) }
 		queue.subqueues[pipe].info.va = 0x100000 + u64(pipe) * 0x10000
 		queue.subqueues[pipe].is_new = true
+		queue.subqueues[pipe].last_command_slot = 1277
 	}
 	for index in 0 .. job_count {
 		render := shape == 1 || (shape == 2 && index % 2 == 1)
@@ -119,6 +120,7 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		23 { headers[last_pipe].read_ptr = 0 }
 		24 { mgr.stop_on_doorbell = true }
 		25 { headers[last_pipe].write_ptr = 1 }
+		26 { states[last_pipe].cpu_wptr = 1279 }
 		else {}
 	}
 	early_operation := failure == 22 || failure == 23
@@ -141,12 +143,17 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		assert result == 0 && mgr.channels.pipes[last_pipe].has_fault() && headers[last_pipe].write_ptr == 1,
 			'whole batch must be refused before publication when one TX write cursor is corrupt'
 	}
-	refused := (failure > 0 && failure < 14) || failure in [17, 18, 23, 25]!
+	if failure == 26 {
+		assert result == 0 && mgr.state == .error,
+			'whole batch must be refused before publication when one inner write cursor is corrupt'
+	}
+	refused := (failure > 0 && failure < 14) || failure in [17, 18, 23, 25, 26]!
 	if refused {
 		assert result == 0 && mgr.pending == old_pending && threshold == old_threshold && counter == old_counter
 		assert mgr.doorbells.len == 0 && completions.all(it.calls == 0)
 		for pipe in 0 .. 3 {
-			assert states[pipe].cpu_wptr == 1278 && queue.subqueues[pipe].command_sequence == 0
+			assert states[pipe].cpu_wptr == if failure == 26 && pipe == last_pipe { u32(1279) } else { u32(1278) }
+			assert queue.subqueues[pipe].command_sequence == 0 && queue.subqueues[pipe].last_command_slot == 1277
 			for value in rings[pipe] { assert value == 0 }
 			for message in messages[pipe] { assert message.work_queue_addr == 0 }
 			assert !queue.subqueues[pipe].lock.is_locked()

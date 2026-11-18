@@ -144,7 +144,7 @@ mut:
 	is_new bool = true
 	command_sequence u64
 	retired_sequence u64
-	last_command_slot u32
+	last_command_slot u32 = fw.g13_workqueue_entries - 1
 	lock   klock.Lock
 }
 
@@ -627,7 +627,7 @@ fn check_retirement() {
 }
 
 fn check_publishers() {
-	for broken in -1 .. 10 {
+	for broken in -1 .. 12 {
 		mut vertex_outer := channel.RingHeader{}
 		mut fragment_outer := channel.RingHeader{}
 		mut vertex_messages := [4]fw.FwRunWorkQueueMsg{}
@@ -663,6 +663,8 @@ fn check_publishers() {
 			7 { fragment_state.gpu_doneptr = ~u32(0) }
 			8 { vertex_outer.write_ptr = 2 }
 			9 { fragment_outer.write_ptr = 2 }
+			10 { vertex_state.cpu_wptr = 1 }
+			11 { fragment_state.cpu_wptr = 1 }
 			else {}
 		}
 		mut job := G13RenderJobResources{
@@ -676,10 +678,15 @@ fn check_publishers() {
 		}
 		before := katomic.barriers()
 		published := mgr.publish_g13_render_job_locked(mut job)
-		if broken >= 8 {
+		if broken in [8, 9]! {
 			assert !published && mgr.channels.pipes[broken - 8].has_fault()
 			assert vertex_outer.write_ptr == if broken == 8 { u32(2) } else { u32(0) }
 			assert fragment_outer.write_ptr == if broken == 9 { u32(2) } else { u32(0) }
+		}
+		if broken >= 10 {
+			assert !published && mgr.state == .error, 'paired render must reject an in-range corrupt inner write cursor'
+			assert vertex_state.cpu_wptr == if broken == 10 { u32(1) } else { u32(0) }
+			assert fragment_state.cpu_wptr == if broken == 11 { u32(1) } else { u32(0) }
 		}
 		if broken == -1 {
 			assert published && mgr.rings == 2 && katomic.barriers() == before + 2
@@ -719,7 +726,7 @@ fn check_publishers() {
 		resources.subqueues[1].lock.acquire()
 		resources.subqueues[1].lock.release()
 	}
-	for broken in -1 .. 5 {
+	for broken in -1 .. 6 {
 		mut outer := channel.RingHeader{}
 		mut messages := [4]fw.FwRunWorkQueueMsg{}
 		mut state := fw.G13WorkQueueRingState{}
@@ -738,11 +745,14 @@ fn check_publishers() {
 			2 { state.cpu_wptr = 1280 }
 			3 { state.gpu_doneptr = ~u32(0) }
 			4 { outer.write_ptr = 2 }
+			5 { state.cpu_wptr = 1 }
 			else {}
 		}
 		before := katomic.barriers()
 		published := mgr.submit_g13_queue_commands(&resources, 2, [alloc.g13_private_start + 0x4000, u64(0), 0]!, 1, 0)
 		if broken == 4 { assert !published && mgr.channels.pipes[2].has_fault() && outer.write_ptr == 2 }
+		if broken == 5 { assert !published && mgr.state == .error && state.cpu_wptr == 1,
+			'compute must reject an in-range corrupt inner write cursor' }
 		if broken == -1 {
 			assert published && mgr.rings == 1 && katomic.barriers() == before + 2
 			assert ring[0] == alloc.g13_private_start + 0x4000

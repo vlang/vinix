@@ -47,6 +47,7 @@ fn check_compute_host_admission() {
 			info:             SharedBuffer{ va: 0x1000 }
 			command_sequence: published
 			retired_sequence: retired
+			last_command_slot: 1278
 		}
 		mut mgr := GpuManager{ hw_config: hw.HwConfig{ gpu_gen: .g13 } }
 		mgr.channels.pipes[2] = channel.new_tx_channel('compute', 1, u64(&header), 1, unsafe { u64(&messages) }, 4, 0x30)
@@ -100,6 +101,7 @@ fn check_render_host_admission() {
 						} }
 						info:             SharedBuffer{ va: u64(pipe + 1) * 0x1000 }
 						command_sequence: published
+						last_command_slot: u32(1277 + pipe)
 						retired_sequence: if pipe == blocked {
 							published - (1279 - count)
 						} else {

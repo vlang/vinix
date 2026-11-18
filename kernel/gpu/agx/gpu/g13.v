@@ -145,7 +145,7 @@ mut:
 	is_new     bool
 	command_sequence u64
 	retired_sequence u64
-	last_command_slot u32
+	last_command_slot u32 = fw.g13_workqueue_entries - 1 // the slot before the initial write index
 	lock       klock.Lock
 }
 
@@ -986,6 +986,12 @@ fn (mut mgr GpuManager) g13_ring_has_space_locked(published u64, retired u64, co
 	return u64(fw.g13_workqueue_entries) - 1 - (published - retired) > u64(count)
 }
 
+// The host owns cpu_wptr. Use the last slot recorded by the publisher to
+// reject a shared write index that would redirect the next command.
+fn g13_workqueue_write_matches(last_command_slot u32, write_ptr u32) bool {
+	return write_ptr == (last_command_slot + 1) % fw.g13_workqueue_entries
+}
+
 // Publish up to two prefix barriers and a command into a queue-owned ring,
 // then emit one RunWorkQueue message with the final write pointer. Holding the
 // outer ring lock across both publications prevents a full outer ring from
@@ -1047,7 +1053,7 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	mut state := unsafe { &fw.G13WorkQueueRingState(queue.state.cpu_address()) }
 	inner_wp := katomic.load(&state.cpu_wptr)
 	inner_done := katomic.load(&state.gpu_doneptr)
-	if inner_wp >= fw.g13_workqueue_entries || inner_done >= fw.g13_workqueue_entries {
+	if !g13_workqueue_write_matches(queue.last_command_slot, inner_wp) || inner_done >= fw.g13_workqueue_entries {
 		mgr.state = .error
 		queue.lock.release()
 		outer.lock.release()
@@ -2051,8 +2057,9 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		fragment_inner_wp = katomic.load(&fragment_state.cpu_wptr)
 		vertex_done := katomic.load(&vertex_state.gpu_doneptr)
 		fragment_done := katomic.load(&fragment_state.gpu_doneptr)
-		valid = vertex_inner_wp < fw.g13_workqueue_entries && vertex_done < fw.g13_workqueue_entries
-			&& fragment_inner_wp < fw.g13_workqueue_entries && fragment_done < fw.g13_workqueue_entries
+		valid = g13_workqueue_write_matches(vertex_queue.last_command_slot, vertex_inner_wp)
+			&& g13_workqueue_write_matches(fragment_queue.last_command_slot, fragment_inner_wp)
+			&& vertex_done < fw.g13_workqueue_entries && fragment_done < fw.g13_workqueue_entries
 		if !valid {
 			mgr.state = .error
 		} else {
