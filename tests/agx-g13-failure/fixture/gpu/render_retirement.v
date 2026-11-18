@@ -22,11 +22,19 @@ fn check_render_retirement_matrix() {
  for vertex in [u64(1), 1279, 1280, 1281, 0x100000001] {
   for fragment in [u64(1), 1280, 1281, 0x100000003] {
    for mask in 0 .. 4 {
-    mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: u32((vertex + 7) % 1280), gpu_doneptr: u32(vertex % 1280), cpu_freeptr: u32((vertex + 1278) % 1280)}
-    mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: u32((fragment + 7) % 1280), gpu_doneptr: u32(fragment % 1280), cpu_freeptr: u32((fragment + 1278) % 1280)}
+    mut vertex_state := fw.G13WorkQueueRingState{
+     cpu_wptr: u32((vertex + 7) % 1280)
+     gpu_doneptr: u32(vertex % 1280)
+     cpu_freeptr: if vertex == 1 { u32(0) } else { u32((vertex - 2) % 1280) }
+    }
+    mut fragment_state := fw.G13WorkQueueRingState{
+     cpu_wptr: u32((fragment + 7) % 1280)
+     gpu_doneptr: u32(fragment % 1280)
+     cpu_freeptr: if fragment == 1 { u32(0) } else { u32((fragment - 2) % 1280) }
+    }
     mut queue := G13QueueResources{}
-    queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: vertex + 7}
-    queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: fragment + 7}
+    queue.subqueues[0] = retirement_subqueue(&vertex_state, vertex + 7, vertex - 1)
+    queue.subqueues[1] = retirement_subqueue(&fragment_state, fragment + 7, fragment - 1)
     mut job := render_retirement_job(&queue, vertex, fragment)
     mut manager := GpuManager{}
     event.set_completed(110, mask & 1 != 0); event.set_completed(111, mask & 2 != 0)
@@ -69,8 +77,8 @@ fn check_render_retirement_failure() {
   mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 5, gpu_doneptr: 5}
   mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 9, gpu_doneptr: 9}
   mut queue := G13QueueResources{}
-  queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: 5}
-  queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: 9}
+  queue.subqueues[0] = retirement_subqueue(&vertex_state, 5, 0)
+  queue.subqueues[1] = retirement_subqueue(&fragment_state, 9, 0)
   mut job := render_retirement_job(&queue, 5, 9)
   mut manager := GpuManager{}
   if bad_pipe == 0 { vertex_state.cpu_wptr = fw.g13_workqueue_entries }
@@ -96,8 +104,8 @@ fn check_render_retirement_failure() {
  mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 1280}
  mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 9, gpu_doneptr: 9}
  mut queue := G13QueueResources{}
- queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: 5}
- queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: 9}
+ queue.subqueues[0] = retirement_subqueue(&vertex_state, 5, 0)
+ queue.subqueues[1] = retirement_subqueue(&fragment_state, 9, 0)
  mut job := render_retirement_job(&queue, 5, 9)
  mut manager := GpuManager{}
  event.set_completed(110, false); event.set_completed(111, true)
@@ -112,8 +120,8 @@ fn check_render_retirement_reverse() {
  mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 2, gpu_doneptr: 2, cpu_freeptr: 1278}
  mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 2, gpu_doneptr: 2, cpu_freeptr: 1278}
  mut queue := G13QueueResources{}
- queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: 1281}
- queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: 1281}
+ queue.subqueues[0] = retirement_subqueue(&vertex_state, 1282, 1279)
+ queue.subqueues[1] = retirement_subqueue(&fragment_state, 1282, 1279)
  mut old_job := render_retirement_job(&queue, 1280, 1280)
  mut new_job := render_retirement_job(&queue, 1281, 1281)
  mut manager := GpuManager{}
@@ -183,15 +191,15 @@ fn retirement_callback(job &G13RenderJobResources, success bool, data voidptr) {
 }
 
 fn check_render_reaper_integration() {
- for mode in 0 .. 4 {
+ for mode in 0 .. 5 {
   retirement_frees = 0; retirement_reads = 0; retirement_ends = 0; retirement_callbacks = 0
   retirement_success = false; retirement_refuse_free = mode == 2
   retirement_stages = [2]int{}
   mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 5, gpu_doneptr: 5}
   mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 9, gpu_doneptr: 9}
   mut queue := G13QueueResources{}
-  queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: 5}
-  queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: 9}
+  queue.subqueues[0] = retirement_subqueue(&vertex_state, 5, 0)
+  queue.subqueues[1] = retirement_subqueue(&fragment_state, 9, 0)
   mut job := &G13RenderJobResources{}
   unsafe { *job = render_retirement_job(&queue, 5, 9) }
   job.submitted = true; job.pending_counted = true; job.completion = retirement_callback
@@ -201,12 +209,15 @@ fn check_render_reaper_integration() {
   event.set_completed(110, true); event.set_completed(111, false)
   if mode == 1 { vertex_state.cpu_wptr = 1280 }
   if mode == 3 { queue.subqueues[0].events = event.published_queue(109, 0x100) }
+  if mode == 4 { vertex_state.cpu_wptr = 4 }
   manager.checked_reap_g13_render_jobs()
   assert manager.g13_render_jobs.len == 1 && retirement_callbacks == 0 && retirement_frees == 0
    && retirement_reads == 0 && retirement_ends == 0, 'shared backing waits for both stages'
   assert job.pending_counted && !job.released
-  if mode == 1 || mode == 3 {
+  protocol_failure := mode in [1, 3, 4]!
+  if protocol_failure {
    assert job.retirement_failed && !job.quarantined
+   if mode == 4 { assert vertex_state.cpu_freeptr == 0 && queue.subqueues[0].retired_sequence == 0 }
    vertex_state.cpu_wptr = 5
    if mode == 3 { queue.subqueues[0].events = event.published_queue(110, 0x100) }
    manager.checked_reap_g13_render_jobs()
@@ -239,7 +250,7 @@ fn check_render_reaper_integration() {
   assert retirement_callbacks == 1
   assert manager.checked_release_g13_queue_resources(&queue) && manager.g13_queues.len == 0,
    'render cleanup retry permits final queue destruction'
-  assert retirement_stages == if mode == 1 || mode == 3 { [0, 0]! } else { [1, 1]! }, 'stage callbacks remain one-shot across quarantine retry'
+  assert retirement_stages == if protocol_failure { [0, 0]! } else { [1, 1]! }, 'stage callbacks remain one-shot across quarantine retry'
  }
  retirement_refuse_free = false
  println('G13 render reaper: actual retirement/completion bodies retain shared backing, defer partial-error callbacks and preserve one-shot cleanup retries')
@@ -251,8 +262,8 @@ fn check_render_error_completion() {
   mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 5, gpu_doneptr: 5}
   mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 9, gpu_doneptr: 9}
   mut queue := G13QueueResources{}
-  queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: 5}
-  queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: 9}
+  queue.subqueues[0] = retirement_subqueue(&vertex_state, 5, 0)
+  queue.subqueues[1] = retirement_subqueue(&fragment_state, 9, 0)
   mut job := &G13RenderJobResources{}
   unsafe { *job = render_retirement_job(&queue, 5, 9) }
   job.submitted = true; job.error = G13JobError{status: status}

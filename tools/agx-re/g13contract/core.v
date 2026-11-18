@@ -907,7 +907,11 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(repo, 'kernel/sched/sched_arm64.v'))!, read(os.join_path(repo, 'kernel/sched/sched_amd64.v'))!)!
 	retirement := section(local, 'fn (mut mgr GpuManager) retire_g13_subqueue_locked(',
 		'fn build_g13_attachments(', 'Vinix workqueue retirement')!
-	require_order(retirement, ['sequence <= queue.retired_sequence', 'katomic.sync()',
+	require_order(retirement, ['sequence <= queue.retired_sequence',
+		'g13_workqueue_slot_before(queue.last_command_slot, queue.command_sequence - queue.retired_sequence)',
+		'slot != g13_workqueue_slot_before(queue.last_command_slot, queue.command_sequence - sequence)',
+		'g13_workqueue_write_matches(queue.last_command_slot, katomic.load(&state.cpu_wptr))',
+		'katomic.load(&state.cpu_freeptr) != expected_free', 'katomic.sync()',
 		'katomic.store(mut &state.cpu_freeptr, slot)', 'queue.retired_sequence = sequence'],
 		'Vinix workqueue retirement')!
 	local_recovery := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_recovery.v'))!

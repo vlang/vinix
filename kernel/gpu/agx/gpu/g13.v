@@ -992,6 +992,11 @@ fn g13_workqueue_write_matches(last_command_slot u32, write_ptr u32) bool {
 	return write_ptr == (last_command_slot + 1) % fw.g13_workqueue_entries
 }
 
+fn g13_workqueue_slot_before(last_command_slot u32, distance u64) u32 {
+	entries := fw.g13_workqueue_entries
+	return (last_command_slot + entries - u32(distance % u64(entries))) % entries
+}
+
 // Publish up to two prefix barriers and a command into a queue-owned ring,
 // then emit one RunWorkQueue message with the final write pointer. Holding the
 // outer ring lock across both publications prevents a full outer ring from
@@ -1140,10 +1145,14 @@ fn (mut mgr GpuManager) retire_g13_subqueue_locked(resources &G13QueueResources,
 		return false
 	}
 	if sequence <= queue.retired_sequence { return true }
+	expected_free := if queue.retired_sequence == 0 { u32(0) } else {
+		g13_workqueue_slot_before(queue.last_command_slot, queue.command_sequence - queue.retired_sequence)
+	}
 	mut state := unsafe { &fw.G13WorkQueueRingState(queue.state.cpu_address()) }
-	if katomic.load(&state.cpu_wptr) >= fw.g13_workqueue_entries
+	if slot != g13_workqueue_slot_before(queue.last_command_slot, queue.command_sequence - sequence)
+		|| !g13_workqueue_write_matches(queue.last_command_slot, katomic.load(&state.cpu_wptr))
 		|| katomic.load(&state.gpu_doneptr) >= fw.g13_workqueue_entries
-		|| katomic.load(&state.cpu_freeptr) >= fw.g13_workqueue_entries {
+		|| katomic.load(&state.cpu_freeptr) != expected_free {
 		mgr.state = .error
 		return false
 	}

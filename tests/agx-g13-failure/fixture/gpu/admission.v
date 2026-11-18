@@ -40,6 +40,7 @@ fn check_compute_host_admission() {
 		mut ring := [1280]u64{init: 0xdeadbeef}
 		published := u64(10 * 1280 + 1279)
 		retired := published - (1279 - count)
+		state.cpu_freeptr = u32((retired - 1) % 1280)
 		mut queue := G13QueueResources{}
 		queue.subqueues[2] = G13Subqueue{
 			state:            SharedBuffer{ phys: u64(&state) }
@@ -108,6 +109,9 @@ fn check_render_host_admission() {
 							published
 						}
 					}
+					free_ptr := u32((queue.subqueues[pipe].retired_sequence - 1) % 1280)
+					if pipe == 0 { vertex_state.cpu_freeptr = free_ptr }
+					else { fragment_state.cpu_freeptr = free_ptr }
 				}
 				mut context := Context{}
 				mut graph := G13ChannelAllocations{}

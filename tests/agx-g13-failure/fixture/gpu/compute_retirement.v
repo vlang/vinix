@@ -70,8 +70,8 @@ fn check_compute_retirement_matrix() {
     mut queue := G13QueueResources{}
     queue.subqueues[0].events = event.credit_queue(110, baseline, 126)
     queue.subqueues[1].events = event.credit_queue(111, baseline, 126)
-    queue.subqueues[2] = G13Subqueue{state: SharedBuffer{phys: u64(&state)}, command_sequence: sequence + 1,
-     events: event.credit_queue(112, baseline, 126)}
+    queue.subqueues[2] = retirement_subqueue(&state, sequence + 1, sequence - 1)
+    queue.subqueues[2].events = event.credit_queue(112, baseline, 126)
     mut timestamps := fw.G13JobTimestamps{start: u64(sequence) + 100, end: u64(sequence) + 200}
     expected_timestamps := timestamps
     mut job := compute_retirement_job(&queue, sequence, baseline + 126 * u32(0x100), &timestamps)
@@ -125,41 +125,51 @@ fn check_compute_retirement_matrix() {
 }
 
 fn check_compute_retirement_failure() {
- for mode in 0 .. 3 {
+ for mode in 0 .. 6 {
   reset_compute_retirement()
   mut state := fw.G13WorkQueueRingState{cpu_wptr: 7, gpu_doneptr: 7}
   mut queue := G13QueueResources{}
-  queue.subqueues[2] = G13Subqueue{state: SharedBuffer{phys: u64(&state)}, command_sequence: 7,
-   events: event.credit_queue(112, 0, 126)}
+  queue.subqueues[2] = retirement_subqueue(&state, 7, 0)
+  queue.subqueues[2].events = event.credit_queue(112, 0, 126)
   mut timestamps := fw.G13JobTimestamps{start: 42, end: 84}
   mut job := compute_retirement_job(&queue, 7, 126 * u32(0x100), &timestamps)
   if mode == 0 { state.cpu_wptr = 1280 }
   if mode == 1 { queue.subqueues[2].events = event.credit_queue(113, 0, 126) }
   if mode == 2 { job.stamp_value += u32(0x100) }
+  if mode == 3 { state.cpu_wptr = 6 }
+  if mode == 4 { state.cpu_freeptr = 1 }
+  if mode == 5 { job.ring_slot = 5 }
+  before := state
   mut manager := GpuManager{g13_compute_jobs: [job]}
   event.set_completed(112, false)
   manager.checked_reap_g13_compute_jobs()
   assert manager.state == .running && compute_retirement_callbacks == 0
   event.set_completed(112, true)
   manager.checked_reap_g13_compute_jobs()
+  if mode >= 3 {
+   assert state == before && queue.subqueues[2].retired_sequence == 0,
+    'an in-range retirement cursor mismatch must leave the ring and retired sequence untouched'
+  }
   assert manager.state == .error && job.quarantined && !job.retirement_published
    && compute_retirement_callbacks == 1 && !compute_retirement_success && compute_retirement_frees == 0,
    'invalid compute retirement must retain backing and report one failure'
   state.cpu_wptr = 7; queue.subqueues[2].events = event.credit_queue(112, 0, 126)
+  if mode == 4 { state.cpu_freeptr = 0 }
+  if mode == 5 { job.ring_slot = 6 }
   job.stamp_value = 126 * u32(0x100); manager.state = .running
   manager.checked_reap_g13_compute_jobs()
   assert manager.g13_compute_jobs.len == 0 && compute_retirement_callbacks == 1
    && compute_retirement_ends == 1 && compute_retirement_frees == 1
  }
- println('G13 compute retirement: malformed ring, foreign event owner and unknown publication quarantine backing; repaired retries never reuse callback data')
+ println('G13 compute retirement: six malformed ring, slot and event cases quarantine backing and preserve the one-shot callback on retry')
 }
 
 fn check_compute_retirement_reverse() {
  reset_compute_retirement()
  mut state := fw.G13WorkQueueRingState{cpu_wptr: 2, gpu_doneptr: 2, cpu_freeptr: 1277}
  mut queue := G13QueueResources{}
- queue.subqueues[2] = G13Subqueue{state: SharedBuffer{phys: u64(&state)}, command_sequence: 1281,
-  events: event.credit_queue(112, 0xffffff00, 126)}
+ queue.subqueues[2] = retirement_subqueue(&state, 1282, 1278)
+ queue.subqueues[2].events = event.credit_queue(112, 0xffffff00, 126)
  mut timestamps := [3]fw.G13JobTimestamps{}
  mut manager := GpuManager{}
  for index in 0 .. 3 {
@@ -167,8 +177,14 @@ fn check_compute_retirement_reverse() {
   manager.g13_compute_jobs << compute_retirement_job(&queue, u64(1279 + index),
    u32(0xffffff00) + u32(124 + index) * u32(0x100), &timestamps[index])
  }
- event.set_completed(112, true)
  before := katomic.barriers()
+ manager.lock.acquire()
+ state.cpu_freeptr = 1278
+ assert !manager.retire_g13_subqueue_locked(&queue, 2, 1281, 0), 'retirement must check the previous free slot across wrap'
+ assert manager.state == .error && state.cpu_freeptr == 1278 && queue.subqueues[2].retired_sequence == 1278
+ state.cpu_freeptr = 1277; manager.state = .running
+ manager.lock.release()
+ event.set_completed(112, true)
  manager.checked_reap_g13_compute_jobs()
  assert manager.g13_compute_jobs.len == 0 && compute_retirement_callbacks == 3 && compute_retirement_ends == 3
  assert state.cpu_freeptr == 0 && katomic.barriers() == before + 1
@@ -189,8 +205,8 @@ fn check_compute_error_completion() {
   reset_compute_retirement(); compute_retirement_refuse = true
   mut state := fw.G13WorkQueueRingState{cpu_wptr: 7, gpu_doneptr: 7}
   mut queue := G13QueueResources{}
-  queue.subqueues[2] = G13Subqueue{state: SharedBuffer{phys: u64(&state)}, command_sequence: 7,
-   events: event.credit_queue(112, 0, 126)}
+  queue.subqueues[2] = retirement_subqueue(&state, 7, 0)
+  queue.subqueues[2].events = event.credit_queue(112, 0, 126)
   mut timestamps := fw.G13JobTimestamps{start: 42, end: 84}
   mut job := compute_retirement_job(&queue, 7, 126 * u32(0x100), &timestamps)
   job.error = G13JobError{status: status}

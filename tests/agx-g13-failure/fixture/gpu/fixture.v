@@ -603,13 +603,20 @@ fn check_recovery() {
 	println('G13 recovery: pending stamps, fault isolation and halt/resume passed')
 }
 
+// These fixtures use queues that started at slot zero, as production does.
+fn retirement_subqueue(state &fw.G13WorkQueueRingState, published u64, retired u64) G13Subqueue {
+	return G13Subqueue{
+		state: SharedBuffer{phys: u64(state)}
+		command_sequence: published
+		retired_sequence: retired
+		last_command_slot: u32((published - 1) % fw.g13_workqueue_entries)
+	}
+}
+
 fn check_retirement() {
 	mut state := fw.G13WorkQueueRingState{ cpu_wptr: 1, gpu_doneptr: 1 }
 	mut resources := G13QueueResources{}
-	resources.subqueues[2] = G13Subqueue{
-		state: SharedBuffer{phys: u64(&state)}
-		command_sequence: 1281
-	}
+	resources.subqueues[2] = retirement_subqueue(&state, 1281, 0)
 	mut mgr := GpuManager{ hw_config: hw.HwConfig{ gpu_gen: .g13 } }
 	before := katomic.barriers()
 	assert mgr.retire_g13_subqueue_locked(&resources, 2, 1281, 0)

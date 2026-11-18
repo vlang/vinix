@@ -9,11 +9,12 @@ fn check_render_event_credits() {
  for baseline in [u32(0), 0xffffff00, 0xffff8000, 0x7fffff00, 0x80000000] {
   for sequence in [u64(126), 1280, 1281, 0x100000001] {
    for first in 0 .. 2 {
-    mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: 1, gpu_doneptr: 1}
-    mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: 1, gpu_doneptr: 1}
+    write_ptr := u32((sequence + 1) % fw.g13_workqueue_entries)
+    mut vertex_state := fw.G13WorkQueueRingState{cpu_wptr: write_ptr, gpu_doneptr: 1}
+    mut fragment_state := fw.G13WorkQueueRingState{cpu_wptr: write_ptr, gpu_doneptr: 1}
     mut queue := G13QueueResources{}
-    queue.subqueues[0] = G13Subqueue{state: SharedBuffer{phys: u64(&vertex_state)}, command_sequence: sequence + 1}
-    queue.subqueues[1] = G13Subqueue{state: SharedBuffer{phys: u64(&fragment_state)}, command_sequence: sequence + 1}
+    queue.subqueues[0] = retirement_subqueue(&vertex_state, sequence + 1, 0)
+    queue.subqueues[1] = retirement_subqueue(&fragment_state, sequence + 1, 0)
     mut job := render_retirement_job(&queue, sequence, sequence)
     queue.subqueues[0].events = event.credit_queue(110, baseline, 126)
     queue.subqueues[1].events = event.credit_queue(111, baseline, 126)

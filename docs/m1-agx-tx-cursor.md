@@ -52,3 +52,31 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `b88201965f3dfc453bcf25143444e1023f40cc30788f6a8ac9280ac8937cfddb`.
 Native M1 firmware validation remains open.
+
+## Workqueue retirement indices
+
+Before advancing `cpu_freeptr`, Vinix now checks the shared `cpu_wptr` and
+`cpu_freeptr` against the host's publication and retirement records. It also
+checks that the completed job's slot matches its sequence. The expected slots
+use the last published slot and the sequence distance around the ring. The
+initial free index is zero. An already-retired sequence skips publication.
+
+An in-range mismatch leaves the shared indices and retired sequence intact.
+The reaper enters its existing failure path, retaining backing and waiting
+for the other render stage when it is still active. Asahi
+`bed544bdf93a496ebf70ba180923bab12b6e01cf` uses event stamps and the last
+completed command's recorded slot to publish its free index.
+
+The previous revision `db979ec4a8054d13a5db3328b9211771a123f429` advanced
+retirement in the corrupt-write-index regression. ASan/UBSan passed the
+updated compute and render retirement tests, including wrap, reverse reaping,
+failure callbacks and repaired retries. The job-lifetime, FwCtl and context
+retirement suites passed, along with 79 local contract test files, 122
+archived-reference checks and both production kernel builds. The allocation
+scan reproduced the same 176 baseline findings by file and warning kind.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-retirement-cursor-20261119.Jtk3vq/`.
+The `bundle.tar.gz` SHA-256 is
+`a528a72944e597cda327214b02588b2e9b4fd9fb4f6e17c4948341dbd4a8ee13`.
+Native M1 firmware validation remains open.
