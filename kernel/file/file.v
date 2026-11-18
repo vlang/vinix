@@ -316,7 +316,7 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64, selecting bo
 
 		mut resource_ := fd.handle.resource
 
-		status := resource.poll_status(mut resource_, fd.handle.flags & resource.o_accmode)
+		status := resource.poll_state(mut resource_, fd.handle.flags & resource.o_accmode, int(fdd.events)).status
 
 		revents := poll_revents(status, fdd.events, selecting)
 		if revents != 0 {
@@ -377,7 +377,8 @@ fn ppoll(fds &PollFD, nfds u64, tmo_p &time.TimeSpec, sigmask &u64, selecting bo
 		// whereas an event's pending wake can be consumed by another poller.
 		for i in 0 .. fdlist.len {
 			mut fdd := unsafe { &fds[fdnums[i]] }
-			fdd.revents = poll_revents(resource.poll_status(mut fdlist[i].handle.resource, fdlist[i].handle.flags & resource.o_accmode), fdd.events, selecting)
+			state := resource.poll_state(mut fdlist[i].handle.resource, fdlist[i].handle.flags & resource.o_accmode, int(fdd.events))
+			fdd.revents = poll_revents(state.status, fdd.events, selecting)
 			if fdd.revents != 0 { ret++ }
 		}
 		if ret != 0 { return ret, 0 }

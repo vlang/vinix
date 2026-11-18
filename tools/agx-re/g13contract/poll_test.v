@@ -19,7 +19,8 @@ fn test_poll_guards_reject_stale_readiness_unlocked_cancellation_and_missing_wak
 		if _ := check_sync_file_poll_contract(drm.replace(token, ''), objects, events, reference) { assert false, token }
 	}
 	for token in ['f.lock.acquire()', 'if n.fence == unsafe { nil }',
-		'f.poll_events = unsafe { node.next }', 'previous.next = cursor.next', 'event.trigger(mut target, false)'] {
+		'f.poll_events = unsafe { node.next }', 'previous.next = cursor.next',
+		'katomic.inc(mut generation)', 'event.trigger(mut target, directional)'] {
 		if _ := check_sync_file_poll_contract(drm, objects, events.replace(token, ''), reference) { assert false, token }
 	}
 	if _ := check_sync_file_poll_contract(drm, objects.replace('f.notify_events_locked()', ''), events, reference) { assert false }

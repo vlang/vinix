@@ -5,14 +5,62 @@ import drm.gem
 import drm.ioctl
 import drm.syncobj
 import errno
+import event.eventstruct
 import file
 import katomic
 import memory
 import proc
+import resource
 import sched
 import usercopy
 
 const prime_access = ioctl.dma_buf_sync_read | ioctl.dma_buf_sync_write
+
+struct PrimePoll {
+mut:
+	fence &syncobj.DmaFence = unsafe { nil }
+	event syncobj.FenceEvent
+	generation u64
+}
+
+fn (mut this GemPrimeResource) poll_requested(requested int) resource.PollState {
+	if this.obj == unsafe { nil } || !this.obj.file_scoped {
+		return resource.PollState{status: this.status, generation: this.event.generation}
+	}
+	mut object := unsafe { this.obj }
+	object.lock.acquire()
+	defer { object.lock.release() }
+	mut status := 0
+	if requested & file.pollout != 0 && prime_poll_ready(mut object, mut this.poll_write, unsafe { &this.event }, true) {
+		status |= file.pollout
+	}
+	if requested & file.pollin != 0 && prime_poll_ready(mut object, mut this.poll_read, unsafe { &this.event }, false) {
+		status |= file.pollin
+	}
+	return resource.PollState{status: status, directional: true,
+		generation: katomic.load(&this.poll_read.generation),
+		write_generation: katomic.load(&this.poll_write.generation)}
+}
+
+// The GEM lock serializes each open description's two subscription slots.
+// Leaves are retained independently of their reservation records. Completion
+// takes the leaf and event locks only and can run while we scan.
+fn prime_poll_ready(mut object gem.GemObject, mut watch PrimePoll, target &eventstruct.Event, write bool) bool {
+	if watch.fence != unsafe { nil } {
+		if !katomic.load(&watch.fence.signaled) { return false }
+		syncobj.cancel_fence_event(watch.fence, unsafe { &watch.event })
+		watch.fence = unsafe { nil }
+	}
+	for {
+		pending := prime_pending_locked(mut object, write)
+		if pending == unsafe { nil } { return true }
+		if !syncobj.poll_leaf_event(pending, unsafe { &watch.event }, target, unsafe { &watch.generation }) {
+			watch.fence = unsafe { pending }
+			return false
+		}
+	}
+	return false
+}
 
 fn prime_import_sync_file(object &gem.GemObject, address u64) int {
 	mut request := ioctl.DmaBufImportSyncFile{}

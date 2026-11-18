@@ -4,6 +4,7 @@ module proc
 import klock
 
 pub const max_fds = 32
+pub const max_events = 32
 pub const initial_fds = 4
 pub const rlimit_nofile = 0
 pub const mac_inspect = u32(1)
@@ -40,6 +41,7 @@ pub fn reset() {
 }
 
 pub fn current_thread() &Thread { return unsafe { &wait_capture_thread } }
+pub fn begin_wait_mask(mut caller Thread, mask u64) { caller.masked_signals = mask }
 pub fn interrupted() bool {
 	task := current_thread()
 	return task.must_exit || pending_signals(task) & ~task.masked_signals != 0

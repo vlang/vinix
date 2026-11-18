@@ -131,14 +131,13 @@ pub mut:
 	can_mmap bool
 	dev      &DrmDevice = unsafe { nil }
 	obj      &gem.GemObject = unsafe { nil }
+	poll_read PrimePoll
+	poll_write PrimePoll
 	box &resource.Resource = unsafe { nil }
 }
 
-// Preserve this asynchronous object's existing status rather than treating
-// its regular-file metadata as ordinary filesystem readiness. Fence-driven
-// DMA-BUF readiness remains a separate implementation.
 fn (mut this GemPrimeResource) poll_status(_access int) int {
-	return this.status
+	return this.poll_requested(file.pollin | file.pollout).status
 }
 
 fn (this &GemPrimeResource) seek_offset(offset i64, whence int) ?u64 {
@@ -204,6 +203,8 @@ fn (mut this GemPrimeResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
+	syncobj.cancel_fence_event(this.poll_read.fence, unsafe { &this.poll_read.event })
+	syncobj.cancel_fence_event(this.poll_write.fence, unsafe { &this.poll_write.event })
 	if this.obj != unsafe { nil } { put_prime_object(this.dev, this.obj) }
 	unsafe {
 		memory.free(voidptr(this.box))

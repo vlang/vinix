@@ -51,9 +51,20 @@ fn main() {
 	native_file := os.read_file('${repo}/kernel/file/file.v')!
 	os.write_file('${scratch}/file/table.v', 'module file\nimport proc\nimport errno\n' +
 		section(native_file, 'pub fn fdnum_create_from_fd(', '// Make room in a descriptor table')!)!
+	os.write_file('${scratch}/file/poll.v', 'module file\nimport proc\nimport errno\nimport resource\nimport event\nimport event.eventstruct\nimport time\nfn C.__builtin_alloca(usize) voidptr\n' +
+		section(native_file, 'struct PollFD {', '// ppoll may sleep')!.replace('C.vinix_stack_alloc', 'C.__builtin_alloca'))!
+	native_epoll := os.read_file('${repo}/kernel/file/epoll.v')!
+	os.write_file('${scratch}/file/epoll_ready.v', 'module file\nimport resource\n' +
+		section(native_epoll, 'struct EpollEntry {', '// Every epoll set')! +
+		section(native_epoll, 'fn epoll_ready_events(', 'pub fn syscall_epoll_pwait(')!)!
+	stack_list := os.read_file('${repo}/kernel/event/stack_list.v')!
+	os.write_file('${scratch}/event/stack_list.v', 'module event\nimport event.eventstruct\n' +
+		section(stack_list, '@[unsafe]', '// await_one is')!)!
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	os.write_file('${scratch}/resource/seek.v', 'module resource\n' +
 		section(resource_source, 'pub interface SeekableResource {', '// An immutable backend')!)!
+	os.write_file('${scratch}/resource/poll.v', 'module resource\nimport stat\n' +
+		section(resource_source, 'pub interface PollableResource {', 'struct ReadOnlyScratch {')!)!
 	os.write_file('${scratch}/resource/stat.v', os.read_file('${repo}/kernel/resource/stat.v')!
 		.replace('C.vinix_stack_alloc', 'C.__builtin_alloca'))!
 	vfs := os.read_file('${repo}/kernel/fs/vfs.v')!

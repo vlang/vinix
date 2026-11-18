@@ -12,31 +12,13 @@ pub const o_cloexec = 0o2000000
 pub const o_rdwr = 2
 pub const o_nonblock = 0o4000
 pub const o_path = 0o10000000
+pub const o_accmode = 3
 
 __global fixture_next_device_id = u64(1)
 
 pub fn create_dev_id() u64 {
 	fixture_next_device_id++
 	return fixture_next_device_id
-}
-
-pub interface PollableResource {
-mut:
-	poll_status(access int) int
-}
-
-struct PollScratch {
-mut:
-	backend PollableResource
-}
-
-pub fn poll_status(mut res Resource, access int) int {
-	if mut res is PollableResource {
-		mut scratch := unsafe { &PollScratch(C.__builtin_alloca(sizeof(PollScratch))) }
-		unsafe { scratch.backend = PollableResource(res) }
-		return scratch.backend.poll_status(access)
-	}
-	return res.status
 }
 
 // The production Resource interface, with inert fixture field types.

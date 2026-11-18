@@ -3,6 +3,7 @@ module syncobj
 
 import event
 import event.eventstruct
+import katomic
 
 // A descriptor owns this node and its event until cancel_fence_event returns.
 // The immutable fence argument supplies the lock even after signaling detaches
@@ -12,6 +13,7 @@ mut:
 	fence &DmaFence = unsafe { nil }
 	next &FenceEvent = unsafe { nil }
 	event &eventstruct.Event = unsafe { nil }
+	generation &u64 = unsafe { nil }
 }
 
 // Register once while checking readiness under the completion lock. Repeated
@@ -21,6 +23,12 @@ pub fn poll_fence(fence &DmaFence, node &FenceEvent, target &eventstruct.Event) 
 	if is_signaled(fence) { return true }
 	enable_array(fence)
 	drain_chain_notifications()
+	return poll_leaf_event(fence, node, target, unsafe { nil })
+}
+
+// PRIME supplies a published leaf and an optional direction generation. This
+// path does no array activation or notification draining under the GEM lock.
+pub fn poll_leaf_event(fence &DmaFence, node &FenceEvent, target &eventstruct.Event, generation &u64) bool {
 	mut f := unsafe { fence }
 	mut n := unsafe { node }
 	f.lock.acquire()
@@ -29,6 +37,7 @@ pub fn poll_fence(fence &DmaFence, node &FenceEvent, target &eventstruct.Event) 
 	if n.fence == unsafe { nil } {
 		n.fence = unsafe { fence }
 		n.event = unsafe { target }
+		n.generation = unsafe { generation }
 		n.next = unsafe { f.poll_events }
 		f.poll_events = unsafe { node }
 	}
@@ -55,7 +64,7 @@ pub fn cancel_fence_event(fence &DmaFence, node &FenceEvent) {
 		previous = unsafe { cursor }
 		cursor = unsafe { cursor.next }
 	}
-	n.fence = unsafe { nil }; n.next = unsafe { nil }; n.event = unsafe { nil }
+	n.fence = unsafe { nil }; n.next = unsafe { nil }; n.event = unsafe { nil }; n.generation = unsafe { nil }
 }
 
 // Caller holds the fence lock until every wake completes. Final close must
@@ -65,7 +74,11 @@ fn (mut f DmaFence) notify_events_locked() {
 		mut node := unsafe { f.poll_events }
 		f.poll_events = unsafe { node.next }
 		mut target := unsafe { node.event }
+		mut generation := unsafe { node.generation }
 		node.fence = unsafe { nil }; node.next = unsafe { nil }; node.event = unsafe { nil }
-		event.trigger(mut target, false)
+		node.generation = unsafe { nil }
+		directional := generation != unsafe { nil }
+		if directional { katomic.inc(mut generation) }
+		event.trigger(mut target, directional)
 	}
 }

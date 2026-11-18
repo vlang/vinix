@@ -101,6 +101,36 @@ pub fn poll_status(mut res Resource, access int) int {
 	return res.status
 }
 
+pub struct PollState {
+pub:
+	status int
+	generation u64
+	write_generation u64
+	directional bool
+}
+
+// Backends with independent read/write waiters can arm only the requested
+// events and report separate edge generations to epoll.
+pub interface PollInterestResource {
+mut:
+	poll_requested(requested int) PollState
+}
+
+struct PollInterestScratch {
+mut:
+	backend PollInterestResource
+}
+
+pub fn poll_state(mut res Resource, access int, requested int) PollState {
+	if mut res is PollInterestResource {
+		mut scratch := unsafe { &PollInterestScratch(C.__builtin_alloca(sizeof(PollInterestScratch))) }
+		unsafe { scratch.backend = PollInterestResource(res) }
+		return scratch.backend.poll_requested(requested)
+	}
+	status := poll_status(mut res, access)
+	return PollState{status: status, generation: res.event.generation}
+}
+
 struct ReadOnlyScratch {
 mut:
 	backend ReadOnlyResource

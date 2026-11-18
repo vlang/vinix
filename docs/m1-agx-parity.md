@@ -924,8 +924,7 @@ When no DRM syncobj adopted a snapshot, final close unlinks its callbacks.
 Queued notifications retain snapshot storage until they finish. PRIME import
 borrows the source descriptor while staging leaves. A snapshot imported
 into a DRM syncobj follows the existing retained-fence lifetime, including
-after replacement or destruction of the syncobj. DMA-BUF poll readiness,
-GPU submission integration and M1 hardware validation remain open.
+after replacement or destruction of the syncobj.
 
 Both kernel builds, all 82 focused V test files, the DRM wire checks and the
 sanitizer fixtures passed. The export fixture exercised failed copyout,
@@ -941,6 +940,30 @@ The restored archive passed inventory and kernel artifact verification for
 `/Users/alex/.local/state/vinix/omarchy-m1-prime-export-20261118.val4Rx/`.
 `bundle.tar.gz` SHA-256 is
 `bfc264a9ee10506a9e49ca67749645b8b3006d62427aeeab5c9ca44a7208a9c9`.
+
+Native G13 PRIME descriptors report `POLLIN` once all reservation writers
+finish, and `POLLOUT` once reservation readers and writers finish. Each open
+description arms one embedded callback for each requested direction, then
+rescans the reservation after completion. Separate generations keep an
+output completion from repeating an input-only epoll edge. A matching edge
+on a combined watch returns its current requested readiness mask. Final
+close cancels both callbacks under their fence locks. [Pinned DMA-BUF poll](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L317-L419)
+
+Both kernel builds, all 82 focused V test files, the DRM wire checks and the
+sanitizer fixtures passed. The host fixture checked wake and rearm in the
+production `ppoll` loop, edge selection, duplicate and re-export ownership,
+and close racing fence completion. Independent review checked callback
+lifetimes and lock order. The allocation scan matched the baseline, and
+eight generated poll and callback functions contained no implicit
+allocations on either architecture. All selected offline source gates
+passed. The verdict remains `not_equivalent`. GPU submission integration
+and native M1 validation remain open.
+
+The restored archive passed inventory and kernel artifact verification for
+`3ca15ca9c56da874444d73e25fc28e9c49368f62` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-prime-poll-20261118.pf6uzU/`.
+`bundle.tar.gz` SHA-256 is
+`6d470684cd1b3f851be3bceeeeeed09ed4583ac3e57d80f5817b1073793c0c9a`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

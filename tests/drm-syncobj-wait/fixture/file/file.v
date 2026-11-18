@@ -7,10 +7,6 @@ import klock
 import proc
 import resource
 
-pub const pollin = 1
-pub const pollout = 4
-pub const pollerr = 8
-
 pub struct Handle {
 pub mut:
 	resource resource.Resource

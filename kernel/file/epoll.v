@@ -40,6 +40,7 @@ mut:
 	// as the same number failed with EEXIST and was never answered.
 	handle     &Handle = unsafe { nil }
 	generation u64
+	write_generation u64
 	disabled   bool
 }
 
@@ -323,6 +324,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, eve
 					// baseline for edge-triggered readiness.
 					entry.ready = 0
 					entry.generation = 0
+					entry.write_generation = 0
 					entry.disabled = false
 					failure = 0
 					break
@@ -359,7 +361,7 @@ pub fn syscall_epoll_ctl(_ voidptr, epfd_word int, op_word int, fd_word int, eve
 // Translate a resource's poll status and apply the delivery mode requested by
 // this registration. EPOLLET reports only newly-ready bits, while
 // EPOLLONESHOT remains disabled until an EPOLL_CTL_MOD rearms it.
-fn epoll_ready_events(mut entry EpollEntry, status int, generation u64) u32 {
+fn epoll_ready_events(mut entry EpollEntry, state resource.PollState) u32 {
 	if entry.disabled {
 		return 0
 	}
@@ -367,7 +369,7 @@ fn epoll_ready_events(mut entry EpollEntry, status int, generation u64) u32 {
 	// Forward normal/band readiness as well as IN/OUT/PRI. Pipe backends
 	// report RDNORM/WRNORM separately, and epoll must preserve requested bits.
 	readiness := u32(epollin | epollout | epollpri | epollrdhup | 0x40 | 0x80 | pollwrnorm | 0x200)
-	current := (u32(status) & entry.events & readiness) | (u32(status) & u32(epollhup | epollerr))
+	current := (u32(state.status) & entry.events & readiness) | (u32(state.status) & u32(epollhup | epollerr))
 
 	mut deliverable := current
 	if entry.events & epollet != 0 {
@@ -375,11 +377,19 @@ fn epoll_ready_events(mut entry EpollEntry, status int, generation u64) u32 {
 		// A resource may become not-ready and ready again between two
 		// epoll waits. Its event generation preserves that intervening edge
 		// even when the sampled status bits are identical.
-		if current != 0 && generation != entry.generation {
+		if state.directional {
+			// A matching edge queues a fresh poll of the full interest mask.
+			if deliverable != 0
+				|| (entry.events & u32(epollin) != 0 && state.generation != entry.generation)
+				|| (entry.events & u32(epollout) != 0 && state.write_generation != entry.write_generation) {
+				deliverable = current
+			}
+		} else if current != 0 && state.generation != entry.generation {
 			deliverable = current
 		}
 		entry.ready = current
-		entry.generation = generation
+		entry.generation = state.generation
+		entry.write_generation = state.write_generation
 	}
 	if deliverable != 0 && entry.events & epolloneshot != 0 {
 		entry.disabled = true
@@ -582,7 +592,9 @@ fn (mut this EpollResource) collect_ready(maxevents int) ?EpollReadySnapshot {
 			continue
 		}
 		mut watched := entry.handle.resource
-		revents := epoll_ready_events(mut entry, resource.poll_status(mut watched, entry.handle.flags & resource.o_accmode), watched.event.generation)
+		if entry.disabled { continue }
+		state := resource.poll_state(mut watched, entry.handle.flags & resource.o_accmode, int(entry.events))
+		revents := epoll_ready_events(mut entry, state)
 		if revents != 0 {
 			events << EpollEvent{
 				events: revents
