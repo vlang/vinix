@@ -186,8 +186,51 @@ fn check_mapping_retirement() {
 		assert stop_pt.unmaps == 1 && stop_vm.destroyed
 	}
 	println('AGX mapping retirement: 200 bind/unbind/GEM-close/retry cycles, failed bind ownership, busy VM admission, partial UNBIND_ALL, replacement, stopped cleanup, exact-lock shutdown races and VM destruction before BIND passed')
+	check_reimported_mapping_retirement()
 	check_eviction_before_file_mapping_check()
 	check_file_mapping_state()
+}
+
+fn check_reimported_mapping_retirement() {
+	gpu.set_running(true)
+	for split in [false, true]! {
+		mut pt := pgtable.UatPgtable{watch_start: 0x4000}
+		mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: &pt}
+		mut file := GpuFile{vms: [&vm]}
+		object := gem.create(7)
+		file.objects.table.add_created(object)
+		mut original := bind(7, 1, 0x4000)
+		original.range = 0xc000
+		assert file.ioctl_gem_bind(&original) == 0
+
+		vm.inflight = 1
+		assert file.close_object_handle(7) == 0
+		assert object.references == 1 && pt.unmaps == 0
+		file.lock.acquire()
+		imported := file.objects.table.import_object(object) or { panic('restore handle') }
+		file.lock.release()
+		assert file.ioctl_gem_bind(bind(imported, 1, 0x10000)) == 0
+		assert file.mappings.len == 2 && object.references == 3 && pt.unmaps == 0
+		vm.inflight = 0
+		if split {
+			assert file.ioctl_gem_bind(unbind(1, 0x8000)) == 0
+			assert file.mappings.len == 3 && object.references == 4 && pt.leaves[1] == 0
+		}
+
+		gpu.fail_mapping_checks(1)
+		assert file.ioctl_gem_bind(bind(imported, 1, 0x14000)) == -5
+		assert pt.leaves[0] == 0 && pt.leaves[1] == 0 && pt.leaves[2] == 0,
+			'reimport must not cancel retirement of bindings selected by the old close'
+		assert pt.leaves[3] == object.phys_addr && pt.leaves[4] == 0
+		assert file.mappings.len == 2 && object.references == 3
+		before := pt.unmaps
+		assert file.ioctl_gem_bind(bind(imported, 1, 0x14000)) == 0
+		assert pt.unmaps == before && pt.leaves[3] == object.phys_addr && pt.leaves[4] == object.phys_addr
+		assert file.mappings.len == 2 && object.references == 3
+		assert file.close() && gem.live() == 0
+		memory.assert_released()
+	}
+	println('AGX GEM reimport: old bindings and split fragments retire after VM idle while new bindings retain the BO')
 }
 
 __global evicting_pt &pgtable.UatPgtable = unsafe { nil }

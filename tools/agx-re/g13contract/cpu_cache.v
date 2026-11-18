@@ -19,7 +19,7 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 		'obj.phys_addr != 0 && !obj.external && obj.pte_extra & memory.pte_uncached != 0',
 		'memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false)',
 		'panic(', 'memory.pmm_free(voidptr(obj.phys_addr), pages)'], 'Remove the namespace entry, restore before PMM reuse; keep external apertures outside ownership')!
-	range := section(bo, 'pub fn (table &Table) valid_mmap_range(', 'pub fn (table &Table) contains(', 'Homogeneous authorized mmap range')!
+	range := section(bo, 'pub fn (table &Table) valid_mmap_range(', '// Remove a file handle', 'Homogeneous authorized mmap range')!
 	require_order(range, ['if length == 0 || offset > ~u64(0) - length', 'table.mmap_objects',
 		'offset >= base && offset - base < object.size', 'return length <= object.size - (offset - base)'], 'One authorized object per VMA')!
 	attributes := section(bo, 'pub fn (table &Table) mmap_attributes(', '// A VMA records', 'Authorized mapping attributes')!

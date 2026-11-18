@@ -112,15 +112,6 @@ pub fn (table &Table) valid_mmap_range(offset u64, length u64) bool {
 	return false
 }
 
-pub fn (table &Table) contains(object &gem.GemObject) bool {
-	for candidate in table.objects {
-		if voidptr(candidate) == voidptr(object) {
-			return true
-		}
-	}
-	return false
-}
-
 // Remove a file handle without dropping its reference. This lets the backend
 // tear down or retain GPU mappings before it performs the matching unref.
 pub fn (mut table Table) remove(handle u32) ?&gem.GemObject {

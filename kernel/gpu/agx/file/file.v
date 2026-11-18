@@ -37,7 +37,7 @@ const max_command_attachments = u32(16)
 struct GpuMapping {
 mut:
 	vm_id    u32
-	handle   u32
+	handle_closed bool // GEM_CLOSE selected this binding for retirement
 	addr     u64
 	size     u64
 	obj      &gem.GemObject = unsafe { nil }
@@ -330,10 +330,9 @@ fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 	return true
 }
 
-// GEM_CLOSE drops every GPU-VA binding owned by the handle once the target VM
-// is idle. A close racing an in-flight job leaves the binding retained; the
-// next bind into that VM collects it after completion. CPU mmap authorization
-// holds its own reference independently.
+// GEM_CLOSE drops the selected GPU-VA bindings once the target VM is idle.
+// An import of the same BO can create new bindings while older ones await
+// retirement. CPU mmap authorization holds its own reference independently.
 fn (mut f GpuFile) cleanup_closed_mappings_locked(vm &mmu.UatContext) bool {
 	vm_id := vm.id
 	if katomic.load(&vm.inflight) != 0 {
@@ -348,7 +347,7 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm &mmu.UatContext) bool {
 		if mapping.vm_id != vm_id {
 			continue
 		}
-		if !vm.detached && !mapping.retiring && f.objects.contains(mapping.obj) {
+		if !vm.detached && !mapping.retiring && !mapping.handle_closed {
 			continue
 		}
 		if !f.retire_mapping_locked(index) {
@@ -363,6 +362,9 @@ fn (mut f GpuFile) close_object_handle(handle u32) int {
 	obj := f.objects.remove(handle) or {
 		f.lock.release()
 		return -2 // ENOENT
+	}
+	for mut mapping in f.mappings {
+		if voidptr(mapping.obj) == voidptr(obj) { mapping.handle_closed = true }
 	}
 	mut success := true
 	for vm in f.vms {
@@ -437,12 +439,12 @@ fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
 			cut_end := if mapping_end < end { mapping_end } else { end }
 			if mapping.addr < cut_start {
 				gem.ref_obj(mapping.obj)
-				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle: mapping.handle,
+				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle_closed: mapping.handle_closed,
 					addr: mapping.addr, size: cut_start - mapping.addr, obj: mapping.obj }
 			}
 			if cut_end < mapping_end {
 				gem.ref_obj(mapping.obj)
-				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle: mapping.handle,
+				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle_closed: mapping.handle_closed,
 					addr: cut_end, size: mapping_end - cut_end, obj: mapping.obj }
 			}
 			f.mappings[i].addr = cut_start
@@ -900,7 +902,6 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			}
 			f.mappings << GpuMapping{
 				vm_id: vm_slot
-				handle: request.handle
 				addr: request.addr
 				size: request.range
 				obj: obj

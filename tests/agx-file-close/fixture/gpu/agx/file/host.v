@@ -41,7 +41,6 @@ __global object_ref_lookups = 0
 
 fn (mut objects Objects) release_all() { objects.table.release_all(); table_releases++ }
 fn (objects &Objects) get_ref(handle u32) ?&gem.GemObject { object_ref_lookups++; return objects.table.get_ref(handle) }
-fn (objects &Objects) contains(object &gem.GemObject) bool { return objects.table.contains(object) }
 fn (mut objects Objects) remove(handle u32) ?&gem.GemObject { return objects.table.remove(handle) }
 fn (mut objects Objects) add_created(object &gem.GemObject) { objects.table.add_created(object) }
 fn (objects &Objects) mmap_attributes(offset u64) u64 { return objects.table.mmap_attributes(offset) }

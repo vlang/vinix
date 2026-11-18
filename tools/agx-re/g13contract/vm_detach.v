@@ -34,7 +34,11 @@ fn check_vm_detach_local(file string) ! {
 	for token in ['memory.', 'free(', 'f.vms <<'] { require(!reap.contains(token), 'VM reaper must not allocate, free metadata or grow its ownership array')! }
 	cleanup := section(file, 'fn (mut f GpuFile) cleanup_closed_mappings_locked(', 'fn (mut f GpuFile) close_object_handle(', 'Detached user bindings')!
 	require_order(cleanup, ['katomic.load(&vm.inflight) != 0',
-		'!vm.detached && !mapping.retiring && f.objects.contains(mapping.obj)', 'f.retire_mapping_locked(index)'], 'Every idle detached user mapping retires even while its BO name remains live')!
+		'!vm.detached && !mapping.retiring && !mapping.handle_closed', 'f.retire_mapping_locked(index)'], 'Every idle detached or closed-handle binding retires independently of current handle names')!
+	close := section(file, 'fn (mut f GpuFile) close_object_handle(', 'fn (mut f GpuFile) reserve_mapping_slots_locked(', 'Close binding selection')!
+	require_order(close, ['f.lock.acquire()', 'f.objects.remove(handle)', 'for mut mapping in f.mappings',
+		'if voidptr(mapping.obj) == voidptr(obj) { mapping.handle_closed = true }',
+		'f.cleanup_closed_mappings_locked(vm)', 'f.lock.release()', 'gem.unref(obj)'], 'GEM_CLOSE records the old bindings before dropping its handle reference')!
 	retire := section(file, 'fn (mut f GpuFile) retire_mapping_locked(', '// GEM_CLOSE drops', 'Hidden mapping owner')!
 	require(retire.contains('f.find_owned_vm(mapping.vm_id)'), 'Retained mappings must find their hidden physical VM')!
 	submit := section(file, 'pub fn (mut f GpuFile) ioctl_submit(', 'fn dispatch(', 'Existing queue VM owner')!
