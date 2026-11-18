@@ -108,7 +108,8 @@ fn check_bind_replacements() {
 		request.handle = 7
 		gpu.fail_mapping_check_after(1)
 		assert file.ioctl_gem_bind(&request) == -5
-		assert old.references == 4 && target.references == 1 && file.mappings.len == 3 && file.mappings[file.mappings.len - 1].retiring; cases++
+		assert old.references == 4 && target.references == 1 && file.mappings.len == 3
+		assert file.mappings[1].retiring && file.mappings[1].addr == request.addr; cases++
 		gpu.fail_mapping_checks(1)
 		assert !file.close() && !vm.destroyed && old.references == 4
 		assert file.close() && vm.destroyed && gem.live() == 0

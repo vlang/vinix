@@ -166,6 +166,10 @@ fn check_modern_binding() {
 			request.num_binds = 1
 			request.stride = sizeof(unbind)
 			request.userptr = unsafe { u64(&unbind) }
+			gpu.fail_mapping_check_after(1)
+			assert file.ioctl_modern_vm_bind(unsafe { &request }) == -5
+			assert file.mappings.len == 2 && file.mappings[0].retiring && obj.references == 3
+			assert pt.leaves[0] == 0 && pt.leaves[1] == 0 && pt.leaves[2] == obj.phys_addr
 			assert file.ioctl_modern_vm_bind(unsafe { &request }) == 0 && file.mappings.len == 0 && obj.references == 1
 			// A short operation retains its low address bytes, with omitted high bytes zero.
 			request.userptr = unsafe { u64(&first) }
@@ -173,14 +177,14 @@ fn check_modern_binding() {
 			assert file.ioctl_modern_vm_bind(unsafe { &request }) == 0 && file.mappings.len == 1
 			assert file.close() && vm.destroyed && gem.live() == 0
 			memory.assert_released()
-			cases += 8
+			cases += 9
 		}
 	}
 	mut file := GpuFile{}
 	assert file.ioctl_modern_vm_bind(&asahi.VmBind{ stride: 1 }) == 0
 	assert file.ioctl_modern_vm_bind(&asahi.VmBind{}) == -22
-	assert cases == 1600
-	println('AGX modern VM_BIND: ${cases} real mapping checks cover immutable batch copy, copy/OOM refusal before mutation, prefix errors, busy-VM unbind, strided/short records and read/write/single-page translation')
+	assert cases == 1800
+	println('AGX modern VM_BIND: ${cases} real mapping checks cover immutable batch copy, copy/OOM refusal before mutation, prefix errors, failed retirement suffix preservation, busy-VM unbind, strided/short records and read/write/single-page translation')
 }
 
 fn check_modern_bind_staging_order() {

@@ -17,7 +17,7 @@ fn range_request(first u64, end u64) ioctl.DrmAsahiGemBind {
 fn check_unbind_ranges() {
 	gpu.set_running(true)
 	mut cases := 0
-	for _ in 0 .. 200 {
+	for round in 0 .. 200 {
 		for repeated in [false, true]! {
 			for cut in [[u64(0), 1]!, [u64(5), 6]!, [u64(2), 4]!, [u64(5), 10]!,
 				[u64(1), 17]!, [u64(0), 20]!, [u64(6), 8]!, [u64(19), 20]!, [u64(0), 6]!]! {
@@ -30,7 +30,9 @@ fn check_unbind_ranges() {
 				mut first := gem.create(7); first.size = 32 * pgtable.uat_pgsz
 				mut second := gem.create(8); second.size = 32 * pgtable.uat_pgsz; second.phys_addr = 0x800000
 				file.objects.table.add_created(first); file.objects.table.add_created(second)
-				for index, span in [[u64(0), 6]!, [u64(8), 12]!, [u64(14), 18]!]! {
+				spans := [[u64(0), 6]!, [u64(8), 12]!, [u64(14), 18]!]!
+				for index in [1, 0, 2]! {
+					span := spans[index]
 					mut request := bind(if index == 1 { u32(8) } else { u32(7) }, 1, (span[0] + 1) * pgtable.uat_pgsz)
 					request.range = (span[1] - span[0]) * pgtable.uat_pgsz
 					request.offset = if repeated { 31 * pgtable.uat_pgsz } else { u64(index + 1) * pgtable.uat_pgsz }
@@ -51,10 +53,15 @@ fn check_unbind_ranges() {
 				assert memory.calls() == before_alloc && gpu.mapping_checks() == before_check && pt.leaves == original
 				vm.inflight = 0; cases++
 				if repeated && cut[0] == 1 && cut[1] == 17 {
-					gpu.fail_mapping_checks(1)
+					prefix := round % 2
+					gpu.fail_mapping_check_after(prefix)
 					assert file.ioctl_gem_bind(&request) == -5
-					assert first.references == 4 && second.references == 2
-					assert pt.unmaps == 3, 'failed range retirement must continue other overlaps'
+					assert first.references == 4 - prefix && second.references == 3
+					assert pt.unmaps == 1 + prefix
+					failed_end := if prefix == 0 { 6 } else { 12 }
+					for page in 0 .. 32 {
+						assert pt.leaves[page] == if page >= 1 && page < failed_end { u64(0) } else { original[page] }
+					}
 					cases++
 				}
 				assert file.ioctl_gem_bind(&request) == 0, 'range UNBIND must accept holes and surviving fragments'
@@ -110,7 +117,7 @@ fn check_unbind_ranges() {
 			gpu.fail_mapping_checks(1)
 			assert file.ioctl_gem_bind(&request) == -5
 			assert object.references == 4 && file.mappings.len == 3 && file.mappings.cap >= 3
-			assert file.mappings[0].retiring && file.mappings[0].addr == request.addr && file.mappings[0].size == request.range
+			assert file.mappings[1].retiring && file.mappings[1].addr == request.addr && file.mappings[1].size == request.range
 			assert pt.unmaps == 1 && pt.last_unmap_addr == request.addr && pt.last_unmap_size == request.range
 			cases++
 			inner := range_request(3, 4)
@@ -150,7 +157,7 @@ fn check_unbind_ranges() {
 			memory.assert_released()
 		}
 	}
-	println('AGX range UNBIND: ${cases} ioctl checks; holes, multiple BOs, head/tail/middle survivors, contiguous/repeated leaves, busy gates, mutation-free reservation OOM, retained split tombstones and full-range retries, replacement, UNBIND_ALL/GEM_CLOSE and freed array reservations passed')
+	println('AGX range UNBIND: ${cases} ioctl checks; VA order, failed retirement suffix preservation, holes, contiguous/repeated survivors, busy gates, reservation OOM, retained split retries, replacement, UNBIND_ALL/GEM_CLOSE and freed arrays passed')
 	check_busy_unbind_all()
 }
 

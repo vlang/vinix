@@ -142,6 +142,30 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `26a89a90c8586bfb028304af1c5561a192a13fcd46ae1a6a9fab040f36bfce0e`.
 
+G13 range unbind and overlap replacement retire GPUVA records in ascending
+address order for the selected VM. The first retirement failure ends the
+walk. The failed interval retains its backing for retry, and subsequent
+mappings remain live. Split survivors keep their references and PTEs. The
+confirmed prefix releases its references and is removed from the mapping
+array in one pass under the file lock.
+[Pinned GPUVM range walk](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gpuvm.c#L2706-L2768)
+
+Both kernel builds and all 82 focused tests passed. The sanitizer fixtures
+covered 15,000 range unbind, 27,000 bind replacement, and 1,800 modern
+VM_BIND cases. They created mappings out of address order and verified
+the retained references and PTEs after first and second retirement failures.
+Independent review checked the split and compaction lifetimes. The generated
+AArch64 code showed one prefix compaction per path and no implicit
+allocations in the five checked routines. The allocation scan matched the
+baseline. All selected audit gates passed, with an overall verdict of
+`not_equivalent`. Native M1 hardware validation remains open.
+
+The restored archive passed inventory and kernel artifact verification for
+`c8fa7a1bff26ef77ed1d8877e676b57025d2a5d2` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-ordered-gpuva-20261118.FurNrz/`.
+`bundle.tar.gz` SHA-256 is
+`025b094e749956d5d07c9bad9f8bbd668458de20d6be6dfa5c335418e16d2813`.
+
 G13 UAT completes child-table zeroing with `DSB SY` before installing the
 parent descriptor, as in the pinned Asahi driver. BIND preparation visits
 each leaf table once, covering up to 32 MiB of GPU VA per lookup. It

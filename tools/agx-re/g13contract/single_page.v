@@ -12,7 +12,7 @@ fn check_single_page_local(header string, pure string, file string, page_table s
 		'mapped := if request.flags & ioctl.asahi_bind_single_page != 0',
 		'pt.map_repeated_page(request.addr, obj.phys_addr + request.offset, request.range, protection)',
 		'else { pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) }',
-		'if !mapped', 'gem.unref(obj)', 'return -12', 'f.mappings << GpuMapping{', 'size: request.range'],
+		'if !mapped', 'gem.unref(obj)', 'return -12', 'f.insert_mapping_locked(mapping_index, GpuMapping{', 'size: request.range'],
 		'Repeated/contiguous dispatch preserves virtual size and mapping ownership')!
 	repeat := section(page_table, 'pub fn (mut pt UatPgtable) map_repeated_page(', '// Change only the access/cache attributes', 'Repeated PTE writer')!
 	require_order(repeat, ['size - 1 > ~iova', 'pt.lock.acquire()', 'defer {', 'pt.invalidate_range_locked(iova, size)',

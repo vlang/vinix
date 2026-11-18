@@ -325,9 +325,17 @@ fn (mut f GpuFile) release_mmap_range(offset u64) {
 }
 
 // Caller holds file.lock and has excluded in-flight jobs from this VM. Unmap
-// completes GPU TLBI before dropping the mapping's object reference. A retry
-// after a device-state refusal starts from the already-invalidated PTEs.
+// completes GPU TLBI before dropping the mapping's object reference.
 fn (mut f GpuFile) retire_mapping_locked(index int) bool {
+	if !f.confirm_mapping_retirement_locked(index) { return false }
+	gem.unref(f.mappings[index].obj)
+	f.mappings.delete(index)
+	return true
+}
+
+// Keep the record and its reference until the caller removes it. A retry
+// after a device-state refusal starts from the already-invalidated PTEs.
+fn (mut f GpuFile) confirm_mapping_retirement_locked(index int) bool {
 	mapping := f.mappings[index]
 	ctx := f.find_owned_vm(mapping.vm_id) or { return false }
 	if katomic.load(&ctx.inflight) != 0 || ctx.pgtable == unsafe { nil } { return false }
@@ -336,12 +344,7 @@ fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 		pt.unmap(mapping.addr, mapping.size)
 		f.mappings[index].retiring = true
 	}
-	if !f.finish_file_mapping(true) {
-		return false
-	}
-	gem.unref(mapping.obj)
-	f.mappings.delete(index)
-	return true
+	return f.finish_file_mapping(true)
 }
 
 // GEM_CLOSE drops the selected GPU-VA bindings once the target VM is idle.
@@ -407,6 +410,33 @@ fn (mut f GpuFile) close_object_handle(handle u32, pad u32) int {
 	return if success || modern { 0 } else { -5 }
 }
 
+// Search GPUVA records by internal VM ID and then by starting address.
+fn (f &GpuFile) mapping_index_locked(vm_id u32, addr u64) int {
+	mut low := 0
+	mut high := f.mappings.len
+	for low < high {
+		middle := low + (high - low) / 2
+		mapping := f.mappings[middle]
+		if mapping.vm_id < vm_id || (mapping.vm_id == vm_id && mapping.addr < addr) {
+			low = middle + 1
+		} else {
+			high = middle
+		}
+	}
+	return low
+}
+
+// The caller reserves capacity first. Shifting records moves their existing
+// BO references with them.
+fn (mut f GpuFile) insert_mapping_locked(index int, mapping GpuMapping) {
+	f.mappings << mapping
+	last := f.mappings.len - 1
+	if index < last {
+		unsafe { C.memmove(&f.mappings[index + 1], &f.mappings[index], u64(last - index) * sizeof(GpuMapping)) }
+		f.mappings[index] = mapping
+	}
+}
+
 // Reserve a complete replacement array before a range mutation takes any new
 // BO references or changes PTEs. Records move; their existing owners do not.
 fn (mut f GpuFile) reserve_mapping_slots_locked(extra int) bool {
@@ -458,32 +488,50 @@ fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
 	fragments := f.mapping_survivor_count_locked(vm_id, addr, size)
 	if fragments < 0 { return -22 }
 	if !f.reserve_mapping_slots_locked(fragments) { return -12 }
-	original_count := f.mappings.len
-	mut retired := true
-	for i := original_count - 1; i >= 0; i-- {
-		mapping := f.mappings[i]
-		if mapping.vm_id != vm_id || !ranges_overlap(mapping.addr, mapping.size, addr, size) { continue }
+	mut index := f.mapping_index_locked(vm_id, addr)
+	if index > 0 {
+		previous := f.mappings[index - 1]
+		if previous.vm_id == vm_id && previous.addr + previous.size > addr { index-- }
+	}
+	mut first := index
+	// Retire the successful prefix together so the suffix only moves once.
+	// Keep all of the records' references until this final removal.
+	defer {
+		if index > first {
+			for retired in first .. index {
+				gem.unref(f.mappings[retired].obj)
+			}
+			f.mappings.delete_many(first, index - first)
+		}
+	}
+	for index < f.mappings.len {
+		mapping := f.mappings[index]
+		if mapping.vm_id != vm_id || mapping.addr >= end { break }
 		if !mapping.retiring {
 			mapping_end := mapping.addr + mapping.size
 			cut_start := if mapping.addr > addr { mapping.addr } else { addr }
 			cut_end := if mapping_end < end { mapping_end } else { end }
+			f.mappings[index].addr = cut_start
+			f.mappings[index].size = cut_end - cut_start
 			if mapping.addr < cut_start {
 				gem.ref_obj(mapping.obj)
-				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle_closed: mapping.handle_closed,
-					addr: mapping.addr, size: cut_start - mapping.addr, obj: mapping.obj }
+				f.insert_mapping_locked(index, GpuMapping{ vm_id: mapping.vm_id, handle_closed: mapping.handle_closed,
+					addr: mapping.addr, size: cut_start - mapping.addr, obj: mapping.obj })
+				// Only the first overlap can keep a piece below addr.
+				first++
+				index++
 			}
 			if cut_end < mapping_end {
 				gem.ref_obj(mapping.obj)
-				f.mappings << GpuMapping{ vm_id: mapping.vm_id, handle_closed: mapping.handle_closed,
-					addr: cut_end, size: mapping_end - cut_end, obj: mapping.obj }
+				f.insert_mapping_locked(index + 1, GpuMapping{ vm_id: mapping.vm_id, handle_closed: mapping.handle_closed,
+					addr: cut_end, size: mapping_end - cut_end, obj: mapping.obj })
 			}
-			f.mappings[i].addr = cut_start
-			f.mappings[i].size = cut_end - cut_start
 		}
 		// An earlier retirement has already unmapped its recorded range.
-		if !f.retire_mapping_locked(i) { retired = false }
+		if !f.confirm_mapping_retirement_locked(index) { return -5 }
+		index++
 	}
-	return if retired { 0 } else { -5 }
+	return 0
 }
 
 // Reserve a nonzero per-open queue ID. Modern G13 returns freed names to
@@ -931,17 +979,18 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				gem.unref(obj)
 				return -12
 			}
-			f.mappings << GpuMapping{
+			mapping_index := f.mapping_index_locked(vm_slot, request.addr)
+			f.insert_mapping_locked(mapping_index, GpuMapping{
 				vm_id: vm_slot
 				addr: request.addr
 				size: request.range
 				obj: obj
-			}
+			})
 			if !f.finish_file_mapping(false) {
 				// Roll back the PTEs and retain backing until retirement can
 				// confirm that the device is running or has stopped.
 				pt.unmap(request.addr, request.range)
-				f.mappings[f.mappings.len - 1].retiring = true
+				f.mappings[mapping_index].retiring = true
 				return -5 // EIO
 			}
 			return 0

@@ -2,6 +2,15 @@
 module g13contract
 
 fn check_unbind_range_local(file string) ! {
+	lookup := section(file, 'fn (f &GpuFile) mapping_index_locked(', 'fn (mut f GpuFile) insert_mapping_locked(', 'Native mapping lookup')!
+	require_order(lookup, ['for low < high', 'mapping := f.mappings[middle]',
+		'mapping.vm_id < vm_id || (mapping.vm_id == vm_id && mapping.addr < addr)',
+		'low = middle + 1', 'high = middle', 'return low'], 'Locate mappings in VM and VA order')!
+	insert := section(file, 'fn (mut f GpuFile) insert_mapping_locked(', 'fn (mut f GpuFile) reserve_mapping_slots_locked(', 'Native mapping insertion')!
+	require_order(insert, ['f.mappings << mapping', 'if index < last',
+		'C.memmove(&f.mappings[index + 1], &f.mappings[index]', 'f.mappings[index] = mapping'],
+		'Insert in order and move existing owners with their records')!
+	require(!insert.contains('gem.') && !insert.contains('malloc'), 'Existing mapping owners move without new references or allocations')!
 	reserve := section(file, 'fn (mut f GpuFile) reserve_mapping_slots_locked(', 'fn (f &GpuFile) mapping_survivor_count_locked(', 'Native split reservation')!
 	require_order(reserve, ['needed := u64(f.mappings.len) + u64(extra)', 'needed <= u64(f.mappings.cap)',
 		'needed > 0x7fff_ffff || needed > ~u64(0) / sizeof(GpuMapping)', 'mut capacity := needed',
@@ -17,13 +26,18 @@ fn check_unbind_range_local(file string) ! {
 		'Disjoint mappings need at most two boundary survivors')!
 	unmap := section(file, 'fn (mut f GpuFile) unbind_range_locked(', '// Reserve a nonzero per-open queue ID.', 'Native range removal')!
 	require_order(unmap, ['fragments := f.mapping_survivor_count_locked(vm_id, addr, size)', 'if fragments < 0 { return -22 }',
-		'if !f.reserve_mapping_slots_locked(fragments) { return -12 }', 'original_count := f.mappings.len',
-		'for i := original_count - 1; i >= 0; i--', 'if !mapping.retiring',
-		'cut_start :=', 'cut_end :=', 'if mapping.addr < cut_start', 'gem.ref_obj(mapping.obj)', 'f.mappings << GpuMapping{',
-		'if cut_end < mapping_end', 'gem.ref_obj(mapping.obj)', 'f.mappings << GpuMapping{',
-		'f.mappings[i].addr = cut_start', 'f.mappings[i].size = cut_end - cut_start',
-		'if !f.retire_mapping_locked(i) { retired = false }', 'return if retired { 0 } else { -5 }'], 'Reserve transient fragments before clipped retirement and retry without resplitting')!
-	require(unmap.count('gem.ref_obj(') == 2 && !unmap.contains('gem.unref(') && !unmap.contains('pt.map'), 'Survivors retain PTEs and own refs; retirement owns the only release')!
+		'if !f.reserve_mapping_slots_locked(fragments) { return -12 }', 'mut index := f.mapping_index_locked(vm_id, addr)',
+		'previous.vm_id == vm_id && previous.addr + previous.size > addr', 'index--',
+		'mut first := index', 'defer {', 'for retired in first .. index', 'gem.unref(f.mappings[retired].obj)',
+		'f.mappings.delete_many(first, index - first)',
+		'for index < f.mappings.len', 'if mapping.vm_id != vm_id || mapping.addr >= end { break }', 'if !mapping.retiring',
+		'cut_start :=', 'cut_end :=', 'f.mappings[index].addr = cut_start', 'f.mappings[index].size = cut_end - cut_start',
+		'if mapping.addr < cut_start', 'gem.ref_obj(mapping.obj)', 'f.insert_mapping_locked(index, GpuMapping{', 'first++', 'index++',
+		'if cut_end < mapping_end', 'gem.ref_obj(mapping.obj)', 'f.insert_mapping_locked(index + 1, GpuMapping{',
+		'if !f.confirm_mapping_retirement_locked(index) { return -5 }', 'index++', 'return 0'],
+		'Reserve fragments, retire in VA order and stop before editing subsequent ranges on failure')!
+	require(unmap.count('gem.ref_obj(') == 2 && unmap.count('gem.unref(') == 1 && !unmap.contains('pt.map'),
+		'Survivors retain their PTEs and owners, and only the successful prefix releases its references')!
 	overlap := section(file, 'fn ranges_overlap(', '// GPU-only GEM mappings', 'Native mapping overlap')!
 	require_order(overlap, ['return first_addr < second_addr + second_size && second_addr < first_addr + first_size',
 		'fn (f &GpuFile) has_mapping_overlap_locked(', 'for mapping in f.mappings',
