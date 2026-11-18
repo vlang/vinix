@@ -28,6 +28,12 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/agx-async/fixture', scratch, false)!
+	os.mkdir_all('${scratch}/errno')!
+	errno := os.read_file('${repo}/kernel/errno/errno.v')!
+	os.write_file('${scratch}/errno/errno.v', 'module errno\n' +
+		section(errno, 'pub const erestartsys =', 'pub fn get()')!)!
+	os.cp('${repo}/kernel/event/stack_list.v', '${scratch}/event/stack_list.v')!
+	os.cp('${repo}/kernel/gpu/agx/mmu/slot_wait.v', '${scratch}/gpu/agx/mmu/slot_wait.v')!
 	os.cp_all('${repo}/kernel/drm/syncobj', '${scratch}/drm/syncobj', false)!
 	object_path := '${scratch}/drm/syncobj/syncobj.v'
 	object_source := os.read_file(object_path)!
@@ -54,7 +60,7 @@ fn main() {
 	source := os.read_file(overrides['--file-source'] or { repo + '/kernel/gpu/agx/file/file.v' })!
 	submit := section(source, 'fn discard_g13_completion(', 'fn dispatch(')!
 	timer_import := if submit.contains('timer.') { 'import aarch64.timer\n' } else { '' }
-	production := 'module file\nimport drm.gem\nimport drm.ioctl\nimport drm.syncobj\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.submission as agxsubmission\nimport katomic\nimport memory\n' +
+	production := 'module file\nimport drm.gem\nimport drm.ioctl\nimport drm.syncobj\nimport errno\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.submission as agxsubmission\nimport katomic\nimport memory\n' +
 		timer_import +
 		'const max_g13_submission_commands = agxsubmission.max_commands\nconst max_submission_syncs = agxsubmission.max_syncs\n' +
 		section(source, 'struct G13SubmissionQueue {', 'pub struct GpuFile {')! +
@@ -74,7 +80,7 @@ fn main() {
 	gpu := os.read_file('${repo}/kernel/gpu/agx/gpu/gpu.v')!
 	g13 := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	errors := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v')!
-	os.write_file('${scratch}/gpu/agx/gpu/production.v', 'module gpu\nimport katomic\n' +
+	os.write_file('${scratch}/gpu/agx/gpu/production.v', 'module gpu\nimport gpu.agx.mmu\nimport katomic\n' +
 		section(g13, 'pub fn (mut queue G13QueueResources) next_fence_seqno()', '// file.lock serializes acquisition')! +
 		section(g13, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(gpu, 'pub fn (mut mgr GpuManager) g13_submission_status(', 'pub fn (mut mgr GpuManager) can_query_global_params(')! +

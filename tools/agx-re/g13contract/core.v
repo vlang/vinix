@@ -220,10 +220,32 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	local_unbind := section(local, 'pub fn (mut mgr UatManager) unbind_context(', '// Map a driver-owned allocation into context zero.', 'Vinix UAT unbind')!
 	require_order(local_unbind, ['slot := ctx.bound_slot()', 'slot == 0', 'slots[slot].ttb0 = 0', 'slots[slot].ttb1 = 0',
 		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()', 'mgr.contexts[slot] = unsafe { nil }'], 'Vinix ASID teardown invalidation')!
+	check_g13_slot_wait(asahi_linux, repo, local)!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
 		'ASID invalidation after root publication and removal',
+		'Interruptible UAT admission before G13 job preparation',
 		'Distinct GPU-only coherent RO/WO/RW bind permissions and Asahi UAT selectors']
+}
+
+fn check_g13_slot_wait(asahi_linux string, repo string, mmu string) ! {
+	slots := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/slotalloc.rs'))!
+	wait := section(slots, 'fn get_inner_impl(', 'break oldest_slot;', 'Asahi slot allocator')!
+	require_order(wait, ['if oldest_time == u64::MAX', 'if !wait', 'return Err(ENOSPC)',
+		'self.0.cond.wait_interruptible(&mut inner)', 'return Err(ERESTARTSYS)'], 'Asahi slot wait')!
+	queue := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/queue/mod.rs'))!
+	require_order(queue, ['let vm_bind = gpu.bind_vm(&self.vm)?', 'let vm_slot = vm_bind.slot()',
+		'let fence: UserFence'], 'Asahi slot admission before the submit fence')!
+	release := section(mmu, 'pub fn (mut mgr UatManager) release_g13_slot(', 'pub fn (mut mgr UatManager) unbind_context(', 'Vinix slot release')!
+	require_order(release, ['mgr.slot_users[slot]--', 'if mgr.slot_users[slot] == 0',
+		'event.trigger(mut mgr.slot_released, true)'], 'Vinix last slot user notification')!
+	file := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
+	submit := section(file, 'fn (mut f GpuFile) submit_g13_staged(', 'fn dispatch(', 'Vinix G13 admission')!
+	require_order(submit, ['gem.ref_obj(result_object)', 'generation := uat_mgr.g13_slot_generation()',
+		'slot = state_manager.try_hold_g13_submission_slot(vm)', 'if slot != 0 { break }', 'f.lock.release()',
+		'uat_mgr.wait_g13_slot(generation)', 'f.lock.acquire()', 'return -int(errno.erestartsys)',
+		'cleanup_closed_mappings_locked(vm)', 'defer { uat_mgr.release_g13_slot(vm, u32(slot)) }',
+		'prepare_g13_compute_job', 'install_output_syncs'], 'Vinix interruptible G13 admission')!
 }
 
 fn check_tlb_instructions(reference string, vinix string) ! {

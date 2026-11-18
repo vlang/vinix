@@ -139,6 +139,7 @@ fn fence(object &syncobj.SyncObj) &syncobj.DmaFence {
 }
 
 fn assert_drained(file &GpuFile) {
+	assert uat_mgr.lease_count == 0
 	for ownership in file.g13_queues { assert !ownership.resources.has_file_references() }
 	assert pending_head == unsafe { nil } && pending_tail == unsafe { nil } && pending_count == 0
 	assert file.vm.inflight == 0 && memory.outstanding() == 0
@@ -361,6 +362,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_g13_slot_wait()
 	check_pending_timestamps()
 	check_detached_submission_ownership()
 	check_detached_vm_submissions()

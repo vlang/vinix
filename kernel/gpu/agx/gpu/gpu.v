@@ -174,11 +174,26 @@ pub fn get_global_manager() ?&GpuManager {
 // Release the state lock before the file mutation lock or fallible job work.
 pub fn (mut mgr GpuManager) g13_submission_status() int {
 	mgr.lock.acquire()
-	status := if mgr.state == .error || mgr.state == .stopped { -19 }
+	defer { mgr.lock.release() }
+	return mgr.g13_submission_status_locked()
+}
+
+fn (mgr &GpuManager) g13_submission_status_locked() int {
+	return if mgr.state == .error || mgr.state == .stopped { -19 }
 		else if mgr.hw_config.gpu_gen != .g13 || mgr.state != .running { -95 }
 		else { 0 }
-	mgr.lock.release()
-	return status
+}
+
+// Take a temporary submission lease before allocating jobs. A positive
+// result is the leased slot, zero requests a retry, and negative is an errno.
+pub fn (mut mgr GpuManager) try_hold_g13_submission_slot(vm &mmu.UatContext) int {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	status := mgr.g13_submission_status_locked()
+	if status != 0 { return status }
+	if uat_mgr == unsafe { nil } || !uat_mgr.handoff_initialized || uat_mgr.handoff_abi != .v12_3
+		|| vm == unsafe { nil } || !vm.active || vm.pgtable == unsafe { nil } { return -19 }
+	return int(uat_mgr.bind_context(vm))
 }
 
 // Match Asahi's global-query crash snapshot. Shutdown publishes stopped under

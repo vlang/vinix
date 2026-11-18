@@ -16,6 +16,8 @@ import katomic
 import aarch64.cpu
 import memory
 import aarch64.timer
+import event
+import event.eventstruct
 
 pub const uat_num_contexts = 64
 pub const uat_kernel_flush_slot = 64
@@ -138,6 +140,7 @@ mut:
 	slot_users        [uat_num_contexts]u64
 	slot_release      [uat_num_contexts]u64
 	slot_release_clock u64
+	slot_released      eventstruct.Event
 }
 
 __global (
@@ -750,6 +753,7 @@ pub fn (mut mgr UatManager) release_g13_slot(ctx &UatContext, slot u32) {
 	if mgr.slot_users[slot] == 0 {
 		mgr.slot_release_clock++
 		mgr.slot_release[slot] = mgr.slot_release_clock
+		event.trigger(mut mgr.slot_released, true)
 	}
 }
 
@@ -772,6 +776,9 @@ pub fn (mut mgr UatManager) unbind_context(ctx &UatContext) {
 	mut pt := unsafe { ctx.pgtable }
 	pt.unbind_tlb()
 	mgr.contexts[slot] = unsafe { nil }
+	if mgr.handoff_abi == .v12_3 {
+		event.trigger(mut mgr.slot_released, true)
+	}
 }
 
 // Map a driver-owned allocation into context zero. Lower addresses use TTBR0;

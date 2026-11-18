@@ -9,13 +9,23 @@ fn check_submit_device_local(file string, gpu string) ! {
 		'if status != 0 { return status }', 'f.lock.acquire()', 'agxsubmission.install_output_syncs('],
 		'Locked device refusal follows staging with owned-buffer cleanup and precedes file mutation/output publication')!
 	gate := section(gpu, 'pub fn (mut mgr GpuManager) g13_submission_status(',
-		'pub fn (mut mgr GpuManager) can_query_global_params(', 'Native submission state snapshot')!
-	require_order(gate, ['mgr.lock.acquire()', 'status := if mgr.state == .error || mgr.state == .stopped { -19 }',
-		'else if mgr.hw_config.gpu_gen != .g13 || mgr.state != .running { -95 }', 'else { 0 }',
-		'mgr.lock.release()', 'return status'], 'Device loss precedes unsupported-state refusal and releases its standalone lock')!
+		'fn (mgr &GpuManager) g13_submission_status_locked(', 'Native submission state snapshot')!
+	classify := section(gpu, 'fn (mgr &GpuManager) g13_submission_status_locked(',
+		'pub fn (mut mgr GpuManager) try_hold_g13_submission_slot(', 'Native submission state classification')!
+	require_order(gate, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+		'return mgr.g13_submission_status_locked()'], 'Snapshot classifies device state under its standalone lock')!
+	require_order(classify, ['return if mgr.state == .error || mgr.state == .stopped { -19 }',
+		'else if mgr.hw_config.gpu_gen != .g13 || mgr.state != .running { -95 }', 'else { 0 }'],
+		'Device loss precedes unsupported-state refusal')!
 	require(gate.count('mgr.lock.acquire()') == 1 && gate.count('mgr.lock.release()') == 1
-		&& gate.count('return ') == 1 && !gate.contains('malloc') && !gate.contains('mgr.state = '),
+		&& gate.count('return ') == 1 && !gate.contains('malloc') && !gate.contains('mgr.state = ')
+		&& !classify.contains('malloc') && !classify.contains('mgr.state = '),
 		'Submission snapshot uses one scalar result and no allocation or state mutation')!
+	retry := section(gpu, 'pub fn (mut mgr GpuManager) try_hold_g13_submission_slot(',
+		'pub fn (mut mgr GpuManager) can_query_global_params(', 'Native slot reacquisition')!
+	require_order(retry, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+		'status := mgr.g13_submission_status_locked()', 'if status != 0 { return status }',
+		'return int(uat_mgr.bind_context(vm))'], 'Submit after a wake rechecks device status under the bind lock')!
 }
 
 fn check_submit_device_reference(queue string) ! {

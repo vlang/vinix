@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Both G13 submit ABIs now wait interruptibly for an eligible UAT slot.
+[G13 UAT slot admission](m1-agx-slot-wait.md)
+
 G13 now reuses idle hardware slots after the last prepared job releases its
 backing. [G13 UAT slot leases](m1-agx-slot-leases.md)
 

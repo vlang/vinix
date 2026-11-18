@@ -12,6 +12,7 @@ import drm.gem
 import drm.ioctl
 import drm.asahi
 import drm.syncobj
+import errno
 import gpu.agx.bo as agxbo
 import gpu.agx.hw
 import gpu.agx.params as agxparams
@@ -1488,8 +1489,10 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	f.lock.acquire()
 	mut unqueued_fence := &syncobj.DmaFence(unsafe { nil })
 	mut unqueued_failure := 0
+	mut result_object := &gem.GemObject(unsafe { nil })
 	defer {
 		f.lock.release()
+		if result_object != unsafe { nil } { gem.unref(result_object) }
 		// Notify cancelled output fences after dropping file.lock and node backing.
 		if unqueued_fence != unsafe { nil } { signal_g13_submission_fence(unqueued_fence, unqueued_failure) }
 	}
@@ -1502,18 +1505,37 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	if !f.cleanup_closed_mappings_locked(vm) { return -5 }
 	if !captured.retained { return -22 }
 	queue_resources := captured.resources
-	mut result_object := &gem.GemObject(unsafe { nil })
 	for command in commands {
 		descriptor := command.descriptor
 		if (descriptor.cmd_type == ioctl.asahi_cmd_compute && queue_caps & ioctl.asahi_queue_cap_compute == 0)
 			|| (descriptor.cmd_type == ioctl.asahi_cmd_render && queue_caps & ioctl.asahi_queue_cap_render == 0) { return -22 }
 		if descriptor.result_size != 0 {
 			if result_handle == 0 { return -22 }
-			if result_object == unsafe { nil } { result_object = f.objects.find(result_handle) or { unsafe { nil } } }
-			if result_object == unsafe { nil } || descriptor.result_offset > result_object.size
+			if result_object == unsafe { nil } {
+				result_object = f.objects.find(result_handle) or { return -22 }
+				// The slot wait can overlap GEM_CLOSE and handle reuse.
+				gem.ref_obj(result_object)
+			}
+			if descriptor.result_offset > result_object.size
 				|| descriptor.result_size > result_object.size - descriptor.result_offset { return -22 }
 		} else if descriptor.result_offset != 0 { return -22 }
 	}
+	if uat_mgr == unsafe { nil } { return -19 }
+	mut slot := 0
+	for {
+		generation := uat_mgr.g13_slot_generation()
+		slot = state_manager.try_hold_g13_submission_slot(vm)
+		if slot < 0 { return slot }
+		if slot != 0 { break }
+		// Cleanup needs file.lock to retire the jobs occupying slots. The
+		// caller still owns the captured queue, which keeps its VM alive.
+		f.lock.release()
+		resumed := uat_mgr.wait_g13_slot(generation)
+		f.lock.acquire()
+		if !resumed { return -int(errno.erestartsys) }
+		if !f.cleanup_closed_mappings_locked(vm) { return -5 }
+	}
+	defer { uat_mgr.release_g13_slot(vm, u32(slot)) }
 	storage := memory.malloc_packed_fallible(sizeof(G13PendingSubmission)) @[freed]
 	if storage == unsafe { nil } { return -12 }
 	mut pending := unsafe { &G13PendingSubmission(storage) }

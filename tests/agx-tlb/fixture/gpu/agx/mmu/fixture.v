@@ -2,6 +2,7 @@ module mmu
 
 import gpu.agx.pgtable
 import klock
+import event.eventstruct
 
 pub const uat_num_contexts = 64
 const ttbr_valid = u64(1)
@@ -54,7 +55,10 @@ mut:
 	slot_users [uat_num_contexts]u64
 	slot_release [uat_num_contexts]u64
 	slot_release_clock u64
+	slot_released eventstruct.Event
 }
+
+pub fn (mgr &UatManager) release_generation() u64 { return mgr.slot_released.generation }
 
 fn handoff_lock(h &UatHandoff) {
 	assert !h.held

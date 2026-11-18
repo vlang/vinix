@@ -162,16 +162,20 @@ fn test_user_slot_capacity() {
 	assert contexts[63].bound_slot() == 0 && slots[0].ttb0 == 0
 	assert tlb.calls().len == 63
 	tlb.clear()
+	generation := mgr.release_generation()
 	assert mgr.bind_context(unsafe { &contexts[0] }) == 1
 	mgr.release_g13_slot(unsafe { &contexts[0] }, 1)
+	assert mgr.release_generation() == generation
 	assert mgr.bind_context(unsafe { &contexts[63] }) == 0, 'one surviving job keeps the slot'
 	mgr.release_g13_slot(unsafe { &contexts[0] }, 1)
 	mgr.release_g13_slot(unsafe { &contexts[1] }, 2)
+	assert mgr.release_generation() == generation + 2
 	handoff.cur_slot = 1
 	handoff.flush[2].state = 1
 	assert mgr.bind_context(unsafe { &contexts[63] }) == 0, 'ASC and FWCTL owners exclude idle roots'
 	mgr.release_g13_slot(unsafe { &contexts[2] }, 3)
 	mgr.release_g13_slot(unsafe { &contexts[3] }, 4)
+	assert mgr.release_generation() == generation + 4
 	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[3]) })
 	assert mgr.bind_context(unsafe { &contexts[63] }) == 3
 	assert contexts[2].bound_slot() == 0 && contexts[3].bound_slot() == 4

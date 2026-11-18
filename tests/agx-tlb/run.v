@@ -14,6 +14,8 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/agx-tlb/fixture', scratch, false)!
+	os.cp_all('${repo}/tests/agx-async/fixture/event', '${scratch}/event', false)!
+	os.cp_all('${repo}/tests/agx-async/fixture/proc', '${scratch}/proc', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
 	os.mkdir_all('${scratch}/gpu/agx/pgtable')!
 	os.cp('${repo}/kernel/gpu/agx/pgtable/pgtable.v', '${scratch}/gpu/agx/pgtable/pgtable.v')!
@@ -22,7 +24,7 @@ fn main() {
 	// Run the actual root publishers against real host page tables. Replace
 	// privileged instructions and handoff arbitration, not the PTE operations.
 	source := os.read_file(os.getenv_opt('AGX_TLB_MMU_SOURCE') or { '${repo}/kernel/gpu/agx/mmu/mmu.v' })!
-	mut production := 'module mmu\nimport aarch64.cpu\nimport katomic\n'
+	mut production := 'module mmu\nimport aarch64.cpu\nimport event\nimport katomic\n'
 	production += section(source, 'fn (mut mgr UatManager) publish_initial_context_roots()', 'pub fn (mut mgr UatManager) create_context(')!
 	production += section(source, 'pub fn (ctx &UatContext) is_bound(', '// Map a driver-owned allocation into context zero.')!
 	os.write_file('${scratch}/gpu/agx/mmu/production.v', production)!
