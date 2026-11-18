@@ -45,3 +45,24 @@ The archive and restored copy passed full inventory verification.
 | --- | --- |
 | `bundle.tar.gz` | `8386b78d101c4d93bcd73f53ec9c39f700f0f398af72ae5c65c16fd980870451` |
 | `bundle.tar.gz.inventory.txt` | `819ef275e5cdd1cdcf486b0c41574d34f0f649b5cceccae28abda37120028e35` |
+
+## Synchronous growth at the block limit
+
+Firmware `GrowTVB` requests a ten-block extension. If fewer than ten blocks
+fit, Vinix leaves the allocation alone and still sends `GrowTVBAck`. With
+exactly ten blocks available, a successful extension fills the buffer to its
+limit.
+[Pinned growth and capacity check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/buffer.rs#L474-L498)
+[Pinned acknowledgement dispatch](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/channel.rs#L399-L408)
+
+The previous handler attempted a partial extension with nine blocks available.
+The ASan/UBSan fixture reproduces that failure and checks three capacity
+boundaries on both firmware ABIs. The fixture also models the current shutdown
+interfaces so it can exercise the production handler. The TVB growth suite,
+79 source-contract test files and both kernel builds passed. The allocation
+scan matched the 176 baseline findings. M1 hardware validation remains open.
+
+The evidence archive covers `82be046b2c9c1b485884f1abf75c7d01d92d3291` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-grow-tvb-limit-20261119.K6LgXP/bundle.tar.gz`
+with SHA-256 `bac9b726bf264fd7e03bcef0d3a352c9d6d86bb7e16b233ce741f405c6256b6d`.

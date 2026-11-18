@@ -70,6 +70,15 @@ fn (res &Resources) get_g13_fault_info() ?FaultInfo {
 	return none
 }
 
+struct FixtureUat {
+mut:
+	lock klock.Lock
+}
+
+fn (uat &FixtureUat) retire_g13_slots_locked() {
+	assert uat.lock.is_held()
+}
+
 struct GpuManager {
 mut:
 	state          GpuState = .running
@@ -77,6 +86,7 @@ mut:
 	channels       GpuChannels
 	g13_channels   &G13ChannelAllocations = unsafe { nil }
 	g13_recovery_queue &G13QueueResources = unsafe { nil }
+	uat &FixtureUat = unsafe { nil }
 	res            Resources
 	lock           klock.Lock
 	firmware_roles u32 = 1
@@ -301,6 +311,10 @@ fn (mut mgr GpuManager) stop_firmware_cpus(roles u32) {
 fn (mut mgr GpuManager) release_rtkit_buffers() {
 	if mgr.rtk != unsafe { nil } { mgr.checked_release_rtkit_buffers() }
 	mgr.trace << 'rtkit'
+}
+
+fn (mgr &GpuManager) retire_g13_timestamp_aperture_locked() {
+	assert mgr.lock.is_held() && mgr.state == .stopped
 }
 
 fn (mut mgr GpuManager) release_all_g13_render_jobs() { mgr.trace << 'fail-render' }

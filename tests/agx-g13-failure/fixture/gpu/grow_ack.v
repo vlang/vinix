@@ -13,6 +13,9 @@ import gpu.agx.hw
 
 enum GrowAckCase {
 	grew
+	fits_limit
+	exceeds_limit
+	at_limit
 	allocation_failed
 	unknown_owner
 	polled
@@ -50,7 +53,7 @@ fn check_g13_grow_ack_transmit() {
 	mut tx := ascmailbox.new_mailbox(base)
 	mailbox.set_wait_transport(unsafe { &tx })
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
-		for sample in [GrowAckCase.grew, .allocation_failed, .unknown_owner, .polled,
+		for sample in [GrowAckCase.grew, .fits_limit, .exceeds_limit, .at_limit, .allocation_failed, .unknown_owner, .polled,
 			.stopped, .fifo_timeout, .ring_full, .fatal_growth]! {
 			mut transport := rtkit.RTKit{name: 'g13-grow-ack'}
 			boot_g13_fixture_transport(mut transport)
@@ -60,11 +63,21 @@ fn check_g13_grow_ack_transmit() {
 			mut ring := [2]fw.FwGrowTVBAck{}
 			mut stats := fw.G13BufferStats{reset: 1}
 			mut owner := G13RenderBufferResources{stats: SharedBuffer{phys: u64(unsafe { &stats })}, active_scenes: 1}
+			initial_blocks := match sample {
+				.fits_limit { g13_tvb_max_blocks - u32(10) }
+				.exceeds_limit { g13_tvb_max_blocks - u32(9) }
+				.at_limit { g13_tvb_max_blocks }
+				else { u32(0) }
+			}
+			if initial_blocks != 0 { owner.blocks = []u8{len: int(initial_blocks)} }
+			original_blocks := unsafe { owner.blocks }
 			mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
 				rtkit_send_irq: if sample == .polled { u32(0) } else { u32(575) },
 				g13_channels: unsafe { &graph }, rtk: unsafe { &transport },
 				tvb_grow_fails: sample == .allocation_failed, tvb_grow_fatal: sample == .fatal_growth}
-			if sample in [.grew, .allocation_failed, .fatal_growth]! { mgr.tvb_owner = unsafe { &owner } }
+			if sample in [.grew, .fits_limit, .exceeds_limit, .at_limit, .allocation_failed, .fatal_growth]! {
+				mgr.tvb_owner = unsafe { &owner }
+			}
 			mgr.channels.device_ctrl = channel.new_tx_channel('device', 1, u64(unsafe { &header }),
 				1, u64(unsafe { &ring }), 2, u32(sizeof(fw.FwGrowTVBAck)))
 			rtkit_owner = unsafe { &mgr }
@@ -99,7 +112,13 @@ fn check_g13_grow_ack_transmit() {
 					assert words == [u64(0x0083000000000011), 0x21]!
 				}
 			}
-			assert owner.blocks.len == (if sample == .grew { 10 } else { 0 })
+			grows := sample in [.grew, .fits_limit]!
+			assert mgr.tvb_calls == if grows || sample in [.allocation_failed, .fatal_growth]! { 1 } else { 0 },
+				'GrowTVB must leave the buffer alone when ten more blocks do not fit'
+			assert owner.blocks.len == int(initial_blocks) + if grows { 10 } else { 0 }
+			if initial_blocks != 0 && owner.blocks.data != original_blocks.data {
+				unsafe { original_blocks.free() }
+			}
 			if owner.blocks.len != 0 { unsafe { owner.blocks.free() } }
 		}
 	}

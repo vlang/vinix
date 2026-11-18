@@ -845,13 +845,10 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(vm_slot u32, buffer_slot u32, counte
 		found = true
 		mut buffer := unsafe { owner }
 		current := u32(buffer.blocks.len)
-		target := if current > g13_tvb_max_blocks - u32(10) {
-			g13_tvb_max_blocks
-		} else {
-			current + u32(10)
-		}
-		if target > current {
-			grew = mgr.ensure_g13_tvb_blocks(mut buffer, target, true)
+		// Asahi's synchronous growth requests a full ten blocks.
+		growth := u32(10)
+		if current <= g13_tvb_max_blocks - growth {
+			grew = mgr.ensure_g13_tvb_blocks(mut buffer, current + growth, true)
 		}
 	}
 	if !found {
