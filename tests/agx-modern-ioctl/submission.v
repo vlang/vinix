@@ -5,6 +5,7 @@ import drm.gem
 import drm.syncobj
 import gpu.agx.gpu
 import gpu.agx.submission
+import klock
 import memory
 import usercopy
 
@@ -162,8 +163,83 @@ pub fn run_modern_submission_checks() {
 	manager.state = .running
 	assert_drained(file)
 	assert cases == 700
+	check_modern_device_status(out)
 	check_modern_timestamp_batch()
 	println('AGX modern SUBMIT: real packet-to-scheduler compute/render, 16-byte combined syncs, captured USC base, immutable input, reverse completion and 700 copy/OOM/retry/drain cases pass')
+}
+
+fn check_modern_device_status(out &syncobj.SyncObj) {
+	original := fence(out)
+	previous := syncobj.new_fence(105, 1)
+	syncobj.replace_fence(out, previous)
+	defer { syncobj.replace_fence(out, original) }
+	for lost in [false, true]! {
+		for mode in 0 .. 9 {
+			gpu.reset()
+			mut file := new_file()
+			mut manager := gpu.get_global_manager() or { panic('manager') }
+			if lost { manager.state = .error }
+			record := asahi.Sync{handle: if mode == 7 { u32(0xffffffff) } else { out.handle },
+				sync_type: 1, timeline_value: 8}
+			header := asahi.CmdHeader{cmd_type: 99, vdm_barrier: asahi.barrier_none,
+				cdm_barrier: asahi.barrier_none}
+			request := asahi.Submit{
+				queue_id: if mode == 8 { u32(99) } else { u32(1) }
+				syncs: unsafe { u64(&record) }
+				out_sync_count: 1
+				cmdbuf: if mode in [0, 3]! { u64(0) } else { unsafe { u64(&header) } }
+				cmdbuf_size: match mode { 0 { u32(0) } 1 { u32(1) } else { u32(sizeof(header)) } }
+			}
+			chains := memory.outstanding_chains()
+			memory.fail_at(match mode { 5 { 1 } 6 { 2 } else { -1 } })
+			usercopy.reject_at(if mode == 4 { 1 } else { -1 })
+			code := file.ioctl_modern_submit(unsafe { &request })
+			assert code == match mode {
+				3, 4 { -14 }
+				5 { -12 }
+				6 { if lost { -19 } else { -12 } }
+				7, 8 { -2 }
+				else { if lost { -19 } else { -22 } }
+			}
+			assert usercopy.reads() == match mode { 8 { 0 } 0, 3, 5, 7 { 1 } else { 2 } }
+			assert memory.attempts() == match mode {
+				7, 8 { 0 }
+				0, 3 { 1 }
+				4, 5 { 2 }
+				6 { if lost { 2 } else { 3 } }
+				else { if lost { 2 } else { 4 } }
+			}
+			memory.fail_at(-1)
+			usercopy.reject_at(-1)
+			assert voidptr(fence(out)) == voidptr(previous) && !syncobj.is_signaled(previous)
+			assert memory.outstanding_chains() == chains && manager.prepares == 0
+			assert file.g13_queues[0].resources.fence_seqno == 0
+			assert_drained(file)
+		}
+	}
+
+	gpu.reset()
+	mut file := new_file()
+	mut packet := []u8{}
+	defer { unsafe { packet.free() } }
+	compute := asahi.CmdCompute{}
+	append_packet(mut packet, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)),
+		asahi.barrier_none, asahi.barrier_none)
+	request := asahi.Submit{queue_id: 1, cmdbuf: u64(packet.data), cmdbuf_size: u32(packet.len)}
+	usercopy.before_once(stop_after_modern_device_snapshot)
+	assert file.ioctl_modern_submit(unsafe { &request }) == -19
+	assert_drained(file)
+	println('G13 modern device status: 19 ioctl cases preserve staging precedence and recheck loss before preparation')
+}
+
+fn stop_after_modern_device_snapshot() {
+	manager := gpu.get_global_manager() or { panic('manager') }
+	klock.after_release_once(unsafe { &manager.lock }, stop_before_modern_decode)
+}
+
+fn stop_before_modern_decode() {
+	mut manager := gpu.get_global_manager() or { panic('manager') }
+	manager.stop()
 }
 
 fn check_modern_timestamp_batch() {

@@ -33,3 +33,27 @@ fn check_submit_device_reference(queue string) ! {
 	require_order(submit, ['if gpu.is_crashed()', 'return Err(ENODEV)', 'let op_guard = if in_sync_count > 0',
 		'gpu.start_op()?'], 'Packaged crashed submission refuses with ENODEV before operation/job setup')!
 }
+
+fn check_modern_submit_device_local(submit string) ! {
+	require_order(submit, ['capture_submission_queue(data.queue_id)', 'submission.stage_packet_syncs(',
+		'defer { if packet != unsafe { nil } { memory.free(packet) } }',
+		'if data.cmdbuf_size != 0', 'memory.malloc_packed_fallible(data.cmdbuf_size)',
+		'usercopy.copy_from_user(packet, data.cmdbuf, data.cmdbuf_size)',
+		'gpu.get_global_manager() or { return -19 }', 'status := manager.g13_submission_status()',
+		'if status != 0 { return status }', 'if data.cmdbuf_size == 0 { return -22 }',
+		'memory.malloc_packed_fallible(sizeof(submission.PacketWorkspace))', 'submission.decode_packet(',
+		'f.submit_g13_staged('], 'Modern submit checks the device after copying and before parsing')!
+	require(submit.count('if data.cmdbuf_size == 0') == 1 && submit.count('g13_submission_status()') == 1,
+		'Modern submit must defer empty-packet rejection until after the device check')!
+}
+
+fn check_modern_submit_device_reference(file string, queue string) ! {
+	submit := section(file, 'pub(crate) fn submit(', 'pub(crate) fn get_time(', 'Asahi modern staging')!
+	require_order(submit, ['.ok_or(ENOENT)?', 'let guarded = ', 'SyncItem::parse_array(',
+		'if !guarded {', 'copy_commands(&mut vec)?', 'queue.lock().submit('],
+		'Asahi unguarded G13 submit snapshots bytes after sync staging')!
+	parse := queue.all_after('impl Queue for Queue::ver {')
+	require_order(parse, ['if gpu.is_crashed()', 'return Err(ENODEV)', 'let mut cmdbuf = Reader::new(cmdbuf_raw)',
+		'while !cmdbuf.is_empty()', 'if nr_hw_commands == 0 || nr_hw_commands > MAX_COMMANDS_PER_SUBMISSION'],
+		'Asahi checks device loss before parsing and hardware-command validation')!
+}

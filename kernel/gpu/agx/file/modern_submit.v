@@ -2,6 +2,7 @@
 module file
 
 import drm.asahi
+import gpu.agx.gpu
 import gpu.agx.submission
 import memory
 import usercopy
@@ -17,12 +18,20 @@ pub fn (mut f GpuFile) ioctl_modern_submit(data &asahi.Submit) int {
 		submission.release_sync_array(inputs)
 		submission.release_sync_array(outputs)
 	}
+	mut packet := voidptr(unsafe { nil })
+	defer { if packet != unsafe { nil } { memory.free(packet) } }
+	if data.cmdbuf_size != 0 {
+		if data.cmdbuf == 0 || u64(data.cmdbuf_size - 1) > ~data.cmdbuf { return -14 }
+		packet = memory.malloc_packed_fallible(data.cmdbuf_size) @[freed]
+		if packet == unsafe { nil } { return -12 }
+		if !usercopy.copy_from_user(packet, data.cmdbuf, data.cmdbuf_size) { return -14 }
+	}
+	// Asahi checks for device loss after the userspace snapshot and before
+	// parsing. The shared submitter checks again before preparing jobs.
+	mut manager := gpu.get_global_manager() or { return -19 }
+	status := manager.g13_submission_status()
+	if status != 0 { return status }
 	if data.cmdbuf_size == 0 { return -22 }
-	if data.cmdbuf == 0 || u64(data.cmdbuf_size - 1) > ~data.cmdbuf { return -14 }
-	packet := memory.malloc_packed_fallible(data.cmdbuf_size) @[freed]
-	if packet == unsafe { nil } { return -12 }
-	defer { memory.free(packet) }
-	if !usercopy.copy_from_user(packet, data.cmdbuf, data.cmdbuf_size) { return -14 }
 	// Keep both the large parser workspace and decoded command table off the
 	// kernel stack. No pointer into this scratch survives submit_g13_staged.
 	workspace := memory.malloc_packed_fallible(sizeof(submission.PacketWorkspace)) @[freed]

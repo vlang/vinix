@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Modern G13 SUBMIT checks device loss after staging and before packet parsing.
+[Modern submit device errors](m1-agx-modern-submit-device.md)
+
 Both G13 submit ABIs publish output fences after the manager accepts the
 batch. [Output fence publication](m1-agx-output-publication.md)
 

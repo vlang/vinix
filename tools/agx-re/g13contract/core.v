@@ -641,6 +641,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(base, 'fw/microseq.rs'))!)!
 	check_submit_device_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_submit_device_reference(read(os.join_path(base, 'queue/mod.rs'))!)!
+	check_modern_submit_device_local(read(os.join_path(repo, 'kernel/gpu/agx/file/modern_submit.v'))!)!
+	check_modern_submit_device_reference(read(os.join_path(base, 'file.rs'))!,
+		read(os.join_path(base, 'queue/mod.rs'))!)!
 	check_timestamp_bind_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!)!
 	check_timestamp_bind_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'gpu.rs'))!,
 		read(os.join_path(base, 'gem.rs'))!, read(os.join_path(base, 'mmu.rs'))!)!

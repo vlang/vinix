@@ -45,10 +45,14 @@ fn check(source string) ! {
 	}
 	submit := body(source, prefix + 'GpuFile__ioctl_modern_submit')!
 	require(submit.count('memory__malloc_packed_fallible(') == 3, 'exactly packet/workspace/command scratch owners')!
+	// Older evidence includes the decoder's retired result-mode argument.
+	decode_prefix := 'submission__decode_packet(packet, data->cmdbuf_size, captured.usc_base, '
+	archived_decode := decode_prefix + 'false, &commands, parser)'
+	decode := if submit.contains(archived_decode) { archived_decode } else { decode_prefix + '&commands, parser)' }
 	ordered(submit, ['capture_submission_queue(f, data->queue_id)', 'submission__stage_packet_syncs(',
 		'memory__malloc_packed_fallible(data->cmdbuf_size)',
 		'usercopy__copy_from_user(packet, data->cmdbuf, data->cmdbuf_size)',
-		'submission__decode_packet(packet, data->cmdbuf_size, captured.usc_base, false, &commands, parser)',
+		decode,
 		'submit_g13_staged(f, captured, commands, &inputs, &outputs, 0)', 'transferred = result == 0;'])!
 	for owner in ['packet', 'workspace', 'storage'] {
 		require(submit.contains('memory__free(' + owner + ');'), 'missing scratch cleanup ' + owner)!
