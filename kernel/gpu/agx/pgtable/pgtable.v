@@ -10,6 +10,7 @@ module pgtable
 import memory
 import klock
 import lib
+import aarch64.cpu
 import gpu.agx.tlb
 
 // --- UAT page table geometry ---
@@ -279,6 +280,7 @@ pub fn destroy(pt &UatPgtable) {
 
 // Walk the page table for a given IOVA and return a pointer to the leaf PTE.
 // If `allocate` is true, intermediate table levels are created as needed.
+// Complete zeroing each new child before a GPU walk can see its descriptor.
 //
 // Address decomposition for the three 16 KiB UAT levels:
 //   root:   bits [IAS-1:36] (8 entries at 39-bit IAS, 64 at 42-bit IAS)
@@ -311,6 +313,7 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 		}
 		l2_table := alloc_table_page() or { return none }
 		l2_phys = u64(l2_table)
+		cpu.dsb_sy()
 		unsafe {
 			l1_virt[l1_idx] = l2_phys | uat_pte_valid | uat_pte_table
 		}
@@ -336,6 +339,7 @@ pub fn (pt &UatPgtable) get_pte(iova u64, allocate bool) ?&u64 {
 		}
 		l3_table := alloc_table_page() or { return none }
 		l3_phys = u64(l3_table)
+		cpu.dsb_sy()
 		unsafe {
 			l2_virt[l2_idx] = l3_phys | uat_pte_valid | uat_pte_table
 		}
@@ -384,10 +388,17 @@ pub fn (mut pt UatPgtable) prepare_map_range(iova u64, size u64) bool {
 	if size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova { return false }
 	pt.lock.acquire()
 	defer { pt.lock.release() }
-	for offset := u64(0); offset < size; offset += uat_pgsz {
-		_ = pt.get_pte(iova + offset, true) or { return false }
+	// One lookup prepares an entire L3 table, even for a partial first span.
+	table_span := u64(1) << uat_middle_shift
+	mut address := iova
+	mut bytes_left := size
+	for {
+		_ = pt.get_pte(address, true) or { return false }
+		chunk := table_span - (address & (table_span - 1))
+		if bytes_left <= chunk { return true }
+		bytes_left -= chunk
+		address += chunk
 	}
-	return true
 }
 
 // Map a contiguous range of GPU pages.

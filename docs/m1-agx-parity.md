@@ -142,6 +142,28 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `26a89a90c8586bfb028304af1c5561a192a13fcd46ae1a6a9fab040f36bfce0e`.
 
+G13 UAT completes child-table zeroing with `DSB SY` before installing the
+parent descriptor, as in the pinned Asahi driver. BIND preparation visits
+each leaf table once, covering up to 32 MiB of GPU VA per lookup. It
+preserves existing leaves and retains any empty tables attached before a
+later allocation failure.
+[Asahi page-table walk](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/pgtable.rs#L660-L756)
+
+Both kernel builds, 82 contract test files, and the TLB, heap, teardown,
+and file-close sanitizer suites passed. The linked ARM64 instructions
+show the barrier before both parent stores. Three compiled controls
+caught late barriers at both levels and a walk that skipped a table
+boundary. The allocation scan reproduced 178 baseline findings.
+The full source audit remains `not_equivalent`. No hardware tests
+or reboots ran.
+
+Evidence for `c1795a97f51df1ba8f548710fca0a3971e8111e2` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-uat-table-publication-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`c2eea80bbab6a1b4351408cf42af7ed3004c7c9ee27abe6ca6fed75cd8b29dd9`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

@@ -205,13 +205,15 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	check_vm_geometry_reference(read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/file.rs'))!,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/buffer.rs'))!,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/alloc.rs'))!)!
+	reference_pt := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/pgtable.rs'))!
 	check_gpu_permission_contract(read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
-		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/pgtable.rs'))!,
+		reference_pt,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/file.rs'))!)!
 	reference := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mem.rs'))!
 	vinix := read(os.join_path(repo, 'kernel/gpu/agx/tlb/tlb.v'))!
 	check_tlb_instructions(reference, vinix)!
+	check_table_preparation_reference(reference_pt, reference)!
 	mmu := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mmu.rs'))!
 	bind := section(mmu, '    pub(crate) fn bind(&self, vm:', 'binding.bind_token = Some(slot.token());', 'Asahi UAT bind')!
 	require_order(bind, ['let mut binding = vm.binding.lock()', 'if binding.binding.is_none()',
@@ -262,6 +264,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'Unbinding must preserve the release age')!
 	check_g13_slot_wait(asahi_linux, repo, local)!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
+		'Child table initialization completes before parent publication and BIND preparation walks each leaf table once',
 		'G13 kernel mappings finish with TLBI and require slot-64 FwCtl only before a cached mapping is removed',
 		'Only an active ASC slot with the matching published TTBR requires FwCtl before user driver-buffer unmap',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',

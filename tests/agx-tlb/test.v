@@ -6,6 +6,7 @@ import gpu.agx.mmu
 import event
 import gpu.agx.tlb
 import memory
+import aarch64.cpu
 
 fn expect_asid(asid u8, pte u64) {
 	calls := tlb.calls()
@@ -433,6 +434,61 @@ fn test_partial_unmap_survivors() {
 	println('AGX partial unmap PTEs: 100 cycles of head/tail/middle/full cuts preserve exact contiguous/repeated RO/WO/RW survivor leaves across L3 boundaries before TLBI and free every table')
 }
 
+fn test_child_table_publication() {
+	mut pt := pgtable.new_pgtable(39, 48) or { panic('publication root') }
+	address := pgtable.uat_pgsz
+	cpu.watch_descriptor(pt.l1)
+	memory.fail_after(0)
+	assert !pt.prepare_map_range(address, pgtable.uat_pgsz)
+	_, no_root_barrier := cpu.descriptor_at_barrier()
+	assert no_root_barrier == 0 && unsafe { *pt.l1 } == 0
+
+	// Publish an L2 table, then fail before its L3 table is allocated.
+	memory.fail_after(1)
+	assert !pt.prepare_map_range(address, pgtable.uat_pgsz)
+	root_at_barrier, root_barriers := cpu.descriptor_at_barrier()
+	assert root_at_barrier == 0 && root_barriers == 1, 'L2 child must be synchronized before its parent store'
+	root_descriptor := unsafe { *pt.l1 }
+	assert root_descriptor & pgtable.uat_pte_page == pgtable.uat_pte_page
+	middle := unsafe { &u64(root_descriptor & pt.oas_mask & ~pgtable.uat_pg_mask) }
+	assert unsafe { *middle } == 0
+
+	cpu.watch_descriptor(middle)
+	memory.fail_after(-1)
+	assert pt.prepare_map_range(address, pgtable.uat_pgsz)
+	middle_at_barrier, middle_barriers := cpu.descriptor_at_barrier()
+	assert middle_at_barrier == 0 && middle_barriers == 1, 'L3 child must be synchronized before its parent store'
+	assert unsafe { *middle } & pgtable.uat_pte_page == pgtable.uat_pte_page
+	assert (pt.read_pte(address) or { panic('prepared leaf') }) == 0 && tlb.calls().len == 0
+	assert pt.prepare_map_range(address, pgtable.uat_pgsz)
+	_, barriers_after_reuse := cpu.descriptor_at_barrier()
+	assert barriers_after_reuse == middle_barriers
+	cpu.watch_descriptor(unsafe { nil })
+	pgtable.destroy(pt)
+	assert memory.live_pages() == 0
+	println('AGX child tables: one barrier before publishing each level, none on failure or reuse')
+}
+
+fn test_preparation_boundaries() {
+	page := pgtable.uat_pgsz
+	root_boundary := u64(1) << 36
+	start := root_boundary - page
+	mut pt := pgtable.new_pgtable(39, 48) or { panic('boundary root') }
+	assert pt.prepare_map_range(start, 2 * page)
+	assert memory.live_pages() == 5 && tlb.calls().len == 0
+	memory.fail_after(0)
+	assert pt.map(start, 0x400000, 2 * page, pgtable.gpu_prot_gpu_shared_rw)
+	memory.fail_after(-1)
+	// Preparation must terminate at the final page without adding its size.
+	top := ~pgtable.uat_pg_mask
+	assert pt.prepare_map_range(top, page)
+	assert (pt.read_pte(top) or { panic('last prepared leaf') }) == 0
+	assert memory.live_pages() == 7 && tlb.calls().len == 0
+	pgtable.destroy(pt)
+	assert memory.live_pages() == 0
+	println('AGX table preparation: covers a root boundary and the last TTBR1 page')
+}
+
 fn test_bind_preparation() {
 	for _ in 0 .. 100 {
 		memory.fail_after(0)
@@ -489,6 +545,8 @@ fn test_bind_preparation() {
 }
 
 fn main() {
+	test_child_table_publication()
+	test_preparation_boundaries()
 	test_bind_preparation()
 	test_partial_unmap_survivors()
 	test_repeated_pages()

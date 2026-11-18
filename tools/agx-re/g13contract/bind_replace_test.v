@@ -12,8 +12,8 @@ fn test_bind_replacement_guards_require_fallible_preparation_and_owner_cleanup()
 		'if retired != 0 { gem.unref(obj); return retired }', 'if replacing && katomic.load(&ctx.inflight)'] {
 		if _ := check_bind_replace_local(file.replace(token, ''), page_table) { assert false, token }
 	}
-	for token in ['size - 1 > ~iova', 'defer { pt.lock.release() }', 'pt.get_pte(iova + offset, true) or { return false }',
-		'memory.pmm_alloc_aligned_fallible('] {
+	for token in ['size - 1 > ~iova', 'defer { pt.lock.release() }', 'pt.get_pte(address, true) or { return false }',
+		'address += chunk', 'cpu.dsb_sy()', 'memory.pmm_alloc_aligned_fallible('] {
 		if _ := check_bind_replace_local(file, page_table.replace(token, '')) { assert false, token }
 	}
 }

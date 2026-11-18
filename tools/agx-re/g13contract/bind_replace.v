@@ -18,12 +18,32 @@ fn check_bind_replace_local(file string, page_table string) ! {
 		'Prepare transient survivor/new metadata and all tables before old retirement; return temporary new owner on failure')!
 	prepare := section(page_table, 'pub fn (mut pt UatPgtable) prepare_map_range(', '// Map a contiguous range', 'Native table preparation')!
 	require_order(prepare, ['size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova',
-		'pt.lock.acquire()', 'defer { pt.lock.release() }', 'offset < size', 'offset += uat_pgsz',
-		'pt.get_pte(iova + offset, true) or { return false }', 'return true'], 'Locked complete-page preparation without rounded-size overflow')!
+		'pt.lock.acquire()', 'defer { pt.lock.release() }', 'table_span := u64(1) << uat_middle_shift',
+		'mut address := iova', 'mut bytes_left := size', 'pt.get_pte(address, true) or { return false }',
+		'chunk := table_span - (address & (table_span - 1))', 'if bytes_left <= chunk { return true }',
+		'bytes_left -= chunk', 'address += chunk'], 'Prepare each touched leaf table under lock without adding a wrapping end address')!
 	for token in ['map_page', 'unmap_page', 'invalidate_', '*pte'] { require(!prepare.contains(token), 'Preparation must preserve leaves: ' + token)! }
 	allocator := section(page_table, 'pub fn alloc_table_page(', '// Free a 16 KiB page table page.', 'Fallible table allocation')!
 	require(allocator.contains('memory.pmm_alloc_aligned_fallible(') && !allocator.contains('memory.pmm_alloc_aligned('),
 		'Table OOM must return through the fallible walker rather than panic')!
+	walk := section(page_table, 'pub fn (pt &UatPgtable) get_pte(', '// Map a single', 'Native table walk')!
+	require_order(walk, ['l2_table := alloc_table_page() or { return none }', 'l2_phys = u64(l2_table)',
+		'cpu.dsb_sy()', 'l1_virt[l1_idx] = l2_phys | uat_pte_valid | uat_pte_table',
+		'l3_table := alloc_table_page() or { return none }', 'l3_phys = u64(l3_table)',
+		'cpu.dsb_sy()', 'l2_virt[l2_idx] = l3_phys | uat_pte_valid | uat_pte_table'],
+		'Complete child initialization before publishing either parent descriptor')!
+}
+
+fn check_table_preparation_reference(page_table string, mem string) ! {
+	walk := section(page_table, 'fn walk_inner<F>(', 'fn free_table(', 'Packaged page-table walk')!
+	require_order(walk, ['let pt_page = Page::alloc_page(GFP_KERNEL | __GFP_ZERO)?',
+		'crate::mem::sync();', 'upte.store(upte_val, Ordering::Relaxed);',
+		'let count = (((end - iova) >> UAT_PGBIT) as usize).min(max_count)',
+		'let block = 1 << (UAT_PGBIT + UAT_LVBIT);', 'iova = align(iova + 1, block);'],
+		'Asahi synchronizes each zeroed child and walks one span per leaf table')!
+	require_order(page_table, ['pub(crate) fn alloc_pages(', 'self.with_pages(iova_range, true, false, |_, _| Ok(()))'],
+		'Asahi BIND preallocates intermediate tables without editing leaves')!
+	require_order(mem, ['pub(crate) fn sync()', 'asm!("dsb sy")'], 'Asahi child-table publication uses a full-system barrier')!
 }
 
 fn check_bind_replace_reference(mmu string) ! {

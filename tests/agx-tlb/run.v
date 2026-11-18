@@ -18,7 +18,8 @@ fn main() {
 	os.cp_all('${repo}/tests/agx-async/fixture/proc', '${scratch}/proc', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
 	os.mkdir_all('${scratch}/gpu/agx/pgtable')!
-	os.cp('${repo}/kernel/gpu/agx/pgtable/pgtable.v', '${scratch}/gpu/agx/pgtable/pgtable.v')!
+	page_table := os.getenv_opt('AGX_TLB_PGTABLE_SOURCE') or { '${repo}/kernel/gpu/agx/pgtable/pgtable.v' }
+	os.cp(page_table, '${scratch}/gpu/agx/pgtable/pgtable.v')!
 	os.cp('${repo}/kernel/gpu/agx/tlb/plan.v', '${scratch}/gpu/agx/tlb/plan.v')!
 	os.write_file('${scratch}/gpu/agx/pgtable/host.v', 'module pgtable\n__global higher_half = u64(0)\n')!
 	// Run the actual root publishers against real host page tables. Replace
