@@ -2,13 +2,34 @@
 module gpu
 
 import gpu.agx.mmu
+import gpu.agx.pgtable
+
+fn check_kernel_mapping_flush() {
+	mut mgr := GpuManager{flush_fails: true}
+	assert !mgr.flush_g13_kernel_buffer(unsafe { nil })
+	for protection in [pgtable.gpu_prot_fw_shared_rw, pgtable.gpu_prot_fw_shared_ro,
+		pgtable.gpu_prot_fw_private_rw, pgtable.gpu_prot_gpu_ro_fw_private_rw]! {
+		mgr.flushes = 0
+		no_address := SharedBuffer{size: 0x4000, protection: protection}
+		no_size := SharedBuffer{va: 0x10000, protection: protection}
+		assert !mgr.flush_g13_kernel_buffer(&no_address)
+		assert !mgr.flush_g13_kernel_buffer(&no_size)
+		assert mgr.flushes == 0
+		buffer := SharedBuffer{phys: 0x4000, va: 0x10000, size: 0x4000, protection: protection}
+		cached := protection == pgtable.gpu_prot_fw_private_rw || protection == pgtable.gpu_prot_gpu_ro_fw_private_rw
+		assert mgr.flush_g13_kernel_buffer(&buffer) == !cached, 'uncached kernel mappings must skip firmware flushes'
+		assert mgr.flushes == if cached { 1 } else { 0 }
+	}
+}
 
 fn check_job_mapping_publication() {
 	gpu_only := mmu.UatBuffer{va: 0x4000, size: 0x4000}
 	private := mmu.UatBuffer{va: 0x8000, size: 0x4000}
 	cache := G13TailPointerCache{buffer: unsafe { &private }}
-	shared := SharedBuffer{phys: 0x10000, size: 0x4000}
-	for failure in 0 .. 9 {
+	shared := SharedBuffer{phys: 0x10000, va: 0x10000, size: 0x4000, protection: pgtable.gpu_prot_fw_shared_rw}
+	private_command := SharedBuffer{phys: 0x14000, va: 0x14000, size: 0x4000}
+	readonly_command := SharedBuffer{phys: 0x18000, va: 0x18000, size: 0x4000, protection: pgtable.gpu_prot_gpu_ro_fw_private_rw}
+	for failure in 0 .. 7 {
 		mut mgr := GpuManager{publication_failure: failure}
 		mut job := G13RenderJobResources{
 			vm_slot: 1
@@ -22,40 +43,41 @@ fn check_job_mapping_publication() {
 				preempt: unsafe { &gpu_only }
 				aux_framebuffer: unsafe { &gpu_only }
 			}
-			init_buffer: shared
-			barrier: shared
-			vertex: shared
-			fragment: shared
-			vertex_microsequence: shared
-			fragment_microsequence: shared
+			init_buffer: private_command
+			barrier: private_command
+			vertex: readonly_command
+			fragment: readonly_command
+			vertex_microsequence: private_command
+			fragment_microsequence: private_command
 		}
 		ok := mgr.publish_render_mappings(mut job) or { false }
 		assert mgr.user_flushes == 0, 'render TPC mapping must not request a firmware flush'
-		assert mgr.flushes == if failure == 0 { 8 } else { failure }
+		assert mgr.flushes == if failure == 0 { 6 } else { failure }
 		assert ok == (failure == 0) && job.mappings_published
 	}
-	for failure in 0 .. 4 {
+	for failure in 0 .. 3 {
 		mut mgr := GpuManager{publication_failure: failure}
 		mut job := G13ComputeJobResources{
 			vm_slot: 1
 			preempt: unsafe { &gpu_only }
-			command: shared
-			microsequence: shared
+			command: readonly_command
+			microsequence: private_command
 			timestamps: shared
 		}
 		ok := mgr.publish_compute_mappings(mut job) or { false }
 		assert mgr.user_flushes == 0, 'compute preemption backing must not request a firmware flush'
-		assert mgr.flushes == if failure == 0 { 3 } else { failure }
+		assert mgr.flushes == if failure == 0 { 2 } else { failure }
 		assert ok == (failure == 0) && job.mappings_published
 	}
-	println('G13 job mappings: page-table publication and all 11 kernel flush failure boundaries passed')
+	println('G13 job mappings: uncached publication and all eight cached flush failure positions passed')
 }
 
 fn check_queue_mapping_publication() {
 	private := mmu.UatBuffer{va: 0x8000, size: 0x4000}
-	shared := SharedBuffer{phys: 0x10000, size: 0x4000}
-	subqueue := G13SubQueueResources{gpu_buffer: shared, state: shared, ring: shared, info: shared}
-	// Four queue buffers, four per render subqueue, and five TVB buffers.
+	shared := SharedBuffer{phys: 0x10000, va: 0x10000, size: 0x4000, protection: pgtable.gpu_prot_fw_shared_rw}
+	cached := SharedBuffer{phys: 0x14000, va: 0x14000, size: 0x4000}
+	subqueue := G13SubQueueResources{gpu_buffer: cached, state: shared, ring: shared, info: cached}
+	// Cached buffer count: one notifier, two per render subqueue and one TVB info.
 	for slot in [u32(1), 0]! {
 		context := mmu.UatContext{slot: slot}
 		queue := G13QueueResources{
@@ -64,10 +86,10 @@ fn check_queue_mapping_publication() {
 			context: shared
 			notifier_list: shared
 			threshold: shared
-			notifier: shared
+			notifier: cached
 			subqueues: [subqueue, subqueue, G13SubQueueResources{}]!
 			render_buffer: G13RenderBufferResources{
-				info: shared
+				info: cached
 				block_control: shared
 				counter: shared
 				stats: shared
@@ -76,13 +98,13 @@ fn check_queue_mapping_publication() {
 				block_list: unsafe { &private }
 			}
 		}
-		for failure in 0 .. 18 {
+		for failure in 0 .. 7 {
 			mut mgr := GpuManager{publication_failure: failure}
 			ok := mgr.flush_g13_queue_mappings(unsafe { &queue })
 			assert mgr.user_flushes == 0, 'TVB list mappings must not request firmware flushes'
-			assert mgr.flushes == if failure == 0 { 17 } else { failure }
+			assert mgr.flushes == if failure == 0 { 6 } else { failure }
 			assert ok == (failure == 0)
 		}
 	}
-	println('G13 queue mappings: resident and dormant TVB lists and all 17 kernel flush failure boundaries passed')
+	println('G13 queue mappings: resident and dormant VMs and all six cached flush failure positions passed')
 }

@@ -332,3 +332,30 @@ The evidence archive covers `37d9fd37a4b22963171c559262a6a8bfe5d39578` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-cached-user-tlbi-20261119.SsKjDg/bundle.tar.gz`
 with SHA-256 `ea20bbb17feff637cb1038bf2e6b7b742c6fc09f7c4dba1f5e8b932b2e8d7e07`.
+
+## Uncached kernel-buffer publication
+
+G13 uses UAT page-table invalidation to publish uncached shared kernel
+buffers. The preparation helper still rejects missing ranges and forwards
+cached ranges to slot 64. A render-only queue avoids eleven firmware-control
+round trips. Render and compute job preparation avoid two and one respectively.
+[Pinned shared queue allocations](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/workqueue.rs#L646-L660)
+[Pinned UAT map completion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L627-L663)
+[Pinned cached teardown](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L1605-L1635)
+
+The lifetime sanitizer fixture runs the production helper with all four G13
+kernel protections. It caught the old uncached failure when the firmware
+flush was refused. It also checks every retained cached flush failure in
+queue and job preparation. The teardown fixture supplies the refreshed
+allocator's host allocation stub and passes all 512 cases. Generated AArch64
+C shows the cacheability check before FwCtl, and the kernel teardown body
+matches the baseline byte for byte.
+
+Both kernel builds, the UAT and queue-unwind sanitizer suites, 79 source-contract
+test files and 122 pinned reference checks passed. The allocation scan matched
+the 176 baseline findings. M1 hardware validation remains open.
+
+The evidence archive covers `f17aed4ceee7883d9dea26d5fd90b77fcf0b8c65` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-shared-kernel-tlbi-20261119.p92tuH/bundle.tar.gz`
+with SHA-256 `b9f325246ac738f3ad8b04ec06045f3411a73d8005d8546319162a31cb5f91b2`.

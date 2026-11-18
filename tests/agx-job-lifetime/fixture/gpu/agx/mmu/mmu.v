@@ -1,5 +1,7 @@
 module mmu
 
+pub const uat_kernel_flush_slot = 64
+
 pub struct UatBuffer {
 pub mut:
 	released bool

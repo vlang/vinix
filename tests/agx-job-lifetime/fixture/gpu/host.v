@@ -4,6 +4,7 @@ module gpu
 import gpu.agx.event
 import gpu.agx.fw
 import gpu.agx.mmu
+import gpu.agx.pgtable
 import gpu.agx.channel
 import klock
 import memory
@@ -69,6 +70,7 @@ mut:
 	phys u64
 	va   u64
 	size u64
+	protection u64 = pgtable.gpu_prot_fw_private_rw
 }
 
 fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
@@ -170,15 +172,14 @@ struct G13EventResources {
 	initialized bool = true
 }
 
-fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
-	assert buffer.phys != 0 && buffer.size != 0
+fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, address u64, size u64) bool {
+	if slot != mmu.uat_kernel_flush_slot {
+		mgr.user_flushes++
+		return true
+	}
+	assert address != 0 && size != 0
 	mgr.flushes++
 	return !mgr.flush_fails && mgr.flushes != mgr.publication_failure
-}
-
-fn (mut mgr GpuManager) flush_g13_uat_range(_ u32, _ u64, _ u64) bool {
-	mgr.user_flushes++
-	return true
 }
 
 fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext, buffer &mmu.UatBuffer) bool {
@@ -287,6 +288,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_kernel_mapping_flush()
 	check_job_mapping_publication()
 	check_queue_mapping_publication()
 	check_prepared_job_backlog()

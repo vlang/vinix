@@ -146,6 +146,12 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		'ch.published - ticket.sequence >= unread'], 'Vinix tracks TX completion beyond a wrapped ring index')!
 	results << 'TX ring entry barrier before write-pointer publication'
 	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	kernel_publication := section(vinix_jobs, 'fn (mut mgr GpuManager) flush_g13_kernel_buffer(',
+		'fn (mut mgr GpuManager) flush_g13_queue_mappings(', 'Vinix kernel buffer publication')!
+	require_order(kernel_publication, ['buffer == unsafe { nil } || buffer.va == 0 || buffer.size == 0',
+		'return false', 'if !pgtable.is_cached_noncoherent(buffer.protection) { return true }',
+		'return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)'],
+		'Only cached kernel buffers send a publication FwCtl request')!
 	queue_mappings := section(vinix_jobs, 'fn (mut mgr GpuManager) flush_g13_queue_mappings(',
 		'@[inline]\nfn g13_div_round_up(', 'Vinix queue mapping publication')!
 	require(!queue_mappings.contains('flush_g13_uat_range('), 'Per-VM TVB list mappings use page-table invalidation')!

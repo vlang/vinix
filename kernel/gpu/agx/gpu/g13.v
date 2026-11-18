@@ -453,6 +453,8 @@ fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
 	if buffer == unsafe { nil } || buffer.va == 0 || buffer.size == 0 {
 		return false
 	}
+	// UAT's page-table invalidation already publishes uncached mappings.
+	if !pgtable.is_cached_noncoherent(buffer.protection) { return true }
 	return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
 }
 
