@@ -324,6 +324,26 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `c51d501ef3736fae5571a6698a343361a870cf1dff4296b5a8836ec0728d5b97`.
 
+G13 timestamp BIND now returns `ENOMEM` through both ioctl ABIs
+if the handle table cannot grow after mapping the buffer. It releases
+the file lock, unmaps the new VA and drops the temporary GEM reference
+without publishing a handle. Growth preserves existing records and
+their captures. [Asahi timestamp publication](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L1217-L1232)
+
+The sanitizer suite passed 400 allocation refusals, 200 checks that
+mapping errors precede table allocation and 100 growth and close
+cycles. Both compiled negative controls failed at the expected
+assertions. Both kernel builds, 82 test files and the lifetime review
+passed. The allocation scan reproduced 178 baseline findings. The full
+source audit remains `not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `de8789a62c7bd554590c142b0c10ef72399aa429` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-publication-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`c78c3d32258b49d7191934953859600ad6599921dd6e8f92a560078b5d91c524`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

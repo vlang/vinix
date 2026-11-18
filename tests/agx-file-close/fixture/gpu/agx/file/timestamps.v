@@ -5,6 +5,7 @@ import drm.gem
 import drm.ioctl
 import drm.asahi
 import gpu.agx.gpu
+import memory
 
 struct TimestampRange {
 	offset u64
@@ -22,6 +23,71 @@ fn timestamp_bind(handle u32, output u32, offset u64, size u64, flags u32) ioctl
 
 fn timestamp_unbind(id u32) ioctl.DrmAsahiGemBindObject {
 	return ioctl.DrmAsahiGemBindObject{ op: ioctl.asahi_bind_object_op_unbind, object_handle: id }
+}
+
+fn expect_timestamp_publication_error(mut file GpuFile, handle u32, code int) {
+	legacy := timestamp_bind(handle, 0x12345678, 0, 0x4000, ioctl.asahi_bind_object_usage_timestamps)
+	modern := asahi.GemBindObject{op: legacy.op, flags: legacy.flags, handle: handle,
+		range: legacy.range, object_handle: legacy.object_handle}
+	saved_legacy := legacy
+	saved_modern := modern
+	assert file.ioctl_gem_bind_object(unsafe { &legacy }) == code && legacy == saved_legacy,
+		'legacy timestamp BIND must report the publication failure without an output handle'
+	assert file.ioctl_modern_gem_bind_object(unsafe { &modern }) == code && modern == saved_modern,
+		'modern timestamp BIND must report the publication failure without an output handle'
+	assert !file.lock.is_held()
+}
+
+fn check_timestamp_publication_storage() {
+	memory.assert_released()
+	for cycle in 0 .. 100 {
+		mut file := GpuFile{}
+		bo := gem.create(u32(9200 + cycle))
+		file.objects.add_created(bo)
+		memory.fail_allocations(true)
+		before_empty := memory.calls()
+		maps_empty := gpu.maps()
+		unmaps_empty := gpu.unmaps()
+		gpu.fail_timestamp_map(-28)
+		expect_timestamp_publication_error(mut file, bo.handle, -28)
+		assert memory.calls() == before_empty && gpu.unmaps() == unmaps_empty
+		gpu.fail_timestamp_map(0)
+		expect_timestamp_publication_error(mut file, bo.handle, -12)
+		assert memory.calls() == before_empty + 2 && memory.outstanding() == 0
+		assert gpu.maps() == maps_empty + 4 && gpu.unmaps() == unmaps_empty + 2
+		assert file.timestamp_objects.len == 0 && bo.references == 1
+
+		memory.fail_allocations(false)
+		for index in 0 .. 7 {
+			assert bind_capture_buffer(mut file, bo.handle) == u32(index + 1)
+		}
+		code, old_capture := file.capture_g13_timestamp(asahi.Timestamp{handle: 1})
+		assert code == 0 && unbind_capture_buffer(mut file, 1) == 0
+		memory.fail_allocations(true)
+		with_spare := memory.calls()
+		assert bind_capture_buffer(mut file, bo.handle) == 1
+		assert memory.calls() == with_spare && file.timestamp_objects.len == 8 && file.timestamp_objects.cap == 8
+		data := file.timestamp_objects.data
+		mut saved := [8]TimestampObject{}
+		for index in 0 .. 8 { saved[index] = file.timestamp_objects[index] }
+		maps_full := gpu.maps()
+		unmaps_full := gpu.unmaps()
+		expect_timestamp_publication_error(mut file, bo.handle, -12)
+		assert memory.calls() == with_spare + 2 && memory.outstanding() == 1
+		assert file.timestamp_objects.data == data && file.timestamp_objects.len == 8 && file.timestamp_objects.cap == 8
+		assert gpu.maps() == maps_full + 2 && gpu.unmaps() == unmaps_full + 2 && bo.references == 9
+		for index in 0 .. 8 { assert saved[index] == file.timestamp_objects[index] }
+
+		memory.fail_allocations(false)
+		assert bind_capture_buffer(mut file, bo.handle) == 8
+		assert file.timestamp_objects.data != data && memory.outstanding() == 1
+		assert file.timestamp_objects.len == 9 && file.timestamp_objects.cap == 16
+		file.release_g13_timestamp(old_capture)
+		assert file.timestamp_objects.len == 8 && file.timestamp_objects[0].va == saved[1].va
+		assert file.close() && gem.live() == 0
+		memory.assert_released()
+	}
+	println('G13 timestamp publication: 400 allocation refusals, 200 mapping-precedence checks, 100 spare-slot publications and growth retries preserve captures and release all storage')
 }
 
 fn check_timestamp_bindings() {

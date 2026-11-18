@@ -507,6 +507,33 @@ fn (mut f GpuFile) allocate_timestamp_id_locked() (u32, int) {
 	return candidate, f.timestamp_objects.len
 }
 
+// Captures keep scalar VAs, so all timestamp records can move under file.lock.
+fn (mut f GpuFile) reserve_timestamp_entry_locked() bool {
+	if f.timestamp_objects.len < f.timestamp_objects.cap { return true }
+	if f.timestamp_objects.len == 0x7fff_ffff { return false }
+	capacity := if f.timestamp_objects.cap == 0 { 8 } else if f.timestamp_objects.cap <= 0x3fff_ffff {
+		f.timestamp_objects.cap * 2
+	} else {
+		0x7fff_ffff
+	}
+	storage := memory.malloc_packed_fallible(u64(capacity) * sizeof(TimestampObject)) @[freed]
+	if storage == unsafe { nil } { return false }
+	mut replacement := []TimestampObject{}
+	unsafe {
+		replacement.data = storage
+		replacement.len = f.timestamp_objects.len
+		replacement.cap = capacity
+		replacement.flags = .noslices
+		if f.timestamp_objects.len != 0 {
+			C.memcpy(storage, f.timestamp_objects.data, u64(f.timestamp_objects.len) * sizeof(TimestampObject))
+		}
+		mut old := f.timestamp_objects
+		f.timestamp_objects = replacement
+		old.free()
+	}
+	return true
+}
+
 // Userspace names belong to the file. Callers hold file.lock.
 fn (f &GpuFile) find_vm(vm_id u32) ?&mmu.UatContext {
 	if vm_id == 0 { return none }
@@ -962,11 +989,12 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 			}
 			f.lock.acquire()
 			id, slot := f.allocate_timestamp_id_locked()
-			if id == 0 {
+			publish_code := if id == 0 { -16 } else if !f.reserve_timestamp_entry_locked() { -12 } else { 0 }
+			if publish_code != 0 {
 				f.lock.release()
 				gpu_manager.unmap_g13_timestamp_buffer(va, request.range)
 				gem.unref(obj)
-				return -16
+				return publish_code
 			}
 			object := TimestampObject{
 				id: id

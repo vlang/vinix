@@ -7,6 +7,12 @@ fn check_timestamp_bind_local(file string) ! {
 		'if object.id > candidate { return candidate, index }', 'if object.id == candidate && !object.detached',
 		'if candidate == ~u32(0) { return 0, index }', 'candidate++', 'return candidate, f.timestamp_objects.len'],
 		'Select the first free timestamp name while ignoring retained detached mappings')!
+	storage := section(file, 'fn (mut f GpuFile) reserve_timestamp_entry_locked(', 'fn (f &GpuFile) find_vm(', 'Timestamp publication storage')!
+	require_order(storage, ['f.timestamp_objects.len < f.timestamp_objects.cap', 'return true',
+		'memory.malloc_packed_fallible(u64(capacity) * sizeof(TimestampObject)) @[freed]',
+		'if storage == unsafe { nil } { return false }', 'replacement.flags = .noslices',
+		'C.memcpy(storage, f.timestamp_objects.data,', 'mut old := f.timestamp_objects',
+		'f.timestamp_objects = replacement', 'old.free()'], 'Grow the timestamp table without changing live records on OOM')!
 	query := section(file, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'pub fn (mut f GpuFile) ioctl_queue_create(', 'Timestamp-object request validation')!
 	bind := section(query, 'ioctl.asahi_bind_object_op_bind {', 'ioctl.asahi_bind_object_op_unbind {', 'Timestamp BIND')!
 	require_order(bind, ['request.flags != ioctl.asahi_bind_object_usage_timestamps',
@@ -15,8 +21,10 @@ fn check_timestamp_bind_local(file string) ! {
 		'if obj.vm_private_identity != 0 { gem.unref(obj); return -22 }', 'if request.range == 0 || request.offset > obj.size',
 		'gem.unref(obj)', 'gpu.get_global_manager()', 'map_code, va := gpu_manager.map_g13_timestamp_buffer(',
 		'if map_code != 0', 'gem.unref(obj)', 'return map_code',
-		'id, slot := f.allocate_timestamp_id_locked()', 'if id == 0', 'f.lock.release()',
-		'gpu_manager.unmap_g13_timestamp_buffer(va, request.range)', 'gem.unref(obj)', 'return -16',
+		'f.lock.acquire()', 'id, slot := f.allocate_timestamp_id_locked()',
+		'publish_code := if id == 0 { -16 } else if !f.reserve_timestamp_entry_locked() { -12 } else { 0 }',
+		'if publish_code != 0', 'f.lock.release()',
+		'gpu_manager.unmap_g13_timestamp_buffer(va, request.range)', 'gem.unref(obj)', 'return publish_code',
 		'f.timestamp_objects << object', 'index > slot', 'f.timestamp_objects[index] = f.timestamp_objects[index - 1]',
 		'f.timestamp_objects[slot] = object', 'f.lock.release()', 'request.object_handle = id'],
 		'Timestamp BIND checks overflow before BO lookup, empty ranges after it and publishes only its output handle')!
@@ -39,6 +47,7 @@ fn check_timestamp_bind_reference(file string, gpu string, gem string, mmu strin
 		'data.flags != uapi::drm_asahi_bind_object_flags_DRM_ASAHI_BIND_OBJECT_USAGE_TIMESTAMPS',
 		'.checked_add(data.range)', '.ok_or(EINVAL)?', 'gem::Object::lookup_handle(file, data.handle)?',
 		'reg_data.gpu.map_timestamp_buffer(bo, offset..end_offset)?',
+		'GFP_KERNEL,', ')?;', 'KBox::new(Object::TimestampBuffer(mapping), GFP_KERNEL)?',
 		'.insert_limit(1..=u32::MAX, obj, GFP_KERNEL)', 'let handle = handle? as u64', 'data.object_handle = handle as u32'],
 		'Packaged BIND validates the sum before lookup and writes object_handle only on success')!
 	require(!bind.contains('data.object_handle !=') && !bind.contains('data.object_handle =='), 'Packaged BIND ignores the initial output handle')!

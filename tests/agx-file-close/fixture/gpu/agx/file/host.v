@@ -165,6 +165,7 @@ pub fn run_checks() {
 	check_global_params_device()
 	check_timestamp_bindings()
 	check_timestamp_captures()
+	check_timestamp_publication_storage()
 	gpu.check_timestamp_serialization()
 	check_zero_bind_ranges()
 	check_create_sizes()
