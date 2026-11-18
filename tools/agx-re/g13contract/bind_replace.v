@@ -18,14 +18,14 @@ fn check_bind_replace_local(file string, page_table string) ! {
 		'Prepare transient survivor/new metadata and all tables before old retirement; return temporary new owner on failure')!
 	prepare := section(page_table, 'pub fn (mut pt UatPgtable) prepare_map_range(', '// Visit each touched L3 table', 'Native table preparation')!
 	require_order(prepare, ['size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova',
-		'pt.lock.acquire()', 'defer { pt.lock.release() }', 'return pt.walk_map_tables_locked(iova, size, true)'],
+		'pt.lock.acquire()', 'defer { pt.lock.release() }', 'return pt.walk_map_tables_locked(iova, size, true) == 0'],
 		'BIND preallocates intermediate tables under lock')!
 	table_walk := section(page_table, 'fn (pt &UatPgtable) walk_map_tables_locked(', '// Map a contiguous range', 'Shared table walk')!
 	require_order(table_walk, ['table_span := u64(1) << uat_middle_shift', 'mut address := iova',
 		'mut bytes_left := size', 'chunk := table_span - (address & (table_span - 1))', 'pt.get_pte(address, allocate)',
 		'if !allocate {', 'pages := (if bytes_left < chunk { bytes_left } else { chunk }) / uat_pgsz',
-		'for index := u64(0); index < pages; index++', 'if unsafe { first[index] } != 0 { return false }',
-		'} else if allocate {', 'return false', 'if bytes_left <= chunk { return true }',
+		'for index := u64(0); index < pages; index++', 'if unsafe { first[index] } != 0 { return -16 }',
+		'} else if allocate {', 'return -12', 'if bytes_left <= chunk { return 0 }',
 		'bytes_left -= chunk', 'address += chunk'], 'Walk whole L3 spans, bound the vacancy scan and fail on missing allocation')!
 	for token in ['map_page', 'unmap_page', 'invalidate_', 'first[index] ='] {
 		require(!table_walk.contains(token), 'Preparation must preserve leaves: ' + token)!
@@ -47,14 +47,18 @@ fn check_bind_replace_local(file string, page_table string) ! {
 
 fn check_fixed_map_local(page_table string, mmu string) ! {
 	install := section(page_table, 'pub fn (mut pt UatPgtable) map_new(', 'fn (mut pt UatPgtable) map_contiguous_locked(', 'Native fixed map')!
-	require_order(install, ['size == 0', 'size - 1 > ~iova || size - 1 > ~phys', 'pt.lock.acquire()',
-		'defer { pt.lock.release() }',
-		'if !pt.walk_map_tables_locked(iova, size, false) || !pt.walk_map_tables_locked(iova, size, true)',
-		'return false', 'return pt.map_contiguous_locked(iova, phys, size, prot)'],
+	require_order(install, ['return pt.map_new_status(iova, phys, size, prot) == 0',
+		'size == 0', 'size - 1 > ~iova || size - 1 > ~phys { return -22 }',
+		'pt.lock.acquire()', 'defer { pt.lock.release() }',
+		'vacancy := pt.walk_map_tables_locked(iova, size, false)', 'if vacancy != 0 { return vacancy }',
+		'prepared := pt.walk_map_tables_locked(iova, size, true)', 'if prepared != 0 { return prepared }',
+		'return if pt.map_contiguous_locked(iova, phys, size, prot) { 0 } else { -12 }'],
 		'Check every destination leaf and prepare tables under the same lock as publication')!
 	kernel := section(mmu, 'pub fn (mgr &UatManager) map_kernel(', '// Reprotect an existing context-zero mapping', 'Native kernel map')!
-	require_order(kernel, ['if iova < (u64(1) << mgr.ias) { mgr.kernel_lower_pgtable } else { mgr.kernel_pgtable }',
-		'if mgr.handoff_abi == .v12_3', 'return pt.map_new(iova, phys, size, prot)', 'return pt.map(iova, phys, size, prot)'],
+	require_order(kernel, ['return mgr.map_kernel_status(iova, phys, size, prot) == 0',
+		'if iova < (u64(1) << mgr.ias) { mgr.kernel_lower_pgtable } else { mgr.kernel_pgtable }',
+		'if mgr.handoff_abi == .v12_3', 'return pt.map_new_status(iova, phys, size, prot)',
+		'return if pt.map(iova, phys, size, prot) { 0 } else { -12 }'],
 		'G13 context-zero mutations use fixed-map preparation on either root')!
 }
 

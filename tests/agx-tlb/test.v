@@ -559,8 +559,11 @@ fn check_kernel_map_preflight(upper bool) {
 	tlb.clear()
 	tlb.observe(collision, unsafe { nil })
 	before := memory.live_pages()
+	assert mgr.map_kernel_status(start, 0x800001, page, prot) == -22
+	assert memory.live_pages() == before && tlb.calls().len == 0
 	for occupied in [saved, u64(0x4000)]! {
 		unsafe { *collision = occupied }
+		assert mgr.map_kernel_status(start, 0x800000, 2 * page, prot) == -16
 		assert !mgr.map_kernel(start, 0x800000, 2 * page, prot), 'collision must fail before preparing earlier tables'
 		assert unsafe { *collision } == occupied && tlb.calls().len == 0
 		assert memory.live_pages() == before
@@ -578,7 +581,7 @@ fn check_kernel_map_preflight(upper bool) {
 	// Fail the second table allocation with the first table already attached.
 	oom_start := start + 2 * span
 	memory.fail_after(1)
-	assert !mgr.map_kernel(oom_start, 0x800000, 2 * page, prot)
+	assert mgr.map_kernel_status(oom_start, 0x800000, 2 * page, prot) == -12
 	assert memory.live_pages() == before + 1 && tlb.calls().len == 0
 	first := pt.get_pte(oom_start, false) or { panic('retained empty table') }
 	assert unsafe { *first } == 0
@@ -601,7 +604,7 @@ fn test_kernel_map_preflight() {
 	for upper in [false, true]! {
 		check_kernel_map_preflight(upper)
 	}
-	println('AGX kernel mapping: TTBR0 and TTBR1 preflight preserves occupied leaves and leaves a failed preparation empty')
+	println('AGX kernel mapping: TTBR0 and TTBR1 preflight distinguish EINVAL, EBUSY and ENOMEM, preserving occupied leaves and keeping failed preparation empty')
 }
 
 fn test_bind_preparation() {

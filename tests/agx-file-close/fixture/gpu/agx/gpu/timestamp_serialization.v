@@ -75,13 +75,16 @@ pub fn check_timestamp_serialization() {
 		manager.g13_timestamp.reject = false
 		pending := manager.g13_timestamp.heap.alloc(0x4000, alloc.gpu_page_size) or { panic('deferred timestamp reservation') }
 		manager.g13_timestamp.heap.release(pending)
-		uat.timestamp_reject = true
-		expect_timestamp_map_error(mut manager, 0x200000, 0x4000, -12)
-		assert manager.g13_timestamp.cancellations == 1 && manager.g13_timestamp.heap.allocations.len == 1
-		deferred, bytes := manager.g13_timestamp.heap.garbage()
-		assert deferred == 1 && bytes == 0x4000, 'map rollback must preserve the deferred VA'
-		assert manager.g13_timestamp.releases == 0 && manager.g13_timestamp.collections == 0
-		uat.timestamp_reject = false
+		for index, status in [-12, -16]! {
+			uat.timestamp_map_status = status
+			expect_timestamp_map_error(mut manager, 0x200000, 0x4000, status)
+			assert manager.g13_timestamp.cancellations == index + 1
+			assert manager.g13_timestamp.heap.allocations.len == 1
+			deferred, bytes := manager.g13_timestamp.heap.garbage()
+			assert deferred == 1 && bytes == 0x4000, 'map rollback must preserve the deferred VA'
+			assert manager.g13_timestamp.releases == 0 && manager.g13_timestamp.collections == 0
+		}
+		uat.timestamp_map_status = 0
 		code, va := manager.checked_timestamp_map(0x200000, 0x4000)
 		assert code == 0 && va == pending + 0x4000 && !timestamp_lock_held()
 		before := manager.g13_timestamp.releases
@@ -96,7 +99,7 @@ pub fn check_timestamp_serialization() {
 	}
 	check_timestamp_aperture_capacity(mut manager, mut uat)
 	uat_mgr = unsafe { nil }
-	println('G13 timestamp allocator: 100 cycles distinguish ENOSPC from ENOMEM, cancel failed maps without collection and reuse their VA under balanced locks')
+	println('G13 timestamp allocator: 100 cycles distinguish ENOSPC, ENOMEM and EBUSY, cancel failed maps without collection and reuse their VA under balanced locks')
 }
 
 fn check_timestamp_aperture_capacity(mut manager GpuManager, mut uat mmu.UatManager) {

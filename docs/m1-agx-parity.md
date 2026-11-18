@@ -256,8 +256,8 @@ The archive and restored copy passed full inventory verification.
 `ec73a69ae1be32f6308d3e947ed67ad46f71f2d19595e562ee1e48fc67ab9fef`.
 
 G13 timestamp BIND returns `ENOSPC` through both ioctl ABIs when
-the 64 MiB firmware aperture has no suitable range. A page-table
-failure still returns `ENOMEM` and cancels the unpublished VA
+the 64 MiB firmware aperture has no suitable range. This revision
+returned `ENOMEM` on any page-table failure and canceled the unpublished VA
 reservation without collecting other deferred ranges. Both failures
 release the temporary GEM reference and preserve the output handle.
 [Asahi range mapping](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L2459-L2504)
@@ -279,6 +279,28 @@ patch is retained under
 The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `c44fa0cd5321315df3131a8e9f53ebb06e8e4c9447d007493119a562cc64a6f1`.
+
+G13 timestamp BIND now propagates `EBUSY` through both ioctl ABIs
+when a destination leaf is occupied. The vacancy scan runs before
+allocating tables or writing leaves, as in the pinned Asahi driver.
+Page-table allocation failure returns `ENOMEM`. Either error cancels
+the new VA reservation and releases the temporary GEM reference.
+[Asahi fixed-map preparation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/pgtable.rs#L893-L906)
+
+The real page-table code preserved occupied leaves on TTBR0 and TTBR1
+under host fixtures. The sanitizer suites passed 184,400 timestamp
+ioctl checks, the 4,096-slot exhaustion case, and the rollback and
+flush checks. Two compiled negative controls failed at the expected
+assertions. Both kernel builds and 82 test files passed. The allocation
+scan reproduced 178 baseline findings. The full source audit remains
+`not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `c7504b1162d0f3da4ae0066c7348dcf783089491` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-map-status-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`90bf451e47b66e04e5b745ca8438639c9e49c369128dfe9fb8ef4c483db596ba`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

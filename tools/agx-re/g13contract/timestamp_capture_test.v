@@ -18,7 +18,7 @@ fn test_timestamp_capture_guards_require_retained_owners_and_rollback() {
 		'f.timestamp_objects[found_index].detached = true', 'owned.reap_detached_timestamp_objects_locked()'] {
 		if _ := check_timestamp_capture_local(file.replace(token, ''), captures, gpu) { assert false, token }
 	}
-	for token in ['return -28, 0', 'mgr.g13_timestamp.cancel_unpublished(va)'] {
+	for token in ['return -28, 0', 'mgr.g13_timestamp.cancel_unpublished(va)', 'return code, 0'] {
 		if _ := check_timestamp_capture_local(file, captures, gpu.replace(token, '')) { assert false, token }
 	}
 }

@@ -387,12 +387,12 @@ pub fn (mut pt UatPgtable) prepare_map_range(iova u64, size u64) bool {
 	if size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova { return false }
 	pt.lock.acquire()
 	defer { pt.lock.release() }
-	return pt.walk_map_tables_locked(iova, size, true)
+	return pt.walk_map_tables_locked(iova, size, true) == 0
 }
 
 // Visit each touched L3 table once. The read-only pass checks existing
 // leaves for collisions without allocating missing tables.
-fn (pt &UatPgtable) walk_map_tables_locked(iova u64, size u64, allocate bool) bool {
+fn (pt &UatPgtable) walk_map_tables_locked(iova u64, size u64, allocate bool) int {
 	table_span := u64(1) << uat_middle_shift
 	mut address := iova
 	mut bytes_left := size
@@ -402,13 +402,13 @@ fn (pt &UatPgtable) walk_map_tables_locked(iova u64, size u64, allocate bool) bo
 			if !allocate {
 				pages := (if bytes_left < chunk { bytes_left } else { chunk }) / uat_pgsz
 				for index := u64(0); index < pages; index++ {
-					if unsafe { first[index] } != 0 { return false }
+					if unsafe { first[index] } != 0 { return -16 }
 				}
 			}
 		} else if allocate {
-			return false
+			return -12
 		}
-		if bytes_left <= chunk { return true }
+		if bytes_left <= chunk { return 0 }
 		bytes_left -= chunk
 		address += chunk
 	}
@@ -428,14 +428,19 @@ pub fn (mut pt UatPgtable) map(iova u64, phys u64, size u64, prot u64) bool {
 // Install a new fixed mapping. One lock covers the vacancy check, table
 // preparation and leaf stores, so an occupied PTE can never be overwritten.
 pub fn (mut pt UatPgtable) map_new(iova u64, phys u64, size u64, prot u64) bool {
+	return pt.map_new_status(iova, phys, size, prot) == 0
+}
+
+pub fn (mut pt UatPgtable) map_new_status(iova u64, phys u64, size u64, prot u64) int {
 	if size == 0 || (iova | phys | size) & uat_pg_mask != 0
-		|| size - 1 > ~iova || size - 1 > ~phys { return false }
+		|| size - 1 > ~iova || size - 1 > ~phys { return -22 }
 	pt.lock.acquire()
 	defer { pt.lock.release() }
-	if !pt.walk_map_tables_locked(iova, size, false) || !pt.walk_map_tables_locked(iova, size, true) {
-		return false
-	}
-	return pt.map_contiguous_locked(iova, phys, size, prot)
+	vacancy := pt.walk_map_tables_locked(iova, size, false)
+	if vacancy != 0 { return vacancy }
+	prepared := pt.walk_map_tables_locked(iova, size, true)
+	if prepared != 0 { return prepared }
+	return if pt.map_contiguous_locked(iova, phys, size, prot) { 0 } else { -12 }
 }
 
 fn (mut pt UatPgtable) map_contiguous_locked(iova u64, phys u64, size u64, prot u64) bool {

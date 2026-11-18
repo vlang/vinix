@@ -807,13 +807,17 @@ pub fn (mut mgr UatManager) unbind_context(ctx &UatContext) {
 // Map a driver-owned allocation into context zero. Lower addresses use TTBR0;
 // canonical high addresses use the reserved firmware-compatible TTBR1 root.
 pub fn (mgr &UatManager) map_kernel(iova u64, phys u64, size u64, prot u64) bool {
+	return mgr.map_kernel_status(iova, phys, size, prot) == 0
+}
+
+pub fn (mgr &UatManager) map_kernel_status(iova u64, phys u64, size u64, prot u64) int {
 	mut pt := unsafe {
 		if iova < (u64(1) << mgr.ias) { mgr.kernel_lower_pgtable } else { mgr.kernel_pgtable }
 	}
 	if mgr.handoff_abi == .v12_3 {
-		return pt.map_new(iova, phys, size, prot)
+		return pt.map_new_status(iova, phys, size, prot)
 	}
-	return pt.map(iova, phys, size, prot)
+	return if pt.map(iova, phys, size, prot) { 0 } else { -12 }
 }
 
 // Reprotect an existing context-zero mapping without changing its physical

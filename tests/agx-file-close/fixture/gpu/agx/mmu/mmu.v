@@ -15,17 +15,17 @@ pub mut:
 	handoff_abi UatHandoffAbi
 	timestamp_map_calls int
 	timestamp_unmap_calls int
-	timestamp_reject bool
+	timestamp_map_status int
 	ias u32 = 39
 	next_context &UatContext = unsafe { nil }
 	vm_binds int
 }
 
-pub fn (mgr &UatManager) map_kernel(va u64, phys u64, size u64, prot u64) bool {
+pub fn (mgr &UatManager) map_kernel_status(va u64, phys u64, size u64, prot u64) int {
 	assert gpu.timestamp_lock_held() && va != 0 && phys != 0 && size == 0x4000
 	assert prot == pgtable.gpu_prot_fw_shared_rw
 	mut owned := unsafe { mgr }; owned.timestamp_map_calls++
-	return !mgr.timestamp_reject
+	return mgr.timestamp_map_status
 }
 
 pub fn (mgr &UatManager) unmap_kernel(va u64, size u64) {

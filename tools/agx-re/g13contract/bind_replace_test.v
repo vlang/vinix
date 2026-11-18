@@ -13,7 +13,7 @@ fn test_bind_replacement_guards_require_fallible_preparation_and_owner_cleanup()
 		if _ := check_bind_replace_local(file.replace(token, ''), page_table) { assert false, token }
 	}
 	for token in ['size - 1 > ~iova', 'defer { pt.lock.release() }', 'pt.get_pte(address, allocate)',
-		'if unsafe { first[index] } != 0 { return false }',
+		'if unsafe { first[index] } != 0 { return -16 }',
 		'address += chunk', 'cpu.dsb_sy()', 'memory.pmm_alloc_aligned_fallible(',
 		'if l1_entry == 0', 'if l2_entry == 0',
 		'l1_entry & uat_pte_page == uat_pte_page', 'l2_entry & uat_pte_page == uat_pte_page'] {
@@ -21,10 +21,10 @@ fn test_bind_replacement_guards_require_fallible_preparation_and_owner_cleanup()
 	}
 	mmu := read(repo + '/kernel/gpu/agx/mmu/mmu.v')!
 	check_fixed_map_local(page_table, mmu)!
-	for token in ['!pt.walk_map_tables_locked(iova, size, false) || ', '|| !pt.walk_map_tables_locked(iova, size, true)'] {
+	for token in ['if vacancy != 0 { return vacancy }', 'if prepared != 0 { return prepared }'] {
 		if _ := check_fixed_map_local(page_table.replace(token, ''), mmu) { assert false, token }
 	}
-	if _ := check_fixed_map_local(page_table, mmu.replace('return pt.map_new(iova, phys, size, prot)', 'return pt.map(iova, phys, size, prot)')) {
+	if _ := check_fixed_map_local(page_table, mmu.replace('return pt.map_new_status(iova, phys, size, prot)', 'return if pt.map(iova, phys, size, prot) { 0 } else { -12 }')) {
 		assert false, 'G13 bypasses fixed-map preparation'
 	}
 }
