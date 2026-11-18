@@ -177,8 +177,20 @@ pub fn (mut ch RxChannel) dequeue(data voidptr) bool {
 	return ch.dequeue_subchannel(data, 0)
 }
 
-// Read one firmware-log subchannel. Other RX channel types use index zero.
 pub fn (mut ch RxChannel) dequeue_subchannel(data voidptr, index u32) bool {
+	return ch.read_subchannel(data, index, true)
+}
+
+pub fn (mut ch RxChannel) peek(data voidptr) bool {
+	return ch.peek_subchannel(data, 0)
+}
+
+// Reading without acknowledgement keeps the log payload available to the host.
+pub fn (mut ch RxChannel) peek_subchannel(data voidptr, index u32) bool {
+	return ch.read_subchannel(data, index, false)
+}
+
+fn (mut ch RxChannel) read_subchannel(data voidptr, index u32, consume bool) bool {
 	if data == unsafe { nil } || ch.state_phys == 0 || ch.ring_phys == 0
 		|| ch.ring_size < 2 || ch.entry_size == 0 || index >= ch.subchannels {
 		return false
@@ -211,37 +223,10 @@ pub fn (mut ch RxChannel) dequeue_subchannel(data voidptr, index u32) bool {
 		C.memcpy(data, src, ch.entry_size)
 	}
 
-	new_rp := (rp + 1) % ch.ring_size
-	// Do not let firmware reuse the slot before the entire entry is read.
-	katomic.sync()
-	katomic.store(mut read_ptr, new_rp)
-	return true
-}
-
-// Read the next entry without advancing the read pointer
-pub fn (ch &RxChannel) peek(data voidptr) bool {
-	return ch.peek_subchannel(data, 0)
-}
-
-pub fn (ch &RxChannel) peek_subchannel(data voidptr, index u32) bool {
-	if data == unsafe { nil } || ch.state_phys == 0 || ch.ring_phys == 0
-		|| ch.ring_size < 2 || ch.entry_size == 0 || index >= ch.subchannels || ch.has_fault() {
-		return false
-	}
-	state_offset := u64(index) * u64(sizeof(RingHeader))
-	read_ptr := unsafe { &u32(ch.state_phys + higher_half + state_offset) }
-	write_ptr := unsafe { &u32(ch.state_phys + higher_half + state_offset + 0x20) }
-	rp := katomic.load(read_ptr)
-	wp := katomic.load(write_ptr)
-
-	if rp >= ch.ring_size || wp >= ch.ring_size || rp == wp {
-		return false
-	}
-
-	offset := (u64(index) * u64(ch.ring_size) + u64(rp)) * u64(ch.entry_size)
-	src := unsafe { voidptr(ch.ring_phys + higher_half + offset) }
-	unsafe {
-		C.memcpy(data, src, ch.entry_size)
+	if consume {
+		// Do not let firmware reuse the slot before the host finishes reading.
+		katomic.sync()
+		katomic.store(mut read_ptr, (rp + 1) % ch.ring_size)
 	}
 	return true
 }

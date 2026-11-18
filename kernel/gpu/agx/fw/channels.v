@@ -18,6 +18,7 @@ pub const device_control_size = u32(256)
 pub const event_size = u32(256)
 pub const fw_ctl_size = u32(256)
 pub const fw_log_size = u32(256)
+pub const fw_log_subchannels = u32(6)
 pub const ktrace_size = u32(512)
 pub const stats_size = u32(256)
 pub const pipe_size = u32(256)
@@ -222,15 +223,33 @@ pub fn make_g13_fwctl_invalidate(addr u64, slot u32) FwFwCtlMsg {
 	}
 }
 
-// Firmware log channel message. Each of the six subchannels uses 0xd8-byte
-// entries; RegionB repeats the same ring address in fwlog_ring2.
+// The receive ring carries indices into the separate RuntimePointers
+// firmware log payload buffer.
 @[packed]
 pub struct FwLogMsg {
+pub mut:
+	msg_type  u32
+	pad_004   u32
+	msg_index u64
+	pad_010   [0x28]u8
+}
+
+@[packed]
+pub struct FwLogPayload {
 pub mut:
 	msg_type  u32
 	sequence  u32
 	timestamp u64
 	message   [0xc8]u8
+}
+
+pub const g13_fw_log_payload_size = u64(fw_log_subchannels) * fw_log_size * sizeof(FwLogPayload)
+
+pub fn g13_fw_log_payload_offset(subchannel u32, descriptor &FwLogMsg) ?u64 {
+	if descriptor.msg_type != 2 || subchannel >= fw_log_subchannels || descriptor.msg_index >= fw_log_size {
+		return none
+	}
+	return (u64(subchannel) * fw_log_size + descriptor.msg_index) * sizeof(FwLogPayload)
 }
 
 // Kernel trace channel message
@@ -270,7 +289,7 @@ pub fn validate_g13_channel_layouts() bool {
 		&& sizeof(ChannelRingPointers) == 0x10 && sizeof(FwDeviceControlMsg) == 0x30
 		&& sizeof(FwGrowTVBAck) == 0x30 && sizeof(FwGrowTVBEvent) == 0x38
 		&& sizeof(FwRunWorkQueueMsg) == 0x30 && sizeof(FwEventMsg) == 0x38
-		&& sizeof(FwFwCtlMsg) == 0x14 && sizeof(FwLogMsg) == 0xd8
+		&& sizeof(FwFwCtlMsg) == 0x14 && sizeof(FwLogMsg) == 0x38 && sizeof(FwLogPayload) == 0xd8
 		&& sizeof(FwKTraceMsg) == 0x38
 		&& sizeof(FwStatsMsg) == 0x30
 }

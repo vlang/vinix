@@ -103,7 +103,7 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	require_order(send_inval, ['msg.addr = addr', 'msg.unk_8 = 0', 'msg.context_id = ctx',
 		'msg.unk_10 = 1', 'msg.unk_12 = 2', 'self.send_message(msg)'], 'm1n1 FwCtl invalidate')!
 	vinix_channels := read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!
-	vinix_inval := section(vinix_channels, 'pub fn make_g13_fwctl_invalidate', '// Firmware log channel message', 'Vinix FwCtl')!
+	vinix_inval := section(vinix_channels, 'pub fn make_g13_fwctl_invalidate', 'pub struct FwLogMsg {', 'Vinix FwCtl')!
 	require_order(vinix_inval, ['addr: addr', 'slot: slot', 'unk_10: 1', 'unk_12: 2'], 'Vinix FwCtl invalidate')!
 	results << 'FwCtl invalidate opcode and handoff-slot message'
 	m1n1_initdata := read(os.join_path(m1n1, 'proxyclient/m1n1/agx/initdata.py'))!
@@ -585,6 +585,11 @@ fn check_submission_pipelining(pending string) ! {
 
 pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string {
 	base := os.join_path(asahi_linux, 'drivers/gpu/drm/asahi')
+	check_fwlog_reference(read(os.join_path(base, 'channel.rs'))!, read(os.join_path(base, 'fw/channels.rs'))!,
+		read(os.join_path(base, 'gpu.rs'))!)!
+	check_fwlog_vinix(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/channel/channel.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!)!
 	check_timestamp_inputs_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
 	check_pending_timestamps_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/file/submission_timestamps.v'))!)!
@@ -980,6 +985,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['Resolved timestamp pairs populate versioned native commands and independently select vertex/fragment/compute instructions while legacy callers provide empty pairs',
+		'G13 firmware log descriptor rings and the separate bounded payload buffer are published and read before acknowledgement',
 		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
 		'host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',

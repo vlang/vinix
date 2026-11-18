@@ -373,6 +373,7 @@ mut:
 	states                     [g13_channel_allocation_count]SharedBuffer
 	rings                      [g13_channel_allocation_count]SharedBuffer
 	allocated                  u32
+	fwlog_payload              SharedBuffer
 	initdata                   SharedBuffer
 	unknown_buffer             SharedBuffer
 	runtime_pointers           SharedBuffer
@@ -770,6 +771,7 @@ fn (mut mgr GpuManager) free_g13_channel_allocations(mut allocations G13ChannelA
 	mgr.free_shared_buffer(mut allocations.globals)
 	mgr.free_shared_buffer(mut allocations.runtime_pointers)
 	mgr.free_shared_buffer(mut allocations.unknown_buffer)
+	mgr.free_shared_buffer(mut allocations.fwlog_payload)
 	mut count := allocations.allocated
 	for count > 0 {
 		count--
@@ -791,14 +793,16 @@ fn (mut mgr GpuManager) release_g13_channels() {
 	mut allocations := unsafe { mgr.g13_channels }
 	mgr.g13_channels = unsafe { nil }
 	mgr.free_g13_channel_allocations(mut allocations)
+	unsafe { free(allocations) }
 }
 
 fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
-	mut allocations := &G13ChannelAllocations{}
+	mut allocations := &G13ChannelAllocations{} @[freed]
 	mut complete := false
 	defer {
 		if !complete {
 			mgr.free_g13_channel_allocations(mut allocations)
+			unsafe { free(allocations) }
 		}
 	}
 
@@ -811,8 +815,10 @@ fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
 	if !mgr.alloc_g13_channel_pair(mut allocations, g13_event_index, sizeof(channel.RingHeader), u64(fw.event_size) * sizeof(fw.FwEventMsg), pgtable.gpu_prot_fw_shared_rw) {
 		return none
 	}
-	// Firmware logging has six independent state/ring subchannels.
-	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_log_index, 6 * sizeof(channel.RingHeader), 6 * u64(fw.fw_log_size) * sizeof(fw.FwLogMsg), pgtable.gpu_prot_fw_shared_rw) {
+	// Firmware logging has six descriptor subrings and a separate payload buffer.
+	log_count := u64(fw.fw_log_subchannels)
+	if !mgr.alloc_g13_channel_pair(mut allocations, g13_fw_log_index, log_count * sizeof(channel.RingHeader),
+		log_count * fw.fw_log_size * sizeof(fw.FwLogMsg), pgtable.gpu_prot_fw_shared_rw) {
 		return none
 	}
 	if !mgr.alloc_g13_channel_pair(mut allocations, g13_ktrace_index, sizeof(channel.RingHeader), u64(fw.ktrace_size) * sizeof(fw.FwKTraceMsg), pgtable.gpu_prot_fw_shared_rw) {
@@ -827,6 +833,7 @@ fn (mut mgr GpuManager) allocate_g13_channels() ?&G13ChannelAllocations {
 			return none
 		}
 	}
+	allocations.fwlog_payload = mgr.alloc_g13_shared_buffer(fw.g13_fw_log_payload_size) or { return none }
 	complete = true
 	return allocations
 }
@@ -840,6 +847,7 @@ fn (mut mgr GpuManager) init_channels() bool {
 	if mgr.g13_channels != unsafe { nil } {
 		return false
 	}
+	stats_entry_size := fw.g13_stats_entry_size(mgr.hw_config.firmware_abi) or { return false }
 	mut allocations := mgr.allocate_g13_channels() or { return false }
 
 	dev_state := &allocations.states[g13_device_control_index]
@@ -853,13 +861,13 @@ fn (mut mgr GpuManager) init_channels() bool {
 	mgr.channels.event = channel.new_rx_channel('event', event_state.va, event_state.phys, event_ring.va, event_ring.phys, fw.event_size, u32(sizeof(fw.FwEventMsg)))
 	log_state := &allocations.states[g13_fw_log_index]
 	log_ring := &allocations.rings[g13_fw_log_index]
-	mgr.channels.fw_log = channel.new_rx_channel_with_subchannels('fwlog', log_state.va, log_state.phys, log_ring.va, log_ring.phys, fw.fw_log_size, u32(sizeof(fw.FwLogMsg)), 6)
+	mgr.channels.fw_log = channel.new_rx_channel_with_subchannels('fwlog', log_state.va, log_state.phys,
+		log_ring.va, log_ring.phys, fw.fw_log_size, u32(sizeof(fw.FwLogMsg)), fw.fw_log_subchannels)
 	ktrace_state := &allocations.states[g13_ktrace_index]
 	ktrace_ring := &allocations.rings[g13_ktrace_index]
 	mgr.channels.ktrace = channel.new_rx_channel('ktrace', ktrace_state.va, ktrace_state.phys, ktrace_ring.va, ktrace_ring.phys, fw.ktrace_size, u32(sizeof(fw.FwKTraceMsg)))
 	stats_state := &allocations.states[g13_stats_index]
 	stats_ring := &allocations.rings[g13_stats_index]
-	stats_entry_size := fw.g13_stats_entry_size(mgr.hw_config.firmware_abi) or { return false }
 	mgr.channels.stats = channel.new_rx_channel('stats', stats_state.va, stats_state.phys, stats_ring.va, stats_ring.phys, fw.stats_size, stats_entry_size)
 	// The channels keep their names, so they are literals rather than built.
 	pipe_names := ['pipe0', 'pipe1', 'pipe2', 'pipe3', 'pipe4', 'pipe5', 'pipe6', 'pipe7',
@@ -1143,8 +1151,7 @@ fn (mut mgr GpuManager) init_firmware_data() bool {
 		runtime.unkptr_198 = graph.unknown_198.va
 		runtime.hwdata_b = graph.hwdata_b.va
 		runtime.hwdata_b_2 = graph.hwdata_b.va
-		// RegionB repeats the FWLog channel ring at fwlog_ring2.
-		runtime.fwlog_buffer = mgr.channels.fw_log.ring_base
+		runtime.fwlog_buffer = graph.fwlog_payload.va
 		runtime.unkptr_1b8 = graph.unknown_1b8.va
 		runtime.unkptr_1c0 = graph.unknown_1c0.va
 		runtime.unkptr_1c8 = graph.unknown_1c8.va
@@ -1364,12 +1371,45 @@ fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 	return true
 }
 
-fn (mut mgr GpuManager) drain_auxiliary_channels() {
-	mut buf := [256]u8{}
-	for subchannel := u32(0); subchannel < 6; subchannel++ {
-		for mgr.channels.fw_log.dequeue_subchannel(voidptr(&buf[0]), subchannel) {
+// The manager lock guards teardown and keeps the peek/copy/ack sequence
+// indivisible to host readers. The caller owns the copy after acknowledgement.
+fn (mut mgr GpuManager) read_g13_fw_log(subchannel u32) ?fw.FwLogPayload {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	if mgr.state != .running || mgr.g13_channels == unsafe { nil } { return none }
+	buffer := &mgr.g13_channels.fwlog_payload
+	if buffer.phys == 0 || buffer.size < fw.g13_fw_log_payload_size { return none }
+	mut descriptor := fw.FwLogMsg{}
+	if !mgr.channels.fw_log.peek_subchannel(unsafe { &descriptor }, subchannel) { return none }
+	payload := if offset := fw.g13_fw_log_payload_offset(subchannel, &descriptor) {
+		unsafe { *&fw.FwLogPayload(u64(buffer.cpu_address()) + offset) }
+	} else {
+		fw.FwLogPayload{}
+	}
+	if !mgr.channels.fw_log.dequeue_subchannel(unsafe { &descriptor }, subchannel) { return none }
+	return payload
+}
+
+fn print_g13_fw_log(subchannel u32, payload fw.FwLogPayload) {
+	if payload.msg_type == 3 {
+		for index := 0; index < payload.message.len; index++ {
+			if payload.message[index] == 0 {
+				C.kprintf(c'agx: FWLog%u: %s\n', subchannel, unsafe { &char(&payload.message[0]) })
+				return
+			}
 		}
 	}
+	C.kprintf(c'agx: FWLog%u invalid message\n', subchannel)
+}
+
+fn (mut mgr GpuManager) drain_auxiliary_channels() {
+	for subchannel := u32(0); subchannel < fw.fw_log_subchannels; subchannel++ {
+		for {
+			payload := mgr.read_g13_fw_log(subchannel) or { break }
+			print_g13_fw_log(subchannel, payload)
+		}
+	}
+	mut buf := [256]u8{}
 	for mgr.channels.ktrace.dequeue(voidptr(&buf[0])) {
 	}
 	for mgr.channels.stats.dequeue(voidptr(&buf[0])) {

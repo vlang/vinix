@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 firmware logging uses six descriptor rings and separate payload storage.
+[Firmware log channel](m1-agx-fwlog.md)
+
 Modern G13 VM_BIND reserves its batch buffer before the user copy can report
 a bad pointer. [VM_BIND staging](m1-agx-vm-bind-staging.md)
 
@@ -426,7 +429,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Timestamp UAPI | Registered modern SUBMIT now resolves compact per-command timestamp objects into all three engines. Capture, independent retirement and modern nanosecond GET_TIME are implemented. Native firmware execution and units still require hardware acceptance. |
 | Power management | Modern G13 SUBMIT restores the packaged 2 ms idle delay on both firmware layouts. Asahi's debug delay overrides and broader reset and suspend/resume behavior remain open. |
 | M1 family | The native path configures base M1/t8103. The reference also supports t6000/t6001/t6002 M1 Pro/Max/Ultra, including clustering and multiple dies. |
-| Telemetry | Vinix drains auxiliary channels but does not expose the reference's full firmware statistics/debug interface. |
+| Telemetry | G13 firmware logging matches the packaged descriptor and payload layout. Vinix prints numbered log levels through its kernel logger. Linux severity filtering and the full firmware statistics/debug interface remain open. |
 | Complete wire comparison | Existing tests cover selected InitData and work-command contracts. Every remaining field/default still needs independent comparison; a matching structure size is insufficient. |
 | Userspace integration | Vinix's bundled Mesa is 25.0.5. Omarchy packages a newer matched Mesa/DRM stack. Driver ABI modernization and userspace migration must be verified together. |
 | Hardware acceptance | No native Vinix boot, recovery, compute/render result, concurrent lifecycle or performance result was obtained for this change. |

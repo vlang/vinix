@@ -47,6 +47,8 @@ fn object_u64(value voidptr, offset u32) u64 {
 fn check_layout_validators() {
 	assert fw.validate_g13_channel_layouts()
 	assert fw.validate_g13_initdata_layouts()
+	assert __offsetof(fw.G13RuntimePointers, fw_log) == 0xe0
+	assert __offsetof(fw.G13RuntimePointers, fwlog_buffer) == 0x1b0
 	assert fw.validate_g13_hwdata_layouts()
 	assert fw.validate_g13_workqueue_layouts()
 	assert fw.validate_g13_event_layouts()

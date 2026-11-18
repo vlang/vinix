@@ -44,12 +44,6 @@ mut:
 
 fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
 
-struct G13ChannelAllocations {
-mut:
-	fw_status SharedBuffer
-	globals SharedBuffer
-}
-
 struct FaultInfo {
 	read        bool
 	address     u64
@@ -89,6 +83,12 @@ mut:
 	g13_render_jobs []&G13RenderJobResources
 	g13_queues []&G13QueueResources
 	auto_ack bool
+	allocs ChannelTestHeap
+	g13_private ChannelTestHeap
+	g13_shared ChannelTestHeap
+	g13_readonly ChannelTestHeap
+	g13_gpu_readonly ChannelTestHeap
+	channel_alloc ChannelAllocProbe
 	tvb_target u32
 	tvb_calls u32
 	tvb_grow_fails bool
@@ -253,18 +253,6 @@ fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 	return true
 }
 
-fn (mut mgr GpuManager) drain_auxiliary_channels() {
-	mut bytes := [256]u8{}
-	for i := u32(0); i < 6; i++ {
-		for mgr.channels.fw_log.dequeue_subchannel(&bytes[0], i) {
-		}
-	}
-	for mgr.channels.ktrace.dequeue(&bytes[0]) {
-	}
-	for mgr.channels.stats.dequeue(&bytes[0]) {
-	}
-}
-
 fn (mut mgr GpuManager) reap_g13_render_jobs() { mgr.trace << 'success' }
 
 fn (mut mgr GpuManager) reap_g13_compute_jobs() { mgr.state = .stopped }
@@ -320,6 +308,8 @@ pub fn run_checks() {
 	check_compute_retirement()
 	check_recovery()
 	check_submit_idle_delay()
+	check_fw_log()
+	check_fw_log_allocations()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10
@@ -357,14 +347,6 @@ pub fn run_checks() {
 	broken.channels.event = channel.new_rx_channel('event', 1, u64(&broken_state), 1, u64(&broken_ring), 4, 0x38)
 	event_worker(mut broken)
 	assert_failed(&broken)
-
-	mut log_state := [6]channel.RingHeader{}
-	mut log_ring := [24]fw.FwLogMsg{}
-	log_state[5].write_ptr = 0xffff_ffff
-	mut bad_log := GpuManager{ hw_config: hw.HwConfig{ gpu_gen: .g13 } }
-	bad_log.channels.fw_log = channel.new_rx_channel_with_subchannels('log', 1, u64(&log_state), 1, u64(&log_ring), 4, 0xd8, 6)
-	event_worker(mut bad_log)
-	assert_failed(&bad_log)
 
 	mut tx_state := channel.RingHeader{ read_ptr: 4 }
 	mut tx_ring := [4]u64{}
