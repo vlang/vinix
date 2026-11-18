@@ -109,7 +109,7 @@ pub fn initialize_g13_workqueue_info(data voidptr, size u64, abi hw.FirmwareAbi,
 		|| notifier_list == 0 || gpu_buffer == 0 || gpu_context == 0 {
 		return false
 	}
-	mut legacy := G13WorkQueueInfo{
+	legacy := G13WorkQueueInfo{
 		state: state
 		ring: ring
 		notifier_list: notifier_list
@@ -121,14 +121,16 @@ pub fn initialize_g13_workqueue_info(data voidptr, size u64, abi hw.FirmwareAbi,
 		unk_54: -1
 		gpu_context: gpu_context
 	}
+	legacy_bytes := unsafe { &u8(&legacy) }
 	unsafe {
 		if abi == .v13_5_partial {
-			// Ventura inserts unk_a0_0 before gpu_context_addr and appends
-			// unk_b0. Both new words are zero in the reference builder.
-			C.memcpy(data, &legacy, 0xa0)
-			C.memcpy(voidptr(u64(data) + 0xa4), voidptr(u64(&legacy) + 0xa0), 0x10)
+			// Ventura inserts unk_84_0 before unk_84_state and appends unk_b0.
+			C.memcpy(data, legacy_bytes, 0x84)
+			C.memset(voidptr(u64(data) + 0x84), 0, 4)
+			C.memcpy(voidptr(u64(data) + 0x88), legacy_bytes + 0x84, 0x2c)
+			C.memset(voidptr(u64(data) + 0xb4), 0, 4)
 		} else {
-			C.memcpy(data, &legacy, sizeof(G13WorkQueueInfo))
+			C.memcpy(data, legacy_bytes, sizeof(G13WorkQueueInfo))
 		}
 	}
 	return true

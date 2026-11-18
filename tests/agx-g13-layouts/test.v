@@ -274,14 +274,19 @@ fn check_fragment_tib_sizing() {
 
 fn check_v13_5_queue_objects() {
 	assert (fw.g13_workqueue_info_active_size(.v13_5_partial) or { 0 }) == 0xb8
-	mut queue := []u8{len: 0xb8}
+	mut queue := [0xba]u8{init: u8(0xa5)}
+	queue_info := unsafe { voidptr(&queue[1]) }
 	priority := fw.g13_workqueue_priority(0) or { panic('missing priority') }
-	assert fw.initialize_g13_workqueue_info(queue.data, u64(queue.len), .v13_5_partial,
+	assert fw.initialize_g13_workqueue_info(queue_info, 0xb8, .v13_5_partial,
 		0x1000, 0x2000, 0x3000, 0x4000, -1, priority, 0x55aa, 0x8877_6655_4433_2211)
-	assert object_u64(queue.data, 0) == 0x1000
-	assert object_u32(queue.data, 0xa0) == 0
-	assert object_u64(queue.data, 0xa4) == 0x8877_6655_4433_2211
-	assert object_u32(queue.data, 0xb4) == 0
+	assert object_u64(queue_info, 0) == 0x1000
+	for offset := u32(0x60); offset < 0xa4; offset += 4 {
+		assert object_u32(queue_info, offset) == 0
+	}
+	assert object_u64(queue_info, 0xa4) == 0x8877_6655_4433_2211
+	assert object_u64(queue_info, 0xac) == 0
+	assert object_u32(queue_info, 0xb4) == 0
+	assert queue[0] == 0xa5 && queue[0xb9] == 0xa5
 
 	assert (fw.g13_buffer_scene_active_size(.v13_5_partial) or { 0 }) == 0x48
 	mut scene := []u8{len: 0x48}

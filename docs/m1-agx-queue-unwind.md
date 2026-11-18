@@ -96,3 +96,28 @@ The evidence archive covers `b25b634a90829d3100dc05fb5a267366a418dc14` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-notifier-head-20261119.s50seM/bundle.tar.gz`
 with SHA-256 `7fec3782c4cc2bc2df04a806b769910ea2132020e36d5c0b50aadc506e275e9e`.
+
+## Firmware 13.5 work-queue record
+
+The G13 initializer now inserts the zero word at `0x84` before the queue state
+fields and explicitly writes the trailing zero word at `0xb4`. Those writes
+initialize all `0xb8` bytes and preserve the GPU context pointer at `0xa4`.
+The previous conversion relied on the queue allocator's initial zero fill for
+two words. On a prefilled destination it left the pattern `0xa5a5a5a5` in the
+record.
+[Pinned queue layout](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/fw/workqueue.rs#L130-L158)
+[Pinned queue initializer](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/workqueue.rs#L706-L735)
+
+The sanitizer regression reproduces the stale word in the old initializer and
+checks the versioned state words, context pointer and guard bytes after the
+fix. The temporary common record now stays on the stack in both ABI branches.
+The host heap comparison measured 25 allocations from this initializer
+before the change and zero afterward, a reduction of 4,800 retained bytes.
+AArch64 generated C confirms the stack record. The allocation scan dropped
+one finding and reproduced the other 176. Both kernel builds and 79 V
+source-contract test files passed. M1 hardware validation remains open.
+
+The evidence archive covers `d8eff76d55dc052e21fde44ef56096d5d72d41f5` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-queue-info-20261119.D2Uk6h/bundle.tar.gz`
+with SHA-256 `49d3acb63fb5803287beb3c978b21a900ce47616e7ab20e3d1f9afb5b8a4862b`.
