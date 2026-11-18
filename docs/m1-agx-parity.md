@@ -391,6 +391,33 @@ are stored in `native-builds.tar.gz` and verified against their original
 hashes. `bundle.tar.gz` SHA-256 is
 `5090cd359d9efa10d72723d088973e51f57f18bc940eaac5df5d2e67a562f926`.
 
+Both G13 timestamp BIND ABIs now hold the shutdown lock while installing
+the handle and assigning it to the ioctl output. They reserve handle
+table capacity before taking that lock. If the manager has stopped by
+the time BIND reaches publication, it returns `ENODEV`, leaves the
+output and existing handles intact, and retires the new VA and GEM
+reference after releasing both locks. Asahi also maps the buffer before
+installing the handle and drops a rejected mapping after releasing the
+handle table lock.
+[Pinned Asahi timestamp BIND](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L1217-L1232)
+
+The sanitizer suite passed 128 simulated shutdown races after a
+successful map and 185,000 timestamp ioctl checks across both ABIs. The
+compiled baseline reproduced the publication bug. Both kernel builds,
+82 test files and the independent lifetime review passed. The allocation
+scan reproduced 178 baseline findings. A BIND that finishes publication
+first can still return after shutdown. Cleanup of published mappings
+across permanent teardown or manager replacement remains open. The full
+source audit remains `not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `9e54aacb83982c2a3617c00e32f34001c62cee4a` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-commit-stop-20261118/`.
+Each native build archive contains the executable and generated C, with
+hashes verified after compression. The bundle passed full inventory
+verification. `bundle.tar.gz` SHA-256 is
+`6db23802111a185aa7ece04df529684db794f22b453fae8c4fac177d59f45dab`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

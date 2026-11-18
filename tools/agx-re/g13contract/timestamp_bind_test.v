@@ -10,6 +10,7 @@ fn test_timestamp_bind_guards_require_output_only_handles_checked_sum_and_lookup
 		'if object.id > candidate { return candidate, index }', 'if object.id == candidate && !object.detached',
 		'f.timestamp_objects[slot] = object',
 		'else if !f.reserve_timestamp_entry_locked() { -12 }', 'return publish_code',
+		'gpu_manager.lock.acquire()', 'publish_code = -19',
 		'if storage == unsafe { nil } { return false }',
 		'if manager := gpu.get_global_manager()', 'f.timestamp_objects[found_index].detached = true',
 		'f.timestamp_objects.delete(found_index)'] {

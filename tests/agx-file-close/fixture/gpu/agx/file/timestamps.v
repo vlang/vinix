@@ -90,6 +90,43 @@ fn check_timestamp_publication_storage() {
 	println('G13 timestamp publication: 400 allocation refusals, 200 mapping-precedence checks, 100 spare-slot publications and growth retries preserve captures and release all storage')
 }
 
+fn check_timestamp_publication_stop() {
+	for _ in 0 .. 64 {
+		for modern in [false, true]! {
+			gpu.available(true)
+			gpu.set_running(true)
+			mut file := GpuFile{}
+			bo := gem.create(9300)
+			file.objects.add_created(bo)
+			assert bind_capture_buffer(mut file, bo.handle) == 1
+			original := file.timestamp_objects[0]
+			before_alloc := memory.calls()
+			maps := gpu.maps()
+			unmaps := gpu.unmaps()
+			stops := gpu.stop_count()
+			gpu.stop_after_next_timestamp_map()
+			legacy := timestamp_bind(bo.handle, 0x12345678, 0, 0x4000, ioctl.asahi_bind_object_usage_timestamps)
+			if modern {
+				request := asahi.GemBindObject{op: legacy.op, flags: legacy.flags, handle: legacy.handle,
+					range: legacy.range, object_handle: legacy.object_handle}
+				before := request
+				assert file.ioctl_modern_gem_bind_object(unsafe { &request }) == -19 && request == before
+			} else {
+				before := legacy
+				assert file.ioctl_gem_bind_object(unsafe { &legacy }) == -19 && legacy == before
+			}
+			assert gpu.stop_count() == stops + 1 && gpu.maps() == maps + 1 && gpu.unmaps() == unmaps + 1
+			assert !file.lock.is_held() && !gpu.timestamp_lock_held()
+			assert memory.calls() == before_alloc && bo.references == 2 && file.timestamp_objects.len == 1
+			assert file.timestamp_objects[0] == original
+			assert file.close() && gem.live() == 0 && gpu.unmaps() == unmaps + 2
+			memory.assert_released()
+		}
+	}
+	gpu.set_running(true)
+	println('G13 timestamp publication: 128 shutdown races after a successful map return ENODEV without publishing a handle and retire only the new mapping')
+}
+
 fn check_timestamp_unbind_without_manager() {
 	for cycle in 0 .. 64 {
 		for modern in [false, true]! {

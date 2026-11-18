@@ -1092,6 +1092,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Timestamp name publication returns ENOMEM on table growth failure and unmaps the new VA before dropping its GEM reference',
 		'Timestamp UNBIND removes the public handle while an unavailable manager delays mapping cleanup',
 		'Timestamp BIND returns ENODEV if the G13 manager stopped before VA allocation, under the shutdown lock',
+		'Timestamp BIND serializes name publication with G13 shutdown and unwinds a mapped VA if shutdown wins',
 		'Timestamp BIND propagates aperture ENOSPC, occupied-leaf EBUSY and table-allocation ENOMEM through both ABIs with unpublished VA rollback',
 		'host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',

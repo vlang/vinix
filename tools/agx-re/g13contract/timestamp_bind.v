@@ -22,12 +22,15 @@ fn check_timestamp_bind_local(file string) ! {
 		'gem.unref(obj)', 'gpu.get_global_manager()', 'map_code, va := gpu_manager.map_g13_timestamp_buffer(',
 		'if map_code != 0', 'gem.unref(obj)', 'return map_code',
 		'f.lock.acquire()', 'id, slot := f.allocate_timestamp_id_locked()',
-		'publish_code := if id == 0 { -16 } else if !f.reserve_timestamp_entry_locked() { -12 } else { 0 }',
-		'if publish_code != 0', 'f.lock.release()',
-		'gpu_manager.unmap_g13_timestamp_buffer(va, request.range)', 'gem.unref(obj)', 'return publish_code',
+		'mut publish_code := if id == 0 { -16 } else if !f.reserve_timestamp_entry_locked() { -12 } else { 0 }',
+		'if publish_code == 0', 'gpu_manager.lock.acquire()', 'if gpu_manager.state == .stopped', 'publish_code = -19',
 		'f.timestamp_objects << object', 'index > slot', 'f.timestamp_objects[index] = f.timestamp_objects[index - 1]',
-		'f.timestamp_objects[slot] = object', 'f.lock.release()', 'request.object_handle = id'],
+		'f.timestamp_objects[slot] = object', 'request.object_handle = id', 'gpu_manager.lock.release()',
+		'f.lock.release()', 'if publish_code != 0',
+		'gpu_manager.unmap_g13_timestamp_buffer(va, request.range)', 'gem.unref(obj)', 'return publish_code'],
 		'Timestamp BIND checks overflow before BO lookup, empty ranges after it and publishes only its output handle')!
+	require(bind.count('gpu_manager.lock.release()') == 1,
+		'Timestamp publication keeps the manager lock through insertion and output assignment')!
 	require(!bind.contains('request.object_handle !=') && !bind.contains('request.object_handle =='),
 		'BIND object_handle is output-only')!
 	unbind := query.all_after('ioctl.asahi_bind_object_op_unbind {')

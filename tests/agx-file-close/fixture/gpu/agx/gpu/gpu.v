@@ -41,9 +41,8 @@ pub struct G17QueueResources {}
 
 pub enum State { idle starting running error stopped }
 pub struct GpuManager {
-mut:
-	lock klock.Lock
 pub mut:
+	lock klock.Lock
 	state State = .running
 	hw_config Config
 	g13_timestamp TimestampAllocator
@@ -60,6 +59,7 @@ __global mapping_check_count = 0
 __global stops_finished = 0
 __global timestamp_maps = 0
 __global timestamp_map_error = 0
+__global stop_after_timestamp_map = false
 __global queue_pool = [16]G13QueueResources{}
 __global queue_attempts = 0
 __global live_queues = 0
@@ -110,11 +110,16 @@ pub fn (mut mgr GpuManager) create_g17_queue_resources(_id u32, _owner u32, _mas
 
 pub fn maps() int { return timestamp_maps }
 pub fn fail_timestamp_map(code int) { timestamp_map_error = code }
+pub fn stop_after_next_timestamp_map() { stop_after_timestamp_map = true }
 
 pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(physical u64, size u64) (int, u64) {
 	assert physical != 0 && size != 0
 	timestamp_maps++
 	if timestamp_map_error != 0 { return timestamp_map_error, 0 }
+	if stop_after_timestamp_map {
+		stop_after_timestamp_map = false
+		stop_during_mapping_lock()
+	}
 	return 0, u64(0xffffffae10000000) + u64(timestamp_maps - 1) * 0x4000
 }
 
@@ -212,6 +217,7 @@ pub fn free_g13_queue_record(resources &G13QueueResources) {
 }
 
 pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(address u64, size u64) bool {
+	assert !mgr.lock.is_held()
 	timestamp_unmaps++
 	return true
 }

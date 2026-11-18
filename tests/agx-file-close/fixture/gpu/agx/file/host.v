@@ -166,6 +166,7 @@ pub fn run_checks() {
 	check_timestamp_bindings()
 	check_timestamp_captures()
 	check_timestamp_publication_storage()
+	check_timestamp_publication_stop()
 	check_timestamp_unbind_without_manager()
 	gpu.check_timestamp_serialization()
 	check_zero_bind_ranges()

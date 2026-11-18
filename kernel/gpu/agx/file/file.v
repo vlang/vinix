@@ -989,27 +989,35 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 			}
 			f.lock.acquire()
 			id, slot := f.allocate_timestamp_id_locked()
-			publish_code := if id == 0 { -16 } else if !f.reserve_timestamp_entry_locked() { -12 } else { 0 }
+			mut publish_code := if id == 0 { -16 } else if !f.reserve_timestamp_entry_locked() { -12 } else { 0 }
+			if publish_code == 0 {
+				// Storage is already reserved. Hold the shutdown lock through
+				// publication, in the usual file-before-manager lock order.
+				gpu_manager.lock.acquire()
+				if gpu_manager.state == .stopped {
+					publish_code = -19
+				} else {
+					object := TimestampObject{
+						id: id
+						va: va
+						size: request.range
+						obj: obj
+					}
+					f.timestamp_objects << object
+					for index := f.timestamp_objects.len - 1; index > slot; index-- {
+						f.timestamp_objects[index] = f.timestamp_objects[index - 1]
+					}
+					f.timestamp_objects[slot] = object
+					request.object_handle = id
+				}
+				gpu_manager.lock.release()
+			}
+			f.lock.release()
 			if publish_code != 0 {
-				f.lock.release()
 				gpu_manager.unmap_g13_timestamp_buffer(va, request.range)
 				gem.unref(obj)
-				return publish_code
 			}
-			object := TimestampObject{
-				id: id
-				va: va
-				size: request.range
-				obj: obj
-			}
-			f.timestamp_objects << object
-			for index := f.timestamp_objects.len - 1; index > slot; index-- {
-				f.timestamp_objects[index] = f.timestamp_objects[index - 1]
-			}
-			f.timestamp_objects[slot] = object
-			f.lock.release()
-			request.object_handle = id
-			return 0
+			return publish_code
 		}
 		ioctl.asahi_bind_object_op_unbind {
 			if request.flags != 0 || request.handle != 0 || request.offset != 0
