@@ -19,7 +19,7 @@ fn checks() !int {
 	for name in ['katomic'] {
 		os.cp_all('${repo}/tests/agx-g13-failure/fixture/${name}', '${scratch}/${name}', false)!
 	}
-	for path in ['drm/ioctl', 'drm/asahi', 'gpu/agx/bo', 'gpu/agx/vm', 'gpu/agx/params'] {
+	for path in ['drm/ioctl', 'drm/asahi', 'gpu/agx/alloc', 'gpu/agx/bo', 'gpu/agx/vm', 'gpu/agx/params'] {
 		os.mkdir_all(os.dir('${scratch}/${path}'))!
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!
 	}

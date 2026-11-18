@@ -38,7 +38,7 @@ fn check_timestamp_captures() {
 	mut validation_cases := 0
 	mut ownership_cases := 0
 	for cycle in 0 .. 64 {
-		gpu.available(true); gpu.set_running(true); gpu.fail_timestamp_map(false)
+		gpu.available(true); gpu.set_running(true); gpu.fail_timestamp_map(0)
 		mut file := GpuFile{}
 		mut foreign := GpuFile{}
 		file.timestamp_objects.flags |= .noslices

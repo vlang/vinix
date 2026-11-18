@@ -969,9 +969,10 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				return -19
 			}
 			mut gpu_manager := unsafe { manager }
-			va := gpu_manager.map_g13_timestamp_buffer(obj.phys_addr + request.offset, request.range) or {
+			map_code, va := gpu_manager.map_g13_timestamp_buffer(obj.phys_addr + request.offset, request.range)
+			if map_code != 0 {
 				gem.unref(obj)
-				return -12
+				return map_code
 			}
 			f.lock.acquire()
 			id := f.allocate_timestamp_id_locked() or {

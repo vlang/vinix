@@ -59,7 +59,7 @@ __global mapping_check_failure_after = int(-1)
 __global mapping_check_count = 0
 __global stops_finished = 0
 __global timestamp_maps = 0
-__global reject_timestamp_map = false
+__global timestamp_map_error = 0
 __global queue_pool = [16]G13QueueResources{}
 __global queue_attempts = 0
 __global live_queues = 0
@@ -109,13 +109,13 @@ pub fn (mut mgr GpuManager) retained_g13_queue_resources(id u32, vm voidptr) ?&G
 pub fn (mut mgr GpuManager) create_g17_queue_resources(_id u32, _owner u32, _mask u32, _priority u32) ?&G17QueueResources { return none }
 
 pub fn maps() int { return timestamp_maps }
-pub fn fail_timestamp_map(reject bool) { reject_timestamp_map = reject }
+pub fn fail_timestamp_map(code int) { timestamp_map_error = code }
 
-pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(physical u64, size u64) ?u64 {
+pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(physical u64, size u64) (int, u64) {
 	assert physical != 0 && size != 0
 	timestamp_maps++
-	if reject_timestamp_map { return none }
-	return u64(0xffffffae10000000) + u64(timestamp_maps - 1) * 0x4000
+	if timestamp_map_error != 0 { return timestamp_map_error, 0 }
+	return 0, u64(0xffffffae10000000) + u64(timestamp_maps - 1) * 0x4000
 }
 
 pub fn stop_count() int { return stops_finished }

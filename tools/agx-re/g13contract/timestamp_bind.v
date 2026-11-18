@@ -8,7 +8,8 @@ fn check_timestamp_bind_local(file string) ! {
 		'request.offset & pgtable.uat_pg_mask != 0', 'request.range & pgtable.uat_pg_mask != 0',
 		'request.range > ~request.offset', 'return -22', 'f.get_object_ref(request.handle) or { return -2 }',
 		'if obj.vm_private_identity != 0 { gem.unref(obj); return -22 }', 'if request.range == 0 || request.offset > obj.size',
-		'gem.unref(obj)', 'gpu.get_global_manager()', 'gpu_manager.map_g13_timestamp_buffer(',
+		'gem.unref(obj)', 'gpu.get_global_manager()', 'map_code, va := gpu_manager.map_g13_timestamp_buffer(',
+		'if map_code != 0', 'gem.unref(obj)', 'return map_code',
 		'f.timestamp_objects << TimestampObject{', 'request.object_handle = id'],
 		'Timestamp BIND checks overflow before BO lookup, empty ranges after it and publishes only its output handle')!
 	require(!bind.contains('request.object_handle !=') && !bind.contains('request.object_handle =='),
@@ -40,6 +41,9 @@ fn check_timestamp_bind_reference(file string, gpu string, gem string, mmu strin
 	require(mapper.contains('bo.map_range_into_range('), 'Packaged timestamp mapping follows BO lookup')!
 	object := section(gem, 'pub(crate) fn map_range_into_range(', '/// Maps an object into a given `Vm` at a specific address.', 'Packaged timestamp BO bounds')!
 	require_order(object, ['if obj_range.end > self.gem.size()', 'return Err(EINVAL)', 'validate_vm_binding(', 'vm.map_in_range('], 'Packaged timestamp BO/private validation')!
-	map_range := section(mmu, 'fn map_in_range_with_mode(', 'let reserved_size', 'Packaged zero-range validation')!
+	map_range := section(mmu, 'fn map_in_range_with_mode(', '/// Map a GEM object into this Vm at a specific address.', 'Packaged mapping admission')!
 	require(map_range.contains('if size == 0 || object_range.end > gem.size()'), 'Packaged empty ranges fail in mapping, after BO lookup')!
+	require_order(map_range, ['inner.mm.insert_node_in_range(', 'Err(error) =>', 'drop(vm_exec);', 'return Err(error);',
+		'let ret = inner.map_node(&node, prot);', 'ret?', 'Ok(KernelMapping(ManuallyDrop::new(node)))'],
+		'Packaged timestamp aperture propagates reservation errors before publishing the mapping owner')!
 }

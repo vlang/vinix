@@ -554,20 +554,19 @@ fn (mut mgr GpuManager) alloc_g13_shared_buffer(size u64) ?SharedBuffer {
 // Timestamp objects are GEM-owned, so only their IOVA is allocated here. The
 // physical backing remains owned by the per-file GEM handle for the complete
 // lifetime of this mapping.
-pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) ?u64 {
+pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) (int, u64) {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
 	if mgr.hw_config.gpu_gen != .g13 || phys & pgtable.uat_pg_mask != 0 || size == 0
 		|| size & pgtable.uat_pg_mask != 0 || uat_mgr == unsafe { nil } {
-		return none
+		return -12, 0
 	}
-	va := mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return none }
+	va := mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }
 	if !uat_mgr.map_kernel(va, phys, size, pgtable.gpu_prot_fw_shared_rw) {
-		mgr.g13_timestamp.release(va)
-		mgr.g13_timestamp.gc()
-		return none
+		mgr.g13_timestamp.cancel_unpublished(va)
+		return -12, 0
 	}
-	return va
+	return 0, va
 }
 
 pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(va u64, size u64) {

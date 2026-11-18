@@ -255,6 +255,31 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `ec73a69ae1be32f6308d3e947ed67ad46f71f2d19595e562ee1e48fc67ab9fef`.
 
+G13 timestamp BIND returns `ENOSPC` through both ioctl ABIs when
+the 64 MiB firmware aperture has no suitable range. A page-table
+failure still returns `ENOMEM` and cancels the unpublished VA
+reservation without collecting other deferred ranges. Both failures
+release the temporary GEM reference and preserve the output handle.
+[Asahi range mapping](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L2459-L2504)
+[DRM MM reservation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_mm.c#L500-L611)
+
+The sanitizer suite filled all 4,096 16 KiB slots using Vinix's real
+allocator with a simulated UAT. A further reservation failed before
+mapping, and a released slot accepted a retry. It also checked 100
+failed-map rollback cycles and 184,000 timestamp ioctl cases.
+Three compiled negative controls failed at their expected assertions.
+Both kernel builds, 82 test files and the page-table rollback and
+async suites passed. The allocation scan reproduced 178 baseline
+findings. The full source audit remains `not_equivalent`. No hardware
+tests or reboots ran.
+
+Evidence for `0120edec85fd1176b6908b3264a5467186f6901f` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-aperture-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`c44fa0cd5321315df3131a8e9f53ebb06e8e4c9447d007493119a562cc64a6f1`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

@@ -6,7 +6,7 @@ import g13layout
 fn test_timestamp_bind_guards_require_output_only_handles_checked_sum_and_lookup_order() {
 	file := read(g13layout.repo_root() + '/kernel/gpu/agx/file/file.v')!
 	check_timestamp_bind_local(file)!
-	for token in ['|| request.range > ~request.offset', 'request.range == 0 || ',
+	for token in ['|| request.range > ~request.offset', 'request.range == 0 || ', 'return map_code',
 		'manager := gpu.get_global_manager() or { f.lock.release(); return -19 }',
 		'f.timestamp_objects.delete(found_index)'] {
 		if _ := check_timestamp_bind_local(file.replace(token, '')) { assert false, token }

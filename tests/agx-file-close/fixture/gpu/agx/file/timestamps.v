@@ -3,6 +3,7 @@ module file
 
 import drm.gem
 import drm.ioctl
+import drm.asahi
 import gpu.agx.gpu
 
 struct TimestampRange {
@@ -27,7 +28,7 @@ fn check_timestamp_bindings() {
 	page := u64(0x4000)
 	mut cases := 0
 	for cycle in 0 .. 200 {
-		gpu.available(true); gpu.set_running(true); gpu.fail_timestamp_map(false)
+		gpu.available(true); gpu.set_running(true); gpu.fail_timestamp_map(0)
 		mut file := GpuFile{}
 		file.timestamp_objects.flags |= .noslices
 		mut foreign := GpuFile{}
@@ -123,13 +124,22 @@ fn check_timestamp_bindings() {
 			assert file.ioctl_gem_bind_object(unsafe { &bad }) == -22 && bad == before
 			assert gpu.maps() == maps && gpu.lookups() == lookups && shared.references == 1 && !file.lock.is_held(); cases++
 		}
-		gpu.fail_timestamp_map(true)
-		mut oom := timestamp_bind(shared.handle, ~u32(0), 0, page, ioctl.asahi_bind_object_usage_timestamps)
-		before_oom := oom; maps := gpu.maps(); unmaps := gpu.unmaps()
-		assert file.ioctl_gem_bind_object(unsafe { &oom }) == -12 && oom == before_oom
-		assert shared.references == 1 && file.timestamp_objects.len == 0 && gpu.maps() == maps + 1 && gpu.unmaps() == unmaps
-		assert !file.lock.is_held(); cases++
-		gpu.fail_timestamp_map(false)
+		for map_error in [-12, -28]! {
+			gpu.fail_timestamp_map(map_error)
+			request := timestamp_bind(shared.handle, ~u32(0), 0, page, ioctl.asahi_bind_object_usage_timestamps)
+			saved := request
+			maps := gpu.maps(); unmaps := gpu.unmaps()
+			assert file.ioctl_gem_bind_object(unsafe { &request }) == map_error && request == saved
+			modern := asahi.GemBindObject{
+				op: request.op, flags: request.flags, handle: request.handle,
+				range: request.range, object_handle: request.object_handle
+			}
+			saved_modern := modern
+			assert file.ioctl_modern_gem_bind_object(unsafe { &modern }) == map_error && modern == saved_modern
+			assert shared.references == 1 && file.timestamp_objects.len == 0 && gpu.maps() == maps + 2 && gpu.unmaps() == unmaps
+			assert !file.lock.is_held(); cases += 2
+		}
+		gpu.fail_timestamp_map(0)
 		// The output field can name a live mapping without replacing it.
 		file.next_timestamp_id = ~u32(0)
 		mut first := timestamp_bind(shared.handle, u32(7), 0, page, ioctl.asahi_bind_object_usage_timestamps)
@@ -144,5 +154,5 @@ fn check_timestamp_bindings() {
 		assert file.close() && foreign.close() && gem.live() == 0
 		assert gpu.unmaps() == unmaps_before_close + 1
 	}
-	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, map OOM, missing/zero/foreign unbind names, retained unavailable-manager owners, header precedence, ID wrap, sibling preservation and final release passed')
+	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, ENOMEM and ENOSPC under both ABIs, missing/zero/foreign unbind names, retained unavailable-manager owners, header precedence, ID wrap, sibling preservation and final release passed')
 }

@@ -40,6 +40,13 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		body := section(gpu, 'pub fn (mut mgr GpuManager) ' + method + '(', end, method)!
 		require_order(body, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'mgr.g13_timestamp.'], 'Global timestamp allocator serialization')!
 	}
+	mapper := section(gpu, 'pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(', 'pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(', 'Native timestamp aperture')!
+	require_order(mapper, ['mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }',
+		'if !uat_mgr.map_kernel(va, phys, size, pgtable.gpu_prot_fw_shared_rw)',
+		'mgr.g13_timestamp.cancel_unpublished(va)', 'return -12, 0', 'return 0, va'],
+		'Timestamp aperture exhaustion and page-table refusal propagate distinct errors')!
+	require(!mapper.contains('mgr.g13_timestamp.gc(') && !mapper.contains('mgr.g13_timestamp.release('),
+		'Failed timestamp map cancels only its unpublished VA')!
 }
 
 fn check_timestamp_capture_reference(common string, render string, compute string, file string) ! {
