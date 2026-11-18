@@ -71,9 +71,9 @@ pub fn close(number int) {
 
 pub fn fd_from_fdnum(_process &proc.Process, number int) ?&FD {
 	process := if _process == unsafe { nil } { proc.current_thread().process } else { unsafe { _process } }
-	if number < 0 || number >= process.fds.len { return none }
+	if number < 0 || number >= process.fds.len { errno.set(errno.ebadf); return none }
 	mut fd := unsafe { &FD(process.fds[number]) }
-	if fd == unsafe { nil } { return none }
+	if fd == unsafe { nil } { errno.set(errno.ebadf); return none }
 	fd.refs++
 	if lookup_action != unsafe { nil } {
 		callback := lookup_action; lookup_action = unsafe { nil }; callback()
@@ -91,7 +91,9 @@ pub fn fd_create_from_resource(mut res resource.Resource, flags int) ?&FD {
 	}
 	handle := &Handle{ resource: unsafe { res }, flags: flags }
 	descriptor_live++
-	return &FD{ handle: handle, flags: flags }
+	blocked := failing == 3
+	if blocked { failing = 0 }
+	return &FD{ handle: handle, flags: flags, blocked: blocked }
 }
 
 fn descriptor_mount_admitted(fd &FD) bool { return !fd.blocked }

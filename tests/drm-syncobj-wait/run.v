@@ -37,6 +37,8 @@ fn main() {
 	assert object_source.count(alias_site) == 1
 	os.write_file(object_path, object_source.replace(alias_site, 'memory.malloc_alias_fallible(sizeof(SyncobjHandle))'))!
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
+	os.cp_all('${repo}/tests/agx-file-close/fixture/drm/gem', '${scratch}/drm/gem', false)!
+	os.cp_all('${repo}/tests/agx-file-close/fixture/memory/mmap', '${scratch}/memory/mmap', false)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/katomic', '${scratch}/katomic', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/event', '${scratch}/event', false)!
@@ -47,11 +49,10 @@ fn main() {
 	os.write_file('${scratch}/file/table.v', 'module file\nimport proc\nimport errno\n' +
 		section(native_file, 'pub fn fdnum_create_from_fd(', '// Make room in a descriptor table')!)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
-	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport stat\nimport klock\nimport memory\nimport event.eventstruct\n' +
-		section(source, 'struct SyncFileResource {', '// A PRIME fd')! +
+	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport stat\nimport klock\nimport memory\nimport memory.mmap\nimport drm.gem\nimport event.eventstruct\n' +
+		section(source, 'struct SyncFileResource {', 'fn (mut this SyncFileResource) poll_status(')! +
 		section(source, 'fn (mut this SyncFileResource) poll_status(', '__global (')! +
-		section(source, 'fn ioctl_syncobj_create(', 'fn create_prime_fd(')! +
-		section(source, 'fn ioctl_syncobj_destroy(', 'fn ioctl_syncobj_wait(')! +
+		section(source, 'fn ioctl_syncobj_create(', 'fn ioctl_syncobj_wait(')! +
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
 	os.write_file('${scratch}/drm/production.v', production)!
 	os.cp('${repo}/kernel/drm/syncobj_fd.v', '${scratch}/drm/syncobj_fd.v')!

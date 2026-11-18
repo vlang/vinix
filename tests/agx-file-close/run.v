@@ -86,8 +86,6 @@ fn checks() !int {
 		section(drm_source, 'fn ioctl_gem_close(', 'fn ioctl_syncobj_create(')! +
 		section(drm_source, 'fn (mut this DrmNode) mapping_attributes(', 'fn (mut this DrmNode) read(')! +
 		section(drm_source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!)!
-	os.write_file('${scratch}/drm/prime.v', 'module drm\nimport drm.gem\nimport drm.ioctl\n' +
-		section(drm_source, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(')!)!
 	priority := os.read_file('${repo}/kernel/gpu/agx/fw/workqueue.v')!
 	os.mkdir_all('${scratch}/gpu/agx/fw')!
 	os.write_file('${scratch}/gpu/agx/fw/priority.v', 'module fw\n@[packed]\n' +

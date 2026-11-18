@@ -810,6 +810,28 @@ The restored archive passed inventory and kernel artifact verification for
 `bundle.tar.gz` SHA-256 is
 `04d2ef7e4c23b0672b5373aa9c8e79eab4cd9a3afc070fafed79fd90e99505c3`.
 
+PRIME export reserves a descriptor before looking up the GEM handle. A full
+table returns `EMFILE`, and a missing handle returns `ENOENT` once a slot is
+available. Wrapper or descriptor construction failure releases the export
+reference once and cancels the reservation. PRIME import ignores the reserved
+flags and returns `EBADF` for invalid or `O_PATH` descriptors and `EINVAL`
+for ordinary files. It pins the DMA-BUF through the import callback so a
+concurrent close cannot retire the exporter. [Pinned PRIME ioctl paths](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_prime.c#L292-L372) [Pinned export reservation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_prime.c#L510-L548) [Pinned DMA-BUF lookup](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L847-L866)
+
+Both kernel builds, 82 focused M1 V test files, the DRM wire checks and the
+sanitizer fixtures passed. The PRIME fixture covered 400 private refusals,
+both wrapper allocation failures, descriptor creation and installation
+failures, and import after an injected concurrent close. Independent review
+checked the reference lifetimes. The allocation scan found one fewer implicit
+site on each architecture. The offline audit reports `not_equivalent`.
+Cross-device DMA-BUF import and M1 hardware validation remain open.
+
+The restored archive passed inventory and kernel artifact verification for
+`7eca3cb5b9b66a21d458747e1f390d3da0bdb844` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-prime-20261118.XqoDLY/`.
+`bundle.tar.gz` SHA-256 is
+`f5ed6ced05681d6cc723daf50287f6ea773bacae5bfd88db525adeacc72b0456`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

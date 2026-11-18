@@ -38,6 +38,10 @@ pub fn reset() {
 }
 
 pub fn current_thread() &Thread { return unsafe { &wait_capture_thread } }
+pub fn interrupted() bool {
+	task := current_thread()
+	return task.must_exit || pending_signals(task) & ~task.masked_signals != 0
+}
 pub fn private_signal(masked bool) {
 	wait_capture_thread.pending_signals = u64(1) << 14
 	wait_capture_thread.masked_signals = if masked { u64(1) << 14 } else { u64(0) }

@@ -184,17 +184,10 @@ fn (mut this GemPrimeResource) unref(_handle voidptr) ? {
 	if katomic.dec(mut &this.refcount) {
 		return
 	}
-	if this.obj != unsafe { nil } {
-		if this.dev != unsafe { nil } && this.dev.driver != unsafe { nil }
-			&& this.dev.driver.gem_export_put != unsafe { nil } {
-			this.dev.driver.gem_export_put(this.dev, this.obj)
-		} else {
-			gem.unref(this.obj)
-		}
-	}
+	if this.obj != unsafe { nil } { put_prime_object(this.dev, this.obj) }
 	unsafe {
-		free(voidptr(this.box))
-		free(voidptr(this))
+		memory.free(voidptr(this.box))
+		memory.free(voidptr(this))
 	}
 }
 
@@ -933,21 +926,45 @@ fn ioctl_syncobj_create(handle voidptr, data voidptr) int {
 	return 0
 }
 
-fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
-	if dev == unsafe { nil } || obj == unsafe { nil } {
+fn put_prime_object(dev &DrmDevice, obj &gem.GemObject) {
+	if dev != unsafe { nil } && dev.driver != unsafe { nil }
+		&& dev.driver.gem_export_put != unsafe { nil } {
+		dev.driver.gem_export_put(dev, obj)
+	} else {
+		gem.unref(obj)
+	}
+}
+
+// Consume the export reference on success and failure.
+fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32, reservation &file.FdReservation) ?int {
+	allocation := memory.malloc_packed_fallible(sizeof(GemPrimeResource))
+	if allocation == unsafe { nil } {
+		put_prime_object(dev, obj)
+		errno.set(errno.enomem)
 		return none
 	}
-	mut wrapper := &GemPrimeResource{
+	box := memory.malloc_packed_fallible(sizeof(resource.Resource))
+	if box == unsafe { nil } {
+		memory.free(allocation)
+		put_prime_object(dev, obj)
+		errno.set(errno.enomem)
+		return none
+	}
+	mut wrapper := unsafe { &GemPrimeResource(allocation) }
+	unsafe { *wrapper = GemPrimeResource{
 		stat: stat.Stat{
 			mode: stat.ifreg | 0o600
 			size: i64(obj.size)
 			blksize: i64(4096)
 			blocks: i64(obj.size / 512)
 		}
-		dev: unsafe { dev }
-		obj: unsafe { obj }
+		dev: dev
+		obj: obj
 		can_mmap: true
-	}
+	} }
+	// Adopt the separately allocated interface as in create_sync_file_fd_at.
+	unsafe { *(&voidptr(&wrapper.box)) = box }
+	unsafe { *wrapper.box = resource.Resource(wrapper) }
 	mut fd_flags := 0
 	if flags & ioctl.drm_cloexec != 0 {
 		fd_flags |= resource.o_cloexec
@@ -955,44 +972,8 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32) ?int {
 	if flags & ioctl.drm_rdwr != 0 {
 		fd_flags |= resource.o_rdwr
 	}
-	wrapper.box = &resource.Resource(unsafe { wrapper }) @[freed]
 	mut res := wrapper.box
-	mut fd := file.fd_create_from_resource(mut res, fd_flags) or {
-		if dev.driver.gem_export_put != unsafe { nil } {
-			dev.driver.gem_export_put(dev, obj)
-		} else {
-			gem.unref(obj)
-		}
-		unsafe {
-			free(voidptr(wrapper.box))
-			free(voidptr(wrapper))
-		}
-		return none
-	}
-	fdnum := file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or {
-		fd.unref()
-		return none
-	}
-	return fdnum
-}
-
-// Return an owned object reference: the descriptor can be closed concurrently
-// after its open-file-description reference is released below.
-fn prime_object_from_fd(dev &DrmDevice, fdnum int) ?&gem.GemObject {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return none }
-	defer {
-		fd.unref()
-	}
-	mut res := fd.handle.resource
-	if mut res is GemPrimeResource {
-		if res.dev != dev || res.obj == unsafe { nil } {
-			return none
-		}
-		obj := unsafe { res.obj }
-		gem.ref_obj(obj)
-		return obj
-	}
-	return none
+	return file.fdnum_create_from_reserved_resource(reservation, mut res, fd_flags)
 }
 
 fn ioctl_prime_handle_to_fd(dev &DrmDevice, handle voidptr, data voidptr) int {
@@ -1000,19 +981,18 @@ fn ioctl_prime_handle_to_fd(dev &DrmDevice, handle voidptr, data voidptr) int {
 		return -22
 	}
 	mut request := unsafe { &ioctl.DrmPrimeHandle(data) }
-	if request.handle == 0 || request.flags & ~(ioctl.drm_cloexec | ioctl.drm_rdwr) != 0 {
+	if request.flags & ~(ioctl.drm_cloexec | ioctl.drm_rdwr) != 0 {
 		return -22
 	}
+	mut reservation := file.FdReservation{}
+	file.reserve_fd(unsafe { nil }, unsafe { &reservation }) or { return -int(errno.get()) }
+	defer { file.cancel_fd_reservation(unsafe { &reservation }) }
 	obj := dev.driver.gem_export(dev, handle, request.handle) or { return -2 }
 	if obj.vm_private_identity != 0 {
-		// The exporter returned an owned reference. Refuse private reservation
-		// domains before creating an fd, using the exporter's matching put.
-		if dev.driver.gem_export_put != unsafe { nil } {
-			dev.driver.gem_export_put(dev, obj)
-		} else { gem.unref(obj) }
-		return -22 // EINVAL, as in Asahi's non-exportable object policy
+		put_prime_object(dev, obj)
+		return -22
 	}
-	fdnum := create_prime_fd(dev, obj, request.flags) or { return -24 }
+	fdnum := create_prime_fd(dev, obj, request.flags, unsafe { &reservation }) or { return -int(errno.get()) }
 	request.fd = i32(fdnum)
 	return 0
 }
@@ -1022,15 +1002,17 @@ fn ioctl_prime_fd_to_handle(dev &DrmDevice, handle voidptr, data voidptr) int {
 		return -22
 	}
 	mut request := unsafe { &ioctl.DrmPrimeHandle(data) }
-	if request.fd < 0 || request.flags != 0 {
-		return -22
+	// Keep the DMA-BUF and its exporter reference live through handle import.
+	mut fd := file.fd_from_fdnum(unsafe { nil }, request.fd) or { return -int(errno.get()) }
+	defer { fd.unref() }
+	if fd.handle.flags & resource.o_path != 0 { return -9 }
+	mut res := fd.handle.resource
+	if mut res is GemPrimeResource {
+		if voidptr(res.dev) != voidptr(dev) || res.obj == unsafe { nil } { return -9 }
+		request.handle = dev.driver.gem_import(dev, handle, res.obj) or { return -12 }
+		return 0
 	}
-	obj := prime_object_from_fd(dev, request.fd) or { return -9 }
-	defer {
-		gem.unref(obj)
-	}
-	request.handle = dev.driver.gem_import(dev, handle, obj) or { return -12 }
-	return 0
+	return -22
 }
 
 fn ioctl_syncobj_destroy(handle voidptr, data voidptr) int {

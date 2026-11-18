@@ -26,7 +26,7 @@ fn test_private_domains_reject_reused_contexts_and_ownership_drift() {
 	if _ := check_private_bo_local(file, bo.replace('object.vm_private_identity != 0', 'false'),
 		mmu, gem, drm, identity) { assert false }
 	for broken in [drm.replace('if obj.vm_private_identity != 0', 'if false'),
-		drm.replace('else { gem.unref(obj) }', 'else {}'),
+		drm.replace('gem.unref(obj)', 'skip_put()'),
 		drm.replace('dev.driver.gem_export_put(dev, obj)', 'skip_put()')] {
 		if _ := check_private_bo_local(file, bo, mmu, gem, broken, identity) { assert false }
 	}

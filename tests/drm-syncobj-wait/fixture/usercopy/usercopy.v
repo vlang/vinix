@@ -2,7 +2,7 @@
 module usercopy
 
 __global start = u64(0)
-__global length = u64(0)
+__global input_size = u64(0)
 __global fail = false
 __global pub reads = 0
 __global pub writes = 0
@@ -13,7 +13,7 @@ __global output_fault = u64(0)
 __global after_output fn (u64, u64) = unsafe { nil }
 
 pub fn allow(address u64, size u64) {
-	start = address; length = size; fail = false; reads = 0; writes = 0
+	start = address; input_size = size; fail = false; reads = 0; writes = 0
 	output_count = 0; output_fault = 0; after_output = unsafe { nil }
 }
 pub fn inject_fault() { fail = true }
@@ -51,8 +51,8 @@ pub fn copy_to_user(output u64, input voidptr, size u64) bool {
 
 pub fn copy_from_user(output voidptr, input u64, size u64) bool {
 	reads++
-	if fail || input == 0 || input < start || input - start > length
-		|| size > length - (input - start) { return false }
+	if fail || input == 0 || input < start || input - start > input_size
+		|| size > input_size - (input - start) { return false }
 	unsafe { C.memcpy(output, voidptr(input), size) }
 	return true
 }

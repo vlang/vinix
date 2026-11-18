@@ -26,6 +26,7 @@ pub mut:
 	vm_private_identity u64
 	pte_extra u64
 	external bool
+	file_scoped bool
 	advice_dontneed bool
 	lock klock.Lock
 }
@@ -40,7 +41,10 @@ pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writebac
 	mut object := create_aligned(size, alignment) or { return none }
 	object.vm_private_identity = identity
 	object.pte_extra = if writeback { u64(0) } else { u64(0x10) }
-	if file_scoped { object.handle = 0 }
+	if file_scoped {
+		object.handle = 0
+		object.file_scoped = true
+	}
 	if file_scoped && registration.mmap_device != 0 {
 		object.mmap_device = registration.mmap_device
 		for index, entry in file_mmap_objects {

@@ -31,9 +31,11 @@ fn check_private_bo_local(file string, bo string, mmu string, gem string, drm st
 	require_order(gem, ['pub:\n\tvm_private_identity u64', 'fn create_object(',
 		'vm_private_identity: private_identity', 'if !file_scoped { gem_objects[handle] = obj }'], 'Vinix immutable GEM domain publication')!
 	prime := section(drm, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(', 'Vinix private PRIME refusal')!
-	require_order(prime, ['dev.driver.gem_export(dev, handle, request.handle)', 'if obj.vm_private_identity != 0',
-		'dev.driver.gem_export_put(dev, obj)', 'else { gem.unref(obj) }', 'return -22',
-		'create_prime_fd(dev, obj, request.flags)'], 'Vinix private PRIME refusal')!
+	require_order(prime, ['file.reserve_fd(', 'defer { file.cancel_fd_reservation(',
+		'dev.driver.gem_export(dev, handle, request.handle)', 'if obj.vm_private_identity != 0',
+		'put_prime_object(dev, obj)', 'return -22', 'create_prime_fd(dev, obj, request.flags,'], 'Vinix private PRIME refusal')!
+	put := section(drm, 'fn put_prime_object(', 'fn create_prime_fd(', 'Vinix PRIME reference release')!
+	require_order(put, ['dev.driver.gem_export_put(dev, obj)', 'gem.unref(obj)'], 'Vinix PRIME reference release')!
 	require_order(identity, ['if pool.next == 0', 'return none', 'identity := pool.next',
 		'pool.next = if identity == ~u64(0) { u64(0) } else { identity + 1 }', 'return identity'],
 		'Vinix non-reused VM identity')!
