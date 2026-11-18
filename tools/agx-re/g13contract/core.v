@@ -139,14 +139,19 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	results << 'retry-safe cached mapping teardown and final translation invalidation'
 	vinix_channel := read(os.join_path(repo, 'kernel/gpu/agx/channel/channel.v'))!
 	enqueue := section(vinix_channel, 'pub fn (mut ch TxChannel) enqueue_with_token', 'pub fn (ch &TxChannel) read_pointer', 'Vinix TX channel')!
-	require_order(enqueue, ['C.memcpy', 'katomic.sync()', 'katomic.store(mut write_ptr'], 'Vinix TX channel publication')!
-	require_order(enqueue, ['katomic.store(mut write_ptr, next_wp)', 'ch.published++',
-		'TxTicket{index: next_wp, sequence: ch.published}', 'fn (mut ch TxChannel) ticket_consumed(',
+	require_order(enqueue, ['ch.validate_pointers(rp, wp)', 'C.memcpy', 'katomic.sync()',
+		'ch.publish_write_pointer_locked(next_wp)', 'TxTicket{index: next_wp, sequence: ch.published}'], 'Vinix TX channel publication')!
+	require_order(enqueue, ['fn (mut ch TxChannel) publish_write_pointer_locked(',
+		'katomic.store(mut write_ptr, next)', 'ch.host_write_ptr = next', 'ch.published++',
+		'fn (mut ch TxChannel) ticket_consumed(',
 		'ch.validate_pointers(read_ptr, write_ptr)', 'capacity := u64(ch.ring_size)',
 		'later := ch.published - ticket.sequence', 'expected_write := (u64(ticket.index) + later % capacity) % capacity',
 		'if u64(write_ptr) != expected_write', 'katomic.store(mut &ch.faulted, u32(1))', 'return none',
 		'unread := (u64(write_ptr) + capacity - u64(read_ptr)) % capacity',
 		'return later >= unread'], 'Vinix validates the host write index before checking wrapped TX completion')!
+	validate := section(vinix_channel, 'pub fn (mut ch TxChannel) validate_pointers(', '\n}\n', 'Vinix TX ring validation')!
+	require_order(validate, ['write_ptr >= ch.ring_size', 'write_ptr != ch.host_write_ptr',
+		'katomic.store(mut &ch.faulted, u32(1))', 'return false'], 'Vinix rejects a mismatched shared TX cursor')!
 	results << 'TX ring entry barrier before write-pointer publication'
 	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
 	for spec in [['render', 'resources.vm', 'G13RenderJobResources', '7'], ['compute', 'ctx', 'G13ComputeJobResources', '3']] {
@@ -174,11 +179,12 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	results << 'G13 command, invalidation and fault routing through the published ASID'
 	batch := section(vinix_jobs, 'fn (mut mgr GpuManager) submit_g13_queue_commands(', 'fn (mut mgr GpuManager) submit_g13_queue_command(', 'Vinix batched G13 publisher')!
 	require_order(batch, ['*entry = command_va', 'katomic.sync()', 'katomic.store(mut &state.cpu_wptr',
-		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()', 'katomic.store(mut outer_write'], 'Vinix batched G13 publication')!
+		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()', 'outer.publish_write_pointer_locked(outer_next)'], 'Vinix batched G13 publication')!
 	render := section(vinix_jobs, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(', '// Transfer a prepared render pass', 'Vinix paired G13 publisher')!
 	require_order(render, ['*vertex_entry_1 = job.vertex.va', 'katomic.sync()',
 		'katomic.store(mut &fragment_state.cpu_wptr', '*vertex_destination = fw.FwRunWorkQueueMsg',
-		'katomic.sync()', 'katomic.store(mut fragment_outer_write'], 'Vinix paired G13 publication')!
+		'katomic.sync()', 'fragment_outer.publish_write_pointer_locked(fragment_outer_next)',
+		'vertex_outer.publish_write_pointer_locked(vertex_outer_next)'], 'Vinix paired G13 publication')!
 	results << 'batched compute/render entry barriers before inner and outer pointer publication'
 	return results
 }
@@ -575,7 +581,7 @@ fn check_batch_publication_contract(local string, pending string, reference stri
 		'job.vertex_ring_slot, job.vertex_retirement_sequence',
 		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()',
 		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)', 'katomic.sync()',
-		'katomic.store(mut write, pipes[pipe].outer_next)', 'pipe_mask |= u32(1) << pipe',
+		'outer.publish_write_pointer_locked(pipes[pipe].outer_next)', 'pipe_mask |= u32(1) << pipe',
 		'return G13BatchDoorbells{priority: queue.priority, pipes: pipe_mask}'], 'Vinix prepared batch publication')!
 	require(local.count('mgr.ring_g13_batch_pipe_locked(') == 1 && local.count('for pipe in [1, 0, 2]!') == 3,
 		'Native batch must publish and notify once per participating pipe in reference order')!

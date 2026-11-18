@@ -627,7 +627,7 @@ fn check_retirement() {
 }
 
 fn check_publishers() {
-	for broken in -1 .. 8 {
+	for broken in -1 .. 10 {
 		mut vertex_outer := channel.RingHeader{}
 		mut fragment_outer := channel.RingHeader{}
 		mut vertex_messages := [4]fw.FwRunWorkQueueMsg{}
@@ -661,6 +661,8 @@ fn check_publishers() {
 			5 { vertex_state.gpu_doneptr = ~u32(0) }
 			6 { fragment_state.cpu_wptr = 1280 }
 			7 { fragment_state.gpu_doneptr = ~u32(0) }
+			8 { vertex_outer.write_ptr = 2 }
+			9 { fragment_outer.write_ptr = 2 }
 			else {}
 		}
 		mut job := G13RenderJobResources{
@@ -674,6 +676,11 @@ fn check_publishers() {
 		}
 		before := katomic.barriers()
 		published := mgr.publish_g13_render_job_locked(mut job)
+		if broken >= 8 {
+			assert !published && mgr.channels.pipes[broken - 8].has_fault()
+			assert vertex_outer.write_ptr == if broken == 8 { u32(2) } else { u32(0) }
+			assert fragment_outer.write_ptr == if broken == 9 { u32(2) } else { u32(0) }
+		}
 		if broken == -1 {
 			assert published && mgr.rings == 2 && katomic.barriers() == before + 2
 			assert vertex_ring[0] == 33 && vertex_ring[1] == 44
@@ -712,7 +719,7 @@ fn check_publishers() {
 		resources.subqueues[1].lock.acquire()
 		resources.subqueues[1].lock.release()
 	}
-	for broken in -1 .. 4 {
+	for broken in -1 .. 5 {
 		mut outer := channel.RingHeader{}
 		mut messages := [4]fw.FwRunWorkQueueMsg{}
 		mut state := fw.G13WorkQueueRingState{}
@@ -730,10 +737,12 @@ fn check_publishers() {
 			1 { outer.write_ptr = ~u32(0) }
 			2 { state.cpu_wptr = 1280 }
 			3 { state.gpu_doneptr = ~u32(0) }
+			4 { outer.write_ptr = 2 }
 			else {}
 		}
 		before := katomic.barriers()
 		published := mgr.submit_g13_queue_commands(&resources, 2, [alloc.g13_private_start + 0x4000, u64(0), 0]!, 1, 0)
+		if broken == 4 { assert !published && mgr.channels.pipes[2].has_fault() && outer.write_ptr == 2 }
 		if broken == -1 {
 			assert published && mgr.rings == 1 && katomic.barriers() == before + 2
 			assert ring[0] == alloc.g13_private_start + 0x4000

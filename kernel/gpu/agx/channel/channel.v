@@ -55,7 +55,8 @@ pub mut:
 	faulted    u32 // sticky protocol error, observed by the firmware worker
 	lock       klock.Lock
 mut:
-	published  u64 // host enqueue count, protected by lock
+	host_write_ptr u32 // expected shared write pointer, protected by lock
+	published      u64 // host enqueue count, protected by lock
 }
 
 // The index serves callers that serialize producers through completion.
@@ -82,6 +83,14 @@ pub mut:
 
 pub fn new_tx_channel(name string, state_va u64, state_phys u64, ring_va u64,
 	ring_phys u64, ring_size u32, entry_size u32) TxChannel {
+	return tx_channel_with_write_offset(name, state_va, state_phys, ring_va, ring_phys, ring_size, entry_size, 0x20)
+}
+
+// Seed the host cursor from initialized channel state before it is shared
+// with firmware. Fresh production rings start at zero.
+fn tx_channel_with_write_offset(name string, state_va u64, state_phys u64, ring_va u64,
+	ring_phys u64, ring_size u32, entry_size u32, write_off u32) TxChannel {
+	initial := if state_phys == 0 { u32(0) } else { unsafe { katomic.load(&u32(state_phys + higher_half + write_off)) } }
 	return TxChannel{
 		name: name
 		state_base: state_va
@@ -90,15 +99,14 @@ pub fn new_tx_channel(name string, state_va u64, state_phys u64, ring_va u64,
 		ring_phys: ring_phys
 		ring_size: ring_size
 		entry_size: entry_size
-		write_off: 0x20
+		write_off: write_off
+		host_write_ptr: initial
 	}
 }
 
 pub fn new_fwctl_tx_channel(name string, state_va u64, state_phys u64, ring_va u64,
 	ring_phys u64, ring_size u32, entry_size u32) TxChannel {
-	mut channel := new_tx_channel(name, state_va, state_phys, ring_va, ring_phys, ring_size, entry_size)
-	channel.write_off = 0x10
-	return channel
+	return tx_channel_with_write_offset(name, state_va, state_phys, ring_va, ring_phys, ring_size, entry_size, 0x10)
 }
 
 pub fn new_rx_channel(name string, state_va u64, state_phys u64, ring_va u64,
@@ -148,7 +156,7 @@ pub fn (mut ch TxChannel) enqueue_tracked(data voidptr) ?TxTicket {
 	}
 
 	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
-	mut write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
+	write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
 	wp := katomic.load(write_ptr)
 	rp := katomic.load(read_ptr)
 	// G13 pointers are indices, not monotonically increasing counters. Apple
@@ -175,9 +183,17 @@ pub fn (mut ch TxChannel) enqueue_tracked(data voidptr) ?TxTicket {
 	// the AP/ASC coherency boundary; the release store alone is not the full
 	// device-observation barrier required by that contract.
 	katomic.sync()
-	katomic.store(mut write_ptr, next_wp)
-	ch.published++
+	ch.publish_write_pointer_locked(next_wp)
 	return TxTicket{index: next_wp, sequence: ch.published}
+}
+
+// The caller holds ch.lock, has validated the reservation, and has made the
+// complete ring entry visible to firmware before advancing this pointer.
+pub fn (mut ch TxChannel) publish_write_pointer_locked(next u32) {
+	mut write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
+	katomic.store(mut write_ptr, next)
+	ch.host_write_ptr = next
+	ch.published++
 }
 
 // A ticket belongs to the issuing channel until it is torn down. All
@@ -286,16 +302,19 @@ fn (mut ch RxChannel) read_subchannel(data voidptr, index u32, consume bool) boo
 }
 
 // Check if the transmit channel is full
-pub fn (ch &TxChannel) is_full() bool {
+pub fn (mut ch TxChannel) is_full() bool {
 	if ch.state_phys == 0 || ch.ring_phys == 0 || ch.ring_size < 2
-		|| ch.entry_size == 0 || ch.has_fault() {
+		|| ch.entry_size == 0 {
 		return true
 	}
+	ch.lock.acquire()
+	defer { ch.lock.release() }
+	if ch.has_fault() { return true }
 	read_ptr := unsafe { &u32(ch.state_phys + higher_half) }
 	write_ptr := unsafe { &u32(ch.state_phys + higher_half + ch.write_off) }
 	wp := katomic.load(write_ptr)
 	rp := katomic.load(read_ptr)
-	return wp >= ch.ring_size || rp >= ch.ring_size || (wp + 1) % ch.ring_size == rp
+	return wp != ch.host_write_ptr || wp >= ch.ring_size || rp >= ch.ring_size || (wp + 1) % ch.ring_size == rp
 }
 
 // Check if the receive channel is empty
@@ -321,7 +340,7 @@ pub fn (mut ch TxChannel) validate_pointers(read_ptr u32, write_ptr u32) bool {
 	if ch.has_fault() {
 		return false
 	}
-	if ch.ring_size < 2 || read_ptr >= ch.ring_size || write_ptr >= ch.ring_size {
+	if ch.ring_size < 2 || read_ptr >= ch.ring_size || write_ptr >= ch.ring_size || write_ptr != ch.host_write_ptr {
 		katomic.store(mut &ch.faulted, u32(1))
 		return false
 	}

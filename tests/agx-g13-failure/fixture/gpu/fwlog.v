@@ -101,6 +101,7 @@ mut:
 	live int
 	protections [37]u64
 	sizes [37]u64
+	headers [37]channel.RingHeader
 }
 
 fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64, protection u64) ?SharedBuffer {
@@ -111,7 +112,7 @@ fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(size u64, protection u6
 	probe.live++
 	probe.sizes[at] = size
 	probe.protections[at] = protection
-	return SharedBuffer{phys: u64(at + 1), va: u64(at + 1) << 16, size: size}
+	return SharedBuffer{phys: unsafe { u64(&probe.headers[at]) }, va: u64(at + 1) << 16, size: size}
 }
 
 fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
@@ -123,7 +124,7 @@ fn (mut mgr GpuManager) free_shared_buffer(mut buffer SharedBuffer) {
 		return
 	}
 	mut probe := &mgr.channel_alloc
-	at := int(buffer.phys - 1)
+	at := int(buffer.va >> 16) - 1
 	assert probe.sizes[at] == buffer.size && probe.sizes[at] != 0
 	probe.sizes[at] = 0
 	probe.live--

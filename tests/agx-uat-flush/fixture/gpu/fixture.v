@@ -142,7 +142,7 @@ fn run_case(initial u32, slot u32, mode int, outer_lock bool, pages u64) {
 	// Production deliberately cannot recycle a timed-out published slot.
 	handoff.flush[slot] = mmu.UatFlushInfo{}
 	header = channel.FwCtlRingHeader{}
-	manager.channels.fw_ctrl.faulted = 0
+	manager.channels.fw_ctrl = channel.new_fwctl_tx_channel('fwctl', 1, u64(&header), 1, u64(&ring), 256, 20)
 	manager.state = .running; manager.mode = 1; manager.acknowledged = false
 	table.handoff_initialized = true
 	if mode != 12 {

@@ -9,12 +9,17 @@ fn check_tx() {
 	value := u64(0x123456789abcdef0)
 	assert tx.enqueue(&value)
 	assert state.write_ptr == 1 && ring[0] == value && !tx.has_fault()
-	state.write_ptr = 3
 	state.read_ptr = 1
+	assert tx.enqueue(&value) && tx.enqueue(&value)
 	assert tx.enqueue(&value)
 	assert state.write_ptr == 0 && ring[3] == value
 	assert !tx.enqueue(&value), 'full ring must remain intact'
 	assert !tx.has_fault()
+	state.read_ptr = 2
+	state.write_ptr = 2
+	before := ring
+	assert !tx.enqueue(&value) && tx.has_fault(), 'TX must reject an in-range shared write pointer that disagrees with its host cursor'
+	assert state.write_ptr == 2 && ring == before
 	for pointers in [[u32(4), 0]!, [u32(0), 4]!, [u32(4), 4]!, [~u32(0), ~u32(0)]!] {
 		mut header := channel.RingHeader{ read_ptr: pointers[0], write_ptr: pointers[1] }
 		mut data := [u64(11), 22, 33, 44]!
@@ -31,6 +36,9 @@ fn check_tx() {
 	mut control_ring := [4]u64{}
 	mut ctl := channel.new_fwctl_tx_channel('fwctl', 1, u64(&control), 1, u64(&control_ring), 4, 8)
 	assert ctl.enqueue(&value) && control.write_ptr == 1
+	control.write_ptr = 2
+	assert !ctl.enqueue(&value) && ctl.has_fault()
+	assert control.write_ptr == 2 && control_ring[2] == 0
 }
 
 fn check_rx() {

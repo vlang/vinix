@@ -40,7 +40,8 @@ fn test_batch_publication_rejects_early_visibility_and_lost_transfer_cleanup() {
 	for token in ['outer.validate_pointers(outer_rp, outer_wp)', 'pipes[pipe].outer_next == outer_rp',
 		'free >= fw.g13_workqueue_entries', 'if !operation_active && !mgr.begin_g13_operation_locked() { return none }',
 		'job.submitted = true',
-		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)'] {
+		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)',
+		'outer.publish_write_pointer_locked(pipes[pipe].outer_next)'] {
 		assert local.contains(token)
 		if _ := check_batch_publication_contract(local.replace(token, ''), pending, reference) { assert false }
 	}

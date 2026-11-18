@@ -197,9 +197,8 @@ fn (mut mgr GpuManager) publish_g13_batch_locked(jobs [64]G13SubmissionJob, coun
 	katomic.sync()
 	for pipe in [1, 0, 2]! {
 		if pipes[pipe].count == 0 { continue }
-		outer := &mgr.channels.pipes[pipe_index(queue.priority, u32(pipe))]
-		mut write := unsafe { &u32(outer.state_phys + higher_half + outer.write_off) }
-		katomic.store(mut write, pipes[pipe].outer_next)
+		mut outer := &mgr.channels.pipes[pipe_index(queue.priority, u32(pipe))]
+		outer.publish_write_pointer_locked(pipes[pipe].outer_next)
 		pipe_mask |= u32(1) << pipe
 	}
 	return G13BatchDoorbells{priority: queue.priority, pipes: pipe_mask}

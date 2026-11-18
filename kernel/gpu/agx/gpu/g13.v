@@ -1017,7 +1017,7 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 		return false
 	}
 	outer_read := unsafe { &u32(outer.state_phys + higher_half) }
-	mut outer_write := unsafe { &u32(outer.state_phys + higher_half + outer.write_off) }
+	outer_write := unsafe { &u32(outer.state_phys + higher_half + outer.write_off) }
 	outer_wp := katomic.load(outer_write)
 	outer_rp := katomic.load(outer_read)
 	if !outer.validate_pointers(outer_rp, outer_wp) {
@@ -1085,7 +1085,7 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 		}
 	}
 	katomic.sync()
-	katomic.store(mut outer_write, outer_next)
+	outer.publish_write_pointer_locked(outer_next)
 	queue.is_new = false
 	queue.lock.release()
 	outer.lock.release()
@@ -2128,15 +2128,9 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 			is_new: if vertex_queue.is_new { u32(1) } else { u32(0) }
 		}
 	}
-	mut fragment_outer_write := unsafe {
-		&u32(fragment_outer.state_phys + higher_half + fragment_outer.write_off)
-	}
-	mut vertex_outer_write := unsafe {
-		&u32(vertex_outer.state_phys + higher_half + vertex_outer.write_off)
-	}
 	katomic.sync()
-	katomic.store(mut fragment_outer_write, fragment_outer_next)
-	katomic.store(mut vertex_outer_write, vertex_outer_next)
+	fragment_outer.publish_write_pointer_locked(fragment_outer_next)
+	vertex_outer.publish_write_pointer_locked(vertex_outer_next)
 	fragment_queue.is_new = false
 	vertex_queue.is_new = false
 

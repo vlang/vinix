@@ -8,10 +8,10 @@ import gpu.agx.mmu
 
 fn check_batch_publication() {
 	for shape in 0 .. 3 {
-		for failure in 0 .. 25 { check_batch_transaction(shape, failure, 64) }
+		for failure in 0 .. 26 { check_batch_transaction(shape, failure, 64) }
 		for count in [1, 2, 63]! { check_batch_transaction(shape, 0, count) }
 	}
-	println('AGX batch publication: 84 actual transactions, aggregate operation ownership, wrapped rings/stamps, notification failure and stop during notification passed')
+	println('AGX batch publication: 87 transactions cover write-cursor faults, aggregate operation ownership, wrapped rings and notification failure')
 }
 
 fn check_batch_transaction(shape int, failure int, job_count int) {
@@ -118,6 +118,7 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		18 { mgr.channels.pipes[last_pipe].write_off = 0x1000 }
 		23 { headers[last_pipe].read_ptr = 0 }
 		24 { mgr.stop_on_doorbell = true }
+		25 { headers[last_pipe].write_ptr = 1 }
 		else {}
 	}
 	early_operation := failure == 22 || failure == 23
@@ -136,7 +137,11 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		offered_count++
 	}
 	mut result := mgr.submit_g13_batch(offered, offered_count, early_operation)
-	refused := (failure > 0 && failure < 14) || failure == 17 || failure == 18 || failure == 23
+	if failure == 25 {
+		assert result == 0 && mgr.channels.pipes[last_pipe].has_fault() && headers[last_pipe].write_ptr == 1,
+			'whole batch must be refused before publication when one TX write cursor is corrupt'
+	}
+	refused := (failure > 0 && failure < 14) || failure in [17, 18, 23, 25]!
 	if refused {
 		assert result == 0 && mgr.pending == old_pending && threshold == old_threshold && counter == old_counter
 		assert mgr.doorbells.len == 0 && completions.all(it.calls == 0)
