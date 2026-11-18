@@ -32,19 +32,15 @@ fn main() {
 	os.mkdir_all('${scratch}/gpu/agx/alloc')!
 	allocator := os.read_file('${repo}/kernel/gpu/agx/alloc/alloc.v')!
 	os.write_file('${scratch}/gpu/agx/alloc/constants.v', 'module alloc\n' + section(allocator, 'pub const g13_private_start', '// RTKit system endpoints')!)!
-	page_table := os.read_file('${repo}/kernel/gpu/agx/pgtable/pgtable.v')!
-	os.write_file('${scratch}/gpu/agx/pgtable/protection.v', 'module pgtable\n' +
-		section(page_table, '// --- PTE attribute bits ---', '// Number of kernel pages required')!)!
 	os.write_file('${scratch}/gpu/agx/event/host.v', 'module event\n__global higher_half = u64(0)\npub fn test_force_refs(slot u32, value u32) u32 { old := gpu_event_mgr.stamps[slot].references; gpu_event_mgr.stamps[slot].references = value; return old }\n')!
 	os.symlink('${repo}/kernel/gpu/agx/fw', '${scratch}/gpu/agx/fw')!
 	source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
-	mut production := 'module gpu\nimport gpu.agx.event\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport katomic\nimport klock\n'
+	mut production := 'module gpu\nimport gpu.agx.event\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport katomic\nimport klock\n'
 	production += section(source, 'struct G13SubQueueResources {', 'struct G13RenderBufferResources {')!
 	production += section(source, 'pub struct G13ComputeJobResources {', 'pub struct G13QueueResources {')!
 	for pair in [
 		['fn (mut mgr GpuManager) begin_g13_operation_locked(', 'pub fn (mut mgr GpuManager) start_g13_submission_operation('],
-		['pub fn (mut mgr GpuManager) finish_g13_submission_operation(', 'fn (mut mgr GpuManager) flush_g13_kernel_buffer('],
-		['fn (mut mgr GpuManager) flush_g13_kernel_buffer(', '@[inline]\nfn g13_div_round_up('],
+		['pub fn (mut mgr GpuManager) finish_g13_submission_operation(', '@[inline]\nfn g13_div_round_up('],
 		['pub fn (queue &G13QueueResources) has_file_references(', '// Caller holds mgr.lock. Asahi QueueInner'],
 		['fn (mut mgr GpuManager) g13_ring_has_space_locked(', '// Publish up to two prefix barriers'],
 		['fn (mut mgr GpuManager) retire_g13_render_stages_locked(', 'fn build_g13_attachments('],

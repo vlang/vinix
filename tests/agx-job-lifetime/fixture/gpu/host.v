@@ -4,7 +4,6 @@ module gpu
 import gpu.agx.event
 import gpu.agx.fw
 import gpu.agx.mmu
-import gpu.agx.pgtable
 import gpu.agx.channel
 import klock
 import memory
@@ -70,7 +69,6 @@ mut:
 	phys u64
 	va   u64
 	size u64
-	protection u64 = pgtable.gpu_prot_fw_private_rw
 }
 
 fn (buffer &SharedBuffer) cpu_address() voidptr { return voidptr(buffer.phys) }
@@ -284,7 +282,6 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
-	check_kernel_mapping_flush()
 	check_job_mapping_publication()
 	check_prepared_job_backlog()
 	check_batch_publication()

@@ -449,15 +449,6 @@ pub fn (mut mgr GpuManager) finish_g13_submission_operation() {
 	if mgr.state != .stopped { mgr.end_g13_operation_locked() }
 }
 
-fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
-	if buffer == unsafe { nil } || buffer.va == 0 || buffer.size == 0 {
-		return false
-	}
-	// UAT's page-table invalidation already publishes uncached mappings.
-	if !pgtable.is_cached_noncoherent(buffer.protection) { return true }
-	return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
-}
-
 @[inline]
 fn g13_div_round_up(value u32, divisor u32) u32 {
 	return value / divisor + if value % divisor != 0 { u32(1) } else { u32(0) }

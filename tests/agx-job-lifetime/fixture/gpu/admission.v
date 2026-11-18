@@ -10,7 +10,7 @@ fn check_batch_admission() {
 	check_batch_ring_window()
 	check_batch_initial_resolution()
 	check_batch_cancellation_grant()
-	println('AGX batch admission: actual production preflight, all-pipe strict event/ring boundaries, host-retirement retry, TVB bind/growth simulation, identity/ownership and initial-prefix flush retry pass')
+	println('AGX batch admission: production preflight, event and ring boundaries, retirement retry, TVB binding, ownership and initial-prefix compaction passed')
 }
 
 fn check_batch_cancellation_grant() {
@@ -205,13 +205,11 @@ fn check_batch_initial_resolution() {
 	assert !mgr.g13_batch_ready(batch, 1), 'an unpublished initial source cannot pass preflight'
 	initial_discard(mut mgr, producer)
 	mgr.flush_fails = true
-	assert !mgr.g13_batch_ready(batch, 1)
-	assert consumer.render.explicit_barriers.initial_pending && consumer.render.explicit_barriers.pin_count == 1
-	mgr.flush_fails = false
 	// After compaction, vertex needs one record rather than two; free2 admits.
 	queue.render_buffer.needs_bind = false
 	queue.subqueues[0].command_sequence = fw.g13_workqueue_entries - 3
-	assert mgr.g13_batch_ready(batch, 1)
+	assert mgr.g13_batch_ready(batch, 1), 'initial prefix compaction must admit the batch when firmware flushes are refused'
+	assert mgr.flushes == 0
 	assert consumer.render.explicit_barriers.count == 0 && !consumer.render.explicit_barriers.initial_pending
 	assert consumer.render.explicit_barriers.pin_count == 1 && !consumer.render.submitted
 	initial_discard(mut mgr, consumer)

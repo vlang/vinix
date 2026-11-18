@@ -146,12 +146,6 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		'ch.published - ticket.sequence >= unread'], 'Vinix tracks TX completion beyond a wrapped ring index')!
 	results << 'TX ring entry barrier before write-pointer publication'
 	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
-	kernel_publication := section(vinix_jobs, 'fn (mut mgr GpuManager) flush_g13_kernel_buffer(',
-		'@[inline]\nfn g13_div_round_up(', 'Vinix kernel buffer publication')!
-	require_order(kernel_publication, ['buffer == unsafe { nil } || buffer.va == 0 || buffer.size == 0',
-		'return false', 'if !pgtable.is_cached_noncoherent(buffer.protection) { return true }',
-		'return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)'],
-		'Only cached kernel buffers send a publication FwCtl request')!
 	for spec in [['render', 'resources.vm', 'G13RenderJobResources', '7'], ['compute', 'ctx', 'G13ComputeJobResources', '3']] {
 		prepare := section(vinix_jobs, 'pub fn (mut mgr GpuManager) prepare_g13_${spec[0]}_job_with_timestamps(',
 			'pub fn (mut mgr GpuManager) release_g13_${spec[0]}_job(', 'Vinix ${spec[0]} root publication')!
@@ -397,7 +391,7 @@ fn check_initial_snapshot_contract(initial string, barriers string, workqueue st
 	resolution := section(barriers, 'fn (mut mgr GpuManager) resolve_g13_initial_barriers_locked(',
 		'pub fn (mut mgr GpuManager) set_g13_compute_barriers(', 'Vinix initial resolution')!
 	require_order(resolution, ['barriers.pin_count', 'barriers.waits[index]', 'events.resolve_initial',
-		'state == .pending', 'state == .absent', 'write_g13_barrier', 'mgr.flush_g13_kernel_buffer',
+		'state == .pending', 'state == .absent', 'write_g13_barrier',
 		'barriers.count = count', 'barriers.initial_pending = false'], 'Vinix initial resolution')!
 	require(barriers.all_after('fn release_g13_barrier_pins(').contains('index < barriers.pin_count'),
 		'Omitted/compacted initial records must keep every physical pin until graph cleanup')!
@@ -1035,11 +1029,12 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	barriers := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_barriers.v'))!
 	check_initial_snapshot_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_initial.v'))!, barriers,
 		read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
-	require_order(barriers.fields().join(' '), ['fn (mut mgr GpuManager) initialize_g13_barriers_locked(',
+	require_order(barriers.fields().join(' '), ['fn initialize_g13_barriers_locked(',
 		'barriers.configured = true', 'event.retain_stamp(wait.slot)',
 		'barriers.slots[index] = wait.slot', 'barriers.waits[index]', 'barriers.pin_count++', 'barriers.count++',
-		'write_g13_barrier(&owner', 'mgr.flush_g13_kernel_buffer(&owner)', 'barriers.ready = true'],
+		'write_g13_barrier(owner', 'barriers.ready = true'],
 		'Vinix owned firmware barrier prefix')!
+	require(!barriers.contains('flush_g13_'), 'Barrier records are published through the work rings')!
 	writer := section(barriers, 'fn write_g13_barrier(', '// Caller holds manager.lock.', 'Vinix barrier wire writer')!
 	require_order(writer.fields().join(' '), ['wait_stamp: event.firmware_stamp_address(wait.slot)', 'wait_value: wait.value',
 		'stamp_self: stamp_self', 'uuid: 0xffffbbbb', 'external_barrier: 0', 'internal_barrier_type: 1'], 'Vinix barrier wire writer')!

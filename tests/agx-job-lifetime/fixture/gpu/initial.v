@@ -107,13 +107,9 @@ fn check_initial_barrier_lifetimes() {
 					initial_publish(producer)
 				}
 				if mode == 3 { initial_retire(mut mgr, producer, mut driver) }
-				if mode == 4 || mode == 5 {
-					mgr.flush_fails = true
-					assert !mgr.resolve_g13_initial_barriers_locked(mut barriers, mut buffer, &queue, self_value)
-					assert barriers.initial_pending && barriers.pin_count == 1 && !barriers.publishable(&owner)
-					mgr.flush_fails = false
-				}
-				assert mgr.resolve_g13_initial_barriers_locked(mut barriers, mut buffer, &queue, self_value)
+				mgr.flush_fails = mode == 4 || mode == 5
+				assert mgr.resolve_g13_initial_barriers_locked(mut barriers, mut buffer, &queue, self_value), 'initial barriers must resolve when firmware flushes are refused'
+				assert mgr.flushes == 0
 				assert barriers.count == if canceled { 0 } else { 1 }
 				assert barriers.pin_count == 1 && barriers.publishable(&owner)
 				if !canceled { expect_barrier(&bytes, 0x80, wait.slot, wait.value, self_value) }
@@ -136,7 +132,7 @@ fn check_initial_barrier_lifetimes() {
 		}
 	}
 	event.reset_event_manager()
-	println('AGX initial prefixes: 140 real acceptance/capture/pin-transfer/resolution/cancellation/flush-retry/producer-retirement/quarantine cycles return all128 slots')
+	println('AGX initial prefixes: 140 acceptance, cancellation, resolution, firmware flush refusal and retirement cycles return all 128 slots')
 }
 
 fn check_initial_cancellation_fallback() {
@@ -277,10 +273,13 @@ fn check_initial_compaction() {
 	assert job.explicit_barriers.count == 2 && job.explicit_barriers.pin_count == 2
 	initial_publish(compute)
 	mgr.flush_fails = true
+	before := bytes
+	job.init_buffer.va = 0
 	assert !mgr.resolve_g13_initial_barriers_locked(mut job.explicit_barriers, mut job.init_buffer, &queue, job.vertex_stamp_value)
-	assert job.explicit_barriers.initial_pending && job.explicit_barriers.count == 2 && job.explicit_barriers.pin_count == 2
-	mgr.flush_fails = false
+	assert bytes == before && job.explicit_barriers.initial_pending && job.explicit_barriers.pin_count == 2
+	job.init_buffer.va = owner.va
 	assert mgr.resolve_g13_initial_barriers_locked(mut job.explicit_barriers, mut job.init_buffer, &queue, job.vertex_stamp_value)
+	assert mgr.flushes == 0
 	assert job.explicit_barriers.count == 1 && job.explicit_barriers.pin_count == 2
 	expect_barrier(&bytes, 0x80, compute.compute.event_slot, compute.compute.stamp_value, job.vertex_stamp_value)
 	initial_retire(mut mgr, compute, mut driver)
@@ -292,5 +291,5 @@ fn check_initial_compaction() {
 	assert completions.all(it.calls == 1)
 	expect_free_events(128, -1)
 	event.reset_event_manager()
-	println('AGX initial compaction: reject wrong pipe, wait for second source, compact two records to one, retain both pins through flush failure/quarantine and release both on final cleanup')
+	println('AGX initial compaction: reject wrong pipe, wait for second source, compact two records to one and retain both pins through quarantine')
 }

@@ -411,3 +411,31 @@ The evidence archive covers `61aa97601c89661d7b7b4a46e3addac3b509d8c2` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-queue-prepare-tlbi-20261119.Ien1zh/bundle.tar.gz`
 with SHA-256 `59cf4c270a88954f20ff769991ac1876ad2c2e3713577bd4a163f8c214557df0`.
+
+## Barrier command publication
+
+G13 writes explicit barrier prefixes and resolves initial-event prefixes
+before submission publishes the work-ring pointers. Those writes now use the
+same publication barrier as the commands they precede. This removes one
+firmware-control request when configuring a nonempty prefix and one more when
+resolving an initial-event prefix. Stamp pins stay with the consuming job
+through retirement or quarantine.
+[Pinned explicit barrier construction](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L859-L893)
+[Pinned work-ring publication](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/workqueue.rs#L509-L522)
+
+The baseline fixture reproduced failed batch admission when firmware refused
+the old resolution flush. The updated sanitizer tests passed 480 barrier
+lifetime cases and 140 initial-prefix cases. They cover guarded writes,
+pending dependencies, canceled-prefix compaction, invalid addresses and final
+pin release. The async submission and UAT sanitizer suites also passed.
+
+Both kernel builds, 79 source-contract test files and 122 pinned reference
+checks passed. Generated AArch64 code confirms that both barrier writers omit
+the flush and that the batch publisher, stamp release and cached kernel
+teardown match the baseline. The allocation scan matched the 176 baseline
+findings. M1 hardware validation remains open.
+
+The evidence archive covers `4041175da24ad8d126a5b1101f06c3a875fce153` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-barrier-publication-20261119.A7nCTX/bundle.tar.gz`
+with SHA-256 `58da9f44b0c8c50f9cfe5edafde5ea9279a6c22c611c70aa7525906b75065530`.

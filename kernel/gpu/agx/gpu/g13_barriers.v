@@ -17,7 +17,7 @@ pub:
 }
 
 // The records live in the tail of the existing command/init allocation.
-// They share its flush/invalidate/free gate and introduce no new allocation.
+// They share its mapping and backing lifetime.
 struct G13CommandBarriers {
 mut:
 	offset     u64
@@ -88,9 +88,9 @@ fn write_g13_barrier(owner &SharedBuffer, offset u64, index u32, wait event.Tick
 
 // Caller holds manager.lock. Store every pin before the next fallible step;
 // any failure is unwound by the consumer's normal graph cleanup or quarantine.
-fn (mut mgr GpuManager) initialize_g13_barriers_locked(mut barriers G13CommandBarriers,
-	mut owner SharedBuffer, queue &G13QueueResources, stamp_self u32, sources [2]G13BarrierSource) bool {
-	if barriers.configured || owner.phys == 0 || barriers.offset == 0
+fn initialize_g13_barriers_locked(mut barriers G13CommandBarriers,
+	owner &SharedBuffer, queue &G13QueueResources, stamp_self u32, sources [2]G13BarrierSource) bool {
+	if barriers.configured || owner.phys == 0 || owner.va == 0 || barriers.offset == 0
 		|| barriers.offset > owner.size || g13_barrier_tail_size > owner.size - barriers.offset {
 		return false
 	}
@@ -106,20 +106,20 @@ fn (mut mgr GpuManager) initialize_g13_barriers_locked(mut barriers G13CommandBa
 		barriers.pin_count++
 		barriers.initial_pending = barriers.initial_pending || source.initial.valid
 		barriers.count++
-		write_g13_barrier(&owner, barriers.offset, index, wait, stamp_self)
+		write_g13_barrier(owner, barriers.offset, index, wait, stamp_self)
 	}
-	if barriers.count != 0 && !mgr.flush_g13_kernel_buffer(&owner) { return false }
+	// Submission orders these stores before publishing the ring pointers.
 	barriers.ready = true
 	return true
 }
 
 // Resolve once immediately before publication. Immutable waits and pin_count
-// survive compaction and flush failure; omitted records retain their pins until
+// survive compaction; omitted records retain their pins until
 // the complete consuming graph is invalidated or firmware stops.
 fn (mut mgr GpuManager) resolve_g13_initial_barriers_locked(mut barriers G13CommandBarriers,
 	mut owner SharedBuffer, queue &G13QueueResources, stamp_self u32) bool {
 	if !barriers.initial_pending { return true }
-	if mgr.state != .running || !barriers.ready || barriers.pin_count > 2 || owner.phys == 0
+	if mgr.state != .running || !barriers.ready || barriers.pin_count > 2 || owner.phys == 0 || owner.va == 0
 		|| barriers.offset == 0 || barriers.offset > owner.size || g13_barrier_tail_size > owner.size - barriers.offset { return false }
 	mut resolved := [2]event.Ticket{}
 	mut count := u32(0)
@@ -137,7 +137,6 @@ fn (mut mgr GpuManager) resolve_g13_initial_barriers_locked(mut barriers G13Comm
 		count++
 	}
 	for index := u32(0); index < count; index++ { write_g13_barrier(&owner, barriers.offset, index, resolved[index], stamp_self) }
-	if !mgr.flush_g13_kernel_buffer(&owner) { return false }
 	barriers.count = count
 	barriers.initial_pending = false
 	return true
@@ -152,7 +151,7 @@ pub fn (mut mgr GpuManager) set_g13_compute_barriers(job &G13ComputeJobResources
 		|| !owned.event_reserved || owned.queue == unsafe { nil } || owned.queue.released || owned.queue.quarantined {
 		return false
 	}
-	return mgr.initialize_g13_barriers_locked(mut owned.explicit_barriers, mut owned.microsequence,
+	return initialize_g13_barriers_locked(mut owned.explicit_barriers, &owned.microsequence,
 		owned.queue, owned.stamp_value, sources)
 }
 
@@ -165,7 +164,7 @@ pub fn (mut mgr GpuManager) set_g13_render_barriers(job &G13RenderJobResources, 
 		|| !owned.vertex_event_reserved || owned.queue == unsafe { nil } || owned.queue.released || owned.queue.quarantined {
 		return false
 	}
-	return mgr.initialize_g13_barriers_locked(mut owned.explicit_barriers, mut owned.init_buffer,
+	return initialize_g13_barriers_locked(mut owned.explicit_barriers, &owned.init_buffer,
 		owned.queue, owned.vertex_stamp_value, sources)
 }
 

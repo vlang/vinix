@@ -2,33 +2,14 @@
 module gpu
 
 import gpu.agx.mmu
-import gpu.agx.pgtable
-
-fn check_kernel_mapping_flush() {
-	mut mgr := GpuManager{flush_fails: true}
-	assert !mgr.flush_g13_kernel_buffer(unsafe { nil })
-	for protection in [pgtable.gpu_prot_fw_shared_rw, pgtable.gpu_prot_fw_shared_ro,
-		pgtable.gpu_prot_fw_private_rw, pgtable.gpu_prot_gpu_ro_fw_private_rw]! {
-		mgr.flushes = 0
-		no_address := SharedBuffer{size: 0x4000, protection: protection}
-		no_size := SharedBuffer{va: 0x10000, protection: protection}
-		assert !mgr.flush_g13_kernel_buffer(&no_address)
-		assert !mgr.flush_g13_kernel_buffer(&no_size)
-		assert mgr.flushes == 0
-		buffer := SharedBuffer{phys: 0x4000, va: 0x10000, size: 0x4000, protection: protection}
-		cached := protection == pgtable.gpu_prot_fw_private_rw || protection == pgtable.gpu_prot_gpu_ro_fw_private_rw
-		assert mgr.flush_g13_kernel_buffer(&buffer) == !cached, 'uncached kernel mappings must skip firmware flushes'
-		assert mgr.flushes == if cached { 1 } else { 0 }
-	}
-}
 
 fn check_job_mapping_publication() {
 	gpu_only := mmu.UatBuffer{va: 0x4000, size: 0x4000}
 	private := mmu.UatBuffer{va: 0x8000, size: 0x4000}
 	cache := G13TailPointerCache{buffer: unsafe { &private }}
-	shared := SharedBuffer{phys: 0x10000, va: 0x10000, size: 0x4000, protection: pgtable.gpu_prot_fw_shared_rw}
+	shared := SharedBuffer{phys: 0x10000, va: 0x10000, size: 0x4000}
 	private_command := SharedBuffer{phys: 0x14000, va: 0x14000, size: 0x4000}
-	readonly_command := SharedBuffer{phys: 0x18000, va: 0x18000, size: 0x4000, protection: pgtable.gpu_prot_gpu_ro_fw_private_rw}
+	readonly_command := SharedBuffer{phys: 0x18000, va: 0x18000, size: 0x4000}
 	mut mgr := GpuManager{flush_fails: true}
 	mut render_job := G13RenderJobResources{
 		vm_slot: 1

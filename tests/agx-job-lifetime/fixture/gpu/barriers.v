@@ -93,7 +93,8 @@ fn check_barrier_lifetimes() {
 				} else {
 					mgr.set_g13_compute_barriers(compute, sources)
 				}
-				assert configured == (mode != 1 && mode != 2)
+				assert configured == (mode != 1), 'barrier configuration must succeed when firmware flushes are refused'
+				assert mgr.flushes == 0
 				barriers := if render_consumer {
 					render.explicit_barriers
 				} else {
@@ -222,5 +223,5 @@ fn check_barrier_lifetimes() {
 		}
 	}
 	event.reset_event_manager()
-	println('AGX firmware barriers: byte oracle, tail canaries, duplicate pins, partial setup/flush failure, producer/consumer callback orders, quarantine retry and stopped cleanup pass 480 cycles with all 128 slots returned')
+	println('AGX firmware barriers: 480 cycles cover guarded writes, duplicate pins, partial setup, firmware flush refusal, callback order, quarantine retry and stopped cleanup')
 }
