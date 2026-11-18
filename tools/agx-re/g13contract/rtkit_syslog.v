@@ -24,8 +24,30 @@ fn check_rtkit_syslog(transport string, linux string) ! {
 	receiver := section(transport, '\n\t\tep_syslog {', '\n\t\tep_oslog {', 'Vinix RTKit Syslog receiver')!
 	require_order(receiver, ['if kind == syslog_init', 'rtk.syslog_entries = u32(msg.data0 & 0xff)',
 		'rtk.syslog_msg_size = u32((msg.data0 >> 24) & 0xff)', 'if kind == syslog_log',
-		'rtk.dump_syslog_entry(msg.data0)', 'return rtk.send_message(ep, msg.data0)'],
+		'rtk.dump_syslog_entry(msg.data0)', 'return rtk.acknowledge_log(ep, msg.data0)'],
 		'Vinix updates both Syslog fields and echoes every notification after the read attempt')!
+}
+
+fn check_rtkit_log_acks(transport string, linux string) ! {
+	require_order(linux, ['#define APPLE_RTKIT_IOREPORT_UNKNOWN1 0x8',
+		'#define APPLE_RTKIT_IOREPORT_UNKNOWN2 0xc', '#define APPLE_RTKIT_SYSLOG_LOG 5'],
+		'Asahi IOReport and Syslog notification types')!
+	ioreport := section(linux, 'static void apple_rtkit_ioreport_rx(', 'static void apple_rtkit_syslog_rx_init(', 'Asahi IOReport receive')!
+	require_order(ioreport, ['case APPLE_RTKIT_IOREPORT_UNKNOWN1:', 'case APPLE_RTKIT_IOREPORT_UNKNOWN2:',
+		'apple_rtkit_send_message(rtk, APPLE_RTKIT_EP_IOREPORT, msg,', 'NULL, false);', 'break;'],
+		'Asahi echoes both IOReport notifications independently of send status')!
+	syslog := section(linux, 'static void apple_rtkit_syslog_rx_log(', 'static void apple_rtkit_syslog_rx(', 'Asahi Syslog receive')!
+	require(syslog.contains('done:\n\tapple_rtkit_send_message(rtk, APPLE_RTKIT_EP_SYSLOG, msg, NULL, false);'),
+		'Asahi echoes Syslog after the read attempt independently of send status')!
+
+	ioreport_v := section(transport, '\n\t\tep_ioreport {', '\n\t\tep_syslog {', 'Vinix IOReport receive')!
+	require_order(ioreport_v, ['if kind == 0x8 || kind == 0xc', 'return rtk.acknowledge_log(ep, msg.data0)'],
+		'Vinix echoes both IOReport messages verbatim')!
+	ack := section(transport, 'fn (mut rtk RTKit) acknowledge_log(', 'fn (rtk &RTKit) dump_syslog_entry(', 'Vinix RTKit acknowledgement')!
+	require(ack.count('rtk.send_message(') == 1, 'Send one acknowledgement per notification')!
+	require_order(ack, ['sent := rtk.send_message(ep, data)', 'if !sent && rtk.nonfatal_log_errors',
+		'log acknowledgement timed out', 'return sent || rtk.nonfatal_log_errors'],
+		'Vinix keeps G13 receiving after acknowledgement failure and preserves strict-client errors')!
 }
 
 fn check_rtkit_agx_coherency(asahi_linux string, repo string, linux string) ! {

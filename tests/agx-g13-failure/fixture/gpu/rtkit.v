@@ -217,7 +217,7 @@ fn check_rtkit_buffer_retry(abi hw.FirmwareAbi, ep u8, timeout bool) {
 	}
 	rtkit_owner = unsafe { &mgr }
 	transport.set_shmem_allocator(unsafe { voidptr(&mgr) }, allocate_rtkit_shmem)
-	assert !transport.nonfatal_buffer_errors
+	assert !transport.nonfatal_log_errors
 
 	// Wire fields are literal so the fixture can catch mask or shift errors.
 	size := if ep == rtkit.ep_oslog { u64(0x2345) } else { u64(4096) }
@@ -299,9 +299,16 @@ fn notify_syslog_fixture(mut mgr GpuManager, index u8, offset u64, length u64) {
 	syslog_expected_sent = mgr.rtk.mbox.sent
 	syslog_expected_iova = alloc.g13_rtkit_start + offset
 	syslog_expected_size = length
+	timeout := mgr.rtk.mbox.fail_next_send
+	attempts := mgr.rtk.mbox.attempts
 	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: data, data1: rtkit.ep_syslog})
-	assert mgr.rtk.mbox.sent == syslog_expected_sent + 1
-	assert mgr.rtk.mbox.last.data0 == data && mgr.rtk.mbox.last.data1 == rtkit.ep_syslog
+	assert mgr.rtk.mbox.attempts == attempts + 1
+	if timeout {
+		assert mgr.rtk.mbox.sent == syslog_expected_sent
+	} else {
+		assert mgr.rtk.mbox.sent == syslog_expected_sent + 1
+		assert mgr.rtk.mbox.last.data0 == data && mgr.rtk.mbox.last.data1 == rtkit.ep_syslog
+	}
 	expected_reads := if length == 0 { 0 } else { 1 }
 	assert syslog_copy_attempts == copies + expected_reads && cpu.barriers() == barriers + u32(expected_reads)
 	cache_after, _, _ := cpu.prepared_range()
@@ -310,7 +317,7 @@ fn notify_syslog_fixture(mut mgr GpuManager, index u8, offset u64, length u64) {
 
 fn check_rtkit_syslog() {
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
-		mut transport := rtkit.RTKit{name: 'g13-syslog', state: .running}
+		mut transport := rtkit.RTKit{name: 'g13-syslog', state: .running, nonfatal_log_errors: true}
 		mut mgr := GpuManager{
 			hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
 			rtk: unsafe { &transport }
@@ -326,6 +333,7 @@ fn check_rtkit_syslog() {
 			C.memcpy(voidptr(base + 72), c'abcdefghijklmnopqrstuvwx', 24)
 			C.memcpy(voidptr(base + 96), c'  trim \r\n ', 11)
 		}
+		transport.mbox.fail_next_send = true
 		notify_syslog_fixture(mut mgr, 1, 72, 56)
 		notify_syslog_fixture(mut mgr, 64, 0, 0) // INIT count exceeds backing
 		transport.set_shmem_reader(unsafe { nil })
@@ -437,7 +445,7 @@ fn check_rtkit_first_buffer_request(abi hw.FirmwareAbi, ep u8, booting bool) {
 	mut transport := rtkit.RTKit{
 		name: 'g13-first-buffer'
 		state: if booting { rtkit.RTKitState.idle } else { .running }
-		nonfatal_buffer_errors: true
+		nonfatal_log_errors: true
 	}
 	mut mgr := GpuManager{
 		hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
@@ -509,5 +517,75 @@ fn check_rtkit_first_buffer_request(abi hw.FirmwareAbi, ep u8, booting bool) {
 	mgr.shutdown()
 	assert mgr.rtkit_buffers.len == 0 && memory.snapshots() == 0
 	unsafe { mgr.rtkit_buffers.free() }
+	rtkit_owner = unsafe { nil }
+}
+
+fn fail_first_boot_log_ack() {
+	// Four successful management sends precede the firmware notifications.
+	if rtkit_owner.rtk.mbox.attempts == 4 {
+		assert rtkit_owner.lock.is_held() && rtkit_owner.rtk.lock.is_held()
+		rtkit_owner.rtk.mbox.fail_next_send = true
+	}
+}
+
+fn check_rtkit_notification_ack_timeouts() {
+	for message in [
+		mailbox.MboxMsg{data0: (u64(5) << 52) | 0x0123_4567_8901, data1: rtkit.ep_syslog},
+		mailbox.MboxMsg{data0: (u64(8) << 52) | 0x0123_4567_8902, data1: rtkit.ep_ioreport},
+		mailbox.MboxMsg{data0: (u64(0xc) << 52) | 0x0123_4567_8903, data1: rtkit.ep_ioreport},
+	]! {
+		mut strict := rtkit.RTKit{state: .running}
+		strict.mbox.fail_next_send = true
+		assert !strict.handle_system_message(message)
+		assert strict.mbox.attempts == 1 && strict.mbox.sent == 0
+		for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+			check_rtkit_notification_ack_timeout(abi, message, true)
+			check_rtkit_notification_ack_timeout(abi, message, false)
+		}
+	}
+	println('G13 RTKit: 12 log ACK timeout sequences across boot and runtime, plus three strict-client cases')
+}
+
+fn check_rtkit_notification_ack_timeout(abi hw.FirmwareAbi, message mailbox.MboxMsg, booting bool) {
+	mut transport := rtkit.RTKit{
+		name: 'g13-log-ack'
+		state: if booting { rtkit.RTKitState.idle } else { .running }
+		nonfatal_log_errors: true
+	}
+	mut mgr := GpuManager{
+		hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+		firmware_roles: 1
+		rtk: unsafe { &transport }
+	}
+	rtkit_owner = unsafe { &mgr }
+	next := mailbox.MboxMsg{data0: message.data0 ^ 0x100, data1: message.data1}
+	if booting {
+		transport.mbox.inject(mailbox.MboxMsg{data0: (u64(1) << 52) | (u64(12) << 16) | 11})
+		transport.mbox.inject(mailbox.MboxMsg{
+			data0: (u64(8) << 52) | (u64(1) << 51) | (u64(1) << message.data1)
+		})
+	}
+	transport.mbox.inject(message)
+	transport.mbox.inject(next)
+	if booting {
+		transport.mbox.inject(mailbox.MboxMsg{data0: (u64(7) << 52) | 0x20})
+		transport.mbox.inject(mailbox.MboxMsg{data0: (u64(0xb) << 52) | 0x20})
+		mailbox.watch_send(fail_first_boot_log_ack)
+		mgr.lock.acquire()
+		booted := mgr.boot_firmware_role(0)
+		mgr.lock.release()
+		mailbox.watch_send(unsafe { nil })
+		assert booted
+		assert transport.protocol_version == 12
+		assert transport.mbox.attempts == 7 && transport.mbox.sent == 6
+	} else {
+		transport.mbox.fail_next_send = true
+		assert mgr.checked_poll_rtkit_messages()
+		// One attempt per notification. The poll still drains the next one.
+		assert transport.mbox.attempts == 2 && transport.mbox.sent == 1
+		assert transport.mbox.last == next
+	}
+	assert transport.state == .running && mgr.state == .running
+	assert mgr.rtkit_buffers.len == 0
 	rtkit_owner = unsafe { nil }
 }

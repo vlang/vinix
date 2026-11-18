@@ -25,9 +25,9 @@ fatal crash-buffer reply timeouts. Generated ARM64 C confirms that the
 policy is enabled only for G13 and adds no implicit allocation. The
 allocation scan reproduced the 178 baseline discrepancies.
 
-The full audit remains `not_equivalent`. Syslog and IOReport notification
-reply failure handling still differs. Physical device behavior remains
-untested. No hardware tests or reboots occurred.
+At this revision the full audit reported `not_equivalent`, with Syslog and
+IOReport acknowledgement failure handling still open. No hardware tests or
+reboots occurred. [Log acknowledgement follow-up](m1-agx-rtkit-log-ack.md)
 
 Evidence is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-rtkit-first-buffer-20261118/`.

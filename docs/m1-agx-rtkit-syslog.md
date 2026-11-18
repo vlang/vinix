@@ -17,8 +17,9 @@ Syslog now checks the slot against both the latest INIT slot count and the
 negotiated buffer length. It copies the context and text into 279 bytes of
 stack storage, bounds and trims the strings, and echoes the notification
 after the read attempt. Missing and invalid records still reach the echo.
-Vinix skips invalid records silently and continues to report a failed ACK
-send to its caller. [Asahi Syslog handler](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/soc/apple/rtkit.c#L638-L730)
+Vinix skips invalid records silently. At this revision a failed ACK send
+still propagated to the caller. [Asahi Syslog handler](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/soc/apple/rtkit.c#L638-L730)
+[Log acknowledgement follow-up](m1-agx-rtkit-log-ack.md)
 
 ARM64 and x86-64 builds, 82 contract test files, five pinned source gates
 and independent lifetime review passed for

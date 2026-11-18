@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 continues boot and runtime receive processing after a Syslog or IOReport
+acknowledgement timeout. [RTKit log acknowledgement handling](m1-agx-rtkit-log-ack.md)
+
 G13 keeps RTKit boot and receive processing going after a first-buffer
 failure. [RTKit initial buffer failure handling](m1-agx-rtkit-first-buffer.md)
 

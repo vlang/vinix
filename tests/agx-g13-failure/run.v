@@ -65,7 +65,10 @@ fn run_checks() int {
 	production += section(source, 'struct G13ChannelAllocations {', '@[inline]\nfn pipe_index') or { panic(err) }
 	production += section(source, 'const buffer_allocator_g13_rtkit', '\n') or { panic(err) }
 	production += '\n'
+	production += section(source, 'pub const ep_firmware', 'pub const ep_doorbell') or { panic(err) }
+	production += section(source, 'pub const msg_rx_doorbell', 'const msg_address_mask') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) start_firmware_endpoint(') or { panic(err) }
+	production += section(source, 'fn (mut mgr GpuManager) recv_role_message(', 'fn (mut mgr GpuManager) stop_firmware_cpus(') or { panic(err) }
 	production += section(source, 'fn allocate_rtkit_shmem(', 'struct G13ChannelAllocations {') or { panic(err) }
 	production += (section(source, 'fn (mut mgr GpuManager) release_rtkit_buffers(', 'fn (mut mgr GpuManager) alloc_g13_channel_pair(') or { panic(err) })
 		.replace('release_rtkit_buffers()', 'checked_release_rtkit_buffers()')
@@ -76,6 +79,8 @@ fn run_checks() int {
 	production += section(source, 'pub fn (mut mgr GpuManager) set_file_reaper(', '// Serialize accepted submissions') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) dequeue_g13_rx(', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) handle_role_system_message(', '// Drain the ASC transport') or { panic(err) }
+	production += (section(source, 'fn (mut mgr GpuManager) poll_rtkit_messages(', '// The manager lock guards teardown') or { panic(err) })
+		.replace('poll_rtkit_messages()', 'checked_poll_rtkit_messages()')
 	production += section(source, 'fn (mut mgr GpuManager) read_g13_fw_log(', '// Shutdown the GPU') or { panic(err) }
 	production += source.all_after('// Shutdown the GPU\n')
 	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')

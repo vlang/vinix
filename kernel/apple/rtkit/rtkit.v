@@ -103,8 +103,9 @@ pub mut:
 	syslog_entries   u32
 	syslog_msg_size  u32
 	oslog_ack_enabled bool
-	// The client must unwind failed allocations before firmware can retry.
-	nonfatal_buffer_errors bool
+	// Log endpoint setup and acknowledgement errors can be handled locally.
+	// The allocator must unwind failures before another request is accepted.
+	nonfatal_log_errors bool
 	// Latches the first out-of-range endpoint-map group so a repeating roll
 	// call cannot flood the console during boot.
 	epmap_group_warned bool
@@ -541,13 +542,13 @@ fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
 			|| rtk.shmem_alloc == unsafe { nil } {
 			C.kprintf(c'rtkit[%.*s]: invalid buffer request ep=%llu size=0x%llx iova=0x%llx\n',
 				i32(rtk.name.len), rtk.name.str, u64(ep), size, requested_iova)
-			return rtk.nonfatal_buffer_errors
+			return rtk.nonfatal_log_errors
 		}
 		iova = rtk.shmem_alloc(rtk.shmem_context, size)
 		if iova == 0 {
 			C.kprintf(c'rtkit[%.*s]: failed to allocate 0x%llx-byte buffer for ep=%llu\n',
 				i32(rtk.name.len), rtk.name.str, size, u64(ep))
-			return rtk.nonfatal_buffer_errors
+			return rtk.nonfatal_log_errors
 		}
 		rtk.system_iovas[ep] = iova
 		rtk.system_sizes[ep] = size
@@ -566,11 +567,20 @@ fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
 	// Logging endpoints can retry publication of a retained mapping after a
 	// mailbox timeout. Crashlog keeps the buffer for later notifications.
 	sent := rtk.send_message(ep, reply)
-	if !sent && rtk.nonfatal_buffer_errors {
+	if !sent && rtk.nonfatal_log_errors {
 		C.kprintf(c'rtkit[%.*s]: buffer reply timed out on endpoint %llu\n',
 			i32(rtk.name.len), rtk.name.str, u64(ep))
 	}
-	return sent || ep != ep_crashlog || rtk.nonfatal_buffer_errors
+	return sent || ep != ep_crashlog || rtk.nonfatal_log_errors
+}
+
+fn (mut rtk RTKit) acknowledge_log(ep u8, data u64) bool {
+	sent := rtk.send_message(ep, data)
+	if !sent && rtk.nonfatal_log_errors {
+		C.kprintf(c'rtkit[%.*s]: log acknowledgement timed out on endpoint %llu\n',
+			i32(rtk.name.len), rtk.name.str, u64(ep))
+	}
+	return sent || rtk.nonfatal_log_errors
 }
 
 fn (rtk &RTKit) dump_syslog_entry(msg u64) {
@@ -651,7 +661,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			// Unknown IOReport requests 0x8 and 0xc must be acknowledged or
 			// some coprocessors stop making progress.
 			if kind == 0x8 || kind == 0xc {
-				return rtk.send_message(ep, msg.data0)
+				return rtk.acknowledge_log(ep, msg.data0)
 			}
 		}
 		ep_syslog {
@@ -667,7 +677,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			// Echo the notification even if the record could not be read.
 			if kind == syslog_log {
 				rtk.dump_syslog_entry(msg.data0)
-				return rtk.send_message(ep, msg.data0)
+				return rtk.acknowledge_log(ep, msg.data0)
 			}
 		}
 		ep_oslog {

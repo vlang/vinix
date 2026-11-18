@@ -599,6 +599,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_rtkit_buffer_retries(transport, asahi_rtkit)!
 	check_rtkit_buffer_startup(transport, asahi_rtkit, repo)!
 	check_rtkit_syslog(transport, asahi_rtkit)!
+	check_rtkit_log_acks(transport, asahi_rtkit)!
 	check_rtkit_oslog(transport, asahi_rtkit, asahi_linux, repo)!
 	check_rtkit_agx_coherency(asahi_linux, repo, asahi_rtkit)!
 	check_rtkit_crashlog(transport, asahi_rtkit,
@@ -1005,6 +1006,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'RTKit Syslog, IOReport and OSLog retries reuse the published buffer and reject changed geometry without ending the session',
 		'G13 keeps receiving after initial RTKit buffer setup failure and retains backing on a reply timeout',
 		'G13 RTKit prepares cached CPU RAM for uncached firmware access and reads bounded Syslog records before acknowledgement',
+		'G13 keeps boot and receive processing alive after a Syslog or IOReport acknowledgement timeout',
 		'Fresh G13 RTKit sessions echo the full OSLog counter on the negotiated channel and ignore reserved channel bits',
 		'RTKit filters unknown crash notifications and decodes bounded strings, time, mailbox history and exception records',
 		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
