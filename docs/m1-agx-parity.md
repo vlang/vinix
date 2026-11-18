@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 preserves slot release order across root removal and invalidates the
+ASID once after publishing a replacement root. [UAT slot replacement](m1-agx-uat-replacement.md)
+
 G13 serializes same-queue job preparation through the UAT wait and notifies
 one waiter when a slot is released. [Queue admission](m1-agx-queue-admission.md)
 
@@ -388,7 +391,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Userspace ABI | Native G13 registers the legacy interface and twelve modern extensible operations, selected per file. Modern flat packets and combined syncs reach the scheduler. GEM_MADVISE records private-object advice with resident contents; complete request/sync/backing semantics and matched Mesa integration remain incomplete. |
 | Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. The file worker tracks publication FIFO per queue without a fixed lookup limit. Whole-batch ring/event readiness and atomic publication are implemented. Finished fences use wrapping 32-bit per-queue numbers. Private input copies keep each independent native fence and the latest fence per ordered context. Own-queue native fences are elided. Asahi's ordered-fence comparison, full scheduler policy and timeline-chain equivalence remain open. |
 | Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
-| VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts; idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and physical-slot capacity still differ. |
+| VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts. Idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and firmware-slot eligibility still differ. |
 | Failed queue construction | The worker retries unpublished G13 resource graphs independently of Handle/VM-name lifetime. Logical queues and captured references retain ownership; failed invalidation retains the graph. Successful release returns the reserved queue ID and allows final VM retirement. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |

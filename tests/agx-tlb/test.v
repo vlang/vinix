@@ -105,23 +105,24 @@ fn test_root_publication_and_reuse() {
 	assert unbind[0].ttb0 == 0 && unbind[0].ttb1 == 0
 	tlb.clear()
 
-	// The same context number, now naming another root, must invalidate even
-	// when no PTE was changed. Firmware kernel aliases keep the same ASID.
+	// An unused slot is older than the slot cleared above. Firmware kernel
+	// aliases use the new root's ASID.
 	mut next := pgtable.new_pgtable(39, 48) or { panic('replacement root') }
 	next_ctx := mmu.UatContext{ id: 129, pgtable: next }
 	mgr.map_kernel_to_user = true
-	assert mgr.bind_context(&next_ctx) == 1
+	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[2]) })
+	assert mgr.bind_context(&next_ctx) == 2
 	reuse := tlb.calls()
-	assert reuse.len == 1 && reuse[0].asid == 1
-	assert reuse[0].ttb0 == next.l1_phys | (u64(1) << 48) | 1
-	assert reuse[0].ttb1 == upper.l1_phys | (u64(1) << 48) | 1
+	assert reuse.len == 1 && reuse[0].asid == 2
+	assert reuse[0].ttb0 == next.l1_phys | (u64(2) << 48) | 1
+	assert reuse[0].ttb1 == upper.l1_phys | (u64(2) << 48) | 1
 	tlb.clear()
-	assert next_ctx.bound_slot() == 1
-	mgr.release_g13_slot(&next_ctx, 1)
+	assert next_ctx.bound_slot() == 2
+	mgr.release_g13_slot(&next_ctx, 2)
 	mgr.unbind_context(&next_ctx)
-	assert next_ctx.bound_slot() == 0 && mgr.contexts[1] == unsafe { nil }
+	assert next_ctx.bound_slot() == 0 && mgr.contexts[2] == unsafe { nil }
 	cleared := tlb.calls()
-	assert cleared.len == 1 && cleared[0].asid == 1
+	assert cleared.len == 1 && cleared[0].asid == 2
 	assert cleared[0].ttb0 == 0 && cleared[0].ttb1 == 0
 	tlb.clear()
 
@@ -146,6 +147,7 @@ fn test_root_publication_and_reuse() {
 }
 
 fn test_user_slot_capacity() {
+	upper := pgtable.new_pgtable(39, 48) or { panic('kernel alias root') }
 	mut slots := [64]mmu.SlotTtbs{}
 	mut handoff := mmu.UatHandoff{}
 	mut contexts := [65]mmu.UatContext{}
@@ -153,6 +155,8 @@ fn test_user_slot_capacity() {
 		handoff_initialized: true
 		ttbs: unsafe { &slots[0] }
 		handoff: &handoff
+		kernel_pgtable: upper
+		map_kernel_to_user: true
 	}
 	for index in 0 .. contexts.len {
 		contexts[index].id = u32(1000 + index)
@@ -184,8 +188,14 @@ fn test_user_slot_capacity() {
 	assert contexts[2].bound_slot() == 0 && contexts[3].bound_slot() == 4
 	assert contexts[0].bound_slot() == 1 && contexts[1].bound_slot() == 2
 	replaced := tlb.calls()
-	assert replaced.len == 2 && replaced[0].asid == 3 && replaced[1].asid == 3
+	assert replaced.len == 1 && replaced[0].asid == 3
 	assert replaced[0].ttb0 == contexts[63].pgtable.l1_phys | (u64(3) << 48) | 1
+	assert replaced[0].ttb1 == upper.l1_phys | (u64(3) << 48) | 1
+	tlb.clear()
+	assert contexts[2].pgtable.map(0x4000, 0x200000, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw)
+	assert tlb.calls().len == 0, 'edits of the displaced root leave the new ASID alone'
+	assert contexts[63].pgtable.map(0x4000, 0x400000, pgtable.uat_pgsz, pgtable.gpu_prot_gpu_shared_rw)
+	assert tlb.calls().len == 1 && tlb.calls()[0].asid == 3
 	// The surviving idle VM can borrow its cached slot without changing its
 	// root. A previously evicted VM gets a new binding epoch on return.
 	tlb.clear()
@@ -197,6 +207,11 @@ fn test_user_slot_capacity() {
 	assert mgr.bind_context(unsafe { &contexts[64] }) == 0
 	tlb.clear()
 	tlb.observe(unsafe { nil }, unsafe { nil })
+	mgr.release_g13_slot(unsafe { &contexts[63] }, 3)
+	mgr.release_g13_slot(unsafe { &contexts[2] }, 4)
+	mgr.unbind_context(unsafe { &contexts[2] })
+	assert mgr.bind_context(unsafe { &contexts[64] }) == 3, 'clearing a newer slot preserves its release age'
+	assert contexts[63].bound_slot() == 0 && slots[4].ttb0 == 0
 	handoff.cur_slot = 0
 	handoff.flush[2].state = 0
 	for index in 0 .. contexts.len {
@@ -208,7 +223,8 @@ fn test_user_slot_capacity() {
 		pgtable.destroy(contexts[index].pgtable)
 		tlb.clear()
 	}
-	println('AGX UAT leases: 63 active roots, overlapping users, cached-root reuse, oldest idle eviction, ASC/FWCTL exclusion and rebinding passed')
+	pgtable.destroy(upper)
+	println('AGX UAT leases: 63 active roots, overlapping users, cached-root reuse, release age across root removal, ASC/FWCTL exclusion and one-invalidation rebind passed')
 }
 
 fn test_borrowed_root_destruction() {

@@ -202,34 +202,50 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	mmu := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mmu.rs'))!
 	bind := section(mmu, '    pub(crate) fn bind(&self, vm:', 'binding.bind_token = Some(slot.token());', 'Asahi UAT bind')!
 	require_order(bind, ['ttbs[idx].ttb0.store(ttb,', 'ttbs[idx].ttb1.store(ttb1,',
-		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID reuse invalidation')!
+		'drop(transaction)', 'mem::sync()', 'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID reuse invalidation')!
+	require(bind.count('mem::tlbi_asid(') == 1, 'Asahi replacement invalidates the published ASID once')!
 	drop_start := mmu.index('impl Drop for VmInner') or { return error('Asahi UAT: missing VM teardown') }
 	require_order(mmu[drop_start..], ['.ttb0.store(0,', '.ttb1.store(0,',
 		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID teardown invalidation')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!
 	local_selection := section(local, 'fn (mgr &UatManager) select_context_slot_locked(', 'pub fn (mgr &UatManager) bind_context(', 'Vinix UAT selection')!
-	require_order(local_selection, ['katomic.load(&mgr.handoff.cur_slot)', 'slot == current',
-		'katomic.load(&mgr.handoff.flush[slot].state) != 0', 'mgr.contexts[slot] == unsafe { nil }',
-		'mgr.slot_users[slot] == 0', 'mgr.slot_release_clock - mgr.slot_release[slot]'], 'Vinix idle ASID choice')!
+	require_order(local_selection, ['katomic.load(&mgr.handoff.cur_slot)', 'if !leased',
+		'mgr.contexts[slot] == unsafe { nil }', 'continue', 'slot == current',
+		'katomic.load(&mgr.handoff.flush[slot].state) != 0', 'mgr.slot_users[slot] != 0 { continue }',
+		'mgr.slot_release_clock - mgr.slot_release[slot]', 'if oldest == 0 || age > oldest_age'], 'Vinix oldest idle G13 ASID choice')!
+	require(local_selection.count('mgr.contexts[slot]') == 1, 'G13 choice must keep the release age of empty slots')!
 	local_bind := section(local, 'pub fn (mgr &UatManager) bind_context(', 'pub fn (mut mgr UatManager) release_g13_slot(', 'Vinix UAT bind')!
 	require_order(local_bind, ['owner.lock.acquire()', 'defer { owner.lock.release() }', 'bound := ctx.bound_slot()',
 		'owner.slot_users[bound]++', 'return bound', 'handoff_lock(mgr.handoff)',
 		'mgr.select_context_slot_locked(leased)', 'slots[slot].ttb0 =', 'slots[slot].ttb1 =',
-		'handoff_unlock(mgr.handoff)', 'previous.unbind_tlb()', 'pt.bind_tlb(u8(slot))',
+		'handoff_unlock(mgr.handoff)', 'pt.replace_tlb(mut previous, u8(slot))', 'else {',
+		'pt.bind_tlb(u8(slot))',
 		'installed.binding_epoch++', 'owner.contexts[slot] = installed'], 'Vinix ASID reuse invalidation')!
+	require(!local_bind.contains('previous.unbind_tlb()'), 'Replacement must not invalidate the displaced ASID separately')!
+	page_table := read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!
+	transfer := section(page_table, 'pub fn (mut pt UatPgtable) replace_tlb(', 'pub fn (mut pt UatPgtable) unbind_tlb(', 'Vinix ASID transfer')!
+	require_order(transfer, ['previous.lock.acquire()', 'defer { previous.lock.release() }', 'pt.lock.acquire()',
+		'defer { pt.lock.release() }', 'pt.tlb_asid = asid', 'pt.tlb_bound = true',
+		'pt.invalidate_tlb_locked()', 'previous.tlb_bound = false'], 'Vinix transfers TLB ownership after the completed invalidation')!
+	require(transfer.count('invalidate_tlb_locked()') == 1, 'Vinix replacement invalidates the published ASID once')!
 	local_unbind := section(local, 'pub fn (mut mgr UatManager) unbind_context(', '// Map a driver-owned allocation into context zero.', 'Vinix UAT unbind')!
 	require_order(local_unbind, ['slot := ctx.bound_slot()', 'slot == 0', 'slots[slot].ttb0 = 0', 'slots[slot].ttb1 = 0',
 		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()', 'mgr.contexts[slot] = unsafe { nil }'], 'Vinix ASID teardown invalidation')!
+	require(!local_unbind.contains('mgr.slot_release[') && !local_unbind.contains('mgr.slot_release_clock'),
+		'Unbinding must preserve the release age')!
 	check_g13_slot_wait(asahi_linux, repo, local)!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
-		'ASID invalidation after root publication and removal',
+		'Oldest idle ASID selection and one invalidation after root replacement or removal',
 		'Serialized per-queue UAT admission and single-waiter release before G13 job preparation',
 		'Distinct GPU-only coherent RO/WO/RW bind permissions and Asahi UAT selectors']
 }
 
 fn check_g13_slot_wait(asahi_linux string, repo string, mmu string) ! {
 	slots := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/slotalloc.rs'))!
+	require_order(slots, ['constructor(&mut data, i).map(|item| Entry', 'drop_time: 0',
+		'if slot.drop_time < oldest_time', 'oldest_slot = i as u32', 'oldest_time = slot.drop_time'],
+		'Asahi starts all slots at age zero and reuses the oldest idle slot')!
 	wait := section(slots, 'fn get_inner_impl(', 'break oldest_slot;', 'Asahi slot allocator')!
 	require_order(wait, ['if oldest_time == u64::MAX', 'if !wait', 'return Err(ENOSPC)',
 		'self.0.cond.wait_interruptible(&mut inner)', 'return Err(ERESTARTSYS)'], 'Asahi slot wait')!

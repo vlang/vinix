@@ -113,6 +113,23 @@ pub fn (mut pt UatPgtable) bind_tlb(asid u8) {
 	pt.invalidate_tlb_locked()
 }
 
+// The UAT manager serializes transfers and has published the new user root.
+// Hold both page tables stable through the ASID invalidation before retiring
+// the previous binding. Ordinary page table edits take one page table lock.
+pub fn (mut pt UatPgtable) replace_tlb(mut previous UatPgtable, asid u8) {
+	assert voidptr(pt) != voidptr(previous)
+	previous.lock.acquire()
+	defer { previous.lock.release() }
+	pt.lock.acquire()
+	defer { pt.lock.release() }
+	assert previous.non_global && previous.tlb_bound && previous.tlb_asid == asid
+	assert pt.non_global && !pt.tlb_bound
+	pt.tlb_asid = asid
+	pt.tlb_bound = true
+	pt.invalidate_tlb_locked()
+	previous.tlb_bound = false
+}
+
 // The context-table roots must be cleared before this call. Complete the
 // invalidation before destroying page tables or releasing physical backing.
 pub fn (mut pt UatPgtable) unbind_tlb() {

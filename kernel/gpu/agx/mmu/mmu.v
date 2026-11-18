@@ -677,14 +677,18 @@ fn (mgr &UatManager) select_context_slot_locked(leased bool) u32 {
 	mut oldest := u32(0)
 	mut oldest_age := u64(0)
 	for slot := u32(1); slot < uat_num_contexts; slot++ {
-		if slot == current || (leased && katomic.load(&mgr.handoff.flush[slot].state) != 0) { continue }
-		if mgr.contexts[slot] == unsafe { nil } { return slot }
-		if leased && mgr.slot_users[slot] == 0 {
-			age := mgr.slot_release_clock - mgr.slot_release[slot]
-			if oldest == 0 || age > oldest_age {
-				oldest = slot
-				oldest_age = age
-			}
+		if !leased {
+			if mgr.contexts[slot] == unsafe { nil } { return slot }
+			continue
+		}
+		if slot == current || katomic.load(&mgr.handoff.flush[slot].state) != 0
+			|| mgr.slot_users[slot] != 0 { continue }
+		// Root removal preserves the allocator's release age. Only slots
+		// that have never been used carry the initial release time.
+		age := mgr.slot_release_clock - mgr.slot_release[slot]
+		if oldest == 0 || age > oldest_age {
+			oldest = slot
+			oldest_age = age
 		}
 	}
 	return oldest
@@ -729,12 +733,13 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) u32 {
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
+	mut pt := unsafe { ctx.pgtable }
 	if replaced != unsafe { nil } {
 		mut previous := unsafe { replaced.pgtable }
-		previous.unbind_tlb()
+		pt.replace_tlb(mut previous, u8(slot))
+	} else {
+		pt.bind_tlb(u8(slot))
 	}
-	mut pt := unsafe { ctx.pgtable }
-	pt.bind_tlb(u8(slot))
 	mut installed := unsafe { ctx }
 	installed.binding_epoch++
 	owner.contexts[slot] = installed
