@@ -7,6 +7,12 @@ import memory
 import event
 import event.eventstruct
 
+pub fn hold_fence_notifications_for_checks(hold bool) {
+	assert chain_notify_draining != hold
+	chain_notify_draining = hold
+	if !hold { drain_chain_notifications() }
+}
+
 pub fn before_fence_lock_for_checks(fence &DmaFence, callback fn ()) {
 	klock.before_once(unsafe { &fence.lock }, callback)
 }

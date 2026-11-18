@@ -177,6 +177,7 @@ fn enqueue_chain(parent &DmaFence) {
 fn enqueue_chain_locked(parent &DmaFence) {
 	mut f := unsafe { parent }
 	if !f.chain_notify_queued {
+		if f.array_snapshot { katomic.inc(mut &f.array_snapshot_refs) }
 		f.chain_notify_queued = true
 		f.chain_notify_next = unsafe { nil }
 		if chain_notify_tail == unsafe { nil } { chain_notify_head = unsafe { parent } }
@@ -215,6 +216,7 @@ fn drain_chain_notifications() {
 		if f.fence_array { if array_ready(f) { complete_array(f) } }
 		else if (f.chain_prev == unsafe { nil } || katomic.load(&f.chain_prev.signaled))
 			&& katomic.load(&f.chain_payload.signaled) { complete_fence(f, 0, true) }
+		if f.array_snapshot { release_snapshot_reference(f) }
 		chain_notify_lock.acquire()
 	}
 	chain_notify_draining = false

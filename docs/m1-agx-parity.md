@@ -897,7 +897,7 @@ Duplicate fence pointers share a record and read usage can upgrade to
 write. Distinct G13 fences on one queue keep separate records because they
 can complete out of order. Completed records are pruned on import or CPU
 START. The final GEM release reclaims the remaining list. Sync-file export,
-GPU submission integration and M1 hardware validation remain open.
+GPU submission integration and M1 hardware validation were open at that revision.
 
 Both kernel builds, all 82 focused M1 V test files, the DRM wire checks and
 the sanitizer fixtures passed. The reservation fixture checked second-leaf
@@ -911,6 +911,36 @@ The restored archive passed inventory and kernel artifact verification for
 `/Users/alex/.local/state/vinix/omarchy-m1-prime-resv-20261118.UCfV9w/`.
 `bundle.tar.gz` SHA-256 is
 `b4f477ca5e9318ff5a05447b89a8c54033a97dfbe0e886611d10951553f31557`.
+
+Native G13 PRIME fds accept `DMA_BUF_IOCTL_EXPORT_SYNC_FILE`. A read snapshot
+selects pending writers. A write or read/write snapshot selects pending
+readers and writers. An empty selection returns the shared completed stub,
+and an aggregate becomes ready after all selected fences complete. Later
+imports into the GEM leave existing snapshots unchanged. The close-on-exec
+descriptor stays reserved and invisible until the request copies out
+successfully. [Pinned DMA-BUF export](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L450-L504) [Pinned array completion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-fence-array.c#L204-L210)
+
+When no DRM syncobj adopted a snapshot, final close unlinks its callbacks.
+Queued notifications retain snapshot storage until they finish. PRIME import
+borrows the source descriptor while staging leaves. A snapshot imported
+into a DRM syncobj follows the existing retained-fence lifetime, including
+after replacement or destruction of the syncobj. DMA-BUF poll readiness,
+GPU submission integration and M1 hardware validation remain open.
+
+Both kernel builds, all 82 focused V test files, the DRM wire checks and the
+sanitizer fixtures passed. The export fixture exercised failed copyout,
+128 export/poll/re-import/close cycles, and closing while a notification
+remained queued. The generated C check covered 13 helpers on both
+architectures. The allocation scan matched the baseline. The broader suite
+reproduced existing compile failures in `g17plan` and `recoverycli`, and the
+full storage checker still reported the same missing helper on the baseline.
+All selected offline source gates passed. The verdict remains `not_equivalent`.
+
+The restored archive passed inventory and kernel artifact verification for
+`79bd6f11b371b7b5382ba0e123a6d670e973fe27` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-prime-export-20261118.val4Rx/`.
+`bundle.tar.gz` SHA-256 is
+`bfc264a9ee10506a9e49ca67749645b8b3006d62427aeeab5c9ca44a7208a9c9`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

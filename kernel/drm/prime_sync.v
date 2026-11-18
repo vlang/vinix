@@ -4,6 +4,8 @@ module drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import errno
+import file
 import katomic
 import memory
 import proc
@@ -16,13 +18,80 @@ fn prime_import_sync_file(object &gem.GemObject, address u64) int {
 	mut request := ioctl.DmaBufImportSyncFile{}
 	if !usercopy.copy_from_user(unsafe { &request }, address, sizeof(request)) { return -14 }
 	if request.flags == 0 || u64(request.flags) & ~prime_access != 0 { return -22 }
-	fence := sync_file_fence_from_fd(request.fd) or { return -22 }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, request.fd) or { return -22 }
+	defer { fd.unref() }
+	fence := sync_file_fence(fd) or { return -22 }
 	return add_prime_fences(object, fence, u64(request.flags) & ioctl.dma_buf_sync_write != 0)
 }
 
-// Prepare every pending leaf before changing the reservation. The sync-file
-// source and its leaves have the same retained lifetime as other published
-// fences, including after the source fd is closed.
+fn prime_export_sync_file(object &gem.GemObject, address u64) int {
+	mut request := ioctl.DmaBufExportSyncFile{}
+	if !usercopy.copy_from_user(unsafe { &request }, address, sizeof(request)) { return -14 }
+	if request.flags == 0 || u64(request.flags) & ~prime_access != 0 { return -22 }
+	mut reservation := file.FdReservation{}
+	number := file.reserve_fd(unsafe { nil }, unsafe { &reservation }) or { return -int(errno.get()) }
+	defer { file.cancel_fd_reservation(unsafe { &reservation }) }
+
+	snapshot := capture_prime_fences(object, u64(request.flags) & ioctl.dma_buf_sync_write != 0) or { return -12 }
+	mut fd := new_sync_file_fd(snapshot.fence, snapshot.owned) or { return -int(errno.get()) }
+	request.fd = i32(number)
+	if !usercopy.copy_to_user(address, unsafe { &request }, sizeof(request)) {
+		fd.unref()
+		return -14
+	}
+	file.fdnum_install_reserved_fd(unsafe { &reservation }, fd) or {
+		code := errno.get()
+		fd.unref()
+		return -int(code)
+	}
+	return 0
+}
+
+struct PrimeSnapshot {
+	fence &syncobj.DmaFence = unsafe { nil }
+	owned bool
+}
+
+// Snapshot membership and access modes under the GEM lock. Any leaf that
+// signals once selected stays in this snapshot with its completed status.
+fn capture_prime_fences(object &gem.GemObject, write bool) ?PrimeSnapshot {
+	mut source := unsafe { object }
+	source.lock.acquire()
+	defer { source.lock.release() }
+	single := prime_pending_locked(mut source, write)
+	if single == unsafe { nil } { return PrimeSnapshot{fence: syncobj.shared_timeline_stub()} }
+	mut count := u32(0)
+	mut entry := unsafe { source.prime_fences }
+	for entry != unsafe { nil } {
+		if write || entry.write {
+			if count == u32(0x7fff_ffff) { return none }
+			count++
+		}
+		entry = unsafe { entry.next }
+	}
+	if count == 1 { return PrimeSnapshot{fence: single} }
+	storage := memory.malloc_packed_fallible(u64(count) * sizeof(voidptr))
+	if storage == unsafe { nil } { return none }
+	items := unsafe { &&syncobj.DmaFence(storage) }
+	mut index := u32(0)
+	entry = unsafe { source.prime_fences }
+	for entry != unsafe { nil } {
+		if write || entry.write {
+			unsafe { items[index] = &syncobj.DmaFence(entry.source) }
+			index++
+		}
+		entry = unsafe { entry.next }
+	}
+	array := syncobj.new_sync_file_snapshot(items, count) or {
+		memory.free(storage)
+		return none
+	}
+	return PrimeSnapshot{fence: array, owned: true}
+}
+
+// Prepare every pending leaf before changing the reservation. The caller
+// pins the sync-file root during traversal. Only published leaves, which
+// have a retained lifetime, remain in the GEM reservation.
 fn add_prime_fences(object &gem.GemObject, root &syncobj.DmaFence, write bool) int {
 	mut staged := &gem.PrimeFence(unsafe { nil })
 	mut cursor := syncobj.FenceUnwrap{}

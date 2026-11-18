@@ -70,16 +70,16 @@ pub fn run_sharing_checks() {
 		binary_action(11, same_file, false); checks++
 		assert_has_no_fence(obj)
 		assert voidptr(syncobj.captured_fence(unsafe { &capture }) or { panic('first publication') }) == voidptr(first)
-		assert voidptr(sync_file_fence_from_fd(snapshot) or { panic('stable sync file') }) == voidptr(first)
+		assert voidptr(fixture_sync_file_fence(snapshot) or { panic('stable sync file') }) == voidptr(first)
 		binary_action(22, right, true); checks++
 		assert voidptr(current(obj)) != voidptr(first) && syncobj.is_signaled(current(obj))
-		assert voidptr(sync_file_fence_from_fd(snapshot) or { panic('stable sync file') }) == voidptr(first)
+		assert voidptr(fixture_sync_file_fence(snapshot) or { panic('stable sync file') }) == voidptr(first)
 		syncobj.release_capture(unsafe { &capture })
 		// Opaque and fence descriptors are distinct types in both directions.
 		request = ioctl.DrmSyncobjHandle{ fd: i32(snapshot), handle: 777 }
 		assert ioctl_syncobj_fd_to_handle(voidptr(33), &request) == -22; checks++
 		assert request.handle == 777
-		if _ := sync_file_fence_from_fd(number) { assert false }
+		if _ := fixture_sync_file_fence(number) { assert false }
 		// Linux maps private sync-file creation failure to EINVAL; opaque
 		// construction retains ENOMEM. Number reservation failure is EMFILE.
 		for flags in [u32(0), 1]! {

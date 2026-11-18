@@ -19,12 +19,14 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 		'if request.flags & ioctl.drm_syncobj_fd_to_handle_import_sync_file == 0', 'if request.point != 0 { return -22 }',
 		'syncobj_from_fd(request.fd) or { return -22 }', 'defer { syncobj.release_syncobj(obj) }',
 		'request.handle = syncobj.import_syncobj(u64(handle), obj) or { return -12 }', 'return 0',
-		'sync_file_fence_from_fd(request.fd) or { return -22 }',
+		'file.fd_from_fdnum(unsafe { nil }, request.fd) or { return -22 }', 'defer { fd.unref() }',
+		'sync_file_fence(fd) or { return -22 }',
 		'syncobj.lookup_referenced(u64(handle), request.handle) or { return -2 }',
 		'defer { syncobj.release_syncobj(obj) }',
 		'if request.flags & ioctl.drm_syncobj_fd_to_handle_timeline != 0 && request.point != 0',
 		'syncobj.reserve_chain() or { return -12 }', 'defer { syncobj.release_chain_reservation(chain) }',
-		'syncobj.add_chain_point(obj, chain, fence, request.point)', 'else {', 'syncobj.replace_fence(obj, fence)'],
+		'syncobj.retain_sync_file_snapshot(fence)', 'syncobj.add_chain_point(obj, chain, fence, request.point)',
+		'else {', 'syncobj.retain_sync_file_snapshot(fence)', 'syncobj.replace_fence(obj, fence)'],
 		'Opaque import creates a handle while sync-file import publishes a point or replaces the head')!
 	link := section(objects, 'pub fn import_syncobj(', '// Prepared entries', 'Vinix alias ownership')!
 	require_order(link, ['if owner == 0 || obj == unsafe { nil }',
@@ -45,10 +47,10 @@ fn check_sharing_contract(drm string, transport string, objects string, referenc
 	require_order(transport, ['fn syncobj_from_fd(', 'file.fd_from_fdnum(', 'defer { fd.unref() }',
 		'if mut res is SyncobjResource', 'syncobj.retain_syncobj(res.object)',
 		'return unsafe { res.object }'], 'Opaque type check and object retention while holding descriptor reference')!
-	file_export := section(drm, 'pub fn create_sync_file_fd(', '// Resolve only fds', 'Vinix sync-file ownership')!
+	file_export := section(drm, 'fn new_sync_file_fd(', '// The caller holds an FD reference', 'Vinix sync-file ownership')!
 	require_order(file_export, ['memory.malloc_packed_fallible(sizeof(SyncFileResource))',
 		'memory.malloc_packed_fallible(sizeof(resource.Resource))', 'if box == unsafe { nil }',
-		'memory.free(allocation)', '*wrapper.box = resource.Resource(wrapper)', 'file.fdnum_create_from_resource('],
+		'memory.free(allocation)', '*wrapper.box = resource.Resource(wrapper)', 'file.fd_create_from_resource(mut res, resource.o_cloexec)'],
 		'Sync-file wrapper and box must be fallible before ownership transfer')!
 	require(file_export.count('memory.free(') == 1,
 		'Sync-file constructor failure must release its wrapper exactly once through the file layer')!

@@ -63,10 +63,17 @@ pub const drm_syncobj_wait_available = u32(1) << 2
 pub const drm_syncobj_wait_deadline = u32(1) << 3
 pub const drm_syncobj_query_last_submitted = u32(1) << 0
 pub const dma_buf_ioctl_sync = u32(0x40086200)
+pub const dma_buf_ioctl_export_sync_file = u32(0xc0086202)
 pub const dma_buf_ioctl_import_sync_file = u32(0x40086203)
 pub const dma_buf_sync_read = u64(1)
 pub const dma_buf_sync_write = u64(2)
 pub const dma_buf_sync_end = u64(4)
+
+pub struct DmaBufExportSyncFile {
+pub mut:
+	flags u32
+	fd i32
+}
 
 pub struct DmaBufImportSyncFile {
 pub mut:

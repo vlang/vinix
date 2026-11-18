@@ -56,6 +56,9 @@ mut:
 	array_fences &&DmaFence = unsafe { nil }
 	array_waiters &ChainWaiter = unsafe { nil }
 	merge_reserved bool
+	array_snapshot bool
+	array_snapshot_refs int
+	array_snapshot_retained bool
 }
 
 struct TimelinePoint {
@@ -156,6 +159,7 @@ pub fn is_signaled(fence &DmaFence) bool {
 	}
 	if katomic.load(&fence.signaled) { return true }
 	if fence.fence_array {
+		if fence.array_snapshot { enable_array(fence) }
 		if !array_ready(fence) { return false }
 		complete_array(fence)
 		drain_chain_notifications()

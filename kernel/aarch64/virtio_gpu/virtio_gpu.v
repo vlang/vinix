@@ -16,6 +16,7 @@ import drm
 import drm.gem
 import drm.ioctl
 import drm.syncobj
+import file as fdtable
 import klock
 import memory
 import memory.mmap
@@ -855,7 +856,9 @@ fn execbuffer_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) int {
 		return -22
 	}
 	if request.flags & ioctl.virtgpu_execbuf_fence_fd_in != 0 {
-		fence := drm.sync_file_fence_from_fd(request.fence_fd) or { return -9 }
+		mut fd := fdtable.fd_from_fdnum(unsafe { nil }, request.fence_fd) or { return -9 }
+		defer { fd.unref() }
+		fence := drm.sync_file_fence(fd) or { return -9 }
 		if !syncobj.wait(fence, command_timeout_ns) { return -16 }
 	}
 	if request.flags & ioctl.virtgpu_execbuf_ring_idx != 0 && request.ring_idx >= file.num_rings {

@@ -113,6 +113,7 @@ pub mut:
 	status   int
 	can_mmap bool
 	fence    &syncobj.DmaFence = unsafe { nil }
+	owns_snapshot bool
 	poll_event syncobj.FenceEvent
 	box &resource.Resource = unsafe { nil }
 }
@@ -191,6 +192,7 @@ fn (mut this GemPrimeResource) ioctl(handle voidptr, request u64, argp voidptr) 
 	}
 	result := match u32(request) {
 		ioctl.dma_buf_ioctl_sync { prime_cpu_access(this.obj, u64(argp)) }
+		ioctl.dma_buf_ioctl_export_sync_file { prime_export_sync_file(this.obj, u64(argp)) }
 		ioctl.dma_buf_ioctl_import_sync_file { prime_import_sync_file(this.obj, u64(argp)) }
 		else { return resource.default_ioctl(handle, request, argp) }
 	}
@@ -255,6 +257,7 @@ fn (mut this SyncFileResource) unref(_handle voidptr) ? {
 		return
 	}
 	syncobj.cancel_fence_event(this.fence, unsafe { &this.poll_event })
+	if this.owns_snapshot { syncobj.release_sync_file_snapshot(this.fence) }
 	unsafe {
 		memory.free(voidptr(this.box))
 		memory.free(voidptr(this))
@@ -1062,19 +1065,34 @@ pub fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 }
 
 fn create_sync_file_fd_at(fence &syncobj.DmaFence, reservation &file.FdReservation) ?int {
+	mut fd := new_sync_file_fd(fence, false) or { return none }
+	if reservation != unsafe { nil } {
+		return file.fdnum_install_reserved_fd(reservation, fd) or { fd.unref(); return none }
+	}
+	return file.fdnum_create_from_fd(unsafe { nil }, fd, 0, false) or { fd.unref(); return none }
+}
+
+// If owns_snapshot is set, construction consumes the snapshot on every path.
+fn new_sync_file_fd(fence &syncobj.DmaFence, owns_snapshot bool) ?&file.FD {
 	if fence == unsafe { nil } {
 		return none
 	}
 	allocation := memory.malloc_packed_fallible(sizeof(SyncFileResource))
-	if allocation == unsafe { nil } { errno.set(errno.enomem); return none }
+	if allocation == unsafe { nil } {
+		if owns_snapshot { syncobj.release_sync_file_snapshot(fence) }
+		errno.set(errno.enomem)
+		return none
+	}
 	mut wrapper := unsafe { &SyncFileResource(allocation) }
 	unsafe { *wrapper = SyncFileResource{
 		fence: fence
+		owns_snapshot: owns_snapshot
 		status: if syncobj.is_signaled(fence) { file.pollin } else { 0 }
 	} }
 	box := memory.malloc_packed_fallible(sizeof(resource.Resource))
 	if box == unsafe { nil } {
 		memory.free(allocation)
+		if owns_snapshot { syncobj.release_sync_file_snapshot(fence) }
 		errno.set(errno.enomem)
 		return none
 	}
@@ -1083,19 +1101,11 @@ fn create_sync_file_fd_at(fence &syncobj.DmaFence, reservation &file.FdReservati
 	unsafe { *(&voidptr(&wrapper.box)) = box }
 	unsafe { *wrapper.box = resource.Resource(wrapper) }
 	mut res := wrapper.box
-	if reservation != unsafe { nil } {
-		return file.fdnum_create_from_reserved_resource(reservation, mut res, resource.o_cloexec)
-	}
-	return file.fdnum_create_from_resource(unsafe { nil }, mut res, resource.o_cloexec, 0, false)
+	return file.fd_create_from_resource(mut res, resource.o_cloexec)
 }
 
-// Resolve only fds created by create_sync_file_fd. The interface type check
-// rejects arbitrary user-provided descriptors before accessing fence state.
-pub fn sync_file_fence_from_fd(fdnum int) ?&syncobj.DmaFence {
-	mut fd := file.fd_from_fdnum(unsafe { nil }, fdnum) or { return none }
-	defer {
-		fd.unref()
-	}
+// The caller holds an FD reference while using the borrowed fence.
+pub fn sync_file_fence(fd &file.FD) ?&syncobj.DmaFence {
 	mut res := fd.handle.resource
 	if mut res is SyncFileResource {
 		if res.fence == unsafe { nil } {
@@ -1154,16 +1164,18 @@ fn ioctl_syncobj_fd_to_handle(handle voidptr, data voidptr) int {
 	}
 	// Linux resolves the transport first. Even when both inputs are invalid,
 	// an invalid sync-file is EINVAL; only a valid fence with no target is ENOENT.
-	// Fence metadata remains retained after the descriptor lookup releases its
-	// reference, including across destination destruction/reuse before lookup.
-	fence := sync_file_fence_from_fd(request.fd) or { return -22 }
+	mut fd := file.fd_from_fdnum(unsafe { nil }, request.fd) or { return -22 }
+	defer { fd.unref() }
+	fence := sync_file_fence(fd) or { return -22 }
 	obj := syncobj.lookup_referenced(u64(handle), request.handle) or { return -2 }
 	defer { syncobj.release_syncobj(obj) }
 	if request.flags & ioctl.drm_syncobj_fd_to_handle_timeline != 0 && request.point != 0 {
 		chain := syncobj.reserve_chain() or { return -12 }
 		defer { syncobj.release_chain_reservation(chain) }
+		syncobj.retain_sync_file_snapshot(fence)
 		if !syncobj.add_chain_point(obj, chain, fence, request.point) { return -22 }
 	} else {
+		syncobj.retain_sync_file_snapshot(fence)
 		syncobj.replace_fence(obj, fence)
 	}
 	return 0

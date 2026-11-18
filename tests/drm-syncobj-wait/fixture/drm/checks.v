@@ -4,6 +4,7 @@ module drm
 
 import drm.ioctl
 import drm.syncobj
+import file
 import sched
 import usercopy
 import proc
@@ -28,6 +29,13 @@ fn remember_fence(fence &syncobj.DmaFence) &syncobj.DmaFence {
 }
 
 fn make_fence() &syncobj.DmaFence { return remember_fence(syncobj.new_fence(7, u64(wait_fixture_fence_count))) }
+
+// Callers compare identities of pre-existing retained fences.
+fn fixture_sync_file_fence(number int) ?&syncobj.DmaFence {
+	mut fd := file.fd_from_fdnum(unsafe { nil }, number) or { return none }
+	defer { fd.unref() }
+	return sync_file_fence(fd)
+}
 
 fn make_object(flags u32) &syncobj.SyncObj {
 	mut request := ioctl.DrmSyncobjCreate{ flags: flags }

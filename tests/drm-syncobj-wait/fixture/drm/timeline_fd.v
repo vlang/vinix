@@ -39,7 +39,7 @@ fn run_timeline_sync_file_checks() {
 		syncobj.replace_fence(target, predecessor)
 
 		number := export_timeline_fd(source, 4, 0)
-		assert (sync_file_fence_from_fd(number) or { panic('selected export') }) == first_chain
+		assert (fixture_sync_file_fence(number) or { panic('selected export') }) == first_chain
 		assert export_timeline_fd(source, 11, -22) == -123
 		file.fail_at(2)
 		assert export_timeline_fd(source, 11, -24) == -123
@@ -47,7 +47,7 @@ fn run_timeline_sync_file_checks() {
 		assert file.outstanding() == 1
 		mut request := ioctl.DrmSyncobjHandle{handle: source.handle, flags: 1, fd: -1, point: 99}
 		assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == 0
-		assert (sync_file_fence_from_fd(request.fd) or { panic('implicit point zero') }) == later_chain
+		assert (fixture_sync_file_fence(request.fd) or { panic('implicit point zero') }) == later_chain
 		file.close(request.fd)
 		request = ioctl.DrmSyncobjHandle{handle: source.handle, flags: 2, fd: -123, point: 5}
 		assert ioctl_syncobj_handle_to_fd(voidptr(11), &request) == -22 && request.fd == -123
@@ -87,7 +87,7 @@ fn run_timeline_sync_file_checks() {
 		syncobj.signal_error(first, -5)
 		assert syncobj.is_signaled(first_chain) && !syncobj.is_signaled(root)
 		retired := export_timeline_fd(source, 5, 0)
-		assert (sync_file_fence_from_fd(retired) or { panic('retired point') }) == syncobj.shared_timeline_stub()
+		assert (fixture_sync_file_fence(retired) or { panic('retired point') }) == syncobj.shared_timeline_stub()
 		syncobj.signal(predecessor)
 		assert syncobj.is_signaled(current(target)) && !syncobj.is_signaled(later_chain)
 		import_timeline_fd(target, retired, 0, 0)

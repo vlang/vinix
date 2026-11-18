@@ -99,7 +99,7 @@ fn check_prime_cpu_access(mut descriptor file.FD) {
 	usercopy.allow(address, sizeof(flags))
 	assert prime_fd_ioctl(mut descriptor, request | 0xa5a5a5a500000000, address) == 0
 	usercopy.allow(address, sizeof(flags))
-	for unknown in [u64(0x40046200), 0x80086200, 0x40086400, 0xc0086202]! {
+	for unknown in [u64(0x40046200), 0x80086200, 0x40086400, 0x80086202]! {
 		assert prime_fd_ioctl(mut descriptor, unknown, address) == -25
 	}
 	assert usercopy.reads == 0 && usercopy.writes == 0

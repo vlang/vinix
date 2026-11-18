@@ -18,6 +18,22 @@ const packet_helpers = [
 	'packet__valid_render',
 ]
 
+const sync_file_export_helpers = [
+	'drm__capture_prime_fences',
+	'drm__prime_export_sync_file',
+	'drm__prime_import_sync_file',
+	'drm__new_sync_file_fd',
+	'drm__create_sync_file_fd_at',
+	'drm__sync_file_fence',
+	'drm__SyncFileResource__unref',
+	'syncobj__new_sync_file_snapshot',
+	'syncobj__retain_sync_file_snapshot',
+	'syncobj__release_sync_file_snapshot',
+	'syncobj__release_snapshot_reference',
+	'syncobj__enqueue_chain_locked',
+	'syncobj__drain_chain_notifications',
+]
+
 const helpers = [
 	'gpu__agx__gpu__GpuManager__reap_g13_compute_jobs',
 	'gpu__agx__event__WorkQueueEvents__record_completion',
@@ -222,6 +238,13 @@ fn result_type(name string) string {
 	if name == 'bo__create_size_error' { return 'i64' }
 	if name == 'vm__bind_backing_size' { return 'u64' }
 	if name in ['file__reserve_fd', 'file__fdnum_install_reserved_fd', 'file__fdnum_create_from_reserved_resource', 'file__fdnum_create_from_fd', 'drm__create_sync_file_fd_at'] { return '__v_option_i64' }
+	if name == 'drm__new_sync_file_fd' { return '__v_option_file__FDptr' }
+	if name == 'drm__capture_prime_fences' { return '__v_option_drm__PrimeSnapshot' }
+	if name in ['drm__prime_export_sync_file', 'drm__prime_import_sync_file'] { return 'i64' }
+	if name in ['drm__sync_file_fence', 'syncobj__new_sync_file_snapshot'] { return '__v_option_syncobj__DmaFenceptr' }
+	if name in ['syncobj__retain_sync_file_snapshot', 'syncobj__release_sync_file_snapshot',
+		'syncobj__release_snapshot_reference', 'syncobj__enqueue_chain_locked',
+		'syncobj__drain_chain_notifications'] { return 'void' }
 	if name == 'file__cancel_fd_reservation' { return 'void' }
 	if name == 'submission__stage_sync_array' { return 'multi_return_i64_submission__SyncArray' }
 	if name == 'syncobj__get_timeline_fence' { return '__v_option_syncobj__DmaFenceptr' }
@@ -277,9 +300,21 @@ fn function_body(source string, name string) !string {
 }
 
 fn check(source string) ! {
-	for name in helpers {
+	staged_fd := source.contains('drm__prime_export_sync_file(') || source.contains('drm__new_sync_file_fd(')
+	mut checked := helpers.clone()
+	if staged_fd { checked << 'drm__new_sync_file_fd' }
+	check_storage(source, checked, staged_fd)!
+}
+
+fn check_storage(source string, checked []string, staged_fd bool) ! {
+	for name in checked {
 		body := function_body(source, name)!
 		mut allocation_scan := body
+		if name == 'drm__capture_prime_fences' {
+			owned := 'memory__malloc_packed_fallible((u64)(count) * sizeof(void*))'
+			if body.count(owned) != 1 { return error('PRIME snapshot must allocate one checked child table') }
+			allocation_scan = body.replace(owned, 'owned_fence_table')
+		}
 		if name.ends_with('GpuFile__reserve_mapping_slots_locked') {
 			owned := 'memory__malloc_packed_fallible(bytes)'
 			if body.count(owned) != 1 { return error('mapping splits require exactly one checked owned array reservation') }
@@ -332,7 +367,8 @@ fn check(source string) ! {
 			if body.count(owned) != 1 { return error('opaque import must have one fallible alias link allocation') }
 			allocation_scan = body.replace(owned, 'owned_alias_link_allocation')
 		}
-		if name in ['drm__create_syncobj_fd', 'drm__create_sync_file_fd_at'] {
+		if name == 'drm__create_syncobj_fd' || name == 'drm__new_sync_file_fd'
+			|| (name == 'drm__create_sync_file_fd_at' && !staged_fd) {
 			kind := if name == 'drm__create_syncobj_fd' { 'SyncobjResource' } else { 'SyncFileResource' }
 			for owned in ['memory__malloc_packed_fallible(sizeof(drm__' + kind + '))',
 				'memory__malloc_packed_fallible(sizeof(resource__Resource))'] {
@@ -402,6 +438,13 @@ fn selftest() ! {
 		fixture += kind + ' ' + name + '(void) {\n' + owned + ' u8 digits[20];\n u32 handles[64];\n void* objects[64];\n ' + captures + ' void* blocked[128];\n bool unpublished[128];\n gpu__agx__gpu__G13SubmissionJob jobs[64];\n gpu__agx__event__Ticket resolved[2];\n u32 events[3];\n u32 commands[3];\n u32 positions[64];\n gpu__agx__gpu__G13BatchPipe pipes[3];\n bool binds[64];\n ' + ending + '\n}\n'
 	}
 	check(fixture)!
+	old_fd := function_body(fixture, 'drm__create_sync_file_fd_at')!
+	new_fd := old_fd.replace('__v_option_i64 drm__create_sync_file_fd_at', '__v_option_file__FDptr drm__new_sync_file_fd')
+	staged := fixture.replace(old_fd, '__v_option_i64 drm__create_sync_file_fd_at(void) {\nreturn (__v_option_i64){0};\n}\n' + new_fd)
+	check(staged)!
+	if _ := check(staged.replace('memory__malloc_packed_fallible(sizeof(drm__SyncFileResource));', '')) {
+		return error('staged sync-file constructor was accepted without its wrapper allocation')
+	}
 	for name in helpers {
 		for allocation in ['memdup', 'HEAP(', 'malloc', 'calloc', 'realloc', '__new_array',
 			'new_array_from', 'array_clone', 'array_slice', '__v3_struct_eq', 'G13QueueResources __eq'] {
@@ -517,6 +560,12 @@ fn packet_selftest() ! {
 }
 
 fn main() {
+	if os.args.len == 3 && os.args[1] == '--sync-file-export' {
+		source := os.read_file(os.args[2]) or { eprintln(err); exit(2) }
+		check_storage(source, sync_file_export_helpers, true) or { eprintln(err); exit(1) }
+		println('PRIME sync-file export storage: ${sync_file_export_helpers.len} live helpers have no implicit allocations')
+		return
+	}
 	if os.args.len == 3 && os.args[1] == '--timestamp-capture' {
 		check_temporary_storage(os.read_file(os.args[2]) or { eprintln(err); exit(1) }, timestamp_helpers) or { eprintln(err); exit(1) }
 		println('Timestamp capture storage: ${timestamp_helpers.len} live helpers have no temporary allocations')
@@ -527,7 +576,7 @@ fn main() {
 		println('Packet input storage: ${packet_helpers.len} live helpers have no temporary allocations')
 		return
 	}
-	if os.args.len != 2 { eprintln('Usage: check-prefix-storage GENERATED_ARM_C | --selftest'); exit(2) }
+	if os.args.len != 2 { eprintln('Usage: check-prefix-storage [--sync-file-export] GENERATED_C | --selftest'); exit(2) }
 	if os.args[1] == '--selftest' { selftest() or { eprintln(err); exit(1) }; packet_selftest() or { eprintln(err); exit(1) }; timestamp_selftest() or { eprintln(err); exit(1) }; return }
 	source := os.read_file(os.args[1]) or { eprintln(err); exit(2) }
 	check(source) or { eprintln(err); exit(1) }
