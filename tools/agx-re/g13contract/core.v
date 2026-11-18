@@ -130,9 +130,11 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		'cache_flush_pending = false', 'unmap_shared_buffer', 'flush_g13_uat_range'], 'Vinix shared-buffer teardown')!
 	vinix_driver := section(vinix_gpu, 'fn (mut mgr GpuManager) invalidate_g13_driver_buffer', 'fn (mut mgr GpuManager) release_shared_buffer_backing', 'Vinix driver-buffer teardown')!
 	require_order(vinix_driver, ['vm_slot := context.bound_slot()', 'if vm_slot == 0 { return true }',
-		'reprotect_driver_buffer_uncached', 'flush_g13_uat_range(vm_slot,',
-		'complete_driver_buffer_cache_flush', 'unmap_driver_buffer', 'flush_g13_uat_range(vm_slot,'], 'Vinix driver-buffer teardown')!
-	results << 'retry-safe reprotect/invalidate/unmap/invalidate teardown'
+		'reprotect_driver_buffer_uncached', 'uat_mgr.g13_cache_flush_required(context, vm_slot) or { return false }',
+		'if flush && !mgr.flush_g13_uat_range(vm_slot,', 'complete_driver_buffer_cache_flush',
+		'return context.unmap_driver_buffer(buffer)'], 'Vinix driver-buffer teardown')!
+	require(vinix_driver.count('mgr.flush_g13_uat_range(') == 1, 'User driver mappings flush the ASC cache only before unmap')!
+	results << 'retry-safe cached mapping teardown and final translation invalidation'
 	vinix_channel := read(os.join_path(repo, 'kernel/gpu/agx/channel/channel.v'))!
 	enqueue := section(vinix_channel, 'pub fn (mut ch TxChannel) enqueue_with_token', 'pub fn (ch &TxChannel) read_pointer', 'Vinix TX channel')!
 	require_order(enqueue, ['C.memcpy', 'katomic.sync()', 'katomic.store(mut write_ptr'], 'Vinix TX channel publication')!
@@ -178,6 +180,11 @@ pub fn check_asahi(asahi_linux string) ![]string {
 	drop := section(mmu, 'impl Drop for KernelMapping', '/// Shared UAT global', 'Asahi MMU')!
 	require_order(drop, ['is_cached_noncoherent', 'remap_uncached_and_flush', 'unmap_pages',
 		'tlbi_range'], 'Asahi cache-safe unmap')!
+	flush := section(mmu, '    fn remap_uncached_and_flush(', 'impl Drop for KernelMapping', 'Asahi cache flush')!
+	require_order(flush, ['.reprot_pages(self.iova_range(), prot)', 'mem::sync()', 'let slot = match owner.slot()',
+		'if owner.is_kernel', 'uat_inner.handoff_lock()', 'handoff().current_slot()', '.ttb0.load(',
+		'uat_inner.handoff_unlock()', 'cur_slot == Some(slot) && ttb_cur == ttb', 'let flush =', 'gpu.fwctl(cmd)'],
+		'Asahi flushes only the matching active user slot after reprotect')!
 	channel := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/channel.rs'))!
 	put := section(channel, '    pub(crate) fn put', '    /// Wait for', 'Asahi TX channel')!
 	require_order(put, ['self.ring.ring[self.wptr as usize] = *msg', 'mem::sync()', 'T::set_wptr'], 'Asahi TX channel publication')!
@@ -214,6 +221,12 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	require_order(mmu[drop_start..], ['.ttb0.store(0,', '.ttb1.store(0,',
 		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID teardown invalidation')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!
+	cache_owner := section(local, 'pub fn (mut mgr UatManager) g13_cache_flush_required(', '// Caller holds both MMU and handoff locks', 'Vinix cache owner')!
+	require_order(cache_owner, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'ctx.bound_slot() != slot',
+		'voidptr(mgr.contexts[slot]) != voidptr(ctx)', 'ctx.pgtable.l1_phys | (u64(slot) << ttbr_asid_shift) | ttbr_valid',
+		'handoff_lock(mgr.handoff)', 'katomic.load(&mgr.handoff.cur_slot)', 'katomic.load(&mgr.ttbs[slot].ttb0)',
+		'handoff_unlock(mgr.handoff)', 'return current == slot && published == expected'],
+		'Vinix samples ASC slot and exact root under handoff arbitration')!
 	local_selection := section(local, 'fn (mgr &UatManager) select_context_slot_locked(', 'pub fn (mgr &UatManager) bind_context(', 'Vinix UAT selection')!
 	require_order(local_selection, ['katomic.load(&mgr.handoff.cur_slot)', 'if !leased',
 		'mgr.contexts[slot] == unsafe { nil }', 'continue', 'slot == current',
@@ -229,6 +242,9 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'installed.binding_epoch++', 'owner.contexts[slot] = installed'], 'Vinix ASID reuse invalidation')!
 	require(!local_bind.contains('previous.unbind_tlb()'), 'Replacement must not invalidate the displaced ASID separately')!
 	page_table := read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!
+	unmap := section(page_table, 'pub fn (mut pt UatPgtable) unmap(', '// Read the PTE', 'Vinix range unmap')!
+	require_order(unmap, ['defer {', 'pt.invalidate_range_locked(iova, size)', 'pt.lock.release()',
+		'pt.unmap_page_locked('], 'Vinix completes range TLBI before returning from unmap')!
 	transfer := section(page_table, 'pub fn (mut pt UatPgtable) replace_tlb(', 'pub fn (mut pt UatPgtable) unbind_tlb(', 'Vinix ASID transfer')!
 	require_order(transfer, ['previous.lock.acquire()', 'defer { previous.lock.release() }', 'pt.lock.acquire()',
 		'defer { pt.lock.release() }', 'pt.tlb_asid = asid', 'pt.tlb_bound = true',
@@ -241,6 +257,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'Unbinding must preserve the release age')!
 	check_g13_slot_wait(asahi_linux, repo, local)!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
+		'Only an active ASC slot with the matching published TTBR requires FwCtl before user driver-buffer unmap',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
 		'Oldest idle ASID selection and one invalidation after root replacement or removal',
 		'Per-queue and per-VM UAT admission with single-waiter release before G13 job preparation',

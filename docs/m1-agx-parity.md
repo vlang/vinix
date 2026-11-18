@@ -52,6 +52,28 @@ The archive and restored copy both passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `dbc5e8bf28bdca22bd2833d5989bc46b5fb44df65e678ed6ac25a7ee4b970954`.
 
+G13 driver-owned user mappings follow Asahi's cache teardown order. The
+driver makes a cached mapping uncached, completes the GPU TLBI, and sends
+FwCtl only if both the ASC's active slot and its TTBR0 match the VM. A
+failed snapshot or flush retains the mapping and backing. Unmap completes
+the outer-shareable GPU TLBI before backing release.
+[Asahi slot and root check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L1466-L1508)
+[Asahi final TLBI](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L1676-L1698)
+
+Both kernel builds, all 82 contract files, TLB and TVB sanitizer tests,
+512 teardown GC cases, job and context lifetime regressions, and two
+compiled negative controls passed. Generated ARM64 C and independent
+review confirmed the snapshot, flush and release order. The allocation
+scan reproduced 178 baseline findings. Whole-driver parity remains
+`not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `a83f3eaac65ac5f9924133e3774883a953ded696` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-user-teardown-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`1a525722dca606934ce3ae1d75be31c7c0fcaf5c12d0eac78e678f4aada154ba`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

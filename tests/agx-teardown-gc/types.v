@@ -9,6 +9,9 @@ __global teardown_host_page_size = u64(16384)
 __global uat_mgr = unsafe { &TeardownUat(nil) }
 struct TeardownUat {}
 fn (_ &TeardownUat) unmap_kernel(_ u64, _ u64) {}
+fn (_ &TeardownUat) release_g13_slot(_ &mmu.UatContext, _ u32) {
+	panic('teardown fixture jobs have no UAT slot lease')
+}
 
 struct TailCache { mut: references u64 = 1 }
 struct G13RenderBufferResources {
@@ -56,6 +59,7 @@ struct G13RenderJobResources {
 mut:
 	released bool
 	context &mmu.UatContext = unsafe { nil }
+	vm_slot u32
 	queue &G13QueueResources = unsafe { nil }
 	explicit_barriers []u64
 	vertex_event_reserved bool
@@ -78,6 +82,7 @@ struct G13ComputeJobResources {
 mut:
 	released bool
 	context &mmu.UatContext = unsafe { nil }
+	vm_slot u32
 	queue &G13QueueResources = unsafe { nil }
 	preempt &mmu.UatBuffer = unsafe { nil }
 	explicit_barriers []u64

@@ -500,9 +500,8 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 }
 
 // Convert a cached driver allocation to the corresponding uncached mapping
-// while its PTEs and physical backing are still valid. The caller must next
-// issue a firmware invalidation, unmap it, and issue the final translation
-// invalidation; see m1n1 GPUAllocator.free and Asahi KernelMapping::drop.
+// while its PTEs and physical backing are still valid. Reprotect completes
+// the GPU TLBI before the caller checks whether an ASC cache flush is needed.
 pub fn (mut ctx UatContext) reprotect_driver_buffer_uncached(buffer &UatBuffer) bool {
 	if buffer == unsafe { nil } {
 		return false
@@ -590,8 +589,8 @@ fn (mut ctx UatContext) release_driver_buffer_locked(buffer &UatBuffer) {
 	}
 }
 
-// Remove a driver-buffer translation but retain its physical backing until
-// the caller has completed the matching firmware UAT invalidation.
+// Remove the translation and complete the GPU TLBI before backing can be
+// freed. The caller has already resolved any outstanding ASC cache flush.
 pub fn (mut ctx UatContext) unmap_driver_buffer(buffer &UatBuffer) bool {
 	if buffer == unsafe { nil } {
 		return false
@@ -669,6 +668,25 @@ pub fn (ctx &UatContext) is_bound() bool {
 // Zero denotes a VM without a resident user root.
 pub fn (ctx &UatContext) bound_slot() u32 {
 	return if ctx.is_bound() { u32(ctx.pgtable.tlb_asid) } else { u32(0) }
+}
+
+// The GPU manager lock keeps the caller's VM resident across this snapshot
+// and any ensuing FwCtl transaction. The handoff lock makes the ASC slot
+// and published root one observation, like Asahi's cached-mapping teardown.
+pub fn (mut mgr UatManager) g13_cache_flush_required(ctx &UatContext, slot u32) ?bool {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	if !mgr.handoff_initialized || mgr.handoff_abi != .v12_3 || mgr.handoff == unsafe { nil }
+		|| mgr.ttbs == unsafe { nil } || slot == 0 || slot >= uat_num_contexts
+		|| ctx == unsafe { nil } || ctx.bound_slot() != slot || voidptr(mgr.contexts[slot]) != voidptr(ctx) {
+		return none
+	}
+	expected := ctx.pgtable.l1_phys | (u64(slot) << ttbr_asid_shift) | ttbr_valid
+	handoff_lock(mgr.handoff)
+	current := katomic.load(&mgr.handoff.cur_slot)
+	published := unsafe { katomic.load(&mgr.ttbs[slot].ttb0) }
+	handoff_unlock(mgr.handoff)
+	return current == slot && published == expected
 }
 
 // Caller holds both MMU and handoff locks. The ASC flushes its translations

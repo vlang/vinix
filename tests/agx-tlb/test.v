@@ -97,6 +97,27 @@ fn test_root_publication_and_reuse() {
 	assert bind[0].ttb0 == user.l1_phys | (u64(1) << 48) | 1
 	assert bind[0].ttb1 == 0
 	tlb.clear()
+
+	// The ASID alone never identifies the ASC's cache owner.
+	saved_root := slots[1].ttb0
+	for current in [u32(0), 1, 2, 63, ~u32(0)]! {
+		handoff.cur_slot = current
+		for root in [saved_root, saved_root ^ pgtable.uat_pgsz]! {
+			slots[1].ttb0 = root
+			required := mgr.g13_cache_flush_required(&ctx, 1) or { panic('valid G13 root snapshot') }
+			assert required == (current == 1 && root == saved_root)
+		}
+	}
+	slots[1].ttb0 = saved_root
+	other := mmu.UatContext{pgtable: user}
+	if _ := mgr.g13_cache_flush_required(&other, 1) { panic('borrowed a different VM root') }
+	if _ := mgr.g13_cache_flush_required(&ctx, 64) { panic('indexed a non-user slot') }
+	mgr.handoff_initialized = false
+	if _ := mgr.g13_cache_flush_required(&ctx, 1) { panic('read an uninitialized handoff') }
+	mgr.handoff_initialized = true
+	assert tlb.calls().len == 0
+	println('AGX UAT cache ownership: active slot and exact published TTBR must match before FwCtl')
+
 	mgr.release_g13_slot(&ctx, 1)
 	mgr.release_g13_slot(&ctx, 1)
 	mgr.unbind_context(&ctx)

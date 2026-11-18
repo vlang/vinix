@@ -26,6 +26,18 @@ pub mut:
 	check     fn () = unsafe { nil }
 }
 
+pub struct UatManager {
+pub mut:
+	current bool
+	available bool = true
+}
+
+pub fn (mut mgr UatManager) g13_cache_flush_required(context &UatContext, slot u32) ?bool {
+	assert slot == 1 && context.bound_slot() == slot
+	if !mgr.available { return none }
+	return mgr.current
+}
+
 pub fn (context &UatContext) bound_slot() u32 {
 	return if context.bound { u32(1) } else { u32(0) }
 }

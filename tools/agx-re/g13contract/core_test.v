@@ -208,7 +208,7 @@ fn test_integer_constant_accepts_v_casts_and_separators() {
 fn test_checked_in_g13_contract_matches_local_m1n1() {
 	if !os.is_dir(g13layout.default_m1n1()) { return }
 	results := check_m1n1(g13layout.default_m1n1())!
-	assert 'retry-safe reprotect/invalidate/unmap/invalidate teardown' in results
+	assert 'retry-safe cached mapping teardown and final translation invalidation' in results
 	assert 'TX ring entry barrier before write-pointer publication' in results
 }
 
@@ -240,7 +240,13 @@ fn test_asahi_contract_requires_teardown_and_publication_order() {
 	defer { os.rmdir_all(fixture) or { panic(err) } }
 	directory := os.join_path(fixture, 'drivers/gpu/drm/asahi')
 	os.mkdir_all(directory)!
-	mmu := 'impl Drop for KernelMapping\nis_cached_noncoherent remap_uncached_and_flush unmap_pages tlbi_range\n/// Shared UAT global'
+	mmu := '    fn remap_uncached_and_flush(
+		.reprot_pages(self.iova_range(), prot) mem::sync() let slot = match owner.slot() if owner.is_kernel
+		uat_inner.handoff_lock() handoff().current_slot() .ttb0.load( uat_inner.handoff_unlock()
+		cur_slot == Some(slot) && ttb_cur == ttb let flush = gpu.fwctl(cmd)
+		impl Drop for KernelMapping
+		is_cached_noncoherent remap_uncached_and_flush unmap_pages tlbi_range
+		/// Shared UAT global'
 	channel := '    pub(crate) fn put\nself.ring.ring[self.wptr as usize] = *msg mem::sync() T::set_wptr\n    /// Wait for'
 	workqueue := 'WorkError::Fault(info) if info.vm_slot != self.vm_slot => WorkError::Killed'
 	os.write_file(os.join_path(directory, 'mmu.rs'), mmu)!
@@ -253,6 +259,12 @@ fn test_asahi_contract_requires_teardown_and_publication_order() {
 		assert false
 	} else {
 		assert err.msg() == "Asahi cache-safe unmap: missing or out-of-order 'tlbi_range'"
+	}
+	os.write_file(os.join_path(directory, 'mmu.rs'), mmu.replace(' && ttb_cur == ttb', ''))!
+	if _ := check_asahi(fixture) {
+		assert false
+	} else {
+		assert err.msg().contains("missing or out-of-order 'cur_slot == Some(slot) && ttb_cur == ttb'")
 	}
 	os.write_file(os.join_path(directory, 'mmu.rs'), mmu)!
 	os.write_file(os.join_path(directory, 'channel.rs'), channel.replace('mem::sync() T::set_wptr', 'T::set_wptr mem::sync()'))!

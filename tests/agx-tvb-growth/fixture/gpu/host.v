@@ -75,6 +75,7 @@ __global observed_pages &u32 = unsafe { nil }
 __global observed_blocks &u32 = unsafe { nil }
 __global expected_count u32
 __global check_unpublished = true
+__global uat_mgr = unsafe { &mmu.UatManager(nil) }
 
 fn unpublished() {
 	assert observed_control.total == expected_count && observed_control.wptr == expected_count
@@ -193,6 +194,9 @@ pub fn run_checks() {
 
 fn check_teardown_after_first_bind() {
 	check_unpublished = false
+	mut uat := mmu.UatManager{current: true}
+	uat_mgr = unsafe { &uat }
+	defer { uat_mgr = unsafe { nil } }
 	mut mgr := GpuManager{ fail_flush_at: 0 }
 	mut context := mmu.UatContext{ id: 17, bound: false }
 	mut buffer := mmu.UatBuffer{ va: 0x100000, size: 0x20000, mapped: true, cache_flush_pending: true }
@@ -204,8 +208,25 @@ fn check_teardown_after_first_bind() {
 	assert !mgr.invalidate_g13_driver_buffer(mut context, &buffer)
 	assert buffer.mapped && buffer.cache_flush_pending && buffer.uncached && mgr.flushes == 1
 	assert mgr.invalidate_g13_driver_buffer(mut context, &buffer)
-	assert !buffer.mapped && !buffer.cache_flush_pending && mgr.flushes == 3
+	assert !buffer.mapped && !buffer.cache_flush_pending && mgr.flushes == 2
 	println('AGX private TVB: retained dormant PTE survives first bind and a failed flush, then releases on retry')
+
+	buffer = mmu.UatBuffer{va: 0x100000, size: 0x20000, mapped: true, cache_flush_pending: true}
+	uat.available = false
+	assert !mgr.invalidate_g13_driver_buffer(mut context, &buffer)
+	assert buffer.mapped && buffer.cache_flush_pending && buffer.uncached && mgr.flushes == 2
+	uat.available = true
+	uat.current = false
+	assert mgr.invalidate_g13_driver_buffer(mut context, &buffer)
+	assert !buffer.mapped && !buffer.cache_flush_pending && mgr.flushes == 2
+	assert mgr.invalidate_g13_driver_buffer(mut context, &buffer)
+	assert mgr.flushes == 2
+
+	buffer = mmu.UatBuffer{va: 0x100000, size: 0x20000, mapped: true, uncached: true}
+	uat.available = false
+	assert mgr.invalidate_g13_driver_buffer(mut context, &buffer)
+	assert !buffer.mapped && mgr.flushes == 2
+	println('AGX user driver teardown: unavailable, inactive, uncached and already-unmapped buffers preserve the FwCtl contract')
 }
 
 fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fail_flush int, metadata_fail bool, bound bool) {

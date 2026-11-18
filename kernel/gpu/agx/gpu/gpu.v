@@ -665,16 +665,13 @@ fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext,
 	vm_slot := context.bound_slot()
 	if vm_slot == 0 { return true }
 	if buffer.needs_cache_flush() {
-		if !context.reprotect_driver_buffer_uncached(buffer)
-			|| !mgr.flush_g13_uat_range(vm_slot, buffer.va, buffer.size)
-			|| !context.complete_driver_buffer_cache_flush(buffer) {
-			return false
-		}
+		if uat_mgr == unsafe { nil } || !context.reprotect_driver_buffer_uncached(buffer) { return false }
+		// A later ASC context switch can only refill from the uncached PTEs.
+		flush := uat_mgr.g13_cache_flush_required(context, vm_slot) or { return false }
+		if flush && !mgr.flush_g13_uat_range(vm_slot, buffer.va, buffer.size) { return false }
+		if !context.complete_driver_buffer_cache_flush(buffer) { return false }
 	}
-	if !context.unmap_driver_buffer(buffer) {
-		return false
-	}
-	return mgr.flush_g13_uat_range(vm_slot, buffer.va, buffer.size)
+	return context.unmap_driver_buffer(buffer)
 }
 
 fn (mut mgr GpuManager) release_shared_buffer_backing(mut buffer SharedBuffer) {
