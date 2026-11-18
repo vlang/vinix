@@ -773,6 +773,24 @@ The restored archive passed inventory and kernel artifact verification for
 `bundle.tar.gz` SHA-256 is
 `bf88bd48f1324d52397f77738526be4416c5c3f0dfcbd399af18c43c57ba7674`.
 
+G13 GEM mappings now require `MAP_SHARED` through DRM nodes and PRIME
+exports. An authorized DRM request for `MAP_PRIVATE` returns `EINVAL`
+before pinning, including requests with read-only protection. Device
+and file authorization still precede the sharing check. G13 PRIME exports
+admit shared subranges that fit within the object. [Pinned shmem mmap](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem_shmem_helper.c#L969-L1006) [Pinned DMA-BUF range check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L228-L262)
+
+Both kernel builds, 82 M1 V test files, the sanitizer fixtures and DRM
+wire checks passed. The allocation scan matched 177 baseline findings.
+The broader AGX test run passed 112 of 114 files and reproduced the prior
+G17 planning and recovery CLI compile failures. The pinned offline audit
+reports `not_equivalent`. M1 hardware validation remains open.
+
+The restored archive passed inventory and kernel artifact verification for
+`86ffa0f298a8d05215619900d76cd953fb5105cf` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-mmap-shared-20261118.zknvWn/`.
+`bundle.tar.gz` SHA-256 is
+`9b0e375db0b5cfa7164090cf5c52712cd91602b9a03c1b8fbd502ce122d05952`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

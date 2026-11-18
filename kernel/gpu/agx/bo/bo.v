@@ -201,13 +201,14 @@ fn (table &Table) mmap_pin_index(offset u64) ?int {
 	return none
 }
 
-pub fn (mut table Table) admit_mmap_range(device u64, offset u64, length u64) int {
+pub fn (mut table Table) admit_mmap_range(device u64, offset u64, length u64, shared bool) int {
 	if !table.local_handles { return if table.valid_mmap_range(offset, length) { 0 } else { -22 } }
 	if length == 0 || offset > ~u64(0) - length { return -22 }
 	for object in table.objects {
 		if object == unsafe { nil } { continue }
 		if offset != gem.create_mmap_offset(object) { continue }
-		if length > object.size { return -22 }
+		// Shmem rejects private mappings even with read-only protection.
+		if !shared || length > object.size { return -22 }
 		if table.mmap_pin_index(offset) != none {
 			return if table.retain_mmap_range(offset, length) { 0 } else { -12 }
 		}

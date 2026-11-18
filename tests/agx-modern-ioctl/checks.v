@@ -332,7 +332,7 @@ fn check_gem_file_names() {
 		assert voidptr(old) != voidptr(other)
 		mut first := lookup_file(first_fd) or { panic('first file') }
 		old_offset := first.authorize_mmap(2) or { panic('original mmap offset') }
-		assert first.admit_mmap_range(old_offset, old.size) == 0
+		assert first.admit_mmap_range(old_offset, old.size, true) == 0
 		memory.fail_allocations(true)
 		assert (gem_import_handler(&device, first_fd, shared) or { panic('repeat PRIME import') }) == 1
 		assert gem_import_handler(&device, first_fd, other) == none
@@ -346,7 +346,7 @@ fn check_gem_file_names() {
 		fresh := gem_export_handler(&device, first_fd, reused) or { panic('replacement export') }
 		assert voidptr(fresh) != voidptr(old) && voidptr(fresh) != voidptr(other)
 		fresh_offset := first.authorize_mmap(reused) or { panic('replacement mmap offset') }
-		assert fresh_offset != old_offset && first.admit_mmap_range(old_offset, old.size) == -13
+		assert fresh_offset != old_offset && first.admit_mmap_range(old_offset, old.size, true) == -13
 		assert first.retain_mmap_range(old_offset, old.size)
 		first.release_mmap_range(old_offset)
 		first.release_mmap_range(old_offset)

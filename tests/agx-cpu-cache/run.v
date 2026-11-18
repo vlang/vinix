@@ -21,12 +21,13 @@ fn main() {
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(repo + '/tests/agx-cpu-cache/fixture', scratch, false)!
 	os.cp_all(repo + '/tests/agx-file-close/fixture/klock', scratch + '/klock', false)!
+	os.cp_all(repo + '/tests/agx-file-close/fixture/memory/mmap', scratch + '/memory/mmap', false)!
 	os.mkdir_all(scratch + '/gpu/agx/bo')!
 	os.cp(overlays['--bo-source'] or { repo + '/kernel/gpu/agx/bo/bo.v' }, scratch + '/gpu/agx/bo/bo.v')!
 	os.cp(overlays['--gem-source'] or { repo + '/kernel/drm/gem/gem.v' }, scratch + '/drm/gem/gem.v')!
 	os.cp(overlays['--ram-source'] or { repo + '/kernel/memory/ram_cache_arm64.v' }, scratch + '/memory/ram_cache.v')!
 	drm := os.read_file(repo + '/kernel/drm/drm.v')!
-	os.write_file(scratch + '/drm/prime.v', 'module drm\n' +
+	os.write_file(scratch + '/drm/prime.v', 'module drm\nimport memory.mmap\n' +
 		section(drm, 'fn (mut this GemPrimeResource) mapping_attributes(', 'fn (mut this GemPrimeResource) read(')!)!
 	virtual := os.read_file(repo + '/kernel/memory/virtual_arm64.v')!
 	os.write_file(scratch + '/memory/bbm.v', 'module memory\nimport aarch64.cpu\n' +

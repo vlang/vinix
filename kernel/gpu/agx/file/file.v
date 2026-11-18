@@ -306,10 +306,10 @@ fn (mut f GpuFile) mmap_attributes(offset u64) u64 {
 	return f.objects.mmap_attributes(offset)
 }
 
-fn (mut f GpuFile) admit_mmap_range(offset u64, length u64) int {
+fn (mut f GpuFile) admit_mmap_range(offset u64, length u64, shared bool) int {
 	f.lock.acquire()
 	defer { f.lock.release() }
-	return f.objects.admit_mmap_range(u64(f.dev), offset, length)
+	return f.objects.admit_mmap_range(u64(f.dev), offset, length, shared)
 }
 
 fn (mut f GpuFile) retain_mmap_range(offset u64, length u64) bool {
@@ -1781,14 +1781,14 @@ pub fn retain_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64,
 }
 
 pub fn admit_mmap_range_handle(dev &drm.DrmDevice, handle voidptr, offset u64,
-	length u64) int {
+	length u64, shared bool) int {
 	if dev == unsafe { nil } || !dev.registered { return -19 }
 	f := lookup_file(handle) or {
 		return if gem.file_mmap_offset_exists(u64(dev), offset, length) { -13 } else { -22 }
 	}
 	if voidptr(f.dev) != voidptr(dev) { return -22 }
 	mut file := unsafe { f }
-	return file.admit_mmap_range(offset, length)
+	return file.admit_mmap_range(offset, length, shared)
 }
 
 pub fn release_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64, _length u64) {

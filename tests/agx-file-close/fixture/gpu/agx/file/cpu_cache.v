@@ -4,6 +4,7 @@ import drm
 import drm.gem
 import gpu.agx.bo
 import memory
+import memory.mmap
 
 fn check_cpu_mapping_policy() {
 	for reversed in [false, true] {
@@ -65,26 +66,29 @@ fn check_cpu_mmap_revocation() {
 		offset := file.authorize_mmap(name) or { panic('GEM mmap offset') }
 		assert name == 1 && object.references == 1
 		foreign := voidptr(key + 1)
-		assert drm.admit_mapping(&device, foreign, offset, 0x4000) == -13
-		assert drm.admit_mapping(&other_device, foreign, offset, 0x4000) == -22
-		assert drm.admit_mapping(&device, foreign, offset, 0x14000) == -22
-		assert drm.admit_mapping(&device, handle, offset + 0x4000, 0x4000) == -22
-		assert drm.admit_mapping(&device, handle, offset, 0x14000) == -22
+		assert drm.admit_mapping(&device, foreign, offset, 0x4000, mmap.map_shared) == -13
+		assert drm.admit_mapping(&device, foreign, offset, 0x4000, mmap.map_private) == -13
+		assert drm.admit_mapping(&other_device, foreign, offset, 0x4000, mmap.map_shared) == -22
+		assert drm.admit_mapping(&device, foreign, offset, 0x14000, mmap.map_shared) == -22
+		assert drm.admit_mapping(&device, handle, offset + 0x4000, 0x4000, mmap.map_shared) == -22
+		assert drm.admit_mapping(&device, handle, offset, 0x14000, mmap.map_shared) == -22
 		assert !drm.retain_mapping(&device, handle, offset, 0x4000)
 		memory.fail_allocations(true)
-		assert drm.admit_mapping(&device, handle, offset, 0x8000) == -12
+		assert drm.admit_mapping(&device, handle, offset, 0x8000, mmap.map_private) == -22
+		assert drm.admit_mapping(&device, handle, offset, 0x8000, mmap.map_shared) == -12
 		memory.fail_allocations(false)
 		assert object.references == 1 && memory.outstanding() == 0
-		assert drm.admit_mapping(&device, handle, offset, 0x8000) == 0
-		assert drm.admit_mapping(&device, handle, offset, 0x4000) == 0
+		assert drm.admit_mapping(&device, handle, offset, 0x8000, mmap.map_shared) == 0
+		assert drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_private) == -22
+		assert drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_shared) == 0
 		device.registered = false
-		assert drm.admit_mapping(&device, handle, offset, 0x4000) == -19
+		assert drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_private) == -19
 		device.registered = true
 		assert object.references == 2
 		gem.ref_obj(object) // An export can outlive the handle and all VMAs.
 		assert close_wire_gem(&device, key, name, 0) == 0
 		assert file.authorize_mmap(name) == none
-		assert drm.admit_mapping(&device, handle, offset, 0x4000) == -13
+		assert drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_shared) == -13
 		assert drm.retain_mapping(&device, handle, offset, 0x8000)
 		assert drm.retain_mapping(&device, handle, offset + 0x4000, 0x4000)
 		assert !drm.retain_mapping(&device, handle, offset + 0xc000, 0x8000)
@@ -95,17 +99,17 @@ fn check_cpu_mmap_revocation() {
 			drm.release_mapping(&device, handle, offset, 0x8000)
 		}
 		assert object.references == 1 && !drm.retain_mapping(&device, handle, offset, 0x4000)
-		assert drm.admit_mapping(&device, handle, offset, 0x4000) == -13
+		assert drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_shared) == -13
 		assert mmap_handle(&device, handle, offset / 0x4000, 0) == unsafe { nil }
 		assert (gem_import_handler(&device, handle, object) or { panic('GEM reimport') }) == name
-		assert drm.admit_mapping(&device, handle, offset, 0x4000) == 0
+		assert drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_shared) == 0
 		gem.unref(object)
 		assert close_wire_gem(&device, key, name, 0) == 0 && gem.live() == 1
 		drm.release_mapping(&device, handle, offset, 0x4000)
-		assert gem.live() == 0 && drm.admit_mapping(&device, handle, offset, 0x4000) == -22
+		assert gem.live() == 0 && drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_shared) == -22
 		file_map.delete(key)
 		assert file.close()
 		memory.assert_released()
 	}
-	println('G13 CPU mmap: 64 lifetimes cover admission OOM, revocation, retained pins and cache attributes, reimport, and final VMA release')
+	println('G13 CPU mmap: 64 lifetimes cover private mapping refusal, errno precedence, admission OOM, revocation, retained pins, reimport and final VMA release')
 }

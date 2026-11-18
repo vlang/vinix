@@ -3,6 +3,7 @@ import drm
 import drm.gem
 import gpu.agx.bo
 import memory
+import memory.mmap
 
 fn C.__asan_address_is_poisoned(pointer voidptr) int
 
@@ -276,6 +277,24 @@ fn check_mmap_offset_links() {
 	println('AGX GEM mmap offsets: exact lookup, device isolation and unlink at every list position passed')
 }
 
+fn check_prime_mapping_admission() {
+	memory.prepare()
+	object := gem.create_aligned_with_cache(32768, 16384, 0, true, true) or { panic('G13 GEM') }
+	ordinary := gem.create_aligned(32768, 16384) or { panic('ordinary GEM') }
+	assert drm.prime_admit(object, 0, 32768, mmap.map_shared)
+	assert drm.prime_admit(object, 16384, 16384, mmap.map_shared)
+	assert !drm.prime_admit(object, 0, 16384, mmap.map_private)
+	assert !drm.prime_admit(object, 16384, 32768, mmap.map_shared)
+	assert !drm.prime_admit(object, 32768, 16384, mmap.map_shared)
+	assert !drm.prime_admit(object, ~u64(0), 16384, mmap.map_shared)
+	assert !drm.prime_admit(object, 0, 0, mmap.map_shared)
+	assert drm.prime_admit(ordinary, 0, 16384, mmap.map_private)
+	gem.unref(ordinary)
+	gem.unref(object)
+	assert memory.live() == 0
+	println('G13 PRIME mmap admission: shared subranges, private refusal and range bounds passed')
+}
+
 fn main() {
 	lines := check_cache_lines()
 	constructors := check_constructors()
@@ -284,6 +303,7 @@ fn main() {
 	check_authorized_aliases()
 	check_file_scoped_objects()
 	check_mmap_offset_links()
+	check_prime_mapping_admission()
 	println('AGX CPU cache: ${lines} cache-line cases, ${constructors} real GEM constructors/final releases, ${refusals} refusal/default-policy cases; actual retag/BBM/cache-loop bodies, full-span validation, WB/NC aliases, PRIME policy, clean-before-retype, TLBI ordering, authorization, retained references and WB-before-PMM reuse passed')
 	println('AGX GEM metadata: ${metadata} injected failures preserve backing, cache state, handle and mmap offset. Backing and retag failures free unpublished metadata.')
 }

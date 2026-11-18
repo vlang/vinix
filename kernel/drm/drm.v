@@ -61,7 +61,7 @@ pub mut:
 	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
 	mmap_attributes fn (&DrmDevice, voidptr, u64) u64 = unsafe { nil }
 	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
-	mmap_admit     fn (&DrmDevice, voidptr, u64, u64) int = unsafe { nil }
+	mmap_admit     fn (&DrmDevice, voidptr, u64, u64, bool) int = unsafe { nil }
 	mmap_retain    fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
 	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 }
@@ -153,6 +153,12 @@ fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, flags int) voidpt
 
 fn (mut this GemPrimeResource) mapping_attributes(_handle voidptr, _offset u64) u64 {
 	return if this.obj != unsafe { nil } { this.obj.pte_extra } else { 0 }
+}
+
+fn (mut this GemPrimeResource) admit_mapping_range(_handle voidptr, offset u64, length u64, flags int) bool {
+	if this.obj == unsafe { nil } || !this.obj.file_scoped { return true }
+	return flags & mmap.map_shared != 0 && length != 0 && offset <= this.obj.size
+		&& length <= this.obj.size - offset
 }
 
 fn (mut this GemPrimeResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -622,7 +628,7 @@ fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 fn (mut this DrmNode) admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
 	if handle != unsafe { nil } && this.dev != unsafe { nil } && this.dev.driver != unsafe { nil }
 		&& this.dev.driver.mmap_admit != unsafe { nil } {
-		code := this.dev.driver.mmap_admit(this.dev, handle, offset, length)
+		code := this.dev.driver.mmap_admit(this.dev, handle, offset, length, flags & mmap.map_shared != 0)
 		if code == 0 { return true }
 		errno.set(u64(-code))
 		return false
