@@ -859,7 +859,7 @@ Both kernel builds, all 82 focused M1 V test files, the DRM wire checks and
 the sanitizer fixtures passed. The PRIME fixture used the production `fstat`
 path to compare duplicates, re-exports and different buffers with the same
 handle number and size. The allocation scan matched the baseline. The offline
-audit reports `not_equivalent`. DMA-BUF CPU synchronization still needs
+audit reports `not_equivalent`. Implicit DMA-BUF CPU synchronization still needs
 reservation fence integration. [Pinned CPU access wait](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L1513-L1528)
 
 The restored archive passed inventory and kernel artifact verification for
@@ -867,6 +867,24 @@ The restored archive passed inventory and kernel artifact verification for
 `/Users/alex/.local/state/vinix/omarchy-m1-prime-stat-20261118.8gWyna/`.
 `bundle.tar.gz` SHA-256 is
 `78baf2676bf8d4bc8f054cd92d6ee930e5409c40f6bf9be4090387cfeefd7546`.
+
+Native G13 PRIME fds accept `DMA_BUF_IOCTL_SYNC` with `READ`, `WRITE` or
+`RW` at START and END. The handler copies one 64-bit flag word. An unreadable
+word returns `EFAULT`, and missing access bits or unknown flags return
+`EINVAL`. Callers still order GPU work through explicit sync objects.
+Implicit reservation-fence waits remain open. [Pinned ioctl validation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L554-L596) [Pinned G13 completion fences](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L980-L1006)
+
+Both kernel builds, all 82 focused M1 V test files, the DRM wire checks and
+the sanitizer fixtures passed. The PRIME fixture exercised 50 requests,
+including all six valid flag combinations, malformed commands and failures
+copying the flag word. The allocation scan matched the baseline. The offline
+audit reports `not_equivalent`. M1 hardware validation remains open.
+
+The restored archive passed inventory and kernel artifact verification for
+`b686c2d2aff6cd9592a895fcb5b7128571ebe7b1` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-prime-sync-20261118.ovsM28/`.
+`bundle.tar.gz` SHA-256 is
+`199b67891746bbb35ce9f3e2e6584956ba1c3316535529f72899b468674e7fec`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

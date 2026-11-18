@@ -11,6 +11,7 @@ import memory
 import proc
 import resource
 import stat
+import usercopy
 
 const page_size = u64(4096)
 
@@ -69,6 +70,42 @@ fn check_prime_seek(mut descriptor file.FD, number int, size u64) {
 	descriptor.handle.flags &= ~resource.o_path
 }
 
+fn prime_fd_ioctl(mut descriptor file.FD, request u64, address u64) int {
+	mut backing := descriptor.handle.resource
+	return backing.ioctl(voidptr(descriptor.handle), request, voidptr(address)) or { -int(errno.get()) }
+}
+
+fn check_prime_cpu_access(mut descriptor file.FD) {
+	// The command is _IOW('b', 0, __u64), followed by exactly one flags word.
+	request := u64(0x40086200)
+	mut flags := u64(0)
+	address := unsafe { u64(&flags) }
+	for raw in 0 .. 16 {
+		flags = u64(raw)
+		usercopy.allow(address, sizeof(flags))
+		valid := raw in [1, 2, 3, 5, 6, 7]!
+		assert prime_fd_ioctl(mut descriptor, request, address) == if valid { 0 } else { -22 }
+		assert flags == u64(raw) && usercopy.reads == 1 && usercopy.writes == 0
+	}
+	flags = (u64(1) << 63) | 1
+	usercopy.allow(address, sizeof(flags))
+	assert prime_fd_ioctl(mut descriptor, request, address) == -22
+	assert prime_fd_ioctl(mut descriptor, request, 0) == -14
+	flags = 0
+	usercopy.allow(address, sizeof(flags) - 1)
+	assert prime_fd_ioctl(mut descriptor, request, address) == -14 && usercopy.reads == 1
+
+	flags = 1
+	usercopy.allow(address, sizeof(flags))
+	assert prime_fd_ioctl(mut descriptor, request | 0xa5a5a5a500000000, address) == 0
+	usercopy.allow(address, sizeof(flags))
+	for unknown in [u64(0x40046200), 0x80086200, 0x40086400, 0x40086203]! {
+		assert prime_fd_ioctl(mut descriptor, unknown, address) == -25
+	}
+	assert usercopy.reads == 0 && usercopy.writes == 0
+	usercopy.allow(0, 0)
+}
+
 fn prime_fstat(number int) stat.Stat {
 	mut metadata := stat.Stat{}
 	result, code := fs.syscall_fstat(unsafe { nil }, number, unsafe { &metadata })
@@ -98,6 +135,10 @@ fn check_prime_inode(device &DrmDevice, object &gem.GemObject, number int) {
 	assert ioctl_prime_handle_to_fd(device, voidptr(11), &export) == 0
 	new_metadata := prime_fstat(export.fd)
 	assert new_metadata.dev == first.dev && new_metadata.ino != first.ino && new_metadata.size == first.size
+	mut ordinary := file.fd_from_fdnum(unsafe { nil }, export.fd) or { panic('ordinary PRIME fd') }
+	assert prime_fd_ioctl(mut ordinary, 0x40086200, 0) == -25
+	assert usercopy.reads == 0
+	ordinary.unref()
 	file.close(export.fd)
 	assert replacement.references == 1 && object.references == 2
 	assert prime_fstat(number).ino == first.ino
@@ -114,7 +155,7 @@ fn check_prime_descriptors() {
 		proc.reset()
 		device := DrmDevice{driver: unsafe { &driver }}
 		foreign := DrmDevice{driver: unsafe { &driver }}
-		mut object := gem.GemObject{handle: 7, vm_private_identity: 99, size: 0x10000010000,
+		mut object := gem.GemObject{handle: 7, vm_private_identity: 99, size: 0x10000010000, file_scoped: true,
 			mmap_offset: offset}
 		offset += 2 * object.size
 		prime_exported = unsafe { &object }
@@ -155,6 +196,7 @@ fn check_prime_descriptors() {
 		file.assert_reservations(0)
 		mut fd := file.fd_from_fdnum(unsafe { nil }, request.fd) or { panic('installed PRIME fd') }
 		assert fd.flags & resource.o_cloexec != 0 && fd.handle.flags & resource.o_rdwr != 0
+		check_prime_cpu_access(mut fd)
 		check_prime_seek(mut fd, request.fd, object.size)
 		fd.unref()
 		check_prime_inode(&device, &object, request.fd)
@@ -185,5 +227,6 @@ fn check_prime_descriptors() {
 	assert prime_custom_puts == 207
 	println('DRM PRIME seek: 72 syscall cases cover size, zero, invalid seeks, O_PATH and unchanged position')
 	println('DRM PRIME fstat: duplicate and re-export identities agree, distinct GEMs with reused handles differ')
+	println('DRM PRIME CPU access: explicit START and END, invalid flags, copy faults and unsupported commands passed')
 	println('DRM PRIME: 400 private refusals, reservation order, wrapper and fd failure cleanup, import errors and concurrent close passed')
 }

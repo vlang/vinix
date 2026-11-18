@@ -62,6 +62,10 @@ pub const drm_syncobj_wait_for_submit = u32(1) << 1
 pub const drm_syncobj_wait_available = u32(1) << 2
 pub const drm_syncobj_wait_deadline = u32(1) << 3
 pub const drm_syncobj_query_last_submitted = u32(1) << 0
+pub const dma_buf_ioctl_sync = u32(0x40086200)
+pub const dma_buf_sync_read = u64(1)
+pub const dma_buf_sync_write = u64(2)
+pub const dma_buf_sync_end = u64(4)
 pub const sync_ioc_file_info = u32(0xc0383e04)
 pub const sync_ioc_set_deadline = u32(0x40103e05)
 
