@@ -75,8 +75,8 @@ fn run_checks() int {
 	production += section(source, 'struct G13ChannelAllocations {', '@[inline]\nfn pipe_index') or { panic(err) }
 	production += section(source, 'const buffer_allocator_g13_rtkit', '\n') or { panic(err) }
 	production += '\n'
-	production += section(source, 'pub const ep_firmware', 'pub const ep_doorbell') or { panic(err) }
-	production += section(source, 'pub const msg_rx_doorbell', 'const msg_address_mask') or { panic(err) }
+	production += section(source, 'pub const ep_firmware', 'pub const msg_fwctl') or { panic(err) }
+	production += section(source, 'pub const msg_rx_doorbell', 'const g13_channel_allocation_count') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) recv_role_message(') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) recv_role_message(', 'fn (mut mgr GpuManager) stop_firmware_cpus(') or { panic(err) }
 	production += section(source, 'fn allocate_rtkit_shmem(', 'struct G13ChannelAllocations {') or { panic(err) }

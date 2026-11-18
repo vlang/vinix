@@ -283,9 +283,9 @@ fn (mut mgr GpuManager) boot_firmware_role(role u32) bool {
 	}
 }
 
-fn (mut mgr GpuManager) start_firmware_endpoint(role u32, endpoint u8) bool {
+fn (mut mgr GpuManager) start_firmware_endpoint(role u32, endpoint u8, send_irq u32) bool {
 	return match role {
-		0 { mgr.rtk.start_endpoint(endpoint) }
+		0 { mgr.rtk.start_endpoint_irq(endpoint, send_irq) }
 		1 {
 			if mgr.firmware_roles == 2 {
 				mgr.secondary_rtk.start_endpoint(endpoint)
@@ -295,6 +295,45 @@ fn (mut mgr GpuManager) start_firmware_endpoint(role u32, endpoint u8) bool {
 		}
 		else { false }
 	}
+}
+
+// The probe still owns the unpublished manager after RTKit negotiation.
+// Reacquire the lock before publishing the manager or unwinding a failed send.
+fn (mut mgr GpuManager) start_firmware_application() bool {
+	send_irq := mgr.rtkit_boot_send_irq
+	if send_irq != 0 {
+		mgr.lock.release()
+	}
+	defer {
+		if send_irq != 0 { mgr.lock.acquire() }
+	}
+
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.start_firmware_endpoint(role, u8(ep_firmware), send_irq) {
+			C.kprintf(c'agx: Failed to start firmware endpoint for role %llu\n', u64(role))
+			return false
+		}
+	}
+	for role := u32(0); role < mgr.firmware_roles; role++ {
+		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell), send_irq) {
+			C.kprintf(c'agx: Failed to start doorbell endpoint for role %llu\n', u64(role))
+			return false
+		}
+	}
+	if !mgr.rtk.send_message_irq(u8(ep_firmware), msg_init | (mgr.initdata_va & msg_address_mask),
+		send_irq) {
+		println('agx: Failed to send MSG_INIT')
+		return false
+	}
+	// MSG_INIT has no synchronous reply. The worker handles the first
+	// firmware notification in receive order after the probe completes.
+	if !mgr.rtk.send_message_irq(u8(ep_doorbell), msg_tx_doorbell | u64(doorbell_device_control),
+		send_irq) || !mgr.rtk.send_message_irq(u8(ep_doorbell),
+		msg_tx_doorbell | u64(doorbell_kick_firmware), send_irq) {
+		println('agx: Failed to ring G13 initialization doorbells')
+		return false
+	}
+	return true
 }
 
 fn (mut mgr GpuManager) send_role_message(role u32, endpoint u8, message u64) bool {
@@ -1021,33 +1060,8 @@ pub fn (mut mgr GpuManager) init(receive_irq u32, send_irq u32) bool {
 		}
 	}
 
-	// Step 7: Start GPU-specific firmware endpoint (0x20) on each role.
-	for role := u32(0); role < mgr.firmware_roles; role++ {
-		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
-			C.kprintf(c'agx: Failed to start firmware endpoint for role %llu\n', u64(role))
-			return mgr.fail_g13_initialization()
-		}
-	}
-
-	// Step 8: Start doorbell endpoint (0x21) on each role.
-	for role := u32(0); role < mgr.firmware_roles; role++ {
-		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
-			C.kprintf(c'agx: Failed to start doorbell endpoint for role %llu\n', u64(role))
-			return mgr.fail_g13_initialization()
-		}
-	}
-
-	// Step 9: Build and send MSG_INIT with initdata VA.
-	if !mgr.send_fw_msg(msg_init, mgr.initdata_va) {
-		println('agx: Failed to send MSG_INIT')
-		return mgr.fail_g13_initialization()
-	}
-
-	// Step 10: Ring the device-control doorbell, then wake the firmware. MSG_INIT
-	// has no synchronous reply; consuming an arbitrary RTKit message as an
-	// acknowledgement can steal the first real firmware notification.
-	if !mgr.ring_device_control() || !mgr.kick_firmware() {
-		println('agx: Failed to ring G13 initialization doorbells')
+	// Start the application endpoints and publish InitData before the worker.
+	if !mgr.start_firmware_application() {
 		return mgr.fail_g13_initialization()
 	}
 

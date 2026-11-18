@@ -818,7 +818,7 @@ fn (mut mgr GpuManager) init_g17() bool {
 			C.printf(c'agx: G17 RTKit boot failed for role %u\n', role)
 			return mgr.fail_g17_initialization(mgr.firmware_roles)
 		}
-		if !mgr.start_firmware_endpoint(role, u8(ep_firmware)) {
+		if !mgr.start_firmware_endpoint(role, u8(ep_firmware), 0) {
 			C.printf(c'agx: G17 firmware endpoint failed for role %u\n', role)
 			return mgr.fail_g17_initialization(mgr.firmware_roles)
 		}
@@ -844,7 +844,7 @@ fn (mut mgr GpuManager) init_g17() bool {
 		return mgr.fail_g17_initialization(mgr.firmware_roles)
 	}
 	for role := u32(0); role < mgr.firmware_roles; role++ {
-		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell)) {
+		if !mgr.start_firmware_endpoint(role, u8(ep_doorbell), 0) {
 			C.printf(c'agx: G17 doorbell endpoint failed for role %u\n', role)
 			return mgr.fail_g17_initialization(mgr.firmware_roles)
 		}

@@ -7,9 +7,12 @@ Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
 Base M1 G13 uses AIC mailbox receive and send-empty interrupts during RTKit
-negotiation, with bounded FIFO polling as a fallback.
-[RTKit boot receive IRQ](m1-agx-boot-rx-irq.md) and
-[RTKit boot send-empty IRQ](m1-agx-boot-tx-irq.md)
+negotiation, with bounded FIFO polling as a fallback. The send-empty line also
+assists application endpoint starts, InitData and the initial doorbells before
+the GPU manager is published.
+[RTKit boot receive IRQ](m1-agx-boot-rx-irq.md),
+[RTKit boot send-empty IRQ](m1-agx-boot-tx-irq.md) and
+[Application startup transmit IRQ](m1-agx-init-tx-irq.md)
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

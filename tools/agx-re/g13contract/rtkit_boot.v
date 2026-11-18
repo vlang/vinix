@@ -49,8 +49,27 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 		'Vinix selects the already-started handshake for G13 and opens an interrupt window only with a claimed line')!
 	require_order(manager.all_after('pub fn (mut mgr GpuManager) init(receive_irq'), ['mgr.res.start_cpu(role)',
 		'mgr.claim_rtkit_irqs(receive_irq, send_irq)',
-		'if !mgr.boot_firmware_role(role)', 'return mgr.fail_g13_initialization()', 'mgr.start_firmware_endpoint(role, u8(ep_firmware))'],
-		'Vinix enters the G13 handshake after releasing the ASC and unwinds failures before starting firmware endpoints')!
+		'if !mgr.boot_firmware_role(role)', 'return mgr.fail_g13_initialization()',
+		'if !mgr.start_firmware_application()', 'return mgr.fail_g13_initialization()', 'mgr.state = .running',
+		'spawn event_worker(mut mgr)'],
+		'Vinix completes the private G13 handshake and application sends before starting the worker and unwinds failures')!
+	gpu := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/gpu.rs'))!
+	application := section(gpu, 'fn init(&self) -> Result {', 'fn ids(&self)', 'Asahi GPU startup')!
+	require_order(application, ['rtk.as_mut().boot()?', 'rtk.as_mut().start_endpoint(EP_FIRMWARE)?',
+		'rtk.as_mut().start_endpoint(EP_DOORBELL)?',
+		'.send_message(EP_FIRMWARE, MSG_INIT | (initdata & INIT_DATA_MASK))?',
+		'.send_message(EP_DOORBELL, MSG_TX_DOORBELL | DOORBELL_DEVCTRL)?', 'self.kick_firmware()?'],
+		'Asahi starts the firmware and doorbell endpoints before InitData, device control and kick')!
+	local_application := section(manager, 'fn (mut mgr GpuManager) start_firmware_application(',
+		'fn (mut mgr GpuManager) send_role_message(', 'Vinix application startup')!
+	require_order(local_application, ['send_irq := mgr.rtkit_boot_send_irq', 'if send_irq != 0',
+		'mgr.lock.release()', 'defer {', 'if send_irq != 0 { mgr.lock.acquire() }',
+		'mgr.start_firmware_endpoint(role, u8(ep_firmware), send_irq)',
+		'mgr.start_firmware_endpoint(role, u8(ep_doorbell), send_irq)',
+		'mgr.rtk.send_message_irq(u8(ep_firmware), msg_init | (mgr.initdata_va & msg_address_mask)',
+		'mgr.rtk.send_message_irq(u8(ep_doorbell), msg_tx_doorbell | u64(doorbell_device_control)',
+		'msg_tx_doorbell | u64(doorbell_kick_firmware)'],
+		'Vinix uses the reserved send line with interrupts restored for the ordered private application sends')!
 	boot := section(transport, 'pub fn (mut rtk RTKit) boot()', '// Only the system endpoints', 'Vinix RTKit handshake')!
 	require_order(boot, ['return rtk.boot_transport(true, 0, 0)', 'return rtk.boot_transport(false, receive_irq, send_irq)',
 		'if request_wake && !rtk.send_management(msg_set_iop_power, u64(power_state_init))',
@@ -82,7 +101,7 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 	reply := section(transport, 'fn (mut rtk RTKit) reply_boot_management(', 'fn (mut rtk RTKit) fail(', 'Vinix boot reply')!
 	require_order(reply, ['if rtk.send_management(kind, payload)', 'if request_wake {', 'return false',
 		'management reply type 0x%llx timed out', 'return true'], 'Vinix logs and continues past failed G13 discovery replies')!
-	require(transport.contains('return rtk.firmware_led_boot && rtk.send_management(msg_start_ep, payload)'),
+	require(transport.contains('return rtk.firmware_led_boot && rtk.send_message_irq(ep_mgmt, message, irq)'),
 		'Vinix retries an unsent endpoint start only on the firmware-led transport')!
 	check_rtkit_iop_confirmation(transport, linux, linux_boot, boot, start)!
 	check_rtkit_mailbox_send(transport, asahi_linux, repo)!
@@ -123,8 +142,9 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 	boot_state := section(transport, 'fn (mut rtk RTKit) boot_transport(', '// Only the system endpoints', 'Vinix boot transmit owner')!
 	require_order(boot_state, ['rtk.lock.acquire()', 'rtk.boot_send_irq = send_irq', 'defer {',
 		'rtk.boot_send_irq = 0', 'rtk.lock.release()'], 'The private boot transport clears the transmit IRQ before returning')!
-	require_order(local_send, ['irq := rtk.boot_send_irq', 'rtk.lock.release()',
-		'rtk.mbox.send_timed_irq(message, irq)', 'rtk.lock.acquire()', 'return sent'],
+	require_order(local_send, ['boot_irq := rtk.boot_send_irq', 'rtk.lock.release()',
+		'rtk.mbox.send_timed_irq(message, boot_irq)', 'rtk.lock.acquire()', 'return sent',
+		'if irq != 0 {', 'return rtk.mbox.send_timed_irq(message, irq)'],
 		'Vinix releases the RTKit lock around boot IRQ-assisted transmit')!
 	require_order(local_send, ['if rtk.firmware_led_boot {', 'return rtk.mbox.send_timed(message)', 'return rtk.mbox.send(message)'],
 		'Vinix selects elapsed-time transmit only for firmware-led G13 RTKit')!
@@ -157,7 +177,7 @@ fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot strin
 	local_start := section(transport, 'pub fn (mut rtk RTKit) start_endpoint(', '// Send a protocol-defined payload', 'Vinix application start')!
 	local_send := section(transport, 'pub fn (mut rtk RTKit) send_message(', 'pub fn (mut rtk RTKit) recv_msg(', 'Vinix application send')!
 	require_order(local_start, ['ep >= app_endpoint_start', 'katomic.load(&rtk.application_ready)',
-		'if !ready', 'return false', 'rtk.send_start_endpoint(ep)'], 'Vinix checks readiness before starting application endpoints')!
+		'if !ready', 'return false', 'rtk.send_start_endpoint(ep, irq)'], 'Vinix checks readiness before starting application endpoints')!
 	require_order(local_send, ['ep >= app_endpoint_start', '!katomic.load(&rtk.application_ready)',
 		'return false', 'rtk.mbox.send'], 'Vinix checks readiness before application mailbox writes')!
 }

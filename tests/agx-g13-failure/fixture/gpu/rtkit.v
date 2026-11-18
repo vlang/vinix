@@ -632,7 +632,7 @@ const rtkit_wake_iop = u64(0x0060000000000220)
 
 fn check_rtkit_application_access(mut mgr GpuManager, allowed bool) {
 	attempts := mgr.rtk.mbox.attempts
-	assert mgr.start_firmware_endpoint(0, 0x21) == allowed
+	assert mgr.start_firmware_endpoint(0, 0x21, 0) == allowed
 	assert mgr.send_role_message(0, 0x20, 0x123456789abcdef0) == allowed
 	if allowed {
 		assert mgr.rtk.mbox.attempts == attempts + 2
@@ -792,7 +792,7 @@ fn check_rtkit_management_send_failures() {
 			assert transport.protocol_version == 12
 			if scenario.booted {
 				assert transport.endpoints[33] && transport.endpoints[rtkit.ep_syslog]
-				assert mgr.start_firmware_endpoint(0, 0x21) == scenario.app_started
+				assert mgr.start_firmware_endpoint(0, 0x21, 0) == scenario.app_started
 			}
 			mgr.lock.release()
 			check_rtkit_send_words(&transport.mbox, scenario)

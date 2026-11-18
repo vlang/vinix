@@ -369,13 +369,14 @@ fn (mut rtk RTKit) send_management(kind u8, payload u64) bool {
 	return rtk.send_message(ep_mgmt, management_message(kind, payload))
 }
 
-fn (mut rtk RTKit) send_start_endpoint(ep u8) bool {
+fn (mut rtk RTKit) send_start_endpoint(ep u8, irq u32) bool {
 	payload := (u64(ep) << 32) | start_ep_flag
-	if rtk.send_management(msg_start_ep, payload) {
+	message := management_message(msg_start_ep, payload)
+	if rtk.send_message_irq(ep_mgmt, message, irq) {
 		return true
 	}
 	// The mailbox reports failure only when neither word was written.
-	return rtk.firmware_led_boot && rtk.send_management(msg_start_ep, payload)
+	return rtk.firmware_led_boot && rtk.send_message_irq(ep_mgmt, message, irq)
 }
 
 fn (mut rtk RTKit) reply_boot_management(kind u8, payload u64, request_wake bool) bool {
@@ -794,7 +795,7 @@ fn start_system_endpoints(mut rtk RTKit, start_tracekit bool) bool {
 	system_eps := [ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog, ep_tracekit]!
 	for ep in system_eps {
 		if ep == ep_tracekit && !start_tracekit { continue }
-		if rtk.endpoints[ep] && !rtk.send_start_endpoint(ep) {
+		if rtk.endpoints[ep] && !rtk.send_start_endpoint(ep, 0) {
 			return false
 		}
 	}
@@ -803,6 +804,12 @@ fn start_system_endpoints(mut rtk RTKit, start_tracekit bool) bool {
 
 // Start an application endpoint after RTKit has reached the ON state.
 pub fn (mut rtk RTKit) start_endpoint(ep u8) bool {
+	return rtk.start_endpoint_irq(ep, 0)
+}
+
+// A nonzero IRQ is reserved for the private G13 initializer, which owns the
+// transport with interrupts enabled after the handshake.
+pub fn (mut rtk RTKit) start_endpoint_irq(ep u8, irq u32) bool {
 	if !rtk.endpoints[ep] {
 		C.kprintf(c'rtkit[%.*s]: Endpoint %llu not available\n', i32(rtk.name.len),
 			rtk.name.str, u64(ep))
@@ -820,11 +827,16 @@ pub fn (mut rtk RTKit) start_endpoint(ep u8) bool {
 			return false
 		}
 	}
-	return rtk.send_start_endpoint(ep)
+	return rtk.send_start_endpoint(ep, irq)
 }
 
 // Send a protocol-defined payload without changing any of its bits.
 pub fn (mut rtk RTKit) send_message(ep u8, data u64) bool {
+	return rtk.send_message_irq(ep, data, 0)
+}
+
+// The same private initializer may use its reserved line for application sends.
+pub fn (mut rtk RTKit) send_message_irq(ep u8, data u64, irq u32) bool {
 	if ep >= app_endpoint_start && rtk.firmware_led_boot && !katomic.load(&rtk.application_ready) {
 		return false
 	}
@@ -833,12 +845,15 @@ pub fn (mut rtk RTKit) send_message(ep u8, data u64) bool {
 		data1: u64(ep)
 	}
 	if rtk.firmware_led_boot {
-		irq := rtk.boot_send_irq
-		if irq != 0 {
+		boot_irq := rtk.boot_send_irq
+		if boot_irq != 0 {
 			rtk.lock.release()
-			sent := rtk.mbox.send_timed_irq(message, irq)
+			sent := rtk.mbox.send_timed_irq(message, boot_irq)
 			rtk.lock.acquire()
 			return sent
+		}
+		if irq != 0 {
+			return rtk.mbox.send_timed_irq(message, irq)
 		}
 		return rtk.mbox.send_timed(message)
 	}

@@ -10,9 +10,10 @@ the same 500 ms budget. The transmit line is masked when the wait ends.
 [Pinned M1 mailbox binding](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/arch/arm64/boot/dts/apple/t8103.dtsi#L541-L552)
 [Pinned Asahi transmit path](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/soc/apple/mailbox.c#L269-L369)
 
-Vinix uses timed polling for IRQ-masked callers, missing or invalid interrupt
-bindings, and sends after negotiation. A missed IRQ still permits polling
-within the same budget. An unsent endpoint-start message still gets one retry.
+This revision used timed polling for IRQ-masked callers, missing or invalid
+interrupt bindings, and sends after negotiation. A missed IRQ still permits
+polling within the same budget. An unsent endpoint-start message still gets
+one retry. [Application startup follow-up](m1-agx-init-tx-irq.md)
 [RTKit management send failures](m1-agx-rtkit-management-send.md)
 
 ARM64 and x86-64 builds and all 82 contract test files passed for
