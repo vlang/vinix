@@ -289,10 +289,11 @@ fn check_prime_mapping_admission() {
 	assert !drm.prime_admit(object, ~u64(0), 16384, mmap.map_shared)
 	assert !drm.prime_admit(object, 0, 0, mmap.map_shared)
 	assert drm.prime_admit(ordinary, 0, 16384, mmap.map_private)
+	assert !drm.prime_mapping_can_grow(object) && drm.prime_mapping_can_grow(ordinary)
 	gem.unref(ordinary)
 	gem.unref(object)
 	assert memory.live() == 0
-	println('G13 PRIME mmap admission: shared subranges, private refusal and range bounds passed')
+	println('G13 PRIME mmap admission: shared subranges, private refusal, range bounds and fixed mapping size passed')
 }
 
 fn main() {

@@ -791,6 +791,25 @@ The restored archive passed inventory and kernel artifact verification for
 `bundle.tar.gz` SHA-256 is
 `9b0e375db0b5cfa7164090cf5c52712cd91602b9a03c1b8fbd502ce122d05952`.
 
+G13 DRM and PRIME mappings now return `EFAULT` when `mremap` tries to
+grow them, including when the larger range fits the GEM buffer. The resize
+check runs with the backing file retained and before any fixed destination
+can be replaced. Same-size relocation and shrinking use the existing VMA
+references. [Pinned shmem mapping flags](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem_shmem_helper.c#L1018-L1027) [Pinned resize check](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/mm/mremap.c#L1846-L1866)
+
+Both kernel builds, all 82 focused M1 V test files, the DRM wire fixture
+and the sanitizer fixtures passed. The x86-64 QEMU memlock guest passed
+all seven groups, including remap and fixed replacement. AArch64 QEMU
+stalled at the same UEFI stage with the updated and prior kernels. The
+allocation scan matched 177 baseline findings. The offline audit reports
+`not_equivalent`. M1 hardware validation remains open.
+
+The restored archive passed inventory and kernel artifact verification for
+`7b82ad6ecc9e2a2c73f287dd7317806aebee5dbb` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-mremap-20261118.Chw2gB/`.
+`bundle.tar.gz` SHA-256 is
+`04d2ef7e4c23b0672b5373aa9c8e79eab4cd9a3afc070fafed79fd90e99505c3`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

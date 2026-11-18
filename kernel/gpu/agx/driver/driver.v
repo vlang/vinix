@@ -1223,6 +1223,7 @@ pub fn initialise() {
 		mmap: agx_file.mmap_handle
 		mmap_attributes: agx_file.mmap_attributes_handle
 		mmap_admit: agx_file.admit_mmap_range_handle
+		mmap_no_expand: cfg.gpu_gen == .g13
 		mmap_retain: agx_file.retain_mmap_range_handle
 		mmap_release: agx_file.release_mmap_range_handle
 	}

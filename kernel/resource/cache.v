@@ -156,6 +156,7 @@ mut:
 pub interface MappingAdmissionResource {
 mut:
 	admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool
+	mapping_can_grow() bool
 }
 
 pub fn admit_mapping_range(mut res Resource, handle voidptr, offset u64, length u64, flags int) bool {
@@ -167,6 +168,15 @@ pub fn admit_mapping_range(mut res Resource, handle voidptr, offset u64, length 
 		return admitted
 	}
 	return retain_mapping_range(mut res, handle, offset, length, flags)
+}
+
+pub fn mapping_can_grow(mut res Resource) bool {
+	if mut res is MappingAdmissionResource {
+		mut admission := MappingAdmissionResource(res)
+		mut stack_admission := unsafe { &admission }
+		return stack_admission.mapping_can_grow()
+	}
+	return true
 }
 
 pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64, flags int) bool {

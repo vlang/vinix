@@ -15,6 +15,7 @@ pub:
 	mmap_attributes fn (&DrmDevice, voidptr, u64) u64 = unsafe { nil }
 	mmap fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
 	mmap_admit fn (&DrmDevice, voidptr, u64, u64, bool) int = unsafe { nil }
+	mmap_no_expand bool
 	mmap_retain fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
 	mmap_release fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 }

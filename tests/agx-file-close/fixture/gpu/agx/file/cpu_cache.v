@@ -51,10 +51,13 @@ fn check_cpu_mapping_policy() {
 }
 
 fn check_cpu_mmap_revocation() {
-	driver := drm.DrmDriver{gem_close_request: close_gem_request, mmap_admit: admit_mmap_range_handle,
+	driver := drm.DrmDriver{gem_close_request: close_gem_request, mmap_admit: admit_mmap_range_handle, mmap_no_expand: true,
 		mmap_retain: retain_mmap_range_handle, mmap_release: release_mmap_range_handle}
 	mut device := drm.DrmDevice{driver: unsafe { &driver }}
 	other_device := drm.DrmDevice{driver: unsafe { &driver }}
+	default_driver := drm.DrmDriver{}
+	assert !drm.mapping_can_grow(&device)
+	assert drm.mapping_can_grow(&drm.DrmDevice{driver: &default_driver})
 	key := u64(0x4c30)
 	handle := voidptr(key)
 	for _ in 0 .. 64 {
@@ -88,6 +91,7 @@ fn check_cpu_mmap_revocation() {
 		gem.ref_obj(object) // An export can outlive the handle and all VMAs.
 		assert close_wire_gem(&device, key, name, 0) == 0
 		assert file.authorize_mmap(name) == none
+		assert !drm.mapping_can_grow(&device)
 		assert drm.admit_mapping(&device, handle, offset, 0x4000, mmap.map_shared) == -13
 		assert drm.retain_mapping(&device, handle, offset, 0x8000)
 		assert drm.retain_mapping(&device, handle, offset + 0x4000, 0x4000)

@@ -123,7 +123,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 	// resource and its handle come along, and the file offset is the source
 	// range's own offset advanced to wherever inside it the move starts.
 	mut global := source.global
-	source_resource := global.resource
+	mut source_resource := global.resource
 	source_handle := global.handle
 	source_handle_ref := global.handle_ref
 	source_handle_unref := global.handle_unref
@@ -171,6 +171,11 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		}
 	}
 	pagemap.l.release()
+
+	if new_length > old_length && map_flags & map_anonymous == 0 && source_resource != unsafe { nil }
+		&& !resource.mapping_can_grow(mut source_resource) {
+		return errno.err, errno.efault
+	}
 
 	// Shrinking, or asking for what is already there, needs no new mapping.
 	if new_length <= old_length && flags & mremap_fixed == 0 {

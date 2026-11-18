@@ -62,6 +62,7 @@ pub mut:
 	mmap_attributes fn (&DrmDevice, voidptr, u64) u64 = unsafe { nil }
 	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
 	mmap_admit     fn (&DrmDevice, voidptr, u64, u64, bool) int = unsafe { nil }
+	mmap_no_expand bool
 	mmap_retain    fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
 	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 }
@@ -159,6 +160,10 @@ fn (mut this GemPrimeResource) admit_mapping_range(_handle voidptr, offset u64, 
 	if this.obj == unsafe { nil } || !this.obj.file_scoped { return true }
 	return flags & mmap.map_shared != 0 && length != 0 && offset <= this.obj.size
 		&& length <= this.obj.size - offset
+}
+
+fn (mut this GemPrimeResource) mapping_can_grow() bool {
+	return this.obj == unsafe { nil } || !this.obj.file_scoped
 }
 
 fn (mut this GemPrimeResource) read(_handle voidptr, _buf voidptr, _loc u64, _count u64) ?i64 {
@@ -634,6 +639,10 @@ fn (mut this DrmNode) admit_mapping_range(handle voidptr, offset u64, length u64
 		return false
 	}
 	return this.retain_mapping_range(handle, offset, length, flags)
+}
+
+fn (mut this DrmNode) mapping_can_grow() bool {
+	return this.dev == unsafe { nil } || this.dev.driver == unsafe { nil } || !this.dev.driver.mmap_no_expand
 }
 
 fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u64, _flags int) bool {

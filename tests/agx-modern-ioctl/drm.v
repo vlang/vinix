@@ -39,6 +39,11 @@ pub fn admit_mapping(dev &DrmDevice, handle voidptr, offset u64, length u64, fla
 	return if node.admit_mapping_range(handle, offset, length, flags) { 0 } else { -int(errno.get()) }
 }
 
+pub fn mapping_can_grow(dev &DrmDevice) bool {
+	mut node := DrmNode{dev: unsafe { dev }}
+	return node.mapping_can_grow()
+}
+
 pub fn retain_mapping(dev &DrmDevice, handle voidptr, offset u64, length u64) bool {
 	mut node := DrmNode{dev: unsafe { dev }}
 	return node.retain_mapping_range(handle, offset, length, 0)

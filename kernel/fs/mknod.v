@@ -101,6 +101,11 @@ fn (mut this MknodDeviceResource) admit_mapping_range(handle voidptr, offset u64
 	return resource.admit_mapping_range(mut backing, handle, offset, length, flags)
 }
 
+fn (mut this MknodDeviceResource) mapping_can_grow() bool {
+	mut backing := this.backing
+	return resource.mapping_can_grow(mut backing)
+}
+
 fn (mut this MknodDeviceResource) retain_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
 	mut backing := this.backing
 	return resource.retain_mapping_range(mut backing, handle, offset, length, flags)

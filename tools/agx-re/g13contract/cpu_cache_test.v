@@ -33,3 +33,19 @@ fn test_cpu_cache_reference_requires_inverse_writeback_flag() {
 	check_cpu_cache_reference(source)!
 	if _ := check_cpu_cache_reference(source.replace('== 0', '!= 0')) { assert false }
 }
+
+fn test_g13_remap_growth_checks_the_retained_resource_before_building_destination() {
+	repo := g13layout.repo_root()
+	linux := read(repo + '/kernel/memory/mmap/linux.v')!
+	remap := section(linux, 'mut source_resource := global.resource', 'destination := mmap_with_credit(', 'mremap growth')!
+	require_order(remap, ['source_handle_ref(source_handle)', 'resource.retain_resource(mut retained)',
+		'pagemap.l.release()', 'if new_length > old_length', '!resource.mapping_can_grow(mut source_resource)',
+		'return errno.err, errno.efault', 'if new_length <= old_length', 'destination_flags |= map_fixed'],
+		'Check growth against the retained resource before constructing the destination')!
+	driver := read(repo + '/kernel/gpu/agx/driver/driver.v')!
+	assert driver.contains('mmap_no_expand: cfg.gpu_gen == .g13')
+	mknod := read(repo + '/kernel/fs/mknod.v')!
+	forwarding := section(mknod, 'fn (mut this MknodDeviceResource) mapping_can_grow(',
+		'fn (mut this MknodDeviceResource) retain_mapping_range(', 'A device node forwards its backing policy')!
+	assert forwarding.contains('return resource.mapping_can_grow(mut backing)')
+}
