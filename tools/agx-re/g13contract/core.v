@@ -206,7 +206,8 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/buffer.rs'))!,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/alloc.rs'))!)!
 	reference_pt := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/pgtable.rs'))!
-	check_gpu_permission_contract(read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!,
+	page_table := read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!
+	check_gpu_permission_contract(page_table,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		reference_pt,
 		read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/file.rs'))!)!
@@ -215,6 +216,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	check_tlb_instructions(reference, vinix)!
 	check_table_preparation_reference(reference_pt, reference)!
 	mmu := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mmu.rs'))!
+	check_fixed_map_reference(reference_pt, mmu)!
 	bind := section(mmu, '    pub(crate) fn bind(&self, vm:', 'binding.bind_token = Some(slot.token());', 'Asahi UAT bind')!
 	require_order(bind, ['let mut binding = vm.binding.lock()', 'if binding.binding.is_none()',
 		'self.slots.get(binding.bind_token)?'], 'Asahi serializes the global slot wait per VM')!
@@ -225,6 +227,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	require_order(mmu[drop_start..], ['.ttb0.store(0,', '.ttb1.store(0,',
 		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID teardown invalidation')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!
+	check_fixed_map_local(page_table, local)!
 	kernel_unmap := section(local, 'pub fn (mgr &UatManager) unmap_kernel(', '// Prepare one firmware cache-flush slot.', 'Vinix kernel unmap')!
 	require_order(kernel_unmap, ['iova < (u64(1) << mgr.ias)', 'mgr.kernel_lower_pgtable', 'pt.unmap(iova, size)',
 		'mgr.kernel_pgtable', 'pt.unmap(iova, size)'], 'Both Vinix kernel roots use the TLBI-completing unmap')!
@@ -248,7 +251,6 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'pt.bind_tlb(u8(slot))',
 		'installed.binding_epoch++', 'owner.contexts[slot] = installed'], 'Vinix ASID reuse invalidation')!
 	require(!local_bind.contains('previous.unbind_tlb()'), 'Replacement must not invalidate the displaced ASID separately')!
-	page_table := read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!
 	unmap := section(page_table, 'pub fn (mut pt UatPgtable) unmap(', '// Read the PTE', 'Vinix range unmap')!
 	require_order(unmap, ['defer {', 'pt.invalidate_range_locked(iova, size)', 'pt.lock.release()',
 		'pt.unmap_page_locked('], 'Vinix completes range TLBI before returning from unmap')!
@@ -266,6 +268,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
 		'Child table initialization completes before parent publication and BIND preparation walks each leaf table once',
 		'UAT walks allocate only empty intermediate entries and follow only table descriptors',
+		'G13 context-zero mapping checks vacancy and reserves tables before publishing leaves on either root',
 		'G13 kernel mappings finish with TLBI and require slot-64 FwCtl only before a cached mapping is removed',
 		'Only an active ASC slot with the matching published TTBR requires FwCtl before user driver-buffer unmap',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',

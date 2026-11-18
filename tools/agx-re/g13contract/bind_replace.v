@@ -16,13 +16,20 @@ fn check_bind_replace_local(file string, page_table string) ! {
 		'if !finish_file_mapping(false)',
 		'f.mappings[f.mappings.len - 1].retiring = true'],
 		'Prepare transient survivor/new metadata and all tables before old retirement; return temporary new owner on failure')!
-	prepare := section(page_table, 'pub fn (mut pt UatPgtable) prepare_map_range(', '// Map a contiguous range', 'Native table preparation')!
+	prepare := section(page_table, 'pub fn (mut pt UatPgtable) prepare_map_range(', '// Visit each touched L3 table', 'Native table preparation')!
 	require_order(prepare, ['size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova',
-		'pt.lock.acquire()', 'defer { pt.lock.release() }', 'table_span := u64(1) << uat_middle_shift',
-		'mut address := iova', 'mut bytes_left := size', 'pt.get_pte(address, true) or { return false }',
-		'chunk := table_span - (address & (table_span - 1))', 'if bytes_left <= chunk { return true }',
-		'bytes_left -= chunk', 'address += chunk'], 'Prepare each touched leaf table under lock without adding a wrapping end address')!
-	for token in ['map_page', 'unmap_page', 'invalidate_', '*pte'] { require(!prepare.contains(token), 'Preparation must preserve leaves: ' + token)! }
+		'pt.lock.acquire()', 'defer { pt.lock.release() }', 'return pt.walk_map_tables_locked(iova, size, true)'],
+		'BIND preallocates intermediate tables under lock')!
+	table_walk := section(page_table, 'fn (pt &UatPgtable) walk_map_tables_locked(', '// Map a contiguous range', 'Shared table walk')!
+	require_order(table_walk, ['table_span := u64(1) << uat_middle_shift', 'mut address := iova',
+		'mut bytes_left := size', 'chunk := table_span - (address & (table_span - 1))', 'pt.get_pte(address, allocate)',
+		'if !allocate {', 'pages := (if bytes_left < chunk { bytes_left } else { chunk }) / uat_pgsz',
+		'for index := u64(0); index < pages; index++', 'if unsafe { first[index] } != 0 { return false }',
+		'} else if allocate {', 'return false', 'if bytes_left <= chunk { return true }',
+		'bytes_left -= chunk', 'address += chunk'], 'Walk whole L3 spans, bound the vacancy scan and fail on missing allocation')!
+	for token in ['map_page', 'unmap_page', 'invalidate_', 'first[index] ='] {
+		require(!table_walk.contains(token), 'Preparation must preserve leaves: ' + token)!
+	}
 	allocator := section(page_table, 'pub fn alloc_table_page(', '// Free a 16 KiB page table page.', 'Fallible table allocation')!
 	require(allocator.contains('memory.pmm_alloc_aligned_fallible(') && !allocator.contains('memory.pmm_alloc_aligned('),
 		'Table OOM must return through the fallible walker rather than panic')!
@@ -36,6 +43,32 @@ fn check_bind_replace_local(file string, page_table string) ! {
 		'} else if l2_entry & uat_pte_page == uat_pte_page {', 'l3_phys = l2_entry & pt.oas_mask & ~uat_pg_mask',
 		'} else {\n\t\treturn none\n\t}', 'l3_virt := unsafe'],
 		'Publish children after initialization in empty entries and follow only table descriptors')!
+}
+
+fn check_fixed_map_local(page_table string, mmu string) ! {
+	install := section(page_table, 'pub fn (mut pt UatPgtable) map_new(', 'fn (mut pt UatPgtable) map_contiguous_locked(', 'Native fixed map')!
+	require_order(install, ['size == 0', 'size - 1 > ~iova || size - 1 > ~phys', 'pt.lock.acquire()',
+		'defer { pt.lock.release() }',
+		'if !pt.walk_map_tables_locked(iova, size, false) || !pt.walk_map_tables_locked(iova, size, true)',
+		'return false', 'return pt.map_contiguous_locked(iova, phys, size, prot)'],
+		'Check every destination leaf and prepare tables under the same lock as publication')!
+	kernel := section(mmu, 'pub fn (mgr &UatManager) map_kernel(', '// Reprotect an existing context-zero mapping', 'Native kernel map')!
+	require_order(kernel, ['if iova < (u64(1) << mgr.ias) { mgr.kernel_lower_pgtable } else { mgr.kernel_pgtable }',
+		'if mgr.handoff_abi == .v12_3', 'return pt.map_new(iova, phys, size, prot)', 'return pt.map(iova, phys, size, prot)'],
+		'G13 context-zero mutations use fixed-map preparation on either root')!
+}
+
+fn check_fixed_map_reference(page_table string, mmu string) ! {
+	prepare := section(page_table, 'pub(crate) fn prepare_map(', 'fn pte_bits(', 'Packaged fixed map preparation')!
+	require_order(prepare, ['range.is_empty()', 'self.with_pages(range.clone(), false, false',
+		'pte.load(Ordering::Acquire) != 0', 'return Err(EBUSY)', 'self.alloc_pages(range)'],
+		'Packaged fixed map checks vacancy without allocation before preparing tables')!
+	node := section(mmu, 'fn map_node(', 'fn map_node_prepared(', 'Packaged fixed node map')!
+	require_order(node, ['self.page_table.prepare_map(node.start()..end)?', 'self.map_node_prepared(node, prot)',
+		'self.page_table.discard_partial_map(node.start()..end)'], 'Packaged node map prepares before writing or unwinding leaves')!
+	io := section(mmu, 'pub(crate) fn map_io(', '/// Unmap everything in an address range.', 'Packaged fixed MMIO map')!
+	require_order(io, ['inner.page_table.prepare_map(iova..end)?', '.map_pages(iova..end, phys as PhysicalAddr, prot, false)'],
+		'Packaged MMIO map prepares before writing leaves')!
 }
 
 fn check_table_preparation_reference(page_table string, mem string) ! {

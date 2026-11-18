@@ -28,6 +28,7 @@ fn main() {
 	mut production := 'module mmu\nimport aarch64.cpu\nimport event\nimport katomic\n'
 	production += section(source, 'fn (mut mgr UatManager) publish_initial_context_roots()', 'pub fn (mut mgr UatManager) create_context(')!
 	production += section(source, 'pub fn (ctx &UatContext) is_bound(', '// Map a driver-owned allocation into context zero.')!
+	production += section(source, 'pub fn (mgr &UatManager) map_kernel(', '// Reprotect an existing context-zero mapping')!
 	os.write_file('${scratch}/gpu/agx/mmu/production.v', production)!
 	os.cp('${repo}/tests/agx-tlb/test.v', '${scratch}/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })

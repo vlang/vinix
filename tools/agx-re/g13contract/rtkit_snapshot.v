@@ -135,7 +135,8 @@ fn check_rtkit_buffer_startup(transport string, linux string, repo string) ! {
 		'Failed G13 setup unwinds pages and unpublished heap reservations')!
 	pgtable := read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!
 	mapping := section(pgtable, 'pub fn (mut pt UatPgtable) map(', 'pub fn (mut pt UatPgtable) map_repeated_page(', 'Vinix G13 mapping unwind')!
-	require_order(mapping, ['defer {', 'pt.invalidate_range_locked(iova, size)', 'pt.lock.release()',
+	require_order(mapping, ['defer { pt.lock.release() }', 'return pt.map_contiguous_locked(',
+		'fn (mut pt UatPgtable) map_contiguous_locked(', 'defer { pt.invalidate_range_locked(iova, size) }',
 		'if !pt.map_page_locked(', 'pt.unmap_page_locked(iova + j * uat_pgsz)', 'return false'],
 		'G13 mapping failure removes partial leaves and invalidates before backing is returned')!
 }

@@ -47,6 +47,7 @@ pub mut:
 	kernel_pgtable       &pgtable.UatPgtable = unsafe { nil }
 	ttbs                 &SlotTtbs           = unsafe { nil }
 	handoff              &UatHandoff = unsafe { nil }
+	ias                  u32
 	handoff_initialized  bool
 	handoff_abi          UatHandoffAbi
 	map_kernel_to_user   bool

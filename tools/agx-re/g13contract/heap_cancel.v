@@ -15,7 +15,8 @@ fn check_heap_cancel_local(allocator string, manager string, table string) ! {
 		'heap.cancel_unpublished(va)', 'memory.pmm_free(voidptr(phys), pages)', 'return none'], 'Only the unpublished failed reservation retires before physical backing')!
 	require(!caller.contains('heap.release(') && !caller.contains('heap.gc('), 'Map failure cannot drain unrelated pending ranges')!
 	mapping := section(table, 'pub fn (mut pt UatPgtable) map(', '// Repeat one physical', 'Page-table rollback')!
-	require_order(mapping, ['defer {', 'pt.invalidate_range_locked(iova, size)', 'pt.lock.release()',
+	require_order(mapping, ['defer { pt.lock.release() }', 'return pt.map_contiguous_locked(',
+		'fn (mut pt UatPgtable) map_contiguous_locked(', 'defer { pt.invalidate_range_locked(iova, size) }',
 		'if !pt.map_page_locked(', 'pt.unmap_page_locked(', 'return false'], 'Failed map rolls back partial leaves and completes invalidation before returning')!
 }
 

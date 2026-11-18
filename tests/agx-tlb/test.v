@@ -538,6 +538,72 @@ fn test_preparation_boundaries() {
 	println('AGX table preparation: covers a root boundary and the last TTBR1 page')
 }
 
+fn check_kernel_map_preflight(upper bool) {
+	page := pgtable.uat_pgsz
+	span := u64(1) << 25
+	base := if upper { u64(0xffffffa000000000) } else { u64(0) }
+	start := base + span - page
+	mut pt := pgtable.new_pgtable(39, 48) or { panic('kernel root') }
+	pt.non_global = !upper
+	mut mgr := mmu.UatManager{
+		ias: 39
+		handoff_abi: .v12_3
+		kernel_lower_pgtable: if upper { unsafe { nil } } else { pt }
+		kernel_pgtable: if upper { pt } else { unsafe { nil } }
+	}
+	prot := pgtable.gpu_prot_fw_shared_rw
+	assert mgr.map_kernel(start + page, 0x200000, page, prot)
+	collision := pt.get_pte(start + page, false) or { panic('occupied PTE') }
+	saved := unsafe { *collision }
+	pt.bind_tlb(0)
+	tlb.clear()
+	tlb.observe(collision, unsafe { nil })
+	before := memory.live_pages()
+	for occupied in [saved, u64(0x4000)]! {
+		unsafe { *collision = occupied }
+		assert !mgr.map_kernel(start, 0x800000, 2 * page, prot), 'collision must fail before preparing earlier tables'
+		assert unsafe { *collision } == occupied && tlb.calls().len == 0
+		assert memory.live_pages() == before
+		if _ := pt.get_pte(start, false) { panic('earlier table allocated before vacancy check finished') }
+	}
+	unsafe { *collision = saved }
+
+	// G17 uses a different handoff path and keeps its existing map semantics.
+	mgr.handoff_abi = .g17_26_5
+	assert mgr.map_kernel(start + page, 0x400000, page, prot)
+	assert (pt.translate(start + page) or { panic('updated G17 PTE') }) == 0x400000
+	mgr.handoff_abi = .v12_3
+	tlb.clear()
+
+	// Fail the second table allocation with the first table already attached.
+	oom_start := start + 2 * span
+	memory.fail_after(1)
+	assert !mgr.map_kernel(oom_start, 0x800000, 2 * page, prot)
+	assert memory.live_pages() == before + 1 && tlb.calls().len == 0
+	first := pt.get_pte(oom_start, false) or { panic('retained empty table') }
+	assert unsafe { *first } == 0
+	if _ := pt.get_pte(oom_start + page, false) { panic('out of memory at second table') }
+	memory.fail_after(-1)
+	tlb.observe(first, unsafe { nil })
+	assert mgr.map_kernel(oom_start, 0x800000, 2 * page, prot)
+	assert (pt.translate(oom_start + page) or { panic('installed final page') }) == 0x800000 + page
+	calls := tlb.calls()
+	assert calls.len == 1 && calls[0].all == upper
+	assert calls[0].pte == unsafe { *first } && calls[0].pte != 0
+	tlb.observe(unsafe { nil }, unsafe { nil })
+	pt.unbind_tlb()
+	tlb.clear()
+	pgtable.destroy(pt)
+	assert memory.live_pages() == 0
+}
+
+fn test_kernel_map_preflight() {
+	for upper in [false, true]! {
+		check_kernel_map_preflight(upper)
+	}
+	println('AGX kernel mapping: TTBR0 and TTBR1 preflight preserves occupied leaves and leaves a failed preparation empty')
+}
+
 fn test_bind_preparation() {
 	for _ in 0 .. 100 {
 		memory.fail_after(0)
@@ -597,6 +663,7 @@ fn main() {
 	test_child_table_publication()
 	test_reserved_descriptors()
 	test_preparation_boundaries()
+	test_kernel_map_preflight()
 	test_bind_preparation()
 	test_partial_unmap_survivors()
 	test_repeated_pages()

@@ -186,6 +186,29 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `f8c87d3cff0a3ed7193d8b93207ed9f853514f0335a2d0db11d641431577a349`.
 
+G13 context-zero mapping checks the full destination for nonzero leaves,
+then prepares the intermediate tables before publishing any leaf.
+One page-table lock covers all three steps on TTBR0 and TTBR1. A collision
+preserves the old mapping without allocating tables. If preparation runs
+out of memory, the destination stays empty and the root keeps any tables
+already attached. [Asahi fixed-map preparation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/pgtable.rs#L894-L908)
+
+Both kernel builds, 82 contract test files, and the TLB, heap, teardown,
+and file-close sanitizer suites passed. The linked ARM64 code confirms
+that preflight branches precede leaf writes and that publication
+completes under the lock. Three compiled controls caught bypassed
+preflight, allocation before collision detection, and early leaf
+publication. The allocation scan reproduced 178 baseline findings.
+The full source audit remains `not_equivalent`. No hardware tests or
+reboots ran.
+
+Evidence for `39ac338bf7dbc9404cea3e3ba62ba4f57e2e6cce` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-fixed-map-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`8fbb2a72537b46e1926ee090b385ad884acce8a8e4c7d59fcf94a399d372fc68`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

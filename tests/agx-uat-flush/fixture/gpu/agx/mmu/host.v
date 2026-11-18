@@ -9,6 +9,7 @@ pub struct UatManager {
 pub mut:
 	handoff &UatHandoff = unsafe { nil }
 	handoff_initialized bool
+	handoff_abi UatHandoffAbi
 	ias u32
 	kernel_lower_pgtable &pgtable.UatPgtable = unsafe { nil }
 	kernel_pgtable &pgtable.UatPgtable = unsafe { nil }

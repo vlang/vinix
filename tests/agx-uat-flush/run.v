@@ -23,7 +23,7 @@ fn main() {
 	flushes := mmu[flush_start..]
 	// These methods are the end of mmu.v; keep their exact implementation.
 	assert flushes.starts_with('pub fn (mgr &UatManager) begin_flush(')
-	layout := section(mmu, '@[packed]\npub struct UatFlushInfo', '@[packed]\nstruct SlotTtbs')!
+	layout := section(mmu, 'pub enum UatHandoffAbi {', '@[packed]\nstruct SlotTtbs')!
 	mappings := section(mmu, 'pub fn (mgr &UatManager) map_kernel(', '// Prepare one firmware cache-flush slot.')!
 	os.write_file(scratch + '/gpu/agx/mmu/production.v', 'module mmu\nimport katomic\nimport aarch64.cpu\nimport gpu.agx.pgtable\n' + layout + mappings + flushes)!
 	for name in ['channel', 'fw', 'hw'] {

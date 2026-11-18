@@ -387,13 +387,27 @@ pub fn (mut pt UatPgtable) prepare_map_range(iova u64, size u64) bool {
 	if size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova { return false }
 	pt.lock.acquire()
 	defer { pt.lock.release() }
-	// One lookup prepares an entire L3 table, even for a partial first span.
+	return pt.walk_map_tables_locked(iova, size, true)
+}
+
+// Visit each touched L3 table once. The read-only pass checks existing
+// leaves for collisions without allocating missing tables.
+fn (pt &UatPgtable) walk_map_tables_locked(iova u64, size u64, allocate bool) bool {
 	table_span := u64(1) << uat_middle_shift
 	mut address := iova
 	mut bytes_left := size
 	for {
-		_ = pt.get_pte(address, true) or { return false }
 		chunk := table_span - (address & (table_span - 1))
+		if first := pt.get_pte(address, allocate) {
+			if !allocate {
+				pages := (if bytes_left < chunk { bytes_left } else { chunk }) / uat_pgsz
+				for index := u64(0); index < pages; index++ {
+					if unsafe { first[index] } != 0 { return false }
+				}
+			}
+		} else if allocate {
+			return false
+		}
 		if bytes_left <= chunk { return true }
 		bytes_left -= chunk
 		address += chunk
@@ -407,11 +421,26 @@ pub fn (mut pt UatPgtable) map(iova u64, phys u64, size u64, prot u64) bool {
 		return true
 	}
 	pt.lock.acquire()
-	defer {
-		// Also flush a failed map after its partial mappings are unwound.
-		pt.invalidate_range_locked(iova, size)
-		pt.lock.release()
+	defer { pt.lock.release() }
+	return pt.map_contiguous_locked(iova, phys, size, prot)
+}
+
+// Install a new fixed mapping. One lock covers the vacancy check, table
+// preparation and leaf stores, so an occupied PTE can never be overwritten.
+pub fn (mut pt UatPgtable) map_new(iova u64, phys u64, size u64, prot u64) bool {
+	if size == 0 || (iova | phys | size) & uat_pg_mask != 0
+		|| size - 1 > ~iova || size - 1 > ~phys { return false }
+	pt.lock.acquire()
+	defer { pt.lock.release() }
+	if !pt.walk_map_tables_locked(iova, size, false) || !pt.walk_map_tables_locked(iova, size, true) {
+		return false
 	}
+	return pt.map_contiguous_locked(iova, phys, size, prot)
+}
+
+fn (mut pt UatPgtable) map_contiguous_locked(iova u64, phys u64, size u64, prot u64) bool {
+	// Also flush a failed map after its partial mappings are unwound.
+	defer { pt.invalidate_range_locked(iova, size) }
 
 	pages := lib.div_roundup(size, uat_pgsz)
 	for i := u64(0); i < pages; i++ {
