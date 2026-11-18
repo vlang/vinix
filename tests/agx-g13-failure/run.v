@@ -114,7 +114,7 @@ fn run_checks() int {
 	os.write_file('${scratch}/gpu/production.v', production) or { panic(err) }
 	os.mkdir_all('${scratch}/gpu/agx/alloc') or { panic(err) }
 	allocator := os.read_file('${repo}/kernel/gpu/agx/alloc/alloc.v') or { panic(err) }
-	constants := section(allocator, 'pub const g13_private_start', '// RTKit system endpoints') or { panic(err) }
+	constants := section(allocator, 'pub const g13_private_start', '// --- Individual allocation record ---') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/alloc/constants.v', 'module alloc\n' + constants) or { panic(err) }
 	// Keep the real firmware definitions and builders; replace only privileged
 	// atomics/interrupt locks and hardware-facing manager services in the fixture.

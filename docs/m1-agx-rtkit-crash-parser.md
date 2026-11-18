@@ -25,9 +25,10 @@ row crossing into the next section, and a short register dump accepted as
 complete. Generated ARM64 C showed no implicit heap allocations in the
 decoder. The allocation scan reproduced the 178 baseline discrepancies.
 
-The full audit remains `not_equivalent`. Shared-buffer retry behavior,
-inherited-session handling and DMA coherency remain open. No hardware tests
-or reboots occurred.
+At this revision the full audit reported `not_equivalent`, with open
+differences in shared-buffer retries, inherited sessions and DMA coherency.
+No hardware tests or reboots occurred.
+[Shared-buffer retry follow-up](m1-agx-rtkit-buffer-retry.md)
 
 Evidence is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-rtkit-crash-parser-20261118/`.

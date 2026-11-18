@@ -10,8 +10,10 @@ pub:
 
 pub struct Mailbox {
 pub mut:
+	attempts int
 	sent int
 	last MboxMsg
+	fail_next_send bool
 }
 
 __global on_send fn () = unsafe { nil }
@@ -25,6 +27,11 @@ pub fn (mut _ Mailbox) recv_blocking(_ int) ?MboxMsg { return none }
 
 pub fn (mut box Mailbox) send(message MboxMsg) bool {
 	if on_send != unsafe { nil } { on_send() }
+	box.attempts++
+	if box.fail_next_send {
+		box.fail_next_send = false
+		return false
+	}
 	box.sent++
 	box.last = message
 	return true

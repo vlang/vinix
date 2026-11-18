@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+RTKit resends the existing Syslog, IOReport and OSLog buffer addresses for
+matching requests, including after a mailbox timeout.
+[RTKit shared-buffer retries](m1-agx-rtkit-buffer-retry.md)
+
 RTKit ignores unknown crash notifications and decodes crash time, mailbox
 history and exception registers on both G13 ABIs.
 [RTKit crash-log decoding](m1-agx-rtkit-crash-parser.md)

@@ -328,6 +328,7 @@ pub fn run_checks() {
 	check_fw_log_allocations()
 	check_g13_receive_shutdown()
 	check_rtkit_crash_snapshot()
+	check_rtkit_buffer_retries()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10

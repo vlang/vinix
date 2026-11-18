@@ -5,20 +5,28 @@ module gpu
 import apple.mailbox
 import apple.rtkit
 import aarch64.cpu
+import gpu.agx.alloc
 import gpu.agx.hw
 import gpu.agx.pgtable
 import klock
 import memory
 
 __global rtkit_owner = unsafe { &GpuManager(nil) }
+__global rtkit_alloc_attempts = 0
+__global rtkit_fail_next_allocation = false
 
 fn alloc_buffer_from_heap(mut _ ChannelTestHeap, size u64, protection u64,
 	allocator u32) ?SharedBuffer {
-	assert size == 4096 && allocator == buffer_allocator_g13_rtkit
+	assert size in [u64(4096), 0x2345]! && allocator == buffer_allocator_g13_rtkit
 	assert protection == pgtable.gpu_prot_fw_shared_rw && rtkit_owner.lock.is_held()
+	rtkit_alloc_attempts++
+	if rtkit_fail_next_allocation {
+		rtkit_fail_next_allocation = false
+		return none
+	}
 	physical := unsafe { C.calloc(1, size) }
 	assert physical != unsafe { nil }
-	return SharedBuffer{va: 0x400000, phys: u64(physical), size: size, allocator: allocator}
+	return SharedBuffer{va: alloc.g13_rtkit_start, phys: u64(physical), size: size, allocator: allocator}
 }
 
 fn check_rtkit_reply_owner() {
@@ -126,7 +134,7 @@ fn check_rtkit_crash_snapshot() {
 			mailbox.watch_send(unsafe { nil })
 			assert transport.mbox.sent == 1 && mgr.rtkit_buffers.len == 1
 			iova := transport.system_iovas[rtkit.ep_crashlog]
-			assert iova == 0x400000 && transport.system_sizes[rtkit.ep_crashlog] == 4096
+			assert iova == alloc.g13_rtkit_start && transport.system_sizes[rtkit.ep_crashlog] == 4096
 			if mode == 0 { check_rtkit_unknown_message(mut mgr, 1) }
 			base := mgr.rtkit_buffers[0].phys
 			crashlog_word(base, 0, 0x434c4845)
@@ -179,4 +187,78 @@ fn check_rtkit_crash_snapshot() {
 	assert late.mbox.sent == 0 && stopped.rtkit_buffers.len == 0
 	rtkit_owner = unsafe { nil }
 	println('G13 RTKit: 22 crash paths and four unknown notifications across both ABIs')
+}
+
+fn check_rtkit_buffer_retries() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for ep in [rtkit.ep_syslog, rtkit.ep_ioreport, rtkit.ep_oslog]! {
+			for timeout in [false, true]! {
+				check_rtkit_buffer_retry(abi, ep, timeout)
+			}
+		}
+	}
+	println('G13 RTKit: 12 shared-buffer retry sequences across both ABIs')
+}
+
+fn check_rtkit_buffer_retry(abi hw.FirmwareAbi, ep u8, timeout bool) {
+	mut transport := rtkit.RTKit{name: 'g13-retry', state: .running}
+	mut mgr := GpuManager{
+		hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+		rtk: unsafe { &transport }
+	}
+	rtkit_owner = unsafe { &mgr }
+	transport.set_shmem_allocator(unsafe { voidptr(&mgr) }, allocate_rtkit_shmem)
+
+	// Wire fields are literal so the fixture can catch mask or shift errors.
+	size := if ep == rtkit.ep_oslog { u64(0x2345) } else { u64(4096) }
+	geometry := if ep == rtkit.ep_oslog { u64(0x0102345000000000) } else { u64(0x0010100000000000) }
+	address := if ep == rtkit.ep_oslog { u64(0xffae00000) } else { u64(0xfae00000000) }
+	size_bit := if ep == rtkit.ep_oslog { u64(1) << 36 } else { u64(1) << 44 }
+	request_type := if ep == rtkit.ep_oslog { u64(1) << 56 } else { u64(1) << 52 }
+	message := mailbox.MboxMsg{data0: geometry, data1: ep}
+	before := rtkit_alloc_attempts
+	// Initial validation/allocation failures still report failure to the caller.
+	assert !mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: geometry | address, data1: ep})
+	assert rtkit_alloc_attempts == before
+	rtkit_fail_next_allocation = true
+	assert !mgr.handle_role_system_message(0, message)
+	assert rtkit_alloc_attempts == before + 1 && mgr.rtkit_buffers.len == 0
+	assert transport.system_iovas[ep] == 0 && transport.system_sizes[ep] == 0
+	assert transport.mbox.attempts == 0
+
+	transport.mbox.fail_next_send = timeout
+	mailbox.watch_send(check_rtkit_reply_owner)
+	assert mgr.handle_role_system_message(0, message)
+	assert transport.mbox.attempts == 1 && transport.mbox.sent == if timeout { 0 } else { 1 }
+	if !timeout {
+		assert transport.mbox.last.data0 == (geometry | address) && transport.mbox.last.data1 == ep
+	}
+	assert mgr.rtkit_buffers.len == 1
+	assert transport.system_iovas[ep] == alloc.g13_rtkit_start && transport.system_sizes[ep] == size
+	backing := mgr.rtkit_buffers[0].phys
+	crashlog_word(backing, 0, 0xfacecafe)
+
+	// Conflicting size/IOVA and a zero-size request receive no reply.
+	for data in [geometry + size_bit, geometry | (address ^ 1), request_type]! {
+		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: data, data1: ep})
+	}
+	assert transport.mbox.attempts == 1
+
+	// Both permitted forms of retry must publish the original wire reply.
+	for data in [geometry, geometry | address]! {
+		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: data, data1: ep})
+		assert transport.mbox.last.data0 == (geometry | address) && transport.mbox.last.data1 == ep
+	}
+	assert transport.mbox.attempts == 3 && transport.mbox.sent == if timeout { 2 } else { 3 }
+	assert rtkit_alloc_attempts == before + 2 && mgr.rtkit_buffers.len == 1
+	assert mgr.rtkit_buffers[0].phys == backing && unsafe { *&u32(backing) } == 0xfacecafe
+	assert mgr.state == .running && transport.state == .running
+	mailbox.watch_send(unsafe { nil })
+
+	mgr.shutdown()
+	assert mgr.handle_role_system_message(0, message)
+	assert mgr.rtkit_buffers.len == 0 && transport.mbox.attempts == 3
+	assert rtkit_alloc_attempts == before + 2
+	unsafe { mgr.rtkit_buffers.free() }
+	rtkit_owner = unsafe { nil }
 }

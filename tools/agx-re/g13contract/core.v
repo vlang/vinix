@@ -596,6 +596,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	asahi_rtkit := read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit.c'))!
 	check_rtkit_snapshot(transport, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!, asahi_rtkit,
 		read(os.join_path(asahi_linux, 'rust/kernel/soc/apple/rtkit.rs'))!)!
+	check_rtkit_buffer_retries(transport, asahi_rtkit)!
 	check_rtkit_crashlog(transport, asahi_rtkit,
 		read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit-internal.h'))!,
 		read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit-crashlog.c'))!)!
@@ -997,6 +998,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 firmware log descriptor rings and the separate bounded payload buffer are published and read before acknowledgement',
 		'G13 Event, KTrace and Stats reads serialize with backing teardown and dispatch private copies after releasing the lock',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
+		'RTKit Syslog, IOReport and OSLog retries reuse the published buffer and reject changed geometry without ending the session',
 		'RTKit filters unknown crash notifications and decodes bounded strings, time, mailbox history and exception records',
 		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
 		'host workqueue retirement pointer and wrap-safe publication',

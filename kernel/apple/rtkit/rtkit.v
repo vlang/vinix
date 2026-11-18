@@ -57,6 +57,8 @@ const buffer_request = u8(1)
 const crash_notification = u8(1)
 const syslog_log = u8(5)
 const syslog_init = u8(8)
+const buffer_iova_mask = (u64(1) << 44) - 1
+const oslog_iova_mask = (u64(1) << 48) - 1
 const max_system_buffer_size = u64(16 * 1024 * 1024)
 const crashlog_header_size = u32(0x20)
 const crashlog_entry_header_size = u32(0x10)
@@ -503,53 +505,60 @@ pub fn (mut rtk RTKit) boot() bool {
 	return rtk.fail(c'boot handshake timed out')
 }
 
-fn (mut rtk RTKit) allocate_system_buffer(ep u8, msg u64) bool {
-	if ep >= rtk.system_iovas.len || rtk.shmem_alloc == unsafe { nil } {
-		return false
-	}
-	if rtk.system_iovas[ep] != 0 {
-		C.kprintf(c'rtkit[%.*s]: duplicate buffer request on endpoint %llu\n',
-			i32(rtk.name.len), rtk.name.str, u64(ep))
-		return false
-	}
-
+// Only the system endpoints that negotiate a buffer call this handler.
+fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
+	iova_mask := if ep == ep_oslog { oslog_iova_mask } else { buffer_iova_mask }
 	mut size := u64(0)
 	mut requested_iova := u64(0)
 	if ep == ep_oslog {
 		size = (msg >> 36) & 0xf_ffff
-		requested_iova = (msg & ((u64(1) << 36) - 1)) << 12
+		requested_iova = (msg << 12) & iova_mask
 	} else {
 		size = ((msg >> 44) & 0xff) << 12
-		requested_iova = msg & ((u64(1) << 44) - 1)
+		requested_iova = msg & iova_mask
 	}
-	// The AGX client owns its UAT mappings and cannot safely adopt an address
-	// chosen by firmware. Current Apple GPU firmware requests allocation with
-	// IOVA zero, matching the Asahi RTKit client contract.
-	if size == 0 || size > max_system_buffer_size || requested_iova != 0 {
-		C.kprintf(c'rtkit[%.*s]: invalid buffer request ep=%llu size=0x%llx iova=0x%llx\n',
-			i32(rtk.name.len), rtk.name.str, u64(ep), u64(size), u64(requested_iova))
-		return false
+	mut iova := rtk.system_iovas[ep]
+	if iova != 0 {
+		// Compare the address as encoded in the reply. AGX keeps the full
+		// sign-extended IOVA for its UAT mapping and crash-buffer reads.
+		if size != rtk.system_sizes[ep] || (requested_iova != 0 && requested_iova != (iova & iova_mask)) {
+			C.kprintf(c'rtkit[%.*s]: conflicting buffer request ep=%llu size=0x%llx iova=0x%llx\n',
+				i32(rtk.name.len), rtk.name.str, u64(ep), size, requested_iova)
+			return true
+		}
+	} else {
+		// Clients allocate the mapping and cannot adopt an address chosen
+		// by firmware. A nonzero address can only identify a live buffer.
+		if size == 0 || size > max_system_buffer_size || requested_iova != 0
+			|| rtk.shmem_alloc == unsafe { nil } {
+			C.kprintf(c'rtkit[%.*s]: invalid buffer request ep=%llu size=0x%llx iova=0x%llx\n',
+				i32(rtk.name.len), rtk.name.str, u64(ep), size, requested_iova)
+			return false
+		}
+		iova = rtk.shmem_alloc(rtk.shmem_context, size)
+		if iova == 0 {
+			C.kprintf(c'rtkit[%.*s]: failed to allocate 0x%llx-byte buffer for ep=%llu\n',
+				i32(rtk.name.len), rtk.name.str, size, u64(ep))
+			return false
+		}
+		rtk.system_iovas[ep] = iova
+		rtk.system_sizes[ep] = size
 	}
 
-	iova := rtk.shmem_alloc(rtk.shmem_context, size)
-	if iova == 0 {
-		C.kprintf(c'rtkit[%.*s]: failed to allocate 0x%llx-byte buffer for ep=%llu\n',
-			i32(rtk.name.len), rtk.name.str, u64(size), u64(ep))
-		return false
-	}
-	rtk.system_iovas[ep] = iova
-	rtk.system_sizes[ep] = size
-
+	wire_iova := iova & iova_mask
 	mut reply := u64(0)
 	if ep == ep_oslog {
 		if iova & 0xfff != 0 {
 			return false
 		}
-		reply = (u64(buffer_request) << 56) | (size << 36) | ((iova >> 12) & ((u64(1) << 36) - 1))
+		reply = (u64(buffer_request) << 56) | (size << 36) | (wire_iova >> 12)
 	} else {
-		reply = (u64(buffer_request) << management_type_shift) | ((size >> 12) << 44) | (iova & ((u64(1) << 44) - 1))
+		reply = (u64(buffer_request) << management_type_shift) | ((size >> 12) << 44) | wire_iova
 	}
-	return rtk.send_message(ep, reply)
+	// Logging endpoints can retry publication of a retained mapping after a
+	// mailbox timeout. Crashlog uses this type for a crash after setup.
+	sent := rtk.send_message(ep, reply)
+	return sent || ep != ep_crashlog
 }
 
 // Handle one RTKit transport message addressed to a system endpoint. This is
@@ -579,7 +588,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 				return true
 			}
 			if rtk.system_iovas[ep] == 0 {
-				return rtk.allocate_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0)
 			}
 			C.kprintf(c'rtkit[%.*s]: coprocessor crash notification\n', i32(rtk.name.len),
 				rtk.name.str)
@@ -590,7 +599,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 		ep_ioreport {
 			kind := management_type(msg.data0)
 			if kind == buffer_request {
-				return rtk.allocate_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0)
 			}
 			// Unknown IOReport requests 0x8 and 0xc must be acknowledged or
 			// some coprocessors stop making progress.
@@ -601,7 +610,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 		ep_syslog {
 			kind := management_type(msg.data0)
 			if kind == buffer_request {
-				return rtk.allocate_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0)
 			}
 			if kind == syslog_init {
 				rtk.syslog_entries = u32(msg.data0 & 0xff)
@@ -615,7 +624,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 		}
 		ep_oslog {
 			if u8(msg.data0 >> 56) == buffer_request {
-				return rtk.allocate_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0)
 			}
 		}
 		else {}

@@ -52,7 +52,7 @@ fn check_rtkit_crashlog(transport string, linux string, header string, decoder s
 	require(transport.contains('const crash_notification = u8(1)'), 'Vinix RTKit crash type')!
 	receive := section(transport, 'pub fn (mut rtk RTKit) handle_system_message(', 'fn start_system_endpoints(', 'Vinix RTKit crash receive')!
 	require_order(receive, ['ep_crashlog {', 'management_type(msg.data0) != crash_notification', 'return true',
-		'rtk.system_iovas[ep] == 0', 'rtk.allocate_system_buffer', 'rtk.dump_crashlog()', 'rtk.state = .error'],
+		'rtk.system_iovas[ep] == 0', 'rtk.reply_system_buffer', 'rtk.dump_crashlog()', 'rtk.state = .error'],
 		'Vinix ignores unknown notifications before negotiation or crash handling')!
 	read := section(transport, 'fn (rtk &RTKit) dump_crashlog()', 'fn management_type(', 'Vinix RTKit record parser')!
 	require_order(read, ['total < crashlog_header_size || u64(total) > allocated',
@@ -63,4 +63,34 @@ fn check_rtkit_crashlog(transport string, linux string, header string, decoder s
 	mailbox := section(transport, 'fn (rtk &RTKit) print_crashlog_mailbox(', 'fn (rtk &RTKit) print_crashlog_registers(', 'Vinix RTKit mailbox decoder')!
 	require_order(mailbox, ['offset + 16', 'offset + 24', 'count := (size - 28) / 24', 'i < count', 'offset + 28 + i * 24'],
 		'Vinix decodes only complete mailbox entries in the payload')!
+}
+
+fn check_rtkit_buffer_retries(transport string, linux string) ! {
+	buffer := section(linux, 'static int apple_rtkit_common_rx_get_buffer(', 'static void apple_rtkit_free_buffer(', 'Asahi RTKit shared buffer')!
+	require_order(buffer, ['if (buffer->size)', 'request.size != buffer->size',
+		'request.iova != buffer->iova', '(request.iova || buffer->is_mapped)', 'return -EBUSY;',
+		'goto reply;', 'apple_rtkit_alloc_shmem(rtk, &request)', '*buffer = request;', 'reply:',
+		'buffer->iova >> 12', 'buffer->size >> 12', 'apple_rtkit_send_message(rtk, ep, reply'],
+		'Asahi reuses a live host allocation and publishes the original reply format')!
+
+	reply := section(transport, 'fn (mut rtk RTKit) reply_system_buffer(', '// Handle one RTKit transport message', 'Vinix RTKit shared buffer')!
+	require_order(reply, ['iova_mask := if ep == ep_oslog { oslog_iova_mask } else { buffer_iova_mask }',
+		'size = (msg >> 36)', 'requested_iova = (msg << 12) & iova_mask', 'size = ((msg >> 44)',
+		'requested_iova = msg & iova_mask', 'mut iova := rtk.system_iovas[ep]', 'if iova != 0',
+		'size != rtk.system_sizes[ep]', 'requested_iova != 0 && requested_iova != (iova & iova_mask)',
+		'return true', '} else {', 'requested_iova != 0', 'return false', 'iova = rtk.shmem_alloc(rtk.shmem_context, size)',
+		'if iova == 0', 'return false',
+		'rtk.system_iovas[ep] = iova', 'rtk.system_sizes[ep] = size', 'wire_iova := iova & iova_mask',
+		'(size << 36) | (wire_iova >> 12)', '((size >> 12) << 44) | wire_iova',
+		'sent := rtk.send_message(ep, reply)', 'return sent || ep != ep_crashlog'],
+		'Vinix stores the live mapping before sending and tolerates logging reply timeouts')!
+	for function in ['ioreport', 'syslog', 'oslog'] {
+		receiver := linux.all_after('static void apple_rtkit_${function}_rx(').all_before('\nstatic ')
+		require(receiver.contains('apple_rtkit_common_rx_get_buffer'), 'Asahi ${function} shares retry logic')!
+	}
+	receiver := section(transport, 'pub fn (mut rtk RTKit) handle_system_message(', 'fn start_system_endpoints(', 'Vinix RTKit receive')!
+	require_order(receiver, ['ep_ioreport {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)',
+		'ep_syslog {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)',
+		'ep_oslog {', 'if u8(msg.data0 >> 56) == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)'],
+		'Vinix logging endpoints share the buffer retry handler')!
 }
