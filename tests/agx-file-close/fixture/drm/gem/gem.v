@@ -7,6 +7,7 @@ __global live_objects = 0
 __global next_created_handle = u32(100)
 __global reject_create = false
 __global create_calls = u64(0)
+__global file_mmap_objects [32]&GemObject
 
 pub fn live() int { return live_objects }
 pub fn get_by_handle(_handle u32) ?&GemObject { return none }
@@ -20,6 +21,7 @@ pub mut:
 	size u64 = 0x10000
 	phys_addr u64 = 0x200000
 	mmap_offset u64
+	mmap_device u64
 	owned bool
 	vm_private_identity u64
 	pte_extra u64
@@ -28,11 +30,27 @@ pub mut:
 	lock klock.Lock
 }
 
-pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool, file_scoped bool) ?&GemObject {
+@[params]
+pub struct MmapRegistration {
+pub:
+	mmap_device u64
+}
+
+pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool, file_scoped bool, registration MmapRegistration) ?&GemObject {
 	mut object := create_aligned(size, alignment) or { return none }
 	object.vm_private_identity = identity
 	object.pte_extra = if writeback { u64(0) } else { u64(0x10) }
 	if file_scoped { object.handle = 0 }
+	if file_scoped && registration.mmap_device != 0 {
+		object.mmap_device = registration.mmap_device
+		for index, entry in file_mmap_objects {
+			if entry == unsafe { nil } {
+				file_mmap_objects[index] = object
+				return object
+			}
+		}
+		panic('fixture mmap registry full')
+	}
 	return object
 }
 
@@ -71,9 +89,23 @@ pub fn unref(object &GemObject) {
 	assert owned.references > 0
 	owned.references--
 	if owned.references == 0 && owned.owned {
+		if owned.mmap_device != 0 {
+			for index, entry in file_mmap_objects {
+				if voidptr(entry) == voidptr(owned) { file_mmap_objects[index] = unsafe { nil }; break }
+			}
+		}
 		live_objects--
 		unsafe { C.free(object) }
 	}
+}
+
+pub fn file_mmap_offset_exists(device u64, offset u64, length u64) bool {
+	for object in file_mmap_objects {
+		if object != unsafe { nil } && object.mmap_device == device && object.mmap_offset == offset {
+			return length != 0 && length <= object.size
+		}
+	}
+	return false
 }
 
 pub fn create_mmap_offset(object &GemObject) u64 {

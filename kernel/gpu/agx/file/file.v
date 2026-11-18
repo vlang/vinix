@@ -309,7 +309,7 @@ fn (mut f GpuFile) mmap_attributes(offset u64) u64 {
 fn (mut f GpuFile) admit_mmap_range(offset u64, length u64) int {
 	f.lock.acquire()
 	defer { f.lock.release() }
-	return f.objects.admit_mmap_range(offset, length)
+	return f.objects.admit_mmap_range(u64(f.dev), offset, length)
 }
 
 fn (mut f GpuFile) retain_mmap_range(offset u64, length u64) bool {
@@ -846,7 +846,8 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	if size_error != 0 { return size_error }
 	if !f.objects.reserve_handle_entry() { return -12 }
 	obj := gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,
-		request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles()) or { return -12 }
+		request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles(),
+		mmap_device: u64(f.dev)) or { return -12 }
 	request.handle = f.objects.add_created(obj)
 	return 0
 }
@@ -1779,9 +1780,13 @@ pub fn retain_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64,
 	return file.retain_mmap_range(offset, length)
 }
 
-pub fn admit_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64,
+pub fn admit_mmap_range_handle(dev &drm.DrmDevice, handle voidptr, offset u64,
 	length u64) int {
-	f := lookup_file(handle) or { return -22 }
+	if dev == unsafe { nil } || !dev.registered { return -19 }
+	f := lookup_file(handle) or {
+		return if gem.file_mmap_offset_exists(u64(dev), offset, length) { -13 } else { -22 }
+	}
+	if voidptr(f.dev) != voidptr(dev) { return -22 }
 	mut file := unsafe { f }
 	return file.admit_mmap_range(offset, length)
 }

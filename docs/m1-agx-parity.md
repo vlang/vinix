@@ -743,7 +743,7 @@ close, retained page and cache access, reimport and final release.
 Independent review checked the fault, fork, remap and teardown paths.
 Both kernel builds, 82 V test files and the DRM wire and CPU cache
 fixtures passed. The allocation scan matched 177 baseline findings.
-Full mmap offset and errno parity and M1 hardware validation are open.
+That revision left mmap offset and errno parity and M1 hardware validation open.
 The pinned offline audit reports `not_equivalent`.
 
 The restored archive passed inventory verification for
@@ -751,6 +751,27 @@ The restored archive passed inventory verification for
 `/Users/alex/.local/state/vinix/omarchy-m1-gem-mmap-revoke-20261118.r9VpW2/`.
 `bundle.tar.gz` SHA-256 is
 `4baccd467f03796bbe7ddd11dd507553216597b72a265053369871c24df80c85`.
+
+G13 admits new GEM mappings at the exact object offset with a length that
+fits the backing. An unregistered device returns `ENODEV`. Unknown, interior
+or oversized ranges return `EINVAL`. A valid range on a live same-device GEM
+without an authorized file handle returns `EACCES`. The offset lookup checks
+device identity and object liveness without taking a GEM reference. Existing
+VMAs can still retain interior ranges through their pins. [Pinned DRM mmap lookup](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L1266-L1312)
+
+The sanitizer fixtures covered 64 close and reimport lifecycles and 10,000
+real GEM registration and release cycles. They checked device isolation,
+range validation, retention through PRIME export and final offset removal.
+Independent review checked the registry and reference lifetimes. Both kernel
+builds, 82 V test files and the DRM wire fixture passed. The allocation scan
+matched 177 baseline findings. The pinned offline audit reports
+`not_equivalent`. M1 hardware validation remains open.
+
+The restored archive passed inventory and kernel artifact verification for
+`02a5fbe52ba5b9f244e6851a1abc128d4bc22f6a` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-mmap-offset-20261118.oLn7zP/`.
+`bundle.tar.gz` SHA-256 is
+`bf88bd48f1324d52397f77738526be4416c5c3f0dfcbd399af18c43c57ba7674`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

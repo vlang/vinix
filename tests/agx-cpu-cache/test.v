@@ -231,10 +231,12 @@ fn check_file_scoped_objects() {
 	pages_before := memory.frees()
 	for cycle in 0 .. 10000 {
 		memory.prepare()
-		object := gem.create_aligned_with_cache(16384, 16384, 0, cycle % 2 == 0, true) or {
+		object := gem.create_aligned_with_cache(16384, 16384, 0, cycle % 2 == 0, true, mmap_device: 1) or {
 			panic('a full global table must allow file-scoped allocation')
 		}
 		assert object.handle == 0 && object.file_scoped && memory.live() == 1
+		offset := object.mmap_offset
+		assert gem.file_mmap_offset_exists(1, offset, object.size)
 		assert table.add_created(object) == 1
 		exported := table.get_ref(1) or { panic('published file handle') }
 		closed := table.remove(1) or { panic('file handle close') }
@@ -242,6 +244,7 @@ fn check_file_scoped_objects() {
 		assert exported.refcount == 1 && C.__asan_address_is_poisoned(exported) == 0
 		gem.unref(exported)
 		assert memory.live() == 0 && C.__asan_address_is_poisoned(exported) != 0
+		assert !gem.file_mmap_offset_exists(1, offset, 16384)
 	}
 	table.release_all()
 	assert memory.metadata_frees() == metadata_before + 10000 && memory.frees() == pages_before + 10000
@@ -251,6 +254,28 @@ fn check_file_scoped_objects() {
 	println('AGX file-scoped GEM: 10000 backing and metadata releases after the final reference with all 4095 global slots occupied')
 }
 
+fn check_mmap_offset_links() {
+	memory.prepare()
+	first := gem.create_aligned_with_cache(16384, 16384, 0, true, true, mmap_device: 1) or { panic('first GEM') }
+	middle := gem.create_aligned_with_cache(32768, 16384, 0, true, true, mmap_device: 2) or { panic('middle GEM') }
+	last := gem.create_aligned_with_cache(16384, 16384, 0, true, true, mmap_device: 1) or { panic('last GEM') }
+	first_offset, middle_offset, last_offset := first.mmap_offset, middle.mmap_offset, last.mmap_offset
+	assert first_offset < middle_offset && middle_offset < last_offset
+	assert gem.file_mmap_offset_exists(2, middle_offset, 32768)
+	assert !gem.file_mmap_offset_exists(1, middle_offset, 16384)
+	assert !gem.file_mmap_offset_exists(2, middle_offset + 16384, 16384)
+	assert !gem.file_mmap_offset_exists(2, middle_offset, 32769)
+	gem.unref(middle)
+	assert !gem.file_mmap_offset_exists(2, middle_offset, 16384)
+	assert gem.file_mmap_offset_exists(1, first_offset, 16384) && gem.file_mmap_offset_exists(1, last_offset, 16384)
+	gem.unref(first)
+	assert !gem.file_mmap_offset_exists(1, first_offset, 16384)
+	assert gem.file_mmap_offset_exists(1, last_offset, 16384)
+	gem.unref(last)
+	assert !gem.file_mmap_offset_exists(1, last_offset, 16384) && memory.live() == 0
+	println('AGX GEM mmap offsets: exact lookup, device isolation and unlink at every list position passed')
+}
+
 fn main() {
 	lines := check_cache_lines()
 	constructors := check_constructors()
@@ -258,6 +283,7 @@ fn main() {
 	metadata := check_metadata_refusal()
 	check_authorized_aliases()
 	check_file_scoped_objects()
+	check_mmap_offset_links()
 	println('AGX CPU cache: ${lines} cache-line cases, ${constructors} real GEM constructors/final releases, ${refusals} refusal/default-policy cases; actual retag/BBM/cache-loop bodies, full-span validation, WB/NC aliases, PRIME policy, clean-before-retype, TLBI ordering, authorization, retained references and WB-before-PMM reuse passed')
 	println('AGX GEM metadata: ${metadata} injected failures preserve backing, cache state, handle and mmap offset. Backing and retag failures free unpublished metadata.')
 }

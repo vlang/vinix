@@ -201,14 +201,13 @@ fn (table &Table) mmap_pin_index(offset u64) ?int {
 	return none
 }
 
-pub fn (mut table Table) admit_mmap_range(offset u64, length u64) int {
+pub fn (mut table Table) admit_mmap_range(device u64, offset u64, length u64) int {
 	if !table.local_handles { return if table.valid_mmap_range(offset, length) { 0 } else { -22 } }
 	if length == 0 || offset > ~u64(0) - length { return -22 }
 	for object in table.objects {
 		if object == unsafe { nil } { continue }
-		base := gem.create_mmap_offset(object)
-		if offset < base || offset - base >= object.size { continue }
-		if length > object.size - (offset - base) { return -22 }
+		if offset != gem.create_mmap_offset(object) { continue }
+		if length > object.size { return -22 }
 		if table.mmap_pin_index(offset) != none {
 			return if table.retain_mmap_range(offset, length) { 0 } else { -12 }
 		}
@@ -217,7 +216,7 @@ pub fn (mut table Table) admit_mmap_range(offset u64, length u64) int {
 		table.mmap_pins << MmapPin{object: object, references: 1}
 		return 0
 	}
-	return if table.mmap_pin_index(offset) != none { -13 } else { -22 }
+	return if gem.file_mmap_offset_exists(device, offset, length) { -13 } else { -22 }
 }
 
 pub fn (mut table Table) retain_mmap_range(offset u64, length u64) bool {

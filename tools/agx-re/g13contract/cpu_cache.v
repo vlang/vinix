@@ -5,9 +5,9 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_gem_create(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(', 'Native CPU cache policy')!
 	require_order(create, ['size_error := agxbo.create_size_error(request.size)',
 		'gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,',
-		'request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles())', 'f.objects.add_created(obj)'], 'Native WRITEBACK and registry selection before publication')!
+		'request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles(),', 'mmap_device: u64(f.dev))', 'f.objects.add_created(obj)'], 'Native WRITEBACK and registry selection before publication')!
 	constructor := section(gem, 'pub fn create_aligned_with_cache(', '// Metadata for a host-owned resource.', 'GEM CPU cache constructor')!
-	require(constructor.contains('create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped)'), 'WRITEBACK must select cacheable aliases')!
+	require(constructor.contains('create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped, registration.mmap_device)'), 'WRITEBACK must select cacheable aliases')!
 	allocation := section(gem, 'fn create_object(', '// Destroy a GEM object:', 'GEM unpublished cache preparation')!
 	require_order(allocation, ['gem_objects_lock.acquire()', 'if !file_scoped {', 'i < gem_max_handles', 'if handle == 0 { return none }',
 		'if aligned_size > u64(-1) - next_mmap_offset',
@@ -30,10 +30,13 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 		'offset >= base && offset - base < object.size', 'return length <= object.size - (offset - base)'], 'One authorized object per VMA')!
 	attributes := section(bo, 'pub fn (table &Table) mmap_attributes(', '// A VMA records', 'Authorized mapping attributes')!
 	require_order(attributes, ['table.mmap_objects', 'offset >= base && offset - base < object.size', 'return object.pte_extra'], 'Authorized object cache policy')!
-	for name, fallback in {'mmap_attributes_handle': '0', 'retain_mmap_range_handle': 'false', 'admit_mmap_range_handle': '-22'} {
+	for name, fallback in {'mmap_attributes_handle': '0', 'retain_mmap_range_handle': 'false'} {
 		callback := section(file, 'pub fn ' + name + '(', '\n}', 'Opaque mmap callback')!
 		require(callback.contains('lookup_file(handle) or { return ' + fallback + ' }') && !callback.contains('&GpuFile(handle)'), 'Mmap callback must resolve opaque Handle: ' + name)!
 	}
+	admission := section(file, 'pub fn admit_mmap_range_handle(', 'pub fn release_mmap_range_handle(', 'New mmap admission')!
+	require_order(admission, ['if dev == unsafe { nil } || !dev.registered { return -19 }', 'lookup_file(handle) or {',
+		'gem.file_mmap_offset_exists(u64(dev), offset, length)', 'file.admit_mmap_range(offset, length)'], 'Check registration before resolving the file and offset')!
 	require(driver.contains('mmap_attributes: agx_file.mmap_attributes_handle')
 		&& driver.contains('mmap_admit: agx_file.admit_mmap_range_handle')
 		&& driver.contains('mmap_retain: agx_file.retain_mmap_range_handle')

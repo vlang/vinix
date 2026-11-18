@@ -50,7 +50,7 @@ fn (mut objects Objects) import_object(object &gem.GemObject) ?u32 { return obje
 fn (mut objects Objects) authorize_mmap(handle u32) ?u64 { return objects.table.authorize_mmap(handle) }
 fn (objects &Objects) mmap_page(page u64) voidptr { return objects.table.mmap_page(page) }
 fn (objects &Objects) mmap_attributes(offset u64) u64 { return objects.table.mmap_attributes(offset) }
-fn (mut objects Objects) admit_mmap_range(offset u64, length u64) int { return objects.table.admit_mmap_range(offset, length) }
+fn (mut objects Objects) admit_mmap_range(device u64, offset u64, length u64) int { return objects.table.admit_mmap_range(device, offset, length) }
 fn (mut objects Objects) retain_mmap_range(offset u64, length u64) bool { return objects.table.retain_mmap_range(offset, length) }
 fn (mut objects Objects) release_mmap_range(offset u64) { objects.table.release_mmap_range(offset) }
 

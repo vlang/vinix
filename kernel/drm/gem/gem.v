@@ -27,7 +27,17 @@ pub mut:
 	advice_dontneed bool // private BO advice; resident backing is not yet purgeable
 pub:
 	vm_private_identity u64 // zero: shareable; otherwise immutable owning VM identity
-	file_scoped bool // only reachable through reference-owning driver tables
+	file_scoped bool // excluded from the global handle table
+mut:
+	mmap_device u64
+	mmap_previous &GemObject = unsafe { nil }
+	mmap_next &GemObject = unsafe { nil }
+}
+
+@[params]
+pub struct MmapRegistration {
+pub:
+	mmap_device u64 // opaque DRM registration identity
 }
 
 const gem_max_handles = u32(4096)
@@ -36,6 +46,7 @@ __global (
 	next_mmap_offset = u64(0x10000000) // start mmap offsets above 256 MiB
 	gem_objects_lock klock.Lock
 	gem_objects      [4096]&GemObject
+	file_mmap_objects &GemObject = unsafe { nil }
 )
 
 // Create a new GEM object of the given size.
@@ -47,31 +58,31 @@ pub fn create(size u64) ?&GemObject {
 // Create a GEM object with a physical and size alignment suitable for the
 // target device. AGX callers require 16 KiB alignment on either kernel granule.
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
-	return create_object(size, alignment, false, 0, 0, false)
+	return create_object(size, alignment, false, 0, 0, false, 0)
 }
 
 // Set the private reservation identity before the object becomes visible in
 // any handle table. Only its owning VM may bind it, and PRIME cannot export it.
 pub fn create_aligned_private(size u64, alignment u64, identity u64) ?&GemObject {
 	if identity == 0 { return none }
-	return create_object(size, alignment, false, identity, 0, false)
+	return create_object(size, alignment, false, identity, 0, false, 0)
 }
 
 // AGX CPU mappings are Normal Non-Cacheable unless WRITEBACK was requested.
 // Select both the direct-map and future userspace attributes before publishing
 // the object. Other GEM constructors retain their existing cacheable policy.
-pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool, file_scoped bool) ?&GemObject {
+pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool, file_scoped bool, registration MmapRegistration) ?&GemObject {
 	$if !arm64 { if !writeback { return none } }
-	return create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped)
+	return create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped, registration.mmap_device)
 }
 
 // Metadata for a host-owned resource. The driver installs its physical
 // aperture after RESOURCE_MAP_BLOB succeeds; the PMM never owns those pages.
 pub fn create_external(size u64) ?&GemObject {
-	return create_object(size, page_size, true, 0, 0, false)
+	return create_object(size, page_size, true, 0, 0, false, 0)
 }
 
-fn create_object(size u64, alignment u64, external bool, private_identity u64, pte_extra u64, file_scoped bool) ?&GemObject {
+fn create_object(size u64, alignment u64, external bool, private_identity u64, pte_extra u64, file_scoped bool, mmap_device u64) ?&GemObject {
 	if size == 0 {
 		return none
 	}
@@ -146,6 +157,12 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 	}
 
 	if !file_scoped { gem_objects[handle] = obj }
+	if file_scoped && mmap_device != 0 {
+		obj.mmap_device = mmap_device
+		obj.mmap_next = unsafe { file_mmap_objects }
+		if file_mmap_objects != unsafe { nil } { file_mmap_objects.mmap_previous = obj }
+		file_mmap_objects = obj
+	}
 
 	return obj
 }
@@ -158,6 +175,15 @@ pub fn destroy(obj &GemObject) {
 	if !obj.file_scoped && obj.handle < gem_max_handles {
 		gem_objects_lock.acquire()
 		gem_objects[obj.handle] = unsafe { nil }
+		gem_objects_lock.release()
+	}
+	if obj.mmap_device != 0 {
+		gem_objects_lock.acquire()
+		mut previous := unsafe { obj.mmap_previous }
+		mut next := unsafe { obj.mmap_next }
+		if previous == unsafe { nil } { file_mmap_objects = next }
+		else { previous.mmap_next = next }
+		if next != unsafe { nil } { next.mmap_previous = unsafe { previous } }
 		gem_objects_lock.release()
 	}
 	$if arm64 {
@@ -218,6 +244,22 @@ pub fn create_mmap_offset(obj &GemObject) u64 {
 		return 0
 	}
 	return obj.mmap_offset
+}
+
+// Classify a missing file handle without granting access to another file's
+// BO. The list owns no references and final release unlinks under this lock.
+pub fn file_mmap_offset_exists(device u64, offset u64, length u64) bool {
+	if device == 0 || length == 0 { return false }
+	gem_objects_lock.acquire()
+	defer { gem_objects_lock.release() }
+	mut object := unsafe { file_mmap_objects }
+	for object != unsafe { nil } && object.mmap_offset >= offset {
+		if object.mmap_offset == offset {
+			return object.mmap_device == device && length <= object.size && katomic.load(unsafe { &object.refcount }) != 0
+		}
+		object = unsafe { object.mmap_next }
+	}
+	return false
 }
 
 // Resolve a fake DRM mmap page only within one already-authorized object.
