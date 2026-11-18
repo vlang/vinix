@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 prepares each RTKit allocation for firmware before publishing its address
+and reads bounded Syslog records before acknowledgement.
+[RTKit Syslog and buffer preparation](m1-agx-rtkit-syslog.md)
+
 RTKit resends the existing Syslog, IOReport and OSLog buffer addresses for
 matching requests, including after a mailbox timeout.
 [RTKit shared-buffer retries](m1-agx-rtkit-buffer-retry.md)

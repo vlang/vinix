@@ -162,7 +162,10 @@ pub fn audit(inputs Inputs) !Report {
 		'drivers/dma-buf/dma-fence.c', 'drivers/dma-buf/dma-fence-chain.c', 'drivers/dma-buf/sync_file.c', 'include/uapi/linux/sync_file.h', 'drivers/gpu/drm/drm_syncobj.c', 'rust/kernel/drm/syncobj.rs', 'include/uapi/drm/drm.h', 'fs/file.c',
 		'rust/kernel/uaccess.rs', 'rust/kernel/alloc/kvec.rs', 'rust/kernel/alloc/layout.rs',
 		'drivers/soc/apple/rtkit.c', 'drivers/soc/apple/rtkit-crashlog.c',
-		'drivers/soc/apple/rtkit-internal.h', 'rust/kernel/soc/apple/rtkit.rs']
+		'drivers/soc/apple/rtkit-internal.h', 'rust/kernel/soc/apple/rtkit.rs',
+		'drivers/gpu/drm/drm_gem_shmem_helper.c', 'rust/kernel/drm/gem/shmem.rs',
+		'arch/arm64/include/asm/pgtable-prot.h', 'arch/arm64/include/asm/sysreg.h',
+		'arch/arm64/mm/proc.S', 'arch/arm64/mm/dma-mapping.c', 'kernel/dma/direct.h']
 	require_clean(inputs.packages, [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD'])!
 	require_clean(inputs.asahi, asahi_sources)!
 	require_clean(inputs.m1n1, ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx'])!
@@ -183,7 +186,7 @@ pub fn audit(inputs Inputs) !Report {
 	mut sources := []Source{}
 	for role, paths in {
 		'vinix':    ['kernel/gpu/agx', 'kernel/drm/syncobj', 'kernel/drm/ioctl/ioctl.v', 'kernel/drm/asahi', 'kernel/drm/gem',
-			'kernel/apple/rtkit/rtkit.v',
+			'kernel/apple/rtkit/rtkit.v', 'kernel/apple/mailbox/mailbox.v',
 			'kernel/fs/vfs.v',
 			'kernel/sched/sched_arm64.v',
 			'kernel/sched/sched_amd64.v',

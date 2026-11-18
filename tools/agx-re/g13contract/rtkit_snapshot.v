@@ -73,7 +73,7 @@ fn check_rtkit_buffer_retries(transport string, linux string) ! {
 		'buffer->iova >> 12', 'buffer->size >> 12', 'apple_rtkit_send_message(rtk, ep, reply'],
 		'Asahi reuses a live host allocation and publishes the original reply format')!
 
-	reply := section(transport, 'fn (mut rtk RTKit) reply_system_buffer(', '// Handle one RTKit transport message', 'Vinix RTKit shared buffer')!
+	reply := section(transport, 'fn (mut rtk RTKit) reply_system_buffer(', 'fn (rtk &RTKit) dump_syslog_entry(', 'Vinix RTKit shared buffer')!
 	require_order(reply, ['iova_mask := if ep == ep_oslog { oslog_iova_mask } else { buffer_iova_mask }',
 		'size = (msg >> 36)', 'requested_iova = (msg << 12) & iova_mask', 'size = ((msg >> 44)',
 		'requested_iova = msg & iova_mask', 'mut iova := rtk.system_iovas[ep]', 'if iova != 0',

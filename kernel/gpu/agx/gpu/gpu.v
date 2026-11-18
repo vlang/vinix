@@ -20,6 +20,7 @@ import memory
 import klock
 import katomic
 import sched
+import aarch64.cpu
 import aarch64.timer
 import drm.syncobj
 
@@ -336,6 +337,9 @@ fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
 		return 0
 	}
 	buffer := alloc_buffer_from_heap(mut mgr.g13_rtkit, size, pgtable.gpu_prot_fw_shared_rw, buffer_allocator_g13_rtkit) or { return 0 }
+	// Give the ASC the initialized bytes before the RTKit reply publishes
+	// the mapping. Asahi's initial GEM DMA map cleans this backing to PoC.
+	cpu.clean_invalidate_data_cache_to_poc(u64(buffer.cpu_address()), buffer.size)
 	iova := buffer.va
 	mgr.rtkit_buffer_lock.acquire()
 	mgr.rtkit_buffers << buffer

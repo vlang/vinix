@@ -60,7 +60,7 @@ fn run_checks() int {
 	os.cp('${repo}/kernel/gpu/agx/channel/channel.v', '${scratch}/gpu/agx/channel/channel.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n') or { panic(err) }
 	source := os.read_file(if os.args.len == 4 && os.args[2] == '--gpu-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' }) or { panic(err) }
-	mut production := 'module gpu\nimport apple.mailbox\nimport apple.rtkit\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport gpu.agx.channel\nimport gpu.agx.pgtable\nimport katomic\nimport sched\n__global higher_half = u64(0)\n'
+	mut production := 'module gpu\nimport aarch64.cpu\nimport apple.mailbox\nimport apple.rtkit\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport gpu.agx.channel\nimport gpu.agx.pgtable\nimport katomic\nimport sched\n__global higher_half = u64(0)\n'
 	production += section(source, 'const g13_channel_allocation_count', 'const buffer_allocator_default') or { panic(err) }
 	production += section(source, 'struct G13ChannelAllocations {', '@[inline]\nfn pipe_index') or { panic(err) }
 	production += section(source, 'const buffer_allocator_g13_rtkit', '\n') or { panic(err) }
@@ -146,7 +146,13 @@ fn run_checks() int {
 	}
 	result := os.exec(['${scratch}/test'])
 	print(result.output)
-	if result.exit_code == 0 { check_crashlog_output(result.output) }
+	if result.exit_code == 0 {
+		check_crashlog_output(result.output)
+		assert result.output.count('syslog message: abcdefghijklmnopqrstuvw:   trim\n') == 2
+		assert result.output.count('syslog message: wide: ' + 'M'.repeat(254) + '\n') == 2
+		assert result.output.count('syslog message: one: \n') == 2
+		assert result.output.count('syslog message: ') == 6
+	}
 	return result.exit_code
 }
 

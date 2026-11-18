@@ -57,6 +57,9 @@ const buffer_request = u8(1)
 const crash_notification = u8(1)
 const syslog_log = u8(5)
 const syslog_init = u8(8)
+const syslog_context_offset = 8
+const syslog_context_size = 24
+const syslog_max_message_size = 255
 const buffer_iova_mask = (u64(1) << 44) - 1
 const oslog_iova_mask = (u64(1) << 48) - 1
 const max_system_buffer_size = u64(16 * 1024 * 1024)
@@ -561,6 +564,41 @@ fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
 	return sent || ep != ep_crashlog
 }
 
+fn (rtk &RTKit) dump_syslog_entry(msg u64) {
+	message_size := rtk.syslog_msg_size
+	iova := rtk.system_iovas[ep_syslog]
+	if rtk.shmem_read == unsafe { nil } || iova == 0 || message_size == 0
+		|| message_size > syslog_max_message_size {
+		return
+	}
+
+	index := u64(u8(msg))
+	stride := u64(syslog_context_offset + syslog_context_size + message_size)
+	if index >= rtk.syslog_entries || index >= rtk.system_sizes[ep_syslog] / stride {
+		return
+	}
+	offset := index * stride + syslog_context_offset
+	mut payload := [syslog_context_size + syslog_max_message_size]u8{}
+	cpu.dmb_ishld()
+	if !rtk.shmem_read(rtk.shmem_context, iova + offset, unsafe { &payload[0] },
+		u64(syslog_context_size + message_size)) {
+		return
+	}
+
+	payload[syslog_context_size - 1] = 0
+	mut end := u32(syslog_context_size)
+	limit := syslog_context_size + message_size - 1
+	for end < limit && payload[end] != 0 { end++ }
+	for end > syslog_context_size {
+		last := payload[end - 1]
+		if last != ` ` && last != `\n` && last != `\r` { break }
+		end--
+	}
+	payload[end] = 0
+	C.kprintf(c'rtkit[%.*s]: syslog message: %s: %s\n', i32(rtk.name.len), rtk.name.str,
+		unsafe { &char(&payload[0]) }, unsafe { &char(&payload[syslog_context_size]) })
+}
+
 // Handle one RTKit transport message addressed to a system endpoint. This is
 // also called after boot so late logs and reports cannot fill the ASC mailbox.
 pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
@@ -617,8 +655,9 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 				rtk.syslog_msg_size = u32((msg.data0 >> 24) & 0xff)
 				return true
 			}
-			// Type 5 is a log notification. Echoing it releases the slot.
+			// Echo the notification even if the record could not be read.
 			if kind == syslog_log {
+				rtk.dump_syslog_entry(msg.data0)
 				return rtk.send_message(ep, msg.data0)
 			}
 		}

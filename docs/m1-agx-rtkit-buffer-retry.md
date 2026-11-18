@@ -27,9 +27,10 @@ Generated ARM64 C confirmed one allocation callback on the first-request
 path and no implicit allocation on retries. The allocation scan reproduced
 the 178 baseline discrepancies.
 
-The full audit remains `not_equivalent`. Initial failure handling,
-inherited sessions and DMA coherency remain open. No hardware tests or
-reboots occurred.
+At this revision the full audit reported `not_equivalent`, with open
+differences in initial failure handling, inherited sessions and DMA setup.
+No hardware tests or reboots occurred.
+[DMA setup and Syslog follow-up](m1-agx-rtkit-syslog.md)
 
 Evidence is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-rtkit-buffer-retry-20261118/`.

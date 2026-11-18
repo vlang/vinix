@@ -14,6 +14,11 @@ import memory
 __global rtkit_owner = unsafe { &GpuManager(nil) }
 __global rtkit_alloc_attempts = 0
 __global rtkit_fail_next_allocation = false
+__global syslog_copy_attempts = 0
+__global syslog_copy_refused = false
+__global syslog_expected_iova = u64(0)
+__global syslog_expected_size = u64(0)
+__global syslog_expected_sent = 0
 
 fn alloc_buffer_from_heap(mut _ ChannelTestHeap, size u64, protection u64,
 	allocator u32) ?SharedBuffer {
@@ -24,13 +29,16 @@ fn alloc_buffer_from_heap(mut _ ChannelTestHeap, size u64, protection u64,
 		rtkit_fail_next_allocation = false
 		return none
 	}
-	physical := unsafe { C.calloc(1, size) }
+	span := (size + 0x3fff) & ~u64(0x3fff)
+	physical := unsafe { C.calloc(1, span) }
 	assert physical != unsafe { nil }
-	return SharedBuffer{va: alloc.g13_rtkit_start, phys: u64(physical), size: size, allocator: allocator}
+	return SharedBuffer{va: alloc.g13_rtkit_start, phys: u64(physical), size: span, allocator: allocator}
 }
 
 fn check_rtkit_reply_owner() {
 	assert rtkit_owner.lock.is_held() && rtkit_owner.rtkit_buffers.len == 1
+	_, address, span := cpu.prepared_range()
+	assert address == rtkit_owner.rtkit_buffers[0].phys && span == rtkit_owner.rtkit_buffers[0].size
 }
 
 fn stop_rtkit_owner() {
@@ -137,6 +145,7 @@ fn check_rtkit_crash_snapshot() {
 			assert iova == alloc.g13_rtkit_start && transport.system_sizes[rtkit.ep_crashlog] == 4096
 			if mode == 0 { check_rtkit_unknown_message(mut mgr, 1) }
 			base := mgr.rtkit_buffers[0].phys
+			span := mgr.rtkit_buffers[0].size
 			crashlog_word(base, 0, 0x434c4845)
 			crashlog_word(base, 4, 1)
 			crashlog_word(base, 8, 0x60)
@@ -147,11 +156,11 @@ fn check_rtkit_crash_snapshot() {
 			unsafe { C.memcpy(voidptr(base + 0x34), c'private snapshot', 17) }
 
 			mut probe := u64(0)
-			assert !copy_rtkit_shmem(unsafe { &mgr }, iova + 4092, unsafe { &probe }, 8)
+			assert !copy_rtkit_shmem(unsafe { &mgr }, iova + span - 4, unsafe { &probe }, 8)
 			assert !copy_rtkit_shmem(unsafe { &mgr }, iova - 1, unsafe { &probe }, 1)
 			assert !copy_rtkit_shmem(unsafe { &mgr }, ~u64(0), unsafe { &probe }, 1)
 			assert !copy_rtkit_shmem(unsafe { &mgr }, iova, unsafe { nil }, 1)
-			assert copy_rtkit_shmem(unsafe { &mgr }, iova + 4096 - sizeof(probe), unsafe { &probe }, sizeof(probe))
+			assert copy_rtkit_shmem(unsafe { &mgr }, iova + span - sizeof(probe), unsafe { &probe }, sizeof(probe))
 			assert probe == 0
 			match mode {
 				1 { klock.on_next_release(unsafe { &mgr.rtkit_buffer_lock }, stop_rtkit_owner) }
@@ -160,7 +169,7 @@ fn check_rtkit_crash_snapshot() {
 				4 { crashlog_word(base, 0, 0) }
 				5 { crashlog_word(base, 8, 4097) }
 				6 { crashlog_word(base, 0x2c, 8) }
-				7 { transport.system_iovas[rtkit.ep_crashlog] = iova + 1 }
+				7 { transport.system_iovas[rtkit.ep_crashlog] = iova + span - 4096 + 1 }
 				8, 9 { build_crashlog_sections(base, mode == 9) }
 				10 { crashlog_word(base, 8, 0x2f) }
 				else {}
@@ -217,6 +226,7 @@ fn check_rtkit_buffer_retry(abi hw.FirmwareAbi, ep u8, timeout bool) {
 	request_type := if ep == rtkit.ep_oslog { u64(1) << 56 } else { u64(1) << 52 }
 	message := mailbox.MboxMsg{data0: geometry, data1: ep}
 	before := rtkit_alloc_attempts
+	cache_before, _, _ := cpu.prepared_range()
 	// Initial validation/allocation failures still report failure to the caller.
 	assert !mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: geometry | address, data1: ep})
 	assert rtkit_alloc_attempts == before
@@ -251,6 +261,8 @@ fn check_rtkit_buffer_retry(abi hw.FirmwareAbi, ep u8, timeout bool) {
 	}
 	assert transport.mbox.attempts == 3 && transport.mbox.sent == if timeout { 2 } else { 3 }
 	assert rtkit_alloc_attempts == before + 2 && mgr.rtkit_buffers.len == 1
+	cache_after, _, _ := cpu.prepared_range()
+	assert cache_after == cache_before + 1
 	assert mgr.rtkit_buffers[0].phys == backing && unsafe { *&u32(backing) } == 0xfacecafe
 	assert mgr.state == .running && transport.state == .running
 	mailbox.watch_send(unsafe { nil })
@@ -261,4 +273,87 @@ fn check_rtkit_buffer_retry(abi hw.FirmwareAbi, ep u8, timeout bool) {
 	assert rtkit_alloc_attempts == before + 2
 	unsafe { mgr.rtkit_buffers.free() }
 	rtkit_owner = unsafe { nil }
+}
+
+fn read_syslog_fixture(context voidptr, iova u64, destination voidptr, size u64) bool {
+	assert rtkit_owner.lock.is_held()
+	assert rtkit_owner.rtk.mbox.sent == syslog_expected_sent, 'the slot must be copied before its ACK'
+	assert iova == syslog_expected_iova && size == syslog_expected_size
+	syslog_copy_attempts++
+	return !syslog_copy_refused && copy_rtkit_shmem(context, iova, destination, size)
+}
+
+fn init_syslog_fixture(mut mgr GpuManager, entries u8, size u8) {
+	data := (u64(8) << 52) | (u64(size) << 24) | u64(entries)
+	sent := mgr.rtk.mbox.sent
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: data, data1: rtkit.ep_syslog})
+	assert mgr.rtk.mbox.sent == sent
+}
+
+fn notify_syslog_fixture(mut mgr GpuManager, index u8, offset u64, length u64) {
+	data := (u64(5) << 52) | 0xabc000 | u64(index)
+	copies := syslog_copy_attempts
+	barriers := cpu.barriers()
+	cache_before, _, _ := cpu.prepared_range()
+	syslog_expected_sent = mgr.rtk.mbox.sent
+	syslog_expected_iova = alloc.g13_rtkit_start + offset
+	syslog_expected_size = length
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: data, data1: rtkit.ep_syslog})
+	assert mgr.rtk.mbox.sent == syslog_expected_sent + 1
+	assert mgr.rtk.mbox.last.data0 == data && mgr.rtk.mbox.last.data1 == rtkit.ep_syslog
+	expected_reads := if length == 0 { 0 } else { 1 }
+	assert syslog_copy_attempts == copies + expected_reads && cpu.barriers() == barriers + u32(expected_reads)
+	cache_after, _, _ := cpu.prepared_range()
+	assert cache_after == cache_before
+}
+
+fn check_rtkit_syslog() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		mut transport := rtkit.RTKit{name: 'g13-syslog', state: .running}
+		mut mgr := GpuManager{
+			hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+			rtk: unsafe { &transport }
+		}
+		rtkit_owner = unsafe { &mgr }
+		transport.set_shmem_allocator(unsafe { voidptr(&mgr) }, allocate_rtkit_shmem)
+		transport.set_shmem_reader(read_syslog_fixture)
+		init_syslog_fixture(mut mgr, 100, 32)
+		notify_syslog_fixture(mut mgr, 1, 0, 0) // INIT without backing
+		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0010100000000000, data1: rtkit.ep_syslog})
+		base := mgr.rtkit_buffers[0].phys
+		unsafe {
+			C.memcpy(voidptr(base + 72), c'abcdefghijklmnopqrstuvwx', 24)
+			C.memcpy(voidptr(base + 96), c'  trim \r\n ', 11)
+		}
+		notify_syslog_fixture(mut mgr, 1, 72, 56)
+		notify_syslog_fixture(mut mgr, 64, 0, 0) // INIT count exceeds backing
+		transport.set_shmem_reader(unsafe { nil })
+		notify_syslog_fixture(mut mgr, 1, 0, 0) // Client only acknowledges
+		transport.set_shmem_reader(read_syslog_fixture)
+		syslog_copy_refused = true
+		notify_syslog_fixture(mut mgr, 1, 72, 56)
+		syslog_copy_refused = false
+
+		init_syslog_fixture(mut mgr, 1, 255)
+		unsafe {
+			C.memcpy(voidptr(base + 8), c'wide', 5)
+			C.memset(voidptr(base + 32), `M`, 254)
+			*&u8(base + 32 + 254) = `X`
+		}
+		notify_syslog_fixture(mut mgr, 0, 8, 279)
+		notify_syslog_fixture(mut mgr, 1, 0, 0) // Index outside replacement INIT
+
+		init_syslog_fixture(mut mgr, 1, 1)
+		unsafe { C.memcpy(voidptr(base + 8), c'one', 4) }
+		notify_syslog_fixture(mut mgr, 0, 8, 25)
+		init_syslog_fixture(mut mgr, 0, 32)
+		notify_syslog_fixture(mut mgr, 0, 0, 0)
+		init_syslog_fixture(mut mgr, 1, 0)
+		notify_syslog_fixture(mut mgr, 0, 0, 0)
+		mgr.shutdown()
+		assert mgr.rtkit_buffers.len == 0
+		unsafe { mgr.rtkit_buffers.free() }
+		rtkit_owner = unsafe { nil }
+	}
+	println('G13 RTKit: 20 Syslog notifications across both ABIs check slot bounds, text and ACK order')
 }
