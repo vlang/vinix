@@ -56,7 +56,7 @@ fn check_timestamp_captures() {
 					else if offset >= 0xfffffff8 { -22 } else if offset > 0x3ff8 { -34 } else { 0 }
 				assert code == expected, 'timestamp lookup/overflow/range precedence'
 				if code == 0 && handle != 0 {
-					assert capture.id == id && capture.address == base + u64(offset), 'timestamp byte address'
+					assert capture.va == base && capture.address == base + u64(offset), 'timestamp byte address'
 					assert file.timestamp_objects[0].references == 1
 					file.release_g13_timestamp(capture)
 				} else { assert capture == G13TimestampCapture{} }
@@ -91,17 +91,26 @@ fn check_timestamp_captures() {
 		missing_code, _ := file.capture_g13_timestamp(asahi.Timestamp{handle: id})
 		assert missing_code == -2 && retained.addresses(2)[1] == base + 41, 'captured timestamp survives namespace removal'
 		assert !file.close() && object.references == 2 && !file.lock.is_held(), 'capture pins file before VM pin'
-		file.next_timestamp_id = id
-		file.lock.acquire()
-		reserved := file.allocate_timestamp_id_locked() or { panic('timestamp ID') }
-		file.lock.release()
-		assert reserved != id, 'captured ID remains reserved'
-		// Force namespace growth/movement while captures store scalar identities.
-		for _ in 0 .. 20 { _ = bind_capture_buffer(mut file, object.handle) }
+		reused := bind_capture_buffer(mut file, object.handle)
+		assert reused == id, 'detached timestamp name must be immediately reusable'
+		replacement_va := file.timestamp_objects[1].va
+		assert replacement_va != base
+		code, replacement := file.capture_g13_timestamp(asahi.Timestamp{handle: reused, offset: 7})
+		assert code == 0 && replacement.va == replacement_va && replacement.address == replacement_va + 7
+		file.release_g13_timestamp(replacement)
+		assert file.timestamp_objects[0].references == 6 && file.timestamp_objects[1].references == 0,
+			'release must find the captured VA even when two entries share the same name'
+		// Grow the name array while both mappings have captures.
+		next_code, next_capture := file.capture_g13_timestamp(asahi.Timestamp{handle: reused, offset: 9})
+		assert next_code == 0
+		for index in 0 .. 19 {
+			assert bind_capture_buffer(mut file, object.handle) == u32(index + 2)
+		}
 		assert retained.addresses(0)[0] == base + 1
 		gpu.available(false)
 		file.release_g13_timestamps(mut retained)
 		assert retained == G13TimestampReferences{} && file.timestamp_objects[0].references == 0
+		assert file.timestamp_objects[1].references == 1
 		assert file.timestamp_objects.len == 21 && object.references == 22 && gpu.unmaps() == before, 'missing manager retains detached owner'
 		assert !file.close() && object.references == 22, 'close cannot drop mapped backing without manager'
 		gpu.available(true)
@@ -109,6 +118,9 @@ fn check_timestamp_captures() {
 		reap_open_detached_g13_queues()
 		file_map.delete(u64(0x51000 + cycle))
 		assert file.timestamp_objects.len == 20 && object.references == 21 && gpu.unmaps() == before + 1, 'worker retries detached timestamp cleanup'
+		assert file.timestamp_objects[0].id == reused && file.timestamp_objects[0].va == next_capture.va
+		file.release_g13_timestamp(next_capture)
+		assert file.timestamp_objects[0].references == 0 && gpu.unmaps() == before + 1
 		assert file.close() && foreign.close() && gem.live() == 0
 		ownership_cases++
 	}
@@ -143,5 +155,5 @@ fn check_timestamp_captures() {
 	assert object.references == 1 && gpu.unmaps() == before + 1, 'racing prefix releases exactly once'
 	timestamp_race_file = unsafe { nil }
 	assert raced.close() && gem.live() == 0
-	println('G13 timestamp capture: ${validation_cases} validation cases, ${ownership_cases} retained mapping lifecycles, six rollback prefixes and inter-lookup UNBIND passed')
+	println('G13 timestamp capture: ${validation_cases} validation cases, ${ownership_cases} retained mapping lifecycles with immediate name reuse and VA-based retirement, six rollback prefixes and inter-lookup UNBIND passed')
 }

@@ -302,6 +302,28 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `90bf451e47b66e04e5b745ca8438639c9e49c369128dfe9fb8ef4c483db596ba`.
 
+G13 timestamp BIND now allocates the lowest free nonzero handle
+through both ioctl ABIs. UNBIND frees the name immediately when a
+command still holds the mapping. Existing captures retain the base GPU
+VA and GEM backing so their release still reaches the original mapping
+after the handle has been reused.
+[Asahi timestamp BIND](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L1217-L1232)
+[XArray name allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/lib/xarray.c#L2008-L2033)
+
+The sanitizer suites passed 184,600 timestamp ioctl checks, 64
+same-handle mapping lifecycles and async timestamp retirement. Two
+compiled negative controls caught delayed reuse and release by handle.
+Both kernel builds and 82 test files passed. The allocation scan
+reproduced 178 baseline findings. The full source audit remains
+`not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `e984cf1f8f700af12236ad652109ca800c5dcada` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-names-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`c51d501ef3736fae5571a6698a343361a870cf1dff4296b5a8836ec0728d5b97`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

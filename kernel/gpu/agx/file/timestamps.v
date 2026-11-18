@@ -5,11 +5,11 @@ import drm.asahi
 import drm.gem
 import gpu.agx.gpu
 
-// IDs stay reserved while a detached mapping has captures. No pointer into
-// the movable namespace array escapes. The retained entry also pins GpuFile
+// The base VA stays reserved while a mapping has captures. Users may reuse
+// the name after UNBIND. The retained entry pins GpuFile
 // through close(), including the interval before a submission has a VM pin.
 struct G13TimestampCapture {
-	id u32
+	va u64
 	address u64
 }
 
@@ -36,13 +36,13 @@ fn (mut f GpuFile) capture_g13_timestamp(timestamp asahi.Timestamp) (int, G13Tim
 		if u64(timestamp.offset) + 8 > object.size { return -34, G13TimestampCapture{} }
 		if object.references == ~u64(0) { return -12, G13TimestampCapture{} }
 		object.references++
-		return 0, G13TimestampCapture{id: object.id, address: object.va + u64(timestamp.offset)}
+		return 0, G13TimestampCapture{va: object.va, address: object.va + u64(timestamp.offset)}
 	}
 	return -2, G13TimestampCapture{}
 }
 
 // Caller holds file.lock. Global timestamp mappings do not depend on any
-// userspace VM. Missing managers keep their GEM owner and ID for a later retry.
+// userspace VM. Missing managers keep their GEM owner and VA for a later retry.
 fn (mut f GpuFile) reap_detached_timestamp_objects_locked() {
 	manager := gpu.get_global_manager() or { return }
 	mut gpu_manager := unsafe { manager }
@@ -56,11 +56,11 @@ fn (mut f GpuFile) reap_detached_timestamp_objects_locked() {
 }
 
 fn (mut f GpuFile) release_g13_timestamp(capture G13TimestampCapture) {
-	if capture.id == 0 { return }
+	if capture.va == 0 { return }
 	f.lock.acquire()
 	defer { f.lock.release() }
 	for index in 0 .. f.timestamp_objects.len {
-		if f.timestamp_objects[index].id != capture.id { continue }
+		if f.timestamp_objects[index].va != capture.va { continue }
 		assert f.timestamp_objects[index].references != 0
 		f.timestamp_objects[index].references--
 		f.reap_detached_timestamp_objects_locked()
@@ -95,7 +95,7 @@ fn (mut f GpuFile) capture_g13_timestamps(input [3]asahi.Timestamps,
 	mut references G13TimestampReferences) int {
 	for pipe in 0 .. 3 {
 		for phase in 0 .. 2 {
-			if references.entries[pipe][phase].id != 0 { return -22 }
+			if references.entries[pipe][phase].va != 0 { return -22 }
 		}
 	}
 	for pipe in 0 .. 3 {

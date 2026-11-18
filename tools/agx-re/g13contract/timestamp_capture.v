@@ -7,11 +7,11 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		'f.lock.acquire()', 'object.id != timestamp.handle || object.detached',
 		'timestamp.offset > ~u32(0) - u32(8)', 'return -22',
 		'u64(timestamp.offset) + 8 > object.size', 'return -34',
-		'object.references++', 'address: object.va + u64(timestamp.offset)', 'return -2'],
+		'object.references++', 'va: object.va, address: object.va + u64(timestamp.offset)', 'return -2'],
 		'Timestamp capture follows null/lookup/overflow/range ordering and retains a stable scalar identity')!
 	require(!lookup.contains('% 8') && !lookup.contains('& 7'), 'Legacy firmware timestamps allow byte offsets')!
 	batch := captures.all_after('fn (mut f GpuFile) capture_g13_timestamps(')
-	require_order(batch, ['references.entries[pipe][phase].id != 0', 'return -22',
+	require_order(batch, ['references.entries[pipe][phase].va != 0', 'return -22',
 		'input[pipe].start', 'input[pipe].end', 'f.capture_g13_timestamp(timestamp)',
 		'if code != 0 { f.release_g13_timestamps(mut references); return code }',
 		'references.entries[pipe][phase] = capture'], 'Owned output cannot be overwritten; failed prefixes roll back')!
@@ -30,7 +30,7 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		'gpu_manager.unmap_g13_timestamp_buffer(object.va, object.size)', 'gem.unref(object.obj)',
 		'f.timestamp_objects.delete(index)'], 'Detached timestamps retain mapping and BO until the final capture and available manager')!
 	release := section(captures, 'fn (mut f GpuFile) release_g13_timestamp(', '// Run outside GpuManager.lock', 'Capture release')!
-	require_order(release, ['capture.id == 0', 'f.lock.acquire()', 'f.timestamp_objects[index].id != capture.id',
+	require_order(release, ['capture.va == 0', 'f.lock.acquire()', 'f.timestamp_objects[index].va != capture.va',
 		'f.timestamp_objects[index].references--', 'f.reap_detached_timestamp_objects_locked()'], 'Release resolves retained identities under the file lock')!
 	registry := section(file, 'fn reap_open_detached_g13_queues()', 'pub fn (mut f GpuFile) ioctl_queue_destroy(', 'Worker timestamp retry')!
 	require_order(registry, ['file_map_lock.acquire()', 'owned.lock.acquire()',

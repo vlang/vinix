@@ -91,9 +91,8 @@ pub mut:
 	objects           agxbo.Table
 	g17_queues        []G17QueueOwnership
 	g13_queues        []G13QueueOwnership
-	timestamp_objects []TimestampObject
+	timestamp_objects []TimestampObject // sorted by name, including detached records
 	next_queue_id     u32
-	next_timestamp_id u32
 	owner_process_id  u32
 	owner_key         u64
 	ioctl_abi         u32 // zero until the first driver request selects a dialect
@@ -156,7 +155,6 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 	mut f := &GpuFile{
 		dev: unsafe { dev }
 		next_queue_id: 1
-		next_timestamp_id: 1
 		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
 	}
@@ -495,30 +493,18 @@ fn (mut f GpuFile) allocate_queue_id_locked() ?u32 {
 	return none
 }
 
-fn (mut f GpuFile) allocate_timestamp_id_locked() ?u32 {
-	mut candidate := f.next_timestamp_id
-	if candidate == 0 {
-		candidate = 1
-	}
-	start := candidate
-	for {
-		mut used := false
-		for object in f.timestamp_objects {
-			if object.id == candidate {
-				used = true
-				break
-			}
-		}
-		if !used {
-			f.next_timestamp_id = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
-			return candidate
-		}
-		candidate = if candidate == ~u32(0) { u32(1) } else { candidate + 1 }
-		if candidate == start {
-			return none
+// Return the lowest free visible name and its insertion index. Detached
+// mappings keep their place in the array but own only their VA and backing.
+fn (mut f GpuFile) allocate_timestamp_id_locked() (u32, int) {
+	mut candidate := u32(1)
+	for index, object in f.timestamp_objects {
+		if object.id > candidate { return candidate, index }
+		if object.id == candidate && !object.detached {
+			if candidate == ~u32(0) { return 0, index }
+			candidate++
 		}
 	}
-	return none
+	return candidate, f.timestamp_objects.len
 }
 
 // Userspace names belong to the file. Callers hold file.lock.
@@ -975,18 +961,24 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				return map_code
 			}
 			f.lock.acquire()
-			id := f.allocate_timestamp_id_locked() or {
+			id, slot := f.allocate_timestamp_id_locked()
+			if id == 0 {
 				f.lock.release()
 				gpu_manager.unmap_g13_timestamp_buffer(va, request.range)
 				gem.unref(obj)
-				return -24
+				return -16
 			}
-			f.timestamp_objects << TimestampObject{
+			object := TimestampObject{
 				id: id
 				va: va
 				size: request.range
 				obj: obj
 			}
+			f.timestamp_objects << object
+			for index := f.timestamp_objects.len - 1; index > slot; index-- {
+				f.timestamp_objects[index] = f.timestamp_objects[index - 1]
+			}
+			f.timestamp_objects[slot] = object
 			f.lock.release()
 			request.object_handle = id
 			return 0

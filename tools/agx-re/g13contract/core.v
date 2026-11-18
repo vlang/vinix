@@ -1088,6 +1088,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Fresh G13 RTKit sessions echo the full OSLog counter on the negotiated channel and ignore reserved channel bits',
 		'RTKit filters unknown crash notifications and decodes bounded strings, time, mailbox history and exception records',
 		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
+		'Timestamp BIND takes the lowest free name while prior captures retain and release their original VA across UNBIND and reuse',
 		'Timestamp BIND propagates aperture ENOSPC, occupied-leaf EBUSY and table-allocation ENOMEM through both ABIs with unpublished VA rollback',
 		'host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',

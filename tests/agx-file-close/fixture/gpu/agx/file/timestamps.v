@@ -141,18 +141,23 @@ fn check_timestamp_bindings() {
 		}
 		gpu.fail_timestamp_map(0)
 		// The output field can name a live mapping without replacing it.
-		file.next_timestamp_id = ~u32(0)
 		mut first := timestamp_bind(shared.handle, u32(7), 0, page, ioctl.asahi_bind_object_usage_timestamps)
-		assert file.ioctl_gem_bind_object(unsafe { &first }) == 0 && first.object_handle == ~u32(0); cases++
+		assert file.ioctl_gem_bind_object(unsafe { &first }) == 0 && first.object_handle == 1; cases++
 		mut second := timestamp_bind(shared.handle, first.object_handle, page, page, ioctl.asahi_bind_object_usage_timestamps)
-		assert file.ioctl_gem_bind_object(unsafe { &second }) == 0 && second.object_handle == 1; cases++
+		assert file.ioctl_gem_bind_object(unsafe { &second }) == 0 && second.object_handle == 2; cases++
 		assert file.timestamp_objects.len == 2 && shared.references == 3
 		mut remove := timestamp_unbind(first.object_handle)
 		assert file.ioctl_gem_bind_object(unsafe { &remove }) == 0 && file.timestamp_objects.len == 1 && shared.references == 2; cases++
 		assert file.timestamp_objects[0].id == second.object_handle
+		mut reused := asahi.GemBindObject{op: first.op, flags: first.flags, handle: first.handle,
+			range: first.range, object_handle: second.object_handle}
+		assert file.ioctl_modern_gem_bind_object(unsafe { &reused }) == 0
+		assert reused.object_handle == 1, 'BIND must reuse the lowest free name'
+		assert file.timestamp_objects[0].id == reused.object_handle && file.timestamp_objects[1].id == second.object_handle
+		assert file.timestamp_objects.len == 2 && shared.references == 3; cases++
 		unmaps_before_close := gpu.unmaps()
 		assert file.close() && foreign.close() && gem.live() == 0
-		assert gpu.unmaps() == unmaps_before_close + 1
+		assert gpu.unmaps() == unmaps_before_close + 2
 	}
-	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, ENOMEM, EBUSY and ENOSPC under both ABIs, missing/zero/foreign unbind names, retained unavailable-manager owners, header precedence, ID wrap, sibling preservation and final release passed')
+	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, ENOMEM, EBUSY and ENOSPC under both ABIs, missing/zero/foreign unbind names, retained unavailable-manager owners, header precedence, lowest-free name reuse, sibling preservation and final release passed')
 }
