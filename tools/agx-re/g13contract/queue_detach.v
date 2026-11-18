@@ -8,6 +8,11 @@ fn check_queue_detach_local(file string, pending string, workqueue string, manag
 		'if g13_resources != unsafe { nil } {', 'q.detached = true',
 		'f.reap_detached_g13_queues_locked()', 'f.lock.release()', 'return 0',
 		'mut gpu_manager := unsafe { f.registration_manager }', 'q.destroy()', 'return -2'], 'G13 namespace removal precedes fallible physical retirement; legacy backend retains its path')!
+	require_order(destroy, ['if g13_resources != unsafe { nil } {', 'if modern {', 'q.destroy()',
+		'record := unsafe { q }', 'f.queues.delete(i)',
+		'f.g13_queues[g13_index].queue_id = 0',
+		'f.next_queue_id = request.queue_id', 'workqueue.free_workqueue(record)',
+		'f.reap_orphaned_g13_queues_locked()'], 'Modern queue name reuse keeps the original backing owner')!
 	reap := section(file, 'fn (mut f GpuFile) reap_detached_g13_queues_locked()', '// The registry lock pins', 'G13 detached owner retirement')!
 	require_order(reap, ['mut gpu_manager := unsafe { f.registration_manager }', 'if gpu_manager == unsafe { nil } { return }',
 		'if !q.detached { continue }', 'ownership.queue_id == q.id',

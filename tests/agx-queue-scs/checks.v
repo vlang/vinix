@@ -25,6 +25,7 @@ fn scs_measure_step(mut file GpuFile, request &asahi.QueueCreate, retry bool) {
 		file.lock.release()
 	}
 	assert file.queues.len == 0 && file.g13_queues.len == 0
+	assert file.next_queue_id == 1
 	assert workqueue.active() == 0 && gpu.active_queues() == 0
 }
 
@@ -50,13 +51,11 @@ pub fn measure_scs_rejection() {
 		request := asahi.QueueCreate{ vm_id: 1, render_scs_layout: [u64(1), 0]! }
 		for retry in [false, true]! {
 			for _ in 0 .. 20 {
-				file.next_queue_id = 1
 				scs_measure_step(mut file, unsafe { &request }, retry)
 			}
 			for batch in 0 .. 3 {
 				before_blocks, before_bytes := live_record_heap()
 				for _ in 0 .. 1000 {
-					file.next_queue_id = 1
 					scs_measure_step(mut file, unsafe { &request }, retry)
 				}
 				after_blocks, after_bytes := live_record_heap()
@@ -138,7 +137,7 @@ pub fn run_modern_scs_checks() {
 					assert file.queues[0].usc_base == request.usc_exec_base
 					assert file.close() && vm.destroyed
 				} else {
-					assert request.queue_id == 73 && file.queues.len == 0
+					assert request.queue_id == 73 && file.queues.len == 0 && file.next_queue_id == 1
 					assert file.capture_submission_queue(1) == none
 					if mode >= 4 {
 						assert C.__asan_address_is_poisoned(workqueue.last_record()) != 0, 'unpublished logical queue metadata must be freed'
@@ -150,8 +149,7 @@ pub fn run_modern_scs_checks() {
 						if mode != 5 {
 							assert voidptr(resource) == voidptr(scs_resource) && resource.calls == 1
 						}
-						file.next_queue_id = 1
-						assert (file.allocate_queue_id_locked() or { panic('retained ID') }) == 2
+						assert file.g13_queues[0].queue_id == 0, 'failed modern creation retains backing without reserving its public name'
 						if mode == 8 {
 							for _ in 0 .. 3 {
 								assert !file.close() && !vm.destroyed && !resource.record_disposed

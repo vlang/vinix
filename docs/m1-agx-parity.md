@@ -565,6 +565,25 @@ The restored archive passed the full inventory check for
 `bundle.tar.gz` SHA-256 is
 `b5dbe0fd5b3ab22c8eaefeaa2a6899fdbf068613ed5d61f19688d5631936b02d`.
 
+Modern G13 `QUEUE_CREATE` now uses the lowest free ID. A failed create
+returns its reservation even when firmware backing needs cleanup.
+`QUEUE_DESTROY` returns the ID immediately and frees the logical record.
+Existing captures and accepted jobs retain the original physical queue
+and its VM while the worker retires it. Reusing the name selects a new
+physical owner. This follows the pinned Asahi namespace policy. [Asahi queue create and destroy](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L1277)
+
+The registered ioctl fixture passed same-name replacement with the old
+capture still held and an injected old-owner retirement retry. The
+file-close and async sanitizer suites, 82 V test files, and both kernel
+builds passed. A host probe ran 6,000 render scratch rejections with no
+retained blocks or consumed names. The allocation scan repeated 178
+baseline findings. The pinned source audit remains `not_equivalent`.
+
+The verified archive for `b60d2eacbaefb8608b81bf6c2c40fbf62c19556c` plus `source.diff` is in
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-queue-names-20261118.0j8Zqy/`.
+`bundle.tar.gz` SHA-256 is
+`0ba28b05fc3c3a06731a677f279dde36f8df8bbd701541d9defb90b4b49b2fb6`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 
@@ -1021,9 +1040,9 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | --- | --- |
 | Userspace ABI | Native G13 registers the legacy interface and twelve modern extensible operations, selected per file. Modern flat packets and combined syncs reach the scheduler. GEM_MADVISE records private-object advice with resident contents; complete request/sync/backing semantics and matched Mesa integration remain incomplete. |
 | Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. The file worker tracks publication FIFO per queue without a fixed lookup limit. Whole-batch ring/event readiness and atomic publication are implemented. Finished fences use wrapping 32-bit per-queue numbers. Private input copies keep each independent native fence and the latest fence per ordered context. Own-queue native fences are elided. The pinned Asahi source documents that compute can finish before earlier render work on the same context. Vinix keeps both fences in that case. Full scheduler policy and timeline-chain equivalence remain open. [Asahi queue submission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L723) |
-| Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
+| Queue destruction | G13 queue names disappear immediately. A modern file can reuse the ID before the original queue drains. Submission captures and accepted work retain their physical queue through copying, callbacks and final retirement. Invalidation failures retain backing. |
 | VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts. Idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and firmware-slot eligibility still differ. |
-| Failed queue construction | The constructor transfers a quarantined record to its file before releasing the manager lock. The file adopts it even if shutdown has released the backing. The worker retries unpublished G13 resource graphs independently of queue and VM names. Successful release returns the reserved queue ID and allows final VM retirement. |
+| Failed queue construction | The constructor transfers a quarantined record to its file before releasing the manager lock. The file adopts it even if shutdown has released the backing. Modern G13 returns the ID at failure. The worker retries unpublished backing and releases its VM ownership after cleanup. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
 | Event publication capacity | Publication applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. Whole-batch readiness checks all three pipes before publication. Preparation grows beyond the inline 127 tickets through owned overflow blocks; it is no longer capped at 127. These selected contracts do not establish complete scheduler equivalence. |

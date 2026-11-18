@@ -12,13 +12,14 @@ fn check_queue_priority_local(file string, ioctl string, gpu string) ! {
 		'firmware_priority := if manager.hw_config.gpu_gen == .g13 {',
 		'ioctl.asahi_priority_realtime - request.priority', '} else { request.priority }',
 		'f.lock.acquire()', 'defer { f.lock.release() }', 'vm := f.find_vm(request.vm_id)',
-		'id := f.allocate_queue_id_locked()',
+		'id := f.allocate_queue_id_locked()', 'retained_id := if reuse_name { u32(0) } else { id }',
+		'defer { if reuse_name && !published { f.next_queue_id = id } }',
 		'workqueue.new_workqueue(id, vm.id, firmware_priority, request.queue_caps)',
 		'gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm, unsafe { &retained }) or {',
 		'if retained != unsafe { nil }',
-		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }',
+		'f.g13_queues << G13QueueOwnership{ queue_id: retained_id, vm_id: vm.id, resources: retained }',
 		'queue.destroy()', 'workqueue.free_workqueue(queue)', 'return -12',
-		'f.queues << wq', 'request.queue_id = id'], 'Vinix G13 priority and VM borrow lifetime')!
+		'f.queues << wq', 'request.queue_id = id', 'published = true'], 'Vinix G13 priority and VM borrow lifetime')!
 	require(create.count('f.lock.acquire()') == 1 && create.count('f.lock.release()') == 1,
 		'Queue creation must hold one file lock through VM borrow and publication')!
 	require(create.count('workqueue.free_workqueue(queue)') == 2, 'Both unpublished logical queue failure paths must free metadata')!

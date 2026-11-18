@@ -11,6 +11,7 @@ import gpu.agx.workqueue
 import klock
 
 struct G13QueueOwnership {
+mut:
 	queue_id u32
 	vm_id u32
 	resources &gpu.G13QueueResources

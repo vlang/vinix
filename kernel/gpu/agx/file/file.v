@@ -50,7 +50,8 @@ struct G17QueueOwnership {
 }
 
 struct G13QueueOwnership {
-	queue_id  u32
+mut:
+	queue_id  u32 // zero when backing has no logical queue or name reservation
 	vm_id     u32
 	resources &gpu.G13QueueResources = unsafe { nil }
 }
@@ -456,9 +457,8 @@ fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
 	return if retired { 0 } else { -5 }
 }
 
-// Reserve a nonzero per-open queue ID. Failed queue construction may leave a
-// hole, so wraparound also checks live IDs instead of assuming monotonic IDs
-// can never be exhausted.
+// Reserve a nonzero per-open queue ID. Modern G13 returns freed names to
+// next_queue_id. Legacy G13 also checks ID reservations on retained backing.
 fn (mut f GpuFile) allocate_queue_id_locked() ?u32 {
 	mut candidate := f.next_queue_id
 	if candidate == 0 {
@@ -1069,11 +1069,11 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 }
 
 pub fn (mut f GpuFile) ioctl_queue_create(data &ioctl.DrmAsahiQueueCreate) int {
-	return f.create_queue(data, 0, [u64(0), 0]!)
+	return f.create_queue(data, 0, [u64(0), 0]!, false)
 }
 
 // Install immutable queue input before publishing its name under file.lock.
-fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, render_scs_layout [2]u64) int {
+fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, render_scs_layout [2]u64, modern bool) int {
 	mut request := unsafe { data }
 	known_caps := ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_blit | ioctl.asahi_queue_cap_compute
 	if request.extensions != 0 || request.flags != 0 || request.pad != 0 || request.priority > ioctl.asahi_priority_realtime
@@ -1096,6 +1096,10 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 	// Keep the VM and its page table alive until the new queue is installed.
 	vm := f.find_vm(request.vm_id) or { return -2 }
 	id := f.allocate_queue_id_locked() or { return -24 } // EMFILE
+	reuse_name := modern && manager.hw_config.gpu_gen == .g13
+	retained_id := if reuse_name { u32(0) } else { id }
+	mut published := false
+	defer { if reuse_name && !published { f.next_queue_id = id } }
 	wq := workqueue.new_workqueue(id, vm.id, firmware_priority, request.queue_caps) or {
 		return -12
 	}
@@ -1137,7 +1141,7 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm, unsafe { &retained }) or {
 			// Adopt the record even if shutdown already released its backing.
 			if retained != unsafe { nil } {
-				f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }
+				f.g13_queues << G13QueueOwnership{ queue_id: retained_id, vm_id: vm.id, resources: retained }
 			}
 			mut queue := unsafe { wq }
 			queue.destroy()
@@ -1154,7 +1158,7 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 		if !released {
 			// Failed invalidation keeps the graph and VM alive through the
 			// existing orphan-owner retry path, independently of this name.
-			f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: g13_resources }
+			f.g13_queues << G13QueueOwnership{ queue_id: retained_id, vm_id: vm.id, resources: g13_resources }
 		}
 		logical.destroy()
 		workqueue.free_workqueue(logical)
@@ -1176,6 +1180,7 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 		}
 	}
 	request.queue_id = id
+	published = true
 	return 0
 }
 
@@ -1204,9 +1209,8 @@ fn (mut f GpuFile) reap_detached_g13_queues_locked() {
 	}
 }
 
-// Failed construction may retain a GPU graph without installing a logical
-// queue. Retry that graph independently of the file/VM name lifetime, while
-// every published or captured queue keeps its original owner installed.
+// Failed construction or modern queue destruction may leave backing without
+// a logical queue. Retry that backing independently of the file/VM name.
 // Caller holds file.lock; physical release retains its manager/job guards.
 fn (mut f GpuFile) reap_orphaned_g13_queues_locked() {
 	mut gpu_manager := unsafe { f.registration_manager }
@@ -1241,6 +1245,10 @@ fn reap_open_detached_g13_queues() {
 }
 
 pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int {
+	return f.destroy_queue(data, false)
+}
+
+fn (mut f GpuFile) destroy_queue(data &ioctl.DrmAsahiQueueDestroy, modern bool) int {
 	request := unsafe { data }
 	if request.extensions != 0 || request.pad != 0 {
 		return -22
@@ -1267,10 +1275,22 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 				}
 			}
 			if g13_resources != unsafe { nil } {
-				// Hide the queue while jobs hold it. The worker or close
-				// retries physical retirement through its original manager.
-				q.detached = true
-				f.reap_detached_g13_queues_locked()
+				if modern {
+					// SUBMIT captures scalars and the physical owner under file.lock.
+					// The name and logical record can go while that owner is pinned.
+					q.destroy()
+					record := unsafe { q }
+					f.queues.delete(i)
+					f.g13_queues[g13_index].queue_id = 0
+					if f.next_queue_id == 0 || request.queue_id < f.next_queue_id {
+						f.next_queue_id = request.queue_id
+					}
+					workqueue.free_workqueue(record)
+					f.reap_orphaned_g13_queues_locked()
+				} else {
+					q.detached = true
+					f.reap_detached_g13_queues_locked()
+				}
 				f.reap_detached_vms_locked()
 				f.lock.release()
 				return 0

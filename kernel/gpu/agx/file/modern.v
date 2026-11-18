@@ -159,7 +159,7 @@ pub fn (mut f GpuFile) ioctl_modern_queue_create(data &asahi.QueueCreate) int {
 		queue_id:   data.queue_id
 		queue_caps: ioctl.asahi_queue_cap_render | ioctl.asahi_queue_cap_compute
 	}
-	code := f.create_queue(unsafe { &old }, data.usc_exec_base, data.render_scs_layout)
+	code := f.create_queue(unsafe { &old }, data.usc_exec_base, data.render_scs_layout, true)
 	mut request := unsafe { data }
 	request.queue_id = old.queue_id
 	return code
@@ -167,7 +167,7 @@ pub fn (mut f GpuFile) ioctl_modern_queue_create(data &asahi.QueueCreate) int {
 
 pub fn (mut f GpuFile) ioctl_modern_queue_destroy(data &asahi.QueueDestroy) int {
 	old := ioctl.DrmAsahiQueueDestroy{ queue_id: data.queue_id }
-	return f.ioctl_queue_destroy(unsafe { &old })
+	return f.destroy_queue(unsafe { &old }, true)
 }
 
 // Asahi snapshots the entire strided batch before any mapping mutation, then

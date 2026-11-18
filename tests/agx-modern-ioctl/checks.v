@@ -8,6 +8,7 @@ import gpu.agx.gpu
 import gpu.agx.mmu
 import gpu.agx.params
 import gpu.agx.pgtable
+import gpu.agx.workqueue
 import memory
 import os
 import usercopy
@@ -359,19 +360,40 @@ fn check_modern_queue_and_object() {
 	file_map[0x4444] = unsafe { &file }
 	mut queue := asahi.QueueCreate{ vm_id: 1, priority: 1, usc_exec_base: 0x120000000 }
 	usercopy.configure(unsafe { u64(&queue) }, sizeof(queue), -1)
+	workqueue.fail_next()
+	assert drm.invoke(&device, 0x4444, asahi.queue_create, sizeof(queue), 3, unsafe { voidptr(&queue) }) == -12
+	assert queue.queue_id == 0
+	workqueue.heap_next_record(true)
 	assert drm.invoke(&device, 0x4444, asahi.queue_create, sizeof(queue), 3, unsafe { voidptr(&queue) }) == 0
-	assert queue.queue_id != 0 && file.queues.len == 1
+	assert queue.queue_id == 1 && file.queues.len == 1
 	assert file.queues[0].usc_base == queue.usc_exec_base && file.queues[0].caps == 5
+	old_record := file.queues[0]
 	captured := file.capture_submission_queue(queue.queue_id) or { panic('modern capture') }
 	assert captured.usc_base == queue.usc_exec_base && captured.resources.has_file_references()
 	destroy := asahi.QueueDestroy{ queue_id: queue.queue_id, pad: 0xffffffff }
+	usercopy.configure(unsafe { u64(&destroy) }, sizeof(destroy), -1)
 	assert drm.invoke(&device, 0x4444, asahi.queue_destroy, sizeof(destroy), 1, unsafe { voidptr(&destroy) }) == 0
 	assert file.capture_submission_queue(queue.queue_id) == none
 	assert !captured.resources.released, 'captured modern queue must survive name deletion'
+	assert file.queues.len == 0 && file.g13_queues.len == 1
+	assert C.__asan_address_is_poisoned(old_record) != 0, 'capture owns only the physical queue'
+	mut replacement := asahi.QueueCreate{vm_id: 1, usc_exec_base: 0x160000000}
+	usercopy.configure(unsafe { u64(&replacement) }, sizeof(replacement), -1)
+	assert drm.invoke(&device, 0x4444, asahi.queue_create, sizeof(replacement), 3, unsafe { voidptr(&replacement) }) == 0
+	assert replacement.queue_id == queue.queue_id && file.g13_queues.len == 2, 'a pinned old queue must not reserve the name'
+	fresh := file.capture_submission_queue(replacement.queue_id) or { panic('replacement capture') }
+	assert fresh.usc_base == replacement.usc_exec_base && voidptr(fresh.resources) != voidptr(captured.resources)
+	mut old := unsafe { captured.resources }
+	old.failures = 1
 	release_submission_queue(captured)
-	file.lock.acquire()
-	file.reap_detached_g13_queues_locked()
-	file.lock.release()
+	reap_open_detached_g13_queues()
+	assert file.g13_queues.len == 2 && !old.released && !fresh.resources.released
+	reap_open_detached_g13_queues()
+	assert old.released && old.record_disposed && !fresh.resources.released
+	assert file.queues.len == 1 && file.g13_queues.len == 1
+	release_submission_queue(fresh)
+	usercopy.configure(unsafe { u64(&destroy) }, sizeof(destroy), -1)
+	assert drm.invoke(&device, 0x4444, asahi.queue_destroy, sizeof(destroy), 1, unsafe { voidptr(&destroy) }) == 0
 	assert file.queues.len == 0 && file.g13_queues.len == 0
 	mut object := asahi.GemCreate{ size: 0x4001, pad: 0xffffffff }
 	usercopy.configure(unsafe { u64(&object) }, sizeof(object), -1)
@@ -383,5 +405,5 @@ fn check_modern_queue_and_object() {
 	file_map.delete(0x4444)
 	assert file.close() && vm.destroyed && gem.live() == 0
 	memory.assert_released()
-	println('AGX modern queue/GEM ioctls: registered creation stores USC before publication, retained captures survive name removal, final ownership drains and rounded objects keep wire output semantics')
+	println('AGX modern queue/GEM ioctls: failed creation returns its name, replacement reuses a pinned queue name, retirement retries the old owner, and rounded objects keep wire output semantics')
 }

@@ -3,7 +3,7 @@ module g13contract
 import g13layout
 
 fn logical_queue_contract(file string, fake string, queue string) ! {
-	require(file.count('workqueue.free_workqueue(') == 6 && fake.count('workqueue.free_workqueue(') == 2, 'All logical queue owner and failure paths dispose metadata')!
+	require(file.count('workqueue.free_workqueue(') == 7 && fake.count('workqueue.free_workqueue(') == 2, 'All logical queue owner and failure paths dispose metadata')!
 	late := section(file, '// Asahi reserves render scratch', '\tf.queues << wq', 'Unpublished render-scratch rejection')!
 	require_order(late, ['release_g13_queue_resources(g13_resources)', 'if !released',
 		'resources: g13_resources', 'logical.destroy()', 'workqueue.free_workqueue(logical)',
