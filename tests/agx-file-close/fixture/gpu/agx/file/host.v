@@ -50,6 +50,8 @@ fn (objects &Objects) valid_mmap_range(offset u64, length u64) bool { return obj
 struct GpuFile {
 mut:
 	lock              klock.Lock
+	dev               &drm.DrmDevice = unsafe { nil }
+	owner_key         u64
 	queues            []&workqueue.WorkQueue
 	g13_queues        []G13QueueOwnership
 	g17_queues        []G17QueueOwnership
@@ -165,6 +167,7 @@ pub fn run_checks() {
 	check_bind_replacements()
 	check_global_params()
 	check_global_params_device()
+	check_timestamp_registration()
 	check_timestamp_bindings()
 	check_timestamp_captures()
 	check_timestamp_publication_storage()

@@ -1,16 +1,8 @@
 module file
 
-import drm
 import drm.asahi
 import drm.gem
 import drm.ioctl
-
-// Backing constructors are injected in this transport fixture. The real
-// mapping, queue, close and timestamp handlers run in the surrounding suite.
-pub fn new_gpu_file(_dev &drm.DrmDevice, _owner u64) ?&GpuFile {
-	assert file_map_lock.is_held(), 'registry must serialize first-file construction'
-	return none
-}
 
 pub fn (mut f GpuFile) ioctl_gem_mmap_offset(data &ioctl.DrmAsahiGemMmapOffset) int {
 	assert data.extensions == 0

@@ -39,7 +39,7 @@ fn check_timestamp_captures() {
 	mut ownership_cases := 0
 	for cycle in 0 .. 64 {
 		gpu.available(true); gpu.set_running(true); gpu.fail_timestamp_map(0)
-		mut file := GpuFile{}
+		mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
 		mut foreign := GpuFile{}
 		file.timestamp_objects.flags |= .noslices
 		foreign.timestamp_objects.flags |= .noslices
@@ -122,7 +122,7 @@ fn check_timestamp_captures() {
 	// Rollback each possible prefix, including duplicate references to one map.
 	for failed in 0 .. 6 {
 		gpu.available(true)
-		mut file := GpuFile{}
+		mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
 		object := gem.create(u32(9000 + failed)); file.objects.add_created(object)
 		id := bind_capture_buffer(mut file, object.handle)
 		mut input := [3]asahi.Timestamps{}
@@ -137,7 +137,7 @@ fn check_timestamp_captures() {
 	}
 	// UNBIND between the first and second individual lookup must retain the
 	// first capture, reject the second, then release the failed prefix once.
-	mut raced := GpuFile{}
+	mut raced := GpuFile{timestamp_manager: gpu.timestamp_manager()}
 	object := gem.create(9100); raced.objects.add_created(object)
 	id := bind_capture_buffer(mut raced, object.handle)
 	mut references := G13TimestampReferences{}

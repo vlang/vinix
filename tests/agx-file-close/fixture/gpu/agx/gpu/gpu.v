@@ -120,6 +120,7 @@ pub fn stop_after_next_timestamp_map() { stop_after_timestamp_map = true }
 
 pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(physical u64, size u64) (int, u64) {
 	assert physical != 0 && size != 0
+	if mgr.state == .stopped { return -19, 0 }
 	timestamp_maps++
 	if timestamp_map_error != 0 { return timestamp_map_error, 0 }
 	if stop_after_timestamp_map {
@@ -190,7 +191,9 @@ pub fn timestamp_manager() &GpuManager {
 
 pub fn replace_manager(replaced bool) {
 	use_replacement_manager = replaced
-	if replaced { replacement_gpu_manager.next_timestamp_va = test_gpu_manager.next_timestamp_va - 0x4000 }
+	if replaced && test_gpu_manager.next_timestamp_va != 0 {
+		replacement_gpu_manager.next_timestamp_va = test_gpu_manager.next_timestamp_va - 0x4000
+	}
 }
 
 pub fn available(value bool) { manager_available = value }

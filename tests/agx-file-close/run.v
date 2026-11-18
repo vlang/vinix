@@ -25,11 +25,11 @@ fn checks() !int {
 		os.symlink('${repo}/kernel/${path}', '${scratch}/${path}')!
 	}
 	source := os.read_file(if os.args.len == 3 && os.args[1] == '--file-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/file.v' })!
-	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport drm.asahi\nimport aarch64.timer\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\n' +
+	production := 'module file\nimport drm\nimport drm.gem\nimport drm.ioctl\nimport drm.asahi\nimport aarch64.timer\nimport gpu.agx.bo as agxbo\nimport gpu.agx.params as agxparams\nimport gpu.agx.gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.vm as agxvm\nimport gpu.agx.workqueue\nimport katomic\nimport memory\nimport proc\n' +
 		section(source, 'fn get_or_create_file(', 'pub fn release_handle(')! +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
 		section(source, 'struct G13SubmissionQueue {', '@[heap]\nstruct G13SubmitCompletion {')! +
-		section(source, 'pub fn release_handle(', 'pub fn new_gpu_file(')! +
+		section(source, 'pub fn release_handle(', '// Tear the file down.')! +
 		section(source, 'fn (mut f GpuFile) mmap_attributes(', '// Caller holds file.lock')! +
 		section(source, 'fn lookup_file(', 'pub fn close_gem_handle(')! +
 		section(source, 'pub fn mmap_attributes_handle(', 'fn ioctl_get_params_handler(')! +

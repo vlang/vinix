@@ -10,6 +10,7 @@ fn main() {
 	os.mkdir_all(state)!
 	mut receipts := []string{}
 	for name, spec in {
+		'bind-selects-global': ['file', 'mut gpu_manager := unsafe { f.timestamp_manager }', 'mut gpu_manager := gpu.get_global_manager() or { gem.unref(obj); return -19 }', 'file.invoke_timestamp_bind:', 'legacy timestamp BIND must use its DRM registration'],
 		'null-handle-offset': ['timestamp', 'if timestamp.handle == 0', 'if timestamp.handle == 0 && timestamp.offset == 0', 'file.check_timestamp_captures:', 'timestamp lookup/overflow/range precedence'],
 		'missing-name-error': ['timestamp', 'return -2, G13TimestampCapture{}', 'return -22, G13TimestampCapture{}', 'file.check_timestamp_captures:', 'timestamp lookup/overflow/range precedence'],
 		'overflow-error': ['timestamp', 'if timestamp.offset > ~u32(0) - u32(8) { return -22,', 'if timestamp.offset > ~u32(0) - u32(8) { return -34,', 'file.check_timestamp_captures:', 'timestamp lookup/overflow/range precedence'],

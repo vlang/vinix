@@ -29,7 +29,7 @@ fn check_timeline_capability_contract(drm string, native string, fake string) ! 
 	require_order(native, ['if !mgr.init(receive_irq, send_irq)', 'base_m1 := chip_id == 0x8103',
 		'mut features := drm.driver_gem | drm.driver_render | drm.driver_compute',
 		'if base_m1 {', 'features |= drm.driver_syncobj_timeline', '}',
-		'agx_drm_driver := &drm.DrmDriver{', 'features: features', 'drm.register_driver(agx_drm_driver)'],
+		'agx_drm_driver := &drm.DrmDriver{', 'features: features', 'drm.register_driver_with_data(agx_drm_driver, voidptr(mgr))'],
 		'Native base M1 enables timeline discovery after firmware initialization')!
 	require(!fake.contains('drm.driver_syncobj_timeline'), 'The fake backend uses a sparse point map')!
 }

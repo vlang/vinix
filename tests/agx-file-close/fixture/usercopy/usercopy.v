@@ -10,11 +10,18 @@ __global last_bytes = u64(0)
 __global last_address = u64(0)
 __global read_fault = u64(0)
 __global read_calls = 0
+__global next_read fn () = unsafe { nil }
 
 pub fn fail_read_at(address u64) { read_fault = address; read_calls = 0 }
+pub fn before_next_read(callback fn ()) { next_read = callback }
 pub fn reads() int { return read_calls }
 pub fn copy_from_user(target voidptr, source u64, size u64) bool {
 	read_calls++
+	if next_read != unsafe { nil } {
+		callback := next_read
+		next_read = unsafe { nil }
+		callback()
+	}
 	if size != 0 && (source == 0 || size - 1 > ~source) { return false }
 	if read_fault != 0 && read_fault >= source && read_fault - source < size { return false }
 	unsafe { C.memcpy(target, voidptr(source), size) }

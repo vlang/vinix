@@ -15,6 +15,8 @@ pub:
 pub struct DrmDevice {
 pub:
 	driver &DrmDriver = unsafe { nil }
+	driver_data voidptr
+pub mut:
 	registered bool = true
 }
 

@@ -92,7 +92,7 @@ pub mut:
 	g17_queues        []G17QueueOwnership
 	g13_queues        []G13QueueOwnership
 	timestamp_objects []TimestampObject // sorted by name, including detached records
-	timestamp_manager &gpu.GpuManager = unsafe { nil } // fixed at first publication
+	timestamp_manager &gpu.GpuManager = unsafe { nil } // owner of this DRM registration
 	next_queue_id     u32
 	owner_process_id  u32
 	owner_key         u64
@@ -155,6 +155,7 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 	}
 	mut f := &GpuFile{
 		dev: unsafe { dev }
+		timestamp_manager: unsafe { &gpu.GpuManager(dev.driver_data) }
 		next_queue_id: 1
 		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
@@ -971,11 +972,11 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				gem.unref(obj)
 				return -22
 			}
-			manager := gpu.get_global_manager() or {
+			mut gpu_manager := unsafe { f.timestamp_manager }
+			if gpu_manager == unsafe { nil } {
 				gem.unref(obj)
 				return -19
 			}
-			mut gpu_manager := unsafe { manager }
 			map_code, va := gpu_manager.map_g13_timestamp_buffer(obj.phys_addr + request.offset, request.range)
 			if map_code != 0 {
 				gem.unref(obj)
@@ -988,8 +989,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				// Storage is already reserved. Hold the shutdown lock through
 				// publication, in the usual file-before-manager lock order.
 				gpu_manager.lock.acquire()
-				if gpu_manager.state == .stopped || (f.timestamp_manager != unsafe { nil }
-					&& voidptr(f.timestamp_manager) != voidptr(gpu_manager)) {
+				if gpu_manager.state == .stopped {
 					publish_code = -19
 				} else {
 					object := TimestampObject{
@@ -998,7 +998,6 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 						size: request.range
 						obj: obj
 					}
-					f.timestamp_manager = gpu_manager
 					f.timestamp_objects << object
 					for index := f.timestamp_objects.len - 1; index > slot; index-- {
 						f.timestamp_objects[index] = f.timestamp_objects[index - 1]

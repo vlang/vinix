@@ -65,6 +65,8 @@ pub mut:
 }
 
 pub struct DrmDevice {
+pub:
+	driver_data voidptr // Immutable for this device's lifetime.
 pub mut:
 	dev_id      u32
 	driver      &DrmDriver = unsafe { nil }
@@ -740,6 +742,13 @@ fn (mut this DrmNode) grow(_handle voidptr, _new_size u64) ? {
 // Register a new DRM device backed by the given driver.
 // Returns a reference to the newly created device or none on failure.
 pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
+	return register_driver_with_data(driver, unsafe { nil })
+}
+
+// Install driver-private context before publishing either device node.
+// The caller keeps the context alive until every reference to the device and
+// its open files is gone, including references that survive unregister.
+pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
 	// Establish the permanent completion's timestamp during DRM startup.
 	syncobj.shared_timeline_stub()
 	drm_devices_lock.acquire()
@@ -755,6 +764,7 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 	next_dev_id++
 
 	mut dev := &DrmDevice{
+		driver_data: driver_data
 		dev_id: id
 		driver: unsafe { driver }
 		registered: true

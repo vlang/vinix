@@ -713,6 +713,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_modern_submit_device_reference(read(os.join_path(base, 'file.rs'))!,
 		read(os.join_path(base, 'queue/mod.rs'))!)!
 	check_timestamp_bind_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!)!
+	check_timestamp_registration_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/drm/drm.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/driver/driver.v'))!)!
 	check_timestamp_bind_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'gpu.rs'))!,
 		read(os.join_path(base, 'gem.rs'))!, read(os.join_path(base, 'mmu.rs'))!)!
 	check_params_device_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
@@ -1093,6 +1095,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Timestamp UNBIND removes the public handle and uses the original manager after global removal or replacement',
 		'Timestamp BIND returns ENODEV if the G13 manager stopped before VA allocation, under the shutdown lock',
 		'Timestamp BIND serializes name publication with G13 shutdown and unwinds a mapped VA if shutdown wins',
+		'First timestamp BIND uses the manager of its original DRM registration across device replacement',
 		'G13 shutdown drains timestamp mappings and reservations from the original UAT before replacement or late capture release',
 		'Timestamp BIND propagates aperture ENOSPC, occupied-leaf EBUSY and table-allocation ENOMEM through both ABIs with unpublished VA rollback',
 		'host workqueue retirement pointer and wrap-safe publication',

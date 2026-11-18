@@ -1225,7 +1225,7 @@ pub fn initialise() {
 		mmap_retain: agx_file.retain_mmap_range_handle
 	}
 
-	agx_driver_inst.drm_dev = drm.register_driver(agx_drm_driver) or {
+	agx_driver_inst.drm_dev = drm.register_driver_with_data(agx_drm_driver, voidptr(mgr)) or {
 		println('agx: Failed to register DRM driver')
 		return
 	}

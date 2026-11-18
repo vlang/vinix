@@ -1,18 +1,99 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module file
 
+import drm
 import drm.gem
 import drm.ioctl
 import drm.asahi
 import gpu.agx.gpu
 import gpu.agx.mmu
 import memory
+import proc
+import usercopy
 
 struct TimestampRange {
 	offset u64
 	size u64
 	bad_header bool
 	bad_backing bool
+}
+
+__global unplugged_timestamp_device &drm.DrmDevice = unsafe { nil }
+
+fn replace_during_timestamp_ioctl() {
+	assert unplugged_timestamp_device.registered
+	unplugged_timestamp_device.registered = false
+	gpu.set_running(false)
+	gpu.replace_manager(true)
+}
+
+fn invoke_timestamp_bind(dev &drm.DrmDevice, key u64, handle u32, modern bool, expected int) {
+	legacy := timestamp_bind(handle, 0x12345678, 0, 0x4000, ioctl.asahi_bind_object_usage_timestamps)
+	if modern {
+		mut request := asahi.GemBindObject{op: legacy.op, flags: legacy.flags, handle: legacy.handle,
+			range: legacy.range, object_handle: legacy.object_handle}
+		before := request
+		address := unsafe { voidptr(&request) }
+		usercopy.configure(u64(address), sizeof(request), -1)
+		assert drm.invoke(dev, key, asahi.gem_bind_object, sizeof(request), 3, address) == expected,
+			'modern timestamp BIND must use its DRM registration'
+		assert request.object_handle == if expected == 0 { u32(1) } else { before.object_handle }
+		if expected != 0 { assert request == before }
+	} else {
+		mut request := legacy
+		address := unsafe { voidptr(&request) }
+		usercopy.configure(u64(address), sizeof(request), -1)
+		assert drm.invoke(dev, key, ioctl.drm_asahi_gem_bind_object, sizeof(request), 3, address) == expected,
+			'legacy timestamp BIND must use its DRM registration'
+		assert request.object_handle == if expected == 0 { u32(1) } else { legacy.object_handle }
+		if expected != 0 { assert request == legacy }
+	}
+}
+
+fn check_timestamp_registration() {
+	proc.enable_owner(true)
+	for _ in 0 .. 64 {
+		for modern in [false, true]! {
+			driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle}
+			original := gpu.timestamp_manager()
+			mut device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: voidptr(original)}
+			key := u64(0x56000)
+			abi := if modern { modern_ioctl_abi } else { legacy_ioctl_abi }
+			mut file := get_or_create_file(voidptr(key), &device) or { panic('original file') }
+			assert file.select_ioctl_abi(abi) && file.timestamp_objects.len == 0
+			bo := gem.create(9500)
+			file.objects.add_created(bo)
+			maps := gpu.maps()
+			unmaps := gpu.unmaps()
+			allocations_before := memory.calls()
+			unplugged_timestamp_device = unsafe { &device }
+			usercopy.before_next_read(replace_during_timestamp_ioctl)
+			invoke_timestamp_bind(&device, key, bo.handle, modern, -19)
+			assert !device.registered && gpu.maps() == maps && gpu.unmaps() == unmaps
+			assert file.timestamp_objects.len == 0 && bo.references == 1 && memory.calls() == allocations_before
+			assert voidptr(file.timestamp_manager) == voidptr(original) && !file.lock.is_held()
+
+			replacement := gpu.timestamp_manager()
+			new_device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: voidptr(replacement)}
+			new_key := key + 1
+			mut new_file := get_or_create_file(voidptr(new_key), &new_device) or { panic('replacement file') }
+			assert new_file.select_ioctl_abi(abi)
+			new_bo := gem.create(9501)
+			new_file.objects.add_created(new_bo)
+			invoke_timestamp_bind(&new_device, new_key, new_bo.handle, modern, 0)
+			assert gpu.maps() == maps + 1 && new_file.timestamp_objects.len == 1 && new_bo.references == 2
+			release_handle(&device, voidptr(key))
+			assert gpu.unmaps() == unmaps && new_bo.references == 2
+			release_handle(&new_device, voidptr(new_key))
+			assert gpu.unmaps() == unmaps + 1 && gem.live() == 0
+			memory.assert_released()
+			unplugged_timestamp_device = unsafe { nil }
+			gpu.replace_manager(false)
+			gpu.set_running(true)
+		}
+	}
+	proc.enable_owner(false)
+	println('G13 timestamp registration: 128 first BIND races after ioctl admission reject the stale device before mapping and admit the replacement open')
 }
 
 fn timestamp_bind(handle u32, output u32, offset u64, size u64, flags u32) ioctl.DrmAsahiGemBindObject {
@@ -42,7 +123,7 @@ fn expect_timestamp_publication_error(mut file GpuFile, handle u32, code int) {
 fn check_timestamp_publication_storage() {
 	memory.assert_released()
 	for cycle in 0 .. 100 {
-		mut file := GpuFile{}
+		mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
 		bo := gem.create(u32(9200 + cycle))
 		file.objects.add_created(bo)
 		memory.fail_allocations(true)
@@ -96,7 +177,7 @@ fn check_timestamp_publication_stop() {
 		for modern in [false, true]! {
 			gpu.available(true)
 			gpu.set_running(true)
-			mut file := GpuFile{}
+			mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
 			bo := gem.create(9300)
 			file.objects.add_created(bo)
 			assert bind_capture_buffer(mut file, bo.handle) == 1
@@ -132,7 +213,7 @@ fn check_timestamp_owner_teardown() {
 	for _ in 0 .. 64 {
 		for modern in [false, true]! {
 			gpu.available(true)
-			mut file := GpuFile{}
+			mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
 			mut replacement := GpuFile{}
 			old_bo := gem.create(9400)
 			new_bo := gem.create(9401)
@@ -158,11 +239,13 @@ fn check_timestamp_owner_teardown() {
 			assert old_bo.references == 3 && original.timestamp_unmaps == old_unmaps + 1
 			gpu.available(true)
 			gpu.replace_manager(true)
+			replacement.timestamp_manager = gpu.timestamp_manager()
 			assert bind_capture_buffer(mut replacement, new_bo.handle) == id
 			assert replacement.timestamp_objects[0].va == capture.va
 			active := gpu.timestamp_manager()
 			refused, empty := file.capture_g13_timestamp(asahi.Timestamp{handle: captured}, active)
 			assert refused == -19 && empty == G13TimestampCapture{} && file.timestamp_objects[1].references == 1
+			gpu.set_running(false)
 			expect_timestamp_publication_error(mut file, old_bo.handle, -19)
 			assert file.timestamp_objects.len == 2 && old_bo.references == 3
 			new_unmaps := active.timestamp_unmaps
@@ -181,6 +264,7 @@ fn check_timestamp_owner_teardown() {
 			assert active.timestamp_unmaps == new_unmaps + 1
 			memory.assert_released()
 			gpu.replace_manager(false)
+			gpu.set_running(true)
 			gpu.available(true)
 		}
 	}
@@ -192,7 +276,7 @@ fn check_timestamp_bindings() {
 	mut cases := 0
 	for cycle in 0 .. 200 {
 		gpu.available(true); gpu.set_running(true); gpu.fail_timestamp_map(0)
-		mut file := GpuFile{}
+		mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
 		file.timestamp_objects.flags |= .noslices
 		mut foreign := GpuFile{}
 		shared := gem.create(u32(1000 + cycle * 4))
@@ -212,7 +296,7 @@ fn check_timestamp_bindings() {
 				for output in [u32(0), u32(1), ~u32(0)]! {
 					for flags in [ioctl.asahi_bind_object_usage_timestamps, u32(0), u32(3)]! {
 						for available in [false, true]! {
-							gpu.available(available)
+							gpu.set_running(available)
 							mut request := timestamp_bind(handle, output, span.offset, span.size, flags)
 							before := request; maps := gpu.maps(); unmaps := gpu.unmaps(); lookups := gpu.lookups()
 							bad_header := span.bad_header || flags != ioctl.asahi_bind_object_usage_timestamps
@@ -224,7 +308,7 @@ fn check_timestamp_bindings() {
 							assert result == expected, 'timestamp BIND expected ${expected}, got ${result}'
 							assert !file.lock.is_held()
 							assert private.references == 1
-							assert gpu.lookups() == lookups + if !bad_header && !missing && !bad_backing { 1 } else { 0 }
+							assert gpu.lookups() == lookups
 							assert gpu.maps() == maps + if expected == 0 { 1 } else { 0 }
 							assert gpu.unmaps() == unmaps
 							cases++
@@ -277,6 +361,7 @@ fn check_timestamp_bindings() {
 			}
 		}
 		gpu.available(true)
+		gpu.set_running(true)
 		for invalid in 0 .. 4 {
 			mut bad := timestamp_bind(shared.handle, ~u32(0), 0, page, ioctl.asahi_bind_object_usage_timestamps)
 			match invalid { 0 { bad.extensions = 1 } 1 { bad.pad = 1 } 2 { bad.vm_id = 1 } else { bad.op = ~u32(0) } }

@@ -445,6 +445,30 @@ The complete archive passed inventory verification. `bundle.tar.gz`
 SHA-256 is
 `2b40fbb62fd04a02ac718aaf3c0703b6d1b69254c5099b56e16344683f0b5e2c`.
 
+Each AGX DRM registration now publishes its own manager with the device.
+The file copies that owner at construction, so even a first timestamp
+BIND admitted before unplug reaches the original manager after replacement.
+Once that manager has stopped, it returns `ENODEV` before reserving a VA
+or writing the UAT. A BIND that wins the shutdown lock can still publish
+on its original device. Asahi also maps through the GPU in its registration.
+[Pinned Asahi timestamp BIND](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L1188-L1218)
+
+The sanitizer suite passed 128 simulated replacements during ioctl input
+copy across both ABIs, with successful binds on the replacement opens.
+The compiled global-manager counterexample reproduced the stale first BIND
+bug. All 18 negative controls reached their designated assertions.
+Both kernel builds, 82 test files and the lifetime review passed. The
+allocation scan reproduced 178 baseline findings. General queue and VM
+teardown and native validation remain open. The source audit remains
+`not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `511b0f663aa65d13996441e9da009cc3629067b5` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-registration-20261118/`.
+The complete archive passed inventory verification. `bundle.tar.gz`
+SHA-256 is
+`a65ab50de61a9f0d093e7c4d3c414a0d3b81a445a84303ef6ea9f3c891f15ea7`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 
