@@ -70,3 +70,26 @@ bytes to the bundle.
 | --- | --- |
 | `bundle.tar.gz` | `feed08607aa5a36a77f0b42f6ee3cf13b6e0ac6967b366a3d8f132ebc9ac0164` |
 | `bundle.tar.gz.inventory.txt` | `448b8b0277adf57dd2cea5063628fa7253b4ed419712e045955a639923d6d794` |
+
+## Sync pointer error order
+
+Modern G13 `SUBMIT` now reserves any required input and output sync spans
+before validating a nonempty sync list's pointer. A failed reservation returns
+`ENOMEM` even for a null or wrapping pointer. If all reservations succeed, a
+bad pointer returns `EFAULT`. Both failure paths release any reserved spans
+and the queue capture before returning. Combined count overflow still returns
+`EOVERFLOW` first. Vinix keeps inline storage for up to 64 records per direction,
+while the pinned Asahi parser reserves a vector for the combined list.
+[Pinned Asahi sync parser](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L199-L231)
+
+The ASan/UBSan suite passed 16 pointer and allocation cases across the
+inline boundary, including failure of the second reservation after the first
+succeeded. The prior handler reproduced `EFAULT` at the new forced-`ENOMEM`
+assertion. The AArch64 and x86-64 builds, 79 V source-contract test files and
+the modern AArch64 generated C checks passed. The allocation scan reported
+the same 177 findings as the baseline. M1 hardware validation remains open.
+
+The archive covers `3435384f345b1ff20327f61ed505dda2b9cf80ea` plus
+`source.diff`. The archive and full restored copy passed verification. It is
+at `/Users/alex/.local/state/vinix/omarchy-m1-sync-pointer-order-20261119.3w3NEw/bundle.tar.gz`
+with SHA-256 `1956cb99f09caf670677739617af60a891b3826f1cab0a949dc4713d25e54d4e`.

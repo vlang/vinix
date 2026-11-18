@@ -39,8 +39,6 @@ pub fn stage_packet_syncs(owner u64, pointer u64, in_count u32, out_count u32) (
 	if in_count > ~u32(0) - out_count { return -75, SyncArray{}, SyncArray{} }
 	count := u64(in_count) + out_count
 	if count == 0 { return 0, SyncArray{}, SyncArray{} }
-	bytes := count * sizeof(asahi.Sync)
-	if pointer == 0 || bytes - 1 > ~pointer { return -14, SyncArray{}, SyncArray{} }
 	mut complete := false
 	defer {
 		if !complete {
@@ -58,6 +56,9 @@ pub fn stage_packet_syncs(owner u64, pointer u64, in_count u32, out_count u32) (
 		if storage == unsafe { nil } { return -12, SyncArray{}, SyncArray{} }
 		outputs.items = unsafe { &SyncItem(storage) }
 	}
+	// Asahi reserves sync storage before attempting any userspace read.
+	bytes := count * sizeof(asahi.Sync)
+	if pointer == 0 || bytes - 1 > ~pointer { return -14, SyncArray{}, SyncArray{} }
 	for index := u64(0); index < count; index++ {
 		mut item := asahi.Sync{}
 		if !usercopy.copy_from_user(unsafe { voidptr(&item) }, pointer + index * sizeof(item), sizeof(item)) {

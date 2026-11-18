@@ -150,6 +150,7 @@ pub fn run_large_sync_checks() {
 		}
 	}
 	check_large_sync_failures(mut file, bytes, input, gate, first, last)
+	check_large_sync_pointer_order(mut file)
 	check_large_sync_backend_lifetimes(mut file, bytes, input, gate, first, last)
 	assert cases == 64
 	println('AGX large syncs: 64 input/output boundary pairs through staging/copy/pending retirement, counts through 1025, last-input waits, last-output publication, immutable snapshots and independent storage pass')
@@ -205,6 +206,33 @@ fn check_large_sync_failures(mut file GpuFile, bytes []u8, input &syncobj.SyncOb
 	assert legacy == -22
 	assert cases == 320
 	println('AGX large sync faults: 320 allocation/copy/lookup failures unwind storage and captures; checked count overflow precedes copying, huge allocations stay fallible, legacy limit stays 64')
+}
+
+fn check_large_sync_pointer_order(mut file GpuFile) {
+	for in_count in [u32(64), 65]! {
+		for out_count in [u32(64), 65]! {
+			spans := int(in_count > 64) + int(out_count > 64)
+			for pointer in [u64(0), ~u64(0) - 15]! {
+				request := asahi.Submit{queue_id: 1, syncs: pointer, in_sync_count: in_count,
+					out_sync_count: out_count}
+				for fail in 0 .. spans + 1 {
+					memory.fail_at(fail)
+					usercopy.reset_reads()
+					code := file.ioctl_modern_submit(unsafe { &request })
+					if fail < spans {
+						assert code == -12, 'sync storage allocation failure must precede an invalid pointer'
+						assert memory.attempts() == fail + 1
+					} else {
+						assert code == -14 && memory.attempts() == spans
+					}
+					assert usercopy.reads() == 0
+					assert_drained(file)
+				}
+			}
+		}
+	}
+	memory.fail_at(-1)
+	println('AGX sync pointers: null and wrapping pointers exercise allocation precedence and cleanup')
 }
 
 fn check_large_sync_backend_lifetimes(mut file GpuFile, bytes []u8, input &syncobj.SyncObj,
