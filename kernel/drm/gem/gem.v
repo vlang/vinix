@@ -106,21 +106,23 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 	if handle == 0 {
 		return none // handle table exhausted
 	}
-
-	// Fallible allocation: a user-sized request must never panic the kernel,
-	// nor take the memory it keeps for itself (memory/reserve.v).
-	phys := if external || !memory.user_room(pages) { unsafe { nil } } else { memory.pmm_alloc_aligned_fallible(pages, alignment / page_size) }
-	if !external && phys == unsafe { nil } {
+	if aligned_size > u64(-1) - next_mmap_offset {
 		return none
 	}
-	if aligned_size > u64(-1) - next_mmap_offset {
-		if !external { memory.pmm_free(phys, pages) }
+
+	// Reserve the unpublished metadata before allocating or retagging backing.
+	storage := memory.malloc_packed_fallible(sizeof(GemObject))
+	if storage == unsafe { nil } { return none }
+	phys := if external || !memory.user_room(pages) { unsafe { nil } } else { memory.pmm_alloc_aligned_fallible(pages, alignment / page_size) }
+	if !external && phys == unsafe { nil } {
+		memory.free(storage)
 		return none
 	}
 	$if arm64 {
 		if pte_extra & memory.pte_uncached != 0 {
 			if !memory.set_ram_direct_map_uncached(u64(phys), aligned_size, true) {
 				memory.pmm_free(phys, pages)
+				memory.free(storage)
 				return none
 			}
 		}
@@ -129,16 +131,19 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 	mmap_off := next_mmap_offset
 	next_mmap_offset += aligned_size
 
-	mut obj := &GemObject{
-		handle:      handle
-		external:    external
-		pte_extra:   pte_extra
-		vm_private_identity: private_identity
-		size:        aligned_size
-		refcount:    1
-		phys_addr:   u64(phys)
-		virt_addr:   u64(phys) + higher_half
-		mmap_offset: mmap_off
+	mut obj := unsafe { &GemObject(storage) }
+	unsafe {
+		*obj = GemObject{
+			handle:      handle
+			external:    external
+			pte_extra:   pte_extra
+			vm_private_identity: private_identity
+			size:        aligned_size
+			refcount:    1
+			phys_addr:   u64(phys)
+			virt_addr:   u64(phys) + higher_half
+			mmap_offset: mmap_off
+		}
 	}
 
 	gem_objects[handle] = obj

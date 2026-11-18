@@ -103,13 +103,16 @@ fn check_refusal_and_original_policy() int {
 		cases++
 	}
 	memory.fail_allocations(true)
+	metadata_before := memory.metadata_frees()
 	if _ := gem.create_aligned_with_cache(16384, 16384, 0, false) { assert false }
 	memory.fail_allocations(false)
-	assert memory.live() == 0 && cpu.count() == 0
+	assert memory.live() == 0 && cpu.count() == 0 && memory.metadata_frees() == metadata_before + 1
 	cases++
 	for missing in 0 .. 8 {
 		memory.prepare(); memory.fail_new_mapping(missing)
+		before := memory.metadata_frees()
 		if _ := gem.create_aligned_with_cache(32768, 16384, 0, false) { assert false }
+		assert memory.metadata_frees() == before + 1
 		assert memory.live() == 0 && count_kind('civac') == 0 && count_kind('tlbi') == 0 && !memory.locked()
 		cases++
 	}
@@ -154,6 +157,39 @@ fn check_refusal_and_original_policy() int {
 	return cases
 }
 
+fn check_metadata_refusal() int {
+	memory.prepare()
+	first := gem.create_aligned_with_cache(16384, 16384, 0, true) or { panic('sentinel GEM') }
+	expected_handle := first.handle + 1
+	expected_offset := first.mmap_offset + first.size
+	before := memory.backing_attempts()
+	memory.fail_metadata(true)
+	for _ in 0 .. 100 {
+		for writeback in [false, true] {
+			if _ := gem.create_aligned_with_cache(16384, 16384, 17, writeback) {
+				panic('metadata OOM must refuse GEM creation')
+			}
+		}
+		if _ := gem.create_external(16384) { panic('metadata OOM must refuse external GEM creation') }
+		assert memory.backing_attempts() == before && memory.live() == 1 && cpu.count() == 0
+		if _ := gem.get_by_handle(expected_handle) { panic('failed constructor published a handle') }
+		visible := gem.get_by_handle(first.handle) or { panic('existing handle disappeared') }
+		assert voidptr(visible) == voidptr(first) && first.refcount == 1
+	}
+	memory.fail_metadata(false)
+	retry := gem.create_aligned_with_cache(16384, 16384, 17, false) or { panic('GEM retry') }
+	assert retry.handle == expected_handle && retry.mmap_offset == expected_offset
+	gem.unref(retry)
+	gem.unref(first)
+	assert memory.live() == 0
+	// The host fixture owns all pointers and can release retained metadata.
+	unsafe {
+		free(voidptr(retry))
+		free(voidptr(first))
+	}
+	return 300
+}
+
 fn check_authorized_aliases() {
 	for reversed in [false, true] {
 		memory.prepare()
@@ -182,6 +218,8 @@ fn main() {
 	lines := check_cache_lines()
 	constructors := check_constructors()
 	refusals := check_refusal_and_original_policy()
+	metadata := check_metadata_refusal()
 	check_authorized_aliases()
 	println('AGX CPU cache: ${lines} cache-line cases, ${constructors} real GEM constructors/final releases, ${refusals} refusal/default-policy cases; actual retag/BBM/cache-loop bodies, full-span validation, WB/NC aliases, PRIME policy, clean-before-retype, TLBI ordering, authorization, retained references and WB-before-PMM reuse passed')
+	println('AGX GEM metadata: ${metadata} injected failures preserve backing, cache state, handle and mmap offset. Backing and retag failures free unpublished metadata.')
 }

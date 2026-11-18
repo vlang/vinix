@@ -20,9 +20,7 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(repo + '/tests/agx-cpu-cache/fixture', scratch, false)!
-	for name, source in {'klock': 'tests/agx-file-close/fixture/klock', 'katomic': 'tests/agx-g13-failure/fixture/katomic'} {
-		os.cp_all(repo + '/' + source, scratch + '/' + name, false)!
-	}
+	os.cp_all(repo + '/tests/agx-file-close/fixture/klock', scratch + '/klock', false)!
 	os.mkdir_all(scratch + '/gpu/agx/bo')!
 	os.cp(overlays['--bo-source'] or { repo + '/kernel/gpu/agx/bo/bo.v' }, scratch + '/gpu/agx/bo/bo.v')!
 	os.cp(overlays['--gem-source'] or { repo + '/kernel/drm/gem/gem.v' }, scratch + '/drm/gem/gem.v')!

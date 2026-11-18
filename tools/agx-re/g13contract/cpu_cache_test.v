@@ -25,6 +25,7 @@ fn test_cpu_cache_guards_require_complete_alias_and_teardown_contract() {
 	}
 	if _ := check_cpu_cache_local(gem, bo, file.replace('lookup_file(handle) or { return 0 }', 'unsafe { &GpuFile(handle) }'), driver, ram, cpu, drm, mmap) { assert false }
 	if _ := check_cpu_cache_local(gem.replace('gem_objects[obj.handle] = unsafe { nil }', ''), bo, file, driver, ram, cpu, drm, mmap) { assert false }
+	if _ := check_cpu_cache_local(gem.replace('memory.free(storage)', ''), bo, file, driver, ram, cpu, drm, mmap) { assert false }
 }
 
 fn test_cpu_cache_reference_requires_inverse_writeback_flag() {

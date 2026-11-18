@@ -624,6 +624,27 @@ The restored archive passed inventory verification for
 `bundle.tar.gz` SHA-256 is
 `0cba7d7b953fe9113daedae7331587f3274c93a91a1b62494ede03a1ffded179`.
 
+`GEM_CREATE` now returns `ENOMEM` when the GEM object record cannot be
+allocated. The shared constructor reserves metadata before allocating
+or retagging backing pages. It frees the record if either later step
+fails, and advances the mmap offset and publishes the handle only after
+both steps succeed. The pinned driver also reserves its GEM record
+fallibly before initializing its backing. [Asahi GEM creation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gem.rs#L280-L311) [DRM shmem constructor](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/rust/kernel/drm/gem/shmem.rs#L340-L372)
+
+The sanitized CPU-cache fixture passed 300 injected metadata refusals,
+confirmed handle and mmap offset reuse on retry, and checked metadata
+release after backing and cache retag failures. The private GEM and
+file-close fixtures, 82 V test files, and both kernel builds passed.
+The allocation scan removed one implicit site on each architecture and
+reported 177 existing findings. The pinned source audit remains
+`not_equivalent`. Validation used host checks and cross-builds.
+
+The restored archive passed inventory verification for
+`5f25413bb3bac398aecb8e9c834f2a159c91a675` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-metadata-20261118.BTXykY/`.
+`bundle.tar.gz` SHA-256 is
+`e27181112076214ec248873d4f65b225fc84786cf31d20e52747db6528d9d33e`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

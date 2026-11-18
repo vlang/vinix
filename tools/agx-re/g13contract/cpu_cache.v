@@ -9,11 +9,13 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 	constructor := section(gem, 'pub fn create_aligned_with_cache(', '// Metadata for a host-owned resource.', 'GEM CPU cache constructor')!
 	require(constructor.contains('create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached })'), 'WRITEBACK must select cacheable aliases')!
 	allocation := section(gem, 'fn create_object(', '// Destroy a GEM object:', 'GEM unpublished cache preparation')!
-	require_order(allocation, ['gem_objects_lock.acquire()', 'memory.pmm_alloc_aligned_fallible',
-		'if aligned_size > u64(-1) - next_mmap_offset', 'if pte_extra & memory.pte_uncached != 0',
+	require_order(allocation, ['gem_objects_lock.acquire()', 'if aligned_size > u64(-1) - next_mmap_offset',
+		'memory.malloc_packed_fallible(sizeof(GemObject))', 'if storage == unsafe { nil } { return none }',
+		'memory.pmm_alloc_aligned_fallible', 'if !external && phys == unsafe { nil }', 'memory.free(storage)',
+		'if pte_extra & memory.pte_uncached != 0',
 		'if !memory.set_ram_direct_map_uncached(u64(phys), aligned_size, true)', 'memory.pmm_free(phys, pages)',
-		'return none', 'next_mmap_offset += aligned_size', 'mut obj := &GemObject{', 'pte_extra:   pte_extra',
-		'vm_private_identity: private_identity', 'gem_objects[handle] = obj'], 'Validate and retag backing before metadata/handle publication')!
+		'memory.free(storage)', 'return none', 'next_mmap_offset += aligned_size', '*obj = GemObject{', 'pte_extra:   pte_extra',
+		'vm_private_identity: private_identity', 'gem_objects[handle] = obj'], 'Reserve metadata fallibly and unwind failed backing before publication')!
 	destroy := section(gem, 'pub fn destroy(', '// Look up a GEM object', 'GEM final cache restoration')!
 	require_order(destroy, ['gem_objects_lock.acquire()', 'gem_objects[obj.handle] = unsafe { nil }', 'gem_objects_lock.release()',
 		'obj.phys_addr != 0 && !obj.external && obj.pte_extra & memory.pte_uncached != 0',

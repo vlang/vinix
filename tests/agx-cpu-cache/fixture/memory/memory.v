@@ -25,6 +25,9 @@ __global leaf_count int
 __global allocations [32]Allocation
 __global allocation_count int
 __global reject_allocation bool
+__global reject_metadata bool
+__global metadata_releases int
+__global pmm_attempts int
 __global omit_leaf = -1
 __global omit_new_leaf = -1
 __global freed int
@@ -46,6 +49,9 @@ pub fn prepare() { cpu.set_probe(probe); cpu.set_root(0x4000); cpu.set_ctr(u64(5
 pub fn live() int { return allocation_count }
 pub fn frees() int { return freed }
 pub fn fail_allocations(value bool) { reject_allocation = value }
+pub fn fail_metadata(value bool) { reject_metadata = value }
+pub fn metadata_frees() int { return metadata_releases }
+pub fn backing_attempts() int { return pmm_attempts }
 pub fn fail_new_mapping(index int) { omit_new_leaf = index }
 pub fn fail_lookup(index int) { omit_leaf = index }
 pub fn initialized(value bool) { vmm_initialised = value }
@@ -60,7 +66,19 @@ pub fn probe(address u64) u64 {
 }
 
 pub fn user_room(pages u64) bool { return pages > 0 && pages <= 16 }
+pub fn malloc_packed_fallible(size u64) voidptr {
+	if reject_metadata { return unsafe { nil } }
+	return unsafe { C.malloc(size) }
+}
+
+pub fn free(storage voidptr) {
+	assert storage != unsafe { nil }
+	unsafe { C.free(storage) }
+	metadata_releases++
+}
+
 pub fn pmm_alloc_aligned_fallible(pages u64, alignment u64) voidptr {
+	pmm_attempts++
 	if reject_allocation { return unsafe { nil } }
 	assert pages <= 16 && alignment > 0 && allocation_count < allocations.len
 	boundary := alignment * 16384
