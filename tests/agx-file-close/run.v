@@ -79,6 +79,9 @@ fn checks() !int {
 	os.write_file('${scratch}/gpu/agx/mmu/identity.v', 'module mmu\nimport klock\nimport gpu.agx.vm as agxvm\n' +
 		section(mmu_source, '__global context_identity_lock', '// Driver-owned backing')!)!
 	drm_source := os.read_file('${repo}/kernel/drm/drm.v')!
+	gem_source := os.read_file('${repo}/kernel/drm/gem/gem.v')!
+	os.write_file('${scratch}/drm/gem/prime_fences.v', 'module gem\nimport memory\n' +
+		section(gem_source, 'pub struct PrimeFence {', '@[heap]\npub struct GemObject')!)!
 	os.cp_all(repo + '/tests/drm-wire/fixture/errno', scratch + '/errno', false)!
 	os.cp(repo + '/tests/agx-modern-ioctl/drm.v', scratch + '/drm/modern_fixture.v')!
 	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport drm.gem\nimport drm.ioctl\nimport usercopy\nimport memory\nimport memory.mmap\nimport errno\n' +

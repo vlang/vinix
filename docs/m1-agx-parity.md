@@ -872,7 +872,7 @@ Native G13 PRIME fds accept `DMA_BUF_IOCTL_SYNC` with `READ`, `WRITE` or
 `RW` at START and END. The handler copies one 64-bit flag word. An unreadable
 word returns `EFAULT`, and missing access bits or unknown flags return
 `EINVAL`. Callers still order GPU work through explicit sync objects.
-Implicit reservation-fence waits remain open. [Pinned ioctl validation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L554-L596) [Pinned G13 completion fences](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L980-L1006)
+That revision covered the empty reservation case. [Pinned ioctl validation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L554-L596) [Pinned G13 completion fences](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L980-L1006)
 
 Both kernel builds, all 82 focused M1 V test files, the DRM wire checks and
 the sanitizer fixtures passed. The PRIME fixture exercised 50 requests,
@@ -885,6 +885,32 @@ The restored archive passed inventory and kernel artifact verification for
 `/Users/alex/.local/state/vinix/omarchy-m1-prime-sync-20261118.ovsM28/`.
 `bundle.tar.gz` SHA-256 is
 `199b67891746bbb35ce9f3e2e6584956ba1c3316535529f72899b468674e7fec`.
+
+Native G13 PRIME fds accept `DMA_BUF_IOCTL_IMPORT_SYNC_FILE` and share the
+imported reservation across exports of the same GEM. Import unwraps pending
+leaves and stages every record before publication. A failed allocation
+releases the staged records. CPU START waits for writers before a read and
+for readers and writers before a write. It yields without the GEM lock and
+rescans after completion. CPU END returns after validation. [Pinned sync-file import](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L506-L550) [Pinned CPU wait](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L1513-L1528)
+
+Duplicate fence pointers share a record and read usage can upgrade to
+write. Distinct G13 fences on one queue keep separate records because they
+can complete out of order. Completed records are pruned on import or CPU
+START. The final GEM release reclaims the remaining list. Sync-file export,
+GPU submission integration and M1 hardware validation remain open.
+
+Both kernel builds, all 82 focused M1 V test files, the DRM wire checks and
+the sanitizer fixtures passed. The reservation fixture checked second-leaf
+allocation failure, access filtering across re-exports, source sync-file
+close, interruption and final release. Independent review checked fence
+retention and GEM lock scope. The allocation scan found no new implicit
+allocation sites. The offline audit reports `not_equivalent`.
+
+The restored archive passed inventory and kernel artifact verification for
+`62028e372139ae29b46caa293ac363169a84edbe` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-prime-resv-20261118.UCfV9w/`.
+`bundle.tar.gz` SHA-256 is
+`b4f477ca5e9318ff5a05447b89a8c54033a97dfbe0e886611d10951553f31557`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

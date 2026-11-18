@@ -11,6 +11,23 @@ import katomic
 import memory
 import lib
 
+pub struct PrimeFence {
+pub:
+	source voidptr // published DmaFence metadata, retained by syncobj
+pub mut:
+	write bool
+	next &PrimeFence = unsafe { nil }
+}
+
+pub fn free_prime_fences(head &PrimeFence) {
+	mut current := unsafe { head }
+	for current != unsafe { nil } {
+		next := current.next
+		memory.free(voidptr(current))
+		current = next
+	}
+}
+
 @[heap]
 pub struct GemObject {
 pub mut:
@@ -25,6 +42,7 @@ pub mut:
 	pte_extra   u64 // identical cache attributes for kernel and user aliases
 	external    bool // host-visible aperture; never returned to the PMM
 	advice_dontneed bool // private BO advice; resident backing is not yet purgeable
+	prime_fences &PrimeFence = unsafe { nil } // protected by lock
 pub:
 	vm_private_identity u64 // zero: shareable; otherwise immutable owning VM identity
 	file_scoped bool // excluded from the global handle table
@@ -172,6 +190,7 @@ pub fn destroy(obj &GemObject) {
 	if obj == unsafe { nil } {
 		return
 	}
+	free_prime_fences(obj.prime_fences)
 	if !obj.file_scoped && obj.handle < gem_max_handles {
 		gem_objects_lock.acquire()
 		gem_objects[obj.handle] = unsafe { nil }

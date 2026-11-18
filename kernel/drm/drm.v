@@ -186,22 +186,16 @@ fn (mut this GemPrimeResource) write(_handle voidptr, _buf voidptr, _loc u64, _c
 }
 
 fn (mut this GemPrimeResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
-	if u32(request) != ioctl.dma_buf_ioctl_sync || this.obj == unsafe { nil } || !this.obj.file_scoped {
+	if this.obj == unsafe { nil } || !this.obj.file_scoped {
 		return resource.default_ioctl(handle, request, argp)
 	}
-	mut flags := u64(0)
-	if !usercopy.copy_from_user(unsafe { &flags }, u64(argp), sizeof(flags)) {
-		errno.set(errno.efault)
-		return none
+	result := match u32(request) {
+		ioctl.dma_buf_ioctl_sync { prime_cpu_access(this.obj, u64(argp)) }
+		ioctl.dma_buf_ioctl_import_sync_file { prime_import_sync_file(this.obj, u64(argp)) }
+		else { return resource.default_ioctl(handle, request, argp) }
 	}
-	access := ioctl.dma_buf_sync_read | ioctl.dma_buf_sync_write
-	if flags & ~(access | ioctl.dma_buf_sync_end) != 0 || flags & access == 0 {
-		errno.set(errno.einval)
-		return none
-	}
-	// Local G13 exports have an empty reservation and use explicit fences.
-	// The pinned GEM exporter has no CPU-access cache callback.
-	return 0
+	if result < 0 { errno.set(u64(-result)); return none }
+	return result
 }
 
 fn (mut this GemPrimeResource) unref(_handle voidptr) ? {

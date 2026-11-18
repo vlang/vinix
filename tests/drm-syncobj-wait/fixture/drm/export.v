@@ -12,6 +12,7 @@ import resource
 pub fn run_export_reservation_checks() {
 	file.run_fd_reservation_checks()
 	check_prime_descriptors()
+	check_prime_reservation_waits()
 	mut checks := 0
 	for _ in 0 .. 200 {
 		memory.reset(); proc.reset()

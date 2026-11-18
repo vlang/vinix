@@ -38,6 +38,9 @@ fn main() {
 	os.write_file(object_path, object_source.replace(alias_site, 'memory.malloc_alias_fallible(sizeof(SyncobjHandle))'))!
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/drm/gem', '${scratch}/drm/gem', false)!
+	gem_source := os.read_file('${repo}/kernel/drm/gem/gem.v')!
+	os.write_file('${scratch}/drm/gem/prime_fences.v', 'module gem\nimport memory\n' +
+		section(gem_source, 'pub struct PrimeFence {', '@[heap]\npub struct GemObject')!)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/memory/mmap', '${scratch}/memory/mmap', false)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/klock', '${scratch}/klock', false)!
 	os.cp_all('${repo}/tests/agx-async/fixture/katomic', '${scratch}/katomic', false)!
@@ -70,6 +73,7 @@ fn main() {
 		section(source, 'fn ioctl_syncobj_create(', 'fn ioctl_syncobj_wait(')! +
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
 	os.write_file('${scratch}/drm/production.v', production)!
+	os.cp('${repo}/kernel/drm/prime_sync.v', '${scratch}/drm/prime_sync.v')!
 	os.cp('${repo}/kernel/drm/syncobj_fd.v', '${scratch}/drm/syncobj_fd.v')!
 	os.cp('${repo}/kernel/drm/syncobj_eventfd.v', '${scratch}/drm/syncobj_eventfd.v')!
 	os.cp('${repo}/kernel/drm/sync_file_info.v', '${scratch}/drm/sync_file_info.v')!

@@ -28,6 +28,7 @@ pub mut:
 	external bool
 	file_scoped bool
 	advice_dontneed bool
+	prime_fences &PrimeFence = unsafe { nil }
 	lock klock.Lock
 }
 
@@ -93,6 +94,7 @@ pub fn unref(object &GemObject) {
 	assert owned.references > 0
 	owned.references--
 	if owned.references == 0 && owned.owned {
+		free_prime_fences(owned.prime_fences)
 		if owned.mmap_device != 0 {
 			for index, entry in file_mmap_objects {
 				if voidptr(entry) == voidptr(owned) { file_mmap_objects[index] = unsafe { nil }; break }

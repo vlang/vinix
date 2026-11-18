@@ -258,7 +258,7 @@ fn check_file_scoped_objects() {
 fn check_mmap_offset_links() {
 	memory.prepare()
 	first := gem.create_aligned_with_cache(16384, 16384, 0, true, true, mmap_device: 1) or { panic('first GEM') }
-	middle := gem.create_aligned_with_cache(32768, 16384, 0, true, true, mmap_device: 2) or { panic('middle GEM') }
+	mut middle := gem.create_aligned_with_cache(32768, 16384, 0, true, true, mmap_device: 2) or { panic('middle GEM') }
 	last := gem.create_aligned_with_cache(16384, 16384, 0, true, true, mmap_device: 1) or { panic('last GEM') }
 	first_offset, middle_offset, last_offset := first.mmap_offset, middle.mmap_offset, last.mmap_offset
 	assert first_offset < middle_offset && middle_offset < last_offset
@@ -266,7 +266,13 @@ fn check_mmap_offset_links() {
 	assert !gem.file_mmap_offset_exists(1, middle_offset, 16384)
 	assert !gem.file_mmap_offset_exists(2, middle_offset + 16384, 16384)
 	assert !gem.file_mmap_offset_exists(2, middle_offset, 32769)
+	entry := memory.malloc_packed_fallible(sizeof(gem.PrimeFence))
+	assert entry != unsafe { nil }
+	unsafe { *(&gem.PrimeFence(entry)) = gem.PrimeFence{} }
+	middle.prime_fences = unsafe { &gem.PrimeFence(entry) }
+	metadata_before := memory.metadata_frees()
 	gem.unref(middle)
+	assert memory.metadata_frees() == metadata_before + 2 && C.__asan_address_is_poisoned(entry) != 0
 	assert !gem.file_mmap_offset_exists(2, middle_offset, 16384)
 	assert gem.file_mmap_offset_exists(1, first_offset, 16384) && gem.file_mmap_offset_exists(1, last_offset, 16384)
 	gem.unref(first)
