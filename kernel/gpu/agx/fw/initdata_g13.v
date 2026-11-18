@@ -85,8 +85,8 @@ pub mut:
 pub struct G13FwStatus {
 pub mut:
 	fwctl      ChannelRingPointers
-	halt_count u32
-	pad_14     [0xc]u8
+	halt_count u64
+	pad_18     [0x8]u8
 	halted     u32
 	pad_24     [0xc]u8
 	resume     u32

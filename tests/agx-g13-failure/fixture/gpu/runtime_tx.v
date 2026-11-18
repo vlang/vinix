@@ -125,17 +125,21 @@ fn stop_during_batch_doorbell() {
 	assert kio.aic_irq_masked(575)
 }
 
+fn boot_g13_fixture_transport(mut transport rtkit.RTKit) {
+	transport.mbox.inject(mailbox.MboxMsg{data0: 0x00100000000c000b})
+	transport.mbox.inject(mailbox.MboxMsg{data0: 0x0088000100000003})
+	transport.mbox.inject(mailbox.MboxMsg{data0: 0x0070000000000020})
+	transport.mbox.inject(mailbox.MboxMsg{data0: rtkit_ap_on})
+	assert transport.boot_started(0, 0)
+}
+
 fn check_g13_batch_pipe_transmit() {
 	base := u64(0x206408000)
 	mut tx := ascmailbox.new_mailbox(base)
 	mailbox.set_wait_transport(unsafe { &tx })
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
 		mut transport := rtkit.RTKit{name: 'g13-batch-doorbell'}
-		transport.mbox.inject(mailbox.MboxMsg{data0: 0x00100000000c000b})
-		transport.mbox.inject(mailbox.MboxMsg{data0: 0x0088000100000003})
-		transport.mbox.inject(mailbox.MboxMsg{data0: 0x0070000000000020})
-		transport.mbox.inject(mailbox.MboxMsg{data0: rtkit_ap_on})
-		assert transport.boot_started(0, 0)
+		boot_g13_fixture_transport(mut transport)
 		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
 			rtkit_send_irq: 575, rtk: unsafe { &transport }}
 		rtkit_owner = unsafe { &mgr }

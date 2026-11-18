@@ -773,7 +773,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	ack := section(manager, '    fn ack_grow(&self, buffer_slot: u32, vm_slot: u32, counter: u32) {',
 		'    fn fwctl(', 'Asahi TVB growth')!
 	require_order(ack, ['raw.flags.halt_count.load', 'DeviceControlMsg::ver::GrowTVBAck',
-		'halt_count: U64(halt_count)'], 'Asahi TVB halt counter')!
+		'halt_count: U64(halt_count)', 'txch.device_control.send(&dc)',
+		'.send_message(EP_DOORBELL, MSG_TX_DOORBELL | DOORBELL_DEVCTRL)'], 'Asahi publishes GrowTVBAck before ringing device control')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
 	check_submit_idle_delay_reference(read(os.join_path(base, 'file.rs'))!, manager,
 		read(os.join_path(base, 'fw/initdata.rs'))!)!
@@ -827,6 +828,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'katomic.store(mut &status.resume, u32(1))'], 'Vinix recoverable fault protocol')!
 	channels := read(os.join_path(base, 'fw/channels.rs'))!
 	require_order(channels, ['GrowTVBAck {', 'subpipe: u32', 'halt_count: U64'], 'Asahi GrowTVBAck layout')!
+	check_g13_device_control_wire(channels, read(os.join_path(base, 'fw/initdata.rs'))!, local,
+		local_recovery, read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/fw/initdata_g13.v'))!)!
 	parameters := read(os.join_path(base, 'asahi_core.rs'))!
 	require_order(parameters, ['debug_flags: u64 {', 'default: 0,',
 		'compute_preempt: i32 {', 'default: -1,'], 'Asahi default compute preemption')!
@@ -1026,6 +1030,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'M1 G13 can use the send-empty IRQ for negotiation and private application startup, with FIFO checks before publication',
 		'M1 G13 runtime system replies recheck GPU liveness and the FIFO deadline after an interrupt-assisted wait',
 		'M1 G13 batch doorbells use the guarded send-empty path after releasing all participating ring locks',
+		'G13 GrowTVBAck and RecoverChannel select the versioned tags, and GrowTVBAck uses the full halt count and guarded device-control doorbell',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',

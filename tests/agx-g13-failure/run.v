@@ -100,6 +100,8 @@ fn run_checks() int {
 	production = production.replace('import sched\n', 'import sched\nimport aarch64.timer\n')
 	production = production.replace('import aarch64.timer\n', 'import aarch64.timer\nimport aarch64.aic\n')
 	submissions := os.read_file(if os.args.len == 4 && os.args[2] == '--g13-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/g13.v' }) or { panic(err) }
+	production += (section(submissions, 'fn (mut mgr GpuManager) handle_g13_grow_tvb(', '// Allocate the two event-counter arrays') or { panic(err) })
+		.replace('handle_g13_grow_tvb(', 'checked_handle_g13_grow_tvb(')
 	production += section(submissions, 'pub fn (mut mgr GpuManager) refresh_g13_submit_globals()',
 		'// The firmware samples pending_submissions') or { panic(err) }
 	barriers := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_barriers.v') or { panic(err) }

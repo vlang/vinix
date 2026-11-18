@@ -164,8 +164,9 @@ fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, 
 		}
 	}
 	if owner == unsafe { nil } || owner.released || owner.subqueues[pipe_type].info.va == 0 { return false }
+	message := fw.make_recover_channel(mgr.hw_config.firmware_abi, pipe_type,
+		owner.subqueues[pipe_type].info.va, value) or { return false }
 	mgr.mark_g13_slot_error_locked(slot, value, G13JobError{status: 7, extra: error_type})
-	message := fw.make_recover_channel(pipe_type, owner.subqueues[pipe_type].info.va, value)
 	token := mgr.channels.device_ctrl.enqueue_with_token(voidptr(&message)) or { return false }
 	if !mgr.ring_device_control() { return false }
 	started := timer.get_ns()

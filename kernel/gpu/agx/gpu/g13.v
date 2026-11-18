@@ -859,14 +859,24 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(vm_slot u32, buffer_slot u32, counte
 		C.kprintf(c'agx: failed to grow TVB slot=%llu vm=%llu\n', u64(buffer_slot), u64(vm_slot))
 	}
 
+	// A fatal firmware-control failure during growth has already stopped
+	// further publication. An ordinary allocation failure still needs an ACK.
+	if mgr.state != .running { return }
 	if mgr.g13_channels == unsafe { nil } || mgr.g13_channels.fw_status.phys == 0 {
 		mgr.state = .error
 		return
 	}
 	status := unsafe { &fw.G13FwStatus(mgr.g13_channels.fw_status.cpu_address()) }
-	ack := fw.make_grow_tvb_ack(buffer_slot, vm_slot, counter,
-		katomic.load(&status.halt_count))
-	if !mgr.channels.device_ctrl.enqueue(voidptr(&ack)) || !mgr.ring_device_control() {
+	ack := fw.make_grow_tvb_ack(mgr.hw_config.firmware_abi, buffer_slot, vm_slot, counter,
+		katomic.load[u64](&status.halt_count)) or {
+		mgr.state = .error
+		return
+	}
+	if mgr.channels.device_ctrl.enqueue(voidptr(&ack))
+		&& mgr.ring_g13_doorbell_locked(doorbell_device_control) {
+		return
+	}
+	if mgr.state == .running {
 		C.kprintf(c'agx: failed to acknowledge GrowTVB slot=%llu vm=%llu\n',
 			u64(buffer_slot), u64(vm_slot))
 		mgr.state = .error

@@ -1322,8 +1322,14 @@ fn (mut mgr GpuManager) ring_pipe(priority u32, cmd_type u32) bool {
 // Batch publication has transferred every job and released its ring locks.
 // The manager lock still guards the live FIFO check and may open only to wait.
 fn (mut mgr GpuManager) ring_g13_batch_pipe_locked(priority u32, cmd_type u32) bool {
+	return mgr.ring_g13_doorbell_locked(pipe_doorbell(priority, cmd_type))
+}
+
+// The caller has finished publishing and has no firmware backing to read
+// after a wait. The scalar doorbell can be abandoned if shutdown wins.
+fn (mut mgr GpuManager) ring_g13_doorbell_locked(channel_id u32) bool {
 	if mgr.state != .running { return false }
-	message := msg_tx_doorbell | u64(pipe_doorbell(priority, cmd_type))
+	message := msg_tx_doorbell | u64(channel_id)
 	return mgr.rtk.send_message_wait(u8(ep_doorbell), message, mgr.g13_rtkit_send_wait_locked())
 }
 
@@ -1552,7 +1558,7 @@ fn (mut mgr GpuManager) check_g13_firmware_health() bool {
 		status := unsafe { &fw.G13FwStatus(mgr.g13_channels.fw_status.cpu_address()) }
 		if katomic.load(&status.halted) != 0 {
 			if !mgr.channels.event.is_empty() { return true }
-			C.kprintf(c'agx: GPU firmware halted (count=%llu)\n', u64(katomic.load(&status.halt_count)))
+			C.kprintf(c'agx: GPU firmware halted (count=%llu)\n', katomic.load[u64](&status.halt_count))
 			mgr.state = .error
 			return false
 		}

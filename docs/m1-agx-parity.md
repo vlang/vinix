@@ -22,6 +22,10 @@ The native G13 batch publisher releases its ring locks before sending
 fragment, vertex and compute doorbells. It can use the send-empty IRQ for
 these notifications. [Batch doorbell transmit IRQ](m1-agx-batch-tx-irq.md)
 
+GrowTVBAck and RecoverChannel use the device-control tags for the selected
+G13 firmware ABI. GrowTVBAck carries the full halt counter and can use the
+send-empty IRQ. [G13 device-control commands](m1-agx-device-control.md)
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 
@@ -438,8 +442,8 @@ it does not certify full driver equivalence.
   have separate owners. Completed commands now publish their last occupied
   slot to `cpu_freeptr`. Logical command ordinals prevent reverse reaping
   from rolling it backwards when the modulo ring pointer wraps.
-- **TVB growth.** GrowTVBAck carries the current firmware halt counter at
-  offset `0x18`, rather than leaving those eight bytes zero.
+- **TVB growth.** GrowTVBAck carries the current 64-bit firmware halt counter
+  at offset `0x18`.
 - **Fault and timeout recovery.** Both firmware ABIs decode their pending
   stamp records, classify culprit/killed work, preserve completed jobs, wait
   for the halt handshake, and acknowledge resume. Cross-VM faults are reported

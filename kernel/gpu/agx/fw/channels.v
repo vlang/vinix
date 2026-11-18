@@ -50,10 +50,12 @@ pub:
 	ring  u64
 }
 
-// G13 v12.3 device-control messages are a 32-bit discriminant followed by a
-// fixed 0x2c-byte payload. Initialize (0x19) carries an all-zero payload.
-pub const device_control_grow_tvb_ack = u32(0x0d)
-pub const device_control_recover_channel = u32(0x0e)
+// G13 device-control messages have a 32-bit tag and 0x2c-byte payload.
+// The firmware 13.3 enum adds Unk0d before these commands.
+pub const device_control_grow_tvb_ack_v12_3 = u32(0x0d)
+pub const device_control_grow_tvb_ack_v13_5 = u32(0x0e)
+pub const device_control_recover_channel_v12_3 = u32(0x0e)
+pub const device_control_recover_channel_v13_5 = u32(0x0f)
 pub const device_control_destroy_context_v12_3 = u32(0x17)
 pub const device_control_destroy_context_v13_5 = u32(0x18)
 pub const device_control_initialize_v12_3 = u32(0x19)
@@ -79,16 +81,22 @@ pub mut:
 	pad_20      [4]u32
 }
 
-pub fn make_grow_tvb_ack(buffer_slot u32, vm_slot u32, counter u32, halt_count u32) FwGrowTVBAck {
+pub fn make_grow_tvb_ack(abi hw.FirmwareAbi, buffer_slot u32, vm_slot u32,
+	counter u32, halt_count u64) ?FwGrowTVBAck {
+	tag := match abi {
+		.v12_3 { device_control_grow_tvb_ack_v12_3 }
+		.v13_5_partial { device_control_grow_tvb_ack_v13_5 }
+		else { return none }
+	}
 	return FwGrowTVBAck{
-		tag: device_control_grow_tvb_ack
+		tag: tag
 		unk_4: 1
 		buffer_slot: buffer_slot
 		vm_slot: vm_slot
 		counter: counter
 		// The reference v12.3 driver uses subpipe zero.
 		subpipe: 0
-		halt_count: u64(halt_count)
+		halt_count: halt_count
 	}
 }
 
@@ -159,9 +167,15 @@ pub mut:
 	pad_14 [7]u32
 }
 
-pub fn make_recover_channel(pipe_type u32, work_queue u64, event_value u32) FwRecoverChannel {
+pub fn make_recover_channel(abi hw.FirmwareAbi, pipe_type u32, work_queue u64,
+	event_value u32) ?FwRecoverChannel {
+	tag := match abi {
+		.v12_3 { device_control_recover_channel_v12_3 }
+		.v13_5_partial { device_control_recover_channel_v13_5 }
+		else { return none }
+	}
 	return FwRecoverChannel{
-		tag: device_control_recover_channel
+		tag: tag
 		pipe_type: pipe_type
 		work_queue: work_queue
 		event_value: event_value
