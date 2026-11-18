@@ -359,3 +359,29 @@ The evidence archive covers `f17aed4ceee7883d9dea26d5fd90b77fcf0b8c65` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-shared-kernel-tlbi-20261119.p92tuH/bundle.tar.gz`
 with SHA-256 `b9f325246ac738f3ad8b04ec06045f3411a73d8005d8546319162a31cb5f91b2`.
+
+## Render and compute job preparation
+
+G13 prepares job buffers through UAT page-table invalidation and exposes the
+commands when submission publishes the work-ring pointers. This removes six
+remaining firmware-control round trips per render job and two per compute job.
+Returned jobs keep their mapping cleanup obligations. Later barrier updates
+and cached teardown use their existing cache maintenance paths.
+[Pinned kernel mapping and TLBI](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L921-L946)
+[Pinned work-ring publication](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/workqueue.rs#L509-L522)
+
+The sanitizer fixture caught the old render preparation flush on the baseline.
+It checks that both production preparation tails complete without a flush and
+retain their cleanup flag before submission. The job lifetime, UAT and
+32,000-case command-wire suites passed. Generated AArch64 C confirms that job
+preparation omits the flush, while the queue preparation, barrier and cached
+teardown bodies match the baseline byte for byte.
+
+Both kernel builds, 79 source-contract test files and 122 pinned reference
+checks passed. The allocation scan matched the 176 baseline findings. M1
+hardware validation remains open.
+
+The evidence archive covers `5d08a5ba813ef445ea45678d02068c22f2fec70c` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-job-prepare-tlbi-20261119.BkmbI9/bundle.tar.gz`
+with SHA-256 `d52ae1ff932d4d07a309b4d76cfb097620dca0652034be2e87c6bd152899070d`.

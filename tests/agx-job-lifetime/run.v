@@ -71,7 +71,7 @@ fn main() {
 	for pipe in ['render', 'compute'] {
 		prepare := section(source, 'pub fn (mut mgr GpuManager) prepare_g13_${pipe}_job_with_timestamps(',
 			'pub fn (mut mgr GpuManager) release_g13_${pipe}_job(')!
-		publication := section(prepare, '\tjob.mappings_published = true\n', '\n\tmgr.g13_${pipe}_jobs << job')!
+		publication := section(prepare, '\tjob.mappings_published = true', '\n\tmgr.g13_${pipe}_jobs << job')!
 		job_type := if pipe == 'render' { 'G13RenderJobResources' } else { 'G13ComputeJobResources' }
 		production += '\nfn (mut mgr GpuManager) publish_${pipe}_mappings(mut job ${job_type}) ?bool {\n' +
 			publication + '\n\treturn true\n}\n'

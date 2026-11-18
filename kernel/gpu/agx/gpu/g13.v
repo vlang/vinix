@@ -1955,20 +1955,9 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		}
 	}
 
-	// The scene's per-VM buffers are mapped by UAT before this point. From
-	// the first firmware flush onward, cancellation must invalidate the
-	// complete graph before its backing can be reused.
+	// Submission publishes the prepared commands through the work rings.
+	// Keep the full mapping cleanup path for returned jobs.
 	job.mappings_published = true
-	if !mgr.flush_g13_kernel_buffer(&job.scene.scene)
-		|| !mgr.flush_g13_kernel_buffer(&job.scene.timestamps)
-		|| !mgr.flush_g13_kernel_buffer(&job.init_buffer)
-		|| !mgr.flush_g13_kernel_buffer(&job.barrier)
-		|| !mgr.flush_g13_kernel_buffer(&job.vertex)
-		|| !mgr.flush_g13_kernel_buffer(&job.fragment)
-		|| !mgr.flush_g13_kernel_buffer(&job.vertex_microsequence)
-		|| !mgr.flush_g13_kernel_buffer(&job.fragment_microsequence) {
-		return none
-	}
 	mgr.g13_render_jobs << job
 	complete = true
 	return job
@@ -2638,11 +2627,6 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 	}
 
 	job.mappings_published = true
-	if !mgr.flush_g13_kernel_buffer(&job.command)
-		|| !mgr.flush_g13_kernel_buffer(&job.microsequence)
-		|| !mgr.flush_g13_kernel_buffer(&job.timestamps) {
-		return none
-	}
 	mgr.g13_compute_jobs << job
 	complete = true
 	return job

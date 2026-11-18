@@ -29,47 +29,41 @@ fn check_job_mapping_publication() {
 	shared := SharedBuffer{phys: 0x10000, va: 0x10000, size: 0x4000, protection: pgtable.gpu_prot_fw_shared_rw}
 	private_command := SharedBuffer{phys: 0x14000, va: 0x14000, size: 0x4000}
 	readonly_command := SharedBuffer{phys: 0x18000, va: 0x18000, size: 0x4000, protection: pgtable.gpu_prot_gpu_ro_fw_private_rw}
-	for failure in 0 .. 7 {
-		mut mgr := GpuManager{publication_failure: failure}
-		mut job := G13RenderJobResources{
-			vm_slot: 1
-			scene: G13RenderSceneResources{
-				scene: shared
-				timestamps: shared
-				user_buffer: unsafe { &gpu_only }
-				heapmeta: unsafe { &gpu_only }
-				tilemap: unsafe { &gpu_only }
-				tail_pointer_cache: unsafe { &cache }
-				preempt: unsafe { &gpu_only }
-				aux_framebuffer: unsafe { &gpu_only }
-			}
-			init_buffer: private_command
-			barrier: private_command
-			vertex: readonly_command
-			fragment: readonly_command
-			vertex_microsequence: private_command
-			fragment_microsequence: private_command
-		}
-		ok := mgr.publish_render_mappings(mut job) or { false }
-		assert mgr.user_flushes == 0, 'render TPC mapping must not request a firmware flush'
-		assert mgr.flushes == if failure == 0 { 6 } else { failure }
-		assert ok == (failure == 0) && job.mappings_published
-	}
-	for failure in 0 .. 3 {
-		mut mgr := GpuManager{publication_failure: failure}
-		mut job := G13ComputeJobResources{
-			vm_slot: 1
-			preempt: unsafe { &gpu_only }
-			command: readonly_command
-			microsequence: private_command
+	mut mgr := GpuManager{flush_fails: true}
+	mut render_job := G13RenderJobResources{
+		vm_slot: 1
+		scene: G13RenderSceneResources{
+			scene: shared
 			timestamps: shared
+			user_buffer: unsafe { &gpu_only }
+			heapmeta: unsafe { &gpu_only }
+			tilemap: unsafe { &gpu_only }
+			tail_pointer_cache: unsafe { &cache }
+			preempt: unsafe { &gpu_only }
+			aux_framebuffer: unsafe { &gpu_only }
 		}
-		ok := mgr.publish_compute_mappings(mut job) or { false }
-		assert mgr.user_flushes == 0, 'compute preemption backing must not request a firmware flush'
-		assert mgr.flushes == if failure == 0 { 2 } else { failure }
-		assert ok == (failure == 0) && job.mappings_published
+		init_buffer: private_command
+		barrier: private_command
+		vertex: readonly_command
+		fragment: readonly_command
+		vertex_microsequence: private_command
+		fragment_microsequence: private_command
 	}
-	println('G13 job mappings: uncached publication and all eight cached flush failure positions passed')
+	render_ok := mgr.publish_render_mappings(mut render_job) or { false }
+	assert mgr.flushes == 0 && mgr.user_flushes == 0, 'render job preparation must not send a firmware flush'
+	assert render_ok && render_job.mappings_published && !render_job.submitted
+
+	mut compute_job := G13ComputeJobResources{
+		vm_slot: 1
+		preempt: unsafe { &gpu_only }
+		command: readonly_command
+		microsequence: private_command
+		timestamps: shared
+	}
+	compute_ok := mgr.publish_compute_mappings(mut compute_job) or { false }
+	assert mgr.flushes == 0 && mgr.user_flushes == 0, 'compute job preparation must not send a firmware flush'
+	assert compute_ok && compute_job.mappings_published && !compute_job.submitted
+	println('G13 job mappings: render and compute preparation complete without a firmware flush')
 }
 
 fn check_queue_mapping_publication() {

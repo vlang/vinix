@@ -14,10 +14,10 @@ fn check_timestamp_inputs_local(native string) ! {
 	render := section(native, 'pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(', 'fn (mut mgr GpuManager) publish_g13_render_job_locked(', 'Render timestamp command population')!
 	require_order(render, ['fw.make_g13_vertex_v13_5(', 'fw.make_g13_fragment_v13_5(',
 		'write_g13_timestamp_pair(voidptr(u64(job.vertex', 'write_g13_timestamp_pair(voidptr(u64(job.fragment',
-		'mgr.flush_g13_kernel_buffer(&job.vertex)', 'mgr.flush_g13_kernel_buffer(&job.fragment)'], 'Version conversion precedes destination writes and publication flushes')!
+		'job.mappings_published = true', 'mgr.g13_render_jobs << job'], 'Version conversion and destination writes precede render job registration')!
 	compute := section(native, 'pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(', 'pub fn (mut mgr GpuManager) release_g13_compute_job(', 'Compute timestamp command population')!
 	require_order(compute, ['fw.make_g13_compute_v13_5(', 'write_g13_timestamp_pair(voidptr(u64(job.command',
-		'mgr.flush_g13_kernel_buffer(&job.command)'], 'Compute conversion precedes destination write and publication flush')!
+		'job.mappings_published = true', 'mgr.g13_compute_jobs << job'], 'Compute conversion and destination writes precede job registration')!
 }
 
 pub fn timestamp_input_sizes_v(microseq string, pair TimestampPairModel) !string {
