@@ -34,7 +34,7 @@ fn run_checks() int {
 	production += (section(source, 'fn (mut mgr GpuManager) free_g13_channel_allocations(', 'fn (mut mgr GpuManager) fail_g13_initialization(') or { panic(err) })
 		.replace('release_g13_channels()', 'checked_release_g13_channels()')
 	production += section(source, 'pub fn (mut mgr GpuManager) set_file_reaper(', '// Serialize accepted submissions') or { panic(err) }
-	production += section(source, 'pub fn (mut mgr GpuManager) handle_event()', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
+	production += section(source, 'fn (mut mgr GpuManager) dequeue_g13_rx(', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) read_g13_fw_log(', '// Shutdown the GPU') or { panic(err) }
 	production += source.all_after('// Shutdown the GPU\n')
 	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')

@@ -99,6 +99,15 @@ fn (mut mgr GpuManager) recover_g13_fault_locked(culprit i32, default_status u32
 		return false
 	}
 	failure := mgr.g13_fault_error(default_status)
+	if default_status == 2 {
+		if failure.status == 4 {
+			C.kprintf(c'agx: Fault addr=0x%llx unit=%llu vm=%llu reason=%llu %s\n',
+				failure.address, u64(failure.unit), u64(failure.vm_slot), u64(failure.fault_type),
+				if failure.is_read != 0 { c'read' } else { c'write' })
+		} else {
+			println('agx: fault event without a valid G13 fault register')
+		}
+	}
 	mut pending := unsafe { &fw.G13PendingStamp(graph.globals.phys + higher_half + offset) }
 	shift := if mgr.hw_config.firmware_abi == .v13_5_partial { u32(4) } else { u32(3) }
 	for index := u32(0); index < fw.g13_pending_stamp_count; index++ {
@@ -137,6 +146,7 @@ fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, 
 	if pipe_type >= 3 || slot >= event.max_stamps { return false }
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
+	if mgr.state != .running { return false }
 	mut owner := &G13QueueResources(unsafe { nil })
 	for job in mgr.g13_compute_jobs {
 		if pipe_type == 2 && job.submitted && !job.released && job.event_slot == slot {

@@ -76,6 +76,7 @@ mut:
 	lock           klock.Lock
 	firmware_roles u32 = 1
 	grows          int
+	last_growth    [3]u32
 	polls          int
 	trace          []string
 	rings          int
@@ -246,7 +247,12 @@ fn (mut mgr GpuManager) ring_pipe(_ u32, _ u32) bool {
 	return true
 }
 
-fn (mut mgr GpuManager) handle_g13_grow_tvb(_ &fw.FwGrowTVBEvent) { mgr.grows++ }
+fn (mut mgr GpuManager) handle_g13_grow_tvb(vm_slot u32, buffer_slot u32, counter u32) {
+	assert !mgr.lock.is_held()
+	if mgr.state != .running { return }
+	mgr.grows++
+	mgr.last_growth = [vm_slot, buffer_slot, counter]!
+}
 
 fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 	mgr.polls++
@@ -310,6 +316,7 @@ pub fn run_checks() {
 	check_submit_idle_delay()
 	check_fw_log()
 	check_fw_log_allocations()
+	check_g13_receive_shutdown()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10
@@ -550,7 +557,10 @@ fn check_recovery() {
 	assert messages[0].work_queue == 0x123000 && messages[0].event_value == 0x100
 	assert header.read_ptr == header.write_ptr && mgr.trace.len == 0
 	assert !mgr.recover_g13_channel(3, 8, 0x100, 1)
-	assert header.write_ptr == 1
+	mgr.state = .stopped
+	job.error = G13JobError{}
+	assert !mgr.recover_g13_channel(2, 8, 0x100, 1)
+	assert header.write_ptr == 1 && job.error.status == 0
 	assert sizeof(fw.FwRecoverChannel) == 0x30
 	println('G13 recovery: pending stamps, fault isolation, halt/resume, channel ACK and error codes passed')
 }

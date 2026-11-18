@@ -1285,49 +1285,50 @@ pub fn (mut mgr GpuManager) send_fw_msg_to_role(role u32, message u64, data u64)
 	return mgr.send_role_message(role, u8(ep_firmware), message | (data & msg_address_mask))
 }
 
-// Process an event from the event channel
+// All G13 receive backing is released under the manager lock. Hold it for
+// one copy and acknowledgement, then dispatch from the private copy.
+fn (mut mgr GpuManager) dequeue_g13_rx(mut rx channel.RxChannel, destination voidptr) bool {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	return mgr.state == .running && rx.dequeue(destination)
+}
+
+fn (mut mgr GpuManager) mark_g13_worker_error() {
+	mgr.lock.acquire()
+	if mgr.state == .running { mgr.state = .error }
+	mgr.lock.release()
+}
+
 pub fn (mut mgr GpuManager) handle_event() {
 	mut buf := [64]u8{}
-	for mgr.channels.event.dequeue(voidptr(&buf[0])) {
-		// EventMsg is a repr(C, u32) enum: its discriminant is the first word.
-		event_type := unsafe { *&u32(&buf[0]) }
-		match event_type {
+	for mgr.dequeue_g13_rx(mut mgr.channels.event, voidptr(&buf[0])) {
+		message := unsafe { *&fw.FwEventMsg(&buf[0]) }
+		match message.tag {
 			fw.fw_event_flag {
 				event.scan_all_completions()
 			}
 			fw.fw_event_fault {
 				println('agx: GPU firmware error event')
-				if info := mgr.res.get_g13_fault_info() {
-					access := if info.read { c'read' } else { c'write' }
-					C.kprintf(c'agx: Fault addr=0x%llx unit=%llu vm=%llu reason=%llu %s\n',
-						u64(info.address), u64(info.unit_code), u64(info.vm_slot),
-						u64(info.reason_code), access)
-				} else {
-					println('agx: fault event without a valid G13 fault register')
-				}
-				if !mgr.recover_g13_fault(-1, 2) { mgr.state = .error }
+				if !mgr.recover_g13_fault(-1, 2) { mgr.mark_g13_worker_error() }
 				return
 			}
 			fw.fw_event_timeout {
 				println('agx: GPU firmware timeout event')
-				slot := unsafe { *&i32(&buf[12]) }
-				if !mgr.recover_g13_fault(slot, 3) { mgr.state = .error }
+				if !mgr.recover_g13_fault(i32(message.payload[2]), 3) { mgr.mark_g13_worker_error() }
 				return
 			}
 			fw.fw_event_channel_error {
 				println('agx: GPU firmware channel error event')
-				message := unsafe { &fw.FwEventMsg(&buf[0]) }
 				if !mgr.recover_g13_channel(message.payload[1], message.payload[2], message.payload[3], message.payload[0]) {
-					mgr.state = .error
+					mgr.mark_g13_worker_error()
 				}
 				return
 			}
 			fw.fw_event_grow_tvb {
-				grow := unsafe { &fw.FwGrowTVBEvent(&buf[0]) }
-				mgr.handle_g13_grow_tvb(grow)
+				mgr.handle_g13_grow_tvb(message.payload[0], message.payload[1], message.payload[2])
 			}
 			else {
-				C.kprintf(c'agx: Unhandled event type %llu\n', u64(event_type))
+				C.kprintf(c'agx: Unhandled event type %llu\n', u64(message.tag))
 			}
 		}
 	}
@@ -1410,9 +1411,9 @@ fn (mut mgr GpuManager) drain_auxiliary_channels() {
 		}
 	}
 	mut buf := [256]u8{}
-	for mgr.channels.ktrace.dequeue(voidptr(&buf[0])) {
+	for mgr.dequeue_g13_rx(mut mgr.channels.ktrace, voidptr(&buf[0])) {
 	}
-	for mgr.channels.stats.dequeue(voidptr(&buf[0])) {
+	for mgr.dequeue_g13_rx(mut mgr.channels.stats, voidptr(&buf[0])) {
 	}
 }
 
@@ -1452,14 +1453,14 @@ fn (mut mgr GpuManager) check_g13_firmware_health() bool {
 fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
 		mgr.lock.acquire()
-		healthy := mgr.check_g13_firmware_health()
+		healthy := mgr.state == .running && mgr.check_g13_firmware_health()
 		mgr.lock.release()
 		if !healthy {
 			break
 		}
 		if !mgr.poll_rtkit_messages() {
 			println('agx: RTKit system endpoint failed')
-			mgr.state = .error
+			mgr.mark_g13_worker_error()
 			break
 		}
 		mgr.handle_event()
@@ -1468,7 +1469,7 @@ fn event_worker(mut mgr GpuManager) {
 		}
 		mgr.drain_auxiliary_channels()
 		mgr.lock.acquire()
-		still_healthy := mgr.check_g13_firmware_health()
+		still_healthy := mgr.state == .running && mgr.check_g13_firmware_health()
 		mgr.lock.release()
 		if !still_healthy {
 			break
@@ -1494,6 +1495,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 		mgr.lock.release()
 	}
 
+	if mgr.state == .stopped { return }
 	mgr.state = .stopped
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)

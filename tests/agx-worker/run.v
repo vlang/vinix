@@ -25,7 +25,12 @@ fn run_checks() !int {
 	manager := os.read_file(if source_root != '' { source_root + '/gpu.v' } else { repo + '/kernel/gpu/agx/gpu/gpu.v' })!
 	g17 := os.read_file(if source_root != '' { source_root + '/g17.v' } else { repo + '/kernel/gpu/agx/gpu/g17.v' })!
 	fake := os.read_file(if source_root != '' { source_root + '/fake.v' } else { repo + '/kernel/gpu/agx/fake/driver.v' })!
-	production := 'module gpu\nimport sched\nimport gpu.agx.event\n' +
+	error_handler := if manager.contains('fn (mut mgr GpuManager) mark_g13_worker_error()') {
+		section(manager, 'fn (mut mgr GpuManager) mark_g13_worker_error()', 'pub fn (mut mgr GpuManager) handle_event()')!
+	} else {
+		''
+	}
+	production := 'module gpu\nimport sched\nimport gpu.agx.event\n' + error_handler +
 		section(manager, 'fn event_worker(', '// Shutdown the GPU')! +
 		section(g17, 'const g17_worker_messages_per_role', '\n')! + '\n' +
 		section(g17, 'fn g17_event_worker(', '// Apple decodes bits 53:48.')!

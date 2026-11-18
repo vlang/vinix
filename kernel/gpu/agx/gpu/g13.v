@@ -829,10 +829,7 @@ fn (mgr &GpuManager) g13_tvb_owner_locked(vm_slot u32, buffer_slot u32) ?&G13Ren
 // Service firmware's synchronous tiled-buffer growth request. The ACK is
 // required even if the slot cannot be grown, otherwise the firmware remains
 // blocked forever waiting for device control.
-fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
-	if event_msg == unsafe { nil } {
-		return
-	}
+fn (mut mgr GpuManager) handle_g13_grow_tvb(vm_slot u32, buffer_slot u32, counter u32) {
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
@@ -843,7 +840,7 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
 
 	mut found := false
 	mut grew := false
-	if owner := mgr.g13_tvb_owner_locked(event_msg.vm_slot, event_msg.buffer_slot) {
+	if owner := mgr.g13_tvb_owner_locked(vm_slot, buffer_slot) {
 		found = true
 		mut buffer := unsafe { owner }
 		current := u32(buffer.blocks.len)
@@ -857,11 +854,9 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
 		}
 	}
 	if !found {
-		C.kprintf(c'agx: GrowTVB requested unknown slot=%llu vm=%llu\n', u64(event_msg.buffer_slot),
-			u64(event_msg.vm_slot))
+		C.kprintf(c'agx: GrowTVB requested unknown slot=%llu vm=%llu\n', u64(buffer_slot), u64(vm_slot))
 	} else if !grew {
-		C.kprintf(c'agx: failed to grow TVB slot=%llu vm=%llu\n', u64(event_msg.buffer_slot),
-			u64(event_msg.vm_slot))
+		C.kprintf(c'agx: failed to grow TVB slot=%llu vm=%llu\n', u64(buffer_slot), u64(vm_slot))
 	}
 
 	if mgr.g13_channels == unsafe { nil } || mgr.g13_channels.fw_status.phys == 0 {
@@ -869,11 +864,11 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(event_msg &fw.FwGrowTVBEvent) {
 		return
 	}
 	status := unsafe { &fw.G13FwStatus(mgr.g13_channels.fw_status.cpu_address()) }
-	ack := fw.make_grow_tvb_ack(event_msg.buffer_slot, event_msg.vm_slot, event_msg.counter,
+	ack := fw.make_grow_tvb_ack(buffer_slot, vm_slot, counter,
 		katomic.load(&status.halt_count))
 	if !mgr.channels.device_ctrl.enqueue(voidptr(&ack)) || !mgr.ring_device_control() {
 		C.kprintf(c'agx: failed to acknowledge GrowTVB slot=%llu vm=%llu\n',
-			u64(event_msg.buffer_slot), u64(event_msg.vm_slot))
+			u64(buffer_slot), u64(vm_slot))
 		mgr.state = .error
 	}
 }

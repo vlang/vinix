@@ -590,6 +590,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_fwlog_vinix(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/channel/channel.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!)!
+	check_g13_receive_lifetime(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
+		read(os.join_path(base, 'gpu.rs'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_recovery.v'))!)!
 	check_timestamp_inputs_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
 	check_pending_timestamps_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/file/submission_timestamps.v'))!)!
@@ -986,6 +988,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Vinix shared command/start counters')!
 	return ['Resolved timestamp pairs populate versioned native commands and independently select vertex/fragment/compute instructions while legacy callers provide empty pairs',
 		'G13 firmware log descriptor rings and the separate bounded payload buffer are published and read before acknowledgement',
+		'G13 Event, KTrace and Stats reads serialize with backing teardown and dispatch private copies after releasing the lock',
 		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
 		'host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',

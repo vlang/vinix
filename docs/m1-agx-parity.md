@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 Event, KTrace and Stats reads hold the manager lock through acknowledgement
+so shutdown can release the rings safely. [Receive ring teardown](m1-agx-rx-lifetime.md)
+
 G13 firmware logging uses six descriptor rings and separate payload storage.
 [Firmware log channel](m1-agx-fwlog.md)
 
