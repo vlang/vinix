@@ -15,13 +15,13 @@ fn main() {
 	variants := [
 		['baseline', baseline, 'UAT wait entered the non-returning scheduler path'],
 		['fixed-page-count', source.replace('make_g13_fwctl_invalidate(addr, slot, u16(pages))', 'make_g13_fwctl_invalidate(addr, slot, 1)'), 'FwCtl must publish the 16-bit page count'],
-		['no-wait', source.replace('for mgr.channels.fw_ctrl.read_pointer() != token', 'for false'), 'UAT success requires both its ring token and completed handoff'],
+		['no-wait', source.replace('for {\n\t\t// Keep the manager lock across the transaction.', 'for false {\n\t\t// Keep the manager lock across the transaction.'), 'UAT success requires both its ring token and completed handoff'],
 		['ignore-handoff', source.replace('if !uat_mgr.complete_flush(slot)', 'if false'), 'published failures must retain their handoff slot'],
 		['missing-abort', source.replace('uat_mgr.abort_unpublished_flush(slot)', '// omitted abort'), 'published failures must retain their handoff slot'],
 		['abort-published', source.replace(publication, publication + '\n\t\tuat_mgr.abort_unpublished_flush(slot)'), 'published failures must retain their handoff slot'],
 		['missing-unlock', source.replace('mgr.fwctl_lock.release()', '// omitted unlock'), 'every UAT return must release the firmware-control lock'],
 		['zero-timeout', source.replace('>= u64(1_000_000_000)', '>= u64(0)'), 'UAT success requires both its ring token and completed handoff'],
-		['wrong-token', source.replace('for mgr.channels.fw_ctrl.read_pointer() != token', 'for mgr.channels.fw_ctrl.read_pointer() == token'), 'UAT success requires both its ring token and completed handoff'],
+		['wrong-token', source.replace('if consumed { break }', 'if !consumed { break }'), 'UAT success requires both its ring token and completed handoff'],
 	]
 	for item in variants {
 		assert item[1] != source

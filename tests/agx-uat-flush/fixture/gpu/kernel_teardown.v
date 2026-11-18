@@ -17,18 +17,19 @@ enum KernelTeardownCase {
 	full
 	no_handoff
 	send_failure
+	corrupt_ack
 	reprotect_failure
 }
 
 fn check_kernel_teardown() {
 	for upper in [false, true]! {
 		for sample in [KernelTeardownCase.uncached, .delayed, .full, .no_handoff, .send_failure,
-			.reprotect_failure]! {
+			.corrupt_ack, .reprotect_failure]! {
 			kernel_teardown_case(upper, sample)
 		}
 	}
 	assert memory.live_pages() == 0
-	println('AGX kernel teardown: 12 lower/upper root cases verify slot-64 acknowledgement before unmap and final TLBI')
+	println('AGX kernel teardown: 14 lower/upper root cases verify slot-64 acknowledgement before unmap and retention on corrupt completion')
 }
 
 fn kernel_teardown_case(upper bool, sample KernelTeardownCase) {
@@ -58,7 +59,7 @@ fn kernel_teardown_case(upper bool, sample KernelTeardownCase) {
 		state: .running
 		hw_config: hw.HwConfig{gpu_gen: .g13}
 		channels: GpuChannels{fw_ctrl: channel.new_fwctl_tx_channel('kernel', 1, u64(unsafe { &header }), 1, u64(unsafe { &ring }), 256, 20)}
-		mode: match sample { .delayed { 1 } .no_handoff { 6 } .send_failure { 2 } else { 0 } }
+		mode: match sample { .delayed { 1 } .no_handoff { 6 } .send_failure { 2 } .corrupt_ack { 13 } else { 0 } }
 		slot: slot
 		kernel_pte: pte
 	}
@@ -105,11 +106,12 @@ fn kernel_teardown_case(upper bool, sample KernelTeardownCase) {
 		assert !manager.invalidate_g13_shared_buffer(mut buffer)
 	}
 	assert manager.sends == expected_sends && !manager.fwctl_lock.is_held()
-	assert header.write_ptr == if expected_sends == 0 { u32(255) } else { u32(0) }
+	assert header.write_ptr == if expected_sends == 0 { u32(255) } else if sample == .corrupt_ack { u32(256) } else { u32(0) }
 	if expected_sends != 0 {
 		assert ring[255] == fw.FwFwCtlMsg{addr: address, slot: slot, page_count: 1, unk_12: 2}
 	}
-	assert handoff.flush[slot].state == if sample in [.no_handoff, .send_failure]! { u64(1) } else { u64(0) }
+	assert handoff.flush[slot].state == if sample == .corrupt_ack { u64(2) }
+		else if sample in [.no_handoff, .send_failure]! { u64(1) } else { u64(0) }
 	mut calls := tlb.calls()
 	defer { unsafe { calls.free() } }
 	assert calls.len == if cached && completed { 2 } else { 1 }

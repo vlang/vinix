@@ -12,4 +12,10 @@ fn test_uat_wait_returns_without_scheduler_handoff() {
 		changed := manager.replace(flush, flush.replace('katomic.sync()', call))
 		if _ := check_uat_poll_local(changed, scheduler) { assert false, call }
 	}
+	for guard in ['mgr.state != .running', 'mgr.channels.fw_ctrl.serialized_token_consumed(token)',
+		'if consumed { break }'] {
+		changed := manager.replace(flush, flush.replace(guard, '// omitted completion guard'))
+		assert changed != manager
+		if _ := check_uat_poll_local(changed, scheduler) { assert false, guard }
+	}
 }

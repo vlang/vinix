@@ -1303,12 +1303,17 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 	}
 
 	started := timer.get_ns()
-	for mgr.channels.fw_ctrl.read_pointer() != token {
+	for {
 		// Keep the manager lock across the transaction. The firmware worker
 		// owns the graph's halt check.
 		if mgr.state != .running {
 			return false
 		}
+		consumed := mgr.channels.fw_ctrl.serialized_token_consumed(token) or {
+			mgr.state = .error
+			return false
+		}
+		if consumed { break }
 		if timer.get_ns() - started >= u64(1_000_000_000) {
 			println('agx: firmware-control UAT flush timed out')
 			mgr.state = .error

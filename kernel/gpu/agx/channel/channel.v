@@ -195,6 +195,22 @@ pub fn (mut ch TxChannel) ticket_consumed(ticket TxTicket) ?bool {
 	return ch.published - ticket.sequence >= unread
 }
 
+// The caller serializes producers from enqueue through completion. The host
+// write pointer must still name the one outstanding command.
+pub fn (mut ch TxChannel) serialized_token_consumed(token u32) ?bool {
+	ch.lock.acquire()
+	defer { ch.lock.release() }
+	if ch.state_phys == 0 { return none }
+	read_ptr := ch.read_pointer()
+	write_ptr := unsafe { katomic.load(&u32(ch.state_phys + higher_half + ch.write_off)) }
+	if !ch.validate_pointers(read_ptr, write_ptr) { return none }
+	if write_ptr != token {
+		katomic.store(mut &ch.faulted, u32(1))
+		return none
+	}
+	return read_ptr == token
+}
+
 pub fn (ch &TxChannel) read_pointer() u32 {
 	if ch.state_phys == 0 {
 		return 0

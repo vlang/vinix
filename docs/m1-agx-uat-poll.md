@@ -66,3 +66,36 @@ sources and reports to that evidence. Results remain outside Git.
 | `bundle/blob-aarch64.c` | `9455a437065ba52c2693a1ff2a9075076c4fb717ccafba9e37ba725dc6136b4a` |
 
 No GPU workload, firmware interaction, Vinix/QEMU boot, reboot, SSH or deployment occurred.
+
+## Validating G13 FwCtl completion
+
+A matching firmware read pointer could previously complete the handoff even
+when the channel reported a fault or its host write pointer was corrupt.
+Vinix now checks the manager state and validates both ring pointers under the
+channel lock. The host write pointer must still match the token published by
+the sole FwCtl producer. A transport fault moves the manager to its error
+state and leaves the published handoff occupied. Cache-sensitive teardown
+requires confirmation from both the transport and the handoff before unmapping.
+
+Asahi revision `bed544bdf93a496ebf70ba180923bab12b6e01cf` holds the FwCtl lock
+through send and read-pointer acknowledgement. Vinix uses its existing
+ring-fault and ownership checks to handle corrupted completion conservatively.
+
+- The previous Vinix revision failed the new corrupt-write-pointer fixture
+  after the firmware had already acknowledged the command and set handoff
+  state 2. ASan/UBSan passed 432 transport cases, 24 invalid requests, five
+  page-count cases and 14 kernel teardown cases after the fix. Both root types
+  retained the valid uncached leaf and its backing on corrupt completion.
+- All nine runtime negative controls, 79 local contract test files, 122
+  archived-reference checks, and the sanitized TLB and failure suites passed.
+- Isolated AArch64 and x86-64 kernels built successfully. Generated AArch64 C
+  confirms the completion order and matches the previous handoff and buffer
+  invalidation bodies. The allocation scan reproduced the previous revision's
+  176 allowance findings with identical allocation counts by file and kind.
+
+The evidence bundle is at
+`/Users/alex/.local/state/vinix/omarchy-m1-fwctl-completion-20261119.KOBxTl/`.
+It records baseline `4f447907617fbe0ce88086f52a9200fa2aaa7c2d`, the tested
+source diff, native binaries, generated C and logs. The `bundle.tar.gz` SHA-256
+is `4b4cce4a626ac7ff45b213d2fc0464d63e0b608cc9318c0ada383c340ca7ea83`.
+Native M1 firmware validation remains open.

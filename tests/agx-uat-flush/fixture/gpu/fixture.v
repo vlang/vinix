@@ -56,7 +56,18 @@ fn (mut manager GpuManager) send_role_message(role u32, endpoint u8, message u64
 			'kernel FwCtl must see a valid uncached PTE before unmap'
 	}
 	manager.sends++
-	if manager.mode in [0, 6]! { consume(mut manager) }
+	if manager.mode in [0, 6]! || manager.mode >= 13 { consume(mut manager) }
+	if manager.mode >= 13 {
+		mut header := unsafe { &channel.FwCtlRingHeader(manager.channels.fw_ctrl.state_phys) }
+		match manager.mode {
+			13 { header.write_ptr = 256 }
+			14 { header.read_ptr = 256 }
+			15 { manager.channels.fw_ctrl.faulted = 1 }
+			16 { manager.state = .stopped }
+			17 { header.write_ptr = (header.write_ptr + 1) % 256 }
+			else { panic('invalid completion fixture') }
+		}
+	}
 	return manager.mode != 2
 }
 
@@ -87,11 +98,17 @@ fn run_case(initial u32, slot u32, mode int, outer_lock bool, pages u64) {
 	assert manager.lock.is_held() == outer_lock, 'polling must preserve its caller lock state'
 	if outer_lock { manager.lock.release() }
 	success := mode in [0, 1]!
+	if mode >= 13 { assert !result, 'a faulted or stopped FwCtl transaction must retain its handoff' }
 	assert result == success, 'UAT success requires both its ring token and completed handoff'
-	published := mode < 7
+	published := mode < 7 || mode >= 13
 	assert manager.sends == if published { 1 } else { 0 }
 	if published {
-		assert header.write_ptr == (initial + 1) % 256
+		expected_write := match mode {
+			13 { u32(256) }
+			17 { (initial + 2) % 256 }
+			else { (initial + 1) % 256 }
+		}
+		assert header.write_ptr == expected_write
 		assert ring[initial] == fw.FwFwCtlMsg{
 			addr: address
 			slot: slot
@@ -101,11 +118,15 @@ fn run_case(initial u32, slot u32, mode int, outer_lock bool, pages u64) {
 		assert handoff.flush[slot].addr == address && handoff.flush[slot].size == size,
 			'published failures must retain their handoff slot and unpublished failures must roll back'
 	}
-	expected_state := if success { u64(0) } else if mode < 8 { u64(1) } else { u64(0) }
+	expected_state := if mode >= 13 { u64(2) } else if success { u64(0) } else if mode < 8 { u64(1) } else { u64(0) }
 	assert handoff.flush[slot].state == expected_state,
 		'published failures must retain their handoff slot and unpublished failures must roll back'
-	if mode in [2, 3, 4, 6, 9]! { assert manager.state == .error }
-	if mode == 5 { assert manager.state == .stopped }
+	if mode in [2, 3, 4, 6, 9, 13, 14, 15, 17]! { assert manager.state == .error }
+	if mode in [5, 16]! { assert manager.state == .stopped }
+	if mode in [13, 14, 15, 17]! {
+		timer.on_tick(fn () {})
+		assert manager.channels.fw_ctrl.has_fault() && timer.get_ns() < u64(1_000_000_000)
+	}
 	if !published && mode != 7 { assert handoff.flush[slot].addr == 0 && handoff.flush[slot].size == 0 }
 	for index, entry in handoff.flush {
 		if u32(index) != slot { assert entry == mmu.UatFlushInfo{}, 'unrelated handoff owners must stay untouched' }
@@ -114,7 +135,7 @@ fn run_case(initial u32, slot u32, mode int, outer_lock bool, pages u64) {
 		manager.state = .running
 		before := manager.sends
 		assert !manager.flush_g13_uat_range(slot, address, size)
-		assert manager.sends == before && handoff.flush[slot].state == 1,
+		assert manager.sends == before && handoff.flush[slot].state == expected_state,
 			'a published failure must block reuse until firmware or shutdown resolves it'
 	}
 	// Reset the fixture's simulated firmware before testing a fresh request.
@@ -126,6 +147,7 @@ fn run_case(initial u32, slot u32, mode int, outer_lock bool, pages u64) {
 	table.handoff_initialized = true
 	if mode != 12 {
 		timer.reset()
+		timer.on_tick(poll_callback)
 		assert manager.flush_g13_uat_range(slot, address, size),
 			'UAT success requires both its ring token and completed handoff'
 		assert !manager.fwctl_lock.is_held()
@@ -166,14 +188,14 @@ pub fn check_uat_flush() {
 	mut cases := 0
 	for initial in [u32(0), 254, 255]! {
 		for slot in [u32(0), 1, 63, 64]! {
-			for mode in 0 .. 13 {
+			for mode in 0 .. 18 {
 				for outer_lock in [false, true]! { run_case(initial, slot, mode, outer_lock, 2); cases++ }
 			}
 		}
 	}
-	assert cases == 312
+	assert cases == 432
 	for invalid in 0 .. 12 { for outer_lock in [false, true]! { validation_case(invalid, outer_lock) } }
-	println('AGX UAT flush: 312 production transport/handoff cases return, preserve locks, retain published failures and permit delayed retry')
+	println('AGX UAT flush: 432 transport and handoff cases cover wrap, completion faults, ownership retention and lock release')
 	println('AGX UAT flush: 24 invalid requests preserve ring, handoff, device state and caller locks')
 	for pages in [u64(1), 3, 0xffff, 0x10000, 0x10001]! {
 		run_case(255, mmu.uat_kernel_flush_slot, 0, true, pages)
