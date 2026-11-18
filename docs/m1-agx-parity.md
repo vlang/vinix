@@ -832,6 +832,24 @@ The restored archive passed inventory and kernel artifact verification for
 `bundle.tar.gz` SHA-256 is
 `f5ed6ced05681d6cc723daf50287f6ea773bacae5bfd88db525adeacc72b0456`.
 
+PRIME descriptors now expose DMA-BUF size discovery through `lseek`.
+`SEEK_END` with offset zero returns the buffer size and `SEEK_SET` with
+offset zero returns zero. Neither call updates the open-file position.
+Other seek modes and nonzero offsets return `EINVAL`. [Pinned DMA-BUF seek](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-buf.c#L265-L290)
+
+Both kernel builds, 82 focused M1 V test files, the DRM wire checks and the
+sanitizer fixtures passed. The PRIME fixture exercised 72 calls through
+the VFS seek dispatcher, including size discovery above 4 GiB and `O_PATH`
+rejection. The x86-64 QEMU `seekextent`, `seekerror` and `opathseek` suites
+passed. The allocation scan matched the baseline. The offline audit reports
+`not_equivalent`. M1 hardware validation remains open.
+
+The restored archive passed inventory and kernel artifact verification for
+`b88dfeaa249f5931fc979880c28d49015a31dedd` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-prime-seek-20261118.TjXqjm/`.
+`bundle.tar.gz` SHA-256 is
+`63dfbdade8c6ba56d2914cd868cd86fe517cfb5ce0bf583480dfea5a559e19a9`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

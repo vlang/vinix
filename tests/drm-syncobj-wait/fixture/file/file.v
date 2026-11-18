@@ -16,7 +16,10 @@ pub mut:
 	resource resource.Resource
 	l klock.Lock
 	flags int
+	loc i64
 }
+
+pub fn (mut handle Handle) mac_check(_access u32) ? {}
 
 pub fn eventfd_refs_for_checks(counter &EventFD) int { return counter.refcount }
 

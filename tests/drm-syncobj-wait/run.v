@@ -48,8 +48,16 @@ fn main() {
 	native_file := os.read_file('${repo}/kernel/file/file.v')!
 	os.write_file('${scratch}/file/table.v', 'module file\nimport proc\nimport errno\n' +
 		section(native_file, 'pub fn fdnum_create_from_fd(', '// Make room in a descriptor table')!)!
+	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
+	os.write_file('${scratch}/resource/seek.v', 'module resource\n' +
+		section(resource_source, 'pub interface SeekableResource {', '// An immutable backend')!)!
+	vfs := os.read_file('${repo}/kernel/fs/vfs.v')!
+	os.mkdir_all('${scratch}/fs')!
+	os.write_file('${scratch}/fs/seek.v', 'module fs\nimport errno\nimport file\nimport proc\nimport resource\nimport stat\n' +
+		section(vfs, 'pub const seek_cur =', 'pub const resolve_no_xdev')! +
+		section(vfs, 'pub fn syscall_seek(', '// symlinkat(')!)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
-	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport stat\nimport klock\nimport memory\nimport memory.mmap\nimport drm.gem\nimport event.eventstruct\n' +
+	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport fs\nimport stat\nimport klock\nimport memory\nimport memory.mmap\nimport drm.gem\nimport event.eventstruct\n' +
 		section(source, 'struct SyncFileResource {', 'fn (mut this SyncFileResource) poll_status(')! +
 		section(source, 'fn (mut this SyncFileResource) poll_status(', '__global (')! +
 		section(source, 'fn ioctl_syncobj_create(', 'fn ioctl_syncobj_wait(')! +

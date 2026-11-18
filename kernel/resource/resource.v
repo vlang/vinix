@@ -62,6 +62,11 @@ mut:
 	open(flags int) ?&Resource
 }
 
+// Some virtual descriptors answer seeks without changing the file position.
+pub interface SeekableResource {
+	seek_offset(offset i64, whence int) ?u64
+}
+
 // An immutable backend stays read-only through every mount alias. Mode bits
 // and per-mount flags alone cannot describe that guarantee to a filesystem.
 pub interface ReadOnlyResource {

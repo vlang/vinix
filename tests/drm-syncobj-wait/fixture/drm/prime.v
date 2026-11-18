@@ -4,7 +4,9 @@ module drm
 
 import drm.gem
 import drm.ioctl
+import errno
 import file
+import fs
 import memory
 import proc
 import resource
@@ -47,6 +49,25 @@ fn prime_import(_dev &DrmDevice, _handle voidptr, object &gem.GemObject) ?u32 {
 
 fn close_prime_source() { file.close(prime_fd_to_close) }
 
+fn check_prime_seek(mut descriptor file.FD, number int, size u64) {
+	descriptor.handle.loc = 123
+	for offset in [i64(0), 1, -1, i64(1) << 40, -i64(0x7fffffffffffffff) - 1]! {
+		for whence in -1 .. fs.seek_hole + 2 {
+			value, code := fs.syscall_seek(unsafe { nil }, number, offset, whence)
+			if offset == 0 && (whence == fs.seek_set || whence == fs.seek_end) {
+				assert code == 0 && value == if whence == fs.seek_end { size } else { u64(0) }
+			} else {
+				assert value == errno.err && code == errno.einval
+			}
+			assert descriptor.handle.loc == 123
+		}
+	}
+	descriptor.handle.flags |= resource.o_path
+	value, code := fs.syscall_seek(unsafe { nil }, number, 0, fs.seek_end)
+	assert value == errno.err && code == errno.ebadf && descriptor.handle.loc == 123
+	descriptor.handle.flags &= ~resource.o_path
+}
+
 fn check_prime_descriptors() {
 	custom := DrmDriver{gem_export: prime_export, gem_export_put: prime_put, gem_import: prime_import}
 	default_driver := DrmDriver{gem_export: prime_export, gem_import: prime_import}
@@ -56,7 +77,7 @@ fn check_prime_descriptors() {
 		proc.reset()
 		device := DrmDevice{driver: unsafe { &driver }}
 		foreign := DrmDevice{driver: unsafe { &driver }}
-		mut object := gem.GemObject{handle: 7, vm_private_identity: 99}
+		mut object := gem.GemObject{handle: 7, vm_private_identity: 99, size: 0x10000010000}
 		prime_exported = unsafe { &object }
 		mut request := ioctl.DrmPrimeHandle{handle: 7, fd: -123}
 		for _ in 0 .. 200 {
@@ -95,6 +116,7 @@ fn check_prime_descriptors() {
 		file.assert_reservations(0)
 		mut fd := file.fd_from_fdnum(unsafe { nil }, request.fd) or { panic('installed PRIME fd') }
 		assert fd.flags & resource.o_cloexec != 0 && fd.handle.flags & resource.o_rdwr != 0
+		check_prime_seek(mut fd, request.fd, object.size)
 		fd.unref()
 		mut imported := ioctl.DrmPrimeHandle{handle: 55, flags: ~u32(0), fd: -1}
 		assert ioctl_prime_fd_to_handle(&device, client, &imported) == -9
@@ -121,5 +143,6 @@ fn check_prime_descriptors() {
 		prime_exported = unsafe { nil }
 	}
 	assert prime_custom_puts == 205
+	println('DRM PRIME seek: 72 syscall cases cover size, zero, invalid seeks, O_PATH and unchanged position')
 	println('DRM PRIME: 400 private refusals, reservation order, wrapper and fd failure cleanup, import errors and concurrent close passed')
 }

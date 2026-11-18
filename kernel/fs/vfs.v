@@ -2155,6 +2155,14 @@ pub fn syscall_seek(_ voidptr, fdnum int, offset i64, whence int) (u64, u64) {
 		handle.l.release()
 	}
 
+	mut backing := handle.resource
+	if mut backing is resource.SeekableResource {
+		seekable := resource.SeekableResource(backing)
+		stack_seekable := unsafe { &seekable }
+		result := stack_seekable.seek_offset(offset, whence) or { return errno.err, errno.get() }
+		return result, 0
+	}
+
 	match handle.resource.stat.mode & stat.ifmt {
 		stat.ifchr, stat.ififo, stat.ifpipe, stat.ifsock {
 			return errno.err, errno.espipe

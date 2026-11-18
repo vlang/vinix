@@ -140,6 +140,15 @@ fn (mut this GemPrimeResource) poll_status(_access int) int {
 	return this.status
 }
 
+fn (this &GemPrimeResource) seek_offset(offset i64, whence int) ?u64 {
+	if offset == 0 {
+		if whence == fs.seek_set { return u64(0) }
+		if whence == fs.seek_end { return u64(this.stat.size) }
+	}
+	errno.set(errno.einval)
+	return none
+}
+
 fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, flags int) voidptr {
 	if this.obj == unsafe { nil } || page > u64(-1) / page_size
 		|| (this.obj.external && (this.obj.phys_addr == 0 || flags & mmap.map_shared == 0)) {
