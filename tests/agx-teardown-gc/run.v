@@ -35,7 +35,7 @@ fn run_checks() !int {
 	mut production := 'module gpu\nimport gpu.agx.alloc\nimport gpu.agx.mmu\nimport gpu.agx.fw\nimport memory\n'
 	production += section(manager, 'const buffer_allocator_default', '// GPU states')!
 	production += section(manager, 'struct SharedBuffer {', '@[inline]')!
-	production += section(manager, 'fn unmap_shared_buffer(', '// Perform the cache-safe teardown')!
+	production += section(manager, 'fn unmap_shared_buffer(', '\n}\n')! + '\n}\n'
 	production += section(manager, 'fn (mut mgr GpuManager) release_shared_buffer_backing(', 'fn (mut mgr GpuManager) release_rtkit_buffers(')!
 	for pair in [
 		['fn (mut mgr GpuManager) free_g13_render_buffer_locked(', 'fn (mut mgr GpuManager) initialize_g13_render_buffer('],

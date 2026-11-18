@@ -5,6 +5,7 @@ import gpu.agx.mmu
 import gpu.agx.channel
 import gpu.agx.fw
 import gpu.agx.hw
+import gpu.agx.pgtable
 import klock
 import aarch64.timer
 
@@ -23,6 +24,7 @@ mut:
 	sends int
 	acknowledged bool
 	slot u32
+	kernel_pte &u64 = unsafe { nil }
 }
 struct GpuChannels { mut: fw_ctrl channel.TxChannel }
 
@@ -47,6 +49,12 @@ fn (mut manager GpuManager) send_role_message(role u32, endpoint u8, message u64
 	assert manager.fwctl_lock.is_held()
 	assert role == 0 && endpoint == 0x21 && message == u64(0x84) << 48
 	assert uat_mgr.handoff.flush[manager.slot].state == 1
+	if manager.kernel_pte != unsafe { nil } {
+		pte := unsafe { *manager.kernel_pte }
+		assert manager.lock.is_held() && manager.slot == mmu.uat_kernel_flush_slot
+		assert pte & pgtable.uat_pte_valid != 0 && !pgtable.is_cached_noncoherent(pte),
+			'kernel FwCtl must see a valid uncached PTE before unmap'
+	}
 	manager.sends++
 	if manager.mode in [0, 6]! { consume(mut manager) }
 	return manager.mode != 2
@@ -171,4 +179,5 @@ pub fn check_uat_flush() {
 		run_case(255, mmu.uat_kernel_flush_slot, 0, true, pages)
 	}
 	println('AGX UAT flush: 5 page-count boundaries preserve the full handoff range')
+	check_kernel_teardown()
 }

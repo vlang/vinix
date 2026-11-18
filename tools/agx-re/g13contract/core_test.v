@@ -241,7 +241,7 @@ fn test_asahi_contract_requires_teardown_and_publication_order() {
 	directory := os.join_path(fixture, 'drivers/gpu/drm/asahi')
 	os.mkdir_all(directory)!
 	mmu := '    fn remap_uncached_and_flush(
-		.reprot_pages(self.iova_range(), prot) mem::sync() let slot = match owner.slot() if owner.is_kernel
+		.reprot_pages(self.iova_range(), prot) mem::sync() let slot = match owner.slot() if owner.is_kernel UAT_NUM_CTX as u32
 		uat_inner.handoff_lock() handoff().current_slot() .ttb0.load( uat_inner.handoff_unlock()
 		cur_slot == Some(slot) && ttb_cur == ttb let flush = gpu.fwctl(cmd)
 		impl Drop for KernelMapping

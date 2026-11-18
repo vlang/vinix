@@ -623,19 +623,15 @@ fn unmap_shared_buffer(mut buffer SharedBuffer) {
 	buffer.mapped = false
 }
 
-// Perform the cache-safe teardown sequence recovered by m1n1 and implemented
-// by Asahi's KernelMapping::drop. Cached firmware mappings must remain valid
-// while firmware discards their noncoherent cache lines; only then may their
-// PTEs be removed. The second invalidation retires the uncached translation.
+// Cached kernel mappings need a slot-64 FwCtl acknowledgement while the
+// uncached PTEs are still present. Unmap then completes the outer-shareable
+// GPU TLBI before the caller can release the backing.
 fn (mut mgr GpuManager) invalidate_g13_shared_buffer(mut buffer SharedBuffer) bool {
 	if buffer.va == 0 || buffer.size == 0 || uat_mgr == unsafe { nil } {
 		return false
 	}
-	// A previous attempt may have removed the PTE and then lost the final
-	// firmware acknowledgement. Keep retrying that final invalidation without
-	// ever remapping or releasing the backing.
 	if !buffer.mapped {
-		return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
+		return !buffer.cache_flush_pending
 	}
 	if buffer.cache_flush_pending {
 		if pgtable.is_cached_noncoherent(buffer.protection) {
@@ -651,7 +647,7 @@ fn (mut mgr GpuManager) invalidate_g13_shared_buffer(mut buffer SharedBuffer) bo
 		buffer.cache_flush_pending = false
 	}
 	unmap_shared_buffer(mut buffer)
-	return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
+	return true
 }
 
 fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext,

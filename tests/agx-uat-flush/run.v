@@ -15,14 +15,17 @@ fn main() {
 	os.cp_all(repo + '/tests/agx-uat-flush/fixture', scratch, false)!
 	manager := os.read_file(if os.args.len == 3 { os.args[2] } else { repo + '/kernel/gpu/agx/gpu/gpu.v' })!
 	method := section(manager, 'pub fn (mut mgr GpuManager) flush_g13_uat_range(', '// Notify one of the four priority instances')!
-	os.write_file(scratch + '/gpu/production.v', 'module gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.fw\nimport aarch64.timer\nimport katomic\nimport sched\n' + method)!
+	buffer := section(manager, 'struct SharedBuffer {', '@[inline]')!
+	teardown := section(manager, 'fn unmap_shared_buffer(', 'fn (mut mgr GpuManager) invalidate_g13_driver_buffer(')!
+	os.write_file(scratch + '/gpu/production.v', 'module gpu\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\nimport gpu.agx.fw\nimport aarch64.timer\nimport katomic\nimport sched\n' + method + buffer + teardown)!
 	mmu := os.read_file(repo + '/kernel/gpu/agx/mmu/mmu.v')!
 	flush_start := mmu.index('pub fn (mgr &UatManager) begin_flush(') or { panic('begin_flush') }
 	flushes := mmu[flush_start..]
 	// These methods are the end of mmu.v; keep their exact implementation.
 	assert flushes.starts_with('pub fn (mgr &UatManager) begin_flush(')
 	layout := section(mmu, '@[packed]\npub struct UatFlushInfo', '@[packed]\nstruct SlotTtbs')!
-	os.write_file(scratch + '/gpu/agx/mmu/production.v', 'module mmu\nimport katomic\nimport aarch64.cpu\n' + layout + flushes)!
+	mappings := section(mmu, 'pub fn (mgr &UatManager) map_kernel(', '// Prepare one firmware cache-flush slot.')!
+	os.write_file(scratch + '/gpu/agx/mmu/production.v', 'module mmu\nimport katomic\nimport aarch64.cpu\nimport gpu.agx.pgtable\n' + layout + mappings + flushes)!
 	for name in ['channel', 'fw', 'hw'] {
 		os.mkdir_all(scratch + '/gpu/agx/' + name)!
 		if name == 'hw' {
@@ -33,6 +36,12 @@ fn main() {
 		}
 	}
 	os.write_file(scratch + '/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n')!
+	for name in ['lib', 'memory', 'gpu/agx/tlb'] {
+		os.cp_all(repo + '/tests/agx-tlb/fixture/' + name, scratch + '/' + name, false)!
+	}
+	os.mkdir_all(scratch + '/gpu/agx/pgtable')!
+	os.cp(repo + '/kernel/gpu/agx/pgtable/pgtable.v', scratch + '/gpu/agx/pgtable/pgtable.v')!
+	os.write_file(scratch + '/gpu/agx/pgtable/host.v', 'module pgtable\n__global higher_half = u64(0)\n')!
 	for name, path in {'klock': 'tests/agx-heap-gc/fixture/klock/lock.v', 'katomic': 'tests/agx-g13-failure/fixture/katomic/atomic.v',
 		'aarch64/timer': 'tests/agx-heap-gc/fixture/aarch64/timer/timer.v', 'aarch64/cpu': 'tests/agx-tlb/fixture/aarch64/cpu/cpu.v'} {
 		os.mkdir_all(scratch + '/' + name)!; os.cp(repo + '/' + path, scratch + '/' + name + '/host.v')!

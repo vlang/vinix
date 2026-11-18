@@ -126,8 +126,10 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		'self.agx.uat.flush_dirty()', 'prepare_cacheflush', 'send_inval', 'wait_cacheflush', 'VALID=0',
 		'self.agx.uat.flush_dirty()', 'complete_cacheflush'], 'm1n1 cache-safe unmap')!
 	vinix_shared := section(vinix_gpu, 'fn (mut mgr GpuManager) invalidate_g13_shared_buffer', 'fn (mut mgr GpuManager) invalidate_g13_driver_buffer', 'Vinix shared-buffer teardown')!
-	require_order(vinix_shared, ['reprotect_kernel', 'flush_g13_uat_range',
-		'cache_flush_pending = false', 'unmap_shared_buffer', 'flush_g13_uat_range'], 'Vinix shared-buffer teardown')!
+	require_order(vinix_shared, ['return !buffer.cache_flush_pending', 'if buffer.cache_flush_pending',
+		'reprotect_kernel', 'if !mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)',
+		'cache_flush_pending = false', 'unmap_shared_buffer', 'return true'], 'Vinix shared-buffer teardown')!
+	require(vinix_shared.count('mgr.flush_g13_uat_range(') == 1, 'Kernel mappings flush the ASC cache only before unmap')!
 	vinix_driver := section(vinix_gpu, 'fn (mut mgr GpuManager) invalidate_g13_driver_buffer', 'fn (mut mgr GpuManager) release_shared_buffer_backing', 'Vinix driver-buffer teardown')!
 	require_order(vinix_driver, ['vm_slot := context.bound_slot()', 'if vm_slot == 0 { return true }',
 		'reprotect_driver_buffer_uncached', 'uat_mgr.g13_cache_flush_required(context, vm_slot) or { return false }',
@@ -182,7 +184,7 @@ pub fn check_asahi(asahi_linux string) ![]string {
 		'tlbi_range'], 'Asahi cache-safe unmap')!
 	flush := section(mmu, '    fn remap_uncached_and_flush(', 'impl Drop for KernelMapping', 'Asahi cache flush')!
 	require_order(flush, ['.reprot_pages(self.iova_range(), prot)', 'mem::sync()', 'let slot = match owner.slot()',
-		'if owner.is_kernel', 'uat_inner.handoff_lock()', 'handoff().current_slot()', '.ttb0.load(',
+		'if owner.is_kernel', 'UAT_NUM_CTX as u32', 'uat_inner.handoff_lock()', 'handoff().current_slot()', '.ttb0.load(',
 		'uat_inner.handoff_unlock()', 'cur_slot == Some(slot) && ttb_cur == ttb', 'let flush =', 'gpu.fwctl(cmd)'],
 		'Asahi flushes only the matching active user slot after reprotect')!
 	channel := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/channel.rs'))!
@@ -221,6 +223,9 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	require_order(mmu[drop_start..], ['.ttb0.store(0,', '.ttb1.store(0,',
 		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID teardown invalidation')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!
+	kernel_unmap := section(local, 'pub fn (mgr &UatManager) unmap_kernel(', '// Prepare one firmware cache-flush slot.', 'Vinix kernel unmap')!
+	require_order(kernel_unmap, ['iova < (u64(1) << mgr.ias)', 'mgr.kernel_lower_pgtable', 'pt.unmap(iova, size)',
+		'mgr.kernel_pgtable', 'pt.unmap(iova, size)'], 'Both Vinix kernel roots use the TLBI-completing unmap')!
 	cache_owner := section(local, 'pub fn (mut mgr UatManager) g13_cache_flush_required(', '// Caller holds both MMU and handoff locks', 'Vinix cache owner')!
 	require_order(cache_owner, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'ctx.bound_slot() != slot',
 		'voidptr(mgr.contexts[slot]) != voidptr(ctx)', 'ctx.pgtable.l1_phys | (u64(slot) << ttbr_asid_shift) | ttbr_valid',
@@ -257,6 +262,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'Unbinding must preserve the release age')!
 	check_g13_slot_wait(asahi_linux, repo, local)!
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
+		'G13 kernel mappings finish with TLBI and require slot-64 FwCtl only before a cached mapping is removed',
 		'Only an active ASC slot with the matching published TTBR requires FwCtl before user driver-buffer unmap',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
 		'Oldest idle ASID selection and one invalidation after root replacement or removal',

@@ -74,6 +74,28 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `1a525722dca606934ce3ae1d75be31c7c0fcaf5c12d0eac78e678f4aada154ba`.
 
+G13 kernel mappings complete teardown with the GPU TLBI in unmap. Cached
+mappings first complete the slot-64 FwCtl handshake while their uncached
+PTEs are still valid. Failed reprotection or acknowledgement retains
+the backing. The lower root invalidates the ASID-0 range and the upper
+root invalidates global translations. FwCtl transmit and completion still
+poll under IRQ-masking locks.
+[Asahi kernel mapping teardown](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L1605-L1689)
+
+Both kernel builds, all 82 contract files, 353 UAT sanitizer cases, and
+teardown, TLB, context and job regressions passed. Two compiled controls
+caught a send after unmap and a missing cached flush. Independent
+lifetime review found no blocker. The allocation scan reproduced 178
+baseline findings. Whole-driver parity remains `not_equivalent`.
+No hardware tests or reboots ran.
+
+Evidence for `65d530fbd3e9f96b20e46a9a8961b97d22a1120b` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-kernel-teardown-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`dc09a675951d0a1e08e71109af4353e11bdbeb396f5d36b5cf0306de6915f567`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

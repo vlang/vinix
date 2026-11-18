@@ -829,8 +829,8 @@ pub fn (mgr &UatManager) reprotect_kernel(iova u64, size u64, prot u64) bool {
 	return pt.reprotect(iova, size, prot)
 }
 
-// Remove a driver-owned context-zero mapping. This is primarily used to
-// unwind a partially constructed firmware MMIO aperture before MSG_INIT.
+// Remove a driver-owned context-zero mapping. A published root completes
+// its GPU TLBI before returning; an unpublished root has no translations.
 pub fn (mgr &UatManager) unmap_kernel(iova u64, size u64) {
 	if iova < (u64(1) << mgr.ias) {
 		mut pt := unsafe { mgr.kernel_lower_pgtable }

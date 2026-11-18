@@ -17,6 +17,13 @@ Five page-count cases cover single- and multi-page flushes, the largest
 16-bit count, and the first two wrapped counts. Each retains the full byte
 range in the handoff.
 
+Twelve kernel teardown cases combine the production FwCtl handshake with
+real page-table edits and a TLB recorder on both roots. They cover uncached
+unmap, delayed acknowledgement, ring-full retry, missing handoff
+acknowledgement, failed send, and partial reprotect. The recorder checks
+the lower root's ASID-0 range and the upper root's global invalidations.
+Retries preserve cache obligations and avoid sending after unmap.
+
 The scheduler stub fails if called: a no-op stub would hide the original bug.
 The original production source fails the delayed-acknowledgement case at this
 stub. Fake time supplies the firmware acknowledgement from inside the polling
