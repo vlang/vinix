@@ -2894,9 +2894,11 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 	}
 	unsafe {
 		mut list := &fw.G13NotifierList(resources.notifier_list.cpu_address())
+		C.memset(list, 0, sizeof(fw.G13NotifierList))
 		list.list_head.next = resources.notifier_list.va
 	}
 	resources.threshold = mgr.alloc_g13_shared_buffer(sizeof(u64)) or { return none }
+	unsafe { C.memset(resources.threshold.cpu_address(), 0, sizeof(u64)) }
 	notifier_size := fw.g13_notifier_active_size(mgr.hw_config.firmware_abi) or { return none }
 	resources.notifier = mgr.alloc_g13_buffer_with_protection(notifier_size, pgtable.gpu_prot_fw_private_rw) or { return none }
 	if !fw.initialize_g13_notifier(resources.notifier.cpu_address(), resources.notifier.size,

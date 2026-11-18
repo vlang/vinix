@@ -46,6 +46,10 @@ fn check_unwind() {
 			assert !returned.released && !returned.quarantined
 			list := unsafe { &fw.G13NotifierList(returned.notifier_list.cpu_address()) }
 			assert list.list_head.next == returned.notifier_list.va, 'notifier next must point to the list head'
+			assert list.list_head.prev == 0 && list.unk_10 == 0, 'notifier list must start empty'
+			threshold := unsafe { *&u64(returned.threshold.cpu_address()) }
+			assert threshold == 0, 'notifier threshold must start at zero'
+			assert manager.workspace[1][0x18] == 0xa5 && manager.workspace[2][8] == 0xa5
 		} else if mode in [11, 12]! {
 			assert returned == unsafe { nil } && manager.cleanups == 1 && manager.g13_queues.len == 1
 			assert voidptr(retained) == voidptr(manager.g13_queues[0])

@@ -54,7 +54,9 @@ fn (mut manager GpuManager) allocate(size u64) ?SharedBuffer {
 	manager.allocations++
 	if manager.allocations == manager.mode || (manager.mode == 12 && manager.allocations == 1) { return none }
 	assert manager.allocations <= 4 && size <= 128
-	return SharedBuffer{va: u64(manager.allocations) * 0x4000, phys: unsafe { u64(&manager.workspace[manager.allocations - 1][0]) }, size: size}
+	data := unsafe { &manager.workspace[manager.allocations - 1][0] }
+	unsafe { C.memset(data, 0xa5, 128) }
+	return SharedBuffer{va: u64(manager.allocations) * 0x4000, phys: u64(data), size: size}
 }
 fn (manager &GpuManager) initialize_g13_subqueue(mut _ G13QueueResources, pipe u32) bool { return manager.mode != 7 + int(pipe) }
 fn (manager &GpuManager) initialize_g13_render_buffer(mut _ G13QueueResources, _ &mmu.UatContext) bool { return manager.mode != 10 }

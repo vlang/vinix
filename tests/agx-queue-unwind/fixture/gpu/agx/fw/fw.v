@@ -3,8 +3,6 @@ module fw
 __global fail_context bool
 __global fail_notifier bool
 pub struct G13GpuContextData { data [64]u8 }
-pub struct ListHead { pub mut: next u64 }
-pub struct G13NotifierList { pub mut: list_head ListHead }
 pub fn validate_g13_workqueue_layouts() bool { return true }
 pub fn validate_g13_event_layouts() bool { return true }
 pub fn initialize_g13_gpu_context(_ voidptr, _ u64) bool { return !fail_context }

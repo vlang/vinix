@@ -16,6 +16,9 @@ fn checks() !int {
 	os.cp_all(repo + '/tests/agx-queue-unwind/fixture', scratch, false)!
 	os.mkdir_all(scratch + '/klock')!
 	os.cp(repo + '/tests/agx-g13-failure/fixture/klock/lock.v', scratch + '/klock/lock.v')!
+	firmware := os.read_file(repo + '/kernel/gpu/agx/fw/event_g13.v')!
+	os.write_file(scratch + '/gpu/agx/fw/notifier_list.v', 'module fw\n' +
+		section(firmware, '@[packed]\npub struct G13LinkedListHead {', '@[packed]\npub struct G13NotifierState {')!)!
 	code := os.read_file(source)!
 	os.write_file(scratch + '/gpu/production.v', 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport gpu.agx.event\nimport gpu.agx.pgtable\nimport drm.syncobj\n' +
 		section(code, 'struct G13QueueIds {', '// Asahi\'s ordinary submit policy')! +

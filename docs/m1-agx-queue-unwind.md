@@ -195,3 +195,29 @@ The evidence archive covers `e1442d84ed6ad1abf4600f2c176f8d5f24879de8` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-workqueue-ring-init-20261119.CFoYvj/bundle.tar.gz`
 with SHA-256 `f35d80e30a8dbac08ef6bbcdc0ce51fabb031eac0ec668de09aeb6fed456680a`.
+
+## Notifier list and threshold defaults
+
+The G13 constructor now clears the `0x18`-byte notifier list before linking
+its `next` pointer to the head, and clears the eight-byte threshold before the
+notifier references it. The queue allocator already clears the backing. The
+constructor now establishes the same defaults on prefilled buffers.
+[Pinned notifier list defaults](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/fw/event.rs#L15-L28)
+[Pinned threshold default](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/fw/event.rs#L66-L69)
+[Pinned queue constructor](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L488-L512)
+
+The sanitizer fixture uses the production list layout and prefilled backing.
+It caught stale list fields on the old constructor and a stale threshold when
+only the list was cleared. With both writes it checked the list, threshold
+and guard bytes in the 3,640-case constructor matrix. All 64 shutdown handoff
+cases also passed. The generated AArch64 constructor differs by two zeroing
+writes, with the threshold cleared before the notifier is initialized.
+
+Both kernel builds, the G13 layout and failure suites, 79 source-contract
+test files and 122 pinned reference checks passed. The allocation scan
+matched the 176 baseline findings. M1 hardware validation remains open.
+
+The evidence archive covers `f80c6ed4f8fa3968e241cc4faacc6043ba315d9e` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-notifier-list-threshold-20261119.Gv8X4B/bundle.tar.gz`
+with SHA-256 `fcc62a5777ba07b8c908176e8b9cc3c2ef762780641a5f7290c72c5130689d08`.
