@@ -55,7 +55,7 @@ fn check_timestamp_registration() {
 	for _ in 0 .. 64 {
 		for modern in [false, true]! {
 			driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle}
-			original := gpu.timestamp_manager()
+			original := gpu.registration_manager()
 			mut device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: voidptr(original)}
 			key := u64(0x56000)
 			abi := if modern { modern_ioctl_abi } else { legacy_ioctl_abi }
@@ -71,9 +71,10 @@ fn check_timestamp_registration() {
 			invoke_timestamp_bind(&device, key, bo.handle, modern, -19)
 			assert !device.registered && gpu.maps() == maps && gpu.unmaps() == unmaps
 			assert file.timestamp_objects.len == 0 && bo.references == 1 && memory.calls() == allocations_before
-			assert voidptr(file.timestamp_manager) == voidptr(original) && !file.lock.is_held()
+			assert voidptr(file.registration_manager) == voidptr(original) && !file.lock.is_held()
 
-			replacement := gpu.timestamp_manager()
+			mut replacement := unsafe { gpu.registration_manager() }
+			replacement.uat = uat_mgr
 			new_device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: voidptr(replacement)}
 			new_key := key + 1
 			mut new_file := get_or_create_file(voidptr(new_key), &new_device) or { panic('replacement file') }
@@ -123,7 +124,7 @@ fn expect_timestamp_publication_error(mut file GpuFile, handle u32, code int) {
 fn check_timestamp_publication_storage() {
 	memory.assert_released()
 	for cycle in 0 .. 100 {
-		mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
+		mut file := GpuFile{registration_manager: gpu.registration_manager()}
 		bo := gem.create(u32(9200 + cycle))
 		file.objects.add_created(bo)
 		memory.fail_allocations(true)
@@ -143,7 +144,7 @@ fn check_timestamp_publication_storage() {
 		for index in 0 .. 7 {
 			assert bind_capture_buffer(mut file, bo.handle) == u32(index + 1)
 		}
-		code, old_capture := file.capture_g13_timestamp(asahi.Timestamp{handle: 1}, gpu.timestamp_manager())
+		code, old_capture := file.capture_g13_timestamp(asahi.Timestamp{handle: 1}, gpu.registration_manager())
 		assert code == 0 && unbind_capture_buffer(mut file, 1) == 0
 		memory.fail_allocations(true)
 		with_spare := memory.calls()
@@ -177,7 +178,7 @@ fn check_timestamp_publication_stop() {
 		for modern in [false, true]! {
 			gpu.available(true)
 			gpu.set_running(true)
-			mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
+			mut file := GpuFile{registration_manager: gpu.registration_manager()}
 			bo := gem.create(9300)
 			file.objects.add_created(bo)
 			assert bind_capture_buffer(mut file, bo.handle) == 1
@@ -213,7 +214,7 @@ fn check_timestamp_owner_teardown() {
 	for _ in 0 .. 64 {
 		for modern in [false, true]! {
 			gpu.available(true)
-			mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
+			mut file := GpuFile{registration_manager: gpu.registration_manager()}
 			mut replacement := GpuFile{}
 			old_bo := gem.create(9400)
 			new_bo := gem.create(9401)
@@ -222,7 +223,7 @@ fn check_timestamp_owner_teardown() {
 			id := bind_capture_buffer(mut file, old_bo.handle)
 			closes := bind_capture_buffer(mut file, old_bo.handle)
 			captured := bind_capture_buffer(mut file, old_bo.handle)
-			original := gpu.timestamp_manager()
+			original := gpu.registration_manager()
 			old_unmaps := original.timestamp_unmaps
 			code, capture := file.capture_g13_timestamp(asahi.Timestamp{handle: captured}, original)
 			assert code == 0 && capture.va != 0
@@ -239,10 +240,10 @@ fn check_timestamp_owner_teardown() {
 			assert old_bo.references == 3 && original.timestamp_unmaps == old_unmaps + 1
 			gpu.available(true)
 			gpu.replace_manager(true)
-			replacement.timestamp_manager = gpu.timestamp_manager()
+			replacement.registration_manager = gpu.registration_manager()
 			assert bind_capture_buffer(mut replacement, new_bo.handle) == id
 			assert replacement.timestamp_objects[0].va == capture.va
-			active := gpu.timestamp_manager()
+			active := gpu.registration_manager()
 			refused, empty := file.capture_g13_timestamp(asahi.Timestamp{handle: captured}, active)
 			assert refused == -19 && empty == G13TimestampCapture{} && file.timestamp_objects[1].references == 1
 			gpu.set_running(false)
@@ -276,7 +277,7 @@ fn check_timestamp_bindings() {
 	mut cases := 0
 	for cycle in 0 .. 200 {
 		gpu.available(true); gpu.set_running(true); gpu.fail_timestamp_map(0)
-		mut file := GpuFile{timestamp_manager: gpu.timestamp_manager()}
+		mut file := GpuFile{registration_manager: gpu.registration_manager()}
 		file.timestamp_objects.flags |= .noslices
 		mut foreign := GpuFile{}
 		shared := gem.create(u32(1000 + cycle * 4))

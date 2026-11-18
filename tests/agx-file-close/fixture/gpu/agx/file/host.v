@@ -56,7 +56,7 @@ mut:
 	g13_queues        []G13QueueOwnership
 	g17_queues        []G17QueueOwnership
 	timestamp_objects []TimestampObject
-	timestamp_manager &gpu.GpuManager = unsafe { nil }
+	registration_manager &gpu.GpuManager = gpu.registration_manager()
 	vms               []&mmu.UatContext
 	mappings          []GpuMapping
 	objects           Objects
@@ -71,6 +71,7 @@ __global file_map_lock klock.Lock
 __global file_map = map[u64]&GpuFile{}
 __global uat_mgr &mmu.UatManager = unsafe { nil }
 __global stopping_file &GpuFile = unsafe { nil }
+__global late_close_vm &mmu.UatContext = unsafe { nil }
 
 fn stop_during_registration() {
 	mut vm := unsafe { stopping_file.vms[0] }
@@ -81,9 +82,44 @@ fn stop_during_registration() {
 	}
 }
 
+fn close_during_reap() {
+	gpu.watch_queue_release(unsafe { nil })
+	assert closing_reaper_active && closing_head == unsafe { nil }
+	reap_closed_files()
+	assert closing_reaper_requested
+	release_handle(&drm.DrmDevice{}, voidptr(u64(4)))
+	assert closing_count == 1
+	late_close_vm.inflight = 0
+}
+
+fn check_late_stopped_close() {
+	gpu.set_running(true)
+	mut first_vm := mmu.UatContext{inflight: 1}
+	mut second_vm := mmu.UatContext{inflight: 1}
+	queue := gpu.G13QueueResources{}
+	file_map[4] = &GpuFile{vms: [&second_vm]}
+	file_map[5] = &GpuFile{
+		vms: [&first_vm]
+		g13_queues: [G13QueueOwnership{resources: &queue}]
+	}
+	release_handle(&drm.DrmDevice{}, voidptr(u64(5)))
+	assert closing_count == 1
+	gpu.set_running(false)
+	first_vm.inflight = 0
+	late_close_vm = unsafe { &second_vm }
+	gpu.watch_queue_release(close_during_reap)
+	reap_closed_files()
+	assert first_vm.destroyed && second_vm.destroyed && closing_count == 0
+	late_close_vm = unsafe { nil }
+	gpu.set_running(true)
+	println('AGX stopped close: a late close and overlapping reap drain both files')
+}
+
 pub fn run_checks() {
 	mut vm_manager := mmu.UatManager{}
 	uat_mgr = &vm_manager
+	mut initial_manager := unsafe { gpu.registration_manager() }
+	initial_manager.uat = &vm_manager
 	mut queue_a := gpu.G13QueueResources{ failures: 1 }
 	mut queue_b := gpu.G13QueueResources{ failures: 1 }
 	mut pt := pgtable.UatPgtable{}
@@ -99,7 +135,7 @@ pub fn run_checks() {
 		vms:               [&vm_a, &vm_b]
 		mappings:          [GpuMapping{ vm_id: 1, addr: 0x4000, size: 0x4000, obj: &mapped }]
 		timestamp_objects: [TimestampObject{ va: 0x10000, size: 4096, obj: &timestamp }]
-		timestamp_manager: gpu.timestamp_manager()
+		registration_manager: gpu.registration_manager()
 	}
 	vm_a.inflight = 1
 	key := u64(0x1234)
@@ -158,7 +194,7 @@ pub fn run_checks() {
 	stopped_vm.inflight = 1
 	file_map[3] = stopped_file
 	stopping_file = stopped_file
-	gpu.stop_on_next_lookup(stop_during_registration)
+	gpu.stop_on_next_retirement(stop_during_registration)
 	release_handle(&device, voidptr(3))
 	stopping_file = unsafe { nil }
 	assert stopped_vm.destroyed && table_releases == 4 && closing_count == 0
@@ -189,5 +225,7 @@ pub fn run_checks() {
 	check_orphaned_queues()
 	check_queue_record_reclamation()
 	check_logical_queue_records()
+	check_late_stopped_close()
+	check_vm_registration_replacement()
 	println('AGX file close: live jobs, failed/partial queue release, retained VMs, retry, final object teardown and intrusive retirement passed')
 }

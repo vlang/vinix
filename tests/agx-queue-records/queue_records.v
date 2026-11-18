@@ -38,11 +38,13 @@ fn check_queue_record_reclamation() {
 	mut cases := 0
 	for path in 0 .. 3 { for available in [false, true]! { for refs in [u64(0), 1, 3]! {
 		for failures in 0 .. 3 { for stopped in [false, true]! { for count in [1, 3]! {
-			gpu.available(available); gpu.set_running(!stopped)
+			gpu.set_running(!stopped)
 			mut records := []&gpu.G13QueueResources{}; records.flags |= .noslices
 			mut queues := [3]workqueue.WorkQueue{}
 			mut vm := mmu.UatContext{id: 1}
 			mut owned := GpuFile{vms: [&vm]}
+			registered := owned.registration_manager
+			if !available { owned.registration_manager = unsafe { nil } }
 			owned.g13_queues.flags |= .noslices; owned.queues.flags |= .noslices
 			for i in 0 .. count {
 				mut record := &gpu.G13QueueResources{queue_id: u32(i + 1), heap_record: true, released: stopped, failures: failures}
@@ -54,10 +56,10 @@ fn check_queue_record_reclamation() {
 			if !available || refs != 0 {
 				assert !record_owner_step(mut owned, path)
 				assert owned.g13_queues.len == count && !vm.destroyed
-				for record in records { assert C.__asan_address_is_poisoned(record) == 0, 'unavailable manager and captured references must retain all metadata' }
+				for record in records { assert C.__asan_address_is_poisoned(record) == 0, 'missing owner and captured references must retain all metadata' }
 			}
 			for mut record in records { for _ in 0 .. int(refs) { record.release_file_reference() } }
-			gpu.available(true)
+			owned.registration_manager = registered
 			mut done := false
 			for _ in 0 .. count * failures + 2 {
 				if record_owner_step(mut owned, path) { done = true; break }

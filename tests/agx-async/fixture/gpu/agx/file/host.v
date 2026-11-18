@@ -52,7 +52,7 @@ mut:
 	objects        Objects
 	mapping_retry_blocked bool
 	timestamp_objects []TimestampObject
-	timestamp_manager &gpu.GpuManager = unsafe { nil }
+	registration_manager &gpu.GpuManager = unsafe { nil }
 }
 
 // Mapping/page-table services are injected here; the close fixture exercises
@@ -84,7 +84,7 @@ fn new_file() &GpuFile {
 	q1 := &gpu.G13QueueResources{ id: 1, fence_context: syncobj.new_queue_context() or { panic('queue context') } }
 	q2 := &gpu.G13QueueResources{ id: 2, fence_context: syncobj.new_queue_context() or { panic('queue context') } }
 	return &GpuFile{
-		timestamp_manager: gpu.get_global_manager() or { panic('initial file manager') }
+		registration_manager: gpu.get_global_manager() or { panic('initial file manager') }
 		queues:     [LogicalQueue{ id: 1 }, LogicalQueue{ id: 2 }]
 		g13_queues: [Ownership{ queue_id: 1, resources: q1 }, Ownership{ queue_id: 2, resources: q2 }]
 		vm:         ctx
@@ -365,6 +365,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_pending_poll_handoff()
 	check_output_publication()
 	check_submission_operations()
 	check_g13_slot_wait()

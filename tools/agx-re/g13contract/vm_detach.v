@@ -9,7 +9,9 @@ fn check_vm_detach_local(file string) ! {
 	require_order(owned, ['for vm in f.vms', 'if vm.id == vm_id', 'return unsafe { vm }'], 'Physical lookup remains valid after namespace removal')!
 	require(!owned.contains('vm.detached'), 'Physical ownership cannot depend on name visibility')!
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_vm_create(', 'pub fn (mut f GpuFile) ioctl_vm_destroy(', 'VM namespace publication')!
-	require_order(create, ['f.lock.acquire()', 'defer { f.lock.release() }', 'vm_id := u32(1)',
+	require_order(create, ['mgr := f.file_uat()', 'f.lock.acquire()', 'defer { f.lock.release() }',
+		'mut gpu_manager := unsafe { f.registration_manager }', 'gpu_manager.lock.acquire()',
+		'defer { gpu_manager.lock.release() }', 'if gpu_manager.state == .stopped || gpu_manager.state == .error { return -19 }', 'vm_id := u32(1)',
 		'if vm.detached { continue }', 'if vm.vm_id > vm_id { insert_at = index; break }',
 		'for f.find_owned_vm(owner_id) != none', 'if !f.reserve_vm_entry_locked()',
 		'm.create_context(', 'ctx.id = owner_id', 'ctx.vm_id = vm_id',
@@ -23,11 +25,11 @@ fn check_vm_detach_local(file string) ! {
 		'vm.detached = true', 'f.reap_detached_vms_locked()', 'return 0'], 'Remove validated names before deferred physical retirement')!
 	require(!destroy.contains('return -16') && !destroy.contains('destroy_context('), 'Busy owners must not prevent namespace removal or be destroyed directly')!
 	reap := section(file, 'fn (mut f GpuFile) reap_detached_vms_locked()', 'pub fn (mut f GpuFile) ioctl_gem_create(', 'Detached physical VM retirement')!
-	require_order(reap, ['if uat_mgr == unsafe { nil } { return }', 'index := f.vms.len - 1',
+	require_order(reap, ['mut uat := unsafe { f.file_uat() }', 'if uat == unsafe { nil } { return }', 'index := f.vms.len - 1',
 		'vm_id := vm.id', 'if !vm.detached || katomic.load(&vm.inflight) != 0',
 		'if !f.cleanup_closed_mappings_locked(vm) { continue }',
 		'for queue in f.queues', 'queue.vm_id == vm_id', 'for ownership in f.g13_queues',
-		'ownership.vm_id == vm_id', 'if retained { continue }', 'manager.destroy_context(vm)',
+		'ownership.vm_id == vm_id', 'if retained { continue }', 'uat.destroy_context(vm)',
 		'f.vms.delete(index)'], 'Retire mappings then exclude every job/queue owner before physical context removal')!
 	for token in ['memory.', 'free(', 'f.vms <<'] { require(!reap.contains(token), 'VM reaper must not allocate, free metadata or grow its ownership array')! }
 	cleanup := section(file, 'fn (mut f GpuFile) cleanup_closed_mappings_locked(', 'fn (mut f GpuFile) close_object_handle(', 'Detached user bindings')!
@@ -54,4 +56,23 @@ fn check_vm_detach_reference(file string, mmu string) ! {
 		'let ualloc = file_vm.ualloc.clone()', 'let ualloc_priv = file_vm.ualloc_priv.clone()', 'reg_data.gpu.new_queue('], 'Asahi queues retain VM and driver allocators independently of VM names')!
 	unmap := section(mmu, 'pub(crate) fn unmap_range', 'fn unmap_prepared_cleanup(', 'Asahi mapping removal')!
 	require_order(unmap, ['if self.defer_unmap(iova, size)?', 'return Ok(())', 'self.unmap_range_commit(dev, iova, size, true)'], 'Asahi can defer user removal or commit through GPUVM guards')!
+}
+
+fn check_file_close_registration_local(file string, closing string) ! {
+	uat := section(file, 'fn (f &GpuFile) file_uat(', 'fn asahi_variant(', 'File UAT ownership')!
+	require_order(uat, ['manager := f.registration_manager', 'if manager == unsafe { nil }',
+		'manager.hw_config.gpu_gen != .g13', 'return manager.uat'],
+		'G13 file operations retain the original UAT through replacement')!
+	retire := section(closing, 'fn retire_closing_file(', 'fn retain_closing_file(', 'Closing registration')!
+	require_order(retire, ['file.registration_manager', 'gpu_manager.queue_file_retirement(',
+		'retain_closing_file(file, true)', 'reap_closed_files()'],
+		'Once the original worker has stopped, register deferred ownership before retrying synchronously')!
+	reap := closing.all_after('pub fn reap_closed_files()')
+	require_order(reap, ['if closing_reaper_active', 'closing_reaper_requested = true',
+		'if closing_head == unsafe { nil }', 'closing_reaper_active = true', 'count := closing_count',
+		'closing_reaper_requested = false', 'if file.close()', 'retain_closing_file(file, false)',
+		'if !closing_reaper_requested', 'closing_reaper_active = false'],
+		'An overlapping close poll transfers a retry without spinning on pinned files')!
+	require(!file.contains('gpu.get_global_manager()') && !closing.contains('gpu.get_global_manager()'),
+		'File operations and deferred retirement use their own DRM registration')!
 }

@@ -4,7 +4,7 @@ module g13contract
 fn check_params_device_local(file string, gpu string) ! {
 	query := section(file, 'pub fn (f &GpuFile) ioctl_get_params(', 'pub fn (mut f GpuFile) ioctl_vm_create(', 'Native parameter-query device state')!
 	require_order(query, ['request.extensions != 0 || request.param_group != 0 || request.pad != 0',
-		'return -22', 'manager := gpu.get_global_manager() or { return -19 }',
+		'return -22', 'manager := f.registration_manager', 'if manager == unsafe { nil } { return -19 }',
 		'mut gpu_manager := unsafe { manager }', 'if !gpu_manager.can_query_global_params() { return -19 }',
 		'params := make_global_params(manager)', 'return agxparams.copy_global('],
 		'Global queries reject lost devices after header validation and before formatting/copying')!

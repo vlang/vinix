@@ -13,11 +13,13 @@ fn check_logical_queue_records() {
 	mut cases := 0
 	for path in 0 .. 2 { for available in [false, true]! { for refs in [u64(0), 1, 3]! {
 		for failures in 0 .. 2 { for count in [1, 3]! {
-			gpu.available(available); gpu.set_running(true)
+			gpu.set_running(true)
 			mut resources := [3]gpu.G13QueueResources{}
 			mut saved := unsafe { [3]&workqueue.WorkQueue{} }
 			mut vm := mmu.UatContext{id: 1}
 			mut file := GpuFile{vms: [&vm]}
+			registered := file.registration_manager
+			if !available { file.registration_manager = unsafe { nil } }
 			file.queues.flags |= .noslices; file.g13_queues.flags |= .noslices
 			for i in 0 .. count {
 				resources[i] = gpu.G13QueueResources{queue_id: u32(i + 1), failures: failures}
@@ -31,7 +33,7 @@ fn check_logical_queue_records() {
 				for i in 0 .. count { assert C.__asan_address_is_poisoned(saved[i]) == 0, 'logical metadata stays alive with captures or absent manager' }
 			}
 			for i in 0 .. count { for _ in 0 .. int(refs) { resources[i].release_file_reference() } }
-			gpu.available(true)
+			file.registration_manager = registered
 			mut done := false
 			for _ in 0 .. count * failures + 2 { if record_owner_step(mut file, path) { done = true; break } }
 			assert done && file.queues.len == 0

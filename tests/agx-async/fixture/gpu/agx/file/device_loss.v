@@ -122,12 +122,14 @@ fn check_submission_device_loss() {
 			expect_device_refusal(mut file, &request, -19, manager, target, previous, &result)
 			loss_file = unsafe { nil }
 		} }
-		gpu.reset(); gpu.available(false); syncobj.replace_fence(target, previous)
+		gpu.reset(); syncobj.replace_fence(target, previous)
+		registration := file.registration_manager
+		file.registration_manager = unsafe { nil }
 		memory.fail_at(-1); usercopy.reject(false)
 		request := ioctl.DrmAsahiSubmit{ queue_id: 1, commands: unsafe { u64(&commands[0]) }, command_count: 1,
 			out_syncs: unsafe { u64(&out_sync) }, out_sync_count: 1 }
-		// Restore lookup availability only for the fixture's drain inspection.
-		assert file.ioctl_submit(&request) == -19; gpu.available(true)
+		assert file.ioctl_submit(&request) == -19
+		file.registration_manager = registration
 		assert_drained(file); assert voidptr(fence(target)) == voidptr(previous); device_cases++
 		assert !syncobj.is_signaled(previous) && !file.lock.is_held() && !manager.lock.is_held() && result.references == 1
 	}

@@ -11,7 +11,7 @@ fn check_params_copy_local(native string, fake string, helper string) ! {
 			'Queries must keep size input-only and allow zero/null bounded copies')!
 	}
 	query := section(native, 'pub fn (f &GpuFile) ioctl_get_params(', 'pub fn (mut f GpuFile) ioctl_vm_create(', 'Native global lookup')!
-	require_order(query, ['return -22', 'manager := gpu.get_global_manager() or { return -19 }', 'params := make_global_params(manager)', 'agxparams.copy_global('],
+	require_order(query, ['return -22', 'manager := f.registration_manager', 'if manager == unsafe { nil } { return -19 }', 'params := make_global_params(manager)', 'agxparams.copy_global('],
 		'Invalid headers precede device lookup; missing device precedes copying')!
 	require_order(helper, ['pub fn copy_global(', 'supported := u64(sizeof(ioctl.DrmAsahiParamsGlobal))',
 		'bytes := if request.size < supported { request.size } else { supported }',

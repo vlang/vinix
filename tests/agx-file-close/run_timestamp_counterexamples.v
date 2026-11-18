@@ -10,7 +10,7 @@ fn main() {
 	os.mkdir_all(state)!
 	mut receipts := []string{}
 	for name, spec in {
-		'bind-selects-global': ['file', 'mut gpu_manager := unsafe { f.timestamp_manager }', 'mut gpu_manager := gpu.get_global_manager() or { gem.unref(obj); return -19 }', 'file.invoke_timestamp_bind:', 'legacy timestamp BIND must use its DRM registration'],
+		'bind-selects-global': ['file', 'mut gpu_manager := unsafe { f.registration_manager }\n\t\t\tif gpu_manager == unsafe { nil } {\n\t\t\t\tgem.unref(obj)', 'mut gpu_manager := gpu.get_global_manager() or { gem.unref(obj); return -19 }\n\t\t\tif gpu_manager == unsafe { nil } {\n\t\t\t\tgem.unref(obj)', 'file.invoke_timestamp_bind:', 'legacy timestamp BIND must use its DRM registration'],
 		'null-handle-offset': ['timestamp', 'if timestamp.handle == 0', 'if timestamp.handle == 0 && timestamp.offset == 0', 'file.check_timestamp_captures:', 'timestamp lookup/overflow/range precedence'],
 		'missing-name-error': ['timestamp', 'return -2, G13TimestampCapture{}', 'return -22, G13TimestampCapture{}', 'file.check_timestamp_captures:', 'timestamp lookup/overflow/range precedence'],
 		'overflow-error': ['timestamp', 'if timestamp.offset > ~u32(0) - u32(8) { return -22,', 'if timestamp.offset > ~u32(0) - u32(8) { return -34,', 'file.check_timestamp_captures:', 'timestamp lookup/overflow/range precedence'],
@@ -22,8 +22,8 @@ fn main() {
 		'early-reap': ['timestamp', 'if !object.detached || object.references != 0 { continue }', 'if !object.detached { continue }', 'file.check_timestamp_captures:', 'cannot reap a captured timestamp'],
 		'unbind-drops-capture': ['file', 'if found.references != 0 {', 'if false && found.references != 0 {', 'file.check_timestamp_captures:', 'UNBIND must retain captured mapping'],
 		'close-drops-capture': ['file', 'if object.references != 0 { f.lock.release(); return false }', 'if false && object.references != 0 { f.lock.release(); return false }', 'file.check_timestamp_captures:', 'capture pins file before VM pin'],
-		'capture-foreign-manager': ['timestamp', 'voidptr(f.timestamp_manager) != voidptr(manager)', 'false', 'file.check_timestamp_owner_teardown:', 'refused == -19'],
-		'close-skips-original-owner': ['file', 'release_timestamp_object(f.timestamp_manager, object)', 'if _ := gpu.get_global_manager() { release_timestamp_object(f.timestamp_manager, object) } else { gem.unref(object.obj) }', 'file.check_timestamp_owner_teardown:', 'original.timestamp_unmaps == old_unmaps + 3'],
+		'capture-foreign-manager': ['timestamp', 'voidptr(f.registration_manager) != voidptr(manager)', 'false', 'file.check_timestamp_owner_teardown:', 'refused == -19'],
+		'close-skips-original-owner': ['file', 'release_timestamp_object(f.registration_manager, object)', 'if _ := gpu.get_global_manager() { release_timestamp_object(f.registration_manager, object) } else { gem.unref(object.obj) }', 'file.check_timestamp_owner_teardown:', 'original.timestamp_unmaps == old_unmaps + 3'],
 		'unbind-skips-original-owner': ['file', 'release_timestamp_object(manager, found)', 'if _ := gpu.get_global_manager() { release_timestamp_object(manager, found) }', 'file.check_timestamp_bindings:', 'shared.references == 1'],
 		'map-without-lock': ['gpu-map', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'gpu.agx.gpu.expect_timestamp_map_error:', '!timestamp_lock_held()'],
 		'unmap-without-lock': ['gpu-unmap', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'mmu.UatManager.unmap_kernel:', 'timestamp_lock_held()'],

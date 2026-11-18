@@ -54,6 +54,7 @@ __global pending_head &G13PendingSubmission = unsafe { nil }
 __global pending_tail &G13PendingSubmission = unsafe { nil }
 __global pending_count = u64(0)
 __global pending_poll_active = false
+__global pending_poll_requested = false
 
 fn signal_g13_submission_fence(fence &syncobj.DmaFence, failure int) {
 	if failure == 0 { syncobj.signal(fence) } else { syncobj.signal_error(fence, failure) }
@@ -283,16 +284,38 @@ fn g13_pending_dispatch_complete(item &G13PendingSubmission) bool {
 // Only unpublished work blocks a later batch on that queue.
 fn process_pending_submissions() {
 	pending_lock.acquire()
-	if pending_poll_active || pending_head == unsafe { nil } {
+	if pending_poll_active {
+		// A replacement worker can reach its final poll while the current
+		// snapshot is detached and misses its newly queued work.
+		pending_poll_requested = true
+		pending_lock.release()
+		return
+	}
+	if pending_head == unsafe { nil } {
 		pending_lock.release()
 		return
 	}
 	pending_poll_active = true
-	mut current := pending_head
-	pending_head = unsafe { nil }
-	pending_tail = unsafe { nil }
-	pending_count = 0
-	pending_lock.release()
+	for {
+		current := pending_head
+		pending_head = unsafe { nil }
+		pending_tail = unsafe { nil }
+		pending_count = 0
+		pending_poll_requested = false
+		pending_lock.release()
+		poll_pending_batch(current)
+		if !pending_poll_requested {
+			pending_poll_active = false
+			pending_lock.release()
+			return
+		}
+	}
+}
+
+// The active poller owns this snapshot. Return holding pending_lock so the
+// handoff test is atomic with restoring the retained list.
+fn poll_pending_batch(first &G13PendingSubmission) {
+	mut current := unsafe { first }
 	// Clear the queue-local scratch for every queue in this snapshot before
 	// visiting any of them. Concurrent appends join the next snapshot.
 	mut cursor := current
@@ -348,8 +371,6 @@ fn process_pending_submissions() {
 		if pending_tail == unsafe { nil } { pending_tail = retained_tail }
 		pending_count += retained_count
 	}
-	pending_poll_active = false
-	pending_lock.release()
 }
 
 pub fn service_file_work() {

@@ -3,7 +3,7 @@ module g13contract
 
 fn check_orphan_queue_local(file string, gpu string, worker string) ! {
 	reap := section(file, 'fn (mut f GpuFile) reap_orphaned_g13_queues_locked()', '// The registry lock pins', 'Unpublished G13 queue cleanup')!
-	require_order(reap, ['manager := gpu.get_global_manager() or { return }',
+	require_order(reap, ['mut gpu_manager := unsafe { f.registration_manager }', 'if gpu_manager == unsafe { nil } { return }',
 		'index := f.g13_queues.len - 1', 'ownership := f.g13_queues[index]',
 		'for queue in f.queues', 'if queue.id == ownership.queue_id { named = true; break }',
 		'if named || ownership.resources.has_file_references() { continue }',

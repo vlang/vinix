@@ -638,15 +638,21 @@ fn check_submission_pipelining(pending string) ! {
 		'item.commands[index].render_job != unsafe { nil }', 'return false', 'return true'], 'Vinix dispatch completion')!
 	require(!dispatch.contains('callbacks_remaining') && !dispatch.contains('syncobj.'),
 		'Publication completion must not depend on retirement or a user fence')!
-	drain := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Vinix submission pipelining')!
-	require_order(drain, ['pending_poll_active = true', 'mut current := pending_head',
-		'pending_head = unsafe { nil }', 'pending_lock.release()', 'mut cursor := current',
+	handoff := section(pending, 'fn process_pending_submissions()', 'fn poll_pending_batch(', 'Vinix worker poll handoff')!
+	require_order(handoff, ['pending_lock.acquire()', 'if pending_poll_active',
+		'pending_poll_requested = true', 'pending_lock.release()', 'return', 'pending_poll_active = true',
+		'for {', 'current := pending_head', 'pending_head = unsafe { nil }', 'pending_tail = unsafe { nil }',
+		'pending_count = 0', 'pending_poll_requested = false', 'pending_lock.release()', 'poll_pending_batch(current)',
+		'if !pending_poll_requested', 'pending_poll_active = false', 'pending_lock.release()', 'return'],
+		'An overlapping worker poll transfers its request to the owner of the detached snapshot')!
+	drain := section(pending, 'fn poll_pending_batch(', 'pub fn service_file_work()', 'Vinix submission pipelining')!
+	require_order(drain, ['mut current := unsafe { first }', 'mut cursor := current',
 		'mut queue := unsafe { cursor.queue }', 'queue.dispatch_blocked_in_poll = false',
 		'cursor = cursor.next', 'for current != unsafe { nil }', 'current = item.next',
 		'mut queue := unsafe { item.queue }', 'earlier := queue.dispatch_blocked_in_poll',
 		'if earlier || poll_g13_pending', '!g13_pending_dispatch_complete(item)',
-		'queue.dispatch_blocked_in_poll = true', 'retained_tail.next = pending_head',
-		'pending_head = retained_head', 'pending_poll_active = false'],
+		'queue.dispatch_blocked_in_poll = true', 'pending_lock.acquire()', 'retained_tail.next = pending_head',
+		'pending_head = retained_head'],
 		'Vinix per-queue publication FIFO in the detached poll snapshot')!
 	require(!drain.contains('initial_barriers'), 'Initial events must not wait for whole-batch CPU retirement')!
 }
@@ -687,6 +693,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
 	check_orphan_queue_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'queue/mod.rs'))!)!
 	check_vm_detach_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!)!
+	check_file_close_registration_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
+		read(os.join_path(repo, 'kernel/gpu/agx/file/closing.v'))!)!
 	check_vm_detach_reference(read(os.join_path(base, 'file.rs'))!, read(os.join_path(base, 'mmu.rs'))!)!
 	check_queue_reference_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!,

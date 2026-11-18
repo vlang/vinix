@@ -217,12 +217,13 @@ fn check_eviction_before_file_mapping_check() {
 
 fn check_file_mapping_state() {
 	mut manager := unsafe { gpu.get_global_manager() or { panic('GPU manager') } }
+	file := GpuFile{ registration_manager: manager }
 	for generation in [gpu.Generation.g13, .g17]! {
 		manager.hw_config.gpu_gen = generation
 		for state in [gpu.State.idle, .starting, .running, .error, .stopped]! {
 			manager.state = state
-			assert finish_file_mapping(false) == (generation == .g13 && state == .running)
-			assert finish_file_mapping(true) == (generation == .g13 && state in [.running, .stopped]!)
+			assert file.finish_file_mapping(false) == (generation == .g13 && state == .running)
+			assert file.finish_file_mapping(true) == (generation == .g13 && state in [.running, .stopped]!)
 			assert !gpu.query_lock_held()
 		}
 	}

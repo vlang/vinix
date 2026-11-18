@@ -496,6 +496,34 @@ The complete archive passed inventory verification. `bundle.tar.gz`
 SHA-256 is
 `66e0b8c5888528c890c9f2a90bfd874afb25cf170d4c66553df2b222abc866e5`.
 
+G13 opens now use their original DRM registration for queue and VM
+creation, mapping checks, submission, and deferred teardown. After
+ordered replacement, the old file can release its queues, mappings and
+VMs through the old manager and UAT. VM creation on a stopped registration
+returns ENODEV before allocating a context. An overlapping worker poll
+requests a fresh pending snapshot. A late close enters the closing list
+before requesting a reap, so it can be retried after the final pins drop.
+
+Both kernel builds, 82 V test files and the ASan/UBSan close and submission
+suites passed. The host tests cover replacement with separate UATs, a late
+close during an active reap, and a final worker poll during a detached
+pending snapshot. Three compiled controls caught wrong-owner queue close,
+global UAT fallback and a missed worker poll. All 18 timestamp controls
+passed. The independent lifetime review passed and the allocation scan
+reproduced 178 baseline findings.
+
+The failed queue-constructor quarantine still has an ownership handoff
+gap if shutdown clears the manager's list before the file adopts the
+record. Concurrent teardown and reprobe, G17 resident-slot retirement,
+and native quiescence remain open. The pinned source audit remains
+`not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `41aa1b93e344aff9c97b50da53c9ea1c8e58146e` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-file-owner-20261118/`.
+`bundle.tar.gz` SHA-256 is
+`676a07075599f7ca8c7084bd0eea81f7b0c05a81c20c0971d920d89a13f654b0`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

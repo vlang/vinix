@@ -48,6 +48,7 @@ pub mut:
 	hw_config Config
 	g13_timestamp TimestampAllocator
 	uat &mmu.UatManager = unsafe { nil }
+	queue_release_calls int
 	timestamp_unmaps int
 	next_timestamp_va u64
 }
@@ -176,16 +177,19 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 pub fn get_global_manager() ?&GpuManager {
 	manager_lookups++
 	if !manager_available { return none }
+	return registration_manager()
+}
+
+fn finish_stop_for_retirement() {
 	if stop_callback != unsafe { nil } {
 		callback := stop_callback
 		stop_callback = unsafe { nil }
 		callback()
 		test_gpu_manager.state = .stopped
 	}
-	return timestamp_manager()
 }
 
-pub fn timestamp_manager() &GpuManager {
+pub fn registration_manager() &GpuManager {
 	return unsafe { if use_replacement_manager { &replacement_gpu_manager } else { &test_gpu_manager } }
 }
 
@@ -209,9 +213,13 @@ pub fn fail_before_query_lock() {
 	klock.before_once(unsafe { &test_gpu_manager.lock }, fail_query)
 }
 
-pub fn stop_on_next_lookup(callback fn ()) { stop_callback = callback }
+pub fn stop_on_next_retirement(callback fn ()) {
+	stop_callback = callback
+	klock.before_once(unsafe { &test_gpu_manager.lock }, finish_stop_for_retirement)
+}
 
 pub fn (mut mgr GpuManager) release_g13_queue_resources(queue &G13QueueResources) bool {
+	mgr.queue_release_calls++
 	if queue_release_watch != unsafe { nil } { queue_release_watch() }
 	mut owned := unsafe { queue }
 	owned.calls++

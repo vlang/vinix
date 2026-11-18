@@ -30,7 +30,7 @@ fn check_queue_priority_local(file string, ioctl string, gpu string) ! {
 		'pub fn (mut f GpuFile) ioctl_gem_create(', 'Vinix failed queue VM pin')!
 	require_order(destroy, ['for ownership in f.g13_queues {',
 		'if ownership.vm_id == vm_id { retained = true; break }', 'if retained { continue }',
-		'manager.destroy_context(vm)'], 'Vinix failed queue VM pin')!
+		'uat.destroy_context(vm)'], 'Vinix failed queue VM pin')!
 	lookup := section(gpu, 'pub fn (mut mgr GpuManager) retained_g13_queue_resources(',
 		'pub fn (mut mgr GpuManager) release_g13_queue_resources(', 'Vinix retained failed queue lookup')!
 	require_order(lookup, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'for resources in mgr.g13_queues',

@@ -211,9 +211,9 @@ fn check_modern_bind_staging_order() {
 		manager.hw_config.gpu_gen = .g17
 		assert file.ioctl_modern_vm_bind(unsafe { &request }) == -14
 		manager.hw_config.gpu_gen = .g13
-		gpu.available(false)
+		file.registration_manager = unsafe { nil }
 		assert file.ioctl_modern_vm_bind(unsafe { &request }) == -14
-		gpu.available(true)
+		file.registration_manager = manager
 		memory.fail_allocations(false)
 		assert memory.calls() == calls && usercopy.reads() == 0
 	}
@@ -222,8 +222,14 @@ fn check_modern_bind_staging_order() {
 
 pub fn run_modern_checks() {
 	mut manager := mmu.UatManager{}
+	mut registered := unsafe { gpu.registration_manager() }
+	saved := registered.uat
+	registered.uat = unsafe { &manager }
 	uat_mgr = unsafe { &manager }
-	defer { uat_mgr = unsafe { nil } }
+	defer {
+		registered.uat = saved
+		uat_mgr = unsafe { nil }
+	}
 	check_modern_transport()
 	check_modern_bind_staging_order()
 	check_file_vm_names(mut manager)

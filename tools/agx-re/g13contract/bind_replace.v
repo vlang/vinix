@@ -13,7 +13,7 @@ fn check_bind_replace_local(file string, page_table string) ! {
 		'retired := f.unbind_range_locked(vm_slot, request.addr, request.range)',
 		'if retired != 0 { gem.unref(obj); return retired }', 'mapped := if', 'if !mapped',
 		'gem.unref(obj)', 'return -12', 'f.mappings << GpuMapping{', 'vm_id: vm_slot', 'obj: obj',
-		'if !finish_file_mapping(false)',
+		'if !f.finish_file_mapping(false)',
 		'f.mappings[f.mappings.len - 1].retiring = true'],
 		'Prepare transient survivor/new metadata and all tables before old retirement; return temporary new owner on failure')!
 	prepare := section(page_table, 'pub fn (mut pt UatPgtable) prepare_map_range(', '// Visit each touched L3 table', 'Native table preparation')!

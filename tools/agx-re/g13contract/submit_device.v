@@ -4,8 +4,8 @@ module g13contract
 fn check_submit_device_local(file string, gpu string) ! {
 	submit := section(file, 'pub fn (mut f GpuFile) ioctl_submit(', 'fn dispatch(', 'Native submission device status')!
 	require_order(submit, ['defer { memory.free(stage_storage) }', 'agxsubmission.stage_command_array(',
-		'agxsubmission.stage_g13_sync_array(', 'manager := gpu.get_global_manager() or { return -19 }',
-		'if voidptr(manager) != voidptr(f.timestamp_manager) { return -19 }',
+		'agxsubmission.stage_g13_sync_array(', 'manager := f.registration_manager',
+		'if manager == unsafe { nil } { return -19 }',
 		'mut gpu_manager := unsafe { manager }', 'status := gpu_manager.g13_submission_status()',
 		'if status != 0 { return status }', 'f.lock.acquire()', 'agxsubmission.install_output_syncs('],
 		'Locked device refusal follows staging with owned-buffer cleanup and precedes file mutation/output publication')!
@@ -36,17 +36,20 @@ fn check_submit_device_reference(queue string) ! {
 }
 
 fn check_modern_submit_device_local(submit string) ! {
-	require_order(submit, ['capture_submission_queue(data.queue_id)', 'submission.stage_packet_syncs(',
+	require_order(submit, ['mut manager := unsafe { f.registration_manager }',
+		'if manager != unsafe { nil } { manager.refresh_g13_submit_globals() }',
+		'capture_submission_queue(data.queue_id)', 'submission.stage_packet_syncs(',
 		'defer { if packet != unsafe { nil } { memory.free(packet) } }',
 		'if data.cmdbuf_size != 0', 'memory.malloc_packed_fallible(data.cmdbuf_size)',
 		'usercopy.copy_from_user(packet, data.cmdbuf, data.cmdbuf_size)',
-		'gpu.get_global_manager() or { return -19 }', 'if voidptr(manager) != voidptr(f.timestamp_manager) { return -19 }',
+		'if manager == unsafe { nil } { return -19 }',
 		'status := manager.g13_submission_status()',
 		'if status != 0 { return status }', 'if data.cmdbuf_size == 0 { return -22 }',
 		'memory.malloc_packed_fallible(sizeof(submission.PacketWorkspace))', 'submission.decode_packet(',
 		'f.submit_g13_staged('], 'Modern submit checks the device after copying and before parsing')!
 	require(submit.count('if data.cmdbuf_size == 0') == 1 && submit.count('g13_submission_status()') == 1,
 		'Modern submit must defer empty-packet rejection until after the device check')!
+	require(!submit.contains('gpu.get_global_manager()'), 'Modern submit remains on the file registration')!
 }
 
 fn check_modern_submit_device_reference(file string, queue string) ! {

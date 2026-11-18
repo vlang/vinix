@@ -19,6 +19,7 @@ pub mut:
 	ias u32 = 39
 	next_context &UatContext = unsafe { nil }
 	vm_binds int
+	vm_destroys int
 }
 
 pub fn (mgr &UatManager) map_kernel_status(va u64, phys u64, size u64, prot u64) int {
@@ -80,6 +81,7 @@ pub fn (mut mgr UatManager) bind_context(ctx &UatContext) u32 {
 }
 
 pub fn (mut vm_manager UatManager) destroy_context(context &UatContext) {
+	vm_manager.vm_destroys++
 	mut owned := unsafe { context }
 	assert owned.queue == unsafe { nil } || owned.queue.released, 'VM destroyed while queue backing is retained'
 	assert !owned.destroyed, 'VM destroyed twice during close retry'

@@ -62,7 +62,7 @@ fn check_orphaned_queues() {
 						}
 						gpu.available(available)
 						reap_open_detached_g13_queues()
-						if references != 0 || !available {
+						if references != 0 {
 							assert orphan.calls == 0 && !orphan.released && file.g13_queues.len == 2
 						}
 						for _ in 0 .. int(references) { orphan.release_file_reference() }

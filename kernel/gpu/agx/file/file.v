@@ -83,6 +83,8 @@ mut:
 }
 
 pub struct GpuFile {
+pub:
+	registration_manager &gpu.GpuManager = unsafe { nil }
 pub mut:
 	dev               &drm.DrmDevice = unsafe { nil }
 	vms               []&mmu.UatContext // visible names are in ascending order
@@ -92,7 +94,6 @@ pub mut:
 	g17_queues        []G17QueueOwnership
 	g13_queues        []G13QueueOwnership
 	timestamp_objects []TimestampObject // sorted by name, including detached records
-	timestamp_manager &gpu.GpuManager = unsafe { nil } // owner of this DRM registration
 	next_queue_id     u32
 	owner_process_id  u32
 	owner_key         u64
@@ -145,7 +146,11 @@ pub fn release_handle(_dev &drm.DrmDevice, handle voidptr) {
 }
 
 pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
-	if dev == unsafe { nil } || uat_mgr == unsafe { nil } || owner_key == 0 {
+	if dev == unsafe { nil } || owner_key == 0 {
+		return none
+	}
+	manager := unsafe { &gpu.GpuManager(dev.driver_data) }
+	if manager == unsafe { nil } || manager.uat == unsafe { nil } {
 		return none
 	}
 	current := proc.current_thread()
@@ -155,7 +160,7 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 	}
 	mut f := &GpuFile{
 		dev: unsafe { dev }
-		timestamp_manager: unsafe { &gpu.GpuManager(dev.driver_data) }
+		registration_manager: manager
 		next_queue_id: 1
 		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
@@ -182,7 +187,7 @@ pub fn (mut f GpuFile) close() bool {
 	// Closing has removed the file's names. An unrelated queue or VM can
 	// still defer close, but has no use for an uncaptured timestamp.
 	for object in f.timestamp_objects {
-		release_timestamp_object(f.timestamp_manager, object)
+		release_timestamp_object(f.registration_manager, object)
 	}
 	unsafe { f.timestamp_objects.free() }
 	f.timestamp_objects = []TimestampObject{}
@@ -199,15 +204,16 @@ pub fn (mut f GpuFile) close() bool {
 			return false
 		}
 	}
-	manager := gpu.get_global_manager() or { unsafe { nil } }
-	if manager == unsafe { nil } && f.g13_queues.len != 0 {
+	mut manager := unsafe { f.registration_manager }
+	mut uat := unsafe { f.file_uat() }
+	if (manager == unsafe { nil } && (f.g13_queues.len != 0 || f.g17_queues.len != 0))
+		|| (uat == unsafe { nil } && f.vms.len != 0) {
 		f.lock.release()
 		return false
 	}
 	if manager != unsafe { nil } {
-		mut gpu_manager := unsafe { manager }
 		for ownership in f.g13_queues {
-			if !gpu_manager.release_g13_queue_resources(ownership.resources) {
+			if !manager.release_g13_queue_resources(ownership.resources) {
 				// Failed invalidation retains backing in the manager. Keep the
 				// VM and every userspace mapping alive until cleanup succeeds or
 				// stopped firmware makes the retained queue safe to release.
@@ -233,9 +239,8 @@ pub fn (mut f GpuFile) close() bool {
 	unsafe { f.queues.free() }
 	f.queues = []&workqueue.WorkQueue{}
 	if manager != unsafe { nil } {
-		mut gpu_manager := unsafe { manager }
 		for ownership in f.g17_queues {
-			gpu_manager.release_g17_queue_resources(ownership.resources)
+			manager.release_g17_queue_resources(ownership.resources)
 		}
 	}
 	unsafe { f.g17_queues.free() }
@@ -247,12 +252,8 @@ pub fn (mut f GpuFile) close() bool {
 	}
 	unsafe { f.g13_queues.free() }
 	f.g13_queues = []G13QueueOwnership{}
-	mgr := uat_mgr
-	if mgr != unsafe { nil } {
-		mut m := unsafe { mgr }
-		for vm in f.vms {
-			m.destroy_context(vm)
-		}
+	for vm in f.vms {
+		uat.destroy_context(vm)
 	}
 	unsafe { f.vms.free() }
 	f.vms = []&mmu.UatContext{}
@@ -321,7 +322,7 @@ fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 		pt.unmap(mapping.addr, mapping.size)
 		f.mappings[index].retiring = true
 	}
-	if !finish_file_mapping(true) {
+	if !f.finish_file_mapping(true) {
 		return false
 	}
 	gem.unref(mapping.obj)
@@ -566,10 +567,21 @@ fn (f &GpuFile) has_mapping_overlap_locked(vm_id u32, addr u64, size u64) bool {
 
 // GPU-only GEM mappings are coherent. Page-table edits complete the
 // translation invalidation for the published root before this state check.
-fn finish_file_mapping(unmapped bool) bool {
-	manager := gpu.get_global_manager() or { return false }
-	mut gpu_manager := unsafe { manager }
+fn (f &GpuFile) finish_file_mapping(unmapped bool) bool {
+	mut gpu_manager := unsafe { f.registration_manager }
+	if gpu_manager == unsafe { nil } { return false }
 	return gpu_manager.finish_g13_file_mapping(unmapped)
+}
+
+fn (f &GpuFile) file_uat() &mmu.UatManager {
+	manager := f.registration_manager
+	if manager == unsafe { nil } { return unsafe { nil } }
+	// G13 clears its resident slots before replacement. Other backends
+	// still need the current UAT to own their firmware-visible slots.
+	if manager.hw_config.gpu_gen != .g13 && voidptr(manager.uat) != voidptr(uat_mgr) {
+		return unsafe { nil }
+	}
+	return manager.uat
 }
 
 fn asahi_variant(config &gpu.GpuManager) u32 {
@@ -657,7 +669,8 @@ pub fn (f &GpuFile) ioctl_get_params(data &ioctl.DrmAsahiGetParams) int {
 	if request.extensions != 0 || request.param_group != 0 || request.pad != 0 {
 		return -22 // EINVAL
 	}
-	manager := gpu.get_global_manager() or { return -19 }
+	manager := f.registration_manager
+	if manager == unsafe { nil } { return -19 }
 	mut gpu_manager := unsafe { manager }
 	if !gpu_manager.can_query_global_params() { return -19 }
 	params := make_global_params(manager)
@@ -693,7 +706,7 @@ fn (mut f GpuFile) reserve_vm_entry_locked() bool {
 
 pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	mut request := unsafe { data }
-	mgr := uat_mgr
+	mgr := f.file_uat()
 	if mgr == unsafe { nil } {
 		return -19
 	}
@@ -705,6 +718,10 @@ pub fn (mut f GpuFile) ioctl_vm_create(data &ioctl.DrmAsahiVmCreate) int {
 	}
 	f.lock.acquire()
 	defer { f.lock.release() }
+	mut gpu_manager := unsafe { f.registration_manager }
+	gpu_manager.lock.acquire()
+	defer { gpu_manager.lock.release() }
+	if gpu_manager.state == .stopped || gpu_manager.state == .error { return -19 }
 	mut vm_id := u32(1)
 	mut insert_at := f.vms.len
 	for index, vm in f.vms {
@@ -757,7 +774,8 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 // idle. A device-state refusal retains their object and context for retry.
 // Queue owners (including failed-create quarantine) retain driver mappings.
 fn (mut f GpuFile) reap_detached_vms_locked() {
-	if uat_mgr == unsafe { nil } { return }
+	mut uat := unsafe { f.file_uat() }
+	if uat == unsafe { nil } { return }
 	for index := f.vms.len - 1; index >= 0; index-- {
 		vm := f.vms[index]
 		vm_id := vm.id
@@ -771,8 +789,7 @@ fn (mut f GpuFile) reap_detached_vms_locked() {
 			if ownership.vm_id == vm_id { retained = true; break }
 		}
 		if retained { continue }
-		mut manager := unsafe { uat_mgr }
-		manager.destroy_context(vm)
+		uat.destroy_context(vm)
 		f.vms.delete(index)
 	}
 }
@@ -888,7 +905,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				size: request.range
 				obj: obj
 			}
-			if !finish_file_mapping(false) {
+			if !f.finish_file_mapping(false) {
 				// Roll back the PTEs and retain backing until retirement can
 				// confirm that the device is running or has stopped.
 				pt.unmap(request.addr, request.range)
@@ -972,7 +989,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				gem.unref(obj)
 				return -22
 			}
-			mut gpu_manager := unsafe { f.timestamp_manager }
+			mut gpu_manager := unsafe { f.registration_manager }
 			if gpu_manager == unsafe { nil } {
 				gem.unref(obj)
 				return -19
@@ -1038,7 +1055,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				f.lock.release()
 				return 0
 			}
-			manager := f.timestamp_manager
+			manager := f.registration_manager
 			f.timestamp_objects.delete(found_index)
 			f.lock.release()
 			release_timestamp_object(manager, found)
@@ -1062,7 +1079,8 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 		|| request.queue_caps == 0 || request.queue_caps & ~known_caps != 0 {
 		return -22
 	}
-	manager := gpu.get_global_manager() or { return -19 }
+	manager := f.registration_manager
+	if manager == unsafe { nil } { return -19 }
 	// Only G13's modern queue path is qualified here. Other backends retain
 	// their previous refusal of nonzero modern render scratch layouts.
 	if manager.hw_config.gpu_gen != .g13 && render_scs_layout != [u64(0), 0]! { return -22 }
@@ -1164,8 +1182,8 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 // their own queue through staging, callbacks and final aggregate retirement.
 // Unrelated work in the same VM does not postpone this queue's release.
 fn (mut f GpuFile) reap_detached_g13_queues_locked() {
-	manager := gpu.get_global_manager() or { return }
-	mut gpu_manager := unsafe { manager }
+	mut gpu_manager := unsafe { f.registration_manager }
+	if gpu_manager == unsafe { nil } { return }
 	for i := f.queues.len - 1; i >= 0; i-- {
 		mut q := unsafe { f.queues[i] }
 		if !q.detached { continue }
@@ -1190,8 +1208,8 @@ fn (mut f GpuFile) reap_detached_g13_queues_locked() {
 // every published or captured queue keeps its original owner installed.
 // Caller holds file.lock; physical release retains its manager/job guards.
 fn (mut f GpuFile) reap_orphaned_g13_queues_locked() {
-	manager := gpu.get_global_manager() or { return }
-	mut gpu_manager := unsafe { manager }
+	mut gpu_manager := unsafe { f.registration_manager }
+	if gpu_manager == unsafe { nil } { return }
 	for index := f.g13_queues.len - 1; index >= 0; index-- {
 		ownership := f.g13_queues[index]
 		mut named := false
@@ -1248,20 +1266,19 @@ pub fn (mut f GpuFile) ioctl_queue_destroy(data &ioctl.DrmAsahiQueueDestroy) int
 				}
 			}
 			if g13_resources != unsafe { nil } {
-				// Namespace removal succeeds independently of live jobs or a
-				// temporarily unavailable manager. Retained ownership is retried
-				// by the worker, or by close after the Handle is released.
+				// Hide the queue while jobs hold it. The worker or close
+				// retries physical retirement through its original manager.
 				q.detached = true
 				f.reap_detached_g13_queues_locked()
 				f.reap_detached_vms_locked()
 				f.lock.release()
 				return 0
 			}
-			manager := gpu.get_global_manager() or {
+			mut gpu_manager := unsafe { f.registration_manager }
+			if gpu_manager == unsafe { nil } {
 				f.lock.release()
 				return -19
 			}
-			mut gpu_manager := unsafe { manager }
 			if resources != unsafe { nil } {
 				gpu_manager.release_g17_queue_resources(resources)
 			}
@@ -1482,8 +1499,8 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	commands []agxsubmission.Command, input_syncs &agxsubmission.SyncArray,
 	output_syncs &agxsubmission.SyncArray, result_handle u32, attachment_initial_mask u32) int {
 	if commands.len == 0 || commands.len > int(max_g13_submission_commands) { return -22 }
-	manager := gpu.get_global_manager() or { return -19 }
-	if voidptr(manager) != voidptr(f.timestamp_manager) { return -19 }
+	manager := f.registration_manager
+	if manager == unsafe { nil } { return -19 }
 	mut gpu_manager := unsafe { manager }
 	status := gpu_manager.g13_submission_status()
 	if status != 0 { return status }

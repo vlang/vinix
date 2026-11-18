@@ -67,7 +67,8 @@ fn make_modern_global_params(manager &gpu.GpuManager) asahi.ParamsGlobal {
 
 pub fn (f &GpuFile) ioctl_modern_get_params(data &asahi.GetParams) int {
 	if data.param_group != 0 || data.pad != 0 { return -22 }
-	manager := gpu.get_global_manager() or { return -19 }
+	manager := f.registration_manager
+	if manager == unsafe { nil } { return -19 }
 	if manager.hw_config.gpu_gen != .g13 { return -95 }
 	mut owned := unsafe { manager }
 	if !owned.can_query_global_params() { return -19 }
@@ -81,7 +82,8 @@ pub fn (f &GpuFile) ioctl_modern_get_params(data &asahi.GetParams) int {
 
 pub fn (f &GpuFile) ioctl_modern_get_time(data &asahi.GetTime) int {
 	if data.flags != 0 { return -22 }
-	manager := gpu.get_global_manager() or { return -19 }
+	manager := f.registration_manager
+	if manager == unsafe { nil } { return -19 }
 	frequency := manager.hw_config.base_clock_hz
 	if frequency == 0 { return -5 }
 	mut request := unsafe { data }
@@ -177,8 +179,8 @@ pub fn (mut f GpuFile) ioctl_modern_vm_bind(data &asahi.VmBind) int {
 	bytes := u64(data.stride) * u64(data.num_binds)
 	// Preserve early rejection for other backends that share this handler.
 	if data.userptr == 0 || bytes - 1 > ~data.userptr {
-		manager := gpu.get_global_manager() or { return -14 }
-		if manager.hw_config.gpu_gen != .g13 { return -14 }
+		manager := f.registration_manager
+		if manager == unsafe { nil } || manager.hw_config.gpu_gen != .g13 { return -14 }
 	}
 	// Asahi's KVec bounds its byte capacity by isize::MAX and reserves it
 	// before the user copy checks the pointer.

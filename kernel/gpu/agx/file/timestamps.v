@@ -31,7 +31,7 @@ fn (mut f GpuFile) capture_g13_timestamp(timestamp asahi.Timestamp, manager &gpu
 	for index in 0 .. f.timestamp_objects.len {
 		mut object := &f.timestamp_objects[index]
 		if object.id != timestamp.handle || object.detached { continue }
-		if voidptr(f.timestamp_manager) != voidptr(manager) { return -19, G13TimestampCapture{} }
+		if voidptr(f.registration_manager) != voidptr(manager) { return -19, G13TimestampCapture{} }
 		// Lookup precedes offset validation; offsets need not be aligned.
 		if timestamp.offset > ~u32(0) - u32(8) { return -22, G13TimestampCapture{} }
 		if u64(timestamp.offset) + 8 > object.size { return -34, G13TimestampCapture{} }
@@ -54,7 +54,7 @@ fn (mut f GpuFile) reap_detached_timestamp_objects_locked() {
 	for index := f.timestamp_objects.len - 1; index >= 0; index-- {
 		object := f.timestamp_objects[index]
 		if !object.detached || object.references != 0 { continue }
-		release_timestamp_object(f.timestamp_manager, object)
+		release_timestamp_object(f.registration_manager, object)
 		f.timestamp_objects.delete(index)
 	}
 }

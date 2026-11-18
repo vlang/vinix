@@ -5,7 +5,7 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 	lookup := section(captures, 'fn (mut f GpuFile) capture_g13_timestamp(', 'fn release_timestamp_object(', 'Timestamp destination capture')!
 	require_order(lookup, ['timestamp.handle == 0', 'return 0, G13TimestampCapture{}',
 		'f.lock.acquire()', 'object.id != timestamp.handle || object.detached',
-		'voidptr(f.timestamp_manager) != voidptr(manager)', 'return -19',
+		'voidptr(f.registration_manager) != voidptr(manager)', 'return -19',
 		'timestamp.offset > ~u32(0) - u32(8)', 'return -22',
 		'u64(timestamp.offset) + 8 > object.size', 'return -34',
 		'object.references++', 'va: object.va, address: object.va + u64(timestamp.offset)', 'return -2'],
@@ -18,15 +18,15 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		'references.entries[pipe][phase] = capture'], 'Owned output cannot be overwritten; failed prefixes roll back')!
 	close := section(file, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(', 'File timestamp capture ownership')!
 	require_order(close, ['f.lock.acquire()', 'object.references != 0', 'f.lock.release(); return false',
-		'release_timestamp_object(f.timestamp_manager, object)', 'f.timestamp_objects.free()',
-		'manager := gpu.get_global_manager()'], 'Close releases uncaptured timestamps through their owner before unrelated cleanup')!
+		'release_timestamp_object(f.registration_manager, object)', 'f.timestamp_objects.free()',
+		'mut manager := unsafe { f.registration_manager }'], 'Close releases uncaptured timestamps through their owner before unrelated cleanup')!
 	drop := section(captures, 'fn release_timestamp_object(', '// Caller holds file.lock.', 'Timestamp backing release')!
 	require_order(drop, ['mut owner := unsafe { manager }', 'owner.unmap_g13_timestamp_buffer(object.va, object.size)',
 		'gem.unref(object.obj)'], 'Unmap the original VA before dropping its GEM reference')!
 	reaper := section(captures, 'fn (mut f GpuFile) reap_detached_timestamp_objects_locked()', 'fn (mut f GpuFile) release_g13_timestamp(', 'Detached timestamp cleanup')!
 	require_order(reaper, ['f.timestamp_objects.len - 1',
 		'if !object.detached || object.references != 0 { continue }',
-		'release_timestamp_object(f.timestamp_manager, object)',
+		'release_timestamp_object(f.registration_manager, object)',
 		'f.timestamp_objects.delete(index)'], 'Detached timestamps retain backing until the final capture')!
 	release := section(captures, 'fn (mut f GpuFile) release_g13_timestamp(', '// Run outside GpuManager.lock', 'Capture release')!
 	require_order(release, ['capture.va == 0', 'f.lock.acquire()', 'f.timestamp_objects[index].va != capture.va',

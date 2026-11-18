@@ -53,7 +53,7 @@ fn submit_timestamp_packet_on_queue(mut file GpuFile, queue u32, count u32, bad 
 }
 
 fn add_timestamp(mut file GpuFile, object &gem.GemObject) {
- file.timestamp_manager = gpu.get_global_manager() or { panic('timestamp owner') }
+ file.registration_manager = gpu.get_global_manager() or { panic('timestamp owner') }
  file.timestamp_objects << TimestampObject{id: 9, va: 0x123456780000, size: 4096, obj: unsafe { object }}
 }
 
@@ -170,7 +170,7 @@ fn check_command_timestamp_retirement() {
    gpu.reset()
    mut file := new_file()
    mut mgr := gpu.get_global_manager() or { panic('manager') }
-   file.timestamp_manager = mgr
+   file.registration_manager = mgr
    mut objects := []gem.GemObject{len: count}
    defer { unsafe { objects.free() } }
    for index in 0 .. count {
@@ -228,7 +228,7 @@ fn check_blocked_timestamp_retirement() {
  gpu.reset()
  mut file := new_file()
  mut manager := gpu.get_global_manager() or { panic('manager') }
- file.timestamp_manager = manager
+ file.registration_manager = manager
  input := output()
  syncobj.replace_fence(input, syncobj.new_fence(0, 1))
  assert submit(mut file, 1, false, input, unsafe { nil }, false) == 0

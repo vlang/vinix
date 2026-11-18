@@ -8,7 +8,7 @@ fn test_user_mapping_lifetime_gates() {
 	manager := os.read_file(g13layout.repo_root() + '/kernel/gpu/agx/gpu/gpu.v')!
 	check_user_mapping_contract(local, manager)!
 	for token in ['if !mapping.retiring', 'f.mappings[index].retiring = true',
-		'if !finish_file_mapping(true)',
+		'if !f.finish_file_mapping(true)',
 		'f.mappings[f.mappings.len - 1].retiring = true', 'f.retire_mapping_locked(index)',
 		'if !f.cleanup_closed_mappings_locked(vm)'] {
 		assert local.contains(token)

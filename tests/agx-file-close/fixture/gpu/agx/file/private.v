@@ -20,7 +20,7 @@ fn check_private_objects() {
 	mut first := mmu.UatContext{ id: 1, vm_id: 1, identity: mmu.new_identity(), pgtable: &first_pt }
 	mut second := mmu.UatContext{ id: 2, vm_id: 2, identity: mmu.new_identity(), pgtable: &second_pt }
 	assert first.identity != 0 && first.identity != second.identity
-	mut file := GpuFile{ vms: [&first, &second], timestamp_manager: gpu.timestamp_manager() }
+	mut file := GpuFile{ vms: [&first, &second], registration_manager: gpu.registration_manager() }
 	file.mappings.flags |= .noslices
 	file.timestamp_objects.flags |= .noslices
 	mut private_request := create_request(1, ioctl.asahi_gem_vm_private | ioctl.asahi_gem_writeback)

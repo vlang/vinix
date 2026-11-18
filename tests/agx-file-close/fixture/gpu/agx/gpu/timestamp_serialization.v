@@ -54,6 +54,7 @@ fn expect_timestamp_map_error(mut manager GpuManager, physical u64, size u64, ex
 
 pub fn check_timestamp_serialization() {
 	mut manager := unsafe { &test_gpu_manager }
+	initial_uat := manager.uat
 	mut uat := mmu.UatManager{}
 	for _ in 0 .. 100 {
 		manager.g13_timestamp = TimestampAllocator{
@@ -109,7 +110,7 @@ pub fn check_timestamp_serialization() {
 	}
 	check_timestamp_aperture_capacity(mut manager, mut uat)
 	check_timestamp_aperture_teardown(mut manager, mut uat)
-	manager.uat = unsafe { nil }
+	manager.uat = initial_uat
 	println('G13 timestamp allocator: 100 cycles distinguish ENOSPC, ENOMEM and EBUSY, cancel failed maps without collection and reuse their VA under balanced locks')
 	println('G13 timestamp shutdown: 100 lock races reject late maps with ENODEV before allocation or UAT writes')
 }

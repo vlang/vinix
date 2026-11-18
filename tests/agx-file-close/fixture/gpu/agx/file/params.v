@@ -44,7 +44,7 @@ fn check_global_params() {
 					assert result == expected, 'GET_PARAMS copy expected ${expected}, got ${result}'
 					assert request == before, 'GET_PARAMS size and request fields must remain input-only'
 					assert usercopy.calls() == 1 && usercopy.bytes() == count && usercopy.address() == pointer
-					assert gpu.lookups() == lookups + 1 && parameter_builds == builds + 1
+					assert gpu.lookups() == lookups && parameter_builds == builds + 1
 					for i := u64(0); i < u64(sizeof(buffer)); i++ {
 						assert buffer[i] == if i >= offset && i - offset < copied { u8(0xa7) } else { u8(0x5c) }
 					}
@@ -78,13 +78,14 @@ fn check_global_params() {
 				assert usercopy.calls() == 0 && gpu.lookups() == lookups && parameter_builds == builds
 				cases++
 			}
-			gpu.available(false)
+			registered := file.registration_manager
+			file.registration_manager = unsafe { nil }
 			mut request := ioctl.DrmAsahiGetParams{ pointer: 0, size: size }
 			before := request; builds := parameter_builds
 			usercopy.configure(0, 0, 0)
 			assert file.ioctl_get_params(unsafe { &request }) == -19 && request == before
 			assert usercopy.calls() == 0 && parameter_builds == builds
-			gpu.available(true); cases++
+			file.registration_manager = registered; cases++
 		}
 	}
 	println('AGX GET_PARAMS copies: ${cases} ioctl checks; zero/null queries, bounded aligned/unaligned prefixes, oversized inputs, unchanged headers/tails, partial EFAULT output and header/device precedence passed')
@@ -109,7 +110,7 @@ fn check_global_params_device() {
 					expected := if lost { -19 } else if invalid_pointer && size != 0 { -14 } else { 0 }
 					result := file.ioctl_get_params(unsafe { &request })
 					assert result == expected, 'GET_PARAMS device expected ${expected}, got ${result}'
-					assert request == before && gpu.lookups() == lookups + 1
+					assert request == before && gpu.lookups() == lookups
 					assert !gpu.query_lock_held()
 					assert parameter_builds == builds + if lost { 0 } else { 1 }
 					assert usercopy.calls() == if lost { 0 } else { 1 }

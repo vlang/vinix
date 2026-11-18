@@ -13,6 +13,30 @@ __global publication_output &syncobj.SyncObj = unsafe { nil }
 __global publication_previous &syncobj.DmaFence = unsafe { nil }
 __global publication_finished &syncobj.DmaFence = unsafe { nil }
 __global publication_stops bool
+__global polling_file &GpuFile = unsafe { nil }
+
+fn stop_during_pending_poll() {
+	assert pending_poll_active && pending_head == unsafe { nil }
+	mut file := unsafe { polling_file }
+	assert submit(mut file, 2, false, unsafe { nil }, unsafe { nil }, false) == 0
+	mut manager := gpu.get_global_manager() or { panic('manager') }
+	manager.stop()
+	service_file_work()
+	assert pending_poll_requested && pending_count == 1
+}
+
+fn check_pending_poll_handoff() {
+	gpu.reset()
+	mut file := new_file()
+	assert submit(mut file, 1, false, unsafe { nil }, unsafe { nil }, false) == 0
+	polling_file = file
+	klock.after_release_once(unsafe { &pending_lock }, stop_during_pending_poll)
+	service_file_work()
+	assert !pending_poll_active && !pending_poll_requested
+	assert_drained(file)
+	polling_file = unsafe { nil }
+	println('G13 pending poll: work appended after the snapshot retires after the final worker poll overlaps')
+}
 
 fn retire_before_output_installation() {
 	assert pending_count == 1

@@ -48,7 +48,7 @@ fn check_detached_queues() {
 					assert file.ioctl_queue_destroy(&request) == 0
 					assert queue.detached && !file.submission_queue_exists(7)
 					assert file.ioctl_queue_destroy(&request) == -2
-					if pins != 0 || !available {
+					if pins != 0 {
 						assert !queue.destroyed && !resource.released && resource.calls == 0
 						assert file.queues.len == 1 && file.g13_queues.len == 1
 					}

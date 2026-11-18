@@ -19,7 +19,7 @@ fn check_timestamp_bind_local(file string) ! {
 		'request.offset & pgtable.uat_pg_mask != 0', 'request.range & pgtable.uat_pg_mask != 0',
 		'request.range > ~request.offset', 'return -22', 'f.get_object_ref(request.handle) or { return -2 }',
 		'if obj.vm_private_identity != 0 { gem.unref(obj); return -22 }', 'if request.range == 0 || request.offset > obj.size',
-		'gem.unref(obj)', 'mut gpu_manager := unsafe { f.timestamp_manager }',
+		'gem.unref(obj)', 'mut gpu_manager := unsafe { f.registration_manager }',
 		'if gpu_manager == unsafe { nil }', 'gem.unref(obj)', 'return -19',
 		'map_code, va := gpu_manager.map_g13_timestamp_buffer(',
 		'if map_code != 0', 'gem.unref(obj)', 'return map_code',
@@ -34,7 +34,7 @@ fn check_timestamp_bind_local(file string) ! {
 		'Timestamp BIND checks overflow before BO lookup, empty ranges after it and publishes only its output handle')!
 	require(bind.count('gpu_manager.lock.release()') == 1,
 		'Timestamp publication keeps the manager lock through insertion and output assignment')!
-	require(!bind.contains('gpu.get_global_manager()') && !bind.contains('f.timestamp_manager ='),
+	require(!bind.contains('gpu.get_global_manager()') && !bind.contains('f.registration_manager ='),
 		'BIND uses the original registration even before a file has a timestamp handle')!
 	require(!bind.contains('request.object_handle !=') && !bind.contains('request.object_handle =='),
 		'BIND object_handle is output-only')!
@@ -43,7 +43,7 @@ fn check_timestamp_bind_local(file string) ! {
 		'request.range != 0', 'return -22', 'f.lock.acquire()', 'object.id == request.object_handle',
 		'if found_index < 0', 'f.lock.release()', 'return -2',
 		'if found.references != 0', 'f.timestamp_objects[found_index].detached = true', 'f.lock.release()', 'return 0',
-		'manager := f.timestamp_manager', 'f.timestamp_objects.delete(found_index)', 'f.lock.release()',
+		'manager := f.registration_manager', 'f.timestamp_objects.delete(found_index)', 'f.lock.release()',
 		'release_timestamp_object(manager, found)', 'return 0'],
 		'Timestamp UNBIND hides the name and the original manager retires it once captures are gone')!
 	require(!unbind.contains('gpu.get_global_manager()'), 'UNBIND cannot select a replacement GPU manager')!
@@ -60,8 +60,9 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 	require_order(driver, ['mgr.init(', 'drm.register_driver_with_data(agx_drm_driver, voidptr(mgr))'],
 		'AGX registers the initialized manager with its device')!
 	constructor := section(file, 'pub fn new_gpu_file(', '// Tear the file down.', 'File registration context')!
-	require_order(constructor, ['dev == unsafe { nil }', 'mut f := &GpuFile{', 'dev: unsafe { dev }',
-		'timestamp_manager: unsafe { &gpu.GpuManager(dev.driver_data) }', 'return f'],
+	require_order(constructor, ['dev == unsafe { nil }', 'manager := unsafe { &gpu.GpuManager(dev.driver_data) }',
+		'manager == unsafe { nil } || manager.uat == unsafe { nil }', 'mut f := &GpuFile{', 'dev: unsafe { dev }',
+		'registration_manager: manager', 'return f'],
 		'A newly constructed file snapshots the manager of its originating device')!
 }
 
