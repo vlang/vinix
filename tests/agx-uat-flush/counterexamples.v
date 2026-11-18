@@ -8,8 +8,13 @@ fn main() {
 	os.mkdir_all(root)!
 	source := os.read_file(repo + '/kernel/gpu/agx/gpu/gpu.v')!
 	publication := 'if !mgr.send_role_message(0, u8(ep_doorbell), msg_fwctl) {\n\t\tmgr.state = .error'
+	// Feed the old scheduler path through the current message builder so
+	// the wire check cannot mask the designated scheduler failure.
+	baseline := os.read_file(os.args[2])!.replace('fw.make_g13_fwctl_invalidate(addr, slot)',
+		'fw.make_g13_fwctl_invalidate(addr, slot, u16(size >> pgtable.uat_pg_shift))')
 	variants := [
-		['baseline', os.read_file(os.args[2])!, 'UAT wait entered the non-returning scheduler path'],
+		['baseline', baseline, 'UAT wait entered the non-returning scheduler path'],
+		['fixed-page-count', source.replace('make_g13_fwctl_invalidate(addr, slot, u16(pages))', 'make_g13_fwctl_invalidate(addr, slot, 1)'), 'FwCtl must publish the 16-bit page count'],
 		['no-wait', source.replace('for mgr.channels.fw_ctrl.read_pointer() != token', 'for false'), 'UAT success requires both its ring token and completed handoff'],
 		['ignore-handoff', source.replace('if !uat_mgr.complete_flush(slot)', 'if false'), 'published failures must retain their handoff slot'],
 		['missing-abort', source.replace('uat_mgr.abort_unpublished_flush(slot)', '// omitted abort'), 'published failures must retain their handoff slot'],

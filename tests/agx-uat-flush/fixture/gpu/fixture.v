@@ -52,7 +52,7 @@ fn (mut manager GpuManager) send_role_message(role u32, endpoint u8, message u64
 	return manager.mode != 2
 }
 
-fn run_case(initial u32, slot u32, mode int, outer_lock bool) {
+fn run_case(initial u32, slot u32, mode int, outer_lock bool, pages u64) {
 	mut handoff := mmu.UatHandoff{}
 	mut table := mmu.UatManager{handoff: &handoff, handoff_initialized: true}
 	uat_mgr = unsafe { &table }
@@ -67,7 +67,7 @@ fn run_case(initial u32, slot u32, mode int, outer_lock bool) {
 	}
 	active = unsafe { &manager }; timer.reset(); timer.on_tick(poll_callback)
 	address := u64(0xffffffa000004000)
-	size := u64(0x8000)
+	size := pages * 0x4000
 	if mode == 7 { handoff.flush[slot].state = 1 }
 	if mode == 8 { header.read_ptr = (initial + 1) % 256 }
 	if mode == 9 { header.write_ptr = 256 }
@@ -84,7 +84,12 @@ fn run_case(initial u32, slot u32, mode int, outer_lock bool) {
 	assert manager.sends == if published { 1 } else { 0 }
 	if published {
 		assert header.write_ptr == (initial + 1) % 256
-		assert ring[initial] == fw.make_g13_fwctl_invalidate(address, slot)
+		assert ring[initial] == fw.FwFwCtlMsg{
+			addr: address
+			slot: slot
+			page_count: u16(pages)
+			unk_12: 2
+		}, 'FwCtl must publish the 16-bit page count alongside the full handoff range'
 		assert handoff.flush[slot].addr == address && handoff.flush[slot].size == size,
 			'published failures must retain their handoff slot and unpublished failures must roll back'
 	}
@@ -154,7 +159,7 @@ pub fn check_uat_flush() {
 	for initial in [u32(0), 254, 255]! {
 		for slot in [u32(0), 1, 63, 64]! {
 			for mode in 0 .. 13 {
-				for outer_lock in [false, true]! { run_case(initial, slot, mode, outer_lock); cases++ }
+				for outer_lock in [false, true]! { run_case(initial, slot, mode, outer_lock, 2); cases++ }
 			}
 		}
 	}
@@ -162,4 +167,8 @@ pub fn check_uat_flush() {
 	for invalid in 0 .. 12 { for outer_lock in [false, true]! { validation_case(invalid, outer_lock) } }
 	println('AGX UAT flush: 312 production transport/handoff cases return, preserve locks, retain published failures and permit delayed retry')
 	println('AGX UAT flush: 24 invalid requests preserve ring, handoff, device state and caller locks')
+	for pages in [u64(1), 3, 0xffff, 0x10000, 0x10001]! {
+		run_case(255, mmu.uat_kernel_flush_slot, 0, true, pages)
+	}
+	println('AGX UAT flush: 5 page-count boundaries preserve the full handoff range')
 }

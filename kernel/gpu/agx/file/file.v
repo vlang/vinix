@@ -551,11 +551,8 @@ fn ranges_overlap(first_addr u64, first_size u64, second_addr u64, second_size u
 // Firmware may retain both UAT translations and noncoherent cache lines after
 // a mapping changes, so every bind and unbind has to invalidate them.
 //
-// Only G13's protocol is implemented. The full byte range is published in its
-// handoff slot; FwCtlMsg only tells firmware which slot to process. Any other
-// generation fails closed. Returning success without flushing would hand
-// userspace a mapping the GPU may never observe, or keep a freed page live in
-// a firmware translation.
+// G13 publishes the full byte range in the handoff slot and its 16-bit
+// page count in the FwCtl message. Other generations fail closed.
 fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
 	manager := gpu.get_global_manager() or { return false }
 	if manager.hw_config.gpu_gen != .g13 {

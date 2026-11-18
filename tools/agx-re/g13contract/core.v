@@ -104,8 +104,8 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		'msg.unk_10 = 1', 'msg.unk_12 = 2', 'self.send_message(msg)'], 'm1n1 FwCtl invalidate')!
 	vinix_channels := read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!
 	vinix_inval := section(vinix_channels, 'pub fn make_g13_fwctl_invalidate', 'pub struct FwLogMsg {', 'Vinix FwCtl')!
-	require_order(vinix_inval, ['addr: addr', 'slot: slot', 'unk_10: 1', 'unk_12: 2'], 'Vinix FwCtl invalidate')!
-	results << 'FwCtl invalidate opcode and handoff-slot message'
+	require_order(vinix_inval, ['addr: addr', 'slot: slot', 'page_count: page_count', 'unk_12: 2'], 'Vinix FwCtl invalidate')!
+	results << 'FwCtl message fields shared with m1n1'
 	m1n1_initdata := read(os.join_path(m1n1, 'proxyclient/m1n1/agx/initdata.py'))!
 	require(m1n1_initdata.contains('initdata.regionA = agx.kshared.new_buf(0x4000, "InitData_RegionA")'), 'm1n1 RegionA allocation contract changed')!
 	vinix_gpu := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
@@ -817,6 +817,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_heap_gc_reference(manager, read(os.join_path(base, 'fw/channels.rs'))!)!
 	check_uat_poll_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
 		read(os.join_path(repo, 'kernel/sched/sched_arm64.v'))!)!
+	check_fwctl_page_count_reference(read(os.join_path(base, 'mmu.rs'))!,
+		read(os.join_path(base, 'fw/channels.rs'))!)!
 	check_worker_scheduling_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/gpu/g17.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/fake/driver.v'))!,
 		read(os.join_path(repo, 'kernel/sched/sched_arm64.v'))!, read(os.join_path(repo, 'kernel/sched/sched_amd64.v'))!)!
@@ -1041,6 +1043,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'M1 G13 batch doorbells use the guarded send-empty path after releasing all participating ring locks',
 		'G13 GrowTVBAck and RecoverChannel select the versioned tags, and GrowTVBAck uses the full halt count and guarded device-control doorbell',
 		'G13 RecoverChannel guards the doorbell wait and retains its workqueue until tracked consumption or ASC stop',
+		'G13 FwCtl encodes the Asahi 16-bit page count while publishing the full byte range in the handoff',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',

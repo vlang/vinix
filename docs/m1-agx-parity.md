@@ -30,6 +30,28 @@ RecoverChannel also uses the guarded send-empty path. It retains the queue
 until firmware consumes the command or the ASC stops, and recognizes
 completion after ring wrap. [RecoverChannel transport](m1-agx-recover-channel.md)
 
+G13 FwCtl writes the number of 16 KiB pages at offset `0x10` of the 20-byte
+cache-flush message. At 65,536 pages and above it logs the overflow and casts the
+count to 16 bits, as the packaged driver does. The handoff keeps the full
+byte range. FwCtl transmit and completion still poll while the caller
+holds IRQ-masking locks.
+[Packaged Asahi flush](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L1542-L1559)
+
+ARM64 and x86-64 builds, the G13 layout and failure suites, heap and
+file-close regressions, all 82 contract files, and 341 sanitizer
+transport and handoff cases passed. Nine compiled negative controls
+include restoring the fixed count of one. The native ARM64 C emits
+the shift and cast before enqueue. The allocation scan reproduced 178
+baseline allowance findings. The source audit remains `not_equivalent`.
+The checks ran without hardware or reboots.
+
+Evidence for `1efbe7326292d54c09e74c2b6515657dbd3b094e` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-fwctl-page-count-20261118/`.
+The archive and restored copy both passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`dbc5e8bf28bdca22bd2833d5989bc46b5fb44df65e678ed6ac25a7ee4b970954`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

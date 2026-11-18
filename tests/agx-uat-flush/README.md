@@ -13,6 +13,9 @@ slots, unpublished rollback and published-failure retention. A retained failure
 must reject another request before fixture reset. A delayed request after that
 reset checks the return/unlock path again. Another 24 invalid requests must
 leave the ring, handoff, device state and caller lock untouched.
+Five page-count cases cover single- and multi-page flushes, the largest
+16-bit count, and the first two wrapped counts. Each retains the full byte
+range in the handoff.
 
 The scheduler stub fails if called: a no-op stub would hide the original bug.
 The original production source fails the delayed-acknowledgement case at this
@@ -21,8 +24,9 @@ loop. No fixture executes the native scheduler or firmware.
 
 `AGX_UAT_FLUSH_C` and `AGX_UAT_FLUSH_BINARY` retain evidence externally.
 `--manager-source PATH` selects an original or mutated manager source.
-`counterexamples.v RUNNER BASELINE_MANAGER FRESH_DIRECTORY` retains eight
-compiled runtime negatives. `check.v --host C`, `--selftest C`,
+`counterexamples.v RUNNER BASELINE_MANAGER FRESH_DIRECTORY` retains nine
+compiled runtime negatives, including the old fixed page count.
+`check.v --host C`, `--selftest C`,
 `--native CURRENT BASELINE` and `--allocations CURRENT BASELINE` check the poll,
 five checker mutations, the exact native wait-primitive transformation and
 unchanged allocation reports. Native comparison resolves interned strings by

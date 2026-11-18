@@ -1277,7 +1277,11 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 	if !uat_mgr.begin_flush(slot, addr, size) {
 		return false
 	}
-	message := fw.make_g13_fwctl_invalidate(addr, slot)
+	pages := size >> pgtable.uat_pg_shift
+	if pages >= 0x10000 {
+		println('agx: firmware-control UAT flush exceeds the 16-bit page count')
+	}
+	message := fw.make_g13_fwctl_invalidate(addr, slot, u16(pages))
 	token := mgr.channels.fw_ctrl.enqueue_with_token(voidptr(&message)) or {
 		uat_mgr.abort_unpublished_flush(slot)
 		if mgr.channels.fw_ctrl.has_fault() {
@@ -1292,9 +1296,8 @@ pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bo
 
 	started := timer.get_ns()
 	for mgr.channels.fw_ctrl.read_pointer() != token {
-		// Some callers hold mgr.lock, while ioctl mapping flushes do not.
-		// Only the worker reads the graph's halt word under that lock. Observe
-		// its failure here without borrowing a graph that shutdown can release.
+		// Keep the manager lock across the transaction. The firmware worker
+		// owns the graph's halt check.
 		if mgr.state != .running {
 			return false
 		}

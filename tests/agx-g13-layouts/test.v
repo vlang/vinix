@@ -142,17 +142,18 @@ fn check_channel_offsets() {
 	assert __offsetof(fw.FwRunWorkQueueMsg, timestamp) == 0x18
 	assert __offsetof(fw.FwRunWorkQueueMsg, data) == 0x20
 
-	// FWCtl carries the context/slot and a fixed invalidate opcode. The byte
-	// range belongs to the handoff slot and must never be encoded at +0x10.
-	message := fw.make_g13_fwctl_invalidate(0x1122_3344_5566_7788, 0x40)
+	// Check the packaged Asahi layout with a multi-page request.
+	message := fw.make_g13_fwctl_invalidate(0x1122_3344_5566_7788, 0x40, 0x1234)
 	assert sizeof(fw.FwFwCtlMsg) == 0x14
 	assert __offsetof(fw.FwFwCtlMsg, addr) == 0
+	assert __offsetof(fw.FwFwCtlMsg, unk_8) == 0x8
 	assert __offsetof(fw.FwFwCtlMsg, slot) == 0xc
-	assert __offsetof(fw.FwFwCtlMsg, unk_10) == 0x10
+	assert __offsetof(fw.FwFwCtlMsg, page_count) == 0x10
+	assert __offsetof(fw.FwFwCtlMsg, unk_12) == 0x12
 	assert message.addr == 0x1122_3344_5566_7788
 	assert message.unk_8 == 0
 	assert message.slot == 0x40
-	assert message.unk_10 == 1
+	assert message.page_count == 0x1234
 	assert message.unk_12 == 2
 }
 
