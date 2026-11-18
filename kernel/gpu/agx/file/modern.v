@@ -175,7 +175,14 @@ pub fn (mut f GpuFile) ioctl_modern_vm_bind(data &asahi.VmBind) int {
 	if data.stride == 0 || data.pad != 0 { return -22 }
 	if data.num_binds == 0 { return 0 }
 	bytes := u64(data.stride) * u64(data.num_binds)
-	if data.userptr == 0 || bytes - 1 > ~data.userptr { return -14 }
+	// Preserve early rejection for other backends that share this handler.
+	if data.userptr == 0 || bytes - 1 > ~data.userptr {
+		manager := gpu.get_global_manager() or { return -14 }
+		if manager.hw_config.gpu_gen != .g13 { return -14 }
+	}
+	// Asahi's KVec bounds its byte capacity by isize::MAX and reserves it
+	// before the user copy checks the pointer.
+	if bytes > u64(max_i64) { return -12 }
 	storage := memory.malloc_packed_fallible(bytes) @[freed]
 	if storage == unsafe { nil } { return -12 }
 	defer { memory.free(storage) }

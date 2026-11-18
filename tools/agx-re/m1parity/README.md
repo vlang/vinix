@@ -22,6 +22,8 @@ Sparse Linux checkouts must include `drivers/dma-buf/dma-fence.c` and
 Asahi and scheduler sources. The generic DRM header supplies the RESET wire ABI.
 Fence-completion and binary-wait checks use the packaged Linux core
 implementations; the audit checks and retains those sources too.
+The VM_BIND staging check also needs `rust/kernel/uaccess.rs`,
+`rust/kernel/alloc/kvec.rs` and `rust/kernel/alloc/layout.rs`.
 
 Its selected ABI comparisons describe the retained `drm.ioctl` legacy
 compatibility declarations. Modern `drm.asahi` declarations are retained as

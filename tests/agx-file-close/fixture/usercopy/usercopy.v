@@ -15,7 +15,7 @@ pub fn fail_read_at(address u64) { read_fault = address; read_calls = 0 }
 pub fn reads() int { return read_calls }
 pub fn copy_from_user(target voidptr, source u64, size u64) bool {
 	read_calls++
-	if size != 0 && source == 0 { return false }
+	if size != 0 && (source == 0 || size - 1 > ~source) { return false }
 	if read_fault != 0 && read_fault >= source && read_fault - source < size { return false }
 	unsafe { C.memcpy(target, voidptr(source), size) }
 	return true

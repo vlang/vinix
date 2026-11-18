@@ -42,3 +42,31 @@ fn check_bind_vm_lookup_contract(local string, pure string, reference string) ! 
 		'Must specify read or write', 'guard.get(vm_id).ok_or(ENOENT)?', 'kernel_range.overlaps(range)'],
 		'Packaged BIND validates its header, BO, global range and permissions before the VM/private reservation')!
 }
+
+fn check_modern_bind_staging_contract(local string, file string, uaccess string, kvec string, layout string) ! {
+	bind := section(file, 'pub(crate) fn vm_bind(', 'fn vm_bind_g17(', 'Asahi G13 VM_BIND staging')!
+	require_order(bind, ['if data.stride == 0 || data.pad != 0', 'return Err(EINVAL)',
+		'if let Some(limit) = reg_data.gpu.bind_batch_limit()', 'data.userptr == 0',
+		'return Self::vm_bind_g17(data, file)', 'let mut vec = KVec::new()',
+		'.checked_mul(usize::try_from(data.num_binds)?)', 'reader.read_all(&mut vec, GFP_KERNEL)?',
+		'reader.read_up_to(data.stride as usize)?', 'Self::do_gem_bind_unbind('],
+		'Asahi legacy GPU VM_BIND copies the full batch before applying records')!
+	read_all := section(uaccess, 'pub fn read_all<A: Allocator>(mut self', 'pub fn strcpy_into_buf', 'Asahi UserSliceReader')!
+	require_order(read_all, ['buf.reserve(len, flags)?', 'self.read_raw('], 'Asahi reserves before validating the source pointer')!
+	reserve := section(kvec, 'pub fn reserve(&mut self', 'A::realloc(', 'Asahi KVec reservation')!
+	require(reserve.contains('ArrayLayout::new(new_cap).map_err(|_| AllocError)?')
+		&& layout.contains('const ISIZE_MAX: usize = isize::MAX as usize;')
+		&& layout.contains('match len.checked_mul(core::mem::size_of::<T>())')
+		&& layout.contains('Some(size) if size <= ISIZE_MAX'), 'Asahi caps vector capacity at isize::MAX')!
+	vinix := section(local, 'pub fn (mut f GpuFile) ioctl_modern_vm_bind(', 'fn modern_get_params_handler(', 'Vinix modern VM_BIND staging')!
+	require_order(vinix, ['if data.stride == 0 || data.pad != 0 { return -22 }', 'if data.num_binds == 0 { return 0 }',
+		'bytes := u64(data.stride) * u64(data.num_binds)',
+		'if data.userptr == 0 || bytes - 1 > ~data.userptr {',
+		'manager := gpu.get_global_manager() or { return -14 }',
+		'if manager.hw_config.gpu_gen != .g13 { return -14 }',
+		'if bytes > u64(max_i64) { return -12 }',
+		'storage := memory.malloc_packed_fallible(bytes)', 'if storage == unsafe { nil } { return -12 }',
+		'defer { memory.free(storage) }', 'if !usercopy.copy_from_user(storage, data.userptr, bytes) { return -14 }',
+		'code := f.ioctl_gem_bind(unsafe { &old })'], 'Vinix allocates and copies the strided batch before any mapping mutation')!
+	require(vinix.count('data.userptr') == 3, 'The full copy decides source pointer errors on G13')!
+}

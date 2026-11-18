@@ -665,6 +665,10 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_single_page_reference(read(os.join_path(asahi_linux, 'include/uapi/drm/asahi_drm.h'))!, read(os.join_path(base, 'mmu.rs'))!)!
 	check_bind_vm_lookup_contract(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/vm/vm.v'))!, read(os.join_path(base, 'file.rs'))!)!
+	check_modern_bind_staging_contract(read(os.join_path(repo, 'kernel/gpu/agx/file/modern.v'))!,
+		read(os.join_path(base, 'file.rs'))!, read(os.join_path(asahi_linux, 'rust/kernel/uaccess.rs'))!,
+		read(os.join_path(asahi_linux, 'rust/kernel/alloc/kvec.rs'))!,
+		read(os.join_path(asahi_linux, 'rust/kernel/alloc/layout.rs'))!)!
 	check_submit_lookup_order_contract(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(base, 'file.rs'))!)!
 	check_identity_lookup_contract(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!, read(os.join_path(base, 'file.rs'))!)!
 	check_asahi_sync_lookup_contract(read(os.join_path(repo, 'kernel/gpu/agx/submission/submission.v'))!,
@@ -988,6 +992,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'GEM-create size validation returns EINVAL for zero and EOVERFLOW for 16 KiB rounding overflow after private VM lookup and before allocation',
 		'SINGLE_PAGE BIND consumes one BO page and repeats its PTE across the complete VA range with rollback/invalidation and retained backing',
 		'BIND resolves its BO and validates size/global fields before VM lookup; unbind and private-window checks retain the mutation lock',
+		'Modern G13 VM_BIND bounds the scratch capacity and reserves it before the single full user copy or any mapping mutation',
 		'Missing submit queues precede command/sync staging, with no borrowed queue across copies and locked backend revalidation',
 		'Absent VM/queue identities return ENOENT during VM destroy, queue create/destroy and submission without confusing invalid internal VM state',
 		'VM-private BO domains reject foreign/recreated VMs, import, kernel timestamp mapping and PRIME export before publication',

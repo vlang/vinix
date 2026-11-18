@@ -154,9 +154,50 @@ fn check_modern_binding() {
 	mut file := GpuFile{}
 	assert file.ioctl_modern_vm_bind(&asahi.VmBind{ stride: 1 }) == 0
 	assert file.ioctl_modern_vm_bind(&asahi.VmBind{}) == -22
-	assert file.ioctl_modern_vm_bind(&asahi.VmBind{ stride: 32, num_binds: 1, userptr: ~u64(0) - 4 }) == -14
 	assert cases == 1200
 	println('AGX modern VM_BIND: 1200 real mapping checks cover immutable batch copy, copy/OOM refusal before mutation, prefix errors, strided/short records and read/write/single-page translation')
+}
+
+fn check_modern_bind_staging_order() {
+	mut file := GpuFile{}
+	mut manager := gpu.get_global_manager() or { panic('missing test manager') }
+	assert manager.hw_config.gpu_gen == .g13
+	for pointer in [u64(0), ~u64(0) - 4]! {
+		mut request := asahi.VmBind{ stride: 32, num_binds: 1, userptr: pointer }
+		for oom in [true, false]! {
+			memory.fail_allocations(oom)
+			usercopy.fail_read_at(0)
+			calls := memory.calls()
+			assert file.ioctl_modern_vm_bind(unsafe { &request }) == if oom { -12 } else { -14 }
+			assert memory.calls() == calls + 1
+			assert usercopy.reads() == if oom { 0 } else { 1 }
+			assert file.mappings.len == 0 && memory.outstanding() == 0
+		}
+		usercopy.fail_read_at(0)
+		calls := memory.calls()
+		// The widened product fits usize but exceeds Asahi's KVec capacity.
+		request.stride = 0x80000001
+		request.num_binds = 0xffffffff
+		assert file.ioctl_modern_vm_bind(unsafe { &request }) == -12
+		request.num_binds = 0
+		assert file.ioctl_modern_vm_bind(unsafe { &request }) == 0
+		request.pad = 1
+		assert file.ioctl_modern_vm_bind(unsafe { &request }) == -22
+		assert memory.calls() == calls && usercopy.reads() == 0 && file.mappings.len == 0
+		request.pad = 0
+		request.num_binds = 1
+		request.stride = 32
+		memory.fail_allocations(true)
+		manager.hw_config.gpu_gen = .g17
+		assert file.ioctl_modern_vm_bind(unsafe { &request }) == -14
+		manager.hw_config.gpu_gen = .g13
+		gpu.available(false)
+		assert file.ioctl_modern_vm_bind(unsafe { &request }) == -14
+		gpu.available(true)
+		memory.fail_allocations(false)
+		assert memory.calls() == calls && usercopy.reads() == 0
+	}
+	println('AGX modern VM_BIND staging: 14 G13 and shared-handler cases preserve error order without mapping changes or live scratch')
 }
 
 pub fn run_modern_checks() {
@@ -164,6 +205,7 @@ pub fn run_modern_checks() {
 	uat_mgr = unsafe { &manager }
 	defer { uat_mgr = unsafe { nil } }
 	check_modern_transport()
+	check_modern_bind_staging_order()
 	check_file_vm_names(mut manager)
 	check_dormant_vm_capacity(mut manager)
 	check_eager_vm_rollback(mut manager)

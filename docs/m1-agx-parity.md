@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Modern G13 VM_BIND reserves its batch buffer before the user copy can report
+a bad pointer. [VM_BIND staging](m1-agx-vm-bind-staging.md)
+
 Modern G13 SUBMIT restores the normal 2 ms firmware idle delay before queue
 lookup. [Submit idle delay](m1-agx-submit-idle-delay.md)
 
@@ -418,7 +421,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
 | Event publication capacity | Publication applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. Whole-batch readiness checks all three pipes before publication. Preparation grows beyond the inline 127 tickets through owned overflow blocks; it is no longer capped at 127. These selected contracts do not establish complete scheduler equivalence. |
 | TVB ownership and growth | Staged extension, scene-bound slots and shared tail-pointer backing are implemented below. Full scheduler backpressure and the remaining render defaults still require comparison. |
-| VM binding | Vinix supports legacy single operations and modern strided batches, copied completely before mutation, with sequential-prefix error semantics. Contiguous/repeated backing, idle overlap replacement and range splitting are implemented. Busy-VM refusals, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
+| VM binding | Vinix supports legacy single operations and modern strided batches, copied completely before mutation, with sequential-prefix error semantics. Modern G13 matches Asahi's scratch size bound and allocation-before-copy order. Contiguous/repeated backing, idle overlap replacement and range splitting are implemented. Busy-VM refusals, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
 | GEM and memory accounting | Vinix records private-object GEM_MADVISE and reports resident contents. Purge/repopulation, shmem/scatter backing, device/client accounting and full reservation-fence behavior remain different or unqualified. The reference's admission limits and creator-RSS attribution are enabled only for G17, so those limits are not a base-M1 blocker. |
 | Timestamp UAPI | Registered modern SUBMIT now resolves compact per-command timestamp objects into all three engines. Capture, independent retirement and modern nanosecond GET_TIME are implemented. Native firmware execution and units still require hardware acceptance. |
 | Power management | Modern G13 SUBMIT restores the packaged 2 ms idle delay on both firmware layouts. Asahi's debug delay overrides and broader reset and suspend/resume behavior remain open. |
