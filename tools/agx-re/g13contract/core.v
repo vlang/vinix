@@ -201,6 +201,8 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	check_tlb_instructions(reference, vinix)!
 	mmu := read(os.join_path(asahi_linux, 'drivers/gpu/drm/asahi/mmu.rs'))!
 	bind := section(mmu, '    pub(crate) fn bind(&self, vm:', 'binding.bind_token = Some(slot.token());', 'Asahi UAT bind')!
+	require_order(bind, ['let mut binding = vm.binding.lock()', 'if binding.binding.is_none()',
+		'self.slots.get(binding.bind_token)?'], 'Asahi serializes the global slot wait per VM')!
 	require_order(bind, ['ttbs[idx].ttb0.store(ttb,', 'ttbs[idx].ttb1.store(ttb1,',
 		'drop(transaction)', 'mem::sync()', 'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID reuse invalidation')!
 	require(bind.count('mem::tlbi_asid(') == 1, 'Asahi replacement invalidates the published ASID once')!
@@ -237,7 +239,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	return ['outer-shareable GPU TLBI instructions and completion barriers',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
 		'Oldest idle ASID selection and one invalidation after root replacement or removal',
-		'Serialized per-queue UAT admission and single-waiter release before G13 job preparation',
+		'Per-queue and per-VM UAT admission with single-waiter release before G13 job preparation',
 		'Distinct GPU-only coherent RO/WO/RW bind permissions and Asahi UAT selectors']
 }
 
@@ -261,16 +263,22 @@ fn check_g13_slot_wait(asahi_linux string, repo string, mmu string) ! {
 	require_order(release, ['mgr.slot_users[slot]--', 'if mgr.slot_users[slot] == 0',
 		'event.trigger_n(mut mgr.slot_released, 1)'], 'Vinix last slot user wakes one waiter')!
 	file := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
-	submit := section(file, 'fn (mut f GpuFile) submit_g13_staged(', 'fn dispatch(', 'Vinix G13 admission')!
+	submit := section(file, 'fn (mut f GpuFile) submit_g13_staged(', 'fn (mut f GpuFile) bind_g13_submission_vm_locked(', 'Vinix G13 admission')!
 	require_order(submit, ['f.lock.acquire()', 'for !queue_resources.submission_gate.try_enter()',
 		'queue_resources.submission_gate.generation()', 'f.lock.release()',
 		'queue_resources.submission_gate.wait(generation)', 'f.lock.acquire()',
 		'return -int(errno.erestartsys)', 'defer {', 'queue_resources.submission_gate.leave()',
-		'gem.ref_obj(result_object)', 'generation := uat_mgr.g13_slot_generation()',
-		'slot = state_manager.try_hold_g13_submission_slot(vm)', 'if slot != 0 { break }', 'f.lock.release()',
-		'uat_mgr.wait_g13_slot(generation)', 'f.lock.acquire()', 'return -int(errno.erestartsys)',
-		'cleanup_closed_mappings_locked(vm)', 'defer { uat_mgr.release_g13_slot(vm, u32(slot)) }',
+		'gem.ref_obj(result_object)', 'slot := f.bind_g13_submission_vm_locked(mut state_manager, vm)',
+		'if slot < 0 { return slot }', 'defer { uat_mgr.release_g13_slot(vm, u32(slot)) }',
 		'prepare_g13_compute_job', 'install_output_syncs'], 'Vinix interruptible G13 admission')!
+	binder := section(file, 'fn (mut f GpuFile) bind_g13_submission_vm_locked(', 'fn dispatch(', 'Vinix VM binder')!
+	require_order(binder, ['for !vm.binding_gate.try_enter()', 'generation := vm.binding_gate.generation()',
+		'f.lock.release()', 'vm.binding_gate.wait(generation)', 'f.lock.acquire()', 'return -int(errno.erestartsys)',
+		'cleanup_closed_mappings_locked(vm)', 'defer { vm.binding_gate.leave() }',
+		'generation := uat_mgr.g13_slot_generation()', 'slot := manager.try_hold_g13_submission_slot(vm)',
+		'if slot != 0 { return slot }', 'f.lock.release()', 'uat_mgr.wait_g13_slot(generation)', 'f.lock.acquire()',
+		'return -int(errno.erestartsys)', 'cleanup_closed_mappings_locked(vm)'],
+		'Vinix holds VM binding admission across the interruptible slot wait')!
 	admission := read(os.join_path(repo, 'kernel/gpu/agx/admission/admission.v'))!
 	release_gate := section(admission, 'pub fn (mut gate Gate) leave()', 'pub fn (mut gate Gate) generation(', 'Vinix queue gate')!
 	require_order(release_gate, ['gate.held = false', 'event.trigger_n(mut gate.released, 1)'],

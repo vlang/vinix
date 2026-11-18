@@ -37,6 +37,7 @@ fn wake_waiting_submitter() {
 	waiting_file.lock.acquire()
 	mut queue := unsafe { waiting_file.g13_queues[0].resources }
 	assert !queue.submission_gate.try_enter(), 'the slot waiter still owns same-queue admission'
+	assert !waiting_file.vm.binding_gate.try_enter(), 'the slot waiter still owns VM binding admission'
 	waiting_file.lock.release()
 	mut task := proc.current_thread()
 	match slot_wake {

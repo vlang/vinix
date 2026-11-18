@@ -3,6 +3,7 @@ module mmu
 
 import event
 import event.eventstruct
+import gpu.agx.admission
 
 pub struct UatContext {
 pub mut:
@@ -11,6 +12,7 @@ pub mut:
 	detached bool
 	active bool = true
 	pgtable voidptr = voidptr(1)
+	binding_gate admission.Gate
 }
 
 pub enum UatHandoffAbi {

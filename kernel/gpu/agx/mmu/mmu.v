@@ -9,6 +9,7 @@ module mmu
 // tables use a 16 KiB granule and are implemented in pgtable.v.
 
 import gpu.agx.pgtable
+import gpu.agx.admission
 import gpu.agx.alloc as gpu_alloc
 import gpu.agx.vm as agxvm
 import klock
@@ -83,6 +84,7 @@ pub mut:
 	detached       bool // protected by the owning file's lock
 	inflight       u64 // atomic callback and aggregate submission pins
 	binding_epoch  u64 // changes whenever this VM's firmware root is installed
+	binding_gate   admission.Gate // serializes G13 submission binds across slot waits
 	dummy_phys     u64
 	kernel_start   u64
 	kernel_end     u64

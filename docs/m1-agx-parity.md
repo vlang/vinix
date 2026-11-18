@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Queues that share a G13 VM now serialize admission to the UAT slot
+allocator. [Per-VM binding admission](m1-agx-vm-binding-admission.md)
+
 G13 preserves slot release order across root removal and invalidates the
 ASID once after publishing a replacement root. [UAT slot replacement](m1-agx-uat-replacement.md)
 

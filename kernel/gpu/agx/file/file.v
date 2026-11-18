@@ -1534,21 +1534,8 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 				|| descriptor.result_size > result_object.size - descriptor.result_offset { return -22 }
 		} else if descriptor.result_offset != 0 { return -22 }
 	}
-	if uat_mgr == unsafe { nil } { return -19 }
-	mut slot := 0
-	for {
-		generation := uat_mgr.g13_slot_generation()
-		slot = state_manager.try_hold_g13_submission_slot(vm)
-		if slot < 0 { return slot }
-		if slot != 0 { break }
-		// Cleanup needs file.lock to retire the jobs occupying slots. The
-		// caller still owns the captured queue, which keeps its VM alive.
-		f.lock.release()
-		resumed := uat_mgr.wait_g13_slot(generation)
-		f.lock.acquire()
-		if !resumed { return -int(errno.erestartsys) }
-		if !f.cleanup_closed_mappings_locked(vm) { return -5 }
-	}
+	slot := f.bind_g13_submission_vm_locked(mut state_manager, vm)
+	if slot < 0 { return slot }
 	defer { uat_mgr.release_g13_slot(vm, u32(slot)) }
 	storage := memory.malloc_packed_fallible(sizeof(G13PendingSubmission)) @[freed]
 	if storage == unsafe { nil } { return -12 }
@@ -1619,6 +1606,35 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	dependencies_transferred = true
 	queued = true
 	return 0
+}
+
+// Caller holds file.lock and a captured queue reference, which keeps the VM
+// live across both waits. Return with file.lock held and transfer a slot lease
+// on success. Jobs and queue teardown can retire while binders sleep.
+fn (mut f GpuFile) bind_g13_submission_vm_locked(mut manager gpu.GpuManager,
+	context &mmu.UatContext) int {
+	if uat_mgr == unsafe { nil } { return -19 }
+	mut vm := unsafe { context }
+	for !vm.binding_gate.try_enter() {
+		generation := vm.binding_gate.generation()
+		f.lock.release()
+		resumed := vm.binding_gate.wait(generation)
+		f.lock.acquire()
+		if !resumed { return -int(errno.erestartsys) }
+		if !f.cleanup_closed_mappings_locked(vm) { return -5 }
+	}
+	defer { vm.binding_gate.leave() }
+	for {
+		generation := uat_mgr.g13_slot_generation()
+		slot := manager.try_hold_g13_submission_slot(vm)
+		if slot != 0 { return slot }
+		f.lock.release()
+		resumed := uat_mgr.wait_g13_slot(generation)
+		f.lock.acquire()
+		if !resumed { return -int(errno.erestartsys) }
+		if !f.cleanup_closed_mappings_locked(vm) { return -5 }
+	}
+	return -19
 }
 
 fn dispatch(handle voidptr, dev &drm.DrmDevice) ?&GpuFile {
