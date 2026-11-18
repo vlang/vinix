@@ -36,7 +36,7 @@ fn main() {
 		section(source, 'pub struct UatContext {', '// Driver-owned backing')! +
 		section(source, 'pub struct UatBuffer {', 'pub struct UatManager {')! +
 		section(source, 'pub fn (mut mgr UatManager) create_context(', '// Convert a cached driver allocation')! +
-		section(source, 'fn (mut ctx UatContext) release_driver_buffer_locked(', '// Remove a driver-buffer translation')! +
+		section(source, 'fn (mut ctx UatContext) release_driver_buffer_locked(', 'pub fn (mut ctx UatContext) unmap_driver_buffer(')! +
 		section(source, 'pub fn (mut ctx UatContext) release_driver_buffer(', 'pub fn (buffer &UatBuffer) cpu_address()')!
 	os.write_file('${scratch}/gpu/agx/mmu/production.v', production)!
 	os.cp('${repo}/tests/agx-vm-allocator/test.v', '${scratch}/main.v')!

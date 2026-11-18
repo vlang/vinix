@@ -10,6 +10,8 @@ pub struct UatPgtable {
 pub mut:
 	maps int
 	unmaps int
+	preflights int
+	occupied_address u64
 	reject_next bool
 	last_address u64
 	last_physical u64
@@ -49,6 +51,12 @@ pub fn (mut table UatPgtable) map(address u64, phys u64, size u64, protection u6
 	table.last_size = size
 	table.last_protection = protection
 	return true
+}
+
+pub fn (mut table UatPgtable) map_new(address u64, phys u64, size u64, protection u64) bool {
+	table.preflights++
+	if table.occupied_address >= address && table.occupied_address - address < size { return false }
+	return table.map(address, phys, size, protection)
 }
 
 pub fn (mut table UatPgtable) unmap(_address u64, _size u64) { table.unmaps++ }

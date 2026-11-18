@@ -20,7 +20,12 @@ fn check_vm_geometry_local(vm string, mmu string) ! {
 		'if size > ~u64(0) - (actual_alignment - 1) { return none }',
 		'aligned_size := (size + actual_alignment - 1) & ~(actual_alignment - 1)',
 		'memory.pmm_alloc_aligned_fallible', 'ctx.driver_private.alloc(aligned_size, actual_alignment)',
-		'ctx.driver_gpu.alloc(aligned_size, actual_alignment)'], 'Vinix minimum driver alignment with checked rounding')!
+		'ctx.driver_gpu.alloc(aligned_size, actual_alignment)', 'if !pt.map_new(va, phys, aligned_size, protection)',
+		'ctx.driver_private.cancel_unpublished(va)', 'ctx.driver_gpu.cancel_unpublished(va)',
+		'memory.pmm_free(voidptr(phys), pages)', 'return none', 'ctx.driver_buffers << buffer'],
+		'Per-VM driver mappings preflight before publication and cancel only the unpublished VA on failure')!
+	require(!allocate.contains('.gc()') && !allocate.contains('.release(va)'),
+		'Failed driver maps preserve previously deferred VA reservations')!
 }
 
 fn check_vm_geometry_reference(file string, buffer string, allocator string) ! {

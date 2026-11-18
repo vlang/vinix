@@ -209,6 +209,30 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `8fbb2a72537b46e1926ee090b385ad884acce8a8e4c7d59fcf94a399d372fc68`.
 
+G13 per-VM driver buffers now use the fixed-map preflight for both
+heaps. The pinned Asahi range allocator calls `map_node`, which checks
+for occupied leaves and prepares tables before placing the mapping.
+On failure, Vinix cancels the new VA reservation and returns its
+backing while preserving earlier deferred reservations.
+[Asahi range mapping](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L2459-L2504)
+
+Both kernel builds and 82 contract test files passed. The allocator
+sanitizer fixture covered 400 contexts and 4000 successful shared and
+private allocations, including 800 retries. The page-table, heap
+cancellation, TPC, TVB, and cache teardown regressions passed. Two
+compiled controls caught a bypassed preflight and collection of older
+reservations. Linked ARM64 code confirms cancellation before physical
+free on map failure. The allocation scan reproduced 178 baseline
+findings. The full source audit remains `not_equivalent`. No hardware
+tests or reboots ran.
+
+Evidence for `fe66f619325c910fcbb80b69199095bc479a1715` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-vm-buffer-preflight-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`37130cff00b98d519bfda130eaa233332f45b3115d30c11ff56c714807d3bf90`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

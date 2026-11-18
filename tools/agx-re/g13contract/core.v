@@ -269,6 +269,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'Child table initialization completes before parent publication and BIND preparation walks each leaf table once',
 		'UAT walks allocate only empty intermediate entries and follow only table descriptors',
 		'G13 context-zero mapping checks vacancy and reserves tables before publishing leaves on either root',
+		'Per-VM driver buffers use the fixed-map preflight and cancel only their unpublished reservation on failure',
 		'G13 kernel mappings finish with TLBI and require slot-64 FwCtl only before a cached mapping is removed',
 		'Only an active ASC slot with the matching published TTBR requires FwCtl before user driver-buffer unmap',
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',

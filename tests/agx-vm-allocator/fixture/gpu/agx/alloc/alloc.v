@@ -31,7 +31,7 @@ pub fn (mut heap HeapAllocator) alloc(size u64, alignment u64) ?u64 {
 		heap.allocations = []Allocation{len: 16}
 	}
 	for index in 0 .. heap.allocations.len {
-		if !heap.allocations[index].live {
+		if heap.allocations[index].address == 0 {
 			heap.allocations[index] = Allocation{ address: address, size: size, live: true }
 			heap.top = address + size
 			return address
@@ -50,10 +50,28 @@ pub fn (mut heap HeapAllocator) release(address u64) {
 	assert false, 'release of unknown GPU VA'
 }
 
-pub fn (mut heap HeapAllocator) gc() {
+fn (mut heap HeapAllocator) update_top() {
 	mut top := heap.start
 	for record in heap.allocations {
-		if record.live && record.address + record.size > top { top = record.address + record.size }
+		if record.address != 0 && record.address + record.size > top { top = record.address + record.size }
 	}
 	heap.top = top
+}
+
+pub fn (mut heap HeapAllocator) cancel_unpublished(address u64) {
+	for index, record in heap.allocations {
+		if record.live && record.address == address {
+			heap.allocations[index] = Allocation{}
+			heap.update_top()
+			return
+		}
+	}
+	assert false, 'cancel of unknown GPU VA'
+}
+
+pub fn (mut heap HeapAllocator) gc() {
+	for index, record in heap.allocations {
+		if !record.live { heap.allocations[index] = Allocation{} }
+	}
+	heap.update_top()
 }

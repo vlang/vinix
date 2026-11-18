@@ -66,6 +66,10 @@ fn check_fixed_map_reference(page_table string, mmu string) ! {
 	node := section(mmu, 'fn map_node(', 'fn map_node_prepared(', 'Packaged fixed node map')!
 	require_order(node, ['self.page_table.prepare_map(node.start()..end)?', 'self.map_node_prepared(node, prot)',
 		'self.page_table.discard_partial_map(node.start()..end)'], 'Packaged node map prepares before writing or unwinding leaves')!
+	ranged := section(mmu, 'fn map_in_range_with_mode(', '/// Map a GEM object into this Vm at a specific address.', 'Packaged range map')!
+	require_order(ranged, ['inner.mm.insert_node_in_range(', 'let ret = inner.map_node(&node, prot)',
+		'core::mem::drop(vm_exec)', 'ret?', 'Ok(KernelMapping(ManuallyDrop::new(node)))'],
+		'Packaged range allocations use the same preflight before exposing a mapping owner')!
 	io := section(mmu, 'pub(crate) fn map_io(', '/// Unmap everything in an address range.', 'Packaged fixed MMIO map')!
 	require_order(io, ['inner.page_table.prepare_map(iova..end)?', '.map_pages(iova..end, phys as PhysicalAddr, prot, false)'],
 		'Packaged MMIO map prepares before writing leaves')!

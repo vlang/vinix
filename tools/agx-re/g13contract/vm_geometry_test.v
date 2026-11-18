@@ -15,7 +15,8 @@ fn test_vm_geometry_rejects_16k_normalization_missing_rounding_checks_and_heap_d
 	for token in ['window := agxvm.driver_window(kernel_start, kernel_end)', 'kernel_end: window.end',
 		"gpu_alloc.new_heap('uat-user-private', window.midpoint, window.end)",
 		'if size > ~u64(0) - (actual_alignment - 1) { return none }',
-		'ctx.driver_gpu.alloc(aligned_size, actual_alignment)'] {
+		'ctx.driver_gpu.alloc(aligned_size, actual_alignment)', 'if !pt.map_new(va, phys, aligned_size, protection)',
+		'ctx.driver_private.cancel_unpublished(va)', 'ctx.driver_gpu.cancel_unpublished(va)'] {
 		if _ := check_vm_geometry_local(vm, mmu.replace(token, '')) { assert false, token }
 	}
 }

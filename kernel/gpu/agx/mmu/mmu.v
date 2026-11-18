@@ -474,13 +474,11 @@ pub fn (mut ctx UatContext) alloc_driver_buffer_aligned(size u64, private bool,
 		pgtable.gpu_prot_gpu_shared_rw
 	}
 	mut pt := unsafe { ctx.pgtable }
-	if !pt.map(va, phys, aligned_size, protection) {
+	if !pt.map_new(va, phys, aligned_size, protection) {
 		if private {
-			ctx.driver_private.release(va)
-			ctx.driver_private.gc()
+			ctx.driver_private.cancel_unpublished(va)
 		} else {
-			ctx.driver_gpu.release(va)
-			ctx.driver_gpu.gc()
+			ctx.driver_gpu.cancel_unpublished(va)
 		}
 		memory.pmm_free(voidptr(phys), pages)
 		return none
