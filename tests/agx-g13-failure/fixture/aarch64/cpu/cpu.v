@@ -3,12 +3,16 @@
 module cpu
 
 __global snapshot_barriers = u32(0)
+__global send_fences = u32(0)
 __global cache_preparations = u32(0)
 __global prepared_address = u64(0)
 __global prepared_span = u64(0)
 
 pub fn wfe() {}
+pub fn isb() {}
 pub fn dmb_ishld() { snapshot_barriers++ }
+pub fn dmb_sy() { send_fences++ }
+pub fn send_barriers() u32 { return send_fences }
 pub fn barriers() u32 { return snapshot_barriers }
 
 pub fn clean_invalidate_data_cache_to_poc(address u64, span u64) {

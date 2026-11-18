@@ -73,6 +73,39 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 	require(transport.contains('return rtk.firmware_led_boot && rtk.send_management(msg_start_ep, payload)'),
 		'Vinix retries an unsent endpoint start only on the firmware-led transport')!
 	check_rtkit_iop_confirmation(transport, linux, linux_boot, boot, start)!
+	check_rtkit_mailbox_send(transport, asahi_linux, repo)!
+}
+
+fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) ! {
+	linux := read(os.join_path(asahi_linux, 'drivers/soc/apple/mailbox.c'))!
+	require(linux.contains('#define APPLE_MBOX_TX_TIMEOUT 500\n'), 'Asahi ASC transmit gives the FIFO 500ms to make space')!
+	send := section(linux, 'int apple_mbox_send(', 'EXPORT_SYMBOL(apple_mbox_send);', 'Asahi mailbox transmit')!
+	require_order(send, ['while (mbox_ctrl & mbox->hw->control_full)', 'if (atomic || mbox->irq_send_empty < 0)',
+		'readl_poll_timeout_atomic(', 'control_full), 100,', 'APPLE_MBOX_TX_TIMEOUT * 1000',
+		'wait_for_completion_interruptible_timeout(', 'msecs_to_jiffies(APPLE_MBOX_TX_TIMEOUT)',
+		'writeq_relaxed(msg.msg0', 'writeq_relaxed(FIELD_PREP(APPLE_MBOX_MSG1_MSG, msg.msg1)'],
+		'Asahi has bounded polling and IRQ paths before publishing either mailbox word')!
+
+	local := read(os.join_path(repo, 'kernel/apple/mailbox/mailbox.v'))!
+	require(local.contains('const send_timeout_us = u64(500_000)') && local.contains('const send_poll_us = u64(100)'),
+		'Vinix uses the Asahi ASC transmit duration and polling interval')!
+	timed := section(local, 'pub fn (mut mbox Mailbox) send_timed(', '// Receive a message', 'Vinix timed mailbox transmit')!
+	require_order(timed, ['mbox.try_send(msg)', 'started := timer.get_us()', 'elapsed := timer.get_us() - started',
+		'elapsed >= send_timeout_us', 'remaining := send_timeout_us - elapsed', 'timer.busywait_us',
+		'mbox.try_send(msg)', 'return false'], 'Vinix measures a fresh wait only when the FIFO is full')!
+	try_send := section(local, 'fn (mut mbox Mailbox) try_send(msg', '// Use the polled ASC timeout', 'Vinix mailbox locking')!
+	require_order(try_send, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }', 'return mbox.try_send_locked(msg)'],
+		'Vinix holds the lock for each mailbox attempt')!
+	publish := section(local, 'fn (mbox &Mailbox) try_send_locked(', '// Send a message to the coprocessor', 'Vinix mailbox publication')!
+	require_order(publish, ['mbox.read_reg(mbox_a2i_ctrl) & mbox_full != 0', 'return false',
+		'cpu.dmb_sy()', 'mbox.write_reg64(mbox_a2i_send0, msg.data0)', 'mbox.write_reg64(mbox_a2i_send1, msg.data1)'],
+		'Vinix checks FIFO space and orders shared writes before publishing a complete mailbox item')!
+	management := section(transport, 'fn (mut rtk RTKit) send_management(', 'fn (mut rtk RTKit) send_start_endpoint(', 'Vinix RTKit management transmit')!
+	require(management.contains('return rtk.send_message(ep_mgmt, management_message(kind, payload))'),
+		'Vinix management and application traffic use the same transmit policy')!
+	local_send := section(transport, 'pub fn (mut rtk RTKit) send_message(', 'pub fn (mut rtk RTKit) recv_msg(', 'Vinix RTKit transmit dispatch')!
+	require_order(local_send, ['if rtk.firmware_led_boot {', 'return rtk.mbox.send_timed(message)', 'return rtk.mbox.send(message)'],
+		'Vinix selects elapsed-time transmit only for firmware-led G13 RTKit')!
 }
 
 fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot string, boot string, start string) ! {

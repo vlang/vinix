@@ -615,6 +615,7 @@ fn check_rtkit_started_boot() {
 	wake.mbox.inject(mailbox.MboxMsg{data0: 0x00b0000000000020})
 	assert wake.boot()
 	assert wake.mbox.sent == 4
+	assert wake.mbox.timed_attempts == 0
 	assert wake.mbox.sent_at(0).data0 == 0x0060000000000220
 	println('G13 RTKit: 14 started-ASC boot transcripts and one legacy wake transcript')
 	check_rtkit_management_send_failures()
@@ -640,6 +641,7 @@ fn check_rtkit_application_access(mut mgr GpuManager, allowed bool) {
 	} else {
 		assert mgr.rtk.mbox.attempts == attempts
 	}
+	assert mgr.rtk.mbox.timed_attempts == mgr.rtk.mbox.attempts
 }
 
 fn check_rtkit_iop_acknowledgements() {
@@ -850,6 +852,7 @@ fn check_rtkit_boot_transcript(abi hw.FirmwareAbi, scenario RTKitBootCase) {
 	mgr.lock.release()
 	elapsed := timer.get_ns() - start
 	assert !transport.lock.is_held()
+	assert transport.mbox.timed_attempts == transport.mbox.attempts
 	assert booted == (scenario in [.delayed, .early_iop]!)
 	assert transport.state == if booted { rtkit.RTKitState.running } else { .error }
 	if scenario == .silent {

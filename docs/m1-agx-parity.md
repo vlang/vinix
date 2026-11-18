@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 ASC transmits use the 500 ms FIFO wait from the pinned driver.
+[RTKit mailbox transmit timing](m1-agx-rtkit-transmit.md)
+
 G13 advances boot on IOP acknowledgement and checks both power states for
 application endpoint starts and sends. [RTKit IOP acknowledgement](m1-agx-rtkit-iop-ack.md)
 

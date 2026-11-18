@@ -363,10 +363,7 @@ fn management_message(kind u8, payload u64) u64 {
 }
 
 fn (mut rtk RTKit) send_management(kind u8, payload u64) bool {
-	return rtk.mbox.send(mailbox.MboxMsg{
-		data0: management_message(kind, payload)
-		data1: u64(ep_mgmt)
-	})
+	return rtk.send_message(ep_mgmt, management_message(kind, payload))
 }
 
 fn (mut rtk RTKit) send_start_endpoint(ep u8) bool {
@@ -811,10 +808,14 @@ pub fn (mut rtk RTKit) send_message(ep u8, data u64) bool {
 	if ep >= app_endpoint_start && rtk.firmware_led_boot && !katomic.load(&rtk.application_ready) {
 		return false
 	}
-	return rtk.mbox.send(mailbox.MboxMsg{
+	message := mailbox.MboxMsg{
 		data0: data
 		data1: u64(ep)
-	})
+	}
+	if rtk.firmware_led_boot {
+		return rtk.mbox.send_timed(message)
+	}
+	return rtk.mbox.send(message)
 }
 
 pub fn (mut rtk RTKit) recv_msg() ?mailbox.MboxMsg {

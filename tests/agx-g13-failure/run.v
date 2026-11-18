@@ -41,7 +41,8 @@ fn check_crashlog_output(output string) {
 fn run_checks() int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	assert os.args.len == 1 || os.args[1..] == ['--sanitize']
-		|| (os.args.len == 4 && os.args[1] == '--sanitize' && os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source'])
+		|| (os.args.len == 4 && os.args[1] == '--sanitize'
+		&& os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source', '--mailbox-source'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-g13-failure-${os.getpid()}')
 	os.mkdir_all(scratch) or { panic(err) }
@@ -50,6 +51,11 @@ fn run_checks() int {
 	os.mkdir_all('${scratch}/apple/rtkit') or { panic(err) }
 	rtkit_source := if os.args.len == 4 && os.args[2] == '--rtkit-source' { os.args[3] } else { '${repo}/kernel/apple/rtkit/rtkit.v' }
 	os.cp(rtkit_source, '${scratch}/apple/rtkit/rtkit.v') or { panic(err) }
+	mailbox_source := if os.args.len == 4 && os.args[2] == '--mailbox-source' { os.args[3] } else { '${repo}/kernel/apple/mailbox/mailbox.v' }
+	mailbox_code := os.read_file(mailbox_source) or { panic(err) }
+	assert mailbox_code.count('module mailbox\n') == 1
+	os.mkdir_all('${scratch}/apple/ascmailbox') or { panic(err) }
+	os.write_file('${scratch}/apple/ascmailbox/mailbox.v', mailbox_code.replace('module mailbox\n', 'module ascmailbox\n')) or { panic(err) }
 	event_queue := os.read_file('${repo}/kernel/gpu/agx/event/workqueue.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/event/queue.v', 'module event\n' +
 		(section(event_queue, 'pub struct WorkQueueEvents {', 'pub fn (mut queue WorkQueueEvents) retain(') or { panic(err) }) +

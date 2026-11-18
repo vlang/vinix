@@ -2,6 +2,8 @@
 @[has_globals]
 module memory
 
+pub fn map_mmio(base u64, _ u64) u64 { return base }
+
 pub const page_size = u64(4096)
 
 __global live_snapshots = u64(0)

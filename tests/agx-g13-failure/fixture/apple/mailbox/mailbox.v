@@ -18,6 +18,7 @@ mut:
 	sent_messages [16]MboxMsg
 pub mut:
 	attempts int
+	timed_attempts int
 	sent int
 	last MboxMsg
 	fail_next_send bool
@@ -78,4 +79,9 @@ pub fn (mut box Mailbox) send(message MboxMsg) bool {
 	box.sent++
 	box.last = message
 	return true
+}
+
+pub fn (mut box Mailbox) send_timed(message MboxMsg) bool {
+	box.timed_attempts++
+	return box.send(message)
 }

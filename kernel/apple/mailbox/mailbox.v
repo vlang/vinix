@@ -7,6 +7,7 @@ module mailbox
 
 import aarch64.kio
 import aarch64.cpu
+import aarch64.timer
 import klock
 import memory
 
@@ -24,6 +25,8 @@ const mbox_i2a_recv1 = u32(0x838)
 // Status bits
 const mbox_empty = u32(1 << 17)
 const mbox_full = u32(1 << 16)
+const send_timeout_us = u64(500_000)
+const send_poll_us = u64(100)
 
 pub struct MboxMsg {
 pub mut:
@@ -56,6 +59,17 @@ fn (mbox &Mailbox) write_reg64(offset u32, value u64) {
 	kio.mmout(unsafe { &u64(mbox.base + offset) }, value)
 }
 
+fn (mbox &Mailbox) try_send_locked(msg MboxMsg) bool {
+	if mbox.read_reg(mbox_a2i_ctrl) & mbox_full != 0 {
+		return false
+	}
+	// The high-word MMIO write publishes the complete item to the IOP.
+	cpu.dmb_sy()
+	mbox.write_reg64(mbox_a2i_send0, msg.data0)
+	mbox.write_reg64(mbox_a2i_send1, msg.data1)
+	return true
+}
+
 // Send a message to the coprocessor (AP -> IOP)
 pub fn (mut mbox Mailbox) send(msg MboxMsg) bool {
 	mbox.lock.acquire()
@@ -65,20 +79,40 @@ pub fn (mut mbox Mailbox) send(msg MboxMsg) bool {
 
 	// Wait for space in the send FIFO
 	for i := 0; i < 1000000; i++ {
-		status := mbox.read_reg(mbox_a2i_ctrl)
-		if status & mbox_full == 0 {
-			// The high-word MMIO write publishes this message to the IOP.
-			// Make every preceding shared-memory write globally visible first.
-			cpu.dmb_sy()
-			// AppleASCWrapV6 writes a complete 16-byte item at +0x800. Keep
-			// the same word order: publishing the second word completes send.
-			mbox.write_reg64(mbox_a2i_send0, msg.data0)
-			mbox.write_reg64(mbox_a2i_send1, msg.data1)
+		if mbox.try_send_locked(msg) {
 			return true
 		}
 		cpu.isb()
 	}
 
+	C.printf(c'mailbox: Send timeout\n')
+	return false
+}
+
+fn (mut mbox Mailbox) try_send(msg MboxMsg) bool {
+	mbox.lock.acquire()
+	defer { mbox.lock.release() }
+	return mbox.try_send_locked(msg)
+}
+
+// Use the polled ASC timeout when the caller cannot wait on a send-empty IRQ.
+// Each poll holds the mailbox lock only through the register access.
+pub fn (mut mbox Mailbox) send_timed(msg MboxMsg) bool {
+	if mbox.try_send(msg) {
+		return true
+	}
+	started := timer.get_us()
+	for {
+		elapsed := timer.get_us() - started
+		if elapsed >= send_timeout_us {
+			break
+		}
+		remaining := send_timeout_us - elapsed
+		timer.busywait_us(if remaining < send_poll_us { remaining } else { send_poll_us })
+		if mbox.try_send(msg) {
+			return true
+		}
+	}
 	C.printf(c'mailbox: Send timeout\n')
 	return false
 }

@@ -334,6 +334,7 @@ pub fn run_checks() {
 	check_rtkit_first_buffer_requests()
 	check_rtkit_notification_ack_timeouts()
 	check_rtkit_started_boot()
+	check_asc_mailbox_send()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10
