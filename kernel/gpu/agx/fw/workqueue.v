@@ -45,6 +45,16 @@ pub mut:
 	pad_64      [3]u32
 }
 
+pub fn initialize_g13_workqueue_ring_state(data voidptr, size u64) bool {
+	if data == unsafe { nil } || size < sizeof(G13WorkQueueRingState) { return false }
+	unsafe {
+		C.memset(data, 0, sizeof(G13WorkQueueRingState))
+		mut state := &G13WorkQueueRingState(data)
+		state.rb_size = g13_workqueue_entries
+	}
+	return true
+}
+
 @[packed]
 pub struct G13WorkQueuePriority {
 pub mut:

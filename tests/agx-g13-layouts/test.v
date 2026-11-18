@@ -272,6 +272,22 @@ fn check_fragment_tib_sizing() {
 	println('G13 TIB sizing: 2304 packaged sample footprints, wide legacy bounds/overflow and both fragment wire fields passed')
 }
 
+fn check_workqueue_ring_state() {
+	assert sizeof(fw.G13WorkQueueRingState) == 0x70
+	mut ring := [0x72]u8{init: u8(0xa5)}
+	data := unsafe { voidptr(&ring[1]) }
+	assert !fw.initialize_g13_workqueue_ring_state(unsafe { nil }, 0x70)
+	assert !fw.initialize_g13_workqueue_ring_state(data, 0x6f)
+	for byte in ring { assert byte == 0xa5 }
+	assert fw.initialize_g13_workqueue_ring_state(data, 0x70)
+	for offset := u32(0); offset < 0x70; offset += 4 {
+		expected := if offset == 0x50 { u32(0x500) } else { u32(0) }
+		assert object_u32(data, offset) == expected, 'work-queue ring word at 0x${offset:x}'
+	}
+	assert ring[0] == 0xa5 && ring[0x71] == 0xa5
+	println('G13 work-queue ring state: capacity, zeroed cursors and padding, and guard bytes passed')
+}
+
 fn check_v13_5_queue_objects() {
 	assert (fw.g13_workqueue_info_active_size(.v13_5_partial) or { 0 }) == 0xb8
 	mut queue := [0xba]u8{init: u8(0xa5)}
@@ -486,6 +502,7 @@ fn main() {
 	check_abi_offset_translation()
 	check_v13_5_command_repacking()
 	check_fragment_tib_sizing()
+	check_workqueue_ring_state()
 	check_v13_5_queue_objects()
 	check_notifier_initialization()
 	check_tvb_initializers()

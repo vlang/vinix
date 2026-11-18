@@ -936,10 +936,7 @@ fn (mut mgr GpuManager) initialize_g13_subqueue(mut resources G13QueueResources,
 	info_size := fw.g13_workqueue_info_active_size(mgr.hw_config.firmware_abi) or { return false }
 	queue.info = mgr.alloc_g13_buffer_with_protection(info_size, pgtable.gpu_prot_fw_private_rw) or { return false }
 	priority := fw.g13_default_workqueue_priority(resources.priority, pipe_type) or { return false }
-	unsafe {
-		mut state := &fw.G13WorkQueueRingState(queue.state.cpu_address())
-		state.rb_size = fw.g13_workqueue_entries
-	}
+	if !fw.initialize_g13_workqueue_ring_state(queue.state.cpu_address(), queue.state.size) { return false }
 	if !fw.initialize_g13_workqueue_info(queue.info.cpu_address(), queue.info.size,
 		mgr.hw_config.firmware_abi, queue.state.va, queue.ring.va, resources.notifier_list.va,
 		queue.gpu_buffer.va, -1, priority, u32(resources.firmware_id), resources.context.va) {

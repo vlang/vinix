@@ -171,3 +171,27 @@ The evidence archive covers `cecb6050d22e8b179b9ecb7b57fda65a9d5b925a` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-notifier-init-20261119.xCqJep/bundle.tar.gz`
 with SHA-256 `9b9f191d29c32bdbce5c9bb5abee08d36d25d8ced51cd79126eb105404495db8`.
+
+## Work-queue ring state
+
+G13 now clears the entire `0x70`-byte shared ring state and sets its capacity
+to `0x500` entries before filling the queue descriptor that references it.
+Previously the constructor wrote the capacity and relied on the allocator
+to clear the cursors and padding.
+[Pinned ring-state defaults](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/fw/workqueue.rs#L80-L101)
+[Pinned ring-state constructor](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/workqueue.rs#L645-L702)
+[Pinned queue capacity](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L61)
+
+The prefilled-buffer regression reproduced a stale done cursor with the old
+capacity-only write. Under ASan and UBSan, it now checks every word of the
+record, both guard bytes and the absence of writes to a short buffer. Both
+kernel builds, all 79 source-contract test files, 122 pinned reference checks,
+and the G13 failure and queue-unwind suites passed. The generated AArch64 C
+shows the initializer runs before the queue descriptor is filled and performs
+no allocation. The allocation scan matched the 176 baseline findings. M1
+hardware validation remains open.
+
+The evidence archive covers `e1442d84ed6ad1abf4600f2c176f8d5f24879de8` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-workqueue-ring-init-20261119.CFoYvj/bundle.tar.gz`
+with SHA-256 `f35d80e30a8dbac08ef6bbcdc0ce51fabb031eac0ec668de09aeb6fed456680a`.
