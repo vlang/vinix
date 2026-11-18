@@ -142,8 +142,11 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 	require_order(enqueue, ['C.memcpy', 'katomic.sync()', 'katomic.store(mut write_ptr'], 'Vinix TX channel publication')!
 	require_order(enqueue, ['katomic.store(mut write_ptr, next_wp)', 'ch.published++',
 		'TxTicket{index: next_wp, sequence: ch.published}', 'fn (mut ch TxChannel) ticket_consumed(',
-		'ch.validate_pointers(read_ptr, write_ptr)', 'unread := (u64(write_ptr) + u64(ch.ring_size) - u64(read_ptr))',
-		'ch.published - ticket.sequence >= unread'], 'Vinix tracks TX completion beyond a wrapped ring index')!
+		'ch.validate_pointers(read_ptr, write_ptr)', 'capacity := u64(ch.ring_size)',
+		'later := ch.published - ticket.sequence', 'expected_write := (u64(ticket.index) + later % capacity) % capacity',
+		'if u64(write_ptr) != expected_write', 'katomic.store(mut &ch.faulted, u32(1))', 'return none',
+		'unread := (u64(write_ptr) + capacity - u64(read_ptr)) % capacity',
+		'return later >= unread'], 'Vinix validates the host write index before checking wrapped TX completion')!
 	results << 'TX ring entry barrier before write-pointer publication'
 	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
 	for spec in [['render', 'resources.vm', 'G13RenderJobResources', '7'], ['compute', 'ctx', 'G13ComputeJobResources', '3']] {

@@ -182,8 +182,9 @@ pub fn (mut ch TxChannel) enqueue_tracked(data voidptr) ?TxTicket {
 
 // A ticket belongs to the issuing channel until it is torn down. All
 // producers on that channel must publish through enqueue_tracked.
-// At most ring_size - 1 entries can be unread, so the unread count can
-// distinguish passage of the ticket even after newer commands wrap the ring.
+// The ticket and host enqueue count predict the write pointer. Once that
+// matches, the unread count distinguishes passage of the ticket even after
+// newer commands wrap the ring.
 pub fn (mut ch TxChannel) ticket_consumed(ticket TxTicket) ?bool {
 	ch.lock.acquire()
 	defer { ch.lock.release() }
@@ -191,8 +192,15 @@ pub fn (mut ch TxChannel) ticket_consumed(ticket TxTicket) ?bool {
 	read_ptr := ch.read_pointer()
 	write_ptr := unsafe { katomic.load(&u32(ch.state_phys + higher_half + ch.write_off)) }
 	if !ch.validate_pointers(read_ptr, write_ptr) { return none }
-	unread := (u64(write_ptr) + u64(ch.ring_size) - u64(read_ptr)) % u64(ch.ring_size)
-	return ch.published - ticket.sequence >= unread
+	capacity := u64(ch.ring_size)
+	later := ch.published - ticket.sequence
+	expected_write := (u64(ticket.index) + later % capacity) % capacity
+	if u64(write_ptr) != expected_write {
+		katomic.store(mut &ch.faulted, u32(1))
+		return none
+	}
+	unread := (u64(write_ptr) + capacity - u64(read_ptr)) % capacity
+	return later >= unread
 }
 
 // The caller serializes producers from enqueue through completion. The host

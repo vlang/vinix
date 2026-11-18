@@ -15,6 +15,7 @@ import katomic
 
 enum RecoverySendCase {
 	delayed
+	later_unread
 	wrapped
 	polled
 	stopped
@@ -22,6 +23,8 @@ enum RecoverySendCase {
 	completion_timeout
 	send_timeout
 	ring_fault
+	bad_write
+	wrapped_bad_write
 	full
 }
 
@@ -45,8 +48,9 @@ fn observe_recovery_irq_wait() {
 		rtkit_owner.channels.device_ctrl.state_phys = 1
 		return
 	}
-	if recovery_send_case in [.wrapped, .late_consumed]! {
-		if recovery_send_case == .wrapped {
+	if recovery_send_case in [.later_unread, .wrapped, .wrapped_bad_write, .late_consumed]! {
+		wraps := recovery_send_case in [.wrapped, .wrapped_bad_write]!
+		if wraps {
 			// Isolate the recovery pin from the job's own teardown guard.
 			mut job := unsafe { rtkit_owner.g13_compute_jobs[0] }
 			job.released = true
@@ -54,16 +58,20 @@ fn observe_recovery_irq_wait() {
 		}
 		rtkit_owner.lock.acquire()
 		recovery_header.read_ptr = recovery_header.write_ptr
-		if recovery_send_case == .wrapped {
-			// A producer can wrap the ring over the original write index.
-			// Leave its last command unread at that same index.
+		if recovery_send_case != .late_consumed {
+			// Leave a later command unread, possibly at the original index.
 			message := fw.FwRecoverChannel{}
-			for index in 0 .. 4 {
+			later := if wraps { 4 } else { 1 }
+			for index in 0 .. later {
 				assert rtkit_owner.channels.device_ctrl.enqueue(voidptr(&message))
-				if index < 3 { recovery_header.read_ptr = recovery_header.write_ptr }
+				if index + 1 < later { recovery_header.read_ptr = recovery_header.write_ptr }
 			}
 		}
 		rtkit_owner.lock.release()
+	}
+	if recovery_send_case in [.bad_write, .wrapped_bad_write]! {
+		// A corrupt, in-range write index falsely reports an empty ring.
+		recovery_header.write_ptr = recovery_header.read_ptr
 	}
 	if recovery_send_case == .late_consumed {
 		timer.watch_busywait(unsafe { nil })
@@ -85,8 +93,8 @@ fn check_g13_recovery_transmit() {
 	mailbox.set_wait_transport(unsafe { &tx })
 	event.set_completed(8, false)
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
-		for sample in [RecoverySendCase.delayed, .wrapped, .polled, .stopped, .late_consumed,
-			.completion_timeout, .send_timeout, .ring_fault, .full]! {
+		for sample in [RecoverySendCase.delayed, .later_unread, .wrapped, .polled, .stopped, .late_consumed,
+			.completion_timeout, .send_timeout, .ring_fault, .bad_write, .wrapped_bad_write, .full]! {
 			mut transport := rtkit.RTKit{name: 'g13-recover-channel'}
 			boot_g13_fixture_transport(mut transport)
 			mut header := channel.RingHeader{write_ptr: 3,
@@ -113,9 +121,14 @@ fn check_g13_recovery_transmit() {
 			} else {
 				timer.watch_busywait(observe_recovery_irq_wait)
 			}
-			complete := sample in [.delayed, .wrapped, .polled, .late_consumed]!
+			complete := sample in [.delayed, .later_unread, .wrapped, .polled, .late_consumed]!
 			assert !mgr.recover_g13_channel(3, 8, 0x100, 1)
-			assert mgr.recover_g13_channel(2, 8, 0x100, 1) == complete
+			result := mgr.recover_g13_channel(2, 8, 0x100, 1)
+			if sample in [.bad_write, .wrapped_bad_write]! {
+				assert !result && job_queue.has_file_references() && mgr.channels.device_ctrl.has_fault(),
+					'corrupt device-control write index must retain the recovery queue until shutdown'
+			}
+			assert result == complete
 			timer.watch_busywait(unsafe { nil })
 			mailbox.watch_send(unsafe { nil })
 			reads, writes, words := kio.send_result()
@@ -131,11 +144,15 @@ fn check_g13_recovery_transmit() {
 			if sample == .full {
 				assert header.write_ptr == 3 && ring[3] == fw.FwRecoverChannel{}
 				assert mgr.state == .running && !job_queue.has_file_references()
-			} else if sample == .wrapped {
-				assert header.write_ptr == 0 && header.read_ptr == 3
-				assert ring[3] == fw.FwRecoverChannel{} && !job_queue.has_file_references()
+			} else if sample in [.wrapped, .wrapped_bad_write]! {
+				assert header.write_ptr == if sample == .wrapped { u32(0) } else { u32(3) }
+				assert header.read_ptr == 3 && ring[3] == fw.FwRecoverChannel{}
 			} else {
-				assert header.write_ptr == 0
+				assert header.write_ptr == match sample {
+					.later_unread { u32(1) }
+					.bad_write { u32(3) }
+					else { u32(0) }
+				}
 				assert ring[3] == fw.FwRecoverChannel{tag: if abi == .v12_3 { u32(0x0e) } else { u32(0x0f) },
 					pipe_type: 2, work_queue: 0x123000, event_value: 0x100}
 			}
@@ -162,5 +179,5 @@ fn check_g13_recovery_transmit() {
 	recovery_header = unsafe { nil }
 	kio.require_send_owner(unsafe { nil })
 	kio.configure_send(0, unsafe { nil }, 0)
-	println('G13 RecoverChannel: both ABIs, IRQ and polling, delayed and wrapped tickets, timeout pins and shutdown passed')
+	println('G13 RecoverChannel: 24 cases cover both ABIs, later publications, write-index faults, timeout pins and shutdown')
 }

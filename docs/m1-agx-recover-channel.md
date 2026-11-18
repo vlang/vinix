@@ -41,3 +41,28 @@ The archive and restored copy passed full inventory verification.
 | `source.diff` | `e2305f71ead6ca5406a99ef3895188e74a580d0cff654e01bcc2ba897682b7f5` |
 | `vinix-aarch64` | `2e8b78b51f86cc2dbbf6363a83b04c564ddd2ff4d152d5afb47f7008bd70d9c6` |
 | `vinix-x86_64` | `328ccbaea0175171e25b575fc844e8d05764c06af6006b3907d37a0e49f56925` |
+
+## Validating the tracked write index
+
+An in-range device-control write index equal to the read index could make
+an unread RecoverChannel command appear consumed. Vinix now derives the
+expected write index from the issued ticket and the number of later host
+publications. It checks that index under the TX lock before using the unread
+count to decide completion. A mismatch latches a channel fault and retains
+the recovery queue reference until stopped-firmware teardown. Later valid
+publications can advance or wrap the ring while the doorbell sender waits.
+
+The sanitizer regression reproduced early release on baseline
+`b4fdab0cf2276539f285a0bb7a112effcc5edfa4`. The updated fixture passed 24
+recovery cases across both G13 ABIs, including valid later publications,
+corrupt write indices before and after wrap, and release at shutdown. The
+context retirement, heap GC and FwCtl sanitizer suites also passed, along
+with 79 local contract tests and 122 archived-reference checks. Isolated
+AArch64 and x86-64 production builds passed. The allocation scan reproduced
+the same 176 allowance findings with identical counts by file and warning kind.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-recovery-ticket-20261119.4vmenS/`.
+The `bundle.tar.gz` SHA-256 is
+`ca88801c25404bf97957c6fd88f2a2ec22d7b101be8e1ea0fede66a4a69d5f9c`.
+Native M1 firmware validation remains open.
