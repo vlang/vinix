@@ -136,7 +136,8 @@ fn snapshot(role string, root string, relative string, mut sources []Source) ! {
 		for name in names { snapshot(role, root, os.join_path(relative, name), mut sources)! }
 	} else if os.is_file(path) {
 		if !path.ends_with('.v') && !path.ends_with('.rs') && !path.ends_with('.py') && !path.ends_with('.c')
-			&& !path.ends_with('.h') && os.file_name(path) != 'PKGBUILD' {
+			&& !path.ends_with('.h') && !path.ends_with('.S') && !path.ends_with('.dtsi')
+			&& os.file_name(path) != 'PKGBUILD' {
 			return
 		}
 		sources << Source{ role: role, path: relative, sha256: hash_file(path)! }
@@ -165,7 +166,8 @@ pub fn audit(inputs Inputs) !Report {
 		'drivers/soc/apple/rtkit-internal.h', 'rust/kernel/soc/apple/rtkit.rs',
 		'drivers/gpu/drm/drm_gem_shmem_helper.c', 'rust/kernel/drm/gem/shmem.rs',
 		'arch/arm64/include/asm/pgtable-prot.h', 'arch/arm64/include/asm/sysreg.h',
-		'arch/arm64/mm/proc.S', 'arch/arm64/mm/dma-mapping.c', 'kernel/dma/direct.h']
+		'arch/arm64/mm/proc.S', 'arch/arm64/mm/dma-mapping.c', 'kernel/dma/direct.h',
+		'arch/arm64/boot/dts/apple/t8103.dtsi']
 	require_clean(inputs.packages, [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD'])!
 	require_clean(inputs.asahi, asahi_sources)!
 	require_clean(inputs.m1n1, ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx'])!

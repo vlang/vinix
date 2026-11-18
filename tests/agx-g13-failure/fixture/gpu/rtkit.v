@@ -357,3 +357,67 @@ fn check_rtkit_syslog() {
 	}
 	println('G13 RTKit: 20 Syslog notifications across both ABIs check slot bounds, text and ACK order')
 }
+
+fn notify_oslog_fixture(mut mgr GpuManager, data u64, acknowledge bool) {
+	attempts := mgr.rtk.mbox.attempts
+	sent := mgr.rtk.mbox.sent
+	assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: data, data1: rtkit.ep_oslog})
+	if acknowledge {
+		assert mgr.rtk.mbox.attempts == attempts + 1 && mgr.rtk.mbox.sent == sent + 1
+		assert mgr.rtk.mbox.last.data0 == data && mgr.rtk.mbox.last.data1 == rtkit.ep_oslog
+	} else {
+		assert mgr.rtk.mbox.attempts == attempts && mgr.rtk.mbox.sent == sent
+	}
+}
+
+fn check_rtkit_oslog() {
+	notification := u64(0x02) << 56
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		mut transport := rtkit.RTKit{name: 'g13-oslog', state: .running}
+		mut mgr := GpuManager{
+			hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+			rtk: unsafe { &transport }
+		}
+		rtkit_owner = unsafe { &mgr }
+		transport.set_shmem_allocator(unsafe { voidptr(&mgr) }, allocate_rtkit_shmem)
+		assert !transport.oslog_ack_enabled
+		transport.oslog_ack_enabled = true
+		notify_oslog_fixture(mut mgr, notification, false) // No negotiated buffer
+
+		allocations := rtkit_alloc_attempts
+		request := mailbox.MboxMsg{data0: 0x0102345000000000, data1: rtkit.ep_oslog}
+		assert mgr.handle_role_system_message(0, request)
+		assert mgr.rtkit_buffers.len == 1 && transport.mbox.sent == 1
+		transport.oslog_ack_enabled = false
+		notify_oslog_fixture(mut mgr, notification, false) // Default policy for other clients
+		transport.oslog_ack_enabled = true
+
+		mailbox.watch_send(check_rtkit_reply_owner)
+		for counter in [u64(0xffff_fffe), 0xffff_ffff, 0, 0, 0x8000_0000, 1]! {
+			notify_oslog_fixture(mut mgr, notification | counter, true)
+		}
+		for bit := u32(32); bit < 56; bit++ {
+			notify_oslog_fixture(mut mgr, notification | (u64(1) << bit) | 4, false)
+		}
+		for kind in [u64(3), 4, 5, 6]! {
+			notify_oslog_fixture(mut mgr, (kind << 56) | 4, false)
+		}
+
+		transport.mbox.fail_next_send = true
+		attempts := transport.mbox.attempts
+		sent := transport.mbox.sent
+		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: notification | 5, data1: rtkit.ep_oslog})
+		assert transport.mbox.attempts == attempts + 1 && transport.mbox.sent == sent
+		assert mgr.state == .running && transport.state == .running
+		notify_oslog_fixture(mut mgr, notification | 5, true)
+		mailbox.watch_send(unsafe { nil })
+
+		mgr.shutdown()
+		assert transport.system_iovas[rtkit.ep_oslog] != 0 && mgr.rtkit_buffers.len == 0
+		notify_oslog_fixture(mut mgr, notification | 6, false) // Stale allocation metadata
+		assert rtkit_alloc_attempts == allocations + 1
+		unsafe { mgr.rtkit_buffers.free() }
+		rtkit_owner = unsafe { nil }
+	}
+	println('G13 RTKit: 78 OSLog notifications across both ABIs check full-width ACKs, reserved bits and shutdown')
+}

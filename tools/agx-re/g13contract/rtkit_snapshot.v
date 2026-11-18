@@ -91,6 +91,6 @@ fn check_rtkit_buffer_retries(transport string, linux string) ! {
 	receiver := section(transport, 'pub fn (mut rtk RTKit) handle_system_message(', 'fn start_system_endpoints(', 'Vinix RTKit receive')!
 	require_order(receiver, ['ep_ioreport {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)',
 		'ep_syslog {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)',
-		'ep_oslog {', 'if u8(msg.data0 >> 56) == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)'],
+		'ep_oslog {', 'kind := u8(msg.data0 >> 56)', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)'],
 		'Vinix logging endpoints share the buffer retry handler')!
 }

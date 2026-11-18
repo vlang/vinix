@@ -241,6 +241,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 	if cfg.gpu_gen == .g13 {
 		mgr.rtk.set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)
 		mgr.rtk.set_shmem_reader(copy_rtkit_shmem)
+		mgr.rtk.oslog_ack_enabled = true
 	}
 
 	return mgr

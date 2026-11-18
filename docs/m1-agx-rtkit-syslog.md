@@ -30,9 +30,10 @@ range. The linked ARM64 binary contains the expected cache and barrier
 instructions. Generated C confirms stack-only Syslog storage, and the
 allocation scan reproduced the 178 baseline discrepancies.
 
-The full audit remains `not_equivalent`. OSLog notification ACKs,
-inherited sessions, and physical device coherency remain open. No hardware
-tests or reboots occurred.
+At this revision the full audit reported `not_equivalent` and OSLog
+notification acknowledgement was still open. Physical device coherency
+remained untested. No hardware tests or reboots occurred.
+[OSLog and fresh-session follow-up](m1-agx-rtkit-oslog.md)
 
 Evidence is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-rtkit-syslog-20261118/`.

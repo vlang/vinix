@@ -60,6 +60,8 @@ const syslog_init = u8(8)
 const syslog_context_offset = 8
 const syslog_context_size = 24
 const syslog_max_message_size = 255
+const oslog_log = u8(2)
+const oslog_log_reserved = u64(0xff_ffff) << 32
 const buffer_iova_mask = (u64(1) << 44) - 1
 const oslog_iova_mask = (u64(1) << 48) - 1
 const max_system_buffer_size = u64(16 * 1024 * 1024)
@@ -100,6 +102,7 @@ pub mut:
 	system_sizes     [16]u64
 	syslog_entries   u32
 	syslog_msg_size  u32
+	oslog_ack_enabled bool
 	// Latches the first out-of-range endpoint-map group so a repeating roll
 	// call cannot flood the console during boot.
 	epmap_group_warned bool
@@ -662,8 +665,22 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			}
 		}
 		ep_oslog {
-			if u8(msg.data0 >> 56) == buffer_request {
+			kind := u8(msg.data0 >> 56)
+			if kind == buffer_request {
 				return rtk.reply_system_buffer(ep, msg.data0)
+			}
+			if kind == oslog_log && rtk.oslog_ack_enabled {
+				if rtk.system_iovas[ep] == 0 || msg.data0 & oslog_log_reserved != 0 {
+					C.kprintf(c'rtkit[%.*s]: invalid oslog notification 0x%llx\n',
+						i32(rtk.name.len), rtk.name.str, msg.data0)
+					return true
+				}
+				// Channel zero carries a wrapping write counter. Echo it
+				// verbatim, including counters larger than the buffer.
+				if !rtk.send_message(ep, msg.data0) {
+					C.kprintf(c'rtkit[%.*s]: oslog acknowledgement failed\n',
+						i32(rtk.name.len), rtk.name.str)
+				}
 			}
 		}
 		else {}

@@ -31,6 +31,7 @@ The RTKit memory attributes and DMA setup checks also need
 `drivers/gpu/drm/drm_gem_shmem_helper.c`, `rust/kernel/drm/gem/shmem.rs`,
 `arch/arm64/include/asm/pgtable-prot.h`, `arch/arm64/include/asm/sysreg.h`,
 `arch/arm64/mm/proc.S`, `arch/arm64/mm/dma-mapping.c` and `kernel/dma/direct.h`.
+The base-M1 OSLog policy check needs `arch/arm64/boot/dts/apple/t8103.dtsi`.
 
 Its selected ABI comparisons describe the retained `drm.ioctl` legacy
 compatibility declarations. Modern `drm.asahi` declarations are retained as

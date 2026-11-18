@@ -598,6 +598,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(asahi_linux, 'rust/kernel/soc/apple/rtkit.rs'))!)!
 	check_rtkit_buffer_retries(transport, asahi_rtkit)!
 	check_rtkit_syslog(transport, asahi_rtkit)!
+	check_rtkit_oslog(transport, asahi_rtkit, asahi_linux, repo)!
 	check_rtkit_agx_coherency(asahi_linux, repo, asahi_rtkit)!
 	check_rtkit_crashlog(transport, asahi_rtkit,
 		read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit-internal.h'))!,
@@ -1002,6 +1003,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'RTKit Syslog, IOReport and OSLog retries reuse the published buffer and reject changed geometry without ending the session',
 		'G13 RTKit prepares cached CPU RAM for uncached firmware access and reads bounded Syslog records before acknowledgement',
+		'Fresh G13 RTKit sessions echo the full OSLog counter on the negotiated channel and ignore reserved channel bits',
 		'RTKit filters unknown crash notifications and decodes bounded strings, time, mailbox history and exception records',
 		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
 		'host workqueue retirement pointer and wrap-safe publication',
