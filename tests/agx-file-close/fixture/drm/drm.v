@@ -8,6 +8,8 @@ pub struct DrmDriver {
 pub:
 	ioctls []DrmIoctl
 	ioctl_abi fn (&DrmDevice, voidptr) u32 = unsafe { nil }
+	gem_close fn (&DrmDevice, voidptr, u32) int = unsafe { nil }
+	gem_close_request fn (&DrmDevice, voidptr, &ioctl.DrmGemClose) int = unsafe { nil }
 	gem_export fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 }

@@ -55,6 +55,7 @@ pub mut:
 	ioctl_abi      fn (&DrmDevice, voidptr) u32 = unsafe { nil }
 	file_close     fn (&DrmDevice, voidptr) = unsafe { nil }
 	gem_close      fn (&DrmDevice, voidptr, u32) int = unsafe { nil }
+	gem_close_request fn (&DrmDevice, voidptr, &ioctl.DrmGemClose) int = unsafe { nil }
 	gem_export     fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
 	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
@@ -877,6 +878,9 @@ fn ioctl_gem_close(dev &DrmDevice, handle voidptr, data voidptr) int {
 		return -14
 	}
 	request := unsafe { &ioctl.DrmGemClose(data) }
+	if dev.driver.gem_close_request != unsafe { nil } {
+		return dev.driver.gem_close_request(dev, handle, request)
+	}
 	if request.pad != 0 {
 		return -22
 	}

@@ -66,7 +66,7 @@ fn check_mapping_retirement() {
 		// A failed BIND keeps the just-published object's reference, too.
 		mut failed_pt := pgtable.UatPgtable{}
 		mut failed_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &failed_pt }
-		mut failed := GpuFile{ vms: [&failed_vm] }
+		mut failed := GpuFile{ vms: [&failed_vm], ioctl_abi: legacy_ioctl_abi }
 		failed.mappings.flags |= .noslices
 		failed_object := gem.create(7)
 		failed.objects.table.add_created(failed_object)
@@ -75,7 +75,7 @@ fn check_mapping_retirement() {
 		assert failed_object.references == 2 && failed.mappings[0].retiring
 		assert failed_pt.unmaps == 1
 		gpu.fail_mapping_checks(2)
-		assert failed.close_object_handle(7) == -5
+		assert failed.close_object_handle(7, 0) == -5
 		assert failed_object.references == 1 && !failed_vm.destroyed
 		assert !failed.close() && !failed_vm.destroyed
 		assert failed_object.references == 1 && failed_pt.unmaps == 1
@@ -92,7 +92,7 @@ fn check_mapping_retirement() {
 		assert busy.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
 		busy_vm.inflight = 1
 		assert busy.ioctl_gem_bind(unbind(1, 0x4000)) == -16
-		assert busy.close_object_handle(7) == 0
+		assert busy.close_object_handle(7, 0) == 0
 		assert busy_object.references == 1 && busy_pt.unmaps == 0
 		assert busy.cleanup_closed_mappings_locked(&busy_vm)
 		assert !busy.close() && !busy_vm.destroyed
@@ -205,7 +205,7 @@ fn check_reimported_mapping_retirement() {
 		assert file.ioctl_gem_bind(&original) == 0
 
 		vm.inflight = 1
-		assert file.close_object_handle(7) == 0
+		assert file.close_object_handle(7, 0) == 0
 		assert object.references == 1 && pt.unmaps == 0
 		file.lock.acquire()
 		imported := file.objects.table.import_object(object) or { panic('restore handle') }
@@ -252,7 +252,7 @@ fn check_worker_mapping_retirement() {
 
 	first.inflight = 2
 	second.inflight = 1
-	assert file.close_object_handle(7) == 0
+	assert file.close_object_handle(7, 0) == 0
 	assert first.closed_mappings_pending && second.closed_mappings_pending && closed.references == 2
 	first.inflight--
 	reap_open_detached_g13_queues()

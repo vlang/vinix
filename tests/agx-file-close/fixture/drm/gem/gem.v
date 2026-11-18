@@ -9,6 +9,7 @@ __global reject_create = false
 __global create_calls = u64(0)
 
 pub fn live() int { return live_objects }
+pub fn get_by_handle(_handle u32) ?&GemObject { return none }
 pub fn fail_creates(reject bool) { reject_create = reject }
 pub fn creates() u64 { return create_calls }
 

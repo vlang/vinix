@@ -244,6 +244,7 @@ pub fn run_modern_checks() {
 	check_modern_queue_and_object()
 	check_gem_handle_storage()
 	check_gem_file_names()
+	check_gem_close_semantics()
 	run_advice_checks()
 	run_modern_scs_checks()
 	assert params.timestamp_ns(24_000_003, 24_000_000) == 1_000_000_125
@@ -308,7 +309,7 @@ fn check_gem_handle_storage() {
 }
 
 fn check_gem_file_names() {
-	driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle}
+	driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle, gem_close_request: close_gem_request}
 	device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: unsafe { voidptr(gpu.registration_manager()) }}
 	first_key, second_key := u64(0x4c02), u64(0x4c03)
 	first_fd, second_fd := voidptr(first_key), voidptr(second_key)
@@ -336,7 +337,7 @@ fn check_gem_file_names() {
 		mut first := lookup_file(first_fd) or { panic('first file') }
 		old_offset := first.authorize_mmap(2) or { panic('original mmap offset') }
 		assert first.valid_mmap_range(old_offset, old.size)
-		assert close_gem_handle(&device, first_fd, 2) == 0 && old.references == 2
+		assert close_wire_gem(&device, first_key, 2, 0) == 0 && old.references == 2
 		assert gem_export_handler(&device, first_fd, 2) == none
 		assert gem_export_handler(&device, first_fd, old.handle) == none
 		reuse_code, reused := create_wire_gem(&device, first_key, true)
@@ -347,7 +348,7 @@ fn check_gem_file_names() {
 		fresh_offset := first.authorize_mmap(reused) or { panic('replacement mmap offset') }
 		assert fresh_offset != old_offset && first.valid_mmap_range(old_offset, old.size)
 		assert (gem_import_handler(&device, first_fd, other) or { panic('PRIME import retry') }) == 5
-		assert close_gem_handle(&device, first_fd, 1) == 0
+		assert close_wire_gem(&device, first_key, 1, 0) == 0
 		release_handle(&device, first_fd)
 		release_handle(&device, second_fd)
 		for object in [old, other, fresh, shared]! { gem.unref(object) }
@@ -355,6 +356,54 @@ fn check_gem_file_names() {
 		memory.assert_released()
 	}
 	println('AGX G13 GEM handles: 64 independent file pairs preserve early PRIME imports across ABI selection, reuse closed names, and retain original mmap and export owners')
+}
+
+fn close_wire_gem(device &drm.DrmDevice, client u64, handle u32, pad u32) int {
+	request := ioctl.DrmGemClose{handle: handle, pad: pad}
+	usercopy.configure(unsafe { u64(&request) }, sizeof(request), -1)
+	return drm.invoke(device, client, ioctl.drm_ioctl_gem_close, sizeof(request), 1, unsafe { voidptr(&request) })
+}
+
+fn check_gem_close_semantics() {
+	driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle, gem_close_request: close_gem_request}
+	device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: unsafe { voidptr(gpu.registration_manager()) }}
+	client := u64(0x4c04)
+	assert close_wire_gem(&device, client, 1, 0) == -22 && lookup_file(voidptr(client)) == none
+	for abi in [u32(0), legacy_ioctl_abi, modern_ioctl_abi]! {
+		for _ in 0 .. 64 {
+			mut pt := pgtable.UatPgtable{}
+			mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: unsafe { &pt }}
+			mut file := GpuFile{ioctl_abi: abi, vms: [unsafe { &vm }], objects: Objects{table: bo.new_table(true)}}
+			file_map[client] = unsafe { &file }
+			object := gem.create(7)
+			handle := file.objects.add_created(object)
+			assert handle == 1 && file.ioctl_gem_bind(bind(handle, 1, 0x4000)) == 0
+			legacy := abi == legacy_ioctl_abi
+			missing := if legacy { -2 } else { -22 }
+			for absent in [u32(0), 2, ~u32(0)]! {
+				assert close_wire_gem(&device, client, absent, 0) == missing
+			}
+			assert object.references == 2 && pt.unmaps == 0
+			gpu.fail_mapping_checks(1)
+			if legacy {
+				assert close_wire_gem(&device, client, handle, 0xffffffff) == -22
+				assert object.references == 2 && pt.unmaps == 0
+				assert close_wire_gem(&device, client, handle, 0) == -5
+			} else {
+				assert close_wire_gem(&device, client, handle, 0xffffffff) == 0
+			}
+			assert file.ioctl_abi == abi && file.objects.get_ref(handle) == none
+			assert pt.unmaps == 1 && object.references == 1 && vm.closed_mappings_pending
+			assert close_wire_gem(&device, client, handle, 0) == missing
+			assert file.mappings.len == 1 && file.mappings[0].retiring
+			reap_open_detached_g13_queues()
+			assert pt.unmaps == 1 && !vm.closed_mappings_pending && file.mappings.len == 0
+			file_map.delete(client)
+			assert file.close() && gem.live() == 0
+			memory.assert_released()
+		}
+	}
+	println('AGX G13 GEM_CLOSE: 192 wire cases cover missing handles, padding, and delayed GPU mapping retirement across both ABIs and before ABI selection')
 }
 
 fn check_file_vm_names(mut manager mmu.UatManager) {

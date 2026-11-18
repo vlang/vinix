@@ -81,9 +81,9 @@ fn checks() !int {
 	drm_source := os.read_file('${repo}/kernel/drm/drm.v')!
 	os.cp_all(repo + '/tests/drm-wire/fixture/errno', scratch + '/errno', false)!
 	os.cp(repo + '/tests/agx-modern-ioctl/drm.v', scratch + '/drm/modern_fixture.v')!
-	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport usercopy\nimport memory\nimport errno\n' +
-		section(drm_source, 'fn decode_ioctl_cmd(', 'fn common_ioctl_layout(')! +
-		section(drm_source, 'fn ioctl_layout(', '// The node is /dev/dri/')! +
+	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport drm.gem\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n' +
+		section(drm_source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')! +
+		section(drm_source, 'fn ioctl_gem_close(', 'fn ioctl_syncobj_create(')! +
 		section(drm_source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!)!
 	os.write_file('${scratch}/drm/prime.v', 'module drm\nimport drm.gem\nimport drm.ioctl\n' +
 		section(drm_source, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(')!)!

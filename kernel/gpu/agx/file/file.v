@@ -363,11 +363,17 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm &mmu.UatContext) bool {
 	return success
 }
 
-fn (mut f GpuFile) close_object_handle(handle u32) int {
+fn (mut f GpuFile) close_object_handle(handle u32, pad u32) int {
 	f.lock.acquire()
+	manager := f.registration_manager
+	modern := f.ioctl_abi != legacy_ioctl_abi && manager != unsafe { nil } && manager.hw_config.gpu_gen == .g13
+	if !modern && pad != 0 {
+		f.lock.release()
+		return -22
+	}
 	obj := f.objects.remove(handle) or {
 		f.lock.release()
-		return -2 // ENOENT
+		return if modern { -22 } else { -2 }
 	}
 	for mut mapping in f.mappings {
 		if voidptr(mapping.obj) != voidptr(obj) { continue }
@@ -384,7 +390,9 @@ fn (mut f GpuFile) close_object_handle(handle u32) int {
 	}
 	f.lock.release()
 	gem.unref(obj)
-	return if success { 0 } else { -5 }
+	// The modern close result describes handle removal. The VM worker owns
+	// retries if an invalidation could not yet be acknowledged.
+	return if success || modern { 0 } else { -5 }
 }
 
 // Reserve a complete replacement array before a range mutation takes any new
@@ -1729,10 +1737,15 @@ fn lookup_file(handle voidptr) ?&GpuFile {
 	return f
 }
 
-pub fn close_gem_handle(_dev &drm.DrmDevice, handle voidptr, object_handle u32) int {
-	f := lookup_file(handle) or { return -2 }
+pub fn close_gem_request(dev &drm.DrmDevice, handle voidptr, request &ioctl.DrmGemClose) int {
+	f := lookup_file(handle) or {
+		manager := unsafe { &gpu.GpuManager(dev.driver_data) }
+		return if request.pad != 0 || (manager != unsafe { nil } && manager.hw_config.gpu_gen == .g13) {
+			-22
+		} else { -2 }
+	}
 	mut file := unsafe { f }
-	return file.close_object_handle(object_handle)
+	return file.close_object_handle(request.handle, request.pad)
 }
 
 pub fn mmap_handle(_dev &drm.DrmDevice, handle voidptr, page u64, _flags int) voidptr {

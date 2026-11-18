@@ -710,6 +710,28 @@ The restored archive passed inventory verification for
 `bundle.tar.gz` SHA-256 is
 `06f95465e73db2e6a9d08432b32719921ab28bb85770e015fdadbd0702089cd4`.
 
+Modern G13 `GEM_CLOSE` now ignores padding, reports `EINVAL` for a
+missing handle, and reports success once it removes a valid handle.
+The same policy applies before ABI selection, including handles imported
+through PRIME. The VM worker retains and retries GPU mapping cleanup
+when the device cannot acknowledge it during the ioctl. The pinned DRM
+core reports the handle deletion result and invokes the Asahi close
+callback for mapping cleanup. [Pinned DRM close](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L365-L419) [Pinned Asahi callback](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gem.rs#L349-L357)
+
+The sanitizer fixture passed 192 canonical close scenarios across the
+modern, legacy and pre-selection paths. The worker retired the mapping
+after an injected acknowledgement failure with one PTE removal. Both
+kernel builds, all 82 V test files and the DRM wire suite passed. The
+allocation scan matched 177 baseline findings. CPU mmap authorization
+revocation on close remains a parity gap. The pinned offline audit
+reports `not_equivalent`.
+
+The restored archive passed inventory verification for
+`e2525c597505fc34d759b37d1559bbaf143bb978` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-close-wire-20261118.MDy0K2/`.
+`bundle.tar.gz` SHA-256 is
+`19efc75d01a38e53122fb2a9c06f4d4b4ee44075f01b82ac8d41a70d74d54b6d`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

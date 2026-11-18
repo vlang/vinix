@@ -1,6 +1,7 @@
 module drm
 
 import errno
+import drm.ioctl
 
 pub struct DrmIoctl {
 pub:
@@ -17,9 +18,10 @@ struct DrmNode {
 	dev &DrmDevice
 }
 
-fn common_ioctl_layout(_cmd u32) ?DrmIoctlLayout { return none }
-
-fn drm_ioctl(_dev &DrmDevice, _cmd u32, _data voidptr, _handle voidptr) int { return -95 }
+fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) int {
+	if cmd == ioctl.drm_ioctl_gem_close { return ioctl_gem_close(dev, handle, data) }
+	return -95
+}
 
 fn account_activity(_dev &DrmDevice, _cmd u32) {}
 

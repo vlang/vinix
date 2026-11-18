@@ -134,7 +134,7 @@ fn check_unbind_ranges() {
 			if repeated {
 				assert file.ioctl_gem_bind(&all) == 0 && object.references == 1 && file.mappings.len == 0; cases++
 			} else {
-				assert file.close_object_handle(7) == 0 && file.mappings.len == 0 && gem.live() == 0; cases++
+				assert file.close_object_handle(7, 0) == 0 && file.mappings.len == 0 && gem.live() == 0; cases++
 			}
 			mut closing_object := gem.create(9); closing_object.size = 16 * pgtable.uat_pgsz
 			file.objects.table.add_created(closing_object)
