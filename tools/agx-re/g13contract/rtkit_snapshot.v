@@ -128,11 +128,17 @@ fn check_rtkit_buffer_startup(transport string, linux string, repo string) ! {
 	require_order(create, ['if cfg.gpu_gen == .g13 {', 'set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)',
 		'mgr.rtk.nonfatal_log_errors = true', '\n\t}', 'return mgr'], 'Only G13 enables nonfatal setup failures')!
 	allocation := section(manager, 'fn alloc_buffer_from_heap(', 'fn (mut mgr GpuManager) alloc_shared_buffer_with_protection(', 'Vinix RTKit backing allocator')!
-	require_order(allocation, ['pmm_alloc_aligned_fallible(pages, 4)', 'if phys == 0', 'return none',
+	require_order(allocation, ['pages := aligned_size / page_size',
+		'alignment_pages := if allocator_id == buffer_allocator_default { u64(4) } else { alloc.gpu_page_size / page_size }',
+		'pmm_alloc_aligned_fallible(pages, alignment_pages)', 'if phys == 0', 'return none',
 		'va := heap.alloc(size, alloc.gpu_page_size) or {', 'memory.pmm_free(voidptr(phys), pages)', 'return none',
 		'if !uat_mgr.map_kernel(va, phys, aligned_size, protection)', 'heap.cancel_unpublished(va)',
 		'memory.pmm_free(voidptr(phys), pages)', 'return none', 'return SharedBuffer{'],
 		'Failed G13 setup unwinds pages and unpublished heap reservations')!
+	fixed := section(manager, 'fn alloc_fixed_buffer(', '// Remove a context-zero UAT mapping', 'Vinix G13 fixed backing')!
+	require_order(fixed, ['pages := aligned_size / page_size', 'pmm_alloc_aligned_fallible(pages, pgtable.uat_pgsz / page_size)',
+		'if !uat_mgr.map_kernel(iova, phys, aligned_size, protection)', 'memory.pmm_free(voidptr(phys), pages)', 'return none'],
+		'Fixed G13 allocations align to one UAT granule and release backing on map refusal')!
 	pgtable := read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!
 	mapping := section(pgtable, 'pub fn (mut pt UatPgtable) map(', 'pub fn (mut pt UatPgtable) map_repeated_page(', 'Vinix G13 mapping unwind')!
 	require_order(mapping, ['defer { pt.lock.release() }', 'return pt.map_contiguous_locked(',

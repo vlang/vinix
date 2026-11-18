@@ -39,7 +39,9 @@ fn run_checks() !int {
 	source := os.read_file(manager_path)!
 	types := section(source, 'struct SharedBuffer {', '@[inline]')!
 	caller := section(source, 'fn alloc_buffer_from_heap(', 'fn (mut mgr GpuManager) alloc_shared_buffer_with_protection(')!
-	os.write_file(scratch + '/gpu/production.v', 'module gpu\nimport gpu.agx.alloc\nimport gpu.agx.pgtable\nimport memory\n' + types + caller.replace(' / page_size', ' / cancel_host_page_size'))!
+	default_allocator := 'const buffer_allocator_default' + source.all_after('const buffer_allocator_default').all_before('\n')
+	os.write_file(scratch + '/gpu/production.v', 'module gpu\nimport gpu.agx.alloc\nimport gpu.agx.pgtable\nimport memory\n' +
+		default_allocator + '\n' + types + caller.replace(' / page_size', ' / cancel_host_page_size'))!
 	compiler := os.getenv_opt('V') or { 'v' }
 	mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals',
 		'-d', 'agx_heap_sanitized', '-d', 'agx_heap_history_invariants', '-d', 'agx_heap_garbage',

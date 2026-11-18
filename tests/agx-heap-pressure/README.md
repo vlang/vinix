@@ -7,15 +7,17 @@ G13 private and GPU-read-only constructor expressions. The buffer helper's
 external `page_size` binding is renamed to avoid a V global/local collision in
 the host closure runtime; its control flow is copied unchanged.
 
-The 128 cases cover both classes, both firmware ABIs, two release orders,
-threshold and sub-threshold garbage, immediate/delayed acknowledgements,
-failed doorbells, timeout, state/fault transitions and full/corrupt rings.
+The 256 cases cover both classes, both firmware ABIs, 4 KiB and 16 KiB PMM
+granules, two release orders, threshold and sub-threshold garbage,
+immediate and delayed acknowledgements, failed doorbells, timeout, state and
+fault transitions, and full or corrupt rings.
 Three repeated allocation failures must preserve metadata addresses, pending
 counts/bytes, live pins and FIFO/hole order. Explicit prefix collection must
 permit only the collected range's reuse. Successful barriers permit reuse of
-their captured prefixes. The actual buffer allocator must unwind all 336 newly
-reserved physical-page batches without publishing a page table. The generic
-constructor's pressure retry remains tested.
+their captured prefixes. The heap allocator must return all 672 new physical
+allocations when VA placement fails. Two fixed-map refusals check the backing
+rollback at each PMM granule. Both paths request 16 KiB physical alignment.
+The default heap control checks its four-page alignment and pressure retry.
 
 `AGX_PRESSURE_C` and `AGX_PRESSURE_BINARY` retain host artifacts outside Git.
 `--manager-source FILE` and `--allocator-source FILE` select alternatives.
@@ -24,10 +26,11 @@ two sources plus five wrong-policy/guard cases. Every binary must fail at the
 unacknowledged-reuse assertion; compilation failure does not count. Fixtures
 are removed before either successful or failed exit.
 
-`check.v --native CURRENT_ARM_C BASELINE_ARM_C` verifies the exact allocation
-guard (including deferred unlock), stack-only constructor, scalar default and
-two class selections. Fourteen heap/backing/barrier/teardown bodies must remain
-unchanged. It resolves interned strings by value and consistently renames only
+`check.v --native CURRENT_ARM_C BASELINE_ARM_C` verifies the original
+pressure-policy change against its retained source and native build. It checks
+the exact allocation guard (including deferred unlock), stack-only constructor,
+scalar default and two class selections. Fourteen heap, backing, barrier and
+teardown bodies must match. It resolves interned strings by value and renames only
 numbered C return/array temporaries, preserving variable identity and uses.
 `--selftest` rejects six mutations, including a wrong temporary alias.
 `AGX_PRESSURE_DIAGNOSTICS` names an existing external directory for a failed

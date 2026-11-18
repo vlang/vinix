@@ -29,10 +29,15 @@ fn run_checks() !int {
 	os.write_file(scratch + '/gpu/factories.v', factories)!
 	caller := manager.all_after('fn alloc_buffer_from_heap(').all_before('fn (mut mgr GpuManager) alloc_shared_buffer_with_protection(')
 	assert caller.contains('memory.pmm_free(voidptr(phys), pages)')
+	fixed := manager.all_after('fn alloc_fixed_buffer(').all_before('// Remove a context-zero UAT mapping')
+	constants := manager.all_after('const buffer_allocator_default').all_before('// GPU states')
 	types := manager.all_after('struct SharedBuffer {').all_before('@[inline]')
 	// Avoid V's cross-module global/local page_size name collision in the host
 	// closure runtime. Only this external binding is renamed; control flow is exact.
-	os.write_file(scratch + '/gpu/caller.v', 'module gpu\nimport memory\nimport gpu.agx.alloc\nimport gpu.agx.pgtable\nstruct SharedBuffer {' + types + '\nfn alloc_buffer_from_heap(' + caller.replace(' / page_size', ' / pressure_host_page_size'))!
+	os.write_file(scratch + '/gpu/caller.v', 'module gpu\nimport memory\nimport gpu.agx.alloc\nimport gpu.agx.pgtable\n' +
+		'const buffer_allocator_default' + constants + 'struct SharedBuffer {' + types +
+		'\nfn alloc_buffer_from_heap(' + caller.replace(' / page_size', ' / pressure_host_page_size') +
+		'\nfn alloc_fixed_buffer(' + fixed.replace(' / page_size', ' / pressure_host_page_size'))!
 	for directory in ['memory', 'gpu/agx/pgtable'] {
 		os.mkdir_all(scratch + '/' + directory)!
 		os.cp(repo + '/tests/agx-heap-pressure/' + os.file_name(directory) + '.v', scratch + '/' + directory + '/host.v')!

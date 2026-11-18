@@ -233,6 +233,28 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `37130cff00b98d519bfda130eaa233332f45b3115d30c11ff56c714807d3bf90`.
 
+G13 firmware heaps and the fixed buffer-manager mapping now request
+one 16 KiB UAT granule of physical alignment. On Vinix's ARM64 PMM,
+that removes the three extra contiguous pages required by the old
+four-page alignment request. Scatter-backed allocation remains open.
+[Asahi page-table mapping](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/pgtable.rs#L929-L944)
+
+Both kernel builds and 82 contract test files passed. The sanitizer
+suite passed 256 pressure cases, two fixed-map refusals and a
+default-heap control. It checked 4 KiB and 16 KiB PMM arguments and
+backing return on failure. Compiled controls caught the oversized
+alignment in each G13 path. Linked ARM64 code confirmed both
+alignment calculations. The allocation scan reproduced 178 baseline
+findings. The full source audit remains `not_equivalent`. No hardware
+tests or reboots ran.
+
+Evidence for `41d57c1995067b7690a0def4d78b0dfded3157c9` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-backing-alignment-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`ec73a69ae1be32f6308d3e947ed67ad46f71f2d19595e562ee1e48fc67ab9fef`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

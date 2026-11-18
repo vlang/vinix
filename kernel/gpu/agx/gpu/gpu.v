@@ -479,7 +479,10 @@ fn alloc_buffer_from_heap(mut heap alloc.HeapAllocator, size u64, protection u64
 	}
 	aligned_size := (size + alloc.gpu_page_size - 1) & ~(alloc.gpu_page_size - 1)
 	pages := aligned_size / page_size
-	phys := u64(memory.pmm_alloc_aligned_fallible(pages, 4))
+	// G13 backing needs one UAT granule of alignment. The default heap
+	// serves G17 and keeps its existing four-page PMM alignment.
+	alignment_pages := if allocator_id == buffer_allocator_default { u64(4) } else { alloc.gpu_page_size / page_size }
+	phys := u64(memory.pmm_alloc_aligned_fallible(pages, alignment_pages))
 	if phys == 0 {
 		return none
 	}
@@ -588,7 +591,7 @@ fn alloc_fixed_buffer(iova u64, size u64, protection u64) ?SharedBuffer {
 	}
 	aligned_size := (size + pgtable.uat_pg_mask) & ~pgtable.uat_pg_mask
 	pages := aligned_size / page_size
-	phys := u64(memory.pmm_alloc_aligned_fallible(pages, 4))
+	phys := u64(memory.pmm_alloc_aligned_fallible(pages, pgtable.uat_pgsz / page_size))
 	if phys == 0 {
 		return none
 	}

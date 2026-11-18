@@ -12,8 +12,14 @@ __global higher_half = u64(0)
 __global pressure_host_page_size = u64(4096)
 __global uat_storage = HostUat{}
 __global uat_mgr = unsafe { &HostUat(nil) }
+__global fixed_map_attempts = 0
 struct HostUat {}
-fn (_ &HostUat) map_kernel(_ u64, _ u64, _ u64, _ u64) bool { panic('exhaustion must fail before page-table publication') }
+fn (_ &HostUat) map_kernel(address u64, _ u64, size u64, _ u64) bool {
+	assert address == 0x20_0000_0000, 'exhaustion must fail before page-table publication'
+	assert size == alloc.gpu_page_size
+	fixed_map_attempts++
+	return false
+}
 
 fn pressure_case(class int, mode int, abi hw.FirmwareAbi, release_high bool, size u64) {
 	mut header := channel.RingHeader{}
@@ -50,7 +56,8 @@ fn pressure_case(class int, mode int, abi hw.FirmwareAbi, release_high bool, siz
 			assert C.__asan_address_is_poisoned(first) == 0 && C.__asan_address_is_poisoned(second) == 0
 			assert heap.allocations.len == 3 && heap.allocations[1] == live && live.va == middle
 			pending, pending_bytes := heap.garbage(); assert pending == count && pending_bytes == bytes
-			if _ := alloc_buffer_from_heap(mut heap, 1, 0, 0) { panic('exhausted buffer allocation must fail') }
+			allocator_id := if class == 0 { buffer_allocator_g13_private } else { buffer_allocator_g13_gpu_readonly }
+			if _ := alloc_buffer_from_heap(mut heap, 1, 0, allocator_id) { panic('exhausted buffer allocation must fail') }
 			memory.check_balanced()
 		}
 		heap.collect_garbage(1)
@@ -68,20 +75,28 @@ fn pressure_case(class int, mode int, abi hw.FirmwareAbi, release_high bool, siz
 pub fn check_pressure() {
 	uat_mgr = unsafe { &uat_storage }
 	mut cases := 0
-	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
-		for class in 0 .. 2 { for mode in [0, 1, 2, 3, 4, 5, 6, 7]! {
-			for high in [false, true]! { for size in [alloc.gpu_page_size, u64(16_793_600)]! {
-				pressure_case(class, mode, abi, high, size); cases++
+	for granule in [u64(4096), 16384]! {
+		pressure_host_page_size = granule
+		memory.set_geometry(granule, alloc.gpu_page_size / granule)
+		for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+			for class in 0 .. 2 { for mode in [0, 1, 2, 3, 4, 5, 6, 7]! {
+				for high in [false, true]! { for size in [alloc.gpu_page_size, u64(16_793_600)]! {
+					pressure_case(class, mode, abi, high, size); cases++
+				} }
 			} }
-		} }
+		}
+		if _ := alloc_fixed_buffer(0x20_0000_0000, 1, 0) { panic('fixed map refusal must return backing') }
+		memory.check_balanced()
 	}
-	assert cases == 128
-	memory.check_total(336)
+	assert cases == 256 && fixed_map_attempts == 2
 	// The generic heap retains its historical allocation-pressure retry.
 	mut legacy := alloc.new_heap('legacy', 0x4000, 0x8000)
 	va := legacy.alloc(1, 0) or { panic('legacy') }; legacy.release(va)
 	assert legacy.alloc(1, 0) or { panic('legacy retry') } == va
+	memory.set_geometry(pressure_host_page_size, 4)
+	if _ := alloc_buffer_from_heap(mut legacy, 1, 0, buffer_allocator_default) { panic('exhausted default heap') }
+	memory.check_total(675)
 	legacy.release(va); legacy.gc(); unsafe { legacy.allocations.free() }
 	uat_mgr = unsafe { nil }
-	println('AGX pressure: 128 real heap/channel cases retain pending ranges until explicit collection; legacy retry preserved')
+	println('AGX pressure: 256 heap/channel cases preserve pending ranges. G13 heap and fixed backing request one UAT granule of alignment on both PMM geometries and return backing on refusal.')
 }
