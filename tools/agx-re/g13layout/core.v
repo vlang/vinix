@@ -770,7 +770,7 @@ pub fn generate_checked(raw_rs string, expected map[string]i64) !string {
 		for name in names {
 			lines << 'pub const g13_${label}_${snake_case(name)}_size = u64(${hx(layouts[name].size)})'
 		}
-		for field_name in ['pending_submissions', 'pending_stamps'] {
+		for field_name in ['pending_submissions', 'pending_stamps', 'idle_off_delay_ms'] {
 			mut found := false
 			for member in layouts['Globals'].fields {
 				if member.name == field_name {

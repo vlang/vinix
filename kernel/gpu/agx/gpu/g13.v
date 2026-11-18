@@ -367,6 +367,19 @@ fn (mut ids G13QueueIds) allocate() u64 {
 	return value
 }
 
+// Asahi's ordinary submit policy restores the firmware's short idle delay.
+// The manager lock excludes shutdown while accessing the published Globals.
+pub fn (mut mgr GpuManager) refresh_g13_submit_globals() {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	if mgr.state != .running || mgr.hw_config.gpu_gen != .g13 || mgr.g13_channels == unsafe { nil } { return }
+	globals := &mgr.g13_channels.globals
+	offset := fw.g13_globals_idle_off_delay_offset(mgr.hw_config.firmware_abi) or { return }
+	if globals.phys == 0 || globals.size < offset + sizeof(u32) { return }
+	mut field := unsafe { &u32(u64(globals.cpu_address()) + offset) }
+	katomic.store(mut field, u32(2))
+}
+
 // The firmware samples pending_submissions to decide whether the GPU may
 // sleep. Manager serialization makes the host-side update a single-writer
 // operation; katomic load/store retain the acquire/release ordering required

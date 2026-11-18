@@ -106,6 +106,7 @@ pub mut:
 	published_order       []u32
 	released_order        []u32
 	prepares              int
+	submit_globals_refreshes int
 	active_operations     int
 	operation_starts      int
 	operation_ends        int
@@ -210,6 +211,11 @@ pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(va u64, size u64) {
 	assert !mgr.lock.is_held(), 'timestamp release under manager lock'
 	assert va != 0 && size != 0
 	mgr.lock.acquire(); mgr.timestamp_unmaps++; mgr.lock.release()
+}
+
+pub fn (mut mgr GpuManager) refresh_g13_submit_globals() {
+	assert !mgr.lock.is_held()
+	mgr.submit_globals_refreshes++
 }
 
 pub fn (mut mgr GpuManager) set_g13_compute_completion(job &G13ComputeJobResources,

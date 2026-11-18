@@ -4,6 +4,14 @@ module fw
 
 import gpu.agx.hw
 
+pub fn g13_globals_idle_off_delay_offset(abi hw.FirmwareAbi) ?u64 {
+	return match abi {
+		.v12_3 { g13_v12_3_globals_idle_off_delay_ms_offset }
+		.v13_5_partial { g13_v13_5_globals_idle_off_delay_ms_offset }
+		else { none }
+	}
+}
+
 // Host/firmware operation guard used to keep the GPU awake while submitted
 // work is outstanding. This is an AtomicU32 in the v12.3 firmware ABI.
 pub fn g13_globals_pending_submissions_offset(abi hw.FirmwareAbi) ?u64 {

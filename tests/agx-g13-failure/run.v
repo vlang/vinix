@@ -34,6 +34,8 @@ fn run_checks() int {
 	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')
 	production = production.replace('import sched\n', 'import sched\nimport aarch64.timer\n')
 	submissions := os.read_file(if os.args.len == 4 { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/g13.v' }) or { panic(err) }
+	production += section(submissions, 'pub fn (mut mgr GpuManager) refresh_g13_submit_globals()',
+		'// The firmware samples pending_submissions') or { panic(err) }
 	barriers := os.read_file('${repo}/kernel/gpu/agx/gpu/g13_barriers.v') or { panic(err) }
 	production += section(barriers, 'const g13_barrier_stride', 'fn g13_barrier_source(') or { panic(err) }
 	production += section(submissions, 'fn (mut mgr GpuManager) g13_ring_has_space_locked(', 'fn (mut mgr GpuManager) submit_g13_queue_command(') or { panic(err) }

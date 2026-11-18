@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Modern G13 SUBMIT restores the normal 2 ms firmware idle delay before queue
+lookup. [Submit idle delay](m1-agx-submit-idle-delay.md)
+
 Modern G13 attachment records accept index-zero barriers for absent prior
 events. [Attachment record barriers](m1-agx-attachment-barriers.md)
 
@@ -418,6 +421,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | VM binding | Vinix supports legacy single operations and modern strided batches, copied completely before mutation, with sequential-prefix error semantics. Contiguous/repeated backing, idle overlap replacement and range splitting are implemented. Busy-VM refusals, scatter backing and DRM GPUVM/reservation-fence integration still differ from the reference. |
 | GEM and memory accounting | Vinix records private-object GEM_MADVISE and reports resident contents. Purge/repopulation, shmem/scatter backing, device/client accounting and full reservation-fence behavior remain different or unqualified. The reference's admission limits and creator-RSS attribution are enabled only for G17, so those limits are not a base-M1 blocker. |
 | Timestamp UAPI | Registered modern SUBMIT now resolves compact per-command timestamp objects into all three engines. Capture, independent retirement and modern nanosecond GET_TIME are implemented. Native firmware execution and units still require hardware acceptance. |
+| Power management | Modern G13 SUBMIT restores the packaged 2 ms idle delay on both firmware layouts. Asahi's debug delay overrides and broader reset and suspend/resume behavior remain open. |
 | M1 family | The native path configures base M1/t8103. The reference also supports t6000/t6001/t6002 M1 Pro/Max/Ultra, including clustering and multiple dies. |
 | Telemetry | Vinix drains auxiliary channels but does not expose the reference's full firmware statistics/debug interface. |
 | Complete wire comparison | Existing tests cover selected InitData and work-command contracts. Every remaining field/default still needs independent comparison; a matching structure size is insufficient. |

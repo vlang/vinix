@@ -17,6 +17,7 @@ pub const g13_v12_3_io_mapping_size = u64(0x20)
 pub const g13_v12_3_power_zone_size = u64(0x20)
 pub const g13_v12_3_globals_pending_submissions_offset = u64(0x8904)
 pub const g13_v12_3_globals_pending_stamps_offset = u64(0x1103c)
+pub const g13_v12_3_globals_idle_off_delay_ms_offset = u64(0x11030)
 
 // ---- G13 V13_5 ----
 pub const g13_v13_5_io_mapping_count = u32(25)
@@ -27,6 +28,7 @@ pub const g13_v13_5_io_mapping_size = u64(0x20)
 pub const g13_v13_5_power_zone_size = u64(0x28)
 pub const g13_v13_5_globals_pending_submissions_offset = u64(0x8974)
 pub const g13_v13_5_globals_pending_stamps_offset = u64(0x111a8)
+pub const g13_v13_5_globals_idle_off_delay_ms_offset = u64(0x1119c)
 
 // Common HwDataB field spans copied from the established 12.3 builder
 // into the 13.5 blob. Changed-size arrays are populated separately.

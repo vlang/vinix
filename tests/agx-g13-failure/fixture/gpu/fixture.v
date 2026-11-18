@@ -319,6 +319,7 @@ pub fn run_checks() {
 	check_render_retirement()
 	check_compute_retirement()
 	check_recovery()
+	check_submit_idle_delay()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10
@@ -384,6 +385,35 @@ pub fn run_checks() {
 	normal.channels.event = channel.new_rx_channel('event', 1, u64(&normal_state), 1, u64(&normal_ring), 4, 0x38)
 	event_worker(mut normal)
 	assert normal.trace == ['success'] && normal.grows == 1
+}
+
+fn check_submit_idle_delay() {
+	// Offsets in the two Globals layouts. Compare the whole buffer so a write
+	// to a neighbouring field or to the older ABI's location cannot pass.
+	for index, abi in [hw.FirmwareAbi.v12_3, .v13_5_partial, .g17_26_5_partial]! {
+		offset := [u64(0x11030), 0x1119c, 0]![index]
+		for mode in 0 .. 7 {
+			mut words := []u32{len: 0x12400 / 4, init: u32(0xa55a51f0)}
+			defer { unsafe { words.free() } }
+			size := if mode == 3 { offset + 3 } else { u64(words.len * 4) }
+			mut graph := G13ChannelAllocations{
+				globals: SharedBuffer{phys: if mode == 2 { u64(0) } else { u64(words.data) }, size: size}
+			}
+			mut mgr := GpuManager{
+				hw_config: hw.HwConfig{firmware_abi: abi, gpu_gen: if mode == 6 { .g17 } else { .g13 }}
+				g13_channels: if mode == 1 { unsafe { nil } } else { unsafe { &graph } }
+				state: match mode { 4 { .stopped } 5 { .error } else { .running } }
+			}
+			mgr.refresh_g13_submit_globals()
+			mgr.lock.acquire()
+			mgr.lock.release()
+			for word_index, word in words {
+				expected := if mode == 0 && index != 2 && u64(word_index * 4) == offset { u32(2) } else { u32(0xa55a51f0) }
+				assert word == expected
+			}
+		}
+	}
+	println('G13 submit idle delay: 21 whole-Globals checks cover both ABIs, absent and short backing, stopped/error state and unrelated GPUs')
 }
 
 fn check_tvb_feedback() {

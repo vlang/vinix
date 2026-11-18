@@ -255,6 +255,9 @@ fn check_modern_device_status(out &syncobj.SyncObj) {
 			mut file := new_file()
 			mut manager := gpu.get_global_manager() or { panic('manager') }
 			if lost { manager.state = .error }
+			bad_header := asahi.Submit{flags: 1}
+			assert file.ioctl_modern_submit(unsafe { &bad_header }) == -22
+			assert manager.submit_globals_refreshes == 0
 			record := asahi.Sync{handle: if mode == 7 { u32(0xffffffff) } else { out.handle },
 				sync_type: 1, timeline_value: 8}
 			header := asahi.CmdHeader{cmd_type: 99, vdm_barrier: asahi.barrier_none,
@@ -270,6 +273,7 @@ fn check_modern_device_status(out &syncobj.SyncObj) {
 			memory.fail_at(match mode { 5 { 1 } 6 { 2 } else { -1 } })
 			usercopy.reject_at(if mode == 4 { 1 } else { -1 })
 			code := file.ioctl_modern_submit(unsafe { &request })
+			assert manager.submit_globals_refreshes == 1
 			assert code == match mode {
 				3, 4 { -14 }
 				5 { -12 }

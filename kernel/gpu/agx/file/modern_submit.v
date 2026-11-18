@@ -9,6 +9,7 @@ import usercopy
 
 pub fn (mut f GpuFile) ioctl_modern_submit(data &asahi.Submit) int {
 	if data.flags != 0 || data.pad != 0 { return -22 }
+	if mut manager := gpu.get_global_manager() { manager.refresh_g13_submit_globals() }
 	captured := f.capture_submission_queue(data.queue_id) or { return -2 }
 	mut transferred := false
 	defer { if !transferred { release_submission_queue(captured) } }

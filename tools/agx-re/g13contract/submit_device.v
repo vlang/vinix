@@ -57,3 +57,29 @@ fn check_modern_submit_device_reference(file string, queue string) ! {
 		'while !cmdbuf.is_empty()', 'if nr_hw_commands == 0 || nr_hw_commands > MAX_COMMANDS_PER_SUBMISSION'],
 		'Asahi checks device loss before parsing and hardware-command validation')!
 }
+
+fn check_submit_idle_delay_reference(file string, manager string, layout string) ! {
+	submit := section(file, 'pub(crate) fn submit(', 'pub(crate) fn get_time(', 'Asahi submit Globals refresh')!
+	require_order(submit, ['if data.flags != 0 || data.pad != 0', 'return Err(EINVAL)',
+		'if let Some(manager) = gpu.manager()', 'manager.update_globals()', '.queues()', 'SyncItem::parse_array('],
+		'Asahi refreshes Globals after header validation and before queue lookup')!
+	refresh := section(manager, 'fn update_globals(&self) {', 'fn alloc(&self)', 'Asahi idle delay refresh')!
+	require_order(refresh, ['let mut timeout: u32 = 2;', 'DebugFlags::WaitForPowerOff',
+		'timeout = 0;', 'DebugFlags::KeepGpuPowered', 'timeout = 5000;',
+		'raw.idle_off_delay_ms.store(timeout, Ordering::Relaxed)'], 'Asahi normal and debug idle delays')!
+	require(layout.contains('idle_off_delay_ms: AtomicU32'), 'Asahi idle delay must be a firmware-visible 32-bit atomic')!
+}
+
+fn check_submit_idle_delay_local(submit string, manager string) ! {
+	require_order(submit, ['if data.flags != 0 || data.pad != 0 { return -22 }',
+		'manager.refresh_g13_submit_globals()', 'f.capture_submission_queue('],
+		'Modern G13 refreshes the idle delay before queue lookup')!
+	refresh := section(manager, 'pub fn (mut mgr GpuManager) refresh_g13_submit_globals()',
+		'// The firmware samples pending_submissions', 'Vinix idle delay refresh')!
+	require_order(refresh, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+		'mgr.state != .running || mgr.hw_config.gpu_gen != .g13 || mgr.g13_channels == unsafe { nil }',
+		'fw.g13_globals_idle_off_delay_offset(mgr.hw_config.firmware_abi)',
+		'globals.phys == 0 || globals.size < offset + sizeof(u32)',
+		'&u32(u64(globals.cpu_address()) + offset)', 'katomic.store(mut field, u32(2))'],
+		'Vinix writes only the active Globals ABI field while holding the shutdown lock')!
+}

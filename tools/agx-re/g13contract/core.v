@@ -738,6 +738,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	require_order(ack, ['raw.flags.halt_count.load', 'DeviceControlMsg::ver::GrowTVBAck',
 		'halt_count: U64(halt_count)'], 'Asahi TVB halt counter')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	check_submit_idle_delay_reference(read(os.join_path(base, 'file.rs'))!, manager,
+		read(os.join_path(base, 'fw/initdata.rs'))!)!
+	check_submit_idle_delay_local(read(os.join_path(repo, 'kernel/gpu/agx/file/modern_submit.v'))!, local)!
 	check_render_retirement_local(local)!
 	check_compute_retirement_local(local)!
 	check_heap_metadata_local(read(os.join_path(repo, 'kernel/gpu/agx/alloc/alloc.v'))!)!
