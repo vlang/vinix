@@ -4,6 +4,8 @@ import drm.gem
 import gpu.agx.bo
 import memory
 
+fn C.__asan_address_is_poisoned(pointer voidptr) int
+
 fn count_kind(kind string) int {
 	mut count := 0
 	for i in 0 .. cpu.count() { if cpu.at(i).kind == kind { count++ } }
@@ -61,7 +63,7 @@ fn check_constructors() int {
 			for identity in [u64(0), 17] {
 				for size in [u64(1), 16384, 16385, 49152] {
 					memory.prepare()
-					object := gem.create_aligned_with_cache(size, 16384, identity, writeback) or { panic('GEM create') }
+					object := gem.create_aligned_with_cache(size, 16384, identity, writeback, false) or { panic('GEM create') }
 					assert object.size == (size + 16383) & ~u64(16383)
 					assert object.vm_private_identity == identity
 					assert object.pte_extra == if writeback { u64(0) } else { memory.pte_uncached }
@@ -98,20 +100,20 @@ fn check_refusal_and_original_policy() int {
 	mut cases := 0
 	memory.prepare()
 	for size in [u64(0), ~u64(0)] {
-		if _ := gem.create_aligned_with_cache(size, 16384, 0, false) { assert false }
+		if _ := gem.create_aligned_with_cache(size, 16384, 0, false, false) { assert false }
 		assert memory.live() == 0 && cpu.count() == 0
 		cases++
 	}
 	memory.fail_allocations(true)
 	metadata_before := memory.metadata_frees()
-	if _ := gem.create_aligned_with_cache(16384, 16384, 0, false) { assert false }
+	if _ := gem.create_aligned_with_cache(16384, 16384, 0, false, false) { assert false }
 	memory.fail_allocations(false)
 	assert memory.live() == 0 && cpu.count() == 0 && memory.metadata_frees() == metadata_before + 1
 	cases++
 	for missing in 0 .. 8 {
 		memory.prepare(); memory.fail_new_mapping(missing)
 		before := memory.metadata_frees()
-		if _ := gem.create_aligned_with_cache(32768, 16384, 0, false) { assert false }
+		if _ := gem.create_aligned_with_cache(32768, 16384, 0, false, false) { assert false }
 		assert memory.metadata_frees() == before + 1
 		assert memory.live() == 0 && count_kind('civac') == 0 && count_kind('tlbi') == 0 && !memory.locked()
 		cases++
@@ -159,14 +161,14 @@ fn check_refusal_and_original_policy() int {
 
 fn check_metadata_refusal() int {
 	memory.prepare()
-	first := gem.create_aligned_with_cache(16384, 16384, 0, true) or { panic('sentinel GEM') }
+	first := gem.create_aligned_with_cache(16384, 16384, 0, true, false) or { panic('sentinel GEM') }
 	expected_handle := first.handle + 1
 	expected_offset := first.mmap_offset + first.size
 	before := memory.backing_attempts()
 	memory.fail_metadata(true)
 	for _ in 0 .. 100 {
 		for writeback in [false, true] {
-			if _ := gem.create_aligned_with_cache(16384, 16384, 17, writeback) {
+			if _ := gem.create_aligned_with_cache(16384, 16384, 17, writeback, false) {
 				panic('metadata OOM must refuse GEM creation')
 			}
 		}
@@ -177,7 +179,7 @@ fn check_metadata_refusal() int {
 		assert voidptr(visible) == voidptr(first) && first.refcount == 1
 	}
 	memory.fail_metadata(false)
-	retry := gem.create_aligned_with_cache(16384, 16384, 17, false) or { panic('GEM retry') }
+	retry := gem.create_aligned_with_cache(16384, 16384, 17, false, false) or { panic('GEM retry') }
 	assert retry.handle == expected_handle && retry.mmap_offset == expected_offset
 	gem.unref(retry)
 	gem.unref(first)
@@ -193,8 +195,8 @@ fn check_metadata_refusal() int {
 fn check_authorized_aliases() {
 	for reversed in [false, true] {
 		memory.prepare()
-		first := gem.create_aligned_with_cache(16384, 16384, 0, reversed) or { panic('first') }
-		second := gem.create_aligned_with_cache(16384, 16384, 0, !reversed) or { panic('second') }
+		first := gem.create_aligned_with_cache(16384, 16384, 0, reversed, false) or { panic('first') }
+		second := gem.create_aligned_with_cache(16384, 16384, 0, !reversed, false) or { panic('second') }
 		mut table := bo.Table{}
 		table.add_created(first); table.add_created(second)
 		a := gem.create_mmap_offset(first); b := gem.create_mmap_offset(second)
@@ -214,12 +216,48 @@ fn check_authorized_aliases() {
 	}
 }
 
+fn check_file_scoped_objects() {
+	// Exhaust the shared registry independently of the physical backing budget.
+	mut global_objects := []&gem.GemObject{cap: 4095}
+	for index in 0 .. 4095 {
+		object := gem.create_external(16384) or { panic('global table filled early') }
+		assert object.handle == u32(index + 1) && !object.file_scoped
+		global_objects << object
+	}
+	if _ := gem.create_external(16384) { panic('expected a full global table') }
+	mut table := bo.new_table(true)
+	assert table.reserve_handle_entry()
+	metadata_before := memory.metadata_frees()
+	pages_before := memory.frees()
+	for cycle in 0 .. 10000 {
+		memory.prepare()
+		object := gem.create_aligned_with_cache(16384, 16384, 0, cycle % 2 == 0, true) or {
+			panic('a full global table must allow file-scoped allocation')
+		}
+		assert object.handle == 0 && object.file_scoped && memory.live() == 1
+		assert table.add_created(object) == 1
+		exported := table.get_ref(1) or { panic('published file handle') }
+		closed := table.remove(1) or { panic('file handle close') }
+		gem.unref(closed)
+		assert exported.refcount == 1 && C.__asan_address_is_poisoned(exported) == 0
+		gem.unref(exported)
+		assert memory.live() == 0 && C.__asan_address_is_poisoned(exported) != 0
+	}
+	table.release_all()
+	assert memory.metadata_frees() == metadata_before + 10000 && memory.frees() == pages_before + 10000
+	assert voidptr(gem.get_by_handle(1) or { panic('global object disappeared') }) == voidptr(global_objects[0])
+	for object in global_objects { gem.unref(object) }
+	unsafe { global_objects.free() }
+	println('AGX file-scoped GEM: 10000 backing and metadata releases after the final reference with all 4095 global slots occupied')
+}
+
 fn main() {
 	lines := check_cache_lines()
 	constructors := check_constructors()
 	refusals := check_refusal_and_original_policy()
 	metadata := check_metadata_refusal()
 	check_authorized_aliases()
+	check_file_scoped_objects()
 	println('AGX CPU cache: ${lines} cache-line cases, ${constructors} real GEM constructors/final releases, ${refusals} refusal/default-policy cases; actual retag/BBM/cache-loop bodies, full-span validation, WB/NC aliases, PRIME policy, clean-before-retype, TLBI ordering, authorization, retained references and WB-before-PMM reuse passed')
 	println('AGX GEM metadata: ${metadata} injected failures preserve backing, cache state, handle and mmap offset. Backing and retag failures free unpublished metadata.')
 }

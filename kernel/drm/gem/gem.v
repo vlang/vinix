@@ -27,6 +27,7 @@ pub mut:
 	advice_dontneed bool // private BO advice; resident backing is not yet purgeable
 pub:
 	vm_private_identity u64 // zero: shareable; otherwise immutable owning VM identity
+	file_scoped bool // only reachable through reference-owning driver tables
 }
 
 const gem_max_handles = u32(4096)
@@ -46,31 +47,31 @@ pub fn create(size u64) ?&GemObject {
 // Create a GEM object with a physical and size alignment suitable for the
 // target device. AGX callers require 16 KiB alignment on either kernel granule.
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
-	return create_object(size, alignment, false, 0, 0)
+	return create_object(size, alignment, false, 0, 0, false)
 }
 
 // Set the private reservation identity before the object becomes visible in
 // any handle table. Only its owning VM may bind it, and PRIME cannot export it.
 pub fn create_aligned_private(size u64, alignment u64, identity u64) ?&GemObject {
 	if identity == 0 { return none }
-	return create_object(size, alignment, false, identity, 0)
+	return create_object(size, alignment, false, identity, 0, false)
 }
 
 // AGX CPU mappings are Normal Non-Cacheable unless WRITEBACK was requested.
 // Select both the direct-map and future userspace attributes before publishing
 // the object. Other GEM constructors retain their existing cacheable policy.
-pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool) ?&GemObject {
+pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool, file_scoped bool) ?&GemObject {
 	$if !arm64 { if !writeback { return none } }
-	return create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached })
+	return create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped)
 }
 
 // Metadata for a host-owned resource. The driver installs its physical
 // aperture after RESOURCE_MAP_BLOB succeeds; the PMM never owns those pages.
 pub fn create_external(size u64) ?&GemObject {
-	return create_object(size, page_size, true, 0, 0)
+	return create_object(size, page_size, true, 0, 0, false)
 }
 
-fn create_object(size u64, alignment u64, external bool, private_identity u64, pte_extra u64) ?&GemObject {
+fn create_object(size u64, alignment u64, external bool, private_identity u64, pte_extra u64, file_scoped bool) ?&GemObject {
 	if size == 0 {
 		return none
 	}
@@ -86,25 +87,22 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 	aligned_size := lib.align_up(size, alignment)
 	pages := aligned_size / page_size
 
-	// Everything below runs under the table lock so handle selection, the
-	// mmap-offset counter, and the physical allocation cannot race with other
-	// creators. Handles are recycled by scanning for a free slot rather than
-	// consuming a monotonic counter, and exhaustion is detected BEFORE any
-	// physical memory is allocated.
+	// Serialize the mmap-offset counter and, for globally named objects,
+	// keep the chosen handle available until the object is published.
 	gem_objects_lock.acquire()
 	defer {
 		gem_objects_lock.release()
 	}
 
 	mut handle := u32(0)
-	for i := u32(1); i < gem_max_handles; i++ {
-		if gem_objects[i] == unsafe { nil } {
-			handle = i
-			break
+	if !file_scoped {
+		for i := u32(1); i < gem_max_handles; i++ {
+			if gem_objects[i] == unsafe { nil } {
+				handle = i
+				break
+			}
 		}
-	}
-	if handle == 0 {
-		return none // handle table exhausted
+		if handle == 0 { return none }
 	}
 	if aligned_size > u64(-1) - next_mmap_offset {
 		return none
@@ -138,6 +136,7 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 			external:    external
 			pte_extra:   pte_extra
 			vm_private_identity: private_identity
+			file_scoped: file_scoped
 			size:        aligned_size
 			refcount:    1
 			phys_addr:   u64(phys)
@@ -146,7 +145,7 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 		}
 	}
 
-	gem_objects[handle] = obj
+	if !file_scoped { gem_objects[handle] = obj }
 
 	return obj
 }
@@ -156,11 +155,11 @@ pub fn destroy(obj &GemObject) {
 	if obj == unsafe { nil } {
 		return
 	}
-	gem_objects_lock.acquire()
-	if obj.handle < gem_max_handles {
+	if !obj.file_scoped && obj.handle < gem_max_handles {
+		gem_objects_lock.acquire()
 		gem_objects[obj.handle] = unsafe { nil }
+		gem_objects_lock.release()
 	}
-	gem_objects_lock.release()
 	$if arm64 {
 		if obj.phys_addr != 0 && !obj.external && obj.pte_extra & memory.pte_uncached != 0 {
 			if !memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false) {
@@ -209,7 +208,7 @@ pub fn unref(obj &GemObject) {
 	if !katomic.dec(mut rc) {
 		// refcount reached zero
 		destroy(obj)
-		if obj.external { unsafe { free(voidptr(obj)) } }
+		if obj.external || obj.file_scoped { memory.free(voidptr(obj)) }
 	}
 }
 

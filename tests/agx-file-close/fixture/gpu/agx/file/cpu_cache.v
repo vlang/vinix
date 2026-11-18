@@ -5,8 +5,8 @@ import drm.gem
 fn check_cpu_mapping_policy() {
 	for reversed in [false, true] {
 		mut file := GpuFile{}
-		mut first := gem.create_aligned_with_cache(0x10000, 0x4000, 0, reversed) or { panic('first GEM') }
-		mut second := gem.create_aligned_with_cache(0x10000, 0x4000, 0, !reversed) or { panic('second GEM') }
+		mut first := gem.create_aligned_with_cache(0x10000, 0x4000, 0, reversed, false) or { panic('first GEM') }
+		mut second := gem.create_aligned_with_cache(0x10000, 0x4000, 0, !reversed, false) or { panic('second GEM') }
 		file.objects.add_created(first)
 		file.objects.add_created(second)
 		first_offset := u64(first.handle) * 0x10000

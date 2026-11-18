@@ -15,7 +15,7 @@ fn test_cpu_cache_guards_require_complete_alias_and_teardown_contract() {
 	mmap := read(repo + '/kernel/memory/mmap/mmap.v')!
 	check_cpu_cache_local(gem, bo, file, driver, ram, cpu, drm, mmap)!
 	for source, token in {'gem': 'memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false)',
-		'bo': 'return length <= object.size - (offset - base)', 'file': 'request.flags & ioctl.asahi_gem_writeback != 0)',
+		'bo': 'return length <= object.size - (offset - base)', 'file': 'request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles())',
 		'driver': 'mmap_retain: agx_file.retain_mmap_range_handle', 'ram': 'cpu.read_ttbr1_el1() & kernel_pte_address_mask',
 		'cpu': 'if end - current <= line { break }'} {
 		if _ := check_cpu_cache_local(if source == 'gem' { gem.replace(token, '') } else { gem },

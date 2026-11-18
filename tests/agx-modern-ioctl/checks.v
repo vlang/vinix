@@ -296,7 +296,7 @@ fn check_gem_handle_storage() {
 			assert memory.outstanding() == 1, 'growth must release the previous table'
 			for handle in [first, second, third]! {
 				object := file.objects.get_ref(handle) or { panic('published GEM handle disappeared') }
-				assert object.handle != handle && object.references == 2 && object.size == 0x8000
+				assert object.handle == 0 && object.references == 2 && object.size == 0x8000
 				gem.unref(object)
 			}
 			file_map.delete(client)

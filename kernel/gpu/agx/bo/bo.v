@@ -30,6 +30,10 @@ pub fn new_table(local_handles bool) Table {
 	return Table{local_handles: local_handles}
 }
 
+pub fn (table &Table) uses_local_handles() bool {
+	return table.local_handles
+}
+
 // Reserve one slot while holding the file lock. GEM creation keeps that lock
 // through publication so it can return ENOMEM before constructing the object.
 pub fn (mut table Table) reserve_handle_entry() bool {
@@ -110,6 +114,7 @@ pub fn (mut table Table) import_object(object &gem.GemObject) ?u32 {
 	if object == unsafe { nil } || object.vm_private_identity != 0 {
 		return none
 	}
+	if !table.local_handles && object.handle == 0 { return none }
 	for index, existing in table.objects {
 		if voidptr(existing) == voidptr(object) {
 			return if table.local_handles { u32(index + 1) } else { existing.handle }

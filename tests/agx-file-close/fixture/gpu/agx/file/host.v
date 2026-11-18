@@ -44,6 +44,7 @@ fn (mut objects Objects) release_all() { objects.table.release_all(); table_rele
 fn (objects &Objects) get_ref(handle u32) ?&gem.GemObject { object_ref_lookups++; return objects.table.get_ref(handle) }
 fn (mut objects Objects) remove(handle u32) ?&gem.GemObject { return objects.table.remove(handle) }
 fn (mut objects Objects) reserve_handle_entry() bool { return objects.table.reserve_handle_entry() }
+fn (objects &Objects) uses_local_handles() bool { return objects.table.uses_local_handles() }
 fn (mut objects Objects) add_created(object &gem.GemObject) u32 { return objects.table.add_created(object) }
 fn (mut objects Objects) import_object(object &gem.GemObject) ?u32 { return objects.table.import_object(object) }
 fn (mut objects Objects) authorize_mmap(handle u32) ?u64 { return objects.table.authorize_mmap(handle) }

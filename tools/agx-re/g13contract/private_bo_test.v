@@ -20,7 +20,7 @@ fn test_private_domains_reject_reused_contexts_and_ownership_drift() {
 	}
 	for broken in [gem.replace('vm_private_identity: private_identity', 'vm_private_identity: 0'),
 		gem.replace('pub:\n\tvm_private_identity', 'pub mut:\n\tvm_private_identity'),
-		gem.replace('create_object(size, alignment, false, identity, 0)', 'create_object(size, alignment, false, 0, 0)')] {
+		gem.replace('create_object(size, alignment, false, identity, 0, false)', 'create_object(size, alignment, false, 0, 0, false)')] {
 		if _ := check_private_bo_local(file, bo, mmu, broken, drm, identity) { assert false }
 	}
 	if _ := check_private_bo_local(file, bo.replace('object.vm_private_identity != 0', 'false'),

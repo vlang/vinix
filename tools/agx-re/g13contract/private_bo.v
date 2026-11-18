@@ -27,9 +27,9 @@ fn check_private_bo_local(file string, bo string, mmu string, gem string, drm st
 	constructor := section(gem, 'pub fn create_aligned_private(',
 		'// Metadata for a host-owned resource.', 'Vinix private GEM constructor')!
 	require_order(constructor, ['if identity == 0', 'return none',
-		'create_object(size, alignment, false, identity, 0)'], 'Vinix private GEM constructor')!
+		'create_object(size, alignment, false, identity, 0, false)'], 'Vinix private GEM constructor')!
 	require_order(gem, ['pub:\n\tvm_private_identity u64', 'fn create_object(',
-		'vm_private_identity: private_identity', 'gem_objects[handle] = obj'], 'Vinix immutable GEM domain publication')!
+		'vm_private_identity: private_identity', 'if !file_scoped { gem_objects[handle] = obj }'], 'Vinix immutable GEM domain publication')!
 	prime := section(drm, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(', 'Vinix private PRIME refusal')!
 	require_order(prime, ['dev.driver.gem_export(dev, handle, request.handle)', 'if obj.vm_private_identity != 0',
 		'dev.driver.gem_export_put(dev, obj)', 'else { gem.unref(obj) }', 'return -22',

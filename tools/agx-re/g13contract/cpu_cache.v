@@ -5,22 +5,26 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_gem_create(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(', 'Native CPU cache policy')!
 	require_order(create, ['size_error := agxbo.create_size_error(request.size)',
 		'gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,',
-		'request.flags & ioctl.asahi_gem_writeback != 0)', 'f.objects.add_created(obj)'], 'Native WRITEBACK selection before publication')!
+		'request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles())', 'f.objects.add_created(obj)'], 'Native WRITEBACK and registry selection before publication')!
 	constructor := section(gem, 'pub fn create_aligned_with_cache(', '// Metadata for a host-owned resource.', 'GEM CPU cache constructor')!
-	require(constructor.contains('create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached })'), 'WRITEBACK must select cacheable aliases')!
+	require(constructor.contains('create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped)'), 'WRITEBACK must select cacheable aliases')!
 	allocation := section(gem, 'fn create_object(', '// Destroy a GEM object:', 'GEM unpublished cache preparation')!
-	require_order(allocation, ['gem_objects_lock.acquire()', 'if aligned_size > u64(-1) - next_mmap_offset',
+	require_order(allocation, ['gem_objects_lock.acquire()', 'if !file_scoped {', 'i < gem_max_handles', 'if handle == 0 { return none }',
+		'if aligned_size > u64(-1) - next_mmap_offset',
 		'memory.malloc_packed_fallible(sizeof(GemObject))', 'if storage == unsafe { nil } { return none }',
 		'memory.pmm_alloc_aligned_fallible', 'if !external && phys == unsafe { nil }', 'memory.free(storage)',
 		'if pte_extra & memory.pte_uncached != 0',
 		'if !memory.set_ram_direct_map_uncached(u64(phys), aligned_size, true)', 'memory.pmm_free(phys, pages)',
 		'memory.free(storage)', 'return none', 'next_mmap_offset += aligned_size', '*obj = GemObject{', 'pte_extra:   pte_extra',
-		'vm_private_identity: private_identity', 'gem_objects[handle] = obj'], 'Reserve metadata fallibly and unwind failed backing before publication')!
+		'vm_private_identity: private_identity', 'file_scoped: file_scoped', 'if !file_scoped { gem_objects[handle] = obj }'], 'Publish only globally named objects in the registry')!
 	destroy := section(gem, 'pub fn destroy(', '// Look up a GEM object', 'GEM final cache restoration')!
-	require_order(destroy, ['gem_objects_lock.acquire()', 'gem_objects[obj.handle] = unsafe { nil }', 'gem_objects_lock.release()',
+	require_order(destroy, ['if !obj.file_scoped && obj.handle < gem_max_handles', 'gem_objects_lock.acquire()', 'gem_objects[obj.handle] = unsafe { nil }', 'gem_objects_lock.release()',
 		'obj.phys_addr != 0 && !obj.external && obj.pte_extra & memory.pte_uncached != 0',
 		'memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false)',
 		'panic(', 'memory.pmm_free(voidptr(obj.phys_addr), pages)'], 'Remove the namespace entry, restore before PMM reuse; keep external apertures outside ownership')!
+	release := section(gem, 'pub fn unref(', '// Return (or lazily create)', 'GEM final reference release')!
+	require_order(release, ['if !katomic.dec(mut rc)', 'destroy(obj)', 'if obj.external || obj.file_scoped { memory.free(voidptr(obj)) }'],
+		'Only the final owner releases file-scoped metadata after backing')!
 	range := section(bo, 'pub fn (table &Table) valid_mmap_range(', '// Remove a file handle', 'Homogeneous authorized mmap range')!
 	require_order(range, ['if length == 0 || offset > ~u64(0) - length', 'table.mmap_objects',
 		'offset >= base && offset - base < object.size', 'return length <= object.size - (offset - base)'], 'One authorized object per VMA')!

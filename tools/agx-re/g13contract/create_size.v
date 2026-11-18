@@ -17,7 +17,7 @@ fn check_create_size_local(objects string, file string, fake string) ! {
 		'size_error := agxbo.create_size_error(request.size)', 'if size_error != 0 { return size_error }',
 		'if !f.objects.reserve_handle_entry() { return -12 }',
 		'gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,',
-		'request.flags & ioctl.asahi_gem_writeback != 0)', 'request.handle = f.objects.add_created(obj)'],
+		'request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles())', 'request.handle = f.objects.add_created(obj)'],
 		'Header and private VM lookup precede checked size, constructors and publication')!
 	software := section(fake, 'fn (mut file FakeG17File) ioctl_gem_create(', 'fn (mut file FakeG17File) ioctl_gem_mmap_offset(', 'Fake checked GEM size')!
 	require_order(software, ['file.lock.acquire()', 'defer { file.lock.release() }', 'file.find_vm(request.vm_id)', '} else if request.vm_id != 0',
