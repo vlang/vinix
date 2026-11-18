@@ -54,10 +54,9 @@ __global manager_available = true
 __global manager_lookups = 0
 __global timestamp_unmaps = 0
 __global stop_callback fn () = unsafe { nil }
-__global failed_mapping_flushes = 0
-__global mapping_flush_failure_after = int(-1)
-__global mapping_flushes = 0
-__global mapping_flush_slot = u32(0)
+__global failed_mapping_checks = 0
+__global mapping_check_failure_after = int(-1)
+__global mapping_check_count = 0
 __global stops_finished = 0
 __global timestamp_maps = 0
 __global reject_timestamp_map = false
@@ -129,32 +128,35 @@ fn finish_stop() {
 
 pub fn stop_during_mapping_lock() {
 	// Production shutdown holds this lock while the early stopped state is
-	// visible. Only completing stop releases it to a concurrent file flush.
+	// visible. Only completing stop releases it to a concurrent file mapping.
 	test_gpu_manager.lock.acquire()
 	test_gpu_manager.state = .stopped
 	klock.wait_once(unsafe { &test_gpu_manager.lock }, finish_stop)
 }
 
-pub fn fail_flushes(count int) { failed_mapping_flushes = count; mapping_flush_failure_after = -1 }
-pub fn fail_flush_after(successes int) { mapping_flush_failure_after = successes }
-pub fn flushes() int { return mapping_flushes }
-pub fn last_flush_slot() u32 { return mapping_flush_slot }
+pub fn fail_mapping_checks(count int) {
+	failed_mapping_checks = count
+	mapping_check_failure_after = -1
+}
 
-pub fn before_file_flush_lock(callback fn ()) {
+pub fn fail_mapping_check_after(successes int) { mapping_check_failure_after = successes }
+pub fn mapping_checks() int { return mapping_check_count }
+
+pub fn before_file_mapping_lock(callback fn ()) {
 	klock.before_once(unsafe { &test_gpu_manager.lock }, callback)
 }
 
-pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bool {
-	// The production file wrapper must serialize even running invalidations.
+fn (mgr &GpuManager) g13_submission_status_locked() int {
 	assert mgr.lock.is_held()
-	assert slot != 0 && addr != 0 && size != 0
-	mapping_flushes++
-	mapping_flush_slot = slot
-	if mgr.state == .stopped { return false }
-	if mapping_flush_failure_after == 0 { mapping_flush_failure_after = -1; return false }
-	if mapping_flush_failure_after > 0 { mapping_flush_failure_after-- }
-	if failed_mapping_flushes > 0 { failed_mapping_flushes--; return false }
-	return true
+	mapping_check_count++
+	if mapping_check_failure_after == 0 { mapping_check_failure_after = -1; return -19 }
+	if mapping_check_failure_after > 0 { mapping_check_failure_after-- }
+	if failed_mapping_checks > 0 { failed_mapping_checks--; return -19 }
+	return mgr.g13_submission_status_real_locked()
+}
+
+pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bool {
+	panic('GPU-only file mappings do not use FwCtl')
 }
 
 pub fn get_global_manager() ?&GpuManager {

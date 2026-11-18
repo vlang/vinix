@@ -40,14 +40,14 @@ fn check_unbind_ranges() {
 				assert file.ioctl_gem_bind(bind(8, 2, 0x4000)) == 0
 				original := pt.leaves
 				request := range_request(cut[0], cut[1])
-				before_alloc := memory.calls(); before_flush := gpu.flushes()
+				before_alloc := memory.calls(); before_check := gpu.mapping_checks()
 				vm.inflight = 1
 				assert file.ioctl_gem_bind(&request) == -16
 				assert first.references == 3 && second.references == 3 && pt.unmaps == 0
-				assert memory.calls() == before_alloc && gpu.flushes() == before_flush && pt.leaves == original
+				assert memory.calls() == before_alloc && gpu.mapping_checks() == before_check && pt.leaves == original
 				vm.inflight = 0; cases++
 				if repeated && cut[0] == 1 && cut[1] == 17 {
-					gpu.fail_flushes(1)
+					gpu.fail_mapping_checks(1)
 					assert file.ioctl_gem_bind(&request) == -5
 					assert first.references == 4 && second.references == 2
 					assert pt.unmaps == 3, 'failed range retirement must continue other overlaps'
@@ -77,7 +77,7 @@ fn check_unbind_ranges() {
 			}
 
 			// A middle cut needs two transient survivor owners while a failed
-			// flush retains the original. OOM must precede every visible effect.
+			// state check retains the original. OOM must precede every visible effect.
 			mut pt := pgtable.UatPgtable{ watch_start: 0x4000 }
 			mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
 			mut file := GpuFile{ vms: [unsafe { &vm }] }
@@ -95,20 +95,20 @@ fn check_unbind_ranges() {
 			data := file.mappings.data; leaves := pt.leaves
 			request := range_request(2, 5)
 			memory.fail_allocations(true)
-			before := memory.calls(); flushes := gpu.flushes()
+			before := memory.calls(); checks := gpu.mapping_checks()
 			assert file.ioctl_gem_bind(&request) == -12
 			memory.fail_allocations(false)
 			assert memory.calls() == before + 1 && file.mappings.data == data && file.mappings.len == 1
-			assert object.references == 2 && pt.unmaps == 0 && pt.leaves == leaves && gpu.flushes() == flushes
+			assert object.references == 2 && pt.unmaps == 0 && pt.leaves == leaves && gpu.mapping_checks() == checks
 			assert !file.lock.is_held(); cases++
-			gpu.fail_flushes(1)
+			gpu.fail_mapping_checks(1)
 			assert file.ioctl_gem_bind(&request) == -5
 			assert object.references == 4 && file.mappings.len == 3 && file.mappings.cap >= 3
 			assert file.mappings[0].retiring && file.mappings[0].addr == request.addr && file.mappings[0].size == request.range
 			assert pt.unmaps == 1 && pt.last_unmap_addr == request.addr && pt.last_unmap_size == request.range
 			cases++
 			inner := range_request(3, 4)
-			gpu.fail_flushes(1)
+			gpu.fail_mapping_checks(1)
 			assert file.ioctl_gem_bind(&inner) == -5 && object.references == 4 && pt.unmaps == 1
 			assert pt.last_unmap_size == request.range; cases++
 			vm.inflight = 1
@@ -134,9 +134,9 @@ fn check_unbind_ranges() {
 			mut closing_bind := bind(9, 1, 0x4000); closing_bind.range = 8 * pgtable.uat_pgsz
 			assert file.ioctl_gem_bind(&closing_bind) == 0
 			unsafe { file.mappings.cap = file.mappings.len }
-			gpu.fail_flushes(1)
+			gpu.fail_mapping_checks(1)
 			assert file.ioctl_gem_bind(&request) == -5 && closing_object.references == 4
-			gpu.fail_flushes(1)
+			gpu.fail_mapping_checks(1)
 			assert !file.close() && !vm.destroyed && closing_object.references == 4
 			assert file.close() && vm.destroyed && gem.live() == 0
 			cases++

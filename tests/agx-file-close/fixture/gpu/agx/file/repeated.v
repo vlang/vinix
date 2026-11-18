@@ -59,14 +59,14 @@ fn check_repeated_bindings() {
 		pt.reject_map = true
 		assert file.ioctl_gem_bind(&request) == -12 && object.references == 1 && file.mappings.len == 0; cases++
 		pt.reject_map = false
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		assert file.ioctl_gem_bind(&request) == -5 && object.references == 2 && file.mappings[0].retiring; cases++
 		assert pt.last_unmap_size == request.range
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		assert !file.cleanup_closed_mappings_locked(&vm) && object.references == 2; cases++
 		assert file.cleanup_closed_mappings_locked(&vm) && object.references == 1 && file.mappings.len == 0; cases++
 		assert file.close() && vm.destroyed && gem.live() == 0
 		unsafe { file.vms.free(); file.mappings.free() }
 	}
-	println('AGX SINGLE_PAGE bindings: ${cases} checks; repeated first/last BO pages across larger VA ranges, RO/WO/RW, one mapping owner, busy pins, full-range removal, shape/bounds/private-hole refusal, failed map/flush ownership and retry passed')
+	println('AGX SINGLE_PAGE bindings: ${cases} checks; repeated first/last BO pages across larger VA ranges, RO/WO/RW, one mapping owner, busy pins, full-range removal, shape/bounds/private-hole refusal, failed map/state-check ownership and retry passed')
 }

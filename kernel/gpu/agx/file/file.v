@@ -41,7 +41,7 @@ mut:
 	addr     u64
 	size     u64
 	obj      &gem.GemObject = unsafe { nil }
-	retiring bool // PTEs removed; backing retained until firmware invalidation completes
+	retiring bool // PTEs removed; backing retained until the device-state check succeeds
 }
 
 struct G17QueueOwnership {
@@ -209,8 +209,8 @@ pub fn (mut f GpuFile) close() bool {
 			}
 		}
 	}
-	// Queue teardown alone does not invalidate userspace mappings. A failed
-	// flush must keep their backing and VM alive for the next close retry.
+	// Retire the userspace mappings before destroying the VM. A device-state
+	// refusal leaves their backing and VM alive for the next close retry.
 	for index := f.mappings.len - 1; index >= 0; index-- {
 		if !f.retire_mapping_locked(index) {
 			f.lock.release()
@@ -316,10 +316,9 @@ fn (mut f GpuFile) valid_mmap_range(offset u64, length u64) bool {
 	return f.objects.valid_mmap_range(offset, length)
 }
 
-// Caller holds file.lock and has excluded in-flight jobs from this VM. Once
-// PTEs are removed, retries invalidate the same range without unmapping it
-// again. The mapping's existing object reference is released only after the
-// firmware acknowledges invalidation, or after firmware has stopped.
+// Caller holds file.lock and has excluded in-flight jobs from this VM. Unmap
+// completes GPU TLBI before dropping the mapping's object reference. A retry
+// after a device-state refusal starts from the already-invalidated PTEs.
 fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 	mapping := f.mappings[index]
 	ctx := f.find_owned_vm(mapping.vm_id) or { return false }
@@ -329,7 +328,7 @@ fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 		pt.unmap(mapping.addr, mapping.size)
 		f.mappings[index].retiring = true
 	}
-	if !flush_firmware_mapping(ctx, mapping.addr, mapping.size, true) {
+	if !finish_file_mapping(true) {
 		return false
 	}
 	gem.unref(mapping.obj)
@@ -434,7 +433,7 @@ fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
 	if fragments < 0 { return -22 }
 	if !f.reserve_mapping_slots_locked(fragments) { return -12 }
 	original_count := f.mappings.len
-	mut flush_ok := true
+	mut retired := true
 	for i := original_count - 1; i >= 0; i-- {
 		mapping := f.mappings[i]
 		if mapping.vm_id != vm_id || !ranges_overlap(mapping.addr, mapping.size, addr, size) { continue }
@@ -455,11 +454,10 @@ fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
 			f.mappings[i].addr = cut_start
 			f.mappings[i].size = cut_end - cut_start
 		}
-		// A prior tombstone retries its full recorded range, without unmapping
-		// again or releasing backing before the invalidation completes.
-		if !f.retire_mapping_locked(i) { flush_ok = false }
+		// An earlier retirement has already unmapped its recorded range.
+		if !f.retire_mapping_locked(i) { retired = false }
 	}
-	return if flush_ok { 0 } else { -5 }
+	return if retired { 0 } else { -5 }
 }
 
 // Reserve a nonzero per-open queue ID. Failed queue construction may leave a
@@ -548,19 +546,12 @@ fn ranges_overlap(first_addr u64, first_size u64, second_addr u64, second_size u
 	return first_addr < second_addr + second_size && second_addr < first_addr + first_size
 }
 
-// Firmware may retain both UAT translations and noncoherent cache lines after
-// a mapping changes, so every bind and unbind has to invalidate them.
-//
-// G13 publishes the full byte range in the handoff slot and its 16-bit
-// page count in the FwCtl message. Other generations fail closed.
-fn flush_firmware_mapping(ctx &mmu.UatContext, addr u64, size u64, unmapped bool) bool {
+// GPU-only GEM mappings are coherent. Page-table edits complete the
+// translation invalidation for the published root before this state check.
+fn finish_file_mapping(unmapped bool) bool {
 	manager := gpu.get_global_manager() or { return false }
-	if manager.hw_config.gpu_gen != .g13 {
-		println('agx: no firmware mapping-flush protocol for this GPU generation')
-		return false
-	}
 	mut gpu_manager := unsafe { manager }
-	return gpu_manager.flush_g13_file_mapping(ctx, addr, size, unmapped)
+	return gpu_manager.finish_g13_file_mapping(unmapped)
 }
 
 fn asahi_variant(config &gpu.GpuManager) u32 {
@@ -745,7 +736,7 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 }
 
 // Caller holds file.lock. User bindings retire only after accepted jobs are
-// idle; failed invalidation keeps their object and context for a later retry.
+// idle. A device-state refusal retains their object and context for retry.
 // Queue owners (including failed-create quarantine) retain driver mappings.
 fn (mut f GpuFile) reap_detached_vms_locked() {
 	if uat_mgr == unsafe { nil } { return }
@@ -886,9 +877,9 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				size: request.range
 				obj: obj
 			}
-			if !flush_firmware_mapping(ctx, request.addr, request.range, false) {
-				// Firmware may have observed the new mapping before the flush
-				// failed. Remove PTEs but retain backing until a retry is safe.
+			if !finish_file_mapping(false) {
+				// Roll back the PTEs and retain backing until retirement can
+				// confirm that the device is running or has stopped.
 				pt.unmap(request.addr, request.range)
 				f.mappings[f.mappings.len - 1].retiring = true
 				return -5 // EIO
@@ -913,17 +904,17 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				gem.unref(obj)
 				return -16
 			}
-			mut flush_ok := true
+			mut retired := true
 			for i := f.mappings.len - 1; i >= 0; i-- {
 				mapping := f.mappings[i]
 				if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj) {
 					if !f.retire_mapping_locked(i) {
-						flush_ok = false
+						retired = false
 					}
 				}
 			}
 			gem.unref(obj)
-			return if flush_ok { 0 } else { -5 }
+			return if retired { 0 } else { -5 }
 		}
 		else {
 			return -22
@@ -1507,8 +1498,8 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 		if captured.retained { queue_resources.submission_gate.leave() }
 	}
 	vm := f.find_owned_vm(vm_id) or { return -22 }
-	// Never publish work through an incompletely invalidated mapping. This
-	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
+	// Finish retained mapping retirements before publishing work. This
+	// also retries an earlier GEM_CLOSE once VM pins end.
 	if !f.cleanup_closed_mappings_locked(vm) { return -5 }
 	if !captured.retained { return -22 }
 	mut initial_mask := attachment_initial_mask

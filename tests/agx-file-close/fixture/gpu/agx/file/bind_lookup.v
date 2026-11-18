@@ -11,10 +11,10 @@ import gpu.agx.pgtable
 __global bind_lookup_cases = 0
 
 fn check_bind_lookup(mut file GpuFile, request &ioctl.DrmAsahiGemBind, expected int, object &gem.GemObject, pt &pgtable.UatPgtable) {
-	maps, unmaps, flushes := pt.maps, pt.unmaps, gpu.flushes()
+	maps, unmaps, checks := pt.maps, pt.unmaps, gpu.mapping_checks()
 	assert file.ioctl_gem_bind(request) == expected, 'bind VM lookup expected ${expected}'
 	assert !file.lock.is_held() && object.references == 2 && file.mappings.len == 1
-	assert pt.maps == maps && pt.unmaps == unmaps && gpu.flushes() == flushes
+	assert pt.maps == maps && pt.unmaps == unmaps && gpu.mapping_checks() == checks
 	bind_lookup_cases++
 }
 

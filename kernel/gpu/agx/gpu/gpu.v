@@ -1237,20 +1237,14 @@ pub fn (mut mgr GpuManager) ring_device_control() bool {
 	return mgr.send_doorbell(doorbell_device_control)
 }
 
-// File mapping operations hold file.lock before manager.lock. Serialize their
-// transport access with shutdown, which marks state stopped before halting
-// firmware and holds this lock until teardown completes. Only an already
-// unmapped range may finish without a flush after acquiring that stopped lock;
-// a new bind must still fail. Internal callers already hold manager.lock.
-pub fn (mut mgr GpuManager) flush_g13_file_mapping(context &mmu.UatContext, addr u64, size u64,
-	unmapped bool) bool {
+// File operations hold file.lock before manager.lock. The page-table lock
+// serializes leaf changes and TLBI with ASID replacement. Wait for shutdown
+// to drop the manager lock before retiring an unmapped range on a stopped GPU.
+pub fn (mut mgr GpuManager) finish_g13_file_mapping(unmapped bool) bool {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
-	if unmapped && mgr.state == .stopped { return true }
-	// The GPU lock excludes eviction and reuse by another file's submission.
-	slot := context.bound_slot()
-	if slot == 0 { return mgr.state == .running }
-	return mgr.flush_g13_uat_range(slot, addr, size)
+	if unmapped && mgr.state == .stopped { return mgr.hw_config.gpu_gen == .g13 }
+	return mgr.g13_submission_status_locked() == 0
 }
 
 // Publish a G13 UAT invalidation through the secure firmware-control ring and

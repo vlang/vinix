@@ -95,7 +95,7 @@ fn check_record_mapping_retry() {
 		mut object := gem.GemObject{}
 		mut file := GpuFile{vms: [&vm], g13_queues: [G13QueueOwnership{queue_id: 1, resources: resource}],
 			mappings: [GpuMapping{vm_id: 1, addr: 0x4000, size: 0x4000, obj: &object}]}
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		assert !file.close() && resource.released && file.g13_queues.len == 1 && !vm.destroyed
 		assert C.__asan_address_is_poisoned(resource) == 0, 'failed mapping cleanup must retain already released queue metadata'
 		assert file.close() && vm.destroyed && C.__asan_address_is_poisoned(resource) != 0

@@ -22,7 +22,7 @@ fn check_unbind_range_local(file string) ! {
 		'cut_start :=', 'cut_end :=', 'if mapping.addr < cut_start', 'gem.ref_obj(mapping.obj)', 'f.mappings << GpuMapping{',
 		'if cut_end < mapping_end', 'gem.ref_obj(mapping.obj)', 'f.mappings << GpuMapping{',
 		'f.mappings[i].addr = cut_start', 'f.mappings[i].size = cut_end - cut_start',
-		'if !f.retire_mapping_locked(i) { flush_ok = false }', 'return if flush_ok { 0 } else { -5 }'], 'Reserve transient fragments before clipped retirement; retry tombstones without resplitting')!
+		'if !f.retire_mapping_locked(i) { retired = false }', 'return if retired { 0 } else { -5 }'], 'Reserve transient fragments before clipped retirement and retry without resplitting')!
 	require(unmap.count('gem.ref_obj(') == 2 && !unmap.contains('gem.unref(') && !unmap.contains('pt.map'), 'Survivors retain PTEs and own refs; retirement owns the only release')!
 	ioctl := section(file.all_after('pub fn (mut f GpuFile) ioctl_gem_bind('), 'ioctl.asahi_bind_op_unbind {', 'ioctl.asahi_bind_op_unbind_all {', 'Native idle range dispatch')!
 	require_order(ioctl, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'katomic.load(&ctx.inflight)', 'return -16',

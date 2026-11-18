@@ -255,9 +255,9 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 	mut object := ioctl.DrmAsahiGemCreate{ size: 0x4000, vm_id: 1, flags: ioctl.asahi_gem_vm_private }
 	assert first.ioctl_gem_create(unsafe { &object }) == 0
 	mut bind := ioctl.DrmAsahiGemBind{ vm_id: 1, handle: object.handle, flags: ioctl.asahi_bind_read, range: 0x4000, addr: 0x4000 }
-	flushes := gpu.flushes()
+	checks := gpu.mapping_checks()
 	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
-	assert gpu.flushes() == flushes && !replacement.is_bound()
+	assert gpu.mapping_checks() == checks + 1 && !replacement.is_bound()
 	assert first.mappings[0].vm_id == replacement.id && first.mappings[0].obj.vm_private_identity == replacement.identity
 	assert old_pt.maps == 0 && new_pt.maps == 1
 	unbind := ioctl.DrmAsahiGemBind{ vm_id: 1, op: ioctl.asahi_bind_op_unbind, range: bind.range, addr: bind.addr }
@@ -265,18 +265,18 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 	assert first.ioctl_gem_bind(&unbind) == -16 && new_pt.unmaps == 0
 	replacement.inflight = 0
 	assert first.ioctl_gem_bind(&unbind) == 0 && new_pt.unmaps == 1 && old_pt.unmaps == 0
-	assert gpu.flushes() == flushes
+	assert gpu.mapping_checks() == checks + 2
 	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
 	assert manager.bind_context(&replacement) == 1 && replacement.is_bound()
 	new_pt.tlb_asid = 6
 	assert first.ioctl_gem_bind(&unbind) == 0 && new_pt.unmaps == 2 && old_pt.unmaps == 0
-	assert gpu.flushes() == flushes + 1 && gpu.last_flush_slot() == 6
+	assert gpu.mapping_checks() == checks + 4
 	assert first.close() && second.close()
 	assert old.destroyed && other.destroyed && sibling.destroyed && replacement.destroyed
 	assert gem.live() == 0
 	memory.assert_released()
 	println('AGX VM names: per-file allocation, detached name reuse, failed creation and physical routing through queue, private GEM and VM_BIND passed')
-	println('AGX VM publication: creation and dormant mappings skip firmware invalidation, with acknowledged unbind after publication')
+	println('AGX VM publication: dormant edits and resident unbind use the page-table path without FwCtl')
 }
 
 fn check_dormant_vm_capacity(mut manager mmu.UatManager) {

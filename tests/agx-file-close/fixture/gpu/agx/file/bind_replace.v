@@ -40,12 +40,12 @@ fn check_bind_replacements() {
 						request.range = (cut[1] - cut[0]) * pgtable.uat_pgsz
 						request.offset = if new_repeat { 31 * pgtable.uat_pgsz } else { pgtable.uat_pgsz }
 						request.flags = flags | if new_repeat { ioctl.asahi_bind_single_page } else { u32(0) }
-						before_alloc := memory.calls(); before_flush := gpu.flushes(); before_prepare := pt.prepares
+						before_alloc := memory.calls(); before_check := gpu.mapping_checks(); before_prepare := pt.prepares
 						vm.inflight = 1
 						assert file.ioctl_gem_bind(&request) == -16
 						assert first.references == 3 && second.references == 3 && target.references == 1
 						assert pt.leaves == old_leaves && pt.protections == old_protection
-						assert memory.calls() == before_alloc && gpu.flushes() == before_flush && pt.prepares == before_prepare
+						assert memory.calls() == before_alloc && gpu.mapping_checks() == before_check && pt.prepares == before_prepare
 						vm.inflight = 0; cases++
 						for _ in 0 .. 2 {
 							assert file.ioctl_gem_bind(&request) == 0, 'BIND must replace idle overlapping mappings'
@@ -96,20 +96,20 @@ fn check_bind_replacements() {
 		pt.reject_prepare = false
 		assert old.references == 2 && target.references == 1 && pt.leaves == leaves && pt.unmaps == 0 && pt.maps == 1
 		assert file.mappings.len == 1 && file.mappings[0].size == original.range; cases++
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		assert file.ioctl_gem_bind(&request) == -5
 		assert old.references == 4 && target.references == 1 && file.mappings.len == 3 && pt.maps == 1 && pt.unmaps == 1; cases++
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		before_prepare := pt.prepares
 		assert file.ioctl_gem_bind(&request) == -5
 		assert old.references == 4 && target.references == 1 && pt.unmaps == 1 && pt.maps == 1 && pt.prepares == before_prepare; cases++
 		assert file.ioctl_gem_bind(&request) == 0
 		assert old.references == 3 && target.references == 2 && file.mappings.len == 3; cases++
 		request.handle = 7
-		gpu.fail_flush_after(1)
+		gpu.fail_mapping_check_after(1)
 		assert file.ioctl_gem_bind(&request) == -5
 		assert old.references == 4 && target.references == 1 && file.mappings.len == 3 && file.mappings[file.mappings.len - 1].retiring; cases++
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		assert !file.close() && !vm.destroyed && old.references == 4
 		assert file.close() && vm.destroyed && gem.live() == 0
 		memory.assert_released()
@@ -132,5 +132,5 @@ fn check_bind_replacements() {
 		assert fresh.close() && gem.live() == 0
 		memory.assert_released()
 	}
-	println('AGX BIND replacement: ${cases} ioctl checks; idle exact/partial/multi-BO replacement, holes, protected contiguous/repeated survivors, same-BO replacement, foreign VMs, busy gate, metadata/table OOM before mutation, old/new flush failures, retained retry/close and freed reservations passed')
+	println('AGX BIND replacement: ${cases} ioctl checks; idle exact/partial/multi-BO replacement, holes, protected contiguous/repeated survivors, same-BO replacement, foreign VMs, busy gate, metadata/table OOM before mutation, old/new device-state refusals, retained retry/close and freed reservations passed')
 }

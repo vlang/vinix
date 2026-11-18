@@ -17,7 +17,7 @@ fn check_zero_bind_ranges() {
 		file.mappings.flags |= .noslices
 		object := gem.create(7); file.objects.table.add_created(object)
 		assert file.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
-		maps, unmaps, flushes, lookups := pt.maps, pt.unmaps, gpu.flushes(), object_ref_lookups
+		maps, unmaps, checks, lookups := pt.maps, pt.unmaps, gpu.mapping_checks(), object_ref_lookups
 		for id in [u32(0), 1, 2, 64, ~u32(0)]! {
 			for handle in [u32(0), 7, 8, ~u32(0)]! {
 				for flags in [u32(0), ioctl.asahi_bind_read, ioctl.asahi_bind_write,
@@ -33,7 +33,7 @@ fn check_zero_bind_ranges() {
 							assert request == before && !file.lock.is_held()
 							assert object_ref_lookups == lookups && object.references == 2
 							assert file.mappings.len == 1 && file.mappings[0].addr == 0x4000 && !file.mappings[0].retiring
-							assert pt.maps == maps && pt.unmaps == unmaps && gpu.flushes() == flushes
+							assert pt.maps == maps && pt.unmaps == unmaps && gpu.mapping_checks() == checks
 							cases++
 						}
 					}

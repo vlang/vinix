@@ -52,7 +52,7 @@ fn check_mapping_retirement() {
 		pt.reject_map = false
 		assert file.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
 		assert object.references == 2 && file.mappings.len == 1
-		gpu.fail_flushes(3)
+		gpu.fail_mapping_checks(3)
 		for _ in 0 .. 3 {
 			assert file.ioctl_gem_bind(unbind(1, 0x4000)) == -5
 			assert object.references == 2 && file.mappings.len == 1
@@ -70,18 +70,18 @@ fn check_mapping_retirement() {
 		failed.mappings.flags |= .noslices
 		failed_object := gem.create(7)
 		failed.objects.table.add_created(failed_object)
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		assert failed.ioctl_gem_bind(bind(7, 1, 0x4000)) == -5
 		assert failed_object.references == 2 && failed.mappings[0].retiring
 		assert failed_pt.unmaps == 1
-		gpu.fail_flushes(2)
+		gpu.fail_mapping_checks(2)
 		assert failed.close_object_handle(7) == -5
 		assert failed_object.references == 1 && !failed_vm.destroyed
 		assert !failed.close() && !failed_vm.destroyed
 		assert failed_object.references == 1 && failed_pt.unmaps == 1
 		assert failed.close() && failed_vm.destroyed && gem.live() == 0
 
-		// Busy VMs retain ordinary closed-handle bindings. Pending invalidation
+		// Busy VMs retain ordinary closed-handle bindings. Pending retirement
 		// blocks admission even while another job holds a VM pin.
 		mut busy_pt := pgtable.UatPgtable{}
 		mut busy_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &busy_pt }
@@ -97,12 +97,12 @@ fn check_mapping_retirement() {
 		assert busy.cleanup_closed_mappings_locked(&busy_vm)
 		assert !busy.close() && !busy_vm.destroyed
 		busy_vm.inflight = 0
-		gpu.fail_flushes(1)
+		gpu.fail_mapping_checks(1)
 		assert !busy.cleanup_closed_mappings_locked(&busy_vm)
 		assert busy.mappings[0].retiring && busy_object.references == 1
 		busy_vm.inflight = 1
-		before := gpu.flushes()
-		assert !busy.cleanup_closed_mappings_locked(&busy_vm) && gpu.flushes() == before
+		before := gpu.mapping_checks()
+		assert !busy.cleanup_closed_mappings_locked(&busy_vm) && gpu.mapping_checks() == before
 		busy_vm.inflight = 0
 		assert busy.cleanup_closed_mappings_locked(&busy_vm) && gem.live() == 0
 		assert busy.close()
@@ -121,7 +121,7 @@ fn check_mapping_retirement() {
 	assert file.ioctl_gem_bind(bind(7, 2, 0x4000)) == 0
 	assert object.references == 4
 	all := ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, handle: 7, vm_id: 1 }
-	gpu.fail_flushes(1)
+	gpu.fail_mapping_checks(1)
 	assert file.ioctl_gem_bind(&all) == -5
 	assert object.references == 3 && file.mappings.len == 2
 	assert first_pt.unmaps == 2 && second_pt.unmaps == 0
@@ -129,24 +129,24 @@ fn check_mapping_retirement() {
 	assert object.references == 2 && file.mappings.len == 1
 	assert file.mappings[0].vm_id == 2
 
-	// Failed retries refuse overlapping replacement; a later successful
-	// invalidation frees the old reservation and permits a new mapping.
-	gpu.fail_flushes(1)
+	// Failed retries refuse overlapping replacement. A later successful
+	// retirement frees the old reservation and permits a new mapping.
+	gpu.fail_mapping_checks(1)
 	assert file.ioctl_gem_bind(unbind(2, 0x4000)) == -5
-	gpu.fail_flushes(1)
+	gpu.fail_mapping_checks(1)
 	assert file.ioctl_gem_bind(bind(7, 2, 0x4000)) == -5
 	assert object.references == 2 && second_pt.maps == 1
 	assert file.ioctl_gem_bind(bind(7, 2, 0x4000)) == 0
 	assert object.references == 2 && second_pt.maps == 2
-	gpu.fail_flushes(1)
+	gpu.fail_mapping_checks(1)
 	assert file.ioctl_gem_bind(unbind(2, 0x4000)) == -5
-	before := gpu.flushes()
+	before := gpu.mapping_checks()
 	gpu.set_running(false)
-	// Stopped firmware permits final release without an unavailable flush.
-	gpu.fail_flushes(100)
-	assert file.close() && gpu.flushes() == before && gem.live() == 0
+	// Stopped firmware permits final release after taking the manager lock.
+	gpu.fail_mapping_checks(100)
+	assert file.close() && gpu.mapping_checks() == before && gem.live() == 0
 	assert first_vm.destroyed && second_vm.destroyed
-	gpu.fail_flushes(0)
+	gpu.fail_mapping_checks(0)
 	assert file.find_owned_vm(64) == none
 	// VM destruction wins before the mutation lock. BIND must re-resolve
 	// the VM inside that lock, before borrowing the page table or GEM.
@@ -172,7 +172,7 @@ fn check_mapping_retirement() {
 		stopping.objects.table.add_created(stop_object)
 		if !is_bind {
 			assert stopping.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
-			gpu.fail_flushes(1)
+			gpu.fail_mapping_checks(1)
 			assert stopping.ioctl_gem_bind(unbind(1, 0x4000)) == -5
 		}
 		before_stops := gpu.stop_count()
@@ -186,37 +186,54 @@ fn check_mapping_retirement() {
 		assert stop_pt.unmaps == 1 && stop_vm.destroyed
 	}
 	println('AGX mapping retirement: 200 bind/unbind/GEM-close/retry cycles, failed bind ownership, busy VM admission, partial UNBIND_ALL, replacement, stopped cleanup, exact-lock shutdown races and VM destruction before BIND passed')
-	check_eviction_before_file_flush()
+	check_eviction_before_file_mapping_check()
+	check_file_mapping_state()
 }
 
 __global evicting_pt &pgtable.UatPgtable = unsafe { nil }
 
-fn evict_before_file_flush() {
+fn evict_before_file_mapping_check() {
 	assert evicting_pt.unmaps == 1 && evicting_pt.tlb_bound
 	evicting_pt.tlb_bound = false
 }
 
-fn check_eviction_before_file_flush() {
+fn check_eviction_before_file_mapping_check() {
 	gpu.set_running(true)
 	mut pt := pgtable.UatPgtable{tlb_asid: 7}
 	mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: &pt}
 	mut file := GpuFile{vms: [&vm]}
 	file.objects.table.add_created(gem.create(7))
-	assert file.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0 && gpu.last_flush_slot() == 7
-	flushes := gpu.flushes()
+	assert file.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
+	checks := gpu.mapping_checks()
 	evicting_pt = unsafe { &pt }
-	gpu.before_file_flush_lock(evict_before_file_flush)
+	gpu.before_file_mapping_lock(evict_before_file_mapping_check)
 	assert file.ioctl_gem_bind(unbind(1, 0x4000)) == 0
-	assert !pt.tlb_bound && gpu.flushes() == flushes && file.mappings.len == 0
+	assert !pt.tlb_bound && gpu.mapping_checks() == checks + 1 && file.mappings.len == 0
 	evicting_pt = unsafe { nil }
 	assert file.close() && gem.live() == 0
 	memory.assert_released()
-	println('AGX file flush: eviction before the GPU lock prevents an invalidation to the old slot')
+	println('AGX file mapping: resident bind and eviction after unmap complete without FwCtl')
+}
+
+fn check_file_mapping_state() {
+	mut manager := unsafe { gpu.get_global_manager() or { panic('GPU manager') } }
+	for generation in [gpu.Generation.g13, .g17]! {
+		manager.hw_config.gpu_gen = generation
+		for state in [gpu.State.idle, .starting, .running, .error, .stopped]! {
+			manager.state = state
+			assert finish_file_mapping(false) == (generation == .g13 && state == .running)
+			assert finish_file_mapping(true) == (generation == .g13 && state in [.running, .stopped]!)
+			assert !gpu.query_lock_held()
+		}
+	}
+	manager.hw_config.gpu_gen = .g13
+	manager.state = .running
+	println('AGX file mapping: device loss, stopped cleanup and unsupported G17 state gates passed')
 }
 
 fn check_mapping_permissions() {
 	gpu.set_running(true)
-	gpu.fail_flushes(0)
+	gpu.fail_mapping_checks(0)
 	mut pt := pgtable.UatPgtable{}
 	mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &pt }
 	mut file := GpuFile{ vms: [&vm] }

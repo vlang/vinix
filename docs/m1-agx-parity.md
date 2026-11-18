@@ -96,6 +96,30 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `dc09a675951d0a1e08e71109af4353e11bdbeb396f5d36b5cf0306de6915f567`.
 
+G13 GPU-only GEM bindings use the page-table path for visibility and TLB
+invalidation under both ioctl ABIs. A resident unmap completes its ASID
+TLBI before releasing the GEM backing. Dormant roots get an ASID
+invalidation when installed. The manager lock still serializes mapping
+completion with shutdown, and a refused state check retains backing for
+retirement. Active jobs continue to gate unbind and overlap replacement.
+[Asahi map publication](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L643-L674)
+[Asahi GEM unmap](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L770-L803)
+
+Both kernel builds and all 82 contract files passed. Sanitizer checks
+covered 1,200 modern VM_BIND cases, 200 file retirement cycles, the
+resident and dormant roots, device loss and shutdown races. Three
+compiled controls caught a FwCtl send, a bind accepted after stop, and
+retirement before ASC shutdown. Independent lifetime review passed.
+The allocation scan reproduced 178 baseline findings. Whole-driver parity
+remains `not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `5a9cb5994ac93f5618f63febab87599afec5ce2a` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-gem-tlbi-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`4729d926ead4c19620aabdb33f16f6ed48c874060ec2fc2876a2b3161d226d51`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

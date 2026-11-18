@@ -11,10 +11,10 @@ import drm.ioctl
 __global bind_order_cases = 0
 
 fn check_bind_order_result(mut file GpuFile, request &ioctl.DrmAsahiGemBind, expected int, object &gem.GemObject, pt &pgtable.UatPgtable) {
-	maps, unmaps, flushes := pt.maps, pt.unmaps, gpu.flushes()
+	maps, unmaps, checks := pt.maps, pt.unmaps, gpu.mapping_checks()
 	assert file.ioctl_gem_bind(request) == expected, 'BIND lookup order expected ${expected}'
 	assert !file.lock.is_held() && object.references == 2 && file.mappings.len == 1
-	assert pt.maps == maps && pt.unmaps == unmaps && gpu.flushes() == flushes
+	assert pt.maps == maps && pt.unmaps == unmaps && gpu.mapping_checks() == checks
 	bind_order_cases++
 }
 
@@ -79,5 +79,5 @@ fn check_bind_order() {
 		assert file.close() && vm.destroyed && gem.live() == 0
 		unsafe { file.vms.free(); file.mappings.free() }
 	}
-	println('AGX BIND order: ${bind_order_cases} checks; alignment/flag header before BO, missing BO before ranges/permissions/VM, BO bounds/global fields before VM, exact temporary-ref cleanup, private-hole checks and unchanged PTE/flush/mapping state passed')
+	println('AGX BIND order: ${bind_order_cases} checks; alignment/flag header before BO, missing BO before ranges/permissions/VM, BO bounds/global fields before VM, exact temporary-ref cleanup, private-hole checks and unchanged PTE/state-check/mapping state passed')
 }

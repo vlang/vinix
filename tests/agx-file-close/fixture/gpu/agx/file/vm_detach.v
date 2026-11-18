@@ -38,7 +38,7 @@ fn check_detached_vms() {
 					vm.inflight = pins
 					key := u64(0x5000_0000 + cycle)
 					file_map[key] = unsafe { &file }
-					gpu.fail_flushes(failures)
+					gpu.fail_mapping_checks(failures)
 					gpu.available(available)
 					destroy := ioctl.DrmAsahiVmDestroy{vm_id: 1}
 					assert file.ioctl_vm_destroy(&destroy) == 0
@@ -122,7 +122,7 @@ fn check_detached_vms() {
 	assert closing_count == 1 && !vm.destroyed && pt.unmaps == 0
 	resources.release_file_reference()
 	vm.inflight = 0
-	gpu.fail_flushes(1)
+	gpu.fail_mapping_checks(1)
 	reap_closed_files()
 	assert closing_count == 1 && !vm.destroyed && object.references == 2
 	reap_closed_files()

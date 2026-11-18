@@ -894,6 +894,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(repo, 'kernel/drm/drm.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/vm/identity.v'))!)!
 	check_private_bo_reference(read(os.join_path(base, 'gem.rs'))!)!
 	check_user_mapping_contract(file_source, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!)!
+	check_user_mapping_reference(read(os.join_path(base, 'mmu.rs'))!)!
 	ioctl_submit := section(file_source, 'pub fn (mut f GpuFile) ioctl_submit(',
 		'fn dispatch(', 'Vinix async submission ioctl')!
 	require(!ioctl_submit.contains('wait_g13_fence') && !ioctl_submit.contains('syncobj.wait')
@@ -1085,8 +1086,8 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Timestamp BIND ignores input output-handles, checks sum overflow before BO lookup and empty ranges after it; UNBIND resolves missing names before manager availability and preserves retained owners',
 		'Global GET_PARAMS rejects error/stopped devices with ENODEV before formatting/copying, using a released manager-lock snapshot',
 		'Global GET_PARAMS treats size as an input bound, shares one bounded prefix copy, permits zero-byte queries and preserves fault output/header semantics',
-		'BIND preallocates fallible mapping/table storage before replacing idle overlaps, preserves survivors and aborts new installation after failed old invalidation',
-		'UNBIND removes intersections across holes/multiple BOs, preallocates surviving fragments, preserves backing through failed invalidation and retries complete tombstones',
+		'BIND preallocates mapping/table storage before replacing idle overlaps, preserves survivors and aborts new installation if old retirement is refused',
+		'UNBIND removes intersections across holes and multiple BOs, preallocates surviving fragments and retries retained retirements',
 		'GEM-create size validation returns EINVAL for zero and EOVERFLOW for 16 KiB rounding overflow after private VM lookup and before allocation',
 		'SINGLE_PAGE BIND consumes one BO page and repeats its PTE across the complete VA range with rollback/invalidation and retained backing',
 		'BIND resolves its BO and validates size/global fields before VM lookup; unbind and private-window checks retain the mutation lock',
@@ -1094,7 +1095,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Missing submit queues precede command/sync staging, with no borrowed queue across copies and locked backend revalidation',
 		'Absent VM/queue identities return ENOENT during VM destroy, queue create/destroy and submission without confusing invalid internal VM state',
 		'VM-private BO domains reject foreign/recreated VMs, import, kernel timestamp mapping and PRIME export before publication',
-		'User mapping backing survives failed invalidation; serialized flush/stop, VM mutation lock and new-submit admission retain ownership',
+		'G13 GEM mappings use GPU TLBI and retain backing across device-state refusals; stopped retirement waits for ASC teardown',
 		'pending-stamp fault classification and halt/resume handshake',
 		'TVB growth ACK halt counter',
 		'G13 LOW/MEDIUM admission, reversed firmware bands, default compute priority and retained failed-create VM ownership',

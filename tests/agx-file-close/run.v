@@ -35,8 +35,7 @@ fn checks() !int {
 		section(source, 'fn (mut f GpuFile) capture_submission_queue(', '// Copy userspace input')! +
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
 		section(source, 'fn (mut f GpuFile) retire_mapping_locked(', '// Reserve a nonzero per-open queue ID.')! +
-		section(source, 'fn (f &GpuFile) find_vm(', '// Firmware may retain both UAT translations')! +
-		section(source, 'fn flush_firmware_mapping(', 'fn asahi_variant(')! +
+		section(source, 'fn (f &GpuFile) find_vm(', 'fn asahi_variant(')! +
 		section(source, 'fn (mut f GpuFile) allocate_timestamp_id_locked(', 'fn (f &GpuFile) find_vm(')! +
 		section(source, 'fn (mut f GpuFile) allocate_queue_id_locked(', 'fn (mut f GpuFile) allocate_timestamp_id_locked(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_vm_create(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(')! +
@@ -66,7 +65,9 @@ fn checks() !int {
 		section(g13_source, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) can_query_global_params(', 'pub fn new_gpu_manager(')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) queue_file_retirement(', 'fn (mut mgr GpuManager) reap_file_resources(')! +
-		section(gpu_source, 'pub fn (mut mgr GpuManager) flush_g13_file_mapping(', '// Publish a G13 UAT invalidation through')! +
+		section(gpu_source, 'fn (mgr &GpuManager) g13_submission_status_locked()', '// Take a temporary submission lease')!
+			.replace('g13_submission_status_locked(', 'g13_submission_status_real_locked(') +
+		section(gpu_source, 'pub fn (mut mgr GpuManager) finish_g13_file_mapping(', '// Publish a G13 UAT invalidation through')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(', 'fn alloc_fixed_buffer(')!
 			.replace('unmap_g13_timestamp_buffer', 'checked_timestamp_unmap')
 			.replace('map_g13_timestamp_buffer', 'checked_timestamp_map'))!
