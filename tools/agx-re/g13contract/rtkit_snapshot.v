@@ -30,7 +30,16 @@ fn check_rtkit_snapshot(transport string, manager string, linux string, rust str
 	require_order(receive, ['role == 0 && mgr.hw_config.gpu_gen == .g13',
 		'mailbox.msg_endpoint(&msg) != rtkit.ep_crashlog || mgr.rtk.system_iovas[rtkit.ep_crashlog] == 0',
 		'mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'if mgr.state != .running { return true }',
-		'return mgr.rtk.handle_system_message(msg)'], 'G13 runtime buffer requests complete under the shutdown lock')!
+		'if mgr.rtkit_send_irq == 0 { return mgr.rtk.handle_system_message(msg) }',
+		'lock: unsafe { &mgr.lock }', 'active: rtkit_transport_running',
+		'return mgr.rtk.handle_system_message_wait(msg, wait)'],
+		'G13 holds the shutdown lock for buffer allocation and passes it through to the guarded reply')!
+	active := section(manager, 'fn rtkit_transport_running(', 'fn (mut mgr GpuManager) handle_role_system_message(', 'Vinix runtime TX liveness')!
+	require(active.contains('return mgr.state == .running'), 'G13 declines TX retry after loss or shutdown')!
+	system_reply := section(transport, 'fn (mut rtk RTKit) send_system_reply(', 'fn start_system_endpoints(', 'Vinix system reply transmit')!
+	require_order(system_reply, ['wait.lock == unsafe { nil }', 'return rtk.send_message(ep, data)',
+		'rtk.mbox.send_timed_wait(mailbox.MboxMsg{data0: data, data1: u64(ep)}, wait)', '|| !wait.active(wait.context)'],
+		'Vinix transmits the scalar reply under the runtime gate and accepts cancellation once stopped')!
 	release := section(manager, 'fn (mut mgr GpuManager) release_rtkit_buffers(', 'fn (mut mgr GpuManager) alloc_g13_channel_pair(', 'Vinix RTKit buffer lifetime')!
 	require_order(release, ['mgr.rtkit_buffer_lock.acquire()', 'mgr.free_shared_buffer(mut mgr.rtkit_buffers[count])',
 		'mgr.rtkit_buffers.clear()', 'mgr.rtkit_buffer_lock.release()'], 'Vinix releases RTKit backing under the snapshot lock')!
@@ -84,16 +93,16 @@ fn check_rtkit_buffer_retries(transport string, linux string) ! {
 		'iova = rtk.shmem_alloc(rtk.shmem_context, size)', 'if iova == 0', 'return rtk.nonfatal_log_errors',
 		'rtk.system_iovas[ep] = iova', 'rtk.system_sizes[ep] = size', 'wire_iova := iova & iova_mask',
 		'(size << 36) | (wire_iova >> 12)', '((size >> 12) << 44) | wire_iova',
-		'sent := rtk.send_message(ep, reply)', 'return sent || ep != ep_crashlog || rtk.nonfatal_log_errors'],
+		'sent := rtk.send_system_reply(ep, reply, wait)', 'return sent || ep != ep_crashlog || rtk.nonfatal_log_errors'],
 		'Vinix stores the live mapping before sending and applies the configured timeout policy')!
 	for function in ['ioreport', 'syslog', 'oslog'] {
 		receiver := linux.all_after('static void apple_rtkit_${function}_rx(').all_before('\nstatic ')
 		require(receiver.contains('apple_rtkit_common_rx_get_buffer'), 'Asahi ${function} shares retry logic')!
 	}
 	receiver := section(transport, 'pub fn (mut rtk RTKit) handle_system_message(', 'fn start_system_endpoints(', 'Vinix RTKit receive')!
-	require_order(receiver, ['ep_ioreport {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)',
-		'ep_syslog {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)',
-		'ep_oslog {', 'kind := u8(msg.data0 >> 56)', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)'],
+	require_order(receiver, ['ep_ioreport {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0, wait)',
+		'ep_syslog {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0, wait)',
+		'ep_oslog {', 'kind := u8(msg.data0 >> 56)', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0, wait)'],
 		'Vinix logging endpoints share the buffer retry handler')!
 }
 

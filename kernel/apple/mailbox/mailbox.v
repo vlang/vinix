@@ -41,6 +41,17 @@ pub mut:
 	lock klock.Lock
 }
 
+// With a guard, the caller holds lock and has checked that the transport is
+// active. Only the IRQ wait drops lock. A stopped transport must be detected
+// after reacquiring it, before checking or writing the FIFO again.
+pub struct SendWait {
+pub:
+	irq     u32
+	lock    &klock.Lock = unsafe { nil }
+	context voidptr
+	active  fn (voidptr) bool = unsafe { nil }
+}
+
 pub fn new_mailbox(base u64) Mailbox {
 	return Mailbox{
 		// Map the ASC mailbox aperture as Device memory (registers up to 0xc14).
@@ -112,14 +123,24 @@ fn wait_send_irq(irq u32, interval u64) {
 	}
 }
 
-// The probe owns the transmit line while issuing a boot message. An IRQ
-// prompts an early FIFO check, with a bounded poll if delivery is delayed.
+// The caller owns the transmit line while issuing the message.
 pub fn (mut mbox Mailbox) send_timed_irq(msg MboxMsg, irq u32) bool {
+	return mbox.send_timed_wait(msg, SendWait{irq: irq})
+}
+
+// An IRQ prompts an early FIFO check, with a bounded poll if delivery is delayed.
+// Only one sender may wait on the line. Ordinary polling senders can still use
+// the FIFO because every status check and write pair holds the mailbox lock.
+pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
 	if mbox.try_send(msg) {
 		return true
 	}
 	started := timer.get_us()
-	wait_for_irq := irq != 0 && cpu.interrupt_state() && aic.arm_deferred_send_irq(irq)
+	irq := wait.irq
+	mut guard := unsafe { wait.lock }
+	guarded := guard != unsafe { nil }
+	interrupts := if guarded { guard.ints } else { cpu.interrupt_state() }
+	wait_for_irq := irq != 0 && interrupts && aic.arm_deferred_send_irq(irq)
 	defer {
 		if wait_for_irq { aic.mask_irq(irq) }
 	}
@@ -131,7 +152,17 @@ pub fn (mut mbox Mailbox) send_timed_irq(msg MboxMsg, irq u32) bool {
 		remaining := send_timeout_us - elapsed
 		interval := if remaining < send_poll_us { remaining } else { send_poll_us }
 		if wait_for_irq {
+			if guarded { guard.release() }
 			wait_send_irq(irq, interval)
+			if guarded {
+				guard.acquire()
+				if !wait.active(wait.context) {
+					return false
+				}
+				if timer.get_us() - started > send_timeout_us {
+					break
+				}
+			}
 		} else {
 			timer.busywait_us(interval)
 		}

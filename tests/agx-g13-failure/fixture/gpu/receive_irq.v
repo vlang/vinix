@@ -40,7 +40,7 @@ fn observe_irq_boot_send() {
 }
 
 fn observe_application_startup_send() {
-	assert irq_boot_probe.lock.is_held() == (irq_boot_probe.rtkit_boot_send_irq == 0)
+	assert irq_boot_probe.lock.is_held() == (irq_boot_probe.rtkit_send_irq == 0)
 	assert !irq_boot_probe.rtk.lock.is_held() && irq_boot_probe.state == .starting
 }
 
@@ -67,7 +67,7 @@ fn check_application_startup(mut mgr GpuManager) {
 		StartupSendCase{timeouts: 4, sent: 2, attempts: 3},
 		StartupSendCase{timeouts: 8, sent: 3, attempts: 4},
 		StartupSendCase{timeouts: 16, sent: 4, attempts: 5}]! {
-		mgr.rtkit_boot_send_irq = sample.irq
+		mgr.rtkit_send_irq = sample.irq
 		mgr.rtk.mbox = mailbox.Mailbox{send_timeout_mask: sample.timeouts}
 		assert mgr.lock.is_held()
 		assert mgr.start_firmware_application() == (sample.sent == messages.len)
@@ -158,7 +158,7 @@ fn check_g13_receive_irq() {
 	mgr.lock.acquire()
 	assert !aic.arm_deferred_send_irq(575)
 	mgr.claim_rtkit_irqs(irq, irq)
-	assert mgr.rtkit_boot_send_irq == 0
+	assert mgr.rtkit_send_irq == 0
 	assert mgr.rtkit_receive_irq == irq && kio.aic_cpu_target(irq) == 1
 	assert !aic.claim_deferred_irq(579) && !kio.aic_irq_masked(irq)
 	// The valid transmit route can be reserved separately after the
@@ -166,7 +166,7 @@ fn check_g13_receive_irq() {
 	assert aic.claim_deferred_send_irq(575)
 	assert !aic.claim_deferred_send_irq(576) && kio.aic_irq_masked(575)
 	assert kio.aic_cpu_target(575) == 1
-	mgr.rtkit_boot_send_irq = 575
+	mgr.rtkit_send_irq = 575
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
 		transport = rtkit.RTKit{name: 'g13-rx-irq'}
 		check_irq_boot(mut mgr, irq, abi)

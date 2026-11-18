@@ -83,7 +83,7 @@ mut:
 	last_growth    [3]u32
 	polls          int
 	rtkit_receive_irq u32
-	rtkit_boot_send_irq u32
+	rtkit_send_irq u32
 	rtkit_receive_us u64
 	initdata_va u64
 	initdata_phys u64
@@ -287,6 +287,7 @@ fn (mut mgr GpuManager) send_fw_msg(message u64, data u64) bool {
 fn (mut mgr GpuManager) stop_firmware_cpus(roles u32) {
 	assert roles == 1
 	if mgr.rtkit_receive_irq != 0 { assert kio.aic_irq_masked(mgr.rtkit_receive_irq) }
+	if mgr.rtkit_send_irq != 0 { assert kio.aic_irq_masked(mgr.rtkit_send_irq) }
 	mgr.trace << 'stop'
 }
 
@@ -338,6 +339,7 @@ pub fn run_checks() {
 	check_g13_receive_shutdown()
 	check_g13_receive_order()
 	check_g13_receive_irq()
+	check_g13_runtime_transmit()
 	check_rtkit_crash_snapshot()
 	check_rtkit_buffer_retries()
 	check_rtkit_syslog()

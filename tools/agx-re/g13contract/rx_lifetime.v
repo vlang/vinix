@@ -77,6 +77,7 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 		'mgr.release_rtkit_buffers()', 'mgr.release_g13_channels()'], 'Vinix masks the claimed line and stops firmware before boot teardown')!
 	require_order(manager, ['aic.deferred_irq_pending(mgr.rtkit_receive_irq)', 'timer.get_us() - mgr.rtkit_receive_us >= 1_000',
 		'poll_mailbox && !mgr.poll_rtkit_messages()', 'if still_healthy && poll_mailbox { mgr.finish_rtkit_receive() }',
-		'mgr.state = .stopped', 'aic.mask_irq(mgr.rtkit_receive_irq)', 'mgr.stop_firmware_cpus(mgr.firmware_roles)'],
-		'Vinix drains in the worker, polls on timeout and masks the line before firmware stop')!
+		'mgr.state = .stopped', 'aic.mask_irq(mgr.rtkit_receive_irq)', 'aic.mask_irq(mgr.rtkit_send_irq)',
+		'mgr.stop_firmware_cpus(mgr.firmware_roles)'],
+		'Vinix drains in the worker, polls on timeout and masks both lines before firmware stop')!
 }

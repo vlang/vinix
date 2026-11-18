@@ -88,8 +88,8 @@ fn run_checks() int {
 		.replace('release_g13_channels()', 'checked_release_g13_channels()')
 	production += section(source, 'fn (mut mgr GpuManager) fail_g13_initialization(', '// Allocate the completion-tracking resources') or { panic(err) }
 	production += section(source, 'pub fn (mut mgr GpuManager) set_file_reaper(', '// Serialize accepted submissions') or { panic(err) }
-	production += section(source, 'fn (mut mgr GpuManager) dequeue_g13_rx(', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
-	production += section(source, 'fn (mut mgr GpuManager) handle_role_system_message(', '// Drain the ASC transport') or { panic(err) }
+	production += section(source, 'fn (mut mgr GpuManager) dequeue_g13_rx(', 'fn rtkit_transport_running(') or { panic(err) }
+	production += section(source, 'fn rtkit_transport_running(', '// Drain the ASC transport') or { panic(err) }
 	production += (section(source, 'fn (mut mgr GpuManager) poll_rtkit_messages(', '// The manager lock guards teardown') or { panic(err) })
 		.replace('poll_rtkit_messages()', 'checked_poll_rtkit_messages()')
 	production += section(source, 'fn (mut mgr GpuManager) read_g13_fw_log(', '// Shutdown the GPU') or { panic(err) }

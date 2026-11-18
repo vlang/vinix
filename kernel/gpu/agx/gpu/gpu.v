@@ -121,7 +121,7 @@ mut:
 	rtkit_buffer_lock klock.Lock
 	rtkit_buffers     []SharedBuffer
 	rtkit_receive_irq u32
-	rtkit_boot_send_irq u32
+	rtkit_send_irq u32
 	rtkit_receive_us  u64
 	file_reaper       fn () = unsafe { nil }
 }
@@ -264,7 +264,7 @@ fn (mut mgr GpuManager) boot_firmware_role(role u32) bool {
 				} else {
 					// The probe owns this unpublished manager, and the worker
 					// starts only after initialization. Let IRQ delivery run.
-					send_irq := mgr.rtkit_boot_send_irq
+					send_irq := mgr.rtkit_send_irq
 					mgr.lock.release()
 					booted := mgr.rtk.boot_started(irq, send_irq)
 					mgr.lock.acquire()
@@ -300,7 +300,7 @@ fn (mut mgr GpuManager) start_firmware_endpoint(role u32, endpoint u8, send_irq 
 // The probe still owns the unpublished manager after RTKit negotiation.
 // Reacquire the lock before publishing the manager or unwinding a failed send.
 fn (mut mgr GpuManager) start_firmware_application() bool {
-	send_irq := mgr.rtkit_boot_send_irq
+	send_irq := mgr.rtkit_send_irq
 	if send_irq != 0 {
 		mgr.lock.release()
 	}
@@ -389,7 +389,7 @@ fn (buffer &SharedBuffer) cpu_address() voidptr {
 }
 
 // The probe owns boot requests until the manager is published. Runtime
-// requests and replies hold mgr.lock. Retain the backing until the ASC stops.
+// allocation and reply writes hold mgr.lock. Backing survives until ASC stop.
 fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
 	if context == unsafe { nil } {
 		return 0
@@ -1377,6 +1377,12 @@ pub fn (mut mgr GpuManager) handle_event() {
 	}
 }
 
+// The worker rechecks this under mgr.lock before polling or publishing again.
+fn rtkit_transport_running(context voidptr) bool {
+	mgr := unsafe { &GpuManager(context) }
+	return mgr.state == .running
+}
+
 fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg) bool {
 	// Only an already-allocated crash log can parse outside the manager
 	// lock. Its reader serializes the snapshot with buffer release.
@@ -1385,7 +1391,14 @@ fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg
 		mgr.lock.acquire()
 		defer { mgr.lock.release() }
 		if mgr.state != .running { return true }
-		return mgr.rtk.handle_system_message(msg)
+		if mgr.rtkit_send_irq == 0 { return mgr.rtk.handle_system_message(msg) }
+		wait := mailbox.SendWait{
+			irq: mgr.rtkit_send_irq
+			lock: unsafe { &mgr.lock }
+			context: voidptr(mgr)
+			active: rtkit_transport_running
+		}
+		return mgr.rtk.handle_system_message_wait(msg, wait)
 	}
 	return match role {
 		0 { mgr.rtk.handle_system_message(msg) }
@@ -1400,12 +1413,12 @@ fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg
 	}
 }
 
-// Caller holds mgr.lock during probe. The worker inherits the receive line.
+// Caller holds mgr.lock during probe. The worker inherits both lines.
 fn (mut mgr GpuManager) claim_rtkit_irqs(receive_irq u32, send_irq u32) {
 	if mgr.hw_config.gpu_gen == .g13 && aic.claim_deferred_irq(receive_irq) {
 		mgr.rtkit_receive_us = timer.get_us()
 		mgr.rtkit_receive_irq = receive_irq
-		if aic.claim_deferred_send_irq(send_irq) { mgr.rtkit_boot_send_irq = send_irq }
+		if aic.claim_deferred_send_irq(send_irq) { mgr.rtkit_send_irq = send_irq }
 	}
 }
 
@@ -1432,6 +1445,9 @@ fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 			if ep < u8(ep_firmware) {
 				if !mgr.handle_role_system_message(role, msg) {
 					return false
+				}
+				if role == 0 && mgr.hw_config.gpu_gen == .g13 && mgr.state != .running {
+					return true
 				}
 				continue
 			}
@@ -1591,6 +1607,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	if mgr.state == .stopped { return }
 	mgr.state = .stopped
 	if mgr.rtkit_receive_irq != 0 { aic.mask_irq(mgr.rtkit_receive_irq) }
+	if mgr.rtkit_send_irq != 0 { aic.mask_irq(mgr.rtkit_send_irq) }
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
 	mgr.release_rtkit_buffers()

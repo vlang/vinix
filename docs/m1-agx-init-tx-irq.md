@@ -9,9 +9,10 @@ before starting the worker or cleaning up a failure.
 
 Each send retains the 500 ms FIFO budget and checks for space before
 writing either word. Endpoint start retries an unsent message once. A missing
-or masked IRQ uses timed polling. Runtime sends still use timed polling under
-the existing teardown synchronization.
-[RTKit negotiation transmit](m1-agx-boot-tx-irq.md)
+or masked IRQ uses timed polling. At this revision, runtime sends used timed
+polling under the existing teardown synchronization.
+[RTKit negotiation transmit](m1-agx-boot-tx-irq.md) and
+[Runtime system reply follow-up](m1-agx-runtime-tx-irq.md)
 
 ARM64 and x86-64 kernel builds and all 82 contract test files passed for
 `4a85fd5298103cf951314a416021d42aabd15f47` plus the archived patch.

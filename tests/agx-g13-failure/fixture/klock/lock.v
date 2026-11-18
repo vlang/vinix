@@ -1,9 +1,13 @@
 @[has_globals]
 module klock
 
+import aarch64.cpu
+
 pub struct Lock {
 mut:
 	held bool
+pub mut:
+	ints bool
 }
 
 __global acquire_target = unsafe { &Lock(nil) }
@@ -31,12 +35,15 @@ pub fn (mut guard Lock) acquire() {
 		callback()
 	}
 	assert !guard.held, 'recursive lock acquisition'
+	guard.ints = cpu.interrupt_state()
+	cpu.set_interrupt_state(false)
 	guard.held = true
 }
 
 pub fn (mut guard Lock) release() {
 	assert guard.held, 'unlock without acquisition'
 	guard.held = false
+	cpu.set_interrupt_state(guard.ints)
 	if guard == release_target && after_release != unsafe { nil } {
 		callback := after_release
 		release_target = unsafe { nil }

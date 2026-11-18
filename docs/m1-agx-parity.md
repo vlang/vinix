@@ -14,6 +14,10 @@ the GPU manager is published.
 [RTKit boot send-empty IRQ](m1-agx-boot-tx-irq.md) and
 [Application startup transmit IRQ](m1-agx-init-tx-irq.md)
 
+The base M1 worker can use the same send-empty line for RTKit system replies.
+It checks GPU liveness and the FIFO deadline after reacquiring the manager
+lock. [Runtime system reply transmit IRQ](m1-agx-runtime-tx-irq.md)
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

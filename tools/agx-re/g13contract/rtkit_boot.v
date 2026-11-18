@@ -62,7 +62,7 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 		'Asahi starts the firmware and doorbell endpoints before InitData, device control and kick')!
 	local_application := section(manager, 'fn (mut mgr GpuManager) start_firmware_application(',
 		'fn (mut mgr GpuManager) send_role_message(', 'Vinix application startup')!
-	require_order(local_application, ['send_irq := mgr.rtkit_boot_send_irq', 'if send_irq != 0',
+	require_order(local_application, ['send_irq := mgr.rtkit_send_irq', 'if send_irq != 0',
 		'mgr.lock.release()', 'defer {', 'if send_irq != 0 { mgr.lock.acquire() }',
 		'mgr.start_firmware_endpoint(role, u8(ep_firmware), send_irq)',
 		'mgr.start_firmware_endpoint(role, u8(ep_doorbell), send_irq)',
@@ -114,20 +114,26 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 	require_order(send, ['while (mbox_ctrl & mbox->hw->control_full)', 'if (atomic || mbox->irq_send_empty < 0)',
 		'readl_poll_timeout_atomic(', 'control_full), 100,', 'APPLE_MBOX_TX_TIMEOUT * 1000',
 		'wait_for_completion_interruptible_timeout(', 'msecs_to_jiffies(APPLE_MBOX_TX_TIMEOUT)',
+		'spin_lock_irqsave(&mbox->tx_lock, flags)', 'unlikely(READ_ONCE(mbox->removing))',
 		'writeq_relaxed(msg.msg0', 'writeq_relaxed(FIELD_PREP(APPLE_MBOX_MSG1_MSG, msg.msg1)'],
 		'Asahi has bounded polling and IRQ paths before publishing either mailbox word')!
 
 	local := read(os.join_path(repo, 'kernel/apple/mailbox/mailbox.v'))!
 	require(local.contains('const send_timeout_us = u64(500_000)') && local.contains('const send_poll_us = u64(100)'),
 		'Vinix uses the Asahi ASC transmit duration and polling interval')!
-	timed := section(local, 'pub fn (mut mbox Mailbox) send_timed_irq(', '// Receive a message', 'Vinix timed mailbox transmit')!
+	timed := section(local, 'pub fn (mut mbox Mailbox) send_timed_wait(', '// Receive a message', 'Vinix timed mailbox transmit')!
 	require_order(timed, ['mbox.try_send(msg)', 'started := timer.get_us()', 'elapsed := timer.get_us() - started',
 		'elapsed >= send_timeout_us', 'remaining := send_timeout_us - elapsed', 'timer.busywait_us',
 		'mbox.try_send(msg)', 'return false'], 'Vinix measures a fresh wait only when the FIFO is full')!
-	require_order(timed, ['mbox.try_send(msg)', 'cpu.interrupt_state() && aic.arm_deferred_send_irq(irq)',
+	require_order(timed, ['mbox.try_send(msg)', 'interrupts := if guarded { guard.ints } else { cpu.interrupt_state() }',
+		'irq != 0 && interrupts && aic.arm_deferred_send_irq(irq)',
 		'defer {', 'aic.mask_irq(irq)', 'wait_send_irq(irq, interval)', 'timer.busywait_us(interval)',
 		'mbox.try_send(msg)', 'aic.deferred_send_irq_pending(irq)', 'aic.arm_deferred_send_irq(irq)'],
 		'Vinix arms only after a full FIFO and checks space before rearming or publishing')!
+	require_order(timed, ['if wait_for_irq {', 'if guarded { guard.release() }', 'wait_send_irq(irq, interval)',
+		'guard.acquire()', 'if !wait.active(wait.context)', 'return false',
+		'timer.get_us() - started > send_timeout_us', 'break', 'mbox.try_send(msg)'],
+		'Vinix reacquires the runtime guard and checks liveness and deadline before retrying TX')!
 	try_send := section(local, 'fn (mut mbox Mailbox) try_send(msg', '// Use the polled ASC timeout', 'Vinix mailbox locking')!
 	require_order(try_send, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }', 'return mbox.try_send_locked(msg)'],
 		'Vinix holds the lock for each mailbox attempt')!

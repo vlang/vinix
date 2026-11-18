@@ -1008,6 +1008,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'M1 G13 mailbox receive uses the named AIC level line and defers FIFO service to the worker with a timed fallback',
 		'M1 G13 receives AIC notifications during boot waits and masks the line before boot failure cleanup',
 		'M1 G13 can use the send-empty IRQ for negotiation and private application startup, with FIFO checks before publication',
+		'M1 G13 runtime system replies recheck GPU liveness and the FIFO deadline after an interrupt-assisted wait',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',

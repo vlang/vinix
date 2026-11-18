@@ -8,6 +8,7 @@ import klock
 
 __global mailbox_base = u64(0)
 __global send_lock = unsafe { &klock.Lock(nil) }
+__global send_owner = unsafe { &klock.Lock(nil) }
 __global mailbox_send_started = u64(0)
 __global available_at = u64(0)
 __global send_barrier_start = u32(0)
@@ -35,6 +36,10 @@ pub fn aic_cpu_target(irq u32) u32 {
 
 pub fn aic_unmasks() int { return simulated_aic_unmasks }
 
+pub fn require_send_owner(guard &klock.Lock) {
+	send_owner = unsafe { guard }
+}
+
 pub fn configure_send(base u64, guard &klock.Lock, full_for_us u64) {
 	mailbox_base = base
 	send_lock = unsafe { guard }
@@ -57,6 +62,7 @@ pub fn mmin32(addr &u32) u32 {
 		return evt
 	}
 	assert u64(addr) == mailbox_base + 0x110 && send_lock.is_held()
+	assert send_owner == unsafe { nil } || send_owner.is_held()
 	status_reads++
 	return if timer.get_us() - mailbox_send_started < available_at { u32(1 << 16) } else { u32(0) }
 }
@@ -81,6 +87,7 @@ pub fn mmin(_ &u64) u64 {
 
 pub fn mmout(addr &u64, value u64) {
 	assert send_lock.is_held()
+	assert send_owner == unsafe { nil } || send_owner.is_held()
 	assert cpu.send_barriers() == send_barrier_start + 1
 	assert timer.get_us() - mailbox_send_started >= available_at
 	assert send_writes < mailbox_send_words.len

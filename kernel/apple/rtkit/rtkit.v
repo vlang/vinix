@@ -591,7 +591,7 @@ fn (mut rtk RTKit) boot_transport(request_wake bool, receive_irq u32, send_irq u
 }
 
 // Only the system endpoints that negotiate a buffer call this handler.
-fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
+fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64, wait mailbox.SendWait) bool {
 	iova_mask := if ep == ep_oslog { oslog_iova_mask } else { buffer_iova_mask }
 	mut size := u64(0)
 	mut requested_iova := u64(0)
@@ -642,7 +642,7 @@ fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
 	}
 	// Logging endpoints can retry publication of a retained mapping after a
 	// mailbox timeout. Crashlog keeps the buffer for later notifications.
-	sent := rtk.send_message(ep, reply)
+	sent := rtk.send_system_reply(ep, reply, wait)
 	if !sent && rtk.nonfatal_log_errors {
 		C.kprintf(c'rtkit[%.*s]: buffer reply timed out on endpoint %llu\n',
 			i32(rtk.name.len), rtk.name.str, u64(ep))
@@ -650,8 +650,8 @@ fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
 	return sent || ep != ep_crashlog || rtk.nonfatal_log_errors
 }
 
-fn (mut rtk RTKit) acknowledge_log(ep u8, data u64) bool {
-	sent := rtk.send_message(ep, data)
+fn (mut rtk RTKit) acknowledge_log(ep u8, data u64, wait mailbox.SendWait) bool {
+	sent := rtk.send_system_reply(ep, data, wait)
 	if !sent && rtk.nonfatal_log_errors {
 		C.kprintf(c'rtkit[%.*s]: log acknowledgement timed out on endpoint %llu\n',
 			i32(rtk.name.len), rtk.name.str, u64(ep))
@@ -705,6 +705,10 @@ fn (mut rtk RTKit) refresh_application_ready() {
 // Handle one RTKit transport message addressed to a system endpoint. This is
 // also called after boot so late logs and reports cannot fill the ASC mailbox.
 pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
+	return rtk.handle_system_message_wait(msg, mailbox.SendWait{})
+}
+
+pub fn (mut rtk RTKit) handle_system_message_wait(msg mailbox.MboxMsg, wait mailbox.SendWait) bool {
 	ep := mailbox.msg_endpoint(&msg)
 	match ep {
 		ep_mgmt {
@@ -731,7 +735,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 				return true
 			}
 			if rtk.system_iovas[ep] == 0 {
-				return rtk.reply_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0, wait)
 			}
 			C.kprintf(c'rtkit[%.*s]: coprocessor crash notification\n', i32(rtk.name.len),
 				rtk.name.str)
@@ -743,18 +747,18 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 		ep_ioreport {
 			kind := management_type(msg.data0)
 			if kind == buffer_request {
-				return rtk.reply_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0, wait)
 			}
 			// Unknown IOReport requests 0x8 and 0xc must be acknowledged or
 			// some coprocessors stop making progress.
 			if kind == 0x8 || kind == 0xc {
-				return rtk.acknowledge_log(ep, msg.data0)
+				return rtk.acknowledge_log(ep, msg.data0, wait)
 			}
 		}
 		ep_syslog {
 			kind := management_type(msg.data0)
 			if kind == buffer_request {
-				return rtk.reply_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0, wait)
 			}
 			if kind == syslog_init {
 				rtk.syslog_entries = u32(msg.data0 & 0xff)
@@ -764,13 +768,13 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			// Echo the notification even if the record could not be read.
 			if kind == syslog_log {
 				rtk.dump_syslog_entry(msg.data0)
-				return rtk.acknowledge_log(ep, msg.data0)
+				return rtk.acknowledge_log(ep, msg.data0, wait)
 			}
 		}
 		ep_oslog {
 			kind := u8(msg.data0 >> 56)
 			if kind == buffer_request {
-				return rtk.reply_system_buffer(ep, msg.data0)
+				return rtk.reply_system_buffer(ep, msg.data0, wait)
 			}
 			if kind == oslog_log && rtk.oslog_ack_enabled {
 				if rtk.system_iovas[ep] == 0 || msg.data0 & oslog_log_reserved != 0 {
@@ -780,7 +784,7 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 				}
 				// Channel zero carries a wrapping write counter. Echo it
 				// verbatim, including counters larger than the buffer.
-				if !rtk.send_message(ep, msg.data0) {
+				if !rtk.send_system_reply(ep, msg.data0, wait) {
 					C.kprintf(c'rtkit[%.*s]: oslog acknowledgement failed\n',
 						i32(rtk.name.len), rtk.name.str)
 				}
@@ -789,6 +793,16 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 		else {}
 	}
 	return true
+}
+
+// A stopped transport has no reply outstanding. For a guarded wait this
+// decision is made under the same lock as the cancellation check.
+fn (mut rtk RTKit) send_system_reply(ep u8, data u64, wait mailbox.SendWait) bool {
+	if wait.lock == unsafe { nil } {
+		return rtk.send_message(ep, data)
+	}
+	return rtk.mbox.send_timed_wait(mailbox.MboxMsg{data0: data, data1: u64(ep)}, wait)
+		|| !wait.active(wait.context)
 }
 
 fn start_system_endpoints(mut rtk RTKit, start_tracekit bool) bool {

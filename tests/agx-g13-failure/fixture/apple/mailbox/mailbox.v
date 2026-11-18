@@ -2,6 +2,9 @@
 @[has_globals]
 module mailbox
 
+import apple.ascmailbox
+import klock
+
 pub struct MboxMsg {
 pub:
 	data0 u64
@@ -27,8 +30,21 @@ pub mut:
 }
 
 __global on_send fn () = unsafe { nil }
+__global wait_transport = unsafe { &ascmailbox.Mailbox(nil) }
 
 pub fn watch_send(callback fn ()) { on_send = callback }
+
+pub fn set_wait_transport(transport &ascmailbox.Mailbox) {
+	wait_transport = unsafe { transport }
+}
+
+pub struct SendWait {
+pub:
+	irq u32
+	lock &klock.Lock = unsafe { nil }
+	context voidptr
+	active fn (voidptr) bool = unsafe { nil }
+}
 
 pub fn new_mailbox(_ u64) Mailbox { return Mailbox{} }
 pub fn msg_endpoint(message &MboxMsg) u8 { return u8(message.data1) }
@@ -91,4 +107,13 @@ pub fn (mut box Mailbox) send_timed_irq(message MboxMsg, irq u32) bool {
 	assert irq == 575
 	box.irq_send_attempts++
 	return box.send_timed(message)
+}
+
+pub fn (mut box Mailbox) send_timed_wait(message MboxMsg, wait SendWait) bool {
+	assert wait.lock.is_held()
+	if wait_transport == unsafe { nil } {
+		return box.send_timed(message)
+	}
+	return wait_transport.send_timed_wait(ascmailbox.MboxMsg{data0: message.data0, data1: message.data1},
+		ascmailbox.SendWait{irq: wait.irq, lock: wait.lock, context: wait.context, active: wait.active})
 }

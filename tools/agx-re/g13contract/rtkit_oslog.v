@@ -33,9 +33,9 @@ fn check_rtkit_oslog(transport string, linux string, asahi_linux string, repo st
 		'oslog_ack_enabled bool\n'], 'Vinix OSLog wire type, reserved bits and default-disabled policy')!
 	oslog := section(transport, '\n\t\tep_oslog {', 'fn start_system_endpoints(', 'Vinix OSLog receive')!
 	require_order(oslog, ['kind := u8(msg.data0 >> 56)', 'if kind == buffer_request',
-		'return rtk.reply_system_buffer(ep, msg.data0)', 'kind == oslog_log && rtk.oslog_ack_enabled',
+		'return rtk.reply_system_buffer(ep, msg.data0, wait)', 'kind == oslog_log && rtk.oslog_ack_enabled',
 		'rtk.system_iovas[ep] == 0 || msg.data0 & oslog_log_reserved != 0', 'return true',
-		'if !rtk.send_message(ep, msg.data0)', 'oslog acknowledgement failed', 'return true'],
+		'if !rtk.send_system_reply(ep, msg.data0, wait)', 'oslog acknowledgement failed', 'return true'],
 		'Vinix echoes the exact negotiated-channel message and logs send errors')!
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
 	create := section(manager, 'pub fn new_gpu_manager(', 'fn (mut mgr GpuManager) boot_firmware_role(', 'Vinix G13 OSLog policy')!
