@@ -22,9 +22,10 @@ pub fn (mut f GpuFile) ioctl_modern_submit(data &asahi.Submit) int {
 	mut packet := voidptr(unsafe { nil })
 	defer { if packet != unsafe { nil } { memory.free(packet) } }
 	if data.cmdbuf_size != 0 {
-		if data.cmdbuf == 0 || u64(data.cmdbuf_size - 1) > ~data.cmdbuf { return -14 }
+		// Asahi reserves the packet buffer before attempting the user read.
 		packet = memory.malloc_packed_fallible(data.cmdbuf_size) @[freed]
 		if packet == unsafe { nil } { return -12 }
+		if data.cmdbuf == 0 || u64(data.cmdbuf_size - 1) > ~data.cmdbuf { return -14 }
 		if !usercopy.copy_from_user(packet, data.cmdbuf, data.cmdbuf_size) { return -14 }
 	}
 	// Asahi checks for device loss after the userspace snapshot and before

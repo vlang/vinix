@@ -92,6 +92,7 @@ pub fn run_modern_submission_checks() {
 	append_packet(mut bytes, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)), asahi.barrier_none, asahi.barrier_none)
 	request = asahi.Submit{ queue_id: 1, cmdbuf: u64(bytes.data), cmdbuf_size: u32(bytes.len) }
 	mut cases := 0
+	mut invalid_address_cases := 0
 	for _ in 0 .. 100 {
 		for fail in 0 .. 4 {
 			memory.fail_at(fail)
@@ -105,6 +106,20 @@ pub fn run_modern_submission_checks() {
 		usercopy.reject(false)
 		assert_drained(file)
 		cases++
+		for pointer in [u64(0), ~u64(0) - 2]! {
+			request.cmdbuf = pointer
+			usercopy.reset_reads()
+			memory.fail_at(0)
+			assert file.ioctl_modern_submit(unsafe { &request }) == -12
+			assert memory.attempts() == 1 && usercopy.reads() == 0
+			assert_drained(file)
+			memory.fail_at(-1)
+			assert file.ioctl_modern_submit(unsafe { &request }) == -14
+			assert memory.attempts() == 1 && usercopy.reads() == 0
+			assert_drained(file)
+			invalid_address_cases += 2
+		}
+		request.cmdbuf = u64(bytes.data)
 		request.queue_id = 99
 		request.syncs = 0
 		request.in_sync_count = 65
@@ -148,11 +163,6 @@ pub fn run_modern_submission_checks() {
 	request.out_sync_count = 0
 	request.cmdbuf_size = 0
 	assert file.ioctl_modern_submit(unsafe { &request }) == -22
-	request.cmdbuf_size = 32
-	request.cmdbuf = ~u64(0) - 2
-	assert file.ioctl_modern_submit(unsafe { &request }) == -14
-	assert_drained(file)
-	request.cmdbuf = u64(bytes.data)
 	request.cmdbuf_size = u32(bytes.len)
 	unsafe { (&asahi.CmdHeader(bytes.data)).cmd_type = 99 }
 	assert file.ioctl_modern_submit(unsafe { &request }) == -22
@@ -162,11 +172,12 @@ pub fn run_modern_submission_checks() {
 	assert file.ioctl_modern_submit(unsafe { &request }) == -19
 	manager.state = .running
 	assert_drained(file)
-	assert cases == 700
+	assert cases == 700 && invalid_address_cases == 400
 	check_modern_device_status(out)
 	check_modern_attachment_barriers(input, out)
 	check_modern_timestamp_batch()
 	println('AGX modern SUBMIT: real packet-to-scheduler compute/render, 16-byte combined syncs, captured USC base, immutable input, reverse completion and 700 copy/OOM/retry/drain cases pass')
+	println('G13 modern SUBMIT: 400 null and wrapping command pointer cases verify allocation precedence and cleanup')
 }
 
 fn check_modern_attachment_barriers(input &syncobj.SyncObj, out &syncobj.SyncObj) {
@@ -284,8 +295,8 @@ fn check_modern_device_status(out &syncobj.SyncObj) {
 			assert usercopy.reads() == match mode { 8 { 0 } 0, 3, 5, 7 { 1 } else { 2 } }
 			assert memory.attempts() == match mode {
 				7, 8 { 0 }
-				0, 3 { 1 }
-				4, 5 { 2 }
+				0 { 1 }
+				3, 4, 5 { 2 }
 				6 { if lost { 2 } else { 3 } }
 				else { if lost { 2 } else { 4 } }
 			}
