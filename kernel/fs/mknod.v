@@ -96,6 +96,26 @@ fn (mut this MknodDeviceResource) mmap(handle voidptr, page u64, flags int) void
 	return backing.mmap(handle, page, flags)
 }
 
+fn (mut this MknodDeviceResource) admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
+	mut backing := this.backing
+	return resource.admit_mapping_range(mut backing, handle, offset, length, flags)
+}
+
+fn (mut this MknodDeviceResource) retain_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
+	mut backing := this.backing
+	return resource.retain_mapping_range(mut backing, handle, offset, length, flags)
+}
+
+fn (mut this MknodDeviceResource) release_mapping_range(handle voidptr, offset u64, length u64, flags int) {
+	mut backing := this.backing
+	resource.release_mapping_range(mut backing, handle, offset, length, flags)
+}
+
+fn (mut this MknodDeviceResource) mapping_attributes(handle voidptr, offset u64) u64 {
+	mut backing := this.backing
+	return resource.mapping_attributes(mut backing, handle, offset)
+}
+
 fn (mut this MknodDeviceResource) grow(_handle voidptr, _new_size u64) ? {
 	return
 }

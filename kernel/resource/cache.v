@@ -152,6 +152,23 @@ mut:
 	release_mapping_range(handle voidptr, offset u64, length u64, flags int)
 }
 
+// New ranges may require authorization that an existing VMA no longer needs.
+pub interface MappingAdmissionResource {
+mut:
+	admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool
+}
+
+pub fn admit_mapping_range(mut res Resource, handle voidptr, offset u64, length u64, flags int) bool {
+	if mut res is MappingAdmissionResource {
+		errno.set(errno.einval)
+		mut admission := MappingAdmissionResource(res)
+		mut stack_admission := unsafe { &admission }
+		admitted := stack_admission.admit_mapping_range(handle, offset, length, flags)
+		return admitted
+	}
+	return retain_mapping_range(mut res, handle, offset, length, flags)
+}
+
 pub fn retain_mapping_range(mut res Resource, handle voidptr, offset u64, length u64, flags int) bool {
 	if mut res is MappingLifetimeResource {
 		errno.set(errno.einval)

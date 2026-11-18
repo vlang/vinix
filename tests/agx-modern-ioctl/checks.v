@@ -330,13 +330,13 @@ fn check_gem_file_names() {
 		old := gem_export_handler(&device, first_fd, 2) or { panic('original export') }
 		other := gem_export_handler(&device, second_fd, 2) or { panic('second file export') }
 		assert voidptr(old) != voidptr(other)
+		mut first := lookup_file(first_fd) or { panic('first file') }
+		old_offset := first.authorize_mmap(2) or { panic('original mmap offset') }
+		assert first.admit_mmap_range(old_offset, old.size) == 0
 		memory.fail_allocations(true)
 		assert (gem_import_handler(&device, first_fd, shared) or { panic('repeat PRIME import') }) == 1
 		assert gem_import_handler(&device, first_fd, other) == none
 		assert shared.references == 3 && other.references == 2
-		mut first := lookup_file(first_fd) or { panic('first file') }
-		old_offset := first.authorize_mmap(2) or { panic('original mmap offset') }
-		assert first.valid_mmap_range(old_offset, old.size)
 		assert close_wire_gem(&device, first_key, 2, 0) == 0 && old.references == 2
 		assert gem_export_handler(&device, first_fd, 2) == none
 		assert gem_export_handler(&device, first_fd, old.handle) == none
@@ -346,7 +346,11 @@ fn check_gem_file_names() {
 		fresh := gem_export_handler(&device, first_fd, reused) or { panic('replacement export') }
 		assert voidptr(fresh) != voidptr(old) && voidptr(fresh) != voidptr(other)
 		fresh_offset := first.authorize_mmap(reused) or { panic('replacement mmap offset') }
-		assert fresh_offset != old_offset && first.valid_mmap_range(old_offset, old.size)
+		assert fresh_offset != old_offset && first.admit_mmap_range(old_offset, old.size) == -13
+		assert first.retain_mmap_range(old_offset, old.size)
+		first.release_mmap_range(old_offset)
+		first.release_mmap_range(old_offset)
+		assert !first.retain_mmap_range(old_offset, old.size) && old.references == 1
 		assert (gem_import_handler(&device, first_fd, other) or { panic('PRIME import retry') }) == 5
 		assert close_wire_gem(&device, first_key, 1, 0) == 0
 		release_handle(&device, first_fd)

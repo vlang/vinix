@@ -7,10 +7,10 @@ fn check_create_size_local(objects string, file string, fake string) ! {
 		'Zero size is EINVAL; 16 KiB rounding overflow is EOVERFLOW')!
 	require(!helper.contains('malloc') && !helper.contains('gem.'), 'Size rejection precedes backing/metadata allocation')!
 	reserve := section(objects, 'pub fn (mut table Table) reserve_handle_entry()', '// Transfer the creator', 'GEM handle table storage')!
-	require_order(reserve, ['if table.objects.len < table.objects.cap { return true }',
-		'memory.malloc_packed_fallible(u64(capacity) * sizeof(voidptr)) @[freed]',
-		'if storage == unsafe { nil } { return false }', 'C.memcpy(storage, table.objects.data',
-		'table.objects = replacement', 'old.free()'], 'Reserve and copy before replacing the owned handle table')!
+	require_order(reserve, ['return reserve_entry(mut table.objects)', 'if entries.len < entries.cap { return true }',
+		'memory.malloc_packed_fallible(u64(capacity) * sizeof(T)) @[freed]',
+		'if storage == unsafe { nil } { return false }', 'C.memcpy(storage, entries.data',
+		'entries = replacement', 'old.free()'], 'Reserve and copy before replacing the owned handle table')!
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_gem_create(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(', 'Native checked GEM size')!
 	require_order(create, ['request.flags & ~valid_flags != 0', 'f.lock.acquire()', 'defer { f.lock.release() }',
 		'f.find_vm(request.vm_id) or { return -2 }', 'private_identity = vm.identity', '} else if request.vm_id != 0',

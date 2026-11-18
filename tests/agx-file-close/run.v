@@ -84,6 +84,7 @@ fn checks() !int {
 	os.write_file(scratch + '/drm/wire.v', 'module drm\nimport drm.gem\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n' +
 		section(drm_source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')! +
 		section(drm_source, 'fn ioctl_gem_close(', 'fn ioctl_syncobj_create(')! +
+		section(drm_source, 'fn (mut this DrmNode) mapping_attributes(', 'fn (mut this DrmNode) read(')! +
 		section(drm_source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!)!
 	os.write_file('${scratch}/drm/prime.v', 'module drm\nimport drm.gem\nimport drm.ioctl\n' +
 		section(drm_source, 'fn ioctl_prime_handle_to_fd(', 'fn ioctl_prime_fd_to_handle(')!)!

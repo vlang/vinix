@@ -61,6 +61,7 @@ pub mut:
 	gem_import     fn (&DrmDevice, voidptr, &gem.GemObject) ?u32 = unsafe { nil }
 	mmap_attributes fn (&DrmDevice, voidptr, u64) u64 = unsafe { nil }
 	mmap           fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
+	mmap_admit     fn (&DrmDevice, voidptr, u64, u64) int = unsafe { nil }
 	mmap_retain    fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
 	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 }
@@ -616,6 +617,17 @@ fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 		return unsafe { nil }
 	}
 	return this.dev.driver.mmap(this.dev, handle, page, flags)
+}
+
+fn (mut this DrmNode) admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
+	if handle != unsafe { nil } && this.dev != unsafe { nil } && this.dev.driver != unsafe { nil }
+		&& this.dev.driver.mmap_admit != unsafe { nil } {
+		code := this.dev.driver.mmap_admit(this.dev, handle, offset, length)
+		if code == 0 { return true }
+		errno.set(u64(-code))
+		return false
+	}
+	return this.retain_mapping_range(handle, offset, length, flags)
 }
 
 fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u64, _flags int) bool {

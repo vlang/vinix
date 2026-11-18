@@ -154,6 +154,7 @@ pub fn syscall_mremap(_ voidptr, old_address u64, old_size u64, new_size u64, fl
 		segmented_file: global.segmented_file
 		no_write: global.no_write
 		no_exec: global.no_exec
+		inherit_mapping_ref: global.owns_mapping_ref
 		credit_base: old_address
 		credit_serial: global.serial
 	}

@@ -306,10 +306,22 @@ fn (mut f GpuFile) mmap_attributes(offset u64) u64 {
 	return f.objects.mmap_attributes(offset)
 }
 
-fn (mut f GpuFile) valid_mmap_range(offset u64, length u64) bool {
+fn (mut f GpuFile) admit_mmap_range(offset u64, length u64) int {
 	f.lock.acquire()
 	defer { f.lock.release() }
-	return f.objects.valid_mmap_range(offset, length)
+	return f.objects.admit_mmap_range(offset, length)
+}
+
+fn (mut f GpuFile) retain_mmap_range(offset u64, length u64) bool {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	return f.objects.retain_mmap_range(offset, length)
+}
+
+fn (mut f GpuFile) release_mmap_range(offset u64) {
+	f.lock.acquire()
+	defer { f.lock.release() }
+	f.objects.release_mmap_range(offset)
 }
 
 // Caller holds file.lock and has excluded in-flight jobs from this VM. Unmap
@@ -1764,7 +1776,20 @@ pub fn retain_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64,
 	length u64) bool {
 	f := lookup_file(handle) or { return false }
 	mut file := unsafe { f }
-	return file.valid_mmap_range(offset, length)
+	return file.retain_mmap_range(offset, length)
+}
+
+pub fn admit_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64,
+	length u64) int {
+	f := lookup_file(handle) or { return -22 }
+	mut file := unsafe { f }
+	return file.admit_mmap_range(offset, length)
+}
+
+pub fn release_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64, _length u64) {
+	f := lookup_file(handle) or { return }
+	mut file := unsafe { f }
+	file.release_mmap_range(offset)
 }
 
 fn ioctl_get_params_handler(dev &drm.DrmDevice, handle voidptr, data voidptr) int {

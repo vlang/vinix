@@ -723,7 +723,7 @@ modern, legacy and pre-selection paths. The worker retired the mapping
 after an injected acknowledgement failure with one PTE removal. Both
 kernel builds, all 82 V test files and the DRM wire suite passed. The
 allocation scan matched 177 baseline findings. CPU mmap authorization
-revocation on close remains a parity gap. The pinned offline audit
+revocation on close was still a parity gap. The pinned offline audit
 reports `not_equivalent`.
 
 The restored archive passed inventory verification for
@@ -731,6 +731,26 @@ The restored archive passed inventory verification for
 `/Users/alex/.local/state/vinix/omarchy-m1-gem-close-wire-20261118.MDy0K2/`.
 `bundle.tar.gz` SHA-256 is
 `19efc75d01a38e53122fb2a9c06f4d4b4ee44075f01b82ac8d41a70d74d54b6d`.
+
+G13 CPU mmap now checks for a live file handle before admitting a new
+VMA. `GEM_CLOSE` revokes admission, and reimport restores it. Already
+admitted VMAs retain their original GEM backing and cache policy through
+fault, fork and remap paths. The final mapping reference releases the
+GEM pin before the VM drops the DRM file reference. [Pinned close](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L365-L384) [Pinned mmap authorization](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L1281-L1313)
+
+The host sanitizer fixture passed 64 lifecycles covering admission OOM,
+close, retained page and cache access, reimport and final release.
+Independent review checked the fault, fork, remap and teardown paths.
+Both kernel builds, 82 V test files and the DRM wire and CPU cache
+fixtures passed. The allocation scan matched 177 baseline findings.
+Full mmap offset and errno parity and M1 hardware validation are open.
+The pinned offline audit reports `not_equivalent`.
+
+The restored archive passed inventory verification for
+`e9ecd5caa61d5089f809b8401b66f3de06c059a4` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-mmap-revoke-20261118.r9VpW2/`.
+`bundle.tar.gz` SHA-256 is
+`4baccd467f03796bbe7ddd11dd507553216597b72a265053369871c24df80c85`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

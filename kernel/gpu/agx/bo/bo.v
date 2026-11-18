@@ -22,8 +22,17 @@ pub struct Table {
 mut:
 	objects      []&gem.GemObject
 	mmap_objects []&gem.GemObject
+	mmap_pins    []MmapPin
 	local_handles bool
 	first_free int // lowest vacant index in the G13 namespace
+}
+
+// One owned GEM reference covers all VMA and fault pins of this object in
+// the file. The handle table controls admission of new mappings separately.
+struct MmapPin {
+	object &gem.GemObject
+mut:
+	references u64
 }
 
 pub fn new_table(local_handles bool) Table {
@@ -38,25 +47,29 @@ pub fn (table &Table) uses_local_handles() bool {
 // through publication so it can return ENOMEM before constructing the object.
 pub fn (mut table Table) reserve_handle_entry() bool {
 	if table.local_handles && table.first_free < table.objects.len { return true }
-	if table.objects.len < table.objects.cap { return true }
-	max_capacity := max_int / int(sizeof(voidptr))
-	if table.objects.len >= max_capacity { return false }
-	capacity := if table.objects.cap == 0 { 2 } else if table.objects.cap <= max_capacity / 2 {
-		table.objects.cap * 2
+	return reserve_entry(mut table.objects)
+}
+
+fn reserve_entry[T](mut entries []T) bool {
+	if entries.len < entries.cap { return true }
+	max_capacity := max_int / int(sizeof(T))
+	if entries.len >= max_capacity { return false }
+	capacity := if entries.cap == 0 { 2 } else if entries.cap <= max_capacity / 2 {
+		entries.cap * 2
 	} else { max_capacity }
-	storage := memory.malloc_packed_fallible(u64(capacity) * sizeof(voidptr)) @[freed]
+	storage := memory.malloc_packed_fallible(u64(capacity) * sizeof(T)) @[freed]
 	if storage == unsafe { nil } { return false }
-	mut replacement := []&gem.GemObject{}
+	mut replacement := []T{}
 	unsafe {
 		replacement.data = storage
-		replacement.len = table.objects.len
+		replacement.len = entries.len
 		replacement.cap = capacity
 		replacement.flags = .noslices
-		if table.objects.len != 0 {
-			C.memcpy(storage, table.objects.data, u64(table.objects.len) * sizeof(voidptr))
+		if entries.len != 0 {
+			C.memcpy(storage, entries.data, u64(entries.len) * sizeof(T))
 		}
-		mut old := table.objects
-		table.objects = replacement
+		mut old := entries
+		entries = replacement
 		old.free()
 	}
 	return true
@@ -127,6 +140,7 @@ pub fn (mut table Table) import_object(object &gem.GemObject) ?u32 {
 
 pub fn (mut table Table) authorize_mmap(handle u32) ?u64 {
 	object := table.find(handle) or { return none }
+	if table.local_handles { return gem.create_mmap_offset(object) }
 	for authorized in table.mmap_objects {
 		if voidptr(authorized) == voidptr(object) {
 			return gem.create_mmap_offset(object)
@@ -139,6 +153,12 @@ pub fn (mut table Table) authorize_mmap(handle u32) ?u64 {
 }
 
 pub fn (table &Table) mmap_page(page u64) voidptr {
+	if table.local_handles {
+		for pin in table.mmap_pins {
+			if address := gem.get_object_mmap_page(pin.object, page) { return address }
+		}
+		return unsafe { nil }
+	}
 	for object in table.mmap_objects {
 		if address := gem.get_object_mmap_page(object, page) {
 			return address
@@ -149,6 +169,10 @@ pub fn (table &Table) mmap_page(page u64) voidptr {
 
 // Match the authorized object's direct-map policy for every userspace alias.
 pub fn (table &Table) mmap_attributes(offset u64) u64 {
+	if table.local_handles {
+		index := table.mmap_pin_index(offset) or { return 0 }
+		return table.mmap_pins[index].object.pte_extra
+	}
 	for object in table.mmap_objects {
 		base := gem.create_mmap_offset(object)
 		if offset >= base && offset - base < object.size { return object.pte_extra }
@@ -167,6 +191,55 @@ pub fn (table &Table) valid_mmap_range(offset u64, length u64) bool {
 		}
 	}
 	return false
+}
+
+fn (table &Table) mmap_pin_index(offset u64) ?int {
+	for index, pin in table.mmap_pins {
+		base := gem.create_mmap_offset(pin.object)
+		if offset >= base && offset - base < pin.object.size { return index }
+	}
+	return none
+}
+
+pub fn (mut table Table) admit_mmap_range(offset u64, length u64) int {
+	if !table.local_handles { return if table.valid_mmap_range(offset, length) { 0 } else { -22 } }
+	if length == 0 || offset > ~u64(0) - length { return -22 }
+	for object in table.objects {
+		if object == unsafe { nil } { continue }
+		base := gem.create_mmap_offset(object)
+		if offset < base || offset - base >= object.size { continue }
+		if length > object.size - (offset - base) { return -22 }
+		if table.mmap_pin_index(offset) != none {
+			return if table.retain_mmap_range(offset, length) { 0 } else { -12 }
+		}
+		if !reserve_entry(mut table.mmap_pins) { return -12 }
+		gem.ref_obj(object)
+		table.mmap_pins << MmapPin{object: object, references: 1}
+		return 0
+	}
+	return if table.mmap_pin_index(offset) != none { -13 } else { -22 }
+}
+
+pub fn (mut table Table) retain_mmap_range(offset u64, length u64) bool {
+	if !table.local_handles { return table.valid_mmap_range(offset, length) }
+	index := table.mmap_pin_index(offset) or { return false }
+	object := table.mmap_pins[index].object
+	base := gem.create_mmap_offset(object)
+	if length == 0 || length > object.size - (offset - base)
+		|| table.mmap_pins[index].references == ~u64(0) { return false }
+	table.mmap_pins[index].references++
+	return true
+}
+
+pub fn (mut table Table) release_mmap_range(offset u64) {
+	if !table.local_handles { return }
+	index := table.mmap_pin_index(offset) or { return }
+	table.mmap_pins[index].references--
+	if table.mmap_pins[index].references == 0 {
+		object := table.mmap_pins[index].object
+		table.mmap_pins.delete(index)
+		gem.unref(object)
+	}
 }
 
 // Remove a file handle without dropping its reference. This lets the backend
@@ -190,11 +263,13 @@ pub fn (mut table Table) release_all() {
 	for object in table.objects {
 		if object != unsafe { nil } { gem.unref(object) }
 	}
+	for pin in table.mmap_pins { gem.unref(pin.object) }
 	// Freed rather than cleared: the table goes with its file. Both are empty
 	// and usable again afterwards.
 	unsafe {
 		table.mmap_objects.free()
 		table.objects.free()
+		table.mmap_pins.free()
 	}
 	table.first_free = 0
 }

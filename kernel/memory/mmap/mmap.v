@@ -179,6 +179,7 @@ mut:
 	file_data_length u64
 	no_write         bool
 	no_exec          bool
+	inherit_mapping_ref bool
 	credit_base      u64
 	credit_serial    u64
 	created_serial   &u64 = unsafe { nil }
@@ -1430,11 +1431,15 @@ fn mmap_with_credit(_pagemap &memory.Pagemap, addr voidptr, _length u64, prot in
 		resource_retained = true
 	}
 	if flags & map_anonymous == 0 && voidptr(resource_) != unsafe { nil } {
-		if !resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length, flags) {
+		mapping_retained = if options.inherit_mapping_ref {
+			resource.retain_mapping_range(mut resource_, range_handle, u64(offset), length, flags)
+		} else {
+			resource.admit_mapping_range(mut resource_, range_handle, u64(offset), length, flags)
+		}
+		if !mapping_retained {
 			unsafe { free_local_range(range_local) }
 			return none
 		}
-		mapping_retained = true
 		if flags & map_shared == 0 {
 			range_local.cow = resource.private_mapping_cow(mut resource_)
 		}

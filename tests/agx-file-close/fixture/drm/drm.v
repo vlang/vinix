@@ -12,6 +12,11 @@ pub:
 	gem_close_request fn (&DrmDevice, voidptr, &ioctl.DrmGemClose) int = unsafe { nil }
 	gem_export fn (&DrmDevice, voidptr, u32) ?&gem.GemObject = unsafe { nil }
 	gem_export_put fn (&DrmDevice, &gem.GemObject) = unsafe { nil }
+	mmap_attributes fn (&DrmDevice, voidptr, u64) u64 = unsafe { nil }
+	mmap fn (&DrmDevice, voidptr, u64, int) voidptr = unsafe { nil }
+	mmap_admit fn (&DrmDevice, voidptr, u64, u64) int = unsafe { nil }
+	mmap_retain fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
+	mmap_release fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 }
 
 pub struct DrmDevice {

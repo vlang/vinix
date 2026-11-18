@@ -1222,7 +1222,9 @@ pub fn initialise() {
 		gem_import: agx_file.gem_import_handler
 		mmap: agx_file.mmap_handle
 		mmap_attributes: agx_file.mmap_attributes_handle
+		mmap_admit: agx_file.admit_mmap_range_handle
 		mmap_retain: agx_file.retain_mmap_range_handle
+		mmap_release: agx_file.release_mmap_range_handle
 	}
 
 	agx_driver_inst.drm_dev = drm.register_driver_with_data(agx_drm_driver, voidptr(mgr)) or {

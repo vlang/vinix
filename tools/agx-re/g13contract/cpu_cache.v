@@ -30,15 +30,18 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 		'offset >= base && offset - base < object.size', 'return length <= object.size - (offset - base)'], 'One authorized object per VMA')!
 	attributes := section(bo, 'pub fn (table &Table) mmap_attributes(', '// A VMA records', 'Authorized mapping attributes')!
 	require_order(attributes, ['table.mmap_objects', 'offset >= base && offset - base < object.size', 'return object.pte_extra'], 'Authorized object cache policy')!
-	for name, fallback in {'mmap_attributes_handle': '0', 'retain_mmap_range_handle': 'false'} {
+	for name, fallback in {'mmap_attributes_handle': '0', 'retain_mmap_range_handle': 'false', 'admit_mmap_range_handle': '-22'} {
 		callback := section(file, 'pub fn ' + name + '(', '\n}', 'Opaque mmap callback')!
 		require(callback.contains('lookup_file(handle) or { return ' + fallback + ' }') && !callback.contains('&GpuFile(handle)'), 'Mmap callback must resolve opaque Handle: ' + name)!
 	}
 	require(driver.contains('mmap_attributes: agx_file.mmap_attributes_handle')
-		&& driver.contains('mmap_retain: agx_file.retain_mmap_range_handle'), 'Register both cache policy and whole-range validation')!
+		&& driver.contains('mmap_admit: agx_file.admit_mmap_range_handle')
+		&& driver.contains('mmap_retain: agx_file.retain_mmap_range_handle')
+		&& driver.contains('mmap_release: agx_file.release_mmap_range_handle'), 'Register CPU cache policy, range admission and backing lifetime hooks')!
 	prime := section(drm, 'fn (mut this GemPrimeResource) mapping_attributes(', 'fn (mut this GemPrimeResource) read(', 'PRIME CPU policy')!
 	require(prime.contains('this.obj.pte_extra'), 'PRIME must retain the object policy')!
-	require_order(mmap, ['handle_ref(range_handle)', 'resource.retain_mapping_range(', 'resource.mapping_attributes(', 'pte_extra: extra_pte'], 'Pin Handle and validate complete VMA before recording attributes')!
+	require_order(mmap, ['handle_ref(range_handle)', 'if options.inherit_mapping_ref', 'resource.retain_mapping_range(',
+		'resource.admit_mapping_range(', 'if !mapping_retained', 'resource.mapping_attributes(', 'pte_extra: extra_pte'], 'Pin Handle and validate complete VMA before recording attributes')!
 	require_order(ram, ['if !vmm_initialised', 'cpu.read_ttbr1_el1() & kernel_pte_address_mask',
 		'kernel_pagemap.l.acquire()', 'defer { kernel_pagemap.l.release() }',
 		'kernel_pagemap.kernel_virt2pte(page + higher_half, false) or { return false }',

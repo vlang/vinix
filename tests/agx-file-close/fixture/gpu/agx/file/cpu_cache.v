@@ -1,6 +1,9 @@
 module file
 
+import drm
 import drm.gem
+import gpu.agx.bo
+import memory
 
 fn check_cpu_mapping_policy() {
 	for reversed in [false, true] {
@@ -44,4 +47,53 @@ fn check_cpu_mapping_policy() {
 		assert gem.live() == 0 && !file.lock.is_held()
 	}
 	println('AGX CPU mmap policy: opaque handle lookup, WRITEBACK selection, authorized whole-BO bounds, adjacent opposite policies, rejected crossings/overflow and GEM_CLOSE retention passed')
+}
+
+fn check_cpu_mmap_revocation() {
+	driver := drm.DrmDriver{gem_close_request: close_gem_request, mmap_admit: admit_mmap_range_handle,
+		mmap_retain: retain_mmap_range_handle, mmap_release: release_mmap_range_handle}
+	device := drm.DrmDevice{driver: unsafe { &driver }}
+	key := u64(0x4c30)
+	handle := voidptr(key)
+	for _ in 0 .. 64 {
+		mut file := GpuFile{objects: Objects{table: bo.new_table(true)}}
+		file_map[key] = unsafe { &file }
+		object := gem.create_aligned_with_cache(0x10000, 0x4000, 0, false, true) or { panic('GEM backing') }
+		name := file.objects.add_created(object)
+		offset := file.authorize_mmap(name) or { panic('GEM mmap offset') }
+		assert name == 1 && object.references == 1
+		assert !drm.retain_mapping(&device, handle, offset, 0x4000)
+		memory.fail_allocations(true)
+		assert drm.admit_mapping(&device, handle, offset, 0x8000) == -12
+		memory.fail_allocations(false)
+		assert object.references == 1 && memory.outstanding() == 0
+		assert drm.admit_mapping(&device, handle, offset, 0x8000) == 0
+		assert drm.admit_mapping(&device, handle, offset + 0x4000, 0x4000) == 0
+		assert object.references == 2
+		gem.ref_obj(object) // An export can outlive the handle and all VMAs.
+		assert close_wire_gem(&device, key, name, 0) == 0
+		assert file.authorize_mmap(name) == none
+		assert drm.admit_mapping(&device, handle, offset, 0x4000) == -13
+		assert drm.retain_mapping(&device, handle, offset, 0x8000)
+		assert drm.retain_mapping(&device, handle, offset + 0x4000, 0x4000)
+		assert !drm.retain_mapping(&device, handle, offset + 0xc000, 0x8000)
+		assert mmap_handle(&device, handle, offset / 0x4000 + 1, 0) == voidptr(object.phys_addr + 0x4000)
+		assert mmap_attributes_handle(&device, handle, offset) == object.pte_extra
+		for index in 0 .. 2 {
+			drm.release_mapping(&device, handle, offset + u64(index) * 0x4000, 0x4000)
+			drm.release_mapping(&device, handle, offset, 0x8000)
+		}
+		assert object.references == 1 && !drm.retain_mapping(&device, handle, offset, 0x4000)
+		assert mmap_handle(&device, handle, offset / 0x4000, 0) == unsafe { nil }
+		assert (gem_import_handler(&device, handle, object) or { panic('GEM reimport') }) == name
+		assert drm.admit_mapping(&device, handle, offset, 0x4000) == 0
+		gem.unref(object)
+		assert close_wire_gem(&device, key, name, 0) == 0 && gem.live() == 1
+		drm.release_mapping(&device, handle, offset, 0x4000)
+		assert gem.live() == 0
+		file_map.delete(key)
+		assert file.close()
+		memory.assert_released()
+	}
+	println('G13 CPU mmap: 64 lifetimes cover admission OOM, revocation, retained pins and cache attributes, reimport, and final VMA release')
 }

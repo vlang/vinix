@@ -79,4 +79,10 @@ pub fn unref(object &GemObject) {
 pub fn create_mmap_offset(object &GemObject) u64 {
 	return if object.mmap_offset != 0 { object.mmap_offset } else { u64(object.handle) * 0x10000 }
 }
-pub fn get_object_mmap_page(object &GemObject, page u64) ?voidptr { return none }
+pub fn get_object_mmap_page(object &GemObject, page u64) ?voidptr {
+	if page > ~u64(0) / 0x4000 { return none }
+	address := page * 0x4000
+	offset := create_mmap_offset(object)
+	if address < offset || address - offset >= object.size { return none }
+	return voidptr(object.phys_addr + address - offset)
+}
