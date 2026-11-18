@@ -23,7 +23,7 @@ fn (references &G13TimestampReferences) addresses(pipe u32) [2]u64 {
 	return [references.entries[pipe][0].address, references.entries[pipe][1].address]!
 }
 
-fn (mut f GpuFile) capture_g13_timestamp(timestamp asahi.Timestamp) (int, G13TimestampCapture) {
+fn (mut f GpuFile) capture_g13_timestamp(timestamp asahi.Timestamp, manager &gpu.GpuManager) (int, G13TimestampCapture) {
 	// Asahi ignores even an overflowing offset when the handle is null.
 	if timestamp.handle == 0 { return 0, G13TimestampCapture{} }
 	f.lock.acquire()
@@ -31,6 +31,7 @@ fn (mut f GpuFile) capture_g13_timestamp(timestamp asahi.Timestamp) (int, G13Tim
 	for index in 0 .. f.timestamp_objects.len {
 		mut object := &f.timestamp_objects[index]
 		if object.id != timestamp.handle || object.detached { continue }
+		if voidptr(f.timestamp_manager) != voidptr(manager) { return -19, G13TimestampCapture{} }
 		// Lookup precedes offset validation; offsets need not be aligned.
 		if timestamp.offset > ~u32(0) - u32(8) { return -22, G13TimestampCapture{} }
 		if u64(timestamp.offset) + 8 > object.size { return -34, G13TimestampCapture{} }
@@ -41,16 +42,19 @@ fn (mut f GpuFile) capture_g13_timestamp(timestamp asahi.Timestamp) (int, G13Tim
 	return -2, G13TimestampCapture{}
 }
 
-// Caller holds file.lock. Global timestamp mappings do not depend on any
-// userspace VM. Missing managers keep their GEM owner and VA for a later retry.
+fn release_timestamp_object(manager &gpu.GpuManager, object TimestampObject) {
+	mut owner := unsafe { manager }
+	owner.unmap_g13_timestamp_buffer(object.va, object.size)
+	gem.unref(object.obj)
+}
+
+// Caller holds file.lock. Timestamp mappings do not depend on a userspace VM
+// or the current global manager.
 fn (mut f GpuFile) reap_detached_timestamp_objects_locked() {
-	manager := gpu.get_global_manager() or { return }
-	mut gpu_manager := unsafe { manager }
 	for index := f.timestamp_objects.len - 1; index >= 0; index-- {
 		object := f.timestamp_objects[index]
 		if !object.detached || object.references != 0 { continue }
-		gpu_manager.unmap_g13_timestamp_buffer(object.va, object.size)
-		gem.unref(object.obj)
+		release_timestamp_object(f.timestamp_manager, object)
 		f.timestamp_objects.delete(index)
 	}
 }
@@ -91,7 +95,7 @@ fn (mut f GpuFile) release_g13_timestamp_pair(mut references G13TimestampReferen
 // Resolve each lookup in command order, retaining earlier destinations across
 // concurrent UNBIND. Any failure releases the prefix and clears owned output.
 // Submission staging transfers this owner through pending-job retirement.
-fn (mut f GpuFile) capture_g13_timestamps(input [3]asahi.Timestamps,
+fn (mut f GpuFile) capture_g13_timestamps(input [3]asahi.Timestamps, manager &gpu.GpuManager,
 	mut references G13TimestampReferences) int {
 	for pipe in 0 .. 3 {
 		for phase in 0 .. 2 {
@@ -101,7 +105,7 @@ fn (mut f GpuFile) capture_g13_timestamps(input [3]asahi.Timestamps,
 	for pipe in 0 .. 3 {
 		for phase in 0 .. 2 {
 			timestamp := if phase == 0 { input[pipe].start } else { input[pipe].end }
-			code, capture := f.capture_g13_timestamp(timestamp)
+			code, capture := f.capture_g13_timestamp(timestamp, manager)
 			if code != 0 { f.release_g13_timestamps(mut references); return code }
 			references.entries[pipe][phase] = capture
 		}

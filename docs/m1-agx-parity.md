@@ -418,6 +418,33 @@ hashes verified after compression. The bundle passed full inventory
 verification. `bundle.tar.gz` SHA-256 is
 `6db23802111a185aa7ece04df529684db794f22b453fae8c4fac177d59f45dab`.
 
+G13 timestamp mappings now stay with the GPU manager and UAT that
+created them. Shutdown stops the ASC and drains that manager's timestamp
+aperture under its lock, including maps whose BIND has yet to publish a
+handle. Late file releases skip the stopped manager's retired aperture.
+The file retains GEM backing until its captures retire. UNBIND, the
+last detached capture and close release through the original manager.
+Close releases uncaptured timestamps before waiting on unrelated queue
+or VM cleanup. Asahi's mapping also retains its owning VM and UAT.
+[Pinned Asahi mapping ownership](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L1233-L1242)
+
+The sanitizer suites passed 128 file lifecycles across both ABIs, 64
+aperture drains with replacement VA reuse and 185,000 timestamp ioctl
+checks. Both kernel builds, 82 test files and the independent lifetime
+review passed. All 17 compiled negative controls reached their designated
+assertions. The allocation scan reproduced 178 baseline findings.
+The scope covers already-bound timestamp files across ordered teardown
+and replacement. General queue and VM reprobe, first BIND admission
+on a stale file and native hardware quiescence remain open. The source
+audit remains `not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `845ba5df7fcd57a59c1b6d80fc17485fe3c05f1b` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-teardown-20261118/`.
+The complete archive passed inventory verification. `bundle.tar.gz`
+SHA-256 is
+`2b40fbb62fd04a02ac718aaf3c0703b6d1b69254c5099b56e16344683f0b5e2c`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

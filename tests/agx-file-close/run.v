@@ -12,7 +12,8 @@ fn checks() !int {
 	assert os.args.len == 1 || (os.args.len == 3 && os.args[1] in ['--file-source', '--timestamp-source', '--gpu-source', '--modern-source'])
 		|| (os.args.len == 2 && os.args[1] in ['--record-measure', '--scs-measure', '--advice-measure', '--advice-trace'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
-	scratch := os.join_path(os.temp_dir(), 'vinix-agx-close-${os.getpid()}')
+	temp_dir := os.getenv_opt('TMPDIR') or { os.temp_dir() }
+	scratch := os.join_path(temp_dir, 'vinix-agx-close-${os.getpid()}')
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/agx-file-close/fixture', scratch, false)!
@@ -70,6 +71,7 @@ fn checks() !int {
 		section(gpu_source, 'pub fn (mut mgr GpuManager) finish_g13_file_mapping(', '// Publish a G13 UAT invalidation through')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(', 'fn alloc_fixed_buffer(')!
 			.replace('unmap_g13_timestamp_buffer', 'checked_timestamp_unmap')
+			.replace('mgr.g13_timestamp.allocations', 'mgr.g13_timestamp.heap.allocations')
 			.replace('map_g13_timestamp_buffer', 'checked_timestamp_map'))!
 	mmu_source := os.read_file('${repo}/kernel/gpu/agx/mmu/mmu.v')!
 	os.write_file('${scratch}/gpu/agx/mmu/identity.v', 'module mmu\nimport klock\nimport gpu.agx.vm as agxvm\n' +

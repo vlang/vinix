@@ -103,6 +103,7 @@ pub mut:
 	state            GpuState
 	lock             klock.Lock
 mut:
+	g13_timestamp_uat &mmu.UatManager = unsafe { nil }
 	g13_channels      &G13ChannelAllocations = unsafe { nil }
 	g13_events        G13EventResources
 	g13_queues        []&G13QueueResources
@@ -236,6 +237,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		g13_readonly: alloc.new_heap_with_garbage('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end, false)
 		g13_rtkit: alloc.new_heap('g13-rtkit', alloc.g13_rtkit_start, alloc.g13_rtkit_end)
 		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
+		g13_timestamp_uat: uat_mgr
 	}
 	// Nothing slices these lists, so growing one can free its old buffer.
 	mgr.g13_queues.flags |= .noslices
@@ -558,14 +560,15 @@ pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) (int, u
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
 	if mgr.hw_config.gpu_gen != .g13 || phys & pgtable.uat_pg_mask != 0 || size == 0
-		|| size & pgtable.uat_pg_mask != 0 || uat_mgr == unsafe { nil } {
+		|| size & pgtable.uat_pg_mask != 0 {
 		return -12, 0
 	}
 	// An ioctl can reach this lock after DRM unregister. Shutdown holds
 	// the same lock from the stopped transition through firmware teardown.
 	if mgr.state == .stopped { return -19, 0 }
+	if mgr.g13_timestamp_uat == unsafe { nil } { return -12, 0 }
 	va := mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }
-	code := uat_mgr.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)
+	code := mgr.g13_timestamp_uat.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)
 	if code != 0 {
 		mgr.g13_timestamp.cancel_unpublished(va)
 		return code, 0
@@ -576,15 +579,26 @@ pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) (int, u
 pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(va u64, size u64) {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
-	if va < alloc.g13_timestamp_start || va >= alloc.g13_timestamp_end || size == 0
+	if mgr.state == .stopped || va < alloc.g13_timestamp_start || va >= alloc.g13_timestamp_end || size == 0
 		|| size > alloc.g13_timestamp_end - va {
 		return
 	}
-	if uat_mgr != unsafe { nil } {
-		uat_mgr.unmap_kernel(va, size)
-	}
+	mgr.g13_timestamp_uat.unmap_kernel(va, size)
 	mgr.g13_timestamp.release(va)
 	mgr.g13_timestamp.gc()
+}
+
+// Shutdown holds mgr.lock after stopping firmware. The aperture is private
+// to this manager. File records and captures still own their GEM references,
+// but no later release may touch these PTEs or reservations.
+fn (mut mgr GpuManager) retire_g13_timestamp_aperture_locked() {
+	for reservation in mgr.g13_timestamp.allocations {
+		mgr.g13_timestamp_uat.unmap_kernel(reservation.va, reservation.size)
+		unsafe { free(reservation) }
+	}
+	unsafe { mgr.g13_timestamp.allocations.free() }
+	mgr.g13_timestamp.allocations = []&alloc.Allocation{}
+	mgr.g13_timestamp_uat = unsafe { nil }
 }
 
 fn alloc_fixed_buffer(iova u64, size u64, protection u64) ?SharedBuffer {
@@ -1624,6 +1638,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 	if mgr.rtkit_send_irq != 0 { aic.mask_irq(mgr.rtkit_send_irq) }
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	if mgr.hw_config.gpu_gen == .g13 { mgr.retire_g13_timestamp_aperture_locked() }
 	mgr.release_rtkit_buffers()
 	mgr.release_all_g13_render_jobs()
 	mgr.release_all_g13_compute_jobs()

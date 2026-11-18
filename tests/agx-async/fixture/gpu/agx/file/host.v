@@ -52,6 +52,7 @@ mut:
 	objects        Objects
 	mapping_retry_blocked bool
 	timestamp_objects []TimestampObject
+	timestamp_manager &gpu.GpuManager = unsafe { nil }
 }
 
 // Mapping/page-table services are injected here; the close fixture exercises

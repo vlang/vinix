@@ -3,6 +3,7 @@ module gpu
 
 import klock
 import gpu.agx.fw
+import gpu.agx.mmu
 
 pub const g13_queue_channel_vertex = u32(1)
 pub const g13_queue_channel_fragment = u32(2)
@@ -46,9 +47,14 @@ pub mut:
 	state State = .running
 	hw_config Config
 	g13_timestamp TimestampAllocator
+	g13_timestamp_uat &mmu.UatManager = unsafe { nil }
+	timestamp_unmaps int
+	next_timestamp_va u64
 }
 
 __global test_gpu_manager GpuManager
+__global replacement_gpu_manager GpuManager
+__global use_replacement_manager = false
 __global manager_available = true
 __global manager_lookups = 0
 __global timestamp_unmaps = 0
@@ -120,7 +126,9 @@ pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(physical u64, size u64) (in
 		stop_after_timestamp_map = false
 		stop_during_mapping_lock()
 	}
-	return 0, u64(0xffffffae10000000) + u64(timestamp_maps - 1) * 0x4000
+	va := u64(0xffffffae10000000) + mgr.next_timestamp_va
+	mgr.next_timestamp_va += 0x4000
+	return 0, va
 }
 
 pub fn stop_count() int { return stops_finished }
@@ -173,7 +181,16 @@ pub fn get_global_manager() ?&GpuManager {
 		callback()
 		test_gpu_manager.state = .stopped
 	}
-	return unsafe { &test_gpu_manager }
+	return timestamp_manager()
+}
+
+pub fn timestamp_manager() &GpuManager {
+	return unsafe { if use_replacement_manager { &replacement_gpu_manager } else { &test_gpu_manager } }
+}
+
+pub fn replace_manager(replaced bool) {
+	use_replacement_manager = replaced
+	if replaced { replacement_gpu_manager.next_timestamp_va = test_gpu_manager.next_timestamp_va - 0x4000 }
 }
 
 pub fn available(value bool) { manager_available = value }
@@ -218,6 +235,7 @@ pub fn free_g13_queue_record(resources &G13QueueResources) {
 
 pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(address u64, size u64) bool {
 	assert !mgr.lock.is_held()
+	mgr.timestamp_unmaps++
 	timestamp_unmaps++
 	return true
 }

@@ -5,6 +5,7 @@ import drm.gem
 import drm.ioctl
 import drm.asahi
 import gpu.agx.gpu
+import gpu.agx.mmu
 import memory
 
 struct TimestampRange {
@@ -61,7 +62,7 @@ fn check_timestamp_publication_storage() {
 		for index in 0 .. 7 {
 			assert bind_capture_buffer(mut file, bo.handle) == u32(index + 1)
 		}
-		code, old_capture := file.capture_g13_timestamp(asahi.Timestamp{handle: 1})
+		code, old_capture := file.capture_g13_timestamp(asahi.Timestamp{handle: 1}, gpu.timestamp_manager())
 		assert code == 0 && unbind_capture_buffer(mut file, 1) == 0
 		memory.fail_allocations(true)
 		with_spare := memory.calls()
@@ -127,18 +128,23 @@ fn check_timestamp_publication_stop() {
 	println('G13 timestamp publication: 128 shutdown races after a successful map return ENODEV without publishing a handle and retire only the new mapping')
 }
 
-fn check_timestamp_unbind_without_manager() {
-	for cycle in 0 .. 64 {
+fn check_timestamp_owner_teardown() {
+	for _ in 0 .. 64 {
 		for modern in [false, true]! {
 			gpu.available(true)
 			mut file := GpuFile{}
+			mut replacement := GpuFile{}
 			old_bo := gem.create(9400)
 			new_bo := gem.create(9401)
 			file.objects.add_created(old_bo)
-			file.objects.add_created(new_bo)
+			replacement.objects.add_created(new_bo)
 			id := bind_capture_buffer(mut file, old_bo.handle)
-			original_va := file.timestamp_objects[0].va
-			unmaps := gpu.unmaps()
+			closes := bind_capture_buffer(mut file, old_bo.handle)
+			captured := bind_capture_buffer(mut file, old_bo.handle)
+			original := gpu.timestamp_manager()
+			old_unmaps := original.timestamp_unmaps
+			code, capture := file.capture_g13_timestamp(asahi.Timestamp{handle: captured}, original)
+			assert code == 0 && capture.va != 0
 
 			gpu.available(false)
 			if modern {
@@ -148,31 +154,37 @@ fn check_timestamp_unbind_without_manager() {
 			} else {
 				assert unbind_capture_buffer(mut file, id) == 0
 			}
-			assert file.timestamp_objects.len == 1 && file.timestamp_objects[0].detached
-			assert file.timestamp_objects[0].references == 0 && file.timestamp_objects[0].va == original_va
-			assert old_bo.references == 2 && new_bo.references == 1 && gpu.unmaps() == unmaps
-			code, _ := file.capture_g13_timestamp(asahi.Timestamp{handle: id})
-			assert code == -2 && !file.close()
-
-			key := u64(0x54000 + cycle)
-			file_map[key] = unsafe { &file }
-			reap_open_detached_g13_queues()
-			assert file.timestamp_objects.len == 1 && gpu.unmaps() == unmaps
-
+			assert file.timestamp_objects.len == 2 && file.timestamp_objects[0].id == closes
+			assert old_bo.references == 3 && original.timestamp_unmaps == old_unmaps + 1
 			gpu.available(true)
-			assert bind_capture_buffer(mut file, new_bo.handle) == id
-			assert file.timestamp_objects.len == 2 && file.timestamp_objects[1].va != original_va
-			reap_open_detached_g13_queues()
-			reap_open_detached_g13_queues()
-			file_map.delete(key)
-			assert file.timestamp_objects.len == 1 && file.timestamp_objects[0].id == id
-			assert !file.timestamp_objects[0].detached && voidptr(file.timestamp_objects[0].obj) == voidptr(new_bo)
-			assert old_bo.references == 1 && new_bo.references == 2 && gpu.unmaps() == unmaps + 1
-			assert file.close() && gem.live() == 0 && gpu.unmaps() == unmaps + 2
+			gpu.replace_manager(true)
+			assert bind_capture_buffer(mut replacement, new_bo.handle) == id
+			assert replacement.timestamp_objects[0].va == capture.va
+			active := gpu.timestamp_manager()
+			refused, empty := file.capture_g13_timestamp(asahi.Timestamp{handle: captured}, active)
+			assert refused == -19 && empty == G13TimestampCapture{} && file.timestamp_objects[1].references == 1
+			expect_timestamp_publication_error(mut file, old_bo.handle, -19)
+			assert file.timestamp_objects.len == 2 && old_bo.references == 3
+			new_unmaps := active.timestamp_unmaps
+			assert unbind_capture_buffer(mut file, captured) == 0 && !file.close()
+			file.release_g13_timestamp(capture)
+			assert old_bo.references == 2 && original.timestamp_unmaps == old_unmaps + 2
+			assert active.timestamp_unmaps == new_unmaps && replacement.timestamp_objects[0].va == capture.va
+
+			mut vm := mmu.UatContext{inflight: 1}
+			file.vms = [&vm]
+			gpu.available(false)
+			assert !file.close() && file.timestamp_objects.len == 0 && old_bo.references == 1
+			assert original.timestamp_unmaps == old_unmaps + 3 && active.timestamp_unmaps == new_unmaps
+			vm.inflight = 0
+			assert file.close() && replacement.close() && gem.live() == 0
+			assert active.timestamp_unmaps == new_unmaps + 1
 			memory.assert_released()
+			gpu.replace_manager(false)
+			gpu.available(true)
 		}
 	}
-	println('G13 timestamp UNBIND: 128 unavailable-manager lifecycles hide the name, retain its backing and reap exactly the old mapping after handle reuse')
+	println('G13 timestamp teardown: 128 lifecycles retire through the original owner across global removal and replacement VA reuse')
 }
 
 fn check_timestamp_bindings() {
@@ -224,24 +236,23 @@ fn check_timestamp_bindings() {
 							mut wanted := before; wanted.object_handle = id
 							assert id != 0 && request == wanted && file.timestamp_objects.len == 1 && shared.references == 2
 							assert file.timestamp_objects[0].size == span.size && voidptr(file.timestamp_objects[0].obj) == voidptr(shared)
-							// Losing access to the manager delays backing cleanup.
+							// The original owner remains usable without a global manager.
 							gpu.available(false)
 							mut remove := timestamp_unbind(id)
 							saved := remove
 							assert file.ioctl_gem_bind_object(unsafe { &remove }) == 0 && remove == saved
-							assert !file.lock.is_held() && shared.references == 2 && file.timestamp_objects.len == 1
-							assert file.timestamp_objects[0].detached
-							assert gpu.unmaps() == unmaps; cases++
+							assert !file.lock.is_held() && shared.references == 1 && file.timestamp_objects.len == 0
+							assert gpu.unmaps() == unmaps + 1; cases++
 							for missing_id in [u32(0), id, ~u32(0)]! {
 								mut absent := timestamp_unbind(missing_id)
 								at_lookup := gpu.lookups(); saved_absent := absent
 								assert file.ioctl_gem_bind_object(unsafe { &absent }) == -2 && absent == saved_absent
 								assert gpu.lookups() == at_lookup && !file.lock.is_held()
-								assert shared.references == 2 && file.timestamp_objects.len == 1; cases++
+								assert shared.references == 1 && file.timestamp_objects.len == 0; cases++
 							}
 							at_lookup := gpu.lookups()
 							assert foreign.ioctl_gem_bind_object(unsafe { &remove }) == -2 && remove == saved
-							assert gpu.lookups() == at_lookup && !foreign.lock.is_held() && shared.references == 2; cases++
+							assert gpu.lookups() == at_lookup && !foreign.lock.is_held() && shared.references == 1; cases++
 							for invalid in 0 .. 7 {
 								mut bad := remove
 								match invalid {
@@ -255,13 +266,9 @@ fn check_timestamp_bindings() {
 								}
 								bad_before := bad; at_bad_lookup := gpu.lookups()
 								assert file.ioctl_gem_bind_object(unsafe { &bad }) == -22 && bad == bad_before
-								assert gpu.lookups() == at_bad_lookup && !file.lock.is_held() && shared.references == 2; cases++
+								assert gpu.lookups() == at_bad_lookup && !file.lock.is_held() && shared.references == 1; cases++
 							}
 							gpu.available(true)
-							file.lock.acquire()
-							file.reap_detached_timestamp_objects_locked()
-							file.lock.release()
-							assert shared.references == 1 && file.timestamp_objects.len == 0 && gpu.unmaps() == unmaps + 1
 							assert file.ioctl_gem_bind_object(unsafe { &remove }) == -2 && remove == saved
 							assert shared.references == 1 && gpu.unmaps() == unmaps + 1 && !file.lock.is_held(); cases++
 						}
@@ -312,5 +319,5 @@ fn check_timestamp_bindings() {
 		assert file.close() && foreign.close() && gem.live() == 0
 		assert gpu.unmaps() == unmaps_before_close + 2
 	}
-	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, ENOMEM, EBUSY, ENODEV and ENOSPC under both ABIs, missing/zero/foreign unbind names, retained unavailable-manager owners, header precedence, lowest-free name reuse, sibling preservation and final release passed')
+	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, ENOMEM, EBUSY, ENODEV and ENOSPC under both ABIs, missing/zero/foreign unbind names, original owner cleanup, header precedence, lowest-free name reuse, sibling preservation and final release passed')
 }

@@ -23,7 +23,8 @@ fn check_timestamp_bind_local(file string) ! {
 		'if map_code != 0', 'gem.unref(obj)', 'return map_code',
 		'f.lock.acquire()', 'id, slot := f.allocate_timestamp_id_locked()',
 		'mut publish_code := if id == 0 { -16 } else if !f.reserve_timestamp_entry_locked() { -12 } else { 0 }',
-		'if publish_code == 0', 'gpu_manager.lock.acquire()', 'if gpu_manager.state == .stopped', 'publish_code = -19',
+		'if publish_code == 0', 'gpu_manager.lock.acquire()', 'if gpu_manager.state == .stopped',
+		'voidptr(f.timestamp_manager) != voidptr(gpu_manager)', 'publish_code = -19', 'f.timestamp_manager = gpu_manager',
 		'f.timestamp_objects << object', 'index > slot', 'f.timestamp_objects[index] = f.timestamp_objects[index - 1]',
 		'f.timestamp_objects[slot] = object', 'request.object_handle = id', 'gpu_manager.lock.release()',
 		'f.lock.release()', 'if publish_code != 0',
@@ -37,11 +38,11 @@ fn check_timestamp_bind_local(file string) ! {
 	require_order(unbind, ['request.flags != 0 || request.handle != 0 || request.offset != 0',
 		'request.range != 0', 'return -22', 'f.lock.acquire()', 'object.id == request.object_handle',
 		'if found_index < 0', 'f.lock.release()', 'return -2',
-		'if found.references == 0', 'if manager := gpu.get_global_manager()',
-		'f.timestamp_objects.delete(found_index)', 'f.lock.release()',
-		'gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)', 'gem.unref(found.obj)', 'return 0',
-		'f.timestamp_objects[found_index].detached = true', 'f.lock.release()', 'return 0'],
-		'Timestamp UNBIND hides the name when captures or manager availability delay cleanup')!
+		'if found.references != 0', 'f.timestamp_objects[found_index].detached = true', 'f.lock.release()', 'return 0',
+		'manager := f.timestamp_manager', 'f.timestamp_objects.delete(found_index)', 'f.lock.release()',
+		'release_timestamp_object(manager, found)', 'return 0'],
+		'Timestamp UNBIND hides the name and the original manager retires it once captures are gone')!
+	require(!unbind.contains('gpu.get_global_manager()'), 'UNBIND cannot select a replacement GPU manager')!
 	require(!unbind.contains('request.object_handle == 0'), 'Zero is a missing timestamp name, not a malformed request')!
 	require(!unbind.contains('return -19'), 'Manager availability does not block name removal')!
 }

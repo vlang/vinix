@@ -11,11 +11,11 @@ fn check_queue_records_local(file string, queues string) ! {
 	require_order(close, ['f.lock.acquire()', 'for ownership in f.g13_queues',
 		'if ownership.resources.has_file_references() { f.lock.release(); return false }',
 		'for vm in f.vms', 'katomic.load(&vm.inflight) != 0',
-		'manager == unsafe { nil } && (f.timestamp_objects.len != 0 || f.g13_queues.len != 0)',
+		'manager == unsafe { nil } && f.g13_queues.len != 0',
 		'gpu_manager.release_g13_queue_resources(ownership.resources)', 'f.retire_mapping_locked(index)',
 		'for mut q in f.queues { q.destroy() }', 'for index := f.g13_queues.len - 1;',
 		'ownership := f.g13_queues[index]', 'f.g13_queues.delete(index)',
-		'gpu.free_g13_queue_record(ownership.resources)', 'unsafe { f.g13_queues.free() }'], 'Close retains all records through capture/backing/mapping failures and deletes each final row before disposal')!
+		'gpu.free_g13_queue_record(ownership.resources)', 'unsafe { f.g13_queues.free() }'], 'Close retains queue records through capture/backing/mapping failures and deletes each final row before disposal')!
 	for pair in [['reap_detached_g13_queues_locked', 'fn (mut f GpuFile) reap_orphaned_g13_queues_locked()'],
 		['reap_orphaned_g13_queues_locked', '// The registry lock pins']] {
 		reap := section(file, 'fn (mut f GpuFile) ' + pair[0] + '()', pair[1], 'Owner reaper')!

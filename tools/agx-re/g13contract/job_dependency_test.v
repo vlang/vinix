@@ -13,7 +13,7 @@ fn check_job_dependencies(copy string, file string) ! {
 	stage := section(file, 'fn (mut f GpuFile) submit_g13_staged(', 'fn dispatch(', 'G13 dependency capture')!
 	require_order(stage, ['g13_submission_status()', 'agxsubmission.copy_job_dependencies(input_syncs)',
 		'defer { if !dependencies_transferred { agxsubmission.release_sync_array(pending_inputs) } }',
-		'f.new_g13_submission_timestamps(commands)', 'dependencies: pending_inputs', 'dependencies_transferred = true'], 'Reduction before publication with unchanged pending ownership')!
+		'f.new_g13_submission_timestamps(commands, manager)', 'dependencies: pending_inputs', 'dependencies_transferred = true'], 'Reduction before publication with unchanged pending ownership')!
 }
 
 fn test_job_dependency_dedup_ownership_and_integration() {

@@ -92,6 +92,7 @@ pub mut:
 	g17_queues        []G17QueueOwnership
 	g13_queues        []G13QueueOwnership
 	timestamp_objects []TimestampObject // sorted by name, including detached records
+	timestamp_manager &gpu.GpuManager = unsafe { nil } // fixed at first publication
 	next_queue_id     u32
 	owner_process_id  u32
 	owner_key         u64
@@ -177,6 +178,13 @@ pub fn (mut f GpuFile) close() bool {
 	for object in f.timestamp_objects {
 		if object.references != 0 { f.lock.release(); return false }
 	}
+	// Closing has removed the file's names. An unrelated queue or VM can
+	// still defer close, but has no use for an uncaptured timestamp.
+	for object in f.timestamp_objects {
+		release_timestamp_object(f.timestamp_manager, object)
+	}
+	unsafe { f.timestamp_objects.free() }
+	f.timestamp_objects = []TimestampObject{}
 	// Captures can precede the aggregate VM pin, including after shutdown has
 	// already released backing. Keep their metadata owner until the last pin.
 	for ownership in f.g13_queues {
@@ -191,7 +199,7 @@ pub fn (mut f GpuFile) close() bool {
 		}
 	}
 	manager := gpu.get_global_manager() or { unsafe { nil } }
-	if manager == unsafe { nil } && (f.timestamp_objects.len != 0 || f.g13_queues.len != 0) {
+	if manager == unsafe { nil } && f.g13_queues.len != 0 {
 		f.lock.release()
 		return false
 	}
@@ -238,20 +246,6 @@ pub fn (mut f GpuFile) close() bool {
 	}
 	unsafe { f.g13_queues.free() }
 	f.g13_queues = []G13QueueOwnership{}
-	if manager != unsafe { nil } {
-		mut gpu_manager := unsafe { manager }
-		for object in f.timestamp_objects {
-			gpu_manager.unmap_g13_timestamp_buffer(object.va, object.size)
-			gem.unref(object.obj)
-		}
-	} else {
-		for object in f.timestamp_objects {
-			gem.unref(object.obj)
-		}
-	}
-	unsafe { f.timestamp_objects.free() }
-	f.timestamp_objects = []TimestampObject{}
-
 	mgr := uat_mgr
 	if mgr != unsafe { nil } {
 		mut m := unsafe { mgr }
@@ -994,7 +988,8 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				// Storage is already reserved. Hold the shutdown lock through
 				// publication, in the usual file-before-manager lock order.
 				gpu_manager.lock.acquire()
-				if gpu_manager.state == .stopped {
+				if gpu_manager.state == .stopped || (f.timestamp_manager != unsafe { nil }
+					&& voidptr(f.timestamp_manager) != voidptr(gpu_manager)) {
 					publish_code = -19
 				} else {
 					object := TimestampObject{
@@ -1003,6 +998,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 						size: request.range
 						obj: obj
 					}
+					f.timestamp_manager = gpu_manager
 					f.timestamp_objects << object
 					for index := f.timestamp_objects.len - 1; index > slot; index-- {
 						f.timestamp_objects[index] = f.timestamp_objects[index - 1]
@@ -1038,20 +1034,15 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				f.lock.release()
 				return -2
 			}
-			if found.references == 0 {
-				if manager := gpu.get_global_manager() {
-					f.timestamp_objects.delete(found_index)
-					f.lock.release()
-					mut gpu_manager := unsafe { manager }
-					gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)
-					gem.unref(found.obj)
-					return 0
-				}
+			if found.references != 0 {
+				f.timestamp_objects[found_index].detached = true
+				f.lock.release()
+				return 0
 			}
-			// Hide the name even when a capture or missing manager keeps the
-			// backing alive. The worker or close retries physical retirement.
-			f.timestamp_objects[found_index].detached = true
+			manager := f.timestamp_manager
+			f.timestamp_objects.delete(found_index)
 			f.lock.release()
+			release_timestamp_object(manager, found)
 			return 0
 		}
 		else {
@@ -1225,7 +1216,6 @@ fn reap_open_detached_g13_queues() {
 		owned.lock.acquire()
 		owned.reap_detached_g13_queues_locked()
 		owned.reap_orphaned_g13_queues_locked()
-		owned.reap_detached_timestamp_objects_locked()
 		owned.reap_detached_vms_locked()
 		owned.lock.release()
 	}
@@ -1503,7 +1493,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	defer { if !dependencies_transferred { agxsubmission.release_sync_array(pending_inputs) } }
 	// Captures acquire file.lock independently, before backend preparation.
 	// This outer defer runs after the file-lock defer and pending cancellation.
-	timestamp_code, captured_timestamps := f.new_g13_submission_timestamps(commands)
+	timestamp_code, captured_timestamps := f.new_g13_submission_timestamps(commands, manager)
 	if timestamp_code != 0 { return timestamp_code }
 	timestamps := captured_timestamps
 	mut timestamps_transferred := false

@@ -54,6 +54,7 @@ mut:
 	g13_queues        []G13QueueOwnership
 	g17_queues        []G17QueueOwnership
 	timestamp_objects []TimestampObject
+	timestamp_manager &gpu.GpuManager = unsafe { nil }
 	vms               []&mmu.UatContext
 	mappings          []GpuMapping
 	objects           Objects
@@ -96,6 +97,7 @@ pub fn run_checks() {
 		vms:               [&vm_a, &vm_b]
 		mappings:          [GpuMapping{ vm_id: 1, addr: 0x4000, size: 0x4000, obj: &mapped }]
 		timestamp_objects: [TimestampObject{ va: 0x10000, size: 4096, obj: &timestamp }]
+		timestamp_manager: gpu.timestamp_manager()
 	}
 	vm_a.inflight = 1
 	key := u64(0x1234)
@@ -167,7 +169,7 @@ pub fn run_checks() {
 	check_timestamp_captures()
 	check_timestamp_publication_storage()
 	check_timestamp_publication_stop()
-	check_timestamp_unbind_without_manager()
+	check_timestamp_owner_teardown()
 	gpu.check_timestamp_serialization()
 	check_zero_bind_ranges()
 	check_create_sizes()

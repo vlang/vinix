@@ -48,6 +48,7 @@ fn check_render_stage_timestamps() {
     for shutdown in [false, true] {
      gpu.reset(); mut file := new_file()
      mut manager := gpu.get_global_manager() or { panic('manager') }
+     file.timestamp_manager = manager
      mut objects := []gem.GemObject{len: count * 2}
      defer { unsafe { objects.free() } }
      for index in 0 .. count {

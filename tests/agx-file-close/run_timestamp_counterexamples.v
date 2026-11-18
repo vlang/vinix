@@ -18,19 +18,25 @@ fn main() {
 		'accept-detached': ['timestamp', ' || object.detached', '', 'file.check_timestamp_captures:', 'captured timestamp survives namespace removal'],
 		'missing-rollback': ['timestamp', 'f.release_g13_timestamps(mut references); return code', 'return code', 'file.check_timestamp_captures:', 'partial capture rollback'],
 		'missing-release': ['timestamp', 'f.timestamp_objects[index].references--', 'f.timestamp_objects[index].references += 0', 'file.check_timestamp_captures:', 'references == 0'],
-		'early-reap': ['timestamp', 'if !object.detached || object.references != 0 { continue }', 'if !object.detached { continue }', 'file.check_timestamp_captures:', 'worker cannot reap a captured timestamp'],
+		'early-reap': ['timestamp', 'if !object.detached || object.references != 0 { continue }', 'if !object.detached { continue }', 'file.check_timestamp_captures:', 'cannot reap a captured timestamp'],
 		'unbind-drops-capture': ['file', 'if found.references != 0 {', 'if false && found.references != 0 {', 'file.check_timestamp_captures:', 'UNBIND must retain captured mapping'],
 		'close-drops-capture': ['file', 'if object.references != 0 { f.lock.release(); return false }', 'if false && object.references != 0 { f.lock.release(); return false }', 'file.check_timestamp_captures:', 'capture pins file before VM pin'],
-		'close-drops-missing-manager': ['file', 'if manager == unsafe { nil } && f.timestamp_objects.len != 0 {', 'if false && manager == unsafe { nil } && f.timestamp_objects.len != 0 {', 'file.check_timestamp_captures:', 'close cannot drop mapped backing without manager'],
-		'missing-worker-retry': ['file', 'owned.reap_detached_timestamp_objects_locked()', '', 'file.check_timestamp_captures:', 'worker retries detached timestamp cleanup'],
-		'map-without-lock': ['gpu-map', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'gpu.agx.gpu.TimestampAllocator.alloc:', 'timestamp_lock_held()'],
-		'unmap-without-lock': ['gpu-unmap', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'mmu.UatManager.unmap_kernel:', 'timestamp_lock_held()']
+		'capture-foreign-manager': ['timestamp', 'voidptr(f.timestamp_manager) != voidptr(manager)', 'false', 'file.check_timestamp_owner_teardown:', 'refused == -19'],
+		'close-skips-original-owner': ['file', 'release_timestamp_object(f.timestamp_manager, object)', 'if _ := gpu.get_global_manager() { release_timestamp_object(f.timestamp_manager, object) } else { gem.unref(object.obj) }', 'file.check_timestamp_owner_teardown:', 'original.timestamp_unmaps == old_unmaps + 3'],
+		'unbind-skips-original-owner': ['file', 'release_timestamp_object(manager, found)', 'if _ := gpu.get_global_manager() { release_timestamp_object(manager, found) }', 'file.check_timestamp_bindings:', 'shared.references == 1'],
+		'map-without-lock': ['gpu-map', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'gpu.agx.gpu.expect_timestamp_map_error:', '!timestamp_lock_held()'],
+		'unmap-without-lock': ['gpu-unmap', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'mmu.UatManager.unmap_kernel:', 'timestamp_lock_held()'],
+		'drain-skips-ptes': ['gpu-drain', 'mgr.g13_timestamp_uat.unmap_kernel(reservation.va, reservation.size)', '', 'gpu.agx.gpu.check_timestamp_aperture_teardown:', 'original.timestamp_unmap_calls == before_stop + 2']
 	} {
 		path := match spec[0] { 'timestamp' { 'kernel/gpu/agx/file/timestamps.v' } 'file' { 'kernel/gpu/agx/file/file.v' } else { 'kernel/gpu/agx/gpu/gpu.v' } }
 		source := os.read_file(repo + '/' + path)!
 		mut begin := 0; mut end := source.len
 		if spec[0].starts_with('gpu-') {
-			marker := if spec[0] == 'gpu-map' { 'pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(' } else { 'pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(' }
+			marker := match spec[0] {
+				'gpu-map' { 'pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(' }
+				'gpu-unmap' { 'pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(' }
+				else { 'fn (mut mgr GpuManager) retire_g13_timestamp_aperture_locked(' }
+			}
 			begin = source.index(marker) or { panic(marker) }
 			end = source.index_after('\n}\n', begin) or { panic('method end') }
 		}
@@ -46,7 +52,7 @@ fn main() {
 		process.set_args([option, directory + '/source.v']); process.set_redirect_stdio(); process.run()
 		log := process.stdout_slurp() + process.stderr_slurp(); process.wait()
 		os.write_file(directory + '/run.log', log)!
-		assert process.code != 0 && log.contains('FAIL: fn ' + spec[3]) && log.contains(spec[4]) && !log.contains('error:'), name + ': ' + log
+		assert process.code != 0 && log.contains('FAIL: fn ' + spec[3]) && log.contains(spec[4]) && !log.contains(': error:'), name + ': ' + log
 		assert os.is_file(directory + '/test'), name + ' must compile before failing'
 		process.close()
 		receipts << name + ' sha256 ' + sha256.sum(mutant.bytes()).hex()

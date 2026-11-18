@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module file
 
+import gpu.agx.gpu
 import gpu.agx.submission
 import katomic
 import memory
@@ -46,7 +47,7 @@ fn (mut f GpuFile) release_g13_submission_timestamps(timestamps G13SubmissionTim
 	if timestamps.entries != unsafe { nil } { memory.free(voidptr(timestamps.entries)) }
 }
 
-fn (mut f GpuFile) new_g13_submission_timestamps(commands []submission.Command) (int, G13SubmissionTimestamps) {
+fn (mut f GpuFile) new_g13_submission_timestamps(commands []submission.Command, manager &gpu.GpuManager) (int, G13SubmissionTimestamps) {
 	if commands.len == 0 || commands.len > int(submission.max_commands) { return -22, G13SubmissionTimestamps{} }
 	mut requested := false
 	for index in 0 .. commands.len {
@@ -61,7 +62,7 @@ fn (mut f GpuFile) new_g13_submission_timestamps(commands []submission.Command) 
 		unsafe { timestamps.entries[index] = G13TimestampReferences{} }
 	}
 	for index := u32(0); index < timestamps.count; index++ {
-		code := unsafe { f.capture_g13_timestamps(commands[index].timestamps, mut timestamps.entries[index]) }
+		code := unsafe { f.capture_g13_timestamps(commands[index].timestamps, manager, mut timestamps.entries[index]) }
 		if code != 0 { f.release_g13_submission_timestamps(timestamps); return code, G13SubmissionTimestamps{} }
 	}
 	return 0, timestamps
