@@ -23,13 +23,24 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 		'Asahi RTKit uses a one-second completion wait')!
 	power := section(linux, 'static int apple_rtkit_set_ap_power_state(', 'static int apple_rtkit_set_iop_power_state(', 'Asahi AP power request')!
 	require_order(power, ['reinit_completion(&rtk->ap_pwr_ack_completion)', 'APPLE_RTKIT_MGMT_SET_AP_PWR_STATE',
-		'apple_rtkit_wait(rtk, &rtk->ap_pwr_ack_completion)', 'rtk->ap_power_state != state'],
-		'Asahi requires a new AP acknowledgement with the complete requested state')!
+		'if (ret)\n\t\treturn ret;', 'apple_rtkit_wait(rtk, &rtk->ap_pwr_ack_completion)',
+		'rtk->ap_power_state != state'], 'Asahi requires a successful AP send and a new acknowledgement with the complete state')!
 	epmap := section(linux, 'static void apple_rtkit_management_rx_epmap(', 'static void apple_rtkit_management_rx_iop_pwr_ack(', 'Asahi EPMAP')!
 	require(linux.contains('APPLE_RTKIT_MGMT_EPMAP_BASE   GENMASK_ULL(34, 32)'), 'Asahi endpoint map base is three bits')!
 	require_order(epmap, ['reply = FIELD_PREP(APPLE_RTKIT_MGMT_EPMAP_BASE, base)', 'APPLE_RTKIT_MGMT_EPMAP_REPLY_MORE',
 		'apple_rtkit_management_send(rtk, APPLE_RTKIT_MGMT_EPMAP_REPLY, reply)', 'case APPLE_RTKIT_EP_TRACEKIT:',
 		'ret = apple_rtkit_start_ep(rtk, ep)'], 'Asahi echoes the decoded base and starts advertised TraceKit')!
+	hello := section(linux, 'static void apple_rtkit_management_rx_hello(', 'static void apple_rtkit_management_rx_epmap(', 'Asahi HELLO')!
+	require(hello.contains('\n\tapple_rtkit_management_send(rtk, APPLE_RTKIT_MGMT_HELLO_REPLY, reply);\n\n\treturn;')
+		&& epmap.contains('\n\tapple_rtkit_management_send(rtk, APPLE_RTKIT_MGMT_EPMAP_REPLY, reply);\n\n\tif (!(msg & APPLE_RTKIT_MGMT_EPMAP_LAST))'),
+		'Asahi HELLO and EPMAP handlers leave a failed reply local to the management sender')!
+	require_order(epmap.all_after('ret = apple_rtkit_start_ep(rtk, ep);'),
+		['if (ret) {', 'rtk->boot_result = ret;', 'complete_all(&rtk->epmap_completion);', 'return;'],
+		'Asahi aborts discovery after a required system endpoint start fails')!
+	start := section(linux, 'int apple_rtkit_start_ep(', 'EXPORT_SYMBOL_GPL(apple_rtkit_start_ep);', 'Asahi endpoint start')!
+	require_order(start, ['ret = apple_rtkit_management_send(rtk, APPLE_RTKIT_MGMT_STARTEP, msg);',
+		'if (ret == -ETIMEDOUT)', 'ret = apple_rtkit_management_send(rtk, APPLE_RTKIT_MGMT_STARTEP, msg);',
+		'return ret;'], 'Asahi retries an unsent system or application endpoint start once')!
 
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
 	role := section(manager, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) start_firmware_endpoint(', 'Vinix RTKit boot dispatch')!
@@ -51,4 +62,14 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 	require(transport.contains('const boot_phase_timeout_ns = u64(1_000_000_000)')
 		&& transport.contains('[ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog, ep_tracekit]!'),
 		'Vinix uses one-second phase deadlines and includes TraceKit in G13 endpoint startup')!
+	require_order(boot, ['rtk.retry_endpoint_start = !request_wake',
+		'rtk.reply_boot_management(msg_hello_ack, payload, request_wake)',
+		'rtk.reply_boot_management(msg_epmap_reply, reply, request_wake)', 'if !start_system_endpoints',
+		'if !rtk.send_management(msg_set_ap_power, u64(power_state_on))',
+		"return rtk.fail(c'failed to request AP power state')"], 'Vinix keeps endpoint starts and AP requests on their own failure paths')!
+	reply := section(transport, 'fn (mut rtk RTKit) reply_boot_management(', 'fn (mut rtk RTKit) fail(', 'Vinix boot reply')!
+	require_order(reply, ['if rtk.send_management(kind, payload)', 'if request_wake {', 'return false',
+		'management reply type 0x%llx timed out', 'return true'], 'Vinix logs and continues past failed G13 discovery replies')!
+	require(transport.contains('return rtk.retry_endpoint_start && rtk.send_management(msg_start_ep, payload)'),
+		'Vinix retries an unsent endpoint start only on the firmware-led transport')!
 }

@@ -14,12 +14,14 @@ mut:
 	empty_polls [16]int
 	pending_len int
 	pending_read int
+	attempted_messages [16]MboxMsg
 	sent_messages [16]MboxMsg
 pub mut:
 	attempts int
 	sent int
 	last MboxMsg
 	fail_next_send bool
+	send_timeout_mask u16
 }
 
 __global on_send fn () = unsafe { nil }
@@ -50,14 +52,25 @@ pub fn (mut box Mailbox) recv() ?MboxMsg {
 pub fn (mut _ Mailbox) recv_blocking(_ int) ?MboxMsg { return none }
 
 pub fn (box &Mailbox) sent_at(index int) MboxMsg {
-	assert index < box.sent
+	assert index < box.sent && index < box.sent_messages.len
 	return box.sent_messages[index]
+}
+
+pub fn (box &Mailbox) attempted_at(index int) MboxMsg {
+	assert index < box.attempts && index < box.attempted_messages.len
+	return box.attempted_messages[index]
 }
 
 pub fn (mut box Mailbox) send(message MboxMsg) bool {
 	if on_send != unsafe { nil } { on_send() }
+	index := box.attempts
 	box.attempts++
-	if box.fail_next_send {
+	mut timeout := false
+	if index < box.attempted_messages.len {
+		box.attempted_messages[index] = message
+		timeout = box.send_timeout_mask & (u16(1) << index) != 0
+	}
+	if box.fail_next_send || timeout {
 		box.fail_next_send = false
 		return false
 	}

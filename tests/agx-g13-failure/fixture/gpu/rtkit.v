@@ -617,6 +617,128 @@ fn check_rtkit_started_boot() {
 	assert wake.mbox.sent == 4
 	assert wake.mbox.sent_at(0).data0 == 0x0060000000000220
 	println('G13 RTKit: 14 started-ASC boot transcripts and one legacy wake transcript')
+	check_rtkit_management_send_failures()
+}
+
+const rtkit_hello_reply = u64(0x00200000000c000c)
+const rtkit_map_more_reply = u64(0x0080000100000001)
+const rtkit_map_last_reply = u64(0x0088000000000000)
+const rtkit_start_syslog = u64(0x0050000200000002)
+const rtkit_ap_on = u64(0x00b0000000000020)
+const rtkit_start_app = u64(0x0050002100000002)
+const rtkit_wake_iop = u64(0x0060000000000220)
+
+struct RTKitSendCase {
+	timeouts    u16
+	words       [7]u64
+	booted      bool
+	app_started bool
+}
+
+fn queue_rtkit_management_messages(mut transport rtkit.RTKit) {
+	for word in [u64(0x00100000000c000b), 0x0080000100000002, 0x0088000000000004,
+		0x0070000000000020, 0x00b0000000000020]! {
+		transport.mbox.inject(mailbox.MboxMsg{data0: word})
+	}
+}
+
+fn check_rtkit_send_words(box &mailbox.Mailbox, scenario RTKitSendCase) {
+	mut attempted := 0
+	mut sent := 0
+	for index, word in scenario.words {
+		if word == 0 { break }
+		message := mailbox.MboxMsg{data0: word}
+		assert box.attempted_at(index) == message
+		attempted++
+		if scenario.timeouts & (u16(1) << index) == 0 {
+			assert box.sent_at(sent) == message
+			sent++
+		}
+	}
+	assert box.attempts == attempted && box.sent == sent
+}
+
+fn check_rtkit_management_send_failures() {
+	normal := [rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply, rtkit_start_syslog,
+		rtkit_ap_on, rtkit_start_app, 0]!
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for scenario in [
+			// HELLO and either EPMAP reply can time out without aborting boot.
+			RTKitSendCase{timeouts: 0b001, words: normal, booted: true, app_started: true},
+			RTKitSendCase{timeouts: 0b010, words: normal, booted: true, app_started: true},
+			RTKitSendCase{timeouts: 0b100, words: normal, booted: true, app_started: true},
+			// Retry the unsent system endpoint once, and fail boot if it times out again.
+			RTKitSendCase{
+				timeouts: 0b01000
+				words: [rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply,
+					rtkit_start_syslog, rtkit_start_syslog, rtkit_ap_on, rtkit_start_app]!
+				booted: true
+				app_started: true
+			},
+			RTKitSendCase{
+				timeouts: 0b11000
+				words: [rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply,
+					rtkit_start_syslog, rtkit_start_syslog, 0, 0]!
+			},
+			// An unsent AP power request stays fatal even if an ACK is queued.
+			RTKitSendCase{
+				timeouts: 0b10000
+				words: [rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply,
+					rtkit_start_syslog, rtkit_ap_on, 0, 0]!
+			},
+			RTKitSendCase{
+				timeouts: 0b0100000
+				words: [rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply,
+					rtkit_start_syslog, rtkit_ap_on, rtkit_start_app, rtkit_start_app]!
+				booted: true
+				app_started: true
+			},
+			RTKitSendCase{
+				timeouts: 0b1100000
+				words: [rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply,
+					rtkit_start_syslog, rtkit_ap_on, rtkit_start_app, rtkit_start_app]!
+				booted: true
+			},
+		]! {
+			mut transport := rtkit.RTKit{name: 'g13-send'}
+			mut mgr := GpuManager{
+				hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+				rtk: unsafe { &transport }
+			}
+			transport.mbox.send_timeout_mask = scenario.timeouts
+			queue_rtkit_management_messages(mut transport)
+			mgr.lock.acquire()
+			assert mgr.boot_firmware_role(0) == scenario.booted
+			assert !transport.lock.is_held()
+			assert transport.state == if scenario.booted { rtkit.RTKitState.running } else { .error }
+			assert transport.protocol_version == 12
+			if scenario.booted {
+				assert transport.endpoints[33] && transport.endpoints[rtkit.ep_syslog]
+				assert mgr.start_firmware_endpoint(0, 0x21) == scenario.app_started
+			}
+			mgr.lock.release()
+			check_rtkit_send_words(&transport.mbox, scenario)
+		}
+	}
+	for scenario in [
+		RTKitSendCase{timeouts: 0b00010, words: [rtkit_wake_iop, rtkit_hello_reply, 0, 0, 0, 0, 0]!},
+		RTKitSendCase{
+			timeouts: 0b01000
+			words: [rtkit_wake_iop, rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply, 0, 0, 0]!
+		},
+		RTKitSendCase{
+			timeouts: 0b10000
+			words: [rtkit_wake_iop, rtkit_hello_reply, rtkit_map_more_reply, rtkit_map_last_reply,
+				rtkit_start_syslog, 0, 0]!
+		},
+	]! {
+		mut wake := rtkit.RTKit{name: 'legacy-send'}
+		wake.mbox.send_timeout_mask = scenario.timeouts
+		queue_rtkit_management_messages(mut wake)
+		assert !wake.boot() && wake.state == .error
+		check_rtkit_send_words(&wake.mbox, scenario)
+	}
+	println('G13 RTKit: 16 management-send transcripts across both ABIs and three legacy timeout transcripts')
 }
 
 fn check_rtkit_boot_transcript(abi hw.FirmwareAbi, scenario RTKitBootCase) {

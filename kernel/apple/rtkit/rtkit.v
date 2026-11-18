@@ -111,6 +111,8 @@ pub mut:
 	// Latches the first out-of-range endpoint-map group so a repeating roll
 	// call cannot flood the console during boot.
 	epmap_group_warned bool
+mut:
+	retry_endpoint_start bool
 }
 
 pub fn new_rtkit(mbox_base u64, name string) RTKit {
@@ -366,7 +368,23 @@ fn (mut rtk RTKit) send_management(kind u8, payload u64) bool {
 
 fn (mut rtk RTKit) send_start_endpoint(ep u8) bool {
 	payload := (u64(ep) << 32) | start_ep_flag
-	return rtk.send_management(msg_start_ep, payload)
+	if rtk.send_management(msg_start_ep, payload) {
+		return true
+	}
+	// The mailbox reports failure only when neither word was written.
+	return rtk.retry_endpoint_start && rtk.send_management(msg_start_ep, payload)
+}
+
+fn (mut rtk RTKit) reply_boot_management(kind u8, payload u64, request_wake bool) bool {
+	if rtk.send_management(kind, payload) {
+		return true
+	}
+	if request_wake {
+		return false
+	}
+	C.kprintf(c'rtkit[%.*s]: management reply type 0x%llx timed out\n',
+		i32(rtk.name.len), rtk.name.str, u64(kind))
+	return true
 }
 
 fn (mut rtk RTKit) fail(message &char) bool {
@@ -395,6 +413,7 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 		return true
 	}
 	rtk.state = .hello_wait
+	rtk.retry_endpoint_start = !request_wake
 	rtk.iop_power_state = 0
 	rtk.ap_power_state = 0
 	C.kprintf(c'rtkit[%.*s]: Starting boot handshake\n', i32(rtk.name.len), rtk.name.str)
@@ -449,7 +468,7 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 				}
 				rtk.protocol_version = version
 				payload := u64(version) | (u64(version) << 16)
-				if !rtk.send_management(msg_hello_ack, payload) {
+				if !rtk.reply_boot_management(msg_hello_ack, payload, request_wake) {
 					return rtk.fail(c'failed to acknowledge HELLO')
 				}
 				rtk.state = .epmap_wait
@@ -488,7 +507,7 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 				} else {
 					reply |= epmap_more
 				}
-				if !rtk.send_management(msg_epmap_reply, reply) {
+				if !rtk.reply_boot_management(msg_epmap_reply, reply, request_wake) {
 					return rtk.fail(c'failed to acknowledge endpoint map')
 				}
 				if last {
