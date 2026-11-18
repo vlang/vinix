@@ -86,6 +86,7 @@ fn run_checks() int {
 	production += section(source, 'fn (mut mgr GpuManager) alloc_g13_channel_pair(', '// Map the t8103 firmware') or { panic(err) }
 	production += (section(source, 'fn (mut mgr GpuManager) free_g13_channel_allocations(', 'fn (mut mgr GpuManager) fail_g13_initialization(') or { panic(err) })
 		.replace('release_g13_channels()', 'checked_release_g13_channels()')
+	production += section(source, 'fn (mut mgr GpuManager) fail_g13_initialization(', '// Allocate the completion-tracking resources') or { panic(err) }
 	production += section(source, 'pub fn (mut mgr GpuManager) set_file_reaper(', '// Serialize accepted submissions') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) dequeue_g13_rx(', 'fn (mut mgr GpuManager) handle_role_system_message') or { panic(err) }
 	production += section(source, 'fn (mut mgr GpuManager) handle_role_system_message(', '// Drain the ASC transport') or { panic(err) }

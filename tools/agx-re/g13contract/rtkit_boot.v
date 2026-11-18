@@ -44,13 +44,15 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
 	role := section(manager, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) start_firmware_endpoint(', 'Vinix RTKit boot dispatch')!
-	require(role.contains('if mgr.hw_config.gpu_gen == .g13 { mgr.rtk.boot_started() } else { mgr.rtk.boot() }'),
-		'Vinix selects the already-started handshake for G13')!
-	require_order(manager.all_after('pub fn (mut mgr GpuManager) init()'), ['mgr.res.start_cpu(role)',
+	require_order(role, ['if mgr.hw_config.gpu_gen != .g13', 'mgr.rtk.boot()', 'irq := mgr.rtkit_receive_irq',
+		'if irq == 0', 'mgr.rtk.boot_started(0)', 'mgr.lock.release()', 'mgr.rtk.boot_started(irq)', 'mgr.lock.acquire()'],
+		'Vinix selects the already-started handshake for G13 and opens an interrupt window only with a claimed line')!
+	require_order(manager.all_after('pub fn (mut mgr GpuManager) init(receive_irq'), ['mgr.res.start_cpu(role)',
+		'mgr.claim_rtkit_receive_irq(receive_irq)',
 		'if !mgr.boot_firmware_role(role)', 'return mgr.fail_g13_initialization()', 'mgr.start_firmware_endpoint(role, u8(ep_firmware))'],
 		'Vinix enters the G13 handshake after releasing the ASC and unwinds failures before starting firmware endpoints')!
 	boot := section(transport, 'pub fn (mut rtk RTKit) boot()', '// Only the system endpoints', 'Vinix RTKit handshake')!
-	require_order(boot, ['return rtk.boot_transport(true)', 'return rtk.boot_transport(false)',
+	require_order(boot, ['return rtk.boot_transport(true, 0)', 'return rtk.boot_transport(false, receive_irq)',
 		'if request_wake && !rtk.send_management(msg_set_iop_power, u64(power_state_init))',
 		'mut phase_started := if request_wake { u64(0) } else { timer.get_ns() }',
 		'timer.get_ns() - phase_started >= boot_phase_timeout_ns', 'timer.busywait_us(10)',
@@ -62,6 +64,16 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 	require(transport.contains('const boot_phase_timeout_ns = u64(1_000_000_000)')
 		&& transport.contains('[ep_crashlog, ep_syslog, ep_debug, ep_ioreport, ep_oslog, ep_tracekit]!'),
 		'Vinix uses one-second phase deadlines and includes TraceKit in G13 endpoint startup')!
+	rx := section(linux, 'static struct apple_rtkit *__apple_rtkit_init(', 'EXPORT_SYMBOL_GPL(apple_rtkit_init);', 'Asahi RTKit startup')!
+	require_order(rx, ['apple_rtkit_claim_rx(rtk)', 'apple_mbox_start(rtk->mbox)', 'return rtk;'],
+		'Asahi enables mailbox receive before waiting for the boot completions')!
+	wait := section(transport, 'fn (mut rtk RTKit) wait_boot_receive_irq(', 'fn (mut rtk RTKit) boot_transport(', 'Vinix boot IRQ wait')!
+	require_order(wait, ['aic.rearm_deferred_irq(receive_irq)', 'rtk.lock.release()', 'timer.get_us()',
+		'!aic.deferred_irq_pending(receive_irq)', 'timer.get_us() - started < boot_irq_poll_us',
+		'timer.busywait_us(10)', 'rtk.lock.acquire()'], 'Vinix restores interrupts during the bounded receive wait')!
+	require(transport.contains('const boot_irq_poll_us = u64(100)')
+		&& boot.contains('else if receive_irq != 0 {\n\t\t\t\trtk.wait_boot_receive_irq(receive_irq)'),
+		'Only the IRQ-assisted boot polls at the longer fallback interval')!
 	require_order(boot, ['rtk.firmware_led_boot = !request_wake',
 		'rtk.reply_boot_management(msg_hello_ack, payload, request_wake)',
 		'rtk.reply_boot_management(msg_epmap_reply, reply, request_wake)', 'if !start_system_endpoints',

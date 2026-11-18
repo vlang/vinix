@@ -6,6 +6,7 @@ module rtkit
 // define their own layouts and must be passed through without modification.
 
 import apple.mailbox
+import aarch64.aic
 import aarch64.cpu
 import aarch64.timer
 import katomic
@@ -56,6 +57,7 @@ const power_state_on = u16(0x20)
 const power_state_init = u16(0x220)
 const wake_boot_poll_limit = 10_000_000
 const boot_phase_timeout_ns = u64(1_000_000_000)
+const boot_irq_poll_us = u64(100)
 const buffer_request = u8(1)
 const crash_notification = u8(1)
 const syslog_log = u8(5)
@@ -395,15 +397,28 @@ fn (mut rtk RTKit) fail(message &char) bool {
 
 // Request IOP initialization from a client that uses the wake handshake.
 pub fn (mut rtk RTKit) boot() bool {
-	return rtk.boot_transport(true)
+	return rtk.boot_transport(true, 0)
 }
 
-// The G13 ASC starts RTKit when the GPU driver releases its CPU.
-pub fn (mut rtk RTKit) boot_started() bool {
-	return rtk.boot_transport(false)
+// The G13 ASC starts RTKit when the GPU driver releases its CPU. The
+// initializer owns the transport until boot returns.
+pub fn (mut rtk RTKit) boot_started(receive_irq u32) bool {
+	return rtk.boot_transport(false, receive_irq)
 }
 
-fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
+fn (mut rtk RTKit) wait_boot_receive_irq(receive_irq u32) {
+	// An empty FIFO can accept another notification. Restore the caller's
+	// interrupt state while waiting and fall back to a fresh read if needed.
+	aic.rearm_deferred_irq(receive_irq)
+	rtk.lock.release()
+	started := timer.get_us()
+	for !aic.deferred_irq_pending(receive_irq) && timer.get_us() - started < boot_irq_poll_us {
+		timer.busywait_us(10)
+	}
+	rtk.lock.acquire()
+}
+
+fn (mut rtk RTKit) boot_transport(request_wake bool, receive_irq u32) bool {
 	rtk.lock.acquire()
 	defer {
 		rtk.lock.release()
@@ -437,6 +452,8 @@ fn (mut rtk RTKit) boot_transport(request_wake bool) bool {
 		msg := rtk.mbox.recv() or {
 			if request_wake {
 				cpu.wfe()
+			} else if receive_irq != 0 {
+				rtk.wait_boot_receive_irq(receive_irq)
 			} else {
 				// The manager and RTKit locks mask interrupts. Keep the
 				// deadline check runnable even without a mailbox event.

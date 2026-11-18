@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Base M1 G13 enables the AIC mailbox receive line for RTKit negotiation and
+keeps a bounded FIFO polling fallback. [RTKit boot receive IRQ](m1-agx-boot-rx-irq.md)
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

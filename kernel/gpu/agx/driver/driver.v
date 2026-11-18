@@ -1187,12 +1187,10 @@ pub fn initialise() {
 	}
 
 	// Step 5: Init GPU (RTKit boot, firmware init)
-	if !mgr.init() {
+	receive_irq := if chip_id == 0x8103 { platform.mailbox_receive_irq } else { u32(0) }
+	if !mgr.init(receive_irq) {
 		println('agx: GPU initialization failed')
 		return
-	}
-	if chip_id == 0x8103 && platform.mailbox_receive_irq != 0 {
-		mgr.enable_rtkit_receive_irq(platform.mailbox_receive_irq)
 	}
 
 	agx_driver_inst.gpu = mgr

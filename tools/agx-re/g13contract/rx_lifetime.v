@@ -61,14 +61,17 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 	driver := read(os.join_path(repo, 'kernel/gpu/agx/driver/driver.v'))!
 	require_order(driver, ["find_compatible('apple,t8103-aic')", "get_property(node, 'interrupt-names')",
 		'mailbox.decode_aic_receive_irq(', 'mailbox_receive_irq: g13_mailbox_receive_irq(mailbox_node)',
-		'if !mgr.init()', 'if chip_id == 0x8103 && platform.mailbox_receive_irq != 0',
-		'mgr.enable_rtkit_receive_irq(platform.mailbox_receive_irq)'],
-		'Vinix enables the receive line only for a successfully initialized M1 with an AICv1 binding')!
+		'receive_irq := if chip_id == 0x8103 { platform.mailbox_receive_irq }', 'if !mgr.init(receive_irq)',
+		'agx_driver_inst.gpu = mgr', 'gpu.set_global_manager(agx_driver_inst.gpu)'],
+		'Vinix passes the M1 AICv1 binding to the private probe before publishing the manager')!
 	controller := read(os.join_path(repo, 'kernel/aarch64/aic/aic.v'))!
 	require_order(controller, ['irq == katomic.load(&deferred_irq)', 'katomic.store(mut deferred_pending, true)',
 		'continue', 'unmask_irq(irq)', 'pub fn claim_deferred_irq(', 'aic_write(aic_target_cpu + irq * 4, 1)',
 		'unmask_irq(irq)'], 'Vinix leaves the deferred line masked and programs CPU 0 before enabling it')!
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
+	failure := section(manager, 'fn (mut mgr GpuManager) fail_g13_initialization(', '// Allocate the completion-tracking resources', 'Vinix failed boot cleanup')!
+	require_order(failure, ['aic.mask_irq(mgr.rtkit_receive_irq)', 'mgr.stop_firmware_cpus(mgr.firmware_roles)',
+		'mgr.release_rtkit_buffers()', 'mgr.release_g13_channels()'], 'Vinix masks the claimed line and stops firmware before boot teardown')!
 	require_order(manager, ['aic.deferred_irq_pending(mgr.rtkit_receive_irq)', 'timer.get_us() - mgr.rtkit_receive_us >= 1_000',
 		'poll_mailbox && !mgr.poll_rtkit_messages()', 'if still_healthy && poll_mailbox { mgr.finish_rtkit_receive() }',
 		'mgr.state = .stopped', 'aic.mask_irq(mgr.rtkit_receive_irq)', 'mgr.stop_firmware_cpus(mgr.firmware_roles)'],

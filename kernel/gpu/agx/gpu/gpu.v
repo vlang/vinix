@@ -254,7 +254,21 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 fn (mut mgr GpuManager) boot_firmware_role(role u32) bool {
 	return match role {
 		0 {
-			if mgr.hw_config.gpu_gen == .g13 { mgr.rtk.boot_started() } else { mgr.rtk.boot() }
+			if mgr.hw_config.gpu_gen != .g13 {
+				mgr.rtk.boot()
+			} else {
+				irq := mgr.rtkit_receive_irq
+				if irq == 0 {
+					mgr.rtk.boot_started(0)
+				} else {
+					// The probe owns this unpublished manager, and the worker
+					// starts only after initialization. Let IRQ delivery run.
+					mgr.lock.release()
+					booted := mgr.rtk.boot_started(irq)
+					mgr.lock.acquire()
+					booted
+				}
+			}
 		}
 		1 {
 			if mgr.firmware_roles == 2 {
@@ -333,8 +347,8 @@ fn (buffer &SharedBuffer) cpu_address() voidptr {
 	return voidptr(buffer.phys + higher_half)
 }
 
-// RTKit buffer requests run under mgr.lock during boot and runtime, including
-// the reply publishing the IOVA. Retain the backing until the ASC stops.
+// The probe owns boot requests until the manager is published. Runtime
+// requests and replies hold mgr.lock. Retain the backing until the ASC stops.
 fn allocate_rtkit_shmem(context voidptr, size u64) u64 {
 	if context == unsafe { nil } {
 		return 0
@@ -893,6 +907,7 @@ fn (mut mgr GpuManager) init_channels() bool {
 }
 
 fn (mut mgr GpuManager) fail_g13_initialization() bool {
+	if mgr.rtkit_receive_irq != 0 { aic.mask_irq(mgr.rtkit_receive_irq) }
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
 	mgr.release_rtkit_buffers()
 	mgr.release_g13_channels()
@@ -925,7 +940,7 @@ pub fn (mut mgr GpuManager) initialize_event_resources() bool {
 }
 
 // Full GPU initialization sequence
-pub fn (mut mgr GpuManager) init() bool {
+pub fn (mut mgr GpuManager) init(receive_irq u32) bool {
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
@@ -996,6 +1011,7 @@ pub fn (mut mgr GpuManager) init() bool {
 	}
 
 	// Step 6: Negotiate the RTKit transport independently for every role.
+	mgr.claim_rtkit_receive_irq(receive_irq)
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.boot_firmware_role(role) {
 			C.kprintf(c'agx: RTKit boot failed for role %llu\n', u64(role))
@@ -1368,10 +1384,9 @@ fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg
 	}
 }
 
-pub fn (mut mgr GpuManager) enable_rtkit_receive_irq(irq u32) {
-	mgr.lock.acquire()
-	defer { mgr.lock.release() }
-	if mgr.state == .running && mgr.hw_config.gpu_gen == .g13 && aic.claim_deferred_irq(irq) {
+// Caller holds mgr.lock during probe. The worker inherits the line on success.
+fn (mut mgr GpuManager) claim_rtkit_receive_irq(irq u32) {
+	if mgr.hw_config.gpu_gen == .g13 && aic.claim_deferred_irq(irq) {
 		mgr.rtkit_receive_us = timer.get_us()
 		mgr.rtkit_receive_irq = irq
 	}
