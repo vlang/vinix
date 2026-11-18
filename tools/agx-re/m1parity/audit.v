@@ -161,7 +161,8 @@ pub fn audit(inputs Inputs) !Report {
 		'drivers/gpu/drm/scheduler/sched_entity.c', 'drivers/gpu/drm/scheduler/sched_main.c', 'drivers/gpu/drm/scheduler/sched_fence.c', 'rust/kernel/drm/sched.rs', 'rust/kernel/dma_fence.rs',
 		'drivers/dma-buf/dma-fence.c', 'drivers/dma-buf/dma-fence-chain.c', 'drivers/dma-buf/sync_file.c', 'include/uapi/linux/sync_file.h', 'drivers/gpu/drm/drm_syncobj.c', 'rust/kernel/drm/syncobj.rs', 'include/uapi/drm/drm.h', 'fs/file.c',
 		'rust/kernel/uaccess.rs', 'rust/kernel/alloc/kvec.rs', 'rust/kernel/alloc/layout.rs',
-		'drivers/soc/apple/rtkit.c', 'rust/kernel/soc/apple/rtkit.rs']
+		'drivers/soc/apple/rtkit.c', 'drivers/soc/apple/rtkit-crashlog.c',
+		'drivers/soc/apple/rtkit-internal.h', 'rust/kernel/soc/apple/rtkit.rs']
 	require_clean(inputs.packages, [package_path, 'pkgbuilds/mesa-aurora/PKGBUILD'])!
 	require_clean(inputs.asahi, asahi_sources)!
 	require_clean(inputs.m1n1, ['rust/src/gpu', 'proxyclient/m1n1/agx', 'proxyclient/m1n1/fw/agx'])!

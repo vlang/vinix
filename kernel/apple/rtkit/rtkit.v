@@ -54,6 +54,7 @@ const power_state_on = u16(0x20)
 const power_state_init = u16(0x220)
 const boot_timeout = 10_000_000
 const buffer_request = u8(1)
+const crash_notification = u8(1)
 const syslog_log = u8(5)
 const syslog_init = u8(8)
 const max_system_buffer_size = u64(16 * 1024 * 1024)
@@ -63,6 +64,8 @@ const crashlog_max_entries = u32(128)
 const crashlog_type_header = u32(0x434c4845) // 'CLHE'
 const crashlog_type_version = u32(0x43766572) // 'Cver'
 const crashlog_type_string = u32(0x43737472) // 'Cstr'
+const crashlog_type_mailbox = u32(0x436d6278) // 'Cmbx'
+const crashlog_type_time = u32(0x4374696d) // 'Ctim'
 const crashlog_type_registers = u32(0x43726738) // 'Crg8'
 const crashlog_type_stack = u32(0x43637374) // 'Ccst'
 
@@ -154,6 +157,64 @@ fn (rtk &RTKit) print_crashlog_entry_kind(kind u32) {
 		i32(u8(kind >> 24)), i32(u8(kind >> 16)), i32(u8(kind >> 8)), i32(u8(kind)))
 }
 
+fn (rtk &RTKit) print_crashlog_message(data voidptr, offset u32, size u32) {
+	id := crashlog_u32(data, offset)
+	message := crashlog_string(data, offset + 4, size - 4)
+	mut line := 0
+	for end := 0; end <= message.len; end++ {
+		if end == message.len {
+			if line == end && end != 0 { break }
+		} else if unsafe { message.str[end] } != `\n` {
+			continue
+		}
+		C.kprintf(c'rtkit[%.*s]: crash message %x: %.*s\n', i32(rtk.name.len),
+			rtk.name.str, id, i32(end - line), unsafe { message.str + line })
+		line = end + 1
+	}
+}
+
+fn (rtk &RTKit) print_crashlog_mailbox(data voidptr, offset u32, size u32) {
+	// The 28-byte prefix ends at the first 24-byte history record.
+	kind := crashlog_u32(data, offset + 16)
+	index := crashlog_u32(data, offset + 24)
+	C.kprintf(c'rtkit[%.*s]: crash mailbox history type=%u index=%u\n',
+		i32(rtk.name.len), rtk.name.str, kind, index)
+	count := (size - 28) / 24
+	for i := u32(0); i < count; i++ {
+		entry := offset + 28 + i * 24
+		C.kprintf(c'rtkit[%.*s]:   #%03u@%08x: %016llx %016llx\n',
+			i32(rtk.name.len), rtk.name.str, i, crashlog_u32(data, entry + 16),
+			crashlog_u64(data, entry), crashlog_u64(data, entry + 8))
+	}
+}
+
+fn (rtk &RTKit) print_crashlog_registers(data voidptr, offset u32) {
+	sp := crashlog_u64(data, offset + 0x100)
+	pc := crashlog_u64(data, offset + 0x108)
+	psr := crashlog_u64(data, offset + 0x110)
+	far := crashlog_u64(data, offset + 0x330)
+	esr := crashlog_u64(data, offset + 0x340)
+	mode := match psr & 0xf {
+		0 { c'EL0t' }
+		4 { c'EL1t' }
+		5 { c'EL1h' }
+		8 { c'EL2t' }
+		9 { c'EL2h' }
+		else { c'unknown' }
+	}
+	C.kprintf(c'rtkit[%.*s]: exception mode=%s pc=0x%llx sp=0x%llx psr=0x%llx far=0x%llx esr=0x%llx\n',
+		i32(rtk.name.len), rtk.name.str, mode, pc, sp, psr, far, esr)
+	for i := u32(0); i < 28; i += 4 {
+		reg := offset + 8 + i * 8
+		C.kprintf(c'rtkit[%.*s]:   x%02u-x%02u = %016llx %016llx %016llx %016llx\n',
+			i32(rtk.name.len), rtk.name.str, i, i + 3, crashlog_u64(data, reg),
+			crashlog_u64(data, reg + 8), crashlog_u64(data, reg + 16), crashlog_u64(data, reg + 24))
+	}
+	C.kprintf(c'rtkit[%.*s]:   x28-x30 = %016llx %016llx %016llx\n',
+		i32(rtk.name.len), rtk.name.str, crashlog_u64(data, offset + 0xe8),
+		crashlog_u64(data, offset + 0xf0), crashlog_u64(data, offset + 0xf8))
+}
+
 fn (rtk &RTKit) dump_crashlog() {
 	iova := rtk.system_iovas[ep_crashlog]
 	allocated := rtk.system_sizes[ep_crashlog]
@@ -206,45 +267,53 @@ fn (rtk &RTKit) dump_crashlog() {
 				i32(rtk.name.len), rtk.name.str, u64(length), u64(offset))
 			return
 		}
+		// The section length includes its header. Each decoder may read only
+		// the payload, even when another section follows in the snapshot.
+		payload := offset + crashlog_entry_header_size
+		size := length - crashlog_entry_header_size
 		match kind {
 			crashlog_type_string {
-				if length >= 0x15 {
-					id := crashlog_u32(data, offset + 0x10)
-					message := crashlog_string(data, offset + 0x14, length - 0x14)
-					C.kprintf(c'rtkit[%.*s]: crash message %llu: %.*s\n', i32(rtk.name.len),
-						rtk.name.str, u64(id), i32(message.len), message.str)
+				if size >= 5 {
+					rtk.print_crashlog_message(data, payload, size)
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
 			}
 			crashlog_type_version {
-				if length >= 0x21 {
-					version := crashlog_string(data, offset + 0x20, length - 0x20)
+				if size >= 17 {
+					version := crashlog_string(data, payload + 16, size - 16)
 					C.kprintf(c'rtkit[%.*s]: crash firmware: %.*s\n', i32(rtk.name.len),
 						rtk.name.str, i32(version.len), version.str)
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
 			}
+			crashlog_type_mailbox {
+				if size >= 28 {
+					rtk.print_crashlog_mailbox(data, payload, size)
+				} else {
+					rtk.print_crashlog_entry_kind(kind)
+				}
+			}
+			crashlog_type_time {
+				if size >= 8 {
+					C.kprintf(c'rtkit[%.*s]: crash time: %lld\n', i32(rtk.name.len),
+						rtk.name.str, i64(crashlog_u64(data, payload)))
+				} else {
+					rtk.print_crashlog_entry_kind(kind)
+				}
+			}
 			crashlog_type_registers {
-				// Crg8 carries 31 GPRs followed by SP/PC/PSR and fault state.
-				if length >= 0x360 {
-					sp := crashlog_u64(data, offset + 0x110)
-					pc := crashlog_u64(data, offset + 0x118)
-					psr := crashlog_u64(data, offset + 0x120)
-					far := crashlog_u64(data, offset + 0x340)
-					esr := crashlog_u64(data, offset + 0x350)
-					C.kprintf(c'rtkit[%.*s]: exception pc=0x%llx sp=0x%llx psr=0x%llx far=0x%llx esr=0x%llx\n',
-						i32(rtk.name.len), rtk.name.str, u64(pc), u64(sp), u64(psr), u64(far),
-						u64(esr))
+				if size >= 0x350 {
+					rtk.print_crashlog_registers(data, payload)
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
 			}
 			crashlog_type_stack {
-				if length >= 0x18 {
+				if size >= 8 {
 					C.kprintf(c'rtkit[%.*s]: crashed task %llu\n', i32(rtk.name.len),
-						rtk.name.str, u64(crashlog_u32(data, offset + 0x10)))
+						rtk.name.str, u64(crashlog_u32(data, payload)))
 				} else {
 					rtk.print_crashlog_entry_kind(kind)
 				}
@@ -504,7 +573,12 @@ pub fn (mut rtk RTKit) handle_system_message(msg mailbox.MboxMsg) bool {
 			}
 		}
 		ep_crashlog {
-			if management_type(msg.data0) == buffer_request && rtk.system_iovas[ep] == 0 {
+			if management_type(msg.data0) != crash_notification {
+				C.kprintf(c'rtkit[%.*s]: unknown crashlog message 0x%llx\n',
+					i32(rtk.name.len), rtk.name.str, msg.data0)
+				return true
+			}
+			if rtk.system_iovas[ep] == 0 {
 				return rtk.allocate_system_buffer(ep, msg.data0)
 			}
 			C.kprintf(c'rtkit[%.*s]: coprocessor crash notification\n', i32(rtk.name.len),

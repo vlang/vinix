@@ -7,17 +7,49 @@ fn section(source string, start string, end string) !string {
 	return source[begin..finish]
 }
 
+fn check_crashlog_output(output string) {
+	valid := [
+		'crash message cafe: one',
+		'crash message cafe: two',
+		'crash message cafe: last',
+		'crash firmware: vM1!',
+		'crash time: -81985529216486896',
+		'crash mailbox history type=17 index=5',
+		'#000@88888888: 0123456789abcdef fedcba9876543210',
+		'#001@00000003: 0000000000000001 0000000000000002',
+		'exception mode=EL2h pc=0x222222222 sp=0x111111111 psr=0x209 far=0x333333333 esr=0x444444444',
+		'x00-x03 = 1111000000000000 1111000000000001 1111000000000002 1111000000000003',
+		'x24-x27 = 1111000000000018 1111000000000019 111100000000001a 111100000000001b',
+		'x28-x30 = 111100000000001c 111100000000001d 111100000000001e',
+	]
+	for expected in valid {
+		assert output.count(expected + '\n') == 2, expected
+	}
+	for kind in ['Cstr', 'Cver', 'Ctim', 'Cmbx', 'Crg8'] {
+		assert output.count('crash entry ' + kind + '\n') == 2, kind
+	}
+	assert output.count('crashed task 47\n') == 4
+	assert output.count('crash message 7: private snapshot\n') == 4
+	assert output.count('cannot allocate crash log snapshot\n') == 2
+	assert output.count('cannot copy crash log at ') == 4
+	assert output.count('crash log has no terminator\n') == 2
+	assert output.count('unknown crashlog message ') == 4
+	assert output.count('crash mailbox history type=') == 2
+	assert !output.contains('#002@')
+}
+
 fn run_checks() int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	assert os.args.len == 1 || os.args[1..] == ['--sanitize']
-		|| (os.args.len == 4 && os.args[1] == '--sanitize' && os.args[2] in ['--g13-source', '--gpu-source'])
+		|| (os.args.len == 4 && os.args[1] == '--sanitize' && os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-g13-failure-${os.getpid()}')
 	os.mkdir_all(scratch) or { panic(err) }
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(os.join_path(repo, 'tests/agx-g13-failure/fixture'), scratch, false) or { panic(err) }
 	os.mkdir_all('${scratch}/apple/rtkit') or { panic(err) }
-	os.cp('${repo}/kernel/apple/rtkit/rtkit.v', '${scratch}/apple/rtkit/rtkit.v') or { panic(err) }
+	rtkit_source := if os.args.len == 4 && os.args[2] == '--rtkit-source' { os.args[3] } else { '${repo}/kernel/apple/rtkit/rtkit.v' }
+	os.cp(rtkit_source, '${scratch}/apple/rtkit/rtkit.v') or { panic(err) }
 	event_queue := os.read_file('${repo}/kernel/gpu/agx/event/workqueue.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/event/queue.v', 'module event\n' +
 		(section(event_queue, 'pub struct WorkQueueEvents {', 'pub fn (mut queue WorkQueueEvents) retain(') or { panic(err) }) +
@@ -112,10 +144,10 @@ fn run_checks() int {
 	if output := os.getenv_opt('AGX_G13_TEST_BINARY') {
 		os.cp('${scratch}/test', output) or { panic(err) }
 	}
-	mut test := os.new_process('${scratch}/test')
-	test.run()
-	test.wait()
-	return test.code
+	result := os.exec(['${scratch}/test'])
+	print(result.output)
+	if result.exit_code == 0 { check_crashlog_output(result.output) }
+	return result.exit_code
 }
 
 fn main() {

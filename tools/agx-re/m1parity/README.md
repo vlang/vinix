@@ -24,8 +24,9 @@ Fence-completion and binary-wait checks use the packaged Linux core
 implementations; the audit checks and retains those sources too.
 The VM_BIND staging check also needs `rust/kernel/uaccess.rs`,
 `rust/kernel/alloc/kvec.rs` and `rust/kernel/alloc/layout.rs`.
-The crash snapshot check needs `drivers/soc/apple/rtkit.c` and
-`rust/kernel/soc/apple/rtkit.rs`.
+The crash-log checks need `drivers/soc/apple/rtkit.c`,
+`drivers/soc/apple/rtkit-crashlog.c`, `drivers/soc/apple/rtkit-internal.h`
+and `rust/kernel/soc/apple/rtkit.rs`.
 
 Its selected ABI comparisons describe the retained `drm.ioctl` legacy
 compatibility declarations. Modern `drm.asahi` declarations are retained as

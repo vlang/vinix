@@ -6,6 +6,10 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+RTKit ignores unknown crash notifications and decodes crash time, mailbox
+history and exception registers on both G13 ABIs.
+[RTKit crash-log decoding](m1-agx-rtkit-crash-parser.md)
+
 G13 RTKit copies the crash log before parsing and serializes system buffer
 requests with shutdown. [RTKit crash-log snapshot](m1-agx-rtkit-snapshot.md)
 

@@ -33,3 +33,34 @@ fn check_rtkit_snapshot(transport string, manager string, linux string, rust str
 	require_order(release, ['mgr.rtkit_buffer_lock.acquire()', 'mgr.free_shared_buffer(mut mgr.rtkit_buffers[count])',
 		'mgr.rtkit_buffers.clear()', 'mgr.rtkit_buffer_lock.release()'], 'Vinix releases RTKit backing under the snapshot lock')!
 }
+
+fn check_rtkit_crashlog(transport string, linux string, header string, decoder string) ! {
+	crash := section(linux, 'static void apple_rtkit_crashlog_rx(', 'static void apple_rtkit_ioreport_rx(', 'Asahi RTKit crash receive')!
+	require(linux.contains('#define APPLE_RTKIT_CRASHLOG_CRASH 1'), 'Asahi RTKit crash type')!
+	require_order(crash, ['if (type != APPLE_RTKIT_CRASHLOG_CRASH)', 'return;', 'if (!rtk->crashlog_buffer.size)',
+		'apple_rtkit_common_rx_get_buffer', 'apple_rtkit_crashlog_dump'], 'Asahi ignores unknown crash messages')!
+	require(header.contains('sizeof(struct apple_rtkit_crashlog_header) == 0x20'), 'Asahi RTKit header size')!
+	require_order(decoder, ['sizeof(struct apple_rtkit_crashlog_mbox_entry) == 0x18',
+		'u64 regs[31];', 'u64 sp;', 'u64 pc;', 'u64 psr;', 'u64 far;', 'u64 esr;',
+		'sizeof(struct apple_rtkit_crashlog_regs) == 0x350'], 'Asahi RTKit mailbox and exception geometry')!
+	dispatch := decoder.all_after('void apple_rtkit_crashlog_dump(')
+	require_order(dispatch, ['bfr + offset + 12', 'case APPLE_RTKIT_CRASHLOG_HEADER_FOURCC:',
+		'case APPLE_RTKIT_CRASHLOG_STR:', 'case APPLE_RTKIT_CRASHLOG_VERSION:',
+		'case APPLE_RTKIT_CRASHLOG_MBOX:', 'case APPLE_RTKIT_CRASHLOG_TIME:',
+		'case APPLE_RTKIT_CRASHLOG_REGS:', 'offset += section_size'], 'Asahi handles the five standard crash records')!
+
+	require(transport.contains('const crash_notification = u8(1)'), 'Vinix RTKit crash type')!
+	receive := section(transport, 'pub fn (mut rtk RTKit) handle_system_message(', 'fn start_system_endpoints(', 'Vinix RTKit crash receive')!
+	require_order(receive, ['ep_crashlog {', 'management_type(msg.data0) != crash_notification', 'return true',
+		'rtk.system_iovas[ep] == 0', 'rtk.allocate_system_buffer', 'rtk.dump_crashlog()', 'rtk.state = .error'],
+		'Vinix ignores unknown notifications before negotiation or crash handling')!
+	read := section(transport, 'fn (rtk &RTKit) dump_crashlog()', 'fn management_type(', 'Vinix RTKit record parser')!
+	require_order(read, ['total < crashlog_header_size || u64(total) > allocated',
+		'offset <= total - crashlog_entry_header_size', 'length < crashlog_entry_header_size || length > total - offset',
+		'payload := offset + crashlog_entry_header_size', 'size := length - crashlog_entry_header_size',
+		'if size >= 5', 'if size >= 17', 'if size >= 28', 'if size >= 8', 'if size >= 0x350', 'offset += length'],
+		'Vinix validates snapshot and payload boundaries before decoding standard records')!
+	mailbox := section(transport, 'fn (rtk &RTKit) print_crashlog_mailbox(', 'fn (rtk &RTKit) print_crashlog_registers(', 'Vinix RTKit mailbox decoder')!
+	require_order(mailbox, ['offset + 16', 'offset + 24', 'count := (size - 28) / 24', 'i < count', 'offset + 28 + i * 24'],
+		'Vinix decodes only complete mailbox entries in the payload')!
+}

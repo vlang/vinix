@@ -26,9 +26,9 @@ Generated ARM64 C confirmed callback registration and cleanup without
 implicit heap allocations. The allocation scan reproduced the baseline's
 178 allowance discrepancies.
 
-The full audit remains `not_equivalent`. RTKit parser, message and DMA
-differences and device coherency remain unverified. No hardware tests or
-reboots occurred.
+At this revision the full audit reported `not_equivalent`, with open RTKit
+parser, message and DMA differences. No hardware tests or reboots occurred.
+[Crash-log decoding follow-up](m1-agx-rtkit-crash-parser.md)
 
 Evidence is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-rtkit-snapshot-20261118/`.

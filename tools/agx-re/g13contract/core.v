@@ -592,9 +592,13 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!)!
 	check_g13_receive_lifetime(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
 		read(os.join_path(base, 'gpu.rs'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_recovery.v'))!)!
-	check_rtkit_snapshot(read(os.join_path(repo, 'kernel/apple/rtkit/rtkit.v'))!,
-		read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!, read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit.c'))!,
+	transport := read(os.join_path(repo, 'kernel/apple/rtkit/rtkit.v'))!
+	asahi_rtkit := read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit.c'))!
+	check_rtkit_snapshot(transport, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!, asahi_rtkit,
 		read(os.join_path(asahi_linux, 'rust/kernel/soc/apple/rtkit.rs'))!)!
+	check_rtkit_crashlog(transport, asahi_rtkit,
+		read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit-internal.h'))!,
+		read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit-crashlog.c'))!)!
 	check_timestamp_inputs_local(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!)!
 	check_pending_timestamps_local(read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!,
 		read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!, read(os.join_path(repo, 'kernel/gpu/agx/file/submission_timestamps.v'))!)!
@@ -993,6 +997,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 firmware log descriptor rings and the separate bounded payload buffer are published and read before acknowledgement',
 		'G13 Event, KTrace and Stats reads serialize with backing teardown and dispatch private copies after releasing the lock',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
+		'RTKit filters unknown crash notifications and decodes bounded strings, time, mailbox history and exception records',
 		'Timestamp capture retains detached mappings and file ownership, preserves lookup/offset errors, rolls back failed prefixes and serializes global timestamp allocation',
 		'host workqueue retirement pointer and wrap-safe publication',
 		'G13 submission returns ENODEV for error/stopped devices at a released manager-lock snapshot before job/output publication, preserving staging cleanup and unsupported-backend errors',
