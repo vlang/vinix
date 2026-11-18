@@ -680,12 +680,21 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 	}
 	buffer.counter = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferCounter)) or { return false }
 	buffer.stats = mgr.alloc_g13_shared_buffer(sizeof(fw.G13BufferStats)) or { return false }
-	buffer.kernel_buffer = mgr.alloc_g13_shared_buffer(0x40) or { return false }
+	kernel_buffer_size := u64(0x40)
+	buffer.kernel_buffer = mgr.alloc_g13_shared_buffer(kernel_buffer_size) or { return false }
 	buffer.page_list = context.alloc_driver_buffer_aligned(u64(g13_tvb_max_pages) * sizeof(u32), true, fw.g13_tvb_page_size) or {
 		return false
 	}
 	buffer.block_list = context.alloc_driver_buffer_aligned(u64(g13_tvb_max_blocks) * u64(2) * sizeof(u32), true, fw.g13_tvb_page_size) or {
 		return false
+	}
+	unsafe {
+		C.memset(buffer.block_control.cpu_address(), 0, sizeof(fw.G13BufferBlockControl))
+		C.memset(buffer.counter.cpu_address(), 0, sizeof(fw.G13BufferCounter))
+		C.memset(buffer.kernel_buffer.cpu_address(), 0, kernel_buffer_size)
+		mut stats := &fw.G13BufferStats(buffer.stats.cpu_address())
+		C.memset(stats, 0, sizeof(fw.G13BufferStats))
+		stats.reset = 1
 	}
 	if !fw.initialize_g13_buffer_info(buffer.info.cpu_address(), buffer.info.size,
 		mgr.hw_config.firmware_abi, buffer.page_list.va,
@@ -693,10 +702,6 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 		buffer.block_control.va, u32(fw.g13_tvb_block_size), buffer.counter.va,
 		g13_tvb_max_pages, g13_tvb_max_blocks_nomemless * fw.g13_tvb_pages_per_block) {
 		return false
-	}
-	unsafe {
-		mut stats := &fw.G13BufferStats(buffer.stats.cpu_address())
-		stats.reset = 1
 	}
 	buffer.initialized = true
 	// Queue::new reserves the module's default eight TVB blocks before any

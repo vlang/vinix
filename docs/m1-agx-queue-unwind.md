@@ -221,3 +221,30 @@ The evidence archive covers `f80c6ed4f8fa3968e241cc4faacc6043ba315d9e` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-notifier-list-threshold-20261119.Gv8X4B/bundle.tar.gz`
 with SHA-256 `fcc62a5777ba07b8c908176e8b9cc3c2ef762780641a5f7290c72c5130689d08`.
+
+## Shared TVB control records
+
+G13 clears the block-control record, counter, statistics record and 64-byte
+kernel buffer during render-queue setup. The statistics reset flag starts at
+one. The constructor writes these defaults before filling the TVB info record
+and growing the initial eight blocks. The allocator already clears backing
+pages, so the prefilled fixture verifies the constructor's own writes.
+[Pinned TVB control layouts](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/fw/buffer.rs#L17-L45)
+[Pinned TVB constructor](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/buffer.rs#L352-L411)
+[Pinned array initialization](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/object.rs#L657-L675)
+
+The sanitizer regression caught stale bytes in the old block-control record.
+It now checks every byte and a trailing guard for all four buffers across both
+firmware ABIs, including with the VM dormant. The TVB growth suite also checks
+that allocation and flush failures release the unpublished graph.
+
+Both kernel builds, the G13 layout and failure suites, 79 source-contract
+test files and 122 pinned reference checks passed. Generated AArch64 C shows
+four bounded clears before the initial growth, with no implicit allocation.
+The allocation scan matched the 176 baseline findings. M1 hardware validation
+remains open.
+
+The evidence archive covers `5f32129142a2291fe2b1fbd00295954d7901f8be` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-tvb-control-defaults-20261119.YLdca3/bundle.tar.gz`
+with SHA-256 `0ed2a812d8ccc8cd0239149c2e7dde5017446fbaacfa480f98235209da659730`.

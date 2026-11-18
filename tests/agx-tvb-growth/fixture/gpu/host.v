@@ -49,8 +49,9 @@ mut:
 fn (mut mgr GpuManager) alloc_g13_shared_buffer(size u64) ?SharedBuffer {
 	if mgr.shared_allocations == mgr.fail_shared_at { return none }
 	mgr.shared_allocations++
-	storage := unsafe { C.calloc(1, size) }
+	storage := unsafe { C.malloc(size + 1) }
 	assert storage != unsafe { nil }
+	unsafe { C.memset(storage, 0xa5, size + 1) }
 	return SharedBuffer{phys: u64(storage), va: 0x500000 + u64(mgr.shared_allocations) * 0x4000, size: size}
 }
 
@@ -229,6 +230,11 @@ fn check_teardown_after_first_bind() {
 	println('AGX user driver teardown: unavailable, inactive, uncached and already-unmapped buffers preserve the FwCtl contract')
 }
 
+fn tvb_record_matches(buffer &SharedBuffer, expected &[0x40]u8) bool {
+	data := buffer.cpu_address()
+	return buffer.size == 0x40 && unsafe { C.memcmp(data, expected, 0x40) == 0 && (&u8(data))[0x40] == 0xa5 }
+}
+
 fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fail_flush int, metadata_fail bool, bound bool) {
 	mut config := hw.t8103_config()
 	config.firmware_abi = abi
@@ -247,8 +253,16 @@ fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fai
 		buffer := &resources.render_buffer
 		assert ok && buffer.initialized && buffer.blocks.len == 8
 		assert !buffer.slot_reserved && buffer.active_scenes == 0 && buffer.tail_pointer_cache == unsafe { nil }
-		control := unsafe { &fw.G13BufferBlockControl(buffer.block_control.cpu_address()) }
-		assert control.total == 8 && control.wptr == 8
+		mut control := [0x40]u8{}
+		control[0] = 8
+		control[4] = 8
+		mut stats := [0x40]u8{}
+		stats[0x20] = 1
+		empty := [0x40]u8{}
+		assert tvb_record_matches(&buffer.block_control, unsafe { &control }), 'TVB initial block control bytes'
+		assert tvb_record_matches(&buffer.counter, unsafe { &empty }), 'TVB initial counter bytes'
+		assert tvb_record_matches(&buffer.stats, unsafe { &stats }), 'TVB initial statistics bytes'
+		assert tvb_record_matches(&buffer.kernel_buffer, unsafe { &empty }), 'TVB initial kernel buffer bytes'
 		assert context.allocated == 10 && mgr.shared_allocations == 5
 		// The initial non-active counters agree with the block table rather
 		// than waiting until the first frame to populate firmware state.
