@@ -18,7 +18,7 @@ fn check_vm_detach_local(file string) ! {
 		'if m.handoff_abi != .v12_3 && m.bind_context(ctx) == 0', 'm.destroy_context(ctx)',
 		'f.vms << ctx', 'f.vms[insert_at] = ctx', 'request.vm_id = vm_id'], 'VM creation publishes the first available file name under the file lock')!
 	require(!file.contains('mmu.uat_num_contexts'), 'Software VM owners must be independent of hardware capacity')!
-	destroy := section(file, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', '// Caller holds file.lock. User bindings', 'VM namespace removal')!
+	destroy := section(file, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', '// Caller holds file.lock. Retry GEM_CLOSE', 'VM namespace removal')!
 	require_order(destroy, ['request.extensions != 0 || request.pad != 0', 'return -22',
 		'if request.vm_id == 0 { return -2 }',
 		'f.lock.acquire()', 'defer { f.lock.release() }', 'f.find_vm(request.vm_id) or { return -2 }',
@@ -26,18 +26,20 @@ fn check_vm_detach_local(file string) ! {
 	require(!destroy.contains('return -16') && !destroy.contains('destroy_context('), 'Busy owners must not prevent namespace removal or be destroyed directly')!
 	reap := section(file, 'fn (mut f GpuFile) reap_detached_vms_locked()', 'pub fn (mut f GpuFile) ioctl_gem_create(', 'Detached physical VM retirement')!
 	require_order(reap, ['mut uat := unsafe { f.file_uat() }', 'if uat == unsafe { nil } { return }', 'index := f.vms.len - 1',
-		'vm_id := vm.id', 'if !vm.detached || katomic.load(&vm.inflight) != 0',
-		'if !f.cleanup_closed_mappings_locked(vm) { continue }',
+		'vm_id := vm.id', 'if (!vm.detached && !vm.closed_mappings_pending) || katomic.load(&vm.inflight) != 0',
+		'if !f.cleanup_closed_mappings_locked(vm) { continue }', 'if !vm.detached { continue }',
 		'for queue in f.queues', 'queue.vm_id == vm_id', 'for ownership in f.g13_queues',
 		'ownership.vm_id == vm_id', 'if retained { continue }', 'uat.destroy_context(vm)',
 		'f.vms.delete(index)'], 'Retire mappings then exclude every job/queue owner before physical context removal')!
 	for token in ['memory.', 'free(', 'f.vms <<'] { require(!reap.contains(token), 'VM reaper must not allocate, free metadata or grow its ownership array')! }
 	cleanup := section(file, 'fn (mut f GpuFile) cleanup_closed_mappings_locked(', 'fn (mut f GpuFile) close_object_handle(', 'Detached user bindings')!
 	require_order(cleanup, ['katomic.load(&vm.inflight) != 0',
-		'!vm.detached && !mapping.retiring && !mapping.handle_closed', 'f.retire_mapping_locked(index)'], 'Every idle detached or closed-handle binding retires independently of current handle names')!
+		'!vm.detached && !mapping.retiring && !mapping.handle_closed', 'f.retire_mapping_locked(index)',
+		'if success {', 'owned.closed_mappings_pending = false'], 'Idle VM binding retirement keeps retries armed until cleanup succeeds')!
 	close := section(file, 'fn (mut f GpuFile) close_object_handle(', 'fn (mut f GpuFile) reserve_mapping_slots_locked(', 'Close binding selection')!
 	require_order(close, ['f.lock.acquire()', 'f.objects.remove(handle)', 'for mut mapping in f.mappings',
-		'if voidptr(mapping.obj) == voidptr(obj) { mapping.handle_closed = true }',
+		'if voidptr(mapping.obj) != voidptr(obj) { continue }', 'mapping.handle_closed = true',
+		'ctx := f.find_owned_vm(mapping.vm_id)', 'vm.closed_mappings_pending = true',
 		'f.cleanup_closed_mappings_locked(vm)', 'f.lock.release()', 'gem.unref(obj)'], 'GEM_CLOSE records the old bindings before dropping its handle reference')!
 	retire := section(file, 'fn (mut f GpuFile) retire_mapping_locked(', '// GEM_CLOSE drops', 'Hidden mapping owner')!
 	require(retire.contains('f.find_owned_vm(mapping.vm_id)'), 'Retained mappings must find their hidden physical VM')!

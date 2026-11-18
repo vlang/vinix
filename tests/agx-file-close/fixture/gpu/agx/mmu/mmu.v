@@ -40,6 +40,7 @@ pub mut:
 	vm_id u32
 	inflight u64
 	detached bool
+	closed_mappings_pending bool
 	identity u64
 	pgtable &pgtable.UatPgtable = unsafe { nil }
 	kernel_start u64 = 0x100000000

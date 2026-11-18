@@ -187,6 +187,7 @@ fn check_mapping_retirement() {
 	}
 	println('AGX mapping retirement: 200 bind/unbind/GEM-close/retry cycles, failed bind ownership, busy VM admission, partial UNBIND_ALL, replacement, stopped cleanup, exact-lock shutdown races and VM destruction before BIND passed')
 	check_reimported_mapping_retirement()
+	check_worker_mapping_retirement()
 	check_eviction_before_file_mapping_check()
 	check_file_mapping_state()
 }
@@ -231,6 +232,49 @@ fn check_reimported_mapping_retirement() {
 		memory.assert_released()
 	}
 	println('AGX GEM reimport: old bindings and split fragments retire after VM idle while new bindings retain the BO')
+}
+
+fn check_worker_mapping_retirement() {
+	gpu.set_running(true)
+	mut first_pt := pgtable.UatPgtable{watch_start: 0x4000}
+	mut second_pt := pgtable.UatPgtable{watch_start: 0x4000}
+	mut first := mmu.UatContext{id: 1, vm_id: 1, pgtable: &first_pt}
+	mut second := mmu.UatContext{id: 2, vm_id: 2, pgtable: &second_pt}
+	mut file := GpuFile{vms: [&first, &second]}
+	file_map[0x4c05] = unsafe { &file }
+	closed := gem.create(7)
+	neighbor_bo := gem.create(8)
+	file.objects.table.add_created(closed)
+	file.objects.table.add_created(neighbor_bo)
+	assert file.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
+	assert file.ioctl_gem_bind(bind(7, 2, 0x4000)) == 0
+	assert file.ioctl_gem_bind(bind(8, 1, 0x8000)) == 0
+
+	first.inflight = 2
+	second.inflight = 1
+	assert file.close_object_handle(7) == 0
+	assert first.closed_mappings_pending && second.closed_mappings_pending && closed.references == 2
+	first.inflight--
+	reap_open_detached_g13_queues()
+	assert first_pt.unmaps == 0 && second_pt.unmaps == 0 && closed.references == 2
+
+	first.inflight--
+	gpu.fail_mapping_checks(1)
+	reap_open_detached_g13_queues()
+	assert first.closed_mappings_pending && first_pt.unmaps == 1 && closed.references == 2
+	reap_open_detached_g13_queues()
+	assert !first.closed_mappings_pending && first_pt.unmaps == 1 && closed.references == 1
+	assert second.closed_mappings_pending && second_pt.unmaps == 0
+
+	second.inflight--
+	reap_open_detached_g13_queues()
+	assert !second.closed_mappings_pending && second_pt.unmaps == 1 && gem.live() == 1
+	assert first_pt.leaves[1] == neighbor_bo.phys_addr && neighbor_bo.references == 2 && file.mappings.len == 1
+	assert !first.destroyed && !second.destroyed && file.find_vm(1) != none && file.find_vm(2) != none
+	file_map.delete(0x4c05)
+	assert file.close() && gem.live() == 0
+	memory.assert_released()
+	println('AGX GEM close worker: idle VMs release old mappings independently, device-state refusal retries once without a second PTE removal, and live mappings and VM names remain available')
 }
 
 __global evicting_pt &pgtable.UatPgtable = unsafe { nil }

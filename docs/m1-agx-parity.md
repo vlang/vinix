@@ -584,6 +584,25 @@ The verified archive for `b60d2eacbaefb8608b81bf6c2c40fbf62c19556c` plus `source
 `bundle.tar.gz` SHA-256 is
 `0ba28b05fc3c3a06731a677f279dde36f8df8bbd701541d9defb90b4b49b2fb6`.
 
+The G13 worker now retires mappings selected by `GEM_CLOSE` after their
+VM's last in-flight pin drops. The worker retries a failed device-state
+check from the already-cleared PTE and clears the pending flag when
+retirement succeeds. VM names and unrelated bindings remain available.
+This applies the pinned driver's deferred-cleanup policy to Vinix's
+existing VM pin and worker model. [Asahi VM lifetime cleanup](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu/lifetime.rs#L646)
+
+The file-close fixture passed independent retirement on two visible VMs,
+including a device-state failure and retry without a second PTE removal.
+Both kernel builds, 82 V test files, and the file-close and async
+sanitizer suites passed. The allocation scan matched the 178 baseline
+findings. The pinned audit still reports `not_equivalent`.
+
+The restored archive passed inventory verification for
+`fc45744d338b743448b1195be27fd64eebd350c6` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-close-worker-20261118.fDORnE/`.
+`bundle.tar.gz` SHA-256 is
+`59f3a5d6c28a83ee36a493f4943a0be2b7f4051137368764143d69a392cd61ef`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

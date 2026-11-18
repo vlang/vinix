@@ -82,6 +82,7 @@ pub mut:
 	lock           klock.Lock
 	vm_id          u32 // userspace name assigned by the owning DRM file
 	detached       bool // protected by the owning file's lock
+	closed_mappings_pending bool // GEM_CLOSE retirement pending under the file lock
 	inflight       u64 // atomic callback and aggregate submission pins
 	binding_epoch  u64 // changes whenever this VM's firmware root is installed
 	binding_gate   admission.Gate // serializes G13 submission binds across slot waits

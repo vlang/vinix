@@ -9,6 +9,8 @@ fn test_vm_detach_guards_require_hidden_names_and_retained_physical_owners() {
 		'vm.vm_id == vm_id', '&& !vm.detached', 'if retained { continue }',
 		'if !f.cleanup_closed_mappings_locked(vm) { continue }', 'f.vms.delete(index)',
 		'f.vms[insert_at] = ctx', 'owned.reap_detached_vms_locked()',
+		'&& !vm.closed_mappings_pending', 'vm.closed_mappings_pending = true',
+		'owned.closed_mappings_pending = false', 'if !vm.detached { continue }',
 		'!vm.detached && !mapping.retiring', 'ctx := f.find_owned_vm(mapping.vm_id)',
 		'vm := f.find_owned_vm(vm_id)'] {
 		if _ := check_vm_detach_local(file.replace(token, '')) { assert false, token }

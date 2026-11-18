@@ -355,6 +355,10 @@ fn (mut f GpuFile) cleanup_closed_mappings_locked(vm &mmu.UatContext) bool {
 			success = false
 		}
 	}
+	if success {
+		mut owned := unsafe { vm }
+		owned.closed_mappings_pending = false
+	}
 	return success
 }
 
@@ -365,7 +369,11 @@ fn (mut f GpuFile) close_object_handle(handle u32) int {
 		return -2 // ENOENT
 	}
 	for mut mapping in f.mappings {
-		if voidptr(mapping.obj) == voidptr(obj) { mapping.handle_closed = true }
+		if voidptr(mapping.obj) != voidptr(obj) { continue }
+		mapping.handle_closed = true
+		ctx := f.find_owned_vm(mapping.vm_id) or { continue }
+		mut vm := unsafe { ctx }
+		vm.closed_mappings_pending = true
 	}
 	mut success := true
 	for vm in f.vms {
@@ -772,17 +780,18 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 	return 0
 }
 
-// Caller holds file.lock. User bindings retire only after accepted jobs are
-// idle. A device-state refusal retains their object and context for retry.
-// Queue owners (including failed-create quarantine) retain driver mappings.
+// Caller holds file.lock. Retry GEM_CLOSE mappings on idle visible VMs as well
+// as bindings on detached VMs. Only detached VMs can lose their context, and
+// queue owners (including failed-create quarantine) retain driver mappings.
 fn (mut f GpuFile) reap_detached_vms_locked() {
 	mut uat := unsafe { f.file_uat() }
 	if uat == unsafe { nil } { return }
 	for index := f.vms.len - 1; index >= 0; index-- {
 		vm := f.vms[index]
 		vm_id := vm.id
-		if !vm.detached || katomic.load(&vm.inflight) != 0 { continue }
+		if (!vm.detached && !vm.closed_mappings_pending) || katomic.load(&vm.inflight) != 0 { continue }
 		if !f.cleanup_closed_mappings_locked(vm) { continue }
+		if !vm.detached { continue }
 		mut retained := false
 		for queue in f.queues {
 			if queue.vm_id == vm_id { retained = true; break }
