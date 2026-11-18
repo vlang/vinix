@@ -1003,6 +1003,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	return ['Resolved timestamp pairs populate versioned native commands and independently select vertex/fragment/compute instructions while legacy callers provide empty pairs',
 		'G13 firmware log descriptor rings and the separate bounded payload buffer are published and read before acknowledgement',
 		'G13 Event, KTrace and Stats reads serialize with backing teardown and dispatch private copies after releasing the lock',
+		'G13 mailbox doorbells drain FWLog, KTrace and Stats before events and before later RTKit messages',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',

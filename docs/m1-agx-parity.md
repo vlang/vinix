@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 receive doorbells drain FWLog, KTrace and Stats before handling firmware
+events and later RTKit messages. [Firmware receive order](m1-agx-rx-doorbell.md)
+
 G13 ASC transmits use the 500 ms FIFO wait from the pinned driver.
 [RTKit mailbox transmit timing](m1-agx-rtkit-transmit.md)
 

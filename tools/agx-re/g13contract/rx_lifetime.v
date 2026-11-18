@@ -16,8 +16,20 @@ fn check_g13_receive_lifetime(local string, remote string, recovery string) ! {
 		'mgr.handle_g13_grow_tvb(message.payload[0], message.payload[1], message.payload[2])'],
 		'Vinix dispatches from its private event copy outside the receive lock')!
 	aux := section(local, 'fn (mut mgr GpuManager) drain_auxiliary_channels()', 'fn (mut mgr GpuManager) check_g13_firmware_health()', 'Vinix auxiliary receive')!
-	require_order(aux, ['mgr.dequeue_g13_rx(mut mgr.channels.ktrace', 'mgr.dequeue_g13_rx(mut mgr.channels.stats'],
-		'KTrace and Stats share the same teardown-guarded reader')!
+	require_order(aux, ['mgr.read_g13_fw_log(subchannel)', 'mgr.dequeue_g13_rx(mut mgr.channels.ktrace',
+		'mgr.dequeue_g13_rx(mut mgr.channels.stats'], 'FWLog, KTrace and Stats drain in firmware receive order')!
+	poll := section(local, 'fn (mut mgr GpuManager) poll_rtkit_messages(', '// The manager lock guards teardown', 'Vinix RTKit receive order')!
+	require_order(poll, ['mgr.recv_role_message(role)', 'ep == u8(ep_firmware) && msg.data0 == msg_rx_doorbell',
+		'role == 0 && mgr.hw_config.gpu_gen == .g13', 'mgr.drain_g13_receive_channels()',
+		'if mgr.state != .running { return true }'], 'A G13 firmware doorbell drains its rings before the next RTKit message')!
+	drain := section(local, 'fn (mut mgr GpuManager) drain_g13_receive_channels()', '// Caller holds mgr.lock.', 'Vinix G13 receive dispatch')!
+	require_order(drain, ['mgr.drain_auxiliary_channels()', 'mgr.handle_event()'],
+		'G13 drains diagnostics before firmware events can trigger recovery or teardown')!
+	worker := section(local, 'fn event_worker(', '// Shutdown the GPU', 'Vinix receive worker')!
+	require_order(worker, ['mgr.check_g13_firmware_health()', 'mgr.poll_rtkit_messages()',
+		'if mgr.state != .running', 'if mgr.hw_config.gpu_gen == .g13',
+		'mgr.drain_g13_receive_channels()', 'mgr.check_g13_firmware_health()'],
+		'G13 workers use the same ordered drain even without a mailbox doorbell')!
 	loss := section(local, 'fn (mut mgr GpuManager) mark_g13_worker_error()', 'pub fn (mut mgr GpuManager) handle_event()', 'Vinix worker error')!
 	require_order(loss, ['mgr.lock.acquire()', 'if mgr.state == .running { mgr.state = .error }', 'mgr.lock.release()'],
 		'An asynchronous receive failure cannot overwrite stopped state')!

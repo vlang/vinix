@@ -1365,9 +1365,7 @@ fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg
 	}
 }
 
-// Drain the ASC transport even though ring channels are polled separately.
-// Doorbells are notifications only, but leaving them in the mailbox eventually
-// back-pressures firmware and prevents later system endpoint messages.
+// Drain the ASC transport in receive order, including firmware doorbells.
 fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		for _ in 0 .. 256 {
@@ -1380,6 +1378,10 @@ fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 				continue
 			}
 			if ep == u8(ep_firmware) && msg.data0 == msg_rx_doorbell {
+				if role == 0 && mgr.hw_config.gpu_gen == .g13 {
+					mgr.drain_g13_receive_channels()
+					if mgr.state != .running { return true }
+				}
 				continue
 			}
 			C.kprintf(c'agx: unexpected RTKit role=%llu ep=0x%llx message=0x%llx\n', u64(role),
@@ -1434,6 +1436,12 @@ fn (mut mgr GpuManager) drain_auxiliary_channels() {
 	}
 }
 
+fn (mut mgr GpuManager) drain_g13_receive_channels() {
+	// Asahi consumes diagnostic rings before events that may require recovery.
+	mgr.drain_auxiliary_channels()
+	mgr.handle_event()
+}
+
 // Caller holds mgr.lock. A queued fault/timeout notification owns the recovery
 // handshake and must be drained before treating a halt as unreported. Never
 // resume a corrupted ring or an unexplained halt; stop ASC before freeing work.
@@ -1480,11 +1488,19 @@ fn event_worker(mut mgr GpuManager) {
 			mgr.mark_g13_worker_error()
 			break
 		}
-		mgr.handle_event()
 		if mgr.state != .running {
 			break
 		}
-		mgr.drain_auxiliary_channels()
+		if mgr.hw_config.gpu_gen == .g13 {
+			// Also service rings when the ASC has no doorbell to deliver.
+			mgr.drain_g13_receive_channels()
+		} else {
+			mgr.handle_event()
+			if mgr.state == .running { mgr.drain_auxiliary_channels() }
+		}
+		if mgr.state != .running {
+			break
+		}
 		mgr.lock.acquire()
 		still_healthy := mgr.state == .running && mgr.check_g13_firmware_health()
 		mgr.lock.release()

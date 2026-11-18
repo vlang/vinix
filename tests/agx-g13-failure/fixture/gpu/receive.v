@@ -2,6 +2,8 @@
 @[has_globals]
 module gpu
 
+import apple.mailbox
+import apple.rtkit
 import gpu.agx.channel
 import gpu.agx.fw
 import gpu.agx.hw
@@ -10,6 +12,7 @@ import klock
 
 __global receive_owner = unsafe { &GpuManager(nil) }
 __global reused_event = unsafe { &fw.FwEventMsg(nil) }
+__global receive_order = unsafe { &ReceiveOrder(nil) }
 
 fn stop_receive_owner() {
 	assert !receive_owner.lock.is_held()
@@ -104,4 +107,111 @@ fn check_g13_receive_shutdown() {
 		reused_event = unsafe { nil }
 	}
 	println('G13 receive shutdown: 18 ring interleavings, six stale fatal events and two TVB payload snapshots passed')
+}
+
+struct ReceiveOrder {
+mut:
+	headers [4]channel.RingHeader
+	acknowledgements int
+}
+
+fn observe_receive_order() {
+	require_receive_lock()
+	assert receive_owner.rtk.iop_power_state == 0, 'a later RTKit message overtook the doorbell'
+	for index, header in receive_order.headers {
+		expected := if index < receive_order.acknowledgements { u32(1) } else { u32(0) }
+		assert header.read_ptr == expected, 'unexpected receive ring acknowledgement order'
+	}
+	receive_order.acknowledgements++
+	if receive_order.acknowledgements < 4 {
+		katomic.on_next_sync(observe_receive_order)
+	}
+}
+
+enum ReceiveOrderCase {
+	doorbell
+	fatal_doorbell
+	fallback
+	fatal_fallback
+	invalid_doorbell
+}
+
+fn check_g13_receive_order() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for scenario in [ReceiveOrderCase.doorbell, .fatal_doorbell, .fallback,
+			.fatal_fallback, .invalid_doorbell]! {
+			check_g13_receive_order_case(abi, scenario)
+		}
+	}
+	println('G13 receive order: 10 doorbell and fallback transcripts across both ABIs')
+}
+
+fn check_g13_receive_order_case(abi hw.FirmwareAbi, scenario ReceiveOrderCase) {
+	fatal := scenario in [.fatal_doorbell, .fatal_fallback]!
+	mut order := ReceiveOrder{headers: [channel.RingHeader{write_ptr: 1},
+		channel.RingHeader{write_ptr: 1}, channel.RingHeader{write_ptr: 1},
+		channel.RingHeader{write_ptr: if fatal { u32(2) } else { u32(1) }}]!}
+	mut log_payloads := []fw.FwLogPayload{len: 6 * 256}
+	defer { unsafe { log_payloads.free() } }
+	log_payloads[0] = fw.FwLogPayload{msg_type: 3}
+	log_payloads[0].message[0] = `D`
+	log_ring := [fw.FwLogMsg{msg_type: 2}, fw.FwLogMsg{}]!
+	aux_ring := [u64(0x1234), 0]!
+	event_ring := [fw.FwEventMsg{tag: if fatal { fw.fw_event_fault } else { fw.fw_event_grow_tvb }},
+		fw.FwEventMsg{tag: fw.fw_event_grow_tvb}, fw.FwEventMsg{}]!
+	mut graph := G13ChannelAllocations{
+		fwlog_payload: SharedBuffer{phys: u64(log_payloads.data), size: fw.g13_fw_log_payload_size}
+	}
+	mut transport := rtkit.RTKit{name: 'g13-doorbell'}
+	mut mgr := GpuManager{
+		hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+		g13_channels: unsafe { &graph }
+		rtk: unsafe { &transport }
+	}
+	mgr.channels.fw_log = channel.new_rx_channel('fwlog', 1, u64(unsafe { &order.headers[0] }),
+		2, u64(unsafe { &log_ring }), 2, 0x38)
+	mgr.channels.ktrace = channel.new_rx_channel('ktrace', 1, u64(unsafe { &order.headers[1] }),
+		2, u64(unsafe { &aux_ring }), 2, 8)
+	mgr.channels.stats = channel.new_rx_channel('stats', 1, u64(unsafe { &order.headers[2] }),
+		2, u64(unsafe { &aux_ring }), 2, 8)
+	mgr.channels.event = channel.new_rx_channel('event', 1, u64(unsafe { &order.headers[3] }),
+		2, u64(unsafe { &event_ring }), 3, 0x38)
+	receive_owner = unsafe { &mgr }
+	receive_order = unsafe { &order }
+	katomic.on_next_sync(observe_receive_order)
+	ack := mailbox.MboxMsg{data0: 0x0070000000000020}
+	if scenario in [.doorbell, .fatal_doorbell]! {
+		doorbell := mailbox.MboxMsg{data0: msg_rx_doorbell, data1: ep_firmware}
+		transport.mbox.inject(doorbell)
+		transport.mbox.inject(doorbell)
+		transport.mbox.inject(ack)
+		assert mgr.checked_poll_rtkit_messages()
+		assert order.acknowledgements == 4
+		if fatal {
+			assert mgr.state == .error && transport.iop_power_state == 0
+			next := transport.recv_msg() or { panic('missing queued doorbell') }
+			later_ack := transport.recv_msg() or { panic('missing queued IOP acknowledgement') }
+			assert next == doorbell && later_ack == ack
+		} else {
+			assert mgr.state == .running && transport.iop_power_state == 0x20
+		}
+	} else if scenario == .invalid_doorbell {
+		transport.mbox.inject(mailbox.MboxMsg{data0: msg_rx_doorbell, data1: 0x21})
+		transport.mbox.inject(mailbox.MboxMsg{data0: msg_rx_doorbell | 1, data1: ep_firmware})
+		assert mgr.checked_poll_rtkit_messages()
+		assert order.acknowledgements == 0
+	}
+	event_worker(mut mgr)
+	for header in order.headers {
+		assert header.read_ptr == 1
+	}
+	assert order.acknowledgements == 4 && !mgr.lock.is_held()
+	if fatal {
+		assert mgr.grows == 0
+		assert_failed(&mgr)
+	} else {
+		assert mgr.grows == 1
+	}
+	receive_order = unsafe { nil }
+	receive_owner = unsafe { nil }
 }
