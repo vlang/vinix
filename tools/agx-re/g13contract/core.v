@@ -1088,6 +1088,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'Global GET_PARAMS treats size as an input bound, shares one bounded prefix copy, permits zero-byte queries and preserves fault output/header semantics',
 		'BIND preallocates mapping/table storage before replacing idle overlaps, preserves survivors and aborts new installation if old retirement is refused',
 		'UNBIND removes intersections across holes and multiple BOs, preallocates surviving fragments and retries retained retirements',
+		'Busy VMs allow range UNBIND over holes and legacy UNBIND_ALL without matching records while protecting live and retiring mappings',
 		'GEM-create size validation returns EINVAL for zero and EOVERFLOW for 16 KiB rounding overflow after private VM lookup and before allocation',
 		'SINGLE_PAGE BIND consumes one BO page and repeats its PTE across the complete VA range with rollback/invalidation and retained backing',
 		'BIND resolves its BO and validates size/global fields before VM lookup; unbind and private-window checks retain the mutation lock',

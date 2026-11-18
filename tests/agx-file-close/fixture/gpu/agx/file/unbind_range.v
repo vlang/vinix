@@ -37,12 +37,16 @@ fn check_unbind_ranges() {
 					if repeated { request.flags |= ioctl.asahi_bind_single_page }
 					assert file.ioctl_gem_bind(&request) == 0
 				}
-				assert file.ioctl_gem_bind(bind(8, 2, 0x4000)) == 0
+				assert file.ioctl_gem_bind(bind(8, 2, 7 * pgtable.uat_pgsz)) == 0
 				original := pt.leaves
 				request := range_request(cut[0], cut[1])
 				before_alloc := memory.calls(); before_check := gpu.mapping_checks()
+				mut occupied := false
+				for index in int(cut[0]) .. int(cut[1]) {
+					if original[index] != 0 { occupied = true; break }
+				}
 				vm.inflight = 1
-				assert file.ioctl_gem_bind(&request) == -16
+				assert file.ioctl_gem_bind(&request) == if occupied { -16 } else { 0 }
 				assert first.references == 3 && second.references == 3 && pt.unmaps == 0
 				assert memory.calls() == before_alloc && gpu.mapping_checks() == before_check && pt.leaves == original
 				vm.inflight = 0; cases++
@@ -66,11 +70,13 @@ fn check_unbind_ranges() {
 					if mapping.vm_id == 1 { assert !ranges_overlap(mapping.addr, mapping.size, request.addr, request.range) }
 				}
 				assert first.references == first_refs && second.references == second_refs
-				assert neighbor.maps == 1 && neighbor.unmaps == 0 && neighbor.leaves[0] == second.phys_addr
-				before_unmaps := pt.unmaps; after_alloc := memory.calls()
+				assert neighbor.maps == 1 && neighbor.unmaps == 0 && neighbor.leaves[6] == second.phys_addr
+				before_unmaps := pt.unmaps; after_alloc := memory.calls(); after_checks := gpu.mapping_checks()
+				vm.inflight = 1
 				assert file.ioctl_gem_bind(&request) == 0
-				assert pt.unmaps == before_unmaps && memory.calls() == after_alloc
+				assert pt.unmaps == before_unmaps && memory.calls() == after_alloc && gpu.mapping_checks() == after_checks
 				assert first.references == first_refs && second.references == second_refs && pt.maps == 3
+				vm.inflight = 0
 				cases++
 				assert file.close() && vm.destroyed && other.destroyed && gem.live() == 0
 				memory.assert_released()
@@ -113,7 +119,9 @@ fn check_unbind_ranges() {
 			assert pt.last_unmap_size == request.range; cases++
 			vm.inflight = 1
 			assert file.ioctl_gem_bind(&inner) == -16 && object.references == 4 && pt.unmaps == 1
-			vm.inflight = 0; cases++
+			all := ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, vm_id: 1, handle: 7 }
+			assert file.ioctl_gem_bind(&all) == -16 && object.references == 4 && pt.unmaps == 1
+			vm.inflight = 0; cases += 2
 			assert file.ioctl_gem_bind(&inner) == 0 && object.references == 3 && file.mappings.len == 2 && pt.unmaps == 1
 			cases++
 			for index in 0 .. 8 {
@@ -124,7 +132,6 @@ fn check_unbind_ranges() {
 			replacement.offset = 8 * pgtable.uat_pgsz
 			assert file.ioctl_gem_bind(&replacement) == 0 && object.references == 4; cases++
 			if repeated {
-				all := ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, vm_id: 1, handle: 7 }
 				assert file.ioctl_gem_bind(&all) == 0 && object.references == 1 && file.mappings.len == 0; cases++
 			} else {
 				assert file.close_object_handle(7) == 0 && file.mappings.len == 0 && gem.live() == 0; cases++
@@ -144,4 +151,34 @@ fn check_unbind_ranges() {
 		}
 	}
 	println('AGX range UNBIND: ${cases} ioctl checks; holes, multiple BOs, head/tail/middle survivors, contiguous/repeated leaves, busy gates, mutation-free reservation OOM, retained split tombstones and full-range retries, replacement, UNBIND_ALL/GEM_CLOSE and freed array reservations passed')
+	check_busy_unbind_all()
+}
+
+fn check_busy_unbind_all() {
+	mut pt := pgtable.UatPgtable{ watch_start: 0x4000 }
+	mut neighbor := pgtable.UatPgtable{ watch_start: 0x4000 }
+	mut vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: unsafe { &pt } }
+	mut other := mmu.UatContext{ id: 2, vm_id: 2, pgtable: unsafe { &neighbor } }
+	mut file := GpuFile{ vms: [unsafe { &vm }, unsafe { &other }] }
+	first := gem.create(7)
+	second := gem.create(8)
+	file.objects.table.add_created(first)
+	file.objects.table.add_created(second)
+	assert file.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
+	assert file.ioctl_gem_bind(bind(8, 2, 0x4000)) == 0
+	before_alloc := memory.calls()
+	before_checks := gpu.mapping_checks()
+	vm.inflight = 1
+	mut request := ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, vm_id: 1, handle: 8 }
+	assert file.ioctl_gem_bind(&request) == 0, 'UNBIND_ALL must ignore bindings in another VM'
+	request.handle = 7
+	assert file.ioctl_gem_bind(&request) == -16
+	request.handle = 99
+	assert file.ioctl_gem_bind(&request) == -2
+	assert file.mappings.len == 2 && first.references == 2 && second.references == 2
+	assert pt.unmaps == 0 && neighbor.unmaps == 0 && memory.calls() == before_alloc && gpu.mapping_checks() == before_checks
+	vm.inflight = 0
+	assert file.close() && vm.destroyed && other.destroyed && gem.live() == 0
+	memory.assert_released()
+	println('AGX legacy UNBIND_ALL: busy VM accepts an unmatched handle, protects mapped backing and rejects a missing handle')
 }

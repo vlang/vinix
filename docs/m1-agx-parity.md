@@ -120,6 +120,28 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `4729d926ead4c19620aabdb33f16f6ed48c874060ec2fc2876a2b3161d226d51`.
 
+Both G13 ABIs now accept a valid range unbind with no overlapping records
+while the VM has jobs in flight. The pinned Asahi GPUVM walk returns
+success for a range with no matching GPUVAs once its preparation succeeds.
+Vinix also accepts legacy UNBIND_ALL when the selected VM has no
+mapping for the handle. Live overlaps and retained retirement records
+still require idle. [Asahi GPUVM unmap walk](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gpuvm.c#L2708-L2767)
+
+Both kernel builds and all 82 contract test files passed. Sanitizer
+coverage includes 15,000 range checks, 1,600 modern VM_BIND checks,
+legacy UNBIND_ALL, submission, and TLB tests. The compiled controls
+caught rejection of an empty range, acceptance of a busy overlap,
+and rejection of a legacy unbind whose handle mapped only in another VM.
+The allocation scan reproduced 178 baseline findings. Whole-driver
+parity remains `not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `737faa979b07b9d68a3ba3b4bec3ac7cef91fc9d` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-empty-unbind-20261118/`.
+The archive and restored copy passed full inventory verification.
+`bundle.tar.gz` SHA-256 is
+`26a89a90c8586bfb028304af1c5561a192a13fcd46ae1a6a9fab040f36bfce0e`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

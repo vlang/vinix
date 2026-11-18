@@ -546,6 +546,16 @@ fn ranges_overlap(first_addr u64, first_size u64, second_addr u64, second_size u
 	return first_addr < second_addr + second_size && second_addr < first_addr + first_size
 }
 
+// Retiring records still have an owner even after their PTEs are gone.
+fn (f &GpuFile) has_mapping_overlap_locked(vm_id u32, addr u64, size u64) bool {
+	for mapping in f.mappings {
+		if mapping.vm_id == vm_id && ranges_overlap(mapping.addr, mapping.size, addr, size) {
+			return true
+		}
+	}
+	return false
+}
+
 // GPU-only GEM mappings are coherent. Page-table edits complete the
 // translation invalidation for the published root before this state check.
 fn finish_file_mapping(unmapped bool) bool {
@@ -837,14 +847,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				gem.unref(obj)
 				return -5
 			}
-			mut replacing := false
-			for mapping in f.mappings {
-				if mapping.vm_id == vm_slot
-					&& ranges_overlap(mapping.addr, mapping.size, request.addr, request.range) {
-					replacing = true
-					break
-				}
-			}
+			replacing := f.has_mapping_overlap_locked(vm_slot, request.addr, request.range)
 			if replacing && katomic.load(&ctx.inflight) != 0 {
 				gem.unref(obj)
 				return -16 // EBUSY: replacement must not remove pages used by jobs.
@@ -891,7 +894,8 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
 			if katomic.load(&ctx.inflight) != 0 {
-				return -16 // EBUSY: firmware may still dereference this mapping
+				// A hole needs no PTE changes or owner retirement.
+				return if f.has_mapping_overlap_locked(ctx.id, request.addr, request.range) { -16 } else { 0 }
 			}
 			return f.unbind_range_locked(ctx.id, request.addr, request.range)
 		}
@@ -900,14 +904,15 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
 			obj := f.objects.get_ref(request.handle) or { return -2 }
-			if katomic.load(&ctx.inflight) != 0 {
-				gem.unref(obj)
-				return -16
-			}
+			busy := katomic.load(&ctx.inflight) != 0
 			mut retired := true
 			for i := f.mappings.len - 1; i >= 0; i-- {
 				mapping := f.mappings[i]
 				if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj) {
+					if busy {
+						gem.unref(obj)
+						return -16
+					}
 					if !f.retire_mapping_locked(i) {
 						retired = false
 					}

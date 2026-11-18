@@ -3,8 +3,8 @@ module g13contract
 
 fn check_bind_replace_local(file string, page_table string) ! {
 	bind := section(file, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'ioctl.asahi_bind_op_unbind {', 'Native BIND replacement')!
-	require_order(bind, ['vm_slot := ctx.id', 'if !f.cleanup_closed_mappings_locked(ctx)', 'mut replacing := false',
-		'replacing = true', 'if replacing && katomic.load(&ctx.inflight)',
+	require_order(bind, ['vm_slot := ctx.id', 'if !f.cleanup_closed_mappings_locked(ctx)',
+		'replacing := f.has_mapping_overlap_locked(vm_slot, request.addr, request.range)', 'if replacing && katomic.load(&ctx.inflight)',
 		'gem.unref(obj)', 'return -16',
 		'fragments := f.mapping_survivor_count_locked(vm_slot, request.addr, request.range)',
 		'if fragments < 0 { gem.unref(obj); return -22 }', 'if !f.reserve_mapping_slots_locked(fragments + 1)',

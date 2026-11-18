@@ -106,6 +106,8 @@ fn check_modern_transport() {
 }
 
 fn check_modern_binding() {
+	driver := drm.DrmDriver{ ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle }
+	device := drm.DrmDevice{ driver: unsafe { &driver } }
 	mut cases := 0
 	for _ in 0 .. 100 {
 		for stride in [u32(sizeof(asahi.GemBindOp)), u32(sizeof(asahi.GemBindOp) + 8)]! {
@@ -137,7 +139,25 @@ fn check_modern_binding() {
 			assert file.ioctl_modern_vm_bind(unsafe { &request }) == 0 && file.mappings.len == 2
 			assert pt.protections[0] == pgtable.gpu_prot_gpu_shared_ro && pt.protections[1] == pgtable.gpu_prot_gpu_shared_wo
 			assert pt.leaves[1] == obj.phys_addr && obj.references == 3
-			mut unbind := asahi.GemBindOp{ flags: asahi.bind_unbind, range: 0x8000, addr: 0x4000 }
+			mut unbind := asahi.GemBindOp{ flags: asahi.bind_unbind, range: 0x4000, addr: 0x4000 }
+			third := asahi.GemBindOp{ flags: asahi.bind_read, handle: 7, range: 0x4000, addr: 0xc000 }
+			before_unmaps := pt.unmaps
+			file_map[0x4444] = unsafe { &file }
+			vm.inflight = 1
+			unsafe {
+				C.memcpy(&bytes[0], &unbind, sizeof(unbind))
+				C.memcpy(&bytes[stride], &third, sizeof(third))
+			}
+			assert drm.invoke(&device, 0x4444, asahi.vm_bind, sizeof(request), 1, unsafe { voidptr(&request) }) == -16
+			assert file.mappings.len == 2 && pt.leaves[2] == 0 && pt.unmaps == before_unmaps && obj.references == 3
+			unbind.addr = 0x10000
+			unsafe { C.memcpy(&bytes[0], &unbind, sizeof(unbind)) }
+			assert drm.invoke(&device, 0x4444, asahi.vm_bind, sizeof(request), 1, unsafe { voidptr(&request) }) == 0
+			assert file.mappings.len == 3 && pt.leaves[2] == obj.phys_addr && pt.unmaps == before_unmaps && obj.references == 4
+			vm.inflight = 0
+			file_map.delete(0x4444)
+			unbind.addr = 0x4000
+			unbind.range = 0xc000
 			request.num_binds = 1
 			request.stride = sizeof(unbind)
 			request.userptr = unsafe { u64(&unbind) }
@@ -148,14 +168,14 @@ fn check_modern_binding() {
 			assert file.ioctl_modern_vm_bind(unsafe { &request }) == 0 && file.mappings.len == 1
 			assert file.close() && vm.destroyed && gem.live() == 0
 			memory.assert_released()
-			cases += 6
+			cases += 8
 		}
 	}
 	mut file := GpuFile{}
 	assert file.ioctl_modern_vm_bind(&asahi.VmBind{ stride: 1 }) == 0
 	assert file.ioctl_modern_vm_bind(&asahi.VmBind{}) == -22
-	assert cases == 1200
-	println('AGX modern VM_BIND: 1200 real mapping checks cover immutable batch copy, copy/OOM refusal before mutation, prefix errors, strided/short records and read/write/single-page translation')
+	assert cases == 1600
+	println('AGX modern VM_BIND: ${cases} real mapping checks cover immutable batch copy, copy/OOM refusal before mutation, prefix errors, busy-VM unbind, strided/short records and read/write/single-page translation')
 }
 
 fn check_modern_bind_staging_order() {

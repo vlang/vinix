@@ -24,9 +24,23 @@ fn check_unbind_range_local(file string) ! {
 		'f.mappings[i].addr = cut_start', 'f.mappings[i].size = cut_end - cut_start',
 		'if !f.retire_mapping_locked(i) { retired = false }', 'return if retired { 0 } else { -5 }'], 'Reserve transient fragments before clipped retirement and retry without resplitting')!
 	require(unmap.count('gem.ref_obj(') == 2 && !unmap.contains('gem.unref(') && !unmap.contains('pt.map'), 'Survivors retain PTEs and own refs; retirement owns the only release')!
-	ioctl := section(file.all_after('pub fn (mut f GpuFile) ioctl_gem_bind('), 'ioctl.asahi_bind_op_unbind {', 'ioctl.asahi_bind_op_unbind_all {', 'Native idle range dispatch')!
-	require_order(ioctl, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'katomic.load(&ctx.inflight)', 'return -16',
-		'return f.unbind_range_locked(ctx.id, request.addr, request.range)'], 'Range mutation follows VM/private validation and idle gate')!
+	overlap := section(file, 'fn ranges_overlap(', '// GPU-only GEM mappings', 'Native mapping overlap')!
+	require_order(overlap, ['return first_addr < second_addr + second_size && second_addr < first_addr + first_size',
+		'fn (f &GpuFile) has_mapping_overlap_locked(', 'for mapping in f.mappings',
+		'if mapping.vm_id == vm_id && ranges_overlap(mapping.addr, mapping.size, addr, size)', 'return true', 'return false'],
+		'Half-open overlap test uses internal VM identity')!
+	require(!overlap.contains('mapping.retiring'), 'Overlap test includes retained retirements')!
+	dispatch := file.all_after('pub fn (mut f GpuFile) ioctl_gem_bind(')
+	range := section(dispatch, 'ioctl.asahi_bind_op_unbind {', 'ioctl.asahi_bind_op_unbind_all {', 'Native range dispatch')!
+	require_order(range, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'katomic.load(&ctx.inflight)',
+		'return if f.has_mapping_overlap_locked(ctx.id, request.addr, request.range) { -16 } else { 0 }',
+		'return f.unbind_range_locked(ctx.id, request.addr, request.range)'], 'Busy range unbind succeeds only for a hole')!
+	all := section(dispatch, 'ioctl.asahi_bind_op_unbind_all {', 'pub fn (f &GpuFile) ioctl_get_time(', 'Native legacy unbind-all dispatch')!
+	require_order(all, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'obj := f.objects.get_ref(request.handle)',
+		'busy := katomic.load(&ctx.inflight) != 0', 'for i := f.mappings.len - 1; i >= 0; i--',
+		'if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj)', 'if busy {', 'gem.unref(obj)', 'return -16',
+		'if !f.retire_mapping_locked(i)', 'gem.unref(obj)', 'return if retired { 0 } else { -5 }'],
+		'Legacy unbind-all gates only matching records and returns the temporary GEM reference')!
 }
 
 fn check_unbind_range_reference(file string, mmu string) ! {
