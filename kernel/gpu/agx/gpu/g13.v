@@ -712,8 +712,7 @@ fn (mut mgr GpuManager) initialize_g13_render_buffer(mut resources G13QueueResou
 }
 
 // Grow the queue's TVB to the minimum needed by a scene. The page and block
-// tables are updated only after every new block has a valid, acknowledged UAT
-// mapping, so firmware never observes a half-committed heap extension.
+// tables are updated only after every new block has a published UAT mapping.
 fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResources,
 	minimum u32, firmware_active bool) bool {
 	if !buffer.initialized || buffer.context == unsafe { nil } || minimum == 0
@@ -729,7 +728,6 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 		return false
 	}
 	mut context := unsafe { buffer.context }
-	vm_slot := context.bound_slot()
 	old_count := buffer.blocks.len
 	// Reserve a complete replacement pointer table before allocating GPU
 	// blocks. It is an owned, nonsliced V array over fallible raw backing;
@@ -753,14 +751,13 @@ fn (mut mgr GpuManager) ensure_g13_tvb_blocks(mut buffer G13RenderBufferResource
 			unsafe { staged.free() }
 		}
 	}
+	// The GPU-only allocator completes the page-table update and any range
+	// TLBI for a resident VM before returning the block.
 	for u32(staged.len) < minimum {
 		block := context.alloc_driver_buffer_aligned(fw.g13_tvb_block_size, false, fw.g13_tvb_page_size) or {
 			return false
 		}
 		staged << block
-		if vm_slot != 0 && !mgr.flush_g13_uat_range(vm_slot, block.va, block.size) {
-			return false
-		}
 	}
 	// Asahi Buffer::ensure_blocks commits only after the entire extension
 	// exists. Allocation or mapping failure leaves both published tables and

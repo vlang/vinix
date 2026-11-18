@@ -248,3 +248,32 @@ The evidence archive covers `5f32129142a2291fe2b1fbd00295954d7901f8be` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-tvb-control-defaults-20261119.YLdca3/bundle.tar.gz`
 with SHA-256 `0ed2a812d8ccc8cd0239149c2e7dde5017446fbaacfa480f98235209da659730`.
+
+## GPU-only TVB block publication
+
+G13 grows the tiled vertex buffer through the GPU-only page-table mapping path.
+The UAT allocator completes the outer-shareable range TLBI for a resident VM.
+A dormant VM gets its ASID invalidation when its root is installed. TVB growth
+publishes the page list, block list and counters only after all new blocks are
+mapped. This removes a firmware-control round trip per new block in a bound VM.
+[Pinned TVB allocation and publication](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/buffer.rs#L485-L538)
+[Pinned UAT map completion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L627-L663)
+
+The sanitizer regression caught the old firmware-control call. The revised
+fixture verifies publication for bound and dormant VMs. Injected allocation and
+mapping failures preserve the existing tables and counters and release staged
+backing. The cached-buffer teardown fixture still exercises the firmware cache
+flush retry. The production UAT sanitizer suite checks mapping, rollback,
+invalidation, and root publication on the host.
+
+Both kernel builds, the G13 failure suite, 79 source-contract test files,
+and 122 pinned reference checks passed. Generated AArch64 C confirms that
+the growth path uses the GPU-only allocator and that the resident range
+invalidation uses outer-shareable TLBI with completion barriers. The
+allocation scan matched the 176 baseline findings. M1 hardware validation
+remains open.
+
+The evidence archive covers `fdd8d95c6141b436f41fce0efca6bcf719abaef5` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-tvb-tlbi-20261119.QqqUCK/bundle.tar.gz`
+with SHA-256 `e82b256174f79cf7d2b0525b41c61cd193269907ec2002de47dcf31033f2f9d4`.

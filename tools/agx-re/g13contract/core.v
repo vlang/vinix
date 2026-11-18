@@ -1224,10 +1224,12 @@ pub fn check_tvb_reference(asahi_linux string, repo string) ![]string {
 		'inner.blocks.reserve', 'new_blocks.into_iter()', 'raw.total.store',
 		'raw.wptr.store', 'if inner.active_scenes == 0'], 'Asahi staged TVB extension')!
 	local_growth := section(local, 'fn (mut mgr GpuManager) ensure_g13_tvb_blocks(', '// Asahi Buffer::auto_grow', 'Vinix TVB extension')!
-	require_order(local_growth, ['vm_slot := context.bound_slot()', 'memory.malloc_packed_fallible', 'for u32(staged.len)',
-		'staged << block', 'if vm_slot != 0 && !mgr.flush_g13_uat_range(vm_slot,', 'for index := u32(old_count)',
+	require_order(local_growth, ['memory.malloc_packed_fallible', 'for u32(staged.len)',
+		'context.alloc_driver_buffer_aligned(fw.g13_tvb_block_size, false, fw.g13_tvb_page_size)',
+		'staged << block', 'for index := u32(old_count)',
 		'buffer.blocks = staged', 'katomic.store(mut &control.total',
 		'katomic.store(mut &control.wptr', 'if !firmware_active'], 'Vinix staged TVB extension')!
+	require(!local_growth.contains('flush_g13_uat_range'), 'GPU-only TVB growth uses page-table TLBI without FwCtl')!
 	reference_scene := section(reference, '    pub(crate) fn new_scene(', '    /// Increment the buffer', 'Asahi scene lifetime')!
 	require_order(reference_scene, ['if inner.active_slot.is_none()', 'inner.active_slot = Some(slot)',
 		'inner.active_scenes += 1'], 'Asahi scene slot retention')!

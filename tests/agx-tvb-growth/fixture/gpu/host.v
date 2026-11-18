@@ -75,7 +75,6 @@ __global observed_control &fw.G13BufferBlockControl = unsafe { nil }
 __global observed_pages &u32 = unsafe { nil }
 __global observed_blocks &u32 = unsafe { nil }
 __global expected_count u32
-__global check_unpublished = true
 __global uat_mgr = unsafe { &mmu.UatManager(nil) }
 
 fn unpublished() {
@@ -90,18 +89,17 @@ fn unpublished() {
 
 fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, address u64, size u64) bool {
 	assert slot == 1 && address % 0x8000 == 0 && size == 0x20000
-	if check_unpublished { unpublished() }
 	index := mgr.flushes
 	mgr.flushes++
 	return index != mgr.fail_flush_at
 }
 
-fn check_growth(abi hw.FirmwareAbi, fail_alloc int, fail_flush int, metadata_fail bool, active bool) {
+fn check_growth(abi hw.FirmwareAbi, fail_alloc int, fail_map int, metadata_fail bool, active bool) {
 	mut pages := [64]u32{init: 0xdeadbeef}
 	mut blocks := [32]u32{init: 0xdeadbeef}
 	mut info := [256]u8{}
 	mut control := fw.G13BufferBlockControl{}
-	mut context := mmu.UatContext{ fail_at: fail_alloc, check: unpublished }
+	mut context := mmu.UatContext{ fail_at: fail_alloc, fail_map_at: fail_map, check: unpublished }
 	mut page_buffer := mmu.UatBuffer{ phys: unsafe { u64(&pages) }, size: sizeof(pages) }
 	mut block_buffer := mmu.UatBuffer{ phys: unsafe { u64(&blocks) }, size: sizeof(blocks) }
 	mut buffer := G13RenderBufferResources{
@@ -117,12 +115,14 @@ fn check_growth(abi hw.FirmwareAbi, fail_alloc int, fail_flush int, metadata_fai
 	observed_pages = unsafe { &pages[0] }
 	observed_blocks = unsafe { &blocks[0] }
 	expected_count = 0
-	mut mgr := GpuManager{ hw_config: hw.HwConfig{ firmware_abi: abi }, fail_flush_at: fail_flush }
+	mut mgr := GpuManager{ hw_config: hw.HwConfig{ firmware_abi: abi }, fail_flush_at: 0 }
 	memory.fail_next(metadata_fail)
 	result := mgr.ensure_g13_tvb_blocks(mut buffer, 8, active)
 	memory.fail_next(false)
-	if fail_alloc >= 0 || fail_flush >= 0 || metadata_fail {
+	assert mgr.flushes == 0, 'GPU-only TVB growth must not request a firmware flush'
+	if fail_alloc >= 0 || fail_map >= 0 || metadata_fail {
 		assert !result
+		assert context.map_failures == if fail_map >= 0 { 1 } else { 0 }
 		unpublished()
 		assert buffer.blocks.len == 0 && context.allocated == context.released
 		assert info.all(it == 0)
@@ -152,17 +152,18 @@ fn check_growth(abi hw.FirmwareAbi, fail_alloc int, fail_flush int, metadata_fai
 	assert !mgr.ensure_g13_tvb_blocks(mut buffer, 12, active)
 	memory.fail_next(false)
 	assert buffer.blocks.len == 8 && info == before
-	context.fail_at = context.allocated + 2
+	context.fail_map_at = context.allocated + 2
 	assert !mgr.ensure_g13_tvb_blocks(mut buffer, 12, active)
 	unpublished()
-	assert buffer.blocks.len == 8 && context.released == 2
+	assert buffer.blocks.len == 8 && context.released == 3 && context.map_failures == 1
 	assert info == before
 	for i in 0 .. 8 {
 		assert blocks[i * 2] == u32(buffer.blocks[i].va >> 15)
 	}
-	context.fail_at = -1
+	context.fail_map_at = -1
 	assert mgr.ensure_g13_tvb_blocks(mut buffer, 12, active)
 	assert buffer.blocks.len == 12 && control.total == 12 && control.wptr == 12
+	assert mgr.flushes == 0
 	assert !mgr.ensure_g13_tvb_blocks(mut buffer, 17, active), 'page table capacity must be checked before allocation'
 	for block in buffer.blocks { context.release_driver_buffer(block) }
 	assert context.released == context.allocated
@@ -174,27 +175,26 @@ pub fn run_checks() {
 		for fail in 0 .. 8 {
 			check_growth(abi, fail, -1, false, false)
 			check_growth(abi, -1, fail, false, false)
+			check_growth(abi, -1, fail, false, true)
 		}
 		check_growth(abi, -1, -1, true, false)
 		check_growth(abi, -1, -1, false, false)
 		check_growth(abi, -1, -1, false, true)
-		check_unpublished = false
-		for fail in 0 .. 10 { check_initialization(abi, fail, -1, -1, false, true) }
+		for fail in 0 .. 10 {
+			check_initialization(abi, fail, -1, -1, false, true)
+			check_initialization(abi, -1, -1, fail, false, true)
+		}
 		for fail in 0 .. 5 { check_initialization(abi, -1, fail, -1, false, true) }
-		for fail in 0 .. 8 { check_initialization(abi, -1, -1, fail, false, true) }
 		check_initialization(abi, -1, -1, -1, true, true)
 		check_initialization(abi, -1, -1, -1, false, true)
-		check_initialization(abi, -1, -1, 0, false, false)
-		check_unpublished = true
+		check_initialization(abi, -1, -1, -1, false, false)
 	}
-	println('AGX TVB growth: both ABIs, every allocation/flush failure, atomic extension and firmware-owned counters passed')
-	println('AGX initial TVB: eight blocks before any scene, all allocation/flush failures unwind the complete graph on both ABIs passed')
-	println('AGX unbound TVB: eight blocks allocated and released without a firmware range flush on both ABIs')
+	println('AGX TVB growth: both ABIs, every allocation and mapping failure, atomic extension and firmware-owned counters passed')
+	println('AGX initial TVB: eight blocks before any scene, bound and dormant VMs grow without firmware flushes and unwind all failures')
 	check_teardown_after_first_bind()
 }
 
 fn check_teardown_after_first_bind() {
-	check_unpublished = false
 	mut uat := mmu.UatManager{current: true}
 	uat_mgr = unsafe { &uat }
 	defer { uat_mgr = unsafe { nil } }
@@ -235,21 +235,22 @@ fn tvb_record_matches(buffer &SharedBuffer, expected &[0x40]u8) bool {
 	return buffer.size == 0x40 && unsafe { C.memcmp(data, expected, 0x40) == 0 && (&u8(data))[0x40] == 0xa5 }
 }
 
-fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fail_flush int, metadata_fail bool, bound bool) {
+fn check_initialization(abi hw.FirmwareAbi, fail_alloc int, fail_shared int, fail_map int, metadata_fail bool, bound bool) {
 	mut config := hw.t8103_config()
 	config.firmware_abi = abi
-	mut mgr := GpuManager{hw_config: config, fail_shared_at: fail_shared, fail_flush_at: fail_flush}
-	mut context := mmu.UatContext{id: 17, fail_at: fail_alloc, bound: bound}
+	mut mgr := GpuManager{hw_config: config, fail_shared_at: fail_shared, fail_flush_at: 0}
+	mut context := mmu.UatContext{id: 17, fail_at: fail_alloc, fail_map_at: fail_map, bound: bound}
 	mut resources := G13QueueResources{}
 	memory.fail_next(metadata_fail)
 	ok := mgr.initialize_g13_render_buffer(mut resources, &context)
 	memory.fail_next(false)
-	if fail_alloc >= 0 || fail_shared >= 0 || (bound && fail_flush >= 0) || metadata_fail {
+	assert mgr.flushes == 0
+	if fail_alloc >= 0 || fail_shared >= 0 || fail_map >= 0 || metadata_fail {
 		assert !ok
+		assert context.map_failures == if fail_map >= 0 { 1 } else { 0 }
 		assert !resources.render_buffer.initialized && resources.render_buffer.info.phys == 0
 		assert resources.render_buffer.blocks.len == 0
 	} else {
-		assert mgr.flushes == if bound { 8 } else { 0 }
 		buffer := &resources.render_buffer
 		assert ok && buffer.initialized && buffer.blocks.len == 8
 		assert !buffer.slot_reserved && buffer.active_scenes == 0 && buffer.tail_pointer_cache == unsafe { nil }

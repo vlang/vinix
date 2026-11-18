@@ -22,6 +22,8 @@ pub mut:
 	allocated int
 	released  int
 	fail_at   int = -1
+	fail_map_at int = -1
+	map_failures int
 	pool      [32]UatBuffer
 	check     fn () = unsafe { nil }
 }
@@ -70,6 +72,12 @@ pub fn (mut context UatContext) alloc_driver_buffer_aligned(size u64, private bo
 	context.allocated++
 	storage := if private { unsafe { C.calloc(1, size) } } else { unsafe { nil } }
 	if private { assert storage != unsafe { nil } }
+	if index == context.fail_map_at {
+		unsafe { C.free(storage) }
+		context.released++
+		context.map_failures++
+		return none
+	}
 	context.pool[index] = UatBuffer{ va: 0x100000 + u64(index) * 0x20000, size: size, phys: u64(storage) }
 	return unsafe { &context.pool[index] }
 }
