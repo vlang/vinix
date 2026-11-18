@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Both G13 submit ABIs publish output fences after the manager accepts the
+batch. [Output fence publication](m1-agx-output-publication.md)
+
 Both G13 submit ABIs hold a single firmware operation for each batch.
 [Firmware operation ownership](m1-agx-operation-ownership.md)
 

@@ -98,17 +98,21 @@ fn test_queue_fence_contract_rejects_reused_public_or_missing_identity() {
 	fences := os.read_file('${repo}/kernel/drm/syncobj/syncobj.v')!
 	queue := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
 	submit := os.read_file('${repo}/kernel/gpu/agx/file/file.v')!
-	check_queue_fence_contract(contexts, fences, queue, submit)!
+	pending := os.read_file('${repo}/kernel/gpu/agx/file/pending.v')!
+	check_queue_fence_contract(contexts, fences, queue, submit, pending)!
 	for broken in [contexts.replace('queue_context != 0 && ', ''),
 		contexts.replace('fence.queue_context == queue_context', 'fence.context == queue_context'),
 		contexts.replace('if value == ~u64(0) { u64(0) } else { value + 1 }', 'value + 1')] {
-		if _ := check_queue_fence_contract(broken, fences, queue, submit) { assert false }
+		if _ := check_queue_fence_contract(broken, fences, queue, submit, pending) { assert false }
 	}
-	if _ := check_queue_fence_contract(contexts, fences.replace('queue_context u64', ''), queue, submit) { assert false }
-	if _ := check_queue_fence_contract(contexts, fences, queue.replace('fence_context: fence_context', 'fence_context: 0'), submit) { assert false }
-	if _ := check_queue_fence_contract(contexts, fences, queue, submit.replace('queue_resources.fence_context)', 'u64(request.queue_id))')) { assert false }
-	if _ := check_queue_fence_contract(contexts, fences, queue.replace('fence_seqno        u32', 'fence_seqno        u64'), submit) { assert false }
-	if _ := check_queue_fence_contract(contexts, fences, queue, submit.replace('u64(fence_queue.next_fence_seqno())', 'timer.get_ns()')) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences.replace('queue_context u64', ''), queue, submit, pending) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue.replace('fence_context: fence_context', 'fence_context: 0'), submit, pending) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue, submit, pending.replace('queue.fence_context)', '1)')) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue.replace('fence_seqno        u32', 'fence_seqno        u64'), submit, pending) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue, submit, pending.replace('queue.next_fence_seqno()', '0')) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue, submit, pending.replace('return fence\n}', 'return item.final_fence\n}')) { assert false }
+	if _ := check_queue_fence_contract(contexts, fences, queue,
+		submit.replace('install_output_syncs(output_syncs, fence)', 'install_output_syncs(output_syncs, pending.final_fence)'), pending) { assert false }
 }
 
 fn test_ring_admission_contract_rejects_gpu_only_space_and_missing_spare() {

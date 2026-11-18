@@ -1466,7 +1466,6 @@ pub fn (mut f GpuFile) ioctl_submit(data &ioctl.DrmAsahiSubmit) int {
 
 // Both copied input formats share preparation and pending ownership. The
 // caller retains captured on failure; successful registration transfers it.
-// Modern ioctl registration still requires a coordinated UAPI transition.
 fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	commands []agxsubmission.Command, input_syncs &agxsubmission.SyncArray,
 	output_syncs &agxsubmission.SyncArray, result_handle u32) int {
@@ -1487,14 +1486,10 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	mut timestamps_transferred := false
 	defer { if !timestamps_transferred { f.release_g13_submission_timestamps(timestamps) } }
 	f.lock.acquire()
-	mut unqueued_fence := &syncobj.DmaFence(unsafe { nil })
-	mut unqueued_failure := 0
 	mut result_object := &gem.GemObject(unsafe { nil })
 	defer {
 		f.lock.release()
 		if result_object != unsafe { nil } { gem.unref(result_object) }
-		// Notify cancelled output fences after dropping file.lock and node backing.
-		if unqueued_fence != unsafe { nil } { signal_g13_submission_fence(unqueued_fence, unqueued_failure) }
 	}
 	vm_id := captured.vm_id
 	queue_caps := captured.caps
@@ -1574,8 +1569,6 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 		if !queued {
 			cancel_g13_pending(mut pending, -5)
 			assert katomic.load(&pending.callbacks_remaining) == 0
-			unqueued_fence = pending.final_fence
-			unqueued_failure = int(katomic.load(&pending.failure))
 			memory.free(storage)
 		}
 	}
@@ -1602,15 +1595,12 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	if !install_g13_batch_barriers(mut pending, initial_events) { return -5 }
 	gpu_manager.release_g13_initial_events(initial_events)
 	initial_events_released = true
-	mut fence_queue := unsafe { queue_resources }
-	pending.final_fence = syncobj.new_queue_fence(f.owner_key, u64(fence_queue.next_fence_seqno()), queue_resources.fence_context)
 	for index := u32(0); index < pending.command_count; index++ {
 		code := install_g13_batch_completion(mut pending, index, unsafe { &commands[index] }, result_object)
 		if code != 0 { return code }
 	}
-	if !agxsubmission.install_output_syncs(output_syncs, pending.final_fence) { return -22 }
 	katomic.inc(mut &pending.vm.inflight)
-	if !register_g13_pending(mut gpu_manager, pending) {
+	fence := register_g13_pending(mut gpu_manager, pending) or {
 		cancel_g13_pending(mut pending, -19)
 		assert katomic.load(&pending.callbacks_remaining) == 0
 		katomic.dec(mut &pending.vm.inflight)
@@ -1621,6 +1611,10 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	timestamps_transferred = true
 	dependencies_transferred = true
 	queued = true
+	// Both native ABIs stage referenced outputs and reserve every timeline
+	// node before preparation. Publication consumes those reservations.
+	installed := agxsubmission.install_output_syncs(output_syncs, fence)
+	assert installed
 	return 0
 }
 

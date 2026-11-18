@@ -351,7 +351,7 @@ fn check_input_dependency_contract(pending string) ! {
 		'cancel_g13_pending(mut item, if failure != 0'], 'Vinix input dependency scheduling')!
 }
 
-fn check_queue_fence_contract(contexts string, fences string, queue string, submit string) ! {
+fn check_queue_fence_contract(contexts string, fences string, queue string, submit string, pending string) ! {
 	require_order(contexts.fields().join(' '), ['next u64 = 1', 'fn (mut contexts QueueFenceContexts) allocate()',
 		'if contexts.next == 0 { return none }', 'value := contexts.next',
 		'contexts.next = if value == ~u64(0) { u64(0) } else { value + 1 }',
@@ -371,9 +371,14 @@ fn check_queue_fence_contract(contexts string, fences string, queue string, subm
 		'pub fn (mut queue G13QueueResources) next_fence_seqno() u32 {',
 		'queue.fence_seqno++', 'return queue.fence_seqno'], 'Vinix wrapping 32-bit fence sequence')!
 	require_order(submit, ['fn (mut f GpuFile) submit_g13_staged(', 'f.lock.acquire()',
-		'install_g13_batch_barriers(mut pending,', 'mut fence_queue := unsafe { queue_resources }',
-		'syncobj.new_queue_fence(f.owner_key, u64(fence_queue.next_fence_seqno()), queue_resources.fence_context)',
-		'agxsubmission.install_output_syncs'], 'Vinix assigns the retained queue sequence under its file lock')!
+		'install_g13_batch_barriers(mut pending,', 'install_g13_batch_completion(mut pending,',
+		'fence := register_g13_pending(mut gpu_manager, pending) or {', 'return -19',
+		'queued = true', 'agxsubmission.install_output_syncs(output_syncs, fence)'],
+		'Vinix publishes the retained queue fence after acceptance')!
+	enqueued := section(pending, 'fn enqueue_g13_pending(', 'fn g13_dependencies_ready(', 'Vinix fence handoff')!
+	require_order(enqueued, ['syncobj.new_queue_fence(item.file.owner_key, u64(queue.next_fence_seqno()), queue.fence_context)',
+		'item.final_fence = fence', 'pending_lock.acquire()', 'pending_tail = item',
+		'pending_lock.release()', 'return fence'], 'Vinix initializes the queue fence before making the worker node visible')!
 }
 
 fn check_event_admission_contract(local string, reference string) ! {
@@ -468,7 +473,7 @@ fn check_batch_admission_contract(local string, pending string, reference string
 		'.render_buffer.bound_blocks ='] {
 		require(!local.contains(mutation), 'Batch preflight must not publish or change live binding: ' + mutation)!
 	}
-	helper := section(pending, 'fn admit_g13_pending(', '// Called under manager.lock', 'Vinix borrowed batch references')!
+	helper := section(pending, 'fn admit_g13_pending(', 'fn enqueue_g13_pending(', 'Vinix borrowed batch references')!
 	require_order(helper, ['mut jobs := [64]gpu.G13SubmissionJob{}', 'index < item.command_count',
 		'manager.g13_batch_ready(jobs, item.command_count)'], 'Vinix borrowed batch references')!
 	poll := section(pending, 'fn poll_g13_pending(', '// Only the worker changes these pointers.', 'Vinix batch admission scheduling')!
@@ -502,7 +507,7 @@ fn check_batch_publication_contract(local string, pending string, reference stri
 		'Native batch must publish and notify once per participating pipe in reference order')!
 	require(!local.contains('pending_counted') && local.count('mgr.begin_g13_operation_locked()') == 1,
 		'Each native batch owns one operation independent of per-command completion')!
-	helper := section(pending, 'fn submit_g13_pending(', '// Called under manager.lock', 'Vinix batch ownership transfer')!
+	helper := section(pending, 'fn submit_g13_pending(', 'fn enqueue_g13_pending(', 'Vinix batch ownership transfer')!
 	require_order(helper, ['mut jobs := [64]gpu.G13SubmissionJob{}', 'mut positions := [64]u32{}',
 		'positions[count] = index', 'manager.submit_g13_batch(jobs, count, item.operation_active)',
 		'if transferred != 0 { item.operation_active = true }',
@@ -796,7 +801,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'value.value_0 = 0', 'value.value_18 = 1'], 'Vinix G13 compute priority')!
 	queue := read(os.join_path(base, 'queue/mod.rs'))!
 	require_order(queue, ['job.add_dependency(fence)?', 'job.commit()?', 'let mut job = job.arm()',
-		'let out_fence = job.fences().finished()', 'job.push()'], 'Asahi asynchronous dependency scheduling')!
+		'let out_fence = job.fences().finished()', 'job.push()', 'for mut sync in syncs',
+		'.add_point(chain, &out_fence, sync.timeline_value)', 'replace_fence(Some(&out_fence))'],
+		'Asahi asynchronous scheduling and output publication')!
 	file_source := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
 	check_queue_priority_local(file_source, read(os.join_path(repo, 'kernel/drm/ioctl/ioctl.v'))!, local)!
 	check_queue_priority_reference(read(os.join_path(asahi_linux, 'include/uapi/drm/asahi_drm.h'))!,
@@ -815,7 +822,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'f.bind_g13_submission_vm_locked', 'memory.malloc_packed_fallible(sizeof(G13PendingSubmission))',
 		'gpu_manager.prepare_g13_compute_job', 'gpu_manager.prepare_g13_render_job',
 		'install_g13_batch_barriers',
-		'gpu_manager.release_g13_initial_events', 'agxsubmission.install_output_syncs', 'register_g13_pending'], 'Vinix prepared async submission')!
+		'gpu_manager.release_g13_initial_events', 'register_g13_pending', 'agxsubmission.install_output_syncs'], 'Vinix prepared async submission')!
 	pending := read(os.join_path(repo, 'kernel/gpu/agx/file/pending.v'))!
 	check_submission_pipelining(pending)!
 	check_ring_admission_contract(local, workqueue)!
@@ -826,7 +833,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_g13_operation_contract(queue, manager, local, ioctl_submit, pending)!
 	check_input_dependency_contract(pending)!
 	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
-		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit)!
+		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit, pending)!
 	require_order(queue, ['let sched = sched::Scheduler::new(', 'let entity = sched::Entity::new(&sched,',
 		'_sched: sched,', 'entity,'], 'Asahi per-user-queue scheduler ownership')!
 	scheduler := read(os.join_path(asahi_linux, 'drivers/gpu/drm/scheduler/sched_entity.c'))!

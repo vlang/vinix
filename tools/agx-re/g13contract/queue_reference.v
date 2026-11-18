@@ -17,7 +17,7 @@ fn check_queue_reference_local(file string, pending string, gpu string, vfs stri
 		'mut queue_resources := unsafe { captured.resources }',
 		'f.cleanup_closed_mappings_locked(vm)', 'if !captured.retained { return -22 }',
 		'katomic.inc(mut &pending.vm.inflight)',
-		'if !register_g13_pending(', 'katomic.dec(mut &pending.vm.inflight)',
+		'fence := register_g13_pending(', 'katomic.dec(mut &pending.vm.inflight)',
 		'return -19', 'transferred = true', 'queued = true'], 'Owned capture survives staging and transfers only with accepted registration')!
 	require(!submit.contains('for queue in f.queues') && !submit.contains('for ownership in f.g13_queues'), 'Captured state must not be resolved again by userspace name')!
 	require(submit.count('katomic.inc(mut &pending.vm.inflight)') == 1 && submit.count('katomic.dec(mut &pending.vm.inflight)') == 1, 'Aggregate VM pin must keep its original registration balance')!

@@ -21,6 +21,7 @@ import klock
 import katomic
 import sched
 import aarch64.timer
+import drm.syncobj
 
 // RTKit endpoint IDs for GPU firmware
 pub const ep_firmware = u32(0x20)
@@ -146,13 +147,12 @@ fn (mut mgr GpuManager) reap_file_resources() {
 
 // Serialize accepted submissions with the worker's final shutdown poll.
 pub fn (mut mgr GpuManager) queue_g13_submission(jobs [64]G13SubmissionJob, count u32,
-	enqueue fn (voidptr), data voidptr) bool {
+	enqueue fn (voidptr) &syncobj.DmaFence, data voidptr) ?&syncobj.DmaFence {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
-	if mgr.state != .running { return false }
-	if !mgr.accept_g13_submission_locked(jobs, count) { return false }
-	enqueue(data)
-	return true
+	if mgr.state != .running { return none }
+	if !mgr.accept_g13_submission_locked(jobs, count) { return none }
+	return enqueue(data)
 }
 
 __global (

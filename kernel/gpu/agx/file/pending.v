@@ -129,7 +129,7 @@ fn install_g13_batch_barriers(mut item G13PendingSubmission, initial gpu.G13Init
 	return true
 }
 
-fn register_g13_pending(mut manager gpu.GpuManager, item &G13PendingSubmission) bool {
+fn register_g13_pending(mut manager gpu.GpuManager, item &G13PendingSubmission) ?&syncobj.DmaFence {
 	mut jobs := [64]gpu.G13SubmissionJob{}
 	for index := u32(0); index < item.command_count; index++ {
 		jobs[index] = gpu.G13SubmissionJob{ render: item.commands[index].render_job, compute: item.commands[index].compute_job }
@@ -168,15 +168,20 @@ fn submit_g13_pending(mut manager gpu.GpuManager, mut item G13PendingSubmission)
 	}
 }
 
-// Called under manager.lock while the ioctl still holds file.lock.
-fn enqueue_g13_pending(data voidptr) {
+// Called after acceptance under manager.lock while the ioctl still holds
+// file.lock. Return the retained fence even if the worker retires the node.
+fn enqueue_g13_pending(data voidptr) &syncobj.DmaFence {
 	mut item := unsafe { &G13PendingSubmission(data) }
 	assert item.next == unsafe { nil }
+	mut queue := unsafe { item.queue }
+	fence := syncobj.new_queue_fence(item.file.owner_key, u64(queue.next_fence_seqno()), queue.fence_context)
+	item.final_fence = fence
 	pending_lock.acquire()
 	if pending_tail == unsafe { nil } { pending_head = item } else { pending_tail.next = item }
 	pending_tail = item
 	pending_count++
 	pending_lock.release()
+	return fence
 }
 
 // DRM scheduler dependencies order execution. A signaled input fence releases

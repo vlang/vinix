@@ -11,19 +11,11 @@ import memory
 __global notification_node &G13PendingSubmission = unsafe { nil }
 __global notification_file &GpuFile = unsafe { nil }
 __global notification_object &gem.GemObject = unsafe { nil }
-__global notification_unqueued = false
 __global notifications = 0
 
 fn on_batch_notification(_ &syncobj.DmaFence) {
-	if notification_unqueued {
-		// Only staged payload storage remains until the last ioctl defer.
-		notification_file.lock.acquire()
-		notification_file.lock.release()
-		assert notification_file.vm.inflight == 0 && memory.outstanding() == 1
-	} else {
-		assert notification_node.callbacks_remaining == 0
-		assert notification_file.vm.inflight == 1
-	}
+	assert notification_node.callbacks_remaining == 0
+	assert notification_file.vm.inflight == 1
 	if notification_object != unsafe { nil } {
 		assert notification_object.references == 1
 	}
@@ -34,16 +26,7 @@ fn watch_batch(file &GpuFile, object &gem.GemObject, target &syncobj.DmaFence) {
 	notification_node = pending_head
 	notification_file = unsafe { file }
 	notification_object = unsafe { object }
-	notification_unqueued = false
 	syncobj.add_waiter(target, &syncobj.FenceWaiter{ callback: on_batch_notification })
-}
-
-fn watch_unqueued(data voidptr) {
-	state := unsafe { &G13SubmitCompletion(data) }
-	notification_file = state.submission.file
-	notification_object = state.result
-	notification_unqueued = true
-	syncobj.add_waiter(state.submission.final_fence, &syncobj.FenceWaiter{ callback: on_batch_notification })
 }
 
 fn is_compute(index u32, pattern int) bool {
@@ -164,10 +147,7 @@ fn check_batch_failures() {
 			manager.stop_barrier_at = if mode == 4 { index } else { -1 }
 			out := output()
 			assert submit_batch(mut file, 64, 2, 0, unsafe { nil }, out, false) < 0
-			// A stop during the last successful barrier call can occur just
-			// before fence creation and be observed during callback setup.
-			armed := mode == 1 || mode == 2 || (mode == 4 && index == 63)
-			assert file.g13_queues[0].resources.fence_seqno == if armed { u32(1) } else { u32(0) }
+			assert file.g13_queues[0].resources.fence_seqno == 0
 			assert manager.published.len == 0
 			assert_reverse(manager.released_order, if mode == 0 { index } else { 64 })
 			assert_drained(file)
@@ -233,26 +213,23 @@ fn check_middle_failure_and_shutdown() {
 	assert_drained(file)
 }
 
-fn check_unqueued_notification() {
+fn check_unqueued_results() {
 	gpu.reset()
 	mut file := new_file()
 	mut manager := gpu.get_global_manager() or { panic('manager') }
 	mut results := [8192]u8{}
 	mut object := gem.GemObject{ size: sizeof(results), virt_addr: unsafe { u64(&results) } }
 	file.objects = Objects{ object: &object }
-	manager.inspect_callback_at = 63
 	manager.stop_callback_at = 63
-	manager.on_callback = watch_unqueued
 	out := output()
+	previous := syncobj.new_fence(40, 1)
+	syncobj.replace_fence(out, previous)
 	before := notifications
 	assert submit_batch(mut file, 64, 2, 0, unsafe { nil }, out, true) == -19
-	assert notifications == before + 1 && object.references == 1
-	assert syncobj.get_error(fence(out)) != 0
-	assert fence(out).seqno == 1 && file.g13_queues[0].resources.fence_seqno == 1
+	assert notifications == before && object.references == 1
+	assert voidptr(fence(out)) == voidptr(previous) && !syncobj.is_signaled(previous)
+	assert file.g13_queues[0].resources.fence_seqno == 0
 	assert_drained(file)
-	notification_file = unsafe { nil }
-	notification_node = unsafe { nil }
-	notification_object = unsafe { nil }
 }
 
 fn check_fake_pair_limit() {
@@ -293,7 +270,7 @@ fn check_batches() {
 	check_batch_failures()
 	check_middle_failure_and_shutdown()
 	check_fake_pair_limit()
-	check_unqueued_notification()
+	check_unqueued_results()
 	check_legacy_timeline()
 	println('AGX batches: four 64-command orderings, per-subqueue barrier bounds, final fence/results, all 64 prepare/barrier/callback/stop failure positions, both allocations, reverse unwind, middle failure and fake pair limit passed')
 }

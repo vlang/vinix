@@ -363,6 +363,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_output_publication()
 	check_submission_operations()
 	check_g13_slot_wait()
 	check_queue_admission()
