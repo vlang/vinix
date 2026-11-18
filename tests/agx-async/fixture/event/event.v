@@ -9,8 +9,11 @@ __global wait_callback fn () = unsafe { nil }
 __global listener_table_full = false
 __global private_waits = 0
 __global generation_wakes = 0
+__global single_wake_count = 0
 
 pub fn notifications() u64 { return notification_count }
+
+pub fn single_wakes() int { return single_wake_count }
 
 pub fn generation(mut e eventstruct.Event) u64 {
 	e.l.acquire()
@@ -23,6 +26,15 @@ pub fn trigger(mut e eventstruct.Event, _drop bool) u64 {
 	e.l.acquire()
 	e.generation++
 	notification_count++
+	e.l.release()
+	return 0
+}
+
+pub fn trigger_n(mut e eventstruct.Event, count u64) u64 {
+	assert count == 1
+	e.l.acquire()
+	e.generation++
+	single_wake_count++
 	e.l.release()
 	return 0
 }

@@ -34,6 +34,10 @@ fn wake_waiting_submitter() {
 	assert waiting_file.vm.inflight == 0 && manager.prepares == 0 && pending_count == 0
 	assert uat_mgr.lease_count == 0 && waiting_file.g13_queues[0].resources.has_file_references()
 	assert time.armed() == 1
+	waiting_file.lock.acquire()
+	mut queue := unsafe { waiting_file.g13_queues[0].resources }
+	assert !queue.submission_gate.try_enter(), 'the slot waiter still owns same-queue admission'
+	waiting_file.lock.release()
 	mut task := proc.current_thread()
 	match slot_wake {
 		.release { uat_mgr.make_slot_available() }
@@ -65,14 +69,14 @@ fn wake_waiting_submitter() {
 	}
 }
 
-fn submit_slot_wait_packet(mut file GpuFile, out &syncobj.SyncObj) int {
+fn submit_slot_wait_packet(mut file GpuFile, queue_id u32, out &syncobj.SyncObj) int {
 	compute := asahi.CmdCompute{cdm_ctrl_stream_base: 0x12340000}
 	mut packet := []u8{}
 	defer { unsafe { packet.free() } }
 	append_packet(mut packet, asahi.cmd_compute, unsafe { &compute }, u16(sizeof(compute)),
 		asahi.barrier_none, asahi.barrier_none)
 	record := asahi.Sync{handle: out.handle}
-	request := asahi.Submit{queue_id: 1, syncs: u64(&record), out_sync_count: 1,
+	request := asahi.Submit{queue_id: queue_id, syncs: u64(&record), out_sync_count: 1,
 		cmdbuf: u64(packet.data), cmdbuf_size: u32(packet.len)}
 	return file.ioctl_modern_submit(&request)
 }
@@ -108,7 +112,7 @@ fn check_g13_slot_wait() {
 				event.before_wait(wake_waiting_submitter, reason == .firmware_switch)
 			}
 			code := if modern {
-				submit_slot_wait_packet(mut file, out)
+				submit_slot_wait_packet(mut file, 1, out)
 			} else {
 				submit(mut file, 1, false, unsafe { nil }, out, true)
 			}

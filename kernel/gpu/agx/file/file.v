@@ -1499,12 +1499,26 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	vm_id := captured.vm_id
 	queue_caps := captured.caps
 	if vm_id == 0 { return -22 }
+	mut queue_resources := unsafe { captured.resources }
+	if captured.retained {
+		for !queue_resources.submission_gate.try_enter() {
+			generation := queue_resources.submission_gate.generation()
+			f.lock.release()
+			resumed := queue_resources.submission_gate.wait(generation)
+			f.lock.acquire()
+			if !resumed { return -int(errno.erestartsys) }
+		}
+	}
+	defer {
+		// Drop the gate under file.lock, before the queue reaper can reclaim
+		// metadata whose captured reference was transferred to the worker.
+		if captured.retained { queue_resources.submission_gate.leave() }
+	}
 	vm := f.find_owned_vm(vm_id) or { return -22 }
 	// Never publish work through an incompletely invalidated mapping. This
 	// also retries mappings retained by an earlier GEM_CLOSE once VM pins end.
 	if !f.cleanup_closed_mappings_locked(vm) { return -5 }
 	if !captured.retained { return -22 }
-	queue_resources := captured.resources
 	for command in commands {
 		descriptor := command.descriptor
 		if (descriptor.cmd_type == ioctl.asahi_cmd_compute && queue_caps & ioctl.asahi_queue_cap_compute == 0)

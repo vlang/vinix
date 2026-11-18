@@ -363,6 +363,7 @@ fn check_mapping_admission() {
 
 pub fn run_checks() {
 	check_g13_slot_wait()
+	check_queue_admission()
 	check_pending_timestamps()
 	check_detached_submission_ownership()
 	check_detached_vm_submissions()

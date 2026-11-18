@@ -14,8 +14,9 @@ fn check_queue_reference_local(file string, pending string, gpu string, vfs stri
 		'mut transferred := false', 'defer { if !transferred { release_submission_queue(captured) } }',
 		'stage_storage := memory.malloc_packed_fallible', 'agxsubmission.stage_command_array(',
 		'g13_submission_status()', 'f.lock.acquire()', 'vm_id := captured.vm_id',
+		'mut queue_resources := unsafe { captured.resources }',
 		'f.cleanup_closed_mappings_locked(vm)', 'if !captured.retained { return -22 }',
-		'queue_resources := captured.resources', 'katomic.inc(mut &pending.vm.inflight)',
+		'katomic.inc(mut &pending.vm.inflight)',
 		'if !register_g13_pending(', 'katomic.dec(mut &pending.vm.inflight)',
 		'return -19', 'transferred = true', 'queued = true'], 'Owned capture survives staging and transfers only with accepted registration')!
 	require(!submit.contains('for queue in f.queues') && !submit.contains('for ownership in f.g13_queues'), 'Captured state must not be resolved again by userspace name')!

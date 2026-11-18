@@ -17,7 +17,8 @@ fn check_submit_lookup_order_contract(local string, reference string) ! {
 		'stage_storage := memory.malloc_packed_fallible(stage_bytes)',
 		'defer { memory.free(stage_storage) }', 'agxsubmission.stage_command_array(',
 		'agxsubmission.stage_g13_sync_array(', 'f.lock.acquire()', 'vm_id := captured.vm_id',
-		'queue_caps := captured.caps', 'vm := f.find_owned_vm(vm_id)', 'queue_resources := captured.resources'],
+		'queue_caps := captured.caps', 'mut queue_resources := unsafe { captured.resources }',
+		'vm := f.find_owned_vm(vm_id)'],
 		'Header validation, owned early lookup, unlocked staging and locked captured state')!
 	remote := section(reference, 'pub(crate) fn submit(', '/// IOCTL: get_time:', 'Packaged queue lookup order')!
 	require_order(remote, ['if data.flags != 0 || data.pad != 0', 'return Err(EINVAL)',

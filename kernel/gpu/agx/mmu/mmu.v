@@ -753,7 +753,7 @@ pub fn (mut mgr UatManager) release_g13_slot(ctx &UatContext, slot u32) {
 	if mgr.slot_users[slot] == 0 {
 		mgr.slot_release_clock++
 		mgr.slot_release[slot] = mgr.slot_release_clock
-		event.trigger(mut mgr.slot_released, true)
+		event.trigger_n(mut mgr.slot_released, 1)
 	}
 }
 
@@ -777,7 +777,7 @@ pub fn (mut mgr UatManager) unbind_context(ctx &UatContext) {
 	pt.unbind_tlb()
 	mgr.contexts[slot] = unsafe { nil }
 	if mgr.handoff_abi == .v12_3 {
-		event.trigger(mut mgr.slot_released, true)
+		event.trigger_n(mut mgr.slot_released, 1)
 	}
 }
 

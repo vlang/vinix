@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 serializes same-queue job preparation through the UAT wait and notifies
+one waiter when a slot is released. [Queue admission](m1-agx-queue-admission.md)
+
 Both G13 submit ABIs now wait interruptibly for an eligible UAT slot.
 [G13 UAT slot admission](m1-agx-slot-wait.md)
 

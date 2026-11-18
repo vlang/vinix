@@ -14,6 +14,7 @@ import gpu.agx.pgtable
 import gpu.agx.event
 import gpu.agx.mmu
 import gpu.agx.render as agxrender
+import gpu.agx.admission
 import drm.syncobj
 import katomic
 import klock
@@ -311,6 +312,7 @@ mut:
 	quarantined        bool
 	released           bool
 pub mut:
+	submission_gate admission.Gate // ioctl preparation under the owning file lock
 	dispatch_blocked_in_poll bool // scratch owned by the single pending-submission poller
 }
 

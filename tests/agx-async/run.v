@@ -33,6 +33,7 @@ fn main() {
 	os.write_file('${scratch}/errno/errno.v', 'module errno\n' +
 		section(errno, 'pub const erestartsys =', 'pub fn get()')!)!
 	os.cp('${repo}/kernel/event/stack_list.v', '${scratch}/event/stack_list.v')!
+	os.cp_all('${repo}/kernel/gpu/agx/admission', '${scratch}/gpu/agx/admission', false)!
 	os.cp('${repo}/kernel/gpu/agx/mmu/slot_wait.v', '${scratch}/gpu/agx/mmu/slot_wait.v')!
 	os.cp_all('${repo}/kernel/drm/syncobj', '${scratch}/drm/syncobj', false)!
 	object_path := '${scratch}/drm/syncobj/syncobj.v'

@@ -4,6 +4,7 @@ module gpu
 import gpu.agx.compute
 import gpu.agx.render
 import gpu.agx.mmu
+import gpu.agx.admission
 import klock
 
 pub enum State {
@@ -29,6 +30,7 @@ pub mut:
 	id          u32
 	fence_context u64
 	fence_seqno u32
+	submission_gate admission.Gate
 	dispatch_blocked_in_poll bool
 	file_references u64
 	released    bool

@@ -10,7 +10,8 @@ fn test_queue_references_require_initial_capture_transfer_and_final_release() {
 	vfs := read(root + '/kernel/fs/vfs.v')!
 	check_queue_reference_local(file, pending, gpu, vfs)!
 	for token in ['resources.retain_file_reference()', 'release_submission_queue(captured)',
-		'usc_base: queue.usc_base', 'queue_resources := captured.resources', 'transferred = true', 'katomic.inc(mut &pending.vm.inflight)'] {
+		'usc_base: queue.usc_base', 'mut queue_resources := unsafe { captured.resources }',
+		'transferred = true', 'katomic.inc(mut &pending.vm.inflight)'] {
 		if _ := check_queue_reference_local(file.replace(token, ''), pending, gpu, vfs) { assert false, token }
 	}
 	if _ := check_queue_reference_local(file, pending.replace('queue.release_file_reference()', ''), gpu, vfs) { assert false }

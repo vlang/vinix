@@ -50,7 +50,7 @@ pub fn (mut mgr UatManager) bind_context(ctx &UatContext) u32 {
 
 pub fn (mut mgr UatManager) make_slot_available() {
 	mgr.occupied = false
-	event.trigger(mut mgr.slot_released, true)
+	event.trigger_n(mut mgr.slot_released, 1)
 }
 
 pub fn (mut mgr UatManager) release_g13_slot(ctx &UatContext, slot u32) {

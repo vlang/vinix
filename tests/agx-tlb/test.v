@@ -3,6 +3,7 @@ module main
 
 import gpu.agx.pgtable
 import gpu.agx.mmu
+import event
 import gpu.agx.tlb
 import memory
 
@@ -163,6 +164,7 @@ fn test_user_slot_capacity() {
 	assert tlb.calls().len == 63
 	tlb.clear()
 	generation := mgr.release_generation()
+	wakes_before := event.single_wakes()
 	assert mgr.bind_context(unsafe { &contexts[0] }) == 1
 	mgr.release_g13_slot(unsafe { &contexts[0] }, 1)
 	assert mgr.release_generation() == generation
@@ -176,6 +178,7 @@ fn test_user_slot_capacity() {
 	mgr.release_g13_slot(unsafe { &contexts[2] }, 3)
 	mgr.release_g13_slot(unsafe { &contexts[3] }, 4)
 	assert mgr.release_generation() == generation + 4
+	assert event.single_wakes() == wakes_before + 4
 	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[3]) })
 	assert mgr.bind_context(unsafe { &contexts[63] }) == 3
 	assert contexts[2].bound_slot() == 0 && contexts[3].bound_slot() == 4
