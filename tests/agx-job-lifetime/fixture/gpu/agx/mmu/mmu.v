@@ -12,10 +12,20 @@ pub mut:
 	active          bool = true
 	id              u32  = 1
 	slot            u32  = 1
+	binding_epoch   u64
+	lease_users     int
 	releases        int
 	allocations     int
 	fail_allocation bool
 	pool            [64]UatBuffer
+}
+
+pub struct UatManager {}
+
+pub fn (mut mgr UatManager) release_g13_slot(context &UatContext, slot u32) {
+	assert slot == context.slot && context.lease_users > 0
+	mut owner := unsafe { context }
+	owner.lease_users--
 }
 
 pub fn (context &UatContext) bound_slot() u32 {

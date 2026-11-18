@@ -61,7 +61,7 @@ fn checks() !int {
 	os.cp(if os.args.len == 3 && os.args[1] == '--timestamp-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/file/timestamps.v' }, '${scratch}/gpu/agx/file/timestamp_capture_production.v')!
 	gpu_source := os.read_file(if os.args.len == 3 && os.args[1] == '--gpu-source' { os.args[2] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' })!
 	g13_source := os.read_file('${repo}/kernel/gpu/agx/gpu/g13.v')!
-	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\nimport katomic\nimport gpu.agx.alloc\nimport gpu.agx.pgtable\n' +
+	os.write_file('${scratch}/gpu/agx/gpu/registration.v', 'module gpu\nimport katomic\nimport gpu.agx.alloc\nimport gpu.agx.mmu\nimport gpu.agx.pgtable\n' +
 		section(g13_source, 'pub fn free_g13_queue_record(', 'pub fn (mut mgr GpuManager) create_g13_queue_resources(')!.replace('free_g13_queue_record(', 'free_g13_queue_record_real(') +
 		section(g13_source, 'pub fn (mut queue G13QueueResources) retain_file_reference()', '// Caller holds mgr.lock. Asahi QueueInner')! +
 		section(gpu_source, 'pub fn (mut mgr GpuManager) can_query_global_params(', 'pub fn new_gpu_manager(')! +

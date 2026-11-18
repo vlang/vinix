@@ -80,6 +80,7 @@ pub mut:
 	vm_id          u32 // userspace name assigned by the owning DRM file
 	detached       bool // protected by the owning file's lock
 	inflight       u64 // atomic callback and aggregate submission pins
+	binding_epoch  u64 // changes whenever this VM's firmware root is installed
 	dummy_phys     u64
 	kernel_start   u64
 	kernel_end     u64
@@ -133,6 +134,10 @@ pub mut:
 	handoff_abi          UatHandoffAbi
 	handoff_initialized  bool
 	lock                 klock.Lock
+mut:
+	slot_users        [uat_num_contexts]u64
+	slot_release      [uat_num_contexts]u64
+	slot_release_clock u64
 }
 
 __global (
@@ -651,31 +656,65 @@ pub fn (buffer &UatBuffer) cpu_address() voidptr {
 	return voidptr(buffer.phys + higher_half)
 }
 
-// Callers serialize publication and removal with VM ownership.
+// G13 callers serialize slot reads with publication and eviction.
 pub fn (ctx &UatContext) is_bound() bool {
 	return ctx.pgtable != unsafe { nil } && ctx.pgtable.tlb_bound
 }
 
-// Zero denotes a user VM whose roots have not been published.
+// Zero denotes a VM without a resident user root.
 pub fn (ctx &UatContext) bound_slot() u32 {
 	return if ctx.is_bound() { u32(ctx.pgtable.tlb_asid) } else { u32(0) }
 }
 
-pub fn (mgr &UatManager) bind_context(ctx &UatContext) bool {
+// Caller holds both MMU and handoff locks. The ASC flushes its translations
+// and cache on a context switch. Keep its selected root until it switches
+// away, and leave any incomplete firmware invalidation with its old owner.
+fn (mgr &UatManager) select_context_slot_locked(leased bool) u32 {
+	current := if leased { katomic.load(&mgr.handoff.cur_slot) } else { u32(0) }
+	mut oldest := u32(0)
+	mut oldest_age := u64(0)
+	for slot := u32(1); slot < uat_num_contexts; slot++ {
+		if slot == current || (leased && katomic.load(&mgr.handoff.flush[slot].state) != 0) { continue }
+		if mgr.contexts[slot] == unsafe { nil } { return slot }
+		if leased && mgr.slot_users[slot] == 0 {
+			age := mgr.slot_release_clock - mgr.slot_release[slot]
+			if oldest == 0 || age > oldest_age {
+				oldest = slot
+				oldest_age = age
+			}
+		}
+	}
+	return oldest
+}
+
+// G13 acquires a user of the slot for each prepared job. G17 keeps an eager
+// binding for the VM's lifetime. A zero return acquires no binding.
+pub fn (mgr &UatManager) bind_context(ctx &UatContext) u32 {
 	// The firmware handoff lock excludes the ASC. The manager lock also
 	// excludes other AP threads, including a different VM's root removal.
 	mut owner := unsafe { mgr }
 	owner.lock.acquire()
 	defer { owner.lock.release() }
 	if !mgr.handoff_initialized || ctx == unsafe { nil } || !ctx.active || ctx.pgtable == unsafe { nil } {
-		return false
+		return 0
 	}
-	if ctx.is_bound() { return true }
-	mut slot := u32(1)
-	for slot < uat_num_contexts && mgr.contexts[slot] != unsafe { nil } { slot++ }
-	if slot == uat_num_contexts { return false }
-	asid := u64(slot) << ttbr_asid_shift
+	leased := mgr.handoff_abi == .v12_3
+	bound := ctx.bound_slot()
+	if bound != 0 {
+		if leased {
+			if mgr.slot_users[bound] == ~u64(0) { return 0 }
+			owner.slot_users[bound]++
+		}
+		return bound
+	}
 	handoff_lock(mgr.handoff)
+	slot := mgr.select_context_slot_locked(leased)
+	if slot == 0 {
+		handoff_unlock(mgr.handoff)
+		return 0
+	}
+	replaced := mgr.contexts[slot]
+	asid := u64(slot) << ttbr_asid_shift
 	unsafe {
 		mut slots := mgr.ttbs
 		slots[slot].ttb0 = ctx.pgtable.l1_phys | asid | ttbr_valid
@@ -687,10 +726,31 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) bool {
 	}
 	cpu.dsb_sy()
 	handoff_unlock(mgr.handoff)
+	if replaced != unsafe { nil } {
+		mut previous := unsafe { replaced.pgtable }
+		previous.unbind_tlb()
+	}
 	mut pt := unsafe { ctx.pgtable }
 	pt.bind_tlb(u8(slot))
-	owner.contexts[slot] = unsafe { ctx }
-	return true
+	mut installed := unsafe { ctx }
+	installed.binding_epoch++
+	owner.contexts[slot] = installed
+	owner.slot_users[slot] = if leased { u64(1) } else { u64(0) }
+	return slot
+}
+
+// A job retains its slot through command and buffer cleanup, including
+// quarantine. The last release leaves the resident root available for reuse.
+pub fn (mut mgr UatManager) release_g13_slot(ctx &UatContext, slot u32) {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	assert slot != 0 && slot < uat_num_contexts
+	assert voidptr(mgr.contexts[slot]) == voidptr(ctx) && mgr.slot_users[slot] != 0
+	mgr.slot_users[slot]--
+	if mgr.slot_users[slot] == 0 {
+		mgr.slot_release_clock++
+		mgr.slot_release[slot] = mgr.slot_release_clock
+	}
 }
 
 // Caller holds mgr.lock.
@@ -700,6 +760,7 @@ pub fn (mut mgr UatManager) unbind_context(ctx &UatContext) {
 	if slot == 0 || slot >= uat_num_contexts {
 		return
 	}
+	assert voidptr(mgr.contexts[slot]) == voidptr(ctx) && mgr.slot_users[slot] == 0
 	handoff_lock(mgr.handoff)
 	unsafe {
 		mut slots := mgr.ttbs

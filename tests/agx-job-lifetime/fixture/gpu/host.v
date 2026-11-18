@@ -14,6 +14,7 @@ import memory
 fn C.kprintf(format &char, ...) i32
 
 __global higher_half = u64(0)
+__global uat_mgr mmu.UatManager
 
 struct GpuChannels {
 mut:
@@ -101,6 +102,7 @@ mut:
 	slot_token_valid bool
 	active_scenes    u32
 	needs_bind       bool
+	vm_binding_epoch u64
 	bound_blocks     u32
 	blocks []&mmu.UatBuffer
 	block_list &mmu.UatBuffer = unsafe { nil }
@@ -279,6 +281,7 @@ pub fn run_checks() {
 	check_barrier_lifetimes()
 	check_published_batches()
 	check_scene_slots()
+	check_job_slot_cleanup()
 	check_tail_pointer_cache()
 	check_queue_cleanup_retry()
 	mut stamps := [128]u32{}
@@ -563,6 +566,35 @@ fn check_scene_slots() {
 	live.released = true
 	assert mgr.g13_tvb_owner_locked(vm.slot, live.render_buffer.slot) == none
 	mgr.release_g13_scene_slot_locked(mut live.render_buffer)
+	mut rebinding := G13RenderBufferResources{context: &vm, info: SharedBuffer{va: 0x123000}}
+	vm.binding_epoch = 1
+	assert mgr.retain_g13_scene_slot_locked(mut rebinding) && rebinding.needs_bind
+	first_slot := rebinding.slot
+	mgr.release_g13_scene_slot_locked(mut rebinding)
+	rebinding.needs_bind = false
+	vm.binding_epoch++
+	assert mgr.retain_g13_scene_slot_locked(mut rebinding)
+	assert rebinding.slot == first_slot && rebinding.needs_bind, 'a new root forces TVB init even with the same buffer slot'
+	mgr.release_g13_scene_slot_locked(mut rebinding)
+}
+
+fn check_job_slot_cleanup() {
+	mut manager := GpuManager{invalidation_fails: true}
+	mut context := mmu.UatContext{slot: 7, lease_users: 2}
+	mut buffer := mmu.UatBuffer{}
+	mut compute := G13ComputeJobResources{vm_slot: 7, context: &context, preempt: &buffer}
+	mut render := G13RenderJobResources{vm_slot: 7, context: &context}
+	assert !manager.free_g13_compute_job_locked(mut compute, true)
+	assert !manager.free_g13_render_job_locked(mut render, true)
+	assert context.lease_users == 2 && !buffer.released
+	manager.invalidation_fails = false
+	assert manager.free_g13_compute_job_locked(mut compute, true)
+	assert manager.free_g13_compute_job_locked(mut compute, true)
+	assert context.lease_users == 1 && buffer.released
+	manager.state = .stopped
+	assert manager.free_g13_render_job_locked(mut render, false)
+	assert context.lease_users == 0
+	println('AGX slot job lifetime: failed cleanup pins both users, retry drops one, and stopped cleanup drops the last')
 }
 
 fn check_tail_pointer_cache() {

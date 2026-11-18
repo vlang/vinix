@@ -156,6 +156,7 @@ mut:
 	slot_token_valid bool
 	active_scenes u32
 	needs_bind    bool
+	vm_binding_epoch u64
 	bound_blocks  u32
 	tail_pointer_cache &G13TailPointerCache = unsafe { nil }
 	info          SharedBuffer
@@ -564,6 +565,10 @@ fn (mut mgr GpuManager) retain_g13_scene_slot_locked(mut buffer G13RenderBufferR
 			buffer.slot = mgr.reserve_g13_tvb_slot() or { return false }
 		}
 		if !buffer.slot_token_valid || mgr.g13_tvb_owners[buffer.slot] != buffer.info.va {
+			buffer.needs_bind = true
+		}
+		if buffer.context != unsafe { nil } && buffer.vm_binding_epoch != buffer.context.binding_epoch {
+			buffer.vm_binding_epoch = buffer.context.binding_epoch
 			buffer.needs_bind = true
 		}
 		mgr.g13_tvb_owners[buffer.slot] = buffer.info.va
@@ -1351,6 +1356,7 @@ fn (mut mgr GpuManager) free_g13_render_job_locked(mut job G13RenderJobResources
 		job.scene_reserved = false
 	}
 	mgr.g13_shared.gc()
+	if job.vm_slot != 0 { uat_mgr.release_g13_slot(job.context, job.vm_slot) }
 	return true
 }
 
@@ -1403,10 +1409,12 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		|| mgr.g13_channels == unsafe { nil } || resources.released || resources.quarantined {
 		return none
 	}
-	if uat_mgr == unsafe { nil } || !uat_mgr.bind_context(resources.vm) { return none }
+	if uat_mgr == unsafe { nil } { return none }
+	vm_slot := uat_mgr.bind_context(resources.vm)
+	if vm_slot == 0 { return none }
 	mut queue := unsafe { resources }
 	mut job := &G13RenderJobResources{
-		vm_slot: resources.vm.bound_slot()
+		vm_slot: vm_slot
 		queue: unsafe { resources }
 		context: unsafe { resources.vm }
 	}
@@ -2370,6 +2378,7 @@ fn (mut mgr GpuManager) free_g13_compute_job_locked(mut job G13ComputeJobResourc
 		mgr.free_shared_buffer(mut job.timestamps)
 	}
 	mgr.g13_shared.gc()
+	if job.vm_slot != 0 { uat_mgr.release_g13_slot(job.context, job.vm_slot) }
 	return true
 }
 
@@ -2413,9 +2422,11 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 		|| mgr.g13_channels == unsafe { nil } || resources.released || resources.quarantined {
 		return none
 	}
-	if uat_mgr == unsafe { nil } || !uat_mgr.bind_context(ctx) { return none }
+	if uat_mgr == unsafe { nil } { return none }
+	vm_slot := uat_mgr.bind_context(ctx)
+	if vm_slot == 0 { return none }
 	mut job := &G13ComputeJobResources{
-		vm_slot: ctx.bound_slot()
+		vm_slot: vm_slot
 		context: unsafe { ctx }
 		queue: unsafe { resources }
 	}

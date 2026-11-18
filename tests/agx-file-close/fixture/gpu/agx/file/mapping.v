@@ -7,6 +7,7 @@ import gpu.agx.gpu
 import gpu.agx.mmu
 import gpu.agx.pgtable
 import klock
+import memory
 
 __global destroying_vm_file &GpuFile = unsafe { nil }
 
@@ -185,6 +186,32 @@ fn check_mapping_retirement() {
 		assert stop_pt.unmaps == 1 && stop_vm.destroyed
 	}
 	println('AGX mapping retirement: 200 bind/unbind/GEM-close/retry cycles, failed bind ownership, busy VM admission, partial UNBIND_ALL, replacement, stopped cleanup, exact-lock shutdown races and VM destruction before BIND passed')
+	check_eviction_before_file_flush()
+}
+
+__global evicting_pt &pgtable.UatPgtable = unsafe { nil }
+
+fn evict_before_file_flush() {
+	assert evicting_pt.unmaps == 1 && evicting_pt.tlb_bound
+	evicting_pt.tlb_bound = false
+}
+
+fn check_eviction_before_file_flush() {
+	gpu.set_running(true)
+	mut pt := pgtable.UatPgtable{tlb_asid: 7}
+	mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: &pt}
+	mut file := GpuFile{vms: [&vm]}
+	file.objects.table.add_created(gem.create(7))
+	assert file.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0 && gpu.last_flush_slot() == 7
+	flushes := gpu.flushes()
+	evicting_pt = unsafe { &pt }
+	gpu.before_file_flush_lock(evict_before_file_flush)
+	assert file.ioctl_gem_bind(unbind(1, 0x4000)) == 0
+	assert !pt.tlb_bound && gpu.flushes() == flushes && file.mappings.len == 0
+	evicting_pt = unsafe { nil }
+	assert file.close() && gem.live() == 0
+	memory.assert_released()
+	println('AGX file flush: eviction before the GPU lock prevents an invalidation to the old slot')
 }
 
 fn check_mapping_permissions() {

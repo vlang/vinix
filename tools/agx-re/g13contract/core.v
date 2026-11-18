@@ -142,12 +142,17 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		prepare := section(vinix_jobs, 'pub fn (mut mgr GpuManager) prepare_g13_${spec[0]}_job_with_timestamps(',
 			'pub fn (mut mgr GpuManager) release_g13_${spec[0]}_job(', 'Vinix ${spec[0]} root publication')!
 		require_order(prepare, ['mgr.lock.acquire()', 'mgr.lock.release()', 'mgr.state != .running',
-			'!uat_mgr.bind_context(${spec[1]})', 'mut job := &${spec[2]}{',
-			'vm_slot: ${spec[1]}.bound_slot()', 'vm_slot: job.vm_slot',
+			'vm_slot := uat_mgr.bind_context(${spec[1]})', 'if vm_slot == 0 { return none }',
+			'mut job := &${spec[2]}{', 'vm_slot: vm_slot', 'vm_slot: job.vm_slot',
 			'flush_g13_uat_range(job.vm_slot,'], 'Publish VM before ${spec[0]} job construction')!
 		require(prepare.count('vm_slot: job.vm_slot') == spec[3].int()
 			&& prepare.count('vm_slot:') == spec[3].int() + 1,
 			'Vinix ${spec[0]} firmware commands must use the job ASID')!
+		release := section(vinix_jobs, 'fn (mut mgr GpuManager) free_g13_${spec[0]}_job_locked(',
+			'fn complete_g13_${spec[0]}_job(', 'Vinix ${spec[0]} ASID release')!
+		require_order(release, ['if invalidate', 'return false', 'job.released = true',
+			'mgr.g13_shared.gc()', 'uat_mgr.release_g13_slot(job.context, job.vm_slot)', 'return true'],
+			'Retain Vinix ${spec[0]} ASID until final backing cleanup')!
 	}
 	recovery := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_recovery.v'))!
 	require(recovery.count('failure.status == 4 && owned.vm_slot != failure.vm_slot') == 2,
@@ -202,11 +207,16 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 	require_order(mmu[drop_start..], ['.ttb0.store(0,', '.ttb1.store(0,',
 		'mem::tlbi_asid(idx as u8)', 'mem::sync()'], 'Asahi ASID teardown invalidation')!
 	local := read(os.join_path(repo, 'kernel/gpu/agx/mmu/mmu.v'))!
-	local_bind := section(local, 'pub fn (mgr &UatManager) bind_context(', 'pub fn (mut mgr UatManager) unbind_context(', 'Vinix UAT bind')!
-	require_order(local_bind, ['owner.lock.acquire()', 'defer { owner.lock.release() }', 'if ctx.is_bound() { return true }',
-		'mgr.contexts[slot] != unsafe { nil }', 'if slot == uat_num_contexts { return false }',
-		'slots[slot].ttb0 =', 'slots[slot].ttb1 =', 'handoff_unlock(mgr.handoff)',
-		'pt.bind_tlb(u8(slot))', 'owner.contexts[slot] = unsafe { ctx }'], 'Vinix ASID reuse invalidation')!
+	local_selection := section(local, 'fn (mgr &UatManager) select_context_slot_locked(', 'pub fn (mgr &UatManager) bind_context(', 'Vinix UAT selection')!
+	require_order(local_selection, ['katomic.load(&mgr.handoff.cur_slot)', 'slot == current',
+		'katomic.load(&mgr.handoff.flush[slot].state) != 0', 'mgr.contexts[slot] == unsafe { nil }',
+		'mgr.slot_users[slot] == 0', 'mgr.slot_release_clock - mgr.slot_release[slot]'], 'Vinix idle ASID choice')!
+	local_bind := section(local, 'pub fn (mgr &UatManager) bind_context(', 'pub fn (mut mgr UatManager) release_g13_slot(', 'Vinix UAT bind')!
+	require_order(local_bind, ['owner.lock.acquire()', 'defer { owner.lock.release() }', 'bound := ctx.bound_slot()',
+		'owner.slot_users[bound]++', 'return bound', 'handoff_lock(mgr.handoff)',
+		'mgr.select_context_slot_locked(leased)', 'slots[slot].ttb0 =', 'slots[slot].ttb1 =',
+		'handoff_unlock(mgr.handoff)', 'previous.unbind_tlb()', 'pt.bind_tlb(u8(slot))',
+		'installed.binding_epoch++', 'owner.contexts[slot] = installed'], 'Vinix ASID reuse invalidation')!
 	local_unbind := section(local, 'pub fn (mut mgr UatManager) unbind_context(', '// Map a driver-owned allocation into context zero.', 'Vinix UAT unbind')!
 	require_order(local_unbind, ['slot := ctx.bound_slot()', 'slot == 0', 'slots[slot].ttb0 = 0', 'slots[slot].ttb1 = 0',
 		'handoff_unlock(mgr.handoff)', 'pt.unbind_tlb()', 'mgr.contexts[slot] = unsafe { nil }'], 'Vinix ASID teardown invalidation')!

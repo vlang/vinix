@@ -140,6 +140,10 @@ pub fn fail_flush_after(successes int) { mapping_flush_failure_after = successes
 pub fn flushes() int { return mapping_flushes }
 pub fn last_flush_slot() u32 { return mapping_flush_slot }
 
+pub fn before_file_flush_lock(callback fn ()) {
+	klock.before_once(unsafe { &test_gpu_manager.lock }, callback)
+}
+
 pub fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, addr u64, size u64) bool {
 	// The production file wrapper must serialize even running invalidations.
 	assert mgr.lock.is_held()

@@ -69,14 +69,14 @@ pub fn (ctx &UatContext) bound_slot() u32 {
 	return if ctx.is_bound() { u32(ctx.pgtable.tlb_asid) } else { u32(0) }
 }
 
-pub fn (mut mgr UatManager) bind_context(ctx &UatContext) bool {
+pub fn (mut mgr UatManager) bind_context(ctx &UatContext) u32 {
 	assert ctx.id != 0 && ctx.vm_id != 0 && !ctx.destroyed
-	if ctx.pgtable == unsafe { nil } { return false }
+	if ctx.pgtable == unsafe { nil } { return 0 }
 	mut table := unsafe { ctx.pgtable }
 	table.tlb_asid = 1
 	table.tlb_bound = true
 	mgr.vm_binds++
-	return true
+	return 1
 }
 
 pub fn (mut vm_manager UatManager) destroy_context(context &UatContext) {

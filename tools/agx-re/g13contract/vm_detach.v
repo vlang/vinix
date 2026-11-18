@@ -13,7 +13,7 @@ fn check_vm_detach_local(file string) ! {
 		'if vm.detached { continue }', 'if vm.vm_id > vm_id { insert_at = index; break }',
 		'for f.find_owned_vm(owner_id) != none', 'if !f.reserve_vm_entry_locked()',
 		'm.create_context(', 'ctx.id = owner_id', 'ctx.vm_id = vm_id',
-		'if m.handoff_abi != .v12_3 && !m.bind_context(ctx)', 'm.destroy_context(ctx)',
+		'if m.handoff_abi != .v12_3 && m.bind_context(ctx) == 0', 'm.destroy_context(ctx)',
 		'f.vms << ctx', 'f.vms[insert_at] = ctx', 'request.vm_id = vm_id'], 'VM creation publishes the first available file name under the file lock')!
 	require(!file.contains('mmu.uat_num_contexts'), 'Software VM owners must be independent of hardware capacity')!
 	destroy := section(file, 'pub fn (mut f GpuFile) ioctl_vm_destroy(', '// Caller holds file.lock. User bindings', 'VM namespace removal')!

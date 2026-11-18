@@ -66,10 +66,12 @@ fn test_root_publication_and_reuse() {
 	mut upper := pgtable.new_pgtable(39, 48) or { panic('upper root') }
 	upper.non_global = false
 	mut slots := [64]mmu.SlotTtbs{}
+	mut handoff := mmu.UatHandoff{}
 	mut mgr := mmu.UatManager{
 		kernel_lower_pgtable: lower
 		kernel_pgtable:       upper
 		ttbs:                 unsafe { &slots[0] }
+		handoff:              &handoff
 	}
 	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[0]) })
 	mgr.publish_roots()
@@ -87,13 +89,15 @@ fn test_root_publication_and_reuse() {
 	assert slots[1].ttb0 == 0 && tlb.calls().len == 0
 	mgr.unbind_context(&ctx)
 	assert tlb.calls().len == 0
-	assert mgr.bind_context(&ctx) && ctx.is_bound() && ctx.bound_slot() == 1
-	assert mgr.bind_context(&ctx) // Additional jobs reuse the published root.
+	assert mgr.bind_context(&ctx) == 1 && ctx.is_bound() && ctx.bound_slot() == 1
+	assert mgr.bind_context(&ctx) == 1 // Additional jobs reuse the published root.
 	bind := tlb.calls()
 	assert bind.len == 1 && !bind[0].all && bind[0].asid == 1
 	assert bind[0].ttb0 == user.l1_phys | (u64(1) << 48) | 1
 	assert bind[0].ttb1 == 0
 	tlb.clear()
+	mgr.release_g13_slot(&ctx, 1)
+	mgr.release_g13_slot(&ctx, 1)
 	mgr.unbind_context(&ctx)
 	unbind := tlb.calls()
 	assert unbind.len == 1 && unbind[0].asid == 1
@@ -105,13 +109,14 @@ fn test_root_publication_and_reuse() {
 	mut next := pgtable.new_pgtable(39, 48) or { panic('replacement root') }
 	next_ctx := mmu.UatContext{ id: 129, pgtable: next }
 	mgr.map_kernel_to_user = true
-	assert mgr.bind_context(&next_ctx)
+	assert mgr.bind_context(&next_ctx) == 1
 	reuse := tlb.calls()
 	assert reuse.len == 1 && reuse[0].asid == 1
 	assert reuse[0].ttb0 == next.l1_phys | (u64(1) << 48) | 1
 	assert reuse[0].ttb1 == upper.l1_phys | (u64(1) << 48) | 1
 	tlb.clear()
 	assert next_ctx.bound_slot() == 1
+	mgr.release_g13_slot(&next_ctx, 1)
 	mgr.unbind_context(&next_ctx)
 	assert next_ctx.bound_slot() == 0 && mgr.contexts[1] == unsafe { nil }
 	cleared := tlb.calls()
@@ -141,30 +146,62 @@ fn test_root_publication_and_reuse() {
 
 fn test_user_slot_capacity() {
 	mut slots := [64]mmu.SlotTtbs{}
-	mut contexts := [64]mmu.UatContext{}
+	mut handoff := mmu.UatHandoff{}
+	mut contexts := [65]mmu.UatContext{}
 	mut mgr := mmu.UatManager{
 		handoff_initialized: true
 		ttbs: unsafe { &slots[0] }
+		handoff: &handoff
 	}
 	for index in 0 .. contexts.len {
 		contexts[index].id = u32(1000 + index)
 		contexts[index].pgtable = pgtable.new_pgtable(39, 48) or { panic('user root') }
-		assert mgr.bind_context(unsafe { &contexts[index] }) == (index < 63)
+		expected := if index < 63 { u32(index + 1) } else { u32(0) }
+		assert mgr.bind_context(unsafe { &contexts[index] }) == expected
 	}
 	assert contexts[63].bound_slot() == 0 && slots[0].ttb0 == 0
 	assert tlb.calls().len == 63
 	tlb.clear()
-	mgr.unbind_context(unsafe { &contexts[12] })
-	assert slots[13].ttb0 == 0 && mgr.contexts[13] == unsafe { nil }
-	assert mgr.bind_context(unsafe { &contexts[63] }) && contexts[63].bound_slot() == 13
-	assert tlb.calls().len == 2 && tlb.calls()[0].asid == 13 && tlb.calls()[1].asid == 13
+	assert mgr.bind_context(unsafe { &contexts[0] }) == 1
+	mgr.release_g13_slot(unsafe { &contexts[0] }, 1)
+	assert mgr.bind_context(unsafe { &contexts[63] }) == 0, 'one surviving job keeps the slot'
+	mgr.release_g13_slot(unsafe { &contexts[0] }, 1)
+	mgr.release_g13_slot(unsafe { &contexts[1] }, 2)
+	handoff.cur_slot = 1
+	handoff.flush[2].state = 1
+	assert mgr.bind_context(unsafe { &contexts[63] }) == 0, 'ASC and FWCTL owners exclude idle roots'
+	mgr.release_g13_slot(unsafe { &contexts[2] }, 3)
+	mgr.release_g13_slot(unsafe { &contexts[3] }, 4)
+	tlb.observe(unsafe { nil }, unsafe { &u64(&slots[3]) })
+	assert mgr.bind_context(unsafe { &contexts[63] }) == 3
+	assert contexts[2].bound_slot() == 0 && contexts[3].bound_slot() == 4
+	assert contexts[0].bound_slot() == 1 && contexts[1].bound_slot() == 2
+	replaced := tlb.calls()
+	assert replaced.len == 2 && replaced[0].asid == 3 && replaced[1].asid == 3
+	assert replaced[0].ttb0 == contexts[63].pgtable.l1_phys | (u64(3) << 48) | 1
+	// The surviving idle VM can borrow its cached slot without changing its
+	// root. A previously evicted VM gets a new binding epoch on return.
 	tlb.clear()
+	assert mgr.bind_context(unsafe { &contexts[3] }) == 4 && contexts[3].binding_epoch == 1
+	assert tlb.calls().len == 0
+	mgr.release_g13_slot(unsafe { &contexts[3] }, 4)
+	assert mgr.bind_context(unsafe { &contexts[2] }) == 4 && contexts[2].binding_epoch == 2
+	assert contexts[3].bound_slot() == 0
+	assert mgr.bind_context(unsafe { &contexts[64] }) == 0
+	tlb.clear()
+	tlb.observe(unsafe { nil }, unsafe { nil })
+	handoff.cur_slot = 0
+	handoff.flush[2].state = 0
 	for index in 0 .. contexts.len {
+		slot := contexts[index].bound_slot()
+		if slot != 0 && index != 0 && index != 1 {
+			mgr.release_g13_slot(unsafe { &contexts[index] }, slot)
+		}
 		mgr.unbind_context(unsafe { &contexts[index] })
 		pgtable.destroy(contexts[index].pgtable)
 		tlb.clear()
 	}
-	println('AGX UAT capacity: 63 published roots, exhaustion and reuse after ASID invalidation passed')
+	println('AGX UAT leases: 63 active roots, overlapping users, cached-root reuse, oldest idle eviction, ASC/FWCTL exclusion and rebinding passed')
 }
 
 fn test_borrowed_root_destruction() {
@@ -177,6 +214,28 @@ fn test_borrowed_root_destruction() {
 	assert unsafe { root[2] } == u64(subtree) | pgtable.uat_pte_table
 	pgtable.free_table_page(subtree)
 	pgtable.free_table_page(root)
+}
+
+fn test_eager_bindings_hold_slots_until_destroy() {
+	mut slots := [64]mmu.SlotTtbs{}
+	mut handoff := mmu.UatHandoff{}
+	mut contexts := [64]mmu.UatContext{}
+	mut mgr := mmu.UatManager{
+		handoff_initialized: true
+		handoff_abi: .g17_26_5
+		ttbs: unsafe { &slots[0] }
+		handoff: &handoff
+	}
+	for index in 0 .. contexts.len {
+		contexts[index].pgtable = pgtable.new_pgtable(39, 48) or { panic('user root') }
+		expected := if index < 63 { u32(index + 1) } else { u32(0) }
+		assert mgr.bind_context(unsafe { &contexts[index] }) == expected
+	}
+	for index in 0 .. contexts.len {
+		mgr.unbind_context(unsafe { &contexts[index] })
+		pgtable.destroy(contexts[index].pgtable)
+	}
+	tlb.clear()
 }
 
 fn test_gpu_permissions() {
@@ -392,6 +451,7 @@ fn main() {
 	test_user_mappings()
 	test_root_publication_and_reuse()
 	test_user_slot_capacity()
+	test_eager_bindings_hold_slots_until_destroy()
 	test_borrowed_root_destruction()
 	test_gpu_permissions()
 	test_range_operands()

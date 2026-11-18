@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+G13 now reuses idle hardware slots after the last prepared job releases its
+backing. [G13 UAT slot leases](m1-agx-slot-leases.md)
+
 G13 VM creation uses a growable per-file namespace. The first job preparation
 assigns a hardware slot. [VM admission and slot assignment](m1-agx-dormant-vms.md)
 
