@@ -17,6 +17,7 @@ import gpu.agx.file as agx_file
 import gpu.dcp
 import drm
 import drm.ioctl as drm_ioctl
+import apple.mailbox
 import apple.rtkit
 import devicetree
 import aarch64.pmgr
@@ -44,6 +45,7 @@ pub:
 	sgx_base               u64
 	sgx_size               u64
 	mailbox_base           u64
+	mailbox_receive_irq    u32
 	secondary_mailbox_base u64
 	firmware_role_count    u32
 	handoff_base           u64
@@ -153,6 +155,19 @@ fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
 	// firmware it is. A bring-up that stops on the ABI needs both.
 	C.kprintf(c'agx: t8103 apple,firmware-version %llu.%llu.%llu\n', u64(cfg.firmware_version[0]),
 		u64(cfg.firmware_version[1]), u64(cfg.firmware_version[2]))
+}
+
+fn g13_mailbox_receive_irq(node &devicetree.DTNode) ?u32 {
+	if _ := devicetree.get_property(node, 'interrupts-extended') { return none }
+	parent := devicetree.get_u32(node, 'interrupt-parent') or { return none }
+	controller := devicetree.find_phandle(parent) or { return none }
+	aic := devicetree.find_compatible('apple,t8103-aic') or { return none }
+	if controller != aic || (devicetree.get_u32(controller, '#interrupt-cells') or { u32(0) }) != 3 {
+		return none
+	}
+	names := devicetree.get_property(node, 'interrupt-names') or { return none }
+	interrupts := devicetree.get_property(node, 'interrupts') or { return none }
+	return mailbox.decode_aic_receive_irq(names.data, names.len, interrupts.data, interrupts.len)
 }
 
 fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
@@ -323,6 +338,7 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 		sgx_base: sgx.base
 		sgx_size: sgx.size
 		mailbox_base: mailbox_regs[0].base
+		mailbox_receive_irq: g13_mailbox_receive_irq(mailbox_node) or { u32(0) }
 		firmware_role_count: 1
 		handoff_base: handoff_regs[0].base
 		handoff_size: handoff_regs[0].size
@@ -1174,6 +1190,9 @@ pub fn initialise() {
 	if !mgr.init() {
 		println('agx: GPU initialization failed')
 		return
+	}
+	if chip_id == 0x8103 && platform.mailbox_receive_irq != 0 {
+		mgr.enable_rtkit_receive_irq(platform.mailbox_receive_irq)
 	}
 
 	agx_driver_inst.gpu = mgr

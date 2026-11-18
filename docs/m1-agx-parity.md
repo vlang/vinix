@@ -6,6 +6,9 @@ original comparison are in [the initial port report](omarchy-m1-gpu-port.md).
 Same firmware protocol is the target; identical Linux/Rust source is not a
 meaningful requirement for a V kernel with different memory and scheduler APIs.
 
+Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
+fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
+
 G13 receive doorbells drain FWLog, KTrace and Stats before handling firmware
 events and later RTKit messages. [Firmware receive order](m1-agx-rx-doorbell.md)
 

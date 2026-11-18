@@ -42,7 +42,7 @@ fn run_checks() int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	assert os.args.len == 1 || os.args[1..] == ['--sanitize']
 		|| (os.args.len == 4 && os.args[1] == '--sanitize'
-		&& os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source', '--mailbox-source'])
+		&& os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source', '--mailbox-source', '--aic-source'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-g13-failure-${os.getpid()}')
 	os.mkdir_all(scratch) or { panic(err) }
@@ -56,6 +56,10 @@ fn run_checks() int {
 	assert mailbox_code.count('module mailbox\n') == 1
 	os.mkdir_all('${scratch}/apple/ascmailbox') or { panic(err) }
 	os.write_file('${scratch}/apple/ascmailbox/mailbox.v', mailbox_code.replace('module mailbox\n', 'module ascmailbox\n')) or { panic(err) }
+	os.cp('${repo}/kernel/apple/mailbox/rxirq.v', '${scratch}/apple/mailbox/rxirq.v') or { panic(err) }
+	os.mkdir_all('${scratch}/aarch64/aic') or { panic(err) }
+	aic_source := if os.args.len == 4 && os.args[2] == '--aic-source' { os.args[3] } else { '${repo}/kernel/aarch64/aic/aic.v' }
+	os.cp(aic_source, '${scratch}/aarch64/aic/aic.v') or { panic(err) }
 	event_queue := os.read_file('${repo}/kernel/gpu/agx/event/workqueue.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/event/queue.v', 'module event\n' +
 		(section(event_queue, 'pub struct WorkQueueEvents {', 'pub fn (mut queue WorkQueueEvents) retain(') or { panic(err) }) +
@@ -91,6 +95,7 @@ fn run_checks() int {
 	production += source.all_after('// Shutdown the GPU\n')
 	production += (os.read_file('${repo}/kernel/gpu/agx/gpu/g13_recovery.v') or { panic(err) }).all_after('import aarch64.timer\n')
 	production = production.replace('import sched\n', 'import sched\nimport aarch64.timer\n')
+	production = production.replace('import aarch64.timer\n', 'import aarch64.timer\nimport aarch64.aic\n')
 	submissions := os.read_file(if os.args.len == 4 && os.args[2] == '--g13-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/g13.v' }) or { panic(err) }
 	production += section(submissions, 'pub fn (mut mgr GpuManager) refresh_g13_submit_globals()',
 		'// The firmware samples pending_submissions') or { panic(err) }

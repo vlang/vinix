@@ -80,6 +80,8 @@ mut:
 	grows          int
 	last_growth    [3]u32
 	polls          int
+	rtkit_receive_irq u32
+	rtkit_receive_us u64
 	trace          []string
 	rings          int
 	g13_compute_jobs []&G13ComputeJobResources
@@ -263,6 +265,7 @@ fn (mut mgr GpuManager) handle_g13_grow_tvb(vm_slot u32, buffer_slot u32, counte
 
 fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 	mgr.polls++
+	if mgr.rtkit_receive_irq != 0 { return mgr.checked_poll_rtkit_messages() }
 	return true
 }
 
@@ -328,6 +331,7 @@ pub fn run_checks() {
 	check_fw_log_allocations()
 	check_g13_receive_shutdown()
 	check_g13_receive_order()
+	check_g13_receive_irq()
 	check_rtkit_crash_snapshot()
 	check_rtkit_buffer_retries()
 	check_rtkit_syslog()

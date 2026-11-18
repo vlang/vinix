@@ -20,6 +20,7 @@ import memory
 import klock
 import katomic
 import sched
+import aarch64.aic
 import aarch64.cpu
 import aarch64.timer
 import drm.syncobj
@@ -119,6 +120,8 @@ mut:
 	fwctl_lock        klock.Lock
 	rtkit_buffer_lock klock.Lock
 	rtkit_buffers     []SharedBuffer
+	rtkit_receive_irq u32
+	rtkit_receive_us  u64
 	file_reaper       fn () = unsafe { nil }
 }
 
@@ -1365,6 +1368,29 @@ fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg
 	}
 }
 
+pub fn (mut mgr GpuManager) enable_rtkit_receive_irq(irq u32) {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	if mgr.state == .running && mgr.hw_config.gpu_gen == .g13 && aic.claim_deferred_irq(irq) {
+		mgr.rtkit_receive_us = timer.get_us()
+		mgr.rtkit_receive_irq = irq
+	}
+}
+
+// Caller holds mgr.lock. Still check the mailbox periodically if an IRQ is
+// delayed or lost. Ring polling and file retirement run on every worker pass.
+fn (mgr &GpuManager) rtkit_receive_due() bool {
+	return mgr.rtkit_receive_irq == 0 || aic.deferred_irq_pending(mgr.rtkit_receive_irq)
+		|| timer.get_us() - mgr.rtkit_receive_us >= 1_000
+}
+
+fn (mut mgr GpuManager) finish_rtkit_receive() {
+	if mgr.rtkit_receive_irq != 0 {
+		mgr.rtkit_receive_us = timer.get_us()
+		aic.rearm_deferred_irq(mgr.rtkit_receive_irq)
+	}
+}
+
 // Drain the ASC transport in receive order, including firmware doorbells.
 fn (mut mgr GpuManager) poll_rtkit_messages() bool {
 	for role := u32(0); role < mgr.firmware_roles; role++ {
@@ -1479,11 +1505,12 @@ fn event_worker(mut mgr GpuManager) {
 	for mgr.state == .running {
 		mgr.lock.acquire()
 		healthy := mgr.state == .running && mgr.check_g13_firmware_health()
+		poll_mailbox := healthy && mgr.rtkit_receive_due()
 		mgr.lock.release()
 		if !healthy {
 			break
 		}
-		if !mgr.poll_rtkit_messages() {
+		if poll_mailbox && !mgr.poll_rtkit_messages() {
 			println('agx: RTKit system endpoint failed')
 			mgr.mark_g13_worker_error()
 			break
@@ -1503,6 +1530,7 @@ fn event_worker(mut mgr GpuManager) {
 		}
 		mgr.lock.acquire()
 		still_healthy := mgr.state == .running && mgr.check_g13_firmware_health()
+		if still_healthy && poll_mailbox { mgr.finish_rtkit_receive() }
 		mgr.lock.release()
 		if !still_healthy {
 			break
@@ -1530,6 +1558,7 @@ pub fn (mut mgr GpuManager) shutdown() {
 
 	if mgr.state == .stopped { return }
 	mgr.state = .stopped
+	if mgr.rtkit_receive_irq != 0 { aic.mask_irq(mgr.rtkit_receive_irq) }
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
 	mgr.release_rtkit_buffers()

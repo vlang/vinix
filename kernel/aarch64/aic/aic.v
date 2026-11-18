@@ -12,6 +12,7 @@ module aic
 
 import aarch64.kio
 import aarch64.exception
+import katomic
 import klock
 import memory
 import term
@@ -24,7 +25,7 @@ const aic_ipi_set = u32(0x2008)
 const aic_ipi_clr = u32(0x200c)
 const aic_ipi_mask_set = u32(0x2024)
 const aic_ipi_mask_clr = u32(0x2028)
-const aic_hw_state = u32(0x3000) // base for per-irq state
+const aic_target_cpu = u32(0x3000)
 
 // Per-IRQ register offsets (indexed by IRQ number, 32 IRQs per 32-bit reg).
 // AICv1 layout (matches Linux irq-apple-aic.c):
@@ -58,6 +59,9 @@ __global (
 	aic_hw_handler fn (u32, voidptr)
 	aic_ipi_handler fn ()
 	aic_fiq_handler fn (voidptr)
+	aic_v1_ready      bool
+	deferred_irq      = u32(0)
+	deferred_pending  bool
 	// AICv2/v3 only; aic_v2 is false on AICv1.
 	aic_v2                  bool
 	aic_v2_event            u32
@@ -148,6 +152,7 @@ pub fn initialise(base u64) bool {
 
 	// Register our dispatch handler with the exception system
 	exception.register_irq_dispatch(aic_dispatch)
+	aic_v1_ready = true
 	term.early_stage_mark(46) // white: dispatch registered
 	print('aic.9 dispatch registered\n')
 	return true
@@ -258,6 +263,12 @@ fn aic_dispatch(gpr_state voidptr) {
 		match evt_type {
 			aic_event_type_hw {
 				irq := evt & aic_event_irq_mask
+				if irq != 0 && irq == katomic.load(&deferred_irq) {
+					// AIC_EVENT already masked this level source. The worker
+					// reenables it after servicing the device.
+					katomic.store(mut deferred_pending, true)
+					continue
+				}
 				if aic_hw_handler != unsafe { nil } {
 					aic_hw_handler(irq, gpr_state)
 				}
@@ -277,6 +288,32 @@ fn aic_dispatch(gpr_state voidptr) {
 				break
 			}
 		}
+	}
+}
+
+// Reserve the AICv1 deferred line for a built-in device. Keep the reservation
+// for the life of the controller so a late interrupt cannot auto-rearm it.
+pub fn claim_deferred_irq(irq u32) bool {
+	if !aic_v1_ready || aic_v2 || irq == 0 || irq >= aic_nr_irqs
+		|| irq >= (aic_sw_set - aic_target_cpu) / 4
+		|| !katomic.cas_acquire(mut deferred_irq, u32(0), irq) {
+		return false
+	}
+	aic_write(aic_sw_clr + (irq / 32) * 4, u32(1) << (irq % 32))
+	aic_write(aic_target_cpu + irq * 4, 1)
+	unmask_irq(irq)
+	return true
+}
+
+pub fn deferred_irq_pending(irq u32) bool {
+	return irq != 0 && irq == katomic.load(&deferred_irq) && katomic.load(&deferred_pending)
+}
+
+// The caller serializes rearming with shutdown and has serviced the device.
+pub fn rearm_deferred_irq(irq u32) {
+	if deferred_irq_pending(irq) {
+		katomic.store(mut deferred_pending, false)
+		unmask_irq(irq)
 	}
 }
 

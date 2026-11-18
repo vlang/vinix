@@ -8,6 +8,12 @@ pub fn load[T](value &T) T { return unsafe { *value } }
 
 pub fn store[T](mut target T, value T) { target = value }
 
+pub fn cas_acquire[T](mut target T, expected T, value T) bool {
+	if unsafe { *target } != expected { return false }
+	target = value
+	return true
+}
+
 pub fn sync() {
 	barrier_count++
 	if next_sync != unsafe { nil } {

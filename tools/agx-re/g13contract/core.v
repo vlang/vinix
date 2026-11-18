@@ -592,6 +592,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		read(os.join_path(repo, 'kernel/gpu/agx/fw/channels.v'))!)!
 	check_g13_receive_lifetime(read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!,
 		read(os.join_path(base, 'gpu.rs'))!, read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_recovery.v'))!)!
+	check_g13_receive_irq(asahi_linux, repo)!
 	transport := read(os.join_path(repo, 'kernel/apple/rtkit/rtkit.v'))!
 	asahi_rtkit := read(os.join_path(asahi_linux, 'drivers/soc/apple/rtkit.c'))!
 	check_rtkit_boot(transport, asahi_rtkit, asahi_linux, repo)!
@@ -1004,6 +1005,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 firmware log descriptor rings and the separate bounded payload buffer are published and read before acknowledgement',
 		'G13 Event, KTrace and Stats reads serialize with backing teardown and dispatch private copies after releasing the lock',
 		'G13 mailbox doorbells drain FWLog, KTrace and Stats before events and before later RTKit messages',
+		'M1 G13 mailbox receive uses the named AIC level line and defers FIFO service to the worker with a timed fallback',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',
