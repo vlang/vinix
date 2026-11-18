@@ -304,3 +304,31 @@ The evidence archive covers `47de0f8d14a42957ae1ceb58eaedb4362c42c744` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-job-scratch-tlbi-20261119.L0KSCW/bundle.tar.gz`
 with SHA-256 `0dc9d2f7f80d090f71883ff62e074e7202b671b00e0dd59e39ab858bbeb413d5`.
+
+## Cached TVB list and tail-pointer cache mappings
+
+G13 publishes the cached TVB page list, block list and render tail-pointer
+cache through the VM's UAT page-table path. Queue creation in a resident VM
+avoids two firmware-control round trips. Render preparation avoids one,
+including when the job reuses the previous tail-pointer cache. Cached teardown
+still reprotects the mapping and waits for the required cache flush before
+unmapping or releasing its backing.
+[Pinned per-VM allocator protections](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L586-L613)
+[Pinned UAT map completion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L627-L663)
+[Pinned cached teardown](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L1454-L1508)
+
+The lifetime sanitizer fixture caught the old TPC and TVB list flushes in
+separate baseline runs. It exercises all 17 kernel-flush failure positions for
+both resident and dormant queue construction, and all 11 render and compute
+kernel-flush failure positions. The TVB, UAT and queue-unwind sanitizer suites
+also passed. The generated AArch64 cached user-buffer teardown body matches
+the baseline byte for byte.
+
+Both kernel builds, 79 source-contract test files and 122 pinned reference
+checks passed. The allocation scan matched the 176 baseline findings. M1
+hardware validation remains open.
+
+The evidence archive covers `37d9fd37a4b22963171c559262a6a8bfe5d39578` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-cached-user-tlbi-20261119.SsKjDg/bundle.tar.gz`
+with SHA-256 `ea20bbb17feff637cb1038bf2e6b7b742c6fc09f7c4dba1f5e8b932b2e8d7e07`.

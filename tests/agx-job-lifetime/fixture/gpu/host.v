@@ -100,6 +100,9 @@ mut:
 	mappings_published bool
 	priority u32
 	channel_mask u32 = 7
+	context SharedBuffer
+	notifier_list SharedBuffer
+	notifier SharedBuffer
 	threshold SharedBuffer
 }
 
@@ -149,7 +152,6 @@ mut:
 	flush_fails bool
 	flushes int
 	user_flushes int
-	user_flush_address u64
 	publication_failure int
 	channels GpuChannels
 	hw_config Config
@@ -171,14 +173,12 @@ struct G13EventResources {
 fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
 	assert buffer.phys != 0 && buffer.size != 0
 	mgr.flushes++
-	return !mgr.flush_fails && mgr.flushes + mgr.user_flushes != mgr.publication_failure
+	return !mgr.flush_fails && mgr.flushes != mgr.publication_failure
 }
 
-fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, address u64, size u64) bool {
-	assert slot == 1 && size == 0x4000
+fn (mut mgr GpuManager) flush_g13_uat_range(_ u32, _ u64, _ u64) bool {
 	mgr.user_flushes++
-	mgr.user_flush_address = address
-	return mgr.flushes + mgr.user_flushes != mgr.publication_failure
+	return true
 }
 
 fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext, buffer &mmu.UatBuffer) bool {
@@ -288,6 +288,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 
 pub fn run_checks() {
 	check_job_mapping_publication()
+	check_queue_mapping_publication()
 	check_prepared_job_backlog()
 	check_batch_publication()
 	check_batch_admission()

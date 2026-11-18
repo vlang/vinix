@@ -484,11 +484,6 @@ fn (mut mgr GpuManager) flush_g13_queue_mappings(resources &G13QueueResources) b
 			|| !mgr.flush_g13_kernel_buffer(&buffer.kernel_buffer) {
 			return false
 		}
-		vm_slot := resources.vm.bound_slot()
-		if vm_slot != 0 && (!mgr.flush_g13_uat_range(vm_slot, buffer.page_list.va, buffer.page_list.size)
-			|| !mgr.flush_g13_uat_range(vm_slot, buffer.block_list.va, buffer.block_list.size)) {
-			return false
-		}
 	}
 	return true
 }
@@ -1958,12 +1953,11 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		}
 	}
 
-	// The GPU-only scene buffers are mapped by UAT before this point. From
+	// The scene's per-VM buffers are mapped by UAT before this point. From
 	// the first firmware flush onward, cancellation must invalidate the
 	// complete graph before its backing can be reused.
 	job.mappings_published = true
-	if !mgr.flush_g13_uat_range(job.vm_slot, job.scene.tail_pointer_cache.buffer.va, job.scene.tail_pointer_cache.buffer.size)
-		|| !mgr.flush_g13_kernel_buffer(&job.scene.scene)
+	if !mgr.flush_g13_kernel_buffer(&job.scene.scene)
 		|| !mgr.flush_g13_kernel_buffer(&job.scene.timestamps)
 		|| !mgr.flush_g13_kernel_buffer(&job.init_buffer)
 		|| !mgr.flush_g13_kernel_buffer(&job.barrier)

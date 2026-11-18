@@ -146,6 +146,9 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		'ch.published - ticket.sequence >= unread'], 'Vinix tracks TX completion beyond a wrapped ring index')!
 	results << 'TX ring entry barrier before write-pointer publication'
 	vinix_jobs := read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13.v'))!
+	queue_mappings := section(vinix_jobs, 'fn (mut mgr GpuManager) flush_g13_queue_mappings(',
+		'@[inline]\nfn g13_div_round_up(', 'Vinix queue mapping publication')!
+	require(!queue_mappings.contains('flush_g13_uat_range('), 'Per-VM TVB list mappings use page-table invalidation')!
 	for spec in [['render', 'resources.vm', 'G13RenderJobResources', '7'], ['compute', 'ctx', 'G13ComputeJobResources', '3']] {
 		prepare := section(vinix_jobs, 'pub fn (mut mgr GpuManager) prepare_g13_${spec[0]}_job_with_timestamps(',
 			'pub fn (mut mgr GpuManager) release_g13_${spec[0]}_job(', 'Vinix ${spec[0]} root publication')!
@@ -153,14 +156,7 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 			'vm_slot := uat_mgr.bind_context(${spec[1]})', 'if vm_slot == 0 { return none }',
 			'mut job := &${spec[2]}{', 'vm_slot: vm_slot', 'vm_slot: job.vm_slot',
 			'job.mappings_published = true', 'flush_g13_kernel_buffer('], 'Publish VM before ${spec[0]} job construction')!
-		if spec[0] == 'render' {
-			require(prepare.count('flush_g13_uat_range(') == 1 && prepare.contains(
-				'flush_g13_uat_range(job.vm_slot, job.scene.tail_pointer_cache.buffer.va,'),
-				'Only the private render TPC uses a firmware flush in the job VM')!
-		} else {
-			require(!prepare.contains('flush_g13_uat_range('),
-				'Compute preemption backing uses GPU-only page-table invalidation')!
-		}
+		require(!prepare.contains('flush_g13_uat_range('), 'Per-VM ${spec[0]} job mappings use page-table invalidation')!
 		require(prepare.count('vm_slot: job.vm_slot') == spec[3].int()
 			&& prepare.count('vm_slot:') == spec[3].int() + 1,
 			'Vinix ${spec[0]} firmware commands must use the job ASID')!
