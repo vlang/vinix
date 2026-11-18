@@ -289,6 +289,31 @@ fn check_v13_5_queue_objects() {
 	assert queue[0] == 0xa5 && queue[0xb9] == 0xa5
 }
 
+fn check_notifier_initialization() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		size := if abi == .v12_3 { u32(0xa8) } else { u32(0xb0) }
+		assert (fw.g13_notifier_active_size(abi) or { 0 }) == size
+		mut bytes := [0xb2]u8{init: u8(0xa5)}
+		data := unsafe { voidptr(&bytes[1]) }
+		threshold := u64(0x1234_5678_9abc_def0)
+		generation := u32(0x8765_4321)
+		assert !fw.initialize_g13_notifier(data, size - 1, abi, threshold, generation)
+		assert !fw.initialize_g13_notifier(data, size, abi, 0, generation)
+		for byte in bytes { assert byte == 0xa5 }
+		assert fw.initialize_g13_notifier(data, size, abi, threshold, generation)
+		assert object_u64(data, 0) == threshold
+		assert object_u32(data, 8) == generation
+		assert object_u32(data, 0x0c) == 0, 'notifier current count starts at zero'
+		assert object_u32(data, 0x10) == 0x50
+		for offset := u32(0x14); offset < 0xa8; offset += 4 {
+			assert object_u32(data, offset) == 0, 'notifier state word at 0x${offset:x}'
+		}
+		if abi == .v13_5_partial { assert object_u64(data, 0xa8) == ~u64(0) }
+		assert bytes[0] == 0xa5 && bytes[size + 1] == 0xa5
+	}
+	println('G13 notifier: complete 12.3 and 13.5 records, rejected requests and guard bytes passed')
+}
+
 fn check_tvb_initializers() {
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
 		newer := abi == .v13_5_partial
@@ -462,6 +487,7 @@ fn main() {
 	check_v13_5_command_repacking()
 	check_fragment_tib_sizing()
 	check_v13_5_queue_objects()
+	check_notifier_initialization()
 	check_tvb_initializers()
 	check_default_queue_priorities()
 	check_v13_5_microsequences()

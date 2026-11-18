@@ -147,3 +147,27 @@ The evidence archive covers `9ceb677caa42e29aa70c8d54b20be4601e36ef16` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-tvb-init-20261119.UTXAd6/bundle.tar.gz`
 with SHA-256 `c8371324603ef1680a64c3a21d6f7cfcf99420404c8044c5b64f492df5e376eb`.
+
+## Notifier record initialization
+
+G13 now clears the common `0xa8`-byte notifier record before setting the
+threshold pointer, generation and `0x50` control word. The eight-byte Ventura
+tail is filled with `0xff`, as in pinned Asahi. This gives the record a zero
+current count and empty event state even when its backing is prefilled.
+[Pinned notifier defaults](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/fw/event.rs#L30-L88)
+[Pinned queue constructor](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L496-L512)
+
+The sanitizer regression reproduced a stale current count in the previous
+initializer. It checks every byte of both firmware records, verifies guard
+bytes and checks that short destinations and a zero threshold write nothing.
+
+Both kernel builds, 79 source-contract test files and the pinned reference
+checks passed. The queue-construction and shutdown-handoff tests passed under
+ASan/UBSan. Generated AArch64 C shows no allocation in the initializer, and the
+allocation scan matched the 176 baseline findings. M1 hardware validation
+remains open.
+
+The evidence archive covers `cecb6050d22e8b179b9ecb7b57fda65a9d5b925a` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-notifier-init-20261119.xCqJep/bundle.tar.gz`
+with SHA-256 `9b9f191d29c32bdbce5c9bb5abee08d36d25d8ced51cd79126eb105404495db8`.

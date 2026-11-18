@@ -64,6 +64,7 @@ pub fn initialize_g13_notifier(data voidptr, size u64, abi hw.FirmwareAbi,
 		return false
 	}
 	unsafe {
+		C.memset(data, 0, sizeof(G13Notifier))
 		mut notifier := &G13Notifier(data)
 		notifier.threshold = threshold
 		notifier.generation = generation
