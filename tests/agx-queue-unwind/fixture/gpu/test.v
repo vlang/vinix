@@ -44,6 +44,8 @@ fn check_unwind() {
 			assert returned != unsafe { nil } && retained == unsafe { nil } && manager.cleanups == 0 && manager.g13_queues.len == 1
 			$if queue_sanitized ? { assert C.__asan_address_is_poisoned(returned) == 0, 'successful returned metadata must remain live' }
 			assert !returned.released && !returned.quarantined
+			list := unsafe { &fw.G13NotifierList(returned.notifier_list.cpu_address()) }
+			assert list.list_head.next == returned.notifier_list.va, 'notifier next must point to the list head'
 		} else if mode in [11, 12]! {
 			assert returned == unsafe { nil } && manager.cleanups == 1 && manager.g13_queues.len == 1
 			assert voidptr(retained) == voidptr(manager.g13_queues[0])

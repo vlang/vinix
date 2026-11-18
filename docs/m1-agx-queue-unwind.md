@@ -74,3 +74,25 @@ inventory checker verifies both the complete bundle and full archive restoration
 | `bundle/blob-aarch64.c` | `865eb298121fefddd91ab4c47cb38e9b32fc2b0039c650f8270cc544a3730e28` |
 
 No GPU workload, firmware interaction, Vinix/QEMU boot, reboot, SSH or deployment occurred.
+
+## Notifier list head
+
+G13 queue construction now initializes the notifier list's `next` pointer to
+the GPU address of the list head. The head starts at offset zero in the shared
+record on both firmware layouts. The previous pointer landed eight bytes into
+the head, at the `next` field itself.
+[Pinned Asahi constructor](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L488-L494)
+[Pinned notifier layout](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/fw/event.rs#L17-L29)
+
+The constructor sanitizer fixture reproduced the old pointer as `0x8008`
+instead of `0x8000`. The patched fixture checked the head pointer on each
+successful construction in the 3,640-case matrix and passed all 64 shutdown
+handoff cases. The layout test pins the head and `next` offsets independently.
+Both kernel builds, 79 V source-contract test files and the pinned reference
+checks passed. The allocation scan matched the baseline with 177 existing
+findings. M1 hardware validation remains open.
+
+The evidence archive covers `b25b634a90829d3100dc05fb5a267366a418dc14` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-notifier-head-20261119.s50seM/bundle.tar.gz`
+with SHA-256 `7fec3782c4cc2bc2df04a806b769910ea2132020e36d5c0b50aadc506e275e9e`.

@@ -52,6 +52,8 @@ fn check_layout_validators() {
 	assert fw.validate_g13_hwdata_layouts()
 	assert fw.validate_g13_workqueue_layouts()
 	assert fw.validate_g13_event_layouts()
+	assert __offsetof(fw.G13NotifierList, list_head) == 0
+	assert __offsetof(fw.G13LinkedListHead, next) == 8
 	assert fw.validate_g13_microsequence_layouts()
 	assert fw.validate_g13_job_layouts()
 	assert fw.validate_g13_compute_layouts()

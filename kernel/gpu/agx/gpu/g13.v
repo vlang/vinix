@@ -2900,7 +2900,7 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 	}
 	unsafe {
 		mut list := &fw.G13NotifierList(resources.notifier_list.cpu_address())
-		list.list_head.next = resources.notifier_list.va + 8
+		list.list_head.next = resources.notifier_list.va
 	}
 	resources.threshold = mgr.alloc_g13_shared_buffer(sizeof(u64)) or { return none }
 	notifier_size := fw.g13_notifier_active_size(mgr.hw_config.firmware_abi) or { return none }
