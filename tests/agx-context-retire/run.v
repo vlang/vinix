@@ -19,6 +19,7 @@ fn run_checks() !int {
 	scratch := os.join_path(os.temp_dir(), 'vinix-agx-context-${os.getpid()}')
 	assert !os.exists(scratch); os.mkdir_all(scratch)!; defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(repo + '/tests/agx-heap-gc/fixture', scratch, false)!
+	os.cp_all(repo + '/tests/agx-heap/fixture/memory', scratch + '/memory', false)!
 	base := os.read_file(scratch + '/gpu/fixture.v')!
 	fields := '\tg13_shared alloc.HeapAllocator\n\tg13_queues []&G13QueueResources\n\tg13_context_head &G13QueueResources = unsafe { nil }\n\tg13_context_tail &G13QueueResources = unsafe { nil }\n\tcontext_refuse_map bool\n\tcontext_map_calls int\n\tcontext_backing_calls int\n'
 	fixture := base.replace('\tg13_gpu_readonly alloc.HeapAllocator\n', '\tg13_gpu_readonly alloc.HeapAllocator\n' + fields)

@@ -2,7 +2,6 @@
 module gpu
 
 import gpu.agx.fw
-import aarch64.timer
 import katomic
 
 // Caller holds mgr.lock. The manager/file owners retain every queued object,
@@ -64,12 +63,7 @@ fn (mut mgr GpuManager) invalidate_g13_context_locked(mut resources G13QueueReso
 	token := mgr.channels.device_ctrl.enqueue_with_token(voidptr(&message)) or { return false }
 	resources.context_retirement = .pending
 	if !mgr.ring_device_control() { return false }
-	started := timer.get_ns()
-	for mgr.channels.device_ctrl.read_pointer() != token {
-		if mgr.state != .running || mgr.channels.device_ctrl.has_fault()
-			|| timer.get_ns() - started >= u64(1_000_000_000) { return false }
-		katomic.sync()
-	}
+	if !mgr.wait_g13_device_control_locked(token) { return false }
 	resources.context_retirement = .complete
 	mgr.g13_private.collect_garbage(private_count)
 	mgr.g13_gpu_readonly.collect_garbage(readonly_count)

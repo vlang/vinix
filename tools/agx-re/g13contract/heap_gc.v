@@ -17,9 +17,13 @@ fn check_heap_gc_local(source string, manager string, wire string) ! {
 		'fw.make_g13_cache_flush(mgr.hw_config.firmware_abi) or { return false }',
 		'enqueue_with_token(voidptr(&message)) or { return false }',
 		'if !mgr.ring_device_control() { return false }',
-		'for mgr.channels.device_ctrl.read_pointer() != token', '1_000_000_000',
-		'katomic.sync()', 'return true'], 'Device-control publication waits for its own token')!
-	require(!barrier.contains('sched.yield('), 'Cache polling must not enter the dying-thread scheduler path')!
+		'return mgr.wait_g13_device_control_locked(token)'], 'Device-control publication waits for its own token')!
+	wait := section(source, 'fn (mut mgr GpuManager) wait_g13_device_control_locked(', '\n}\n', 'Device-control completion')!
+	require_order(wait, ['started := timer.get_ns()', 'for mgr.state == .running',
+		'mgr.channels.device_ctrl.serialized_token_consumed(token) or { return false }',
+		'if consumed { return true }', 'timer.get_ns() - started >= u64(1_000_000_000)',
+		'katomic.sync()', 'return false'], 'Live manager and valid channel token gate cache completion')!
+	require(!wait.contains('sched.yield('), 'Cache polling must not enter the dying-thread scheduler path')!
 	allocation := section(manager, 'fn (mut mgr GpuManager) alloc_g13_buffer_with_protection(', '\n}\n', 'G13 allocator entry')!
 	require_order(allocation, ['protection != pgtable.gpu_prot_fw_private_rw',
 		'pgtable.gpu_prot_gpu_ro_fw_private_rw { return none }',

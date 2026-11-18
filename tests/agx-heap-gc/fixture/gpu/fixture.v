@@ -30,6 +30,12 @@ struct GpuChannels { mut: device_ctrl channel.TxChannel }
 
 __global active = unsafe { &GpuManager(nil) }
 
+const device_control_bad_write = 17
+const device_control_bad_read = 18
+const device_control_latched_fault = 19
+const device_control_unexpected_write = 20
+const device_control_stopped = 21
+
 fn acknowledge() {
 	mut manager := unsafe { active }
 	assert manager != unsafe { nil }
@@ -56,9 +62,20 @@ fn (mut manager GpuManager) ring_device_control() bool {
 		unsafe { *&u32(manager.channels.device_ctrl.state_phys) = *&u32(manager.channels.device_ctrl.state_phys + 0x20) }
 		return false
 	}
-	if manager.mode == 0 {
+	if manager.mode == 0 || manager.mode >= device_control_bad_write {
 		manager.acknowledged = true
 		unsafe { *&u32(manager.channels.device_ctrl.state_phys) = *&u32(manager.channels.device_ctrl.state_phys + 0x20) }
+	}
+	if manager.mode >= device_control_bad_write {
+		mut header := unsafe { &channel.RingHeader(manager.channels.device_ctrl.state_phys) }
+		match manager.mode {
+			device_control_bad_write { header.write_ptr = 256 }
+			device_control_bad_read { header.read_ptr = 256 }
+			device_control_latched_fault { manager.channels.device_ctrl.faulted = 1 }
+			device_control_unexpected_write { header.write_ptr = (header.write_ptr + 1) % 256 }
+			device_control_stopped { manager.state = .stopped }
+			else { panic('invalid device-control completion fixture') }
+		}
 	}
 	return true
 }
@@ -128,8 +145,14 @@ fn run_case(abi hw.FirmwareAbi, mode int, initial u32, trigger int, late bool, s
 	if mode == 8 { manager.state = .starting }
 	manager.lock.acquire()
 	manager.collect_g13_heap_garbage_locked()
-	manager.lock.release()
 	triggered := size > 16_777_216
+	if triggered && mode >= device_control_bad_write {
+		assert C.__asan_address_is_poisoned(pp) == 0 && C.__asan_address_is_poisoned(rp) == 0,
+			'faulted or stopped device-control completion must retain both heap prefixes'
+		assert manager.channels.device_ctrl.has_fault() == (mode != device_control_stopped)
+		assert timer.get_ns() < u64(1_000_000_000)
+	}
+	manager.lock.release()
 	succeeded := triggered && mode in [0, 1]!
 	assert (C.__asan_address_is_poisoned(pp) != 0) == succeeded
 	assert (C.__asan_address_is_poisoned(rp) != 0) == succeeded,
@@ -161,7 +184,8 @@ pub fn check_heap_gc() {
 	mut cases := 0
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
 		for initial in [u32(0), 254, 255]! {
-			for mode in 0 .. 11 {
+			for mode in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, device_control_bad_write, device_control_bad_read,
+				device_control_latched_fault, device_control_unexpected_write, device_control_stopped]! {
 				for trigger in 0 .. 2 {
 					for late in [false, true]! {
 						for size in [u64(16_777_216), 16_793_600]! {
@@ -172,6 +196,6 @@ pub fn check_heap_gc() {
 			}
 		}
 	}
-	assert cases == 528
-	println('AGX heap GC: exact 48-byte cache commands for both ABIs, 256 threshold boundaries and 528 real heap/channel barrier cases pass')
+	assert cases == 768
+	println('AGX heap GC: exact 48-byte cache commands for both ABIs, 256 threshold boundaries and 768 heap/channel barrier cases pass')
 }

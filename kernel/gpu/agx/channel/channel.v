@@ -196,7 +196,7 @@ pub fn (mut ch TxChannel) ticket_consumed(ticket TxTicket) ?bool {
 }
 
 // The caller serializes producers from enqueue through completion. The host
-// write pointer must still name the one outstanding command.
+// write pointer must still name the most recently published command.
 pub fn (mut ch TxChannel) serialized_token_consumed(token u32) ?bool {
 	ch.lock.acquire()
 	defer { ch.lock.release() }

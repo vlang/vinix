@@ -53,7 +53,13 @@ fn context_case(abi hw.FirmwareAbi, mode int, initial u32, private_count int, re
 	manager.collect_g13_context_garbage_locked()
 	result := manager.free_g13_queue_resources_locked(mut queue, true)
 	success := mode in [0, 1]!
-	unpublished := mode >= 6
+	unpublished := mode >= 6 && mode < device_control_bad_write
+	if mode >= device_control_bad_write {
+		assert !result && queue.context.mapped && !queue.released,
+			'faulted or stopped device-control completion must retain mapped context backing'
+		assert manager.channels.device_ctrl.has_fault() == (mode != device_control_stopped)
+		assert timer.get_ns() < u64(1_000_000_000)
+	}
 	assert result == (success && !refuse_map), 'queue release must depend on context acknowledgement and mapping cleanup'
 	assert queue.context_retirement == if success { G13ContextRetirement.complete } else if unpublished { G13ContextRetirement.queued } else { G13ContextRetirement.pending },
 		'publication acceptance must preserve retirement state'
@@ -62,7 +68,7 @@ fn context_case(abi hw.FirmwareAbi, mode int, initial u32, private_count int, re
 	for record in old_private { assert (C.__asan_address_is_poisoned(record) != 0) == success, 'only acknowledged context retirement may collect captured private garbage' }
 	for record in old_readonly { assert (C.__asan_address_is_poisoned(record) != 0) == success, 'each heap must use its own captured count' }
 	assert C.__asan_address_is_poisoned(pp) == 0 && C.__asan_address_is_poisoned(rp) == 0, 'captured collection must preserve live and later-released pins'
-	if mode < 6 {
+	if !unpublished {
 		for i in 0 .. 48 { assert unsafe { (&u8(&ring[initial]))[i] } == expected[i], 'published context command must preserve the raw firmware IDs and pointer' }
 		assert pp.in_use == !late && rp.in_use == !late, 'post-snapshot releases must actually execute and remain reserved'
 	}
@@ -119,11 +125,11 @@ fn check_unpublished_context() {
 pub fn check_context_retirement() {
 	check_context_wire(); check_unpublished_context()
 	mut cases := 0
-	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! { for mode in 0 .. 17 { for initial in [u32(0), 254, 255]! {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! { for mode in 0 .. device_control_stopped + 1 { for initial in [u32(0), 254, 255]! {
 		for pc in [0, 1, 3]! { for rc in [0, 2, 5]! { for late in [false, true]! { for refuse in [false, true]! {
 			context_case(abi, mode, initial, pc, rc, late, refuse); cases++
 		} } } }
 	} } }
-	assert cases == 3672
-	println('AGX context retirement: 3672 real queue/heap/channel cases gate unmapping, retain ambiguous publication, preserve retry/GC snapshots and release backing once')
+	assert cases == 4752
+	println('AGX context retirement: 4752 queue/heap/channel cases gate unmapping, retain ambiguous publication, preserve retry/GC snapshots and release backing once')
 }

@@ -10,7 +10,8 @@ fn test_heap_gc_barrier_snapshots_and_allocation_entry() {
 	check_heap_gc_local(source, manager, wire)!
 	for token in ['16 * 1024 * 1024', '2048', 'if !mgr.flush_g13_fw_cache_locked()',
 		'mgr.g13_private.collect_garbage(private_count)', 'mgr.g13_gpu_readonly.collect_garbage(readonly_count)',
-		'enqueue_with_token(voidptr(&message)) or { return false }', 'read_pointer() != token'] {
+		'enqueue_with_token(voidptr(&message)) or { return false }', 'return mgr.wait_g13_device_control_locked(token)',
+		'for mgr.state == .running', 'serialized_token_consumed(token)', '1_000_000_000'] {
 		if _ := check_heap_gc_local(source.replace(token, 'false'), manager, wire) { assert false, token }
 	}
 	if _ := check_heap_gc_local(source, manager.replace('mgr.collect_g13_heap_garbage_locked()', ''), wire) { assert false }

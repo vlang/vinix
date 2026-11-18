@@ -12,7 +12,8 @@ fn test_context_acknowledgement_gates_unmapping_and_snapshot_collection() {
 		if _ := check_context_retire_local(wire.replace(token, ''), garbage, queues) { assert false, token }
 	}
 	for token in ['if resources.context_retirement == .complete { return true }', 'if resources.context_retirement == .pending { return false }',
-		'resources.context_retirement = .pending', 'mgr.g13_private.collect_garbage(private_count)'] {
+		'resources.context_retirement = .pending', 'if !mgr.wait_g13_device_control_locked(token) { return false }',
+		'mgr.g13_private.collect_garbage(private_count)'] {
 		if _ := check_context_retire_local(wire, garbage.replace(token, ''), queues) { assert false, token }
 	}
 	if _ := check_context_retire_local(wire, garbage, queues.replace('!mgr.defer_g13_context_locked(mut resources)\n\t\t|| ', '')) { assert false }

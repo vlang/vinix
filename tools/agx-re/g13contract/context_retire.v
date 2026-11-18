@@ -14,8 +14,8 @@ fn check_context_retire_local(wire string, garbage string, queues string) ! {
 		'!resources.context.mapped', 'private_count, _ := mgr.g13_private.garbage()',
 		'readonly_count, _ := mgr.g13_gpu_readonly.garbage()', 'katomic.sync()', 'fw.make_g13_context_invalidate(',
 		'enqueue_with_token(voidptr(&message)) or { return false }', 'resources.context_retirement = .pending',
-		'if !mgr.ring_device_control() { return false }', 'for mgr.channels.device_ctrl.read_pointer() != token',
-		'1_000_000_000', 'katomic.sync()', 'resources.context_retirement = .complete',
+		'if !mgr.ring_device_control() { return false }', 'if !mgr.wait_g13_device_control_locked(token) { return false }',
+		'resources.context_retirement = .complete',
 		'mgr.g13_private.collect_garbage(private_count)', 'mgr.g13_gpu_readonly.collect_garbage(readonly_count)', 'return true'], 'Publication is one-shot and acknowledgement gates both captured heap prefixes')!
 	require(!retire.contains('.gc()') && !retire.contains('= .fresh'), 'Failure cannot collect later garbage or reset published retirement')!
 	require(queues.contains('context_retirement G13ContextRetirement'), 'Queue owns one scalar retirement state')!

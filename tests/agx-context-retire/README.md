@@ -9,12 +9,14 @@ services; the fixture does not run GPU firmware.
 An independent byte oracle checks all 48 message bytes in 24 cases, including
 both firmware ABIs, raw firmware IDs, packed pointers and zero padding. Another
 69 cases reject unsupported ABIs, short context storage and missing pointers.
-The 3,672 queue/heap/channel cases cover immediate/delayed acknowledgement,
+The 4,752 queue/heap/channel cases cover immediate and delayed acknowledgement,
 publication followed by failed doorbell, timeout, state/fault transitions,
-full/corrupt rings, invalid context inputs and three ring positions. They vary
-each heap's captured count, inject later releases and check live pins. Successful
-retirement followed by refused UAT cleanup poisons context storage before retry:
-the retry must neither read it nor send or collect again. Published failures
+full or corrupt rings, invalid context inputs and three ring positions. Faults
+at completion keep the context mapped and retain both captured heap prefixes.
+The cases vary each heap's captured count, inject later releases and check live
+pins. After successful retirement and refused UAT cleanup, the fixture poisons
+context storage before retry. The retry skips the context read, send and
+collection. Published failures
 remain quarantined even after a late acknowledgement. Stopped teardown and
 unpublished initialization bypass the gate; backing releases once.
 
@@ -50,3 +52,5 @@ normal release requests queue retirement, and the modeled allocator borrow
 drains it before cleanup retries. The original C checker and evidence helper
 above retain their original baseline/current artifact contracts; use the
 deferred scheduling check/evidence helper for the newer increment.
+The [device-control completion report](../../docs/m1-agx-device-control-completion.md)
+records the current completion regression cases and native builds.
