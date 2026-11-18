@@ -8,6 +8,9 @@ render-buffer and publication failures, successful return and cleanup refusal.
 Freed-address poisoning distinguishes safely cleaned unreturned records from
 live returned/quarantined records. Backing cleanup and external firmware/VM
 services are instrumented; the host queue type is reduced to constructor fields.
+Another 64 cases run the production shutdown drain at the constructor unlock.
+They check that the manager releases backing and the caller receives the
+exact live record for final disposal.
 
 `MallocNanoZone=0 v run tests/agx-queue-unwind/run.v --measure` measures retained
 malloc blocks/bytes across three 10,000-failure batches. Warmup excludes setup
@@ -19,11 +22,13 @@ control and fixed constructor remain flat; the baseline still leaks one block
 per failed construction. Preserve both diagnostics and controlled measurements.
 These host bytes do not measure native kernel object sizes or slab rates.
 
-`--source G13` selects alternative constructor input. `AGX_UNWIND_C` and
+`--source G13` selects a constructor with the current handoff signature.
+`AGX_UNWIND_C` and
 `AGX_UNWIND_BINARY` retain artifacts externally. Temporary fixtures are removed
-before exit. `counterexamples.v RUNNER BASELINE_G13 FRESH_OUTPUT` requires five
-compiled baseline/mutated cases to reach designated missing-free, retained-owner,
-returned-owner or double-free failures; compile failures do not qualify.
+before exit. The original five-case `counterexamples.v RUNNER BASELINE_G13
+FRESH_OUTPUT` check uses the runner, fixtures and pre-handoff sources retained
+in the sealed [original evidence bundle](../../docs/m1-agx-queue-unwind.md).
+Each baseline or mutated source must compile and reach its designated failure.
 
 `check.v --native CURRENT_ARM_C BASELINE_ARM_C` removes exactly the twelve
 lowered cleanup-success free arms and requires the remaining constructor to

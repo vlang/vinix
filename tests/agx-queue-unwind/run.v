@@ -19,7 +19,8 @@ fn checks() !int {
 	code := os.read_file(source)!
 	os.write_file(scratch + '/gpu/production.v', 'module gpu\nimport gpu.agx.fw\nimport gpu.agx.mmu\nimport gpu.agx.event\nimport gpu.agx.pgtable\nimport drm.syncobj\n' +
 		section(code, 'struct G13QueueIds {', '// Asahi\'s ordinary submit policy')! +
-		section(code, 'pub fn (mut mgr GpuManager) create_g13_queue_resources(', '// A failed constructor may retain backing')!)!
+		section(code, 'pub fn free_g13_queue_record(', 'pub fn (mut mgr GpuManager) release_g13_queue_resources(')! +
+		section(code, 'fn (mut mgr GpuManager) release_all_g13_queue_resources()', '\n}\n')! + '\n}\n')!
 	os.write_file(scratch + '/main.v', 'import gpu\nfn main() { gpu.check_queue_unwind(' + measure.str() + ') }\n')!
 	mut flags := ['-nocache', '-no-parallel', '-gc', 'none', '-manualfree', '-cc', 'cc', '-enable-globals', '-path', scratch + '|@vlib|@vmodules']
 	if !measure { flags << ['-d', 'queue_sanitized', '-cflags', '-fsanitize=address,undefined -fno-omit-frame-pointer', '-ldflags', '-fsanitize=address,undefined'] }

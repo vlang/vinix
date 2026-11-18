@@ -14,8 +14,8 @@ fn check_queue_priority_local(file string, ioctl string, gpu string) ! {
 		'f.lock.acquire()', 'defer { f.lock.release() }', 'vm := f.find_vm(request.vm_id)',
 		'id := f.allocate_queue_id_locked()',
 		'workqueue.new_workqueue(id, vm.id, firmware_priority, request.queue_caps)',
-		'gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm)',
-		'gpu_manager.retained_g13_queue_resources(id, vm)',
+		'gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm, unsafe { &retained }) or {',
+		'if retained != unsafe { nil }',
 		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }',
 		'queue.destroy()', 'workqueue.free_workqueue(queue)', 'return -12',
 		'f.queues << wq', 'request.queue_id = id'], 'Vinix G13 priority and VM borrow lifetime')!
@@ -31,11 +31,7 @@ fn check_queue_priority_local(file string, ioctl string, gpu string) ! {
 	require_order(destroy, ['for ownership in f.g13_queues {',
 		'if ownership.vm_id == vm_id { retained = true; break }', 'if retained { continue }',
 		'uat.destroy_context(vm)'], 'Vinix failed queue VM pin')!
-	lookup := section(gpu, 'pub fn (mut mgr GpuManager) retained_g13_queue_resources(',
-		'pub fn (mut mgr GpuManager) release_g13_queue_resources(', 'Vinix retained failed queue lookup')!
-	require_order(lookup, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'for resources in mgr.g13_queues',
-		'resources.queue_id == queue_id && voidptr(resources.vm) == voidptr(vm)',
-		'&& resources.quarantined && !resources.released', 'return resources'], 'Vinix retained failed queue lookup')!
+	check_queue_unwind_local(gpu)!
 }
 
 fn check_queue_priority_reference(header string, file string) ! {

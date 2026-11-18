@@ -2,14 +2,15 @@
 module g13contract
 
 fn check_queue_unwind_local(source string) ! {
-	constructor := section(source, 'pub fn (mut mgr GpuManager) create_g13_queue_resources(', '// A failed constructor may retain backing', 'Queue constructor ownership')!
-	require_order(constructor, ['mgr.lock.acquire()', 'defer {', 'mgr.lock.release()', 'mut resources := &G13QueueResources{',
+	constructor := section(source, 'pub fn (mut mgr GpuManager) create_g13_queue_resources(', 'pub fn (mut mgr GpuManager) release_g13_queue_resources(', 'Queue constructor ownership')!
+	require_order(constructor, ['retained &&G13QueueResources', 'unsafe { *retained = nil }',
+		'mgr.lock.acquire()', 'defer {', 'mgr.lock.release()', 'mut resources := &G13QueueResources{',
 		'mut complete := false', 'defer {', 'if !complete {',
 		'if !mgr.free_g13_queue_resources_locked(mut resources, resources.mappings_published) {',
-		'resources.quarantined = true', 'mgr.g13_queues << resources', '} else {',
+		'resources.quarantined = true', 'mgr.g13_queues << resources', 'unsafe { *retained = resources }', '} else {',
 		'unsafe { free(resources) }', 'resources.context =', 'resources.mappings_published = true',
 		'if !mgr.flush_g13_queue_mappings(resources)', 'mgr.g13_queues << resources', 'complete = true', 'return resources'],
-		'Only unreturned metadata with successful backing cleanup is freed before unlocking')!
+		'Transfer quarantined metadata and free fully unwound metadata before unlocking')!
 	require(constructor.count('free(resources)') == 1, 'Exactly one source failure-only metadata free')!
 }
 

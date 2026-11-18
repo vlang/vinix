@@ -21,9 +21,7 @@ fn test_priority_conversion_and_retained_failure_ownership_reject_drift() {
 		'f.lock.release()\nvm := f.find_vm(request.vm_id)'), ioctl, gpu) { assert false }
 	if _ := check_queue_priority_local(file, ioctl.replace('asahi_priority_medium = u32(1)',
 		'asahi_priority_medium = u32(2)'), gpu) { assert false }
-	for token in ['voidptr(resources.vm) == voidptr(vm)', 'resources.quarantined && !resources.released'] {
-		if _ := check_queue_priority_local(file, ioctl, gpu.replace(token, 'true')) { assert false }
-	}
+	if _ := check_queue_priority_local(file, ioctl, gpu.replace('unsafe { *retained = resources }', '')) { assert false }
 }
 
 fn test_packaged_priority_oracle_rejects_policy_and_conversion_drift() {

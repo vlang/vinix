@@ -2845,8 +2845,12 @@ pub fn free_g13_queue_record(resources &G13QueueResources) {
 	unsafe { free(resources) }
 }
 
+// The caller holds the VM's file lock. Failed invalidation transfers the
+// record through retained before unlocking, even if shutdown drains backing
+// before the caller installs its ownership row.
 pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
-	channel_mask u32, priority u32, vm &mmu.UatContext) ?&G13QueueResources {
+	channel_mask u32, priority u32, vm &mmu.UatContext, retained &&G13QueueResources) ?&G13QueueResources {
+	unsafe { *retained = nil }
 	if queue_id == 0 || channel_mask == 0 || channel_mask & ~g13_queue_channel_mask != 0
 		|| priority >= 4 || !fw.validate_g13_workqueue_layouts()
 		|| !fw.validate_g13_event_layouts() || vm == unsafe { nil } || !vm.active
@@ -2877,6 +2881,7 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 			if !mgr.free_g13_queue_resources_locked(mut resources, resources.mappings_published) {
 				resources.quarantined = true
 				mgr.g13_queues << resources
+				unsafe { *retained = resources }
 			} else {
 				// No caller or manager owns this unreturned, fully unwound record.
 				unsafe { free(resources) }
@@ -2922,20 +2927,6 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 	mgr.g13_queues << resources
 	complete = true
 	return resources
-}
-
-// A failed constructor may retain backing after an interrupted invalidation.
-// The caller holds the VM owner's file lock until it records this ownership.
-pub fn (mut mgr GpuManager) retained_g13_queue_resources(queue_id u32, vm &mmu.UatContext) ?&G13QueueResources {
-	mgr.lock.acquire()
-	defer { mgr.lock.release() }
-	for resources in mgr.g13_queues {
-		if resources.queue_id == queue_id && voidptr(resources.vm) == voidptr(vm)
-			&& resources.quarantined && !resources.released {
-			return resources
-		}
-	}
-	return none
 }
 
 pub fn (mut mgr GpuManager) release_g13_queue_resources(resources &G13QueueResources) bool {

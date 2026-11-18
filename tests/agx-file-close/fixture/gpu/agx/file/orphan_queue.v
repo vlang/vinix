@@ -2,6 +2,7 @@
 module file
 
 import drm.ioctl
+import drm.asahi
 import gpu.agx.gpu
 import gpu.agx.mmu
 import gpu.agx.pgtable
@@ -9,11 +10,44 @@ import gpu.agx.pgtable
 __global orphan_reaping_file &GpuFile = unsafe { nil }
 __global orphan_release_checks int
 
-fn check_orphan_release_locks() {
+fn check_orphan_release_locks(_ &gpu.G13QueueResources) {
 	assert file_map_lock.is_held() && orphan_reaping_file.lock.is_held()
 	assert orphan_reaping_file.g13_queues.len == 2
 	assert orphan_reaping_file.vms[0].inflight == 7
 	orphan_release_checks++
+}
+
+fn check_stopped_constructor_adoption() {
+	for _ in 0 .. 32 {
+		for modern in [false, true]! {
+			gpu.set_running(true)
+			mut vm := mmu.UatContext{id: 1, vm_id: 1}
+			mut file := GpuFile{vms: [&vm]}
+			gpu.stop_on_next_queue_quarantine()
+			if modern {
+				request := asahi.QueueCreate{vm_id: 1, queue_id: 73}
+				assert file.ioctl_modern_queue_create(&request) == -12 && request.queue_id == 73
+			} else {
+				mut request := queue_request(ioctl.asahi_priority_low, ioctl.asahi_queue_cap_render)
+				request.queue_id = 73
+				assert file.ioctl_queue_create(&request) == -12 && request.queue_id == 73
+			}
+			assert file.queues.len == 0 && file.g13_queues.len == 1,
+				'the failed ioctl must adopt the record after the shutdown drain'
+			record := file.g13_queues[0].resources
+			assert record.released && C.__asan_address_is_poisoned(record) == 0
+			assert file.ioctl_vm_destroy(&ioctl.DrmAsahiVmDestroy{vm_id: 1}) == 0
+			assert !vm.destroyed
+			file.lock.acquire()
+			file.reap_orphaned_g13_queues_locked()
+			file.reap_detached_vms_locked()
+			file.lock.release()
+			assert C.__asan_address_is_poisoned(record) != 0 && vm.destroyed
+			assert file.close()
+		}
+	}
+	gpu.set_running(true)
+	println('G13 failed queue handoff: 64 legacy and modern shutdown cases adopt and reclaim the unpublished record')
 }
 
 fn check_orphaned_queues() {

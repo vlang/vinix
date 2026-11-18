@@ -18,7 +18,8 @@ fn check_orphan_queue_local(file string, gpu string, worker string) ! {
 		'owned.reap_detached_vms_locked()', 'owned.lock.release()', 'file_map_lock.release()'], 'Retry unpublished resources before final VM release under registry/file locks')!
 	create := section(file, 'pub fn (mut f GpuFile) ioctl_queue_create(', 'fn (mut f GpuFile) reap_detached_g13_queues_locked()', 'Failed queue adoption')!
 	require_order(create, ['f.lock.acquire()', 'defer { f.lock.release() }',
-		'gpu_manager.retained_g13_queue_resources(id, vm)',
+		'gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm, unsafe { &retained }) or {',
+		'if retained != unsafe { nil }',
 		'f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }',
 		'queue.destroy()', 'workqueue.free_workqueue(queue)', 'return -12', 'f.queues << wq'], 'Construction adoption and successful publication stay under the same file lock')!
 	manager := section(gpu, 'pub fn (mut mgr GpuManager) release_g13_queue_resources(', '// Quarantined backing must retire', 'Existing physical release gates')!

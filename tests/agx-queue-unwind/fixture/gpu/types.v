@@ -27,7 +27,11 @@ mut:
 	mappings_published bool
 	quarantined bool
 	released bool
+	context_next &G13QueueResources = unsafe { nil }
 }
+
+fn (_ &G13QueueResources) has_file_references() bool { return false }
+
 struct GpuManager {
 mut:
 	lock klock.Lock
@@ -36,6 +40,8 @@ mut:
 	g13_channels voidptr = voidptr(1)
 	g13_queue_ids G13QueueIds
 	g13_queues []&G13QueueResources
+	g13_context_head &G13QueueResources = unsafe { nil }
+	g13_context_tail &G13QueueResources = unsafe { nil }
 	mode int
 	allocations int
 	cleanups int
@@ -55,7 +61,7 @@ fn (manager &GpuManager) initialize_g13_render_buffer(mut _ G13QueueResources, _
 fn (manager &GpuManager) flush_g13_queue_mappings(_ &G13QueueResources) bool { return manager.mode != 11 }
 fn (mut manager GpuManager) free_g13_queue_resources_locked(mut resources G13QueueResources, published bool) bool {
 	manager.cleanups++; manager.last = &resources
-	if published || manager.mode == 12 { return false }
+	if manager.state == .running && (published || manager.mode == 12) { return false }
 	resources.context = SharedBuffer{}; resources.notifier_list = SharedBuffer{}
 	resources.threshold = SharedBuffer{}; resources.notifier = SharedBuffer{}
 	resources.released = true

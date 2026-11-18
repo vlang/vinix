@@ -12,7 +12,6 @@ import memory
 import usercopy
 
 __global scs_file &GpuFile = unsafe { nil }
-__global scs_vm &mmu.UatContext = unsafe { nil }
 __global scs_resource &gpu.G13QueueResources = unsafe { nil }
 __global scs_failures int
 
@@ -32,8 +31,14 @@ fn scs_measure_step(mut file GpuFile, request &asahi.QueueCreate, retry bool) {
 pub fn measure_scs_rejection() {
 	$if macos {
 		mut manager := mmu.UatManager{}
+		mut registered := unsafe { gpu.registration_manager() }
+		saved := registered.uat
+		registered.uat = unsafe { &manager }
 		uat_mgr = unsafe { &manager }
-		defer { uat_mgr = unsafe { nil } }
+		defer {
+			registered.uat = saved
+			uat_mgr = unsafe { nil }
+		}
 		gpu.available(true)
 		gpu.set_running(true)
 		mut vm := mmu.UatContext{ id: 1, vm_id: 1 }
@@ -41,7 +46,6 @@ pub fn measure_scs_rejection() {
 		file.queues.flags |= .noslices
 		file.g13_queues.flags |= .noslices
 		scs_file = unsafe { &file }
-		scs_vm = unsafe { &vm }
 		scs_failures = 1
 		request := asahi.QueueCreate{ vm_id: 1, render_scs_layout: [u64(1), 0]! }
 		for retry in [false, true]! {
@@ -62,18 +66,15 @@ pub fn measure_scs_rejection() {
 		}
 		assert file.close() && vm.destroyed
 		scs_file = unsafe { nil }
-		scs_vm = unsafe { nil }
 		scs_resource = unsafe { nil }
 	} $else {
 		panic('malloc-zone retention measurement requires macOS')
 	}
 }
 
-fn watch_scs_release() {
+fn watch_scs_release(queue &gpu.G13QueueResources) {
 	assert scs_file.lock.is_held() && scs_file.queues.len == 0
-	manager := gpu.get_global_manager() or { panic('manager during rollback') }
-	mut owned := unsafe { manager }
-	mut resource := owned.retained_g13_queue_resources(1, scs_vm) or { panic('constructed graph') }
+	mut resource := unsafe { queue }
 	assert !resource.released && !resource.record_disposed
 	scs_resource = resource
 	resource.failures = scs_failures
@@ -107,7 +108,6 @@ pub fn run_modern_scs_checks() {
 				if mode == 4 { gpu.fail_queue() }
 				if mode == 5 { gpu.quarantine_queue() }
 				scs_file = unsafe { &file }
-				scs_vm = unsafe { &vm }
 				scs_resource = unsafe { nil }
 				scs_failures = if mode == 7 {
 					2
@@ -179,7 +179,6 @@ pub fn run_modern_scs_checks() {
 				}
 				file_map.delete(0x5c5)
 				scs_file = unsafe { nil }
-				scs_vm = unsafe { nil }
 				scs_resource = unsafe { nil }
 				assert workqueue.active() == 0 && gpu.active_queues() == 0
 				memory.assert_released()

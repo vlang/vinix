@@ -15,6 +15,7 @@ fn main() {
 	mut receipts := []string{}
 	for name, pair in {
 		'missing-retry': ['owned.reap_orphaned_g13_queues_locked()', ''],
+		'discard-stopped-constructor': ['if retained != unsafe { nil } {', 'if retained != unsafe { nil } && !retained.released {'],
 		'ignore-logical-owner': ['if named || ownership.resources.has_file_references() { continue }', 'if (named && false) || ownership.resources.has_file_references() { continue }'],
 		'ignore-reference': ['if named || ownership.resources.has_file_references() { continue }', 'if named { continue }'],
 		'compare-vm-identity': ['if queue.id == ownership.queue_id { named = true; break }', 'if queue.vm_id == ownership.vm_id { named = true; break }'],
@@ -23,7 +24,7 @@ fn main() {
 		'delete-wrong-owner': ['f.g13_queues.delete(index)', 'f.g13_queues.delete(0)']
 	} {
 		mut mutant := ''
-		if name == 'missing-retry' {
+		if name in ['missing-retry', 'discard-stopped-constructor'] {
 			assert source.count(pair[0]) == 1
 			mutant = source.replace(pair[0], pair[1])
 		} else {
@@ -39,6 +40,7 @@ fn main() {
 		log := p.stdout_slurp() + p.stderr_slurp(); p.wait()
 		os.write_file(directory + '/run.log', log)!
 		target := match name {
+			'discard-stopped-constructor' { 'file.check_stopped_constructor_adoption:' }
 			'ignore-logical-owner' { 'file.check_detached_queues:' }
 			'forget-failed-release', 'delete-wrong-owner' {
 				'gpu.agx.gpu.free_g13_queue_record: assert resources.released'

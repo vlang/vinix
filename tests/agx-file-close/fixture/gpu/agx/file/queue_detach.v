@@ -9,7 +9,7 @@ import gpu.agx.workqueue
 __global reaping_file &GpuFile = unsafe { nil }
 __global queue_release_checks int
 
-fn check_registry_pin() {
+fn check_registry_pin(_ &gpu.G13QueueResources) {
 	assert file_map_lock.is_held() && reaping_file.lock.is_held()
 	assert reaping_file.queues.len == 1 && reaping_file.g13_queues.len == 1
 	assert reaping_file.queues[0].detached

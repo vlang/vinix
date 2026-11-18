@@ -512,8 +512,8 @@ global UAT fallback and a missed worker poll. All 18 timestamp controls
 passed. The independent lifetime review passed and the allocation scan
 reproduced 178 baseline findings.
 
-The failed queue-constructor quarantine still has an ownership handoff
-gap if shutdown clears the manager's list before the file adopts the
+That revision has an ownership handoff gap if shutdown clears the
+manager's quarantine list before the file adopts the failed constructor's
 record. Concurrent teardown and reprobe, G17 resident-slot retirement,
 and native quiescence remain open. The pinned source audit remains
 `not_equivalent`. No hardware tests or reboots ran.
@@ -523,6 +523,27 @@ patch is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-g13-file-owner-20261118/`.
 `bundle.tar.gz` SHA-256 is
 `676a07075599f7ca8c7084bd0eea81f7b0c05a81c20c0971d920d89a13f654b0`.
+
+Failed G13 queue construction now gives the file the quarantined record
+under the manager lock. The file holds its own lock through adoption, so
+it retains the VM and can free the record even when shutdown releases
+the backing before the constructor returns. Both ioctl ABIs retain their
+failure status and leave the requested queue name untouched.
+
+The AArch64 and x86_64 kernels built, and all 82 V test files and the
+sanitized constructor, close and async suites passed. The constructor and
+ioctl fixtures each passed 64 shutdown handoffs. Host measurements found
+zero retained blocks over 30,000 clean constructor failures and 6,000
+render scratch layout rejections, including cleanup retries. The allocation
+scan reproduced 178 baseline findings. The pinned audit still reports
+`not_equivalent`. Concurrent reprobe and native validation remain open.
+
+The restored archive passed the full inventory check for
+`a8baabb2c567cd56a535594b76386310366285f0` plus `verified-source.diff`.
+The evidence directory is
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-queue-adoption-20261118/`.
+`bundle.tar.gz` SHA-256 is
+`fdbdc3d6626aa4f5cb1e1246097a6e15645f9ccf03861623687be9ab0ba4c22e`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
@@ -982,7 +1003,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Submission scheduling | Vinix prepares up to 64 mixed render/compute commands through either native interface. In-batch and initial cross-submission dependencies use firmware prefixes. Later batches pipeline after older publication. The file worker tracks publication FIFO per queue without a fixed lookup limit. Whole-batch ring/event readiness and atomic publication are implemented. Finished fences use wrapping 32-bit per-queue numbers. Private input copies keep each independent native fence and the latest fence per ordered context. Own-queue native fences are elided. Asahi's ordered-fence comparison, full scheduler policy and timeline-chain equivalence remain open. |
 | Queue destruction | G13 queue names disappear immediately. Initial submission capture and accepted nodes retain their own queue through copying, callbacks and final retirement; unrelated work in the same VM does not delay release. Invalidation failures retain backing. |
 | VM destruction | VM names disappear independently of queues and jobs. Existing queues retain physical contexts. Idle user bindings use acknowledged teardown, and failed invalidation retains backing. Contexts retire after every owner ends. Native close timing, reservation scheduling and firmware-slot eligibility still differ. |
-| Failed queue construction | The worker retries unpublished G13 resource graphs independently of Handle/VM-name lifetime. Logical queues and captured references retain ownership; failed invalidation retains the graph. Successful release returns the reserved queue ID and allows final VM retirement. |
+| Failed queue construction | The constructor transfers a quarantined record to its file before releasing the manager lock. The file adopts it even if shutdown has released the backing. The worker retries unpublished G13 resource graphs independently of queue and VM names. Successful release returns the reserved queue ID and allows final VM retirement. |
 | Render scenes | Multiple prepared and published scenes retain shared backing and conditional binding. Commands and batches on one queue may overlap; individual commands wait for their explicit firmware dependencies. |
 | Command ring capacity | Compute and both render subqueues count host-unretired command positions and require Asahi's spare entry before publication. Firmware consumption alone does not release host capacity. |
 | Event publication capacity | Publication applies Asahi's strict spare-slot rule to the last-published/host-completed stamp delta. Whole-batch readiness checks all three pipes before publication. Preparation grows beyond the inline 127 tickets through owned overflow blocks; it is no longer capped at 127. These selected contracts do not establish complete scheduler equivalence. |

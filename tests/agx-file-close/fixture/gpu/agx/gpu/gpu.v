@@ -22,13 +22,13 @@ pub mut:
 pub struct G13QueueResources {
 pub mut:
 	queue_id u32
+	vm_address u64
 	file_references u64
 	released bool
 	failures int
 	calls    int
 	priority u32
 	channel_mask u32
-	vm_address u64
 	pooled bool
 	heap_record bool
 	record_disposed bool
@@ -72,19 +72,31 @@ __global queue_attempts = 0
 __global live_queues = 0
 __global reject_queue = false
 __global quarantine_next = false
-__global queue_release_watch fn () = unsafe { nil }
+__global stop_on_quarantine_next = false
+__global queue_release_watch fn (&G13QueueResources) = unsafe { nil }
 
-pub fn watch_queue_release(callback fn ()) { queue_release_watch = callback }
+pub fn watch_queue_release(callback fn (&G13QueueResources)) { queue_release_watch = callback }
 
 pub fn queue_creates() int { return queue_attempts }
 pub fn active_queues() int { return live_queues }
 pub fn fail_queue() { reject_queue = true }
 pub fn quarantine_queue() { quarantine_next = true }
+pub fn stop_on_next_queue_quarantine() { stop_on_quarantine_next = true }
 
-pub fn (mut mgr GpuManager) create_g13_queue_resources(id u32, mask u32, priority u32, vm voidptr) ?&G13QueueResources {
+pub fn (mut mgr GpuManager) create_g13_queue_resources(id u32, mask u32, priority u32, vm voidptr, retained &&G13QueueResources) ?&G13QueueResources {
+	unsafe { *retained = nil }
 	queue_attempts++
 	if reject_queue { reject_queue = false; return none }
 	if mgr.state != .running { return none }
+	if stop_on_quarantine_next {
+		stop_on_quarantine_next = false
+		record := &G13QueueResources{queue_id: id, heap_record: true, released: true}
+		unsafe { *retained = record }
+		// The shutdown drain removed the manager's entry before the
+		// constructor returned to the file. The record is still live.
+		mgr.state = .stopped
+		return none
+	}
 	for index in 0 .. 16 {
 		if !queue_pool[index].pooled || queue_pool[index].released {
 			queue_pool[index] = G13QueueResources{ queue_id: id, priority: priority, channel_mask: mask, vm_address: u64(vm), pooled: true }
@@ -95,18 +107,9 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(id u32, mask u32, priorit
 			if quarantine_next {
 				quarantine_next = false
 				queue_pool[index].failures = 2
+				unsafe { *retained = &queue_pool[index] }
 				return none
 			}
-			return unsafe { &queue_pool[index] }
-		}
-	}
-	return none
-}
-
-pub fn (mut mgr GpuManager) retained_g13_queue_resources(id u32, vm voidptr) ?&G13QueueResources {
-	for index in 0 .. 16 {
-		if queue_pool[index].pooled && !queue_pool[index].released
-			&& queue_pool[index].queue_id == id && queue_pool[index].vm_address == u64(vm) {
 			return unsafe { &queue_pool[index] }
 		}
 	}
@@ -220,7 +223,7 @@ pub fn stop_on_next_retirement(callback fn ()) {
 
 pub fn (mut mgr GpuManager) release_g13_queue_resources(queue &G13QueueResources) bool {
 	mgr.queue_release_calls++
-	if queue_release_watch != unsafe { nil } { queue_release_watch() }
+	if queue_release_watch != unsafe { nil } { queue_release_watch(queue) }
 	mut owned := unsafe { queue }
 	owned.calls++
 	if owned.released { return true }

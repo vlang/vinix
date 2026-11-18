@@ -82,7 +82,7 @@ fn stop_during_registration() {
 	}
 }
 
-fn close_during_reap() {
+fn close_during_reap(_ &gpu.G13QueueResources) {
 	gpu.watch_queue_release(unsafe { nil })
 	assert closing_reaper_active && closing_head == unsafe { nil }
 	reap_closed_files()
@@ -223,6 +223,7 @@ pub fn run_checks() {
 	check_detached_queues()
 	check_detached_vms()
 	check_orphaned_queues()
+	check_stopped_constructor_adoption()
 	check_queue_record_reclamation()
 	check_logical_queue_records()
 	check_late_stopped_close()

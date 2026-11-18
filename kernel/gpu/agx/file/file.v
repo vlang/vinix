@@ -1132,10 +1132,10 @@ fn (mut f GpuFile) create_queue(data &ioctl.DrmAsahiQueueCreate, usc_base u64, r
 			channel_mask |= gpu.g13_queue_channel_compute
 		}
 		mut gpu_manager := unsafe { manager }
-		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm) or {
-			// Failed invalidation may leave a partially built queue borrowing
-			// this VM. Adopt that graph before releasing the file lock.
-			if retained := gpu_manager.retained_g13_queue_resources(id, vm) {
+		mut retained := &gpu.G13QueueResources(unsafe { nil })
+		g13_resources = gpu_manager.create_g13_queue_resources(id, channel_mask, firmware_priority, vm, unsafe { &retained }) or {
+			// Adopt the record even if shutdown already released its backing.
+			if retained != unsafe { nil } {
 				f.g13_queues << G13QueueOwnership{ queue_id: id, vm_id: vm.id, resources: retained }
 			}
 			mut queue := unsafe { wq }
