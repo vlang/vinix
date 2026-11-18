@@ -146,6 +146,7 @@ fn assert_drained(file &GpuFile) {
 	manager := gpu.get_global_manager() or { panic('manager') }
 	assert manager.g13_compute_jobs.len == 0 && manager.g13_render_jobs.len == 0
 	assert manager.capture_pins == 0
+	if manager.state != .stopped { assert manager.active_operations == 0 }
 }
 
 fn check_dependencies_and_fifo() {
@@ -362,6 +363,7 @@ fn check_mapping_admission() {
 }
 
 pub fn run_checks() {
+	check_submission_operations()
 	check_g13_slot_wait()
 	check_queue_admission()
 	check_pending_timestamps()

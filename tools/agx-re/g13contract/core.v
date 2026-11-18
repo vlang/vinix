@@ -491,10 +491,8 @@ fn check_batch_publication_contract(local string, pending string, reference stri
 		'lock.acquire()', 'outer.validate_pointers(outer_rp, outer_wp)',
 		'pipes[pipe].outer_next == outer_rp', 'free >= fw.g13_workqueue_entries',
 		'pipes[pipe].count > fw.g13_workqueue_entries - used - 1',
-		'g13_pending_submissions_locked()', 'old_pending > ~u32(0) - count',
-		'katomic.store(mut pending, old_pending + count)', '!mgr.kick_firmware()',
-		'katomic.store(mut pending, old_pending)', 'katomic.store(mut threshold,',
-		'append_g13_batch_command(queue, 2', 'job.submitted, job.pending_counted = true, true',
+		'if !operation_active && !mgr.begin_g13_operation_locked() { return 0 }',
+		'katomic.store(mut threshold,', 'append_g13_batch_command(queue, 2', 'job.submitted = true',
 		'job.vertex_ring_slot, job.vertex_retirement_sequence',
 		'*destination = fw.FwRunWorkQueueMsg', 'katomic.sync()',
 		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)', 'katomic.sync()',
@@ -502,13 +500,38 @@ fn check_batch_publication_contract(local string, pending string, reference stri
 		'return if count == 64 { ~u64(0) }'], 'Vinix prepared batch publication')!
 	require(local.count('mgr.ring_pipe(') == 1 && local.count('for pipe in [1, 0, 2]!') == 3,
 		'Native batch must publish and notify once per participating pipe in reference order')!
+	require(!local.contains('pending_counted') && local.count('mgr.begin_g13_operation_locked()') == 1,
+		'Each native batch owns one operation independent of per-command completion')!
 	helper := section(pending, 'fn submit_g13_pending(', '// Called under manager.lock', 'Vinix batch ownership transfer')!
 	require_order(helper, ['mut jobs := [64]gpu.G13SubmissionJob{}', 'mut positions := [64]u32{}',
-		'positions[count] = index', 'manager.submit_g13_batch(jobs, count)',
+		'positions[count] = index', 'manager.submit_g13_batch(jobs, count, item.operation_active)',
+		'if transferred != 0 { item.operation_active = true }',
 		'transferred & (u64(1) << index)', 'command.compute_job, command.render_job = unsafe { nil }, unsafe { nil }',
 		'command.published = true'], 'Vinix batch ownership transfer')!
-	require(!helper.all_after('manager.submit_g13_batch(jobs, count)').contains('jobs['),
+	require(!helper.all_after('manager.submit_g13_batch(jobs, count, item.operation_active)').contains('jobs['),
 		'Transferred job metadata must never be dereferenced after publication returns')!
+}
+
+fn check_g13_operation_contract(reference_queue string, reference_gpu string, gpu string, ioctl_submit string, pending string) ! {
+	require_order(reference_queue, ['if job.op_guard.is_none()', 'job.op_guard = Some(gpu.start_op()?)',
+		'let op_guard = if in_sync_count > 0', 'Some(gpu.start_op()?)', 'let mut events:', 'let vm_bind = gpu.bind_vm(&self.vm)?',
+		'QueueJob::ver {', 'op_guard,'], 'Asahi owns one operation per scheduled submission')!
+	require_order(reference_gpu, ['impl Drop for OpGuard', 'self.0.end_op()', 'pub(crate) fn start_op(',
+		'raw.pending_submissions.fetch_add(1, Ordering::Acquire)', 'let guard = OpGuard(self.clone())',
+		'self.kick_firmware()?', 'raw.pending_submissions.fetch_sub(1, Ordering::Release)'], 'Asahi firmware operation lifetime')!
+	require_order(gpu, ['fn (mut mgr GpuManager) begin_g13_operation_locked()', 'if old_pending == ~u32(0)',
+		'katomic.store(mut pending, old_pending + 1)', 'if !mgr.kick_firmware()', 'katomic.store(mut pending, old_pending)',
+		'fn (mut mgr GpuManager) end_g13_operation_locked()', 'katomic.store(mut pending, old_pending - 1)',
+		'pub fn (mut mgr GpuManager) finish_g13_submission_operation()', 'mgr.lock.acquire()',
+		'if mgr.state != .stopped { mgr.end_g13_operation_locked() }'], 'Vinix firmware counter and shutdown ownership')!
+	require_order(ioctl_submit, ['early_operation := input_syncs.count != 0', 'gpu_manager.start_g13_submission_operation()',
+		'defer { if early_operation && !queued { gpu_manager.finish_g13_submission_operation() } }',
+		'gpu_manager.capture_g13_initial_events', 'f.bind_g13_submission_vm_locked',
+		'operation_active: early_operation', 'register_g13_pending', 'queued = true'], 'Vinix starts early operations before VM admission')!
+	drain := section(pending, 'fn process_pending_submissions()', 'pub fn service_file_work()', 'Aggregate firmware operation')!
+	require_order(drain, ['assert katomic.load(&item.callbacks_remaining) == 0', 'signal_g13_submission_fence(',
+		'if item.operation_active', 'manager.finish_g13_submission_operation()', 'memory.free(voidptr(item))'],
+		'Vinix releases the aggregate operation after final callbacks')!
 }
 
 fn check_ring_admission_contract(local string, reference string) ! {
@@ -800,6 +823,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_prepared_backlog_contract(read(os.join_path(repo, 'kernel/gpu/agx/event/workqueue.v'))!, workqueue)!
 	check_batch_admission_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_admission.v'))!, pending, queue)!
 	check_batch_publication_contract(read(os.join_path(repo, 'kernel/gpu/agx/gpu/g13_batch.v'))!, pending, queue)!
+	check_g13_operation_contract(queue, manager, local, ioctl_submit, pending)!
 	check_input_dependency_contract(pending)!
 	check_queue_fence_contract(read(os.join_path(repo, 'kernel/drm/syncobj/queue.v'))!,
 		read(os.join_path(repo, 'kernel/drm/syncobj/syncobj.v'))!, local, ioctl_submit)!

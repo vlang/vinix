@@ -40,6 +40,7 @@ mut:
 	timestamps          G13SubmissionTimestamps
 	dependencies        submission.SyncArray
 	dependencies_ready  bool
+	operation_active    bool // one firmware operation per submission
 	admitted            bool // scalar survives publication and immediate metadata retirement
 	final_fence         &syncobj.DmaFence = unsafe { nil }
 	commands            [64]G13PendingCommand
@@ -156,7 +157,8 @@ fn submit_g13_pending(mut manager gpu.GpuManager, mut item G13PendingSubmission)
 		count++
 	}
 	if count == 0 { return }
-	transferred := manager.submit_g13_batch(jobs, count)
+	transferred := manager.submit_g13_batch(jobs, count, item.operation_active)
+	if transferred != 0 { item.operation_active = true }
 	for index := u32(0); index < count; index++ {
 		if transferred & (u64(1) << index) == 0 { continue }
 		// Transferred metadata may already be freed. Clear values only.
@@ -320,6 +322,10 @@ fn process_pending_submissions() {
 			}
 			assert katomic.load(&item.callbacks_remaining) == 0
 			signal_g13_submission_fence(item.final_fence, int(katomic.load(&item.failure)))
+			if item.operation_active {
+				mut manager := unsafe { item.manager }
+				manager.finish_g13_submission_operation()
+			}
 			// GPU callbacks have dropped their final node access. Release global
 			// timestamp mappings outside manager.lock, while file/VM pins remain.
 			mut owner := unsafe { item.file }

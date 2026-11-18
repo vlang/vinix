@@ -63,18 +63,18 @@ fn check_queued_job_backlog(render bool, stop bool) {
 	for start := 0; start < 512; start += 64 {
 		mut batch := [64]G13SubmissionJob{}
 		for offset in 0 .. 64 { batch[offset] = jobs[start + offset] }
-		assert mgr.submit_g13_batch(batch, 64) == ~u64(0)
-		mgr.pending += 64
-		assert mgr.batch_pending == 64
+		assert mgr.submit_g13_batch(batch, 64, false) == ~u64(0)
+		assert mgr.pending == 1
 		state, resolved := queue.subqueues[physical].events.resolve_initial(target)
 		assert state == if start == 448 { event.InitialState.ready } else { event.InitialState.pending }
 		if start == 448 { assert resolved.serial == target.serial }
 		if start < 448 {
 			mut later := [64]G13SubmissionJob{}
 			for offset in 0 .. 64 { later[offset] = jobs[start + 64 + offset] }
-			assert mgr.submit_g13_batch(later, 64) == 0, 'queued reservations do not increase hardware credit'
+			assert mgr.submit_g13_batch(later, 64, false) == 0, 'queued reservations do not increase hardware credit'
 		}
 		if stop {
+			mgr.pending = 0 // Firmware globals are released on stop.
 			mgr.state = .stopped
 			mgr.release_all_g13_compute_jobs()
 			mgr.release_all_g13_render_jobs()
@@ -99,10 +99,12 @@ fn check_queued_job_backlog(render bool, stop bool) {
 			if render { mgr.reap_g13_render_jobs() } else { mgr.reap_g13_compute_jobs() }
 			assert !mgr.g13_queue_dispatch_blocked_locked(&queue) && memory.outstanding() <= kept
 		}
-		assert mgr.pending == 0 && mgr.batch_pending == 0
+		assert mgr.pending == 1
+		mgr.finish_g13_submission_operation()
+		assert mgr.pending == 0
 	}
 	assert completions.all(it.calls == 1) && memory.outstanding() == 0
-	assert mgr.g13_compute_jobs.len == 0 && mgr.g13_render_jobs.len == 0 && mgr.pending == 0 && mgr.batch_pending == 0
+	assert mgr.g13_compute_jobs.len == 0 && mgr.g13_render_jobs.len == 0 && mgr.pending == 0
 	expect_free_events(127, int(target.slot))
 	mgr.release_g13_initial_events(capture)
 	expect_free_events(128, -1)

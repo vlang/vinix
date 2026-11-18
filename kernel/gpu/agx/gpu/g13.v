@@ -420,6 +420,21 @@ fn (mut mgr GpuManager) end_g13_operation_locked() bool {
 	return true
 }
 
+pub fn (mut mgr GpuManager) start_g13_submission_operation() int {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	status := mgr.g13_submission_status_locked()
+	if status != 0 { return status }
+	return if mgr.begin_g13_operation_locked() { 0 } else { -5 }
+}
+
+pub fn (mut mgr GpuManager) finish_g13_submission_operation() {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	// Shutdown releases the firmware counter under this same lock.
+	if mgr.state != .stopped { mgr.end_g13_operation_locked() }
+}
+
 fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
 	if buffer == unsafe { nil } || buffer.va == 0 || buffer.size == 0 {
 		return false

@@ -28,7 +28,7 @@ fn pipe_index(priority u32, pipe u32) int { return int(priority * 3 + pipe) }
 
 fn (mut mgr GpuManager) g13_pending_submissions_locked() ?&u32 {
 	if mgr.pending_missing { return none }
-	return unsafe { &mgr.batch_pending }
+	return unsafe { &mgr.pending }
 }
 
 fn (mut mgr GpuManager) kick_firmware() bool {
@@ -42,11 +42,11 @@ fn (mut mgr GpuManager) ring_pipe(priority u32, pipe u32) bool {
 	mut submitted := u32(0)
 	for job in mgr.g13_compute_jobs {
 		if mgr.expected_owned == 0 { assert job.submitted }
-		if job.submitted { assert job.pending_counted; submitted++ }
+		if job.submitted { assert !job.pending_counted; submitted++ }
 	}
 	for job in mgr.g13_render_jobs {
 		if mgr.expected_owned == 0 { assert job.submitted }
-		if job.submitted { assert job.pending_counted; submitted++ }
+		if job.submitted { assert !job.pending_counted; submitted++ }
 	}
 	if mgr.expected_owned != 0 { assert submitted == mgr.expected_owned }
 	return mgr.doorbell_fail != int(pipe)
@@ -128,7 +128,7 @@ mut:
 	retirements           int
 	freed_buffers         int
 	driver_invalidations int
-	pending               int
+	pending               u32
 	g13_tvb_slots         [127]bool
 	g13_tvb_owners        [127]u64
 	g13_tvb_free_order    [127]u64
@@ -139,7 +139,6 @@ mut:
 	channels GpuChannels
 	hw_config Config
 	g13_channels &u8 = unsafe { nil }
-	batch_pending u32
 	pending_missing bool
 	kicks int
 	kick_fails bool
@@ -183,12 +182,6 @@ fn (mut mgr GpuManager) free_g13_queue_resources_locked(mut queue G13QueueResour
 	if invalidate && mgr.invalidation_fails { return false }
 	mgr.free_g13_render_buffer_locked(mut queue.render_buffer)
 	queue.released = true
-	return true
-}
-
-fn (mut mgr GpuManager) end_g13_operation_locked() bool {
-	mgr.pending--
-	if mgr.batch_pending != 0 { mgr.batch_pending-- }
 	return true
 }
 

@@ -26,7 +26,7 @@ fn g13_batch_address(address u64) bool {
 // complete graph, even if notification fails after publication. Native batches
 // transfer all jobs together; the mask also lets the caller handle a backend
 // that transfers only a prefix without ever dereferencing transferred metadata.
-pub fn (mut mgr GpuManager) submit_g13_batch(jobs [64]G13SubmissionJob, count u32) u64 {
+pub fn (mut mgr GpuManager) submit_g13_batch(jobs [64]G13SubmissionJob, count u32, operation_active bool) u64 {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
 	if mgr.hw_config.gpu_gen != .g13 || !mgr.admit_g13_batch_locked(jobs, count) { return 0 }
@@ -118,18 +118,10 @@ pub fn (mut mgr GpuManager) submit_g13_batch(jobs [64]G13SubmissionJob, count u3
 		if pipes[pipe].count > fw.g13_workqueue_entries - used - 1 { return 0 }
 		pipes[pipe].inner_next = wp
 	}
-	mut pending := mgr.g13_pending_submissions_locked() or { return 0 }
-	old_pending := katomic.load(pending)
-	if old_pending > ~u32(0) - count { return 0 }
-	katomic.store(mut pending, old_pending + count)
-	if !mgr.kick_firmware() {
-		katomic.store(mut pending, old_pending)
-		mgr.state = .error
-		return 0
-	}
+	if !operation_active && !mgr.begin_g13_operation_locked() { return 0 }
 	// All fallible preparation is finished before notifier accounting or the
-	// first visible pointer, as in Asahi QueueJob::run. One pending operation
-	// per command still matches the existing per-command retirement callbacks.
+	// first visible pointer. The pending submission owns the operation once
+	// any work is published, including after a doorbell error.
 	mut threshold := unsafe { &u64(queue.threshold.cpu_address()) }
 	katomic.store(mut threshold, katomic.load(threshold) + u64(count) + u64(renders))
 	if renders != 0 {
@@ -145,7 +137,7 @@ pub fn (mut mgr GpuManager) submit_g13_batch(jobs [64]G13SubmissionJob, count u3
 			}
 			append_g13_batch_command(queue, 2, unsafe { &pipes[2] }, job.command.va)
 			job.ring_slot, job.retirement_sequence = queue.subqueues[2].last_command_slot, queue.subqueues[2].command_sequence
-			job.submitted, job.pending_counted = true, true
+			job.submitted = true
 			if !queue.subqueues[2].events.publish(job.event_slot, job.stamp_value) { mgr.state = .error }
 		} else {
 			mut job := unsafe { source.render }
@@ -158,7 +150,7 @@ pub fn (mut mgr GpuManager) submit_g13_batch(jobs [64]G13SubmissionJob, count u3
 			append_g13_batch_command(queue, 1, unsafe { &pipes[1] }, job.fragment.va)
 			job.vertex_ring_slot, job.vertex_retirement_sequence = queue.subqueues[0].last_command_slot, queue.subqueues[0].command_sequence
 			job.fragment_ring_slot, job.fragment_retirement_sequence = queue.subqueues[1].last_command_slot, queue.subqueues[1].command_sequence
-			job.submitted, job.pending_counted = true, true
+			job.submitted = true
 			if !queue.subqueues[0].events.publish(job.vertex_event_slot, job.vertex_stamp_value)
 				|| !queue.subqueues[1].events.publish(job.fragment_event_slot, job.fragment_stamp_value) { mgr.state = .error }
 		}

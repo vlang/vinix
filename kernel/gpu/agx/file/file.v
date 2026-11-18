@@ -1537,6 +1537,14 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 				|| descriptor.result_size > result_object.size - descriptor.result_offset { return -22 }
 		} else if descriptor.result_offset != 0 { return -22 }
 	}
+	// Use the caller's input count before reduction, as the Asahi queue does.
+	early_operation := input_syncs.count != 0
+	if early_operation {
+		operation_status := gpu_manager.start_g13_submission_operation()
+		if operation_status != 0 { return operation_status }
+	}
+	mut queued := false
+	defer { if early_operation && !queued { gpu_manager.finish_g13_submission_operation() } }
 	// Fix the prior event targets while this ioctl owns the queue gate.
 	// The snapshot pins survive either admission wait.
 	initial_events := gpu_manager.capture_g13_initial_events(queue_resources, initial_mask) or {
@@ -1557,11 +1565,11 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 		queue: queue_resources
 		manager: manager
 		dependencies: pending_inputs
+		operation_active: early_operation
 		command_count: u32(commands.len)
 		timestamps: timestamps
 	} }
 	if !resolve_g13_batch_dependencies(mut pending, commands) { memory.free(storage); return -22 }
-	mut queued := false
 	defer {
 		if !queued {
 			cancel_g13_pending(mut pending, -5)

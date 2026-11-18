@@ -25,13 +25,14 @@ fn test_batch_publication_rejects_early_visibility_and_lost_transfer_cleanup() {
 	reference := 'frag_sub = Some(wqjob.submit()?); vtx_sub = Some(wqjob.submit()?); comp_sub = Some(wqjob.submit()?); raw.increase(job.notification_count); frag_sub.map(|a| gpu.run_job(a)); vtx_sub.map(|a| gpu.run_job(a)); comp_sub.map(|a| gpu.run_job(a));'
 	check_batch_publication_contract(local, pending, reference)!
 	for token in ['outer.validate_pointers(outer_rp, outer_wp)', 'pipes[pipe].outer_next == outer_rp',
-		'free >= fw.g13_workqueue_entries', 'old_pending > ~u32(0) - count',
-		'katomic.store(mut pending, old_pending)', 'job.submitted, job.pending_counted = true, true',
+		'free >= fw.g13_workqueue_entries', 'if !operation_active && !mgr.begin_g13_operation_locked() { return 0 }',
+		'job.submitted = true',
 		'katomic.store(mut &state.cpu_wptr, pipes[pipe].inner_next)'] {
 		assert local.contains(token)
 		if _ := check_batch_publication_contract(local.replace(token, ''), pending, reference) { assert false }
 	}
-	for token in ['transferred & (u64(1) << index)', 'command.compute_job, command.render_job = unsafe { nil }, unsafe { nil }'] {
+	for token in ['if transferred != 0 { item.operation_active = true }', 'transferred & (u64(1) << index)',
+		'command.compute_job, command.render_job = unsafe { nil }, unsafe { nil }'] {
 		if _ := check_batch_publication_contract(local, pending.replace(token, ''), reference) { assert false }
 	}
 	if _ := check_batch_publication_contract(local, pending, reference.replace('comp_sub = Some(wqjob.submit()?)', 'skip')) { assert false }

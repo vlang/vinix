@@ -106,6 +106,10 @@ pub mut:
 	published_order       []u32
 	released_order        []u32
 	prepares              int
+	active_operations     int
+	operation_starts      int
+	operation_ends        int
+	fail_operation_wake   bool
 	callbacks             int
 	barrier_setups        int
 	capture_pins          int
@@ -460,6 +464,7 @@ pub fn (mut mgr GpuManager) finish_render_stage(ordinal u32, pipe u32) {
 pub fn (mut mgr GpuManager) stop() {
 	mgr.lock.acquire()
 	mgr.state = .stopped
+	mgr.active_operations = 0
 	// Prepared metadata remains caller-owned, just as native shutdown does.
 	for index := mgr.g13_render_jobs.len - 1; index >= 0; index-- {
 		job := mgr.g13_render_jobs[index]

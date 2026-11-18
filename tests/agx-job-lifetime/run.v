@@ -39,6 +39,8 @@ fn main() {
 	production += section(source, 'struct G13SubQueueResources {', 'struct G13RenderBufferResources {')!
 	production += section(source, 'pub struct G13ComputeJobResources {', 'pub struct G13QueueResources {')!
 	for pair in [
+		['fn (mut mgr GpuManager) begin_g13_operation_locked(', 'pub fn (mut mgr GpuManager) start_g13_submission_operation('],
+		['pub fn (mut mgr GpuManager) finish_g13_submission_operation(', 'fn (mut mgr GpuManager) flush_g13_kernel_buffer('],
 		['pub fn (queue &G13QueueResources) has_file_references(', '// Caller holds mgr.lock. Asahi QueueInner'],
 		['fn (mut mgr GpuManager) g13_ring_has_space_locked(', '// Publish up to two prefix barriers'],
 		['fn (mut mgr GpuManager) retire_g13_render_stages_locked(', 'fn build_g13_attachments('],
