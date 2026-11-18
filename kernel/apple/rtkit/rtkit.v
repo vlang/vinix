@@ -116,6 +116,7 @@ pub mut:
 	epmap_group_warned bool
 mut:
 	firmware_led_boot bool
+	boot_send_irq u32
 	// Publish both power checks together for senders outside the receive lock.
 	application_ready bool
 }
@@ -397,13 +398,13 @@ fn (mut rtk RTKit) fail(message &char) bool {
 
 // Request IOP initialization from a client that uses the wake handshake.
 pub fn (mut rtk RTKit) boot() bool {
-	return rtk.boot_transport(true, 0)
+	return rtk.boot_transport(true, 0, 0)
 }
 
 // The G13 ASC starts RTKit when the GPU driver releases its CPU. The
 // initializer owns the transport until boot returns.
-pub fn (mut rtk RTKit) boot_started(receive_irq u32) bool {
-	return rtk.boot_transport(false, receive_irq)
+pub fn (mut rtk RTKit) boot_started(receive_irq u32, send_irq u32) bool {
+	return rtk.boot_transport(false, receive_irq, send_irq)
 }
 
 fn (mut rtk RTKit) wait_boot_receive_irq(receive_irq u32) {
@@ -418,9 +419,11 @@ fn (mut rtk RTKit) wait_boot_receive_irq(receive_irq u32) {
 	rtk.lock.acquire()
 }
 
-fn (mut rtk RTKit) boot_transport(request_wake bool, receive_irq u32) bool {
+fn (mut rtk RTKit) boot_transport(request_wake bool, receive_irq u32, send_irq u32) bool {
 	rtk.lock.acquire()
+	rtk.boot_send_irq = send_irq
 	defer {
+		rtk.boot_send_irq = 0
 		rtk.lock.release()
 	}
 
@@ -830,6 +833,13 @@ pub fn (mut rtk RTKit) send_message(ep u8, data u64) bool {
 		data1: u64(ep)
 	}
 	if rtk.firmware_led_boot {
+		irq := rtk.boot_send_irq
+		if irq != 0 {
+			rtk.lock.release()
+			sent := rtk.mbox.send_timed_irq(message, irq)
+			rtk.lock.acquire()
+			return sent
+		}
 		return rtk.mbox.send_timed(message)
 	}
 	return rtk.mbox.send(message)

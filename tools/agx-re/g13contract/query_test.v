@@ -26,7 +26,7 @@ fn check_timeline_capability_contract(drm string, native string, fake string) ! 
 	cap := section(drm, 'fn ioctl_get_cap(', 'fn ioctl_gem_close(', 'DRM capability reporting')!
 	require_order(cap, ['ioctl.drm_cap_syncobj_timeline {', 'dev.driver.features & driver_syncobj_timeline != 0',
 		'return 0'], 'DRM timeline capability follows the registered device')!
-	require_order(native, ['if !mgr.init(receive_irq)', 'base_m1 := chip_id == 0x8103',
+	require_order(native, ['if !mgr.init(receive_irq, send_irq)', 'base_m1 := chip_id == 0x8103',
 		'mut features := drm.driver_gem | drm.driver_render | drm.driver_compute',
 		'if base_m1 {', 'features |= drm.driver_syncobj_timeline', '}',
 		'agx_drm_driver := &drm.DrmDriver{', 'features: features', 'drm.register_driver(agx_drm_driver)'],

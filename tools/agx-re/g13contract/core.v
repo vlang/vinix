@@ -1007,6 +1007,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 mailbox doorbells drain FWLog, KTrace and Stats before events and before later RTKit messages',
 		'M1 G13 mailbox receive uses the named AIC level line and defers FIFO service to the worker with a timed fallback',
 		'M1 G13 receives AIC notifications during boot waits and masks the line before boot failure cleanup',
+		'M1 G13 can use the send-empty IRQ during negotiation and still checks FIFO space before publishing',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
 		'G13 logs failed RTKit discovery replies and retries unsent endpoint starts once',

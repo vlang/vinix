@@ -46,6 +46,7 @@ pub:
 	sgx_size               u64
 	mailbox_base           u64
 	mailbox_receive_irq    u32
+	mailbox_send_irq       u32
 	secondary_mailbox_base u64
 	firmware_role_count    u32
 	handoff_base           u64
@@ -157,7 +158,7 @@ fn load_fdt_firmware_version(gpu_node &devicetree.DTNode, native_adt bool,
 		u64(cfg.firmware_version[1]), u64(cfg.firmware_version[2]))
 }
 
-fn g13_mailbox_receive_irq(node &devicetree.DTNode) ?u32 {
+fn g13_mailbox_irq(node &devicetree.DTNode, irq_name string) ?u32 {
 	if _ := devicetree.get_property(node, 'interrupts-extended') { return none }
 	parent := devicetree.get_u32(node, 'interrupt-parent') or { return none }
 	controller := devicetree.find_phandle(parent) or { return none }
@@ -167,7 +168,7 @@ fn g13_mailbox_receive_irq(node &devicetree.DTNode) ?u32 {
 	}
 	names := devicetree.get_property(node, 'interrupt-names') or { return none }
 	interrupts := devicetree.get_property(node, 'interrupts') or { return none }
-	return mailbox.decode_aic_receive_irq(names.data, names.len, interrupts.data, interrupts.len)
+	return mailbox.decode_aic_mailbox_irq(names.data, names.len, interrupts.data, interrupts.len, irq_name)
 }
 
 fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
@@ -338,7 +339,8 @@ fn get_platform_resources(gpu_node &devicetree.DTNode, native_adt bool,
 		sgx_base: sgx.base
 		sgx_size: sgx.size
 		mailbox_base: mailbox_regs[0].base
-		mailbox_receive_irq: g13_mailbox_receive_irq(mailbox_node) or { u32(0) }
+		mailbox_receive_irq: g13_mailbox_irq(mailbox_node, 'recv-not-empty') or { u32(0) }
+		mailbox_send_irq: g13_mailbox_irq(mailbox_node, 'send-empty') or { u32(0) }
 		firmware_role_count: 1
 		handoff_base: handoff_regs[0].base
 		handoff_size: handoff_regs[0].size
@@ -1188,7 +1190,8 @@ pub fn initialise() {
 
 	// Step 5: Init GPU (RTKit boot, firmware init)
 	receive_irq := if chip_id == 0x8103 { platform.mailbox_receive_irq } else { u32(0) }
-	if !mgr.init(receive_irq) {
+	send_irq := if chip_id == 0x8103 { platform.mailbox_send_irq } else { u32(0) }
+	if !mgr.init(receive_irq, send_irq) {
 		println('agx: GPU initialization failed')
 		return
 	}

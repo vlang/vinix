@@ -47,7 +47,7 @@ fn check_g13_receive_lifetime(local string, remote string, recovery string) ! {
 fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 	dts := read(os.join_path(asahi_linux, 'arch/arm64/boot/dts/apple/t8103.dtsi'))!
 	node := section(dts, 'agx_mbox: mbox@206408000', 'cpufreq_e:', 'Asahi M1 mailbox binding')!
-	require_order(node, ['interrupt-parent = <&aic>', '<AIC_IRQ 578 IRQ_TYPE_LEVEL_HIGH>',
+	require_order(node, ['interrupt-parent = <&aic>', '<AIC_IRQ 575 IRQ_TYPE_LEVEL_HIGH>', '<AIC_IRQ 578 IRQ_TYPE_LEVEL_HIGH>',
 		'"recv-empty", "recv-not-empty"'], 'Asahi names the level-triggered M1 GPU mailbox receive line')!
 	linux := read(os.join_path(asahi_linux, 'drivers/soc/apple/mailbox.c'))!
 	handler := section(linux, 'static irqreturn_t apple_mbox_recv_irq(', 'int apple_mbox_poll(', 'Asahi receive IRQ handler')!
@@ -60,14 +60,17 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 
 	driver := read(os.join_path(repo, 'kernel/gpu/agx/driver/driver.v'))!
 	require_order(driver, ["find_compatible('apple,t8103-aic')", "get_property(node, 'interrupt-names')",
-		'mailbox.decode_aic_receive_irq(', 'mailbox_receive_irq: g13_mailbox_receive_irq(mailbox_node)',
-		'receive_irq := if chip_id == 0x8103 { platform.mailbox_receive_irq }', 'if !mgr.init(receive_irq)',
+		'mailbox.decode_aic_mailbox_irq(', "mailbox_receive_irq: g13_mailbox_irq(mailbox_node, 'recv-not-empty')",
+		"mailbox_send_irq: g13_mailbox_irq(mailbox_node, 'send-empty')",
+		'receive_irq := if chip_id == 0x8103 { platform.mailbox_receive_irq }',
+		'send_irq := if chip_id == 0x8103 { platform.mailbox_send_irq }', 'if !mgr.init(receive_irq, send_irq)',
 		'agx_driver_inst.gpu = mgr', 'gpu.set_global_manager(agx_driver_inst.gpu)'],
 		'Vinix passes the M1 AICv1 binding to the private probe before publishing the manager')!
 	controller := read(os.join_path(repo, 'kernel/aarch64/aic/aic.v'))!
 	require_order(controller, ['irq == katomic.load(&deferred_irq)', 'katomic.store(mut deferred_pending, true)',
-		'continue', 'unmask_irq(irq)', 'pub fn claim_deferred_irq(', 'aic_write(aic_target_cpu + irq * 4, 1)',
-		'unmask_irq(irq)'], 'Vinix leaves the deferred line masked and programs CPU 0 before enabling it')!
+		'continue', 'irq == katomic.load(&deferred_send_irq)', 'katomic.store(mut deferred_send_pending, true)',
+		'continue', 'unmask_irq(irq)', 'fn claim_deferred_line(', 'aic_write(aic_target_cpu + irq * 4, 1)',
+		'if !send { unmask_irq(irq) }'], 'Vinix leaves both deferred lines masked on delivery and keeps transmit masked until armed')!
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
 	failure := section(manager, 'fn (mut mgr GpuManager) fail_g13_initialization(', '// Allocate the completion-tracking resources', 'Vinix failed boot cleanup')!
 	require_order(failure, ['aic.mask_irq(mgr.rtkit_receive_irq)', 'mgr.stop_firmware_cpus(mgr.firmware_roles)',

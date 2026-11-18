@@ -45,14 +45,14 @@ fn check_rtkit_boot(transport string, linux string, asahi_linux string, repo str
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
 	role := section(manager, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) start_firmware_endpoint(', 'Vinix RTKit boot dispatch')!
 	require_order(role, ['if mgr.hw_config.gpu_gen != .g13', 'mgr.rtk.boot()', 'irq := mgr.rtkit_receive_irq',
-		'if irq == 0', 'mgr.rtk.boot_started(0)', 'mgr.lock.release()', 'mgr.rtk.boot_started(irq)', 'mgr.lock.acquire()'],
+		'if irq == 0', 'mgr.rtk.boot_started(0, 0)', 'mgr.lock.release()', 'mgr.rtk.boot_started(irq, send_irq)', 'mgr.lock.acquire()'],
 		'Vinix selects the already-started handshake for G13 and opens an interrupt window only with a claimed line')!
 	require_order(manager.all_after('pub fn (mut mgr GpuManager) init(receive_irq'), ['mgr.res.start_cpu(role)',
-		'mgr.claim_rtkit_receive_irq(receive_irq)',
+		'mgr.claim_rtkit_irqs(receive_irq, send_irq)',
 		'if !mgr.boot_firmware_role(role)', 'return mgr.fail_g13_initialization()', 'mgr.start_firmware_endpoint(role, u8(ep_firmware))'],
 		'Vinix enters the G13 handshake after releasing the ASC and unwinds failures before starting firmware endpoints')!
 	boot := section(transport, 'pub fn (mut rtk RTKit) boot()', '// Only the system endpoints', 'Vinix RTKit handshake')!
-	require_order(boot, ['return rtk.boot_transport(true, 0)', 'return rtk.boot_transport(false, receive_irq)',
+	require_order(boot, ['return rtk.boot_transport(true, 0, 0)', 'return rtk.boot_transport(false, receive_irq, send_irq)',
 		'if request_wake && !rtk.send_management(msg_set_iop_power, u64(power_state_init))',
 		'mut phase_started := if request_wake { u64(0) } else { timer.get_ns() }',
 		'timer.get_ns() - phase_started >= boot_phase_timeout_ns', 'timer.busywait_us(10)',
@@ -101,10 +101,14 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 	local := read(os.join_path(repo, 'kernel/apple/mailbox/mailbox.v'))!
 	require(local.contains('const send_timeout_us = u64(500_000)') && local.contains('const send_poll_us = u64(100)'),
 		'Vinix uses the Asahi ASC transmit duration and polling interval')!
-	timed := section(local, 'pub fn (mut mbox Mailbox) send_timed(', '// Receive a message', 'Vinix timed mailbox transmit')!
+	timed := section(local, 'pub fn (mut mbox Mailbox) send_timed_irq(', '// Receive a message', 'Vinix timed mailbox transmit')!
 	require_order(timed, ['mbox.try_send(msg)', 'started := timer.get_us()', 'elapsed := timer.get_us() - started',
 		'elapsed >= send_timeout_us', 'remaining := send_timeout_us - elapsed', 'timer.busywait_us',
 		'mbox.try_send(msg)', 'return false'], 'Vinix measures a fresh wait only when the FIFO is full')!
+	require_order(timed, ['mbox.try_send(msg)', 'cpu.interrupt_state() && aic.arm_deferred_send_irq(irq)',
+		'defer {', 'aic.mask_irq(irq)', 'wait_send_irq(irq, interval)', 'timer.busywait_us(interval)',
+		'mbox.try_send(msg)', 'aic.deferred_send_irq_pending(irq)', 'aic.arm_deferred_send_irq(irq)'],
+		'Vinix arms only after a full FIFO and checks space before rearming or publishing')!
 	try_send := section(local, 'fn (mut mbox Mailbox) try_send(msg', '// Use the polled ASC timeout', 'Vinix mailbox locking')!
 	require_order(try_send, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }', 'return mbox.try_send_locked(msg)'],
 		'Vinix holds the lock for each mailbox attempt')!
@@ -116,6 +120,12 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 	require(management.contains('return rtk.send_message(ep_mgmt, management_message(kind, payload))'),
 		'Vinix management and application traffic use the same transmit policy')!
 	local_send := section(transport, 'pub fn (mut rtk RTKit) send_message(', 'pub fn (mut rtk RTKit) recv_msg(', 'Vinix RTKit transmit dispatch')!
+	boot_state := section(transport, 'fn (mut rtk RTKit) boot_transport(', '// Only the system endpoints', 'Vinix boot transmit owner')!
+	require_order(boot_state, ['rtk.lock.acquire()', 'rtk.boot_send_irq = send_irq', 'defer {',
+		'rtk.boot_send_irq = 0', 'rtk.lock.release()'], 'The private boot transport clears the transmit IRQ before returning')!
+	require_order(local_send, ['irq := rtk.boot_send_irq', 'rtk.lock.release()',
+		'rtk.mbox.send_timed_irq(message, irq)', 'rtk.lock.acquire()', 'return sent'],
+		'Vinix releases the RTKit lock around boot IRQ-assisted transmit')!
 	require_order(local_send, ['if rtk.firmware_led_boot {', 'return rtk.mbox.send_timed(message)', 'return rtk.mbox.send(message)'],
 		'Vinix selects elapsed-time transmit only for firmware-led G13 RTKit')!
 }

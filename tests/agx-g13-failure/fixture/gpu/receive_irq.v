@@ -19,17 +19,24 @@ fn check_receive_irq_binding() {
 		0, 0, 0, 0, 0, 0, 2, 66, 0, 0, 0, 4]!
 	address := unsafe { &cells[0] }
 	size := u32(cells.len)
-	assert (mailbox.decode_aic_receive_irq(names.str, u32(names.len), address, size) or { u32(0) }) == 578
-	assert mailbox.decode_aic_receive_irq(names.str, u32(names.len - 1), address, size) == none
-	assert mailbox.decode_aic_receive_irq(names.str, u32(names.len), address, size - 1) == none
-	assert mailbox.decode_aic_receive_irq(names.str, u32(names.len), address, 12) == none
+	assert (mailbox.decode_aic_mailbox_irq(names.str, u32(names.len), address, size, 'recv-not-empty') or { u32(0) }) == 578
+	assert (mailbox.decode_aic_mailbox_irq(names.str, u32(names.len), address, size, 'send-empty') or { u32(0) }) == 575
+	assert mailbox.decode_aic_mailbox_irq(names.str, u32(names.len - 1), address, size, 'send-empty') == none
+	assert mailbox.decode_aic_mailbox_irq(names.str, u32(names.len), address, size - 1, 'recv-not-empty') == none
+	assert mailbox.decode_aic_mailbox_irq(names.str, u32(names.len), address, 12, 'recv-not-empty') == none
 	duplicate := 'recv-not-empty\x00recv-not-empty\x00'
-	assert mailbox.decode_aic_receive_irq(duplicate.str, u32(duplicate.len), address, size) == none
+	assert mailbox.decode_aic_mailbox_irq(duplicate.str, u32(duplicate.len), address, size, 'recv-not-empty') == none
 	cells[15] = 1
-	assert mailbox.decode_aic_receive_irq(names.str, u32(names.len), address, size) == none
+	assert mailbox.decode_aic_mailbox_irq(names.str, u32(names.len), address, size, 'recv-not-empty') == none
 	cells[15] = 0
 	cells[23] = 1
-	assert mailbox.decode_aic_receive_irq(names.str, u32(names.len), address, size) == none
+	assert mailbox.decode_aic_mailbox_irq(names.str, u32(names.len), address, size, 'recv-not-empty') == none
+	cells[11] = 1
+	assert mailbox.decode_aic_mailbox_irq(names.str, u32(names.len), address, size, 'send-empty') == none
+}
+
+fn observe_irq_boot_send() {
+	assert !irq_boot_probe.lock.is_held() && !irq_boot_probe.rtk.lock.is_held()
 }
 
 fn observe_irq_boot_wait() {
@@ -57,14 +64,19 @@ fn check_irq_boot(mut mgr GpuManager, irq u32, abi hw.FirmwareAbi) {
 	irq_boot_probe = unsafe { &mgr }
 	irq_boot_waits = 0
 	timer.watch_busywait(observe_irq_boot_wait)
+	mailbox.watch_send(observe_irq_boot_send)
 	assert mgr.boot_firmware_role(0)
+	mailbox.watch_send(unsafe { nil })
 	timer.watch_busywait(unsafe { nil })
 	irq_boot_probe = unsafe { nil }
 	assert mgr.lock.is_held() && !mgr.rtk.lock.is_held()
 	assert mgr.rtk.state == .running && mgr.rtk.iop_power_state == 0x0220
 	assert irq_boot_waits == 13
 	assert mgr.rtk.mbox.sent == 3 && mgr.rtk.mbox.sent_at(2).data0 == rtkit_ap_on
+	assert mgr.rtk.mbox.irq_send_attempts == 3
 	assert aic.deferred_irq_pending(irq) && kio.aic_irq_masked(irq)
+	assert mgr.rtk.send_message(0x20, 0x1234)
+	assert mgr.rtk.mbox.timed_attempts == 4 && mgr.rtk.mbox.irq_send_attempts == 3
 }
 
 fn check_silent_irq_boot(irq u32) {
@@ -95,9 +107,17 @@ fn check_g13_receive_irq() {
 	mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13}, rtk: unsafe { &transport }}
 	assert mgr.rtkit_receive_due()
 	mgr.lock.acquire()
-	mgr.claim_rtkit_receive_irq(irq)
+	assert !aic.arm_deferred_send_irq(575)
+	mgr.claim_rtkit_irqs(irq, irq)
+	assert mgr.rtkit_boot_send_irq == 0
 	assert mgr.rtkit_receive_irq == irq && kio.aic_cpu_target(irq) == 1
 	assert !aic.claim_deferred_irq(579) && !kio.aic_irq_masked(irq)
+	// The valid transmit route can be reserved separately after the
+	// deliberately aliased configuration above rejected its transmit line.
+	assert aic.claim_deferred_send_irq(575)
+	assert !aic.claim_deferred_send_irq(576) && kio.aic_irq_masked(575)
+	assert kio.aic_cpu_target(575) == 1
+	mgr.rtkit_boot_send_irq = 575
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
 		transport = rtkit.RTKit{name: 'g13-rx-irq'}
 		check_irq_boot(mut mgr, irq, abi)

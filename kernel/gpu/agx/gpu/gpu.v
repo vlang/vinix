@@ -121,6 +121,7 @@ mut:
 	rtkit_buffer_lock klock.Lock
 	rtkit_buffers     []SharedBuffer
 	rtkit_receive_irq u32
+	rtkit_boot_send_irq u32
 	rtkit_receive_us  u64
 	file_reaper       fn () = unsafe { nil }
 }
@@ -259,12 +260,13 @@ fn (mut mgr GpuManager) boot_firmware_role(role u32) bool {
 			} else {
 				irq := mgr.rtkit_receive_irq
 				if irq == 0 {
-					mgr.rtk.boot_started(0)
+					mgr.rtk.boot_started(0, 0)
 				} else {
 					// The probe owns this unpublished manager, and the worker
 					// starts only after initialization. Let IRQ delivery run.
+					send_irq := mgr.rtkit_boot_send_irq
 					mgr.lock.release()
-					booted := mgr.rtk.boot_started(irq)
+					booted := mgr.rtk.boot_started(irq, send_irq)
 					mgr.lock.acquire()
 					booted
 				}
@@ -940,7 +942,7 @@ pub fn (mut mgr GpuManager) initialize_event_resources() bool {
 }
 
 // Full GPU initialization sequence
-pub fn (mut mgr GpuManager) init(receive_irq u32) bool {
+pub fn (mut mgr GpuManager) init(receive_irq u32, send_irq u32) bool {
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
@@ -1011,7 +1013,7 @@ pub fn (mut mgr GpuManager) init(receive_irq u32) bool {
 	}
 
 	// Step 6: Negotiate the RTKit transport independently for every role.
-	mgr.claim_rtkit_receive_irq(receive_irq)
+	mgr.claim_rtkit_irqs(receive_irq, send_irq)
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.boot_firmware_role(role) {
 			C.kprintf(c'agx: RTKit boot failed for role %llu\n', u64(role))
@@ -1384,11 +1386,12 @@ fn (mut mgr GpuManager) handle_role_system_message(role u32, msg mailbox.MboxMsg
 	}
 }
 
-// Caller holds mgr.lock during probe. The worker inherits the line on success.
-fn (mut mgr GpuManager) claim_rtkit_receive_irq(irq u32) {
-	if mgr.hw_config.gpu_gen == .g13 && aic.claim_deferred_irq(irq) {
+// Caller holds mgr.lock during probe. The worker inherits the receive line.
+fn (mut mgr GpuManager) claim_rtkit_irqs(receive_irq u32, send_irq u32) {
+	if mgr.hw_config.gpu_gen == .g13 && aic.claim_deferred_irq(receive_irq) {
 		mgr.rtkit_receive_us = timer.get_us()
-		mgr.rtkit_receive_irq = irq
+		mgr.rtkit_receive_irq = receive_irq
+		if aic.claim_deferred_send_irq(send_irq) { mgr.rtkit_boot_send_irq = send_irq }
 	}
 }
 

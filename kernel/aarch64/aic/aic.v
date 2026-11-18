@@ -62,6 +62,8 @@ __global (
 	aic_v1_ready      bool
 	deferred_irq      = u32(0)
 	deferred_pending  bool
+	deferred_send_irq = u32(0)
+	deferred_send_pending bool
 	// AICv2/v3 only; aic_v2 is false on AICv1.
 	aic_v2                  bool
 	aic_v2_event            u32
@@ -269,6 +271,10 @@ fn aic_dispatch(gpr_state voidptr) {
 					katomic.store(mut deferred_pending, true)
 					continue
 				}
+				if irq != 0 && irq == katomic.load(&deferred_send_irq) {
+					katomic.store(mut deferred_send_pending, true)
+					continue
+				}
 				if aic_hw_handler != unsafe { nil } {
 					aic_hw_handler(irq, gpr_state)
 				}
@@ -294,15 +300,45 @@ fn aic_dispatch(gpr_state voidptr) {
 // Reserve the AICv1 deferred line for a built-in device. Keep the reservation
 // for the life of the controller so a late interrupt cannot auto-rearm it.
 pub fn claim_deferred_irq(irq u32) bool {
+	return claim_deferred_line(irq, false)
+}
+
+// A send-empty line stays masked until a full mailbox needs to wait.
+pub fn claim_deferred_send_irq(irq u32) bool {
+	return claim_deferred_line(irq, true)
+}
+
+fn claim_deferred_line(irq u32, send bool) bool {
+	aic_lock.acquire()
+	defer { aic_lock.release() }
 	if !aic_v1_ready || aic_v2 || irq == 0 || irq >= aic_nr_irqs
-		|| irq >= (aic_sw_set - aic_target_cpu) / 4
-		|| !katomic.cas_acquire(mut deferred_irq, u32(0), irq) {
+		|| irq >= (aic_sw_set - aic_target_cpu) / 4 {
 		return false
+	}
+	rx := katomic.load(&deferred_irq)
+	tx := katomic.load(&deferred_send_irq)
+	if send {
+		if tx != 0 || irq == rx { return false }
+		katomic.store(mut deferred_send_irq, irq)
+	} else {
+		if rx != 0 || irq == tx { return false }
+		katomic.store(mut deferred_irq, irq)
 	}
 	aic_write(aic_sw_clr + (irq / 32) * 4, u32(1) << (irq % 32))
 	aic_write(aic_target_cpu + irq * 4, 1)
+	if !send { unmask_irq(irq) }
+	return true
+}
+
+pub fn arm_deferred_send_irq(irq u32) bool {
+	if irq == 0 || irq != katomic.load(&deferred_send_irq) { return false }
+	katomic.store(mut deferred_send_pending, false)
 	unmask_irq(irq)
 	return true
+}
+
+pub fn deferred_send_irq_pending(irq u32) bool {
+	return irq != 0 && irq == katomic.load(&deferred_send_irq) && katomic.load(&deferred_send_pending)
 }
 
 pub fn deferred_irq_pending(irq u32) bool {

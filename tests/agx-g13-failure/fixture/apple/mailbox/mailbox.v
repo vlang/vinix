@@ -19,6 +19,7 @@ mut:
 pub mut:
 	attempts int
 	timed_attempts int
+	irq_send_attempts int
 	sent int
 	last MboxMsg
 	fail_next_send bool
@@ -84,4 +85,10 @@ pub fn (mut box Mailbox) send(message MboxMsg) bool {
 pub fn (mut box Mailbox) send_timed(message MboxMsg) bool {
 	box.timed_attempts++
 	return box.send(message)
+}
+
+pub fn (mut box Mailbox) send_timed_irq(message MboxMsg, irq u32) bool {
+	assert irq == 575
+	box.irq_send_attempts++
+	return box.send_timed(message)
 }

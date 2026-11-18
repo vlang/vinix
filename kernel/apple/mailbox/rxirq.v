@@ -10,7 +10,7 @@ fn irq_cell(data voidptr, offset u32) u32 {
 
 // Decode the standard three-cell AICv1 binding and the mailbox's parallel
 // interrupt-names property. Both buffers are borrowed for this call only.
-pub fn decode_aic_receive_irq(names voidptr, names_size u32, specifiers voidptr, specifiers_size u32) ?u32 {
+pub fn decode_aic_mailbox_irq(names voidptr, names_size u32, specifiers voidptr, specifiers_size u32, irq_name string) ?u32 {
 	if names == unsafe { nil } || specifiers == unsafe { nil } || names_size == 0
 		|| specifiers_size == 0 || specifiers_size % 12 != 0 {
 		return none
@@ -22,7 +22,7 @@ pub fn decode_aic_receive_irq(names voidptr, names_size u32, specifiers voidptr,
 		if unsafe { *&u8(u64(names) + end) } != 0 { continue }
 		if end == start || index >= specifiers_size / 12 { return none }
 		name := unsafe { tos(&char(u64(names) + start), int(end - start)) }
-		if name == 'recv-not-empty' {
+		if name == irq_name {
 			offset := index * 12
 			// AIC hardware IRQ (0), followed by its number and level-high (4).
 			if irq != 0 || irq_cell(specifiers, offset) != 0

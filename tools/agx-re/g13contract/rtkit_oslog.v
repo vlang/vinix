@@ -27,7 +27,7 @@ fn check_rtkit_oslog(transport string, linux string, asahi_linux string, repo st
 		'Asahi AGX uses the normal RTKit constructor without inherited buffers')!
 	driver := read(os.join_path(repo, 'kernel/gpu/agx/driver/driver.v'))!
 	require_order(driver, ['gpu_rtk := rtkit.new_rtkit(platform.mailbox_base,', 'gpu.new_gpu_manager(&gpu_res, &cfg, &gpu_rtk',
-		'if !mgr.init(receive_irq)'], 'Vinix AGX starts its own RTKit session')!
+		'if !mgr.init(receive_irq, send_irq)'], 'Vinix AGX starts its own RTKit session')!
 
 	require_order(transport, ['const oslog_log = u8(2)', 'const oslog_log_reserved = u64(0xff_ffff) << 32',
 		'oslog_ack_enabled bool\n'], 'Vinix OSLog wire type, reserved bits and default-disabled policy')!

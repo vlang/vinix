@@ -83,6 +83,7 @@ mut:
 	last_growth    [3]u32
 	polls          int
 	rtkit_receive_irq u32
+	rtkit_boot_send_irq u32
 	rtkit_receive_us u64
 	initdata_va u64
 	initdata_phys u64
@@ -345,6 +346,7 @@ pub fn run_checks() {
 	check_rtkit_notification_ack_timeouts()
 	check_rtkit_started_boot()
 	check_asc_mailbox_send()
+	check_asc_mailbox_send_irq()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10
