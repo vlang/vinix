@@ -7,7 +7,7 @@ fn test_heap_bounds_require_checked_alignment_and_identical_post_gc_validation()
  check_heap_bounds_local(source)!
  for token in ['value > ~u64(0) - mask', 'address > end || size > end - address',
   'size == 0 || (align != 0 && (align & (align - 1)) != 0)',
-  'checked_heap_align_up(size, actual_align) or { return none }'] {
+  'checked_heap_align_up(size, actual_align) or { return -22, 0 }'] {
   if _ := check_heap_bounds_local(source.replace(token, 'false')) { assert false, token }
  }
  token := '\n\t\th.find_address_locked(h.end, aligned_size, actual_align) or {'

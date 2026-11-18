@@ -39,16 +39,15 @@ pre-padding-fix allocator and a fresh external directory; four compiled variants
 exercise the original gap, wrong initial frontier, preceding-record start and
 destruction of a live prefix.
 
-`--measure-capacity` grows from a warmed two-entry table to 8,192 simultaneous
-records, releases them, then restores the warmed table capacity in the fixture.
-This removes the legitimately owned final buffer from the comparison. The
-pre-capacity-fix source retains 12 discarded buffers / 90,160 malloc bytes;
-the fixed source requires zero additional blocks and bytes. The sanitized suite
+`--measure-capacity` warms the allocator, measures an empty table, and grows it
+to 8,192 simultaneous records. It releases the records and the final buffer
+before measuring again. The fixed source requires zero additional blocks and
+bytes. The sanitized suite
 checks 13 growth boundaries, ASan poisoning of all 12 replaced buffers, stable
 allocation pointees and concurrent locked statistics readers. The initial empty
 table has no buffer to retire. `capacity-counterexamples.v` takes the runner,
-pre-capacity-fix allocator and a fresh external directory; four compiled variants
-catch original, missing, late and lost ownership of the pointer buffer.
+pre-capacity-fix allocator and a fresh external directory. Three compiled variants
+check the original retention, missing retirement and skipped first retirement.
 
 `--measure-collect` releases 8,192 records below one live allocation. The old
 suffix-only collector reclaims zero records; the current collector reclaims

@@ -7,7 +7,7 @@ fn check_heap_pressure_local(source string, manager string) ! {
 	require_order(constructor, ['mut heap := new_heap(name, start, end)', 'heap.gc_on_pressure = false', 'return heap'], 'Explicit heaps disable pressure GC at construction')!
 	allocate := section(source, 'pub fn (mut h HeapAllocator) alloc(', '// Release the allocation', 'Pressure policy')!
 	require_order(allocate, ['h.find_address_locked(h.end, aligned_size, actual_align) or {',
-		'if !h.gc_on_pressure { return none }', 'h.gc_locked()',
+		'if !h.gc_on_pressure { return -28, 0 }', 'h.gc_locked()',
 		'h.find_address_locked(h.end, aligned_size, actual_align)'], 'Exhaustion cannot bypass explicit collection')!
 	for class in ['g13_private', 'g13_gpu_readonly'] {
 		require(manager.contains(class + ': alloc.new_heap_with_explicit_gc('), 'Both firmware-private classes require explicit GC')!

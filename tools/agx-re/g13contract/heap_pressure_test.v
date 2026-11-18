@@ -7,7 +7,7 @@ fn test_firmware_heap_pressure_requires_explicit_collection() {
 	source := read(root + '/kernel/gpu/agx/alloc/alloc.v')!
 	manager := read(root + '/kernel/gpu/agx/gpu/gpu.v')!
 	check_heap_pressure_local(source, manager)!
-	for token in ['gc_on_pressure bool = true', 'heap.gc_on_pressure = false', 'if !h.gc_on_pressure { return none }'] {
+	for token in ['gc_on_pressure bool = true', 'heap.gc_on_pressure = false', 'if !h.gc_on_pressure { return -28, 0 }'] {
 		if _ := check_heap_pressure_local(source.replace(token, ''), manager) { assert false, token }
 	}
 	for class in ['g13_private', 'g13_gpu_readonly'] {

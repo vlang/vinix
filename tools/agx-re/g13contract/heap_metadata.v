@@ -27,7 +27,7 @@ fn check_heap_metadata_local(source string) ! {
  require_order(release, ['if a.va == va && a.in_use', 'a.in_use = false',
   'h.garbage_count++', 'a.release_order = h.garbage_count', 'h.garbage_bytes += a.size'],
   'A first release assigns one bounded FIFO rank and counts rounded bytes')!
- for method in ['alloc(', 'release(', 'gc()', 'used()', 'available()', 'garbage()', 'collect_garbage(count u64)'] {
+ for method in ['alloc_status(', 'release(', 'gc()', 'used()', 'available()', 'garbage()', 'collect_garbage(count u64)'] {
   body := section(source, 'pub fn (mut h HeapAllocator) ' + method, '\n}\n', 'Heap metadata reader serialization')!
   require_order(body, ['h.lock.acquire()', 'defer {', 'h.lock.release()'], 'All readers serialize with metadata destruction')!
  }
@@ -35,7 +35,12 @@ fn check_heap_metadata_local(source string) ! {
  require(statistics.contains('return h.garbage_count, h.garbage_bytes'), 'Garbage statistics publish rounded pending count/bytes')!
  bounded := section(source, 'pub fn (mut h HeapAllocator) collect_garbage(count u64)', '\n}\n', 'Bounded metadata GC')!
  require(bounded.contains('h.collect_garbage_locked(count)'), 'Bounded GC forwards its requested count')!
- require(source.count('} @[freed]') == 1, 'The shared metadata constructor retains its verified-free annotation')!
+ reserve := section(source, 'fn (mut h HeapAllocator) reserve_entry_locked()', '\n}\n', 'Heap pointer storage growth')!
+ require_order(reserve, ['if h.allocations.len < h.allocations.cap { return true }',
+  'memory.malloc_packed_fallible(u64(capacity) * sizeof(voidptr)) @[freed]',
+  'if storage == unsafe { nil } { return false }', 'C.memcpy(storage, h.allocations.data',
+  'h.allocations = replacement', 'old.free()'], 'Retain old pointer storage until fallible growth succeeds')!
+ require(source.count(') @[freed]') == 2, 'Both heap metadata allocations retain verified-free annotations')!
 }
 
 fn check_heap_metadata_reference(source string) ! {

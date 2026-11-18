@@ -568,7 +568,8 @@ pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) (int, u
 	// the same lock from the stopped transition through firmware teardown.
 	if mgr.state == .stopped { return -19, 0 }
 	if mgr.uat == unsafe { nil } { return -12, 0 }
-	va := mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }
+	reserve_code, va := mgr.g13_timestamp.alloc_status(size, alloc.gpu_page_size)
+	if reserve_code != 0 { return reserve_code, 0 }
 	code := mgr.uat.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)
 	if code != 0 {
 		mgr.g13_timestamp.cancel_unpublished(va)

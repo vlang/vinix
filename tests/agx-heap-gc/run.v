@@ -11,6 +11,7 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all(repo + '/tests/agx-heap-gc/fixture', scratch, false)!
+	os.cp_all(repo + '/tests/agx-heap/fixture/memory', scratch + '/memory', false)!
 	for name in ['alloc', 'channel', 'fw', 'hw'] {
 		os.mkdir_all(scratch + '/gpu/agx/' + name)!
 		if name == 'hw' {

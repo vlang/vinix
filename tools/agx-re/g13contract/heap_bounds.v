@@ -11,15 +11,18 @@ fn check_heap_bounds_local(source string) ! {
  allocation := section(source, 'pub fn (mut h HeapAllocator) alloc(', '// Release the allocation', 'GPU heap reservation')!
  require_order(allocation, ['h.lock.acquire()', 'h.lock.release()',
   'size == 0 || (align != 0 && (align & (align - 1)) != 0)',
-  'actual_align := if align < gpu_page_size', 'checked_heap_align_up(size, actual_align) or { return none }',
+  'actual_align := if align < gpu_page_size', 'checked_heap_align_up(size, actual_align) or { return -22, 0 }',
   'h.find_address_locked(h.end, aligned_size, actual_align)', 'h.gc_locked()',
   'h.find_address_locked(h.end, aligned_size, actual_align)',
+  'storage := memory.malloc_packed_fallible(sizeof(Allocation)) @[freed]',
+  'if storage == unsafe { nil } { return -12, 0 }', 'if !h.reserve_entry_locked()',
+  'unsafe { free(storage) }', 'return -12, 0',
   'if va + aligned_size > h.top { h.top = va + aligned_size }',
-  'a := &Allocation{', '} @[freed]', 'h.allocations << a',
+  'unsafe { *a = Allocation{', 'h.allocations << a',
   'for index > 0 && h.allocations[index - 1].va > va',
-  'h.allocations[index] = h.allocations[index - 1]', 'index--', 'h.allocations[index] = a', 'return va'],
+  'h.allocations[index] = h.allocations[index - 1]', 'index--', 'h.allocations[index] = a', 'return 0, va'],
   'GPU heap validates before mutation, retries identical bounds and preserves sorted ownership after GC')!
- require(allocation.count('a := &Allocation{') == 1 && allocation.count('h.top =') == 1,
+ require(allocation.count('memory.malloc_packed_fallible(sizeof(Allocation))') == 1 && allocation.count('h.top =') == 1,
   'GPU heap success has one frontier update and one metadata owner')!
  require(!allocation.contains('lib.align_up('), 'GPU heap cannot use unchecked global rounding')!
  search := section(source, 'fn (h &HeapAllocator) find_address_locked(', '// Zero alignment selects', 'GPU heap best fit')!

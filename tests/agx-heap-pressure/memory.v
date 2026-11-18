@@ -1,6 +1,10 @@
 @[has_globals]
 module memory
 
+pub fn malloc_packed_fallible(size u64) voidptr {
+	return unsafe { C.malloc(size) }
+}
+
 __global backing = [16384]u8{}
 __global outstanding = false
 __global allocated = 0

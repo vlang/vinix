@@ -5,11 +5,13 @@ module memory
 fn C.__asan_address_is_poisoned(addr voidptr) int
 
 __global reject_allocations = false
+__global allocations_before_failure = -1
 __global allocation_calls = 0
-__global allocations [64]voidptr
+__global allocations [8192]voidptr // includes every record in the timestamp aperture
 __global allocation_count = 0
 
 pub fn fail_allocations(reject bool) { reject_allocations = reject }
+pub fn fail_after(count int) { allocations_before_failure = count }
 pub fn calls() int { return allocation_calls }
 pub fn outstanding() int {
 	$if queue_records_sanitized ? {
@@ -39,7 +41,8 @@ pub fn malloc_packed_fallible(size u64) voidptr {
 		}
 		allocation_count = kept
 	}
-	if reject_allocations { return unsafe { nil } }
+	if reject_allocations || allocations_before_failure == 0 { return unsafe { nil } }
+	if allocations_before_failure > 0 { allocations_before_failure-- }
 	result := unsafe { C.malloc(size) }
 	assert result != unsafe { nil }
 	$if queue_records_sanitized ? {

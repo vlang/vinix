@@ -12,6 +12,7 @@ module alloc
 // Translated from the Asahi Linux alloc.rs allocator code.
 
 import klock
+import memory
 
 // --- GPU page size (must match pgtable.uat_pgsz) ---
 pub const gpu_page_size = u64(16384)
@@ -172,28 +173,67 @@ fn (mut h HeapAllocator) newest_hole_order_locked() u64 {
 	return h.hole_count
 }
 
+// Reserve pointer storage before publishing the record or changing hole ranks.
+fn (mut h HeapAllocator) reserve_entry_locked() bool {
+	if h.allocations.len < h.allocations.cap { return true }
+	max_capacity := max_int / int(sizeof(voidptr))
+	if h.allocations.len >= max_capacity { return false }
+	capacity := if h.allocations.cap == 0 { 2 } else if h.allocations.cap <= max_capacity / 2 {
+		h.allocations.cap * 2
+	} else { max_capacity }
+	storage := memory.malloc_packed_fallible(u64(capacity) * sizeof(voidptr)) @[freed]
+	if storage == unsafe { nil } { return false }
+	mut replacement := []&Allocation{}
+	unsafe {
+		replacement.data = storage
+		replacement.len = h.allocations.len
+		replacement.cap = capacity
+		replacement.flags = .noslices
+		if h.allocations.len != 0 {
+			C.memcpy(storage, h.allocations.data, u64(h.allocations.len) * sizeof(voidptr))
+		}
+		mut old := h.allocations
+		h.allocations = replacement
+		old.free()
+	}
+	return true
+}
+
 // Zero alignment selects the page minimum. Nonzero alignments must be powers
 // of two, as in Asahi. The size and complete aligned interval must fit.
 pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
+	status, va := h.alloc_status(size, align)
+	if status != 0 { return none }
+	return va
+}
+
+pub fn (mut h HeapAllocator) alloc_status(size u64, align u64) (int, u64) {
 	h.lock.acquire()
 	defer {
 		h.lock.release()
 	}
 
-	if size == 0 || (align != 0 && (align & (align - 1)) != 0) { return none }
+	if size == 0 || (align != 0 && (align & (align - 1)) != 0) { return -22, 0 }
 	actual_align := if align < gpu_page_size { gpu_page_size } else { align }
-	aligned_size := checked_heap_align_up(size, actual_align) or { return none }
+	aligned_size := checked_heap_align_up(size, actual_align) or { return -22, 0 }
 	va := h.find_address_locked(h.end, aligned_size, actual_align) or {
-		if !h.gc_on_pressure { return none }
+		if !h.gc_on_pressure { return -28, 0 }
 		// Collect deferred releases only after the first placement attempt.
 		// Retry the same checked range after GC makes its holes available.
 		h.gc_locked()
 		h.find_address_locked(h.end, aligned_size, actual_align) or {
 			available := if h.top < h.end { h.end - h.top } else { u64(0) }
 			C.printf(c'gpu alloc %s: out of VA space (need 0x%llx, avail 0x%llx)\n', h.name.str, aligned_size, available)
-			return none
+			return -28, 0
 		}
 	}
+	storage := memory.malloc_packed_fallible(sizeof(Allocation)) @[freed]
+	if storage == unsafe { nil } { return -12, 0 }
+	if !h.reserve_entry_locked() {
+		unsafe { free(storage) }
+		return -12, 0
+	}
+	a := unsafe { &Allocation(storage) }
 	if va + aligned_size > h.top { h.top = va + aligned_size }
 	mut insertion := 0
 	for insertion < h.allocations.len && h.allocations[insertion].va < va { insertion++ }
@@ -212,12 +252,12 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 	}
 	trailing_order := if va + aligned_size < gap_end { h.newest_hole_order_locked() } else { u64(0) }
 
-	a := &Allocation{
+	unsafe { *a = Allocation{
 		va: va
 		size: aligned_size
 		in_use: true
 		hole_order: trailing_order
-	} @[freed]
+	} }
 	h.allocations << a
 	// Append retains one explicit owner; rotating pointers avoids an insert
 	// temporary and leaves every separately allocated record at its address.
@@ -228,7 +268,7 @@ pub fn (mut h HeapAllocator) alloc(size u64, align u64) ?u64 {
 	}
 	h.allocations[index] = a
 
-	return va
+	return 0, va
 }
 
 // Release the allocation at va. Deferred heaps reserve it until collection;

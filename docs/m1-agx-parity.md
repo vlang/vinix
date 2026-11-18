@@ -603,6 +603,27 @@ The restored archive passed inventory verification for
 `bundle.tar.gz` SHA-256 is
 `59f3a5d6c28a83ee36a493f4943a0be2b7f4051137368764143d69a392cd61ef`.
 
+G13 timestamp `BIND` now returns `ENOMEM` when the VA record or its
+pointer table cannot be allocated. Both allocations finish before the
+heap changes its hole order or the driver installs PTEs. A full 64 MiB
+aperture returns `ENOSPC`, and releasing a reservation makes its range
+available again. The pinned driver also allocates its DRM MM node
+fallibly. [Asahi timestamp mapping](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gpu.rs#L1472-L1485) [DRM MM node allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/rust/kernel/drm/mm.rs#L249-L269)
+
+Both kernel builds, 82 V test files, and the sanitized file-close and
+heap fixtures passed. Fault injection checked the first record and table
+allocations and a later table expansion while reservations were live.
+The host probes measured zero retained blocks and bytes after 30,000
+allocation cycles and after freeing an 8,192-entry table. The allocation
+scan matched its 178 baseline findings. The pinned source audit remains
+`not_equivalent`. This round used host checks and cross-builds.
+
+The restored archive passed inventory verification for
+`dbac3215706c6eab19de1457e38255c6cc324e9a` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-timestamp-heap-20261118.XIVRNm/`.
+`bundle.tar.gz` SHA-256 is
+`0cba7d7b953fe9113daedae7331587f3274c93a91a1b62494ede03a1ffded179`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

@@ -16,24 +16,24 @@ fn release_capacity(mut heap alloc.HeapAllocator, count int) {
 }
 
 fn measure_capacity() {
- // Construct the host mutex before measuring; only table growth is in scope.
+ // Warm the host mutex and allocator before measuring table ownership.
  mut heap := alloc.new_heap('capacity-measured', alloc.g13_shared_start, alloc.g13_shared_end)
  fill_capacity(mut heap, 2)
  release_capacity(mut heap, 2)
+ unsafe { heap.allocations.free() }
+ heap.allocations = []&alloc.Allocation{}
+ heap.allocations.flags |= .noslices
  live_heap()
  before_blocks, before_bytes := live_heap()
  fill_capacity(mut heap, 8192)
  release_capacity(mut heap, 8192)
- // The final table remains legitimately owned by the heap. Return to the
- // warmed two-entry capacity to measure only discarded growth buffers.
+ // Release the last owned buffer so both samples have an empty table.
  unsafe { heap.allocations.free() }
- heap.allocations = []&alloc.Allocation{cap: 2}
  after_blocks, after_bytes := live_heap()
  blocks := i64(after_blocks) - i64(before_blocks)
  bytes := i64(after_bytes) - i64(before_bytes)
  C.printf(c'AGX-HEAP-CAPACITY records=8192 retained_blocks=%lld retained_bytes=%lld\n', blocks, bytes)
  assert blocks == 0 && bytes == 0, 'GPU heap table growth must not retain discarded buffers'
- unsafe { heap.allocations.free() }
 }
 
 fn check_capacity_growth() {

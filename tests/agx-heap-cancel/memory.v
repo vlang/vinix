@@ -1,6 +1,10 @@
 @[has_globals]
 module memory
 
+pub fn malloc_packed_fallible(size u64) voidptr {
+	return unsafe { C.malloc(size) }
+}
+
 struct Page { aligned u64 raw voidptr }
 __global pages_live = []Page{}
 __global cancel_remaining_allocations = int(-1)

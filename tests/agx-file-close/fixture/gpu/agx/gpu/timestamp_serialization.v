@@ -4,6 +4,7 @@ module gpu
 
 import gpu.agx.alloc
 import gpu.agx.mmu
+import memory
 
 struct TimestampAllocator {
 mut:
@@ -21,11 +22,11 @@ pub fn timestamp_lock_held() bool {
 	return test_gpu_manager.lock.is_held() || replacement_gpu_manager.lock.is_held()
 }
 
-fn (mut allocator TimestampAllocator) alloc(size u64, alignment u64) ?u64 {
+fn (mut allocator TimestampAllocator) alloc_status(size u64, alignment u64) (int, u64) {
 	assert timestamp_lock_held() && size == 0x4000 && alignment == alloc.gpu_page_size
 	allocator.allocations++
-	if allocator.reject { return none }
-	return allocator.heap.alloc(size, alignment)
+	if allocator.reject { return -28, 0 }
+	return allocator.heap.alloc_status(size, alignment)
 }
 
 fn (mut allocator TimestampAllocator) release(va u64) {
@@ -165,6 +166,22 @@ fn check_timestamp_aperture_capacity(mut manager GpuManager, mut uat mmu.UatMana
 	capacity := (alloc.g13_timestamp_end - alloc.g13_timestamp_start) / unit
 	assert capacity == 4096
 	for index := u64(0); index < capacity; index++ {
+		if index in [u64(0), 8]! {
+			top := manager.g13_timestamp.heap.top
+			holes := manager.g13_timestamp.heap.hole_count
+			entries := manager.g13_timestamp.heap.allocations.data
+			maps := uat.timestamp_map_calls
+			retained_count := memory.outstanding()
+			for successful_allocations in [0, 1]! {
+				memory.fail_after(successful_allocations)
+				expect_timestamp_map_error(mut manager, 0x200000, unit, -12)
+				memory.fail_after(-1)
+				assert uat.timestamp_map_calls == maps && memory.outstanding() == retained_count
+				assert manager.g13_timestamp.heap.top == top && manager.g13_timestamp.heap.hole_count == holes
+				assert manager.g13_timestamp.heap.allocations.data == entries
+				assert manager.g13_timestamp.heap.allocations.len == int(index)
+			}
+		}
 		code, va := manager.checked_timestamp_map(0x200000, unit)
 		assert code == 0 && va == alloc.g13_timestamp_start + index * unit
 	}
@@ -181,5 +198,6 @@ fn check_timestamp_aperture_capacity(mut manager GpuManager, mut uat mmu.UatMana
 	}
 	assert manager.g13_timestamp.heap.allocations.len == 0 && !timestamp_lock_held()
 	unsafe { manager.g13_timestamp.heap.allocations.free() }
-	println('G13 timestamp aperture: 4096 live reservations exhaust the real 64 MiB heap with ENOSPC and a released hole accepts retry')
+	memory.assert_released()
+	println('G13 timestamp aperture: record and table ENOMEM preserve reservations, 4096 live records reach ENOSPC, and a released hole accepts retry')
 }

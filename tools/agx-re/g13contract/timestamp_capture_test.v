@@ -19,7 +19,7 @@ fn test_timestamp_capture_guards_require_retained_owners_and_rollback() {
 	for token in ['object.references != 0', 'release_timestamp_object(f.registration_manager, object)'] {
 		if _ := check_timestamp_capture_local(file.replace(token, ''), captures, gpu) { assert false, token }
 	}
-	for token in ['if mgr.state == .stopped { return -19, 0 }', 'return -28, 0',
+	for token in ['if mgr.state == .stopped { return -19, 0 }', 'if reserve_code != 0 { return reserve_code, 0 }',
 		'mgr.g13_timestamp.cancel_unpublished(va)', 'return code, 0', 'if mgr.state == .stopped || va',
 		'mgr.uat.unmap_kernel(reservation.va, reservation.size)',
 		'mgr.retire_g13_timestamp_aperture_locked()', 'mgr.stop_firmware_cpus(mgr.firmware_roles)'] {

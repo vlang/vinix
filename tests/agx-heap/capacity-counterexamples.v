@@ -9,15 +9,12 @@ fn main() {
  assert !os.exists(state) && !state.starts_with(repo + '/')
  os.mkdir_all(state)!
  source := os.read_file(repo + '/kernel/gpu/agx/alloc/alloc.v')!
- flag := 'heap.allocations.flags |= .noslices'
- assert source.count(flag) == 1
+ retire := 'old.free()'
+ assert source.count(retire) == 1
  variants := [
   ['original-source', os.read_file(os.args[2])!],
-  ['missing-owner', source.replace(flag, '')],
-  ['late-owner', source.replace(flag, '').replace('for mut a in h.allocations {',
-   'h.allocations.flags |= .noslices\n\tfor mut a in h.allocations {')],
-  ['lost-growth-owner', source.replace('h.allocations << a',
-   'h.allocations.flags &= ~ArrayFlags.noslices\n\th.allocations << a')],
+  ['missing-retirement', source.replace(retire, '')],
+  ['skipped-first-retirement', source.replace(retire, 'if old.cap != 2 { old.free() }')],
  ]
  mut receipts := []string{}
  for item in variants {
