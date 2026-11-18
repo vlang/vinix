@@ -277,3 +277,30 @@ The evidence archive covers `fdd8d95c6141b436f41fce0efca6bcf719abaef5` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-tvb-tlbi-20261119.QqqUCK/bundle.tar.gz`
 with SHA-256 `e82b256174f79cf7d2b0525b41c61cd193269907ec2002de47dcf31033f2f9d4`.
+
+## GPU-only render and compute scratch mappings
+
+G13 prepares the five GPU-only render buffers and the compute preemption
+buffer through the UAT page-table path. This removes five firmware-control
+round trips per render job and one per compute job. The retained flushes
+cover the private render tail-pointer cache and the kernel buffers.
+[Pinned render scene allocations](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/buffer.rs#L562-L602)
+[Pinned auxiliary framebuffer allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/render.rs#L596)
+[Pinned compute preemption allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/compute.rs#L80-L89)
+
+The sanitizer fixture executes the production preparation tails. It caught
+the previous render flushes and exercised all twelve retained flush failure
+points. At each failure, preparation stops and leaves the publication flag
+set for cleanup. The job lifetime and UAT sanitizer suites passed. The
+render-wire fixture was updated to use the job's bound VM slot. All 32,000
+wire cases passed with that fixture.
+
+Both kernel builds, 79 source-contract test files and 122 pinned reference
+checks passed. Generated AArch64 C confirms the retained flush calls and
+their order after the publication flag is set. The allocation scan matched
+the 176 baseline findings. M1 hardware validation remains open.
+
+The evidence archive covers `47de0f8d14a42957ae1ceb58eaedb4362c42c744` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-job-scratch-tlbi-20261119.L0KSCW/bundle.tar.gz`
+with SHA-256 `0dc9d2f7f80d090f71883ff62e074e7202b671b00e0dd59e39ab858bbeb413d5`.

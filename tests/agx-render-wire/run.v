@@ -23,7 +23,7 @@ fn main() {
 		section(source, 'fn write_g13_start_vertex(', 'fn write_g13_finalize_vertex(')! +
 		section(source, 'fn write_g13_start_compute(', 'struct G13EventResources {')! +
 		'fn encode(destination voidptr, v13_5 bool, sample Sample) u64 {\n' +
-		'job := sample.job; buffer := sample.buffer; mgr := sample.manager; vertex_queue := sample.queue; ctx := sample.context; resources := sample.resources; input := sample.input; vertex_attachments := sample.attachments\n' +
+		'job := sample.job; buffer := sample.buffer; mgr := sample.manager; vertex_queue := sample.queue; resources := sample.resources; input := sample.input; vertex_attachments := sample.attachments\n' +
 		'abi := if v13_5 { hw.FirmwareAbi.v13_5_partial } else { hw.FirmwareAbi.v12_3 }\n' +
 		'vertex_tiling_params_offset := fw.g13_vertex_tiling_params_offset_for(abi) or { panic("tiling offset") }\n' +
 		'vertex_job_params_1_offset := fw.g13_vertex_job_params_1_offset_for(abi) or { panic("params offset") }\n' +

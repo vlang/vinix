@@ -152,7 +152,15 @@ pub fn check_m1n1_at(m1n1 string, repo string) ![]string {
 		require_order(prepare, ['mgr.lock.acquire()', 'mgr.lock.release()', 'mgr.state != .running',
 			'vm_slot := uat_mgr.bind_context(${spec[1]})', 'if vm_slot == 0 { return none }',
 			'mut job := &${spec[2]}{', 'vm_slot: vm_slot', 'vm_slot: job.vm_slot',
-			'flush_g13_uat_range(job.vm_slot,'], 'Publish VM before ${spec[0]} job construction')!
+			'job.mappings_published = true', 'flush_g13_kernel_buffer('], 'Publish VM before ${spec[0]} job construction')!
+		if spec[0] == 'render' {
+			require(prepare.count('flush_g13_uat_range(') == 1 && prepare.contains(
+				'flush_g13_uat_range(job.vm_slot, job.scene.tail_pointer_cache.buffer.va,'),
+				'Only the private render TPC uses a firmware flush in the job VM')!
+		} else {
+			require(!prepare.contains('flush_g13_uat_range('),
+				'Compute preemption backing uses GPU-only page-table invalidation')!
+		}
 		require(prepare.count('vm_slot: job.vm_slot') == spec[3].int()
 			&& prepare.count('vm_slot:') == spec[3].int() + 1,
 			'Vinix ${spec[0]} firmware commands must use the job ASID')!

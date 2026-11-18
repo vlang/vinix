@@ -148,6 +148,9 @@ mut:
 	g13_queues            []&G13QueueResources
 	flush_fails bool
 	flushes int
+	user_flushes int
+	user_flush_address u64
+	publication_failure int
 	channels GpuChannels
 	hw_config Config
 	g13_channels &u8 = unsafe { nil }
@@ -168,7 +171,14 @@ struct G13EventResources {
 fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
 	assert buffer.phys != 0 && buffer.size != 0
 	mgr.flushes++
-	return !mgr.flush_fails
+	return !mgr.flush_fails && mgr.flushes + mgr.user_flushes != mgr.publication_failure
+}
+
+fn (mut mgr GpuManager) flush_g13_uat_range(slot u32, address u64, size u64) bool {
+	assert slot == 1 && size == 0x4000
+	mgr.user_flushes++
+	mgr.user_flush_address = address
+	return mgr.flushes + mgr.user_flushes != mgr.publication_failure
 }
 
 fn (mut mgr GpuManager) invalidate_g13_driver_buffer(mut context mmu.UatContext, buffer &mmu.UatBuffer) bool {
@@ -277,6 +287,7 @@ fn (mut mgr GpuManager) render_job(mut queue G13QueueResources, context &mmu.Uat
 }
 
 pub fn run_checks() {
+	check_job_mapping_publication()
 	check_prepared_job_backlog()
 	check_batch_publication()
 	check_batch_admission()

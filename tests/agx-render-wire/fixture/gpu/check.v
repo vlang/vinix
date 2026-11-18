@@ -9,13 +9,12 @@ import gpu.agx.hw
 fn C.kprintf(format &char, ...) i32
 
 struct Node { va u64 }
-struct Job { vertex Node; scene Scene; vertex_event_sequence u64 }
+struct Job { vm_slot u32; vertex Node; scene Scene; vertex_event_sequence u64 }
 struct Scene { scene Node }
 struct Buffer { info Node; slot u32 }
 struct Channels { stats_vertex Node }
 struct Manager { g13_channels Channels }
 struct Queue { info Node }
-struct Context { id u32 }
 struct Resources { firmware_id u64 }
 struct Input { vertex_command_id u32 }
 struct Sample {
@@ -23,7 +22,6 @@ struct Sample {
 	buffer Buffer
 	manager Manager
 	queue Queue
-	context Context
 	resources Resources
 	input Input
 	attachments fw.G13MicroseqAttachments
@@ -50,7 +48,7 @@ fn expected_bytes(sample Sample, newer bool) [0x18c]u8 {
 	put64(mut out, 0x1c, sample.job.scene.scene.va)
 	put64(mut out, 0x24, sample.manager.g13_channels.stats_vertex.va + 4)
 	put64(mut out, 0x2c, sample.queue.info.va)
-	put32(mut out, 0x34, sample.context.id)
+	put32(mut out, 0x34, sample.job.vm_slot)
 	put32(mut out, 0x38, 1)
 	put32(mut out, 0x3c, u32(sample.resources.firmware_id))
 	put32(mut out, 0x40, sample.buffer.slot)
@@ -93,11 +91,15 @@ pub fn run_checks() {
 							}
 						}
 						sample := Sample{
-							job: Job{ vertex: Node{0xffff_ffa0_1000_0000 + seed}, scene: Scene{Node{0xffff_ffa0_2000_0000 + seed}}, vertex_event_sequence: counter }
+							job: Job{
+								vm_slot: u32(cycle % 63 + 1)
+								vertex: Node{0xffff_ffa0_1000_0000 + seed}
+								scene: Scene{Node{0xffff_ffa0_2000_0000 + seed}}
+								vertex_event_sequence: counter
+							}
 							buffer: Buffer{Node{0xffff_ffa0_3000_0000 + seed}, u32(cycle)}
 							manager: Manager{Channels{Node{0xffff_ffa0_4000_0000 + seed}}}
 							queue: Queue{Node{0xffff_ffa0_5000_0000 + seed}}
-							context: Context{u32(cycle % 63 + 1)}
 							resources: Resources{counter}
 							input: Input{u32(cycle) | 0xa500_0000}
 							attachments: attachments
