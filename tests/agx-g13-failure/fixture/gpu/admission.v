@@ -36,7 +36,7 @@ fn check_compute_host_admission() {
 	for count := u32(1); count <= 3; count++ {
 		mut header := channel.RingHeader{}
 		mut messages := [4]fw.FwRunWorkQueueMsg{}
-		mut state := fw.G13WorkQueueRingState{ cpu_wptr: 1279, gpu_doneptr: 1279 }
+		mut state := fw.G13WorkQueueRingState{ cpu_wptr: 1279, gpu_doneptr: 1279, rb_size: fw.g13_workqueue_entries }
 		mut ring := [1280]u64{init: 0xdeadbeef}
 		published := u64(10 * 1280 + 1279)
 		retired := published - (1279 - count)
@@ -78,8 +78,8 @@ fn check_render_host_admission() {
 				mut fragment_header := channel.RingHeader{}
 				mut vertex_messages := [4]fw.FwRunWorkQueueMsg{}
 				mut fragment_messages := [4]fw.FwRunWorkQueueMsg{}
-				mut vertex_state := fw.G13WorkQueueRingState{ cpu_wptr: 1278, gpu_doneptr: 1278 }
-				mut fragment_state := fw.G13WorkQueueRingState{ cpu_wptr: 1279, gpu_doneptr: 1279 }
+				mut vertex_state := fw.G13WorkQueueRingState{ cpu_wptr: 1278, gpu_doneptr: 1278, rb_size: fw.g13_workqueue_entries }
+				mut fragment_state := fw.G13WorkQueueRingState{ cpu_wptr: 1279, gpu_doneptr: 1279, rb_size: fw.g13_workqueue_entries }
 				mut vertex_ring := [1280]u64{init: 0xdeadbeef}
 				mut fragment_ring := [1280]u64{init: 0xdeadbeef}
 				mut queue := G13QueueResources{}

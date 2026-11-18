@@ -634,13 +634,13 @@ fn check_retirement() {
 }
 
 fn check_publishers() {
-	for broken in -1 .. 12 {
+	for broken in -1 .. 14 {
 		mut vertex_outer := channel.RingHeader{}
 		mut fragment_outer := channel.RingHeader{}
 		mut vertex_messages := [4]fw.FwRunWorkQueueMsg{}
 		mut fragment_messages := [4]fw.FwRunWorkQueueMsg{}
-		mut vertex_state := fw.G13WorkQueueRingState{}
-		mut fragment_state := fw.G13WorkQueueRingState{}
+		mut vertex_state := fw.G13WorkQueueRingState{rb_size: fw.g13_workqueue_entries}
+		mut fragment_state := fw.G13WorkQueueRingState{rb_size: fw.g13_workqueue_entries}
 		mut vertex_ring := [1280]u64{}
 		mut fragment_ring := [1280]u64{}
 		mut resources := G13QueueResources{}
@@ -672,6 +672,8 @@ fn check_publishers() {
 			9 { fragment_outer.write_ptr = 2 }
 			10 { vertex_state.cpu_wptr = 1 }
 			11 { fragment_state.cpu_wptr = 1 }
+			12 { vertex_state.rb_size-- }
+			13 { fragment_state.rb_size++ }
 			else {}
 		}
 		mut job := G13RenderJobResources{
@@ -690,10 +692,15 @@ fn check_publishers() {
 			assert vertex_outer.write_ptr == if broken == 8 { u32(2) } else { u32(0) }
 			assert fragment_outer.write_ptr == if broken == 9 { u32(2) } else { u32(0) }
 		}
-		if broken >= 10 {
+		if broken in [10, 11]! {
 			assert !published && mgr.state == .error, 'paired render must reject an in-range corrupt inner write cursor'
 			assert vertex_state.cpu_wptr == if broken == 10 { u32(1) } else { u32(0) }
 			assert fragment_state.cpu_wptr == if broken == 11 { u32(1) } else { u32(0) }
+		}
+		if broken >= 12 {
+			assert !published && mgr.state == .error, 'paired render must reject either mismatched workqueue capacity'
+			assert vertex_state.cpu_wptr == 0 && fragment_state.cpu_wptr == 0
+			assert vertex_outer.write_ptr == 0 && fragment_outer.write_ptr == 0
 		}
 		if broken == -1 {
 			assert published && mgr.rings == 2 && katomic.barriers() == before + 2
@@ -733,10 +740,10 @@ fn check_publishers() {
 		resources.subqueues[1].lock.acquire()
 		resources.subqueues[1].lock.release()
 	}
-	for broken in -1 .. 6 {
+	for broken in -1 .. 7 {
 		mut outer := channel.RingHeader{}
 		mut messages := [4]fw.FwRunWorkQueueMsg{}
-		mut state := fw.G13WorkQueueRingState{}
+		mut state := fw.G13WorkQueueRingState{rb_size: fw.g13_workqueue_entries}
 		mut ring := [1280]u64{}
 		mut resources := G13QueueResources{}
 		resources.subqueues[2] = G13Subqueue{
@@ -753,6 +760,7 @@ fn check_publishers() {
 			3 { state.gpu_doneptr = ~u32(0) }
 			4 { outer.write_ptr = 2 }
 			5 { state.cpu_wptr = 1 }
+			6 { state.rb_size = 0 }
 			else {}
 		}
 		before := katomic.barriers()
@@ -760,6 +768,10 @@ fn check_publishers() {
 		if broken == 4 { assert !published && mgr.channels.pipes[2].has_fault() && outer.write_ptr == 2 }
 		if broken == 5 { assert !published && mgr.state == .error && state.cpu_wptr == 1,
 			'compute must reject an in-range corrupt inner write cursor' }
+		if broken == 6 {
+			assert !published && mgr.state == .error, 'compute must reject an invalid firmware-visible workqueue capacity'
+			assert state.cpu_wptr == 0 && outer.write_ptr == 0
+		}
 		if broken == -1 {
 			assert published && mgr.rings == 1 && katomic.barriers() == before + 2
 			assert ring[0] == alloc.g13_private_start + 0x4000

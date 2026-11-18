@@ -1058,7 +1058,8 @@ fn (mut mgr GpuManager) submit_g13_queue_commands(resources &G13QueueResources,
 	mut state := unsafe { &fw.G13WorkQueueRingState(queue.state.cpu_address()) }
 	inner_wp := katomic.load(&state.cpu_wptr)
 	inner_done := katomic.load(&state.gpu_doneptr)
-	if !g13_workqueue_write_matches(queue.last_command_slot, inner_wp) || inner_done >= fw.g13_workqueue_entries {
+	if katomic.load(&state.rb_size) != fw.g13_workqueue_entries
+		|| !g13_workqueue_write_matches(queue.last_command_slot, inner_wp) || inner_done >= fw.g13_workqueue_entries {
 		mgr.state = .error
 		queue.lock.release()
 		outer.lock.release()
@@ -2066,7 +2067,9 @@ fn (mut mgr GpuManager) publish_g13_render_job_locked(mut job G13RenderJobResour
 		fragment_inner_wp = katomic.load(&fragment_state.cpu_wptr)
 		vertex_done := katomic.load(&vertex_state.gpu_doneptr)
 		fragment_done := katomic.load(&fragment_state.gpu_doneptr)
-		valid = g13_workqueue_write_matches(vertex_queue.last_command_slot, vertex_inner_wp)
+		valid = katomic.load(&vertex_state.rb_size) == fw.g13_workqueue_entries
+			&& katomic.load(&fragment_state.rb_size) == fw.g13_workqueue_entries
+			&& g13_workqueue_write_matches(vertex_queue.last_command_slot, vertex_inner_wp)
 			&& g13_workqueue_write_matches(fragment_queue.last_command_slot, fragment_inner_wp)
 			&& vertex_done < fw.g13_workqueue_entries && fragment_done < fw.g13_workqueue_entries
 		if !valid {

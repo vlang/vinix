@@ -80,3 +80,27 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `a528a72944e597cda327214b02588b2e9b4fd9fb4f6e17c4948341dbd4a8ee13`.
 Native M1 firmware validation remains open.
+
+## Firmware-visible workqueue capacity
+
+Asahi writes the allocated workqueue size to `rb_size` in the shared ring
+descriptor. Vinix initializes the field to 1280 entries and uses the same
+capacity for host indexing. Compute, paired-render and batch publishers now
+verify the descriptor capacity before writing command addresses or advancing
+the outer TX ring. A mismatch puts the manager into its error state and
+refuses the publication. A batch checks every participating pipe before
+publishing any part of the batch.
+
+The paired-render and batch regressions reproduced acceptance of a mismatched
+capacity on `7e17410a07b3a90158fdd72abc0ff6f38a8f3add`. ASan/UBSan passed the
+updated standalone publisher tests and all 93 batch transactions. The cases
+cover zero, smaller and larger advertised capacities and valid ring wrap.
+Both kernel builds, all 79 local contract tests and 122 archived-reference
+checks passed. The allocation scan reproduced the same 176 baseline findings
+by file and kind.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-workqueue-size-20261119.FQGYmf/`.
+The `bundle.tar.gz` SHA-256 is
+`b9aa8538d3114de69b56c53bfd7a123507a5866ff064763e16560b800e28a498`.
+Native M1 firmware validation remains open.

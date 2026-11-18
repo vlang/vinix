@@ -34,6 +34,7 @@ fn check_queued_job_backlog(render bool, stop bool) {
 	queue.threshold = SharedBuffer{ phys: unsafe { u64(&threshold) }, size: sizeof(threshold) }
 	queue.render_buffer.counter = SharedBuffer{ phys: unsafe { u64(&counter) }, size: sizeof(counter) }
 	for pipe in 0 .. 3 {
+		states[pipe].rb_size = fw.g13_workqueue_entries
 		mgr.channels.pipes[pipe] = channel.new_tx_channel('backlog', 1, unsafe { u64(&headers[pipe]) }, 1,
 			unsafe { u64(&messages[pipe]) }, 16, u32(sizeof(fw.FwRunWorkQueueMsg)))
 		queue.subqueues[pipe].state = SharedBuffer{ phys: unsafe { u64(&states[pipe]) }, size: sizeof(fw.G13WorkQueueRingState) }

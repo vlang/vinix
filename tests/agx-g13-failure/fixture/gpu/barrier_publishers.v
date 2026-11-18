@@ -14,8 +14,8 @@ fn check_barrier_publishers() {
 			mut fragment_outer := channel.RingHeader{}
 			mut vertex_messages := [4]fw.FwRunWorkQueueMsg{}
 			mut fragment_messages := [4]fw.FwRunWorkQueueMsg{}
-			mut vertex_state := fw.G13WorkQueueRingState{ cpu_wptr: 1278 }
-			mut fragment_state := fw.G13WorkQueueRingState{ cpu_wptr: 1279 }
+			mut vertex_state := fw.G13WorkQueueRingState{ cpu_wptr: 1278, rb_size: fw.g13_workqueue_entries }
+			mut fragment_state := fw.G13WorkQueueRingState{ cpu_wptr: 1279, rb_size: fw.g13_workqueue_entries }
 			mut vertex_ring := [1280]u64{}
 			mut fragment_ring := [1280]u64{}
 			mut resources := G13QueueResources{}
@@ -89,7 +89,7 @@ fn check_barrier_publishers() {
 		for failure in -1 .. 3 {
 			mut outer := channel.RingHeader{}
 			mut messages := [4]fw.FwRunWorkQueueMsg{}
-			mut state := fw.G13WorkQueueRingState{ cpu_wptr: 1279 }
+			mut state := fw.G13WorkQueueRingState{ cpu_wptr: 1279, rb_size: fw.g13_workqueue_entries }
 			mut ring := [1280]u64{}
 			mut queue := G13QueueResources{}
 			queue.subqueues[2] = G13Subqueue{ state: SharedBuffer{ phys: u64(&state) }, ring: SharedBuffer{ phys: unsafe { u64(&ring) } }, info: SharedBuffer{ va: 0x1000 }, last_command_slot: 1278 }

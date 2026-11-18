@@ -8,10 +8,10 @@ import gpu.agx.mmu
 
 fn check_batch_publication() {
 	for shape in 0 .. 3 {
-		for failure in 0 .. 27 { check_batch_transaction(shape, failure, 64) }
+		for failure in 0 .. 28 { check_batch_transaction(shape, failure, 64) }
 		for count in [1, 2, 63]! { check_batch_transaction(shape, 0, count) }
 	}
-	println('AGX batch publication: 90 transactions cover inner and outer cursor faults, aggregate operation ownership, wrapped rings and notification failure')
+	println('AGX batch publication: 93 transactions cover ring capacity and cursor faults, aggregate operation ownership, wrap and notification failure')
 }
 
 fn check_batch_transaction(shape int, failure int, job_count int) {
@@ -47,6 +47,7 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		// Exactly one free outer entry must suffice for the complete batch.
 		headers[pipe].read_ptr, headers[pipe].write_ptr = 1, 3
 		states[pipe].cpu_wptr, states[pipe].gpu_doneptr, states[pipe].cpu_freeptr = 1278, 1278, 1277
+		states[pipe].rb_size = fw.g13_workqueue_entries
 		mgr.channels.pipes[pipe] = channel.new_tx_channel('batch', 1, unsafe { u64(&headers[pipe]) }, 1,
 			unsafe { u64(&messages[pipe]) }, 4, u32(sizeof(fw.FwRunWorkQueueMsg)))
 		queue.subqueues[pipe].state = SharedBuffer{ phys: unsafe { u64(&states[pipe]) }, size: sizeof(fw.G13WorkQueueRingState) }
@@ -121,6 +122,7 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		24 { mgr.stop_on_doorbell = true }
 		25 { headers[last_pipe].write_ptr = 1 }
 		26 { states[last_pipe].cpu_wptr = 1279 }
+		27 { states[last_pipe].rb_size-- }
 		else {}
 	}
 	early_operation := failure == 22 || failure == 23
@@ -147,7 +149,11 @@ fn check_batch_transaction(shape int, failure int, job_count int) {
 		assert result == 0 && mgr.state == .error,
 			'whole batch must be refused before publication when one inner write cursor is corrupt'
 	}
-	refused := (failure > 0 && failure < 14) || failure in [17, 18, 23, 25, 26]!
+	if failure == 27 {
+		assert result == 0 && mgr.state == .error,
+			'whole batch must be refused before publication when one workqueue capacity is inconsistent'
+	}
+	refused := (failure > 0 && failure < 14) || failure in [17, 18, 23, 25, 26, 27]!
 	if refused {
 		assert result == 0 && mgr.pending == old_pending && threshold == old_threshold && counter == old_counter
 		assert mgr.doorbells.len == 0 && completions.all(it.calls == 0)

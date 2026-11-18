@@ -574,7 +574,8 @@ fn check_batch_publication_contract(local string, pending string, reference stri
 		'lock.acquire()', 'defer {', 'queue.subqueues[pipe].lock.release()',
 		'mgr.channels.pipes[pipe_index(queue.priority, u32(pipe))].lock.release()',
 		'outer.validate_pointers(outer_rp, outer_wp)',
-		'pipes[pipe].outer_next == outer_rp', 'g13_workqueue_write_matches(inner.last_command_slot, wp)',
+		'pipes[pipe].outer_next == outer_rp', 'katomic.load(&state.rb_size) != fw.g13_workqueue_entries',
+		'g13_workqueue_write_matches(inner.last_command_slot, wp)',
 		'free >= fw.g13_workqueue_entries',
 		'pipes[pipe].count > fw.g13_workqueue_entries - used - 1',
 		'if !operation_active && !mgr.begin_g13_operation_locked() { return none }',
@@ -621,6 +622,7 @@ fn check_g13_operation_contract(reference_queue string, reference_gpu string, gp
 }
 
 fn check_ring_admission_contract(local string, reference string) ! {
+	require(reference.contains('raw.rb_size = size;'), 'Asahi publishes workqueue capacity in the shared descriptor')!
 	free := section(reference, '    pub(crate) fn free_space(', '    pub(crate) fn free_slots(', 'Asahi host ring capacity')!
 	require(free.contains('self.size as usize - self.pending.len() - 1'), 'Asahi ring capacity must count host-pending commands')!
 	require_order(reference, ['pub(crate) fn can_submit(', 'inner.free_space() > self.pending.len()',
@@ -637,14 +639,17 @@ fn check_ring_admission_contract(local string, reference string) ! {
 	compute := section(local, 'fn (mut mgr GpuManager) submit_g13_queue_commands(',
 		'fn (mut mgr GpuManager) publish_g13_compute_job_locked(', 'Vinix compute admission')!
 	require_order(compute, ['mgr.g13_ring_has_space_locked(queue.command_sequence, queue.retired_sequence, command_count)',
-		'inner_done := katomic.load', 'g13_workqueue_write_matches(queue.last_command_slot, inner_wp)',
+		'inner_done := katomic.load', 'katomic.load(&state.rb_size) != fw.g13_workqueue_entries',
+		'g13_workqueue_write_matches(queue.last_command_slot, inner_wp)',
 		'command_count > inner_free', '*entry = command_va',
 		'queue.command_sequence += u64(command_count)', 'katomic.store(mut &state.cpu_wptr'], 'Vinix compute admission')!
 	render := section(local, 'fn (mut mgr GpuManager) publish_g13_render_job_locked(',
 		'// Transfer a prepared render pass', 'Vinix render admission')!
 	require_order(render, ['mgr.g13_ring_has_space_locked(vertex_queue.command_sequence, vertex_queue.retired_sequence, vertex_count)',
 		'mgr.g13_ring_has_space_locked(fragment_queue.command_sequence, fragment_queue.retired_sequence, 2)',
-		'vertex_inner_wp = katomic.load', 'g13_workqueue_write_matches(vertex_queue.last_command_slot, vertex_inner_wp)',
+		'vertex_inner_wp = katomic.load', 'katomic.load(&vertex_state.rb_size) == fw.g13_workqueue_entries',
+		'katomic.load(&fragment_state.rb_size) == fw.g13_workqueue_entries',
+		'g13_workqueue_write_matches(vertex_queue.last_command_slot, vertex_inner_wp)',
 		'g13_workqueue_write_matches(fragment_queue.last_command_slot, fragment_inner_wp)',
 		'if !valid {', 'vertex_queue.command_sequence += vertex_count'], 'Vinix paired host admission')!
 }

@@ -38,6 +38,7 @@ fn test_batch_publication_rejects_early_visibility_and_lost_transfer_cleanup() {
 	reference := 'frag_sub = Some(wqjob.submit()?); vtx_sub = Some(wqjob.submit()?); comp_sub = Some(wqjob.submit()?); raw.increase(job.notification_count); frag_sub.map(|a| gpu.run_job(a)); vtx_sub.map(|a| gpu.run_job(a)); comp_sub.map(|a| gpu.run_job(a));'
 	check_batch_publication_contract(local, pending, reference)!
 	for token in ['outer.validate_pointers(outer_rp, outer_wp)', 'pipes[pipe].outer_next == outer_rp',
+		'katomic.load(&state.rb_size) != fw.g13_workqueue_entries',
 		'g13_workqueue_write_matches(inner.last_command_slot, wp)',
 		'free >= fw.g13_workqueue_entries', 'if !operation_active && !mgr.begin_g13_operation_locked() { return none }',
 		'job.submitted = true',
@@ -134,10 +135,13 @@ fn test_queue_fence_contract_rejects_reused_public_or_missing_identity() {
 fn test_ring_admission_contract_rejects_gpu_only_space_and_missing_spare() {
 	local := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/gpu/g13.v'))!
 	reference := '    pub(crate) fn free_space(&self) -> usize { self.size as usize - self.pending.len() - 1 }\n    pub(crate) fn free_slots() {}\npub(crate) fn can_submit() { inner.free_space() > self.pending.len() }\npub(crate) fn submit() { inner.free_space() <= command_count }\n' +
-		'let mut wptr = inner.wptr; inner.info.ring[wptr as usize]; raw.cpu_wptr.store(wptr, Ordering::Release); inner.wptr = wptr;'
+		'let mut wptr = inner.wptr; inner.info.ring[wptr as usize]; raw.cpu_wptr.store(wptr, Ordering::Release); inner.wptr = wptr; raw.rb_size = size;'
 	check_ring_admission_contract(local, reference)!
 	for broken in [local.replace('(published - retired) > u64(count)', '(published - retired) >= u64(count)'),
 		local.replace('published > ~u64(0) - u64(count)', 'false'),
+		local.replace('katomic.load(&state.rb_size) != fw.g13_workqueue_entries', 'false'),
+		local.replace('katomic.load(&vertex_state.rb_size) == fw.g13_workqueue_entries', 'true'),
+		local.replace('katomic.load(&fragment_state.rb_size) == fw.g13_workqueue_entries', 'true'),
 		local.replace('g13_workqueue_write_matches(queue.last_command_slot, inner_wp)', 'true'),
 		local.replace('g13_workqueue_write_matches(fragment_queue.last_command_slot, fragment_inner_wp)', 'true'),
 		local.replace('mgr.g13_ring_has_space_locked(queue.command_sequence, queue.retired_sequence, command_count)', 'true'),
