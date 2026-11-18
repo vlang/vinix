@@ -7,6 +7,8 @@ pub const ifsock = 0xc000
 pub const ifpipe = 0x3000
 pub struct Stat {
 pub mut:
+	dev u64
+	ino u64
 	mode int
 	blksize i64
 	size i64

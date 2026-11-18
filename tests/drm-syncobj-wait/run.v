@@ -51,15 +51,22 @@ fn main() {
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	os.write_file('${scratch}/resource/seek.v', 'module resource\n' +
 		section(resource_source, 'pub interface SeekableResource {', '// An immutable backend')!)!
+	os.write_file('${scratch}/resource/stat.v', os.read_file('${repo}/kernel/resource/stat.v')!
+		.replace('C.vinix_stack_alloc', 'C.__builtin_alloca'))!
 	vfs := os.read_file('${repo}/kernel/fs/vfs.v')!
 	os.mkdir_all('${scratch}/fs')!
 	os.write_file('${scratch}/fs/seek.v', 'module fs\nimport errno\nimport file\nimport proc\nimport resource\nimport stat\n' +
 		section(vfs, 'pub const seek_cur =', 'pub const resolve_no_xdev')! +
 		section(vfs, 'pub fn syscall_seek(', '// symlinkat(')!)!
+	stat_source := os.read_file('${repo}/kernel/fs/stat.v')!
+	os.write_file('${scratch}/fs/stat.v', 'module fs\nimport errno\nimport file\nimport proc\nimport resource\nimport stat\n' +
+		section(stat_source, 'fn stat_resource(', 'fn stat_path_resource(')! +
+		section(vfs, 'pub fn syscall_fstat(', 'pub fn syscall_linkat(')!)!
 	source := os.read_file('${repo}/kernel/drm/drm.v')!
 	production := 'module drm\nimport drm.ioctl\nimport drm.syncobj\nimport usercopy\nimport sched\nimport proc\nimport katomic\nimport file\nimport resource\nimport errno\nimport fs\nimport stat\nimport klock\nimport memory\nimport memory.mmap\nimport drm.gem\nimport event.eventstruct\n' +
 		section(source, 'struct SyncFileResource {', 'fn (mut this SyncFileResource) poll_status(')! +
 		section(source, 'fn (mut this SyncFileResource) poll_status(', '__global (')! +
+		section(source, '__global (\n\tregistered_devices', 'fn decode_ioctl_cmd(')! +
 		section(source, 'fn ioctl_syncobj_create(', 'fn ioctl_syncobj_wait(')! +
 		section(source, 'fn ioctl_syncobj_wait(', 'fn core_ioctl(')!
 	os.write_file('${scratch}/drm/production.v', production)!

@@ -1,3 +1,4 @@
+@[has_globals]
 module resource
 
 import stat
@@ -11,6 +12,13 @@ pub const o_cloexec = 0o2000000
 pub const o_rdwr = 2
 pub const o_nonblock = 0o4000
 pub const o_path = 0o10000000
+
+__global fixture_next_device_id = u64(1)
+
+pub fn create_dev_id() u64 {
+	fixture_next_device_id++
+	return fixture_next_device_id
+}
 
 pub interface PollableResource {
 mut:

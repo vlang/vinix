@@ -10,6 +10,7 @@ import fs
 import memory
 import proc
 import resource
+import stat
 
 const page_size = u64(4096)
 
@@ -68,16 +69,54 @@ fn check_prime_seek(mut descriptor file.FD, number int, size u64) {
 	descriptor.handle.flags &= ~resource.o_path
 }
 
+fn prime_fstat(number int) stat.Stat {
+	mut metadata := stat.Stat{}
+	result, code := fs.syscall_fstat(unsafe { nil }, number, unsafe { &metadata })
+	assert result == 0 && code == 0
+	return metadata
+}
+
+fn check_prime_inode(device &DrmDevice, object &gem.GemObject, number int) {
+	first := prime_fstat(number)
+	assert first.dev != 0 && first.ino != 0 && first.size == i64(object.size)
+	duplicate := file.duplicate(number)
+	alias := prime_fstat(duplicate)
+	assert alias.dev == first.dev && alias.ino == first.ino
+	file.close(duplicate)
+
+	mut export := ioctl.DrmPrimeHandle{ handle: object.handle, fd: -1 }
+	assert ioctl_prime_handle_to_fd(device, voidptr(12), &export) == 0
+	assert export.fd != number
+	reexport := prime_fstat(export.fd)
+	assert reexport.dev == first.dev && reexport.ino == first.ino && reexport.size == first.size
+	file.close(export.fd)
+
+	// An unrelated GEM can reuse the handle while the original PRIME fd lives.
+	mut replacement := gem.GemObject{handle: object.handle, size: object.size,
+		mmap_offset: object.mmap_offset + object.size}
+	prime_exported = unsafe { &replacement }
+	assert ioctl_prime_handle_to_fd(device, voidptr(11), &export) == 0
+	new_metadata := prime_fstat(export.fd)
+	assert new_metadata.dev == first.dev && new_metadata.ino != first.ino && new_metadata.size == first.size
+	file.close(export.fd)
+	assert replacement.references == 1 && object.references == 2
+	assert prime_fstat(number).ino == first.ino
+	prime_exported = unsafe { object }
+}
+
 fn check_prime_descriptors() {
 	custom := DrmDriver{gem_export: prime_export, gem_export_put: prime_put, gem_import: prime_import}
 	default_driver := DrmDriver{gem_export: prime_export, gem_import: prime_import}
 	client := voidptr(11)
+	mut offset := u64(0x10000000)
 	for driver in [custom, default_driver]! {
 		memory.reset()
 		proc.reset()
 		device := DrmDevice{driver: unsafe { &driver }}
 		foreign := DrmDevice{driver: unsafe { &driver }}
-		mut object := gem.GemObject{handle: 7, vm_private_identity: 99, size: 0x10000010000}
+		mut object := gem.GemObject{handle: 7, vm_private_identity: 99, size: 0x10000010000,
+			mmap_offset: offset}
+		offset += 2 * object.size
 		prime_exported = unsafe { &object }
 		mut request := ioctl.DrmPrimeHandle{handle: 7, fd: -123}
 		for _ in 0 .. 200 {
@@ -118,6 +157,7 @@ fn check_prime_descriptors() {
 		assert fd.flags & resource.o_cloexec != 0 && fd.handle.flags & resource.o_rdwr != 0
 		check_prime_seek(mut fd, request.fd, object.size)
 		fd.unref()
+		check_prime_inode(&device, &object, request.fd)
 		mut imported := ioctl.DrmPrimeHandle{handle: 55, flags: ~u32(0), fd: -1}
 		assert ioctl_prime_fd_to_handle(&device, client, &imported) == -9
 		assert imported.handle == 55
@@ -142,7 +182,8 @@ fn check_prime_descriptors() {
 		file.assert_reservations(0)
 		prime_exported = unsafe { nil }
 	}
-	assert prime_custom_puts == 205
+	assert prime_custom_puts == 207
 	println('DRM PRIME seek: 72 syscall cases cover size, zero, invalid seeks, O_PATH and unchanged position')
+	println('DRM PRIME fstat: duplicate and re-export identities agree, distinct GEMs with reused handles differ')
 	println('DRM PRIME: 400 private refusals, reservation order, wrapper and fd failure cleanup, import errors and concurrent close passed')
 }

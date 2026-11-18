@@ -265,6 +265,7 @@ __global (
 	registered_devices [64]&DrmDevice
 	next_dev_id        = u32(0)
 	drm_devices_lock   klock.Lock
+	prime_stat_dev_id  u64
 )
 
 fn decode_ioctl_cmd(request u64) ?u32 {
@@ -935,6 +936,15 @@ fn ioctl_syncobj_create(handle voidptr, data voidptr) int {
 	return 0
 }
 
+fn prime_stat_device() u64 {
+	drm_devices_lock.acquire()
+	defer { drm_devices_lock.release() }
+	if prime_stat_dev_id == 0 {
+		prime_stat_dev_id = resource.create_dev_id()
+	}
+	return prime_stat_dev_id
+}
+
 fn put_prime_object(dev &DrmDevice, obj &gem.GemObject) {
 	if dev != unsafe { nil } && dev.driver != unsafe { nil }
 		&& dev.driver.gem_export_put != unsafe { nil } {
@@ -962,6 +972,9 @@ fn create_prime_fd(dev &DrmDevice, obj &gem.GemObject, flags u32, reservation &f
 	mut wrapper := unsafe { &GemPrimeResource(allocation) }
 	unsafe { *wrapper = GemPrimeResource{
 		stat: stat.Stat{
+			dev: prime_stat_device()
+			// GEM offsets are globally unique and never reused, even if a handle is.
+			ino: gem.create_mmap_offset(obj) / page_size
 			mode: stat.ifreg | 0o600
 			size: i64(obj.size)
 			blksize: i64(4096)
