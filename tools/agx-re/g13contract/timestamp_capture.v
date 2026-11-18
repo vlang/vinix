@@ -42,7 +42,9 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		require_order(body, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'mgr.g13_timestamp.'], 'Global timestamp allocator serialization')!
 	}
 	mapper := section(gpu, 'pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(', 'pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(', 'Native timestamp aperture')!
-	require_order(mapper, ['mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }',
+	require_order(mapper, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
+		'if mgr.state == .stopped { return -19, 0 }',
+		'mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }',
 		'code := uat_mgr.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)', 'if code != 0',
 		'mgr.g13_timestamp.cancel_unpublished(va)', 'return code, 0', 'return 0, va'],
 		'Timestamp aperture exhaustion and page-table status propagate through BIND')!

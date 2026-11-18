@@ -561,6 +561,9 @@ pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) (int, u
 		|| size & pgtable.uat_pg_mask != 0 || uat_mgr == unsafe { nil } {
 		return -12, 0
 	}
+	// An ioctl can reach this lock after DRM unregister. Shutdown holds
+	// the same lock from the stopped transition through firmware teardown.
+	if mgr.state == .stopped { return -19, 0 }
 	va := mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }
 	code := uat_mgr.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)
 	if code != 0 {

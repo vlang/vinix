@@ -240,7 +240,7 @@ fn check_timestamp_bindings() {
 			assert file.ioctl_gem_bind_object(unsafe { &bad }) == -22 && bad == before
 			assert gpu.maps() == maps && gpu.lookups() == lookups && shared.references == 1 && !file.lock.is_held(); cases++
 		}
-		for map_error in [-12, -16, -28]! {
+		for map_error in [-12, -16, -19, -28]! {
 			gpu.fail_timestamp_map(map_error)
 			request := timestamp_bind(shared.handle, ~u32(0), 0, page, ioctl.asahi_bind_object_usage_timestamps)
 			saved := request
@@ -275,5 +275,5 @@ fn check_timestamp_bindings() {
 		assert file.close() && foreign.close() && gem.live() == 0
 		assert gpu.unmaps() == unmaps_before_close + 2
 	}
-	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, ENOMEM, EBUSY and ENOSPC under both ABIs, missing/zero/foreign unbind names, retained unavailable-manager owners, header precedence, lowest-free name reuse, sibling preservation and final release passed')
+	println('AGX timestamp object validation: ${cases} ioctl checks; output-only bind handles, checked overflow before BO lookup, empty-range lookup precedence, private/bounds refusal, ENOMEM, EBUSY, ENODEV and ENOSPC under both ABIs, missing/zero/foreign unbind names, retained unavailable-manager owners, header precedence, lowest-free name reuse, sibling preservation and final release passed')
 }

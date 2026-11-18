@@ -131,7 +131,7 @@ shutdown holding that lock. All paths release it; formatting asserts it is free.
 The snapshot does not serialize the subsequent user copy with later device loss.
 These injected lock schedules do not qualify native multi-CPU crash publication.
 
-Timestamp-object validation runs 184,600 ioctl checks. BIND ignores the initial
+Timestamp-object validation runs 185,000 ioctl checks. BIND ignores the initial
 output handle, checks offset/range overflow before BO lookup and rejects empty
 ranges after lookup. UNBIND resolves zero/missing/foreign names to ENOENT before
 manager lookup. A successful UNBIND hides the handle when the manager is

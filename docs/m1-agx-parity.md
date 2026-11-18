@@ -368,6 +368,29 @@ inventory verification against the retained original.
 `bundle.tar.gz` SHA-256 is
 `01d8d45549f261eb637ac6ac6c1ead83ae089cd7a07a97d9c985ece3f7a72198`.
 
+Both G13 timestamp ioctl ABIs return `ENODEV` if the manager has
+stopped by the time a valid BIND reaches the mapper. The check holds
+the shutdown lock and precedes VA reservation and page-table writes.
+Linux DRM rejects ioctls on unplugged devices at entry.
+[Pinned DRM ioctl admission](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_ioctl.c#L844-L851)
+
+The sanitizer suite passed 100 simulated shutdown lock races and
+185,000 timestamp ioctl checks. Existing mappings could still be
+retired while stopped. The compiled baseline failed the stopped-map
+assertion. Both kernel builds and 82 test files passed. The allocation
+scan reproduced 178 baseline findings. Mapping publication after a
+successful pre-stop map and cleanup across permanent teardown remain
+open. The full source audit remains `not_equivalent`. No hardware tests
+or reboots ran.
+
+Evidence for `cef64c6b5c9c0c34caef9d631af50a296eacec9c` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-stop-20261118/`.
+The archive passed full inventory verification. The native outputs
+are stored in `native-builds.tar.gz` and verified against their original
+hashes. `bundle.tar.gz` SHA-256 is
+`5090cd359d9efa10d72723d088973e51f57f18bc940eaac5df5d2e67a562f926`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

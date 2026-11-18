@@ -68,6 +68,13 @@ pub fn check_timestamp_serialization() {
 		expect_timestamp_map_error(mut manager, 0x200000, 0x4000, -12)
 		assert manager.g13_timestamp.allocations == 0
 		uat_mgr = unsafe { &uat }
+		before_stop := stop_count()
+		maps_before_stop := uat.timestamp_map_calls
+		stop_during_mapping_lock()
+		expect_timestamp_map_error(mut manager, 0x200000, 0x4000, -19)
+		assert stop_count() == before_stop + 1 && manager.g13_timestamp.allocations == 0
+		assert uat.timestamp_map_calls == maps_before_stop
+		manager.state = .running
 		manager.g13_timestamp.reject = true
 		before_maps := uat.timestamp_map_calls
 		expect_timestamp_map_error(mut manager, 0x200000, 0x4000, -28)
@@ -92,14 +99,17 @@ pub fn check_timestamp_serialization() {
 			manager.checked_timestamp_unmap(invalid_va, size)
 			assert !timestamp_lock_held() && manager.g13_timestamp.releases == before
 		}
+		manager.state = .stopped
 		manager.checked_timestamp_unmap(va, 0x4000)
 		assert !timestamp_lock_held() && manager.g13_timestamp.releases == before + 1
 		assert manager.g13_timestamp.collections == 1 && manager.g13_timestamp.heap.allocations.len == 0
 		unsafe { manager.g13_timestamp.heap.allocations.free() }
+		manager.state = .running
 	}
 	check_timestamp_aperture_capacity(mut manager, mut uat)
 	uat_mgr = unsafe { nil }
 	println('G13 timestamp allocator: 100 cycles distinguish ENOSPC, ENOMEM and EBUSY, cancel failed maps without collection and reuse their VA under balanced locks')
+	println('G13 timestamp shutdown: 100 lock races reject late maps with ENODEV before allocation or UAT writes and retire existing mappings while stopped')
 }
 
 fn check_timestamp_aperture_capacity(mut manager GpuManager, mut uat mmu.UatManager) {
