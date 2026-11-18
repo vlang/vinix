@@ -81,6 +81,7 @@ pub mut:
 	fd i32
 }
 
+pub const sync_ioc_merge = u32(0xc0303e03)
 pub const sync_ioc_file_info = u32(0xc0383e04)
 pub const sync_ioc_set_deadline = u32(0x40103e05)
 
@@ -88,6 +89,15 @@ pub struct SyncSetDeadline {
 pub mut:
 	deadline_ns u64
 	pad u64
+}
+
+pub struct SyncMergeData {
+pub mut:
+	name [32]u8
+	fd2 i32
+	fence i32
+	flags u32
+	pad u32
 }
 
 // include/uapi/linux/sync_file.h. These fixed-width layouts are shared by
@@ -773,7 +783,7 @@ pub fn validate_asahi_25_layouts() bool {
 		&& sizeof(DrmSyncobjDestroy) == 8 && sizeof(DrmSyncobjHandle) == 24
 		&& sizeof(DrmSyncobjWait) == 40 && sizeof(DrmSyncobjArray) == 16
 		&& sizeof(SyncFileInfo) == 56 && sizeof(SyncFenceInfo) == 80
-		&& sizeof(SyncSetDeadline) == 16
+		&& sizeof(SyncSetDeadline) == 16 && sizeof(SyncMergeData) == 48
 		&& sizeof(DrmAsahiParamsGlobal) == 432
 		&& sizeof(DrmAsahiGetParams) == 32 && sizeof(DrmAsahiVmCreate) == 32
 		&& sizeof(DrmAsahiVmDestroy) == 16 && sizeof(DrmAsahiGemCreate) == 32

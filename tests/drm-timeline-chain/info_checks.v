@@ -26,18 +26,18 @@ pub fn run_chain_info_checks() {
 		mut header := ioctl.SyncFileInfo{}
 		mut details := [2]ioctl.SyncFenceInfo{}
 		prepare_info(unsafe { &header }, unsafe { &details[0] }, 0)
-		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }) == 0
+		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }, unsafe { nil }) == 0
 		assert header.num_fences == 2 && header.status == 0 && usercopy.writes == 1
 		check_info_name(unsafe { &header.name[0] }, 'dma_fence_chain-unbound${n2.context}-20', 0xa5)
 		prepare_info(unsafe { &header }, unsafe { &details[0] }, 1)
 		attempts := memory.attempts()
-		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }) == -22
+		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }, unsafe { nil }) == -22
 		assert memory.attempts() == attempts && usercopy.writes == 0
 		prepare_info(unsafe { &header }, unsafe { &details[0] }, 2)
 		memory.fail_next()
-		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }) == -12 && usercopy.writes == 0
+		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }, unsafe { nil }) == -12 && usercopy.writes == 0
 		prepare_info(unsafe { &header }, unsafe { &details[0] }, 2)
-		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }) == 0
+		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }, unsafe { nil }) == 0
 		assert header.num_fences == 2 && header.status == 0
 		for detail in details { assert detail.status == 0 && detail.timestamp_ns == 0 && detail.flags == 0 }
 		// Retirement between the count and fill passes shrinks num_fences but
@@ -52,7 +52,7 @@ pub fn run_chain_info_checks() {
 			usercopy.allow_output(unsafe { u64(&header) }, sizeof(header))
 			usercopy.allow_output(unsafe { u64(&details[0]) }, sizeof(ioctl.SyncFenceInfo))
 		}
-		code := sync_file_info_ioctl(n2, unsafe { u64(&header) })
+		code := sync_file_info_ioctl(n2, unsafe { u64(&header) }, unsafe { nil })
 		assert code == if fault == 0 { 0 } else { -14 }
 		assert memory.outstanding() == 2, 'only two retained chain nodes remain'
 		if fault == 0 {
@@ -61,9 +61,9 @@ pub fn run_chain_info_checks() {
 		}
 		syncobj.signal_error(&second, -19)
 		prepare_info(unsafe { &header }, unsafe { &details[0] }, 0)
-		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }) == 0 && header.status == 1
+		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }, unsafe { nil }) == 0 && header.status == 1
 		prepare_info(unsafe { &header }, unsafe { &details[0] }, 2)
-		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }) == 0
+		assert sync_file_info_ioctl(n2, unsafe { u64(&header) }, unsafe { nil }) == 0
 		assert header.num_fences == 1 && header.status == -19 && details[0].status == -19
 		assert details[0].timestamp_ns != 0 && details[0].flags == 0
 		// Fixture-only retirement after all synchronous handlers and child

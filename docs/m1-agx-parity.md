@@ -956,14 +956,46 @@ and close racing fence completion. Independent review checked callback
 lifetimes and lock order. The allocation scan matched the baseline, and
 eight generated poll and callback functions contained no implicit
 allocations on either architecture. All selected offline source gates
-passed. The verdict remains `not_equivalent`. GPU submission integration
-and native M1 validation remain open.
+passed. The verdict remains `not_equivalent`.
 
 The restored archive passed inventory and kernel artifact verification for
 `3ca15ca9c56da874444d73e25fc28e9c49368f62` plus `source.diff`. Evidence is in
 `/Users/alex/.local/state/vinix/omarchy-m1-prime-poll-20261118.pf6uzU/`.
 `bundle.tar.gz` SHA-256 is
 `6d470684cd1b3f851be3bceeeeeed09ed4583ac3e57d80f5817b1073793c0c9a`.
+
+Sync-file descriptors accept `SYNC_IOC_MERGE`, including descriptors
+exported from PRIME buffers. The new close-on-exec descriptor holds a flat
+snapshot of the pending fences from both inputs. Repeated references
+collapse, and independently completing G13 fences retain distinct
+dependencies. An already-completed pair yields a private completed fence
+with the latest source timestamp. `SYNC_IOC_FILE_INFO` reports the name
+assigned by the merge. The descriptor table reserves the fd before
+copying the request and publishes it after successful copyout.
+[Pinned sync-file ioctl](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/sync_file.c#L213-L267) [Pinned fence merge](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/dma-buf/dma-fence-unwrap.c#L121-L206)
+
+The pinned G13 queue takes explicit dependencies from the input sync
+objects. The host fixture imported a merged descriptor, staged it through
+native G13 input handling, and checked dependency readiness after closing
+the source descriptors and destroying the syncobj handle. Close reclaims
+private merge metadata, and successful syncobj import adopts it into the
+existing retained-fence lifetime. GPUVM reservation bookkeeping and
+hardware validation remain open.
+[Pinned G13 job dependencies](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L800-L836)
+
+Both kernel builds, all 82 focused V test files, the DRM wire checks and the
+sanitizer fixtures passed. The merge tests exercised full descriptor tables,
+allocation failure, partial copyout and private-fence cleanup. Independent
+review checked source ownership and descriptor publication. The allocation
+scan found no new implicit sites, and the generated C check covered nine
+merge and snapshot routines on both architectures. The selected offline
+source gates passed. The audit verdict remains `not_equivalent`.
+
+The restored archive passed inventory and kernel artifact verification for
+`a48f787942405e6d2c99816ae1e913d6eac6a012` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-sync-file-merge-20261118.RNka1k/`.
+`bundle.tar.gz` SHA-256 is
+`831ef001ffbface04b1e564dc0a0fed35ead1c1e6f814422443aee5a87227786`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

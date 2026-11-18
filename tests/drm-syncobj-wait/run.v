@@ -88,6 +88,7 @@ fn main() {
 	os.cp('${repo}/kernel/drm/syncobj_fd.v', '${scratch}/drm/syncobj_fd.v')!
 	os.cp('${repo}/kernel/drm/syncobj_eventfd.v', '${scratch}/drm/syncobj_eventfd.v')!
 	os.cp('${repo}/kernel/drm/sync_file_info.v', '${scratch}/drm/sync_file_info.v')!
+	os.cp('${repo}/kernel/drm/sync_file_merge.v', '${scratch}/drm/sync_file_merge.v')!
 	os.cp('${repo}/kernel/drm/sync_file_deadline.v', '${scratch}/drm/sync_file_deadline.v')!
 	query_source := os.getenv_opt('DRM_QUERY_SOURCE') or { repo + '/kernel/drm/syncobj_query.v' }
 	os.cp(query_source, scratch + '/drm/syncobj_query.v')!
@@ -108,6 +109,7 @@ fn main() {
 		section(submission, 'pub struct SyncArray {', 'pub struct Command {')! +
 		section(submission, 'pub fn stage_sync_array(', '// Snapshot one descriptor')!)!
 	os.cp('${repo}/kernel/gpu/agx/submission/sync_storage.v', '${scratch}/gpu/agx/submission/sync_storage.v')!
+	os.cp('${repo}/kernel/gpu/agx/submission/dependencies.v', '${scratch}/gpu/agx/submission/dependencies.v')!
 	os.cp('${repo}/kernel/gpu/agx/submission/modern.v', '${scratch}/gpu/agx/submission/modern.v')!
 	os.cp_all('${repo}/kernel/drm/asahi', '${scratch}/drm/asahi', false)!
 	os.write_file('${scratch}/drm/registration.v', 'module drm\nimport drm.ioctl\n' +

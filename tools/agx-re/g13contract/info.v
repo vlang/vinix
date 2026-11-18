@@ -3,7 +3,7 @@ module g13contract
 
 fn check_sync_file_info_contract(drm string, uapi string, implementation string, snapshot string, stub string) ! {
 	request := section(drm, 'fn (mut this SyncFileResource) ioctl(', 'fn (mut this SyncFileResource) unref(', 'Sync-file info dispatch')!
-	require_order(request, ['if u32(request) == ioctl.sync_ioc_file_info', 'sync_file_info_ioctl(this.fence, u64(argp))',
+	require_order(request, ['if u32(request) == ioctl.sync_ioc_file_info', 'sync_file_info_ioctl(this.fence, u64(argp), unsafe { &this.name[0] })',
 		'errno.set(u64(-result))', 'resource.default_ioctl'], 'Typed sync-file info dispatch')!
 	require(integer_constant(uapi, 'sync_ioc_file_info', 'Sync-file info command')! == 0xc0383e04, 'Sync-file info command changed')!
 	for pair in [['pub struct SyncFileInfo {', 'pub struct SyncFenceInfo {', 'name [32]u8', 'status i32', 'flags u32', 'num_fences u32', 'pad u32', 'sync_fence_info u64'],

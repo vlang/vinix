@@ -61,7 +61,7 @@ fn sync_info_names(file_name &u8, obj_name &u8, driver_name &u8, info &syncobj.F
 
 // Unwrap retained chains head-first, as dma_fence_unwrap does. Retirement can
 // shrink the second pass, but immutable links cannot add records after count.
-fn sync_file_info_ioctl(fence &syncobj.DmaFence, address u64) int {
+fn sync_file_info_ioctl(fence &syncobj.DmaFence, address u64, name &u8) int {
 	mut info := ioctl.SyncFileInfo{}
 	if !usercopy.copy_from_user(unsafe { &info }, address, sizeof(ioctl.SyncFileInfo)) { return -14 }
 	if info.flags != 0 || info.pad != 0 { return -22 }
@@ -102,9 +102,16 @@ fn sync_file_info_ioctl(fence &syncobj.DmaFence, address u64) int {
 		// order when the later copy fails or the two user ranges overlap.
 		if !usercopy.copy_to_user(info.sync_fence_info, details, bytes) { return -14 }
 	}
-	state := syncobj.identity(fence)
-	mut names := ioctl.SyncFenceInfo{}
-	sync_info_names(unsafe { &info.name[0] }, unsafe { &names.obj_name[0] }, unsafe { &names.driver_name[0] }, unsafe { &state })
+	if name != unsafe { nil } && unsafe { name[0] } != 0 {
+		for i in 0 .. info.name.len {
+			info.name[i] = unsafe { name[i] }
+			if info.name[i] == 0 { break }
+		}
+	} else {
+		state := syncobj.identity(fence)
+		mut names := ioctl.SyncFenceInfo{}
+		sync_info_names(unsafe { &info.name[0] }, unsafe { &names.obj_name[0] }, unsafe { &names.driver_name[0] }, unsafe { &state })
+	}
 	info.num_fences = count
 	if !usercopy.copy_to_user(address, unsafe { &info }, sizeof(ioctl.SyncFileInfo)) { return -14 }
 	return 0

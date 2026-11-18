@@ -52,20 +52,43 @@ fn merge_stub(timestamp u64) ?&DmaFence {
 // The caller owns a new stub/array reservation until add_chain_point retains
 // it. Existing single pending leaves are borrowed and never reclaimed here.
 pub fn unwrap_merge(head &DmaFence) ?&DmaFence {
+	return unwrap_merge_roots(head, unsafe { nil })
+}
+
+pub struct SyncFileMerge {
+pub:
+	fence &DmaFence = unsafe { nil }
+	owned bool
+}
+
+// The caller holds both source descriptors while flattening their roots.
+// The new descriptor owns any allocated result, including a completed stub.
+pub fn merge_sync_file_fences(first &DmaFence, second &DmaFence) ?SyncFileMerge {
+	fence := unwrap_merge_roots(first, second) or { return none }
+	owned := fence.merge_reserved
+	if owned { adopt_sync_file_snapshot(fence) }
+	return SyncFileMerge{fence: fence, owned: owned}
+}
+
+fn unwrap_merge_roots(first &DmaFence, second &DmaFence) ?&DmaFence {
+	heads := [first, second]!
 	mut cursor := unsafe { &FenceUnwrap(C.__builtin_alloca(sizeof(FenceUnwrap))) }
 	mut count := u32(0)
 	mut timestamp := u64(0)
 	mut single := &DmaFence(unsafe { nil })
-	mut leaf := unwrap_first(head, cursor)
-	for leaf != unsafe { nil } {
-		if !is_signaled(leaf) {
-			if count == u32(0x7fff_ffff) { return none }
-			count++; single = unsafe { leaf }
-		} else {
-			info := identity(leaf)
-			if info.timestamp_ns > timestamp { timestamp = info.timestamp_ns }
+	for head in heads {
+		mut leaf := unwrap_first(head, cursor)
+		for leaf != unsafe { nil } {
+			if !is_signaled(leaf) {
+				if count == u32(0x7fff_ffff) { return none }
+				count++
+				single = unsafe { leaf }
+			} else {
+				info := identity(leaf)
+				if info.timestamp_ns > timestamp { timestamp = info.timestamp_ns }
+			}
+			leaf = unwrap_next(cursor)
 		}
-		leaf = unwrap_next(cursor)
 	}
 	if count == 0 { return merge_stub(timestamp) }
 	if count == 1 { return single }
@@ -75,14 +98,16 @@ pub fn unwrap_merge(head &DmaFence) ?&DmaFence {
 	mut owned := true
 	defer { if owned { memory.free(storage) } }
 	count = 0
-	leaf = unwrap_first(head, cursor)
-	for leaf != unsafe { nil } {
-		if !is_signaled(leaf) { unsafe { items[count] = leaf }; count++ }
-		else {
-			info := identity(leaf)
-			if info.timestamp_ns > timestamp { timestamp = info.timestamp_ns }
+	for head in heads {
+		mut leaf := unwrap_first(head, cursor)
+		for leaf != unsafe { nil } {
+			if !is_signaled(leaf) { unsafe { items[count] = leaf }; count++ }
+			else {
+				info := identity(leaf)
+				if info.timestamp_ns > timestamp { timestamp = info.timestamp_ns }
+			}
+			leaf = unwrap_next(cursor)
 		}
-		leaf = unwrap_next(cursor)
 	}
 	if count == 0 { return merge_stub(timestamp) }
 	if count == 1 { return unsafe { items[0] } }

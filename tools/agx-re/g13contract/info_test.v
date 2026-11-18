@@ -23,6 +23,6 @@ fn test_info_guard_rejects_layout_copy_order_status_provenance_and_cleanup_drift
 	for token in ['sync_ioc_file_info = u32(0xc0383e04)', 'num_fences u32', 'timestamp_ns u64'] {
 		if _ := check_sync_file_info_contract(drm, uapi.replace(token, ''), implementation, snapshot, stub) { assert false, token }
 	}
-	if _ := check_sync_file_info_contract(drm.replace('sync_file_info_ioctl(this.fence, u64(argp))', ''), uapi, implementation, snapshot, stub) { assert false }
+	if _ := check_sync_file_info_contract(drm.replace('sync_file_info_ioctl(this.fence, u64(argp), unsafe { &this.name[0] })', ''), uapi, implementation, snapshot, stub) { assert false }
 	if _ := check_sync_file_info_contract(drm, uapi, implementation, snapshot, stub.replace('fence.private_stub = true', '')) { assert false }
 }

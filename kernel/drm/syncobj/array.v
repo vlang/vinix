@@ -82,26 +82,31 @@ pub fn release_merge_reservation(fence &DmaFence) {
 // The sync file owns the array and pointer table. Borrowed leaves already
 // follow the published-fence lifetime. Each drainer entry pins the array.
 pub fn new_sync_file_snapshot(children &&DmaFence, count u32) ?&DmaFence {
-	mut fence := new_merge_array(children, count) or { return none }
-	fence.merge_reserved = false
-	fence.array_snapshot = true
-	fence.array_snapshot_refs = 1
+	fence := new_merge_array(children, count) or { return none }
+	adopt_sync_file_snapshot(fence)
 	return fence
+}
+
+fn adopt_sync_file_snapshot(fence &DmaFence) {
+	mut f := unsafe { fence }
+	f.merge_reserved = false
+	f.file_snapshot = true
+	f.file_snapshot_refs = 1
 }
 
 // Before a snapshot escapes its descriptor into a syncobj, transfer it to
 // the published-fence lifetime. The caller holds the source FD reference.
 pub fn retain_sync_file_snapshot(fence &DmaFence) {
-	if fence.array_snapshot {
+	if fence.file_snapshot {
 		mut f := unsafe { fence }
-		katomic.store(mut &f.array_snapshot_retained, true)
+		katomic.store(mut &f.file_snapshot_retained, true)
 	}
 }
 
 fn release_snapshot_reference(fence &DmaFence) {
 	mut f := unsafe { fence }
-	if !katomic.dec(mut &f.array_snapshot_refs) {
-		memory.free(voidptr(fence.array_fences))
+	if !katomic.dec(mut &f.file_snapshot_refs) {
+		if fence.fence_array { memory.free(voidptr(fence.array_fences)) }
 		memory.free(voidptr(fence))
 	}
 }
@@ -109,7 +114,7 @@ fn release_snapshot_reference(fence &DmaFence) {
 // Last sync-file reference. Detach each borrowed child link under the same
 // lock used for completion. A drainer may still own an independent reference.
 pub fn release_sync_file_snapshot(fence &DmaFence) {
-	if katomic.load(&fence.array_snapshot_retained) { return }
+	if katomic.load(&fence.file_snapshot_retained) { return }
 	if katomic.load(&fence.array_enabled) {
 		for index := u32(0); index < fence.array_count; index++ {
 			mut child := unsafe { fence.array_fences[index] }

@@ -113,6 +113,7 @@ pub mut:
 	status   int
 	can_mmap bool
 	fence    &syncobj.DmaFence = unsafe { nil }
+	name [32]u8
 	owns_snapshot bool
 	poll_event syncobj.FenceEvent
 	box &resource.Resource = unsafe { nil }
@@ -240,8 +241,13 @@ fn (mut this SyncFileResource) write(_handle voidptr, _buf voidptr, _loc u64, _c
 }
 
 fn (mut this SyncFileResource) ioctl(handle voidptr, request u64, argp voidptr) ?int {
+	if u32(request) == ioctl.sync_ioc_merge {
+		result := sync_file_merge_ioctl(this.fence, u64(argp))
+		if result < 0 { errno.set(u64(-result)); return none }
+		return result
+	}
 	if u32(request) == ioctl.sync_ioc_file_info {
-		result := sync_file_info_ioctl(this.fence, u64(argp))
+		result := sync_file_info_ioctl(this.fence, u64(argp), unsafe { &this.name[0] })
 		if result < 0 { errno.set(u64(-result)); return none }
 		return result
 	}
@@ -1066,7 +1072,7 @@ pub fn create_sync_file_fd(fence &syncobj.DmaFence) ?int {
 }
 
 fn create_sync_file_fd_at(fence &syncobj.DmaFence, reservation &file.FdReservation) ?int {
-	mut fd := new_sync_file_fd(fence, false) or { return none }
+	mut fd := new_sync_file_fd(fence, false, unsafe { nil }) or { return none }
 	if reservation != unsafe { nil } {
 		return file.fdnum_install_reserved_fd(reservation, fd) or { fd.unref(); return none }
 	}
@@ -1074,7 +1080,7 @@ fn create_sync_file_fd_at(fence &syncobj.DmaFence, reservation &file.FdReservati
 }
 
 // If owns_snapshot is set, construction consumes the snapshot on every path.
-fn new_sync_file_fd(fence &syncobj.DmaFence, owns_snapshot bool) ?&file.FD {
+fn new_sync_file_fd(fence &syncobj.DmaFence, owns_snapshot bool, name &u8) ?&file.FD {
 	if fence == unsafe { nil } {
 		return none
 	}
@@ -1090,6 +1096,9 @@ fn new_sync_file_fd(fence &syncobj.DmaFence, owns_snapshot bool) ?&file.FD {
 		owns_snapshot: owns_snapshot
 		status: if syncobj.is_signaled(fence) { file.pollin } else { 0 }
 	} }
+	if name != unsafe { nil } {
+		unsafe { C.memcpy(&wrapper.name[0], name, sizeof(wrapper.name)) }
+	}
 	box := memory.malloc_packed_fallible(sizeof(resource.Resource))
 	if box == unsafe { nil } {
 		memory.free(allocation)

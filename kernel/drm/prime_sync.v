@@ -81,18 +81,9 @@ fn prime_export_sync_file(object &gem.GemObject, address u64) int {
 	defer { file.cancel_fd_reservation(unsafe { &reservation }) }
 
 	snapshot := capture_prime_fences(object, u64(request.flags) & ioctl.dma_buf_sync_write != 0) or { return -12 }
-	mut fd := new_sync_file_fd(snapshot.fence, snapshot.owned) or { return -int(errno.get()) }
+	mut fd := new_sync_file_fd(snapshot.fence, snapshot.owned, unsafe { nil }) or { return -int(errno.get()) }
 	request.fd = i32(number)
-	if !usercopy.copy_to_user(address, unsafe { &request }, sizeof(request)) {
-		fd.unref()
-		return -14
-	}
-	file.fdnum_install_reserved_fd(unsafe { &reservation }, fd) or {
-		code := errno.get()
-		fd.unref()
-		return -int(code)
-	}
-	return 0
+	return publish_sync_file_fd(mut fd, unsafe { &reservation }, address, unsafe { &request }, sizeof(request))
 }
 
 struct PrimeSnapshot {

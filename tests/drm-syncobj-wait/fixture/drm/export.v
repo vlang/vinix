@@ -15,6 +15,7 @@ pub fn run_export_reservation_checks() {
 	check_prime_reservation_waits()
 	check_prime_sync_file_exports()
 	check_prime_poll()
+	check_sync_file_merge()
 	mut checks := 0
 	for _ in 0 .. 200 {
 		memory.reset(); proc.reset()

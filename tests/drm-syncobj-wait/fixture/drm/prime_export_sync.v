@@ -60,8 +60,9 @@ fn check_prime_sync_file_exports() {
 	assert poll_descriptor(empty) == file.pollin
 	file.close(empty)
 
-	writer := make_fence()
-	reader := make_fence()
+	context := syncobj.new_queue_context() or { panic('PRIME source queue') }
+	writer := remember_fence(syncobj.new_queue_fence(7, 1, context))
+	reader := remember_fence(syncobj.new_queue_fence(7, 2, context))
 	prime_add_export_leaf(mut prime, writer, 2)
 	prime_add_export_leaf(mut prime, reader, 1)
 	read := prime_export_result(mut prime, 1, 0)
@@ -124,6 +125,9 @@ fn check_prime_sync_file_exports() {
 	assert syncobj.array_count_for_checks(root) == 2 && !syncobj.is_signaled(root)
 	assert poll_descriptor(write) == 0 && descriptor_generation(write) == 0
 	write_fd.unref()
+	merged := merge_fd(write, read, 'PRIME dependencies')
+	query_merge_info(merged, 'PRIME dependencies', 2, 0)
+	file.close(merged)
 
 	target := make_object(0)
 	mut request := ioctl.DrmSyncobjHandle{handle: ~u32(0), fd: i32(write), flags: 1}

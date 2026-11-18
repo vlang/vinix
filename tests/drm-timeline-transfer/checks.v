@@ -116,7 +116,7 @@ pub fn run_timeline_transfer_checks() {
 		mut details := [8]ioctl.SyncFenceInfo{}
 		prepare_info(unsafe { &header }, unsafe { &details[0] }, u32(count))
 		usercopy.allow_output(unsafe { u64(&details[0]) }, sizeof(details))
-		assert sync_file_info_ioctl(head, unsafe { u64(&header) }) == 0
+		assert sync_file_info_ioctl(head, unsafe { u64(&header) }, unsafe { nil }) == 0
 		assert header.num_fences == syncobj.array_count_for_checks(payload)
 		for index in 0 .. count {
 			if !done { syncobj.signal_error(leaves[index], -19) }
