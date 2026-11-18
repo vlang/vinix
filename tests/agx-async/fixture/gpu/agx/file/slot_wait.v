@@ -8,12 +8,14 @@ import drm.syncobj
 import errno
 import event
 import gpu.agx.gpu
+import gpu.agx.mmu
 import proc
 import time
 
 enum SlotWake {
 	release
 	release_before_wait
+	replace_global_uat
 	firmware_switch
 	signal
 	masked_signal
@@ -27,6 +29,7 @@ enum SlotWake {
 __global waiting_file &GpuFile = unsafe { nil }
 __global slot_wake SlotWake
 __global replacement_result &gem.GemObject = unsafe { nil }
+__global slot_test_replacement_uat mmu.UatManager
 
 fn wake_waiting_submitter() {
 	mut manager := gpu.get_global_manager() or { panic('manager') }
@@ -42,6 +45,10 @@ fn wake_waiting_submitter() {
 	mut task := proc.current_thread()
 	match slot_wake {
 		.release { uat_mgr.make_slot_available() }
+		.replace_global_uat {
+			uat_mgr.make_slot_available()
+			mmu.select_test_uat(unsafe { &slot_test_replacement_uat })
+		}
 		.firmware_switch { uat_mgr.occupied = false }
 		.signal { task.pending = 1 }
 		.masked_signal {
@@ -84,7 +91,7 @@ fn submit_slot_wait_packet(mut file GpuFile, queue_id u32, cdm_barrier u16, out 
 
 fn check_g13_slot_wait() {
 	for modern in [false, true]! {
-		for reason in [SlotWake.release, .release_before_wait, .firmware_switch, .signal, .masked_signal,
+		for reason in [SlotWake.release, .release_before_wait, .replace_global_uat, .firmware_switch, .signal, .masked_signal,
 			.group_stop, .thread_exit, .device_stop, .mapping_failure, .reuse_result_handle]! {
 			if modern && reason == .reuse_result_handle { continue }
 			gpu.reset()
@@ -105,6 +112,7 @@ fn check_g13_slot_wait() {
 			waiting_file = file
 			slot_wake = reason
 			uat_mgr.occupied = true
+			original_uat := uat_mgr
 			slot_attempts := uat_mgr.acquire_attempts
 			private_before, generations_before := event.wait_counts()
 			if reason == .release_before_wait {
@@ -116,6 +124,11 @@ fn check_g13_slot_wait() {
 				submit_slot_wait_packet(mut file, 1, asahi.barrier_none, out)
 			} else {
 				submit(mut file, 1, false, unsafe { nil }, out, true)
+			}
+			if reason == .replace_global_uat {
+				assert voidptr(uat_mgr) != voidptr(original_uat)
+				assert uat_mgr.acquire_attempts == 0 && uat_mgr.lease_count == 0
+				mmu.select_test_uat(original_uat)
 			}
 			assert !file.lock.is_held() && !manager.lock.is_held()
 			assert uat_mgr.lease_count == 0 && time.armed() == 0
@@ -156,5 +169,5 @@ fn check_g13_slot_wait() {
 			uat_mgr.occupied = false
 		}
 	}
-	println('G13 slot admission: both ioctl ABIs resumed after release and timer; signal, group stop, device stop, mapping retry and retained result target passed')
+	println('G13 slot admission: both ABIs retain the original UAT across a global swap and handle release, timer, interruption, shutdown and mapping retry')
 }

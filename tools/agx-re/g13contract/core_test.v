@@ -7,6 +7,19 @@ fn test_order_accepts_repeated_tokens() {
 	require_order('flush reprotect flush unmap flush', ['flush', 'flush', 'flush'], 'sample')!
 }
 
+fn test_retired_g13_slots_require_root_invalidation_and_shutdown_exclusion() {
+	root := g13layout.repo_root()
+	mmu := read(root + '/kernel/gpu/agx/mmu/mmu.v')!
+	gpu := read(root + '/kernel/gpu/agx/gpu/gpu.v')!
+	check_g13_slot_retirement_local(mmu, gpu)!
+	for token in ['if mgr.g13_slots_retired ||', 'slots[slot].ttb0 = 0',
+		'if mgr.slot_users[slot] == 0 { mgr.contexts[slot] = unsafe { nil } }',
+		'event.trigger(mut mgr.slot_released, true)'] {
+		if _ := check_g13_slot_retirement_local(mmu.replace(token, ''), gpu) { assert false, token }
+	}
+	if _ := check_g13_slot_retirement_local(mmu, gpu.replace('if retire_slots { uat.lock.acquire() }', '')) { assert false }
+}
+
 fn test_dependency_publication_rejects_callback_waits_and_missing_batch_gate() {
 	source := os.read_file(os.join_path(g13layout.repo_root(), 'kernel/gpu/agx/file/pending.v'))!
 	poll := section(source, 'fn poll_g13_pending(', '\n}\n', 'test poll')!

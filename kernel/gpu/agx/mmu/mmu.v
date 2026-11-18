@@ -143,6 +143,7 @@ mut:
 	slot_release      [uat_num_contexts]u64
 	slot_release_clock u64
 	slot_released      eventstruct.Event
+	g13_slots_retired  bool
 }
 
 __global (
@@ -720,7 +721,8 @@ pub fn (mgr &UatManager) bind_context(ctx &UatContext) u32 {
 	mut owner := unsafe { mgr }
 	owner.lock.acquire()
 	defer { owner.lock.release() }
-	if !mgr.handoff_initialized || ctx == unsafe { nil } || !ctx.active || ctx.pgtable == unsafe { nil } {
+	if mgr.g13_slots_retired || !mgr.handoff_initialized || ctx == unsafe { nil }
+		|| !ctx.active || ctx.pgtable == unsafe { nil } {
 		return 0
 	}
 	leased := mgr.handoff_abi == .v12_3
@@ -774,10 +776,36 @@ pub fn (mut mgr UatManager) release_g13_slot(ctx &UatContext, slot u32) {
 	assert voidptr(mgr.contexts[slot]) == voidptr(ctx) && mgr.slot_users[slot] != 0
 	mgr.slot_users[slot]--
 	if mgr.slot_users[slot] == 0 {
+		if mgr.g13_slots_retired {
+			mgr.contexts[slot] = unsafe { nil }
+			return
+		}
 		mgr.slot_release_clock++
 		mgr.slot_release[slot] = mgr.slot_release_clock
 		event.trigger_n(mut mgr.slot_released, 1)
 	}
+}
+
+// The GPU manager took mgr.lock before stopping the ASC, excluding any
+// thread using the firmware handoff lock. Retire hardware roots now. Job
+// and staging leases keep their software records until the users leave.
+pub fn (mut mgr UatManager) retire_g13_slots_locked() {
+	if mgr.handoff_abi != .v12_3 || mgr.g13_slots_retired { return }
+	mgr.g13_slots_retired = true
+	for slot in 1 .. uat_num_contexts {
+		ctx := mgr.contexts[slot]
+		if ctx == unsafe { nil } { continue }
+		unsafe {
+			mut slots := mgr.ttbs
+			slots[slot].ttb0 = 0
+			slots[slot].ttb1 = 0
+		}
+		cpu.dsb_sy()
+		mut pt := unsafe { ctx.pgtable }
+		pt.unbind_tlb()
+		if mgr.slot_users[slot] == 0 { mgr.contexts[slot] = unsafe { nil } }
+	}
+	event.trigger(mut mgr.slot_released, true)
 }
 
 // Caller holds mgr.lock.

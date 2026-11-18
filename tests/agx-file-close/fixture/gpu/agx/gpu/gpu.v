@@ -47,7 +47,7 @@ pub mut:
 	state State = .running
 	hw_config Config
 	g13_timestamp TimestampAllocator
-	g13_timestamp_uat &mmu.UatManager = unsafe { nil }
+	uat &mmu.UatManager = unsafe { nil }
 	timestamp_unmaps int
 	next_timestamp_va u64
 }

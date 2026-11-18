@@ -59,17 +59,17 @@ pub fn check_timestamp_serialization() {
 		manager.g13_timestamp = TimestampAllocator{
 			heap: alloc.new_heap('timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
 		}
-		manager.g13_timestamp_uat = unsafe { &uat }
+		manager.uat = unsafe { &uat }
 		manager.hw_config.gpu_gen = .g17
 		expect_timestamp_map_error(mut manager, 0x200000, 0x4000, -12)
 		manager.hw_config.gpu_gen = .g13
 		for physical, size in {u64(0x200001): u64(0x4000), u64(0x200002): u64(0), u64(0x200003): u64(0x4001)} {
 			expect_timestamp_map_error(mut manager, physical, size, -12)
 		}
-		manager.g13_timestamp_uat = unsafe { nil }
+		manager.uat = unsafe { nil }
 		expect_timestamp_map_error(mut manager, 0x200000, 0x4000, -12)
 		assert manager.g13_timestamp.allocations == 0
-		manager.g13_timestamp_uat = unsafe { &uat }
+		manager.uat = unsafe { &uat }
 		before_stop := stop_count()
 		maps_before_stop := uat.timestamp_map_calls
 		stop_during_mapping_lock()
@@ -109,7 +109,7 @@ pub fn check_timestamp_serialization() {
 	}
 	check_timestamp_aperture_capacity(mut manager, mut uat)
 	check_timestamp_aperture_teardown(mut manager, mut uat)
-	manager.g13_timestamp_uat = unsafe { nil }
+	manager.uat = unsafe { nil }
 	println('G13 timestamp allocator: 100 cycles distinguish ENOSPC, ENOMEM and EBUSY, cancel failed maps without collection and reuse their VA under balanced locks')
 	println('G13 timestamp shutdown: 100 lock races reject late maps with ENODEV before allocation or UAT writes')
 }
@@ -122,7 +122,7 @@ fn check_timestamp_aperture_teardown(mut manager GpuManager, mut original mmu.Ua
 		manager.g13_timestamp = TimestampAllocator{
 			heap: alloc.new_heap('old timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
 		}
-		manager.g13_timestamp_uat = unsafe { &original }
+		manager.uat = unsafe { &original }
 		code, va := manager.checked_timestamp_map(0x200000, unit)
 		unpublished_code, unpublished := manager.checked_timestamp_map(0x204000, unit)
 		assert code == 0 && unpublished_code == 0 && unpublished == va + unit
@@ -132,13 +132,13 @@ fn check_timestamp_aperture_teardown(mut manager GpuManager, mut original mmu.Ua
 		manager.retire_g13_timestamp_aperture_locked()
 		manager.lock.release()
 		assert original.timestamp_unmap_calls == before_stop + 2
-		assert manager.g13_timestamp.heap.allocations.len == 0 && manager.g13_timestamp_uat == unsafe { nil }
+		assert manager.g13_timestamp.heap.allocations.len == 0 && voidptr(manager.uat) == voidptr(original)
 		expect_timestamp_map_error(mut manager, 0x200000, unit, -19)
 
 		replacement.g13_timestamp = TimestampAllocator{
 			heap: alloc.new_heap('new timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
 		}
-		replacement.g13_timestamp_uat = unsafe { &replacement_uat }
+		replacement.uat = unsafe { &replacement_uat }
 		new_code, reused := replacement.checked_timestamp_map(0x208000, unit)
 		assert new_code == 0 && reused == va
 		before_late := replacement_uat.timestamp_unmap_calls
@@ -150,7 +150,7 @@ fn check_timestamp_aperture_teardown(mut manager GpuManager, mut original mmu.Ua
 		replacement.checked_timestamp_unmap(reused, unit)
 		assert replacement_uat.timestamp_unmap_calls == before_late + 1
 		unsafe { replacement.g13_timestamp.heap.allocations.free() }
-		replacement.g13_timestamp_uat = unsafe { nil }
+		replacement.uat = unsafe { nil }
 		manager.state = .running
 	}
 	println('G13 timestamp aperture teardown: 64 drains revoke mapped and unpublished VAs before replacement reuse and ignore old releases')

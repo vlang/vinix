@@ -35,20 +35,20 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 	require_order(mapper, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }',
 		'if mgr.state == .stopped { return -19, 0 }',
 		'mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }',
-		'code := mgr.g13_timestamp_uat.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)', 'if code != 0',
+		'code := mgr.uat.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)', 'if code != 0',
 		'mgr.g13_timestamp.cancel_unpublished(va)', 'return code, 0', 'return 0, va'],
 		'Timestamp aperture exhaustion and page-table status propagate through BIND')!
 	require(!mapper.contains('mgr.g13_timestamp.gc(') && !mapper.contains('mgr.g13_timestamp.release('),
 		'Failed timestamp map cancels only its unpublished VA')!
 	unmap := section(gpu, 'pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(', 'fn (mut mgr GpuManager) retire_g13_timestamp_aperture_locked(', 'Timestamp unmap')!
 	require_order(unmap, ['mgr.lock.acquire()', 'defer { mgr.lock.release() }', 'if mgr.state == .stopped',
-		'mgr.g13_timestamp_uat.unmap_kernel(va, size)', 'mgr.g13_timestamp.release(va)', 'mgr.g13_timestamp.gc()'],
+		'mgr.uat.unmap_kernel(va, size)', 'mgr.g13_timestamp.release(va)', 'mgr.g13_timestamp.gc()'],
 		'Late release skips PTEs and reservations retired by shutdown')!
 	retire := section(gpu, 'fn (mut mgr GpuManager) retire_g13_timestamp_aperture_locked(', 'fn alloc_fixed_buffer(', 'Timestamp aperture teardown')!
 	require_order(retire, ['for reservation in mgr.g13_timestamp.allocations',
-		'mgr.g13_timestamp_uat.unmap_kernel(reservation.va, reservation.size)', 'free(reservation)',
-		'mgr.g13_timestamp.allocations.free()', 'mgr.g13_timestamp_uat = unsafe { nil }'],
-		'Retire every old mapping and allocation before dropping the original UAT pointer')!
+		'mgr.uat.unmap_kernel(reservation.va, reservation.size)', 'free(reservation)',
+		'mgr.g13_timestamp.allocations.free()'],
+		'Retire every old mapping and allocation through the original UAT')!
 	shutdown := gpu.all_after('pub fn (mut mgr GpuManager) shutdown()')
 	require_order(shutdown, ['mgr.lock.acquire()', 'mgr.lock.release()', 'if mgr.state == .stopped { return }',
 		'mgr.state = .stopped', 'mgr.stop_firmware_cpus(mgr.firmware_roles)',

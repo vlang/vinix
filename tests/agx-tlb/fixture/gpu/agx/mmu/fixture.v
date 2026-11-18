@@ -22,7 +22,6 @@ pub struct UatHandoff {
 pub mut:
 	cur_slot u32
 	flush [uat_num_contexts + 1]UatFlushInfo
-mut:
 	held bool
 }
 
@@ -57,6 +56,7 @@ mut:
 	slot_release [uat_num_contexts]u64
 	slot_release_clock u64
 	slot_released eventstruct.Event
+	g13_slots_retired bool
 }
 
 pub fn (mgr &UatManager) release_generation() u64 { return mgr.slot_released.generation }

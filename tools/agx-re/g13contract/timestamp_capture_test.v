@@ -21,7 +21,7 @@ fn test_timestamp_capture_guards_require_retained_owners_and_rollback() {
 	}
 	for token in ['if mgr.state == .stopped { return -19, 0 }', 'return -28, 0',
 		'mgr.g13_timestamp.cancel_unpublished(va)', 'return code, 0', 'if mgr.state == .stopped || va',
-		'mgr.g13_timestamp_uat.unmap_kernel(reservation.va, reservation.size)',
+		'mgr.uat.unmap_kernel(reservation.va, reservation.size)',
 		'mgr.retire_g13_timestamp_aperture_locked()', 'mgr.stop_firmware_cpus(mgr.firmware_roles)'] {
 		if _ := check_timestamp_capture_local(file, captures, gpu.replace(token, '')) { assert false, token }
 	}

@@ -9,7 +9,9 @@ import usercopy
 
 pub fn (mut f GpuFile) ioctl_modern_submit(data &asahi.Submit) int {
 	if data.flags != 0 || data.pad != 0 { return -22 }
-	if mut manager := gpu.get_global_manager() { manager.refresh_g13_submit_globals() }
+	if mut manager := gpu.get_global_manager() {
+		if voidptr(manager) == voidptr(f.timestamp_manager) { manager.refresh_g13_submit_globals() }
+	}
 	captured := f.capture_submission_queue(data.queue_id) or { return -2 }
 	mut transferred := false
 	defer { if !transferred { release_submission_queue(captured) } }
@@ -30,6 +32,7 @@ pub fn (mut f GpuFile) ioctl_modern_submit(data &asahi.Submit) int {
 	// Asahi checks for device loss after the userspace snapshot and before
 	// parsing. The shared submitter checks again before preparing jobs.
 	mut manager := gpu.get_global_manager() or { return -19 }
+	if voidptr(manager) != voidptr(f.timestamp_manager) { return -19 }
 	status := manager.g13_submission_status()
 	if status != 0 { return status }
 	if data.cmdbuf_size == 0 { return -22 }

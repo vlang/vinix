@@ -1483,6 +1483,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	output_syncs &agxsubmission.SyncArray, result_handle u32, attachment_initial_mask u32) int {
 	if commands.len == 0 || commands.len > int(max_g13_submission_commands) { return -22 }
 	manager := gpu.get_global_manager() or { return -19 }
+	if voidptr(manager) != voidptr(f.timestamp_manager) { return -19 }
 	mut gpu_manager := unsafe { manager }
 	status := gpu_manager.g13_submission_status()
 	if status != 0 { return status }
@@ -1567,7 +1568,8 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	}
 	slot := f.bind_g13_submission_vm_locked(mut gpu_manager, vm)
 	if slot < 0 { return slot }
-	defer { uat_mgr.release_g13_slot(vm, u32(slot)) }
+	mut uat := unsafe { gpu_manager.uat }
+	defer { uat.release_g13_slot(vm, u32(slot)) }
 	storage := memory.malloc_packed_fallible(sizeof(G13PendingSubmission)) @[freed]
 	if storage == unsafe { nil } { return -12 }
 	mut pending := unsafe { &G13PendingSubmission(storage) }
@@ -1640,7 +1642,8 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 // on success. Jobs and queue teardown can retire while binders sleep.
 fn (mut f GpuFile) bind_g13_submission_vm_locked(mut manager gpu.GpuManager,
 	context &mmu.UatContext) int {
-	if uat_mgr == unsafe { nil } { return -19 }
+	mut uat := unsafe { manager.uat }
+	if uat == unsafe { nil } { return -19 }
 	mut vm := unsafe { context }
 	for !vm.binding_gate.try_enter() {
 		generation := vm.binding_gate.generation()
@@ -1652,11 +1655,11 @@ fn (mut f GpuFile) bind_g13_submission_vm_locked(mut manager gpu.GpuManager,
 	}
 	defer { vm.binding_gate.leave() }
 	for {
-		generation := uat_mgr.g13_slot_generation()
+		generation := uat.g13_slot_generation()
 		slot := manager.try_hold_g13_submission_slot(vm)
 		if slot != 0 { return slot }
 		f.lock.release()
-		resumed := uat_mgr.wait_g13_slot(generation)
+		resumed := uat.wait_g13_slot(generation)
 		f.lock.acquire()
 		if !resumed { return -int(errno.erestartsys) }
 		if !f.cleanup_closed_mappings_locked(vm) { return -5 }

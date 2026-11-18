@@ -469,6 +469,33 @@ The complete archive passed inventory verification. `bundle.tar.gz`
 SHA-256 is
 `a65ab50de61a9f0d093e7c4d3c414a0d3b81a445a84303ef6ea9f3c891f15ea7`.
 
+G13 shutdown now locks the original UAT before stopping the ASC. It
+clears resident user TTBRs and invalidates their ASIDs while excluding
+AP handoff callers. It wakes old slot waiters, refuses new roots, and
+keeps outstanding job and staging leases in software until their last
+release. Late releases cannot clear a replacement manager's roots.
+Both submission ABIs reject a manager from another DRM registration.
+Waits and deferred staging releases use the selected manager's UAT.
+
+ASan and UBSan passed 64 simulated shutdown and replacement cycles
+with leased and idle roots. Both submission ABIs passed a global UAT
+swap during a slot wait. Three compiled negative controls caught a
+missing invalidation, early lease disposal and a missed wakeup. Both
+kernel builds, all 82 test files and the independent lifetime review
+passed. The allocation scan reproduced 178 baseline findings.
+
+This covers ordered shutdown and replacement. File-level queue and VM
+owner routing, concurrent reprobe, recovery from an already wedged
+handoff, and native quiescence remain open. The pinned source audit
+remains `not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `38415ca26bee5a8806d61b75240400a95dee115f` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-uat-slots-stop-20261118/`.
+The complete archive passed inventory verification. `bundle.tar.gz`
+SHA-256 is
+`66e0b8c5888528c890c9f2a90bfd874afb25cf170d4c66553df2b222abc866e5`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

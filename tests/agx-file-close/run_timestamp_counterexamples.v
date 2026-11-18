@@ -27,7 +27,7 @@ fn main() {
 		'unbind-skips-original-owner': ['file', 'release_timestamp_object(manager, found)', 'if _ := gpu.get_global_manager() { release_timestamp_object(manager, found) }', 'file.check_timestamp_bindings:', 'shared.references == 1'],
 		'map-without-lock': ['gpu-map', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'gpu.agx.gpu.expect_timestamp_map_error:', '!timestamp_lock_held()'],
 		'unmap-without-lock': ['gpu-unmap', 'mgr.lock.acquire()\n\tdefer { mgr.lock.release() }', '', 'mmu.UatManager.unmap_kernel:', 'timestamp_lock_held()'],
-		'drain-skips-ptes': ['gpu-drain', 'mgr.g13_timestamp_uat.unmap_kernel(reservation.va, reservation.size)', '', 'gpu.agx.gpu.check_timestamp_aperture_teardown:', 'original.timestamp_unmap_calls == before_stop + 2']
+		'drain-skips-ptes': ['gpu-drain', 'mgr.uat.unmap_kernel(reservation.va, reservation.size)', '', 'gpu.agx.gpu.check_timestamp_aperture_teardown:', 'original.timestamp_unmap_calls == before_stop + 2']
 	} {
 		path := match spec[0] { 'timestamp' { 'kernel/gpu/agx/file/timestamps.v' } 'file' { 'kernel/gpu/agx/file/file.v' } else { 'kernel/gpu/agx/gpu/gpu.v' } }
 		source := os.read_file(repo + '/' + path)!

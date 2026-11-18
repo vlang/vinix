@@ -84,6 +84,8 @@ pub mut:
 }
 
 pub struct GpuManager {
+pub:
+	uat &mmu.UatManager = unsafe { nil } // retained by file and job leases after stop
 pub mut:
 	res              regs.GpuResources
 	hw_config        hw.HwConfig
@@ -103,7 +105,6 @@ pub mut:
 	state            GpuState
 	lock             klock.Lock
 mut:
-	g13_timestamp_uat &mmu.UatManager = unsafe { nil }
 	g13_channels      &G13ChannelAllocations = unsafe { nil }
 	g13_events        G13EventResources
 	g13_queues        []&G13QueueResources
@@ -198,9 +199,9 @@ pub fn (mut mgr GpuManager) try_hold_g13_submission_slot(vm &mmu.UatContext) int
 	defer { mgr.lock.release() }
 	status := mgr.g13_submission_status_locked()
 	if status != 0 { return status }
-	if uat_mgr == unsafe { nil } || !uat_mgr.handoff_initialized || uat_mgr.handoff_abi != .v12_3
+	if mgr.uat == unsafe { nil } || !mgr.uat.handoff_initialized || mgr.uat.handoff_abi != .v12_3
 		|| vm == unsafe { nil } || !vm.active || vm.pgtable == unsafe { nil } { return -19 }
-	return int(uat_mgr.bind_context(vm))
+	return int(mgr.uat.bind_context(vm))
 }
 
 // Match Asahi's global-query crash snapshot. Shutdown publishes stopped under
@@ -237,7 +238,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		g13_readonly: alloc.new_heap_with_garbage('g13-readonly', alloc.g13_readonly_start, alloc.g13_readonly_end, false)
 		g13_rtkit: alloc.new_heap('g13-rtkit', alloc.g13_rtkit_start, alloc.g13_rtkit_end)
 		g13_timestamp: alloc.new_heap('g13-timestamp', alloc.g13_timestamp_start, alloc.g13_timestamp_end)
-		g13_timestamp_uat: uat_mgr
+		uat: uat_mgr
 	}
 	// Nothing slices these lists, so growing one can free its old buffer.
 	mgr.g13_queues.flags |= .noslices
@@ -566,9 +567,9 @@ pub fn (mut mgr GpuManager) map_g13_timestamp_buffer(phys u64, size u64) (int, u
 	// An ioctl can reach this lock after DRM unregister. Shutdown holds
 	// the same lock from the stopped transition through firmware teardown.
 	if mgr.state == .stopped { return -19, 0 }
-	if mgr.g13_timestamp_uat == unsafe { nil } { return -12, 0 }
+	if mgr.uat == unsafe { nil } { return -12, 0 }
 	va := mgr.g13_timestamp.alloc(size, alloc.gpu_page_size) or { return -28, 0 }
-	code := mgr.g13_timestamp_uat.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)
+	code := mgr.uat.map_kernel_status(va, phys, size, pgtable.gpu_prot_fw_shared_rw)
 	if code != 0 {
 		mgr.g13_timestamp.cancel_unpublished(va)
 		return code, 0
@@ -583,7 +584,7 @@ pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(va u64, size u64) {
 		|| size > alloc.g13_timestamp_end - va {
 		return
 	}
-	mgr.g13_timestamp_uat.unmap_kernel(va, size)
+	mgr.uat.unmap_kernel(va, size)
 	mgr.g13_timestamp.release(va)
 	mgr.g13_timestamp.gc()
 }
@@ -593,12 +594,11 @@ pub fn (mut mgr GpuManager) unmap_g13_timestamp_buffer(va u64, size u64) {
 // but no later release may touch these PTEs or reservations.
 fn (mut mgr GpuManager) retire_g13_timestamp_aperture_locked() {
 	for reservation in mgr.g13_timestamp.allocations {
-		mgr.g13_timestamp_uat.unmap_kernel(reservation.va, reservation.size)
+		mgr.uat.unmap_kernel(reservation.va, reservation.size)
 		unsafe { free(reservation) }
 	}
 	unsafe { mgr.g13_timestamp.allocations.free() }
 	mgr.g13_timestamp.allocations = []&alloc.Allocation{}
-	mgr.g13_timestamp_uat = unsafe { nil }
 }
 
 fn alloc_fixed_buffer(iova u64, size u64, protection u64) ?SharedBuffer {
@@ -1636,8 +1636,16 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.state = .stopped
 	if mgr.rtkit_receive_irq != 0 { aic.mask_irq(mgr.rtkit_receive_irq) }
 	if mgr.rtkit_send_irq != 0 { aic.mask_irq(mgr.rtkit_send_irq) }
+	mut uat := unsafe { mgr.uat }
+	retire_slots := mgr.hw_config.gpu_gen == .g13 && uat != unsafe { nil }
+	// Exclude UAT operations that need a live ASC before we stop it.
+	if retire_slots { uat.lock.acquire() }
 	mgr.send_fw_msg(msg_halt, 0)
 	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	if retire_slots {
+		uat.retire_g13_slots_locked()
+		uat.lock.release()
+	}
 	if mgr.hw_config.gpu_gen == .g13 { mgr.retire_g13_timestamp_aperture_locked() }
 	mgr.release_rtkit_buffers()
 	mgr.release_all_g13_render_jobs()

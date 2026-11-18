@@ -249,6 +249,79 @@ fn test_user_slot_capacity() {
 	println('AGX UAT leases: 63 active roots, overlapping users, cached-root reuse, release age across root removal, ASC/FWCTL exclusion and one-invalidation rebind passed')
 }
 
+fn test_stopped_slot_retirement() {
+	for _ in 0 .. 64 {
+		mut slots := [64]mmu.SlotTtbs{}
+		mut handoff := mmu.UatHandoff{}
+		mut new_handoff := mmu.UatHandoff{}
+		upper := pgtable.new_pgtable(39, 48) or { panic('upper root') }
+		leased := mmu.UatContext{pgtable: pgtable.new_pgtable(39, 48) or { panic('leased root') }}
+		idle := mmu.UatContext{pgtable: pgtable.new_pgtable(39, 48) or { panic('idle root') }}
+		reused := mmu.UatContext{pgtable: pgtable.new_pgtable(39, 48) or { panic('replacement root') }}
+		mut original := mmu.UatManager{
+			ttbs: unsafe { &slots[0] }
+			handoff: unsafe { &handoff }
+			kernel_pgtable: upper
+			map_kernel_to_user: true
+			handoff_initialized: true
+		}
+		slots[0].ttb0 = 0x400001
+		assert original.bind_context(&leased) == 1 && original.bind_context(&leased) == 1
+		assert original.bind_context(&idle) == 2
+		assert slots[1].ttb1 != 0 && slots[2].ttb1 != 0
+		original.release_g13_slot(&idle, 2)
+		tlb.clear()
+		tlb.observe(unsafe { nil }, unsafe { &u64(&slots[1]) })
+		handoff.held = true
+		before := original.release_generation()
+		original.lock.acquire()
+		original.retire_g13_slots_locked()
+		original.lock.release()
+		cleared := tlb.calls()
+		assert cleared.len == 2 && cleared[0].asid == 1 && cleared[1].asid == 2
+		assert cleared[0].ttb0 == 0 && cleared[0].ttb1 == 0
+		assert leased.bound_slot() == 0 && idle.bound_slot() == 0
+		assert voidptr(original.contexts[1]) == voidptr(&leased) && original.contexts[2] == unsafe { nil }
+		assert slots[0].ttb0 == 0x400001 && slots[1].ttb0 == 0 && slots[2].ttb0 == 0
+		assert slots[1].ttb1 == 0 && slots[2].ttb1 == 0
+		assert original.release_generation() == before + 1 && handoff.held
+		original.lock.acquire()
+		original.retire_g13_slots_locked()
+		original.lock.release()
+		assert original.release_generation() == before + 1 && tlb.calls().len == 2
+		assert original.bind_context(&leased) == 0 && original.bind_context(&idle) == 0
+
+		tlb.clear()
+		mut replacement := mmu.UatManager{
+			ttbs: unsafe { &slots[0] }
+			handoff: unsafe { &new_handoff }
+			kernel_pgtable: upper
+			map_kernel_to_user: true
+			handoff_initialized: true
+		}
+		assert replacement.bind_context(&reused) == 1
+		published := slots[1].ttb0
+		published_upper := slots[1].ttb1
+		tlb.clear()
+		original.release_g13_slot(&leased, 1)
+		assert voidptr(original.contexts[1]) == voidptr(&leased)
+		original.release_g13_slot(&leased, 1)
+		original.unbind_context(&leased)
+		pgtable.destroy(leased.pgtable)
+		pgtable.destroy(idle.pgtable)
+		assert original.contexts[1] == unsafe { nil } && original.release_generation() == before + 1
+		assert slots[1].ttb0 == published && slots[1].ttb1 == published_upper && tlb.calls().len == 0
+		replacement.release_g13_slot(&reused, 1)
+		replacement.unbind_context(&reused)
+		pgtable.destroy(reused.pgtable)
+		pgtable.destroy(upper)
+		tlb.clear()
+		tlb.observe(unsafe { nil }, unsafe { nil })
+		assert memory.live_pages() == 0
+	}
+	println('AGX UAT shutdown: 64 retirements clear resident roots, wake slot waiters, keep late leases on the old UAT and preserve replacement roots')
+}
+
 fn test_borrowed_root_destruction() {
 	root := pgtable.alloc_table_page() or { panic('bootloader root') }
 	subtree := pgtable.alloc_table_page() or { panic('bootloader subtree') }
@@ -673,6 +746,7 @@ fn main() {
 	test_user_mappings()
 	test_root_publication_and_reuse()
 	test_user_slot_capacity()
+	test_stopped_slot_retirement()
 	test_eager_bindings_hold_slots_until_destroy()
 	test_borrowed_root_destruction()
 	test_gpu_permissions()

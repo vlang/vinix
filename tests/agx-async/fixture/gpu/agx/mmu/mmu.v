@@ -35,6 +35,9 @@ mut:
 __global host_uat UatManager
 __global uat_mgr = unsafe { &host_uat }
 
+pub fn active_test_uat() &UatManager { return uat_mgr }
+pub fn select_test_uat(manager &UatManager) { uat_mgr = unsafe { manager } }
+
 pub fn (mut mgr UatManager) bind_context(ctx &UatContext) u32 {
 	mgr.acquire_attempts++
 	if mgr.occupied {

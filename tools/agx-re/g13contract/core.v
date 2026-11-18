@@ -275,6 +275,7 @@ pub fn check_tlb_reference(asahi_linux string, repo string) ![]string {
 		'32 KiB native driver window normalization, heap split and minimum allocation alignment',
 		'Oldest idle ASID selection and one invalidation after root replacement or removal',
 		'Per-queue and per-VM UAT admission with single-waiter release before G13 job preparation',
+		'G13 shutdown retires the original hardware slots before replacement while late leases release through their original UAT',
 		'Distinct GPU-only coherent RO/WO/RW bind permissions and Asahi UAT selectors']
 }
 
@@ -298,6 +299,7 @@ fn check_g13_slot_wait(asahi_linux string, repo string, mmu string) ! {
 		'let fence: UserFence'], 'Asahi slot admission before the submit fence')!
 	release := section(mmu, 'pub fn (mut mgr UatManager) release_g13_slot(', 'pub fn (mut mgr UatManager) unbind_context(', 'Vinix slot release')!
 	require_order(release, ['mgr.slot_users[slot]--', 'if mgr.slot_users[slot] == 0',
+		'if mgr.g13_slots_retired', 'mgr.contexts[slot] = unsafe { nil }', 'return',
 		'event.trigger_n(mut mgr.slot_released, 1)'], 'Vinix last slot user wakes one waiter')!
 	file := read(os.join_path(repo, 'kernel/gpu/agx/file/file.v'))!
 	submit := section(file, 'fn (mut f GpuFile) submit_g13_staged(', 'fn (mut f GpuFile) bind_g13_submission_vm_locked(', 'Vinix G13 admission')!
@@ -309,20 +311,40 @@ fn check_g13_slot_wait(asahi_linux string, repo string, mmu string) ! {
 		'gpu_manager.capture_g13_initial_events(queue_resources, initial_mask)',
 		'defer { if !initial_events_released { gpu_manager.release_g13_initial_events(initial_events) } }',
 		'slot := f.bind_g13_submission_vm_locked(mut gpu_manager, vm)',
-		'if slot < 0 { return slot }', 'defer { uat_mgr.release_g13_slot(vm, u32(slot)) }',
+		'if slot < 0 { return slot }', 'mut uat := unsafe { gpu_manager.uat }', 'defer { uat.release_g13_slot(vm, u32(slot)) }',
 		'prepare_g13_compute_job', 'install_output_syncs'], 'Vinix interruptible G13 admission')!
 	binder := section(file, 'fn (mut f GpuFile) bind_g13_submission_vm_locked(', 'fn dispatch(', 'Vinix VM binder')!
-	require_order(binder, ['for !vm.binding_gate.try_enter()', 'generation := vm.binding_gate.generation()',
+	require_order(binder, ['mut uat := unsafe { manager.uat }', 'for !vm.binding_gate.try_enter()', 'generation := vm.binding_gate.generation()',
 		'f.lock.release()', 'vm.binding_gate.wait(generation)', 'f.lock.acquire()', 'return -int(errno.erestartsys)',
 		'cleanup_closed_mappings_locked(vm)', 'defer { vm.binding_gate.leave() }',
-		'generation := uat_mgr.g13_slot_generation()', 'slot := manager.try_hold_g13_submission_slot(vm)',
-		'if slot != 0 { return slot }', 'f.lock.release()', 'uat_mgr.wait_g13_slot(generation)', 'f.lock.acquire()',
+		'generation := uat.g13_slot_generation()', 'slot := manager.try_hold_g13_submission_slot(vm)',
+		'if slot != 0 { return slot }', 'f.lock.release()', 'uat.wait_g13_slot(generation)', 'f.lock.acquire()',
 		'return -int(errno.erestartsys)', 'cleanup_closed_mappings_locked(vm)'],
 		'Vinix holds VM binding admission across the interruptible slot wait')!
+	gpu := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
+	check_g13_slot_retirement_local(mmu, gpu)!
 	admission := read(os.join_path(repo, 'kernel/gpu/agx/admission/admission.v'))!
 	release_gate := section(admission, 'pub fn (mut gate Gate) leave()', 'pub fn (mut gate Gate) generation(', 'Vinix queue gate')!
 	require_order(release_gate, ['gate.held = false', 'event.trigger_n(mut gate.released, 1)'],
 		'Vinix queue departure wakes one contender')!
+}
+
+fn check_g13_slot_retirement_local(mmu string, gpu string) ! {
+	bind := section(mmu, 'pub fn (mgr &UatManager) bind_context(', 'pub fn (mut mgr UatManager) release_g13_slot(', 'Vinix retired UAT admission')!
+	require_order(bind, ['owner.lock.acquire()', 'if mgr.g13_slots_retired ||', 'return 0',
+		'handoff_lock(mgr.handoff)'], 'Retired UAT managers cannot install another user root')!
+	retire := section(mmu, 'pub fn (mut mgr UatManager) retire_g13_slots_locked(', 'pub fn (mut mgr UatManager) unbind_context(', 'Vinix stopped UAT slot retirement')!
+	require_order(retire, ['mgr.g13_slots_retired = true', 'for slot in 1 .. uat_num_contexts',
+		'slots[slot].ttb0 = 0', 'slots[slot].ttb1 = 0', 'cpu.dsb_sy()', 'pt.unbind_tlb()',
+		'if mgr.slot_users[slot] == 0 { mgr.contexts[slot] = unsafe { nil } }',
+		'event.trigger(mut mgr.slot_released, true)'], 'Retire hardware roots and preserve their outstanding software leases')!
+	require(!retire.contains('handoff_lock('), 'A stopped ASC cannot release the handoff lock')!
+	shutdown := gpu.all_after('pub fn (mut mgr GpuManager) shutdown()')
+	require_order(shutdown, ['mgr.lock.acquire()', 'mgr.state = .stopped', 'mut uat := unsafe { mgr.uat }',
+		'if retire_slots { uat.lock.acquire() }', 'mgr.send_fw_msg(msg_halt, 0)',
+		'mgr.stop_firmware_cpus(mgr.firmware_roles)', 'uat.retire_g13_slots_locked()', 'uat.lock.release()',
+		'mgr.release_all_g13_render_jobs()', 'mgr.release_all_g13_compute_jobs()'],
+		'Exclude AP handoff callers before stopping the ASC and release the UAT lock before job cleanup')!
 }
 
 fn check_tlb_instructions(reference string, vinix string) ! {

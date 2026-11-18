@@ -97,6 +97,7 @@ pub mut:
 
 pub struct GpuManager {
 pub mut:
+	uat                   &mmu.UatManager = unsafe { nil }
 	lock                  klock.Lock
 	state                 State = .running
 	hw_config             Config
@@ -157,7 +158,7 @@ pub fn reset() {
 		test_async_gpu_manager.published_order.free()
 		test_async_gpu_manager.released_order.free()
 	}
-	test_async_gpu_manager = GpuManager{}
+	test_async_gpu_manager = GpuManager{ uat: mmu.active_test_uat() }
 	test_async_gpu_manager.g13_compute_jobs.flags |= .noslices
 	test_async_gpu_manager.g13_render_jobs.flags |= .noslices
 	test_async_gpu_manager.published.flags |= .noslices
