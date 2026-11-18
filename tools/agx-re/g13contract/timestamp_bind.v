@@ -34,11 +34,13 @@ fn check_timestamp_bind_local(file string) ! {
 	require_order(unbind, ['request.flags != 0 || request.handle != 0 || request.offset != 0',
 		'request.range != 0', 'return -22', 'f.lock.acquire()', 'object.id == request.object_handle',
 		'if found_index < 0', 'f.lock.release()', 'return -2',
-		'manager := gpu.get_global_manager() or { f.lock.release(); return -19 }',
+		'if found.references == 0', 'if manager := gpu.get_global_manager()',
 		'f.timestamp_objects.delete(found_index)', 'f.lock.release()',
-		'gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)', 'gem.unref(found.obj)'],
-		'Timestamp UNBIND resolves missing names before manager lookup and keeps ownership installed on missing-manager failure')!
+		'gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)', 'gem.unref(found.obj)', 'return 0',
+		'f.timestamp_objects[found_index].detached = true', 'f.lock.release()', 'return 0'],
+		'Timestamp UNBIND hides the name when captures or manager availability delay cleanup')!
 	require(!unbind.contains('request.object_handle == 0'), 'Zero is a missing timestamp name, not a malformed request')!
+	require(!unbind.contains('return -19'), 'Manager availability does not block name removal')!
 }
 
 fn check_timestamp_bind_reference(file string, gpu string, gem string, mmu string) ! {

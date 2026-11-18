@@ -11,7 +11,7 @@ fn test_timestamp_bind_guards_require_output_only_handles_checked_sum_and_lookup
 		'f.timestamp_objects[slot] = object',
 		'else if !f.reserve_timestamp_entry_locked() { -12 }', 'return publish_code',
 		'if storage == unsafe { nil } { return false }',
-		'manager := gpu.get_global_manager() or { f.lock.release(); return -19 }',
+		'if manager := gpu.get_global_manager()', 'f.timestamp_objects[found_index].detached = true',
 		'f.timestamp_objects.delete(found_index)'] {
 		if _ := check_timestamp_bind_local(file.replace(token, '')) { assert false, token }
 	}

@@ -21,9 +21,10 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		'gpu_manager.unmap_g13_timestamp_buffer(object.va, object.size)', 'gem.unref(object.obj)'], 'Close retains captures and mapped backing without a manager')!
 	unbind := section(file, 'ioctl.asahi_bind_object_op_unbind {', 'pub fn (mut f GpuFile) ioctl_queue_create(', 'Timestamp namespace removal')!
 	require_order(unbind, ['object.id == request.object_handle && !object.detached',
-		'if found_index < 0', 'return -2', 'if found.references != 0',
-		'f.timestamp_objects[found_index].detached = true', 'f.lock.release()', 'return 0',
-		'manager := gpu.get_global_manager()', 'f.timestamp_objects.delete(found_index)'], 'UNBIND hides captured names before physical cleanup')!
+		'if found_index < 0', 'return -2', 'if found.references == 0',
+		'if manager := gpu.get_global_manager()', 'f.timestamp_objects.delete(found_index)', 'return 0',
+		'f.timestamp_objects[found_index].detached = true', 'f.lock.release()', 'return 0'],
+		'UNBIND defers VA cleanup for captured or unavailable-manager objects while removing the name')!
 	reaper := section(captures, 'fn (mut f GpuFile) reap_detached_timestamp_objects_locked()', 'fn (mut f GpuFile) release_g13_timestamp(', 'Detached timestamp cleanup')!
 	require_order(reaper, ['gpu.get_global_manager() or { return }', 'f.timestamp_objects.len - 1',
 		'if !object.detached || object.references != 0 { continue }',

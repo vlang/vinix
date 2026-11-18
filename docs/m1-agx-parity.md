@@ -344,6 +344,30 @@ The archive and restored copy passed full inventory verification.
 `bundle.tar.gz` SHA-256 is
 `c78c3d32258b49d7191934953859600ad6599921dd6e8f92a560078b5d91c524`.
 
+Both G13 timestamp ioctl ABIs now remove the handle on a valid UNBIND
+even if the GPU manager is unavailable. The detached record keeps its
+VA and GEM reference for worker or close cleanup. A later bind can reuse
+the public handle independently of the old mapping. Cleanup requires
+access to the original manager. Permanent teardown and manager
+replacement remain open.
+[Asahi timestamp UNBIND](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L1235-L1274)
+
+The sanitizer suite passed 128 manager-loss and restoration lifecycles
+across both ABIs and 184,600 timestamp ioctl checks. The worker retired
+the original VA after handle reuse and preserved the replacement.
+Both kernel builds, 82 test files and the lifetime review passed.
+Two compiled negative controls failed at their expected assertions.
+The allocation scan reproduced 178 baseline findings. The full source
+audit remains `not_equivalent`. No hardware tests or reboots ran.
+
+Evidence for `8d8f5f6b573f99575ed2b0020917531c84a72a8e` plus the tested
+patch is retained under
+`/Users/alex/.local/state/vinix/omarchy-m1-g13-timestamp-unbind-20261118/`.
+The archive created with sparse-file detection disabled passed full
+inventory verification against the retained original.
+`bundle.tar.gz` SHA-256 is
+`01d8d45549f261eb637ac6ac6c1ead83ae089cd7a07a97d9c985ece3f7a72198`.
+
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)
 

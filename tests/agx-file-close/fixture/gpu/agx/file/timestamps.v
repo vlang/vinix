@@ -90,6 +90,54 @@ fn check_timestamp_publication_storage() {
 	println('G13 timestamp publication: 400 allocation refusals, 200 mapping-precedence checks, 100 spare-slot publications and growth retries preserve captures and release all storage')
 }
 
+fn check_timestamp_unbind_without_manager() {
+	for cycle in 0 .. 64 {
+		for modern in [false, true]! {
+			gpu.available(true)
+			mut file := GpuFile{}
+			old_bo := gem.create(9400)
+			new_bo := gem.create(9401)
+			file.objects.add_created(old_bo)
+			file.objects.add_created(new_bo)
+			id := bind_capture_buffer(mut file, old_bo.handle)
+			original_va := file.timestamp_objects[0].va
+			unmaps := gpu.unmaps()
+
+			gpu.available(false)
+			if modern {
+				request := asahi.GemBindObject{op: ioctl.asahi_bind_object_op_unbind, object_handle: id}
+				before := request
+				assert file.ioctl_modern_gem_bind_object(unsafe { &request }) == 0 && request == before
+			} else {
+				assert unbind_capture_buffer(mut file, id) == 0
+			}
+			assert file.timestamp_objects.len == 1 && file.timestamp_objects[0].detached
+			assert file.timestamp_objects[0].references == 0 && file.timestamp_objects[0].va == original_va
+			assert old_bo.references == 2 && new_bo.references == 1 && gpu.unmaps() == unmaps
+			code, _ := file.capture_g13_timestamp(asahi.Timestamp{handle: id})
+			assert code == -2 && !file.close()
+
+			key := u64(0x54000 + cycle)
+			file_map[key] = unsafe { &file }
+			reap_open_detached_g13_queues()
+			assert file.timestamp_objects.len == 1 && gpu.unmaps() == unmaps
+
+			gpu.available(true)
+			assert bind_capture_buffer(mut file, new_bo.handle) == id
+			assert file.timestamp_objects.len == 2 && file.timestamp_objects[1].va != original_va
+			reap_open_detached_g13_queues()
+			reap_open_detached_g13_queues()
+			file_map.delete(key)
+			assert file.timestamp_objects.len == 1 && file.timestamp_objects[0].id == id
+			assert !file.timestamp_objects[0].detached && voidptr(file.timestamp_objects[0].obj) == voidptr(new_bo)
+			assert old_bo.references == 1 && new_bo.references == 2 && gpu.unmaps() == unmaps + 1
+			assert file.close() && gem.live() == 0 && gpu.unmaps() == unmaps + 2
+			memory.assert_released()
+		}
+	}
+	println('G13 timestamp UNBIND: 128 unavailable-manager lifecycles hide the name, retain its backing and reap exactly the old mapping after handle reuse')
+}
+
 fn check_timestamp_bindings() {
 	page := u64(0x4000)
 	mut cases := 0
@@ -139,14 +187,15 @@ fn check_timestamp_bindings() {
 							mut wanted := before; wanted.object_handle = id
 							assert id != 0 && request == wanted && file.timestamp_objects.len == 1 && shared.references == 2
 							assert file.timestamp_objects[0].size == span.size && voidptr(file.timestamp_objects[0].obj) == voidptr(shared)
-							// A found owner remains installed when its manager is absent.
+							// Losing access to the manager delays backing cleanup.
 							gpu.available(false)
 							mut remove := timestamp_unbind(id)
 							saved := remove
-							assert file.ioctl_gem_bind_object(unsafe { &remove }) == -19 && remove == saved
+							assert file.ioctl_gem_bind_object(unsafe { &remove }) == 0 && remove == saved
 							assert !file.lock.is_held() && shared.references == 2 && file.timestamp_objects.len == 1
+							assert file.timestamp_objects[0].detached
 							assert gpu.unmaps() == unmaps; cases++
-							for missing_id in [u32(0), if id == ~u32(0) { id - 1 } else { ~u32(0) }]! {
+							for missing_id in [u32(0), id, ~u32(0)]! {
 								mut absent := timestamp_unbind(missing_id)
 								at_lookup := gpu.lookups(); saved_absent := absent
 								assert file.ioctl_gem_bind_object(unsafe { &absent }) == -2 && absent == saved_absent
@@ -172,9 +221,10 @@ fn check_timestamp_bindings() {
 								assert gpu.lookups() == at_bad_lookup && !file.lock.is_held() && shared.references == 2; cases++
 							}
 							gpu.available(true)
-							assert file.ioctl_gem_bind_object(unsafe { &remove }) == 0 && remove == saved
+							file.lock.acquire()
+							file.reap_detached_timestamp_objects_locked()
+							file.lock.release()
 							assert shared.references == 1 && file.timestamp_objects.len == 0 && gpu.unmaps() == unmaps + 1
-							assert !file.lock.is_held(); cases++
 							assert file.ioctl_gem_bind_object(unsafe { &remove }) == -2 && remove == saved
 							assert shared.references == 1 && gpu.unmaps() == unmaps + 1 && !file.lock.is_held(); cases++
 						}

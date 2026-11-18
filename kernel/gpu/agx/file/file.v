@@ -1030,19 +1030,20 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				f.lock.release()
 				return -2
 			}
-			if found.references != 0 {
-				f.timestamp_objects[found_index].detached = true
-				f.lock.release()
-				return 0
+			if found.references == 0 {
+				if manager := gpu.get_global_manager() {
+					f.timestamp_objects.delete(found_index)
+					f.lock.release()
+					mut gpu_manager := unsafe { manager }
+					gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)
+					gem.unref(found.obj)
+					return 0
+				}
 			}
-			// Keep the existing mapping owner installed if its manager is
-			// unavailable. Missing names, including zero, still return ENOENT.
-			manager := gpu.get_global_manager() or { f.lock.release(); return -19 }
-			f.timestamp_objects.delete(found_index)
+			// Hide the name even when a capture or missing manager keeps the
+			// backing alive. The worker or close retries physical retirement.
+			f.timestamp_objects[found_index].detached = true
 			f.lock.release()
-			mut gpu_manager := unsafe { manager }
-			gpu_manager.unmap_g13_timestamp_buffer(found.va, found.size)
-			gem.unref(found.obj)
 			return 0
 		}
 		else {

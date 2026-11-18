@@ -134,8 +134,9 @@ These injected lock schedules do not qualify native multi-CPU crash publication.
 Timestamp-object validation runs 184,600 ioctl checks. BIND ignores the initial
 output handle, checks offset/range overflow before BO lookup and rejects empty
 ranges after lookup. UNBIND resolves zero/missing/foreign names to ENOENT before
-manager lookup. A found mapping keeps its owner when the manager is unavailable;
-retry removes it once the manager returns. Cases cover private/bounds/header
+manager lookup. A successful UNBIND hides the handle when the manager is
+unavailable. The detached mapping keeps its owner for worker or close cleanup.
+Cases cover private/bounds/header
 refusal, injected mapping errors, lowest-free name reuse, an output field naming a live sibling,
 unchanged failure outputs and final close. BO references return to their original
 counts after failures/unbind and every allocated fixture BO is freed. GPU mapping
