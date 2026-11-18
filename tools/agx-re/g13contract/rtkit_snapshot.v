@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module g13contract
 
+import os
+
 fn check_rtkit_snapshot(transport string, manager string, linux string, rust string) ! {
 	crash := section(linux, 'static void apple_rtkit_crashlog_rx(', 'static void apple_rtkit_ioreport_rx(', 'Asahi RTKit crash reader')!
 	require_order(crash, ['u8 *bfr __free(kfree)', 'bfr = kzalloc(rtk->crashlog_buffer.size, GFP_KERNEL)',
@@ -78,12 +80,12 @@ fn check_rtkit_buffer_retries(transport string, linux string) ! {
 		'size = (msg >> 36)', 'requested_iova = (msg << 12) & iova_mask', 'size = ((msg >> 44)',
 		'requested_iova = msg & iova_mask', 'mut iova := rtk.system_iovas[ep]', 'if iova != 0',
 		'size != rtk.system_sizes[ep]', 'requested_iova != 0 && requested_iova != (iova & iova_mask)',
-		'return true', '} else {', 'requested_iova != 0', 'return false', 'iova = rtk.shmem_alloc(rtk.shmem_context, size)',
-		'if iova == 0', 'return false',
+		'return true', '} else {', 'requested_iova != 0', 'return rtk.nonfatal_buffer_errors',
+		'iova = rtk.shmem_alloc(rtk.shmem_context, size)', 'if iova == 0', 'return rtk.nonfatal_buffer_errors',
 		'rtk.system_iovas[ep] = iova', 'rtk.system_sizes[ep] = size', 'wire_iova := iova & iova_mask',
 		'(size << 36) | (wire_iova >> 12)', '((size >> 12) << 44) | wire_iova',
-		'sent := rtk.send_message(ep, reply)', 'return sent || ep != ep_crashlog'],
-		'Vinix stores the live mapping before sending and tolerates logging reply timeouts')!
+		'sent := rtk.send_message(ep, reply)', 'return sent || ep != ep_crashlog || rtk.nonfatal_buffer_errors'],
+		'Vinix stores the live mapping before sending and applies the configured timeout policy')!
 	for function in ['ioreport', 'syslog', 'oslog'] {
 		receiver := linux.all_after('static void apple_rtkit_${function}_rx(').all_before('\nstatic ')
 		require(receiver.contains('apple_rtkit_common_rx_get_buffer'), 'Asahi ${function} shares retry logic')!
@@ -93,4 +95,32 @@ fn check_rtkit_buffer_retries(transport string, linux string) ! {
 		'ep_syslog {', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)',
 		'ep_oslog {', 'kind := u8(msg.data0 >> 56)', 'if kind == buffer_request', 'return rtk.reply_system_buffer(ep, msg.data0)'],
 		'Vinix logging endpoints share the buffer retry handler')!
+}
+
+fn check_rtkit_buffer_startup(transport string, linux string, repo string) ! {
+	buffer := section(linux, 'static int apple_rtkit_common_rx_get_buffer(', 'static void apple_rtkit_free_buffer(', 'Asahi RTKit setup')!
+	require_order(buffer, ['if (!request.size)', 'goto error;',
+		'err = apple_rtkit_alloc_shmem(rtk, &request)', 'if (err)', 'goto error;', '*buffer = request;',
+		'apple_rtkit_send_message(rtk, ep, reply, NULL, false)', 'return 0;', 'error:', 'return err;'],
+		'Asahi publishes no backing on setup failure and retains a negotiated buffer through reply failure')!
+	crash := section(linux, 'static void apple_rtkit_crashlog_rx(', 'static void apple_rtkit_ioreport_rx(', 'Asahi RTKit crash setup')!
+	require_order(crash, ['if (!rtk->crashlog_buffer.size)', 'apple_rtkit_common_rx_get_buffer', 'goto unmapped;',
+		'if (!rtk->crashlog_inherited)', 'return;', 'rtk->crashed = true', 'unmapped:',
+		'if (!rtk->crashlog_inherited)', 'return;'], 'A fresh Asahi crash endpoint can negotiate again after setup failure')!
+	require(transport.contains('nonfatal_buffer_errors bool\n'), 'Vinix buffer failure policy defaults to strict handling')!
+	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
+	create := section(manager, 'pub fn new_gpu_manager(', 'fn (mut mgr GpuManager) boot_firmware_role(', 'Vinix G13 RTKit startup')!
+	require_order(create, ['if cfg.gpu_gen == .g13 {', 'set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)',
+		'mgr.rtk.nonfatal_buffer_errors = true', '\n\t}', 'return mgr'], 'Only G13 enables nonfatal setup failures')!
+	allocation := section(manager, 'fn alloc_buffer_from_heap(', 'fn (mut mgr GpuManager) alloc_shared_buffer_with_protection(', 'Vinix RTKit backing allocator')!
+	require_order(allocation, ['pmm_alloc_aligned_fallible(pages, 4)', 'if phys == 0', 'return none',
+		'va := heap.alloc(size, alloc.gpu_page_size) or {', 'memory.pmm_free(voidptr(phys), pages)', 'return none',
+		'if !uat_mgr.map_kernel(va, phys, aligned_size, protection)', 'heap.cancel_unpublished(va)',
+		'memory.pmm_free(voidptr(phys), pages)', 'return none', 'return SharedBuffer{'],
+		'Failed G13 setup unwinds pages and unpublished heap reservations')!
+	pgtable := read(os.join_path(repo, 'kernel/gpu/agx/pgtable/pgtable.v'))!
+	mapping := section(pgtable, 'pub fn (mut pt UatPgtable) map(', 'pub fn (mut pt UatPgtable) map_repeated_page(', 'Vinix G13 mapping unwind')!
+	require_order(mapping, ['defer {', 'pt.invalidate_range_locked(iova, size)', 'pt.lock.release()',
+		'if !pt.map_page_locked(', 'pt.unmap_page_locked(iova + j * uat_pgsz)', 'return false'],
+		'G13 mapping failure removes partial leaves and invalidates before backing is returned')!
 }

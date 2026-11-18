@@ -9,6 +9,10 @@ pub:
 }
 
 pub struct Mailbox {
+mut:
+	pending [16]MboxMsg
+	pending_len int
+	pending_read int
 pub mut:
 	attempts int
 	sent int
@@ -22,7 +26,17 @@ pub fn watch_send(callback fn ()) { on_send = callback }
 
 pub fn new_mailbox(_ u64) Mailbox { return Mailbox{} }
 pub fn msg_endpoint(message &MboxMsg) u8 { return u8(message.data1) }
-pub fn (mut _ Mailbox) recv() ?MboxMsg { return none }
+pub fn (mut box Mailbox) inject(message MboxMsg) {
+	assert box.pending_len < box.pending.len
+	box.pending[box.pending_len] = message
+	box.pending_len++
+}
+pub fn (mut box Mailbox) recv() ?MboxMsg {
+	if box.pending_read == box.pending_len { return none }
+	message := box.pending[box.pending_read]
+	box.pending_read++
+	return message
+}
 pub fn (mut _ Mailbox) recv_blocking(_ int) ?MboxMsg { return none }
 
 pub fn (mut box Mailbox) send(message MboxMsg) bool {

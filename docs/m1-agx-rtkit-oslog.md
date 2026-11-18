@@ -28,9 +28,10 @@ The source-retention filter now includes device-tree includes and assembly.
 The restored audit retains the exact t8103 device tree and ARM64 memory
 attribute assembly used by the checks.
 
-The full audit remains `not_equivalent`. Initial RTKit failure handling
-and physical device behavior remain open. No hardware tests or reboots
-occurred.
+At this revision the audit reported `not_equivalent`, with initial RTKit
+failure handling still open and physical device behavior untested. No
+hardware tests or reboots occurred.
+[Initial buffer failure follow-up](m1-agx-rtkit-first-buffer.md)
 
 Evidence is retained under
 `/Users/alex/.local/state/vinix/omarchy-m1-rtkit-oslog-20261118/`.

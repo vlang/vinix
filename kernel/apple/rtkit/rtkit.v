@@ -103,6 +103,8 @@ pub mut:
 	syslog_entries   u32
 	syslog_msg_size  u32
 	oslog_ack_enabled bool
+	// The client must unwind failed allocations before firmware can retry.
+	nonfatal_buffer_errors bool
 	// Latches the first out-of-range endpoint-map group so a repeating roll
 	// call cannot flood the console during boot.
 	epmap_group_warned bool
@@ -539,13 +541,13 @@ fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
 			|| rtk.shmem_alloc == unsafe { nil } {
 			C.kprintf(c'rtkit[%.*s]: invalid buffer request ep=%llu size=0x%llx iova=0x%llx\n',
 				i32(rtk.name.len), rtk.name.str, u64(ep), size, requested_iova)
-			return false
+			return rtk.nonfatal_buffer_errors
 		}
 		iova = rtk.shmem_alloc(rtk.shmem_context, size)
 		if iova == 0 {
 			C.kprintf(c'rtkit[%.*s]: failed to allocate 0x%llx-byte buffer for ep=%llu\n',
 				i32(rtk.name.len), rtk.name.str, size, u64(ep))
-			return false
+			return rtk.nonfatal_buffer_errors
 		}
 		rtk.system_iovas[ep] = iova
 		rtk.system_sizes[ep] = size
@@ -562,9 +564,13 @@ fn (mut rtk RTKit) reply_system_buffer(ep u8, msg u64) bool {
 		reply = (u64(buffer_request) << management_type_shift) | ((size >> 12) << 44) | wire_iova
 	}
 	// Logging endpoints can retry publication of a retained mapping after a
-	// mailbox timeout. Crashlog uses this type for a crash after setup.
+	// mailbox timeout. Crashlog keeps the buffer for later notifications.
 	sent := rtk.send_message(ep, reply)
-	return sent || ep != ep_crashlog
+	if !sent && rtk.nonfatal_buffer_errors {
+		C.kprintf(c'rtkit[%.*s]: buffer reply timed out on endpoint %llu\n',
+			i32(rtk.name.len), rtk.name.str, u64(ep))
+	}
+	return sent || ep != ep_crashlog || rtk.nonfatal_buffer_errors
 }
 
 fn (rtk &RTKit) dump_syslog_entry(msg u64) {

@@ -597,6 +597,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	check_rtkit_snapshot(transport, read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!, asahi_rtkit,
 		read(os.join_path(asahi_linux, 'rust/kernel/soc/apple/rtkit.rs'))!)!
 	check_rtkit_buffer_retries(transport, asahi_rtkit)!
+	check_rtkit_buffer_startup(transport, asahi_rtkit, repo)!
 	check_rtkit_syslog(transport, asahi_rtkit)!
 	check_rtkit_oslog(transport, asahi_rtkit, asahi_linux, repo)!
 	check_rtkit_agx_coherency(asahi_linux, repo, asahi_rtkit)!
@@ -1002,6 +1003,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'G13 Event, KTrace and Stats reads serialize with backing teardown and dispatch private copies after releasing the lock',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'RTKit Syslog, IOReport and OSLog retries reuse the published buffer and reject changed geometry without ending the session',
+		'G13 keeps receiving after initial RTKit buffer setup failure and retains backing on a reply timeout',
 		'G13 RTKit prepares cached CPU RAM for uncached firmware access and reads bounded Syslog records before acknowledgement',
 		'Fresh G13 RTKit sessions echo the full OSLog counter on the negotiated channel and ignore reserved channel bits',
 		'RTKit filters unknown crash notifications and decodes bounded strings, time, mailbox history and exception records',

@@ -242,6 +242,7 @@ pub fn new_gpu_manager(res &regs.GpuResources, cfg &hw.HwConfig, rtk &rtkit.RTKi
 		mgr.rtk.set_shmem_allocator(voidptr(mgr), allocate_rtkit_shmem)
 		mgr.rtk.set_shmem_reader(copy_rtkit_shmem)
 		mgr.rtk.oslog_ack_enabled = true
+		mgr.rtk.nonfatal_buffer_errors = true
 	}
 
 	return mgr

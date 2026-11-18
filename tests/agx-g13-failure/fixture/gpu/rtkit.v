@@ -217,6 +217,7 @@ fn check_rtkit_buffer_retry(abi hw.FirmwareAbi, ep u8, timeout bool) {
 	}
 	rtkit_owner = unsafe { &mgr }
 	transport.set_shmem_allocator(unsafe { voidptr(&mgr) }, allocate_rtkit_shmem)
+	assert !transport.nonfatal_buffer_errors
 
 	// Wire fields are literal so the fixture can catch mask or shift errors.
 	size := if ep == rtkit.ep_oslog { u64(0x2345) } else { u64(4096) }
@@ -420,4 +421,93 @@ fn check_rtkit_oslog() {
 		rtkit_owner = unsafe { nil }
 	}
 	println('G13 RTKit: 78 OSLog notifications across both ABIs check full-width ACKs, reserved bits and shutdown')
+}
+
+fn check_rtkit_first_buffer_requests() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for ep in [rtkit.ep_crashlog, rtkit.ep_syslog, rtkit.ep_ioreport, rtkit.ep_oslog]! {
+			check_rtkit_first_buffer_request(abi, ep, true)
+			check_rtkit_first_buffer_request(abi, ep, false)
+		}
+	}
+	println('G13 RTKit: 16 first-buffer sequences across boot and runtime on both ABIs')
+}
+
+fn check_rtkit_first_buffer_request(abi hw.FirmwareAbi, ep u8, booting bool) {
+	mut transport := rtkit.RTKit{
+		name: 'g13-first-buffer'
+		state: if booting { rtkit.RTKitState.idle } else { .running }
+		nonfatal_buffer_errors: true
+	}
+	mut mgr := GpuManager{
+		hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}
+		rtk: unsafe { &transport }
+	}
+	rtkit_owner = unsafe { &mgr }
+	geometry := if ep == rtkit.ep_oslog { u64(0x0102345000000000) } else { u64(0x0010100000000000) }
+	address := if ep == rtkit.ep_oslog { u64(0xffae00000) } else { u64(0xfae00000000) }
+	request_type := if ep == rtkit.ep_oslog { u64(1) << 56 } else { u64(1) << 52 }
+	request := mailbox.MboxMsg{data0: geometry, data1: ep}
+	empty := mailbox.MboxMsg{data0: request_type, data1: ep}
+	foreign := mailbox.MboxMsg{data0: geometry | 1, data1: ep}
+	if !booting {
+		assert mgr.handle_role_system_message(0, request) // No allocator installed
+		assert transport.mbox.attempts == 0 && transport.system_iovas[ep] == 0
+	}
+	transport.set_shmem_allocator(unsafe { voidptr(&mgr) }, allocate_rtkit_shmem)
+	transport.set_shmem_reader(copy_rtkit_shmem)
+	allocations := rtkit_alloc_attempts
+	cache_before, _, _ := cpu.prepared_range()
+	rtkit_fail_next_allocation = true
+	if booting {
+		for item in [
+			mailbox.MboxMsg{data0: (u64(1) << 52) | (u64(12) << 16) | 11},
+			mailbox.MboxMsg{data0: (u64(8) << 52) | (u64(1) << 51) | (u64(1) << ep)},
+			empty, foreign, request, request,
+			mailbox.MboxMsg{data0: (u64(7) << 52) | 0x20},
+			mailbox.MboxMsg{data0: (u64(0xb) << 52) | 0x20},
+		]! {
+			transport.mbox.inject(item)
+		}
+		mgr.lock.acquire()
+		booted := mgr.boot_firmware_role(0)
+		mgr.lock.release()
+		assert booted && transport.protocol_version == 12
+		assert transport.mbox.attempts == 6 && transport.mbox.sent == 6
+	} else {
+		for item in [empty, foreign, request]! {
+			assert mgr.handle_role_system_message(0, item)
+			assert transport.mbox.attempts == 0 && mgr.rtkit_buffers.len == 0
+			assert transport.system_iovas[ep] == 0 && transport.system_sizes[ep] == 0
+		}
+		assert rtkit_alloc_attempts == allocations + 1
+		transport.mbox.fail_next_send = true
+		mailbox.watch_send(check_rtkit_reply_owner)
+		assert mgr.handle_role_system_message(0, request)
+		assert transport.mbox.attempts == 1 && transport.mbox.sent == 0
+		mailbox.watch_send(unsafe { nil })
+	}
+	assert mgr.state == .running && transport.state == .running
+	assert mgr.rtkit_buffers.len == 1 && rtkit_alloc_attempts == allocations + 2
+	assert transport.system_iovas[ep] == alloc.g13_rtkit_start
+	assert transport.system_sizes[ep] == if ep == rtkit.ep_oslog { 0x2345 } else { 4096 }
+	cache_after, _, _ := cpu.prepared_range()
+	assert cache_after == cache_before + 1
+
+	if !booting {
+		if ep == rtkit.ep_crashlog {
+			// With backing installed, another type 1 is a crash.
+			assert !mgr.handle_role_system_message(0, request)
+			assert transport.state == .error && transport.mbox.attempts == 1
+		} else {
+			assert mgr.handle_role_system_message(0, request)
+			assert transport.mbox.attempts == 2 && transport.mbox.sent == 1
+			assert transport.mbox.last.data0 == (geometry | address) && transport.mbox.last.data1 == ep
+		}
+		assert rtkit_alloc_attempts == allocations + 2
+	}
+	mgr.shutdown()
+	assert mgr.rtkit_buffers.len == 0 && memory.snapshots() == 0
+	unsafe { mgr.rtkit_buffers.free() }
+	rtkit_owner = unsafe { nil }
 }

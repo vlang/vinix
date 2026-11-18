@@ -65,6 +65,7 @@ fn run_checks() int {
 	production += section(source, 'struct G13ChannelAllocations {', '@[inline]\nfn pipe_index') or { panic(err) }
 	production += section(source, 'const buffer_allocator_g13_rtkit', '\n') or { panic(err) }
 	production += '\n'
+	production += section(source, 'fn (mut mgr GpuManager) boot_firmware_role(', 'fn (mut mgr GpuManager) start_firmware_endpoint(') or { panic(err) }
 	production += section(source, 'fn allocate_rtkit_shmem(', 'struct G13ChannelAllocations {') or { panic(err) }
 	production += (section(source, 'fn (mut mgr GpuManager) release_rtkit_buffers(', 'fn (mut mgr GpuManager) alloc_g13_channel_pair(') or { panic(err) })
 		.replace('release_rtkit_buffers()', 'checked_release_rtkit_buffers()')
