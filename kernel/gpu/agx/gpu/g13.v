@@ -458,38 +458,6 @@ fn (mut mgr GpuManager) flush_g13_kernel_buffer(buffer &SharedBuffer) bool {
 	return mgr.flush_g13_uat_range(mmu.uat_kernel_flush_slot, buffer.va, buffer.size)
 }
 
-fn (mut mgr GpuManager) flush_g13_queue_mappings(resources &G13QueueResources) bool {
-	if !mgr.flush_g13_kernel_buffer(&resources.context)
-		|| !mgr.flush_g13_kernel_buffer(&resources.notifier_list)
-		|| !mgr.flush_g13_kernel_buffer(&resources.threshold)
-		|| !mgr.flush_g13_kernel_buffer(&resources.notifier) {
-		return false
-	}
-	for pipe_type := u32(0); pipe_type < 3; pipe_type++ {
-		if resources.channel_mask & (u32(1) << pipe_type) == 0 {
-			continue
-		}
-		queue := &resources.subqueues[pipe_type]
-		if !mgr.flush_g13_kernel_buffer(&queue.gpu_buffer)
-			|| !mgr.flush_g13_kernel_buffer(&queue.state)
-			|| !mgr.flush_g13_kernel_buffer(&queue.ring)
-			|| !mgr.flush_g13_kernel_buffer(&queue.info) {
-			return false
-		}
-	}
-	if resources.render_buffer.initialized {
-		buffer := &resources.render_buffer
-		if !mgr.flush_g13_kernel_buffer(&buffer.info)
-			|| !mgr.flush_g13_kernel_buffer(&buffer.block_control)
-			|| !mgr.flush_g13_kernel_buffer(&buffer.counter)
-			|| !mgr.flush_g13_kernel_buffer(&buffer.stats)
-			|| !mgr.flush_g13_kernel_buffer(&buffer.kernel_buffer) {
-			return false
-		}
-	}
-	return true
-}
-
 @[inline]
 fn g13_div_round_up(value u32, divisor u32) u32 {
 	return value / divisor + if value % divisor != 0 { u32(1) } else { u32(0) }
@@ -2893,10 +2861,9 @@ pub fn (mut mgr GpuManager) create_g13_queue_resources(queue_id u32,
 		&& !mgr.initialize_g13_render_buffer(mut resources, vm) {
 		return none
 	}
+	// UAT has installed the mappings. The first work-queue message exposes
+	// the descriptor to firmware. Returned queues keep the full cleanup path.
 	resources.mappings_published = true
-	if !mgr.flush_g13_queue_mappings(resources) {
-		return none
-	}
 	mgr.g13_queues << resources
 	complete = true
 	return resources

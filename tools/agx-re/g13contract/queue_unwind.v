@@ -8,10 +8,12 @@ fn check_queue_unwind_local(source string) ! {
 		'mut complete := false', 'defer {', 'if !complete {',
 		'if !mgr.free_g13_queue_resources_locked(mut resources, resources.mappings_published) {',
 		'resources.quarantined = true', 'mgr.g13_queues << resources', 'unsafe { *retained = resources }', '} else {',
-		'unsafe { free(resources) }', 'resources.context =', 'resources.mappings_published = true',
-		'if !mgr.flush_g13_queue_mappings(resources)', 'mgr.g13_queues << resources', 'complete = true', 'return resources'],
+		'unsafe { free(resources) }', 'resources.context =', 'mgr.initialize_g13_subqueue(',
+		'mgr.initialize_g13_render_buffer(', 'resources.mappings_published = true',
+		'mgr.g13_queues << resources', 'complete = true', 'return resources'],
 		'Transfer quarantined metadata and free fully unwound metadata before unlocking')!
 	require(constructor.count('free(resources)') == 1, 'Exactly one source failure-only metadata free')!
+	require(!constructor.contains('flush_g13_'), 'Queue construction uses page-table invalidation')!
 }
 
 fn check_queue_unwind_reference(queue string, buffer string, types string, allocator string) ! {

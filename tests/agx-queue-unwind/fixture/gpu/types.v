@@ -60,6 +60,7 @@ fn (mut manager GpuManager) allocate(size u64) ?SharedBuffer {
 }
 fn (manager &GpuManager) initialize_g13_subqueue(mut _ G13QueueResources, pipe u32) bool { return manager.mode != 7 + int(pipe) }
 fn (manager &GpuManager) initialize_g13_render_buffer(mut _ G13QueueResources, _ &mmu.UatContext) bool { return manager.mode != 10 }
+// Negative control for the historical constructor's firmware flush.
 fn (manager &GpuManager) flush_g13_queue_mappings(_ &G13QueueResources) bool { return manager.mode != 11 }
 fn (mut manager GpuManager) free_g13_queue_resources_locked(mut resources G13QueueResources, published bool) bool {
 	manager.cleanups++; manager.last = &resources

@@ -38,19 +38,20 @@ fn check_unwind() {
 		mut sentinel := G13QueueResources{}
 		mut retained := unsafe { &sentinel }
 		if resources := manager.create_g13_queue_resources(1, mask, priority, &vm, unsafe { &retained }) { returned = resources }
-		failed := mode in [1, 2, 3, 4, 5, 6, 11, 12]! || (mode >= 7 && mode <= 9 && mask & (u32(1) << (mode - 7)) != 0)
+		failed := mode in [1, 2, 3, 4, 5, 6, 12]! || (mode >= 7 && mode <= 9 && mask & (u32(1) << (mode - 7)) != 0)
 			|| (mode == 10 && mask & 1 != 0)
+		if mode == 11 { assert returned != unsafe { nil }, 'queue creation must succeed when firmware flushes are refused' }
 		if !failed {
 			assert returned != unsafe { nil } && retained == unsafe { nil } && manager.cleanups == 0 && manager.g13_queues.len == 1
 			$if queue_sanitized ? { assert C.__asan_address_is_poisoned(returned) == 0, 'successful returned metadata must remain live' }
-			assert !returned.released && !returned.quarantined
+			assert returned.mappings_published && !returned.released && !returned.quarantined
 			list := unsafe { &fw.G13NotifierList(returned.notifier_list.cpu_address()) }
 			assert list.list_head.next == returned.notifier_list.va, 'notifier next must point to the list head'
 			assert list.list_head.prev == 0 && list.unk_10 == 0, 'notifier list must start empty'
 			threshold := unsafe { *&u64(returned.threshold.cpu_address()) }
 			assert threshold == 0, 'notifier threshold must start at zero'
 			assert manager.workspace[1][0x18] == 0xa5 && manager.workspace[2][8] == 0xa5
-		} else if mode in [11, 12]! {
+		} else if mode == 12 {
 			assert returned == unsafe { nil } && manager.cleanups == 1 && manager.g13_queues.len == 1
 			assert voidptr(retained) == voidptr(manager.g13_queues[0])
 			$if queue_sanitized ? { assert C.__asan_address_is_poisoned(retained) == 0, 'quarantined metadata must remain live for manager/file adoption' }
@@ -86,15 +87,21 @@ fn check_stopped_handoff() {
 			mut retained := &G13QueueResources(unsafe { nil })
 			stopping_manager = unsafe { &manager }
 			klock.on_next_release(unsafe { &manager.lock }, stop_on_constructor_unlock)
-			if _ := manager.create_g13_queue_resources(1, 7, 1, &vm, unsafe { &retained }) {
-				panic('constructor must fail after quarantine')
+			returned := manager.create_g13_queue_resources(1, 7, 1, &vm, unsafe { &retained }) or { unsafe { nil } }
+			failed := mode == 12
+			if failed {
+				assert returned == unsafe { nil } && retained != unsafe { nil }
+				assert manager.cleanups == 2
+			} else {
+				assert returned != unsafe { nil } && retained == unsafe { nil }
+				assert manager.cleanups == 1
 			}
-			assert manager.g13_queues.len == 0 && manager.cleanups == 2 && manager.state == .stopped
-			assert retained != unsafe { nil }, 'shutdown must not lose the constructor handoff'
-			assert retained.released && retained.quarantined && voidptr(retained.vm) == voidptr(&vm)
-			$if queue_sanitized ? { assert C.__asan_address_is_poisoned(retained) == 0 }
-			free_g13_queue_record(retained)
-			$if queue_sanitized ? { assert C.__asan_address_is_poisoned(retained) != 0 }
+			owner := if failed { retained } else { returned }
+			assert manager.g13_queues.len == 0 && manager.state == .stopped
+			assert owner.released && owner.quarantined == failed && voidptr(owner.vm) == voidptr(&vm)
+			$if queue_sanitized ? { assert C.__asan_address_is_poisoned(owner) == 0 }
+			free_g13_queue_record(owner)
+			$if queue_sanitized ? { assert C.__asan_address_is_poisoned(owner) != 0 }
 			stopping_manager = unsafe { nil }
 			unsafe { manager.g13_queues.free() }
 		}

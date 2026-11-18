@@ -385,3 +385,29 @@ The evidence archive covers `5d08a5ba813ef445ea45678d02068c22f2fec70c` plus
 `source.diff`. The original and restored copies passed verification. The
 archive is at `/Users/alex/.local/state/vinix/omarchy-m1-job-prepare-tlbi-20261119.BkmbI9/bundle.tar.gz`
 with SHA-256 `d52ae1ff932d4d07a309b4d76cfb097620dca0652034be2e87c6bd152899070d`.
+
+## Queue preparation through UAT
+
+G13 constructs queues through UAT page-table invalidation. Firmware first
+receives the queue descriptor in a work-queue message. This removes six
+firmware-control round trips for a render-only queue and three for a
+compute-only queue. Returned queues retain the full mapping and context
+retirement path.
+[Pinned queue construction](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/queue/mod.rs#L556-L608)
+[Pinned mapping completion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/mmu.rs#L921-L946)
+
+The sanitizer regression reproduced constructor failure when the old
+publication flush was refused. The updated fixture passed 3,640 constructor
+cases and 64 shutdown handoffs, including successful returns and quarantined
+failures. The host heap check observed zero retained allocations across
+30,000 failed constructions. Generated AArch64 C shows queue registration
+without the flush. The four compared cleanup bodies match the baseline.
+
+Both kernel builds, the job lifetime and UAT sanitizer suites, 79 source-contract
+test files and 122 pinned reference checks passed. The allocation scan matched
+the 176 baseline findings. M1 hardware validation remains open.
+
+The evidence archive covers `61aa97601c89661d7b7b4a46e3addac3b509d8c2` plus
+`source.diff`. The original and restored copies passed verification. The
+archive is at `/Users/alex/.local/state/vinix/omarchy-m1-queue-prepare-tlbi-20261119.Ien1zh/bundle.tar.gz`
+with SHA-256 `59cf4c270a88954f20ff769991ac1876ad2c2e3713577bd4a163f8c214557df0`.
