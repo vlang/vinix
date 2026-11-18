@@ -4,6 +4,7 @@ import drm
 import drm.asahi
 import drm.gem
 import drm.ioctl
+import gpu.agx.bo
 import gpu.agx.gpu
 import gpu.agx.mmu
 import gpu.agx.params
@@ -11,6 +12,7 @@ import gpu.agx.pgtable
 import gpu.agx.workqueue
 import memory
 import os
+import proc
 import usercopy
 
 fn check_modern_transport() {
@@ -91,10 +93,12 @@ fn check_modern_transport() {
 	assert context.vm_id == 1 && context.id == 1
 	vm.flags = 1
 	assert drm.invoke(&device, 0x1111, asahi.vm_create, sizeof(vm), 3, unsafe { voidptr(&vm) }) == -22
+	mapped := gem.create(91)
+	modern.objects.add_created(mapped)
 	mut mmap := asahi.GemMmapOffset{ handle: 91 }
 	usercopy.configure(unsafe { u64(&mmap) }, sizeof(mmap), -1)
 	assert drm.invoke(&device, 0x1111, asahi.gem_mmap_offset, sizeof(mmap), 3, unsafe { voidptr(&mmap) }) == 0
-	assert mmap.offset == 0xabc000
+	assert mmap.offset == gem.create_mmap_offset(mapped)
 	// Advice now reaches the per-file handle lookup; zero is not a handle.
 	mut advice := asahi.GemMadvise{}
 	usercopy.configure(unsafe { u64(&advice) }, sizeof(advice), -1)
@@ -239,6 +243,7 @@ pub fn run_modern_checks() {
 	check_modern_binding()
 	check_modern_queue_and_object()
 	check_gem_handle_storage()
+	check_gem_file_names()
 	run_advice_checks()
 	run_modern_scs_checks()
 	assert params.timestamp_ns(24_000_003, 24_000_000) == 1_000_000_125
@@ -267,7 +272,8 @@ fn check_gem_handle_storage() {
 	memory.assert_released()
 	for modern in [false, true]! {
 		for _ in 0 .. 64 {
-			mut file := GpuFile{ioctl_abi: if modern { modern_ioctl_abi } else { legacy_ioctl_abi }}
+			mut file := GpuFile{ioctl_abi: if modern { modern_ioctl_abi } else { legacy_ioctl_abi },
+				objects: Objects{table: bo.new_table(true)}}
 			file_map[client] = unsafe { &file }
 			before := gem.creates()
 			memory.fail_allocations(true)
@@ -276,7 +282,7 @@ fn check_gem_handle_storage() {
 			assert gem.live() == 0 && memory.outstanding() == 0 && !file.lock.is_held()
 			memory.fail_allocations(false)
 			first_code, first := create_wire_gem(&device, client, modern)
-			assert first_code == 0 && memory.outstanding() == 1
+			assert first_code == 0 && first == 1 && memory.outstanding() == 1
 			memory.fail_allocations(true)
 			calls := memory.calls()
 			second_code, second := create_wire_gem(&device, client, modern)
@@ -290,7 +296,7 @@ fn check_gem_handle_storage() {
 			assert memory.outstanding() == 1, 'growth must release the previous table'
 			for handle in [first, second, third]! {
 				object := file.objects.get_ref(handle) or { panic('published GEM handle disappeared') }
-				assert object.handle == handle && object.references == 2 && object.size == 0x8000
+				assert object.handle != handle && object.references == 2 && object.size == 0x8000
 				gem.unref(object)
 			}
 			file_map.delete(client)
@@ -299,6 +305,56 @@ fn check_gem_handle_storage() {
 		}
 	}
 	println('AGX GEM handle storage: 256 first/growth failures across both ABIs preserve request outputs and existing handles. Spare capacity, retries and close release pass.')
+}
+
+fn check_gem_file_names() {
+	driver := drm.DrmDriver{ioctls: drm_ioctls(), ioctl_abi: ioctl_abi_handle}
+	device := drm.DrmDevice{driver: unsafe { &driver }, driver_data: unsafe { voidptr(gpu.registration_manager()) }}
+	first_key, second_key := u64(0x4c02), u64(0x4c03)
+	first_fd, second_fd := voidptr(first_key), voidptr(second_key)
+	proc.enable_owner(true)
+	defer { proc.enable_owner(false) }
+	for _ in 0 .. 64 {
+		shared := gem.create(0xabc0)
+		assert (gem_import_handler(&device, first_fd, shared) or { panic('early PRIME import') }) == 1
+		assert (gem_import_handler(&device, second_fd, shared) or { panic('second PRIME import') }) == 1
+		assert ioctl_abi_handle(&device, first_fd) == 0 && ioctl_abi_handle(&device, second_fd) == 0
+		modern_code, modern_name := create_wire_gem(&device, first_key, true)
+		legacy_code, legacy_name := create_wire_gem(&device, second_key, false)
+		assert modern_code == 0 && legacy_code == 0 && modern_name == 2 && legacy_name == 2
+		for expected in [u32(3), 4]! {
+			code, name := create_wire_gem(&device, first_key, true)
+			assert code == 0 && name == expected
+		}
+		old := gem_export_handler(&device, first_fd, 2) or { panic('original export') }
+		other := gem_export_handler(&device, second_fd, 2) or { panic('second file export') }
+		assert voidptr(old) != voidptr(other)
+		memory.fail_allocations(true)
+		assert (gem_import_handler(&device, first_fd, shared) or { panic('repeat PRIME import') }) == 1
+		assert gem_import_handler(&device, first_fd, other) == none
+		assert shared.references == 3 && other.references == 2
+		mut first := lookup_file(first_fd) or { panic('first file') }
+		old_offset := first.authorize_mmap(2) or { panic('original mmap offset') }
+		assert first.valid_mmap_range(old_offset, old.size)
+		assert close_gem_handle(&device, first_fd, 2) == 0 && old.references == 2
+		assert gem_export_handler(&device, first_fd, 2) == none
+		assert gem_export_handler(&device, first_fd, old.handle) == none
+		reuse_code, reused := create_wire_gem(&device, first_key, true)
+		memory.fail_allocations(false)
+		assert reuse_code == 0 && reused == 2
+		fresh := gem_export_handler(&device, first_fd, reused) or { panic('replacement export') }
+		assert voidptr(fresh) != voidptr(old) && voidptr(fresh) != voidptr(other)
+		fresh_offset := first.authorize_mmap(reused) or { panic('replacement mmap offset') }
+		assert fresh_offset != old_offset && first.valid_mmap_range(old_offset, old.size)
+		assert (gem_import_handler(&device, first_fd, other) or { panic('PRIME import retry') }) == 5
+		assert close_gem_handle(&device, first_fd, 1) == 0
+		release_handle(&device, first_fd)
+		release_handle(&device, second_fd)
+		for object in [old, other, fresh, shared]! { gem.unref(object) }
+		assert gem.live() == 0
+		memory.assert_released()
+	}
+	println('AGX G13 GEM handles: 64 independent file pairs preserve early PRIME imports across ABI selection, reuse closed names, and retain original mmap and export owners')
 }
 
 fn check_file_vm_names(mut manager mmu.UatManager) {

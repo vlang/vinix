@@ -29,17 +29,19 @@ fn checks() !int {
 		section(source, 'fn get_or_create_file(', 'pub fn release_handle(')! +
 		section(source, 'struct GpuMapping {', 'struct G17QueueOwnership {')! +
 		section(source, 'struct G13SubmissionQueue {', '@[heap]\nstruct G13SubmitCompletion {')! +
-		section(source, 'pub fn release_handle(', '// Tear the file down.')! +
+		section(source, 'pub fn release_handle(', '// Tear the file down.')!
+			.replace('objects: agxbo.new_table(manager.hw_config.gpu_gen == .g13)',
+				'objects: Objects{table: agxbo.new_table(manager.hw_config.gpu_gen == .g13)}') +
+		section(source, 'fn (mut f GpuFile) import_object(', 'fn (mut f GpuFile) mmap_attributes(')! +
 		section(source, 'fn (mut f GpuFile) mmap_attributes(', '// Caller holds file.lock')! +
-		section(source, 'fn lookup_file(', 'pub fn close_gem_handle(')! +
-		section(source, 'pub fn mmap_attributes_handle(', 'fn ioctl_get_params_handler(')! +
+		section(source, 'fn lookup_file(', 'fn ioctl_get_params_handler(')! +
 		section(source, 'fn (mut f GpuFile) capture_submission_queue(', '// Copy userspace input')! +
 		section(source, 'pub fn (mut f GpuFile) close()', 'fn (mut f GpuFile) import_object(')! +
 		section(source, 'fn (mut f GpuFile) retire_mapping_locked(', '// Reserve a nonzero per-open queue ID.')! +
 		section(source, 'fn (f &GpuFile) find_vm(', 'fn asahi_variant(')! +
 		section(source, 'fn (mut f GpuFile) allocate_timestamp_id_locked(', 'fn (f &GpuFile) find_vm(')! +
 		section(source, 'fn (mut f GpuFile) allocate_queue_id_locked(', 'fn (mut f GpuFile) allocate_timestamp_id_locked(')! +
-		section(source, 'pub fn (mut f GpuFile) ioctl_vm_create(', 'pub fn (mut f GpuFile) ioctl_gem_mmap_offset(')! +
+		section(source, 'pub fn (mut f GpuFile) ioctl_vm_create(', 'pub fn (mut f GpuFile) ioctl_gem_bind(')! +
 		section(source, 'pub fn (f &GpuFile) ioctl_get_params(', 'pub fn (mut f GpuFile) ioctl_vm_create(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'pub fn (f &GpuFile) ioctl_get_time(')! +
 		section(source, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(', 'fn discard_g13_completion(')! +

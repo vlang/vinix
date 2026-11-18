@@ -650,7 +650,7 @@ constructing the object. If the first table allocation or later growth
 fails, the ioctl returns `ENOMEM` with the existing handles and request
 fields intact. The native and software backends hold the file lock from
 reservation through publication. The pinned DRM core also reserves its
-handle entry fallibly. Vinix still assigns handle numbers from its global
+handle entry fallibly. This revision assigned handle numbers from the global
 GEM table. [Pinned DRM handle creation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L479-L535)
 
 The sanitized ioctl fixture passed 256 injected allocation failures
@@ -665,6 +665,28 @@ The restored archive passed inventory verification for
 `/Users/alex/.local/state/vinix/omarchy-m1-gem-handle-storage-20261118.sCpXgC/`.
 `bundle.tar.gz` SHA-256 is
 `516036194cad54d0941ff9c9e058fa19c0237f06eba8b804a33fbcabc067cda5`.
+
+G13 opens now allocate the lowest available nonzero GEM handle in each
+file, matching the pinned DRM allocator. Both ABIs use the same file
+table from open, so PRIME imports issued before ABI selection keep their
+names. Repeated imports return the existing name. Closing a handle makes
+its number available while existing mappings and exports retain the
+original object. Vinix's global backing-object limit still applies.
+[Pinned DRM handle allocation and release](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_gem.c#L384-L535)
+
+The sanitized fixture passed 64 pairs of legacy and modern files. It
+covered early PRIME import, duplicate and failed imports, reuse with a
+full table, and independent mmap offsets and export owners. It also
+passed the existing 256 table allocation failures and timestamp
+registration races with the new names. Both kernel builds, the CPU-cache
+fixture and 82 V test files passed. The allocation scan matched its 177
+baseline findings. The pinned offline audit remains `not_equivalent`.
+
+The restored archive passed inventory verification for
+`d4214b5cf55d21c1c90ad6a274f3bb44fa32fc14` plus `source.diff`. Evidence is in
+`/Users/alex/.local/state/vinix/omarchy-m1-gem-file-names-20261118.iDELzd/`.
+`bundle.tar.gz` SHA-256 is
+`14fa9d5cb971a3a26c2c329185130c895854020739eab729a86da5b1939af400`.
 
 Base M1 G13 can use the AIC mailbox receive interrupt with a timed poll
 fallback. [RTKit mailbox receive IRQ](m1-agx-rx-irq.md)

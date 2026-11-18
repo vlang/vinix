@@ -22,11 +22,18 @@ pub struct Table {
 mut:
 	objects      []&gem.GemObject
 	mmap_objects []&gem.GemObject
+	local_handles bool
+	first_free int // lowest vacant index in the G13 namespace
+}
+
+pub fn new_table(local_handles bool) Table {
+	return Table{local_handles: local_handles}
 }
 
 // Reserve one slot while holding the file lock. GEM creation keeps that lock
 // through publication so it can return ENOMEM before constructing the object.
 pub fn (mut table Table) reserve_handle_entry() bool {
+	if table.local_handles && table.first_free < table.objects.len { return true }
 	if table.objects.len < table.objects.cap { return true }
 	max_capacity := max_int / int(sizeof(voidptr))
 	if table.objects.len >= max_capacity { return false }
@@ -51,29 +58,46 @@ pub fn (mut table Table) reserve_handle_entry() bool {
 	return true
 }
 
-// Nothing slices either list, so one that grows can free the buffer it
-// outgrew. V keeps it otherwise, and every handle a file made lost one.
-fn (mut table Table) push(object &gem.GemObject) {
+// Transfer the creator's reference and return the name visible to this file.
+// Production callers reserve storage before constructing or importing a BO.
+pub fn (mut table Table) add_created(object &gem.GemObject) u32 {
+	if object == unsafe { nil } { return 0 }
 	table.objects.flags |= .noslices
-	table.objects << object
+	if !table.local_handles {
+		table.objects << object
+		return object.handle
+	}
+	index := table.first_free
+	if index == table.objects.len {
+		table.objects << object
+	} else {
+		table.objects[index] = object
+	}
+	table.first_free++
+	for table.first_free < table.objects.len && table.objects[table.first_free] != unsafe { nil } {
+		table.first_free++
+	}
+	return u32(index + 1)
 }
 
-// Add the creator's existing reference to this file's handle table.
-pub fn (mut table Table) add_created(object &gem.GemObject) {
-	if object != unsafe { nil } {
-		table.push(object)
+fn (table &Table) handle_index(handle u32) ?int {
+	if table.local_handles {
+		if handle == 0 || u64(handle) > u64(table.objects.len) { return none }
+		index := int(handle - 1)
+		if table.objects[index] == unsafe { nil } { return none }
+		return index
 	}
+	for index, object in table.objects {
+		if object.handle == handle { return index }
+	}
+	return none
 }
 
 // Return a borrowed pointer. The caller must retain the file lock while using
 // it, or use get_ref() when the pointer has to outlive that lock.
 pub fn (table &Table) find(handle u32) ?&gem.GemObject {
-	for object in table.objects {
-		if object.handle == handle {
-			return object
-		}
-	}
-	return none
+	index := table.handle_index(handle) or { return none }
+	return table.objects[index]
 }
 
 pub fn (table &Table) get_ref(handle u32) ?&gem.GemObject {
@@ -86,14 +110,14 @@ pub fn (mut table Table) import_object(object &gem.GemObject) ?u32 {
 	if object == unsafe { nil } || object.vm_private_identity != 0 {
 		return none
 	}
-	for existing in table.objects {
+	for index, existing in table.objects {
 		if voidptr(existing) == voidptr(object) {
-			return existing.handle
+			return if table.local_handles { u32(index + 1) } else { existing.handle }
 		}
 	}
+	if !table.reserve_handle_entry() { return none }
 	gem.ref_obj(object)
-	table.push(object)
-	return object.handle
+	return table.add_created(object)
 }
 
 pub fn (mut table Table) authorize_mmap(handle u32) ?u64 {
@@ -143,13 +167,15 @@ pub fn (table &Table) valid_mmap_range(offset u64, length u64) bool {
 // Remove a file handle without dropping its reference. This lets the backend
 // tear down or retain GPU mappings before it performs the matching unref.
 pub fn (mut table Table) remove(handle u32) ?&gem.GemObject {
-	for index, object in table.objects {
-		if object.handle == handle {
-			table.objects.delete(index)
-			return object
-		}
+	index := table.handle_index(handle) or { return none }
+	object := table.objects[index]
+	if table.local_handles {
+		table.objects[index] = unsafe { nil }
+		if index < table.first_free { table.first_free = index }
+	} else {
+		table.objects.delete(index)
 	}
-	return none
+	return object
 }
 
 pub fn (mut table Table) release_all() {
@@ -157,7 +183,7 @@ pub fn (mut table Table) release_all() {
 		gem.unref(object)
 	}
 	for object in table.objects {
-		gem.unref(object)
+		if object != unsafe { nil } { gem.unref(object) }
 	}
 	// Freed rather than cleared: the table goes with its file. Both are empty
 	// and usable again afterwards.
@@ -165,4 +191,5 @@ pub fn (mut table Table) release_all() {
 		table.mmap_objects.free()
 		table.objects.free()
 	}
+	table.first_free = 0
 }

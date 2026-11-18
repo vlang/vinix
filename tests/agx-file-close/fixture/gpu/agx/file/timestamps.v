@@ -62,13 +62,13 @@ fn check_timestamp_registration() {
 			mut file := get_or_create_file(voidptr(key), &device) or { panic('original file') }
 			assert file.select_ioctl_abi(abi) && file.timestamp_objects.len == 0
 			bo := gem.create(9500)
-			file.objects.add_created(bo)
+			handle := file.objects.add_created(bo)
 			maps := gpu.maps()
 			unmaps := gpu.unmaps()
 			allocations_before := memory.calls()
 			unplugged_timestamp_device = unsafe { &device }
 			usercopy.before_next_read(replace_during_timestamp_ioctl)
-			invoke_timestamp_bind(&device, key, bo.handle, modern, -19)
+			invoke_timestamp_bind(&device, key, handle, modern, -19)
 			assert !device.registered && gpu.maps() == maps && gpu.unmaps() == unmaps
 			assert file.timestamp_objects.len == 0 && bo.references == 1 && memory.calls() == allocations_before
 			assert voidptr(file.registration_manager) == voidptr(original) && !file.lock.is_held()
@@ -80,8 +80,8 @@ fn check_timestamp_registration() {
 			mut new_file := get_or_create_file(voidptr(new_key), &new_device) or { panic('replacement file') }
 			assert new_file.select_ioctl_abi(abi)
 			new_bo := gem.create(9501)
-			new_file.objects.add_created(new_bo)
-			invoke_timestamp_bind(&new_device, new_key, new_bo.handle, modern, 0)
+			new_handle := new_file.objects.add_created(new_bo)
+			invoke_timestamp_bind(&new_device, new_key, new_handle, modern, 0)
 			assert gpu.maps() == maps + 1 && new_file.timestamp_objects.len == 1 && new_bo.references == 2
 			release_handle(&device, voidptr(key))
 			assert gpu.unmaps() == unmaps && new_bo.references == 2

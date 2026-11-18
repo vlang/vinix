@@ -162,6 +162,7 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 	mut f := &GpuFile{
 		dev: unsafe { dev }
 		registration_manager: manager
+		objects: agxbo.new_table(manager.hw_config.gpu_gen == .g13)
 		next_queue_id: 1
 		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
@@ -826,8 +827,7 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	if !f.objects.reserve_handle_entry() { return -12 }
 	obj := gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,
 		request.flags & ioctl.asahi_gem_writeback != 0) or { return -12 }
-	f.objects.add_created(obj)
-	request.handle = obj.handle
+	request.handle = f.objects.add_created(obj)
 	return 0
 }
 

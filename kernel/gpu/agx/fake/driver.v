@@ -416,9 +416,8 @@ fn (mut file FakeG17File) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	if size_error != 0 { return size_error }
 	if !file.objects.reserve_handle_entry() { return -12 }
 	object := gem.create_aligned(request.size, vm_page_size) or { return -12 }
-	file.objects.add_created(object)
+	request.handle = file.objects.add_created(object)
 	request.size = object.size
-	request.handle = object.handle
 	return 0
 }
 
