@@ -344,6 +344,38 @@ render node 128 plus the card number, where Linux numbers render nodes on their
 own; `run-m1-agx-smoke` and Vinix's Mesa patch name `renderD128` directly. If a
 boot log shows the GPU as a later card, they will not find it.
 
+### One boot, one report
+
+`gpucheck` collects this evidence in one run, so that one boot of the M1
+yields all of it. Build it on the Mac with
+`v run tools/gpucheck/build.v gpucheck`, and copy it to the M1's Vinix disk.
+For Omarchy's Mesa, also copy a root staged with `tests/omarchy-mesa/stage.v`
+to `/root/omarchy-mesa`. Then run it as root on the M1:
+
+```sh
+gpucheck            # report on the console and in /root/gpucheck-<seconds>.md
+```
+
+It does the following, and marks each problem it finds:
+
+- **Boot evidence:** lists every `agx:` line from `/proc/bootlog` except the
+  firmware log, which it counts.
+- **Identity:** checks the asahi render node's `subsystem` link and its
+  `uevent` compatibles.
+- **Telemetry:** reads `agx_stats`, `gpu_memory` and `asahi_stats`.
+- **Vinix's Mesa:** runs `run-m1-agx-smoke`.
+- **Omarchy's Mesa:** chroots into its root and runs `vulkaninfo --summary`,
+  `eglinfo -B` and `peglgears`. The renderer must be the Apple M1, and
+  `peglgears` must hold memory on the asahi device in its fdinfo while it
+  runs.
+- **After rendering:** reads the telemetry again and requires completed jobs
+  to have grown.
+- **Recovery:** counts the lines listed in step 6.
+
+The report stays in `/root` across reboots. `tests/gpucheck` runs it in QEMU,
+where there is no Apple GPU, and checks that it reports each missing piece.
+`--no-render` only reads; it runs nothing.
+
 ## Known unproven
 
 * No step of the sequence above has been run on hardware from this tree.
