@@ -42,11 +42,17 @@ fn main() {
 	assert driver_source.contains('sysfs_parent: if base_m1 { gpu_sysfs_path(platform.asc_base) }'), 'DRM parent must be named from the ASC base'
 	assert !agx_source.contains('gpu_mmio_base'), 'the sysfs name must not come from the SGX base'
 	subsystem := section(agx_source, 'fs.sysfs_link(subsystem, \'', '\')')!.all_after('\'')
+	// The VirtIO-MMIO GPU's devices, and that virtio-gpu names its DRM parent
+	// with them.
+	virtio_source := os.read_file(os.getenv_opt('VIRTIO_SYSFS_SOURCE') or { '${repo}/kernel/aarch64/virtio_gpu/sysfs.v' })!
+	virtio_driver := os.read_file('${repo}/kernel/aarch64/virtio_gpu/virtio_gpu.v')!
+	assert virtio_driver.contains('virtio_device_path(virtgpu_transport.unit_address, virtgpu_transport.slot)'), 'virtio-gpu must name its DRM parent'
+	assert virtio_driver.contains('publish_virtio_sysfs(virtgpu_transport.unit_address'), 'virtio-gpu must publish its devices'
 	production := 'module drm\nimport fs\nimport lib\n' + 'const drm_major' +
 		drm_source.all_after('\nconst drm_major') + '\n' +
 		section(agx_source, 'const t8103_compatible', '// The platform device\'s own files')! +
 		section(agx_source, 'fn gpu_modalias()', '// Removal waits')! +
-		'const agx_subsystem_link = \'${subsystem}\'\n'
+		'const agx_subsystem_link = \'${subsystem}\'\n' + virtio_source.all_after('import lib\n')
 	os.write_file('${scratch}/drm/production.v', production)!
 	os.write_file('${scratch}/drm/oracle.v', oracle)!
 	os.cp('${repo}/tests/drm-sysfs/check.v', '${scratch}/drm/check.v')!

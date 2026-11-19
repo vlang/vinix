@@ -25,6 +25,7 @@ import usercopy
 const reg_magic = u64(0x000)
 const reg_version = u64(0x004)
 const reg_device_id = u64(0x008)
+const reg_vendor_id = u64(0x00c)
 const reg_host_features = u64(0x010)
 const reg_guest_features = u64(0x020)
 const reg_guest_page_size = u64(0x028)
@@ -224,6 +225,10 @@ mut:
 	capset_mask    u64
 	ready          bool
 	lock           klock.Lock
+	// Where Linux would find the MMIO device in sysfs; zero on PCI.
+	unit_address u64
+	slot         u64
+	vendor_id    u32
 	common         u64
 	notify         u64
 	isr            u64
@@ -1235,6 +1240,9 @@ pub fn initialise(hhdm u64) bool {
 			response_virt: response_phys + hhdm
 			next_fence:    1
 			ready:         true
+			unit_address:  mmio_base + slot * mmio_slot_size
+			slot:          slot
+			vendor_id:     mmio_r32(base + reg_vendor_id)
 		}
 		mmio_w32(base + reg_queue_pfn, u32(queue_phys / page_size))
 		mmio_w32(base + reg_status, status_acknowledge | status_driver | status_driver_ok)
@@ -1287,11 +1295,22 @@ fn register_driver() bool {
 		mmap:            mmap_object
 		mmap_retain:     mmap_retain
 		mmap_release:    mmap_release
+		// The MMIO device's place in sysfs, so libdrm and Mesa list its
+		// render node; it lives as long as the driver, which stays.
+		sysfs_parent: if virtgpu_transport.unit_address != 0 {
+			virtio_device_path(virtgpu_transport.unit_address, virtgpu_transport.slot)
+		} else {
+			''
+		}
 	}
 	drm.register_driver_definition(driver, unsafe { nil }) or {
 		virtgpu_transport.ready = false
 		uart.puts(c'virtio-gpu: DRM registration failed\n')
 		return false
+	}
+	if virtgpu_transport.unit_address != 0 {
+		publish_virtio_sysfs(virtgpu_transport.unit_address, virtgpu_transport.slot,
+			virtio_id_gpu, virtgpu_transport.vendor_id)
 	}
 	uart.puts(c'virtio-gpu: VirGL render node ready\n')
 	return true

@@ -17,7 +17,11 @@ from the pinned `t8103.dtsi`. It also requires that `driver.v` names the device
 from the ASC base. It then checks Linux's DRM debugfs directory in
 `kernel/debug/dri`: the directory named after the parent, a link per minor, a
 root-only driver file read through either link, none for the parentless device,
-and removal at unregister. `DRM_SYSFS_SOURCE`, `AGX_SYSFS_SOURCE` and
+and removal at unregister. A VirtIO-MMIO GPU, named by
+`kernel/aarch64/virtio_gpu/sysfs.v`, must be listed as a platform device
+through its virtio parent, as libdrm's `drmParseSubsystemType()` does, named
+from its `MODALIAS`, with subsystem links that lead to the buses.
+`VIRTIO_SYSFS_SOURCE` selects another `sysfs.v`. `DRM_SYSFS_SOURCE`, `AGX_SYSFS_SOURCE` and
 `AGX_DRIVER_SOURCE` select other sources, for negative controls.
 
 `guest.c` runs on both architectures and checks every `/dev/dri` node's class

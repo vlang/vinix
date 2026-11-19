@@ -83,6 +83,14 @@ fn subsystem_type(minor u32) string {
 	return link.all_after_last('/')
 }
 
+// drmParseSubsystemType(): a virtio device's bus is its parent's.
+fn libdrm_bus(minor u32) string {
+	bus := subsystem_type(minor)
+	if bus != 'virtio' { return bus }
+	link := readlink('dev/char/226:${minor}/device/../subsystem') or { return 'virtio' }
+	return link.all_after_last('/')
+}
+
 fn device_name(minor u32) ?string {
 	if !node_is_drm(minor) { return none }
 	name := uevent_get('dev/char/226:${minor}', 'DEVNAME')?
@@ -202,6 +210,38 @@ pub fn run_checks() {
 	assert framebuffer.debugfs_dir == '' && !fs.published('kernel/debug/dri/0')
 	assert !debugfs_add_file(&framebuffer, 'asahi_stats', show_marker, unsafe { nil })
 
+	// QEMU's VirGL GPU on the VirtIO-MMIO transport, at slot 31 of the virt
+	// machine: its DRM parent is the virtio device, in the platform device of
+	// the virtio_mmio@a003e00 node, with QEMU's vendor ID.
+	virtio_parent := virtio_device_path(0x0a003e00, 31)
+	assert virtio_parent == 'devices/platform/a003e00.virtio_mmio/virtio31', virtio_parent
+	mut virtio_driver := DrmDriver{sysfs_parent: virtio_parent}
+	mut virtio := DrmDevice{driver: &virtio_driver, dev_id: 2, render_node: &node}
+	publish_drm_sysfs(mut virtio)
+	publish_virtio_sysfs(0x0a003e00, 31, 16, 0x554d4551)
+	for minor in [u32(2), 130] {
+		// libdrm lists it, on the platform bus through the virtio parent.
+		assert node_is_drm(minor), 'libdrm rejects 226:${minor}'
+		assert subsystem_type(minor) == 'virtio'
+		assert libdrm_bus(minor) == 'platform', libdrm_bus(minor)
+		// libdrm reads only the links' last names; Linux's lead to the buses.
+		assert (resolve('dev/char/226:${minor}/device/subsystem') or { '' }) == 'bus/virtio'
+		assert (resolve('dev/char/226:${minor}/device/../subsystem') or { '' }) == 'bus/platform'
+		// drmParseOFBusInfo() and drmParseOFDeviceInfo(): the virtio device
+		// has no OF data, so both use its MODALIAS after the last colon.
+		device := 'dev/char/226:${minor}/device'
+		assert uevent_get(device, 'OF_FULLNAME') == none
+		assert (uevent_get(device, 'MODALIAS') or { '' }) == 'virtio:d00000010v554D4551'
+		// The platform device above it carries the node's identity.
+		assert (uevent_get(device + '/..', 'OF_FULLNAME') or { '' }) == '/virtio_mmio@a003e00'
+		assert (uevent_get(device + '/..', 'OF_COMPATIBLE_0') or { '' }) == 'virtio,mmio'
+	}
+	assert (device_name(130) or { '' }) == '/dev/dri/renderD130'
+	assert (resolve('class/drm/renderD130/device') or { '' }) == virtio_parent
+	assert virtio.debugfs_dir == 'kernel/debug/dri/virtio31'
+	remove_drm_sysfs(mut virtio)
+	assert !fs.published('dev/char/226:130') && !fs.published('class/drm/card2')
+
 	// Unregistering removes the class and dev/char links and the minors; the
 	// parent directory and its own files stay with their driver.
 	remove_drm_sysfs(mut gpu_device)
@@ -220,5 +260,5 @@ pub fn run_checks() {
 	assert node_is_drm(0) == false && exists('class/drm/card0')
 	remove_drm_sysfs(mut framebuffer)
 	_ = lib.new_text(0)
-	println('DRM sysfs: libdrm finds the M1 GPU as a platform device named from the pinned device tree, its debugfs directory holds root-only driver files, virtual devices stay unlisted, and unregister removes every link')
+	println('DRM sysfs: libdrm finds the M1 GPU as a platform device named from the pinned device tree, its debugfs directory holds root-only driver files, virtual devices stay unlisted, and unregister removes every link; a VirtIO-MMIO GPU is listed as a platform device through its virtio parent')
 }
