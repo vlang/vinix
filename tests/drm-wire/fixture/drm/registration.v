@@ -10,6 +10,10 @@ struct NodeBox {
 	minor u64
 }
 
+struct NodeHandle {
+	flags int
+}
+
 struct RegistryLock {
 mut:
 	held bool
@@ -36,6 +40,7 @@ fn shared_timeline_stub() {}
 fn expect_unavailable(mut node DrmNode) {
 	errno.set(0)
 	assert node.open(0) == none && errno.get() == errno.enodev
+	assert (node.open(o_path) or { panic('metadata-only open rejected') }) == node.box
 	request := (u64(`d`) << 8) | 0x00
 	expect_error(mut node, request, unsafe { nil }, errno.enodev)
 }
@@ -49,6 +54,7 @@ fn devtmpfs_remove_device(name string, expected &NodeBox) bool {
 	if node == unsafe { nil } || node.box != expected { return false }
 	expect_unavailable(mut node)
 	node_names[expected.minor] = unsafe { nil }
+	node.unref(unsafe { nil }) or { panic('namespace reference release failed') }
 	return true
 }
 
@@ -57,7 +63,7 @@ fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&
 	assert prefix == if render { 'renderD' } else { 'card' }
 	assert number == u64(dev.dev_id) + if render { u64(128) } else { u64(0) }
 	assert node_names[number] == unsafe { nil }, 'reused device slots must have no visible old name'
-	mut node := &DrmNode{dev: unsafe { dev }, box: &NodeBox{minor: number}}
+	mut node := &DrmNode{dev: unsafe { dev }, box: &NodeBox{minor: number}, refcount: 1}
 	// Opening a visible primary node can race creation of the render node.
 	expect_unavailable(mut node)
 	if render {
@@ -102,7 +108,48 @@ fn check_registration() {
 	assert !drm_devices_lock.held
 	check_slot_reuse()
 	check_unregistered_mapping_admission()
+	check_file_close_after_unregister()
 	println('DRM registration: publication, namespace rollback, 64 active slots and safe ID reuse passed')
+}
+
+__global close_device = unsafe { &DrmDevice(nil) }
+__global closed_handle = voidptr(0)
+__global destroyed_owner = u64(0)
+
+fn close_test_file(dev &DrmDevice, handle voidptr) {
+	assert dev == close_device
+	assert closed_handle == unsafe { nil }
+	closed_handle = handle
+}
+
+fn destroy_owner(owner u64) {
+	assert destroyed_owner == 0
+	destroyed_owner = owner
+}
+
+fn check_file_close_after_unregister() {
+	driver := DrmDriver{file_close: close_test_file}
+	old := register_driver_with_data(&driver, unsafe { nil }) or { panic('initial registration failed') }
+	defer { close_device = unsafe { nil } }
+	close_device = unsafe { old }
+	mut node := unsafe { old.node }
+	data := NodeHandle{}
+	path := NodeHandle{flags: o_path}
+	assert (node.open(0) or { panic('data open failed') }) == node.box
+	node.refcount++
+	unregister_device(old)
+	replacement := register_driver_with_data(&driver, unsafe { nil }) or { panic('replacement registration failed') }
+	defer { unregister_device(replacement) }
+	assert replacement.dev_id == old.dev_id
+	assert (node.open(o_path) or { panic('metadata-only open failed') }) == node.box
+	node.refcount++
+	node.unref(voidptr(&path)) or { panic('metadata-only close failed') }
+	assert node.refcount == 1 && closed_handle == unsafe { nil } && destroyed_owner == 0
+	node.unref(voidptr(&data)) or { panic('data close failed') }
+	assert node.refcount == 0 && closed_handle == voidptr(&data) && destroyed_owner == u64(&data)
+	closed_handle = unsafe { nil }
+	destroyed_owner = 0
+	println('DRM close: metadata handles skip driver cleanup and old data handles close on their original device')
 }
 
 __global mapping_device = unsafe { &DrmDevice(nil) }

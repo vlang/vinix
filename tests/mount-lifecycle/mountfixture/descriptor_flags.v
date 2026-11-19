@@ -89,6 +89,16 @@ fn descriptor_flags_case(kind int) {
 		descriptor_flags_matrix(fd, fresh, readonly)
 		mut value := C.stat{}
 		check(C.fstat(fd, &value) == 0 && (!unlinked || value.st_nlink == 0), 594)
+		if !unlinked {
+			path_fd := C.open(&target[0], C.O_PATH)
+			mut path_value := C.stat{}
+			check(path_fd >= 0 && C.fstat(path_fd, &path_value) == 0, 596)
+			timestamp_identity(&path_value, &value)
+			mut bits := i32(-1)
+			check(C.ioctl(i32(path_fd), u64(0x80086601), &bits) == -1
+				&& *C.__errno_location() == C.EBADF && bits == -1, 596)
+			check(C.close(path_fd) == 0, 596)
+		}
 		if !is_directory {
 			mut bytes := [8]u8{}
 			check(C.read(fd, &bytes[0], 8) == 8 && C.memcmp(&bytes[0], c'MOUNT-OK', 8) == 0, 594)

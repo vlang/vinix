@@ -657,8 +657,9 @@ fn remove_device_node(node &DrmNode, prefix string, number u64) {
 	unsafe { name.free() }
 }
 
-fn (mut this DrmNode) open(_flags int) ?&resource.Resource {
-	if this.dev == unsafe { nil } || !this.dev.is_registered() {
+fn (mut this DrmNode) open(flags int) ?&resource.Resource {
+	// O_PATH pins the node for metadata. Only a device open needs registration.
+	if flags & resource.o_path == 0 && (this.dev == unsafe { nil } || !this.dev.is_registered()) {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -800,12 +801,11 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 }
 
 fn (mut this DrmNode) unref(handle voidptr) ? {
-	if handle != unsafe { nil } && this.dev != unsafe { nil } && this.dev.driver != unsafe { nil } {
-		if this.dev.driver.file_close != unsafe { nil } {
+	if handle != unsafe { nil } && unsafe { (&file.Handle(handle)).flags & resource.o_path == 0 } {
+		if this.dev != unsafe { nil } && this.dev.driver != unsafe { nil }
+			&& this.dev.driver.file_close != unsafe { nil } {
 			this.dev.driver.file_close(this.dev, handle)
 		}
-	}
-	if handle != unsafe { nil } {
 		syncobj.destroy_owner(u64(handle))
 	}
 	katomic.dec(mut &this.refcount)

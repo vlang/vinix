@@ -1527,6 +1527,9 @@ pub fn syscall_ioctl(_ voidptr, fdnum int, _request u64, argp voidptr) (u64, u64
 	defer {
 		fd.unref()
 	}
+	if fd.handle.flags & resource.o_path != 0 {
+		return errno.err, errno.ebadf
+	}
 	fd.handle.mac_check(proc.mac_ioctl) or { return errno.err, errno.get() }
 	if storage_request(request) {
 		if result := storage_ioctl(mut fd, request, argp) { return u64(result), 0 }

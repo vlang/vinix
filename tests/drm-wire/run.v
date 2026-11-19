@@ -17,8 +17,10 @@ fn main() {
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
 	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
+	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
 	production += 'import katomic\n'
+	production += section(resource_source, 'pub const o_path = ', 'pub const o_accmode = ')!
 	production += section(source, 'pub const driver_gem', 'pub struct DrmIoctl {')!
 	production += section(source, 'pub const default_driver_date', 'pub struct DrmDriver {')!
 	production += section(source, 'fn copy_version_field(', 'fn ioctl_gem_close(')!
@@ -26,6 +28,10 @@ fn main() {
 	production += section(source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!
 	production += section(source, 'pub fn (dev &DrmDevice) is_registered(', '// Forward-reference placeholder')!
 	production += section(source, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(')!.replace('resource.Resource', 'NodeBox')
+		.replace('resource.o_path', 'o_path')
+	production += section(source, 'fn (mut this DrmNode) unref(', 'fn (mut this DrmNode) link(')!
+		.replace('file.Handle', 'NodeHandle').replace('resource.o_path', 'o_path')
+		.replace('syncobj.destroy_owner(', 'destroy_owner(')
 	production += section(source, 'fn remove_device_node(', 'fn (mut this DrmNode) open(')!
 		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!

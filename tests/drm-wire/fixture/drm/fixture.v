@@ -26,6 +26,7 @@ struct DrmDriver {
 	features  u32
 	ioctls    []DrmIoctl
 	ioctl_abi fn (&DrmDevice, voidptr) u32 = unsafe { nil }
+	file_close fn (&DrmDevice, voidptr) = unsafe { nil }
 	mmap_admit fn (&DrmDevice, voidptr, u64, u64, bool) int = unsafe { nil }
 	mmap_retain fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
 	mmap_release fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
@@ -46,6 +47,7 @@ struct DrmNode {
 	dev &DrmDevice
 mut:
 	box &NodeBox = unsafe { nil }
+	refcount int
 }
 
 __global handler_status = 0

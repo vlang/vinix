@@ -198,3 +198,33 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `d9e54898d0e15072a308b69801dd6f211b8e353701373160015c592835bbdb96`.
 Native M1 validation remains open.
+
+## Metadata-only DRM handles across unregister
+
+A still-reachable DRM node can be opened with `O_PATH` before device
+publication or after unregister. Data opens still require registration and
+return `ENODEV` on the inactive device. VFS returns `EBADF` for ioctl calls
+on path-only descriptors before dispatch. Closing a DRM path handle drops
+its node reference. Data handles retained across unregister still close
+through their original driver and release their syncobj owner.
+[Linux path-only open](https://github.com/torvalds/linux/blob/v6.12/fs/open.c#L855-L872),
+[ioctl descriptor lookup](https://github.com/torvalds/linux/blob/v6.12/fs/ioctl.c#L844-L857),
+[descriptor filtering](https://github.com/torvalds/linux/blob/v6.12/fs/file.c#L1044-L1059).
+
+The DRM wire sanitizer fixture verified both open modes, minor-number reuse
+and close callbacks. The original open gate and a control with unconditional
+close callbacks both failed. The six descriptor-flags cases passed in
+AArch64 and x86-64 QEMU guests. The linked-file and directory cases verified
+that `fstat` succeeds on `O_PATH` and ioctl returns `EBADF`. An AArch64
+kernel with the VFS check omitted failed the new assertion.
+
+Both kernel builds, both AGX sanitizer suites, 79 local contract tests
+and 122 pinned-reference checks passed. The allocation scan matched the
+176 existing findings. The tested base was
+`fcaa2b8cf58560e99657202159539d5e2ad9577b` plus the archived patch.
+Native M1 validation remains open.
+
+Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-path-handles-20261119.yFoXLl/`.
+The `bundle.tar.gz` SHA-256 is
+`a4d39ddcfb411d9552c710d06d2a0b09a043b33729dca991826bbc69693ee9b3`.
