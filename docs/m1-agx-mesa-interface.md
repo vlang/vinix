@@ -168,3 +168,63 @@ checksums and the checksums of the kernel, init and disk image. The packages
 | `bundle.tar.gz` | `d8e9c8e883c6bc557e01c65ded1902befc680dee72f7891d0db12c67faa70c13` |
 | `bundle.tar.gz` inventory | `c37f986454dee719ff09a40f6ff1f9d03c6fd099c9252a9664cd9f8527cc275c` |
 | kernel `bin/vinix` at `604be201b` | `9a6774e446e1ce3906aaadb631750285046ee4514cc201803ef513a32ed34dd8` |
+
+## Vinix's own build
+
+`scripts/build-asahi-aarch64.sh` now builds this Mesa for Vinix itself, from
+the same pinned commit, with no Vinix patches. It builds for Linux, linked
+against the Alpine 3.21 musl sysroot that Vinix's Mesa has always used. The
+build includes:
+
+- the Asahi Gallium driver, VirGL and softpipe;
+- the Honeykrisp Vulkan driver;
+- EGL, GLX, GLES 2 and GBM.
+
+Its staging tree replaces Mesa 25.0.5 in the desktop image, and it also
+carries Alpine's Vulkan loader and `libdisplay-info`. The 25.0.5 patches are
+no longer needed: one taught Mesa about a "vinix" system and named
+`/dev/dri/renderD128` directly because Vinix had no sysfs, and libdrm now
+finds the GPU through the DRM sysfs entries.
+
+| | Mesa 25.0.5 (before) | Omarchy's Mesa |
+| --- | --- | --- |
+| Source | mesa3d.org release with four Vinix patches | `omacom/mesa` `b7b03c5`, unmodified |
+| Asahi interface | legacy (`unstable_asahi_drm.h`) | the packaged UAPI, as on Omarchy |
+| Vulkan | none | Honeykrisp |
+| Finds the GPU | patched to `renderD128` | libdrm, through sysfs |
+
+The build needs Debian's `libclang-rt-19-dev`, so that clang can link for the
+musl triple, and `glslang-tools` for Honeykrisp's shaders. The script checks
+for both. In a Debian 13 aarch64 VM it builds from scratch in 3 minutes 21
+seconds.
+
+On Vinix in QEMU (`tests/vinix-mesa`):
+
+- every library of the drivers, of EGL, GL and GBM, and of `eglinfo` and
+  `vulkaninfo` resolves through musl's loader;
+- the Vulkan loader loads Honeykrisp, which finds no GPU;
+- softpipe creates GL 3.3 and GLES 3.1 contexts from Mesa 26.3.
+
+The M1 image preflight now accepts the release the image's marker names. For
+Omarchy's Mesa it also requires Honeykrisp, the Vulkan loader and the ICD
+file, and the staging tree passes it.
+
+Two things still use 25.0.5:
+
+- **The fake G17 renderer.** It is a 25.0.5 patch for the legacy interface.
+  `VINIX_MESA_RELEASE=25.0.5` builds that release as before. The changed
+  script was not run for it.
+- **The QEMU VirGL desktop.** Mesa 26.3 lists render nodes only through
+  libdrm's sysfs walk. QEMU's virtio-gpu node has no parent in sysfs yet, so
+  this Mesa would not find it and would draw with softpipe. The VirGL QEMU
+  (KekVM) is not built on this Mac, so this was not run.
+
+Evidence is under
+`/Users/alex/.local/state/vinix/vinix-mesa26-20261119/`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `bundle.tar.gz` | `3f6d9c2fd23a109bb5138ed8587c98191a322f888edb24a79535e33ae0462d4d` |
+| `bundle.tar.gz` inventory | `0f5a20df7bcb4906f2d7a800a29030dfa8810297e1737629f1fbe958150b20e1` |
+| `libgallium-26.3.0-devel.so` | `a8e00b4daa6148661bbe66a66833563ce3c499604b8a9fe02a5210821fb37a13` |
+| `libvulkan_asahi.so` | `4de422fc10c1af233b48aaeb2a0166babcfd24cd8628e8aa3f6a21c15f4e083f` |

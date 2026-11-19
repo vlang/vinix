@@ -55,7 +55,9 @@ No firmware field value differs on that path. The comparisons confirmed:
 
 ## The legacy UAPI
 
-Vinix also accepts the legacy submit ioctl used by its bundled Mesa 25.0.5.
+Vinix also accepts the legacy submit ioctl used by Mesa 25.0.5, which Vinix
+shipped before it built Omarchy's Mesa and still builds for the fake G17
+renderer.
 Asahi has no such path. There, several values come from userspace where the
 packaged UAPI path writes Asahi's constants:
 

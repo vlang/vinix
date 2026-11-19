@@ -1043,8 +1043,10 @@ dashboard intended for live demonstrations and screenshots.
 ### Apple M1 GPU test image
 
 Vinix has an experimental native AGX path for the base M1 (`t8103`/G13G). It
-uses the Mesa 25.0.5 Asahi Gallium driver for desktop OpenGL and GLES through
-EGL, with surfaceless, GBM and X11 platform support. The native desktop uses a
+uses the Mesa Omarchy packages, `omacom/mesa` at a pinned 26.3 development
+commit, built for Vinix's musl userland: the Asahi Gallium driver for desktop
+OpenGL and GLES through EGL, with surfaceless, GBM and X11 platform support,
+and the Honeykrisp Vulkan driver. The native desktop uses a
 surfaceless GPU presenter, while Xorg/Firefox share GPU buffers through PRIME
 and DRI3. Both still copy the completed image to the Limine framebuffer because
 Vinix does not yet have a native DCP/KMS scanout driver. The private G13 GPU
@@ -1117,7 +1119,8 @@ or `sudo ~/code/kek.sh desktop-wifi` to boot the same desktop with AGX disabled
 if the experimental probe resets before reaching userspace.
 
 GPU deployments now run an archive preflight before touching the ESP. It
-checks the native AArch64 kernel, Mesa 25.0.5 Asahi loader and Gallium library,
+checks the native AArch64 kernel, the Mesa Asahi loader and the Gallium library
+of the release the image names (with Honeykrisp for Omarchy's Mesa),
 the in-guest test source, and—in desktop mode—the accelerated compositor and
 Firefox/X11 closure. Use `sudo ~/code/kek.sh gpu-probe` only when deliberately
 testing the kernel/RTKit probe without a complete Mesa image.
