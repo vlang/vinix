@@ -32,3 +32,28 @@ Evidence is retained under
 | --- | --- |
 | `bundle.tar.gz` | `920780fbce555cf7ee5ee3ef752a031dc60bdc3b6a6fc1f26c2e3cc9932b3a76` |
 | `bundle.tar.gz.inventory.txt` | `06e07bf5b10cb94af57ff9d1bdadd71bd70ac4abbad6a54f2ffcc7eac8e0bdc3` |
+
+## ASC mailbox receive during shutdown
+
+The G13 worker now holds the manager lock while checking running state and
+reading one ASC mailbox message. Shutdown takes the same lock before it
+marks the manager stopped and stops the ASC. The worker releases the lock
+before it dispatches the copied message.
+
+The sanitizer fixture reproduced a FIFO pop racing shutdown on
+`9fc17b7d32564db6895d7d0fa6a2156c8c246100`. Six cases passed across both
+G13 firmware ABIs. Shutdown before a receive preserves both queued messages.
+Shutdown after the first receive suppresses its power-state update and
+preserves the second message. A later poll on a stopped manager leaves the
+FIFO untouched.
+
+AArch64 and x86-64 builds, the job-lifetime suite, 79 local contract tests,
+and 122 pinned-reference checks passed. Generated AArch64 C keeps the FIFO
+read within the manager lock. The allocation scan matched the 176 baseline
+findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-asc-rx-shutdown-20261119.N4nx89/`.
+The `bundle.tar.gz` SHA-256 is
+`4f12c50cc8e2addfa865aca3652cb981d36f7685707b0db47807c8e76c736af9`.
+Native M1 firmware validation remains open.

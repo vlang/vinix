@@ -109,6 +109,44 @@ fn check_g13_receive_shutdown() {
 	println('G13 receive shutdown: 18 ring interleavings, six stale fatal events and two TVB payload snapshots passed')
 }
 
+enum MailboxShutdownPoint {
+	before_receive
+	after_receive
+	already_stopped
+}
+
+fn check_g13_mailbox_receive_shutdown() {
+	first := mailbox.MboxMsg{data0: 0x0070000000000020}
+	next := mailbox.MboxMsg{data0: rtkit_ap_on}
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for point in [MailboxShutdownPoint.before_receive, .after_receive, .already_stopped]! {
+			mut transport := rtkit.RTKit{name: 'g13-mailbox-stop', state: .running}
+			mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
+				rtk: unsafe { &transport }}
+			receive_owner = unsafe { &mgr }
+			transport.mbox.inject(first)
+			transport.mbox.inject(next)
+			match point {
+				.before_receive { klock.on_next_acquire(unsafe { &mgr.lock }, stop_receive_owner) }
+				.after_receive { klock.on_next_release(unsafe { &mgr.lock }, stop_receive_owner) }
+				.already_stopped { mgr.shutdown() }
+			}
+			assert mgr.checked_poll_rtkit_messages() && !mgr.lock.is_held()
+			assert_failed(&mgr)
+			assert mgr.checked_poll_rtkit_messages()
+			assert transport.iop_power_state == 0 && transport.ap_power_state == 0
+			if point != .after_receive {
+				queued := transport.recv_msg() or { panic('missing first queued RTKit message') }
+				assert queued == first, 'shutdown before receive must leave the ASC FIFO untouched'
+			}
+			queued := transport.recv_msg() or { panic('missing next queued RTKit message') }
+			assert queued == next && transport.recv_msg() == none
+			receive_owner = unsafe { nil }
+		}
+	}
+	println('G13 mailbox receive shutdown: six interleavings across both firmware ABIs')
+}
+
 struct ReceiveOrder {
 mut:
 	headers [4]channel.RingHeader

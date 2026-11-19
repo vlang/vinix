@@ -355,6 +355,14 @@ fn (mut mgr GpuManager) send_role_message(role u32, endpoint u8, message u64) bo
 }
 
 fn (mut mgr GpuManager) recv_role_message(role u32) ?mailbox.MboxMsg {
+	if role == 0 && mgr.hw_config.gpu_gen == .g13 {
+		// Shutdown owns this lock while stopping the ASC. Keep it through
+		// the FIFO read so the worker only dequeues while firmware is live.
+		mgr.lock.acquire()
+		defer { mgr.lock.release() }
+		if mgr.state != .running { return none }
+		return mgr.rtk.recv_msg()
+	}
 	return match role {
 		0 { mgr.rtk.recv_msg() }
 		1 {

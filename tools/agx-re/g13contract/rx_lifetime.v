@@ -20,6 +20,10 @@ fn check_g13_receive_lifetime(local string, remote string, recovery string) ! {
 	aux := section(local, 'fn (mut mgr GpuManager) drain_auxiliary_channels()', 'fn (mut mgr GpuManager) check_g13_firmware_health()', 'Vinix auxiliary receive')!
 	require_order(aux, ['mgr.read_g13_fw_log(subchannel)', 'mgr.dequeue_g13_rx(mut mgr.channels.ktrace',
 		'mgr.dequeue_g13_rx(mut mgr.channels.stats'], 'FWLog, KTrace and Stats drain in firmware receive order')!
+	mailbox_read := section(local, 'fn (mut mgr GpuManager) recv_role_message(', 'fn (mut mgr GpuManager) stop_firmware_cpus(', 'Vinix ASC receive lifetime')!
+	require_order(mailbox_read, ['if role == 0 && mgr.hw_config.gpu_gen == .g13 {', 'mgr.lock.acquire()',
+		'defer { mgr.lock.release() }', 'if mgr.state != .running { return none }', 'return mgr.rtk.recv_msg()',
+		'return match role'], 'Vinix checks the G13 transport state under the teardown lock before reading the ASC FIFO')!
 	poll := section(local, 'fn (mut mgr GpuManager) poll_rtkit_messages(', '// The manager lock guards teardown', 'Vinix RTKit receive order')!
 	require_order(poll, ['mgr.recv_role_message(role)', 'ep == u8(ep_firmware) && msg.data0 == msg_rx_doorbell',
 		'role == 0 && mgr.hw_config.gpu_gen == .g13', 'mgr.drain_g13_receive_channels()',
@@ -55,8 +59,12 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 		'"recv-empty", "recv-not-empty"'], 'Asahi names the level-triggered M1 GPU mailbox receive line')!
 	linux := read(os.join_path(asahi_linux, 'drivers/soc/apple/mailbox.c'))!
 	handler := section(linux, 'static irqreturn_t apple_mbox_recv_irq(', 'int apple_mbox_poll(', 'Asahi receive IRQ handler')!
-	require_order(handler, ['spin_lock(&mbox->rx_lock)', 'apple_mbox_poll_locked(mbox)', 'spin_unlock(&mbox->rx_lock)'],
-		'Asahi drains its receive mailbox on the receive IRQ')!
+	require_order(handler, ['spin_lock(&mbox->rx_lock)', 'if (likely(!READ_ONCE(mbox->removing)))',
+		'apple_mbox_poll_locked(mbox)', 'spin_unlock(&mbox->rx_lock)'], 'Asahi drains the IRQ receive FIFO while the provider is present')!
+	poll := section(linux, 'int apple_mbox_poll(', 'EXPORT_SYMBOL(apple_mbox_poll);', 'Asahi mailbox polling')!
+	require_order(poll, ['spin_lock_irqsave(&mbox->rx_lock, flags)', 'if (unlikely(READ_ONCE(mbox->removing)))',
+		'ret = -ENODEV;', 'ret = apple_mbox_poll_locked(mbox)', 'spin_unlock_irqrestore(&mbox->rx_lock, flags)'],
+		'Asahi checks provider removal under the receive lock before polling its FIFO')!
 	irqchip := read(os.join_path(asahi_linux, 'drivers/irqchip/irq-apple-aic.c'))!
 	require(irqchip.contains('Reading the interrupt reason automatically acknowledges and masks')
 		&& irqchip.contains('irqc->info.target_cpu + off + i * 4, 1'),
