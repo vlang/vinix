@@ -53,11 +53,11 @@ fn package_diagnostics(config Config, packages []Installed) map[string]string {
 		id := installed.package.id
 		diagnostic := package_diagnostic(config, installed, mut keys)
 		diagnostics[id] = diagnostic
-		if diagnostic != '' { pending << id }
+		if diagnostic != '' { pending << id.clone() }
 		for dependency in installed.package.dependencies {
 			mut users := dependents[dependency.id] or { []string{} }
 			users.flags |= .noslices
-			users << id
+			users << id.clone()
 			dependents[dependency.id] = users
 		}
 	}
@@ -71,14 +71,15 @@ fn package_diagnostics(config Config, packages []Installed) map[string]string {
 		for id in users {
 			if diagnostics[id] != '' { continue }
 			diagnostics[id] = diagnostics[blocked].clone()
-			pending << id
+			pending << id.clone()
 		}
 	}
 	return diagnostics
 }
 
-// Messages own their text, including propagated copies. Maps and array pushes
-// clone their ID strings; their cleanup leaves caller-owned provenance intact.
+// Messages own their text, including propagated copies. Maps clone their ID
+// keys and the queues push explicit copies, so their cleanup leaves the
+// caller's package IDs intact.
 fn close_package_diagnostics(diagnostics map[string]string) {
 	unsafe {
 		for _, message in diagnostics { message.free() }
