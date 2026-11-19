@@ -20,7 +20,6 @@ import proc
 import memory
 import memory.mmap
 import usercopy
-import lib
 
 // DRM driver feature flags
 pub const driver_gem = u32(0x1)
@@ -652,30 +651,46 @@ fn create_device_node(dev &DrmDevice, render bool) ?&DrmNode {
 	return node
 }
 
-fn drm_node_name(prefix string, number u64, full_path bool) string {
-	mut path := lib.new_text(32)
-	if full_path { path.add('dri/') }
-	path.add(prefix)
-	path.add_unsigned(number)
-	return lib.finish_text(path)
+// The name borrows a 32-byte caller buffer. The fixed prefixes and a u64
+// decimal suffix fit, including the terminating zero.
+fn drm_node_name(buffer &u8, prefix string, number u64, full_path bool) string {
+	head := if full_path { 'dri/' } else { '' }
+	unsafe {
+		C.memcpy(buffer, head.str, head.len)
+		C.memcpy(buffer + head.len, prefix.str, prefix.len)
+	}
+	mut length := head.len + prefix.len
+	mut scale := u64(1)
+	for number / scale >= 10 { scale *= 10 }
+	for scale != 0 {
+		unsafe { buffer[length] = u8(`0`) + u8(number / scale % 10) }
+		length++
+		scale /= 10
+	}
+	unsafe {
+		buffer[length] = 0
+		return tos(buffer, length)
+	}
 }
 
 fn publish_device_nodes(dev &DrmDevice) ? {
-	card_name := drm_node_name('card', u64(dev.dev_id), false) @[freed]
-	defer { unsafe { card_name.free() } }
+	// The borrowed names are used synchronously. An explicit stack slot
+	// keeps V from promoting their buffers on this optional-return path.
+	card_path := unsafe { &u8(C.vinix_stack_alloc(32)) }
+	card_name := drm_node_name(card_path, 'card', u64(dev.dev_id), false)
 	if dev.render_node == unsafe { nil } {
 		return fs.devtmpfs_add_dri_devices(dev.node.box, card_name, unsafe { nil }, '')
 	}
-	render_name := drm_node_name('renderD', u64(128 + dev.dev_id), false) @[freed]
-	defer { unsafe { render_name.free() } }
+	render_path := unsafe { &u8(C.vinix_stack_alloc(32)) }
+	render_name := drm_node_name(render_path, 'renderD', u64(128 + dev.dev_id), false)
 	return fs.devtmpfs_add_dri_devices(dev.node.box, card_name, dev.render_node.box, render_name)
 }
 
 fn remove_device_node(node &DrmNode, prefix string, number u64) {
 	if node == unsafe { nil } { return }
-	name := drm_node_name(prefix, number, true) @[freed]
+	path := unsafe { &u8(C.vinix_stack_alloc(32)) }
+	name := drm_node_name(path, prefix, number, true)
 	fs.devtmpfs_remove_device(name, node.box)
-	unsafe { name.free() }
 }
 
 fn (mut this DrmNode) open(flags int) ?&resource.Resource {

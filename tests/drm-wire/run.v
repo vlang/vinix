@@ -21,6 +21,7 @@ fn main() {
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
 	production += 'import katomic\n'
+	production += '#include <alloca.h>\nfn C.alloca(u64) voidptr\n'
 	production += section(resource_source, 'pub const o_path = ', 'pub const o_accmode = ')!
 	production += section(source, 'pub const driver_gem', 'pub struct DrmIoctl {')!
 	production += section(source, 'pub const default_driver_date', 'pub struct DrmDriver {')!
@@ -39,13 +40,18 @@ fn main() {
 		.replace('stat.ifchr', 'node_ifchr')
 		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
 		.replace('memory.free(', 'memory.free_registration(')
-	production += section(source, 'fn publish_device_nodes(', 'fn remove_device_node(')!
+	production += section(source, 'fn drm_node_name(', 'fn remove_device_node(')!
 		.replace('fs.devtmpfs_add_dri_devices(', 'devtmpfs_add_dri_devices(')
+		.replace('C.vinix_stack_alloc(', 'C.alloca(')
 	production += section(devtmpfs_source, 'pub fn devtmpfs_add_dri_devices(', '// Caller holds vfs_lock.')!
 		.replace('resource.Resource', 'NodeBox')
 		.replace('stat.isdir(parent.resource.stat.mode)', 'parent.directory')
+		.replace("filesystem: filesystems['devtmpfs']", '')
+		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
+		.replace('memory.free(', 'memory.free_registration(')
 	production += section(source, 'fn remove_device_node(', 'fn (mut this DrmNode) open(')!
 		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
+		.replace('C.vinix_stack_alloc(', 'C.alloca(')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!
 		.replace('mmap.map_shared', 'map_shared')
 	production += section(source, 'pub fn static_ioctl_table(', 'fn copy_version_field(')!

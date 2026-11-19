@@ -433,16 +433,53 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 		errno.set(errno.eexist)
 		return none
 	}
-	publish_devtmpfs_device(card, parent, card_name.clone(), true)
+	mut primary_leaf := prepare_dri_leaf(parent, card_name)?
 	if render != unsafe { nil } {
-		publish_devtmpfs_device(render, parent, render_name.clone(), true)
+		mut render_leaf := prepare_dri_leaf(parent, render_name) or {
+			memory.free(primary_leaf.name.str)
+			memory.free(primary_leaf)
+			return none
+		}
+		publish_devtmpfs_node(mut primary_leaf, card, true)
+		publish_devtmpfs_node(mut render_leaf, render, true)
+		return
 	}
+	publish_devtmpfs_node(mut primary_leaf, card, true)
+}
+
+// No namespace or resource reference is transferred until publication.
+fn prepare_dri_leaf(parent &VFSNode, name string) ?&VFSNode {
+	storage := memory.malloc_packed_fallible(sizeof(VFSNode))
+	if storage == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	name_storage := memory.malloc_packed_fallible(u64(name.len) + 1)
+	if name_storage == unsafe { nil } {
+		memory.free(storage)
+		errno.set(errno.enomem)
+		return none
+	}
+	mut node := unsafe { &VFSNode(storage) }
+	unsafe {
+		C.memcpy(name_storage, name.str, name.len)
+		(&u8(name_storage))[name.len] = 0
+		*node = VFSNode{
+			name: tos(&u8(name_storage), name.len)
+			parent: parent
+			filesystem: filesystems['devtmpfs']
+		}
+	}
+	return node
 }
 
 // Caller holds vfs_lock. The node takes ownership of leaf.
 fn publish_devtmpfs_device(device &resource.Resource, parent &VFSNode, leaf string, seat bool) {
 	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, leaf, false)
+	publish_devtmpfs_node(mut new_node, device, seat)
+}
 
+fn publish_devtmpfs_node(mut new_node VFSNode, device &resource.Resource, seat bool) {
 	new_node.resource = unsafe { device }
 	new_node.seat = seat
 	new_node.resource.stat.dev = devtmpfs_dev_id
@@ -452,7 +489,7 @@ fn publish_devtmpfs_device(device &resource.Resource, parent &VFSNode, leaf stri
 	new_node.resource.stat.ctim = realtime_clock
 	new_node.resource.stat.mtim = realtime_clock
 
-	publish_child(parent, leaf, new_node)
+	publish_child(new_node.parent, new_node.name, new_node)
 }
 
 // Remove a dynamically-created device node. The resource held one reference

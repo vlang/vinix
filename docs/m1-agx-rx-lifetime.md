@@ -340,3 +340,31 @@ Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-driver-definition-20261119.Gpl3ZL/`.
 The `bundle.tar.gz` SHA-256 is
 `923255fd53c319b74b103cfe225de8f58b4699264ca299d1414276f91e137a01`.
+
+## Fallible DRM device leaf publication
+
+DRM formats temporary device names on the stack. Devtmpfs prepares each
+requested leaf record and its owned name with fallible allocations before
+publishing either entry. An allocation failure returns `ENOMEM` and
+releases the prepared storage. The `dri` directory and VFS child map
+retain their existing allocation paths.
+
+The DRM wire sanitizer fixture passed 336 injected allocation failures
+across the registration entry points. It checked that failed registrations
+released their storage, kept the namespace empty and allowed retry. Two
+controls caught missing cleanup after a name allocation failure and after
+render leaf preparation failed. The independent lifetime review confirmed
+ownership through publication and detach. Generated ARM64 code confirmed
+stack storage for all three temporary name buffers.
+
+Both kernel builds, both QEMU descriptor-flags suites, both AGX sanitizer
+suites, 79 local contract tests and 122 pinned-reference checks passed.
+The ARM64 guest logged simple DRM card creation. The allocation scan
+matched the 173 existing findings. The tested base was
+`b2c1a7765a6b0b5c404dc5c3da5d46985a874167` plus the archived patch.
+Native M1 validation remains open.
+
+Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-leaf-staging-20261119.F7Tz4Q/`.
+The `bundle.tar.gz` SHA-256 is
+`dce6e82d93b18e965c01de043dcf75460c0a757341d74f9abccb4ec0cd3cf031`.

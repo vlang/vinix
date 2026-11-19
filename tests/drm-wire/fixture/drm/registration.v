@@ -25,6 +25,8 @@ mut:
 struct VFSNode {
 	directory bool
 mut:
+	name string
+	parent &VFSNode = unsafe { nil }
 	children &map[string]&VFSNode = unsafe { nil }
 }
 
@@ -55,19 +57,19 @@ fn expect_unavailable(mut node DrmNode) {
 	expect_error(mut node, request, unsafe { nil }, errno.enodev)
 }
 
-fn drm_node_name(prefix string, number u64, full_path bool) string {
-	return if full_path { 'dri/${prefix}${number}' } else { '${prefix}${number}' }
-}
-
 fn devtmpfs_remove_device(name string, expected &NodeBox) bool {
 	assert drm_devices_lock.held
-	leaf := drm_node_name(if expected.minor >= 128 { 'renderD' } else { 'card' }, expected.minor, false)
+	prefix := if expected.minor >= 128 { 'renderD' } else { 'card' }
+	leaf := '${prefix}${expected.minor}'
 	assert name == 'dri/${leaf}'
 	mut node := unsafe { node_names[expected.minor] }
 	if node == unsafe { nil } || node.box != expected { return false }
 	expect_unavailable(mut node)
 	mut parent := unsafe { devtmpfs_root.children['dri'] }
+	namespace_node := unsafe { parent.children[leaf] }
 	parent.children.delete(leaf)
+	memory.free_registration(namespace_node.name.str)
+	memory.free_registration(namespace_node)
 	node_names[expected.minor] = unsafe { nil }
 	node.unref(unsafe { nil }) or { panic('namespace reference release failed') }
 	return true
@@ -81,11 +83,13 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	return dir
 }
 
-fn publish_devtmpfs_device(device &NodeBox, directory &VFSNode, leaf string, seat bool) {
+fn publish_devtmpfs_node(mut namespace_node VFSNode, device &NodeBox, seat bool) {
 	assert drm_devices_lock.held && vfs_lock.held && seat
 	prefix := if device.minor >= 128 { 'renderD' } else { 'card' }
-	assert leaf == drm_node_name(prefix, device.minor, false)
-	mut parent := unsafe { directory }
+	leaf := namespace_node.name
+	assert leaf == '${prefix}${device.minor}'
+	assert unsafe { leaf.str[leaf.len] } == 0
+	mut parent := unsafe { namespace_node.parent }
 	mut node := unsafe { device.node }
 	assert registered_devices[node.dev.dev_id] == unsafe { nil }
 	assert node.stat.rdev == u64(226 << 8) | device.minor
@@ -96,7 +100,7 @@ fn publish_devtmpfs_device(device &NodeBox, directory &VFSNode, leaf string, sea
 		expect_unavailable(mut node_names[node.dev.dev_id])
 	}
 	node_names[device.minor] = unsafe { node }
-	unsafe { parent.children[leaf] = &VFSNode{} }
+	unsafe { parent.children[leaf] = namespace_node }
 	published_nodes++
 }
 
@@ -136,7 +140,7 @@ fn check_registration_allocation_failure() {
 	dir := unsafe { devtmpfs_root.children['dri'] }
 	for render in [false, true]! {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
-		allocations := if render { 5 } else { 3 }
+		allocations := if render { 9 } else { 5 }
 		for _ in 0 .. 8 {
 			for successful in 0 .. allocations {
 				live := memory.registration_outstanding()
@@ -156,7 +160,7 @@ fn check_registration_allocation_failure() {
 			}
 		}
 	}
-	println('DRM registration: 64 injected metadata allocation failures release the prefix and allow retry')
+	println('DRM registration: 112 injected failures across DRM metadata and leaf storage allow retry')
 }
 
 __global owned_driver = unsafe { &DrmDriver(nil) }
@@ -196,7 +200,7 @@ fn check_owned_driver_registration() {
 	context := u64(0xa551)
 	for _ in 0 .. 16 {
 		live := memory.registration_outstanding()
-		for allocation in 0 .. 5 {
+		for allocation in 0 .. 9 {
 			driver := new_owned_test_driver()
 			memory.fail_registration_after(allocation)
 			assert register_owned_driver(driver, voidptr(&context)) == none && errno.get() == errno.enomem
@@ -222,7 +226,7 @@ fn check_owned_driver_registration() {
 	assert context == 0xa551
 	owned_driver = unsafe { nil }
 	owned_ioctl_storage = unsafe { nil }
-	println('DRM owned registration: 96 failed attempts release the driver and ioctl table, and a published device keeps both')
+	println('DRM owned registration: 160 failed attempts release the driver and ioctl table, and a published device keeps both')
 }
 
 const published_ioctl_table = [DrmIoctl{cmd: 0x40}, DrmIoctl{cmd: 0x41}]!
@@ -236,7 +240,7 @@ fn check_driver_definition_registration() {
 	for _ in 0 .. 8 {
 		live := memory.registration_outstanding()
 		prior_publications := published_nodes
-		for allocation in 0 .. 6 {
+		for allocation in 0 .. 10 {
 			memory.fail_registration_after(allocation)
 			errno.set(0)
 			assert register_driver_definition(definition, unsafe { nil }) == none && errno.get() == errno.enomem
@@ -250,10 +254,18 @@ fn check_driver_definition_registration() {
 	assert device.dev_id == 0 && device.driver.ioctls.data == ioctls.data
 	unregister_device(device)
 	assert device.driver.ioctls[1].cmd == 0x41
-	println('DRM driver definition: 48 allocation failures release storage and preserve the static ioctl table')
+	println('DRM driver definition: 80 allocation failures release storage and preserve the static ioctl table')
+}
+
+fn check_drm_names() {
+	mut buffer := [32]u8{}
+	name := drm_node_name(unsafe { &buffer[0] }, 'renderD', ~u64(0), true)
+	assert name == 'dri/renderD18446744073709551615' && name.len == 31
+	assert buffer[31] == 0 && name.str == unsafe { &buffer[0] }
 }
 
 fn check_registration() {
+	check_drm_names()
 	check_registration_collisions()
 	check_registration_allocation_failure()
 	check_owned_driver_registration()
