@@ -59,7 +59,9 @@ fn scan_installed_namespace(tree InstalledTree, relative string, expected map[st
 		name := unsafe { tos(&u8(&entry.d_name[0]), int(C.strlen(&char(&entry.d_name[0])))) }
 		if name in ['.', '..']! { continue }
 		path := if relative == '' { name.clone() } else { relative + '/' + name }
-		defer { unsafe { path.free() } }
+		// A queued directory path is owned and freed by the queue.
+		mut queued := false
+		defer { if !queued { unsafe { path.free() } } }
 		if path !in expected || count >= remaining { return error('undeclared installed entry: ${path}') }
 		count++
 		mut child := C.stat{}
@@ -70,7 +72,9 @@ fn scan_installed_namespace(tree InstalledTree, relative string, expected map[st
 			if child.st_mode & 0o170000 != 0o040000 || child.st_mode & 0o7777 != 0o755 {
 				return error('installed directory type or permissions changed: ${path}')
 			}
+			// A push copies the string header, not its bytes.
 			pending << path
+			queued = true
 		} else if child.st_mode & 0o170000 != 0o100000 || child.st_nlink != 1 || child.st_mode & 0o7777 != mode {
 			return error('installed file type, links or permissions changed: ${path}')
 		}

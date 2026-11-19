@@ -7,11 +7,15 @@ import time
 
 #include <sys/resource.h>
 #include <sys/wait.h>
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.link(&char, &char) int
 fn C.chown(&char, i32, i32) i32
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.setgroups(usize, voidptr) int
 fn C.setgid(u32) int
@@ -151,7 +155,7 @@ fn test_ordinary_launch_checks_administrator_owned_closure_before_data_preparati
 			assert refused && !os.exists(work + '/home/.local')
 			C._exit(0)
 		}
-		mut status := 0
+		mut status := i32(0)
 		assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 		namespace_restore(work, id, 'file')!
 	}
@@ -162,7 +166,7 @@ fn test_ordinary_launch_checks_administrator_owned_closure_before_data_preparati
 		verify_installed(work + '/store', state, no_progress)!
 		C._exit(0)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	println('INSTALLED NAMESPACE ordinary launch refuses undeclared app/runtime/dependency entries before private-data creation or execution; restored administrator-owned trees verify PASS')
 }
