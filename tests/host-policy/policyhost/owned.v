@@ -54,7 +54,7 @@ pub fn command_checkpoint() ! {
 fn owned_stream(fd i32, text string) ! {
 	mut offset := 0
 	for offset < text.len {
-		count := unsafe { C.write(fd, text.str + offset, usize(text.len - offset)) }
+		count := unsafe { C.write(fd, text.str + offset, uint(text.len - offset)) }
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count <= 0 { return error('Cannot write compiler diagnostics') }
 		offset += int(count)

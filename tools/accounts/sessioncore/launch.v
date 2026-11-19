@@ -139,7 +139,7 @@ fn run_unlock_helper(unlock Unlock, environment []string) {
 	}
 	C.close(line[0])
 	C.close(ready[1])
-	C.write(line[1], unlock.secret.data, usize(unlock.secret.len))
+	C.write(line[1], unlock.secret.data, uint(unlock.secret.len))
 	C.write(line[1], c'\n', 1)
 	C.close(line[1])
 	if first > 0 {
@@ -221,7 +221,7 @@ fn start_profile(db accountcore.Database, user accountcore.User, argv []string, 
 			}
 		}
 		number := session.str() + '\n'
-		C.write(report[1], number.str, usize(number.len))
+		C.write(report[1], number.str, uint(number.len))
 		C.close(report[1])
 		if control >= 0 && control != 3 {
 			if C.dup2(control, 3) != 3 { C._exit(126) }

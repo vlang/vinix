@@ -116,7 +116,7 @@ pub fn read_trusted(path string, private bool, owned bool) !string {
 	defer { unsafe { data.free() } }
 	mut done := 0
 	for done < data.len {
-		got := C.read(fd, unsafe { &data[done] }, usize(data.len - done))
+		got := C.read(fd, unsafe { &data[done] }, uint(data.len - done))
 		if got < 0 {
 			return error('cannot read ${path}')
 		}
@@ -148,7 +148,7 @@ fn (s Store) replace(path string, text string, mode u32) ! {
 	mut ok := true
 	mut done := 0
 	for done < text.len {
-		put := C.write(fd, unsafe { text.str + done }, usize(text.len - done))
+		put := C.write(fd, unsafe { text.str + done }, uint(text.len - done))
 		if put <= 0 {
 			ok = false
 			break

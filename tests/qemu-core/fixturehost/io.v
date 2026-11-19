@@ -17,8 +17,8 @@ import time
 #include "spawn_abi.h"
 
 fn C.fopen(&char, &char) &C.FILE
-fn C.fread(voidptr, usize, usize, &C.FILE) usize
-fn C.fwrite(voidptr, usize, usize, &C.FILE) usize
+fn C.fread(voidptr, uint, uint, &C.FILE) uint
+fn C.fwrite(voidptr, uint, uint, &C.FILE) uint
 fn C.ferror(&C.FILE) i32
 fn C.clearerr(&C.FILE)
 fn C.fclose(&C.FILE) i32
@@ -150,7 +150,7 @@ pub fn read(path string) !string {
 	mut result := strings.new_builder(8192)
 	mut buffer := []u8{len: 8192}
 	for {
-		count := int(C.fread(buffer.data, 1, usize(buffer.len), stream))
+		count := int(C.fread(buffer.data, 1, uint(buffer.len), stream))
 		number := C.errno
 		if count > 0 { result.write(buffer[..count])! }
 		if C.ferror(stream) != 0 {
@@ -174,7 +174,7 @@ pub fn write(path string, text string) ! {
 	}
 	mut closed := false
 	defer { if !closed { C.fclose(stream) } }
-	if C.fwrite(text.str, 1, usize(text.len), stream) != usize(text.len) {
+	if C.fwrite(text.str, 1, uint(text.len), stream) != uint(text.len) {
 		number := C.errno
 		return file_error(path, number)
 	}
@@ -390,7 +390,7 @@ pub fn capture_in_preferred(argv []string, log string, env map[string]string, me
 	mut output := strings.new_builder(8192)
 	mut buffer := [8192]u8{}
 	for {
-		count := C.read(pipes[0], &buffer[0], usize(buffer.len))
+		count := C.read(pipes[0], &buffer[0], uint(buffer.len))
 		number := C.errno
 		if count < 0 {
 			if number == C.EINTR { continue }
@@ -537,7 +537,7 @@ fn capture_streams_bounded(argv []string, env map[string]string, host_arch strin
 		}
 		for index in 0 .. 2 {
 			if descriptors[index].fd < 0 || descriptors[index].revents == 0 { continue }
-			count := C.read(descriptors[index].fd, &buffer[0], usize(buffer.len))
+			count := C.read(descriptors[index].fd, &buffer[0], uint(buffer.len))
 			number := C.errno
 			if count < 0 {
 				if number == C.EINTR { continue }

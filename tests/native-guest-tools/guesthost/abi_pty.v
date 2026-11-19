@@ -9,7 +9,7 @@ fn C.truncate(&char, i64) i32
 fn abi_console(bytes []u8) ! {
 	mut written := 0
 	for written < bytes.len {
-		count := unsafe { C.write(1, &bytes[0] + written, usize(bytes.len - written)) }
+		count := unsafe { C.write(1, &bytes[0] + written, uint(bytes.len - written)) }
 		if count < 0 {
 			if C.errno == C.EINTR { continue }
 			return posix_error()

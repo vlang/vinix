@@ -27,7 +27,7 @@ fn install(source string, destination string, mode u32, prefix string) ! {
 	data := os.read_bytes(source)!
 	mut sent := 0
 	for sent < data.len {
-		count := unsafe { C.write(fd, &data[sent], usize(data.len - sent)) }
+		count := unsafe { C.write(fd, &data[sent], uint(data.len - sent)) }
 		if count < 0 {
 			if C.errno == C.EINTR { continue }
 			return error_with_code('Cannot write staged temporary file', int(C.errno))

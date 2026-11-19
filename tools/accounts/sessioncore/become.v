@@ -25,7 +25,7 @@ $if linux {
 
 #include <sys/stat.h>
 
-fn C.setgroups(count usize, list &u32) int
+fn C.setgroups(count uint, list &u32) int
 fn C.getgroups(count int, list &u32) int
 fn C.setresgid(real u32, effective u32, saved u32) int
 fn C.setresuid(real u32, effective u32, saved u32) int
@@ -147,7 +147,7 @@ fn become_with_groups(user accountcore.User, groups []u32) ! {
 	C.prctl(47, 4, 0, 0, 0)
 	// PR_SET_KEEPCAPS 8.
 	C.prctl(8, 0, 0, 0, 0)
-	if C.setgroups(usize(groups.len), if groups.len > 0 { &groups[0] } else { unsafe { nil } }) != 0 {
+	if C.setgroups(uint(groups.len), if groups.len > 0 { &groups[0] } else { unsafe { nil } }) != 0 {
 		return error('cannot set the groups')
 	}
 	if C.setresgid(user.gid, user.gid, user.gid) != 0 {
@@ -267,7 +267,7 @@ fn write_whole(path string, text string) ! {
 		defer { unsafe { number.free() } }
 		return error('cannot open ${path} (errno ${number})')
 	}
-	put := C.write(fd, text.str, usize(text.len))
+	put := C.write(fd, text.str, uint(text.len))
 	code := C.errno
 	C.close(fd)
 	if put != text.len {

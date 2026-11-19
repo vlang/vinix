@@ -102,7 +102,7 @@ fn (env Env) report(peer Peer, what string, result string) {
 	if fd < 0 {
 		return
 	}
-	C.write(fd, text.str, usize(if text.len > 120 { 120 } else { text.len }))
+	C.write(fd, text.str, uint(if text.len > 120 { 120 } else { text.len }))
 	C.close(fd)
 }
 

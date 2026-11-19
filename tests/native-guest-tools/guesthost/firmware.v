@@ -7,8 +7,8 @@ module guesthost
 #include <unistd.h>
 
 fn C.open(&char, int, ...) i32
-fn C.read(i32, voidptr, usize) isize
-fn C.write(i32, voidptr, usize) isize
+fn C.read(i32, voidptr, uint) int
+fn C.write(i32, voidptr, uint) int
 fn C.lseek(i32, i64, int) i64
 fn C.fstat(i32, &C.stat) int
 fn C.ftruncate(i32, u64) i32
@@ -38,7 +38,7 @@ fn copy_firmware_variables(source string, destination string) ! {
 	mut buffer := [65536]u8{}
 	mut total := i64(0)
 	for {
-		read := C.read(input, unsafe { &buffer[0] }, usize(buffer.len))
+		read := C.read(input, unsafe { &buffer[0] }, uint(buffer.len))
 		if read < 0 {
 			if C.errno == C.EINTR { continue }
 			return error('cannot read firmware template: ' + source)
@@ -52,7 +52,7 @@ fn copy_firmware_variables(source string, destination string) ! {
 		} else {
 			mut written := 0
 			for written < int(read) {
-				count := C.write(output, unsafe { &buffer[written] }, usize(int(read) - written))
+				count := C.write(output, unsafe { &buffer[written] }, uint(int(read) - written))
 				if count < 0 && C.errno == C.EINTR { continue }
 				if count <= 0 { return error('cannot write private firmware image') }
 				written += int(count)

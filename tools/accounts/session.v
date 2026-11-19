@@ -257,7 +257,7 @@ fn package_launch() !int {
 	mut bytes := [33]u8{}
 	mut used := 0
 	for used < bytes.len {
-		count := C.read(0, unsafe { &bytes[used] }, usize(bytes.len - used))
+		count := C.read(0, unsafe { &bytes[used] }, uint(bytes.len - used))
 		if count < 0 && C.errno == C.EINTR { continue }
 		if count < 0 { return error('cannot read isolated launch invitation') }
 		if count == 0 { break }

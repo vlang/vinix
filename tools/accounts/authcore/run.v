@@ -101,7 +101,7 @@ pub fn run_action(action Action, argv []string, input []u8, peer Peer, user stri
 	// The input is at most one field, which fits a pipe: this cannot block
 	// on a program that does not read it.
 	if input.len > 0 {
-		C.write(to_child[1], input.data, usize(input.len))
+		C.write(to_child[1], input.data, uint(input.len))
 	}
 	C.close(to_child[1])
 
@@ -126,7 +126,7 @@ pub fn run_action(action Action, argv []string, input []u8, peer Peer, user stri
 		if ready < 0 {
 			continue
 		}
-		got := C.read(from_child[0], buffer.data, usize(buffer.len))
+		got := C.read(from_child[0], buffer.data, uint(buffer.len))
 		if got <= 0 {
 			break
 		}

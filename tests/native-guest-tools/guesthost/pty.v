@@ -50,8 +50,8 @@ $if macos || ios || freebsd || openbsd || dragonfly || android || termux {
 fn C.socket(i32, i32, i32) i32
 fn C.connect(i32, &C.sockaddr, u32) i32
 fn C.getsockopt(i32, i32, i32, voidptr, &u32) i32
-fn C.send(i32, voidptr, usize, i32) i32
-fn C.recv(i32, voidptr, usize, i32) i32
+fn C.send(i32, voidptr, uint, i32) i32
+fn C.recv(i32, voidptr, uint, i32) i32
 fn C.signal(i32, voidptr) voidptr
 fn C.WIFSIGNALED(i32) i32
 fn C.__atomic_store_n(&i32, i32, i32)
@@ -200,7 +200,7 @@ fn monitor_send(fd i32, text string) ! {
 	mut sent := 0
 	for sent < text.len {
 		if !ready(fd, true, deadline)! { return error('QMP send timed out') }
-		count := unsafe { C.send(fd, text.str + sent, usize(text.len - sent), 0) }
+		count := unsafe { C.send(fd, text.str + sent, uint(text.len - sent), 0) }
 		if count < 0 {
 			if C.errno == C.EINTR { continue }
 			return posix_error()
@@ -217,7 +217,7 @@ fn quit_monitor(path string) ! {
 	$if macos {
 		address.sun_len = u8(sizeof(C.sockaddr_un))
 	}
-	unsafe { C.memcpy(&address.sun_path[0], path.str, usize(path.len)) }
+	unsafe { C.memcpy(&address.sun_path[0], path.str, uint(path.len)) }
 	fd := C.socket(C.AF_UNIX, C.SOCK_STREAM, 0)
 	if fd < 0 { return posix_error() }
 	defer { C.close(fd) }
