@@ -4,7 +4,9 @@ module drm
 
 import errno
 
-struct NodeBox {}
+struct NodeBox {
+	minor u64
+}
 
 struct RegistryLock {
 mut:
@@ -22,8 +24,8 @@ fn (mut lock_state RegistryLock) release() {
 }
 
 __global drm_devices_lock RegistryLock
-__global next_dev_id = u32(0)
 __global registered_devices [64]&DrmDevice
+__global node_names [192]&DrmNode
 __global staged_card = unsafe { &DrmNode(nil) }
 __global fail_render = false
 
@@ -36,17 +38,33 @@ fn expect_unavailable(mut node DrmNode) {
 	expect_error(mut node, request, unsafe { nil }, errno.enodev)
 }
 
-fn create_device_node(dev &DrmDevice, _ string, _ u64, render bool) ?&DrmNode {
+fn drm_node_name(prefix string, number u64) string { return 'dri/${prefix}${number}' }
+
+fn devtmpfs_remove_device(name string, expected &NodeBox) bool {
+	assert drm_devices_lock.held
+	assert name == drm_node_name(if expected.minor >= 128 { 'renderD' } else { 'card' }, expected.minor)
+	mut node := unsafe { node_names[expected.minor] }
+	if node == unsafe { nil } || node.box != expected { return false }
+	expect_unavailable(mut node)
+	node_names[expected.minor] = unsafe { nil }
+	return true
+}
+
+fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&DrmNode {
 	assert drm_devices_lock.held && registered_devices[dev.dev_id] == unsafe { nil }
-	mut node := &DrmNode{dev: unsafe { dev }, box: &NodeBox{}}
+	assert prefix == if render { 'renderD' } else { 'card' }
+	assert number == u64(dev.dev_id) + if render { u64(128) } else { u64(0) }
+	assert node_names[number] == unsafe { nil }, 'reused device slots must have no visible old name'
+	mut node := &DrmNode{dev: unsafe { dev }, box: &NodeBox{minor: number}}
 	// Opening a visible primary node can race creation of the render node.
 	expect_unavailable(mut node)
 	if render {
-		expect_unavailable(mut staged_card)
+		expect_unavailable(mut node_names[dev.dev_id])
 		if fail_render { return none }
 	} else {
 		staged_card = unsafe { node }
 	}
+	node_names[number] = unsafe { node }
 	return node
 }
 
@@ -55,6 +73,7 @@ fn check_registration() {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
 		dev := register_driver_with_data(&driver, voidptr(0x1234)) or { panic('registration failed') }
 		assert dev.is_registered() && dev.driver_data == voidptr(0x1234)
+		assert dev.dev_id == 0
 		assert (get_device(dev.dev_id) or { panic('registry entry missing') }) == dev
 		mut card := unsafe { dev.node }
 		assert (card.open(0) or { panic('primary node failed to open') }) == card.box
@@ -66,6 +85,7 @@ fn check_registration() {
 		}
 		unregister_device(dev)
 		assert get_device(dev.dev_id) == none
+		assert node_names[0] == unsafe { nil } && node_names[128] == unsafe { nil }
 		expect_unavailable(mut card)
 		if render {
 			mut render_node := unsafe { dev.render_node }
@@ -73,10 +93,39 @@ fn check_registration() {
 		}
 	}
 	fail_render = true
-	failed_id := next_dev_id
 	assert register_driver_with_data(&DrmDriver{features: driver_render}, unsafe { nil }) == none
-	assert get_device(failed_id) == none
+	assert get_device(0) == none && node_names[0] == unsafe { nil } && node_names[128] == unsafe { nil }
 	expect_unavailable(mut staged_card)
+	fail_render = false
 	assert !drm_devices_lock.held
-	println('DRM registration: node opens follow publication and stop on failure or unregister')
+	check_slot_reuse()
+	println('DRM registration: publication, namespace rollback, 64 active slots and safe ID reuse passed')
+}
+
+fn check_slot_reuse() {
+	driver := DrmDriver{features: driver_render}
+	mut devices := [64]&DrmDevice{}
+	for index in 0 .. devices.len {
+		dev := register_driver_with_data(&driver, voidptr(u64(index) + 1)) or { panic('active slot missing') }
+		assert dev.dev_id == u32(index)
+		devices[index] = unsafe { dev }
+	}
+	assert register_driver_with_data(&driver, unsafe { nil }) == none
+	old := devices[13]
+	mut old_card := unsafe { old.node }
+	mut old_render := unsafe { old.render_node }
+	unregister_device(old)
+	for _ in 0 .. 70 {
+		replacement := register_driver_with_data(&driver, voidptr(0xffff)) or { panic('cannot reuse minor number') }
+		assert replacement != old && replacement.dev_id == old.dev_id
+		unregister_device(old)
+		assert (get_device(13) or { panic('stale unregister removed the replacement') }) == replacement
+		assert node_names[13] == replacement.node && node_names[141] == replacement.render_node
+		assert old.driver_data == voidptr(14)
+		expect_unavailable(mut old_card)
+		expect_unavailable(mut old_render)
+		unregister_device(replacement)
+	}
+	for dev in devices { unregister_device(dev) }
+	for node in node_names { assert node == unsafe { nil } }
 }

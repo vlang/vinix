@@ -70,8 +70,8 @@ pub mut:
 pub struct DrmDevice {
 pub:
 	driver_data voidptr // Immutable for this device's lifetime.
-pub mut:
 	dev_id      u32
+pub mut:
 	driver      &DrmDriver = unsafe { nil }
 	gem_objects []&GemObjectRef
 	lock        klock.Lock
@@ -289,7 +289,6 @@ fn (mut this SyncFileResource) grow(_handle voidptr, _new_size u64) ? {
 
 __global (
 	registered_devices [64]&DrmDevice
-	next_dev_id        = u32(0)
 	drm_devices_lock   klock.Lock
 	prime_stat_dev_id  u64
 )
@@ -623,6 +622,7 @@ fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&
 	mut node := &DrmNode{
 		dev: unsafe { dev }
 		render: render
+		refcount: 1 // The devtmpfs name owns the initial reference.
 	}
 	node.stat.size = 0
 	node.stat.blocks = 0
@@ -634,16 +634,27 @@ fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&
 	node.stat.mode = stat.ifchr | 0o666
 	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
-	mut path := lib.new_text(32)
-	path.add('dri/')
-	path.add(prefix)
-	path.add_unsigned(number)
-	name := path.str() @[freed]
+	name := drm_node_name(prefix, number) @[freed]
 	// devtmpfs keeps its own copy of the last path component.
 	node.box = &resource.Resource(unsafe { node })
 	fs.devtmpfs_add_device(node.box, name)
 	unsafe { name.free() }
 	return node
+}
+
+fn drm_node_name(prefix string, number u64) string {
+	mut path := lib.new_text(32)
+	path.add('dri/')
+	path.add(prefix)
+	path.add_unsigned(number)
+	return lib.finish_text(path)
+}
+
+fn remove_device_node(node &DrmNode, prefix string, number u64) {
+	if node == unsafe { nil } { return }
+	name := drm_node_name(prefix, number) @[freed]
+	fs.devtmpfs_remove_device(name, node.box)
+	unsafe { name.free() }
 }
 
 fn (mut this DrmNode) open(_flags int) ?&resource.Resource {
@@ -822,12 +833,13 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 		drm_devices_lock.release()
 	}
 
-	if next_dev_id >= 64 {
+	mut id := u32(0)
+	for id < u32(registered_devices.len) && registered_devices[id] != unsafe { nil } {
+		id++
+	}
+	if id == u32(registered_devices.len) {
 		return none
 	}
-
-	id := next_dev_id
-	next_dev_id++
 
 	mut dev := &DrmDevice{
 		driver_data: driver_data
@@ -839,6 +851,7 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 	dev.node = create_device_node(dev, 'card', u64(id), false) or { return none }
 	if driver.features & driver_render != 0 {
 		dev.render_node = create_device_node(dev, 'renderD', u64(128 + id), true) or {
+			remove_device_node(dev.node, 'card', u64(id))
 			return none
 		}
 	}
@@ -863,12 +876,14 @@ pub fn unregister_device(dev &DrmDevice) {
 		drm_devices_lock.release()
 	}
 
-	if dev.dev_id < 64 {
-		mut d := unsafe { dev }
-		katomic.store(mut d.registered, false)
-		registered_devices[dev.dev_id] = unsafe { nil }
-		C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
-	}
+	if dev == unsafe { nil } || dev.dev_id >= u32(registered_devices.len)
+		|| registered_devices[dev.dev_id] != dev { return }
+	mut d := unsafe { dev }
+	katomic.store(mut d.registered, false)
+	remove_device_node(dev.render_node, 'renderD', u64(128 + dev.dev_id))
+	remove_device_node(dev.node, 'card', u64(dev.dev_id))
+	registered_devices[dev.dev_id] = unsafe { nil }
+	C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
 }
 
 fn copy_version_field(address u64, capacity u64, value string) bool {

@@ -57,8 +57,14 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 	registration := section(drm, 'pub fn register_driver_with_data(', 'pub fn unregister_device(', 'DRM publication')!
 	require_order(registration, ['mut dev := &DrmDevice{', 'driver_data: driver_data',
 		'registered: false', "create_device_node(dev, 'card'", "create_device_node(dev, 'renderD'",
+		"remove_device_node(dev.node, 'card', u64(id))", 'return none',
 		'registered_devices[id] = dev', 'katomic.store(mut dev.registered, true)'],
 		'Publish device readiness after installing its context, nodes and registry entry')!
+	unregister := section(drm, 'pub fn unregister_device(', 'fn copy_version_field(', 'DRM unregistration')!
+	require_order(unregister, ['drm_devices_lock.acquire()', 'registered_devices[dev.dev_id] != dev { return }',
+		'katomic.store(mut d.registered, false)', "remove_device_node(dev.render_node, 'renderD'",
+		"remove_device_node(dev.node, 'card'", 'registered_devices[dev.dev_id] = unsafe { nil }'],
+		'Remove the registered owner and its names before allowing the slot to be reused')!
 	open := section(drm, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(', 'DRM node open')!
 	require_order(open, ['!this.dev.is_registered()', 'errno.set(errno.enodev)', 'return none', 'return this.box'],
 		'DRM opens check device readiness and reuse the node resource')!

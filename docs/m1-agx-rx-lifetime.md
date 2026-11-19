@@ -152,3 +152,26 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `91b99cd17e3be58222a84513e5eb1e7b3207f936fb4a2fc3cdf3b2a428bf0270`.
 Native M1 validation remains open.
+
+## DRM device name removal and slot reuse
+
+Unregister marks the device inactive, detaches its card and render names,
+and releases its slot under the registry lock. A stale unregister checks
+the device pointer against the slot's current owner. Old open files keep
+their original device identity. A failed render-node creation detaches
+the staged card node, and DRM activity reports the number of live slots.
+
+The DRM wire sanitizer fixture filled 64 active slots and reused a freed
+slot 70 times while retaining the old card and render objects. It checked
+that stale unregister leaves the replacement active and existing opens
+cannot address it. Negative controls caught missing teardown, missing
+registration rollback and a missing owner check. Both AGX sanitizer
+suites and kernel builds passed, along with 79 local contract tests and
+122 pinned-reference checks. The allocation scan matched the 176 baseline
+findings. The tested base was `a7da85a72ebcc34c753f3942b5f5168c362e6e52`.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-slot-reuse-20261119.qpJ3ja/`.
+The `bundle.tar.gz` SHA-256 is
+`cc7c683c3b7fd6f3abb052b45935e671867559d2ce72ff6e874c8abc4db0b5ef`.
+Native M1 validation remains open.

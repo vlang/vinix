@@ -26,6 +26,8 @@ fn main() {
 	production += section(source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!
 	production += section(source, 'pub fn (dev &DrmDevice) is_registered(', '// Forward-reference placeholder')!
 	production += section(source, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(')!.replace('resource.Resource', 'NodeBox')
+	production += section(source, 'fn remove_device_node(', 'fn (mut this DrmNode) open(')!
+		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
 	production += section(source, 'pub fn register_driver_with_data(', 'fn copy_version_field(')!
 		.replace('syncobj.shared_timeline_stub()', 'shared_timeline_stub()').replace('C.kprintf(', 'C.printf(')
 	assert source.contains('\npub fn get_device(')

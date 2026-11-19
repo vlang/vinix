@@ -21,11 +21,14 @@ fn account_activity(device &DrmDevice, command u32) {
 pub fn activity_text() string {
 	mut text := lib.new_text(256)
 	drm_devices_lock.acquire()
+	mut active := u64(0)
+	for device in registered_devices {
+		if device != unsafe { nil } { active++ }
+	}
 	text.add('devices: ')
-	text.add_unsigned(u64(next_dev_id))
+	text.add_unsigned(active)
 	text.add('\ndrivers:')
-	for index in 0 .. int(next_dev_id) {
-		device := registered_devices[index]
+	for device in registered_devices {
 		if device != unsafe { nil } && device.driver != unsafe { nil } {
 			text.add(' ')
 			text.add(device.driver.name)
