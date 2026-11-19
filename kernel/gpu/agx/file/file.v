@@ -1831,7 +1831,7 @@ pub fn retain_mmap_range_handle(_dev &drm.DrmDevice, handle voidptr, offset u64,
 
 pub fn admit_mmap_range_handle(dev &drm.DrmDevice, handle voidptr, offset u64,
 	length u64, shared bool) int {
-	if dev == unsafe { nil } || !dev.registered { return -19 }
+	if dev == unsafe { nil } || !dev.is_registered() { return -19 }
 	f := lookup_file(handle) or {
 		return if gem.file_mmap_offset_exists(u64(dev), offset, length) { -13 } else { -22 }
 	}

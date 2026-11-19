@@ -27,3 +27,5 @@ pub:
 pub mut:
 	registered bool = true
 }
+
+pub fn (dev &DrmDevice) is_registered() bool { return dev.registered }

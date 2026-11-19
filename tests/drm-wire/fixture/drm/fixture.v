@@ -29,12 +29,19 @@ struct DrmDriver {
 }
 
 struct DrmDevice {
+	driver_data voidptr
+	dev_id u32
 	driver     &DrmDriver = unsafe { nil }
+mut:
 	registered bool       = true
+	node &DrmNode = unsafe { nil }
+	render_node &DrmNode = unsafe { nil }
 }
 
 struct DrmNode {
 	dev &DrmDevice
+mut:
+	box &NodeBox = unsafe { nil }
 }
 
 __global handler_status = 0
@@ -65,6 +72,7 @@ fn handle(_ &DrmDevice, _ voidptr, data voidptr) int {
 }
 
 pub fn run_checks() {
+	check_registration()
 	check_node_transport()
 	driver := DrmDriver{
 		ioctls: [DrmIoctl{ cmd: 0x41, size: 32, direction: 3, abi: 1 },

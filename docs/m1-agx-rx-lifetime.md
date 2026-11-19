@@ -128,3 +128,27 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `763ee40f2c3608a19a10328fcfea00e5659078bf5407e70d4356f7c14209e5d8`.
 Native M1 firmware validation remains open.
+
+## DRM node readiness
+
+DRM publishes readiness after installing the driver context, requested
+card and render nodes, and registry entry. An open that reaches a node
+before publication or after unregister returns `ENODEV`. Successful opens
+return the resource already installed in devtmpfs.
+
+The DRM wire sanitizer fixture covers card-only and card-plus-render
+registration, opens during node creation, unregister, and an injected
+render-node creation failure. Negative controls caught early publication
+and an open that skipped the readiness check. The AGX file-close and G13
+failure sanitizer suites, both kernel builds, 79 local contract tests
+and 122 pinned-reference checks passed against
+`51094f779c9777e828a90088fc215835d85e0547` plus the archived patch.
+The allocation scan returned 176 findings. Its only change was the
+existing node interface allocation classified as an explicit cast.
+Generated AArch64 C confirms there is no allocation in the open callback.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-node-readiness-20261119.tR6HXk/`.
+The `bundle.tar.gz` SHA-256 is
+`91b99cd17e3be58222a84513e5eb1e7b3207f936fb4a2fc3cdf3b2a428bf0270`.
+Native M1 validation remains open.

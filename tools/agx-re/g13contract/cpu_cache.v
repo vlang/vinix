@@ -35,7 +35,7 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 		require(callback.contains('lookup_file(handle) or { return ' + fallback + ' }') && !callback.contains('&GpuFile(handle)'), 'Mmap callback must resolve opaque Handle: ' + name)!
 	}
 	admission := section(file, 'pub fn admit_mmap_range_handle(', 'pub fn release_mmap_range_handle(', 'New mmap admission')!
-	require_order(admission, ['if dev == unsafe { nil } || !dev.registered { return -19 }', 'lookup_file(handle) or {',
+	require_order(admission, ['if dev == unsafe { nil } || !dev.is_registered() { return -19 }', 'lookup_file(handle) or {',
 		'gem.file_mmap_offset_exists(u64(dev), offset, length)', 'file.admit_mmap_range(offset, length, shared)'], 'Check registration before resolving the file and offset')!
 	require(driver.contains('mmap_attributes: agx_file.mmap_attributes_handle')
 		&& driver.contains('mmap_admit: agx_file.admit_mmap_range_handle')

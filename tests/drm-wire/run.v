@@ -15,13 +15,21 @@ fn main() {
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/drm-wire/fixture', scratch, false)!
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
-	source := os.read_file('${repo}/kernel/drm/drm.v')!
+	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
+	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
+	production += 'import katomic\n'
 	production += section(source, 'pub const driver_gem', 'pub struct DrmIoctl {')!
 	production += section(source, 'pub const default_driver_date', 'pub struct DrmDriver {')!
 	production += section(source, 'fn copy_version_field(', 'fn ioctl_gem_close(')!
 	production += section(source, 'fn decode_ioctl_cmd(', '// The node is /dev/dri/')!
 	production += section(source, 'fn (mut this DrmNode) ioctl(', 'fn (mut this DrmNode) unref(')!
+	production += section(source, 'pub fn (dev &DrmDevice) is_registered(', '// Forward-reference placeholder')!
+	production += section(source, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(')!.replace('resource.Resource', 'NodeBox')
+	production += section(source, 'pub fn register_driver_with_data(', 'fn copy_version_field(')!
+		.replace('syncobj.shared_timeline_stub()', 'shared_timeline_stub()').replace('C.kprintf(', 'C.printf(')
+	assert source.contains('\npub fn get_device(')
+	production += 'pub fn get_device(' + source.all_after('\npub fn get_device(')
 	os.write_file('${scratch}/drm/production.v', production)!
 	agx_source := os.read_file(os.getenv_opt('AGX_DRM_DRIVER_SOURCE') or {
 		'${repo}/kernel/gpu/agx/driver/driver.v'

@@ -56,7 +56,12 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 	require_order(device, ['pub:', 'driver_data voidptr', 'pub mut:'], 'DRM device context is immutable')!
 	registration := section(drm, 'pub fn register_driver_with_data(', 'pub fn unregister_device(', 'DRM publication')!
 	require_order(registration, ['mut dev := &DrmDevice{', 'driver_data: driver_data',
-		'create_device_node(dev,', 'registered_devices[id] = dev'], 'Set the device context before exposing a node')!
+		'registered: false', "create_device_node(dev, 'card'", "create_device_node(dev, 'renderD'",
+		'registered_devices[id] = dev', 'katomic.store(mut dev.registered, true)'],
+		'Publish device readiness after installing its context, nodes and registry entry')!
+	open := section(drm, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(', 'DRM node open')!
+	require_order(open, ['!this.dev.is_registered()', 'errno.set(errno.enodev)', 'return none', 'return this.box'],
+		'DRM opens check device readiness and reuse the node resource')!
 	require_order(driver, ['mgr.init(', 'drm.register_driver_with_data(agx_drm_driver, voidptr(mgr))'],
 		'AGX registers the initialized manager with its device')!
 	constructor := section(file, 'pub fn new_gpu_file(', '// Tear the file down.', 'File registration context')!

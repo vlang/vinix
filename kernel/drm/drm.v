@@ -75,9 +75,14 @@ pub mut:
 	driver      &DrmDriver = unsafe { nil }
 	gem_objects []&GemObjectRef
 	lock        klock.Lock
-	registered  bool
 	node        &DrmNode = unsafe { nil }
 	render_node &DrmNode = unsafe { nil }
+mut:
+	registered  bool
+}
+
+pub fn (dev &DrmDevice) is_registered() bool {
+	return katomic.load(&dev.registered)
 }
 
 // Forward-reference placeholder for GEM objects stored at device level.
@@ -98,6 +103,8 @@ pub mut:
 	can_mmap bool
 	render   bool
 	dev      &DrmDevice = unsafe { nil }
+mut:
+	box      &resource.Resource = unsafe { nil }
 }
 
 // A sync-file fd is a stable reference to one DMA fence. Mesa uses this to
@@ -633,9 +640,18 @@ fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&
 	path.add_unsigned(number)
 	name := path.str() @[freed]
 	// devtmpfs keeps its own copy of the last path component.
-	fs.devtmpfs_add_device(node, name)
+	node.box = &resource.Resource(unsafe { node })
+	fs.devtmpfs_add_device(node.box, name)
 	unsafe { name.free() }
 	return node
+}
+
+fn (mut this DrmNode) open(_flags int) ?&resource.Resource {
+	if this.dev == unsafe { nil } || !this.dev.is_registered() {
+		errno.set(errno.enodev)
+		return none
+	}
+	return this.box
 }
 
 fn (mut this DrmNode) mapping_attributes(handle voidptr, offset u64) u64 {
@@ -703,7 +719,7 @@ fn (mut this DrmNode) ioctl(handle voidptr, request u64, argp voidptr) ?int {
 	raw := u32(request & 0xffffffff)
 	request_size := (raw >> ioctl_size_shift) & ioctl_size_mask
 	request_direction := (raw >> ioctl_direction_shift) & ioctl_direction_mask
-	if this.dev == unsafe { nil } || this.dev.driver == unsafe { nil } || !this.dev.registered {
+	if this.dev == unsafe { nil } || this.dev.driver == unsafe { nil } || !this.dev.is_registered() {
 		errno.set(errno.enodev)
 		return none
 	}
@@ -817,7 +833,7 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 		driver_data: driver_data
 		dev_id: id
 		driver: unsafe { driver }
-		registered: true
+		registered: false
 	}
 
 	dev.node = create_device_node(dev, 'card', u64(id), false) or { return none }
@@ -827,6 +843,9 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 		}
 	}
 	registered_devices[id] = dev
+	// The primary node can already be visible in devtmpfs. Admit opens
+	// once every node and the registry entry have been installed.
+	katomic.store(mut dev.registered, true)
 
 	C.kprintf(c'drm: Registered driver %.*s as card%llu\n', i32(driver.name.len), driver.name.str,
 		u64(id))
@@ -846,7 +865,7 @@ pub fn unregister_device(dev &DrmDevice) {
 
 	if dev.dev_id < 64 {
 		mut d := unsafe { dev }
-		d.registered = false
+		katomic.store(mut d.registered, false)
 		registered_devices[dev.dev_id] = unsafe { nil }
 		C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
 	}
@@ -1406,7 +1425,7 @@ pub fn drm_ioctl(dev &DrmDevice, cmd u32, data voidptr, handle voidptr) int {
 		return -1
 	}
 
-	if !dev.registered {
+	if !dev.is_registered() {
 		return -19 // ENODEV
 	}
 	if ret := core_ioctl(dev, cmd, data, handle) {
@@ -1432,7 +1451,7 @@ pub fn get_device(id u32) ?&DrmDevice {
 	dev := registered_devices[id]
 	drm_devices_lock.release()
 
-	if dev == unsafe { nil } || !dev.registered {
+	if dev == unsafe { nil } || !dev.is_registered() {
 		return none
 	}
 	return dev
