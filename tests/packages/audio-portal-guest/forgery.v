@@ -5,11 +5,16 @@ import os
 import tools.packages.audiopcm
 import tools.packages.pkgcore
 import tools.packages.pkglaunch
+import tools.packages.pkgprotocol
+
+// Named explicitly: V omits pkgcore's private default callback when the
+// service is built here, and the C then names an undeclared function.
+fn quiet(_ pkgprotocol.Progress) {}
 
 fn isolated_forgery() ! {
 	require(C.getuid() == 1000 && C.geteuid() == 1000 && C.getgroups(0, unsafe { nil }) == 0,
 		'forgery control did not enter an isolated ordinary account')!
-	mut admission := (pkgcore.Service{}).audio_admission('tone')!
+	mut admission := (pkgcore.Service{ progress: quiet }).audio_admission('tone')!
 	defer { admission.close() }
 	require(admission.allowed, 'forgery control has no real signed audio admission')!
 	mut portal := audiopcm.start('tone', admission.generation, admission.manifest)!

@@ -162,37 +162,37 @@ fn main() {
 	println('HWTEST START ${name}')
 	setup() or {
 		eprintln('HWTEST FAIL ${name}: ${err}')
-		shutdown()
+		power_off()
 		return
 	}
 	if name == 'packages-audio-basic' {
 		basic() or {
 			eprintln('HWTEST FAIL ${name}: ${err}')
-			shutdown()
+			power_off()
 			return
 		}
 	} else if name == 'packages-audio-lifecycle' {
 		lifecycle() or {
 			eprintln('HWTEST FAIL ${name}: ${err}')
-			shutdown()
+			power_off()
 			return
 		}
 	} else if name == 'packages-audio-seat' {
 		seat() or {
 			eprintln('HWTEST FAIL ${name}: ${err}')
-			shutdown()
+			power_off()
 			return
 		}
 	} else {
 		eprintln('HWTEST FAIL unknown audio scenario')
-		shutdown()
+		power_off()
 		return
 	}
 	println('HWTEST PASS ${name}')
-	shutdown()
+	power_off()
 }
 
-fn shutdown() {
+fn power_off() {
 	C.usleep(300_000)
 	C.sync()
 	C.reboot(0x4321fedc)

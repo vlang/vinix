@@ -244,7 +244,9 @@ fn cross_inputs(host hwhost.Host, out string, mut paths map[string]string,
 	os.setenv('VINIX_AUDIO_FROZEN_SYSROOT', frozen, true)
 	os.setenv('VINIX_AUDIO_FROZEN_GCC', out + '/inputs/cross-gcc', true)
 	os.setenv('VINIX_AARCH64_SYSROOT', frozen, true)
-	host_cc := os.real_path('/opt/homebrew/opt/llvm/bin/clang')
+	// Newer LLVM rejects the C that some V releases generate for host tools
+	// (int pointers in vlib/os); VINIX_AUDIO_HOST_CC selects another clang.
+	host_cc := os.real_path(os.getenv_opt('VINIX_AUDIO_HOST_CC') or { '/opt/homebrew/opt/llvm/bin/clang' })
 	paths['adapter-host-cc'] = retained(host_cc, out, 'adapter-host-cc')!
 	originals['adapter-host-cc'] = host_cc
 	adapter := out + '/cross-cc'
@@ -301,7 +303,7 @@ fn audio_suite(root string, out string, arch string, sandbox string, key string)
 		programs:     [
 			hwhost.Program{ source: 'tools/packages/main.v', path: 'usr/bin/vinix-package', flags: ['-prod'] },
 			hwhost.Program{ source: 'tools/accounts/account.v', path: 'usr/sbin/vinix-account', flags: ['-prod'] },
-			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-prod'] },
+			hwhost.Program{ source: 'tools/accounts/session.v', path: 'usr/sbin/vinix-session', flags: ['-prod', '-enable-globals'] },
 			hwhost.Program{ source: 'tools/accounts/authd.v', path: 'usr/sbin/vinix-authd', flags: ['-prod'] },
 		]
 		binaries:     [hwhost.RootBinary{ source: sandbox, path: 'usr/bin/vinix-sandbox' }]
@@ -355,6 +357,8 @@ fn prepare_check(options hwhost.Options, root string, out string, before map[str
 	for name in ['snapshot.json', 'v.mod'] {
 		key := 'v-compiler/' + name
 		original := os.dir(host.v) + '/' + name
+		// A compiler built from a V checkout has no snapshot record.
+		if name == 'snapshot.json' && !os.exists(original) { continue }
 		paths[key] = retained(original, out, key)!
 		originals[key] = original
 	}
@@ -722,11 +726,12 @@ fn finish_check(options hwhost.Options, root string, out string, before map[stri
 		write_json(out + '/input-before.json', inputs_before)!
 	}
 	if source_inventory(root)! != before { return error('producer sources changed during build') }
+	unsealed := 'kernel-seal' !in paths
+	if unsealed { admit_unsealed_kernel(root, out)! }
 	mut passed := true
 	mut count := 0
 	for scenario in suite.scenarios {
 		if options.scenarios.len > 0 && scenario.name !in options.scenarios { continue }
-		if 'kernel-seal' !in paths { return error('native execution requires VINIX_AUDIO_KERNEL_EVIDENCE') }
 		state := out + '/run/' + scenario.name
 		outcome := hwhost.run_scenario(host, scenario, hwhost.Run{
 			kernel:  paths['kernel']
@@ -770,6 +775,10 @@ fn finish_check(options hwhost.Options, root string, out string, before map[stri
 	}
 	if !passed || count != 3 {
 		return error('requires all three native guest scenarios to pass; raw attempts retained')
+	}
+	if unsealed {
+		println('All three scenarios passed on an unsealed kernel; no qualification receipt was written.')
+		return
 	}
 	for name in ['source-before', 'source-after', 'generated-before', 'generated-after', 'input-before',
 		'input-after'] {
@@ -886,4 +895,21 @@ fn main() {
 		eprintln('audio-portal-runtime-check: ${err}')
 		exit(1)
 	}
+}
+
+// A kernel built from a source tree that carries SO_PEERLOGIN needs no
+// separately sealed build: the guest refuses a kernel without it. Such a run
+// says whether the scenarios pass and stops short of a qualification receipt,
+// since nothing binds the ELF to the frozen source. It must be asked for.
+fn admit_unsealed_kernel(root string, out string) ! {
+	if os.getenv('VINIX_AUDIO_KERNEL_UNSEALED') != '1' {
+		return error('native execution requires VINIX_AUDIO_KERNEL_EVIDENCE, or VINIX_AUDIO_KERNEL_UNSEALED=1 for a kernel built from this source')
+	}
+	public := os.read_file(root + '/kernel/socket/public/public.v') or {
+		return error('an unsealed kernel needs the kernel socket source')
+	}
+	if !public.contains('pub const so_peerlogin = 0x564c') {
+		return error('the kernel source has no SO_PEERLOGIN')
+	}
+	os.write_file(out + '/kernel-unsealed.txt', 'The kernel was not sealed; this run is not a qualification.\n')!
 }

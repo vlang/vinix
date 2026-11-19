@@ -209,3 +209,30 @@ The tested retainer source SHA-256 is
 `25ed785df391d2dd574b76a1a49833856c8484df900e5252b236f6256636d2d0`;
 the focused runner source SHA-256 is
 `ec95d77ad5a4c657fbbb23397d0727ab1b4e82d28b9f506c5de233b658feee8c`.
+
+## Unsealed master-kernel runs (2026-11-19)
+
+`SO_PEERLOGIN` is on master (`9a5ab3a60`), and the sealed kernel bundle and
+pinned compiler named above no longer exist. `VINIX_AUDIO_KERNEL_UNSEALED=1`
+lets the controller boot a kernel built from a source tree that carries
+`SO_PEERLOGIN`; it writes `kernel-unsealed.txt` and never a qualification
+receipt. Other inputs for current tools: `V` a compiler whose
+`vlib/os/process_nix.c.v` passes waitpid an `i32` status (clang 23 and GCC 14
+refuse the `i64` one), `VINIX_AUDIO_HOST_CC=/usr/bin/cc` (Homebrew LLVM 23
+refuses the same C), `VINIX_AARCH64_SYSROOT` the musl-cross sysroot, and
+`VINIX_AUDIO_BACKEND_CC` its GCC.
+
+On AArch64 every program now builds and links, the guests boot, and setup
+(accounts, authd, signed `update` and `install`) passes after fixing a double
+free in generation admission (`57fd667fd`). Remaining failures:
+
+- basic: `vinix-session run --isolated alex /sbin/init isolated-forgery`
+  exits with SIGSEGV.
+- lifecycle and seat: the tone client never writes `client.ready` /
+  `seat.ready`.
+
+Likely cause, not yet confirmed: the current V compiler does not clone a string
+appended to an array (`a << s`), while V1 did, and much of `tools/packages`
+was written assuming it does (see the comments that say so). Each such site
+that later frees `s` is a use-after-free under the current compiler.
+Real playback remains unqualified.
