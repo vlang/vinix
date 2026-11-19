@@ -424,7 +424,7 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 		errno.set(errno.enodev)
 		return none
 	}
-	parent := ensure_devtmpfs_dir(devtmpfs_root, 'dri')
+	mut parent := ensure_devtmpfs_dir(devtmpfs_root, 'dri')
 	if parent.children == unsafe { nil } || !stat.isdir(parent.resource.stat.mode) {
 		errno.set(errno.enotdir)
 		return none
@@ -440,11 +440,19 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 			memory.free(primary_leaf)
 			return none
 		}
-		publish_devtmpfs_node(mut primary_leaf, card, true)
-		publish_devtmpfs_node(mut render_leaf, render, true)
+		init_devtmpfs_node(mut primary_leaf, card, true)
+		init_devtmpfs_node(mut render_leaf, render, true)
+		// Directory readers see the pair when the map lock is released.
+		children_lock.acquire()
+		unsafe {
+			parent.children[primary_leaf.name] = primary_leaf
+			parent.children[render_leaf.name] = render_leaf
+		}
+		children_lock.release()
 		return
 	}
-	publish_devtmpfs_node(mut primary_leaf, card, true)
+	init_devtmpfs_node(mut primary_leaf, card, true)
+	publish_child(parent, primary_leaf.name, primary_leaf)
 }
 
 // No namespace or resource reference is transferred until publication.
@@ -476,10 +484,11 @@ fn prepare_dri_leaf(parent &VFSNode, name string) ?&VFSNode {
 // Caller holds vfs_lock. The node takes ownership of leaf.
 fn publish_devtmpfs_device(device &resource.Resource, parent &VFSNode, leaf string, seat bool) {
 	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, leaf, false)
-	publish_devtmpfs_node(mut new_node, device, seat)
+	init_devtmpfs_node(mut new_node, device, seat)
+	publish_child(parent, new_node.name, new_node)
 }
 
-fn publish_devtmpfs_node(mut new_node VFSNode, device &resource.Resource, seat bool) {
+fn init_devtmpfs_node(mut new_node VFSNode, device &resource.Resource, seat bool) {
 	new_node.resource = unsafe { device }
 	new_node.seat = seat
 	new_node.resource.stat.dev = devtmpfs_dev_id
@@ -488,8 +497,6 @@ fn publish_devtmpfs_node(mut new_node VFSNode, device &resource.Resource, seat b
 	new_node.resource.stat.atim = realtime_clock
 	new_node.resource.stat.ctim = realtime_clock
 	new_node.resource.stat.mtim = realtime_clock
-
-	publish_child(new_node.parent, new_node.name, new_node)
 }
 
 // Remove a dynamically-created device node. The resource held one reference

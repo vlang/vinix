@@ -18,6 +18,7 @@ fn main() {
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
 	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
 	devtmpfs_source := os.read_file(os.getenv_opt('DRM_DEVTMPFS_SOURCE') or { '${repo}/kernel/fs/devtmpfs.v' })!
+	vfs_source := os.read_file('${repo}/kernel/fs/vfs.v')!
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
 	production += 'import katomic\n'
@@ -49,6 +50,7 @@ fn main() {
 		.replace("filesystem: filesystems['devtmpfs']", '')
 		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
 		.replace('memory.free(', 'memory.free_registration(')
+	production += section(vfs_source, 'pub fn publish_child(', 'fn remove_child(')!
 	production += section(source, 'fn remove_device_node(', 'fn (mut this DrmNode) open(')!
 		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
 		.replace('C.vinix_stack_alloc(', 'C.alloca(')

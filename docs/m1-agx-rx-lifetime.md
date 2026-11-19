@@ -368,3 +368,26 @@ Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-leaf-staging-20261119.F7Tz4Q/`.
 The `bundle.tar.gz` SHA-256 is
 `dce6e82d93b18e965c01de043dcf75460c0a757341d74f9abccb4ec0cd3cf031`.
+
+## Paired DRM directory publication
+
+Devtmpfs initializes both DRM leaves before inserting them under one
+directory lock. Path lookups and directory snapshots take that lock, so
+a reader observes the pair together. Data opens become available after
+DRM installs the registry entry.
+
+The DRM wire sanitizer fixture inspected the directory at each unlock.
+A control that released the lock between insertions exposed a partial
+pair. Generated ARM64 code showed both map insertions between one acquire
+and release. The allocation scan matched the 173 baseline findings.
+
+Both kernel builds, the QEMU descriptor-flags suites, both AGX sanitizer
+suites and all 79 local contract tests passed. An ARM64 QEMU boot with
+the fake G17 driver enabled logged publication of `card0` and
+`renderD128`. Native M1 validation remains open.
+
+The tested base was `a77430d795afe96188f9c8283aa70e7e48bd646c` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-paired-publication-20261119.NtAk6Z/`.
+The `bundle.tar.gz` SHA-256 is
+`c49fc226b8057fc0594c07ec3e7038934fa115e90a2ba2e52ede92418c3dc3ae`.

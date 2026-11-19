@@ -22,6 +22,11 @@ mut:
 	held bool
 }
 
+struct NamespaceLock {
+mut:
+	held bool
+}
+
 struct VFSNode {
 	directory bool
 mut:
@@ -40,12 +45,26 @@ fn (mut lock_state RegistryLock) release() {
 	lock_state.held = false
 }
 
+fn (mut lock_state NamespaceLock) acquire() {
+	assert !lock_state.held && vfs_lock.held
+	lock_state.held = true
+}
+
+fn (mut lock_state NamespaceLock) release() {
+	assert lock_state.held
+	lock_state.held = false
+	observe_dri_publication()
+}
+
 __global drm_devices_lock RegistryLock
 __global vfs_lock RegistryLock
+__global children_lock NamespaceLock
 __global devtmpfs_root = unsafe { &VFSNode(nil) }
 __global registered_devices [64]&DrmDevice
 __global node_names [192]&DrmNode
 __global published_nodes = 0
+__global staged_nodes [2]&VFSNode
+__global staged_devices [2]&NodeBox
 
 fn shared_timeline_stub() {}
 
@@ -83,25 +102,40 @@ fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	return dir
 }
 
-fn publish_devtmpfs_node(mut namespace_node VFSNode, device &NodeBox, seat bool) {
-	assert drm_devices_lock.held && vfs_lock.held && seat
+fn init_devtmpfs_node(mut namespace_node VFSNode, device &NodeBox, seat bool) {
+	assert drm_devices_lock.held && vfs_lock.held && !children_lock.held && seat
 	prefix := if device.minor >= 128 { 'renderD' } else { 'card' }
 	leaf := namespace_node.name
 	assert leaf == '${prefix}${device.minor}'
 	assert unsafe { leaf.str[leaf.len] } == 0
-	mut parent := unsafe { namespace_node.parent }
-	mut node := unsafe { device.node }
-	assert registered_devices[node.dev.dev_id] == unsafe { nil }
-	assert node.stat.rdev == u64(226 << 8) | device.minor
-	assert node.stat.mode == node_ifchr | 0o666
-	assert node.refcount == 1 && node.box == device
-	expect_unavailable(mut node)
-	if device.minor >= 128 {
-		expect_unavailable(mut node_names[node.dev.dev_id])
+	assert leaf !in namespace_node.parent.children
+	slot := if device.minor >= 128 { 1 } else { 0 }
+	assert staged_nodes[slot] == unsafe { nil }
+	staged_nodes[slot] = unsafe { namespace_node }
+	staged_devices[slot] = unsafe { device }
+}
+
+fn observe_dri_publication() {
+	assert drm_devices_lock.held && vfs_lock.held && !children_lock.held
+	primary := staged_devices[0]
+	assert primary != unsafe { nil }
+	count := if primary.node.dev.render_node == unsafe { nil } { 1 } else { 2 }
+	for slot in 0 .. count {
+		entry := staged_nodes[slot]
+		device := staged_devices[slot]
+		assert entry != unsafe { nil } && device != unsafe { nil }
+		assert unsafe { entry.parent.children[entry.name] } == entry, 'directory reader saw partial DRM publication'
+		mut node := unsafe { device.node }
+		assert registered_devices[node.dev.dev_id] == unsafe { nil }
+		assert node.stat.rdev == u64(226 << 8) | device.minor
+		assert node.stat.mode == node_ifchr | 0o666
+		assert node.refcount == 1 && node.box == device
+		expect_unavailable(mut node)
+		node_names[device.minor] = unsafe { node }
+		staged_nodes[slot] = unsafe { nil }
+		staged_devices[slot] = unsafe { nil }
+		published_nodes++
 	}
-	node_names[device.minor] = unsafe { node }
-	unsafe { parent.children[leaf] = namespace_node }
-	published_nodes++
 }
 
 fn check_registration_collisions() {
