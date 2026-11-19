@@ -8,6 +8,7 @@ import aarch64.exception
 import aarch64.kio
 import aarch64.timer
 import apple.ascmailbox
+import klock
 
 __global tx_irq_waits = 0
 __global tx_irq_pulses = [2]int{}
@@ -27,6 +28,43 @@ fn contend_for_send_empty() {
 	kio.configure_send(tx_contended_mailbox.base, unsafe { &tx_contended_mailbox.lock }, 1)
 	kio.queue_aic_event(575)
 	exception.dispatch()
+}
+
+fn delay_timed_retry() {
+	timer.watch_busywait(unsafe { nil })
+	timer.busywait_us(500_001)
+}
+
+fn contend_with_timed_retry() {
+	timer.watch_busywait(unsafe { nil })
+	klock.on_next_acquire(unsafe { &tx_contended_mailbox.lock }, delay_timed_retry)
+}
+
+fn check_asc_mailbox_retry_deadline() {
+	base := u64(0x206408000)
+	message := ascmailbox.MboxMsg{data0: 0x123456789abcdef0, data1: 0x21}
+	mut box := ascmailbox.new_mailbox(base)
+	tx_contended_mailbox = unsafe { &box }
+	timer.require_unlocked_waits(unsafe { &box.lock })
+	for irq in [u32(0), 575]! {
+		for contended in [false, true]! {
+			kio.configure_send(base, unsafe { &box.lock }, 500_001)
+			barriers := cpu.send_barriers()
+			start := timer.get_us()
+			timer.watch_busywait(if contended { contend_with_timed_retry } else { delay_timed_retry })
+			assert !box.send_timed_irq(message, irq), 'ASC timed retry must refuse a FIFO that becomes ready after the deadline'
+			reads, writes, _ := kio.send_result()
+			assert timer.get_us() - start > 500_000 && reads == 1 && writes == 0
+			assert cpu.send_barriers() == barriers && !box.lock.is_held() && kio.aic_irq_masked(575)
+			assert box.send_timed_irq(message, irq)
+			retry_reads, retry_writes, words := kio.send_result()
+			assert retry_reads == 2 && retry_writes == 2 && words == [message.data0, message.data1]!
+		}
+	}
+	timer.require_unlocked_waits(unsafe { nil })
+	tx_contended_mailbox = unsafe { nil }
+	kio.configure_send(0, unsafe { nil }, 0)
+	println('ASC timed retry: four IRQ and polling cases preserve the deadline across wait and lock delays')
 }
 
 fn check_asc_mailbox_send() {

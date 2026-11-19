@@ -373,6 +373,7 @@ pub fn run_checks() {
 	check_rtkit_started_boot()
 	check_asc_mailbox_send()
 	check_asc_mailbox_send_irq()
+	check_asc_mailbox_retry_deadline()
 	check_tvb_feedback()
 	assert sizeof(fw.G13FwStatus) == 0x80
 	assert __offsetof(fw.G13FwStatus, halt_count) == 0x10

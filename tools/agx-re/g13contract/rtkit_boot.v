@@ -122,13 +122,14 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 	require(local.contains('const send_timeout_us = u64(500_000)') && local.contains('const send_poll_us = u64(100)'),
 		'Vinix uses the Asahi ASC transmit duration and polling interval')!
 	timed := section(local, 'pub fn (mut mbox Mailbox) send_timed_wait(', '// Receive a message', 'Vinix timed mailbox transmit')!
-	require_order(timed, ['mbox.try_send(msg)', 'started := timer.get_us()', 'elapsed := timer.get_us() - started',
+	require_order(timed, ['mbox.try_send(msg, none)', 'started := timer.get_us()', 'elapsed := timer.get_us() - started',
 		'elapsed >= send_timeout_us', 'remaining := send_timeout_us - elapsed', 'timer.busywait_us',
-		'mbox.try_send(msg)', 'return false'], 'Vinix measures a fresh wait only when the FIFO is full')!
-	require_order(timed, ['mbox.try_send(msg)', 'interrupts := if guarded { guard.ints } else { cpu.interrupt_state() }',
+		'if timer.get_us() - started > send_timeout_us { break }', 'mbox.try_send(msg, started)',
+		'return false'], 'Vinix measures a fresh wait after a full FIFO and checks the budget after every wait')!
+	require_order(timed, ['mbox.try_send(msg, none)', 'interrupts := if guarded { guard.ints } else { cpu.interrupt_state() }',
 		'irq != 0 && interrupts && mbox.claim_send_irq(irq)',
 		'defer {', 'mbox.release_send_irq(irq)', 'wait_send_irq(irq, interval)', 'timer.busywait_us(interval)',
-		'mbox.try_send(msg)', 'aic.deferred_send_irq_pending(irq)', 'aic.arm_deferred_send_irq(irq)'],
+		'mbox.try_send(msg, started)', 'aic.deferred_send_irq_pending(irq)', 'aic.arm_deferred_send_irq(irq)'],
 		'Vinix arms only after a full FIFO and checks space before rearming or publishing')!
 	claim := section(local, 'fn (mut mbox Mailbox) claim_send_irq(', '// An IRQ prompts', 'Vinix send-empty ownership')!
 	require_order(claim, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }',
@@ -137,11 +138,12 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 		'Vinix serializes the single IRQ waiter and masks before releasing ownership')!
 	require_order(timed, ['if wait_for_irq {', 'if guarded { guard.release() }', 'wait_send_irq(irq, interval)',
 		'guard.acquire()', 'if !wait.active(wait.context)', 'return false',
-		'timer.get_us() - started > send_timeout_us', 'break', 'mbox.try_send(msg)'],
+		'timer.get_us() - started > send_timeout_us', 'break', 'mbox.try_send(msg, started)'],
 		'Vinix reacquires the runtime guard and checks liveness and deadline before retrying TX')!
 	try_send := section(local, 'fn (mut mbox Mailbox) try_send(msg', '// Use the polled ASC timeout', 'Vinix mailbox locking')!
-	require_order(try_send, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }', 'return mbox.try_send_locked(msg)'],
-		'Vinix holds the lock for each mailbox attempt')!
+	require_order(try_send, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }', 'if start := started',
+		'if timer.get_us() - start > send_timeout_us { return false }', 'return mbox.try_send_locked(msg)'],
+		'Vinix checks the retry deadline under the mailbox lock before touching the FIFO')!
 	publish := section(local, 'fn (mbox &Mailbox) try_send_locked(', '// Send a message to the coprocessor', 'Vinix mailbox publication')!
 	require_order(publish, ['mbox.read_reg(mbox_a2i_ctrl) & mbox_full != 0', 'return false',
 		'cpu.dmb_sy()', 'mbox.write_reg64(mbox_a2i_send0, msg.data0)', 'mbox.write_reg64(mbox_a2i_send1, msg.data1)'],
