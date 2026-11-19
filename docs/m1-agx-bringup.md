@@ -317,6 +317,29 @@ executed anything. In order:
    read back offscreen.
 4. **Lifecycle.** Repeat across allocate/free, mapping reuse, process exit and
    several contexts. Check for leaked objects, stale mappings and stuck fences.
+5. **Telemetry.** Before and after `run-m1-agx-smoke`, read
+   `/sys/class/drm/renderD128/device/agx_stats` and `gpu_memory`
+   ([G13 statistics](m1-agx-stats.md)). `jobs` should grow by the submissions
+   the test made and `busy_ns` should grow; `pstate` and `util1`..`util4` should
+   rise while it renders. `readlink /sys/dev/char/226:128/device/subsystem`
+   should end in `bus/platform`, and that device's `uevent` should name
+   `OF_FULLNAME=/soc/gpu@206400000` ([DRM sysfs](m1-agx-drm-sysfs.md)). While a
+   GL client runs, `grep -H drm- /proc/<pid>/fdinfo/*` should show
+   `drm-driver: asahi` and its memory ([fdinfo](m1-agx-fdinfo.md)).
+6. **Recovery.** Keep the serial log. These lines are logged and the GPU keeps
+   running, as on Asahi: `agx: Fault addr=...`, `agx: fault event without a
+   valid G13 fault register`, `agx: GPU firmware did not halt ...; cannot
+   recover`, `agx: channel error names pipe ...; nothing to recover`,
+   `agx: no workqueue for channel error slot ...`, `agx: RecoverChannel
+   doorbell send failed` and `agx: timed out waiting for RecoverChannel; its
+   queue stays pinned`. The last means later device-control commands will also
+   time out until the firmware catches up ([RecoverChannel](m1-agx-recover-channel.md)).
+
+The GPU driver initialises before the display and framebuffer drivers
+(`kernel/main_arm64.v`), so it is `card0` and `renderD128`. Vinix numbers a
+render node 128 plus the card number, where Linux numbers render nodes on their
+own; `run-m1-agx-smoke` and Vinix's Mesa patch name `renderD128` directly. If a
+boot log shows the GPU as a later card, they will not find it.
 
 ## Known unproven
 
