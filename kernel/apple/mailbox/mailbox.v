@@ -54,6 +54,12 @@ pub:
 	active  fn (voidptr) bool = unsafe { nil }
 }
 
+pub enum SendResult {
+	sent
+	timed_out
+	cancelled
+}
+
 pub fn new_mailbox(base u64) Mailbox {
 	return Mailbox{
 		// Map the ASC mailbox aperture as Device memory (registers up to 0xc14).
@@ -133,7 +139,7 @@ fn wait_send_irq(irq u32, interval u64) {
 
 // The caller owns the transmit line while issuing the message.
 pub fn (mut mbox Mailbox) send_timed_irq(msg MboxMsg, irq u32) bool {
-	return mbox.send_timed_wait(msg, SendWait{irq: irq})
+	return mbox.send_timed_wait(msg, SendWait{irq: irq}) == .sent
 }
 
 fn (mut mbox Mailbox) claim_send_irq(irq u32) bool {
@@ -154,10 +160,10 @@ fn (mut mbox Mailbox) release_send_irq(irq u32) {
 // An IRQ prompts an early FIFO check, with a bounded poll if delivery is delayed.
 // One sender owns the line. Concurrent senders continue to poll the FIFO
 // without changing that sender's interrupt mask or pending state.
-pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
-	sent := mbox.try_send(msg, none, wait) or { return false }
+pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) SendResult {
+	sent := mbox.try_send(msg, none, wait) or { return .cancelled }
 	if sent {
-		return true
+		return .sent
 	}
 	started := timer.get_us()
 	irq := wait.irq
@@ -183,9 +189,9 @@ pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
 			timer.busywait_us(interval)
 		}
 		if timer.get_us() - started > send_timeout_us { break }
-		retried := mbox.try_send(msg, started, wait) or { return false }
+		retried := mbox.try_send(msg, started, wait) or { return .cancelled }
 		if retried {
-			return true
+			return .sent
 		}
 		if wait_for_irq && aic.deferred_send_irq_pending(irq)
 			&& timer.get_us() - started < send_timeout_us {
@@ -193,7 +199,7 @@ pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
 		}
 	}
 	C.printf(c'mailbox: Send timeout\n')
-	return false
+	return .timed_out
 }
 
 // Receive a message from the coprocessor (IOP -> AP)

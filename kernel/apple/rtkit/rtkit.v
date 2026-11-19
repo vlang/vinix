@@ -373,12 +373,16 @@ fn (mut rtk RTKit) send_management(kind u8, payload u64) bool {
 
 fn (mut rtk RTKit) send_start_endpoint(ep u8, irq u32) bool {
 	payload := (u64(ep) << 32) | start_ep_flag
-	message := management_message(msg_start_ep, payload)
-	if rtk.send_message_irq(ep_mgmt, message, irq) {
+	message := mailbox.MboxMsg{data0: management_message(msg_start_ep, payload), data1: ep_mgmt}
+	wait := mailbox.SendWait{irq: irq}
+	// START_EP travels over management, but the target may need application power.
+	application := ep >= app_endpoint_start
+	result := rtk.send_message_result(message, wait, application)
+	if result == .sent {
 		return true
 	}
-	// The mailbox reports failure only when neither word was written.
-	return rtk.firmware_led_boot && rtk.send_message_irq(ep_mgmt, message, irq)
+	return rtk.firmware_led_boot && result == .timed_out
+		&& rtk.send_message_result(message, wait, application) == .sent
 }
 
 fn (mut rtk RTKit) reply_boot_management(kind u8, payload u64, request_wake bool) bool {
@@ -867,16 +871,21 @@ fn rtkit_send_active(context voidptr) bool {
 		&& (!guard.application || katomic.load(&guard.rtk.application_ready))
 }
 
-// A firmware-led send checks for a crash before each FIFO attempt.
 pub fn (mut rtk RTKit) send_message_wait(ep u8, data u64, wait mailbox.SendWait) bool {
 	message := mailbox.MboxMsg{
 		data0: data
 		data1: u64(ep)
 	}
+	return rtk.send_message_result(message, wait, ep >= app_endpoint_start) == .sent
+}
+
+// A firmware-led send checks readiness before each FIFO attempt.
+fn (mut rtk RTKit) send_message_result(message mailbox.MboxMsg, wait mailbox.SendWait,
+	application bool) mailbox.SendResult {
 	if rtk.firmware_led_boot {
 		boot_irq := if wait.lock == unsafe { nil } { rtk.boot_send_irq } else { u32(0) }
 		// The mailbox checks this synchronously, with wait.lock held if supplied.
-		guard := TransportSendGuard{rtk: rtk, wait: wait, application: ep >= app_endpoint_start}
+		guard := TransportSendGuard{rtk: rtk, wait: wait, application: application}
 		send_wait := mailbox.SendWait{
 			irq: if boot_irq != 0 { boot_irq } else { wait.irq }
 			lock: wait.lock
@@ -884,14 +893,14 @@ pub fn (mut rtk RTKit) send_message_wait(ep u8, data u64, wait mailbox.SendWait)
 			active: rtkit_send_active
 		}
 		if boot_irq != 0 { rtk.lock.release() }
-		sent := rtk.mbox.send_timed_wait(message, send_wait)
+		result := rtk.mbox.send_timed_wait(message, send_wait)
 		if boot_irq != 0 { rtk.lock.acquire() }
-		return sent
+		return result
 	}
 	if wait.lock != unsafe { nil } {
 		return rtk.mbox.send_timed_wait(message, wait)
 	}
-	return rtk.mbox.send(message)
+	return if rtk.mbox.send(message) { .sent } else { .timed_out }
 }
 
 pub fn (mut rtk RTKit) recv_msg() ?mailbox.MboxMsg {

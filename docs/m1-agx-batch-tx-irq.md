@@ -158,3 +158,28 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `882d2f67c44d53cd6f7e91d364d3fe5e515fd54b970adb17cadc82dda2405b16`.
 Native M1 firmware validation remains open.
+
+## Application endpoint power during START_EP
+
+START_EP uses the management endpoint and carries its target in the
+payload. G13 RTKit now checks the target's power requirement under the
+FIFO lock on every attempt. It retries an unsent START_EP once after a
+mailbox timeout, as the pinned Asahi implementation does. Cancellation
+ends the request.
+
+The sanitizer fixture reproduced a send after application power dropped on
+`5011dc2a93db52c7565c4a0c51c0709f786d5191`. Four cases passed across both
+G13 ABIs with IRQ-assisted and polled sends. The cases restore power after
+cancellation and verify that only a fresh request publishes the two words.
+A negative control that retried cancellation reproduced the stale send.
+Existing system endpoint, timeout retry and boot transcripts passed.
+
+Both kernel builds, the job-lifetime suite, 79 local contract tests and 122
+pinned-reference checks passed. The allocation scan reproduced the same
+176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-rtkit-start-ep-20261119.RhjADr/`.
+The `bundle.tar.gz` SHA-256 is
+`68048e131a7ca9fff3ed9279bdf29d19e08293aa66a787691983f4bd78a44ee5`.
+Native M1 firmware validation remains open.

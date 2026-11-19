@@ -47,6 +47,12 @@ pub:
 	active fn (voidptr) bool = unsafe { nil }
 }
 
+pub enum SendResult {
+	sent
+	timed_out
+	cancelled
+}
+
 pub fn new_mailbox(_ u64) Mailbox { return Mailbox{} }
 pub fn msg_endpoint(message &MboxMsg) u8 { return u8(message.data1) }
 pub fn (mut box Mailbox) inject(message MboxMsg) {
@@ -100,26 +106,31 @@ pub fn (mut box Mailbox) send(message MboxMsg) bool {
 }
 
 pub fn (mut box Mailbox) send_timed(message MboxMsg) bool {
-	return box.send_timed_wait(message, SendWait{})
+	return box.send_timed_wait(message, SendWait{}) == .sent
 }
 
 pub fn (mut box Mailbox) send_timed_irq(message MboxMsg, irq u32) bool {
-	return box.send_timed_wait(message, SendWait{irq: irq})
+	return box.send_timed_wait(message, SendWait{irq: irq}) == .sent
 }
 
-pub fn (mut box Mailbox) send_timed_wait(message MboxMsg, wait SendWait) bool {
+pub fn (mut box Mailbox) send_timed_wait(message MboxMsg, wait SendWait) SendResult {
 	guarded := wait.lock != unsafe { nil }
 	if guarded { assert wait.lock.is_held() }
 	mut transport := unsafe { if guarded { wait_transport } else { box.unguarded_transport } }
 	if transport != unsafe { nil } {
-		return transport.send_timed_wait(ascmailbox.MboxMsg{data0: message.data0, data1: message.data1},
+		result := transport.send_timed_wait(ascmailbox.MboxMsg{data0: message.data0, data1: message.data1},
 			ascmailbox.SendWait{irq: wait.irq, lock: wait.lock, context: wait.context, active: wait.active})
+		return match result {
+			.sent { .sent }
+			.timed_out { .timed_out }
+			.cancelled { .cancelled }
+		}
 	}
 	if wait.irq != 0 && !guarded {
 		assert wait.irq == 575
 		box.irq_send_attempts++
 	}
-	if wait.active != unsafe { nil } && !wait.active(wait.context) { return false }
+	if wait.active != unsafe { nil } && !wait.active(wait.context) { return .cancelled }
 	box.timed_attempts++
-	return box.send(message)
+	return if box.send(message) { .sent } else { .timed_out }
 }

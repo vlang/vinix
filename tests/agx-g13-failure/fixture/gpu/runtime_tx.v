@@ -134,6 +134,41 @@ fn boot_g13_fixture_transport(mut transport rtkit.RTKit) {
 	assert transport.boot_started(0, 0)
 }
 
+fn restore_power_after_start_attempt() {
+	assert rtkit_owner.rtk.handle_system_message(mailbox.MboxMsg{data0: rtkit_ap_on})
+}
+
+fn drop_power_during_endpoint_start() {
+	timer.watch_busywait(unsafe { nil })
+	assert rtkit_owner.rtk.handle_system_message(mailbox.MboxMsg{data0: u64(rtkit.msg_ap_power_ack) << 52})
+	// Power can return after the FIFO attempt reports cancellation. Only a
+	// caller's fresh START_EP should publish a message in that case.
+	fifo_lock := unsafe { &rtkit_owner.rtk.mbox.unguarded_transport.lock }
+	klock.on_next_release(fifo_lock, restore_power_after_start_attempt)
+}
+
+fn check_g13_endpoint_start_power(abi hw.FirmwareAbi, mut tx ascmailbox.Mailbox) {
+	kio.require_send_owner(unsafe { nil })
+	for irq in [u32(0), 575]! {
+		mut transport := rtkit.RTKit{name: 'g13-start-power'}
+		boot_g13_fixture_transport(mut transport)
+		transport.mbox.unguarded_transport = unsafe { &tx }
+		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}, rtk: unsafe { &transport }}
+		rtkit_owner = unsafe { &mgr }
+		kio.configure_send(tx.base, unsafe { &tx.lock }, 1)
+		unmasks := kio.aic_unmasks()
+		timer.watch_busywait(drop_power_during_endpoint_start)
+		assert !transport.start_endpoint_irq(0x21, irq), 'START_EP must stop if its application target loses power while waiting'
+		reads, writes, _ := kio.send_result()
+		assert transport.ap_power_state == 0x20 && reads == 1 && writes == 0 && !tx.lock.is_held()
+		assert kio.aic_irq_masked(575) && kio.aic_unmasks() == unmasks + if irq == 0 { 0 } else { 1 }
+		assert transport.start_endpoint_irq(0x21, irq)
+		retry_reads, retry_writes, words := kio.send_result()
+		assert retry_reads == 2 && retry_writes == 2 && words == [rtkit_start_app, u64(rtkit.ep_mgmt)]!
+		rtkit_owner = unsafe { nil }
+	}
+}
+
 fn drop_power_during_batch_doorbell() {
 	timer.watch_busywait(unsafe { nil })
 	assert !rtkit_owner.lock.is_held() && !kio.aic_irq_masked(575)
@@ -236,6 +271,7 @@ fn check_g13_batch_pipe_transmit() {
 	mut tx := ascmailbox.new_mailbox(base)
 	mailbox.set_wait_transport(unsafe { &tx })
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		check_g13_endpoint_start_power(abi, mut tx)
 		for point in [PolledCrashPoint.first_lock, .poll_wait, .retry_lock]! {
 			for message in [mailbox.MboxMsg{data0: u64(8) << 52, data1: rtkit.ep_ioreport},
 				mailbox.MboxMsg{data0: 0x008300000000000e, data1: 0x21}]! {
@@ -284,5 +320,6 @@ fn check_g13_batch_pipe_transmit() {
 	rtkit_owner = unsafe { nil }
 	kio.require_send_owner(unsafe { nil })
 	kio.configure_send(0, unsafe { nil }, 0)
+	println('G13 START_EP: IRQ and polling cancellation leave a fresh start usable on both ABIs')
 	println('G13 batch pipe transmit: both ABIs cover live encoding, shutdown, polled crashes and in-flight power transitions with system replies')
 }
