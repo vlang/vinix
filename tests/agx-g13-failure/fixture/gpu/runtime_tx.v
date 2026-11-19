@@ -178,7 +178,19 @@ fn crash_during_polled_doorbell() {
 		data1: rtkit.ep_crashlog})
 }
 
-fn check_g13_polled_crash_wait(abi hw.FirmwareAbi, mut tx ascmailbox.Mailbox) {
+fn crash_on_fifo_retry() {
+	timer.watch_busywait(unsafe { nil })
+	fifo_lock := unsafe { &rtkit_owner.rtk.mbox.unguarded_transport.lock }
+	klock.on_next_acquire(fifo_lock, crash_during_polled_doorbell)
+}
+
+enum PolledCrashPoint {
+	first_lock
+	poll_wait
+	retry_lock
+}
+
+fn check_g13_polled_crash_wait(abi hw.FirmwareAbi, point PolledCrashPoint, mut tx ascmailbox.Mailbox) {
 	for irq in [u32(0), 575]! {
 		mut transport := rtkit.RTKit{name: 'g13-polled-crash'}
 		boot_g13_fixture_transport(mut transport)
@@ -195,15 +207,20 @@ fn check_g13_polled_crash_wait(abi hw.FirmwareAbi, mut tx ascmailbox.Mailbox) {
 		assert mgr.ring_g13_batch_pipe_locked(3, 2)
 		reads, writes, words := kio.send_result()
 		assert reads == 1 && writes == 2 && words == [u64(0x008300000000000e), 0x21]!
-		kio.configure_send(tx.base, unsafe { &tx.lock }, 1)
-		timer.watch_busywait(crash_during_polled_doorbell)
-		assert !mgr.ring_g13_batch_pipe_locked(3, 2), 'polled doorbell must stop when a crash revokes RTKit readiness during the FIFO wait'
+		kio.configure_send(tx.base, unsafe { &tx.lock }, if point == .first_lock { u64(0) } else { u64(1) })
+		match point {
+			.first_lock { klock.on_next_acquire(unsafe { &tx.lock }, crash_during_polled_doorbell) }
+			.poll_wait { timer.watch_busywait(crash_during_polled_doorbell) }
+			.retry_lock { timer.watch_busywait(crash_on_fifo_retry) }
+		}
+		assert !mgr.ring_g13_batch_pipe_locked(3, 2), 'polled doorbell must stop when a crash revokes RTKit readiness at ${point}'
 		assert transport.state == .error && mgr.state == .running && mgr.lock.is_held()
 		crash_reads, crash_writes, _ := kio.send_result()
-		assert crash_reads == 1 && crash_writes == 0 && !tx.lock.is_held()
+		expected_reads := if point == .first_lock { u64(0) } else { u64(1) }
+		assert crash_reads == expected_reads && crash_writes == 0 && !tx.lock.is_held()
 		assert !mgr.ring_g13_batch_pipe_locked(3, 2)
 		final_reads, final_writes, _ := kio.send_result()
-		assert final_reads == 1 && final_writes == 0
+		assert final_reads == expected_reads && final_writes == 0
 		mgr.lock.release()
 		assert cpu.interrupt_state() == (irq == 0)
 		cpu.set_interrupt_state(true)
@@ -217,7 +234,9 @@ fn check_g13_batch_pipe_transmit() {
 	mut tx := ascmailbox.new_mailbox(base)
 	mailbox.set_wait_transport(unsafe { &tx })
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
-		check_g13_polled_crash_wait(abi, mut tx)
+		for point in [PolledCrashPoint.first_lock, .poll_wait, .retry_lock]! {
+			check_g13_polled_crash_wait(abi, point, mut tx)
+		}
 		mut transport := rtkit.RTKit{name: 'g13-batch-doorbell'}
 		boot_g13_fixture_transport(mut transport)
 		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},

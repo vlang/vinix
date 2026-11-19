@@ -113,3 +113,24 @@ The original and restored bundles passed inventory verification. The
 `bundle.tar.gz` SHA-256 is
 `5050f93928e525b0fad511d78cdd706f97bb3e9861116775b3df49429de9f708`.
 Native M1 firmware validation remains open.
+
+## RTKit readiness after ASC FIFO lock contention
+
+The readiness check could pass before the sender had acquired the ASC FIFO
+lock. The mailbox now checks readiness and any caller liveness predicate
+with that lock held before the first FIFO access and every retry. Cancellation
+releases the FIFO lock and any claimed send IRQ.
+
+The sanitizer fixture reproduced a stale doorbell on
+`a8b6222d36804aeb2c90fb4907b3ccedc9307498`. Twelve cases passed across the
+two G13 ABIs, covering a crash during the first lock acquisition, the polling
+wait or retry lock acquisition. Each case checks that cancellation prevents
+further FIFO reads and both mailbox writes. The job-lifetime suite, AArch64
+and x86-64 builds, 79 local contract tests and 122 pinned-reference checks
+passed. The allocation scan reproduced the same 176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-asc-locked-readiness-20261119.auUuuY/`.
+The `bundle.tar.gz` SHA-256 is
+`d18db22b6d4b194303963b150652187663099a81e02ada426f1de046f60108d2`.
+Native M1 firmware validation remains open.

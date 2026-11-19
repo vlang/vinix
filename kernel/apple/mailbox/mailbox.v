@@ -43,9 +43,9 @@ mut:
 	send_irq_claimed bool
 }
 
-// If supplied, active is checked before the first attempt and after each wait.
-// The caller holds lock when supplied. Only an IRQ wait drops it, and reacquires
-// it before checking active again.
+// The mailbox calls active with the FIFO lock held before each attempt.
+// It must only inspect state. If supplied, the caller's lock is also held and
+// an IRQ wait drops and reacquires it before the next attempt.
 pub struct SendWait {
 pub:
 	irq     u32
@@ -103,9 +103,11 @@ pub fn (mut mbox Mailbox) send(msg MboxMsg) bool {
 	return false
 }
 
-fn (mut mbox Mailbox) try_send(msg MboxMsg, started ?u64) bool {
+// An inactive transport cancels the entire send. A full FIFO allows a retry.
+fn (mut mbox Mailbox) try_send(msg MboxMsg, started ?u64, wait SendWait) ?bool {
 	mbox.lock.acquire()
 	defer { mbox.lock.release() }
+	if wait.active != unsafe { nil } && !wait.active(wait.context) { return none }
 	if start := started {
 		// A retry can run out of time while acquiring the FIFO lock.
 		if timer.get_us() - start > send_timeout_us { return false }
@@ -114,7 +116,7 @@ fn (mut mbox Mailbox) try_send(msg MboxMsg, started ?u64) bool {
 }
 
 // Use the polled ASC timeout when the caller cannot wait on a send-empty IRQ.
-// Each poll holds the mailbox lock only through the register access.
+// Each poll holds the mailbox lock only for the FIFO attempt.
 pub fn (mut mbox Mailbox) send_timed(msg MboxMsg) bool {
 	return mbox.send_timed_irq(msg, 0)
 }
@@ -153,9 +155,8 @@ fn (mut mbox Mailbox) release_send_irq(irq u32) {
 // One sender owns the line. Concurrent senders continue to poll the FIFO
 // without changing that sender's interrupt mask or pending state.
 pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
-	check_active := wait.active != unsafe { nil }
-	if check_active && !wait.active(wait.context) { return false }
-	if mbox.try_send(msg, none) {
+	sent := mbox.try_send(msg, none, wait) or { return false }
+	if sent {
 		return true
 	}
 	started := timer.get_us()
@@ -181,9 +182,9 @@ pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
 		} else {
 			timer.busywait_us(interval)
 		}
-		if check_active && !wait.active(wait.context) { return false }
 		if timer.get_us() - started > send_timeout_us { break }
-		if mbox.try_send(msg, started) {
+		retried := mbox.try_send(msg, started, wait) or { return false }
+		if retried {
 			return true
 		}
 		if wait_for_irq && aic.deferred_send_irq_pending(irq)
