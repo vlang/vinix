@@ -43,6 +43,8 @@ const helpers = [
 	'gpu__agx__gpu__write_g13_timestamp_pair',
 	'gpu__agx__gpu__GpuManager__prepare_g13_render_job',
 	'gpu__agx__gpu__GpuManager__prepare_g13_compute_job',
+	'gpu__agx__gpu__GpuManager__prepare_g13_render_job_with_timestamps',
+	'gpu__agx__gpu__GpuManager__prepare_g13_compute_job_with_timestamps',
 	'gpu__agx__file__GpuFile__reap_detached_timestamp_objects_locked',
 	'gpu__agx__file__GpuFile__reap_orphaned_g13_queues_locked',
 	'gpu__agx__file__GpuFile__find_vm',
@@ -61,7 +63,6 @@ const helpers = [
 	'bo__Table__mmap_attributes',
 	'bo__Table__valid_mmap_range',
 	'gpu__agx__file__GpuFile__mmap_attributes',
-	'gpu__agx__file__GpuFile__valid_mmap_range',
 	'gpu__agx__file__mmap_attributes_handle',
 	'gpu__agx__file__retain_mmap_range_handle',
 	'fw__g13_timestamp_user_ts_offset_for',
@@ -71,6 +72,12 @@ const helpers = [
 	'fw__make_g13_fragment_v13_5',
 	'fw__g13_microseq_finalize_compute_v13_5',
 	'gpu__agx__gpu__write_g13_start_vertex',
+	'gpu__agx__gpu__write_g13_timestamp',
+	'gpu__agx__gpu__write_g13_finalize_vertex',
+	'gpu__agx__gpu__write_g13_start_fragment',
+	'gpu__agx__gpu__write_g13_finalize_fragment',
+	'gpu__agx__gpu__write_g13_start_compute',
+	'gpu__agx__gpu__write_g13_finalize_compute',
 	'fw__g13_microseq_start_vertex_v13_5',
 	'gpu__agx__gpu__GpuManager__g13_submission_status',
 	'gpu__agx__file__GpuFile__ioctl_gem_bind_object',
@@ -146,14 +153,12 @@ const helpers = [
 	'syncobj__signal_error',
 	'fw__g13_fragment_tib_blocks',
 	'vm__driver_window',
-	'gpu__agx__gpu__GpuManager__retained_g13_queue_resources',
 	'vm__IdentityPool__allocate',
 	'mmu__allocate_context_identity',
 	'gpu__agx__file__GpuFile__retire_mapping_locked',
 	'gpu__agx__file__GpuFile__cleanup_closed_mappings_locked',
-	'gpu__agx__gpu__GpuManager__flush_g13_file_mapping',
 	'gpu__agx__file__install_g13_batch_barriers',
-	'gpu__agx__gpu__GpuManager__initialize_g13_barriers_locked',
+	'gpu__agx__gpu__initialize_g13_barriers_locked',
 	'gpu__agx__gpu__GpuManager__g13_ring_has_space_locked',
 	'gpu__agx__file__poll_g13_pending',
 	'gpu__agx__file__g13_pending_dispatch_complete',
@@ -194,6 +199,8 @@ fn result_type(name string) string {
 	if name == 'gpu__agx__gpu__write_g13_timestamp_pair' { return 'void' }
 	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_render_job' { return '__v_option_gpu__agx__gpu__G13RenderJobResourcesptr' }
 	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_compute_job' { return '__v_option_gpu__agx__gpu__G13ComputeJobResourcesptr' }
+	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_render_job_with_timestamps' { return '__v_option_gpu__agx__gpu__G13RenderJobResourcesptr' }
+	if name == 'gpu__agx__gpu__GpuManager__prepare_g13_compute_job_with_timestamps' { return '__v_option_gpu__agx__gpu__G13ComputeJobResourcesptr' }
 	if name in ['gpu__agx__file__GpuFile__reap_detached_timestamp_objects_locked', 'gpu__agx__file__GpuFile__release_g13_timestamp', 'gpu__agx__file__GpuFile__release_g13_timestamps'] { return 'void' }
 	if name == 'gpu__agx__file__GpuFile__capture_g13_timestamp' { return 'multi_return_i64_gpu__agx__file__G13TimestampCapture' }
 	if name == 'gpu__agx__file__GpuFile__capture_g13_timestamps' { return 'i64' }
@@ -226,7 +233,10 @@ fn result_type(name string) string {
 	if name == 'fw__make_g13_compute_v13_5' { return 'fw__G13RunComputeV135' }
 	if name == 'fw__make_g13_fragment_v13_5' { return 'fw__G13RunFragmentV135' }
 	if name == 'fw__g13_microseq_finalize_compute_v13_5' { return 'fw__G13MicroseqFinalizeComputeV135' }
-	if name == 'gpu__agx__gpu__write_g13_start_vertex' { return 'u64' }
+	if name in ['gpu__agx__gpu__write_g13_start_vertex', 'gpu__agx__gpu__write_g13_timestamp',
+		'gpu__agx__gpu__write_g13_finalize_vertex', 'gpu__agx__gpu__write_g13_start_fragment',
+		'gpu__agx__gpu__write_g13_finalize_fragment', 'gpu__agx__gpu__write_g13_start_compute',
+		'gpu__agx__gpu__write_g13_finalize_compute'] { return 'u64' }
 	if name == 'fw__g13_microseq_start_vertex_v13_5' { return 'fw__G13MicroseqStartVertexV135' }
 	if name.ends_with('GpuManager__g13_submission_status') { return 'i64' }
 	if name.ends_with('GpuFile__ioctl_gem_bind_object') { return 'i64' }
@@ -269,7 +279,6 @@ fn result_type(name string) string {
 	if name in ['syncobj__signal', 'syncobj__signal_error', 'syncobj__SyncObj__publish_captures_locked', 'syncobj__release_capture', 'syncobj__replace_fence'] { return 'void' }
 	if name == 'fw__g13_fragment_tib_blocks' { return '__v_option_u32' }
 	if name == 'vm__driver_window' { return '__v_option_vm__DriverWindow' }
-	if name.ends_with('retained_g13_queue_resources') { return '__v_option_gpu__agx__gpu__G13QueueResourcesptr' }
 	if name.ends_with('IdentityPool__allocate') || name.ends_with('allocate_context_identity') { return '__v_option_u64' }
 	if name.ends_with('process_pending_submissions') || name.ends_with('write_g13_barrier')
 		|| name.ends_with('release_g13_initial_events') || name.ends_with('release_g13_barrier_pins')
@@ -319,6 +328,14 @@ fn check_storage(source string, checked []string, staged_fd bool) ! {
 			owned := 'memory__malloc_packed_fallible(bytes)'
 			if body.count(owned) != 1 { return error('mapping splits require exactly one checked owned array reservation') }
 			allocation_scan = body.replace(owned, 'owned_mapping_table_reservation')
+		}
+		// Preparation owns its job record and builds every microsequence record on the stack.
+		if name.ends_with('GpuManager__prepare_g13_render_job_with_timestamps')
+			|| name.ends_with('GpuManager__prepare_g13_compute_job_with_timestamps') {
+			kind := if name.contains('render') { 'Render' } else { 'Compute' }
+			owned := 'memdup(&(gpu__agx__gpu__G13' + kind + 'JobResources)'
+			if body.count(owned) != 1 { return error(name + ': must allocate exactly one job record') }
+			allocation_scan = body.replace(owned, 'owned_job_record')
 		}
 		if name == 'drm__sync_file_info_ioctl' {
 			owned := 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo))'
@@ -423,6 +440,8 @@ fn selftest() ! {
 		owned := if name.ends_with('WorkQueueEvents__retain') { 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));\n' }
 			else if name.ends_with('GpuFile__reserve_mapping_slots_locked') { 'memory__malloc_packed_fallible(bytes);\n' }
 			else if name == 'drm__sync_file_info_ioctl' { 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));\n' }
+			else if name.ends_with('prepare_g13_render_job_with_timestamps') { 'memdup(&(gpu__agx__gpu__G13RenderJobResources){0}, 1);\n' }
+			else if name.ends_with('prepare_g13_compute_job_with_timestamps') { 'memdup(&(gpu__agx__gpu__G13ComputeJobResources){0}, 1);\n' }
 			else if name.ends_with('WorkQueueEvents__release') { 'memory__free((void*)(block));\n' }
 			else if name == 'drm__new_syncobj_wait_buffer' { 'memory__malloc_packed_fallible(geometry.bytes);\n' }
 			else if name == 'drm__new_syncobj_handle_buffer' { 'memory__malloc_packed_fallible(geometry.captures_offset);\n' }
@@ -461,6 +480,10 @@ fn selftest() ! {
 		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', 'memory__malloc_packed_fallible(1);'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));', 'memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo)); memory__malloc_packed_fallible(sizeof(drm__ioctl__SyncFenceInfo));'),
 		fixture.replace('u8 digits[20];', 'u8* digits;'),
+		fixture.replace('memdup(&(gpu__agx__gpu__G13RenderJobResources){0}, 1);', ''),
+		fixture.replace('memdup(&(gpu__agx__gpu__G13ComputeJobResources){0}, 1);', ''),
+		fixture.replace('memdup(&(gpu__agx__gpu__G13RenderJobResources){0}, 1);', 'memdup(&(gpu__agx__gpu__G13RenderJobResources){0}, 1); memdup(&(gpu__agx__gpu__G13RenderJobResources){0}, 1);'),
+		fixture.replace('memdup(&(gpu__agx__gpu__G13ComputeJobResources){0}, 1);', 'memdup(&(gpu__agx__gpu__G13ComputeJobResources){0}, 1); memdup(&(fw__G13MicroseqStartCompute){0}, 1);'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', ''),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', 'memory__malloc_packed_fallible(1);'),
 		fixture.replace('memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));', 'memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock)); memory__malloc_packed_fallible(sizeof(gpu__agx__event__TicketBlock));'),

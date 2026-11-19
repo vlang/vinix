@@ -1335,6 +1335,7 @@ are incomplete. The [GPU heap collection below live allocations](m1-agx-heap-col
 [13.5 parameter and scratch offsets](m1-agx-fragment-tail.md),
 [compute finalizer command flag](m1-agx-compute-finalize.md),
 [versioned single-cluster vertex start](m1-agx-vertex-marker.md),
+[microsequence writes without heap copies](m1-agx-microseq-heap.md),
 [G13 submissions after device loss](m1-agx-submit-device.md),
 [zero-length BIND before BO lookup](m1-agx-bind-zero.md),
 [timestamp-object validation and lookup order](m1-agx-timestamp-bind.md),

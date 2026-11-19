@@ -1123,10 +1123,10 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'vertex_counter := fragment_counter + u64(1)',
 		'fw.make_g13_vertex_v13_5(vertex, vertex_counter)',
 		'fw.make_g13_fragment_v13_5(fragment, fragment_counter)',
-		'v13_5, unsafe { &vertex_start }, vertex_counter,', 'v13_5, &fragment_start, fragment_counter,',
+		'v13_5, unsafe { &vertex_start }, vertex_counter,', 'v13_5, unsafe { &fragment_start }, fragment_counter,',
 		'compute_counter := owned_queue.command_counter.reserve(1, v13_5)',
 		'fw.make_g13_compute_v13_5(run, compute_counter)',
-		'v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter,'],
+		'v13_5, unsafe { &start }, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter,'],
 		'Vinix shared command/start counters')!
 	return ['Resolved timestamp pairs populate versioned native commands and independently select vertex/fragment/compute instructions while legacy callers provide empty pairs',
 		'G13 firmware log descriptor rings and the separate bounded payload buffer are published and read before acknowledgement',

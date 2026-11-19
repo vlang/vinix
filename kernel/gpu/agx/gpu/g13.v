@@ -38,14 +38,13 @@ fn write_g13_timestamp_pair(destination voidptr, pair [2]u64) {
 
 fn write_g13_timestamp(destination voidptr, v13_5 bool, legacy &fw.G13MicroseqTimestamp,
 	unknown_timestamp_address u64) u64 {
-	unsafe {
-		if v13_5 {
-			value := fw.g13_microseq_timestamp_v13_5(legacy, unknown_timestamp_address)
-			C.memcpy(destination, &value, sizeof(fw.G13MicroseqTimestampV135))
-			return sizeof(fw.G13MicroseqTimestampV135)
-		}
-		C.memcpy(destination, legacy, sizeof(fw.G13MicroseqTimestamp))
+	if v13_5 {
+		value := fw.g13_microseq_timestamp_v13_5(legacy, unknown_timestamp_address)
+		value_ptr := unsafe { voidptr(&value) }
+		unsafe { C.memcpy(destination, value_ptr, sizeof(fw.G13MicroseqTimestampV135)) }
+		return sizeof(fw.G13MicroseqTimestampV135)
 	}
+	unsafe { C.memcpy(destination, legacy, sizeof(fw.G13MicroseqTimestamp)) }
 	return sizeof(fw.G13MicroseqTimestamp)
 }
 
@@ -63,67 +62,62 @@ fn write_g13_start_vertex(destination voidptr, v13_5 bool,
 
 fn write_g13_finalize_vertex(destination voidptr, v13_5 bool,
 	legacy &fw.G13MicroseqFinalizeVertex) u64 {
-	unsafe {
-		if v13_5 {
-			value := fw.g13_microseq_finalize_vertex_v13_5(legacy)
-			C.memcpy(destination, &value, sizeof(fw.G13MicroseqFinalizeVertexV135))
-			return sizeof(fw.G13MicroseqFinalizeVertexV135)
-		}
-		C.memcpy(destination, legacy, sizeof(fw.G13MicroseqFinalizeVertex))
+	if v13_5 {
+		value := fw.g13_microseq_finalize_vertex_v13_5(legacy)
+		value_ptr := unsafe { voidptr(&value) }
+		unsafe { C.memcpy(destination, value_ptr, sizeof(fw.G13MicroseqFinalizeVertexV135)) }
+		return sizeof(fw.G13MicroseqFinalizeVertexV135)
 	}
+	unsafe { C.memcpy(destination, legacy, sizeof(fw.G13MicroseqFinalizeVertex)) }
 	return sizeof(fw.G13MicroseqFinalizeVertex)
 }
 
 fn write_g13_start_fragment(destination voidptr, v13_5 bool,
 	legacy &fw.G13MicroseqStartFragment, counter u64, event_control_buffer u64) u64 {
-	unsafe {
-		if v13_5 {
-			value := fw.g13_microseq_start_fragment_v13_5(legacy, counter, event_control_buffer)
-			C.memcpy(destination, &value, sizeof(fw.G13MicroseqStartFragmentV135))
-			return sizeof(fw.G13MicroseqStartFragmentV135)
-		}
-		C.memcpy(destination, legacy, sizeof(fw.G13MicroseqStartFragment))
+	if v13_5 {
+		value := fw.g13_microseq_start_fragment_v13_5(legacy, counter, event_control_buffer)
+		value_ptr := unsafe { voidptr(&value) }
+		unsafe { C.memcpy(destination, value_ptr, sizeof(fw.G13MicroseqStartFragmentV135)) }
+		return sizeof(fw.G13MicroseqStartFragmentV135)
 	}
+	unsafe { C.memcpy(destination, legacy, sizeof(fw.G13MicroseqStartFragment)) }
 	return sizeof(fw.G13MicroseqStartFragment)
 }
 
 fn write_g13_finalize_fragment(destination voidptr, v13_5 bool,
 	legacy &fw.G13MicroseqFinalizeFragment) u64 {
-	unsafe {
-		if v13_5 {
-			value := fw.g13_microseq_finalize_fragment_v13_5(legacy)
-			C.memcpy(destination, &value, sizeof(fw.G13MicroseqFinalizeFragmentV135))
-			return sizeof(fw.G13MicroseqFinalizeFragmentV135)
-		}
-		C.memcpy(destination, legacy, sizeof(fw.G13MicroseqFinalizeFragment))
+	if v13_5 {
+		value := fw.g13_microseq_finalize_fragment_v13_5(legacy)
+		value_ptr := unsafe { voidptr(&value) }
+		unsafe { C.memcpy(destination, value_ptr, sizeof(fw.G13MicroseqFinalizeFragmentV135)) }
+		return sizeof(fw.G13MicroseqFinalizeFragmentV135)
 	}
+	unsafe { C.memcpy(destination, legacy, sizeof(fw.G13MicroseqFinalizeFragment)) }
 	return sizeof(fw.G13MicroseqFinalizeFragment)
 }
 
 fn write_g13_start_compute(destination voidptr, v13_5 bool,
 	legacy &fw.G13MicroseqStartCompute, flag_address u64, counter u64, event_control_buffer u64) u64 {
-	unsafe {
-		if v13_5 {
-			value := fw.g13_microseq_start_compute_v13_5(legacy, flag_address, counter,
-				event_control_buffer)
-			C.memcpy(destination, &value, sizeof(fw.G13MicroseqStartComputeV135))
-			return sizeof(fw.G13MicroseqStartComputeV135)
-		}
-		C.memcpy(destination, legacy, sizeof(fw.G13MicroseqStartCompute))
+	if v13_5 {
+		value := fw.g13_microseq_start_compute_v13_5(legacy, flag_address, counter,
+			event_control_buffer)
+		value_ptr := unsafe { voidptr(&value) }
+		unsafe { C.memcpy(destination, value_ptr, sizeof(fw.G13MicroseqStartComputeV135)) }
+		return sizeof(fw.G13MicroseqStartComputeV135)
 	}
+	unsafe { C.memcpy(destination, legacy, sizeof(fw.G13MicroseqStartCompute)) }
 	return sizeof(fw.G13MicroseqStartCompute)
 }
 
 fn write_g13_finalize_compute(destination voidptr, v13_5 bool,
 	legacy &fw.G13MicroseqFinalizeCompute, flag_address u64) u64 {
-	unsafe {
-		if v13_5 {
-			value := fw.g13_microseq_finalize_compute_v13_5(legacy, flag_address)
-			C.memcpy(destination, &value, sizeof(fw.G13MicroseqFinalizeComputeV135))
-			return sizeof(fw.G13MicroseqFinalizeComputeV135)
-		}
-		C.memcpy(destination, legacy, sizeof(fw.G13MicroseqFinalizeCompute))
+	if v13_5 {
+		value := fw.g13_microseq_finalize_compute_v13_5(legacy, flag_address)
+		value_ptr := unsafe { voidptr(&value) }
+		unsafe { C.memcpy(destination, value_ptr, sizeof(fw.G13MicroseqFinalizeComputeV135)) }
+		return sizeof(fw.G13MicroseqFinalizeComputeV135)
 	}
+	unsafe { C.memcpy(destination, legacy, sizeof(fw.G13MicroseqFinalizeCompute)) }
 	return sizeof(fw.G13MicroseqFinalizeCompute)
 }
 
@@ -1791,6 +1785,9 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 	mut vertex_offset := u64(0)
 	vertex_offset += write_g13_start_vertex(unsafe { voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset) },
 		v13_5, unsafe { &vertex_start }, vertex_counter, resources.notifier.va + u64(0xa8))
+	retire := fw.G13MicroseqSimpleOp{
+		header: fw.g13_useq_retire_stamp
+	}
 	unsafe {
 		if vertex_timestamps {
 			vertex_ts_start := fw.G13MicroseqTimestamp{
@@ -1839,39 +1836,38 @@ pub fn (mut mgr GpuManager) prepare_g13_render_job_with_timestamps(resources &G1
 		}
 		vertex_offset += write_g13_finalize_vertex(voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset),
 			v13_5, &vertex_finalize)
-		retire := fw.G13MicroseqSimpleOp{
-			header: fw.g13_useq_retire_stamp
-		}
 		C.memcpy(voidptr(job.vertex_microsequence.phys + higher_half + vertex_offset), voidptr(&retire), sizeof(fw.G13MicroseqSimpleOp))
 		vertex_offset += sizeof(fw.G13MicroseqSimpleOp)
 		if vertex_offset != vertex_microsequence_size {
 			return none
 		}
-
-		fragment_start := fw.G13MicroseqStartFragment{
-			header: fw.g13_useq_start_fragment
-			job_params_2: job.fragment.va + fragment_job_params_2_offset
-			job_params_1: job.fragment.va + fragment_job_params_1_offset
-			scene: job.scene.scene.va
-			stats: mgr.g13_channels.stats_fragment.va + u64(8)
-			busy_flag: job.fragment.va + fragment_busy_flag_offset
-			tvb_overflow_count: job.fragment.va + fragment_overflow_count_offset
-			unk_pointer: job.fragment.va + fragment_unk_pointee_offset
-			work_queue: fragment_queue.info.va
-			work_item: job.fragment.va
-			vm_slot: job.vm_slot
-			unk_50: 1
-			event_generation: u32(resources.firmware_id)
-			buffer_slot: buffer.slot
-			event_sequence: job.fragment_event_sequence
-			unk_758_flag: job.fragment.va + fragment_unk_758_flag_offset
-			unk_job_buffer: job.fragment.va + fragment_unk_buf_0_offset
-			uuid: input.fragment_command_id
-			attachments: fragment_attachments
-		}
-		mut fragment_offset := u64(0)
-		fragment_offset += write_g13_start_fragment(voidptr(job.fragment_microsequence.phys + higher_half + fragment_offset),
-			v13_5, &fragment_start, fragment_counter, resources.notifier.va + u64(0xa8))
+	}
+	// Outside the unsafe block, so V keeps this fixed-array holder on the stack.
+	fragment_start := fw.G13MicroseqStartFragment{
+		header: fw.g13_useq_start_fragment
+		job_params_2: job.fragment.va + fragment_job_params_2_offset
+		job_params_1: job.fragment.va + fragment_job_params_1_offset
+		scene: job.scene.scene.va
+		stats: mgr.g13_channels.stats_fragment.va + u64(8)
+		busy_flag: job.fragment.va + fragment_busy_flag_offset
+		tvb_overflow_count: job.fragment.va + fragment_overflow_count_offset
+		unk_pointer: job.fragment.va + fragment_unk_pointee_offset
+		work_queue: fragment_queue.info.va
+		work_item: job.fragment.va
+		vm_slot: job.vm_slot
+		unk_50: 1
+		event_generation: u32(resources.firmware_id)
+		buffer_slot: buffer.slot
+		event_sequence: job.fragment_event_sequence
+		unk_758_flag: job.fragment.va + fragment_unk_758_flag_offset
+		unk_job_buffer: job.fragment.va + fragment_unk_buf_0_offset
+		uuid: input.fragment_command_id
+		attachments: fragment_attachments
+	}
+	mut fragment_offset := u64(0)
+	fragment_offset += write_g13_start_fragment(unsafe { voidptr(job.fragment_microsequence.phys + higher_half + fragment_offset) },
+		v13_5, unsafe { &fragment_start }, fragment_counter, resources.notifier.va + u64(0xa8))
+	unsafe {
 		if fragment_timestamps {
 			fragment_ts_start := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp | (u32(1) << 31)
@@ -2525,24 +2521,26 @@ pub fn (mut mgr GpuManager) prepare_g13_compute_job_with_timestamps(resources &G
 			C.memcpy(voidptr(run), &run_v13_5, sizeof(fw.G13RunComputeV135))
 		}
 		write_g13_timestamp_pair(voidptr(u64(job.command.cpu_address()) + compute_user_ts_offset), user_timestamps)
-
-		start := fw.G13MicroseqStartCompute{
-			header: fw.g13_useq_start_compute
-			unk_pointer: job.command.va + compute_unk_pointee_offset
-			job_params_1: job.command.va + compute_job_params_1_offset
-			stats: stats_compute
-			work_queue: compute_queue.info.va
-			vm_slot: job.vm_slot
-			unk_28: 1
-			event_generation: u32(resources.firmware_id)
-			event_sequence: job.event_sequence
-			job_params_2: job.command.va + compute_job_params_2_offset
-			uuid: input.command_id
-			attachments: attachments
-		}
-		mut micro_offset := u64(0)
-		micro_offset += write_g13_start_compute(voidptr(job.microsequence.phys + higher_half + micro_offset),
-			v13_5, &start, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter, resources.notifier.va + u64(0xa8))
+	}
+	// Outside the unsafe block, so V keeps this fixed-array holder on the stack.
+	start := fw.G13MicroseqStartCompute{
+		header: fw.g13_useq_start_compute
+		unk_pointer: job.command.va + compute_unk_pointee_offset
+		job_params_1: job.command.va + compute_job_params_1_offset
+		stats: stats_compute
+		work_queue: compute_queue.info.va
+		vm_slot: job.vm_slot
+		unk_28: 1
+		event_generation: u32(resources.firmware_id)
+		event_sequence: job.event_sequence
+		job_params_2: job.command.va + compute_job_params_2_offset
+		uuid: input.command_id
+		attachments: attachments
+	}
+	mut micro_offset := u64(0)
+	micro_offset += write_g13_start_compute(unsafe { voidptr(job.microsequence.phys + higher_half + micro_offset) },
+		v13_5, unsafe { &start }, job.command.va + fw.g13_compute_v13_5_flag_offset, compute_counter, resources.notifier.va + u64(0xa8))
+	unsafe {
 		if compute_timestamps {
 			start_timestamp := fw.G13MicroseqTimestamp{
 				header: fw.g13_useq_timestamp | (u32(1) << 31)
