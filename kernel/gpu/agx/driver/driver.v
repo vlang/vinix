@@ -1234,6 +1234,7 @@ pub fn initialise() {
 		mmap_no_expand: cfg.gpu_gen == .g13
 		mmap_retain: agx_file.retain_mmap_range_handle
 		mmap_release: agx_file.release_mmap_range_handle
+		memory_stats: agx_file.memory_stats_handle
 	}
 
 	if !agx_driver_inst.register_gpu(mgr, agx_drm_driver) { return }

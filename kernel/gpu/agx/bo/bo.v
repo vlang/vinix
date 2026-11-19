@@ -242,6 +242,17 @@ pub fn (mut table Table) release_mmap_range(offset u64) {
 	}
 }
 
+// The size of the objects in this table that client `creator` created: what
+// Asahi's fdinfo reports as the client's total. The caller holds the file lock.
+pub fn (table &Table) created_bytes(creator u64) u64 {
+	if creator == 0 { return 0 }
+	mut total := u64(0)
+	for object in table.objects {
+		if object != unsafe { nil } && object.creator == creator { total += object.size }
+	}
+	return total
+}
+
 // Remove a file handle without dropping its reference. This lets the backend
 // tear down or retain GPU mappings before it performs the matching unref.
 pub fn (mut table Table) remove(handle u32) ?&gem.GemObject {

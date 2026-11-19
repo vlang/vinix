@@ -33,9 +33,9 @@ On G13 the totals are reported, per client, as `drm-total-system` and
 ([file.rs](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L302)),
 and device-wide in a `gpu_memory` sysfs file.
 
-Vinix has no `fdinfo` directory and no `gpu_memory` file. That difference is
-observable to monitoring tools only. It changes no allocation, mapping or
-rendering result.
+Vinix now reports the per-client lines in `fdinfo`, with two small differences
+([fdinfo](m1-agx-fdinfo.md)). It has no `gpu_memory` file. Both are observable
+to monitoring tools only and change no allocation, mapping or rendering result.
 
 ## Power management
 

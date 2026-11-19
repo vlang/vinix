@@ -53,6 +53,7 @@ fn (objects &Objects) mmap_attributes(offset u64) u64 { return objects.table.mma
 fn (mut objects Objects) admit_mmap_range(device u64, offset u64, length u64, shared bool) int { return objects.table.admit_mmap_range(device, offset, length, shared) }
 fn (mut objects Objects) retain_mmap_range(offset u64, length u64) bool { return objects.table.retain_mmap_range(offset, length) }
 fn (mut objects Objects) release_mmap_range(offset u64) { objects.table.release_mmap_range(offset) }
+fn (objects &Objects) created_bytes(creator u64) u64 { return objects.table.created_bytes(creator) }
 
 struct GpuFile {
 mut:
@@ -70,12 +71,14 @@ mut:
 	next_queue_id u32 = 1
 	owner_process_id u32 = 7
 	ioctl_abi u32
+	client_serial u64
 	closing_next      &GpuFile = unsafe { nil }
 	closing_queued    bool
 }
 
 __global file_map_lock klock.Lock
 __global file_map = map[u64]&GpuFile{}
+__global last_client_serial = u64(0)
 __global uat_mgr &mmu.UatManager = unsafe { nil }
 __global stopping_file &GpuFile = unsafe { nil }
 __global late_close_vm &mmu.UatContext = unsafe { nil }
@@ -220,6 +223,7 @@ pub fn run_checks() {
 	gpu.check_timestamp_serialization()
 	check_zero_bind_ranges()
 	check_create_sizes()
+	check_memory_stats()
 	check_bind_order()
 	check_bind_vm_lookup()
 	check_mapping_retirement()

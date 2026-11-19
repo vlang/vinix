@@ -64,6 +64,8 @@ pub mut:
 	mmap_no_expand bool
 	mmap_retain    fn (&DrmDevice, voidptr, u64, u64) bool = unsafe { nil }
 	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
+	// The client's memory for its fdinfo; nil prints no memory lines.
+	memory_stats   fn (&DrmDevice, voidptr) ?MemoryStats = unsafe { nil }
 }
 
 pub struct DrmDevice {
@@ -846,6 +848,7 @@ fn (mut this DrmNode) unref(handle voidptr) ? {
 		}
 		syncobj.destroy_owner(u64(handle))
 	}
+	forget_drm_client(handle)
 	katomic.dec(mut &this.refcount)
 }
 

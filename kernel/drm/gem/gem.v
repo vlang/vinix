@@ -44,6 +44,10 @@ pub mut:
 	external    bool // host-visible aperture; never returned to the PMM
 	advice_dontneed bool // private BO advice; resident backing is not yet purgeable
 	prime_fences &PrimeFence = unsafe { nil } // protected by lock
+	// Serial of the DRM client that created this user object, for its fdinfo
+	// totals; zero for kernel and imported objects. Set once, before the
+	// creator publishes the handle.
+	creator u64
 pub:
 	vm_private_identity u64 // zero: shareable; otherwise immutable owning VM identity
 	file_scoped bool // excluded from the global handle table

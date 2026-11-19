@@ -99,6 +99,7 @@ pub mut:
 	owner_process_id  u32
 	owner_key         u64
 	ioctl_abi         u32 // zero until the first driver request selects a dialect
+	client_serial     u64 // tags the objects this file creates; never reused
 	lock              klock.Lock
 	closing_next      &GpuFile = unsafe { nil }
 	closing_queued    bool
@@ -107,6 +108,7 @@ pub mut:
 __global (
 	file_map_lock klock.Lock
 	file_map      = map[u64]&GpuFile{}
+	last_client_serial = u64(0)
 )
 
 fn get_or_create_file(handle voidptr, dev &drm.DrmDevice) ?&GpuFile {
@@ -166,6 +168,7 @@ pub fn new_gpu_file(dev &drm.DrmDevice, owner_key u64) ?&GpuFile {
 		next_queue_id: 1
 		owner_process_id: u32(current.process.pid)
 		owner_key: owner_key
+		client_serial: katomic.inc(mut &last_client_serial) + 1
 	}
 	// Nothing slices these, so growing one can free its old buffer.
 	f.vms.flags |= .noslices
@@ -912,6 +915,8 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	obj := gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,
 		request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles(),
 		mmap_device: u64(f.dev)) or { return -12 }
+	mut created := unsafe { obj }
+	created.creator = f.client_serial
 	request.handle = f.objects.add_created(obj)
 	return 0
 }
@@ -1796,6 +1801,18 @@ fn (mut f GpuFile) bind_g13_submission_vm_locked(mut manager gpu.GpuManager,
 
 fn dispatch(handle voidptr, dev &drm.DrmDevice) ?&GpuFile {
 	return dispatch_abi(handle, dev, legacy_ioctl_abi)
+}
+
+// What Asahi's fdinfo reports for a G13 client: the objects it created. Vinix
+// allocates backing at creation, so all of it is resident. A description that
+// has made no driver request yet has no file and nothing to report. The caller
+// keeps the description referenced, so the file cannot be closed meanwhile.
+pub fn memory_stats_handle(_dev &drm.DrmDevice, handle voidptr) ?drm.MemoryStats {
+	mut f := lookup_file(handle) or { return drm.MemoryStats{supported: drm.memory_stats_resident} }
+	f.lock.acquire()
+	total := f.objects.created_bytes(f.client_serial)
+	f.lock.release()
+	return drm.MemoryStats{private: total, resident: total, supported: drm.memory_stats_resident}
 }
 
 fn lookup_file(handle voidptr) ?&GpuFile {

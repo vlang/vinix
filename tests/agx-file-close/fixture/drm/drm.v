@@ -29,3 +29,15 @@ pub mut:
 }
 
 pub fn (dev &DrmDevice) is_registered() bool { return dev.registered }
+
+pub struct MemoryStats {
+pub:
+	shared    u64
+	private   u64
+	resident  u64
+	purgeable u64
+	active    u64
+	supported u32
+}
+
+pub const memory_stats_resident = u32(1)

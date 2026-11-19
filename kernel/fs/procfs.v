@@ -106,6 +106,7 @@ enum ProcFSKind {
 	process_io
 	net_tcp6
 	net_if_inet6
+	fdinfo
 }
 
 @[heap]
@@ -125,6 +126,8 @@ pub mut:
 	// files and the static ones under /proc/sys.
 	pid  int
 	tid  int
+	// For an entry of /proc/<pid>/fdinfo, the descriptor it describes.
+	fdnum int
 	text string
 	// A /proc/<pid> or /proc/<pid>/task/<tid> directory is filled in the first
 	// time something looks inside it. Building every entry of every process
@@ -749,6 +752,9 @@ fn (this &ProcFSResource) contents() string {
 		.process_io {
 			return proc.process_io_text(this.pid)
 		}
+		.fdinfo {
+			return fdinfo_text(this.pid, this.fdnum)
+		}
 		.net_dev {
 			if net_dev_snapshot != unsafe { nil } { return net_dev_snapshot() }
 			return 'Inter-|   Receive                                                |  Transmit\n face |bytes    packets errs drop fifo frame compressed multicast|bytes    packets errs drop fifo colls carrier compressed\n'
@@ -908,7 +914,7 @@ fn add_cpu_stat_fields(mut text lib.Text, user u64, system u64, idle u64) {
 // The files that say where a process keeps things; see proc.may_inspect.
 fn (this &ProcFSResource) shows_layout() bool {
 	return match this.kind {
-		.maps, .smaps, .auxv, .process_io { true }
+		.maps, .smaps, .auxv, .process_io, .fdinfo { true }
 		else { false }
 	}
 }
@@ -941,8 +947,14 @@ fn (mut this ProcFSResource) read(_handle voidptr, buf voidptr, loc u64, count u
 		errno.set(errno.eacces)
 		return none
 	}
+	// As on Linux, an entry for a descriptor closed since it was listed reads
+	// as gone rather than empty.
+	if this.kind == .fdinfo && !fdinfo_descriptor_open(this.pid, this.fdnum) {
+		errno.set(errno.enoent)
+		return none
+	}
 	if (this.kind == .bootlog || this.kind == .maps || this.kind == .smaps || this.kind == .net_tcp || this.kind == .net_dev
-		|| this.kind == .security_audit || this.kind == .security_events || this.kind == .net_tcp6 || this.kind == .net_if_inet6)
+		|| this.kind == .security_audit || this.kind == .security_events || this.kind == .net_tcp6 || this.kind == .net_if_inet6 || this.kind == .fdinfo)
 		&& _handle != unsafe { nil } {
 		return this.snapshot_read(_handle, buf, loc, count)
 	}
@@ -1561,6 +1573,8 @@ fn procfs_refresh_named_locked(node &VFSNode, name string) {
 			refresh_thread_directories(mut target, directory.pid)
 		} else if target.name == 'fd' {
 			refresh_fd_directory(mut target, directory.pid)
+		} else if target.name == 'fdinfo' {
+			refresh_fdinfo_directory(mut target, directory.pid)
 		} else if target.name == 'ns' {
 			refresh_ns_directory(mut target, directory.pid)
 		}
@@ -1604,7 +1618,7 @@ fn procfs_lookup_refresh_locked(node &VFSNode, name string) {
 		}
 		return
 	}
-	if directory.pid != 0 && (node.name == 'fd' || node.name == 'ns') {
+	if directory.pid != 0 && (node.name == 'fd' || node.name == 'fdinfo' || node.name == 'ns') {
 		procfs_refresh_named_locked(node, '')
 		return
 	}
@@ -1776,7 +1790,7 @@ fn populate_process_directory(mut node VFSNode, pid int) {
 // share all three.
 const process_entry_names = ['cmdline', 'comm', 'stat', 'statm', 'status', 'io', 'cgroup', 'environ',
 	'mountinfo', 'mounts', 'mountstats', 'maps', 'smaps', 'auxv', 'limits', 'loginuid', 'sessionid',
-	'oom_score_adj', 'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'ns', 'attr']
+	'oom_score_adj', 'uid_map', 'gid_map', 'setgroups', 'root', 'cwd', 'exe', 'fd', 'fdinfo', 'ns', 'attr']
 
 fn add_process_entries(mut node VFSNode, pid int) {
 	for name in process_entry_names {
@@ -1841,6 +1855,12 @@ fn add_process_entry(mut node VFSNode, pid int, name string, is_process bool) bo
 			mut fd_resource := unsafe { &ProcFSResource(descriptors.resource) }
 			fd_resource.pid = pid
 			refresh_fd_directory(mut descriptors, pid)
+		}
+		'fdinfo' {
+			mut infos := add_procfs_directory(mut node, 'fdinfo')
+			mut infos_resource := unsafe { &ProcFSResource(infos.resource) }
+			infos_resource.pid = pid
+			refresh_fdinfo_directory(mut infos, pid)
 		}
 		'ns' {
 			mut namespaces := add_procfs_directory(mut node, 'ns')
@@ -1995,6 +2015,158 @@ fn refresh_fd_directory(mut descriptors VFSNode, pid int) {
 		}
 	}
 	prune_directories(mut descriptors, live)
+}
+
+// /proc/<pid>/fdinfo holds one file per open descriptor, made by the scan
+// /proc/<pid>/fd makes; what each file says is made when it is read. A busy
+// descriptor table leaves the listing as it was.
+fn refresh_fdinfo_directory(mut infos VFSNode, pid int) {
+	mut live := []int{}
+	defer {
+		unsafe { live.free() }
+	}
+	mut scanned := false
+	for attempt := 0; attempt < 4096 && !scanned; attempt++ {
+		proc.lock_table()
+		mut process := proc.process_at(pid)
+		if process == unsafe { nil } {
+			proc.unlock_table()
+			break
+		}
+		if process.fds_lock.test_and_acquire() {
+			scanned = true
+			// Sized first, as in refresh_fd_directory().
+			mut open_count := 0
+			for fdnum := 0; fdnum < process.fds.len; fdnum++ {
+				if process.fds[fdnum] != unsafe { nil } {
+					open_count++
+				}
+			}
+			unsafe { live.free() }
+			live = []int{cap: open_count} @[freed]
+			for fdnum := 0; fdnum < process.fds.len; fdnum++ {
+				if process.fds[fdnum] == unsafe { nil } {
+					continue
+				}
+				entry := unsafe { &file.FD(process.fds[fdnum]) }
+				if entry.handle != unsafe { nil } && entry.handle.resource != unsafe { nil } {
+					live << fdnum
+				}
+			}
+			process.fds_lock.release()
+		}
+		proc.unlock_table()
+	}
+	if !scanned {
+		if proc.process_at(pid) == unsafe { nil } {
+			prune_directories(mut infos, live)
+		}
+		return
+	}
+	for fdnum in live {
+		name := fdnum.str()
+		if name in infos.children {
+			unsafe { name.free() }
+			continue
+		}
+		mut info := create_node(infos.filesystem, infos, name, false)
+		mut info_resource := new_procfs_resource(.fdinfo, stat.ifreg | 0o444, pid, 0)
+		info_resource.fdnum = fdnum
+		info.resource = info_resource.box
+		unsafe {
+			infos.children[name] = info
+		}
+	}
+	prune_directories(mut infos, live)
+}
+
+// Whether `fdnum` is still open in `pid`. A table that stays busy counts as
+// open; the text then says what it can.
+fn fdinfo_descriptor_open(pid int, fdnum int) bool {
+	for attempt := 0; attempt < 4096; attempt++ {
+		proc.lock_table()
+		mut process := proc.process_at(pid)
+		if process == unsafe { nil } {
+			proc.unlock_table()
+			return false
+		}
+		if process.fds_lock.test_and_acquire() {
+			present := fdnum >= 0 && fdnum < process.fds.len && process.fds[fdnum] != unsafe { nil }
+			process.fds_lock.release()
+			proc.unlock_table()
+			return present
+		}
+		proc.unlock_table()
+	}
+	return true
+}
+
+// Linux's fdinfo: the offset, the open flags with O_CLOEXEC, the mount and the
+// inode, then what the kind of file adds; for a DRM file, its client and its
+// memory. The descriptor is taken without blocking under the process table,
+// as the directory scan does, and kept while the text is made with both locks
+// dropped. A descriptor that is gone reads as empty.
+fn fdinfo_text(pid int, fdnum int) string {
+	mut descriptor := &file.FD(unsafe { nil })
+	for attempt := 0; attempt < 4096 && descriptor == unsafe { nil }; attempt++ {
+		proc.lock_table()
+		mut process := proc.process_at(pid)
+		// Checked again under the lock: read() checked before the process
+		// could exec something privileged or its number be reused.
+		if process == unsafe { nil } || !proc.may_inspect_locked(process) {
+			proc.unlock_table()
+			break
+		}
+		if process.fds_lock.test_and_acquire() {
+			if fdnum >= 0 && fdnum < process.fds.len && process.fds[fdnum] != unsafe { nil } {
+				mut candidate := unsafe { &file.FD(process.fds[fdnum]) }
+				if candidate.handle != unsafe { nil } && candidate.handle.resource != unsafe { nil } {
+					katomic.inc(mut &candidate.handle.refcount)
+					katomic.inc(mut &candidate.refcount)
+					descriptor = candidate
+				}
+			}
+			process.fds_lock.release()
+			proc.unlock_table()
+			break
+		}
+		proc.unlock_table()
+	}
+	if descriptor == unsafe { nil } {
+		return ''
+	}
+	defer {
+		descriptor.unref()
+	}
+	handle := descriptor.handle
+	// Linux keeps none of the open-time flags, and on 64-bit always sets
+	// O_LARGEFILE.
+	mut flags := (u64(handle.flags) | u64(resource.o_largefile)) & ~u64(resource.o_creat | resource.o_excl
+		| resource.o_noctty | resource.o_trunc)
+	if descriptor.flags & resource.o_cloexec != 0 {
+		flags |= u64(resource.o_cloexec)
+	}
+	// Pipes, sockets and the other anonymous files were not opened through a
+	// mount; Linux shows its internal ones, which have no number here.
+	mut mount_id := 0
+	top := lib.mount_context_top(&handle.mount)
+	if top != unsafe { nil } {
+		mount_id = unsafe { &Mount(top) }.id
+	}
+	// Formatting helpers borrow the stack builder; finish_text returns owned bytes.
+	mut text := unsafe { &lib.Text(C.vinix_stack_alloc(sizeof(lib.Text))) }
+	unsafe { *text = lib.new_text(160) }
+	text.add('pos:\t')
+	text.add_decimal(handle.loc)
+	text.add('\nflags:\t0')
+	text.add_radix(flags, 8, 0)
+	text.add('\nmnt_id:\t')
+	text.add_decimal(mount_id)
+	text.add('\nino:\t')
+	text.add_unsigned(handle.resource.stat.ino)
+	text.add_byte(`\n`)
+	drm.add_fdinfo(voidptr(handle), mut text)
+	return lib.finish_text(*text)
 }
 
 // The link takes the text, or set_link_text() frees it when it says what the

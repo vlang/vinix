@@ -33,6 +33,7 @@ pub mut:
 	file_scoped bool
 	advice_dontneed bool
 	prime_fences &PrimeFence = unsafe { nil }
+	creator u64
 	lock klock.Lock
 }
 

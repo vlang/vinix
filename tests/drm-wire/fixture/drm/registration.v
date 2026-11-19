@@ -463,14 +463,20 @@ fn check_file_close_after_unregister() {
 	defer { unregister_device(replacement) }
 	assert replacement.dev_id == old.dev_id
 	assert (node.open(o_path) or { panic('metadata-only open failed') }) == node.box
+	// Closing a description forgets its fdinfo client number.
+	data_client := drm_client_id(voidptr(&data))
+	path_client := drm_client_id(voidptr(&path))
+	assert path_client == data_client + 1 && drm_client_ids.len == 2
 	node.refcount++
 	node.unref(voidptr(&path)) or { panic('metadata-only close failed') }
+	assert u64(&path) !in drm_client_ids && u64(&data) in drm_client_ids
 	assert node.refcount == 1 && closed_handle == unsafe { nil } && destroyed_owner == 0
 	node.unref(voidptr(&data)) or { panic('data close failed') }
+	assert drm_client_ids.len == 0
 	assert node.refcount == 0 && closed_handle == voidptr(&data) && destroyed_owner == u64(&data)
 	closed_handle = unsafe { nil }
 	destroyed_owner = 0
-	println('DRM close: metadata handles skip driver cleanup and old data handles close on their original device')
+	println('DRM close: metadata handles skip driver cleanup, old data handles close on their original device, and both forget their fdinfo client numbers')
 }
 
 __global mapping_device = unsafe { &DrmDevice(nil) }

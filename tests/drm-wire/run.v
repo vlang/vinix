@@ -16,14 +16,17 @@ fn main() {
 	os.cp_all('${repo}/tests/drm-wire/fixture', scratch, false)!
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
+	os.cp_all('${repo}/tests/agx-g13-failure/fixture/klock', '${scratch}/klock', false)!
 	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
 	devtmpfs_source := os.read_file(os.getenv_opt('DRM_DEVTMPFS_SOURCE') or { '${repo}/kernel/fs/devtmpfs.v' })!
 	vfs_source := os.read_file('${repo}/kernel/fs/vfs.v')!
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
+	fdinfo_source := os.read_file(os.getenv_opt('DRM_FDINFO_SOURCE') or { '${repo}/kernel/drm/fdinfo.v' })!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
-	production += 'import katomic\n'
+	production += 'import katomic\nimport klock\n'
 	production += '#include <alloca.h>\nfn C.alloca(u64) voidptr\n'
 	production += section(resource_source, 'pub const o_path = ', 'pub const o_accmode = ')!
+	production += section(fdinfo_source, '__global (', '// Append the DRM lines')!
 	production += section(source, 'pub const driver_gem', 'pub struct DrmIoctl {')!
 	production += section(source, 'pub const default_driver_date', 'pub struct DrmDriver {')!
 	production += section(source, 'fn copy_version_field(', 'fn ioctl_gem_close(')!
