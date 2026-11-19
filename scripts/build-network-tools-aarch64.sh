@@ -113,7 +113,7 @@ install -m755 "$SCRIPT_DIR/build-support/minecraft/run-minecraft" \
 install -m755 "$SCRIPT_DIR/build-support/minecraft/minecraft-xinitrc" \
     "$STAGING/usr/libexec/vinix-minecraft/minecraft-xinitrc"
 "$SCRIPT_DIR/build-support/run-v-tool.sh" "$SCRIPT_DIR/build-support/java-cacerts-stage.v" \
-    --arch aarch64 --staging "$STAGING"
+    --arch "$VINIX_ARCH" --staging "$STAGING"
 
 install -m755 "$SCRIPT_DIR/tests/network/tools-smoke.sh" \
     "$STAGING/root/network-tools-smoke.sh"
