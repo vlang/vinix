@@ -172,7 +172,23 @@ fn observe_dri_publication() {
 	}
 }
 
+__global sysfs_publishes = 0
+__global sysfs_removals = 0
+
+// tests/drm-sysfs covers what is published; here only when, and that it is
+// outside the device lock, since sysfs calls may sleep.
+fn publish_drm_sysfs(mut dev DrmDevice) {
+	assert !drm_devices_lock.held, 'sysfs published under the device lock'
+	sysfs_publishes++
+}
+
+fn remove_drm_sysfs(mut dev DrmDevice) {
+	assert !drm_devices_lock.held, 'sysfs removed under the device lock'
+	sysfs_removals++
+}
+
 fn check_initial_registration_failures() {
+	published_before := sysfs_publishes
 	for render in [false, true]! {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
 		allocations := if render { 9 } else { 5 }
@@ -186,11 +202,17 @@ fn check_initial_registration_failures() {
 			assert !drm_devices_lock.held && !vfs_lock.held && !children_lock.held
 		}
 	}
+	assert sysfs_publishes == published_before, 'a failed registration published sysfs entries'
 	retry := register_driver_with_data(&DrmDriver{features: driver_render}, unsafe { nil }) or { panic('first registration retry failed') }
+	assert sysfs_publishes == published_before + 1
 	dir := unsafe { devtmpfs_root.children['dri'] }
 	assert dir.children.len == 2 && 'card0' in dir.children && 'renderD128' in dir.children
+	removed_before := sysfs_removals
 	unregister_device(retry)
 	assert dir.children.len == 0
+	assert sysfs_removals == removed_before + 1
+	unregister_device(retry)
+	assert sysfs_removals == removed_before + 1, 'a second unregister removed sysfs entries again'
 	println('DRM registration: 14 first-registration failures leave /dev/dri absent and allow retry')
 }
 

@@ -66,6 +66,9 @@ pub mut:
 	mmap_release   fn (&DrmDevice, voidptr, u64, u64) = unsafe { nil }
 	// The client's memory for its fdinfo; nil prints no memory lines.
 	memory_stats   fn (&DrmDevice, voidptr) ?MemoryStats = unsafe { nil }
+	// The /sys path of the device the minors belong to, such as
+	// devices/platform/soc/206400000.gpu; empty for devices/virtual.
+	sysfs_parent   string
 }
 
 pub struct DrmDevice {
@@ -80,6 +83,7 @@ pub mut:
 	render_node &DrmNode = unsafe { nil }
 mut:
 	registered  bool
+	sysfs_parent string // owned copy, for removal after the driver is gone
 }
 
 pub fn (dev &DrmDevice) is_registered() bool {
@@ -921,6 +925,12 @@ fn discard_unpublished_device(dev &DrmDevice) {
 // The caller keeps the context alive until every reference to the device and
 // its open files is gone, including references that survive unregister.
 pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
+	mut dev := register_device_nodes(driver, driver_data)?
+	publish_drm_sysfs(mut dev)
+	return dev
+}
+
+fn register_device_nodes(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
 	// Establish the permanent completion's timestamp during DRM startup.
 	syncobj.shared_timeline_stub()
 	drm_devices_lock.acquire()
@@ -979,18 +989,25 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 
 // Unregister a DRM device and mark it as inactive.
 pub fn unregister_device(dev &DrmDevice) {
+	if !unregister_device_nodes(dev) { return }
+	mut device := unsafe { dev }
+	remove_drm_sysfs(mut device)
+}
+
+fn unregister_device_nodes(dev &DrmDevice) bool {
 	drm_devices_lock.acquire()
 	defer {
 		drm_devices_lock.release()
 	}
 
 	if dev == unsafe { nil } || dev.dev_id >= u32(registered_devices.len)
-		|| registered_devices[dev.dev_id] != dev { return }
+		|| registered_devices[dev.dev_id] != dev { return false }
 	mut d := unsafe { dev }
 	katomic.store(mut d.registered, false)
 	remove_device_nodes(dev)
 	registered_devices[dev.dev_id] = unsafe { nil }
 	C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
+	return true
 }
 
 fn copy_version_field(address u64, capacity u64, value string) bool {

@@ -32,6 +32,9 @@ pub mut:
 	initialized bool
 	// The /sys directory holding agx_stats and gpu_memory, or empty.
 	sysfs_device string
+	// Physical base of the GPU's first register range, the ASC: its device-tree
+	// unit address, which Linux names the platform device after.
+	unit_address u64
 mut:
 	probe_cleanup &gpu.GpuManager = unsafe { nil }
 }
@@ -1147,6 +1150,7 @@ pub fn initialise() {
 
 	// The identity registers are valid after the gfx power domain is active.
 	// Reading the fused core mask here distinguishes the 7-core base M1 Air.
+	agx_driver_inst.unit_address = platform.asc_base
 	gpu_res := regs.new_resources(platform.asc_base, platform.asc_size, platform.secondary_asc_base, platform.secondary_asc_size, platform.firmware_role_count, platform.sgx_base, platform.sgx_size)
 	if chip_id == 0x8103 {
 		identity := gpu_res.get_g13_identity() or {
@@ -1237,6 +1241,7 @@ pub fn initialise() {
 		mmap_retain: agx_file.retain_mmap_range_handle
 		mmap_release: agx_file.release_mmap_range_handle
 		memory_stats: agx_file.memory_stats_handle
+		sysfs_parent: if base_m1 { gpu_sysfs_path(platform.asc_base) } else { '' }
 	}
 
 	if !agx_driver_inst.register_gpu(mgr, agx_drm_driver) { return }
@@ -1276,13 +1281,14 @@ pub fn shutdown() {
 	}
 
 	println('agx: Shutting down Apple GPU driver')
-	agx_driver_inst.remove_sysfs()
 
-	// Unregister DRM device
+	// Unregister the DRM device, which removes its minors from /sys, before the
+	// device directory they sit in: each owner removes its own entries.
 	if agx_driver_inst.drm_dev != unsafe { nil } {
 		drm.unregister_device(agx_driver_inst.drm_dev)
 		agx_driver_inst.drm_dev = unsafe { nil }
 	}
+	agx_driver_inst.remove_sysfs()
 
 	if !agx_driver_inst.stop_gpu() { return }
 

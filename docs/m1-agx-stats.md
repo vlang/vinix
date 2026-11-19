@@ -50,11 +50,12 @@ and `refused` are 0, as Asahi prints them there.
 
 Linux names the GPU's platform device after its device-tree node,
 `gpu@206400000` on M1: `/sys/devices/platform/soc/206400000.gpu`. Vinix
-builds the same name from the GPU's register base, whichever device tree it
+builds the same name from the ASC register base, whichever device tree it
 booted with, and publishes both files there once the DRM device is registered.
-They are removed before the GPU is stopped; removal waits for any read still
-running. Vinix has no `/sys/class/drm` entries yet, so tools that start there
-do not find them.
+(The first version used the SGX base, which would have made it
+`204000000.gpu`.) They are removed before the GPU is stopped; removal waits for
+any read still running. `/sys/class/drm/card*/device` leads there
+([DRM sysfs](m1-agx-drm-sysfs.md)).
 
 ## Validation
 
