@@ -159,9 +159,68 @@ fn check_registration_allocation_failure() {
 	println('DRM registration: 64 injected metadata allocation failures release the prefix and allow retry')
 }
 
+__global owned_driver = unsafe { &DrmDriver(nil) }
+__global owned_ioctl_storage = voidptr(0)
+
+fn new_owned_test_driver() &DrmDriver {
+	assert owned_driver == unsafe { nil } && owned_ioctl_storage == unsafe { nil }
+	driver := &DrmDriver{features: driver_render, ioctls: [DrmIoctl{cmd: 0x40}]}
+	owned_driver = unsafe { driver }
+	owned_ioctl_storage = driver.ioctls.data
+	return driver
+}
+
+fn release_test_driver_ioctls(ioctls []DrmIoctl) {
+	assert owned_driver != unsafe { nil }
+	assert owned_ioctl_storage != unsafe { nil } && owned_ioctl_storage == ioctls.data
+	unsafe { ioctls.free() }
+	owned_ioctl_storage = unsafe { nil }
+}
+
+fn release_test_driver(driver &DrmDriver) {
+	assert driver == owned_driver && owned_ioctl_storage == unsafe { nil }
+	unsafe { free(driver) }
+	owned_driver = unsafe { nil }
+}
+
+fn check_owned_driver_registration() {
+	mut directory := unsafe { devtmpfs_root.children['dri'] }
+	context := u64(0xa551)
+	for _ in 0 .. 16 {
+		live := memory.registration_outstanding()
+		for allocation in 0 .. 5 {
+			driver := new_owned_test_driver()
+			memory.fail_registration_after(allocation)
+			assert register_owned_driver(driver, voidptr(&context)) == none && errno.get() == errno.enomem
+			memory.fail_registration_after(-1)
+			assert owned_driver == unsafe { nil } && owned_ioctl_storage == unsafe { nil }
+			assert memory.registration_outstanding() == live && directory.children.len == 0
+		}
+		blocker := &VFSNode{}
+		unsafe { directory.children['renderD128'] = blocker }
+		driver := new_owned_test_driver()
+		assert register_owned_driver(driver, voidptr(&context)) == none && errno.get() == errno.eexist
+		assert owned_driver == unsafe { nil } && owned_ioctl_storage == unsafe { nil }
+		assert memory.registration_outstanding() == live && directory.children.len == 1
+		assert unsafe { directory.children['renderD128'] == blocker }
+		directory.children.delete('renderD128')
+	}
+	driver := new_owned_test_driver()
+	device := register_owned_driver(driver, voidptr(&context)) or { panic('owned registration retry failed') }
+	assert device.driver == driver && device.driver_data == voidptr(&context)
+	assert owned_driver == driver && owned_ioctl_storage == device.driver.ioctls.data
+	unregister_device(device)
+	assert device.driver.ioctls[0].cmd == 0x40 && device.driver_data == voidptr(&context)
+	assert context == 0xa551
+	owned_driver = unsafe { nil }
+	owned_ioctl_storage = unsafe { nil }
+	println('DRM owned registration: 96 failed attempts release the driver and ioctl table, and a published device keeps both')
+}
+
 fn check_registration() {
 	check_registration_collisions()
 	check_registration_allocation_failure()
+	check_owned_driver_registration()
 	for render in [false, true]! {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
 		dev := register_driver_with_data(&driver, voidptr(0x1234)) or { panic('registration failed') }
@@ -289,6 +348,8 @@ fn check_slot_reuse() {
 		devices[index] = unsafe { dev }
 	}
 	assert register_driver_with_data(&driver, unsafe { nil }) == none
+	assert register_owned_driver(new_owned_test_driver(), unsafe { nil }) == none
+	assert owned_driver == unsafe { nil } && owned_ioctl_storage == unsafe { nil }
 	old := devices[13]
 	mut old_card := unsafe { old.node }
 	mut old_render := unsafe { old.render_node }

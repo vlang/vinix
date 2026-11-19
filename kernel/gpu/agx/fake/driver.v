@@ -1107,7 +1107,7 @@ pub fn initialise() bool {
 		gem_import: gem_import_handler
 		mmap: mmap_handle
 	}
-	device := drm.register_driver(driver) or {
+	device := drm.register_owned_driver(driver, unsafe { nil }) or {
 		println('fake-g17: DRM registration failed')
 		return false
 	}

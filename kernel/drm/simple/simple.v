@@ -252,7 +252,7 @@ pub fn register() {
 		gem_import: import_object
 		mmap: mmap_object
 	}
-	drm.register_driver(driver) or {
+	drm.register_owned_driver(driver, unsafe { nil }) or {
 		simple_registered = false
 		println('simpledrm: failed to register dumb-buffer allocator')
 		return

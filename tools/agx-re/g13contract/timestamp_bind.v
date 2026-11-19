@@ -75,7 +75,11 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 	open := section(drm, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(', 'DRM node open')!
 	require_order(open, ['!this.dev.is_registered()', 'errno.set(errno.enodev)', 'return none', 'return this.box'],
 		'DRM opens check device readiness and reuse the node resource')!
-	require_order(driver, ['mgr.init(', 'drm.register_driver_with_data(agx_drm_driver, voidptr(mgr))'],
+	owned := section(drm, 'pub fn register_owned_driver(', 'fn discard_unpublished_device(', 'Owned DRM descriptor')!
+	require_order(owned, ['return register_driver_with_data(driver, driver_data) or {',
+		'driver.ioctls.free()', 'free(driver)', 'return none'],
+		'Failed registration releases its owned ioctl table and descriptor')!
+	require_order(driver, ['mgr.init(', 'drm.register_owned_driver(agx_drm_driver, voidptr(mgr))'],
 		'AGX registers the initialized manager with its device')!
 	constructor := section(file, 'pub fn new_gpu_file(', '// Tear the file down.', 'File registration context')!
 	require_order(constructor, ['dev == unsafe { nil }', 'manager := unsafe { &gpu.GpuManager(dev.driver_data) }',

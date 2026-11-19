@@ -115,7 +115,7 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 		'r.read32_for_role(role, asc_ctl) or { return false }', 'ctl & asc_ctl_cpu_run == 0'],
 		'Vinix clears RUN with an MMIO barrier and checks its readback on the same role')!
 	register := section(driver, 'fn (mut driver AgxDriver) register_gpu(', 'fn (mut driver AgxDriver) stop_gpu(', 'Vinix AGX DRM registration')!
-	require_order(register, ['driver.gpu = unsafe { mgr }', 'drm.register_driver_with_data(agx_drm_driver, voidptr(mgr)) or {',
+	require_order(register, ['driver.gpu = unsafe { mgr }', 'drm.register_owned_driver(agx_drm_driver, voidptr(mgr)) or {',
 		'driver.stop_gpu()', 'return false', 'gpu.set_global_manager(driver.gpu)', 'driver.initialized = true'],
 		'Vinix unwinds failed DRM registration before publishing the manager globally')!
 	require_order(driver.all_after('fn (mut driver AgxDriver) stop_gpu('), ['if !mgr.shutdown() { return false }',

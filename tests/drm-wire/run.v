@@ -48,8 +48,10 @@ fn main() {
 		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!
 		.replace('mmap.map_shared', 'map_shared')
-	production += section(source, 'fn discard_unpublished_device(', 'fn copy_version_field(')!
+	production += section(source, 'pub fn register_owned_driver(', 'fn copy_version_field(')!
 		.replace('syncobj.shared_timeline_stub()', 'shared_timeline_stub()').replace('C.kprintf(', 'C.printf(')
+		.replace('driver.ioctls.free()', 'release_test_driver_ioctls(driver.ioctls)')
+		.replace('free(driver)', 'release_test_driver(driver)')
 		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
 		.replace('memory.free(', 'memory.free_registration(')
 	assert source.contains('\npub fn get_device(')

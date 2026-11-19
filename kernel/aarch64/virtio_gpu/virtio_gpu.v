@@ -1317,7 +1317,7 @@ fn register_driver() bool {
 		mmap_retain:     mmap_retain
 		mmap_release:    mmap_release
 	}
-	drm.register_driver(driver) or {
+	drm.register_owned_driver(driver, unsafe { nil }) or {
 		virtgpu_transport.ready = false
 		uart.puts(c'virtio-gpu: DRM registration failed\n')
 		return false

@@ -285,3 +285,29 @@ Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-registration-oom-20261119.fYrPl6/`.
 The `bundle.tar.gz` SHA-256 is
 `ce232a872e853cca35a24d006040391e2d1ed57e420bf436a2fee64e2d552204`.
+
+## Driver metadata after rejected registration
+
+Native AGX, fake G17, simple DRM and VirtIO GPU transfer their heap driver
+descriptors and ioctl tables to DRM registration. Rejection frees the
+table and descriptor before returning to the caller. A registered
+device keeps both available to files that survive unregister. Driver
+private context stays with its caller, so AGX can retain a manager across
+an unconfirmed firmware stop.
+
+The DRM wire sanitizer fixture measured the releases across 80 injected
+allocation failures, 16 name collisions and a full registry. It also
+verified a successful retry and access to its table after unregister.
+Two controls caught missing frees. The independent lifetime review and
+generated ARM64 code confirmed ownership at each caller.
+
+Both kernel builds, both QEMU descriptor-flags suites, both AGX
+sanitizer suites, 79 local contract tests and 122 pinned-reference
+checks passed. The allocation scan matched the 174 existing findings.
+The tested base was `7ecf4b9787e98eda28b366e681f28ce0dbcf209b` plus
+the archived patch. Native M1 validation remains open.
+
+Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-owned-driver-20261119.L80oKk/`.
+The `bundle.tar.gz` SHA-256 is
+`1e942eece7c13d2d70e6b1d94f80aecc9c24990b1daaf7c6ee8015c18bce4212`.

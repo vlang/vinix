@@ -36,7 +36,7 @@ __global published_gpu = unsafe { &GpuManager(nil) }
 
 fn set_global_manager(mgr &GpuManager) { published_gpu = unsafe { mgr } }
 
-fn register_driver_with_data(driver &DrmDriver, data voidptr) ?&DrmDevice {
+fn register_owned_driver(driver &DrmDriver, data voidptr) ?&DrmDevice {
 	assert published_gpu == unsafe { nil }, 'GPU publication must follow DRM registration'
 	if driver.fail { return none }
 	test_drm_device.driver_data = data

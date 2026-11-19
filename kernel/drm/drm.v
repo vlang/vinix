@@ -849,6 +849,18 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 	return register_driver_with_data(driver, unsafe { nil })
 }
 
+// Consume a heap driver descriptor with an owned ioctl table. On success
+// the device keeps both for open files that can survive unregister.
+pub fn register_owned_driver(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
+	return register_driver_with_data(driver, driver_data) or {
+		unsafe {
+			driver.ioctls.free()
+			free(driver)
+		}
+		return none
+	}
+}
+
 fn discard_unpublished_device(dev &DrmDevice) {
 	for node in [dev.node, dev.render_node]! {
 		if node == unsafe { nil } { continue }

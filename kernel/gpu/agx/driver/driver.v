@@ -1251,7 +1251,7 @@ pub fn initialise() {
 
 fn (mut driver AgxDriver) register_gpu(mgr &gpu.GpuManager, agx_drm_driver &drm.DrmDriver) bool {
 	driver.gpu = unsafe { mgr }
-	driver.drm_dev = drm.register_driver_with_data(agx_drm_driver, voidptr(mgr)) or {
+	driver.drm_dev = drm.register_owned_driver(agx_drm_driver, voidptr(mgr)) or {
 		println('agx: Failed to register DRM driver')
 		driver.stop_gpu()
 		return false
