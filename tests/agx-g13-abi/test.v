@@ -176,6 +176,11 @@ fn check_se_block() {
 	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_unk_9c_offset) == 0x45fa0000
 	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_unk_a0_offset) == 1400
 	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_unk_124_offset) == 40
+	// 1 - 1/3 lies exactly between two floats. Asahi's software float rounds
+	// the tie up; a correctly rounded subtraction would give 0x3f2aaaaa.
+	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_gpu_se_filter_1_a_offset) == 0x3eaa_aaab
+	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_gpu_se_filter_1_a_neg_offset) == 0x3f2a_aaab
+	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_gpu_se_filter_a_neg_offset) == 0x3f63_8e39
 	// se_filter_time_constant 9 and 3, times the 8 ms sample period.
 	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_gpu_se_filter_time_constant_ms_offset) == 72
 	assert read_u32(new, fw.g13_v13_5_hwdata_a_unk_e10_0_gpu_se_filter_time_constant_1_ms_offset) == 24

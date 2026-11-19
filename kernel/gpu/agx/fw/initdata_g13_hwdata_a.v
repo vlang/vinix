@@ -181,10 +181,10 @@ pub fn populate_g13_hwdata_a(mut data G13HwDataA, config &hw.HwConfig) bool {
 	pwr_pstate_k := firmware_fraction_to_f32_bits(max_scaled, config.max_power_mw) or {
 		return false
 	}
-	boost_numerator := g13_checked_mul_u32(max_state - config.perf_state_base, 100) or {
+	// F32::from(boost_ps_count) / f32!(0.95), with 0.95 as its binary32 value.
+	boost_k := firmware_u32_div_f32_bits(max_state - config.perf_state_base, 0x3f73_3333) or {
 		return false
 	}
-	boost_k := firmware_fraction_to_f32_bits(boost_numerator, 95) or { return false }
 	ppm_ki_dt := firmware_f32_multiply_bits(power.ppm_ki_f32, period_s) or {
 		return false
 	}

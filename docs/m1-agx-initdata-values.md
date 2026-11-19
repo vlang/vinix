@@ -50,12 +50,6 @@ for t8103, including fields left zero and version-conditional fields:
 
 ## Remaining differences
 
-- Asahi's software float rounds exact ties up, and its multiply and divide
-  truncate before rounding. Vinix rounds correctly to even. They differ by
-  one ULP where a result falls exactly between two floats. At 13.5,
-  `gpu_se_filter_1_a_neg` = 1 − 1/3 is such a tie: Asahi and m1n1 write
-  `0x3f2aaaab`, Vinix `0x3f2aaaaa`. Other coefficients checked against the
-  live t8103 inputs are equal.
 - Unused `pwr_*` fields in `hw/t8103.v` hold values that are not t8103's;
   nothing reads them.
 - The native Apple device-tree power loader is incomplete, but that boot
@@ -92,3 +86,41 @@ checksums are in the bundle.
 | --- | --- |
 | `bundle.tar.gz` | `a2f53f4f0a6232468dd3f87220bab10cf3f63df1769c960a4fdb12bdb300a049` |
 | `bundle.inventory.txt` | `997e0e0d40dd035d8de677da28aa5431ebc761d318a42649fc965e846bf874c8` |
+
+## Asahi software float
+
+The float coefficients now use a port of Asahi's software `F32`
+([`float.rs`](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/float.rs))
+in `kernel/gpu/agx/fw/asahi_f32.v`. That arithmetic is not IEEE: it keeps a
+33-bit mantissa, multiplies and divides with truncated operands, rounds exact
+ties up and flushes subnormals to zero. The previous helpers rounded correctly
+to even, so they could differ from Asahi in the last place. At 13.5,
+`gpu_se_filter_1_a_neg` = 1 − 1/3 is an exact tie. It was `0x3f2aaaaa` and is
+now Asahi's `0x3f2aaaab`, which m1n1's double-precision builder also writes.
+`boost_state_unk_k` now divides by the binary32 value of 0.95, as Asahi does,
+instead of computing 100/95 exactly.
+
+`tests/agx-asahi-f32` compiles the arithmetic core of the pinned `float.rs`,
+unmodified, with `rustc` and compares it with the V port on 125,299 inputs.
+These cover integer conversion, `1/n` up to 20,000, sample periods,
+`-max_pstate_scaled / max_power`, `n / 0.95`, the device-tree gains times
+`period_s`, `1 − x`, and pseudo-random operands. All match bit for bit. The
+previous helpers produced different values for 1,210 quotients, 1,306
+products and 281 `1 − x` results, and refused 36,103 inputs outside their
+supported range. Restoring only the old `1 − x` fails the new 13.5
+assertion in `tests/agx-g13-abi`.
+
+Passed in an isolated worktree at `f2598c10c` plus this change: the float
+oracle, `agx-g13-abi` and `agx-t8103-opp` under ASan/UBSan, `agx-g13-layouts`,
+`agx-g13-failure` under ASan/UBSan, the InitData layout check, 79 G13 contract
+test files, all 122 pinned-reference checks, and both `PROD` kernel builds.
+The allocation scan reports the same 427 findings, none in the new file.
+Native M1 validation remains open.
+
+Evidence is under
+`/Users/alex/.local/state/vinix/omarchy-m1-asahi-f32-20261119/`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `bundle.tar.gz` | `707e9c43a8ba1cf1c3df042093c4d2847d8ded1c0ff984d95540536348cd7555` |
+| `bundle.inventory.txt` | `df6d703956d4aafb30983ddfc96453e451644df787e1130535287b538ed8d368` |
