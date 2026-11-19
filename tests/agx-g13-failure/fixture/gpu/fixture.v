@@ -546,6 +546,16 @@ fn check_recovery() {
 		assert status.halted == 0 && status.resume == 1 && mgr.state == .running
 		assert culprit.error.status == 3 && other.error.status == 5
 		assert already_done.error.status == 0 && render.error.status == 5
+		// A fault the firmware handles without halting is not fatal: Asahi
+		// logs that it cannot recover and keeps the device. The pending work is
+		// still marked failed and cleared, and nothing is resumed.
+		other.error = G13JobError{}
+		unsafe { pending[0] = fw.G13PendingStamp{info: (u32(4) << shift) | 1, wait_value: 0x100} }
+		status.halted = 0
+		status.resume = 0
+		assert mgr.recover_g13_fault(3, 3)
+		assert mgr.state == .running && status.halted == 0 && status.resume == 0
+		assert other.error.status == 5 && unsafe { pending[0].info == 0 && pending[0].wait_value == 0 }
 		// A later fault on a shared workqueue stamp must preserve earlier
 		// completed work, even while its newer job is still pending.
 		mut prior := G13ComputeJobResources{event_slot: 3, stamp_value: 0x100, submitted: true}
@@ -599,11 +609,12 @@ fn check_recovery() {
 		mgr.handle_event()
 		assert mgr.state == .running && status.resume == 1 && status.halted == 0
 		assert unsafe { pending[255].info == 0 && pending[255].wait_value == 0 }
-		// An unacknowledged halt may not be resumed; truncated Globals may
-		// not be read at all. Callers fall back to stop-before-free shutdown.
+		// A halt that never arrives is not resumed, and as in Asahi it is not
+		// fatal. Truncated Globals may not be read at all; callers then fall
+		// back to stop-before-free shutdown.
 		status.resume = 0
-		assert !mgr.recover_g13_fault(-1, 2)
-		assert status.resume == 0
+		assert mgr.recover_g13_fault(-1, 2)
+		assert status.resume == 0 && mgr.state == .running
 		graph.globals.size = offset
 		status.halted = 1
 		assert !mgr.recover_g13_fault(-1, 2)

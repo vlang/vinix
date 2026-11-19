@@ -127,7 +127,14 @@ fn (mut mgr GpuManager) recover_g13_fault_locked(culprit i32, default_status u32
 	mut status := unsafe { &fw.G13FwStatus(graph.fw_status.cpu_address()) }
 	started := timer.get_ns()
 	for katomic.load(&status.halted) == 0 {
-		if timer.get_ns() - started >= u64(100_000_000) { return false }
+		if timer.get_ns() - started >= u64(100_000_000) {
+			// Asahi's recover() logs "Cannot recover" and keeps the device: the
+			// pending work is already marked failed, there is nothing to resume,
+			// and a later unexplained halt still fails the firmware health check.
+			C.kprintf(c'agx: GPU firmware did not halt (count=%llu); cannot recover\n',
+				katomic.load[u64](&status.halt_count))
+			return true
+		}
 		katomic.sync()
 	}
 	katomic.store(mut &status.halted, u32(0))

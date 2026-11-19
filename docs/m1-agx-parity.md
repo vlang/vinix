@@ -1441,7 +1441,8 @@ it does not certify full driver equivalence.
   at offset `0x18`.
 - **Fault and timeout recovery.** Both firmware ABIs decode their pending
   stamp records, classify culprit/killed work, preserve completed jobs, wait
-  for the halt handshake, and acknowledge resume. Cross-VM faults are reported
+  for the halt handshake, and acknowledge resume. Without a halt the device
+  keeps running, as in Asahi ([no-halt recovery](m1-agx-recover-nohalt.md)). Cross-VM faults are reported
   as killed work. Resources remain owned until firmware completion stamps
   advance; notification alone never permits freeing a command.
 - **Channel recovery.** A recoverable channel error locates its queue,
