@@ -228,3 +228,32 @@ Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-path-handles-20261119.yFoXLl/`.
 The `bundle.tar.gz` SHA-256 is
 `a4d39ddcfb411d9552c710d06d2a0b09a043b33729dca991826bbc69693ee9b3`.
+
+## DRM name collisions during registration
+
+Devtmpfs checks the card name and any requested render name under one
+writer lock before publishing either DRM node. An occupied name returns
+`EEXIST`. A non-directory `/dev/dri` returns `ENOTDIR`. Rejection releases
+the unpublished device, nodes and resource boxes, leaving the registry
+slot available. Data opens become available after the names and registry
+entry are installed.
+
+The DRM wire sanitizer fixture covered an unavailable devtmpfs, a
+non-directory `dri`, collisions at each leaf, card-only registration
+beside an occupied render name, and registry slot reuse. Two controls
+caught missing collision checks and card publication before the render
+check. The independent lifetime review confirmed that all recoverable
+failures precede publication. Generated ARM64 code confirms that the
+failure path releases each unpublished allocation.
+
+Both kernel builds, both AGX sanitizer suites, 79 local contract tests
+and 122 pinned-reference checks passed. Both QEMU guests passed the
+descriptor-flags suite, and the ARM64 guest logged creation of the
+simple DRM card. The allocation scan matched the 176 existing findings.
+The tested base was `ac5698ad846ad3bcfdc7051e77f924c65b0db8ac` plus
+the archived patch. Native M1 validation remains open.
+
+Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-name-publication-20261119.ImjujQ/`.
+The `bundle.tar.gz` SHA-256 is
+`9f0be0a75fe94380a6f0da660d7d1c0420a55a0320662aabd1646251ceba73ea`.

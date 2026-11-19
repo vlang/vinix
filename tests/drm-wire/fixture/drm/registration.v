@@ -8,6 +8,7 @@ const map_shared = 1
 
 struct NodeBox {
 	minor u64
+	node &DrmNode
 }
 
 struct NodeHandle {
@@ -17,6 +18,12 @@ struct NodeHandle {
 struct RegistryLock {
 mut:
 	held bool
+}
+
+struct VFSNode {
+	directory bool
+mut:
+	children &map[string]&VFSNode = unsafe { nil }
 }
 
 fn (mut lock_state RegistryLock) acquire() {
@@ -30,10 +37,11 @@ fn (mut lock_state RegistryLock) release() {
 }
 
 __global drm_devices_lock RegistryLock
+__global vfs_lock RegistryLock
+__global devtmpfs_root = unsafe { &VFSNode(nil) }
 __global registered_devices [64]&DrmDevice
 __global node_names [192]&DrmNode
-__global staged_card = unsafe { &DrmNode(nil) }
-__global fail_render = false
+__global published_nodes = 0
 
 fn shared_timeline_stub() {}
 
@@ -45,38 +53,87 @@ fn expect_unavailable(mut node DrmNode) {
 	expect_error(mut node, request, unsafe { nil }, errno.enodev)
 }
 
-fn drm_node_name(prefix string, number u64) string { return 'dri/${prefix}${number}' }
+fn drm_node_name(prefix string, number u64, full_path bool) string {
+	return if full_path { 'dri/${prefix}${number}' } else { '${prefix}${number}' }
+}
 
 fn devtmpfs_remove_device(name string, expected &NodeBox) bool {
 	assert drm_devices_lock.held
-	assert name == drm_node_name(if expected.minor >= 128 { 'renderD' } else { 'card' }, expected.minor)
+	leaf := drm_node_name(if expected.minor >= 128 { 'renderD' } else { 'card' }, expected.minor, false)
+	assert name == 'dri/${leaf}'
 	mut node := unsafe { node_names[expected.minor] }
 	if node == unsafe { nil } || node.box != expected { return false }
 	expect_unavailable(mut node)
+	mut parent := unsafe { devtmpfs_root.children['dri'] }
+	parent.children.delete(leaf)
 	node_names[expected.minor] = unsafe { nil }
 	node.unref(unsafe { nil }) or { panic('namespace reference release failed') }
 	return true
 }
 
-fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&DrmNode {
+fn create_device_node(dev &DrmDevice, render bool) &DrmNode {
 	assert drm_devices_lock.held && registered_devices[dev.dev_id] == unsafe { nil }
-	assert prefix == if render { 'renderD' } else { 'card' }
-	assert number == u64(dev.dev_id) + if render { u64(128) } else { u64(0) }
-	assert node_names[number] == unsafe { nil }, 'reused device slots must have no visible old name'
-	mut node := &DrmNode{dev: unsafe { dev }, box: &NodeBox{minor: number}, refcount: 1}
-	// Opening a visible primary node can race creation of the render node.
-	expect_unavailable(mut node)
-	if render {
-		expect_unavailable(mut node_names[dev.dev_id])
-		if fail_render { return none }
-	} else {
-		staged_card = unsafe { node }
-	}
-	node_names[number] = unsafe { node }
+	minor := u64(dev.dev_id) + if render { u64(128) } else { u64(0) }
+	mut node := &DrmNode{dev: unsafe { dev }, refcount: 1}
+	node.box = &NodeBox{minor: minor, node: unsafe { node }}
 	return node
 }
 
+fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
+	if name in parent.children { return unsafe { parent.children[name] } }
+	mut root := unsafe { parent }
+	dir := &VFSNode{directory: true, children: &map[string]&VFSNode{}}
+	unsafe { root.children[name] = dir }
+	return dir
+}
+
+fn publish_devtmpfs_device(device &NodeBox, directory &VFSNode, leaf string, seat bool) {
+	assert drm_devices_lock.held && vfs_lock.held && seat
+	prefix := if device.minor >= 128 { 'renderD' } else { 'card' }
+	assert leaf == drm_node_name(prefix, device.minor, false)
+	mut parent := unsafe { directory }
+	mut node := unsafe { device.node }
+	assert registered_devices[node.dev.dev_id] == unsafe { nil }
+	expect_unavailable(mut node)
+	if device.minor >= 128 {
+		expect_unavailable(mut node_names[node.dev.dev_id])
+	}
+	node_names[device.minor] = unsafe { node }
+	unsafe { parent.children[leaf] = &VFSNode{} }
+	published_nodes++
+}
+
+fn check_registration_collisions() {
+	driver := DrmDriver{features: driver_render}
+	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enodev
+	devtmpfs_root = &VFSNode{directory: true, children: &map[string]&VFSNode{}}
+	blocker := &VFSNode{}
+	unsafe { devtmpfs_root.children['dri'] = blocker }
+	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enotdir
+	assert unsafe { devtmpfs_root.children['dri'] == blocker }
+	devtmpfs_root.children.delete('dri')
+	mut dir := ensure_devtmpfs_dir(devtmpfs_root, 'dri')
+	for leaf in ['card0', 'renderD128']! {
+		unsafe { dir.children[leaf] = blocker }
+		assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.eexist
+		assert published_nodes == 0 && dir.children.len == 1 && unsafe { dir.children[leaf] == blocker }
+		assert get_device(0) == none && node_names[0] == unsafe { nil } && node_names[128] == unsafe { nil }
+		if leaf == 'card0' {
+			assert register_driver_with_data(&DrmDriver{}, unsafe { nil }) == none && errno.get() == errno.eexist
+		}
+		dir.children.delete(leaf)
+	}
+	unsafe { dir.children['renderD128'] = blocker }
+	card_only := register_driver_with_data(&DrmDriver{}, unsafe { nil }) or { panic('unrelated render name blocked a card') }
+	assert card_only.dev_id == 0 && card_only.render_node == unsafe { nil }
+	unregister_device(card_only)
+	assert dir.children.len == 1 && unsafe { dir.children['renderD128'] == blocker }
+	dir.children.delete('renderD128')
+	assert !drm_devices_lock.held && !vfs_lock.held
+}
+
 fn check_registration() {
+	check_registration_collisions()
 	for render in [false, true]! {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
 		dev := register_driver_with_data(&driver, voidptr(0x1234)) or { panic('registration failed') }
@@ -100,16 +157,11 @@ fn check_registration() {
 			expect_unavailable(mut render_node)
 		}
 	}
-	fail_render = true
-	assert register_driver_with_data(&DrmDriver{features: driver_render}, unsafe { nil }) == none
-	assert get_device(0) == none && node_names[0] == unsafe { nil } && node_names[128] == unsafe { nil }
-	expect_unavailable(mut staged_card)
-	fail_render = false
 	assert !drm_devices_lock.held
 	check_slot_reuse()
 	check_unregistered_mapping_admission()
 	check_file_close_after_unregister()
-	println('DRM registration: publication, namespace rollback, 64 active slots and safe ID reuse passed')
+	println('DRM registration: name collisions, paired publication, 64 active slots and safe ID reuse passed')
 }
 
 __global close_device = unsafe { &DrmDevice(nil) }

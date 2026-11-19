@@ -616,9 +616,7 @@ fn copy_ioctl_output(user u64, buffer voidptr, size u32, user_size u32) bool {
 }
 
 // The node is /dev/dri/<prefix><number>.
-fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&DrmNode {
-	fs.create(vfs_root, '/dev/dri', stat.ifdir | 0o755) or {}
-
+fn create_device_node(dev &DrmDevice, render bool) &DrmNode {
 	mut node := &DrmNode{
 		dev: unsafe { dev }
 		render: render
@@ -634,25 +632,32 @@ fn create_device_node(dev &DrmDevice, prefix string, number u64, render bool) ?&
 	node.stat.mode = stat.ifchr | 0o666
 	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
-	name := drm_node_name(prefix, number) @[freed]
-	// devtmpfs keeps its own copy of the last path component.
 	node.box = &resource.Resource(unsafe { node })
-	fs.devtmpfs_add_device(node.box, name)
-	unsafe { name.free() }
 	return node
 }
 
-fn drm_node_name(prefix string, number u64) string {
+fn drm_node_name(prefix string, number u64, full_path bool) string {
 	mut path := lib.new_text(32)
-	path.add('dri/')
+	if full_path { path.add('dri/') }
 	path.add(prefix)
 	path.add_unsigned(number)
 	return lib.finish_text(path)
 }
 
+fn publish_device_nodes(dev &DrmDevice) ? {
+	card_name := drm_node_name('card', u64(dev.dev_id), false) @[freed]
+	defer { unsafe { card_name.free() } }
+	if dev.render_node == unsafe { nil } {
+		return fs.devtmpfs_add_dri_devices(dev.node.box, card_name, unsafe { nil }, '')
+	}
+	render_name := drm_node_name('renderD', u64(128 + dev.dev_id), false) @[freed]
+	defer { unsafe { render_name.free() } }
+	return fs.devtmpfs_add_dri_devices(dev.node.box, card_name, dev.render_node.box, render_name)
+}
+
 fn remove_device_node(node &DrmNode, prefix string, number u64) {
 	if node == unsafe { nil } { return }
-	name := drm_node_name(prefix, number) @[freed]
+	name := drm_node_name(prefix, number, true) @[freed]
 	fs.devtmpfs_remove_device(name, node.box)
 	unsafe { name.free() }
 }
@@ -854,16 +859,26 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 		registered: false
 	}
 
-	dev.node = create_device_node(dev, 'card', u64(id), false) or { return none }
+	dev.node = create_device_node(dev, false)
 	if driver.features & driver_render != 0 {
-		dev.render_node = create_device_node(dev, 'renderD', u64(128 + id), true) or {
-			remove_device_node(dev.node, 'card', u64(id))
-			return none
+		dev.render_node = create_device_node(dev, true)
+	}
+	publish_device_nodes(dev) or {
+		// Both names were checked before either node could become reachable.
+		unsafe {
+			free(dev.node.box)
+			free(dev.node)
+			if dev.render_node != nil {
+				free(dev.render_node.box)
+				free(dev.render_node)
+			}
+			free(dev)
 		}
+		return none
 	}
 	registered_devices[id] = dev
-	// The primary node can already be visible in devtmpfs. Admit opens
-	// once every node and the registry entry have been installed.
+	// Both nodes can already be visible. Admit data opens after installing
+	// the registry entry.
 	katomic.store(mut dev.registered, true)
 
 	C.kprintf(c'drm: Registered driver %.*s as card%llu\n', i32(driver.name.len), driver.name.str,

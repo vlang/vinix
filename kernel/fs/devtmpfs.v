@@ -410,10 +410,41 @@ pub fn devtmpfs_add_device(device &resource.Resource, name string) {
 		return
 	}
 
+	publish_devtmpfs_device(device, parent, leaf, seat_device_name(name))
+}
+
+// Check both DRM names under the same writer lock before transferring
+// either resource to devtmpfs. A nil render resource requests only a card.
+pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
+	render &resource.Resource, render_name string) ? {
+	vfs_lock.acquire()
+	defer { vfs_lock.release() }
+
+	if devtmpfs_root == unsafe { nil } {
+		errno.set(errno.enodev)
+		return none
+	}
+	parent := ensure_devtmpfs_dir(devtmpfs_root, 'dri')
+	if parent.children == unsafe { nil } || !stat.isdir(parent.resource.stat.mode) {
+		errno.set(errno.enotdir)
+		return none
+	}
+	if card_name in parent.children || (render != unsafe { nil } && render_name in parent.children) {
+		errno.set(errno.eexist)
+		return none
+	}
+	publish_devtmpfs_device(card, parent, card_name.clone(), true)
+	if render != unsafe { nil } {
+		publish_devtmpfs_device(render, parent, render_name.clone(), true)
+	}
+}
+
+// Caller holds vfs_lock. The node takes ownership of leaf.
+fn publish_devtmpfs_device(device &resource.Resource, parent &VFSNode, leaf string, seat bool) {
 	mut new_node := create_node(unsafe { filesystems['devtmpfs'] }, parent, leaf, false)
 
 	new_node.resource = unsafe { device }
-	new_node.seat = seat_device_name(name)
+	new_node.seat = seat
 	new_node.resource.stat.dev = devtmpfs_dev_id
 	new_node.resource.stat.ino = devtmpfs_inode_counter++
 	new_node.resource.stat.nlink = 1

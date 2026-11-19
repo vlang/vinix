@@ -17,6 +17,7 @@ fn main() {
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-g13-failure/fixture/katomic', '${scratch}/katomic', false)!
 	source := os.read_file(os.getenv_opt('DRM_WIRE_SOURCE') or { '${repo}/kernel/drm/drm.v' })!
+	devtmpfs_source := os.read_file(os.getenv_opt('DRM_DEVTMPFS_SOURCE') or { '${repo}/kernel/fs/devtmpfs.v' })!
 	resource_source := os.read_file('${repo}/kernel/resource/resource.v')!
 	mut production := 'module drm\nimport drm.ioctl\nimport usercopy\nimport memory\nimport errno\n'
 	production += 'import katomic\n'
@@ -32,6 +33,11 @@ fn main() {
 	production += section(source, 'fn (mut this DrmNode) unref(', 'fn (mut this DrmNode) link(')!
 		.replace('file.Handle', 'NodeHandle').replace('resource.o_path', 'o_path')
 		.replace('syncobj.destroy_owner(', 'destroy_owner(')
+	production += section(source, 'fn publish_device_nodes(', 'fn remove_device_node(')!
+		.replace('fs.devtmpfs_add_dri_devices(', 'devtmpfs_add_dri_devices(')
+	production += section(devtmpfs_source, 'pub fn devtmpfs_add_dri_devices(', '// Caller holds vfs_lock.')!
+		.replace('resource.Resource', 'NodeBox')
+		.replace('stat.isdir(parent.resource.stat.mode)', 'parent.directory')
 	production += section(source, 'fn remove_device_node(', 'fn (mut this DrmNode) open(')!
 		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!

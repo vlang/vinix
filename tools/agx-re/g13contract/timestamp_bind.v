@@ -56,8 +56,10 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 	require_order(device, ['pub:', 'driver_data voidptr', 'pub mut:'], 'DRM device context is immutable')!
 	registration := section(drm, 'pub fn register_driver_with_data(', 'pub fn unregister_device(', 'DRM publication')!
 	require_order(registration, ['mut dev := &DrmDevice{', 'driver_data: driver_data',
-		'registered: false', "create_device_node(dev, 'card'", "create_device_node(dev, 'renderD'",
-		"remove_device_node(dev.node, 'card', u64(id))", 'return none',
+		'registered: false', 'dev.node = create_device_node(dev, false)',
+		'dev.render_node = create_device_node(dev, true)', 'publish_device_nodes(dev) or {',
+		'free(dev.node.box)', 'free(dev.node)', 'free(dev.render_node.box)', 'free(dev.render_node)',
+		'free(dev)', 'return none',
 		'registered_devices[id] = dev', 'katomic.store(mut dev.registered, true)'],
 		'Publish device readiness after installing its context, nodes and registry entry')!
 	unregister := section(drm, 'pub fn unregister_device(', 'fn copy_version_field(', 'DRM unregistration')!

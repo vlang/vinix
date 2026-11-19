@@ -28,5 +28,6 @@ fn test_timestamp_registration_keeps_the_original_manager() {
 	check_timestamp_registration_local(file, drm, driver)!
 	if _ := check_timestamp_registration_local(file.replace('dev.driver_data', 'nil'), drm, driver) { assert false }
 	if _ := check_timestamp_registration_local(file, drm.replace('driver_data: driver_data', ''), driver) { assert false }
+	if _ := check_timestamp_registration_local(file, drm.replace('publish_device_nodes(dev) or {', ''), driver) { assert false }
 	if _ := check_timestamp_registration_local(file, drm, driver.replace('voidptr(mgr)', 'nil')) { assert false }
 }
