@@ -487,17 +487,11 @@ fn load_t8103_performance_config(gpu_node &devicetree.DTNode, mut cfg hw.HwConfi
 		}
 		unsafe { entries.free() }
 	}
+	// Every child is a state, whatever its status: Asahi walks the table with
+	// of_get_next_child(), which does not skip disabled nodes.
 	for opp in opp_table.children {
-		if status := devicetree.get_string_list(opp, 'status') {
-			mut owned_status := status
-			disabled := owned_status.len > 0 && owned_status[0] == 'disabled'
-			unsafe { owned_status.free() }
-			if disabled {
-				continue
-			}
-		}
 		if u32(entries.len) >= hw.perf_state_capacity {
-			println('agx: t8103 has too many enabled OPPs')
+			println('agx: t8103 has too many OPPs')
 			return false
 		}
 		// A zero opp-hz or opp-microwatt is data, not a missing property, so
