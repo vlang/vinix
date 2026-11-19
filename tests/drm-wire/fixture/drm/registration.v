@@ -430,9 +430,30 @@ fn check_slot_reuse() {
 		assert dev.dev_id == u32(index)
 		devices[index] = unsafe { dev }
 	}
-	assert register_driver_with_data(&driver, unsafe { nil }) == none
-	assert register_owned_driver(new_owned_test_driver(), unsafe { nil }) == none
+	live := memory.registration_outstanding()
+	prior_publications := published_nodes
+	errno.set(errno.eexist)
+	assert register_driver(&driver) == none && errno.get() == errno.ebusy
+	memory.fail_registration_after(0)
+	errno.set(errno.eexist)
+	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.ebusy
+	errno.set(errno.eexist)
+	assert register_owned_driver(new_owned_test_driver(), unsafe { nil }) == none && errno.get() == errno.ebusy
 	assert owned_driver == unsafe { nil } && owned_ioctl_storage == unsafe { nil }
+	ioctls := unsafe { static_ioctl_table(&published_ioctl_table[0], published_ioctl_table.len) }
+	definition := DrmDriver{features: driver_render, ioctls: ioctls}
+	assert register_driver_definition(definition, unsafe { nil }) == none && errno.get() == errno.enomem
+	memory.fail_registration_after(1)
+	assert register_driver_definition(definition, unsafe { nil }) == none && errno.get() == errno.ebusy
+	memory.fail_registration_after(-1)
+	assert ioctls[0].cmd == 0x40 && ioctls[1].cmd == 0x41
+	assert published_nodes == prior_publications && memory.registration_outstanding() == live
+	for index, dev in devices {
+		assert dev.is_registered() && registered_devices[index] == dev
+		assert node_names[index] == dev.node && node_names[128 + index] == dev.render_node
+	}
+	assert !drm_devices_lock.held && !vfs_lock.held && !children_lock.held
+	println('DRM registration: a full table returns EBUSY and preserves all devices')
 	old := devices[13]
 	mut old_card := unsafe { old.node }
 	mut old_render := unsafe { old.render_node }

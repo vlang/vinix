@@ -5,6 +5,7 @@ pub const einval = u64(22)
 pub const enodev = u64(19)
 pub const enomem = u64(12)
 pub const efault = u64(14)
+pub const ebusy = u64(16)
 pub const eexist = u64(17)
 pub const enotdir = u64(20)
 

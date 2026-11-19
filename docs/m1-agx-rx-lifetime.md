@@ -391,3 +391,24 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-paired-publication-20261119.NtAk6Z/`.
 The `bundle.tar.gz` SHA-256 is
 `c49fc226b8057fc0594c07ec3e7038934fa115e90a2ba2e52ede92418c3dc3ae`.
+
+## DRM registration with a full table
+
+When all 64 device slots are occupied, DRM sets `EBUSY` before returning
+from the slot search. This matches the exhaustion errno of the pinned
+Linux DRM minor allocator. Linux has a larger minor-number range.
+[DRM minor allocation](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/drm_drv.c#L143-L161)
+[XArray exhaustion](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/lib/xarray.c#L2008-L2032)
+
+The DRM wire sanitizer fixture checked all four registration entry points,
+allocation failure before a slot search, ownership cleanup and reuse of
+a freed slot. The previous implementation failed the stale errno check.
+Both kernel builds, both QEMU descriptor-flags suites, both AGX sanitizer
+suites, 79 local contract tests and 122 pinned-reference checks passed.
+The allocation scan matched the 173 baseline findings.
+
+The tested base was `538c081ac3a86a5566591c43e6cb43174e78f372` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-registry-full-20261119.BKLVIq/`.
+The `bundle.tar.gz` SHA-256 is
+`7ca6ef905066d5e7e1dcbc56f72b9d105d9921923caccf2a52c3b6a8a8ec7b10`.

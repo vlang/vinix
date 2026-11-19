@@ -56,7 +56,7 @@ fn main() {
 		.replace('C.vinix_stack_alloc(', 'C.alloca(')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!
 		.replace('mmap.map_shared', 'map_shared')
-	production += section(source, 'pub fn static_ioctl_table(', 'fn copy_version_field(')!
+	production += section(source, 'pub fn register_driver(', 'fn copy_version_field(')!
 		.replace('syncobj.shared_timeline_stub()', 'shared_timeline_stub()').replace('C.kprintf(', 'C.printf(')
 		.replace('driver.ioctls.free()', 'release_test_driver_ioctls(driver.ioctls)')
 		.replace('free(driver)', 'release_test_driver(driver)')

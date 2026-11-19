@@ -928,6 +928,7 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 		id++
 	}
 	if id == u32(registered_devices.len) {
+		errno.set(errno.ebusy)
 		return none
 	}
 
