@@ -73,9 +73,10 @@ Two cases differ:
   the total only.
 - Asahi keeps charging an object to its creator after the creator closes its
   handle while another client still holds it. Vinix drops it from the creator's
-  total then. Asahi's device-wide `gpu_memory` and
-`agx_stats` sysfs files are not provided; Vinix has no `/sys/class/drm` tree for
-them yet.
+  total then.
+
+The device-wide `gpu_memory` and `agx_stats` files are described in
+[G13 statistics](m1-agx-stats.md).
 
 ## Validation
 

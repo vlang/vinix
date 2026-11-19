@@ -30,6 +30,8 @@ pub mut:
 	hw_config   hw.HwConfig
 	detected    bool
 	initialized bool
+	// The /sys directory holding agx_stats and gpu_memory, or empty.
+	sysfs_device string
 mut:
 	probe_cleanup &gpu.GpuManager = unsafe { nil }
 }
@@ -1252,6 +1254,7 @@ fn (mut driver AgxDriver) register_gpu(mgr &gpu.GpuManager, agx_drm_driver drm.D
 		return false
 	}
 	gpu.set_global_manager(driver.gpu)
+	driver.publish_sysfs(mgr)
 	driver.initialized = true
 	return true
 }
@@ -1273,6 +1276,7 @@ pub fn shutdown() {
 	}
 
 	println('agx: Shutting down Apple GPU driver')
+	agx_driver_inst.remove_sysfs()
 
 	// Unregister DRM device
 	if agx_driver_inst.drm_dev != unsafe { nil } {

@@ -43,6 +43,11 @@ pub:
 	mmap_device u64
 }
 
+pub fn set_creator(obj &GemObject, creator u64) {
+	mut owned := unsafe { obj }
+	owned.creator = creator
+}
+
 pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool, file_scoped bool, registration MmapRegistration) ?&GemObject {
 	mut object := create_aligned(size, alignment) or { return none }
 	object.vm_private_identity = identity

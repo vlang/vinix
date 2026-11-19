@@ -34,8 +34,9 @@ On G13 the totals are reported, per client, as `drm-total-system` and
 and device-wide in a `gpu_memory` sysfs file.
 
 Vinix now reports the per-client lines in `fdinfo`, with two small differences
-([fdinfo](m1-agx-fdinfo.md)). It has no `gpu_memory` file. Both are observable
-to monitoring tools only and change no allocation, mapping or rendering result.
+([fdinfo](m1-agx-fdinfo.md)), and the device totals in `gpu_memory`
+([G13 statistics](m1-agx-stats.md)). Both are observable to monitoring tools
+only and change no allocation, mapping or rendering result.
 
 ## Power management
 

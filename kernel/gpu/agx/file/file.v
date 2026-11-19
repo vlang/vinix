@@ -915,8 +915,7 @@ pub fn (mut f GpuFile) ioctl_gem_create(data &ioctl.DrmAsahiGemCreate) int {
 	obj := gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,
 		request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles(),
 		mmap_device: u64(f.dev)) or { return -12 }
-	mut created := unsafe { obj }
-	created.creator = f.client_serial
+	gem.set_creator(obj, f.client_serial)
 	request.handle = f.objects.add_created(obj)
 	return 0
 }

@@ -119,6 +119,7 @@ mut:
 	g13_recoveries    [g13_recovery_capacity]G13PendingRecovery
 	g13_recovery_count u32
 	g13_recover_message fw.FwRecoverChannel // RecoverChannel staging, under lock
+	g13_stats         G13Stats // latest firmware statistics, for agx_stats
 	g13_queue_ids     G13QueueIds
 	g13_compute_jobs  []&G13ComputeJobResources
 	g13_render_jobs   []&G13RenderJobResources
@@ -1579,6 +1580,10 @@ fn (mut mgr GpuManager) drain_auxiliary_channels() {
 	for mgr.dequeue_g13_rx(mut mgr.channels.ktrace, voidptr(&buf[0])) {
 	}
 	for mgr.dequeue_g13_rx(mut mgr.channels.stats, voidptr(&buf[0])) {
+		if mgr.hw_config.gpu_gen == .g13 {
+			message := unsafe { *&fw.FwStatsMsg(&buf[0]) }
+			mgr.g13_stats.record(message, mgr.hw_config.base_clock_hz)
+		}
 	}
 }
 

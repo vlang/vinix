@@ -90,6 +90,7 @@ mut:
 	g13_recoveries [g13_recovery_capacity]G13PendingRecovery
 	g13_recovery_count u32
 	g13_recover_message fw.FwRecoverChannel
+	g13_stats G13Stats
 	uat &FixtureUat = unsafe { nil }
 	res            Resources
 	lock           klock.Lock

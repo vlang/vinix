@@ -352,6 +352,8 @@ fn poll_pending_batch(first &G13PendingSubmission) {
 			signal_g13_submission_fence(item.final_fence, int(katomic.load(&item.failure)))
 			if item.operation_active {
 				mut manager := unsafe { item.manager }
+				// Its commands all completed on the GPU: Asahi's agx_stats job count.
+				manager.note_g13_job()
 				manager.finish_g13_submission_operation()
 			}
 			// GPU callbacks have dropped their final node access. Release global

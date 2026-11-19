@@ -107,6 +107,8 @@ fn run_checks() int {
 	production += source.all_after('// Shutdown the GPU\n')
 	recovery_source := if os.args.len == 4 && os.args[2] == '--recovery-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/g13_recovery.v' }
 	production += (os.read_file(recovery_source) or { panic(err) }).all_after('import aarch64.timer\n')
+	stats_source := os.read_file('${repo}/kernel/gpu/agx/gpu/stats.v') or { panic(err) }
+	production += section(stats_source, '// Stats message tags', '// A submission whose commands') or { panic(err) }
 	production = production.replace('import sched\n', 'import sched\nimport aarch64.timer\n')
 	production = production.replace('import aarch64.timer\n', 'import aarch64.timer\nimport aarch64.aic\n')
 	submissions := os.read_file(if os.args.len == 4 && os.args[2] == '--g13-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/g13.v' }) or { panic(err) }

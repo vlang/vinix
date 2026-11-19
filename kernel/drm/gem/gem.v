@@ -70,7 +70,36 @@ __global (
 	gem_objects_lock klock.Lock
 	gem_objects      [4096]&GemObject
 	file_mmap_objects &GemObject = unsafe { nil }
+	// Bytes of live user objects, counted once against their creator: what
+	// Asahi's gpu_memory calls user_committed.
+	gem_user_committed = u64(0)
 )
+
+// Tag `obj` as created by the DRM client `creator`, and count it in the device
+// total until it is destroyed. Called once, before the creator publishes the
+// handle, so no other client can see the object yet.
+pub fn set_creator(obj &GemObject, creator u64) {
+	if obj == unsafe { nil } || creator == 0 || obj.creator != 0 { return }
+	mut owned := unsafe { obj }
+	owned.creator = creator
+	adjust_user_committed(obj.size, true)
+}
+
+pub fn user_committed() u64 {
+	return katomic.load(&gem_user_committed)
+}
+
+fn adjust_user_committed(size u64, add bool) {
+	gem_objects_lock.acquire()
+	gem_user_committed = if add {
+		gem_user_committed + size
+	} else if gem_user_committed >= size {
+		gem_user_committed - size
+	} else {
+		u64(0)
+	}
+	gem_objects_lock.release()
+}
 
 // Create a new GEM object of the given size.
 // Allocates physical pages and maps them to the higher half.
@@ -224,6 +253,7 @@ pub fn destroy(obj &GemObject) {
 	if obj == unsafe { nil } {
 		return
 	}
+	if obj.creator != 0 { adjust_user_committed(obj.size, false) }
 	free_prime_fences(obj.prime_fences)
 	if !obj.file_scoped && obj.handle < gem_max_handles {
 		gem_objects_lock.acquire()

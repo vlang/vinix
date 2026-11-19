@@ -97,6 +97,7 @@ pub mut:
 
 pub struct GpuManager {
 pub mut:
+	noted_jobs            u64
 	uat                   &mmu.UatManager = unsafe { nil }
 	lock                  klock.Lock
 	state                 State = .running
@@ -499,3 +500,5 @@ pub fn (mut mgr GpuManager) stop() {
 	}
 	mgr.lock.release()
 }
+
+pub fn (mut mgr GpuManager) note_g13_job() { mgr.noted_jobs++ }
