@@ -66,3 +66,56 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `ca88801c25404bf97957c6fd88f2a2ec22d7b101be8e1ea0fede66a4a69d5f9c`.
 Native M1 firmware validation remains open.
+
+## Timeouts no longer stop the GPU
+
+Asahi logs a RecoverChannel that the firmware has not consumed within its
+one-second wait and keeps the GPU running. Vinix used to stop the GPU at that
+point. It now logs `agx: timed out waiting for RecoverChannel; its queue stays
+pinned` and keeps running, as Asahi does.
+[Asahi timeout](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gpu.rs#L1717-L1722)
+
+Unlike Asahi, which drops its workqueue reference when the handler returns,
+Vinix keeps the queue pinned until the firmware consumes the command or
+stops. Pins live in a table of 255 entries, one for each device-control
+entry that can hold an unconsumed command. The event worker releases consumed
+pins on every healthy pass. A new channel error also releases them before it
+publishes, so a command the ring accepts always finds a free entry. A second
+channel error while a command is pending now publishes another RecoverChannel
+instead of stopping the GPU. A corrupt ring index still stops it, and so does
+a full ring, where Asahi instead waits for space indefinitely.
+
+The device-control ring is first-in, first-out. While the firmware leaves a
+RecoverChannel unconsumed, later cache flushes and context invalidations on
+that ring also time out after a second each, in Asahi as in Vinix. In Vinix the
+pinned queue, its file's mappings and any context whose invalidation timed
+out then stay allocated until the firmware catches up or the GPU shuts down.
+
+The command is staged in manager storage rather than a local. Storing the
+returned ticket in the table otherwise led V to move the local, which holds a
+fixed array, to the heap for good: 48 bytes per channel error.
+
+The sanitizer fixture now expects both timeout cases to keep the GPU running
+with the queue pinned. It publishes a second command while the first is
+pending and releases each pin as the firmware consumes it. Three mutants fail
+it: a fatal timeout, a worker that never releases, and publication without
+first releasing consumed pins. The G13 contracts require the worker release,
+the table order and its capacity. An independent lifetime review found no
+use-after-free, double release or table overflow; it raised the comment and
+the ring stall described above.
+
+The G13 failure suite passes under ASan/UBSan, as do 79 contract test files and
+122 pinned reference checks. Both `PROD` kernels build. The allocation scan
+matches the previous 427 findings, and the generated RecoverChannel path has no
+`memdup`. The AArch64 kernel boots in QEMU and passes the mount-lifecycle
+`descflags` case. The worker suite (`tests/agx-worker`) already failed to
+compile on the base revision because its fixture lacks four manager methods; this
+change adds a fifth. No M1 hardware test or reboot occurred.
+
+Evidence is under
+`/Users/alex/.local/state/vinix/omarchy-m1-recover-timeout-20261119/`.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `bundle.tar.gz` | `76883d8cc683e006971708db27b482746a7a60b6f6f81155615842af5eab5a5c` |
+| `bundle.tar.gz` inventory | `ca9b5a4de8e5d1d110456b723b81d1d2f5a03d4a07c4a97cf9d7f60b0edacd8e` |

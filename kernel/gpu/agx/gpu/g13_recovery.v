@@ -4,6 +4,7 @@ module gpu
 import gpu.agx.fw
 import gpu.agx.event
 import katomic
+import gpu.agx.channel
 import aarch64.timer
 
 // WorkError information remains attached to retained jobs until firmware
@@ -149,19 +150,57 @@ fn (mut mgr GpuManager) recover_g13_fault(culprit i32, default_status u32) bool 
 	return mgr.recover_g13_fault_locked(culprit, default_status)
 }
 
-// Caller holds mgr.lock. Clear the manager's pointer before dropping the
-// last reference, which can let the file reaper free the queue record.
-fn (mut mgr GpuManager) release_g13_recovery_queue_locked() {
-	if mgr.g13_recovery_queue == unsafe { nil } { return }
-	mut owner := unsafe { mgr.g13_recovery_queue }
-	mgr.g13_recovery_queue = unsafe { nil }
+// One entry per device-control slot that can hold an unconsumed command:
+// fw.device_control_size - 1, because one ring entry always stays empty.
+const g13_recovery_capacity = 255
+
+// A published RecoverChannel and the queue it pins until the firmware
+// consumes it or stops.
+struct G13PendingRecovery {
+	ticket channel.TxTicket
+	owner  &G13QueueResources = unsafe { nil }
+}
+
+// Caller holds mgr.lock. Remove the entry before dropping its reference,
+// which can let the file reaper free the queue record.
+fn (mut mgr GpuManager) release_g13_recovery_locked(index u32) {
+	if index >= mgr.g13_recovery_count { return }
+	mut owner := unsafe { mgr.g13_recoveries[index].owner }
+	mgr.g13_recovery_count--
+	mgr.g13_recoveries[index] = mgr.g13_recoveries[mgr.g13_recovery_count]
+	mgr.g13_recoveries[mgr.g13_recovery_count] = G13PendingRecovery{}
 	owner.release_file_reference()
+}
+
+// Caller holds mgr.lock. Unpin each queue whose RecoverChannel the firmware has
+// consumed. A corrupt ring keeps every pin: ticket_consumed latches the channel
+// fault, and the health check stops the device before teardown releases them.
+fn (mut mgr GpuManager) release_consumed_g13_recoveries_locked() {
+	mut index := u32(0)
+	for index < mgr.g13_recovery_count {
+		consumed := mgr.channels.device_ctrl.ticket_consumed(mgr.g13_recoveries[index].ticket) or { return }
+		if consumed {
+			mgr.release_g13_recovery_locked(index)
+		} else {
+			index++
+		}
+	}
+}
+
+// Caller holds mgr.lock and has stopped the firmware, so no published
+// RecoverChannel can still read its workqueue.
+fn (mut mgr GpuManager) release_g13_recoveries_locked() {
+	for mgr.g13_recovery_count > 0 {
+		mgr.release_g13_recovery_locked(mgr.g13_recovery_count - 1)
+	}
 }
 
 // As in Asahi's handle_channel_error, the slot's work is marked failed before
 // its queue is looked up, and a missing queue is not fatal: the error can name
-// work that has already retired. A failure after RecoverChannel is published
-// still stops the device, because the command may dereference the workqueue.
+// work that has already retired. A command the firmware has not consumed after
+// a second is logged and the device keeps running, as in Asahi. Its queue stays
+// pinned until the firmware consumes the command or stops, because the command
+// can still dereference the workqueue. A corrupt ring stops the device.
 fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, error_type u32) bool {
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
@@ -174,7 +213,6 @@ fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, 
 			u64(pipe_type), u64(slot))
 		return true
 	}
-	if mgr.g13_recovery_queue != unsafe { nil } { return false }
 	mut owner := unsafe { &G13QueueResources(nil) }
 	for job in mgr.g13_compute_jobs {
 		if pipe_type == 2 && job.submitted && !job.released && job.event_slot == slot {
@@ -195,13 +233,20 @@ fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, 
 		C.kprintf(c'agx: no workqueue for channel error slot %llu\n', u64(slot))
 		return true
 	}
-	message := fw.make_recover_channel(mgr.hw_config.firmware_abi, pipe_type,
+	// Every pinned command still occupies a device-control entry, so once the
+	// consumed ones are released, a command the ring accepts has a table entry.
+	mgr.release_consumed_g13_recoveries_locked()
+	if mgr.g13_recovery_count >= g13_recovery_capacity { return false }
+	// Stage the command in manager storage. The ticket that names a stack local
+	// would reach the table, and V would move that local to the heap for good.
+	mgr.g13_recover_message = fw.make_recover_channel(mgr.hw_config.firmware_abi, pipe_type,
 		owner.subqueues[pipe_type].info.va, value) or { return false }
-	ticket := mgr.channels.device_ctrl.enqueue_tracked(voidptr(&message)) or { return false }
+	ticket := mgr.channels.device_ctrl.enqueue_tracked(voidptr(&mgr.g13_recover_message)) or { return false }
 	// The published command can still dereference the workqueue. Keep its
 	// backing until consumption or stopped-firmware teardown, even on timeout.
 	owner.retain_file_reference()
-	mgr.g13_recovery_queue = owner
+	mgr.g13_recoveries[mgr.g13_recovery_count] = G13PendingRecovery{ticket: ticket, owner: owner}
+	mgr.g13_recovery_count++
 	sent := mgr.ring_g13_doorbell_locked(doorbell_device_control)
 	if mgr.state != .running { return false }
 	// An overlapping doorbell may have notified this command too. Check
@@ -209,14 +254,28 @@ fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, 
 	if !sent { println('agx: RecoverChannel doorbell send failed') }
 	started := timer.get_ns()
 	for mgr.state == .running {
-		consumed := mgr.channels.device_ctrl.ticket_consumed(ticket) or { break }
+		consumed := mgr.channels.device_ctrl.ticket_consumed(ticket) or {
+			// The latched ring fault keeps the pin until stopped-firmware teardown.
+			mgr.state = .error
+			return false
+		}
 		if consumed {
-			mgr.release_g13_recovery_queue_locked()
+			// Only the event worker publishes and releases recoveries, and a
+			// shutdown during the doorbell wait returned above, so the entry is
+			// still in the table.
+			for index := u32(0); index < mgr.g13_recovery_count; index++ {
+				if mgr.g13_recoveries[index].ticket == ticket {
+					mgr.release_g13_recovery_locked(index)
+					break
+				}
+			}
 			return true
 		}
-		if timer.get_ns() - started >= u64(1_000_000_000) { break }
+		if timer.get_ns() - started >= u64(1_000_000_000) {
+			println('agx: timed out waiting for RecoverChannel; its queue stays pinned')
+			return true
+		}
 		katomic.sync()
 	}
-	if mgr.state == .running { mgr.state = .error }
 	return false
 }

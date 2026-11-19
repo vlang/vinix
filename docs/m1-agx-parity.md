@@ -28,7 +28,8 @@ send-empty IRQ. [G13 device-control commands](m1-agx-device-control.md)
 
 RecoverChannel also uses the guarded send-empty path. It retains the queue
 until firmware consumes the command or the ASC stops, and recognizes
-completion after ring wrap. [RecoverChannel transport](m1-agx-recover-channel.md)
+completion after ring wrap. A consumption timeout is logged and the GPU keeps
+running, as in Asahi. [RecoverChannel transport](m1-agx-recover-channel.md)
 
 G13 FwCtl writes the number of 16 KiB pages at offset `0x10` of the 20-byte
 cache-flush message. At 65,536 pages and above it logs the overflow and casts the
@@ -1447,7 +1448,8 @@ it does not certify full driver equivalence.
   advance; notification alone never permits freeing a command.
 - **Channel recovery.** A recoverable channel error locates its queue,
   records its error and sends RecoverChannel, waiting for consumption. A
-  missing queue is logged and not fatal, as in Asahi.
+  missing queue or a consumption timeout is logged and not fatal, as in Asahi;
+  the queue stays pinned until the firmware consumes the command.
 - **Error reporting.** Job results preserve fault diagnostics and timeout,
   killed and channel-error status. Fences distinguish timeout, cancellation,
   no-device and unknown errors. Shutdown retains stop-before-free ordering.
@@ -1464,8 +1466,7 @@ it does not certify full driver equivalence.
   rounded-up 3x usage, capped at the non-memoryless block limit. Calculations
   use 64 bits to handle every raw 32-bit statistics value.
 
-Corrupt ring indices, failed recovery acknowledgments and unexplained halts
-remain fatal. The worker drains a queued fault notification before treating
+Corrupt ring indices and unexplained halts remain fatal. The worker drains a queued fault notification before treating
 its halt as unexplained. Recovery and retirement introduce no new kernel
 allocations. TVB feedback uses the existing growth and cleanup path; these
 changes retain the existing object ownership model.

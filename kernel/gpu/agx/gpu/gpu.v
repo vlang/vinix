@@ -116,7 +116,9 @@ mut:
 	g13_queues        []&G13QueueResources
 	g13_context_head &G13QueueResources = unsafe { nil }
 	g13_context_tail &G13QueueResources = unsafe { nil }
-	g13_recovery_queue &G13QueueResources = unsafe { nil }
+	g13_recoveries    [g13_recovery_capacity]G13PendingRecovery
+	g13_recovery_count u32
+	g13_recover_message fw.FwRecoverChannel // RecoverChannel staging, under lock
 	g13_queue_ids     G13QueueIds
 	g13_compute_jobs  []&G13ComputeJobResources
 	g13_render_jobs   []&G13RenderJobResources
@@ -1649,6 +1651,8 @@ fn event_worker(mut mgr GpuManager) {
 		mgr.lock.acquire()
 		still_healthy := mgr.state == .running && mgr.check_g13_firmware_health()
 		if still_healthy && poll_mailbox { mgr.finish_rtkit_receive() }
+		// Unpin queues whose RecoverChannel the firmware consumed after its wait.
+		if still_healthy { mgr.release_consumed_g13_recoveries_locked() }
 		mgr.lock.release()
 		if !still_healthy {
 			break
@@ -1703,7 +1707,7 @@ pub fn (mut mgr GpuManager) shutdown() bool {
 	mgr.release_all_g13_render_jobs()
 	mgr.release_all_g13_compute_jobs()
 	mgr.release_all_g13_queue_resources()
-	mgr.release_g13_recovery_queue_locked()
+	mgr.release_g13_recoveries_locked()
 	mgr.release_g13_channels()
 	mgr.release_g13_event_resources_locked()
 	mgr.release_all_g17_queue_resources()

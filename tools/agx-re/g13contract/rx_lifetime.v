@@ -34,8 +34,9 @@ fn check_g13_receive_lifetime(local string, remote string, recovery string) ! {
 	worker := section(local, 'fn event_worker(', '// Shutdown the GPU', 'Vinix receive worker')!
 	require_order(worker, ['mgr.check_g13_firmware_health()', 'mgr.poll_rtkit_messages()',
 		'if mgr.state != .running', 'if mgr.hw_config.gpu_gen == .g13',
-		'mgr.drain_g13_receive_channels()', 'mgr.check_g13_firmware_health()'],
-		'G13 workers use the same ordered drain even without a mailbox doorbell')!
+		'mgr.drain_g13_receive_channels()', 'mgr.check_g13_firmware_health()',
+		'if still_healthy { mgr.release_consumed_g13_recoveries_locked() }', 'mgr.lock.release()'],
+		'G13 workers use the same ordered drain even without a mailbox doorbell and unpin consumed recoveries while healthy')!
 	loss := section(local, 'fn (mut mgr GpuManager) mark_g13_worker_error()', 'pub fn (mut mgr GpuManager) handle_event()', 'Vinix worker error')!
 	require_order(loss, ['mgr.lock.acquire()', 'if mgr.state == .running { mgr.state = .error }', 'mgr.lock.release()'],
 		'An asynchronous receive failure cannot overwrite stopped state')!
@@ -46,10 +47,11 @@ fn check_g13_receive_lifetime(local string, remote string, recovery string) ! {
 		'Vinix marks G13 stopped and releases RX backing under the manager lock after confirming the ASC stop')!
 	require_order(recovery.all_after('fn (mut mgr GpuManager) recover_g13_channel('), [
 		'mgr.lock.acquire()', 'if mgr.state != .running { return false }', 'mgr.mark_g13_slot_error_locked(',
-		'if mgr.g13_recovery_queue != unsafe { nil } { return false }', 'mgr.channels.device_ctrl.enqueue_tracked('],
-		'Channel recovery declines stale requests after loss or teardown, marks the slot first and serializes recovery')!
+		'mgr.release_consumed_g13_recoveries_locked()', 'if mgr.g13_recovery_count >= g13_recovery_capacity { return false }',
+		'mgr.channels.device_ctrl.enqueue_tracked('],
+		'Channel recovery declines stale requests after loss or teardown, marks the slot first and unpins consumed recoveries before publishing')!
 	require_order(stop, ['mgr.stop_firmware_cpus(mgr.firmware_roles)', 'mgr.release_all_g13_queue_resources()',
-		'mgr.release_g13_recovery_queue_locked()', 'mgr.release_g13_channels()'],
+		'mgr.release_g13_recoveries_locked()', 'mgr.release_g13_channels()'],
 		'Stopped firmware lets shutdown release recovery backing and its metadata pin')!
 }
 

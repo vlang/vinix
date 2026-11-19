@@ -121,11 +121,14 @@ fn check_g13_recovery_transmit() {
 			} else {
 				timer.watch_busywait(observe_recovery_irq_wait)
 			}
-			complete := sample in [.delayed, .later_unread, .wrapped, .polled, .late_consumed]!
+			consumed := sample in [.delayed, .later_unread, .wrapped, .polled, .late_consumed]!
+			// As in Asahi, a command not consumed within a second is logged, not fatal.
+			timed_out := sample in [.completion_timeout, .send_timeout]!
+			complete := consumed || timed_out
 			// An invalid pipe marks the slot but publishes nothing (Asahi logs it).
 			write_before := header.write_ptr
 			assert mgr.recover_g13_channel(3, 8, 0x100, 1) && mgr.state == .running
-			assert header.write_ptr == write_before && mgr.g13_recovery_queue == unsafe { nil }
+			assert header.write_ptr == write_before && mgr.g13_recovery_count == 0
 			assert job.error.status == 7 && job.error.extra == 1
 			result := mgr.recover_g13_channel(2, 8, 0x100, 1)
 			if sample in [.bad_write, .wrapped_bad_write]! {
@@ -160,9 +163,11 @@ fn check_g13_recovery_transmit() {
 				assert ring[3] == fw.FwRecoverChannel{tag: if abi == .v12_3 { u32(0x0e) } else { u32(0x0f) },
 					pipe_type: 2, work_queue: 0x123000, event_value: 0x100}
 			}
-			if complete {
+			if consumed {
 				assert mgr.state == .running && !job_queue.has_file_references()
-				assert mgr.g13_recovery_queue == unsafe { nil }
+				assert mgr.g13_recovery_count == 0
+			} else if timed_out {
+				check_pending_recoveries(mut mgr, mut header, mut job_queue, base, mut tx)
 			} else if sample == .stopped {
 				assert mgr.state == .stopped && !job_queue.has_file_references()
 				assert !mgr.recover_g13_channel(2, 8, 0x100, 1)
@@ -172,7 +177,7 @@ fn check_g13_recovery_transmit() {
 				assert !mgr.checked_release_g13_queue_resources(&job_queue)
 				mgr.shutdown()
 				assert mgr.state == .stopped && !job_queue.has_file_references()
-				assert mgr.g13_recovery_queue == unsafe { nil }
+				assert mgr.g13_recovery_count == 0
 			}
 		}
 	}
@@ -190,7 +195,7 @@ fn check_g13_recovery_transmit() {
 		mgr.channels.device_ctrl = channel.new_tx_channel('recovery', 1, u64(unsafe { &header }),
 			1, u64(unsafe { &ring }), 4, u32(sizeof(fw.FwRecoverChannel)))
 		assert mgr.recover_g13_channel(2, 8, 0x100, 1)
-		assert mgr.state == .running && header.write_ptr == 3 && mgr.g13_recovery_queue == unsafe { nil }
+		assert mgr.state == .running && header.write_ptr == 3 && mgr.g13_recovery_count == 0
 		assert mgr.recover_g13_channel(1, event.max_stamps, 0x100, 1)
 		assert mgr.state == .running && header.write_ptr == 3 && !job_queue.has_file_references()
 		mgr.state = .stopped
@@ -203,5 +208,39 @@ fn check_g13_recovery_transmit() {
 	recovery_header = unsafe { nil }
 	kio.require_send_owner(unsafe { nil })
 	kio.configure_send(0, unsafe { nil }, 0)
-	println('G13 RecoverChannel: 24 cases cover both ABIs, later publications, write-index faults, timeout pins and shutdown')
+	println('G13 RecoverChannel: 24 cases cover both ABIs, later publications, write-index faults, pinned timeouts, overlapping recoveries and shutdown')
+}
+
+// A RecoverChannel the firmware has not consumed keeps its queue pinned while
+// the device runs. Another channel error can publish a second command, and the
+// worker unpins each queue as the firmware consumes its command.
+fn check_pending_recoveries(mut mgr GpuManager, mut header channel.RingHeader, mut job_queue G13QueueResources,
+	base u64, mut tx ascmailbox.Mailbox) {
+	assert mgr.state == .running && mgr.g13_recovery_count == 1 && job_queue.has_file_references()
+	assert header.write_ptr == 0 && header.read_ptr == 3
+	// The worker leaves an unconsumed command pinned.
+	mgr.lock.acquire()
+	mgr.release_consumed_g13_recoveries_locked()
+	mgr.lock.release()
+	assert mgr.g13_recovery_count == 1 && job_queue.has_file_references()
+	kio.configure_send(base, unsafe { &tx.lock }, u64(500_001))
+	assert mgr.recover_g13_channel(2, 8, 0x100, 1)
+	assert mgr.state == .running && header.write_ptr == 1 && mgr.g13_recovery_count == 2
+	assert katomic.load(&job_queue.file_references) == 2
+	// The firmware consumes the first command only.
+	header.read_ptr = 0
+	mgr.lock.acquire()
+	mgr.release_consumed_g13_recoveries_locked()
+	mgr.lock.release()
+	assert mgr.g13_recovery_count == 1 && katomic.load(&job_queue.file_references) == 1
+	// A new channel error releases consumed pins before publishing.
+	header.read_ptr = 1
+	assert mgr.recover_g13_channel(2, 8, 0x100, 1)
+	assert mgr.state == .running && header.write_ptr == 2 && mgr.g13_recovery_count == 1
+	assert katomic.load(&job_queue.file_references) == 1
+	header.read_ptr = 2
+	mgr.lock.acquire()
+	mgr.release_consumed_g13_recoveries_locked()
+	mgr.lock.release()
+	assert mgr.g13_recovery_count == 0 && !job_queue.has_file_references()
 }

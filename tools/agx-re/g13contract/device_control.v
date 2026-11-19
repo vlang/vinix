@@ -30,13 +30,23 @@ fn check_g13_device_control_wire(channels string, initdata string, grow string, 
 		'mgr.ring_g13_doorbell_locked(doorbell_device_control)', 'if mgr.state == .running', 'mgr.state = .error'],
 		'Vinix passes the full counter and retains shutdown state after waiting')!
 	require_order(recovery.all_after('fn (mut mgr GpuManager) recover_g13_channel('),
-		['fw.make_recover_channel(mgr.hw_config.firmware_abi',
-			'mgr.channels.device_ctrl.enqueue_tracked', 'owner.retain_file_reference()',
-			'mgr.g13_recovery_queue = owner', 'sent := mgr.ring_g13_doorbell_locked(doorbell_device_control)',
-			'if mgr.state != .running { return false }', 'mgr.channels.device_ctrl.ticket_consumed(ticket)',
-			'mgr.release_g13_recovery_queue_locked()', 'if mgr.state == .running { mgr.state = .error }'],
-		'Vinix pins the published recovery, checks the device after the IRQ wait and releases the owner on consumption')!
-	require_order(recovery.all_after('fn (mut mgr GpuManager) release_g13_recovery_queue_locked('),
-		['mgr.g13_recovery_queue = unsafe { nil }', 'owner.release_file_reference()'],
-		'Vinix clears the manager pointer before dropping its recovery reference')!
+		['mgr.g13_recover_message = fw.make_recover_channel(mgr.hw_config.firmware_abi',
+			'mgr.channels.device_ctrl.enqueue_tracked(voidptr(&mgr.g13_recover_message))', 'owner.retain_file_reference()',
+			'mgr.g13_recoveries[mgr.g13_recovery_count] = G13PendingRecovery{ticket: ticket, owner: owner}',
+			'mgr.g13_recovery_count++', 'sent := mgr.ring_g13_doorbell_locked(doorbell_device_control)',
+			'if mgr.state != .running { return false }', 'mgr.channels.device_ctrl.ticket_consumed(ticket) or {',
+			'mgr.state = .error', 'return false', 'if consumed {', 'mgr.release_g13_recovery_locked(index)', 'return true',
+			"println('agx: timed out waiting for RecoverChannel; its queue stays pinned')", 'return true'],
+		'Vinix pins the published recovery, checks the device after the IRQ wait, releases the owner on consumption and keeps running after a timeout')!
+	require_order(recovery.all_after('fn (mut mgr GpuManager) release_g13_recovery_locked('),
+		['mgr.g13_recovery_count--', 'mgr.g13_recoveries[index] = mgr.g13_recoveries[mgr.g13_recovery_count]',
+			'owner.release_file_reference()'],
+		'Vinix removes the pending entry before dropping its recovery reference')!
+	require_order(recovery.all_after('fn (mut mgr GpuManager) release_consumed_g13_recoveries_locked('),
+		['mgr.channels.device_ctrl.ticket_consumed(mgr.g13_recoveries[index].ticket) or { return }',
+			'if consumed {', 'mgr.release_g13_recovery_locked(index)'],
+		'Vinix unpins only consumed recoveries and keeps every pin on a corrupt ring')!
+	require(recovery.contains('const g13_recovery_capacity = 255')
+		&& wire.contains('pub const device_control_size = u32(256)'),
+		'The pending-recovery table holds every device-control entry that can be unconsumed')!
 }

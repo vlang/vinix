@@ -87,7 +87,9 @@ mut:
 	hw_config      hw.HwConfig
 	channels       GpuChannels
 	g13_channels   &G13ChannelAllocations = unsafe { nil }
-	g13_recovery_queue &G13QueueResources = unsafe { nil }
+	g13_recoveries [g13_recovery_capacity]G13PendingRecovery
+	g13_recovery_count u32
+	g13_recover_message fw.FwRecoverChannel
 	uat &FixtureUat = unsafe { nil }
 	res            Resources
 	lock           klock.Lock

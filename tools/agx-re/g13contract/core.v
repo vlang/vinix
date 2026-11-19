@@ -924,8 +924,9 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 	recover_channel := section(manager, 'let dc = fw::channels::DeviceControlMsg::ver::RecoverChannel {',
 		'    fn ack_grow(', 'Asahi channel recovery')!
 	require_order(recover_channel, ['let mut txch = self.tx_channels.lock()', 'let token = txch.device_control.send(&dc)',
-		'.send_message(EP_DOORBELL, MSG_TX_DOORBELL | DOORBELL_DEVCTRL)', 'txch.device_control.wait_for(token)'],
-		'Asahi retains the device-control token across the doorbell and waits for consumption after a send failure')!
+		'.send_message(EP_DOORBELL, MSG_TX_DOORBELL | DOORBELL_DEVCTRL)', 'txch.device_control.wait_for(token)',
+		'"Timed out waiting for Recover Channel command\\n"'],
+		'Asahi retains the device-control token across the doorbell, waits for consumption after a send failure and only logs a timeout')!
 	require_order(local_recovery, ['fw.g13_pending_stamp_count', 'mgr.mark_g13_slot_error_locked',
 		'katomic.store(mut &pending[index].info', 'katomic.load(&status.halted)',
 		'katomic.store(mut &status.halted, u32(0))', 'katomic.sync()',
@@ -1137,7 +1138,7 @@ pub fn check_queue_recovery_reference(asahi_linux string, repo string) ![]string
 		'M1 G13 runtime system replies recheck GPU liveness and the FIFO deadline after an interrupt-assisted wait',
 		'M1 G13 batch doorbells use the guarded send-empty path after releasing all participating ring locks',
 		'G13 GrowTVBAck and RecoverChannel select the versioned tags, and GrowTVBAck uses the full halt count and guarded device-control doorbell',
-		'G13 RecoverChannel guards the doorbell wait and retains its workqueue until tracked consumption or ASC stop',
+		'G13 RecoverChannel guards the doorbell wait, logs a consumption timeout and retains its workqueue until tracked consumption or ASC stop',
 		'G13 FwCtl encodes the Asahi 16-bit page count while publishing the full byte range in the handoff',
 		'RTKit parses private crash-log snapshots and serializes G13 buffer allocation and replies with shutdown',
 		'G13 waits for firmware-led RTKit startup with elapsed-time phase deadlines and starts advertised TraceKit',
