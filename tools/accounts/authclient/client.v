@@ -130,7 +130,7 @@ pub fn root_service_listening(socket_path string) !bool {
 	if C.setsockopt(fd, C.SOL_SOCKET, C.SO_SNDTIMEO, &timeout, u32(sizeof(timeout))) != 0 { return error('cannot bound readiness connection') }
 	mut address := C.sockaddr_un{sun_family: u16(C.AF_UNIX)}
 	unsafe { vmemcpy(&address.sun_path[0], socket_path.str, socket_path.len) }
-	if C.connect(fd, &address, u32(sizeof(address))) != 0 {
+	if C.connect(fd, voidptr(&address), u32(sizeof(address))) != 0 {
 		if C.errno == C.ENOENT || C.errno == C.ECONNREFUSED { return false }
 		return error('authentication service readiness connection failed')
 	}
