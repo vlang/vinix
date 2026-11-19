@@ -1,4 +1,4 @@
-# M1 AGX parity with Omarchy
+`/sys/class/drm/card*/device` leads to them, and libdrm finds the GPU through sysfs as on Linux ([DRM sysfs](m1-agx-drm-sysfs.md)). Asahi's raw statistics are kept as the firmware sends them and published as `asahi_stats` in the DRM debugfs directory, at Linux's path in /sys; the text matches the reference's own formatter byte for byte ([raw statistics](m1-agx-stats.md#raw-statistics-in-debugfs)). Console level filtering of the other severities remains open. |# M1 AGX parity with Omarchy
 
 Status: **incomplete**. Reference: the Asahi driver in Omarchy's packaged
 Linux-Aurora `bed544bdf93a496ebf70ba180923bab12b6e01cf`. The source chain and

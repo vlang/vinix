@@ -323,7 +323,10 @@ executed anything. In order:
    the test made and `busy_ns` should grow; `pstate` and `util1`..`util4` should
    rise while it renders. `readlink /sys/dev/char/226:128/device/subsystem`
    should end in `bus/platform`, and that device's `uevent` should name
-   `OF_FULLNAME=/soc/gpu@206400000` ([DRM sysfs](m1-agx-drm-sysfs.md)). While a
+   `OF_FULLNAME=/soc/gpu@206400000` ([DRM sysfs](m1-agx-drm-sysfs.md)). As
+   root, `/sys/kernel/debug/dri/0/asahi_stats` should show `messages` and the
+   per-kind counts growing between two reads, with `captured_ns` near `now_ns`
+   ([raw statistics](m1-agx-stats.md#raw-statistics-in-debugfs)). While a
    GL client runs, `grep -H drm- /proc/<pid>/fdinfo/*` should show
    `drm-driver: asahi` and its memory ([fdinfo](m1-agx-fdinfo.md)).
 6. **Recovery.** Keep the serial log. These lines are logged and the GPU keeps

@@ -52,6 +52,32 @@ subsystem  -> ../../../../bus/platform
 So on M1, libdrm reports the GPU as a platform device with Linux's bus info and
 compatible strings. Vinix's own Mesa still names the render node directly.
 
+## DRM debugfs
+
+Linux's DRM core also gives every device a debugfs directory, named after its
+parent device (`dev->unique`), with a link to it per minor. Drivers add their
+debug files there. Vinix has no debugfs filesystem, so the core publishes that
+part of it in /sys, at the path where Linux mounts debugfs:
+
+```
+/sys/kernel/debug/dri/206400000.gpu/
+    asahi_stats    added by the AGX driver; root-only
+/sys/kernel/debug/dri/0    -> 206400000.gpu
+/sys/kernel/debug/dri/128  -> 206400000.gpu
+```
+
+`drm.debugfs_add_file()` is Linux's `drm_debugfs_add_file()`: a read-only
+file whose text a callback makes on each read. The core removes the directory,
+its files and the links when the device unregisters, before it releases the
+card number. Removal waits for any read still running, so the callback's data
+need only last until then. Adding a file does not synchronize with
+unregistering, so a driver adds its files during its own registration. A
+device with no parent gets no directory, and adding a file to it fails. So
+does a second device whose parent has a name already taken there, as Linux's
+`debugfs_create_dir()` refuses it. Unlike debugfs, these directories can be
+listed by anyone; the files in them are root-only. On the M1 the GPU's file is `asahi_stats`
+([raw statistics](m1-agx-stats.md#raw-statistics-in-debugfs)).
+
 ## Devices without a parent
 
 The QEMU framebuffer and any other driver that names no parent get Linux's
@@ -97,6 +123,9 @@ anything that reads them directly.
   test files and 122 pinned reference checks pass. Both `PROD` kernels build,
   the allocation scan is unchanged, and the AArch64 kernel boots in QEMU. The
   M1 GPU's own entries were checked on the host only; QEMU has no AGX device.
+- The DRM debugfs directory is validated with the raw statistics it was added
+  for ([validation](m1-agx-stats.md#validation-of-asahi_stats)); evidence
+  under `/Users/alex/.local/state/vinix/omarchy-m1-asahi-stats-20261119/`.
 
 Evidence is under
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-sysfs-20261119/`.
