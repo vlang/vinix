@@ -182,9 +182,37 @@ fn publish_drm_sysfs(mut dev DrmDevice) {
 	sysfs_publishes++
 }
 
+__global register_during_removal = false
+__global registered_during_removal = unsafe { &DrmDevice(nil) }
+
 fn remove_drm_sysfs(mut dev DrmDevice) {
 	assert !drm_devices_lock.held, 'sysfs removed under the device lock'
+	// The retiring device still holds its card number, unregistered.
+	assert registered_devices[dev.dev_id] != unsafe { nil } && !dev.is_registered()
 	sysfs_removals++
+	if register_during_removal {
+		register_during_removal = false
+		other := register_driver_with_data(&DrmDriver{}, unsafe { nil }) or { panic('registration during removal failed') }
+		assert other.dev_id != dev.dev_id, 'a device registering during removal took the retiring card number'
+		registered_during_removal = other
+	}
+}
+
+// A device registering while another's sysfs entries are removed gets another
+// card number, so the removal cannot delete its entries.
+fn check_card_number_held_during_removal() {
+	first := register_driver_with_data(&DrmDriver{}, unsafe { nil }) or { panic('first registration failed') }
+	register_during_removal = true
+	unregister_device(first)
+	other := registered_during_removal
+	assert other != unsafe { nil } && other.dev_id != first.dev_id
+	assert get_device(first.dev_id) == none && get_device(other.dev_id) != none
+	removals := sysfs_removals
+	unregister_device(first)
+	assert sysfs_removals == removals, 'a second unregister removed sysfs entries again'
+	unregister_device(other)
+	assert get_device(other.dev_id) == none && sysfs_removals == removals + 1
+	println('DRM unregister: a card number stays taken until its sysfs entries are gone, and a retired device unregisters once')
 }
 
 fn check_initial_registration_failures() {
@@ -228,6 +256,7 @@ fn check_registration_collisions() {
 	assert unsafe { devtmpfs_root.children['dri'] == blocker }
 	devtmpfs_root.children.delete('dri')
 	check_initial_registration_failures()
+	check_card_number_held_during_removal()
 	mut dir := unsafe { devtmpfs_root.children['dri'] }
 	prior_publications := published_nodes
 	live := memory.registration_outstanding()

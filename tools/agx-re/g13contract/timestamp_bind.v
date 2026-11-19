@@ -69,10 +69,11 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 		'Release only the initialized registration records on failure')!
 	unregister := section(drm, 'pub fn unregister_device(', 'fn copy_version_field(', 'DRM unregistration')!
 	require_order(unregister, ['if !unregister_device_nodes(dev) { return }', 'remove_drm_sysfs(mut device)',
-		'fn unregister_device_nodes(', 'drm_devices_lock.acquire()', 'registered_devices[dev.dev_id] != dev { return false }',
-		'katomic.store(mut d.registered, false)', 'remove_device_nodes(dev)',
-		'registered_devices[dev.dev_id] = unsafe { nil }'],
-		'Remove the registered owner and its names before allowing the slot to be reused, and its sysfs entries after, outside the lock')!
+		'release_device_slot(dev)', 'fn unregister_device_nodes(', 'drm_devices_lock.acquire()',
+		'registered_devices[dev.dev_id] != dev || !dev.is_registered() { return false }',
+		'katomic.store(mut d.registered, false)', 'remove_device_nodes(dev)', 'fn release_device_slot(',
+		'drm_devices_lock.acquire()', 'registered_devices[dev.dev_id] = unsafe { nil }'],
+		'Remove the registered owner and its names, then its sysfs entries outside the lock, before allowing the slot to be reused')!
 	open := section(drm, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(', 'DRM node open')!
 	require_order(open, ['!this.dev.is_registered()', 'errno.set(errno.enodev)', 'return none', 'return this.box'],
 		'DRM opens check device readiness and reuse the node resource')!

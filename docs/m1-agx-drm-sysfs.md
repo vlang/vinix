@@ -81,11 +81,16 @@ anything that reads them directly.
   use-after-free. It found that the paths the publisher builds were never freed,
   now fixed, and that the AGX shutdown removed the device directory, minors
   included, before unregistering the DRM device; the DRM device now goes first,
-  so each owner removes its own entries. Two races remain that no caller can
-  reach today, since every device registers once from the boot thread and only
-  shutdown unregisters: a new device taking a card number while the old one's
-  entries are still being removed would lose its entries, and an unregister
-  racing the publication would not see the parent path. The AGX driver's
+  so each owner removes its own entries. It also found that a device
+  registering while another's entries were being removed could take the same
+  card number and lose its entries to that removal. Unregistering now keeps the
+  number taken until the entries are gone; `tests/drm-wire` registers a device
+  from inside the removal and fails if it gets the retiring number, as the
+  earlier order does. One race remains that no caller can reach, since devices
+  are handed out only after registration returns: an unregister racing the
+  publication would not see the parent path. Evidence for that change:
+  `~/.local/state/vinix/omarchy-m1-drm-slot-20261119/bundle.tar.gz`, SHA-256
+  `3ec565cda253b095d4ef12e0634e446f12287f533243af05d2e8d65366239714`. The AGX driver's
   parent path string lives as long as its driver definition, which is never
   freed.
 - The fdinfo guest test, the AGX stats, failure and async suites, 79 contract

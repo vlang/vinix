@@ -987,11 +987,14 @@ fn register_device_nodes(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
 	return dev
 }
 
-// Unregister a DRM device and mark it as inactive.
+// Unregister a DRM device and mark it as inactive. Its card number stays taken
+// until its sysfs entries are gone, so a device registering meanwhile cannot
+// get the same names and lose them to this removal.
 pub fn unregister_device(dev &DrmDevice) {
 	if !unregister_device_nodes(dev) { return }
 	mut device := unsafe { dev }
 	remove_drm_sysfs(mut device)
+	release_device_slot(dev)
 }
 
 fn unregister_device_nodes(dev &DrmDevice) bool {
@@ -1000,14 +1003,23 @@ fn unregister_device_nodes(dev &DrmDevice) bool {
 		drm_devices_lock.release()
 	}
 
+	// A retiring device keeps its slot but is no longer registered; a second
+	// unregister finds it so and does nothing.
 	if dev == unsafe { nil } || dev.dev_id >= u32(registered_devices.len)
-		|| registered_devices[dev.dev_id] != dev { return false }
+		|| registered_devices[dev.dev_id] != dev || !dev.is_registered() { return false }
 	mut d := unsafe { dev }
 	katomic.store(mut d.registered, false)
 	remove_device_nodes(dev)
-	registered_devices[dev.dev_id] = unsafe { nil }
 	C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
 	return true
+}
+
+fn release_device_slot(dev &DrmDevice) {
+	drm_devices_lock.acquire()
+	if registered_devices[dev.dev_id] == dev {
+		registered_devices[dev.dev_id] = unsafe { nil }
+	}
+	drm_devices_lock.release()
 }
 
 fn copy_version_field(address u64, capacity u64, value string) bool {
