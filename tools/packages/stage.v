@@ -18,7 +18,7 @@ fn compile_image_tools(build &pkgcore.ImageToolBuild, architecture string, repos
 	work := build.directory()!
 	defer { unsafe { work.free() } }
 	mut runtime_sources := []string{}
-	process_runtime := os.dir(v) + '/vlib/os/execute_capture_nix.c'
+	process_runtime := os.dir(os.real_path(v)) + '/vlib/os/execute_capture_nix.c'
 	if os.is_file(process_runtime) { runtime_sources << process_runtime }
 	for pair in [['vinix-package', 'tools/packages/main.v'], ['vinix-session', 'tools/accounts/session.v'],
 		['vinix-linux-runner', 'tools/packages/linux-runner.v']] {

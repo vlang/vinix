@@ -23,8 +23,8 @@ fn build_input_paths(repository string, v string, compiler string) !map[string]s
 	}
 	source_inputs(repository + '/tools/accounts', 'accounts/', mut paths)!
 	source_inputs(repository + '/tools/packages', 'packages/', mut paths)!
-	source_inputs(os.dir(v) + '/vlib', 'vlib/', mut paths)!
-	source_inputs(os.dir(v) + '/thirdparty', 'thirdparty/', mut paths)!
+	source_inputs(os.dir(os.real_path(v)) + '/vlib', 'vlib/', mut paths)!
+	source_inputs(os.dir(os.real_path(v)) + '/thirdparty', 'thirdparty/', mut paths)!
 	for name in os.ls(repository + '/tools/accounts/actions')! {
 		paths['action/' + name] = repository + '/tools/accounts/actions/' + name
 	}
@@ -122,7 +122,7 @@ fn stage() ! {
 	// V's Linux process pipes live in an external runtime object. Manual C
 	// links must include it, just as the compiler's normal linker does.
 	mut runtime_sources := []string{}
-	process_runtime := os.dir(v) + '/vlib/os/execute_capture_nix.c'
+	process_runtime := os.dir(os.real_path(v)) + '/vlib/os/execute_capture_nix.c'
 	if os.is_file(process_runtime) { runtime_sources << process_runtime }
 	for program in programs {
 		installer.check()!
