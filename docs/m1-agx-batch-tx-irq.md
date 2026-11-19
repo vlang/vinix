@@ -61,3 +61,29 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `964c7c377fa201eb36c72a89ba995f841278bacd3bfac046400d5f462297f6f8`.
 Native M1 firmware validation remains open.
+
+## RTKit power changes during a guarded send
+
+A batch doorbell can release the GPU manager lock while it waits for ASC
+FIFO space. An AP or IOP power acknowledgement can clear RTKit application
+readiness during that wait while the GPU manager still reports running.
+Guarded application sends now check both conditions after reacquiring the
+lock and before retrying the FIFO. System endpoint replies retain the
+caller's transport check.
+
+The previous revision `14b70da6a121cb0c69f4355f0ac481e3a24186b2` sent the
+waiting doorbell after power was revoked. ASan/UBSan passed four regression
+cases across both G13 ABIs. They verify cancellation before another FIFO
+read or write, successful system replies with application power off, and
+a fresh application send after power returns. Existing deadline, shutdown,
+RecoverChannel and batch lifetime cases also passed.
+
+AArch64 and x86-64 builds, 79 local contract tests and 122 archived-reference
+checks passed. Generated AArch64 C keeps the synchronous guard on the stack.
+The allocation scan reproduced the same 176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-rtkit-application-ready-20261119.xOSxEz/`.
+The `bundle.tar.gz` SHA-256 is
+`3b7b7a39e89356d16109d5a8da29d71296c70c65ff259aeaf062741c5fbd7b04`.
+Native M1 firmware validation remains open.

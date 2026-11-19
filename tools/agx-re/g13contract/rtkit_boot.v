@@ -161,9 +161,16 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 		'Vinix releases the RTKit lock around boot IRQ-assisted transmit')!
 	require_order(local_send, ['if rtk.firmware_led_boot {', 'return rtk.mbox.send_timed(message)', 'return rtk.mbox.send(message)'],
 		'Vinix selects elapsed-time transmit only for firmware-led G13 RTKit')!
-	require_order(local_send, ['!katomic.load(&rtk.application_ready)', 'return false',
-		'if wait.lock != unsafe { nil }', 'return rtk.mbox.send_timed_wait(message, wait)'],
-		'Vinix checks RTKit readiness before any guarded application send')!
+	require_order(local_send, ['fn rtkit_application_send_active(',
+		'guard.wait.active(guard.wait.context) && katomic.load(&guard.rtk.application_ready)',
+		'application := ep >= app_endpoint_start && rtk.firmware_led_boot',
+		'if application && !katomic.load(&rtk.application_ready)', 'return false',
+		'if wait.lock != unsafe { nil }', 'if application {',
+		'guard := ApplicationSendGuard{rtk: rtk, wait: wait}',
+		'return rtk.mbox.send_timed_wait(message, mailbox.SendWait{', 'lock: wait.lock',
+		'context: unsafe { voidptr(&guard) }', 'active: rtkit_application_send_active',
+		'return rtk.mbox.send_timed_wait(message, wait)'],
+		'Vinix checks both caller liveness and RTKit readiness after guarded application waits')!
 }
 
 fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot string, boot string, start string) ! {

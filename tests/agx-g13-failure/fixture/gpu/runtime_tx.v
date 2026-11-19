@@ -23,6 +23,7 @@ enum RuntimeWaitCase {
 
 __global runtime_case = RuntimeWaitCase.timely
 __global runtime_waits = 0
+__global batch_power_ack = u64(0)
 
 fn simulate_runtime_lock_contention() {
 	timer.busywait_us(if runtime_case == .late { u64(500_000) } else { u64(499_900) })
@@ -133,6 +134,43 @@ fn boot_g13_fixture_transport(mut transport rtkit.RTKit) {
 	assert transport.boot_started(0, 0)
 }
 
+fn drop_power_during_batch_doorbell() {
+	timer.watch_busywait(unsafe { nil })
+	assert !rtkit_owner.lock.is_held() && !kio.aic_irq_masked(575)
+	assert rtkit_owner.handle_role_system_message(0, mailbox.MboxMsg{data0: batch_power_ack})
+}
+
+fn check_g13_batch_power_wait(mut mgr GpuManager, mut tx ascmailbox.Mailbox) {
+	for kind in [rtkit.msg_iop_power_ack, rtkit.msg_ap_power_ack]! {
+		batch_power_ack = u64(kind) << 52
+		kio.configure_send(tx.base, unsafe { &tx.lock }, 1)
+		timer.watch_busywait(drop_power_during_batch_doorbell)
+		mgr.lock.acquire()
+		assert !mgr.ring_g13_batch_pipe_locked(3, 2), 'batch doorbell must stop when RTKit loses application readiness during the FIFO wait'
+		assert mgr.lock.is_held() && mgr.state == .running && kio.aic_irq_masked(575)
+		mgr.lock.release()
+		reads, writes, _ := kio.send_result()
+		assert reads == 1 && writes == 0 && !tx.lock.is_held()
+
+		// System replies remain available while an application power gate is off.
+		kio.configure_send(tx.base, unsafe { &tx.lock }, 1)
+		runtime_waits = 0
+		timer.watch_busywait(observe_runtime_wait)
+		report := mailbox.MboxMsg{data0: u64(8) << 52, data1: rtkit.ep_ioreport}
+		assert mgr.handle_role_system_message(0, report)
+		system_reads, system_writes, system_words := kio.send_result()
+		assert system_reads == 2 && system_writes == 2 && system_words == [report.data0, report.data1]!
+
+		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: batch_power_ack | 0x20})
+		kio.configure_send(tx.base, unsafe { &tx.lock }, 0)
+		mgr.lock.acquire()
+		assert mgr.ring_g13_batch_pipe_locked(3, 2)
+		mgr.lock.release()
+		retry_reads, retry_writes, retry_words := kio.send_result()
+		assert retry_reads == 1 && retry_writes == 2 && retry_words == [u64(0x008300000000000e), 0x21]!
+	}
+}
+
 fn check_g13_batch_pipe_transmit() {
 	base := u64(0x206408000)
 	mut tx := ascmailbox.new_mailbox(base)
@@ -163,6 +201,7 @@ fn check_g13_batch_pipe_transmit() {
 		rejected_reads, rejected_writes, _ := kio.send_result()
 		assert rejected_reads == 0 && rejected_writes == 0
 		assert mgr.handle_role_system_message(0, mailbox.MboxMsg{data0: 0x0070000000000020})
+		check_g13_batch_power_wait(mut mgr, mut tx)
 		kio.configure_send(base, unsafe { &tx.lock }, 1)
 		timer.watch_busywait(stop_during_batch_doorbell)
 		mgr.lock.acquire()
@@ -179,5 +218,5 @@ fn check_g13_batch_pipe_transmit() {
 	rtkit_owner = unsafe { nil }
 	kio.require_send_owner(unsafe { nil })
 	kio.configure_send(0, unsafe { nil }, 0)
-	println('G13 batch pipe transmit: live application IRQ, encoding, power and shutdown gates passed on both ABIs')
+	println('G13 batch pipe transmit: both ABIs cover live encoding, shutdown and four in-flight power transitions with system replies')
 }
