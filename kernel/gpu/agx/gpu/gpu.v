@@ -24,6 +24,7 @@ import aarch64.aic
 import aarch64.cpu
 import aarch64.timer
 import drm.syncobj
+import time
 
 // RTKit endpoint IDs for GPU firmware
 pub const ep_firmware = u32(0x20)
@@ -1582,7 +1583,7 @@ fn (mut mgr GpuManager) drain_auxiliary_channels() {
 	for mgr.dequeue_g13_rx(mut mgr.channels.stats, voidptr(&buf[0])) {
 		if mgr.hw_config.gpu_gen == .g13 {
 			message := unsafe { *&fw.FwStatsMsg(&buf[0]) }
-			mgr.g13_stats.record(message, mgr.hw_config.base_clock_hz)
+			mgr.g13_stats.record(message, mgr.hw_config.base_clock_hz, time.monotonic_ns())
 		}
 	}
 }

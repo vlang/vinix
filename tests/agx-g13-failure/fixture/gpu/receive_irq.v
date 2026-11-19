@@ -21,9 +21,11 @@ mut:
 	initialized bool
 }
 
-// The sysfs files are published by the production driver's sysfs.v, which
-// this fixture does not build.
+// The sysfs and debugfs files are published by the production driver's
+// sysfs.v, which this fixture does not build.
 fn (mut driver AgxDriver) publish_sysfs(_ &GpuManager) {}
+
+fn (mut driver AgxDriver) publish_debugfs(_ &GpuManager) {}
 
 fn (mut driver AgxDriver) remove_sysfs() {}
 

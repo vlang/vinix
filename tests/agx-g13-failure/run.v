@@ -70,7 +70,7 @@ fn run_checks() int {
 	os.cp('${repo}/kernel/gpu/agx/channel/channel.v', '${scratch}/gpu/agx/channel/channel.v') or { panic(err) }
 	os.write_file('${scratch}/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n') or { panic(err) }
 	source := os.read_file(if os.args.len == 4 && os.args[2] == '--gpu-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' }) or { panic(err) }
-	mut production := 'module gpu\nimport aarch64.cpu\nimport apple.mailbox\nimport apple.rtkit\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport gpu.agx.channel\nimport gpu.agx.pgtable\nimport katomic\nimport sched\n__global higher_half = u64(0)\n'
+	mut production := 'module gpu\nimport aarch64.cpu\nimport apple.mailbox\nimport apple.rtkit\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport gpu.agx.channel\nimport gpu.agx.pgtable\nimport katomic\nimport klock\nimport sched\n__global higher_half = u64(0)\n'
 	production += section(source, 'pub enum ProbeResult {', '// All GPU firmware communication channels') or { panic(err) }
 	driver_source := if os.args.len == 4 && os.args[2] == '--driver-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/driver/driver.v' }
 	driver := os.read_file(driver_source) or { panic(err) }
@@ -145,6 +145,10 @@ fn run_checks() int {
 		.replace('free_g13_queue_resources_locked', 'completion_test_free_queue')
 	production += section(submissions, 'fn (mut mgr GpuManager) auto_grow_g13_tvb_locked(', '// Caller holds mgr.lock. Idle queues') or { panic(err) }
 	production += section(submissions, 'const g13_tvb_max_size', 'fn write_g13_timestamp(') or { panic(err) }
+	// The stats poll stamps each sample with the kernel's monotonic clock;
+	// this fixture has no clock, and no check here reads the stamp.
+	assert production.contains('time.monotonic_ns()')
+	production = production.replace('time.monotonic_ns()', 'u64(0)')
 	os.write_file('${scratch}/gpu/production.v', production) or { panic(err) }
 	os.mkdir_all('${scratch}/gpu/agx/alloc') or { panic(err) }
 	allocator := os.read_file('${repo}/kernel/gpu/agx/alloc/alloc.v') or { panic(err) }

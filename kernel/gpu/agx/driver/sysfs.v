@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
 module driver
 
+import drm
 import drm.gem
 import fs
 import gpu.agx.gpu
 import lib
+import time
 
 // Linux's device-tree identity of the base M1 GPU node, gpu@206400000 in
 // t8103.dtsi, which libdrm reads from the device's uevent.
@@ -117,4 +119,18 @@ fn show_agx_stats(context voidptr, mut text lib.Text) {
 fn show_gpu_memory(context voidptr, mut text lib.Text) {
 	mut manager := unsafe { &gpu.GpuManager(context) }
 	manager.g13_memory_text(mut text, gem.user_committed())
+}
+
+// Asahi's raw firmware statistics, asahi_stats in the DRM device's debugfs
+// directory, which Linux-Aurora's stats_raw.rs adds once the device is
+// registered. The DRM core removes it when the device unregisters, before
+// the manager it reads is stopped.
+fn (mut driver AgxDriver) publish_debugfs(mgr &gpu.GpuManager) {
+	if mgr.hw_config.gpu_gen != .g13 || driver.drm_dev == unsafe { nil } { return }
+	drm.debugfs_add_file(driver.drm_dev, 'asahi_stats', show_asahi_stats, voidptr(mgr))
+}
+
+fn show_asahi_stats(context voidptr, mut text lib.Text) {
+	mut manager := unsafe { &gpu.GpuManager(context) }
+	manager.g13_raw_stats_text(mut text, agx_driver_inst.unit_address, time.monotonic_ns())
 }

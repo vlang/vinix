@@ -17,3 +17,18 @@ windows over whole seconds, a single tick, a value above 100 and a timestamp
 that goes back; power state, average power and temperature; an unknown tag;
 and two completed jobs. They then compare both files' text, names and values.
 `AGX_STATS_SOURCE` selects another `stats.v`, for negative controls.
+
+The runner also checks `asahi_stats`, Asahi's raw statistics in debugfs, and
+needs `rustc` for it. It compiles the reference's own code into an oracle:
+`StatsMsg` from `fw/channels.rs`, `RawStatsSnapshot` and `format_snapshot`
+from `stats_raw.rs`, and `record_raw` from `channel.rs`, the decoding the stats
+channel applies to every tag up to `STATS_MAX`. It fails if any of those
+sources no longer has the text it takes. Two phases of messages go through the
+oracle and through Vinix's decoder:
+
+1. two kinds, an undecoded tag and a tag past the last;
+2. every kind, another undecoded tag and a second utilization sample.
+
+Every field has its own value, 64-bit ones above 32 bits, and Vinix's copies
+carry junk in the pads and undecoded words. After each phase, Vinix's text
+must match the oracle's byte for byte.

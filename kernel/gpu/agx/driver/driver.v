@@ -1260,6 +1260,7 @@ fn (mut driver AgxDriver) register_gpu(mgr &gpu.GpuManager, agx_drm_driver drm.D
 	}
 	gpu.set_global_manager(driver.gpu)
 	driver.publish_sysfs(mgr)
+	driver.publish_debugfs(mgr)
 	driver.initialized = true
 	return true
 }

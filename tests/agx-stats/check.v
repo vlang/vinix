@@ -76,42 +76,42 @@ pub fn run_checks() {
 		g13_timestamp: FakeHeap{bytes: 0x4000}
 	}
 	// The first window only sets the base: nothing has elapsed yet.
-	mgr.g13_stats.record(utilization(1000, [u32(40), 75, 3, 0]!), ts_hz)
+	mgr.g13_stats.record(utilization(1000, [u32(40), 75, 3, 0]!), ts_hz, 0)
 	assert mgr.g13_stats.busy_ns == 0
 	// 2.5 s at 75 % busy is 1.875 s of busy time.
-	mgr.g13_stats.record(utilization(1000 + ts_hz * 5 / 2, [u32(40), 75, 3, 0]!), ts_hz)
+	mgr.g13_stats.record(utilization(1000 + ts_hz * 5 / 2, [u32(40), 75, 3, 0]!), ts_hz, 0)
 	assert mgr.g13_stats.busy_ns == 1_875_000_000
 	// Values above 100 count as 100; one tick is 41 ns of busy time.
-	mgr.g13_stats.record(utilization(1001 + ts_hz * 5 / 2, [u32(0), 0, 101, 0]!), ts_hz)
+	mgr.g13_stats.record(utilization(1001 + ts_hz * 5 / 2, [u32(0), 0, 101, 0]!), ts_hz, 0)
 	assert mgr.g13_stats.busy_ns == 1_875_000_041
 	assert mgr.g13_stats.util == [u32(0), 0, 101, 0]!
 	// A timestamp that goes back adds nothing, but becomes the new base.
-	mgr.g13_stats.record(utilization(500, [u32(100), 0, 0, 0]!), ts_hz)
+	mgr.g13_stats.record(utilization(500, [u32(100), 0, 0, 0]!), ts_hz, 0)
 	assert mgr.g13_stats.busy_ns == 1_875_000_041
-	mgr.g13_stats.record(utilization(500 + ts_hz, [u32(100), 0, 0, 0]!), ts_hz)
+	mgr.g13_stats.record(utilization(500 + ts_hz, [u32(100), 0, 0, 0]!), ts_hz, 0)
 	assert mgr.g13_stats.busy_ns == 2_875_000_041
 
 	mut wire := Wire{}
 	wire.u32_at(0, oracle_tag_powerstate)
 	wire.u64_at(oracle_powerstate_timestamp, 0x1234_5678_9abc)
 	wire.u32_at(oracle_powerstate_pstate, 5)
-	mgr.g13_stats.record(wire.message(), ts_hz)
+	mgr.g13_stats.record(wire.message(), ts_hz, 0)
 	wire = Wire{}
 	wire.u32_at(0, oracle_tag_avgpower)
 	wire.u32_at(oracle_avgpower_avg_power, 1234)
-	mgr.g13_stats.record(wire.message(), ts_hz)
+	mgr.g13_stats.record(wire.message(), ts_hz, 0)
 	wire = Wire{}
 	wire.u32_at(0, oracle_tag_temperature)
 	wire.u32_at(oracle_temperature_raw_value, 4567)
 	wire.u32_at(oracle_temperature_scale, 100)
-	mgr.g13_stats.record(wire.message(), ts_hz)
+	mgr.g13_stats.record(wire.message(), ts_hz, 0)
 	assert mgr.g13_stats.pstate == 5 && mgr.g13_stats.avg_power_mw == 1234
 	assert mgr.g13_stats.temperature_raw == 4567 && mgr.g13_stats.temperature_scale == 100
 	// A tag past the last known one is counted; the snapshot is unchanged.
 	wire = Wire{}
 	wire.u32_at(0, oracle_unknown_tag)
 	wire.u32_at(4, 0xdead)
-	mgr.g13_stats.record(wire.message(), ts_hz)
+	mgr.g13_stats.record(wire.message(), ts_hz, 0)
 	assert mgr.g13_stats.unknown_messages == 1 && mgr.g13_stats.pstate == 5
 	mgr.note_g13_job()
 	mgr.note_g13_job()
@@ -130,5 +130,32 @@ pub fn run_checks() {
 	assert memory_names == oracle_gpu_memory, 'gpu_memory lines ${memory_names} != ${oracle_gpu_memory}'
 	assert memory_values == [u64(0x30000), 0x30000, 0x20000, 0, 0, 0]
 	assert !mgr.lock.is_held()
-	println('AGX stats: Utilization, PowerState, AvgPower and Temperature at the pinned Rust offsets, utilization-weighted busy time, job counts and both sysfs files in Asahi order passed')
+	run_raw_checks()
+	println('AGX stats: Utilization, PowerState, AvgPower and Temperature at the pinned Rust offsets, utilization-weighted busy time, job counts, both sysfs files in Asahi order, and asahi_stats byte for byte as the reference formats it passed')
+}
+
+// asahi_stats: the messages of each phase, laid out at the pinned offsets with
+// junk in the pads, go through Vinix's decoder; the text must be what the
+// reference's own record_raw and format_snapshot, compiled, printed.
+fn run_raw_checks() {
+	mut mgr := GpuManager{}
+	for phase, samples in oracle_raw_phases {
+		for sample in samples {
+			mut wire := Wire{}
+			wire.u32_at(0, sample.tag)
+			for write in sample.writes {
+				if write.size == 8 {
+					wire.u64_at(write.offset, write.value)
+				} else {
+					wire.u32_at(write.offset, u32(write.value))
+				}
+			}
+			mgr.g13_stats.record(wire.message(), ts_hz, sample.stamp)
+		}
+		mut text := lib.new_text(1024)
+		mgr.g13_raw_stats_text(mut text, 0x206400000, oracle_raw_now[phase])
+		got := lib.finish_text(text)
+		assert got == oracle_raw_texts[phase], 'asahi_stats after phase ${phase}:\n${got}\nreference:\n${oracle_raw_texts[phase]}'
+	}
+	assert !mgr.g13_stats.raw_lock.is_held()
 }
