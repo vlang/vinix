@@ -43,7 +43,8 @@ fn check_fwlog_vinix(manager string, channel string, wire string) ! {
 		'buffer.size < fw.g13_fw_log_payload_size', 'fw_log.peek_subchannel(', 'g13_fw_log_payload_offset(',
 		'*&fw.FwLogPayload(u64(buffer.cpu_address()) + offset)', 'fw_log.dequeue_subchannel(', 'return payload',
 		'if payload.msg_type == 3', 'if payload.message[index] == 0',
-		'payload := mgr.read_g13_fw_log(subchannel) or { break }', 'print_g13_fw_log(subchannel, payload)'],
+		'if subchannel == 0 { return false }', 'payload := mgr.read_g13_fw_log(subchannel) or { break }',
+		'_ = print_g13_fw_log(subchannel, payload)'],
 		'Vinix snapshots payloads under the teardown lock before acknowledging and printing')!
 	rx := section(channel, 'fn (mut ch RxChannel) read_subchannel(', '// Check if the transmit', 'Vinix log ring')!
 	require_order(rx, ['rp >= ch.ring_size || wp >= ch.ring_size', 'katomic.store(mut &ch.faulted',

@@ -80,9 +80,13 @@ fn check_fw_log() {
 	}
 	mut valid := fw.FwLogPayload{msg_type: 3}
 	valid.message[0] = 90
-	print_g13_fw_log(4, valid)
-	print_g13_fw_log(4, fw.FwLogPayload{msg_type: 3, message: [0xc8]u8{init: 0x58}})
-	print_g13_fw_log(4, fw.FwLogPayload{msg_type: 2})
+	// The debug subring (0) is consumed silently, as Asahi's dev_dbg is;
+	// the others print, and malformed records are reported on every subring.
+	assert !print_g13_fw_log(0, valid)
+	for subchannel in u32(1) .. fw.fw_log_subchannels { assert print_g13_fw_log(subchannel, valid) }
+	assert print_g13_fw_log(4, fw.FwLogPayload{msg_type: 3, message: [0xc8]u8{init: 0x58}})
+	assert print_g13_fw_log(0, fw.FwLogPayload{msg_type: 3, message: [0xc8]u8{init: 0x58}})
+	assert print_g13_fw_log(0, fw.FwLogPayload{msg_type: 2})
 	println('G13 firmware log: 24 payloads survived descriptor wrap and immediate reuse, with bounds and fault checks on both ABIs')
 }
 

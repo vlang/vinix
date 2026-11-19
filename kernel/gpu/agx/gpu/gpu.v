@@ -1547,23 +1547,30 @@ fn (mut mgr GpuManager) read_g13_fw_log(subchannel u32) ?fw.FwLogPayload {
 	return payload
 }
 
-fn print_g13_fw_log(subchannel u32, payload fw.FwLogPayload) {
+// Subring N carries firmware severity N, which Asahi logs with dev_dbg,
+// dev_info, dev_notice, dev_warn, dev_err and dev_crit. As with dev_dbg in a
+// kernel without dynamic debug, debug messages are consumed without printing;
+// a malformed record is still reported on every subring. Returns whether a
+// line was printed.
+fn print_g13_fw_log(subchannel u32, payload fw.FwLogPayload) bool {
 	if payload.msg_type == 3 {
 		for index := 0; index < payload.message.len; index++ {
 			if payload.message[index] == 0 {
+				if subchannel == 0 { return false }
 				C.kprintf(c'agx: FWLog%u: %s\n', subchannel, unsafe { &char(&payload.message[0]) })
-				return
+				return true
 			}
 		}
 	}
 	C.kprintf(c'agx: FWLog%u invalid message\n', subchannel)
+	return true
 }
 
 fn (mut mgr GpuManager) drain_auxiliary_channels() {
 	for subchannel := u32(0); subchannel < fw.fw_log_subchannels; subchannel++ {
 		for {
 			payload := mgr.read_g13_fw_log(subchannel) or { break }
-			print_g13_fw_log(subchannel, payload)
+			_ = print_g13_fw_log(subchannel, payload)
 		}
 	}
 	mut buf := [256]u8{}
