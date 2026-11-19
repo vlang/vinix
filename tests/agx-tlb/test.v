@@ -394,6 +394,35 @@ fn test_gpu_permissions() {
 	println('AGX GPU permissions: exact RO/WO/RW leaf words, nine reprotect transitions and visible ASID invalidations passed')
 }
 
+// Asahi's Prot::from_bits(ap, uxn, pxn).memattr(attr).as_pte(): GPU_ACCESS
+// at bit 55, UXN at 54, PXN at 53, AP at 7:6, AttrIndx at 4:2, and AF.
+fn asahi_leaf_word(ap u64, uxn u64, pxn u64, memattr u64) u64 {
+	return ((u64(8) | (pxn << 1) | (uxn << 2)) << 52) | (ap << 6) | (memattr << 2) | (u64(1) << 10)
+}
+
+fn test_protection_words() {
+	cached, device, uncached := u64(0), u64(1), u64(2)
+	fw_gpu, fw, gpu := u64(0), u64(1), u64(2)
+	// Each Vinix constant beside the pgtable.rs protection it stands for.
+	pairs := [
+		[pgtable.gpu_prot_fw_gpu_cached_rw, asahi_leaf_word(fw_gpu, 1, 1, cached)], // PROT_GPU_FW_PRIV_RW
+		[pgtable.gpu_prot_fw_gpu_shared_rw, asahi_leaf_word(fw_gpu, 1, 1, uncached)], // PROT_GPU_FW_SHARED_RW
+		[pgtable.gpu_prot_fw_shared_rw, asahi_leaf_word(fw, 1, 0, uncached)], // PROT_FW_SHARED_RW
+		[pgtable.gpu_prot_fw_shared_ro, asahi_leaf_word(fw, 0, 0, uncached)], // PROT_FW_SHARED_RO
+		[pgtable.gpu_prot_fw_private_rw, asahi_leaf_word(fw, 1, 0, cached)], // PROT_FW_PRIV_RW
+		[pgtable.gpu_prot_gpu_ro_fw_private_rw, asahi_leaf_word(fw, 1, 1, cached)], // PROT_GPU_RO_FW_PRIV_RW
+		[pgtable.gpu_prot_fw_mmio_rw, asahi_leaf_word(fw, 1, 0, device)], // PROT_FW_MMIO_RW
+		[pgtable.gpu_prot_fw_mmio_ro, asahi_leaf_word(fw, 0, 0, device)], // PROT_FW_MMIO_RO
+		[pgtable.gpu_prot_gpu_shared_rw, asahi_leaf_word(gpu, 1, 0, uncached)], // PROT_GPU_SHARED_RW
+		[pgtable.gpu_prot_gpu_shared_ro, asahi_leaf_word(gpu, 0, 0, uncached)], // PROT_GPU_SHARED_RO
+		[pgtable.gpu_prot_gpu_shared_wo, asahi_leaf_word(gpu, 0, 1, uncached)], // PROT_GPU_SHARED_WO
+	]
+	for index, pair in pairs {
+		assert pair[0] == pair[1], 'protection ${index}: 0x${pair[0]:x} != Asahi 0x${pair[1]:x}'
+	}
+	println('AGX protection words: all eleven match Asahi from_bits encodings')
+}
+
 fn test_range_operands() {
 	single := tlb.range_plan(3, 0x4000, 1) or { panic('page plan') }
 	pair := tlb.range_plan(3, 0x4000, 0x8000) or { panic('range plan') }
@@ -750,6 +779,7 @@ fn main() {
 	test_eager_bindings_hold_slots_until_destroy()
 	test_borrowed_root_destruction()
 	test_gpu_permissions()
+	test_protection_words()
 	test_range_operands()
 	assert memory.live_pages() == 0
 	println('AGX TLB: mapping visibility, cache transitions, rollback, globals and context reuse passed')

@@ -56,8 +56,12 @@ const uat_pte_memattr_mask = u64(7) << 2
 // protection encoding rather than the CPU's superficially similar AP bits.
 pub const gpu_prot_fw_gpu_cached_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn | uat_pte_ap_fw_gpu | uat_memattr_normal_cached | uat_pte_af
 pub const gpu_prot_fw_gpu_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn | uat_pte_ap_fw_gpu | uat_memattr_normal_uncached | uat_pte_af
-pub const gpu_prot_fw_shared_rw = uat_pte_os | uat_pte_pxn | uat_pte_uxn | uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
-pub const gpu_prot_fw_shared_ro = uat_pte_os | uat_pte_pxn | uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
+// For AP=firmware, UXN grants the firmware write access and UXN with PXN
+// adds GPU read access. Firmware-shared memory gives the GPU none, so these
+// two are Asahi's PROT_FW_RW and PROT_FW_RO with the uncached attribute.
+// PXN alone would be Asahi's _PROT_FW_NA, which the firmware cannot read.
+pub const gpu_prot_fw_shared_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
+pub const gpu_prot_fw_shared_ro = uat_pte_os | uat_pte_ap_fw_only | uat_memattr_normal_uncached | uat_pte_af
 pub const gpu_prot_fw_private_rw = uat_pte_os | uat_pte_uxn | uat_pte_ap_fw_only | uat_memattr_normal_cached | uat_pte_af
 // Firmware-private R/W while the GPU can only read. Apple UAT uses PXN as the
 // extra GPU-read permission bit for this otherwise firmware-private mapping.
