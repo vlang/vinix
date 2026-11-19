@@ -158,11 +158,23 @@ fn (mut mgr GpuManager) release_g13_recovery_queue_locked() {
 	owner.release_file_reference()
 }
 
+// As in Asahi's handle_channel_error, the slot's work is marked failed before
+// its queue is looked up, and a missing queue is not fatal: the error can name
+// work that has already retired. A failure after RecoverChannel is published
+// still stops the device, because the command may dereference the workqueue.
 fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, error_type u32) bool {
-	if pipe_type >= 3 || slot >= event.max_stamps { return false }
 	mgr.lock.acquire()
 	defer { mgr.lock.release() }
-	if mgr.state != .running || mgr.g13_recovery_queue != unsafe { nil } { return false }
+	if mgr.state != .running { return false }
+	if slot < event.max_stamps {
+		mgr.mark_g13_slot_error_locked(slot, value, G13JobError{status: 7, extra: error_type})
+	}
+	if pipe_type >= 3 || slot >= event.max_stamps {
+		C.kprintf(c'agx: channel error names pipe %llu slot %llu; nothing to recover\n',
+			u64(pipe_type), u64(slot))
+		return true
+	}
+	if mgr.g13_recovery_queue != unsafe { nil } { return false }
 	mut owner := unsafe { &G13QueueResources(nil) }
 	for job in mgr.g13_compute_jobs {
 		if pipe_type == 2 && job.submitted && !job.released && job.event_slot == slot {
@@ -179,10 +191,12 @@ fn (mut mgr GpuManager) recover_g13_channel(pipe_type u32, slot u32, value u32, 
 			}
 		}
 	}
-	if owner == unsafe { nil } || owner.released || owner.subqueues[pipe_type].info.va == 0 { return false }
+	if owner == unsafe { nil } || owner.released || owner.subqueues[pipe_type].info.va == 0 {
+		C.kprintf(c'agx: no workqueue for channel error slot %llu\n', u64(slot))
+		return true
+	}
 	message := fw.make_recover_channel(mgr.hw_config.firmware_abi, pipe_type,
 		owner.subqueues[pipe_type].info.va, value) or { return false }
-	mgr.mark_g13_slot_error_locked(slot, value, G13JobError{status: 7, extra: error_type})
 	ticket := mgr.channels.device_ctrl.enqueue_tracked(voidptr(&message)) or { return false }
 	// The published command can still dereference the workqueue. Keep its
 	// backing until consumption or stopped-firmware teardown, even on timeout.

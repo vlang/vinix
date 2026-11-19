@@ -122,7 +122,11 @@ fn check_g13_recovery_transmit() {
 				timer.watch_busywait(observe_recovery_irq_wait)
 			}
 			complete := sample in [.delayed, .later_unread, .wrapped, .polled, .late_consumed]!
-			assert !mgr.recover_g13_channel(3, 8, 0x100, 1)
+			// An invalid pipe marks the slot but publishes nothing (Asahi logs it).
+			write_before := header.write_ptr
+			assert mgr.recover_g13_channel(3, 8, 0x100, 1) && mgr.state == .running
+			assert header.write_ptr == write_before && mgr.g13_recovery_queue == unsafe { nil }
+			assert job.error.status == 7 && job.error.extra == 1
 			result := mgr.recover_g13_channel(2, 8, 0x100, 1)
 			if sample in [.bad_write, .wrapped_bad_write]! {
 				assert !result && job_queue.has_file_references() && mgr.channels.device_ctrl.has_fault(),
@@ -171,6 +175,26 @@ fn check_g13_recovery_transmit() {
 				assert mgr.g13_recovery_queue == unsafe { nil }
 			}
 		}
+	}
+	// A channel error whose work already retired names no live queue. Asahi
+	// logs it and carries on; Vinix does too, without publishing a command.
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		mut header := channel.RingHeader{write_ptr: 3, read_ptr: 3}
+		mut ring := [4]fw.FwRecoverChannel{}
+		mut job_queue := G13QueueResources{}
+		job_queue.subqueues[2].info.va = 0x123000
+		mut retired := G13ComputeJobResources{queue: unsafe { &job_queue }, event_slot: 8, stamp_value: 0x100,
+			submitted: true, released: true}
+		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
+			g13_compute_jobs: [unsafe { &retired }]}
+		mgr.channels.device_ctrl = channel.new_tx_channel('recovery', 1, u64(unsafe { &header }),
+			1, u64(unsafe { &ring }), 4, u32(sizeof(fw.FwRecoverChannel)))
+		assert mgr.recover_g13_channel(2, 8, 0x100, 1)
+		assert mgr.state == .running && header.write_ptr == 3 && mgr.g13_recovery_queue == unsafe { nil }
+		assert mgr.recover_g13_channel(1, event.max_stamps, 0x100, 1)
+		assert mgr.state == .running && header.write_ptr == 3 && !job_queue.has_file_references()
+		mgr.state = .stopped
+		assert !mgr.recover_g13_channel(2, 8, 0x100, 1)
 	}
 	assert sizeof(fw.FwRecoverChannel) == 0x30 && __offsetof(fw.FwRecoverChannel, work_queue) == 8
 	mailbox.set_wait_transport(unsafe { nil })

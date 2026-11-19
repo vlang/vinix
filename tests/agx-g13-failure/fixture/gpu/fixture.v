@@ -396,6 +396,14 @@ pub fn run_checks() {
 			mut mgr := GpuManager{ hw_config: hw.HwConfig{ gpu_gen: .g13, firmware_abi: abi } }
 			mgr.channels.event = channel.new_rx_channel('event', 1, u64(&header), 1, u64(&ring), 4, 0x38)
 			event_worker(mut mgr)
+			if tag == fw.fw_event_channel_error {
+				// A channel error that names no live queue is logged, as in
+				// Asahi, and the worker completes normally instead of failing the
+				// device. The next event stays queued for the worker's next pass.
+				assert mgr.state != .error && mgr.trace == ['success']
+				assert mgr.grows == 0 && header.read_ptr == 1
+				continue
+			}
 			assert_failed(&mgr)
 			assert mgr.grows == 0
 			assert header.read_ptr == 1, 'stop consuming events after a fatal event'

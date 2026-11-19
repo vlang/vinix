@@ -1446,7 +1446,8 @@ it does not certify full driver equivalence.
   as killed work. Resources remain owned until firmware completion stamps
   advance; notification alone never permits freeing a command.
 - **Channel recovery.** A recoverable channel error locates its queue,
-  records its error and sends RecoverChannel, waiting for consumption.
+  records its error and sends RecoverChannel, waiting for consumption. A
+  missing queue is logged and not fatal, as in Asahi.
 - **Error reporting.** Job results preserve fault diagnostics and timeout,
   killed and channel-error status. Fences distinguish timeout, cancellation,
   no-device and unknown errors. Shutdown retains stop-before-free ordering.

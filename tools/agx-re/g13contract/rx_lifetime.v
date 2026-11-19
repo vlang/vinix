@@ -45,9 +45,9 @@ fn check_g13_receive_lifetime(local string, remote string, recovery string) ! {
 		'if !stopped {', 'return false', 'mgr.state = .stopped', 'mgr.release_g13_channels()'],
 		'Vinix marks G13 stopped and releases RX backing under the manager lock after confirming the ASC stop')!
 	require_order(recovery.all_after('fn (mut mgr GpuManager) recover_g13_channel('), [
-		'mgr.lock.acquire()', 'if mgr.state != .running || mgr.g13_recovery_queue != unsafe { nil }',
-		'mgr.mark_g13_slot_error_locked(', 'mgr.channels.device_ctrl.enqueue_tracked('],
-		'Channel recovery declines stale requests after loss or teardown')!
+		'mgr.lock.acquire()', 'if mgr.state != .running { return false }', 'mgr.mark_g13_slot_error_locked(',
+		'if mgr.g13_recovery_queue != unsafe { nil } { return false }', 'mgr.channels.device_ctrl.enqueue_tracked('],
+		'Channel recovery declines stale requests after loss or teardown, marks the slot first and serializes recovery')!
 	require_order(stop, ['mgr.stop_firmware_cpus(mgr.firmware_roles)', 'mgr.release_all_g13_queue_resources()',
 		'mgr.release_g13_recovery_queue_locked()', 'mgr.release_g13_channels()'],
 		'Stopped firmware lets shutdown release recovery backing and its metadata pin')!

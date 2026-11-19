@@ -30,7 +30,7 @@ fn check_g13_device_control_wire(channels string, initdata string, grow string, 
 		'mgr.ring_g13_doorbell_locked(doorbell_device_control)', 'if mgr.state == .running', 'mgr.state = .error'],
 		'Vinix passes the full counter and retains shutdown state after waiting')!
 	require_order(recovery.all_after('fn (mut mgr GpuManager) recover_g13_channel('),
-		['fw.make_recover_channel(mgr.hw_config.firmware_abi', 'mgr.mark_g13_slot_error_locked',
+		['fw.make_recover_channel(mgr.hw_config.firmware_abi',
 			'mgr.channels.device_ctrl.enqueue_tracked', 'owner.retain_file_reference()',
 			'mgr.g13_recovery_queue = owner', 'sent := mgr.ring_g13_doorbell_locked(doorbell_device_control)',
 			'if mgr.state != .running { return false }', 'mgr.channels.device_ctrl.ticket_consumed(ticket)',
