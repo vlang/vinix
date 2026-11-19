@@ -45,6 +45,7 @@ pub fn build_program_with_flags(host Host, source string, directory string, name
 	}
 	compile << ['-o', c_file, source]
 	run_tool(compile, map[string]string{}, log, tool_seconds)!
+	add_process_runtime(c_file)!
 	if host.arch == 'aarch64' {
 		sysroot := environment_or('VINIX_AARCH64_SYSROOT', shared_path(host.root, os.join_path('build-aarch64-userland',
 			'sysroot')))
@@ -361,4 +362,18 @@ pub fn check_writing(writing Writing, state string) ! {
 	if found != writing.text {
 		return error('${path} holds "${found}", not "${writing.text}"')
 	}
+}
+
+// V links os.Process's pipe helper (vlib/os/execute_capture_nix.c) as a
+// native object of its own, which a program whose C is generated here and
+// linked by a target compiler never gets. On Linux the helper is pipe2 with
+// O_CLOEXEC; it goes into the same file so a link still has one object.
+fn add_process_runtime(c_file string) ! {
+	text := os.read_file(c_file)!
+	if !text.contains('v_os_process_pipe_cloexec(') || text.contains('int v_os_process_pipe_cloexec(int fds[2]) {') {
+		return
+	}
+	mut file := os.open_append(c_file)!
+	defer { file.close() }
+	file.write_string('\n#include <fcntl.h>\n#include <unistd.h>\n__attribute__((weak)) int v_os_process_pipe_cloexec(int fds[2]) {\n\treturn pipe2(fds, O_CLOEXEC);\n}\n')!
 }
