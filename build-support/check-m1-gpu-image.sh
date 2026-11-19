@@ -92,15 +92,29 @@ done
 
 marker="$(tar -xOf "$IMAGE" ./usr/share/vinix/asahi-x11-egl 2>/dev/null || \
     tar -xOf "$IMAGE" usr/share/vinix/asahi-x11-egl 2>/dev/null || true)"
+# The marker names the Mesa release, whose Gallium library must be there.
+MESA_VERSION="${marker#mesa=}"
+MESA_VERSION="${MESA_VERSION%% *}"
 case "$marker" in
     "mesa=25.0.5 "*"drivers="*"asahi"*"platforms="*"surfaceless"*"gbm=enabled"*) ;;
+    # Omarchy's Mesa also brings Honeykrisp, its Vulkan driver, and the loader
+    # that finds it through the ICD file.
+    "mesa="*" source=omacom/mesa@"*" drivers="*"asahi"*" vulkan=asahi "*"platforms="*"surfaceless"*"gbm=enabled"*)
+        for path in usr/lib/libvulkan_asahi.so usr/lib/libvulkan.so.1 \
+            usr/share/vulkan/icd.d/asahi_icd.aarch64.json; do
+            require_path "$path"
+        done
+        ;;
     *)
         echo "error: M1 GPU image has an unexpected Mesa capability marker" >&2
         echo "       found: ${marker:-<missing>}" >&2
         missing=1
+        MESA_VERSION=
         ;;
 esac
-require_path "usr/lib/libgallium-25.0.5.so"
+if [ -n "$MESA_VERSION" ]; then
+    require_path "usr/lib/libgallium-$MESA_VERSION.so"
+fi
 
 driver_metadata="$(tar -tvf "$IMAGE" 2>/dev/null | \
     awk '/(^|\/)asahi_dri\.so( ->|$)/ { print; exit }')"
@@ -195,4 +209,4 @@ fi
 
 kind="shell"
 [ "$DESKTOP" -eq 1 ] && kind="desktop + Firefox"
-echo "M1 GPU image preflight: PASS ($kind, Mesa 25.0.5 Asahi)"
+echo "M1 GPU image preflight: PASS ($kind, Mesa $MESA_VERSION Asahi)"

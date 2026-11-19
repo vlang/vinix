@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: GPL-2.0-or-later
-// Boot tests/omarchy-mesa/guest.c on aarch64 with the root that
-// tests/omarchy-mesa/stage.v staged, as a read-only ext2 disk.
+// Boot a guest init on aarch64 with a Mesa root as a read-only ext2 disk:
+// tests/omarchy-mesa/guest.c with the root tests/omarchy-mesa/stage.v staged,
+// by default, or another guest and root, such as tests/vinix-mesa's.
 module main
 
 import guesthost
 import os
 
-const usage = 'usage: omarchy-mesa --kernel-dir DIR --root STAGED_ROOT --state NEW_DIR [--timeout SECONDS]'
+const usage = 'usage: omarchy-mesa --kernel-dir DIR --root STAGED_ROOT --state NEW_DIR [--timeout SECONDS] [--guest SOURCE] [--marker PREFIX]'
 
 fn mke2fs() !string {
 	for candidate in [os.getenv('VINIX_MKE2FS'), '/opt/homebrew/opt/e2fsprogs/sbin/mke2fs',
@@ -35,6 +36,9 @@ fn run() !int {
 	mut staged := ''
 	mut state := ''
 	mut timeout := 900
+	mut source := os.real_path(os.join_path(os.dir(@FILE), '..', 'omarchy-mesa', 'guest.c'))
+	// The guest prints PREFIX PASS, or PREFIX INCOMPLETE.
+	mut marker := 'OMARCHY-MESA'
 	mut index := 1
 	for index < os.args.len {
 		if index + 1 >= os.args.len {
@@ -46,6 +50,8 @@ fn run() !int {
 			'--root' { staged = os.real_path(value) }
 			'--state' { state = value }
 			'--timeout' { timeout = value.int() }
+			'--guest' { source = os.real_path(value) }
+			'--marker' { marker = value }
 			else { return error(usage) }
 		}
 		index += 2
@@ -53,8 +59,8 @@ fn run() !int {
 	if kernel_dir == '' || staged == '' || state == '' || timeout <= 0 {
 		return error(usage)
 	}
-	if !os.is_file(staged + '/usr/lib/libEGL_mesa.so.0') {
-		return error('${staged} is not a root staged by tests/omarchy-mesa/stage.v')
+	if !os.is_file(staged + '/usr/bin/vulkaninfo') {
+		return error('${staged} is not a Mesa root with its test clients')
 	}
 	if os.exists(state) {
 		return error('${state} already exists; give a new directory')
@@ -75,7 +81,6 @@ fn run() !int {
 	}
 	println('Root disk: ${disk} (${size_mib} MiB)')
 
-	source := os.real_path(os.join_path(os.dir(@FILE), '..', 'omarchy-mesa', 'guest.c'))
 	init := guesthost.compile_init(source, state_dir, 'aarch64', false)!
 	archive := guesthost.image(init, state_dir)!
 	launch := guesthost.launch(init, archive, state_dir, kernel_dir, 'aarch64', true)!
@@ -88,8 +93,7 @@ fn run() !int {
 	}
 	command << ['-drive', 'if=none,format=raw,readonly=on,file=' + disk + ',id=omarchy-root', '-device',
 		'virtio-blk-device,drive=omarchy-root']
-	positive, negative := guesthost.verdict_policy(['OMARCHY-MESA PASS'], ['OMARCHY-MESA INCOMPLETE'],
-		false)
+	positive, negative := guesthost.verdict_policy(['${marker} PASS'], ['${marker} INCOMPLETE'], false)
 	println('Guest artifacts: ' + state_dir)
 	return guesthost.boot_from_cancelled(command, launch.env, state_dir, positive, negative,
 		timeout, true, '', unsafe { nil })!

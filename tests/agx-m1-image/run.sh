@@ -78,4 +78,33 @@ if "$checker" "$work/wrong-driver.tar" >/dev/null 2>&1; then
     exit 1
 fi
 
+# Omarchy's Mesa: the marker names its source and release, and Honeykrisp,
+# the Vulkan loader and the ICD file that joins them must be there.
+mv "$root/usr/lib/libgallium-25.0.5.so" "$root/usr/lib/libgallium-26.3.0-devel.so"
+mkdir -p "$root/usr/share/vulkan/icd.d"
+for path in usr/lib/libvulkan_asahi.so usr/lib/libvulkan.so.1 \
+    usr/share/vulkan/icd.d/asahi_icd.aarch64.json; do
+    : > "$root/$path"
+done
+printf '%s\n' \
+    'mesa=26.3.0-devel source=omacom/mesa@b7b03c5b3b8abe1e040d6056dc62c01b02d3639c drivers=asahi,virgl,softpipe vulkan=asahi platforms=x11,surfaceless gbm=enabled glx=dri' \
+    > "$root/usr/share/vinix/asahi-x11-egl"
+tar --format=ustar -cf "$work/omarchy.tar" -C "$root" .
+"$checker" "$work/omarchy.tar" | grep -q 'Mesa 26.3.0-devel Asahi'
+
+rm "$root/usr/lib/libvulkan_asahi.so"
+tar --format=ustar -cf "$work/no-honeykrisp.tar" -C "$root" .
+if "$checker" "$work/no-honeykrisp.tar" >/dev/null 2>&1; then
+    echo "M1 image test: checker accepted Omarchy's Mesa without Honeykrisp" >&2
+    exit 1
+fi
+: > "$root/usr/lib/libvulkan_asahi.so"
+
+mv "$root/usr/lib/libgallium-26.3.0-devel.so" "$root/usr/lib/libgallium-25.0.5.so"
+tar --format=ustar -cf "$work/other-gallium.tar" -C "$root" .
+if "$checker" "$work/other-gallium.tar" >/dev/null 2>&1; then
+    echo "M1 image test: checker accepted a Gallium library of another release" >&2
+    exit 1
+fi
+
 echo "M1 GPU image preflight tests: PASS"
