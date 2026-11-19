@@ -76,7 +76,7 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 		'mailbox.decode_aic_mailbox_irq(', "mailbox_receive_irq: g13_mailbox_irq(mailbox_node, 'recv-not-empty')",
 		"mailbox_send_irq: g13_mailbox_irq(mailbox_node, 'send-empty')",
 		'receive_irq := if chip_id == 0x8103 { platform.mailbox_receive_irq }',
-		'send_irq := if chip_id == 0x8103 { platform.mailbox_send_irq }', 'if !mgr.init(receive_irq, send_irq)',
+		'send_irq := if chip_id == 0x8103 { platform.mailbox_send_irq }', 'probe := mgr.init(receive_irq, send_irq)',
 		'agx_driver_inst.gpu = mgr', 'gpu.set_global_manager(agx_driver_inst.gpu)'],
 		'Vinix passes the M1 AICv1 binding to the private probe before publishing the manager')!
 	controller := read(os.join_path(repo, 'kernel/aarch64/aic/aic.v'))!
@@ -87,8 +87,19 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
 	failure := section(manager, 'fn (mut mgr GpuManager) fail_g13_initialization(', '// Allocate the completion-tracking resources', 'Vinix failed boot cleanup')!
 	require_order(failure, ['aic.mask_irq(mgr.rtkit_receive_irq)', 'aic.mask_irq(mgr.rtkit_send_irq)',
-		'if !mgr.stop_firmware_cpus(mgr.firmware_roles)', 'return false', 'mgr.release_rtkit_buffers()',
+		'if !mgr.stop_firmware_cpus(mgr.firmware_roles)', 'return .cleanup_pending', 'mgr.release_rtkit_buffers()',
 		'mgr.release_g13_channels()'], 'Vinix masks both claimed lines and confirms the stop before boot teardown')!
+	require_order(failure, ['pub fn (mut mgr GpuManager) retry_g13_probe_cleanup()', 'mgr.lock.acquire()',
+		'defer { mgr.lock.release() }', 'if mgr.state == .stopped { return true }',
+		'if mgr.fail_g13_initialization() == .cleanup_pending { return false }', 'mgr.state = .stopped'],
+		'Vinix retries the private probe unwind under the manager lock')!
+	require_order(driver, ['fn (mut driver AgxDriver) retry_probe_cleanup()', 'if !pending.retry_g13_probe_cleanup() { return false }',
+		'driver.probe_cleanup = unsafe { nil }', 'pub fn initialise()',
+		'if agx_driver_inst.initialized || !agx_driver_inst.retry_probe_cleanup() { return }', 'mmu.new_manager(',
+		'probe := mgr.init(receive_irq, send_irq)', 'if probe != .ready {',
+		'if probe == .cleanup_pending { agx_driver_inst.probe_cleanup = mgr }', 'return',
+		'agx_driver_inst.gpu = mgr', 'gpu.set_global_manager(', 'drm.register_driver_with_data('],
+		'Vinix keeps a failed probe private and clears its backing before a new probe replaces the UAT')!
 	require_order(manager, ['aic.deferred_irq_pending(mgr.rtkit_receive_irq)', 'timer.get_us() - mgr.rtkit_receive_us >= 1_000',
 		'poll_mailbox && !mgr.poll_rtkit_messages()', 'if still_healthy && poll_mailbox { mgr.finish_rtkit_receive() }',
 		'mgr.state = if g13 { .error } else { .stopped }', 'aic.mask_irq(mgr.rtkit_receive_irq)', 'aic.mask_irq(mgr.rtkit_send_irq)',
@@ -102,7 +113,8 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 		'!r.write32_for_role(role, asc_ctl, ctl)', 'cpu.dsb_sy()', 'pub fn (r &GpuResources) cpu_stopped(',
 		'r.read32_for_role(role, asc_ctl) or { return false }', 'ctl & asc_ctl_cpu_run == 0'],
 		'Vinix clears RUN with an MMIO barrier and checks its readback on the same role')!
-	require_order(driver.all_after('pub fn shutdown()'), ['if !g.shutdown() { return }',
+	require_order(driver.all_after('pub fn shutdown()'), ['if !agx_driver_inst.retry_probe_cleanup() { return }',
+		'if !agx_driver_inst.initialized', 'if !g.shutdown() { return }',
 		'gpu.set_global_manager(unsafe { nil })', 'agx_driver_inst.gpu = unsafe { nil }'],
 		'Vinix retains the published manager for a later retry after an unconfirmed stop')!
 }

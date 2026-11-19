@@ -17,7 +17,7 @@ fn check_teardown_gc_local(source string, manager string) ! {
 		'mgr.release_all_g13_render_jobs()',
 		'mgr.release_all_g13_compute_jobs()', 'mgr.release_all_g13_queue_resources()', 'mgr.release_g13_channels()', 'mgr.release_g13_event_resources_locked()'], 'Stopped firmware drains pending job/queue ranges before channel/event ownership ends')!
 	init := section(manager, 'fn (mut mgr GpuManager) fail_g13_initialization()', '\n}\n', 'Initialization failure drain')!
-	require_order(init, ['if !mgr.stop_firmware_cpus(', 'return false', 'mgr.release_g13_channels()',
+	require_order(init, ['if !mgr.stop_firmware_cpus(', 'return .cleanup_pending', 'mgr.release_g13_channels()',
 		'mgr.release_g13_event_resources_locked()'], 'Initialization failure drains backing only after a confirmed stop')!
 }
 

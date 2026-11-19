@@ -83,3 +83,26 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `936adb04e917cd00455624653cdc132816b364f0bda0da854f82c43968fc7e09`.
 Native M1 firmware validation remains open.
+
+## Cleanup retry for an unpublished G13 probe
+
+An unconfirmed ASC stop now returns a distinct probe result. The driver
+retains that manager privately and retries its cleanup on shutdown or
+before another initialization can replace the UAT. Repeated stop failures
+retain the same owner and backing. A confirmed stop runs the probe cleanup
+and clears the driver's private reference. Only a successful probe
+publishes the GPU manager and registers DRM.
+
+Sanitizer cases for both firmware ABIs cover an initial stop failure,
+another failed cleanup attempt, successful release and an idempotent
+subsequent call. A negative control that dropped the private reference
+after a failed retry was detected. Both kernel builds, the job-lifetime
+suite, 79 local contract tests and 122 pinned-reference checks passed
+against `83ba6486d5111364333a58d298a4cde22206d4f3` plus the archived
+patch. The allocation scan matched the 176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-asc-probe-cleanup-20261119.8UnNGo/`.
+The `bundle.tar.gz` SHA-256 is
+`e74e764202e8af6375c28f44530cbd936a6fb61e21330ba90e35d624446af028`.
+Native M1 firmware validation remains open.

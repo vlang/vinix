@@ -30,6 +30,8 @@ pub mut:
 	hw_config   hw.HwConfig
 	detected    bool
 	initialized bool
+mut:
+	probe_cleanup &gpu.GpuManager = unsafe { nil }
 }
 
 __global (
@@ -1029,8 +1031,17 @@ fn report_g13_internal_abi() bool {
 	return ok
 }
 
+fn (mut driver AgxDriver) retry_probe_cleanup() bool {
+	mut pending := unsafe { driver.probe_cleanup }
+	if pending == unsafe { nil } { return true }
+	if !pending.retry_g13_probe_cleanup() { return false }
+	driver.probe_cleanup = unsafe { nil }
+	return true
+}
+
 // Probe GPU from device tree and bring up all supported subsystems.
 pub fn initialise() {
+	if agx_driver_inst.initialized || !agx_driver_inst.retry_probe_cleanup() { return }
 	println('agx: Probing Apple GPU')
 
 	// Step 1: Find and identify the GPU node.
@@ -1191,7 +1202,9 @@ pub fn initialise() {
 	// Step 5: Init GPU (RTKit boot, firmware init)
 	receive_irq := if chip_id == 0x8103 { platform.mailbox_receive_irq } else { u32(0) }
 	send_irq := if chip_id == 0x8103 { platform.mailbox_send_irq } else { u32(0) }
-	if !mgr.init(receive_irq, send_irq) {
+	probe := mgr.init(receive_irq, send_irq)
+	if probe != .ready {
+		if probe == .cleanup_pending { agx_driver_inst.probe_cleanup = mgr }
 		println('agx: GPU initialization failed')
 		return
 	}
@@ -1242,6 +1255,7 @@ pub fn initialise() {
 
 // Tear down the GPU driver and release all resources.
 pub fn shutdown() {
+	if !agx_driver_inst.retry_probe_cleanup() { return }
 	if !agx_driver_inst.initialized {
 		return
 	}

@@ -13,6 +13,11 @@ import gpu.agx.hw
 __global irq_boot_probe = unsafe { &GpuManager(nil) }
 __global irq_boot_waits = 0
 
+struct AgxDriver {
+mut:
+	probe_cleanup &GpuManager = unsafe { nil }
+}
+
 fn check_receive_irq_binding() {
 	names := 'send-empty\x00recv-not-empty\x00'
 	mut cells := [u8(0), 0, 0, 0, 0, 0, 2, 63, 0, 0, 0, 4,
@@ -140,20 +145,10 @@ fn check_silent_irq_boot(irq u32) {
 	assert !failed.boot_firmware_role(0) && failed.lock.is_held()
 	elapsed := timer.get_ns() - started
 	assert elapsed >= 1_000_000_000 && elapsed < 1_020_000_000
-	assert !failed.fail_g13_initialization()
+	assert failed.fail_g13_initialization() == .failed
 	failed.lock.release()
 	assert transport.state == .error && failed.state == .error && kio.aic_irq_masked(irq)
 	assert failed.trace == ['stop', 'rtkit', 'channels', 'events']
-}
-
-fn run_g13_test_teardown(mut mgr GpuManager, probe bool) {
-	if probe {
-		mgr.lock.acquire()
-		assert !mgr.fail_g13_initialization()
-		mgr.lock.release()
-	} else {
-		mgr.shutdown()
-	}
 }
 
 fn check_g13_failed_asc_stop() {
@@ -171,18 +166,36 @@ fn check_g13_failed_asc_stop() {
 			mgr.lock.release()
 			aic.unmask_irq(578)
 			aic.unmask_irq(575)
-			run_g13_test_teardown(mut mgr, probe)
+			mut driver := AgxDriver{}
+			if probe {
+				mgr.lock.acquire()
+				assert mgr.fail_g13_initialization() == .cleanup_pending
+				mgr.lock.release()
+				driver.probe_cleanup = unsafe { &mgr }
+			} else {
+				assert !mgr.shutdown()
+			}
 			assert mgr.rtkit_buffers.len == 1, 'failed ASC stop must retain firmware-visible backing'
 			assert mgr.state == .error && !mgr.lock.is_held() && !uat.lock.is_held() && uat.retired == 0
 			assert mgr.initdata_va == 0x4000 && mgr.initdata_phys == 0x8000
 			assert mgr.trace == if probe { ['stop'] } else { ['halt', 'stop'] }
 			assert mgr.recv_role_message(0) == none
+			if probe {
+				assert !driver.retry_probe_cleanup()
+				assert driver.probe_cleanup == unsafe { &mgr }, 'driver must keep ownership after another stop failure'
+				assert mgr.rtkit_buffers.len == 1 && !mgr.lock.is_held()
+			}
 			mgr.stop_fails = false
-			run_g13_test_teardown(mut mgr, probe)
+			if probe {
+				assert driver.retry_probe_cleanup() && driver.probe_cleanup == unsafe { nil }
+				assert driver.retry_probe_cleanup()
+			} else {
+				assert mgr.shutdown()
+			}
 			assert mgr.rtkit_buffers.len == 0 && !mgr.lock.is_held() && !uat.lock.is_held()
 			if probe {
-				assert mgr.state == .error && uat.retired == 0 && mgr.initdata_va == 0 && mgr.initdata_phys == 0
-				assert mgr.trace == ['stop', 'stop', 'rtkit', 'channels', 'events']
+				assert mgr.state == .stopped && uat.retired == 0 && mgr.initdata_va == 0 && mgr.initdata_phys == 0
+				assert mgr.trace == ['stop', 'stop', 'stop', 'rtkit', 'channels', 'events']
 			} else {
 				assert mgr.state == .stopped && uat.retired == 1
 				mgr.shutdown()
@@ -193,7 +206,7 @@ fn check_g13_failed_asc_stop() {
 			rtkit_owner = unsafe { nil }
 		}
 	}
-	println('G13 ASC stop failure: probe and runtime retain backing until a confirmed stop on both ABIs')
+	println('G13 ASC stop failure: the driver retains failed probes across retries on both ABIs')
 }
 
 fn check_g13_receive_irq() {

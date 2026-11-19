@@ -71,6 +71,12 @@ pub enum GpuState {
 	stopped  = 4
 }
 
+pub enum ProbeResult {
+	ready
+	failed
+	cleanup_pending
+}
+
 // All GPU firmware communication channels
 pub struct GpuChannels {
 pub mut:
@@ -974,20 +980,30 @@ fn (mut mgr GpuManager) init_channels() bool {
 	return true
 }
 
-fn (mut mgr GpuManager) fail_g13_initialization() bool {
+fn (mut mgr GpuManager) fail_g13_initialization() ProbeResult {
 	mgr.state = .error
 	if mgr.rtkit_receive_irq != 0 { aic.mask_irq(mgr.rtkit_receive_irq) }
 	if mgr.rtkit_send_irq != 0 { aic.mask_irq(mgr.rtkit_send_irq) }
 	if !mgr.stop_firmware_cpus(mgr.firmware_roles) {
 		println('agx: ASC stop could not be confirmed during initialization cleanup')
-		return false
+		return .cleanup_pending
 	}
 	mgr.release_rtkit_buffers()
 	mgr.release_g13_channels()
 	mgr.release_g13_event_resources_locked()
 	mgr.initdata_va = 0
 	mgr.initdata_phys = 0
-	return false
+	return .failed
+}
+
+// The driver owns this unpublished manager after init returns cleanup_pending.
+pub fn (mut mgr GpuManager) retry_g13_probe_cleanup() bool {
+	mgr.lock.acquire()
+	defer { mgr.lock.release() }
+	if mgr.state == .stopped { return true }
+	if mgr.fail_g13_initialization() == .cleanup_pending { return false }
+	mgr.state = .stopped
+	return true
 }
 
 // Allocate the completion-tracking resources the firmware bootstrap depends
@@ -1012,7 +1028,7 @@ pub fn (mut mgr GpuManager) initialize_event_resources() bool {
 }
 
 // Full GPU initialization sequence
-pub fn (mut mgr GpuManager) init(receive_irq u32, send_irq u32) bool {
+pub fn (mut mgr GpuManager) init(receive_irq u32, send_irq u32) ProbeResult {
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
@@ -1021,30 +1037,27 @@ pub fn (mut mgr GpuManager) init(receive_irq u32, send_irq u32) bool {
 	mgr.state = .starting
 	println('agx: Starting GPU initialization')
 	if mgr.hw_config.firmware_abi == .g17_26_5_partial {
-		return mgr.init_g17()
+		return if mgr.init_g17() { .ready } else { .failed }
 	}
 
 	// Step 1: Start every firmware role's independent ASC CPU via ASC_CTL.
 	for role := u32(0); role < mgr.firmware_roles; role++ {
 		if !mgr.res.start_cpu(role) {
 			C.kprintf(c'agx: Failed to start ASC role %llu\n', u64(role))
+			if mgr.hw_config.gpu_gen == .g13 { return mgr.fail_g13_initialization() }
 			mgr.stop_firmware_cpus(role)
 			mgr.state = .error
-			return false
+			return .failed
 		}
 	}
 	if mgr.hw_config.gpu_gen == .g13 {
 		identity := mgr.res.get_g13_identity() or {
 			println('agx: Invalid G13 identity registers')
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g13_initialization()
 		}
 		if !mgr.hw_config.apply_g13_identity(identity.revision_code, identity.num_clusters, identity.num_cores_per_cluster, identity.num_frags_per_cluster, identity.num_gps_per_cluster, identity.total_active_cores, identity.core_masks) {
 			println('agx: G13 identity exceeds t8103 hardware limits')
-			mgr.stop_firmware_cpus(mgr.firmware_roles)
-			mgr.state = .error
-			return false
+			return mgr.fail_g13_initialization()
 		}
 		C.kprintf(c'agx: G13 topology: %llu/%llu active cores, mask 0x%llx\n',
 			u64(identity.total_active_cores),
@@ -1099,7 +1112,7 @@ pub fn (mut mgr GpuManager) init(receive_irq u32, send_irq u32) bool {
 	mgr.state = .running
 	spawn event_worker(mut mgr)
 	println('agx: GPU firmware initialized and running')
-	return true
+	return .ready
 }
 
 fn (mut mgr GpuManager) init_firmware_data() bool {

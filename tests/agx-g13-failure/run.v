@@ -42,7 +42,7 @@ fn run_checks() int {
 	os.setenv('V_C_ERROR_BUG_REPORT_DISABLED', '1', true)
 	assert os.args.len == 1 || os.args[1..] == ['--sanitize']
 		|| (os.args.len == 4 && os.args[1] == '--sanitize'
-		&& os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source', '--mailbox-source', '--aic-source', '--recovery-source'])
+		&& os.args[2] in ['--g13-source', '--gpu-source', '--rtkit-source', '--mailbox-source', '--aic-source', '--recovery-source', '--driver-source'])
 	repo := os.real_path(os.join_path(os.dir(@FILE), '../..'))
 	scratch := os.join_path(os.temp_dir(), 'vinix-g13-failure-${os.getpid()}')
 	os.mkdir_all(scratch) or { panic(err) }
@@ -71,6 +71,10 @@ fn run_checks() int {
 	os.write_file('${scratch}/gpu/agx/channel/host.v', 'module channel\n__global higher_half = u64(0)\n') or { panic(err) }
 	source := os.read_file(if os.args.len == 4 && os.args[2] == '--gpu-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/gpu/gpu.v' }) or { panic(err) }
 	mut production := 'module gpu\nimport aarch64.cpu\nimport apple.mailbox\nimport apple.rtkit\nimport gpu.agx.fw\nimport gpu.agx.event\nimport gpu.agx.alloc\nimport gpu.agx.channel\nimport gpu.agx.pgtable\nimport katomic\nimport sched\n__global higher_half = u64(0)\n'
+	production += section(source, 'pub enum ProbeResult {', '// All GPU firmware communication channels') or { panic(err) }
+	driver_source := if os.args.len == 4 && os.args[2] == '--driver-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/driver/driver.v' }
+	driver := os.read_file(driver_source) or { panic(err) }
+	production += section(driver, 'fn (mut driver AgxDriver) retry_probe_cleanup(', '// Probe GPU from device tree') or { panic(err) }
 	production += section(source, 'const g13_channel_allocation_count', 'const buffer_allocator_default') or { panic(err) }
 	production += section(source, 'struct G13ChannelAllocations {', '@[inline]\nfn pipe_index') or { panic(err) }
 	production += section(source, 'const buffer_allocator_g13_rtkit', '\n') or { panic(err) }
