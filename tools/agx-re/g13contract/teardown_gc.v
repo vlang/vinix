@@ -13,10 +13,12 @@ fn check_teardown_gc_local(source string, manager string) ! {
 	events := section(source, 'fn (mut mgr GpuManager) release_g13_event_resources_locked()', '\n}\n', 'Event drain')!
 	require_order(events, ['event.reset_event_manager()', 'mgr.free_shared_buffer(', 'mgr.g13_private.gc()'], 'Final event teardown still drains its deferred stamp owner')!
 	shutdown := section(manager, 'pub fn (mut mgr GpuManager) shutdown()', '\n}\n', 'Stopped firmware drain')!
-	require_order(shutdown, ['mgr.state = .stopped', 'mgr.stop_firmware_cpus(', 'mgr.release_all_g13_render_jobs()',
+	require_order(shutdown, ['mgr.stop_firmware_cpus(', 'if !stopped {', 'return false', 'mgr.state = .stopped',
+		'mgr.release_all_g13_render_jobs()',
 		'mgr.release_all_g13_compute_jobs()', 'mgr.release_all_g13_queue_resources()', 'mgr.release_g13_channels()', 'mgr.release_g13_event_resources_locked()'], 'Stopped firmware drains pending job/queue ranges before channel/event ownership ends')!
 	init := section(manager, 'fn (mut mgr GpuManager) fail_g13_initialization()', '\n}\n', 'Initialization failure drain')!
-	require_order(init, ['mgr.stop_firmware_cpus(', 'mgr.release_g13_channels()', 'mgr.release_g13_event_resources_locked()'], 'Initialization failure retains its stopped/unpublished drain')!
+	require_order(init, ['if !mgr.stop_firmware_cpus(', 'return false', 'mgr.release_g13_channels()',
+		'mgr.release_g13_event_resources_locked()'], 'Initialization failure drains backing only after a confirmed stop')!
 }
 
 fn check_teardown_gc_reference(allocator string, manager string) ! {

@@ -146,6 +146,56 @@ fn check_silent_irq_boot(irq u32) {
 	assert failed.trace == ['stop', 'rtkit', 'channels', 'events']
 }
 
+fn run_g13_test_teardown(mut mgr GpuManager, probe bool) {
+	if probe {
+		mgr.lock.acquire()
+		assert !mgr.fail_g13_initialization()
+		mgr.lock.release()
+	} else {
+		mgr.shutdown()
+	}
+}
+
+fn check_g13_failed_asc_stop() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for probe in [false, true]! {
+			mut transport := rtkit.RTKit{name: 'g13-stop-failure'}
+			mut uat := FixtureUat{}
+			mut mgr := GpuManager{state: if probe { .starting } else { .running },
+				hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}, rtk: unsafe { &transport },
+				uat: unsafe { &uat }, rtkit_receive_irq: 578, rtkit_send_irq: 575,
+				stop_fails: true, initdata_va: 0x4000, initdata_phys: 0x8000}
+			rtkit_owner = unsafe { &mgr }
+			mgr.lock.acquire()
+			assert allocate_rtkit_shmem(unsafe { voidptr(&mgr) }, 4096) != 0
+			mgr.lock.release()
+			aic.unmask_irq(578)
+			aic.unmask_irq(575)
+			run_g13_test_teardown(mut mgr, probe)
+			assert mgr.rtkit_buffers.len == 1, 'failed ASC stop must retain firmware-visible backing'
+			assert mgr.state == .error && !mgr.lock.is_held() && !uat.lock.is_held() && uat.retired == 0
+			assert mgr.initdata_va == 0x4000 && mgr.initdata_phys == 0x8000
+			assert mgr.trace == if probe { ['stop'] } else { ['halt', 'stop'] }
+			assert mgr.recv_role_message(0) == none
+			mgr.stop_fails = false
+			run_g13_test_teardown(mut mgr, probe)
+			assert mgr.rtkit_buffers.len == 0 && !mgr.lock.is_held() && !uat.lock.is_held()
+			if probe {
+				assert mgr.state == .error && uat.retired == 0 && mgr.initdata_va == 0 && mgr.initdata_phys == 0
+				assert mgr.trace == ['stop', 'stop', 'rtkit', 'channels', 'events']
+			} else {
+				assert mgr.state == .stopped && uat.retired == 1
+				mgr.shutdown()
+				assert mgr.trace == ['halt', 'stop', 'halt', 'stop', 'rtkit', 'fail-render',
+					'fail-compute', 'queues', 'channels', 'events']
+			}
+			unsafe { mgr.rtkit_buffers.free() }
+			rtkit_owner = unsafe { nil }
+		}
+	}
+	println('G13 ASC stop failure: probe and runtime retain backing until a confirmed stop on both ABIs')
+}
+
 fn check_g13_receive_irq() {
 	check_receive_irq_binding()
 	irq := u32(578)

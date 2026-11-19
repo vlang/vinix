@@ -73,10 +73,12 @@ fn (res &Resources) get_g13_fault_info() ?FaultInfo {
 struct FixtureUat {
 mut:
 	lock klock.Lock
+	retired int
 }
 
-fn (uat &FixtureUat) retire_g13_slots_locked() {
+fn (mut uat FixtureUat) retire_g13_slots_locked() {
 	assert uat.lock.is_held()
+	uat.retired++
 }
 
 struct GpuManager {
@@ -90,6 +92,7 @@ mut:
 	res            Resources
 	lock           klock.Lock
 	firmware_roles u32 = 1
+	stop_fails bool
 	grows          int
 	last_growth    [3]u32
 	polls          int
@@ -301,11 +304,13 @@ fn (mut mgr GpuManager) send_fw_msg(message u64, data u64) bool {
 	return true
 }
 
-fn (mut mgr GpuManager) stop_firmware_cpus(roles u32) {
+fn (mut mgr GpuManager) stop_firmware_cpus(roles u32) bool {
 	assert roles == 1
+	assert mgr.lock.is_held()
 	if mgr.rtkit_receive_irq != 0 { assert kio.aic_irq_masked(mgr.rtkit_receive_irq) }
 	if mgr.rtkit_send_irq != 0 { assert kio.aic_irq_masked(mgr.rtkit_send_irq) }
 	mgr.trace << 'stop'
+	return !mgr.stop_fails
 }
 
 fn (mut mgr GpuManager) release_rtkit_buffers() {
@@ -361,6 +366,7 @@ pub fn run_checks() {
 	check_g13_mailbox_receive_shutdown()
 	check_g13_receive_order()
 	check_g13_receive_irq()
+	check_g13_failed_asc_stop()
 	check_g13_runtime_transmit()
 	check_g13_batch_pipe_transmit()
 	check_g13_grow_ack_transmit()

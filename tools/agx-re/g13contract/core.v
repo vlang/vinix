@@ -352,9 +352,10 @@ fn check_g13_slot_retirement_local(mmu string, gpu string) ! {
 		'event.trigger(mut mgr.slot_released, true)'], 'Retire hardware roots and preserve their outstanding software leases')!
 	require(!retire.contains('handoff_lock('), 'A stopped ASC cannot release the handoff lock')!
 	shutdown := gpu.all_after('pub fn (mut mgr GpuManager) shutdown()')
-	require_order(shutdown, ['mgr.lock.acquire()', 'mgr.state = .stopped', 'mut uat := unsafe { mgr.uat }',
+	require_order(shutdown, ['mgr.lock.acquire()', 'mut uat := unsafe { mgr.uat }',
 		'if retire_slots { uat.lock.acquire() }', 'mgr.send_fw_msg(msg_halt, 0)',
-		'mgr.stop_firmware_cpus(mgr.firmware_roles)', 'uat.retire_g13_slots_locked()', 'uat.lock.release()',
+		'mgr.stop_firmware_cpus(mgr.firmware_roles)', 'if !stopped {', 'if retire_slots { uat.lock.release() }',
+		'return false', 'mgr.state = .stopped', 'uat.retire_g13_slots_locked()', 'uat.lock.release()',
 		'mgr.release_all_g13_render_jobs()', 'mgr.release_all_g13_compute_jobs()'],
 		'Exclude AP handoff callers before stopping the ASC and release the UAT lock before job cleanup')!
 }

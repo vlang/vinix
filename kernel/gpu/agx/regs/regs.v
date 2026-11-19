@@ -365,6 +365,12 @@ pub fn (r &GpuResources) stop_cpu(role u32) bool {
 	return true
 }
 
+// Read back ASC_CTL after the stop write and its MMIO barrier.
+pub fn (r &GpuResources) cpu_stopped(role u32) bool {
+	ctl := r.read32_for_role(role, asc_ctl) or { return false }
+	return ctl & asc_ctl_cpu_run == 0
+}
+
 // Decode the pre-G14X MMU fault register. G13 stores validity, reason, unit,
 // context, sideband, and the address (in 64-byte units) in one u64.
 pub fn decode_g13_fault_info(raw u64) ?FaultInfo {

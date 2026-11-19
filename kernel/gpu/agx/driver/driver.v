@@ -1257,7 +1257,7 @@ pub fn shutdown() {
 	// Shutdown GPU manager (stops firmware, ASC)
 	if agx_driver_inst.gpu != unsafe { nil } {
 		mut g := unsafe { agx_driver_inst.gpu }
-		g.shutdown()
+		if !g.shutdown() { return }
 		gpu.set_global_manager(unsafe { nil })
 		agx_driver_inst.gpu = unsafe { nil }
 	}

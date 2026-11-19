@@ -57,3 +57,29 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `4f12c50cc8e2addfa865aca3652cb981d36f7685707b0db47807c8e76c736af9`.
 Native M1 firmware validation remains open.
+
+## ASC stop confirmation before G13 teardown
+
+G13 now reads back the ASC RUN bit after the stop write and its MMIO
+barrier. Probe cleanup and runtime shutdown mask both claimed IRQs and
+retain firmware-visible backing if the stop write or readback fails.
+Runtime shutdown keeps the manager available for a later attempt. It
+publishes stopped and retires UAT roots only after RUN has cleared.
+A failed probe remains unpublished and retains its backing.
+
+The sanitizer fixture reproduced premature RTKit buffer release on
+`5d517cea2b49a21ec9df85a4ed499ad2e06cfa78`. Four cases passed across the
+two G13 firmware ABIs with an injected stop failure in probe cleanup or
+runtime shutdown. They check backing retention, IRQ masking and lock
+release on failure, then verify cleanup after a successful stop.
+
+AArch64 and x86-64 builds, the job-lifetime suite, 79 local contract tests
+and 122 pinned-reference checks passed. Generated AArch64 C confirms the
+readback and early return before release. The allocation scan matched the
+176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-asc-stop-readback-20261119.ErG0D4/`.
+The `bundle.tar.gz` SHA-256 is
+`936adb04e917cd00455624653cdc132816b364f0bda0da854f82c43968fc7e09`.
+Native M1 firmware validation remains open.

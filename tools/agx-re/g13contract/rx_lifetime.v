@@ -40,9 +40,10 @@ fn check_g13_receive_lifetime(local string, remote string, recovery string) ! {
 	require_order(loss, ['mgr.lock.acquire()', 'if mgr.state == .running { mgr.state = .error }', 'mgr.lock.release()'],
 		'An asynchronous receive failure cannot overwrite stopped state')!
 	stop := local.all_after('pub fn (mut mgr GpuManager) shutdown()')
-	require_order(stop, ['mgr.lock.acquire()', 'if mgr.state == .stopped { return }', 'mgr.state = .stopped',
-		'mgr.stop_firmware_cpus(mgr.firmware_roles)', 'mgr.release_g13_channels()'],
-		'Vinix marks stopped and releases RX backing under the same lock')!
+	require_order(stop, ['mgr.lock.acquire()', 'if mgr.state == .stopped { return true }',
+		'mgr.state = if g13 { .error } else { .stopped }', 'mgr.stop_firmware_cpus(mgr.firmware_roles)',
+		'if !stopped {', 'return false', 'mgr.state = .stopped', 'mgr.release_g13_channels()'],
+		'Vinix marks G13 stopped and releases RX backing under the manager lock after confirming the ASC stop')!
 	require_order(recovery.all_after('fn (mut mgr GpuManager) recover_g13_channel('), [
 		'mgr.lock.acquire()', 'if mgr.state != .running || mgr.g13_recovery_queue != unsafe { nil }',
 		'mgr.mark_g13_slot_error_locked(', 'mgr.channels.device_ctrl.enqueue_tracked('],
@@ -85,11 +86,23 @@ fn check_g13_receive_irq(asahi_linux string, repo string) ! {
 		'if !send { unmask_irq(irq) }'], 'Vinix leaves both deferred lines masked on delivery and keeps transmit masked until armed')!
 	manager := read(os.join_path(repo, 'kernel/gpu/agx/gpu/gpu.v'))!
 	failure := section(manager, 'fn (mut mgr GpuManager) fail_g13_initialization(', '// Allocate the completion-tracking resources', 'Vinix failed boot cleanup')!
-	require_order(failure, ['aic.mask_irq(mgr.rtkit_receive_irq)', 'mgr.stop_firmware_cpus(mgr.firmware_roles)',
-		'mgr.release_rtkit_buffers()', 'mgr.release_g13_channels()'], 'Vinix masks the claimed line and stops firmware before boot teardown')!
+	require_order(failure, ['aic.mask_irq(mgr.rtkit_receive_irq)', 'aic.mask_irq(mgr.rtkit_send_irq)',
+		'if !mgr.stop_firmware_cpus(mgr.firmware_roles)', 'return false', 'mgr.release_rtkit_buffers()',
+		'mgr.release_g13_channels()'], 'Vinix masks both claimed lines and confirms the stop before boot teardown')!
 	require_order(manager, ['aic.deferred_irq_pending(mgr.rtkit_receive_irq)', 'timer.get_us() - mgr.rtkit_receive_us >= 1_000',
 		'poll_mailbox && !mgr.poll_rtkit_messages()', 'if still_healthy && poll_mailbox { mgr.finish_rtkit_receive() }',
-		'mgr.state = .stopped', 'aic.mask_irq(mgr.rtkit_receive_irq)', 'aic.mask_irq(mgr.rtkit_send_irq)',
+		'mgr.state = if g13 { .error } else { .stopped }', 'aic.mask_irq(mgr.rtkit_receive_irq)', 'aic.mask_irq(mgr.rtkit_send_irq)',
 		'mgr.stop_firmware_cpus(mgr.firmware_roles)'],
 		'Vinix drains in the worker, polls on timeout and masks both lines before firmware stop')!
+	stop_cpus := section(manager, 'fn (mut mgr GpuManager) stop_firmware_cpus(', 'struct SharedBuffer', 'Vinix ASC stop')!
+	require_order(stop_cpus, ['mgr.res.stop_cpu(remaining)', 'mgr.hw_config.gpu_gen == .g13 && !mgr.res.cpu_stopped(remaining)',
+		'stopped = false', 'return stopped'], 'Vinix propagates failed stop writes and G13 RUN readback failures')!
+	registers := read(os.join_path(repo, 'kernel/gpu/agx/regs/regs.v'))!
+	require_order(registers.all_after('pub fn (r &GpuResources) stop_cpu('), ['ctl &= ~asc_ctl_cpu_run',
+		'!r.write32_for_role(role, asc_ctl, ctl)', 'cpu.dsb_sy()', 'pub fn (r &GpuResources) cpu_stopped(',
+		'r.read32_for_role(role, asc_ctl) or { return false }', 'ctl & asc_ctl_cpu_run == 0'],
+		'Vinix clears RUN with an MMIO barrier and checks its readback on the same role')!
+	require_order(driver.all_after('pub fn shutdown()'), ['if !g.shutdown() { return }',
+		'gpu.set_global_manager(unsafe { nil })', 'agx_driver_inst.gpu = unsafe { nil }'],
+		'Vinix retains the published manager for a later retry after an unconfirmed stop')!
 }

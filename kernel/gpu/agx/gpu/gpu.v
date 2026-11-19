@@ -376,12 +376,16 @@ fn (mut mgr GpuManager) recv_role_message(role u32) ?mailbox.MboxMsg {
 	}
 }
 
-fn (mut mgr GpuManager) stop_firmware_cpus(count u32) {
+fn (mut mgr GpuManager) stop_firmware_cpus(count u32) bool {
 	mut remaining := count
+	mut stopped := true
 	for remaining > 0 {
 		remaining--
-		mgr.res.stop_cpu(remaining)
+		if !mgr.res.stop_cpu(remaining) || (mgr.hw_config.gpu_gen == .g13 && !mgr.res.cpu_stopped(remaining)) {
+			stopped = false
+		}
 	}
+	return stopped
 }
 
 struct SharedBuffer {
@@ -971,14 +975,18 @@ fn (mut mgr GpuManager) init_channels() bool {
 }
 
 fn (mut mgr GpuManager) fail_g13_initialization() bool {
+	mgr.state = .error
 	if mgr.rtkit_receive_irq != 0 { aic.mask_irq(mgr.rtkit_receive_irq) }
-	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	if mgr.rtkit_send_irq != 0 { aic.mask_irq(mgr.rtkit_send_irq) }
+	if !mgr.stop_firmware_cpus(mgr.firmware_roles) {
+		println('agx: ASC stop could not be confirmed during initialization cleanup')
+		return false
+	}
 	mgr.release_rtkit_buffers()
 	mgr.release_g13_channels()
 	mgr.release_g13_event_resources_locked()
 	mgr.initdata_va = 0
 	mgr.initdata_phys = 0
-	mgr.state = .error
 	return false
 }
 
@@ -1640,22 +1648,32 @@ fn event_worker(mut mgr GpuManager) {
 }
 
 // Shutdown the GPU
-pub fn (mut mgr GpuManager) shutdown() {
+pub fn (mut mgr GpuManager) shutdown() bool {
 	mgr.lock.acquire()
 	defer {
 		mgr.lock.release()
 	}
 
-	if mgr.state == .stopped { return }
-	mgr.state = .stopped
+	if mgr.state == .stopped { return true }
+	g13 := mgr.hw_config.gpu_gen == .g13
+	mgr.state = if g13 { .error } else { .stopped }
 	if mgr.rtkit_receive_irq != 0 { aic.mask_irq(mgr.rtkit_receive_irq) }
 	if mgr.rtkit_send_irq != 0 { aic.mask_irq(mgr.rtkit_send_irq) }
 	mut uat := unsafe { mgr.uat }
-	retire_slots := mgr.hw_config.gpu_gen == .g13 && uat != unsafe { nil }
+	retire_slots := g13 && uat != unsafe { nil }
 	// Exclude UAT operations that need a live ASC before we stop it.
 	if retire_slots { uat.lock.acquire() }
 	mgr.send_fw_msg(msg_halt, 0)
-	mgr.stop_firmware_cpus(mgr.firmware_roles)
+	stopped := mgr.stop_firmware_cpus(mgr.firmware_roles)
+	if g13 {
+		if !stopped {
+			if retire_slots { uat.lock.release() }
+			println('agx: ASC stop could not be confirmed during shutdown')
+			return false
+		}
+		// Stopped lets file cleanup retire mappings without firmware access.
+		mgr.state = .stopped
+	}
 	if retire_slots {
 		uat.retire_g13_slots_locked()
 		uat.lock.release()
@@ -1671,4 +1689,5 @@ pub fn (mut mgr GpuManager) shutdown() {
 	mgr.release_all_g17_queue_resources()
 	mgr.release_g17_firmware_graph()
 	println('agx: GPU shutdown complete')
+	return true
 }

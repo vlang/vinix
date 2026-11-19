@@ -51,8 +51,8 @@ fn check_timestamp_capture_local(file string, captures string, gpu string) ! {
 		'mgr.g13_timestamp.allocations.free()'],
 		'Retire every old mapping and allocation through the original UAT')!
 	shutdown := gpu.all_after('pub fn (mut mgr GpuManager) shutdown()')
-	require_order(shutdown, ['mgr.lock.acquire()', 'mgr.lock.release()', 'if mgr.state == .stopped { return }',
-		'mgr.state = .stopped', 'mgr.stop_firmware_cpus(mgr.firmware_roles)',
+	require_order(shutdown, ['mgr.lock.acquire()', 'mgr.lock.release()', 'if mgr.state == .stopped { return true }',
+		'mgr.stop_firmware_cpus(mgr.firmware_roles)', 'if !stopped {', 'return false', 'mgr.state = .stopped',
 		'if mgr.hw_config.gpu_gen == .g13 { mgr.retire_g13_timestamp_aperture_locked() }', 'mgr.release_all_g13_render_jobs()'],
 		'Drain the timestamp aperture under the shutdown lock after firmware stops')!
 }
