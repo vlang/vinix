@@ -175,3 +175,26 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `cc7c683c3b7fd6f3abb052b45935e671867559d2ce72ff6e874c8abc4db0b5ef`.
 Native M1 validation remains open.
+
+## DRM mapping admission after unregister
+
+DRM core now rejects a new mapping with `ENODEV` after its device is
+unregistered, including the path for drivers without an admission callback.
+It also rejects expansion of an existing mapping on the inactive device.
+Existing mappings retain and release backing through the original device
+when the slot is reused.
+
+The DRM wire sanitizer fixture reproduced new mapping admission on
+`929db3aa5fc9cb4b043238d9fa57703aecd3db3c`. A regression control that
+removed the growth check caught expansion after unregister. The revised
+fixture checked three callback configurations across slot reuse, including
+retaining and releasing old backing and admitting mappings on the new
+device. Both AGX sanitizer suites, both kernel builds, 79 local contract
+tests and 122 pinned-reference checks passed. Allocation findings matched
+the baseline.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-mmap-unregister-20261119.N5W8ab/`.
+The `bundle.tar.gz` SHA-256 is
+`d9e54898d0e15072a308b69801dd6f211b8e353701373160015c592835bbdb96`.
+Native M1 validation remains open.

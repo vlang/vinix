@@ -4,6 +4,8 @@ module drm
 
 import errno
 
+const map_shared = 1
+
 struct NodeBox {
 	minor u64
 }
@@ -99,7 +101,56 @@ fn check_registration() {
 	fail_render = false
 	assert !drm_devices_lock.held
 	check_slot_reuse()
+	check_unregistered_mapping_admission()
 	println('DRM registration: publication, namespace rollback, 64 active slots and safe ID reuse passed')
+}
+
+__global mapping_device = unsafe { &DrmDevice(nil) }
+__global mapping_refs = 0
+
+fn retain_test_mapping(dev &DrmDevice, _ voidptr, _ u64, _ u64) bool {
+	assert dev == mapping_device
+	mapping_refs++
+	return true
+}
+
+fn admit_test_mapping(dev &DrmDevice, handle voidptr, offset u64, len u64, shared_mapping bool) int {
+	assert shared_mapping && retain_test_mapping(dev, handle, offset, len)
+	return 0
+}
+
+fn release_test_mapping(dev &DrmDevice, _ voidptr, _ u64, _ u64) {
+	assert dev == mapping_device && mapping_refs > 0
+	mapping_refs--
+}
+
+fn check_unregistered_mapping_admission() {
+	handle := voidptr(1)
+	for driver in [DrmDriver{},
+		DrmDriver{mmap_retain: retain_test_mapping, mmap_release: release_test_mapping},
+		DrmDriver{mmap_admit: admit_test_mapping, mmap_retain: retain_test_mapping, mmap_release: release_test_mapping}]! {
+		old := register_driver_with_data(&driver, voidptr(1)) or { panic('initial registration failed') }
+		mapping_device = unsafe { old }
+		mut old_node := unsafe { old.node }
+		assert old_node.admit_mapping_range(handle, 0, 4096, map_shared) && old_node.mapping_can_grow()
+		unregister_device(old)
+		replacement := register_driver_with_data(&DrmDriver{}, voidptr(2)) or { panic('replacement registration failed') }
+		assert replacement.dev_id == old.dev_id
+		mut new_node := unsafe { replacement.node }
+		assert new_node.admit_mapping_range(handle, 0, 4096, map_shared) && new_node.mapping_can_grow()
+		errno.set(0)
+		assert !old_node.admit_mapping_range(handle, 0, 4096, map_shared) && errno.get() == errno.enodev
+		assert !old_node.mapping_can_grow()
+		assert old_node.retain_mapping_range(handle, 0, 4096, map_shared)
+		assert mapping_refs == if driver.mmap_retain != unsafe { nil } { 2 } else { 0 }
+		old_node.release_mapping_range(handle, 0, 4096, map_shared)
+		old_node.release_mapping_range(handle, 0, 4096, map_shared)
+		assert mapping_refs == 0
+		new_node.release_mapping_range(handle, 0, 4096, map_shared)
+		unregister_device(replacement)
+	}
+	mapping_device = unsafe { nil }
+	println('DRM mmap: unregister blocks new mappings and growth while old mappings retain their device')
 }
 
 fn check_slot_reuse() {

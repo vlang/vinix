@@ -680,7 +680,11 @@ fn (mut this DrmNode) mmap(handle voidptr, page u64, flags int) voidptr {
 }
 
 fn (mut this DrmNode) admit_mapping_range(handle voidptr, offset u64, length u64, flags int) bool {
-	if handle != unsafe { nil } && this.dev != unsafe { nil } && this.dev.driver != unsafe { nil }
+	if this.dev == unsafe { nil } || !this.dev.is_registered() {
+		errno.set(errno.enodev)
+		return false
+	}
+	if handle != unsafe { nil } && this.dev.driver != unsafe { nil }
 		&& this.dev.driver.mmap_admit != unsafe { nil } {
 		code := this.dev.driver.mmap_admit(this.dev, handle, offset, length, flags & mmap.map_shared != 0)
 		if code == 0 { return true }
@@ -691,9 +695,11 @@ fn (mut this DrmNode) admit_mapping_range(handle voidptr, offset u64, length u64
 }
 
 fn (mut this DrmNode) mapping_can_grow() bool {
-	return this.dev == unsafe { nil } || this.dev.driver == unsafe { nil } || !this.dev.driver.mmap_no_expand
+	return this.dev != unsafe { nil } && this.dev.is_registered()
+		&& (this.dev.driver == unsafe { nil } || !this.dev.driver.mmap_no_expand)
 }
 
+// Existing VMAs can still retain and release backing through their own device.
 fn (mut this DrmNode) retain_mapping_range(handle voidptr, offset u64, length u64, _flags int) bool {
 	if handle == unsafe { nil } || this.dev == unsafe { nil }
 		|| this.dev.driver == unsafe { nil } {

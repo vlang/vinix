@@ -41,6 +41,13 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 		&& driver.contains('mmap_admit: agx_file.admit_mmap_range_handle')
 		&& driver.contains('mmap_retain: agx_file.retain_mmap_range_handle')
 		&& driver.contains('mmap_release: agx_file.release_mmap_range_handle'), 'Register CPU cache policy, range admission and backing lifetime hooks')!
+	node_admit := section(drm, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) mapping_can_grow(', 'DRM mapping admission')!
+	require_order(node_admit, ['!this.dev.is_registered()', 'errno.set(errno.enodev)', 'return false',
+		'this.dev.driver.mmap_admit(', 'return this.retain_mapping_range('], 'Registration gates both DRM mapping admission paths')!
+	growth := section(drm, 'fn (mut this DrmNode) mapping_can_grow(', 'fn (mut this DrmNode) retain_mapping_range(', 'DRM mapping growth')!
+	require_order(growth, ['this.dev.is_registered()', '!this.dev.driver.mmap_no_expand'], 'A DRM mapping can grow only while its device is registered and permits growth')!
+	lifetime := section(drm, 'fn (mut this DrmNode) retain_mapping_range(', 'fn (mut this DrmNode) read(', 'DRM mapping lifetime')!
+	require(!lifetime.contains('.is_registered()'), 'Existing mappings can retain and release backing after unregister')!
 	prime := section(drm, 'fn (mut this GemPrimeResource) mapping_attributes(', 'fn (mut this GemPrimeResource) read(', 'PRIME CPU policy')!
 	require(prime.contains('this.obj.pte_extra'), 'PRIME must retain the object policy')!
 	require_order(mmap, ['handle_ref(range_handle)', 'if options.inherit_mapping_ref', 'resource.retain_mapping_range(',
