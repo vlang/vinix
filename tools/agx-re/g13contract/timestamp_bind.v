@@ -69,8 +69,8 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 		'Release only the initialized registration records on failure')!
 	unregister := section(drm, 'pub fn unregister_device(', 'fn copy_version_field(', 'DRM unregistration')!
 	require_order(unregister, ['drm_devices_lock.acquire()', 'registered_devices[dev.dev_id] != dev { return }',
-		'katomic.store(mut d.registered, false)', "remove_device_node(dev.render_node, 'renderD'",
-		"remove_device_node(dev.node, 'card'", 'registered_devices[dev.dev_id] = unsafe { nil }'],
+		'katomic.store(mut d.registered, false)', 'remove_device_nodes(dev)',
+		'registered_devices[dev.dev_id] = unsafe { nil }'],
 		'Remove the registered owner and its names before allowing the slot to be reused')!
 	open := section(drm, 'fn (mut this DrmNode) open(', 'fn (mut this DrmNode) mapping_attributes(', 'DRM node open')!
 	require_order(open, ['!this.dev.is_registered()', 'errno.set(errno.enodev)', 'return none', 'return this.box'],

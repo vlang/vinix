@@ -10,6 +10,7 @@ const node_ifchr = u32(0o020000)
 
 struct NodeBox {
 	minor u64
+mut:
 	node &DrmNode
 }
 
@@ -33,6 +34,10 @@ mut:
 	name string
 	parent &VFSNode = unsafe { nil }
 	children &map[string]&VFSNode = unsafe { nil }
+	resource &NodeBox = unsafe { nil }
+	parent_held bool
+	orphan bool
+	handles int
 }
 
 fn (mut lock_state RegistryLock) acquire() {
@@ -53,7 +58,11 @@ fn (mut lock_state NamespaceLock) acquire() {
 fn (mut lock_state NamespaceLock) release() {
 	assert lock_state.held
 	lock_state.held = false
-	observe_dri_publication()
+	if staged_devices[0] != unsafe { nil } {
+		observe_dri_publication()
+	} else if detaching_device != unsafe { nil } {
+		observe_dri_removal()
+	}
 }
 
 __global drm_devices_lock RegistryLock
@@ -65,6 +74,7 @@ __global node_names [192]&DrmNode
 __global published_nodes = 0
 __global staged_nodes [2]&VFSNode
 __global staged_devices [2]&NodeBox
+__global detaching_device = unsafe { &DrmDevice(nil) }
 
 fn shared_timeline_stub() {}
 
@@ -76,22 +86,43 @@ fn expect_unavailable(mut node DrmNode) {
 	expect_error(mut node, request, unsafe { nil }, errno.enodev)
 }
 
-fn devtmpfs_remove_device(name string, expected &NodeBox) bool {
-	assert drm_devices_lock.held
-	prefix := if expected.minor >= 128 { 'renderD' } else { 'card' }
-	leaf := '${prefix}${expected.minor}'
-	assert name == 'dri/${leaf}'
-	mut node := unsafe { node_names[expected.minor] }
-	if node == unsafe { nil } || node.box != expected { return false }
+fn hold_parent(mut node VFSNode) {
+	assert drm_devices_lock.held && vfs_lock.held && children_lock.held
+	assert !node.parent_held && !node.orphan
+	node.parent_held = true
+	device := node.resource.node.dev
+	assert detaching_device == unsafe { nil } || detaching_device == device
+	detaching_device = unsafe { device }
+}
+
+fn observe_dri_removal() {
+	dev := detaching_device
+	assert !dev.is_registered() && registered_devices[dev.dev_id] == dev && vfs_lock.held
+	parent := unsafe { devtmpfs_root.children['dri'] }
+	for leaf, node in parent.children {
+		assert node.resource == unsafe { nil } || node.resource.node.dev != dev,
+			'directory reader saw partial DRM removal at ${leaf}'
+	}
+	detaching_device = unsafe { nil }
+}
+
+fn (mut box NodeBox) unref(handle voidptr) ? {
+	assert drm_devices_lock.held && vfs_lock.held && !children_lock.held
+	assert detaching_device == unsafe { nil }
+	mut node := unsafe { box.node }
+	assert registered_devices[node.dev.dev_id] == node.dev && node.stat.nlink == 0
+	assert node_names[box.minor] == node
 	expect_unavailable(mut node)
-	mut parent := unsafe { devtmpfs_root.children['dri'] }
-	namespace_node := unsafe { parent.children[leaf] }
-	parent.children.delete(leaf)
-	memory.free_registration(namespace_node.name.str)
-	memory.free_registration(namespace_node)
-	node_names[expected.minor] = unsafe { nil }
-	node.unref(unsafe { nil }) or { panic('namespace reference release failed') }
-	return true
+	node_names[box.minor] = unsafe { nil }
+	return node.unref(handle)
+}
+
+fn retire_node(mut node VFSNode) {
+	assert !vfs_lock.held && !children_lock.held && node.parent_held && node.orphan
+	assert node.resource.node.stat.nlink == 0 && node.handles == 0
+	assert unsafe { node.parent.children[node.name] } != node
+	memory.free_registration(node.name.str)
+	memory.free_registration(node)
 }
 
 fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
@@ -109,6 +140,9 @@ fn init_devtmpfs_node(mut namespace_node VFSNode, device &NodeBox, seat bool) {
 	assert leaf == '${prefix}${device.minor}'
 	assert unsafe { leaf.str[leaf.len] } == 0
 	assert leaf !in namespace_node.parent.children
+	namespace_node.resource = unsafe { device }
+	mut node := unsafe { device.node }
+	node.stat.nlink = 1
 	slot := if device.minor >= 128 { 1 } else { 0 }
 	assert staged_nodes[slot] == unsafe { nil }
 	staged_nodes[slot] = unsafe { namespace_node }
@@ -293,9 +327,48 @@ fn check_driver_definition_registration() {
 
 fn check_drm_names() {
 	mut buffer := [32]u8{}
-	name := drm_node_name(unsafe { &buffer[0] }, 'renderD', ~u64(0), true)
-	assert name == 'dri/renderD18446744073709551615' && name.len == 31
-	assert buffer[31] == 0 && name.str == unsafe { &buffer[0] }
+	name := drm_node_name(unsafe { &buffer[0] }, 'renderD', ~u64(0))
+	assert name == 'renderD18446744073709551615' && name.len == 27
+	assert buffer[27] == 0 && name.str == unsafe { &buffer[0] }
+}
+
+fn check_detach_with_absent_or_replaced_name() {
+	mut dir := unsafe { devtmpfs_root.children['dri'] }
+	for replaced in [false, true]! {
+		dev := register_driver_with_data(&DrmDriver{features: driver_render}, unsafe { nil }) or { panic('pair registration failed') }
+		other := register_driver_with_data(&DrmDriver{}, unsafe { nil }) or { panic('second device registration failed') }
+		mut old_primary := unsafe { dev.node }
+		old_card := unsafe { dir.children['card0'] }
+		mut render_leaf := unsafe { dir.children['renderD128'] }
+		mut render_node := unsafe { dev.render_node }
+		dir.children.delete('card0')
+		node_names[dev.dev_id] = unsafe { nil }
+		old_primary.stat.nlink = 0
+		old_primary.unref(unsafe { nil }) or { panic('early detach failed') }
+		memory.free_registration(old_card.name.str)
+		memory.free_registration(old_card)
+		other_leaf := unsafe { dir.children['card1'] }
+		if replaced { unsafe { dir.children['card0'] = other_leaf } }
+		render_leaf.handles++
+		render_node.refcount++
+		live := memory.registration_outstanding()
+		unregister_device(dev)
+		assert 'renderD128' !in dir.children && render_leaf.orphan && render_leaf.parent_held
+		assert render_node.stat.nlink == 0 && render_node.refcount == 1
+		assert memory.registration_outstanding() == live
+		assert other.is_registered() && other.node.refcount == 1
+		assert ('card0' in dir.children) == replaced
+		if replaced {
+			assert unsafe { dir.children['card0'] } == other_leaf
+			dir.children.delete('card0')
+		}
+		render_node.unref(unsafe { nil }) or { panic('last reference release failed') }
+		render_leaf.handles--
+		retire_node(mut render_leaf)
+		assert memory.registration_outstanding() == live - 2
+		unregister_device(other)
+	}
+	println('DRM removal: missing and replacement names preserve unrelated devices and open handles')
 }
 
 fn check_registration() {
@@ -304,6 +377,7 @@ fn check_registration() {
 	check_registration_allocation_failure()
 	check_owned_driver_registration()
 	check_driver_definition_registration()
+	check_detach_with_absent_or_replaced_name()
 	for render in [false, true]! {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
 		dev := register_driver_with_data(&driver, voidptr(0x1234)) or { panic('registration failed') }

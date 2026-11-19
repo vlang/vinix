@@ -511,11 +511,47 @@ fn init_devtmpfs_node(mut new_node VFSNode, device &resource.Resource, seat bool
 // reported a 192-byte object written after it was freed.
 pub fn devtmpfs_remove_device(name string, expected &resource.Resource) bool {
 	mut node := detach_device_node(name, expected) or { return false }
+	retire_detached_device(mut node)
+	return true
+}
+
+// Remove both matching DRM names in one directory update. Each name's
+// namespace reference is released once the map no longer exposes either name.
+pub fn devtmpfs_remove_dri_devices(card &resource.Resource, card_name string,
+	render &resource.Resource, render_name string) {
+	vfs_lock.acquire()
+	if devtmpfs_root == unsafe { nil } || 'dri' !in devtmpfs_root.children {
+		vfs_lock.release()
+		return
+	}
+	mut parent := unsafe { devtmpfs_root.children['dri'] }
+	children_lock.acquire()
+	mut render_leaf := detach_dri_leaf(mut parent, render_name, render)
+	mut primary_leaf := detach_dri_leaf(mut parent, card_name, card)
+	children_lock.release()
+	drop_device_name(mut render_leaf)
+	drop_device_name(mut primary_leaf)
+	vfs_lock.release()
+	retire_detached_device(mut render_leaf)
+	retire_detached_device(mut primary_leaf)
+}
+
+// Caller holds vfs_lock and children_lock.
+fn detach_dri_leaf(mut parent VFSNode, name string, expected &resource.Resource) &VFSNode {
+	mut node := matching_device_node(parent, name, expected)
+	if node != unsafe { nil } {
+		hold_parent(mut node)
+		parent.children.delete(name)
+	}
+	return node
+}
+
+fn retire_detached_device(mut node VFSNode) {
+	if node == unsafe { nil } { return }
 	node.orphan = true
 	if katomic.load(&node.handles) == 0 {
 		retire_node(mut node)
 	}
-	return true
 }
 
 // Take a device node out of devtmpfs, and its name's reference to its
@@ -553,20 +589,29 @@ fn detach_device_node(name string, expected &resource.Resource) ?&VFSNode {
 		leaf = last
 	}
 
-	if parent == unsafe { nil } || parent.children == unsafe { nil } || leaf !in parent.children {
-		return none
-	}
-	mut node := unsafe { parent.children[leaf] }
-	// A retired endpoint can finish after its numeric path has been reused.
-	// It must never detach the replacement device.
-	if voidptr(node.resource) != voidptr(expected) { return none }
+	mut node := matching_device_node(parent, leaf, expected)
+	if node == unsafe { nil } { return none }
 	if node.resource is LogicalVolume && pinned(node) { errno.set(errno.ebusy); return none }
 	hold_parent(mut node)
 	remove_child(parent, leaf)
+	drop_device_name(mut node)
+	return node
+}
+
+fn matching_device_node(parent &VFSNode, name string, expected &resource.Resource) &VFSNode {
+	if expected == unsafe { nil } || parent == unsafe { nil } || parent.children == unsafe { nil }
+		|| name !in parent.children { return unsafe { nil } }
+	node := unsafe { parent.children[name] }
+	// A reused pathname can already belong to a different device.
+	if voidptr(node.resource) != voidptr(expected) { return unsafe { nil } }
+	return node
+}
+
+fn drop_device_name(mut node VFSNode) {
+	if node == unsafe { nil } { return }
 	node.resource.stat.nlink = 0
 	mut removed_resource := node.resource
 	removed_resource.unref(unsafe { nil }) or {}
-	return node
 }
 
 pub fn devtmpfs_get_root() &VFSNode {

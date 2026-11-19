@@ -51,6 +51,7 @@ mut:
 	blksize i64
 	rdev u64
 	mode u32
+	nlink u64
 }
 
 struct DrmNode {

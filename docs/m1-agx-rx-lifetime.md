@@ -412,3 +412,29 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-registry-full-20261119.BKLVIq/`.
 The `bundle.tar.gz` SHA-256 is
 `7ca6ef905066d5e7e1dcbc56f72b9d105d9921923caccf2a52c3b6a8a8ec7b10`.
+
+## Paired DRM directory removal
+
+Unregister marks the device inactive, then removes the matching card and
+render names under one directory lock. Each removal checks the resource
+identity, so a replacement at either name is preserved. Devtmpfs drops
+the namespace references after unlocking the directory map. Open handles
+keep the detached nodes alive through the existing grace-period retirement.
+DRM releases the registry slot after this removal returns.
+
+The DRM wire sanitizer fixture checked both names at the lock boundary,
+card-only devices, absent and replaced names, open handles and slot reuse.
+Two controls caught a split removal and a missing identity check. The
+independent lifetime review and generated ARM64 code confirmed the order
+of parent pins, map updates, reference drops and retirement.
+
+Both kernel builds, both QEMU descriptor-flags suites, both AGX sanitizer
+suites, 79 local contract tests and 122 pinned-reference checks passed.
+The allocation scan matched the 173 baseline findings. Native M1
+validation remains open.
+
+The tested base was `cd32b339145c967212b89abc663888f41a3b63a5` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-paired-removal-20261119.xeY3Qw/`.
+The `bundle.tar.gz` SHA-256 is
+`2eb665a310a839a8308b3361c16c26cd500a73064670e162c2dc3994f5549c0b`.

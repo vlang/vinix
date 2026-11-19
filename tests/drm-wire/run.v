@@ -41,8 +41,9 @@ fn main() {
 		.replace('stat.ifchr', 'node_ifchr')
 		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
 		.replace('memory.free(', 'memory.free_registration(')
-	production += section(source, 'fn drm_node_name(', 'fn remove_device_node(')!
+	production += section(source, 'fn drm_node_name(', 'fn (mut this DrmNode) open(')!
 		.replace('fs.devtmpfs_add_dri_devices(', 'devtmpfs_add_dri_devices(')
+		.replace('fs.devtmpfs_remove_dri_devices(', 'devtmpfs_remove_dri_devices(')
 		.replace('C.vinix_stack_alloc(', 'C.alloca(')
 	production += section(devtmpfs_source, 'pub fn devtmpfs_add_dri_devices(', '// Caller holds vfs_lock.')!
 		.replace('resource.Resource', 'NodeBox')
@@ -51,9 +52,10 @@ fn main() {
 		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
 		.replace('memory.free(', 'memory.free_registration(')
 	production += section(vfs_source, 'pub fn publish_child(', 'fn remove_child(')!
-	production += section(source, 'fn remove_device_node(', 'fn (mut this DrmNode) open(')!
-		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
-		.replace('C.vinix_stack_alloc(', 'C.alloca(')
+	production += section(devtmpfs_source, 'pub fn devtmpfs_remove_dri_devices(', '// Take a device node out of devtmpfs')!
+		.replace('resource.Resource', 'NodeBox')
+	production += section(devtmpfs_source, 'fn matching_device_node(', 'pub fn devtmpfs_get_root(')!
+		.replace('resource.Resource', 'NodeBox').replace('node.resource.stat.nlink', 'node.resource.node.stat.nlink')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!
 		.replace('mmap.map_shared', 'map_shared')
 	production += section(source, 'pub fn register_driver(', 'fn copy_version_field(')!

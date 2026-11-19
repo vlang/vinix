@@ -653,13 +653,9 @@ fn create_device_node(dev &DrmDevice, render bool) ?&DrmNode {
 
 // The name borrows a 32-byte caller buffer. The fixed prefixes and a u64
 // decimal suffix fit, including the terminating zero.
-fn drm_node_name(buffer &u8, prefix string, number u64, full_path bool) string {
-	head := if full_path { 'dri/' } else { '' }
-	unsafe {
-		C.memcpy(buffer, head.str, head.len)
-		C.memcpy(buffer + head.len, prefix.str, prefix.len)
-	}
-	mut length := head.len + prefix.len
+fn drm_node_name(buffer &u8, prefix string, number u64) string {
+	unsafe { C.memcpy(buffer, prefix.str, prefix.len) }
+	mut length := prefix.len
 	mut scale := u64(1)
 	for number / scale >= 10 { scale *= 10 }
 	for scale != 0 {
@@ -677,20 +673,25 @@ fn publish_device_nodes(dev &DrmDevice) ? {
 	// The borrowed names are used synchronously. An explicit stack slot
 	// keeps V from promoting their buffers on this optional-return path.
 	card_path := unsafe { &u8(C.vinix_stack_alloc(32)) }
-	card_name := drm_node_name(card_path, 'card', u64(dev.dev_id), false)
+	card_name := drm_node_name(card_path, 'card', u64(dev.dev_id))
 	if dev.render_node == unsafe { nil } {
 		return fs.devtmpfs_add_dri_devices(dev.node.box, card_name, unsafe { nil }, '')
 	}
 	render_path := unsafe { &u8(C.vinix_stack_alloc(32)) }
-	render_name := drm_node_name(render_path, 'renderD', u64(128 + dev.dev_id), false)
+	render_name := drm_node_name(render_path, 'renderD', u64(128 + dev.dev_id))
 	return fs.devtmpfs_add_dri_devices(dev.node.box, card_name, dev.render_node.box, render_name)
 }
 
-fn remove_device_node(node &DrmNode, prefix string, number u64) {
-	if node == unsafe { nil } { return }
-	path := unsafe { &u8(C.vinix_stack_alloc(32)) }
-	name := drm_node_name(path, prefix, number, true)
-	fs.devtmpfs_remove_device(name, node.box)
+fn remove_device_nodes(dev &DrmDevice) {
+	card_path := unsafe { &u8(C.vinix_stack_alloc(32)) }
+	card_name := drm_node_name(card_path, 'card', u64(dev.dev_id))
+	if dev.render_node == unsafe { nil } {
+		fs.devtmpfs_remove_dri_devices(dev.node.box, card_name, unsafe { nil }, '')
+		return
+	}
+	render_path := unsafe { &u8(C.vinix_stack_alloc(32)) }
+	render_name := drm_node_name(render_path, 'renderD', u64(128 + dev.dev_id))
+	fs.devtmpfs_remove_dri_devices(dev.node.box, card_name, dev.render_node.box, render_name)
 }
 
 fn (mut this DrmNode) open(flags int) ?&resource.Resource {
@@ -983,8 +984,7 @@ pub fn unregister_device(dev &DrmDevice) {
 		|| registered_devices[dev.dev_id] != dev { return }
 	mut d := unsafe { dev }
 	katomic.store(mut d.registered, false)
-	remove_device_node(dev.render_node, 'renderD', u64(128 + dev.dev_id))
-	remove_device_node(dev.node, 'card', u64(dev.dev_id))
+	remove_device_nodes(dev)
 	registered_devices[dev.dev_id] = unsafe { nil }
 	C.kprintf(c'drm: Unregistered card%llu\n', u64(dev.dev_id))
 }
