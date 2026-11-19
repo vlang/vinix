@@ -40,7 +40,9 @@ fn scan_generation_directory(root string, relative string, expected map[string]u
 		name := unsafe { tos(&u8(&entry.d_name[0]), int(C.strlen(&char(&entry.d_name[0])))) }
 		if name == '.' || name == '..' { continue }
 		child := if relative == '' { name.clone() } else { relative + '/' + name }
-		defer { unsafe { child.free() } }
+		// A queued directory name is owned and freed by the queue.
+		mut queued := false
+		defer { if !queued { unsafe { child.free() } } }
 		if child !in expected || count >= remaining { return error('unexpected generation entry: ${child}') }
 		count++
 		mut leaf := C.stat{}
@@ -51,8 +53,9 @@ fn scan_generation_directory(root string, relative string, expected map[string]u
 			if leaf.st_mode & 0o170000 != 0o040000 || (flushed && leaf.st_mode & 0o7777 != 0o755) {
 				return error('generation directory type or permissions changed: ${child}')
 			}
-			// V clones string pushes; the queue owns its copy independently.
+			// A push copies the string header, not its bytes.
 			pending << child
+			queued = true
 		} else if leaf.st_mode & 0o170000 != 0o100000 || leaf.st_nlink != 1 || leaf.st_mode & 0o7777 != wanted {
 			return error('generation file type, link count or permissions changed: ${child}')
 		}
