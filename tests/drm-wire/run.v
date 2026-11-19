@@ -33,6 +33,12 @@ fn main() {
 	production += section(source, 'fn (mut this DrmNode) unref(', 'fn (mut this DrmNode) link(')!
 		.replace('file.Handle', 'NodeHandle').replace('resource.o_path', 'o_path')
 		.replace('syncobj.destroy_owner(', 'destroy_owner(')
+	production += section(source, 'fn create_device_node(', 'fn drm_node_name(')!
+		.replace('sizeof(resource.Resource)', 'sizeof(NodeBox)')
+		.replace('resource.Resource(node)', 'NodeBox{minor: u64(minor), node: node}')
+		.replace('stat.ifchr', 'node_ifchr')
+		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
+		.replace('memory.free(', 'memory.free_registration(')
 	production += section(source, 'fn publish_device_nodes(', 'fn remove_device_node(')!
 		.replace('fs.devtmpfs_add_dri_devices(', 'devtmpfs_add_dri_devices(')
 	production += section(devtmpfs_source, 'pub fn devtmpfs_add_dri_devices(', '// Caller holds vfs_lock.')!
@@ -42,8 +48,10 @@ fn main() {
 		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!
 		.replace('mmap.map_shared', 'map_shared')
-	production += section(source, 'pub fn register_driver_with_data(', 'fn copy_version_field(')!
+	production += section(source, 'fn discard_unpublished_device(', 'fn copy_version_field(')!
 		.replace('syncobj.shared_timeline_stub()', 'shared_timeline_stub()').replace('C.kprintf(', 'C.printf(')
+		.replace('memory.malloc_packed_fallible(', 'memory.allocate_registration(')
+		.replace('memory.free(', 'memory.free_registration(')
 	assert source.contains('\npub fn get_device(')
 	production += 'pub fn get_device(' + source.all_after('\npub fn get_device(')
 	os.write_file('${scratch}/drm/production.v', production)!

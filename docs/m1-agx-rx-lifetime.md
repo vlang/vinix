@@ -257,3 +257,31 @@ Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-name-publication-20261119.ImjujQ/`.
 The `bundle.tar.gz` SHA-256 is
 `9f0be0a75fe94380a6f0da660d7d1c0420a55a0320662aabd1646251ceba73ea`.
+
+## DRM registration allocation failures
+
+DRM allocates the device record, each node record and each resource box
+with the fallible allocator. Failure returns `ENOMEM`, releases every
+allocation made for the unpublished registration, and leaves the names
+and registry slot available. Successful devtmpfs publication transfers
+ownership before the device starts accepting data opens.
+
+The DRM wire sanitizer fixture injected 64 failures at all five sites
+across card-only and card-plus-render registration. Each case checked
+the live allocation count, empty namespace and successful retry. Two
+controls caught a missing free after box allocation failure and missing
+cleanup after a partial construction. The independent lifetime review
+and generated ARM64 code confirmed the allocation and cleanup order.
+
+Both kernel builds, both QEMU descriptor-flags suites, both AGX
+sanitizer suites, 79 local contract tests and 122 pinned-reference
+checks passed. The ARM64 guest logged simple DRM card creation. The
+allocation scan found three fewer implicit DRM sites on each
+architecture, with 174 existing allowance findings. The tested base
+was `29d22abfad57f54834f2c0f01caee9f06ee55a44` plus the archived patch.
+Native M1 validation remains open.
+
+Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-registration-oom-20261119.fYrPl6/`.
+The `bundle.tar.gz` SHA-256 is
+`ce232a872e853cca35a24d006040391e2d1ed57e420bf436a2fee64e2d552204`.

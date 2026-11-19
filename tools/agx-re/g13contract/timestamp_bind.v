@@ -55,13 +55,18 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 	device := section(drm, 'pub struct DrmDevice {', '// Forward-reference placeholder', 'DRM registration data')!
 	require_order(device, ['pub:', 'driver_data voidptr', 'pub mut:'], 'DRM device context is immutable')!
 	registration := section(drm, 'pub fn register_driver_with_data(', 'pub fn unregister_device(', 'DRM publication')!
-	require_order(registration, ['mut dev := &DrmDevice{', 'driver_data: driver_data',
-		'registered: false', 'dev.node = create_device_node(dev, false)',
-		'dev.render_node = create_device_node(dev, true)', 'publish_device_nodes(dev) or {',
-		'free(dev.node.box)', 'free(dev.node)', 'free(dev.render_node.box)', 'free(dev.render_node)',
-		'free(dev)', 'return none',
+	require_order(registration, ['memory.malloc_packed_fallible(sizeof(DrmDevice))',
+		'if storage == unsafe { nil }', 'errno.set(errno.enomem)', 'return none',
+		'*dev = DrmDevice{', 'driver_data: driver_data',
+		'registered: false', 'if !published { discard_unpublished_device(dev) }',
+		'dev.node = create_device_node(dev, false)?', 'dev.render_node = create_device_node(dev, true)?',
+		'publish_device_nodes(dev)?', 'published = true',
 		'registered_devices[id] = dev', 'katomic.store(mut dev.registered, true)'],
 		'Publish device readiness after installing its context, nodes and registry entry')!
+	discard := section(drm, 'fn discard_unpublished_device(', '// Install driver-private context', 'DRM registration rollback')!
+	require_order(discard, ['for node in [dev.node, dev.render_node]!', 'if node == unsafe { nil }',
+		'memory.free(voidptr(node.box))', 'memory.free(voidptr(node))', 'memory.free(voidptr(dev))'],
+		'Release only the initialized registration records on failure')!
 	unregister := section(drm, 'pub fn unregister_device(', 'fn copy_version_field(', 'DRM unregistration')!
 	require_order(unregister, ['drm_devices_lock.acquire()', 'registered_devices[dev.dev_id] != dev { return }',
 		'katomic.store(mut d.registered, false)', "remove_device_node(dev.render_node, 'renderD'",

@@ -3,8 +3,10 @@
 module drm
 
 import errno
+import memory
 
 const map_shared = 1
+const node_ifchr = u32(0o020000)
 
 struct NodeBox {
 	minor u64
@@ -71,14 +73,6 @@ fn devtmpfs_remove_device(name string, expected &NodeBox) bool {
 	return true
 }
 
-fn create_device_node(dev &DrmDevice, render bool) &DrmNode {
-	assert drm_devices_lock.held && registered_devices[dev.dev_id] == unsafe { nil }
-	minor := u64(dev.dev_id) + if render { u64(128) } else { u64(0) }
-	mut node := &DrmNode{dev: unsafe { dev }, refcount: 1}
-	node.box = &NodeBox{minor: minor, node: unsafe { node }}
-	return node
-}
-
 fn ensure_devtmpfs_dir(parent &VFSNode, name string) &VFSNode {
 	if name in parent.children { return unsafe { parent.children[name] } }
 	mut root := unsafe { parent }
@@ -94,6 +88,9 @@ fn publish_devtmpfs_device(device &NodeBox, directory &VFSNode, leaf string, sea
 	mut parent := unsafe { directory }
 	mut node := unsafe { device.node }
 	assert registered_devices[node.dev.dev_id] == unsafe { nil }
+	assert node.stat.rdev == u64(226 << 8) | device.minor
+	assert node.stat.mode == node_ifchr | 0o666
+	assert node.refcount == 1 && node.box == device
 	expect_unavailable(mut node)
 	if device.minor >= 128 {
 		expect_unavailable(mut node_names[node.dev.dev_id])
@@ -106,10 +103,12 @@ fn publish_devtmpfs_device(device &NodeBox, directory &VFSNode, leaf string, sea
 fn check_registration_collisions() {
 	driver := DrmDriver{features: driver_render}
 	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enodev
+	assert memory.registration_outstanding() == 0
 	devtmpfs_root = &VFSNode{directory: true, children: &map[string]&VFSNode{}}
 	blocker := &VFSNode{}
 	unsafe { devtmpfs_root.children['dri'] = blocker }
 	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enotdir
+	assert memory.registration_outstanding() == 0
 	assert unsafe { devtmpfs_root.children['dri'] == blocker }
 	devtmpfs_root.children.delete('dri')
 	mut dir := ensure_devtmpfs_dir(devtmpfs_root, 'dri')
@@ -118,6 +117,7 @@ fn check_registration_collisions() {
 		assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.eexist
 		assert published_nodes == 0 && dir.children.len == 1 && unsafe { dir.children[leaf] == blocker }
 		assert get_device(0) == none && node_names[0] == unsafe { nil } && node_names[128] == unsafe { nil }
+		assert memory.registration_outstanding() == 0
 		if leaf == 'card0' {
 			assert register_driver_with_data(&DrmDriver{}, unsafe { nil }) == none && errno.get() == errno.eexist
 		}
@@ -132,8 +132,36 @@ fn check_registration_collisions() {
 	assert !drm_devices_lock.held && !vfs_lock.held
 }
 
+fn check_registration_allocation_failure() {
+	dir := unsafe { devtmpfs_root.children['dri'] }
+	for render in [false, true]! {
+		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
+		allocations := if render { 5 } else { 3 }
+		for _ in 0 .. 8 {
+			for successful in 0 .. allocations {
+				live := memory.registration_outstanding()
+				prior_publications := published_nodes
+				memory.fail_registration_after(successful)
+				errno.set(0)
+				assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enomem
+				memory.fail_registration_after(-1)
+				assert memory.registration_outstanding() == live, 'failed registration retained metadata'
+				assert published_nodes == prior_publications && dir.children.len == 0
+				assert get_device(0) == none && node_names[0] == unsafe { nil } && node_names[128] == unsafe { nil }
+				assert !drm_devices_lock.held && !vfs_lock.held
+				retry := register_driver_with_data(&driver, unsafe { nil }) or { panic('registration retry failed') }
+				assert retry.dev_id == 0 && retry.is_registered()
+				assert memory.registration_outstanding() == live + allocations
+				unregister_device(retry)
+			}
+		}
+	}
+	println('DRM registration: 64 injected metadata allocation failures release the prefix and allow retry')
+}
+
 fn check_registration() {
 	check_registration_collisions()
+	check_registration_allocation_failure()
 	for render in [false, true]! {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
 		dev := register_driver_with_data(&driver, voidptr(0x1234)) or { panic('registration failed') }

@@ -616,11 +616,25 @@ fn copy_ioctl_output(user u64, buffer voidptr, size u32, user_size u32) bool {
 }
 
 // The node is /dev/dri/<prefix><number>.
-fn create_device_node(dev &DrmDevice, render bool) &DrmNode {
-	mut node := &DrmNode{
-		dev: unsafe { dev }
-		render: render
-		refcount: 1 // The devtmpfs name owns the initial reference.
+fn create_device_node(dev &DrmDevice, render bool) ?&DrmNode {
+	storage := memory.malloc_packed_fallible(sizeof(DrmNode))
+	if storage == unsafe { nil } {
+		errno.set(errno.enomem)
+		return none
+	}
+	box := memory.malloc_packed_fallible(sizeof(resource.Resource))
+	if box == unsafe { nil } {
+		memory.free(storage)
+		errno.set(errno.enomem)
+		return none
+	}
+	mut node := unsafe { &DrmNode(storage) }
+	unsafe {
+		*node = DrmNode{
+			dev: dev
+			render: render
+			refcount: 1 // The devtmpfs name owns the initial reference.
+		}
 	}
 	node.stat.size = 0
 	node.stat.blocks = 0
@@ -632,7 +646,9 @@ fn create_device_node(dev &DrmDevice, render bool) &DrmNode {
 	node.stat.mode = stat.ifchr | 0o666
 	node.can_mmap = voidptr(dev.driver) != unsafe { nil } && dev.driver.mmap != unsafe { nil }
 
-	node.box = &resource.Resource(unsafe { node })
+	// Adopt the separately allocated box without an implicit V allocation.
+	unsafe { *(&voidptr(&node.box)) = box }
+	unsafe { *node.box = resource.Resource(node) }
 	return node
 }
 
@@ -833,6 +849,15 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 	return register_driver_with_data(driver, unsafe { nil })
 }
 
+fn discard_unpublished_device(dev &DrmDevice) {
+	for node in [dev.node, dev.render_node]! {
+		if node == unsafe { nil } { continue }
+		memory.free(voidptr(node.box))
+		memory.free(voidptr(node))
+	}
+	memory.free(voidptr(dev))
+}
+
 // Install driver-private context before publishing either device node.
 // The caller keeps the context alive until every reference to the device and
 // its open files is gone, including references that survive unregister.
@@ -852,30 +877,32 @@ pub fn register_driver_with_data(driver &DrmDriver, driver_data voidptr) ?&DrmDe
 		return none
 	}
 
-	mut dev := &DrmDevice{
-		driver_data: driver_data
-		dev_id: id
-		driver: unsafe { driver }
-		registered: false
-	}
-
-	dev.node = create_device_node(dev, false)
-	if driver.features & driver_render != 0 {
-		dev.render_node = create_device_node(dev, true)
-	}
-	publish_device_nodes(dev) or {
-		// Both names were checked before either node could become reachable.
-		unsafe {
-			free(dev.node.box)
-			free(dev.node)
-			if dev.render_node != nil {
-				free(dev.render_node.box)
-				free(dev.render_node)
-			}
-			free(dev)
-		}
+	storage := memory.malloc_packed_fallible(sizeof(DrmDevice))
+	if storage == unsafe { nil } {
+		errno.set(errno.enomem)
 		return none
 	}
+	mut dev := unsafe { &DrmDevice(storage) }
+	unsafe {
+		*dev = DrmDevice{
+			driver_data: driver_data
+			dev_id: id
+			driver: driver
+			registered: false
+		}
+	}
+	mut published := false
+	defer {
+		if !published { discard_unpublished_device(dev) }
+	}
+
+	dev.node = create_device_node(dev, false)?
+	if driver.features & driver_render != 0 {
+		dev.render_node = create_device_node(dev, true)?
+	}
+	// Devtmpfs checks both names before either node can become reachable.
+	publish_device_nodes(dev)?
+	published = true
 	registered_devices[id] = dev
 	// Both nodes can already be visible. Admit data opens after installing
 	// the registry entry.
