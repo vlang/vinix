@@ -4,8 +4,10 @@ apple/smc/smc.v conversion to interface	2
 apple/smc/smc.v struct on the heap	2
 block/verity/verity.v cast to interface	1
 block/verity/verity.v struct on the heap	1
+dev/ahci/ahci.v cast to interface	1
 dev/console/console_arm64.v cast to interface	1
 dev/fbdev/fbdev.v string interpolation	1
+dev/nvme/nvme.v cast to interface	1
 devicetree/devicetree.v array initialization	3
 drm/simple/simple.v array initialization	1
 event/event_arm64.v array initialization	1

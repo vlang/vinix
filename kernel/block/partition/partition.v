@@ -148,7 +148,16 @@ fn partition_name(prefix string, index int) string {
 	return text.str()
 }
 
-pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
+// Every partition found keeps `parent` for good, so it must be the device's
+// interface box, made once and never freed: the one its device node holds.
+// A `mut resource.Resource` argument cannot be kept: for a concrete device V
+// passes the address of an interface it builds in the caller's frame, which
+// is gone when the caller returns. Partitions holding that address worked
+// until something reused the stack, and then the first read through one --
+// hibernate's look at every disk's first block -- panicked with "interface
+// method resource__Resource.read not implemented".
+pub fn scan_partitions(parent &resource.Resource, prefix string) int {
+	mut parent_device := unsafe { parent }
 	parent_identity := resource.block_identity(mut parent_device)
 	lba_buffer := memory.malloc(u64(parent_device.stat.blksize))
 
@@ -192,7 +201,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			mut partition := &Partition{
 				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
 				sector_cnt:    sectors
-				parent_device: unsafe { parent_device }
+				parent_device: unsafe { parent }
 			}
 
 			partition.stat.blocks = partition.sector_cnt
@@ -233,7 +242,7 @@ pub fn scan_partitions(mut parent_device resource.Resource, prefix string) int {
 			mut partition := &Partition{
 				device_offset: u64(partition_entry.starting_lba * parent_device.stat.blksize)
 				sector_cnt:    partition_entry.sector_cnt
-				parent_device: unsafe { parent_device }
+				parent_device: unsafe { parent }
 			}
 
 			partition.stat.blocks = partition.sector_cnt

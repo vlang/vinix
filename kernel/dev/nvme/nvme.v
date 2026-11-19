@@ -998,6 +998,9 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 			C.kprintf(c'nvme: lba size: %llx\n', u64(new_namespace.stat.blksize))
 			C.kprintf(c'nvme: max prps: %llx\n', u64(new_namespace.max_prps))
 
+			// The device node and the partitions on the namespace keep this
+			// box for good.
+			box := &resource.Resource(new_namespace)
 			// The device node keeps the name; the partitions' names are made
 			// from the prefix, which goes afterwards.
 			mut name := lib.new_text(16)
@@ -1005,7 +1008,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 			name.add_decimal(controller_list.len)
 			name.add_byte(`n`)
 			name.add_unsigned(i)
-			fs.devtmpfs_add_device(new_namespace, name.str())
+			fs.devtmpfs_add_device(box, name.str())
 			mut prefix_text := lib.new_text(16)
 			prefix_text.add('nvme')
 			prefix_text.add_decimal(controller_list.len)
@@ -1013,7 +1016,7 @@ pub fn (mut c NVMEController) initialise(pci_device &pci.PCIDevice) int {
 			prefix_text.add_unsigned(i)
 			prefix_text.add_byte(`p`)
 			prefix := prefix_text.str()
-			partition.scan_partitions(mut new_namespace, prefix)
+			partition.scan_partitions(box, prefix)
 			unsafe { prefix.free() }
 
 			c.namespace_list << new_namespace

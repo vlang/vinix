@@ -827,18 +827,21 @@ pub fn (mut c AHCIController) initialise(pci_device &pci.PCIDevice) int {
 						continue
 					}
 
+					// The device node and the partitions on the disk keep this
+					// box for good.
+					box := &resource.Resource(device)
 					// The device node keeps the name; the partitions' names are
 					// made from the prefix, which goes afterwards.
 					mut name := lib.new_text(8)
 					name.add('sd')
 					name.add_decimal(c.device_list.len)
-					fs.devtmpfs_add_device(device, name.str())
+					fs.devtmpfs_add_device(box, name.str())
 					mut prefix_text := lib.new_text(8)
 					prefix_text.add('sd')
 					prefix_text.add_decimal(c.device_list.len)
 					prefix_text.add_byte(`-`)
 					prefix := prefix_text.str()
-					partition.scan_partitions(mut device, prefix)
+					partition.scan_partitions(box, prefix)
 					unsafe { prefix.free() }
 
 					c.device_list << device
