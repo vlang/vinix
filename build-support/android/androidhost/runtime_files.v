@@ -7,7 +7,7 @@ import crypto.sha256
 #include <stdlib.h>
 
 fn C.mkstemp(&u8) i32
-fn C.write(i32, voidptr, usize) isize
+fn C.write(i32, voidptr, uint) int
 fn C.close(i32) i32
 fn C.unlink(&char) i32
 fn C.rename(&char, &char) i32
@@ -229,7 +229,7 @@ fn copy_to_temporary(source string, temporary Temporary) ! {
 		if count == 0 { break }
 		mut cursor := 0
 		for cursor < count {
-			written := C.write(temporary.fd, unsafe { &u8(buffer.data) + cursor }, usize(count - cursor))
+			written := C.write(temporary.fd, unsafe { &u8(buffer.data) + cursor }, uint(count - cursor))
 			if written < 0 {
 				if int(C.errno) == int(C.EINTR) { continue }
 				failure := file_error('')

@@ -26,7 +26,7 @@ fn needed_read(mut file os.File, count u64) ![]u8 {
 	mut remaining := count
 	for remaining > 0 {
 		wanted := if remaining > u64(buffer.len) { buffer.len } else { int(remaining) }
-		n := C.read(i32(file.fd), &buffer[0], usize(wanted))
+		n := C.read(i32(file.fd), &buffer[0], uint(wanted))
 		if n < 0 {
 			if C.errno == C.EINTR { continue }
 			return file_error('')

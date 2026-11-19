@@ -334,7 +334,7 @@ fn make_probe_zip(items []ProbePayload) ![]u8 {
 fn write_probe_bytes(mut stream os.File, bytes []u8) ! {
 	mut position := 0
 	for position < bytes.len {
-		n := C.write(i32(stream.fd), unsafe { &u8(bytes.data) + position }, usize(bytes.len - position))
+		n := C.write(i32(stream.fd), unsafe { &u8(bytes.data) + position }, uint(bytes.len - position))
 		if n < 0 {
 			if C.errno == C.EINTR { continue }
 			return file_error('')
@@ -410,7 +410,7 @@ fn (mut a ProbeAppend) publish(item ?ProbePayload) ! {
 	if C.lseek(i32(a.stream.fd), i64(z.start), C.SEEK_SET) < 0 { return file_error('') }
 	mut position := z.start
 	for position < output.len {
-		n := C.write(i32(a.stream.fd), unsafe { &u8(output.data) + position }, usize(output.len - position))
+		n := C.write(i32(a.stream.fd), unsafe { &u8(output.data) + position }, uint(output.len - position))
 		if n < 0 {
 			if C.errno == C.EINTR { continue }
 			return file_error('')

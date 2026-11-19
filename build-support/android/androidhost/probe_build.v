@@ -202,7 +202,7 @@ fn probe_command_output_preferred(arguments []string, capture bool, host_arch st
 		write_open = false
 		mut buffer := [8192]u8{}
 		for {
-			count := C.read(pipes[0], &buffer[0], usize(buffer.len))
+			count := C.read(pipes[0], &buffer[0], uint(buffer.len))
 			if count < 0 {
 				if C.errno == C.EINTR { continue }
 				return file_error('')

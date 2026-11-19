@@ -6,7 +6,7 @@ import crypto.sha256
 #include <sys/stat.h>
 
 fn C.fstat(i32, &C.stat) i32
-fn C.read(i32, voidptr, usize) isize
+fn C.read(i32, voidptr, uint) int
 fn C.lseek(i32, i64, i32) i64
 
 pub struct FileError {
@@ -73,7 +73,7 @@ fn read_part(mut stream os.File, count int, path string) ![]u8 {
 	mut bytes := []u8{len: count}
 	mut cursor := 0
 	for cursor < count {
-		n := C.read(i32(stream.fd), unsafe { &u8(bytes.data) + cursor }, usize(count - cursor))
+		n := C.read(i32(stream.fd), unsafe { &u8(bytes.data) + cursor }, uint(count - cursor))
 		if n < 0 {
 			if C.errno == C.EINTR { continue }
 			return file_error(path)
