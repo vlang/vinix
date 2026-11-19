@@ -350,4 +350,6 @@ boot log shows the GPU as a later card, they will not find it.
 * Userspace is a separate acceptance criterion. The submission interface is
   pinned to a particular Mesa-era UAPI (`drm_ioctl.validate_asahi_25_layouts()`),
   and whether userspace selects the native driver and emits commands and shaders
-  this kernel accepts is not covered here.
+  this kernel accepts is not covered here. Omarchy's prebuilt Mesa 26.3 runs
+  on Vinix in QEMU from a staged glibc root, but QEMU has no Apple GPU
+  ([running it on Vinix](m1-agx-mesa-interface.md#running-it-on-vinix)).

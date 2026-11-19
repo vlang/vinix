@@ -1,11 +1,12 @@
 # What Omarchy's Mesa asks of the kernel
 
 Omarchy packages Mesa `omacom/mesa` `b7b03c5b3b8abe1e040d6056dc62c01b02d3639c`.
-Building it needs meson, which is Python, so it has not been built or run on
-Vinix. This page lists every kernel interface that Mesa's Asahi drivers and the
-code they use on a render node call, from the pinned source, and where Vinix
-provides each. It is the checklist for the migration; it does not replace
-running the build.
+Building it needs meson, which is Python, so Vinix has not built it, but
+Omarchy's prebuilt package of it runs on Vinix in QEMU
+([below](#running-it-on-vinix)). This page lists every kernel interface that
+Mesa's Asahi drivers and the code they use on a render node call, from the
+pinned source, and where Vinix provides each. It is the checklist for the
+migration; it does not replace running Mesa on the GPU.
 
 The audit covers the Gallium and Vulkan (Honeykrisp) drivers in `src/asahi`
 and `src/gallium/drivers/asahi`, the shared Vulkan runtime and window-system
@@ -26,8 +27,8 @@ the display driver and are not listed.
 | `/proc/self/fdinfo` | not read by Mesa | provided for monitoring tools ([fdinfo](m1-agx-fdinfo.md)) |
 
 Nothing Mesa calls on the render node is missing. What is unverified is the
-behaviour behind each entry with this Mesa: the build has not run, and no
-submission has reached a physical GPU.
+behaviour behind each entry with this Mesa: no submission has reached a
+physical GPU.
 
 ## Evidence
 
@@ -58,4 +59,63 @@ alongside the libraries it depends on.
 | Depends | `expat`, `glibc`, `gcc-libs`, `libdrm`, `libglvnd`, `libx11`, `libxcb`, `libxext`, `libxshmfence`, `libxxf86vm`, `libLLVM.so=23.1-64`, `lm_sensors`, `wayland`, `zlib`, `zstd`, `vulkan-mesa-implicit-layers` |
 
 Everything but Mesa itself comes from Arch Linux ARM, including LLVM 23's
-`libLLVM.so`, the largest of them. Nothing has been downloaded or run yet.
+`libLLVM.so`, the largest of them. Arch Linux ARM's `llvm-libs 23.1.5-1.2`
+provides `libLLVM.so=23.1-64`.
+
+## Running it on Vinix
+
+`tests/omarchy-mesa` stages the package with everything it needs and runs it,
+unmodified, on Vinix in QEMU ([README](../tests/omarchy-mesa/README.md)).
+`stage.v` resolves the dependencies the way pacman does and checks every
+package against its database. On 2026-11-19 it chose 94 packages: 108 MiB to
+download, 558 MiB installed.
+
+| Package | Version | From |
+| --- | --- | --- |
+| `mesa-aurora`, `vulkan-aurora` | `1:26.3.0_devel.20261107.231485.b7b03c5b3b8-3` | Omarchy edge |
+| `llvm-libs` | `23.1.5-1.2` | Arch Linux ARM |
+| `glibc` | `2.43+r22+g8362e8ce10b2-2` | Arch Linux ARM |
+| `libdrm` | `2.4.134-1` | Arch Linux ARM |
+| `vulkan-icd-loader`, `vulkan-tools` | `1.4.363.0-1` | Arch Linux ARM |
+| `vulkan-mesa-implicit-layers` | `1:26.3.1-1` | Arch Linux ARM (Omarchy has none) |
+| `mesa-utils` | `9.0.0-7` | Arch Linux ARM |
+
+The root goes to QEMU as a read-only disk, and the test chroots into it on a
+kernel built from `604be201b`, aarch64 `PROD`. There:
+
+- Every library of the Gallium driver (`libgallium-26.3.0-devel.so`), of
+  Honeykrisp (`libvulkan_asahi.so`), of `libEGL_mesa.so.0` and of
+  `vulkaninfo`, `eglinfo` and `peglgears` resolves.
+- The Vulkan loader loads Honeykrisp and creates an instance. Honeykrisp finds
+  no GPU, since QEMU has none, so `vkEnumeratePhysicalDevices` fails the way
+  the loader fails with no GPU.
+- `eglinfo` gets, on the surfaceless and device platforms, `llvmpipe (LLVM
+  23.1.5, 128 bits)` with OpenGL `4.6 (Core Profile) Mesa 26.3.0-devel
+  (git-b7b03c5b3b)` and OpenGL ES 3.2. GBM, Wayland and X11 do not initialise:
+  there is no render node and no display server.
+- The device platform lists only the software device. libdrm 2.4.134 lists no
+  DRM device, because QEMU's framebuffer is a DRM device without a parent
+  ([DRM sysfs](m1-agx-drm-sysfs.md#devices-without-a-parent)).
+- `peglgears` draws 41,375 frames in 5 seconds on llvmpipe.
+- As a control, the same root without `libLLVM.so.23.1` reports six problems.
+
+glibc 2.43 tries to register `rseq` (syscall 293 on AArch64) in every process.
+Vinix does not implement it and logs `VACANT SC:293`. glibc carries on without
+it, as it does on Linux kernels older than 4.18.
+
+So in QEMU, Omarchy's Mesa, LLVM 23 and glibc load and render on Vinix. The
+Asahi Gallium driver and Honeykrisp only load there. Their device paths need
+the M1, where the same root would find `renderD128` through sysfs, without
+Vinix's Mesa patch.
+
+Evidence is under
+`/Users/alex/.local/state/vinix/omarchy-m1-mesa-root-20261119/`. The bundle
+has the run logs, the package manifest with each SHA-256, the database
+checksums and the checksums of the kernel, init and disk image. The packages
+(`pkgcache/`) and the staged root (`stage-final/root`) are kept beside it.
+
+| Artifact | SHA-256 |
+| --- | --- |
+| `bundle.tar.gz` | `d8e9c8e883c6bc557e01c65ded1902befc680dee72f7891d0db12c67faa70c13` |
+| `bundle.tar.gz` inventory | `c37f986454dee719ff09a40f6ff1f9d03c6fd099c9252a9664cd9f8527cc275c` |
+| kernel `bin/vinix` at `604be201b` | `9a6774e446e1ce3906aaadb631750285046ee4514cc201803ef513a32ed34dd8` |
