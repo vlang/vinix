@@ -209,15 +209,15 @@ The M1 image preflight now accepts the release the image's marker names. For
 Omarchy's Mesa it also requires Honeykrisp, the Vulkan loader and the ICD
 file, and the staging tree passes it.
 
-Two things still use 25.0.5:
+The fake G17 renderer still needs 25.0.5: it is a patch for the legacy
+interface. `VINIX_MESA_RELEASE=25.0.5` builds that release as before, though
+the changed script was not run for it.
 
-- **The fake G17 renderer.** It is a 25.0.5 patch for the legacy interface.
-  `VINIX_MESA_RELEASE=25.0.5` builds that release as before. The changed
-  script was not run for it.
-- **The QEMU VirGL desktop.** Mesa 26.3 lists render nodes only through
-  libdrm's sysfs walk. QEMU's virtio-gpu node has no parent in sysfs yet, so
-  this Mesa would not find it and would draw with softpipe. The VirGL QEMU
-  (KekVM) is not built on this Mac, so this was not run.
+Mesa 26.3 lists render nodes only through libdrm's sysfs walk, and QEMU's
+virtio-gpu node had no parent in sysfs, so this Mesa would not have found it
+for the VirGL desktop. The node now has Linux's parent, the virtio device in
+its `virtio_mmio` platform device ([DRM sysfs](m1-agx-drm-sysfs.md#qemus-virgl-gpu)).
+Neither has run with a VirGL QEMU, because KekVM's is not built on this Mac.
 
 Evidence is under
 `/Users/alex/.local/state/vinix/vinix-mesa26-20261119/`.

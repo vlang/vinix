@@ -78,6 +78,37 @@ does a second device whose parent has a name already taken there, as Linux's
 listed by anyone; the files in them are root-only. On the M1 the GPU's file is `asahi_stats`
 ([raw statistics](m1-agx-stats.md#raw-statistics-in-debugfs)).
 
+## QEMU's VirGL GPU
+
+QEMU's virtio-gpu on the VirtIO-MMIO transport now has Linux's place too. On
+Linux its DRM device's parent is the virtio device, inside the platform device
+of the device-tree node `virtio_mmio@<address>`:
+
+```
+/sys/devices/platform/a003e00.virtio_mmio/
+    uevent     DRIVER=virtio-mmio, OF_FULLNAME=/virtio_mmio@a003e00,
+               OF_COMPATIBLE_0=virtio,mmio, MODALIAS=of:Nvirtio_mmioT(null)Cvirtio,mmio
+    subsystem  -> ../../../bus/platform
+    virtio31/
+        uevent     DRIVER=virtio_gpu, MODALIAS=virtio:d00000010v554D4551
+        subsystem  -> ../../../../bus/virtio
+        drm/card0, drm/renderD128
+```
+
+libdrm 2.4.123's `drmParseSubsystemType()` reads the node's bus from the
+virtio device. Finding `virtio` there, it takes the bus of the device's
+parent, so it lists the node as a platform device. It names the device from
+the virtio device's `MODALIAS`, since there is no OF data there. Mesa 26.3
+lists render nodes only through libdrm, so without these entries it would not
+find the VirGL node. Linux numbers virtio devices in the order it finds them;
+Vinix names the device after its MMIO slot, which nothing reads. A
+virtio-gpu on PCI still gets no parent.
+
+`tests/drm-sysfs` publishes such a device and walks it with a port of
+libdrm's rule, read from its source. A link one level short, or a uevent
+without `MODALIAS`, fails the test. QEMU here has no VirGL device, so the
+driver's registration with these entries has not run in a guest.
+
 ## Devices without a parent
 
 The QEMU framebuffer and any other driver that names no parent get Linux's
