@@ -40,3 +40,22 @@ its checksum and every match of the interfaces above, by file and line.
 | --- | --- |
 | Mesa archive of the pinned commit | `924e5a7b57f61c6ccee4b538959a3d66d21a299f8346a9b576626c682a77ca5b` |
 | `bundle.tar.gz` | `6a4947e938d84ab49661a469b6de1735f66471fc694d8feca1b015d36d377426` |
+
+## The prebuilt package
+
+Omarchy publishes this Mesa prebuilt. Its pacman repository's aarch64 edge
+channel (`https://pkgs.omarchy.org/edge/aarch64/omarchy.db`, read on
+2026-11-19) lists `mesa-aurora 1:26.3.0_devel.20261107.231485.b7b03c5b3b8-3`,
+built from the pinned commit; the stable channel still has an older build. So
+the packaged Mesa could be run on Vinix without building it, in a glibc root
+alongside the libraries it depends on.
+
+| Field | Value |
+| --- | --- |
+| File | `mesa-aurora-1:26.3.0_devel.20261107.231485.b7b03c5b3b8-3-aarch64.pkg.tar.zst` |
+| Size | 7,214,296 bytes compressed, 35,225,817 installed |
+| SHA-256 | `ace83518fcd258ac45ed9cb68709c3c39da1af97431618e0020d5a37dd621e4f` |
+| Depends | `expat`, `glibc`, `gcc-libs`, `libdrm`, `libglvnd`, `libx11`, `libxcb`, `libxext`, `libxshmfence`, `libxxf86vm`, `libLLVM.so=23.1-64`, `lm_sensors`, `wayland`, `zlib`, `zstd`, `vulkan-mesa-implicit-layers` |
+
+Everything but Mesa itself comes from Arch Linux ARM, including LLVM 23's
+`libLLVM.so`, the largest of them. Nothing has been downloaded or run yet.
