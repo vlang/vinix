@@ -119,6 +119,8 @@ mut:
 	boot_send_irq u32
 	// Publish both power checks together for senders outside the receive lock.
 	application_ready bool
+	// A crash blocks every firmware-led endpoint until the next handshake.
+	crashed bool
 }
 
 pub fn new_rtkit(mbox_base u64, name string) RTKit {
@@ -436,6 +438,7 @@ fn (mut rtk RTKit) boot_transport(request_wake bool, receive_irq u32, send_irq u
 	rtk.iop_power_state = 0
 	rtk.ap_power_state = 0
 	rtk.refresh_application_ready()
+	katomic.store(mut rtk.crashed, false)
 	C.kprintf(c'rtkit[%.*s]: Starting boot handshake\n', i32(rtk.name.len), rtk.name.str)
 
 	// Wake the IOP. Its acknowledgment may arrive before or after HELLO/EPMAP.
@@ -737,9 +740,9 @@ pub fn (mut rtk RTKit) handle_system_message_wait(msg mailbox.MboxMsg, wait mail
 			if rtk.system_iovas[ep] == 0 {
 				return rtk.reply_system_buffer(ep, msg.data0, wait)
 			}
+			katomic.store(mut rtk.crashed, true)
 			C.kprintf(c'rtkit[%.*s]: coprocessor crash notification\n', i32(rtk.name.len),
 				rtk.name.str)
-			katomic.store(mut rtk.application_ready, false)
 			rtk.dump_crashlog()
 			rtk.state = .error
 			return false
@@ -828,7 +831,7 @@ pub fn (mut rtk RTKit) start_endpoint_irq(ep u8, irq u32) bool {
 	}
 	if ep >= app_endpoint_start {
 		ready := if rtk.firmware_led_boot {
-			katomic.load(&rtk.application_ready)
+			!katomic.load(&rtk.crashed) && katomic.load(&rtk.application_ready)
 		} else {
 			rtk.state == .running
 		}
@@ -851,48 +854,42 @@ pub fn (mut rtk RTKit) send_message_irq(ep u8, data u64, irq u32) bool {
 	return rtk.send_message_wait(ep, data, mailbox.SendWait{irq: irq})
 }
 
-struct ApplicationSendGuard {
+struct TransportSendGuard {
 	rtk  &RTKit
 	wait mailbox.SendWait
+	application bool
 }
 
-fn rtkit_application_send_active(context voidptr) bool {
-	guard := unsafe { &ApplicationSendGuard(context) }
+fn rtkit_send_active(context voidptr) bool {
+	guard := unsafe { &TransportSendGuard(context) }
 	return (guard.wait.active == unsafe { nil } || guard.wait.active(guard.wait.context))
-		&& katomic.load(&guard.rtk.application_ready)
+		&& !katomic.load(&guard.rtk.crashed)
+		&& (!guard.application || katomic.load(&guard.rtk.application_ready))
 }
 
-// Firmware-led application sends recheck readiness after polling or IRQ waits.
+// A firmware-led send checks for a crash before each FIFO attempt.
 pub fn (mut rtk RTKit) send_message_wait(ep u8, data u64, wait mailbox.SendWait) bool {
 	message := mailbox.MboxMsg{
 		data0: data
 		data1: u64(ep)
 	}
-	if ep >= app_endpoint_start && rtk.firmware_led_boot {
+	if rtk.firmware_led_boot {
+		boot_irq := if wait.lock == unsafe { nil } { rtk.boot_send_irq } else { u32(0) }
 		// The mailbox checks this synchronously, with wait.lock held if supplied.
-		guard := ApplicationSendGuard{rtk: rtk, wait: wait}
-		return rtk.mbox.send_timed_wait(message, mailbox.SendWait{
-			irq: wait.irq
+		guard := TransportSendGuard{rtk: rtk, wait: wait, application: ep >= app_endpoint_start}
+		send_wait := mailbox.SendWait{
+			irq: if boot_irq != 0 { boot_irq } else { wait.irq }
 			lock: wait.lock
 			context: unsafe { voidptr(&guard) }
-			active: rtkit_application_send_active
-		})
+			active: rtkit_send_active
+		}
+		if boot_irq != 0 { rtk.lock.release() }
+		sent := rtk.mbox.send_timed_wait(message, send_wait)
+		if boot_irq != 0 { rtk.lock.acquire() }
+		return sent
 	}
 	if wait.lock != unsafe { nil } {
 		return rtk.mbox.send_timed_wait(message, wait)
-	}
-	if rtk.firmware_led_boot {
-		boot_irq := rtk.boot_send_irq
-		if boot_irq != 0 {
-			rtk.lock.release()
-			sent := rtk.mbox.send_timed_irq(message, boot_irq)
-			rtk.lock.acquire()
-			return sent
-		}
-		if wait.irq != 0 {
-			return rtk.mbox.send_timed_irq(message, wait.irq)
-		}
-		return rtk.mbox.send_timed(message)
 	}
 	return rtk.mbox.send(message)
 }

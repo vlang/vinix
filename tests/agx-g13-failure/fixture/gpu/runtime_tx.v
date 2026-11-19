@@ -171,7 +171,7 @@ fn check_g13_batch_power_wait(mut mgr GpuManager, mut tx ascmailbox.Mailbox) {
 	}
 }
 
-fn crash_during_polled_doorbell() {
+fn crash_during_polled_send() {
 	timer.watch_busywait(unsafe { nil })
 	assert rtkit_owner.lock.is_held() && kio.aic_irq_masked(575)
 	assert !rtkit_owner.handle_role_system_message(0, mailbox.MboxMsg{data0: u64(1) << 52,
@@ -181,7 +181,7 @@ fn crash_during_polled_doorbell() {
 fn crash_on_fifo_retry() {
 	timer.watch_busywait(unsafe { nil })
 	fifo_lock := unsafe { &rtkit_owner.rtk.mbox.unguarded_transport.lock }
-	klock.on_next_acquire(fifo_lock, crash_during_polled_doorbell)
+	klock.on_next_acquire(fifo_lock, crash_during_polled_send)
 }
 
 enum PolledCrashPoint {
@@ -190,7 +190,7 @@ enum PolledCrashPoint {
 	retry_lock
 }
 
-fn check_g13_polled_crash_wait(abi hw.FirmwareAbi, point PolledCrashPoint, mut tx ascmailbox.Mailbox) {
+fn check_g13_polled_crash_wait(abi hw.FirmwareAbi, point PolledCrashPoint, message mailbox.MboxMsg, mut tx ascmailbox.Mailbox) {
 	for irq in [u32(0), 575]! {
 		mut transport := rtkit.RTKit{name: 'g13-polled-crash'}
 		boot_g13_fixture_transport(mut transport)
@@ -203,22 +203,24 @@ fn check_g13_polled_crash_wait(abi hw.FirmwareAbi, point PolledCrashPoint, mut t
 		kio.require_send_owner(unsafe { &mgr.lock })
 		cpu.set_interrupt_state(irq == 0)
 		mgr.lock.acquire()
+		wait := mgr.g13_rtkit_send_wait_locked()
+		ep := mailbox.msg_endpoint(&message)
 		kio.configure_send(tx.base, unsafe { &tx.lock }, 0)
-		assert mgr.ring_g13_batch_pipe_locked(3, 2)
+		assert transport.send_message_wait(ep, message.data0, wait)
 		reads, writes, words := kio.send_result()
-		assert reads == 1 && writes == 2 && words == [u64(0x008300000000000e), 0x21]!
+		assert reads == 1 && writes == 2 && words == [message.data0, message.data1]!
 		kio.configure_send(tx.base, unsafe { &tx.lock }, if point == .first_lock { u64(0) } else { u64(1) })
 		match point {
-			.first_lock { klock.on_next_acquire(unsafe { &tx.lock }, crash_during_polled_doorbell) }
-			.poll_wait { timer.watch_busywait(crash_during_polled_doorbell) }
+			.first_lock { klock.on_next_acquire(unsafe { &tx.lock }, crash_during_polled_send) }
+			.poll_wait { timer.watch_busywait(crash_during_polled_send) }
 			.retry_lock { timer.watch_busywait(crash_on_fifo_retry) }
 		}
-		assert !mgr.ring_g13_batch_pipe_locked(3, 2), 'polled doorbell must stop when a crash revokes RTKit readiness at ${point}'
+		assert !transport.send_message_wait(ep, message.data0, wait), 'polled RTKit send on endpoint ${ep} must stop after a crash at ${point}'
 		assert transport.state == .error && mgr.state == .running && mgr.lock.is_held()
 		crash_reads, crash_writes, _ := kio.send_result()
 		expected_reads := if point == .first_lock { u64(0) } else { u64(1) }
 		assert crash_reads == expected_reads && crash_writes == 0 && !tx.lock.is_held()
-		assert !mgr.ring_g13_batch_pipe_locked(3, 2)
+		assert !transport.send_message_wait(ep, message.data0, wait)
 		final_reads, final_writes, _ := kio.send_result()
 		assert final_reads == expected_reads && final_writes == 0
 		mgr.lock.release()
@@ -235,7 +237,10 @@ fn check_g13_batch_pipe_transmit() {
 	mailbox.set_wait_transport(unsafe { &tx })
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
 		for point in [PolledCrashPoint.first_lock, .poll_wait, .retry_lock]! {
-			check_g13_polled_crash_wait(abi, point, mut tx)
+			for message in [mailbox.MboxMsg{data0: u64(8) << 52, data1: rtkit.ep_ioreport},
+				mailbox.MboxMsg{data0: 0x008300000000000e, data1: 0x21}]! {
+				check_g13_polled_crash_wait(abi, point, message, mut tx)
+			}
 		}
 		mut transport := rtkit.RTKit{name: 'g13-batch-doorbell'}
 		boot_g13_fixture_transport(mut transport)

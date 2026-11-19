@@ -157,21 +157,20 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 	boot_state := section(transport, 'fn (mut rtk RTKit) boot_transport(', '// Only the system endpoints', 'Vinix boot transmit owner')!
 	require_order(boot_state, ['rtk.lock.acquire()', 'rtk.boot_send_irq = send_irq', 'defer {',
 		'rtk.boot_send_irq = 0', 'rtk.lock.release()'], 'The private boot transport clears the transmit IRQ before returning')!
-	require_order(local_send, ['boot_irq := rtk.boot_send_irq', 'rtk.lock.release()',
-		'rtk.mbox.send_timed_irq(message, boot_irq)', 'rtk.lock.acquire()', 'return sent',
-		'if wait.irq != 0 {', 'return rtk.mbox.send_timed_irq(message, wait.irq)'],
+	require_order(local_send, ['boot_irq := if wait.lock == unsafe { nil } { rtk.boot_send_irq } else { u32(0) }',
+		'irq: if boot_irq != 0 { boot_irq } else { wait.irq }', 'if boot_irq != 0 { rtk.lock.release() }',
+		'rtk.mbox.send_timed_wait(message, send_wait)', 'if boot_irq != 0 { rtk.lock.acquire() }', 'return sent'],
 		'Vinix releases the RTKit lock around boot IRQ-assisted transmit')!
-	require_order(local_send, ['if rtk.firmware_led_boot {', 'return rtk.mbox.send_timed(message)', 'return rtk.mbox.send(message)'],
-		'Vinix selects elapsed-time transmit only for firmware-led G13 RTKit')!
-	require_order(local_send, ['fn rtkit_application_send_active(',
+	require_order(local_send, ['if rtk.firmware_led_boot {', 'rtk.mbox.send_timed_wait(message, send_wait)',
+		'if wait.lock != unsafe { nil }', 'return rtk.mbox.send_timed_wait(message, wait)', 'return rtk.mbox.send(message)'],
+		'Vinix selects elapsed-time transmit for firmware-led RTKit and preserves the legacy transport')!
+	require_order(local_send, ['fn rtkit_send_active(',
 		'guard.wait.active == unsafe { nil } || guard.wait.active(guard.wait.context)',
-		'&& katomic.load(&guard.rtk.application_ready)',
-		'if ep >= app_endpoint_start && rtk.firmware_led_boot {',
-		'guard := ApplicationSendGuard{rtk: rtk, wait: wait}',
-		'return rtk.mbox.send_timed_wait(message, mailbox.SendWait{', 'irq: wait.irq', 'lock: wait.lock',
-		'context: unsafe { voidptr(&guard) }', 'active: rtkit_application_send_active',
-		'if wait.lock != unsafe { nil }', 'return rtk.mbox.send_timed_wait(message, wait)'],
-		'Vinix supplies RTKit readiness and optional caller liveness for every firmware-led application send')!
+		'&& !katomic.load(&guard.rtk.crashed)', '&& (!guard.application || katomic.load(&guard.rtk.application_ready))',
+		'if rtk.firmware_led_boot {', 'guard := TransportSendGuard{rtk: rtk, wait: wait, application: ep >= app_endpoint_start}',
+		'send_wait := mailbox.SendWait{', 'lock: wait.lock', 'context: unsafe { voidptr(&guard) }',
+		'active: rtkit_send_active', 'rtk.mbox.send_timed_wait(message, send_wait)'],
+		'Vinix checks the crash latch on all firmware-led sends and the power gate on application sends')!
 }
 
 fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot string, boot string, start string) ! {
@@ -183,6 +182,9 @@ fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot strin
 	require_order(running, ['if (rtk->crashed)', '(rtk->iop_power_state & 0xff) != APPLE_RTKIT_PWR_STATE_ON',
 		'(rtk->ap_power_state & 0xff) != APPLE_RTKIT_PWR_STATE_ON'], 'Asahi application readiness requires both power low bytes and a live coprocessor')!
 	send := section(linux, 'int apple_rtkit_send_message(', 'EXPORT_SYMBOL_GPL(apple_rtkit_send_message);', 'Asahi application send')!
+	require_order(send, ['if (rtk->crashed)', 'return -EINVAL;',
+		'if (ep >= APPLE_RTKIT_APP_ENDPOINT_START &&', 'return apple_mbox_send'],
+		'Asahi rejects a crashed transport before applying the application-only power check')!
 	require(start.contains('endpoint >= APPLE_RTKIT_APP_ENDPOINT_START &&\n\t    !apple_rtkit_is_running(rtk)')
 		&& send.contains('ep >= APPLE_RTKIT_APP_ENDPOINT_START &&\n\t    !apple_rtkit_is_running(rtk)'),
 		'Asahi checks current application readiness at both start and send')!
@@ -200,9 +202,9 @@ fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot strin
 		'Vinix publishes both ON predicates together')!
 	local_start := section(transport, 'pub fn (mut rtk RTKit) start_endpoint(', '// Send a protocol-defined payload', 'Vinix application start')!
 	local_send := section(transport, 'pub fn (mut rtk RTKit) send_message(', 'pub fn (mut rtk RTKit) recv_msg(', 'Vinix application send')!
-	require_order(local_start, ['ep >= app_endpoint_start', 'katomic.load(&rtk.application_ready)',
+	require_order(local_start, ['ep >= app_endpoint_start', '!katomic.load(&rtk.crashed) && katomic.load(&rtk.application_ready)',
 		'if !ready', 'return false', 'rtk.send_start_endpoint(ep, irq)'], 'Vinix checks readiness before starting application endpoints')!
-	require_order(local_send, ['fn rtkit_application_send_active(', 'katomic.load(&guard.rtk.application_ready)',
-		'if ep >= app_endpoint_start && rtk.firmware_led_boot', 'rtk.mbox.send_timed_wait',
-		'active: rtkit_application_send_active'], 'Vinix supplies the current readiness gate before timed application mailbox writes')!
+	require_order(local_send, ['fn rtkit_send_active(', 'katomic.load(&guard.rtk.application_ready)',
+		'if rtk.firmware_led_boot', 'application: ep >= app_endpoint_start', 'active: rtkit_send_active',
+		'rtk.mbox.send_timed_wait'], 'Vinix supplies the current readiness gate before timed application mailbox writes')!
 }

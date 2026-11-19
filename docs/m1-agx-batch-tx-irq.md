@@ -134,3 +134,27 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `d18db22b6d4b194303963b150652187663099a81e02ada426f1de046f60108d2`.
 Native M1 firmware validation remains open.
+
+## System sends after an RTKit crash
+
+The pinned Asahi transport rejects messages to every endpoint after a
+coprocessor crash. G13 RTKit now sets a crash flag before reading the log
+and checks it under the ASC FIFO lock on each send attempt. System replies
+remain available when application power is off and the transport is live.
+
+The sanitizer fixture reproduced a stale IOReport reply on
+`30cd542c7dcc775a9d73e2fc4695b8ed08a357db`. All 24 cases passed across
+both G13 firmware ABIs, covering IOReport replies and application doorbells
+with a crash during the first FIFO lock acquisition, the poll wait or the
+retry lock acquisition. They verify cancellation before any further FIFO
+access and rejection of a fresh send after the crash.
+
+Both kernel builds, the job-lifetime suite, 79 local contract tests and
+122 pinned-reference checks passed. Generated AArch64 C keeps the transmit
+context on the stack. The allocation scan reproduced 176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-rtkit-system-crash-20261119.bFnGkX/`.
+The `bundle.tar.gz` SHA-256 is
+`882d2f67c44d53cd6f7e91d364d3fe5e515fd54b970adb17cadc82dda2405b16`.
+Native M1 firmware validation remains open.

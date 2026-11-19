@@ -69,8 +69,9 @@ fn check_rtkit_crashlog(transport string, linux string, header string, decoder s
 	require(transport.contains('const crash_notification = u8(1)'), 'Vinix RTKit crash type')!
 	receive := section(transport, 'pub fn (mut rtk RTKit) handle_system_message(', 'fn start_system_endpoints(', 'Vinix RTKit crash receive')!
 	require_order(receive, ['ep_crashlog {', 'management_type(msg.data0) != crash_notification', 'return true',
-		'rtk.system_iovas[ep] == 0', 'rtk.reply_system_buffer', 'rtk.dump_crashlog()', 'rtk.state = .error'],
-		'Vinix ignores unknown notifications before negotiation or crash handling')!
+		'rtk.system_iovas[ep] == 0', 'rtk.reply_system_buffer', 'katomic.store(mut rtk.crashed, true)',
+		'rtk.dump_crashlog()', 'rtk.state = .error'],
+		'Vinix distinguishes buffer negotiation from a crash and closes the send gate before reading the log')!
 	read := section(transport, 'fn (rtk &RTKit) dump_crashlog()', 'fn management_type(', 'Vinix RTKit record parser')!
 	require_order(read, ['total < crashlog_header_size || u64(total) > allocated',
 		'offset <= total - crashlog_entry_header_size', 'length < crashlog_entry_header_size || length > total - offset',
