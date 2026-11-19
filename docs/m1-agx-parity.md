@@ -1490,7 +1490,7 @@ and unverified behavior. Passing a source gate does not certify a complete row.
 | Power management | Modern G13 SUBMIT restores the packaged 2 ms idle delay on both firmware layouts. Asahi's debug delay overrides and broader reset and suspend/resume behavior remain open. |
 | M1 family | The native path configures base M1/t8103. The reference also supports t6000/t6001/t6002 M1 Pro/Max/Ultra, including clustering and multiple dies. |
 | Telemetry | G13 firmware logging matches the packaged descriptor and payload layout. Vinix prints numbered log levels through its kernel logger. Linux severity filtering and the full firmware statistics/debug interface remain open. |
-| Complete wire comparison | Existing tests cover selected InitData and work-command contracts. Every remaining field/default still needs independent comparison; a matching structure size is insufficient. |
+| Complete wire comparison | Every t8103 InitData field value at 12.3 and 13.5, the device-tree power derivation and the firmware object protections were compared with the reference; the differences found are fixed ([InitData values](m1-agx-initdata-values.md)). One-ULP ties in the reference software float remain. Work-command fields beyond the tested contracts still need independent comparison. |
 | Userspace integration | Vinix's bundled Mesa is 25.0.5. Omarchy packages a newer matched Mesa/DRM stack. Driver ABI modernization and userspace migration must be verified together. |
 | Hardware acceptance | No native Vinix boot, recovery, compute/render result, concurrent lifecycle or performance result was obtained for this change. |
 

@@ -337,6 +337,99 @@ fn check_initdata() {
 	assert read_u64(bytes, 0x28) == 0xdddd_eeee_ffff_0001
 }
 
+fn hwdata_b_bytes_for(cfg &hw.HwConfig) []u8 {
+	mut data := fw.G13HwDataBBlob{}
+	assert fw.populate_g13_hwdata_b_blob(mut data, cfg, 0x1234_0000, 0xffff_ffa0_1100_0000,
+		0xffff_ffae_1000_0000)
+	mut out := []u8{len: data.bytes.len}
+	for index in 0 .. data.bytes.len {
+		out[index] = data.bytes[index]
+	}
+	return out
+}
+
+// Where a 12.3 HwDataB field lands in the 13.5 blob, through the copied spans.
+fn hwdata_b_offset(abi hw.FirmwareAbi, offset u32) u32 {
+	if abi == .v12_3 {
+		return offset
+	}
+	for span, start in fw.g13_hwdata_b_copy_offsets_v12_3 {
+		if offset >= start && offset < start + fw.g13_hwdata_b_copy_sizes[span] {
+			return fw.g13_hwdata_b_copy_offsets_v13_5[span] + offset - start
+		}
+	}
+	panic('HwDataB 0x${offset:x} is not copied to 13.5')
+}
+
+// Values that differed from Asahi's initdata.rs (Linux-Aurora bed544bdf) for
+// t8103 before they were matched. Each 13.5 offset is also given as computed
+// by hand from the struct definitions, so the generated tables are checked too.
+fn check_asahi_reference_values() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial] {
+		v13 := abi == .v13_5_partial
+		mut cfg := config_for(abi)
+		// A seven-core M1 Air: the identity registers still report eight cores
+		// in its one cluster, and the fused mask leaves seven of them on.
+		assert cfg.apply_g13_identity(0x01, 1, 8, 8, 4, 7, [u32(0x7f), 0, 0, 0]!)
+		assert cfg.gpu_core_count == 7
+		cfg.g13_power.pwr_integral_min_clamp = 7
+		cfg.g13_power.pwr_sample_period_aic_clks = 12345
+
+		// HwDataB.unk_20/unk_28 (the macOS USC start) are 0 in Asahi, and
+		// num_cores is cores per cluster times clusters, not the active count.
+		b := hwdata_b_bytes_for(&cfg)
+		usc := hwdata_b_offset(abi, 0x20)
+		assert usc == if v13 { u32(0x10) } else { 0x20 }
+		assert read_u64(b, usc) == 0
+		assert read_u64(b, hwdata_b_offset(abi, 0x28)) == 0
+		num_cores := hwdata_b_offset(abi, 0x568)
+		assert num_cores == if v13 { u32(0xa88) } else { 0x568 }
+		assert read_u32(b, num_cores) == 8
+
+		// Globals.unk_903c: 0 below 13.0b4 and 1 from it.
+		globals := globals_for(&cfg)
+		unk_903c := fw.g13_globals_offset(abi, 0x903c) or { panic('unk_903c') }
+		assert unk_903c == if v13 { u32(0x9190) } else { 0x903c }
+		assert read_u32(globals, unk_903c) == u32(v13)
+
+		mut hwdata_a := fw.G13HwDataA{}
+		assert fw.populate_g13_hwdata_a(mut hwdata_a, &cfg)
+		mut a := []u8{len: hwdata_a.bytes.len}
+		for index in 0 .. hwdata_a.bytes.len {
+			a[index] = hwdata_a.bytes[index]
+		}
+		// pwr_integral_min_clamp is the float at 0x670; Asahi never writes
+		// pwr_integral_min_clamp_2.
+		assert read_u32(a, fw.g13_hwdata_a_offset(abi, 0x670) or { 0 }) == 0x40e0_0000
+		clamp_2 := if v13 { u32(0x714) } else { 0x6f8 }
+		assert read_u32(a, clamp_2) == 0
+		// clocks_per_period follows apple,pwr-sample-period-aic-clks.
+		assert read_u32(a, 0x004) == 12345
+
+		// T81xxData is filled below 13.3 only.
+		t81xx := [u32(0xd8c), 0xd90, 0xd9c, 0xda4, 0xdac, 0xdb8, 0xdbc, 0xdcc]!
+		expected := [u32(0x8000_0000), 4, 0x3f19_999a, 0x3ecc_cccd, 0x3ec5_62e1, 0x4780_0000,
+			0x4158_f5c3, 600]!
+		for index, offset in t81xx {
+			at := fw.g13_hwdata_a_offset(abi, offset) or { panic('T81xxData') }
+			if v13 {
+				assert at == 0x1020 + offset - 0xd8c
+			}
+			assert read_u32(a, at) == if v13 { u32(0) } else { expected[index] }
+		}
+
+		if v13 {
+			assert read_u32(a, fw.g13_v13_5_hwdata_a_clocks_per_period_2_offset) == 12345
+			// The SE time constants count 24 MHz clocks over the 8 ms period,
+			// whatever apple,pwr-sample-period-aic-clks says.
+			clks := fw.g13_v13_5_hwdata_a_unk_e10_0_gpu_se_filter_time_constant_clks_offset
+			assert read_u64(a, clks) == 9 * 24_000 * 8
+			clks_1 := fw.g13_v13_5_hwdata_a_unk_e10_0_gpu_se_filter_time_constant_1_clks_offset
+			assert read_u64(a, clks_1) == 3 * 24_000 * 8
+		}
+	}
+}
+
 // Nothing outside the two G13 ABIs may build these blobs.
 fn check_unsupported_abi_refused() {
 	mut cfg := config_for(.v12_3)
@@ -356,6 +449,7 @@ fn main() {
 	check_globals_fault_control()
 	check_hwdata_b()
 	check_initdata()
+	check_asahi_reference_values()
 	check_unsupported_abi_refused()
 	println('G13 firmware ABI translation tests passed')
 }

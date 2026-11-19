@@ -220,7 +220,6 @@ pub fn populate_g13_hwdata_a(mut data G13HwDataA, config &hw.HwConfig) bool {
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x6d4, ppm_periods_x4)
 	ok = ok && g13_set_filter(mut data, abi, 0x6e0, 0x6e8, ppm_periods)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x6f0, ppm_ki_dt)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x6f8, power.pwr_integral_min_clamp)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x6fc, 0x4780_0000)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x700, power.ppm_kp_f32)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0x70c, power.pwr_min_duty_cycle)
@@ -301,15 +300,18 @@ pub fn populate_g13_hwdata_a(mut data G13HwDataA, config &hw.HwConfig) bool {
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd4c, power.avg_power_filter_tc_ms)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd64, max_scaled)
 
-	// Exact pre-13.3 t8103 tail selected by Apple's builder.
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd8c, 0x8000_0000)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd90, 4)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd9c, 0x3f19_999a)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xda4, 0x3ecc_cccd)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdac, 0x3ec5_62e1)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdb8, 0x4780_0000)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdbc, 0x4158_f5c3)
-	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdcc, max_scaled)
+	// The t8103 T81xxData tail. Asahi fills it only below firmware 13.3 and
+	// leaves it zero at 13.5.
+	if abi == .v12_3 {
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd8c, 0x8000_0000)
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd90, 4)
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xd9c, 0x3f19_999a)
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xda4, 0x3ecc_cccd)
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdac, 0x3ec5_62e1)
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdb8, 0x4780_0000)
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdbc, 0x4158_f5c3)
+		ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xdcc, max_scaled)
+	}
 	ok = ok && g13_hwdata_a_put_u64(mut data, abi, 0xe1c, 0x12)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xe24, 112)
 	ok = ok && g13_hwdata_a_put_u32(mut data, abi, 0xe28, 1)

@@ -57,10 +57,14 @@ fn g13_hwdata_a_write_se_block(mut data G13HwDataA, abi hw.FirmwareAbi,
 	f32_65536 := firmware_u32_to_f32_bits(65536) or { return false }
 	f32_8000 := firmware_u32_to_f32_bits(8000) or { return false }
 
-	tc_clks := g13_checked_mul_u32(power.se_filter_time_constant, inputs.clocks_per_period) or {
+	// Asahi counts these in whole milliseconds of the 24 MHz clock, not in
+	// apple,pwr-sample-period-aic-clks, so a device tree override of that
+	// property leaves them alone.
+	coarse_clks := g13_checked_mul_u32(inputs.base_clock_khz, inputs.period_ms) or { return false }
+	tc_clks := g13_checked_mul_u32(power.se_filter_time_constant, coarse_clks) or {
 		return false
 	}
-	tc_1_clks := g13_checked_mul_u32(power.se_filter_time_constant_1, inputs.clocks_per_period) or {
+	tc_1_clks := g13_checked_mul_u32(power.se_filter_time_constant_1, coarse_clks) or {
 		return false
 	}
 	tc_ms := g13_checked_mul_u32(power.se_filter_time_constant, inputs.period_ms) or {

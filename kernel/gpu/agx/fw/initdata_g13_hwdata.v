@@ -185,8 +185,9 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 	data.unk_008 = 0x14_00000000
 	data.unk_010 = 0x1_00000000
 	data.unk_018 = 0xffc00000
-	data.usc_start = 0x11_00000000
-	data.usc_end = 0x11_00000000
+	// m1n1 records 0x11_00000000 here from macOS; Asahi writes 0 to both.
+	data.usc_start = 0
+	data.usc_end = 0
 	data.unknown_page = unknown_page
 	data.unkptr_038 = timestamp_area_base
 	data.chip_id = config.chip_id
@@ -213,7 +214,9 @@ pub fn populate_g13_hwdata_b(mut data G13HwDataB, config &hw.HwConfig,
 	data.uat_ttb_base = uat_ttb_base
 	data.gpu_core_id = config.firmware_gpu_core_id
 	data.gpu_revision_id = revision_id
-	data.num_cores = config.gpu_core_count
+	// Cores per cluster times clusters, as the identity registers report them:
+	// Asahi writes 8 on a seven-core M1. gpu_core_count is the fused active count.
+	data.num_cores = config.num_cores_per_cluster * config.num_clusters
 	data.max_pstate = config.perf_state_count - 1
 	data.num_pstates = config.perf_state_count
 	data.min_sram_voltage_mv = config.min_sram_microvolt / 1000
