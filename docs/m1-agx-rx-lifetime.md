@@ -106,3 +106,25 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `e74e764202e8af6375c28f44530cbd936a6fb61e21330ba90e35d624446af028`.
 Native M1 firmware validation remains open.
+
+## Cleanup after DRM registration failure
+
+The AGX driver publishes the global manager after DRM registration succeeds.
+If registration fails after firmware startup, the driver runs the normal
+GPU shutdown path. An unconfirmed G13 ASC stop leaves the unregistered
+manager under driver ownership. Shutdown or the next initialization can
+retry before a new probe replaces the UAT.
+
+Six sanitizer cases across both firmware ABIs cover registration success,
+failure cleanup, and a failed stop followed by successful cleanup. Three
+negative controls detected early publication, missing cleanup and shutdown
+that skipped an unregistered manager. Both kernel builds, the job-lifetime
+suite, 79 local contract tests and 122 pinned-reference checks passed
+against `41c9ed349e0ad7f148a074723e3990afb5a83ba4` plus the archived patch.
+The allocation scan matched the 176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-agx-drm-registration-20261119.YnIjzc/`.
+The `bundle.tar.gz` SHA-256 is
+`763ee40f2c3608a19a10328fcfea00e5659078bf5407e70d4356f7c14209e5d8`.
+Native M1 firmware validation remains open.

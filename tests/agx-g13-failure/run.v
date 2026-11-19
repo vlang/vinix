@@ -75,6 +75,11 @@ fn run_checks() int {
 	driver_source := if os.args.len == 4 && os.args[2] == '--driver-source' { os.args[3] } else { '${repo}/kernel/gpu/agx/driver/driver.v' }
 	driver := os.read_file(driver_source) or { panic(err) }
 	production += section(driver, 'fn (mut driver AgxDriver) retry_probe_cleanup(', '// Probe GPU from device tree') or { panic(err) }
+	registration := driver.all_after('\nfn (mut driver AgxDriver) register_gpu(')
+	assert registration.contains('pub fn shutdown()')
+	production += ('fn (mut driver AgxDriver) register_gpu(' + registration)
+		.replace('gpu.GpuManager', 'GpuManager').replace('gpu.set_global_manager', 'set_global_manager')
+		.replace('drm.', '')
 	production += section(source, 'const g13_channel_allocation_count', 'const buffer_allocator_default') or { panic(err) }
 	production += section(source, 'struct G13ChannelAllocations {', '@[inline]\nfn pipe_index') or { panic(err) }
 	production += section(source, 'const buffer_allocator_g13_rtkit', '\n') or { panic(err) }

@@ -367,6 +367,7 @@ pub fn run_checks() {
 	check_g13_receive_order()
 	check_g13_receive_irq()
 	check_g13_failed_asc_stop()
+	check_g13_drm_registration()
 	check_g13_runtime_transmit()
 	check_g13_batch_pipe_transmit()
 	check_g13_grow_ack_transmit()

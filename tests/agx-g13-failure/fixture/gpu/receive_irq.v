@@ -16,6 +16,69 @@ __global irq_boot_waits = 0
 struct AgxDriver {
 mut:
 	probe_cleanup &GpuManager = unsafe { nil }
+	gpu &GpuManager = unsafe { nil }
+	drm_dev &DrmDevice = unsafe { nil }
+	initialized bool
+}
+
+struct DrmDriver {
+	fail bool
+}
+
+struct DrmDevice {
+mut:
+	driver_data voidptr
+}
+
+__global agx_driver_inst AgxDriver
+__global test_drm_device DrmDevice
+__global published_gpu = unsafe { &GpuManager(nil) }
+
+fn set_global_manager(mgr &GpuManager) { published_gpu = unsafe { mgr } }
+
+fn register_driver_with_data(driver &DrmDriver, data voidptr) ?&DrmDevice {
+	assert published_gpu == unsafe { nil }, 'GPU publication must follow DRM registration'
+	if driver.fail { return none }
+	test_drm_device.driver_data = data
+	return unsafe { &test_drm_device }
+}
+
+fn unregister_device(dev &DrmDevice) {
+	assert dev == unsafe { &test_drm_device } && dev.driver_data == voidptr(published_gpu)
+	test_drm_device.driver_data = unsafe { nil }
+}
+
+fn check_g13_drm_registration() {
+	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		for scenario in [0, 1, 2]! {
+			mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}, stop_fails: scenario == 2}
+			registered := agx_driver_inst.register_gpu(unsafe { &mgr }, &DrmDriver{fail: scenario != 0})
+			assert registered == (scenario == 0) && agx_driver_inst.initialized == registered
+			if registered {
+				assert mgr.state == .running && mgr.trace.len == 0
+				assert published_gpu == unsafe { &mgr } && test_drm_device.driver_data == unsafe { voidptr(&mgr) }
+			} else {
+				assert published_gpu == unsafe { nil } && agx_driver_inst.drm_dev == unsafe { nil }
+				if scenario == 2 {
+					assert mgr.state == .error && mgr.trace == ['halt', 'stop']
+					shutdown()
+					assert agx_driver_inst.gpu == unsafe { &mgr }, 'failed shutdown must retain the unregistered manager'
+					mgr.stop_fails = false
+				} else {
+					assert_failed(&mgr)
+					assert agx_driver_inst.gpu == unsafe { nil }
+				}
+			}
+			shutdown()
+			assert mgr.state == .stopped && published_gpu == unsafe { nil } && !agx_driver_inst.initialized
+			assert agx_driver_inst.gpu == unsafe { nil } && agx_driver_inst.drm_dev == unsafe { nil }
+			assert test_drm_device.driver_data == unsafe { nil }
+			stop_trace_len := mgr.trace.len
+			shutdown()
+			assert mgr.trace.len == stop_trace_len
+		}
+	}
+	println('G13 DRM registration: success, failure unwind and retained stop failure on both ABIs')
 }
 
 fn check_receive_irq_binding() {

@@ -1041,7 +1041,10 @@ fn (mut driver AgxDriver) retry_probe_cleanup() bool {
 
 // Probe GPU from device tree and bring up all supported subsystems.
 pub fn initialise() {
-	if agx_driver_inst.initialized || !agx_driver_inst.retry_probe_cleanup() { return }
+	if agx_driver_inst.initialized || !agx_driver_inst.retry_probe_cleanup()
+		|| !agx_driver_inst.stop_gpu() {
+		return
+	}
 	println('agx: Probing Apple GPU')
 
 	// Step 1: Find and identify the GPU node.
@@ -1209,8 +1212,6 @@ pub fn initialise() {
 		return
 	}
 
-	agx_driver_inst.gpu = mgr
-	gpu.set_global_manager(agx_driver_inst.gpu)
 	mgr.set_file_reaper(agx_file.service_file_work)
 
 	// Step 7: Register the DRM driver after firmware initialization.
@@ -1241,22 +1242,38 @@ pub fn initialise() {
 		mmap_release: agx_file.release_mmap_range_handle
 	}
 
-	agx_driver_inst.drm_dev = drm.register_driver_with_data(agx_drm_driver, voidptr(mgr)) or {
-		println('agx: Failed to register DRM driver')
-		return
-	}
-
-	agx_driver_inst.initialized = true
+	if !agx_driver_inst.register_gpu(mgr, agx_drm_driver) { return }
 
 	// Step 8: Log success
 	println('agx: Apple GPU driver initialized successfully')
 	C.kprintf(c'agx: DRM device registered as card%llu\n', u64(agx_driver_inst.drm_dev.dev_id))
 }
 
+fn (mut driver AgxDriver) register_gpu(mgr &gpu.GpuManager, agx_drm_driver &drm.DrmDriver) bool {
+	driver.gpu = unsafe { mgr }
+	driver.drm_dev = drm.register_driver_with_data(agx_drm_driver, voidptr(mgr)) or {
+		println('agx: Failed to register DRM driver')
+		driver.stop_gpu()
+		return false
+	}
+	gpu.set_global_manager(driver.gpu)
+	driver.initialized = true
+	return true
+}
+
+fn (mut driver AgxDriver) stop_gpu() bool {
+	mut mgr := unsafe { driver.gpu }
+	if mgr == unsafe { nil } { return true }
+	if !mgr.shutdown() { return false }
+	gpu.set_global_manager(unsafe { nil })
+	driver.gpu = unsafe { nil }
+	return true
+}
+
 // Tear down the GPU driver and release all resources.
 pub fn shutdown() {
 	if !agx_driver_inst.retry_probe_cleanup() { return }
-	if !agx_driver_inst.initialized {
+	if !agx_driver_inst.initialized && agx_driver_inst.gpu == unsafe { nil } {
 		return
 	}
 
@@ -1268,13 +1285,7 @@ pub fn shutdown() {
 		agx_driver_inst.drm_dev = unsafe { nil }
 	}
 
-	// Shutdown GPU manager (stops firmware, ASC)
-	if agx_driver_inst.gpu != unsafe { nil } {
-		mut g := unsafe { agx_driver_inst.gpu }
-		if !g.shutdown() { return }
-		gpu.set_global_manager(unsafe { nil })
-		agx_driver_inst.gpu = unsafe { nil }
-	}
+	if !agx_driver_inst.stop_gpu() { return }
 
 	agx_driver_inst.initialized = false
 	println('agx: GPU driver shutdown complete')
