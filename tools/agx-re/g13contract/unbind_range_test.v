@@ -11,11 +11,14 @@ fn test_unbind_range_guards_require_reservation_and_retained_fragment_ownership(
 		'C.memmove(&f.mappings[index + 1], &f.mappings[index]', 'if !f.confirm_mapping_retirement_locked(index) { return -5 }',
 		'f.mappings.delete_many(first, index - first)', 'first++',
 		'gem.ref_obj(mapping.obj)', 'f.mappings[index].size = cut_end - cut_start', 'return f.unbind_range_locked(ctx.id, request.addr, request.range)',
-		'return if f.has_mapping_overlap_locked(ctx.id, request.addr, request.range) { -16 } else { 0 }',
-		'if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj)', 'if busy {'] {
+		'if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj)'] {
 		if _ := check_unbind_range_local(file.replace(token, '')) { assert false, token }
 	}
 	if _ := check_unbind_range_local(file.replace('if !mapping.retiring {', 'if true {')) { assert false, 're-splitting pending retirement' }
+	unbind := 'return f.unbind_range_locked(ctx.id, request.addr, request.range)'
+	if _ := check_unbind_range_local(file.replace(unbind, 'if katomic.load(&ctx.inflight) != 0 { return -16 }\n\t\t\t' + unbind)) {
+		assert false, 'busy range unbind refusal'
+	}
 	if _ := check_unbind_range_local(file.replace('gem.ref_obj(mapping.obj)', 'gem.unref(mapping.obj)')) { assert false, 'dropping surviving backing' }
 	if _ := check_unbind_range_local(file.replace('if mapping.vm_id == vm_id && ranges_overlap', 'if !mapping.retiring && mapping.vm_id == vm_id && ranges_overlap')) {
 		assert false, 'ignoring retained retirements'

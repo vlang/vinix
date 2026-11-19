@@ -13,10 +13,10 @@ fn main() {
 	for name, spec in {
 		'busy-name-removal': ['close', 'vm.detached = true', 'if f.queues.len != 0 { return -16 }; vm.detached = true', 'file.identity_result:'],
 		'visible-name': ['close', 'if vm.vm_id == vm_id && !vm.detached', 'if vm.vm_id == vm_id', 'file.identity_result:'],
-		'visible-retirement-lookup': ['close', 'ctx := f.find_owned_vm(mapping.vm_id)', 'ctx := f.find_vm(mapping.vm_id)', 'file.check_detached_vms:'],
+		'visible-retirement-lookup': ['close', 'ctx := f.find_owned_vm(mapping.vm_id) or { return false }', 'ctx := f.find_vm(mapping.vm_id) or { return false }', 'file.check_detached_vms:'],
 		'lost-queue-owner': ['close', 'if retained { continue }', 'assert retained || !retained', 'file.check_identity_lookups:'],
-		'live-bo-bindings-retained': ['close', '!vm.detached && !mapping.retiring', '!mapping.retiring', 'file.check_detached_vms:'],
-		'no-worker-retry': ['close', 'owned.reap_detached_vms_locked()', '', 'file.check_detached_vms:'],
+		'live-bo-bindings-retained': ['close', '!detached_idle && !mapping.retiring', '!mapping.retiring', 'file.check_detached_vms:'],
+		'no-worker-retry': ['close', 'owned.reap_detached_vms_locked()', '', 'file.check_worker_mapping_retirement:'],
 		'visible-submit-lookup': ['async', 'vm := f.find_owned_vm(vm_id)', 'vm := f.find_vm(vm_id)', 'file.check_detached_vm_submissions:']
 	} {
 		assert source.count(spec[1]) == 1, name

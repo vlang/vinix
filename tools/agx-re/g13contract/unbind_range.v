@@ -46,15 +46,16 @@ fn check_unbind_range_local(file string) ! {
 	require(!overlap.contains('mapping.retiring'), 'Overlap test includes retained retirements')!
 	dispatch := file.all_after('pub fn (mut f GpuFile) ioctl_gem_bind(')
 	range := section(dispatch, 'ioctl.asahi_bind_op_unbind {', 'ioctl.asahi_bind_op_unbind_all {', 'Native range dispatch')!
-	require_order(range, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'katomic.load(&ctx.inflight)',
-		'return if f.has_mapping_overlap_locked(ctx.id, request.addr, request.range) { -16 } else { 0 }',
-		'return f.unbind_range_locked(ctx.id, request.addr, request.range)'], 'Busy range unbind succeeds only for a hole')!
+	require_order(range, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(',
+		'return f.unbind_range_locked(ctx.id, request.addr, request.range)'], 'Range unbind runs while jobs run, as on Asahi G13')!
+	require(!range.contains('inflight'), 'Range unbind does not wait for jobs')!
 	all := section(dispatch, 'ioctl.asahi_bind_op_unbind_all {', 'pub fn (f &GpuFile) ioctl_get_time(', 'Native legacy unbind-all dispatch')!
 	require_order(all, ['f.find_vm(request.vm_id)', 'agxvm.valid_bind_request(', 'obj := f.objects.get_ref(request.handle)',
-		'busy := katomic.load(&ctx.inflight) != 0', 'for i := f.mappings.len - 1; i >= 0; i--',
-		'if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj)', 'if busy {', 'gem.unref(obj)', 'return -16',
+		'for i := f.mappings.len - 1; i >= 0; i--',
+		'if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj)',
 		'if !f.retire_mapping_locked(i)', 'gem.unref(obj)', 'return if retired { 0 } else { -5 }'],
-		'Legacy unbind-all gates only matching records and returns the temporary GEM reference')!
+		'Legacy unbind-all retires only matching records and returns the temporary GEM reference')!
+	require(!all.contains('inflight'), 'Legacy unbind-all does not wait for jobs')!
 }
 
 fn check_unbind_range_reference(file string, mmu string) ! {

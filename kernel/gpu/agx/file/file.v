@@ -324,8 +324,9 @@ fn (mut f GpuFile) release_mmap_range(offset u64) {
 	f.objects.release_mmap_range(offset)
 }
 
-// Caller holds file.lock and has excluded in-flight jobs from this VM. Unmap
-// completes GPU TLBI before dropping the mapping's object reference.
+// Caller holds file.lock. Jobs may still be running in this VM, as Asahi allows
+// on G13: unmap completes the GPU TLBI before the mapping drops its object
+// reference, so later GPU accesses fault instead of reaching freed pages.
 fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 	if !f.confirm_mapping_retirement_locked(index) { return false }
 	gem.unref(f.mappings[index].obj)
@@ -338,7 +339,7 @@ fn (mut f GpuFile) retire_mapping_locked(index int) bool {
 fn (mut f GpuFile) confirm_mapping_retirement_locked(index int) bool {
 	mapping := f.mappings[index]
 	ctx := f.find_owned_vm(mapping.vm_id) or { return false }
-	if katomic.load(&ctx.inflight) != 0 || ctx.pgtable == unsafe { nil } { return false }
+	if ctx.pgtable == unsafe { nil } { return false }
 	if !mapping.retiring {
 		mut pt := unsafe { ctx.pgtable }
 		pt.unmap(mapping.addr, mapping.size)
@@ -347,24 +348,21 @@ fn (mut f GpuFile) confirm_mapping_retirement_locked(index int) bool {
 	return f.finish_file_mapping(true)
 }
 
-// GEM_CLOSE drops the selected GPU-VA bindings once the target VM is idle.
-// An import of the same BO can create new bindings while older ones await
-// retirement. CPU mmap authorization holds its own reference independently.
+// GEM_CLOSE drops the selected GPU-VA bindings at once, as Asahi's G13
+// drop_mappings does even while jobs run. A detached VM keeps its other
+// bindings until its jobs end, because those jobs still own the VM. An import
+// of the same BO can create new bindings while older ones await retirement.
+// CPU mmap authorization holds its own reference independently.
 fn (mut f GpuFile) cleanup_closed_mappings_locked(vm &mmu.UatContext) bool {
 	vm_id := vm.id
-	if katomic.load(&vm.inflight) != 0 {
-		for mapping in f.mappings {
-			if mapping.vm_id == vm_id && mapping.retiring { return false }
-		}
-		return true
-	}
+	detached_idle := vm.detached && katomic.load(&vm.inflight) == 0
 	mut success := true
 	for index := f.mappings.len - 1; index >= 0; index-- {
 		mapping := f.mappings[index]
 		if mapping.vm_id != vm_id {
 			continue
 		}
-		if !vm.detached && !mapping.retiring && !mapping.handle_closed {
+		if !detached_idle && !mapping.retiring && !mapping.handle_closed {
 			continue
 		}
 		if !f.retire_mapping_locked(index) {
@@ -481,8 +479,10 @@ fn (f &GpuFile) mapping_survivor_count_locked(vm_id u32, addr u64, size u64) int
 	return fragments
 }
 
-// The file lock and idle-VM gate protect every fragment. The original owner
-// becomes the removed interval's tombstone; each surviving piece owns one ref.
+// The file lock protects every fragment. Jobs may still run: their slot lease
+// keeps the VM bound, so unmap's TLBI completes before any release. The
+// original owner becomes the removed interval's tombstone; each surviving
+// piece owns one ref.
 fn (mut f GpuFile) unbind_range_locked(vm_id u32, addr u64, size u64) int {
 	end := addr + size
 	fragments := f.mapping_survivor_count_locked(vm_id, addr, size)
@@ -849,18 +849,19 @@ pub fn (mut f GpuFile) ioctl_vm_destroy(data &ioctl.DrmAsahiVmDestroy) int {
 	return 0
 }
 
-// Caller holds file.lock. Retry GEM_CLOSE mappings on idle visible VMs as well
-// as bindings on detached VMs. Only detached VMs can lose their context, and
-// queue owners (including failed-create quarantine) retain driver mappings.
+// Caller holds file.lock. Retry GEM_CLOSE mappings on visible VMs, busy or not,
+// and the remaining bindings of detached VMs once their jobs end. Only
+// detached VMs can lose their context, and queue owners (including
+// failed-create quarantine) retain driver mappings.
 fn (mut f GpuFile) reap_detached_vms_locked() {
 	mut uat := unsafe { f.file_uat() }
 	if uat == unsafe { nil } { return }
 	for index := f.vms.len - 1; index >= 0; index-- {
 		vm := f.vms[index]
 		vm_id := vm.id
-		if (!vm.detached && !vm.closed_mappings_pending) || katomic.load(&vm.inflight) != 0 { continue }
+		if !vm.detached && !vm.closed_mappings_pending { continue }
 		if !f.cleanup_closed_mappings_locked(vm) { continue }
-		if !vm.detached { continue }
+		if !vm.detached || katomic.load(&vm.inflight) != 0 { continue }
 		mut retained := false
 		for queue in f.queues {
 			if queue.vm_id == vm_id { retained = true; break }
@@ -953,11 +954,9 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				gem.unref(obj)
 				return -5
 			}
+			// Replacement proceeds while jobs run, as Asahi's GPUVM remap does on
+			// G13: removed pages are invalidated before their owners are released.
 			replacing := f.has_mapping_overlap_locked(vm_slot, request.addr, request.range)
-			if replacing && katomic.load(&ctx.inflight) != 0 {
-				gem.unref(obj)
-				return -16 // EBUSY: replacement must not remove pages used by jobs.
-			}
 			fragments := f.mapping_survivor_count_locked(vm_slot, request.addr, request.range)
 			if fragments < 0 { gem.unref(obj); return -22 }
 			if !f.reserve_mapping_slots_locked(fragments + 1) {
@@ -999,10 +998,6 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			ctx := f.find_vm(request.vm_id) or { return -2 }
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
-			if katomic.load(&ctx.inflight) != 0 {
-				// A hole needs no PTE changes or owner retirement.
-				return if f.has_mapping_overlap_locked(ctx.id, request.addr, request.range) { -16 } else { 0 }
-			}
 			return f.unbind_range_locked(ctx.id, request.addr, request.range)
 		}
 		ioctl.asahi_bind_op_unbind_all {
@@ -1010,15 +1005,10 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 			if ctx.pgtable == unsafe { nil }
 				|| !agxvm.valid_bind_request(request, ctx.kernel_start, ctx.kernel_end) { return -22 }
 			obj := f.objects.get_ref(request.handle) or { return -2 }
-			busy := katomic.load(&ctx.inflight) != 0
 			mut retired := true
 			for i := f.mappings.len - 1; i >= 0; i-- {
 				mapping := f.mappings[i]
 				if mapping.vm_id == ctx.id && voidptr(mapping.obj) == voidptr(obj) {
-					if busy {
-						gem.unref(obj)
-						return -16
-					}
 					if !f.retire_mapping_locked(i) {
 						retired = false
 					}
@@ -1642,7 +1632,7 @@ fn (mut f GpuFile) submit_g13_staged(captured G13SubmissionQueue,
 	}
 	vm := f.find_owned_vm(vm_id) or { return -22 }
 	// Finish retained mapping retirements before publishing work. This
-	// also retries an earlier GEM_CLOSE once VM pins end.
+	// also retries an earlier GEM_CLOSE whose acknowledgement failed.
 	if !f.cleanup_closed_mappings_locked(vm) { return -5 }
 	if !captured.retained { return -22 }
 	mut initial_mask := attachment_initial_mask

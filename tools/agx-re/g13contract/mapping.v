@@ -6,10 +6,11 @@ fn check_user_mapping_contract(local string, manager string) ! {
 		'// GEM_CLOSE drops', 'Vinix user mapping retirement')!
 	require_order(retire, ['if !f.confirm_mapping_retirement_locked(index) { return false }',
 		'gem.unref(f.mappings[index].obj)', 'f.mappings.delete(index)',
-		'fn (mut f GpuFile) confirm_mapping_retirement_locked(', 'f.find_owned_vm(mapping.vm_id)', 'katomic.load(&ctx.inflight)',
+		'fn (mut f GpuFile) confirm_mapping_retirement_locked(', 'f.find_owned_vm(mapping.vm_id)',
 		'if !mapping.retiring', 'pt.unmap(mapping.addr, mapping.size)',
 		'f.mappings[index].retiring = true',
 		'return f.finish_file_mapping(true)'], 'Vinix retained mapping backing')!
+	require(!retire.contains('inflight'), 'Retirement does not wait for jobs: TLBI precedes the release, as on Asahi G13')!
 	require(retire.count('gem.unref(') == 1 && !retire.contains('manager.state'),
 		'User mapping retirement releases once after TLBI and the device-state check')!
 	bind := section(local, 'pub fn (mut f GpuFile) ioctl_gem_bind(',

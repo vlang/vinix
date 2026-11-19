@@ -42,16 +42,7 @@ fn check_unbind_ranges() {
 				assert file.ioctl_gem_bind(bind(8, 2, 7 * pgtable.uat_pgsz)) == 0
 				original := pt.leaves
 				request := range_request(cut[0], cut[1])
-				before_alloc := memory.calls(); before_check := gpu.mapping_checks()
-				mut occupied := false
-				for index in int(cut[0]) .. int(cut[1]) {
-					if original[index] != 0 { occupied = true; break }
-				}
-				vm.inflight = 1
-				assert file.ioctl_gem_bind(&request) == if occupied { -16 } else { 0 }
-				assert first.references == 3 && second.references == 3 && pt.unmaps == 0
-				assert memory.calls() == before_alloc && gpu.mapping_checks() == before_check && pt.leaves == original
-				vm.inflight = 0; cases++
+				assert first.references == 3 && second.references == 3 && pt.unmaps == 0; cases++
 				if repeated && cut[0] == 1 && cut[1] == 17 {
 					prefix := round % 2
 					gpu.fail_mapping_check_after(prefix)
@@ -64,7 +55,10 @@ fn check_unbind_ranges() {
 					}
 					cases++
 				}
+				// Alternate rounds unbind while a job holds the VM (Asahi G13).
+				vm.inflight = u64(round % 2)
 				assert file.ioctl_gem_bind(&request) == 0, 'range UNBIND must accept holes and surviving fragments'
+				vm.inflight = 0
 				cases++
 				for index in 0 .. 32 {
 					expected := if u64(index) >= cut[0] && u64(index) < cut[1] { u64(0) } else { original[index] }
@@ -124,12 +118,12 @@ fn check_unbind_ranges() {
 			gpu.fail_mapping_checks(1)
 			assert file.ioctl_gem_bind(&inner) == -5 && object.references == 4 && pt.unmaps == 1
 			assert pt.last_unmap_size == request.range; cases++
-			vm.inflight = 1
-			assert file.ioctl_gem_bind(&inner) == -16 && object.references == 4 && pt.unmaps == 1
 			all := ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, vm_id: 1, handle: 7 }
-			assert file.ioctl_gem_bind(&all) == -16 && object.references == 4 && pt.unmaps == 1
-			vm.inflight = 0; cases += 2
+			// A job in flight does not hold user bindings (Asahi G13): the retry
+			// completes from the already-removed PTEs while the VM is busy.
+			vm.inflight = 1
 			assert file.ioctl_gem_bind(&inner) == 0 && object.references == 3 && file.mappings.len == 2 && pt.unmaps == 1
+			vm.inflight = 0
 			cases++
 			for index in 0 .. 8 {
 				assert pt.leaves[index] == if index >= 2 && index < 5 { u64(0) } else { leaves[index] }
@@ -157,7 +151,7 @@ fn check_unbind_ranges() {
 			memory.assert_released()
 		}
 	}
-	println('AGX range UNBIND: ${cases} ioctl checks; VA order, failed retirement suffix preservation, holes, contiguous/repeated survivors, busy gates, reservation OOM, retained split retries, replacement, UNBIND_ALL/GEM_CLOSE and freed arrays passed')
+	println('AGX range UNBIND: ${cases} ioctl checks; VA order, failed retirement suffix preservation, holes, contiguous/repeated survivors, busy-VM retries, reservation OOM, retained split retries, replacement, UNBIND_ALL/GEM_CLOSE and freed arrays passed')
 	check_busy_unbind_all()
 }
 
@@ -178,14 +172,16 @@ fn check_busy_unbind_all() {
 	vm.inflight = 1
 	mut request := ioctl.DrmAsahiGemBind{ op: ioctl.asahi_bind_op_unbind_all, vm_id: 1, handle: 8 }
 	assert file.ioctl_gem_bind(&request) == 0, 'UNBIND_ALL must ignore bindings in another VM'
+	assert pt.unmaps == 0 && gpu.mapping_checks() == before_checks
 	request.handle = 7
-	assert file.ioctl_gem_bind(&request) == -16
+	assert file.ioctl_gem_bind(&request) == 0, 'jobs in flight do not hold user bindings'
 	request.handle = 99
 	assert file.ioctl_gem_bind(&request) == -2
-	assert file.mappings.len == 2 && first.references == 2 && second.references == 2
-	assert pt.unmaps == 0 && neighbor.unmaps == 0 && memory.calls() == before_alloc && gpu.mapping_checks() == before_checks
+	assert file.mappings.len == 1 && first.references == 1 && second.references == 2
+	assert pt.unmaps == 1 && pt.leaves[0] == 0 && neighbor.unmaps == 0
+	assert memory.calls() == before_alloc && gpu.mapping_checks() == before_checks + 1
 	vm.inflight = 0
 	assert file.close() && vm.destroyed && other.destroyed && gem.live() == 0
 	memory.assert_released()
-	println('AGX legacy UNBIND_ALL: busy VM accepts an unmatched handle, protects mapped backing and rejects a missing handle')
+	println('AGX legacy UNBIND_ALL: busy VM ignores bindings in another VM, retires its own mapping and rejects a missing handle')
 }

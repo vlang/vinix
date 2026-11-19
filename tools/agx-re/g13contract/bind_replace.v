@@ -4,8 +4,7 @@ module g13contract
 fn check_bind_replace_local(file string, page_table string) ! {
 	bind := section(file, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'ioctl.asahi_bind_op_unbind {', 'Native BIND replacement')!
 	require_order(bind, ['vm_slot := ctx.id', 'if !f.cleanup_closed_mappings_locked(ctx)',
-		'replacing := f.has_mapping_overlap_locked(vm_slot, request.addr, request.range)', 'if replacing && katomic.load(&ctx.inflight)',
-		'gem.unref(obj)', 'return -16',
+		'replacing := f.has_mapping_overlap_locked(vm_slot, request.addr, request.range)',
 		'fragments := f.mapping_survivor_count_locked(vm_slot, request.addr, request.range)',
 		'if fragments < 0 { gem.unref(obj); return -22 }', 'if !f.reserve_mapping_slots_locked(fragments + 1)',
 		'gem.unref(obj)', 'return -12', 'if !pt.prepare_map_range(request.addr, request.range)',
@@ -16,6 +15,7 @@ fn check_bind_replace_local(file string, page_table string) ! {
 		'f.insert_mapping_locked(mapping_index, GpuMapping{', 'vm_id: vm_slot', 'obj: obj',
 		'if !f.finish_file_mapping(false)', 'f.mappings[mapping_index].retiring = true'],
 		'Prepare transient survivor/new metadata and all tables before old retirement; return temporary new owner on failure')!
+	require(!bind.contains('inflight'), 'BIND replaces overlapping mappings while jobs run, as Asahi G13 does')!
 	prepare := section(page_table, 'pub fn (mut pt UatPgtable) prepare_map_range(', '// Visit each touched L3 table', 'Native table preparation')!
 	require_order(prepare, ['size == 0 || (iova | size) & uat_pg_mask != 0 || size - 1 > ~iova',
 		'pt.lock.acquire()', 'defer { pt.lock.release() }', 'return pt.walk_map_tables_locked(iova, size, true) == 0'],

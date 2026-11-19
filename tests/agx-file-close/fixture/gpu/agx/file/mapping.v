@@ -81,30 +81,31 @@ fn check_mapping_retirement() {
 		assert failed_object.references == 1 && failed_pt.unmaps == 1
 		assert failed.close() && failed_vm.destroyed && gem.live() == 0
 
-		// Busy VMs retain ordinary closed-handle bindings. Pending retirement
-		// blocks admission even while another job holds a VM pin.
+		// Jobs in flight do not hold user bindings, as on Asahi's G13 path:
+		// UNBIND and GEM_CLOSE remove the PTEs and invalidate them before the
+		// mapping drops its reference. A failed acknowledgement keeps the
+		// record and its reference, and the retry runs while the VM is busy.
 		mut busy_pt := pgtable.UatPgtable{}
 		mut busy_vm := mmu.UatContext{ id: 1, vm_id: 1, pgtable: &busy_pt }
-		mut busy := GpuFile{ vms: [&busy_vm] }
+		mut busy := GpuFile{ vms: [&busy_vm], ioctl_abi: legacy_ioctl_abi }
 		busy.mappings.flags |= .noslices
 		busy_object := gem.create(7)
 		busy.objects.table.add_created(busy_object)
 		assert busy.ioctl_gem_bind(bind(7, 1, 0x4000)) == 0
+		assert busy.ioctl_gem_bind(bind(7, 1, 0x8000)) == 0
+		assert busy_object.references == 3
 		busy_vm.inflight = 1
-		assert busy.ioctl_gem_bind(unbind(1, 0x4000)) == -16
-		assert busy.close_object_handle(7, 0) == 0
-		assert busy_object.references == 1 && busy_pt.unmaps == 0
-		assert busy.cleanup_closed_mappings_locked(&busy_vm)
+		assert busy.ioctl_gem_bind(unbind(1, 0x4000)) == 0
+		assert busy_object.references == 2 && busy_pt.unmaps == 1 && busy.mappings.len == 1
+		gpu.fail_mapping_checks(1)
+		assert busy.close_object_handle(7, 0) == -5
+		assert busy.mappings[0].retiring && busy_object.references == 1 && busy_pt.unmaps == 2
+		assert !busy.close() && !busy_vm.destroyed
+		before := gpu.mapping_checks()
+		assert busy.cleanup_closed_mappings_locked(&busy_vm) && gpu.mapping_checks() == before + 1
+		assert busy.mappings.len == 0 && busy_pt.unmaps == 2 && gem.live() == 0
 		assert !busy.close() && !busy_vm.destroyed
 		busy_vm.inflight = 0
-		gpu.fail_mapping_checks(1)
-		assert !busy.cleanup_closed_mappings_locked(&busy_vm)
-		assert busy.mappings[0].retiring && busy_object.references == 1
-		busy_vm.inflight = 1
-		before := gpu.mapping_checks()
-		assert !busy.cleanup_closed_mappings_locked(&busy_vm) && gpu.mapping_checks() == before
-		busy_vm.inflight = 0
-		assert busy.cleanup_closed_mappings_locked(&busy_vm) && gem.live() == 0
 		assert busy.close()
 	}
 
@@ -197,41 +198,48 @@ fn check_reimported_mapping_retirement() {
 	for split in [false, true]! {
 		mut pt := pgtable.UatPgtable{watch_start: 0x4000}
 		mut vm := mmu.UatContext{id: 1, vm_id: 1, pgtable: &pt}
-		mut file := GpuFile{vms: [&vm]}
+		mut file := GpuFile{vms: [&vm], ioctl_abi: legacy_ioctl_abi}
 		object := gem.create(7)
 		file.objects.table.add_created(object)
+		// An export keeps the BO alive across its handle's close.
+		gem.ref_obj(object)
 		mut original := bind(7, 1, 0x4000)
 		original.range = 0xc000
 		assert file.ioctl_gem_bind(&original) == 0
+		if split {
+			assert file.ioctl_gem_bind(unbind(1, 0x8000)) == 0
+			assert file.mappings.len == 2 && object.references == 4 && pt.leaves[1] == 0
+		}
+		old_records := file.mappings.len
+		before_close := pt.unmaps
 
+		// The close removes the old bindings' PTEs while a job holds the VM.
+		// One failed acknowledgement leaves a record retiring with its reference.
 		vm.inflight = 1
-		assert file.close_object_handle(7, 0) == 0
-		assert object.references == 1 && pt.unmaps == 0
+		gpu.fail_mapping_checks(1)
+		assert file.close_object_handle(7, 0) == -5
+		assert pt.leaves[0] == 0 && pt.leaves[1] == 0 && pt.leaves[2] == 0
+		assert pt.unmaps == before_close + old_records
+		assert file.mappings.len == 1 && file.mappings[0].retiring && object.references == 2
 		file.lock.acquire()
 		imported := file.objects.table.import_object(object) or { panic('restore handle') }
 		file.lock.release()
-		assert file.ioctl_gem_bind(bind(imported, 1, 0x10000)) == 0
-		assert file.mappings.len == 2 && object.references == 3 && pt.unmaps == 0
-		vm.inflight = 0
-		if split {
-			assert file.ioctl_gem_bind(unbind(1, 0x8000)) == 0
-			assert file.mappings.len == 3 && object.references == 4 && pt.leaves[1] == 0
-		}
+		assert object.references == 3
 
-		gpu.fail_mapping_checks(1)
-		assert file.ioctl_gem_bind(bind(imported, 1, 0x14000)) == -5
+		// A bind through the reimported handle completes the old retirement
+		// without unmapping it again, and installs the new binding.
+		assert file.ioctl_gem_bind(bind(imported, 1, 0x10000)) == 0
+		assert pt.unmaps == before_close + old_records && pt.leaves[3] == object.phys_addr
 		assert pt.leaves[0] == 0 && pt.leaves[1] == 0 && pt.leaves[2] == 0,
-			'reimport must not cancel retirement of bindings selected by the old close'
-		assert pt.leaves[3] == object.phys_addr && pt.leaves[4] == 0
-		assert file.mappings.len == 2 && object.references == 3
-		before := pt.unmaps
-		assert file.ioctl_gem_bind(bind(imported, 1, 0x14000)) == 0
-		assert pt.unmaps == before && pt.leaves[3] == object.phys_addr && pt.leaves[4] == object.phys_addr
-		assert file.mappings.len == 2 && object.references == 3
-		assert file.close() && gem.live() == 0
+			'reimport must not restore bindings selected by the old close'
+		assert file.mappings.len == 1 && !file.mappings[0].retiring && object.references == 3
+		vm.inflight = 0
+		assert file.close() && object.references == 1
+		gem.unref(object)
+		assert gem.live() == 0
 		memory.assert_released()
 	}
-	println('AGX GEM reimport: old bindings and split fragments retire after VM idle while new bindings retain the BO')
+	println('AGX GEM reimport: a busy close retires old bindings and split fragments at once; a reimport neither cancels nor repeats a pending retirement')
 }
 
 fn check_worker_mapping_retirement() {
@@ -250,31 +258,27 @@ fn check_worker_mapping_retirement() {
 	assert file.ioctl_gem_bind(bind(7, 2, 0x4000)) == 0
 	assert file.ioctl_gem_bind(bind(8, 1, 0x8000)) == 0
 
+	// Jobs in flight do not hold user bindings (Asahi G13): the close removes
+	// both VMs' PTEs at once. The first VM's acknowledgement fails once, and
+	// the worker retries it while that VM is still busy, without a second
+	// PTE removal.
 	first.inflight = 2
 	second.inflight = 1
-	assert file.close_object_handle(7, 0) == 0
-	assert first.closed_mappings_pending && second.closed_mappings_pending && closed.references == 2
-	first.inflight--
-	reap_open_detached_g13_queues()
-	assert first_pt.unmaps == 0 && second_pt.unmaps == 0 && closed.references == 2
-
-	first.inflight--
 	gpu.fail_mapping_checks(1)
+	assert file.close_object_handle(7, 0) == 0
+	assert first.closed_mappings_pending && !second.closed_mappings_pending
+	assert first_pt.unmaps == 1 && second_pt.unmaps == 1 && closed.references == 1
 	reap_open_detached_g13_queues()
-	assert first.closed_mappings_pending && first_pt.unmaps == 1 && closed.references == 2
-	reap_open_detached_g13_queues()
-	assert !first.closed_mappings_pending && first_pt.unmaps == 1 && closed.references == 1
-	assert second.closed_mappings_pending && second_pt.unmaps == 0
-
-	second.inflight--
-	reap_open_detached_g13_queues()
-	assert !second.closed_mappings_pending && second_pt.unmaps == 1 && gem.live() == 1
+	assert !first.closed_mappings_pending && first_pt.unmaps == 1 && second_pt.unmaps == 1 && gem.live() == 1
 	assert first_pt.leaves[1] == neighbor_bo.phys_addr && neighbor_bo.references == 2 && file.mappings.len == 1
+	assert first.inflight == 2 && second.inflight == 1
 	assert !first.destroyed && !second.destroyed && file.find_vm(1) != none && file.find_vm(2) != none
+	first.inflight = 0
+	second.inflight = 0
 	file_map.delete(0x4c05)
 	assert file.close() && gem.live() == 0
 	memory.assert_released()
-	println('AGX GEM close worker: idle VMs release old mappings independently, device-state refusal retries once without a second PTE removal, and live mappings and VM names remain available')
+	println('AGX GEM close worker: busy VMs release old mappings at once, device-state refusal retries once without a second PTE removal, and live mappings and VM names remain available')
 }
 
 __global evicting_pt &pgtable.UatPgtable = unsafe { nil }

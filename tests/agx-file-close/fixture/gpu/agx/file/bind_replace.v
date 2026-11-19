@@ -40,15 +40,12 @@ fn check_bind_replacements() {
 						request.range = (cut[1] - cut[0]) * pgtable.uat_pgsz
 						request.offset = if new_repeat { 31 * pgtable.uat_pgsz } else { pgtable.uat_pgsz }
 						request.flags = flags | if new_repeat { ioctl.asahi_bind_single_page } else { u32(0) }
-						before_alloc := memory.calls(); before_check := gpu.mapping_checks(); before_prepare := pt.prepares
-						vm.inflight = 1
-						assert file.ioctl_gem_bind(&request) == -16
-						assert first.references == 3 && second.references == 3 && target.references == 1
-						assert pt.leaves == old_leaves && pt.protections == old_protection
-						assert memory.calls() == before_alloc && gpu.mapping_checks() == before_check && pt.prepares == before_prepare
-						vm.inflight = 0; cases++
-						for _ in 0 .. 2 {
-							assert file.ioctl_gem_bind(&request) == 0, 'BIND must replace idle overlapping mappings'
+						for round in 0 .. 2 {
+							// The first replacement runs while a job holds the VM: jobs
+							// do not hold user bindings on Asahi's G13 path.
+							vm.inflight = u64(1 - round)
+							assert file.ioctl_gem_bind(&request) == 0, 'BIND must replace overlapping mappings'
+							vm.inflight = 0
 							for index in 0 .. 32 {
 								inside := u64(index) >= cut[0] && u64(index) < cut[1]
 								physical := target.phys_addr + request.offset + if new_repeat { u64(0) } else { (u64(index) - cut[0]) * pgtable.uat_pgsz }
@@ -133,5 +130,5 @@ fn check_bind_replacements() {
 		assert fresh.close() && gem.live() == 0
 		memory.assert_released()
 	}
-	println('AGX BIND replacement: ${cases} ioctl checks; idle exact/partial/multi-BO replacement, holes, protected contiguous/repeated survivors, same-BO replacement, foreign VMs, busy gate, metadata/table OOM before mutation, old/new device-state refusals, retained retry/close and freed reservations passed')
+	println('AGX BIND replacement: ${cases} ioctl checks; busy and idle exact/partial/multi-BO replacement, holes, protected contiguous/repeated survivors, same-BO replacement, foreign VMs, metadata/table OOM before mutation, old/new device-state refusals, retained retry/close and freed reservations passed')
 }

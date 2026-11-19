@@ -29,11 +29,11 @@ fn check_repeated_bindings() {
 					assert pt.last_protection == [pgtable.gpu_prot_gpu_shared_ro, pgtable.gpu_prot_gpu_shared_wo, pgtable.gpu_prot_gpu_shared_rw]![index]
 					mut remove := unbind(1, request.addr); remove.range = request.range
 					before := pt.unmaps
-					vm.inflight = 1
-					assert file.ioctl_gem_bind(&remove) == -16 && object.references == 2 && pt.unmaps == before
-					vm.inflight = 0
+					// A job in flight does not hold the binding (Asahi G13).
+					vm.inflight = u64(index % 2)
 					assert file.ioctl_gem_bind(&remove) == 0 && object.references == 1 && file.mappings.len == 0
-					assert pt.last_unmap_size == request.range
+					assert pt.unmaps == before + 1 && pt.last_unmap_size == request.range
+					vm.inflight = 0
 					cases += 3
 				}
 			}

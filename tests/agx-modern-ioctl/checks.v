@@ -148,17 +148,29 @@ fn check_modern_binding() {
 			third := asahi.GemBindOp{ flags: asahi.bind_read, handle: 7, range: 0x4000, addr: 0xc000 }
 			before_unmaps := pt.unmaps
 			file_map[0x4444] = unsafe { &file }
+			// A job holding the VM does not hold its bindings, as on Asahi's G13
+			// path: a hole, a live unbind and a replacing map all proceed.
 			vm.inflight = 1
+			unbind.addr = 0x10000
 			unsafe {
 				C.memcpy(&bytes[0], &unbind, sizeof(unbind))
 				C.memcpy(&bytes[stride], &third, sizeof(third))
 			}
-			assert drm.invoke(&device, 0x4444, asahi.vm_bind, sizeof(request), 1, unsafe { voidptr(&request) }) == -16
-			assert file.mappings.len == 2 && pt.leaves[2] == 0 && pt.unmaps == before_unmaps && obj.references == 3
+			assert drm.invoke(&device, 0x4444, asahi.vm_bind, sizeof(request), 1, unsafe { voidptr(&request) }) == 0
+			assert file.mappings.len == 3 && pt.leaves[2] == obj.phys_addr && pt.unmaps == before_unmaps && obj.references == 4
+			unbind.addr = 0x4000
+			unsafe {
+				C.memcpy(&bytes[0], &unbind, sizeof(unbind))
+				C.memcpy(&bytes[stride], &first, sizeof(first))
+			}
+			assert drm.invoke(&device, 0x4444, asahi.vm_bind, sizeof(request), 1, unsafe { voidptr(&request) }) == 0
+			assert file.mappings.len == 3 && pt.leaves[0] == obj.phys_addr && pt.unmaps == before_unmaps + 1
+			assert obj.references == 4
 			unbind.addr = 0x10000
 			unsafe { C.memcpy(&bytes[0], &unbind, sizeof(unbind)) }
 			assert drm.invoke(&device, 0x4444, asahi.vm_bind, sizeof(request), 1, unsafe { voidptr(&request) }) == 0
-			assert file.mappings.len == 3 && pt.leaves[2] == obj.phys_addr && pt.unmaps == before_unmaps && obj.references == 4
+			assert file.mappings.len == 3 && pt.leaves[0] == obj.phys_addr && pt.unmaps == before_unmaps + 2
+			assert pt.protections[0] == pgtable.gpu_prot_gpu_shared_ro && obj.references == 4
 			vm.inflight = 0
 			file_map.delete(0x4444)
 			unbind.addr = 0x4000
@@ -458,10 +470,10 @@ fn check_file_vm_names(mut manager mmu.UatManager) {
 	assert first.mappings[0].vm_id == replacement.id && first.mappings[0].obj.vm_private_identity == replacement.identity
 	assert old_pt.maps == 0 && new_pt.maps == 1
 	unbind := ioctl.DrmAsahiGemBind{ vm_id: 1, op: ioctl.asahi_bind_op_unbind, range: bind.range, addr: bind.addr }
+	// The replacement VM's job does not hold the binding (Asahi G13).
 	replacement.inflight = 1
-	assert first.ioctl_gem_bind(&unbind) == -16 && new_pt.unmaps == 0
-	replacement.inflight = 0
 	assert first.ioctl_gem_bind(&unbind) == 0 && new_pt.unmaps == 1 && old_pt.unmaps == 0
+	replacement.inflight = 0
 	assert gpu.mapping_checks() == checks + 2
 	assert first.ioctl_gem_bind(unsafe { &bind }) == 0
 	assert manager.bind_context(&replacement) == 1 && replacement.is_bound()
