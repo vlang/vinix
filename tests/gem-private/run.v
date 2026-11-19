@@ -11,6 +11,7 @@ fn main() {
 	os.cp_all(repo + '/tests/agx-g13-failure/fixture/klock', scratch + '/klock', false)!
 	os.mkdir_all(scratch + '/drm/gem')!
 	os.cp(repo + '/kernel/drm/gem/gem.v', scratch + '/drm/gem/gem.v')!
+	os.cp(repo + '/kernel/drm/gem/backing.v', scratch + '/drm/gem/backing.v')!
 	os.write_file(scratch + '/drm/gem/host.v', 'module gem\n__global page_size = u64(16384)\n__global higher_half = u64(0)\n')!
 	os.cp(repo + '/tests/gem-private/test.v', scratch + '/main.v')!
 	mut build := os.new_process(os.getenv_opt('V') or { 'v' })

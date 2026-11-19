@@ -17,7 +17,7 @@ fn check_user_mapping_contract(local string, manager string) ! {
 		'pub fn (f &GpuFile) ioctl_get_time(', 'Vinix user mapping ioctl')!
 	require_order(bind, ['f.lock.acquire()', 'defer { f.lock.release() }', 'match request.op',
 		'ioctl.asahi_bind_op_bind {', 'f.objects.get_ref(request.handle)', 'f.find_vm(request.vm_id)',
-		'ctx.pgtable', 'pt.map(', 'f.insert_mapping_locked(mapping_index, GpuMapping{',
+		'ctx.pgtable', 'map_object_runs(mut pt, obj,', 'f.insert_mapping_locked(mapping_index, GpuMapping{',
 		'if !f.finish_file_mapping(false)',
 		'pt.unmap(request.addr, request.range)', 'f.mappings[mapping_index].retiring = true',
 		'return -5'], 'Vinix bind ownership transfer')!

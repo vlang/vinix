@@ -198,6 +198,8 @@ pub fn (mut dcp AppleDCP) flush(fb &mode.DrmFramebuffer) bool {
 	if fb.gem_obj == unsafe { nil } {
 		return false
 	}
+	// The swap names the framebuffer by one physical run.
+	src_addr := fb.gem_obj.contiguous_phys() or { return false }
 
 	// Start a new swap transaction
 	swap_id := iomfb_swap_start(mut dcp.rtk, &dcp.iomfb)
@@ -209,7 +211,7 @@ pub fn (mut dcp AppleDCP) flush(fb &mode.DrmFramebuffer) bool {
 	// Build the swap descriptor from the framebuffer
 	desc := IomfbSwapDesc{
 		swap_id:    swap_id
-		src_addr:   fb.gem_obj.phys_addr
+		src_addr:   src_addr
 		src_stride: fb.pitches[0]
 		src_width:  fb.width
 		src_height: fb.height

@@ -165,7 +165,8 @@ fn (mut this GemPrimeResource) mmap(_handle voidptr, page u64, flags int) voidpt
 	if offset >= this.obj.size {
 		return unsafe { nil }
 	}
-	return voidptr(this.obj.phys_addr + offset)
+	if this.obj.external { return voidptr(this.obj.phys_addr + offset) }
+	return voidptr(this.obj.page_phys(offset) or { return unsafe { nil } })
 }
 
 fn (mut this GemPrimeResource) mapping_attributes(_handle voidptr, _offset u64) u64 {

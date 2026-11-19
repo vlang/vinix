@@ -14,7 +14,7 @@ fn check_private_bo_local(file string, bo string, mmu string, gem string, drm st
 		'pub fn (f &GpuFile) ioctl_get_time(', 'Vinix private VM binding')!
 	require_order(bind, ['f.lock.acquire()', 'f.objects.get_ref(request.handle)',
 		'if obj.vm_private_identity != 0 && obj.vm_private_identity != ctx.identity',
-		'gem.unref(obj)', 'return -22', 'pt.map('], 'Vinix private VM binding')!
+		'gem.unref(obj)', 'return -22', 'map_object_runs(mut pt, obj,'], 'Vinix private VM binding')!
 	timestamps := section(file, 'pub fn (mut f GpuFile) ioctl_gem_bind_object(',
 		'pub fn (mut f GpuFile) ioctl_queue_create(', 'Vinix private timestamp refusal')!
 	require_order(timestamps, ['obj := f.get_object_ref(request.handle)',

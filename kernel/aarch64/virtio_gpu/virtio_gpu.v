@@ -734,11 +734,13 @@ fn resource_create_handler(_dev &drm.DrmDevice, handle voidptr, data voidptr) in
 		resource_id: resource_id
 		nr_entries:  1
 	}
+	// One backing entry: the resource needs a single physical run.
+	backing := object.contiguous_phys() or { u64(0) }
 	mut entry := MemoryEntry{
-		address: object.phys_addr
+		address: backing
 		length:  u32(object.size)
 	}
-	if object.size > u64(0xffff_ffff)
+	if backing == 0 || object.size > u64(0xffff_ffff)
 		|| !nodata(voidptr(&attach), sizeof(attach), voidptr(&entry), sizeof(entry), false) {
 		mut unref := ResourceCommand{
 			hdr:         header(cmd_resource_unref, 0)

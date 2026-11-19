@@ -176,7 +176,8 @@ pub fn plane_update(mut dcp AppleDCP, state &DcpPlaneState) bool {
 		return false
 	}
 
-	fb_phys := state.fb.gem_obj.phys_addr
+	// Scanout is identity-mapped as one run.
+	fb_phys := state.fb.gem_obj.contiguous_phys() or { return false }
 	fb_size := u64(state.fb.pitches[0]) * u64(state.fb.height)
 	dcp.disp_dart.map(fb_phys, fb_phys, fb_size)
 

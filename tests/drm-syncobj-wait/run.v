@@ -38,6 +38,7 @@ fn main() {
 	os.write_file(object_path, object_source.replace(alias_site, 'memory.malloc_alias_fallible(sizeof(SyncobjHandle))'))!
 	os.cp_all('${repo}/kernel/drm/ioctl', '${scratch}/drm/ioctl', false)!
 	os.cp_all('${repo}/tests/agx-file-close/fixture/drm/gem', '${scratch}/drm/gem', false)!
+	os.cp('${repo}/kernel/drm/gem/backing.v', '${scratch}/drm/gem/backing.v')!
 	gem_source := os.read_file('${repo}/kernel/drm/gem/gem.v')!
 	os.write_file('${scratch}/drm/gem/prime_fences.v', 'module gem\nimport memory\n' +
 		section(gem_source, 'pub struct PrimeFence {', '@[heap]\npub struct GemObject')!)!

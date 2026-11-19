@@ -25,6 +25,7 @@ fn main() {
 	os.mkdir_all(scratch + '/gpu/agx/bo')!
 	os.cp(overlays['--bo-source'] or { repo + '/kernel/gpu/agx/bo/bo.v' }, scratch + '/gpu/agx/bo/bo.v')!
 	os.cp(overlays['--gem-source'] or { repo + '/kernel/drm/gem/gem.v' }, scratch + '/drm/gem/gem.v')!
+	os.cp(repo + '/kernel/drm/gem/backing.v', scratch + '/drm/gem/backing.v')!
 	os.cp(overlays['--ram-source'] or { repo + '/kernel/memory/ram_cache_arm64.v' }, scratch + '/memory/ram_cache.v')!
 	drm := os.read_file(repo + '/kernel/drm/drm.v')!
 	os.write_file(scratch + '/drm/prime.v', 'module drm\nimport memory.mmap\n' +

@@ -14,6 +14,9 @@ fn test_single_page_guards_reject_wrong_backing_stride_ownership_and_software_ac
 	if _ := check_single_page_local(header.replace('asahi_bind_single_page = u32(1) << 3', 'asahi_bind_single_page = u32(1) << 2'), pure, file, page_table, fake) { assert false }
 	if _ := check_single_page_local(header, pure.replace('{ page_size } else { request.range }', '{ request.range } else { request.range }'), file, page_table, fake) { assert false }
 	if _ := check_single_page_local(header, pure, file.replace('pt.map_repeated_page(', 'pt.map('), page_table, fake) { assert false }
+	if _ := check_single_page_local(header, pure, file.replace('if done != 0 { pt.unmap(addr, done) }', ''), page_table, fake) {
+		assert false, 'a failed run must unmap the runs already installed'
+	}
 	for token in ['pt.map_page_locked(iova + i * uat_pgsz, phys, prot)', 'pt.unmap_page_locked(iova + j * uat_pgsz)', 'pt.invalidate_range_locked(iova, size)'] {
 		if _ := check_single_page_local(header, pure, file, page_table.replace(token, ''), fake) { assert false, token }
 	}

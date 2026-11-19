@@ -10,10 +10,15 @@ fn check_single_page_local(header string, pure string, file string, page_table s
 	bind := section(file, 'pub fn (mut f GpuFile) ioctl_gem_bind(', 'pub fn (f &GpuFile) ioctl_get_time(', 'Native repeated mapping')!
 	require_order(bind, ['backing_bytes := agxvm.bind_backing_size(request)', 'backing_bytes > obj.size - request.offset',
 		'mapped := if request.flags & ioctl.asahi_bind_single_page != 0',
-		'pt.map_repeated_page(request.addr, obj.phys_addr + request.offset, request.range, protection)',
-		'else { pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) }',
+		'page := obj.page_phys(request.offset) or { 0 }',
+		'page != 0 && pt.map_repeated_page(request.addr, page, request.range, protection)',
+		'else { map_object_runs(mut pt, obj, request.addr, request.offset, request.range, protection) }',
 		'if !mapped', 'gem.unref(obj)', 'return -12', 'f.insert_mapping_locked(mapping_index, GpuMapping{', 'size: request.range'],
 		'Repeated/contiguous dispatch preserves virtual size and mapping ownership')!
+	runs := section(file, 'fn map_object_runs(', '// GPU-only GEM mappings', 'Run-wise BIND mapping')!
+	require_order(runs, ['for done < size', 'obj.contiguous_run(offset + done, size - done) or { break }',
+		'if !pt.map(addr + done, phys, run, protection) { break }', 'done += run', 'if done == size { return true }',
+		'if done != 0 { pt.unmap(addr, done) }', 'return false'], 'A BIND maps every backing run or none of them')!
 	repeat := section(page_table, 'pub fn (mut pt UatPgtable) map_repeated_page(', '// Change only the access/cache attributes', 'Repeated PTE writer')!
 	require_order(repeat, ['size - 1 > ~iova', 'pt.lock.acquire()', 'defer {', 'pt.invalidate_range_locked(iova, size)',
 		'pt.lock.release()', 'pages := size / uat_pgsz', 'pt.map_page_locked(iova + i * uat_pgsz, phys, prot)',

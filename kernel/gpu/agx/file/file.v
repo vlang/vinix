@@ -644,6 +644,21 @@ fn (f &GpuFile) has_mapping_overlap_locked(vm_id u32, addr u64, size u64) bool {
 	return false
 }
 
+// Map [offset, offset + size) of obj at addr one physically contiguous run at
+// a time. pt.map undoes its own partial work; a later failure here also
+// unmaps the runs already installed, so the range is all or nothing.
+fn map_object_runs(mut pt pgtable.UatPgtable, obj &gem.GemObject, addr u64, offset u64, size u64, protection u64) bool {
+	mut done := u64(0)
+	for done < size {
+		phys, run := obj.contiguous_run(offset + done, size - done) or { break }
+		if !pt.map(addr + done, phys, run, protection) { break }
+		done += run
+	}
+	if done == size { return true }
+	if done != 0 { pt.unmap(addr, done) }
+	return false
+}
+
 // GPU-only GEM mappings are coherent. Page-table edits complete the
 // translation invalidation for the published root before this state check.
 fn (f &GpuFile) finish_file_mapping(unmapped bool) bool {
@@ -972,8 +987,9 @@ pub fn (mut f GpuFile) ioctl_gem_bind(data &ioctl.DrmAsahiGemBind) int {
 				if retired != 0 { gem.unref(obj); return retired }
 			}
 			mapped := if request.flags & ioctl.asahi_bind_single_page != 0 {
-				pt.map_repeated_page(request.addr, obj.phys_addr + request.offset, request.range, protection)
-			} else { pt.map(request.addr, obj.phys_addr + request.offset, request.range, protection) }
+				page := obj.page_phys(request.offset) or { 0 }
+				page != 0 && pt.map_repeated_page(request.addr, page, request.range, protection)
+			} else { map_object_runs(mut pt, obj, request.addr, request.offset, request.range, protection) }
 			if !mapped {
 				gem.unref(obj)
 				return -12
@@ -1055,8 +1071,13 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 			// Timestamp objects belong to the kernel VM, outside any private
 			// userspace reservation domain.
 			if obj.vm_private_identity != 0 { gem.unref(obj); return -22 }
-			if request.range == 0 || request.offset > obj.size || request.range > obj.size - request.offset
-				|| obj.phys_addr > u64(-1) - request.offset {
+			if request.range == 0 || request.offset > obj.size || request.range > obj.size - request.offset {
+				gem.unref(obj)
+				return -22
+			}
+			// The kernel maps a timestamp range as one physical run.
+			timestamp_phys, timestamp_run := obj.contiguous_run(request.offset, request.range) or { u64(0), u64(0) }
+			if timestamp_run != request.range {
 				gem.unref(obj)
 				return -22
 			}
@@ -1065,7 +1086,7 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				gem.unref(obj)
 				return -19
 			}
-			map_code, va := gpu_manager.map_g13_timestamp_buffer(obj.phys_addr + request.offset, request.range)
+			map_code, va := gpu_manager.map_g13_timestamp_buffer(timestamp_phys, request.range)
 			if map_code != 0 {
 				gem.unref(obj)
 				return map_code
@@ -1453,9 +1474,7 @@ fn g13_render_completed(job &gpu.G13RenderJobResources, successful bool, data vo
 				result.flags |= ioctl.asahi_result_render_tvb_overflowed
 			}
 		}
-		unsafe {
-			C.memcpy(voidptr(state.result.virt_addr + state.result_offset), voidptr(&result), sizeof(ioctl.DrmAsahiResultRender))
-		}
+		_ = state.result.write_bytes(state.result_offset, voidptr(&result), sizeof(ioctl.DrmAsahiResultRender))
 	}
 	finish_g13_submit(mut state, successful, job.error.fence_error())
 }
@@ -1473,9 +1492,7 @@ fn g13_compute_completed(job &gpu.G13ComputeJobResources, successful bool, data 
 			result.ts_start = values.start
 			result.ts_end = values.end
 		}
-		unsafe {
-			C.memcpy(voidptr(state.result.virt_addr + state.result_offset), voidptr(&result), sizeof(ioctl.DrmAsahiResultCompute))
-		}
+		_ = state.result.write_bytes(state.result_offset, voidptr(&result), sizeof(ioctl.DrmAsahiResultCompute))
 	}
 	finish_g13_submit(mut state, successful, job.error.fence_error())
 }

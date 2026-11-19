@@ -292,5 +292,5 @@ pub fn get_object_mmap_page(obj &GemObject, page u64) ?voidptr {
 	if byte_offset < obj.mmap_offset || byte_offset - obj.mmap_offset >= obj.size {
 		return none
 	}
-	return voidptr(obj.phys_addr + byte_offset - obj.mmap_offset)
+	return voidptr(obj.page_phys(byte_offset - obj.mmap_offset) or { return none })
 }

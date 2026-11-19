@@ -28,6 +28,7 @@ fn main() {
 	os.mkdir_all(scratch)!
 	defer { os.rmdir_all(scratch) or { panic(err) } }
 	os.cp_all('${repo}/tests/agx-async/fixture', scratch, false)!
+	os.cp('${repo}/kernel/drm/gem/backing.v', '${scratch}/drm/gem/backing.v')!
 	os.mkdir_all('${scratch}/errno')!
 	errno := os.read_file('${repo}/kernel/errno/errno.v')!
 	os.write_file('${scratch}/errno/errno.v', 'module errno\n' +

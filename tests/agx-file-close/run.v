@@ -51,6 +51,7 @@ fn checks() !int {
 	os.write_file('${scratch}/gpu/agx/file/production.v', production)!
 	os.cp(if os.args.len == 3 && os.args[1] == '--modern-source' { os.args[2] } else { repo + '/kernel/gpu/agx/file/modern.v' }, scratch + '/gpu/agx/file/modern.v')!
 	os.cp(os.getenv_opt('AGX_MADVISE_SOURCE') or { repo + '/kernel/drm/gem/advice.v' }, scratch + '/drm/gem/advice.v')!
+	os.cp(repo + '/kernel/drm/gem/backing.v', scratch + '/drm/gem/backing.v')!
 	os.cp(repo + '/tests/agx-gem-advice/checks.v', scratch + '/gpu/agx/file/advice_checks.v')!
 	for name in ['backend.v', 'checks.v'] { os.cp(repo + '/tests/agx-modern-ioctl/' + name, scratch + '/gpu/agx/file/modern_' + name)! }
 	os.cp(repo + '/tests/agx-queue-scs/checks.v', scratch + '/gpu/agx/file/scs_checks.v')!
