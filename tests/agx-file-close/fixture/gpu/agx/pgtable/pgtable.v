@@ -15,6 +15,7 @@ pub mut:
 	tlb_asid u8 = 1
 	unmaps int
 	reject_map bool
+	reject_map_after int = -1 // nonnegative: that many more maps succeed, then they fail
 	reject_prepare bool
 	prepares int
 	destroyed bool
@@ -51,8 +52,10 @@ pub fn (mut pt UatPgtable) map(addr u64, phys u64, size u64, protection u64) boo
 	pt.maps++
 	pt.last_protection = protection
 	pt.last_phys = phys; pt.last_size = size; pt.repeated = false
-	if !pt.reject_map { pt.watch_map(addr, phys, size, false) }
-	return !pt.reject_map
+	reject := pt.reject_map || pt.reject_map_after == 0
+	if pt.reject_map_after > 0 { pt.reject_map_after-- }
+	if !reject { pt.watch_map(addr, phys, size, false) }
+	return !reject
 }
 
 pub fn (mut pt UatPgtable) map_repeated_page(addr u64, phys u64, size u64, protection u64) bool {

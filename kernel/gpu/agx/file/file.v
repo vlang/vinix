@@ -1075,11 +1075,13 @@ pub fn (mut f GpuFile) ioctl_gem_bind_object(data &ioctl.DrmAsahiGemBindObject) 
 				gem.unref(obj)
 				return -22
 			}
-			// The kernel maps a timestamp range as one physical run.
+			// The kernel maps a timestamp range as one physical run. A range split
+			// across a scattered object's runs is refused as out of memory, as
+			// creating the object was before scattered backing existed.
 			timestamp_phys, timestamp_run := obj.contiguous_run(request.offset, request.range) or { u64(0), u64(0) }
 			if timestamp_run != request.range {
 				gem.unref(obj)
-				return -22
+				return -12
 			}
 			mut gpu_manager := unsafe { f.registration_manager }
 			if gpu_manager == unsafe { nil } {

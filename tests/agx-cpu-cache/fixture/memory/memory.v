@@ -77,6 +77,10 @@ pub fn free(storage voidptr) {
 	metadata_releases++
 }
 
+// The cache fixture has no single-page pool: a GEM scatter fallback fails
+// here and the object is refused, as when contiguous backing fails.
+pub fn pmm_alloc_fallible(_pages u64) voidptr { return unsafe { nil } }
+
 pub fn pmm_alloc_aligned_fallible(pages u64, alignment u64) voidptr {
 	pmm_attempts++
 	if reject_allocation { return unsafe { nil } }

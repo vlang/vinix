@@ -5,6 +5,7 @@ import klock
 
 __global live_objects = 0
 __global higher_half = u64(0) // host fixtures address backing directly
+__global page_size = u64(16384)
 __global next_created_handle = u32(100)
 __global reject_create = false
 __global create_calls = u64(0)
@@ -22,6 +23,7 @@ pub mut:
 	size u64 = 0x10000
 	phys_addr u64 = 0x200000
 	virt_addr u64
+	pages &u64 = unsafe { nil }
 	mmap_offset u64
 	mmap_device u64
 	owned bool

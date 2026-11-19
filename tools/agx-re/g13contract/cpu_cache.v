@@ -7,21 +7,37 @@ fn check_cpu_cache_local(gem string, bo string, file string, driver string, ram 
 		'gem.create_aligned_with_cache(request.size, pgtable.uat_pgsz, private_identity,',
 		'request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles(),', 'mmap_device: u64(f.dev))', 'f.objects.add_created(obj)'], 'Native WRITEBACK and registry selection before publication')!
 	constructor := section(gem, 'pub fn create_aligned_with_cache(', '// Metadata for a host-owned resource.', 'GEM CPU cache constructor')!
-	require(constructor.contains('create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped, registration.mmap_device)'), 'WRITEBACK must select cacheable aliases')!
+	require(constructor.contains('create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped, registration.mmap_device, true)'), 'WRITEBACK must select cacheable aliases; only AGX objects may scatter')!
 	allocation := section(gem, 'fn create_object(', '// Destroy a GEM object:', 'GEM unpublished cache preparation')!
-	require_order(allocation, ['gem_objects_lock.acquire()', 'if !file_scoped {', 'i < gem_max_handles', 'if handle == 0 { return none }',
-		'if aligned_size > u64(-1) - next_mmap_offset',
-		'memory.malloc_packed_fallible(sizeof(GemObject))', 'if storage == unsafe { nil } { return none }',
-		'memory.pmm_alloc_aligned_fallible', 'if !external && phys == unsafe { nil }', 'memory.free(storage)',
-		'if pte_extra & memory.pte_uncached != 0',
+	require_order(allocation, ['memory.malloc_packed_fallible(sizeof(GemObject))', 'if storage == unsafe { nil } { return none }',
+		'memory.pmm_alloc_aligned_fallible', 'if !external && phys == unsafe { nil }',
+		'if room && scatter && alignment == page_size && pages > 1', 'page_list = alloc_scattered_pages(pages, pte_extra)',
+		'if page_list == unsafe { nil }', 'memory.free(storage)',
+		'if phys != unsafe { nil } && pte_extra & memory.pte_uncached != 0',
 		'if !memory.set_ram_direct_map_uncached(u64(phys), aligned_size, true)', 'memory.pmm_free(phys, pages)',
-		'memory.free(storage)', 'return none', 'next_mmap_offset += aligned_size', '*obj = GemObject{', 'pte_extra:   pte_extra',
-		'vm_private_identity: private_identity', 'file_scoped: file_scoped', 'if !file_scoped { gem_objects[handle] = obj }'], 'Publish only globally named objects in the registry')!
+		'memory.free(storage)', 'return none', 'gem_objects_lock.acquire()', 'if !file_scoped {', 'i < gem_max_handles',
+		'if handle == 0 { publishable = false }', 'aligned_size > u64(-1) - next_mmap_offset', 'if !publishable {',
+		'gem_objects_lock.release()', 'release_unpublished_backing(phys, page_list, pages, pte_extra)', 'memory.free(storage)', 'return none',
+		'next_mmap_offset += aligned_size', '*obj = GemObject{', 'pte_extra:   pte_extra',
+		'vm_private_identity: private_identity', 'file_scoped: file_scoped', 'if !file_scoped { gem_objects[handle] = obj }',
+		'gem_objects_lock.release()'], 'Allocate and prepare backing before the registry lock; publish only globally named objects in the registry')!
+	require(!allocation.all_before('gem_objects_lock.acquire()').contains('gem_objects['), 'Nothing touches the registry before its lock')!
+	unpublished := section(gem, 'fn release_unpublished_backing(', 'pub fn destroy(', 'Unpublished backing release')!
+	require_order(unpublished, ['free_scattered_pages(list, page_count, pte_extra)', 'return', 'if phys == unsafe { nil } { return }',
+		'memory.set_ram_direct_map_uncached(u64(phys), page_count * page_size, false)', 'panic(', 'memory.pmm_free(phys, page_count)'],
+		'Unpublished backing gets its cacheable policy back before PMM reuse')!
 	destroy := section(gem, 'pub fn destroy(', '// Look up a GEM object', 'GEM final cache restoration')!
 	require_order(destroy, ['if !obj.file_scoped && obj.handle < gem_max_handles', 'gem_objects_lock.acquire()', 'gem_objects[obj.handle] = unsafe { nil }', 'gem_objects_lock.release()',
+		'if obj.pages != unsafe { nil }', 'free_scattered_pages(obj.pages, obj.size / page_size, obj.pte_extra)',
 		'obj.phys_addr != 0 && !obj.external && obj.pte_extra & memory.pte_uncached != 0',
 		'memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false)',
 		'panic(', 'memory.pmm_free(voidptr(obj.phys_addr), pages)'], 'Remove the namespace entry, restore before PMM reuse; keep external apertures outside ownership')!
+	scattered := section(gem, 'fn alloc_scattered_pages(', '// Look up a GEM object', 'GEM scattered backing')!
+	require_order(scattered, ['page := memory.pmm_alloc_fallible(1)', 'free_scattered_pages(list, index, pte_extra)', 'return none',
+		'memory.set_ram_direct_map_uncached(u64(page), page_size, true)', 'memory.pmm_free(page, 1)', 'free_scattered_pages(list, index, pte_extra)',
+		'unsafe { list[index] = u64(page) }', 'fn free_scattered_pages(',
+		'memory.set_ram_direct_map_uncached(page, page_size, false)', 'panic(', 'memory.pmm_free(voidptr(page), 1)', 'memory.free(voidptr(list))'],
+		'Scattered pages take the uncached policy before publication and get the cacheable one back before PMM reuse')!
 	release := section(gem, 'pub fn unref(', '// Return (or lazily create)', 'GEM final reference release')!
 	require_order(release, ['if !katomic.dec(mut rc)', 'destroy(obj)', 'if obj.external || obj.file_scoped { memory.free(voidptr(obj)) }'],
 		'Only the final owner releases file-scoped metadata after backing')!

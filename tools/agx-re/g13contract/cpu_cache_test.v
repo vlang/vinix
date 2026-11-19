@@ -14,6 +14,11 @@ fn test_cpu_cache_guards_require_complete_alias_and_teardown_contract() {
 	drm := read(repo + '/kernel/drm/drm.v')!
 	mmap := read(repo + '/kernel/memory/mmap/mmap.v')!
 	check_cpu_cache_local(gem, bo, file, driver, ram, cpu, drm, mmap)!
+	for token in ['memory.set_ram_direct_map_uncached(page, page_size, false)', 'memory.pmm_free(voidptr(page), 1)',
+		'free_scattered_pages(obj.pages, obj.size / page_size, obj.pte_extra)', 'scatter && alignment == page_size',
+		'release_unpublished_backing(phys, page_list, pages, pte_extra)'] {
+		if _ := check_cpu_cache_local(gem.replace(token, ''), bo, file, driver, ram, cpu, drm, mmap) { assert false, token }
+	}
 	for source, token in {'gem': 'memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false)',
 		'bo': 'return length <= object.size - (offset - base)', 'file': 'request.flags & ioctl.asahi_gem_writeback != 0, f.objects.uses_local_handles(),',
 		'driver': 'mmap_retain: agx_file.retain_mmap_range_handle', 'ram': 'cpu.read_ttbr1_el1() & kernel_pte_address_mask',

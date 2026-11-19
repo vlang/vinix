@@ -34,8 +34,9 @@ pub mut:
 	handle      u32
 	size        u64
 	refcount    u64
-	phys_addr   u64        // physical base address
-	virt_addr   u64        // kernel virtual address (higher half)
+	phys_addr   u64        // physical base address; 0 when scattered
+	virt_addr   u64        // kernel virtual address (higher half); 0 when scattered
+	pages       &u64 = unsafe { nil } // one physical page address per page when scattered
 	lock        klock.Lock
 	mmap_offset u64
 	name        string
@@ -76,14 +77,14 @@ pub fn create(size u64) ?&GemObject {
 // Create a GEM object with a physical and size alignment suitable for the
 // target device. AGX callers require 16 KiB alignment on either kernel granule.
 pub fn create_aligned(size u64, alignment u64) ?&GemObject {
-	return create_object(size, alignment, false, 0, 0, false, 0)
+	return create_object(size, alignment, false, 0, 0, false, 0, false)
 }
 
 // Set the private reservation identity before the object becomes visible in
 // any handle table. Only its owning VM may bind it, and PRIME cannot export it.
 pub fn create_aligned_private(size u64, alignment u64, identity u64) ?&GemObject {
 	if identity == 0 { return none }
-	return create_object(size, alignment, false, identity, 0, false, 0)
+	return create_object(size, alignment, false, identity, 0, false, 0, false)
 }
 
 // AGX CPU mappings are Normal Non-Cacheable unless WRITEBACK was requested.
@@ -91,16 +92,16 @@ pub fn create_aligned_private(size u64, alignment u64, identity u64) ?&GemObject
 // the object. Other GEM constructors retain their existing cacheable policy.
 pub fn create_aligned_with_cache(size u64, alignment u64, identity u64, writeback bool, file_scoped bool, registration MmapRegistration) ?&GemObject {
 	$if !arm64 { if !writeback { return none } }
-	return create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped, registration.mmap_device)
+	return create_object(size, alignment, false, identity, if writeback { u64(0) } else { memory.pte_uncached }, file_scoped, registration.mmap_device, true)
 }
 
 // Metadata for a host-owned resource. The driver installs its physical
 // aperture after RESOURCE_MAP_BLOB succeeds; the PMM never owns those pages.
 pub fn create_external(size u64) ?&GemObject {
-	return create_object(size, page_size, true, 0, 0, false, 0)
+	return create_object(size, page_size, true, 0, 0, false, 0, false)
 }
 
-fn create_object(size u64, alignment u64, external bool, private_identity u64, pte_extra u64, file_scoped bool, mmap_device u64) ?&GemObject {
+fn create_object(size u64, alignment u64, external bool, private_identity u64, pte_extra u64, file_scoped bool, mmap_device u64, scatter bool) ?&GemObject {
 	if size == 0 {
 		return none
 	}
@@ -116,37 +117,28 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 	aligned_size := lib.align_up(size, alignment)
 	pages := aligned_size / page_size
 
-	// Serialize the mmap-offset counter and, for globally named objects,
-	// keep the chosen handle available until the object is published.
-	gem_objects_lock.acquire()
-	defer {
-		gem_objects_lock.release()
-	}
-
-	mut handle := u32(0)
-	if !file_scoped {
-		for i := u32(1); i < gem_max_handles; i++ {
-			if gem_objects[i] == unsafe { nil } {
-				handle = i
-				break
-			}
-		}
-		if handle == 0 { return none }
-	}
-	if aligned_size > u64(-1) - next_mmap_offset {
-		return none
-	}
-
-	// Reserve the unpublished metadata before allocating or retagging backing.
+	// Allocate the unpublished metadata and backing before taking the registry
+	// lock: page allocation can reclaim, the lock masks interrupts, and nothing
+	// else can see either until publication.
 	storage := memory.malloc_packed_fallible(sizeof(GemObject))
 	if storage == unsafe { nil } { return none }
-	phys := if external || !memory.user_room(pages) { unsafe { nil } } else { memory.pmm_alloc_aligned_fallible(pages, alignment / page_size) }
+	room := external || memory.user_room(pages)
+	phys := if external || !room { unsafe { nil } } else { memory.pmm_alloc_aligned_fallible(pages, alignment / page_size) }
+	mut page_list := unsafe { &u64(nil) }
 	if !external && phys == unsafe { nil } {
-		memory.free(storage)
-		return none
+		// A fragmented PMM can lack one run this long while plenty of pages are
+		// free. Objects that allow it are backed by single pages instead; a
+		// one-page object has nothing to split.
+		if room && scatter && alignment == page_size && pages > 1 {
+			page_list = alloc_scattered_pages(pages, pte_extra) or { unsafe { nil } }
+		}
+		if page_list == unsafe { nil } {
+			memory.free(storage)
+			return none
+		}
 	}
 	$if arm64 {
-		if pte_extra & memory.pte_uncached != 0 {
+		if phys != unsafe { nil } && pte_extra & memory.pte_uncached != 0 {
 			if !memory.set_ram_direct_map_uncached(u64(phys), aligned_size, true) {
 				memory.pmm_free(phys, pages)
 				memory.free(storage)
@@ -155,6 +147,27 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 		}
 	}
 
+	// Serialize the mmap-offset counter and, for globally named objects,
+	// keep the chosen handle available until the object is published.
+	gem_objects_lock.acquire()
+	mut handle := u32(0)
+	mut publishable := true
+	if !file_scoped {
+		for i := u32(1); i < gem_max_handles; i++ {
+			if gem_objects[i] == unsafe { nil } {
+				handle = i
+				break
+			}
+		}
+		if handle == 0 { publishable = false }
+	}
+	if publishable && aligned_size > u64(-1) - next_mmap_offset { publishable = false }
+	if !publishable {
+		gem_objects_lock.release()
+		release_unpublished_backing(phys, page_list, pages, pte_extra)
+		memory.free(storage)
+		return none
+	}
 	mmap_off := next_mmap_offset
 	next_mmap_offset += aligned_size
 
@@ -169,7 +182,8 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 			size:        aligned_size
 			refcount:    1
 			phys_addr:   u64(phys)
-			virt_addr:   u64(phys) + higher_half
+			virt_addr:   if page_list != unsafe { nil } { u64(0) } else { u64(phys) + higher_half }
+			pages:       page_list
 			mmap_offset: mmap_off
 		}
 	}
@@ -181,8 +195,24 @@ fn create_object(size u64, alignment u64, external bool, private_identity u64, p
 		if file_mmap_objects != unsafe { nil } { file_mmap_objects.mmap_previous = obj }
 		file_mmap_objects = obj
 	}
-
+	gem_objects_lock.release()
 	return obj
+}
+
+// Free backing that was never published: the object never reached a table.
+fn release_unpublished_backing(phys voidptr, list &u64, page_count u64, pte_extra u64) {
+	if list != unsafe { nil } {
+		free_scattered_pages(list, page_count, pte_extra)
+		return
+	}
+	if phys == unsafe { nil } { return }
+	$if arm64 {
+		if pte_extra & memory.pte_uncached != 0
+			&& !memory.set_ram_direct_map_uncached(u64(phys), page_count * page_size, false) {
+			panic('GEM direct-map cache policy could not be restored')
+		}
+	}
+	memory.pmm_free(phys, page_count)
 }
 
 // Destroy a GEM object: unmap from higher half and free physical pages.
@@ -205,6 +235,9 @@ pub fn destroy(obj &GemObject) {
 		if next != unsafe { nil } { next.mmap_previous = unsafe { previous } }
 		gem_objects_lock.release()
 	}
+	if obj.pages != unsafe { nil } {
+		free_scattered_pages(obj.pages, obj.size / page_size, obj.pte_extra)
+	}
 	$if arm64 {
 		if obj.phys_addr != 0 && !obj.external && obj.pte_extra & memory.pte_uncached != 0 {
 			if !memory.set_ram_direct_map_uncached(obj.phys_addr, obj.size, false) {
@@ -217,6 +250,47 @@ pub fn destroy(obj &GemObject) {
 		pages := obj.size / page_size
 		memory.pmm_free(voidptr(obj.phys_addr), pages)
 	}
+}
+
+// Allocate `page_count` single pages for an object that no contiguous run could
+// hold, each with the object's direct-map cache policy. All or nothing.
+fn alloc_scattered_pages(page_count u64, pte_extra u64) ?&u64 {
+	if page_count == 0 || page_count > u64(-1) / sizeof(u64) { return none }
+	list := unsafe { &u64(memory.malloc_packed_fallible(page_count * sizeof(u64))) }
+	if list == unsafe { nil } { return none }
+	for index := u64(0); index < page_count; index++ {
+		page := memory.pmm_alloc_fallible(1)
+		if page == unsafe { nil } {
+			free_scattered_pages(list, index, pte_extra)
+			return none
+		}
+		$if arm64 {
+			if pte_extra & memory.pte_uncached != 0
+				&& !memory.set_ram_direct_map_uncached(u64(page), page_size, true) {
+				memory.pmm_free(page, 1)
+				free_scattered_pages(list, index, pte_extra)
+				return none
+			}
+		}
+		unsafe { list[index] = u64(page) }
+	}
+	return list
+}
+
+// Release the first `page_count` pages of a scattered list and the list itself,
+// restoring each page's cacheable direct mapping before the PMM reuses it.
+fn free_scattered_pages(list &u64, page_count u64, pte_extra u64) {
+	for index := u64(0); index < page_count; index++ {
+		page := unsafe { list[index] }
+		$if arm64 {
+			if pte_extra & memory.pte_uncached != 0
+				&& !memory.set_ram_direct_map_uncached(page, page_size, false) {
+				panic('GEM direct-map cache policy could not be restored')
+			}
+		}
+		memory.pmm_free(voidptr(page), 1)
+	}
+	memory.free(voidptr(list))
 }
 
 // Look up a GEM object by its handle.

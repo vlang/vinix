@@ -2,6 +2,7 @@
 module gem
 
 __global higher_half = u64(0) // host fixtures address backing directly
+__global page_size = u64(16384)
 
 pub struct GemObject {
 pub mut:
@@ -9,6 +10,7 @@ pub mut:
 	virt_addr  u64
 	phys_addr  u64
 	external   bool
+	pages      &u64 = unsafe { nil }
 	references int = 1
 }
 
