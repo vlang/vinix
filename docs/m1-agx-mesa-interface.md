@@ -30,6 +30,55 @@ Nothing Mesa calls on the render node is missing. What is unverified is the
 behaviour behind each entry with this Mesa: no submission has reached a
 physical GPU.
 
+## Opening the M1 GPU
+
+Before any of those calls, Mesa has to accept the device. Each check below
+was read in the pinned source and compared with what Vinix gives on base M1.
+None of it has run against a real GPU.
+
+1. **Discovery.** Honeykrisp (`hk_create_drm_physical_device`) takes a libdrm
+   device only if it has a render node and its bus is `DRM_BUS_PLATFORM`. Its
+   `drmGetVersion` name must be `asahi`. EGL's surfaceless and device
+   platforms find render nodes the same way. Vinix's GPU is a platform device
+   in sysfs ([DRM sysfs](m1-agx-drm-sysfs.md)), and its driver name is
+   `asahi`.
+2. **Identity.** `agx_open_device` needs a `GET_PARAMS` reply of at least
+   `offsetof(memory_limit)` bytes. `agx_chip_from_params` maps generation 13,
+   variant `'G'` and 1 to 64 clusters to G13G, which
+   `agx_params_driver_supported` admits. The AGX3 kernel-ABI feature check
+   does not apply to G13. Mesa's `drm_asahi_params_global` declares the same
+   fields as Linux-Aurora's header, from which Vinix's reply is generated.
+3. **Values.** Every field of Vinix's modern G13 reply
+   (`make_modern_global_params` in `kernel/gpu/agx/file/modern.v`) is the one
+   Linux-Aurora's G13 `get_params` gives
+   ([file.rs](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/file.rs#L375-L449),
+   [gpu.rs](https://github.com/omacom/linux-aurora/blob/bed544bdf93a496ebf70ba180923bab12b6e01cf/drivers/gpu/drm/asahi/gpu.rs)):
+
+   | Field | Both |
+   | --- | --- |
+   | `vm_start`, `vm_end` | `0x4000` to `(1 << 39) - 0x8000`, the user range below the dummy page |
+   | `vm_kernel_min_size` | `0x20000000` |
+   | `max_commands_per_submission`, `max_attachments` | 64, 16 |
+   | `command_timestamp_frequency_hz` | 1,000,000,000 |
+   | `usc_generation`, `gpu_hal_generation` | 2, 0 (legacy) |
+   | `features` | `SOFT_FAULTS` only ([soft faults](m1-agx-soft-faults.md)) |
+   | `memory_limit`, `client_memory_limit` | 0: Linux-Aurora sets its limits only when it probes a G17 |
+   | `gpu_variant`, `gpu_revision` | the character `'G'`; revision codes `0x00` to `0x21` |
+   | `max_frequency_khz` | the highest operating point |
+   | generation, chip, dies, clusters, cores, core masks | from the GPU's identity registers and the t8103 configuration, on both |
+
+   So Mesa derives the same address layout as on Asahi. The shader heap is at
+   `0x1100000000`, the first 4 GiB boundary above its 64 GiB robustness
+   carve-out and printf buffer. A 32 GiB kernel range at the top goes to
+   `VM_CREATE`, and the user heap is split for its read-only alias.
+
+On the M1, Vinix's display is a simple framebuffer device, `vinix-dumb`, not
+Asahi's display driver `apple`. Mesa maps `apple` to its render-only display
+driver (`apple_dri.so`), which allocates on the GPU and scans out on the
+display; it has no driver for `vinix-dumb`. So a compositor that drives the
+display through Mesa will not get that GPU path. Offscreen rendering, which
+the acceptance sequence uses, needs only the render node.
+
 ## Evidence
 
 The source came from the GitHub archive of the pinned commit; the bundle keeps
