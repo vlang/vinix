@@ -32,10 +32,14 @@ fn publish_drm_sysfs(mut dev DrmDevice) {
 	if dev.render_node != unsafe { nil } {
 		publish_minor_sysfs(parent, 'renderD', 128 + dev.dev_id)
 	}
+	if parent != 'devices/virtual' {
+		publish_drm_debugfs(mut dev, parent)
+	}
 }
 
 fn remove_drm_sysfs(mut dev DrmDevice) {
 	if dev.sysfs_parent.len == 0 { return }
+	remove_drm_debugfs(mut dev)
 	remove_minor_sysfs(dev.sysfs_parent, 'card', dev.dev_id)
 	if dev.render_node != unsafe { nil } {
 		remove_minor_sysfs(dev.sysfs_parent, 'renderD', 128 + dev.dev_id)
@@ -108,6 +112,89 @@ fn remove_minor_sysfs(parent string, prefix string, minor u32) {
 		name.free()
 		char_name.free()
 	}
+}
+
+// Linux's DRM debugfs: a directory per device named after its parent device
+// (dev->unique), dri/206400000.gpu on M1, and a link to it per minor, dri/0
+// and dri/128. Linux mounts debugfs at /sys/kernel/debug. Vinix has no
+// debugfs, so the DRM part of it is published in /sys at that path, for the
+// files drivers add with debugfs_add_file(). A device with no parent gets
+// none: Linux names the directory after the parent. Unlike debugfs, whose
+// root only root may enter, these directories can be listed by anyone; the
+// files in them are root-only.
+const debugfs_dri = 'kernel/debug/dri'
+
+fn publish_drm_debugfs(mut dev DrmDevice, parent string) {
+	unique := parent_name(parent)
+	directory := sysfs_join3(debugfs_dri, '/', unique)
+	// A name another device already has stays that device's, as Linux's
+	// debugfs_create_dir() refuses it; this device then gets no directory.
+	if !fs.sysfs_exists(directory) && fs.sysfs_directory(directory) {
+		publish_debugfs_link(dev.dev_id, unique)
+		if dev.render_node != unsafe { nil } {
+			publish_debugfs_link(128 + dev.dev_id, unique)
+		}
+		dev.debugfs_dir = directory
+	} else {
+		unsafe { directory.free() }
+	}
+	unsafe { unique.free() }
+}
+
+fn publish_debugfs_link(minor u32, unique string) {
+	name := minor_name('', minor)
+	publish_link(debugfs_dri, name, unique)
+	unsafe { name.free() }
+}
+
+// Removing the directory waits for every read of a file in it to return.
+fn remove_drm_debugfs(mut dev DrmDevice) {
+	if dev.debugfs_dir.len == 0 { return }
+	remove_debugfs_link(dev.dev_id)
+	if dev.render_node != unsafe { nil } {
+		remove_debugfs_link(128 + dev.dev_id)
+	}
+	fs.sysfs_remove(dev.debugfs_dir)
+	unsafe { dev.debugfs_dir.free() }
+	dev.debugfs_dir = ''
+}
+
+fn remove_debugfs_link(minor u32) {
+	name := minor_name('', minor)
+	path := sysfs_join3(debugfs_dri, '/', name)
+	fs.sysfs_remove(path)
+	unsafe {
+		path.free()
+		name.free()
+	}
+}
+
+// Add the read-only file `name` to the device's debugfs directory, read
+// through `show`: Linux's drm_debugfs_add_file(). Only root may read it, as
+// only root may enter debugfs on Linux. The file goes when the device
+// unregisters, once no read of it is running, so `context` must last until
+// then. It does not synchronize with unregister_device(): call it before
+// anything can unregister the device, as the AGX driver does during its own
+// registration. False for a device with no directory.
+pub fn debugfs_add_file(dev &DrmDevice, name string, show fs.SysfsShow, context voidptr) bool {
+	if dev.debugfs_dir.len == 0 { return false }
+	path := sysfs_join3(dev.debugfs_dir, '/', name)
+	added := fs.sysfs_attribute(path, 0o400, show, unsafe { nil }, context)
+	unsafe { path.free() }
+	return added
+}
+
+// The last component of `parent`, a copy: 206400000.gpu.
+fn parent_name(parent string) string {
+	mut start := 0
+	for index, c in parent {
+		if c == `/` { start = index + 1 }
+	}
+	mut text := lib.new_text(parent.len - start)
+	for index := start; index < parent.len; index++ {
+		text.add_byte(parent[index])
+	}
+	return lib.finish_text(text)
 }
 
 fn minor_name(prefix string, minor u32) string {

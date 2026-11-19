@@ -76,6 +76,10 @@ static void minors(void) {
         // libdrm's drmNodeIsDRM(): a device without a parent is not listed.
         snprintf(path, sizeof(path), "/sys/dev/char/%u:%u/device/drm", maj, min);
         check(stat(path, &st) != 0 && errno == ENOENT, "libdrm does not list a virtual device");
+        // Linux names a device's debugfs directory after its parent; a
+        // device without one gets no dri/<minor> link.
+        snprintf(path, sizeof(path), "/sys/kernel/debug/dri/%u", min);
+        check(lstat(path, &st) != 0 && errno == ENOENT, "a virtual device has no debugfs entry");
     }
     closedir(dir);
     check(seen > 0, "the guest has a DRM node");

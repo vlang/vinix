@@ -18,6 +18,7 @@ pub mut:
 	dev_id       u32
 	render_node  &DrmNode = unsafe { nil }
 	sysfs_parent string
+	debugfs_dir  string
 }
 
 // Follow every link in `path`, relative links from the link's own directory,
@@ -93,6 +94,22 @@ fn text_of(path string) string {
 	return (fs.entry(real) or { return '' }).value
 }
 
+// Read an attribute through its show function, as a read(2) of it does.
+fn read_attribute(path string) ?string {
+	real := resolve(path)?
+	entry := fs.entry(real) or { return none }
+	if entry.kind != .attribute { return none }
+	mut text := lib.new_text(64)
+	entry.show(entry.context, mut text)
+	return lib.finish_text(text)
+}
+
+fn show_marker(context voidptr, mut text lib.Text) {
+	text.add('stats of ')
+	text.add_unsigned(u64(context))
+	text.add_byte(`\n`)
+}
+
 pub fn run_checks() {
 	// The base M1 GPU as the AGX driver registers it: card1 and renderD129,
 	// under the directory named after the device-tree node.
@@ -141,6 +158,36 @@ pub fn run_checks() {
 		assert (uevent_get(device, 'DRIVER') or { '' }) == 'asahi'
 	}
 
+	// Linux's DRM debugfs at /sys/kernel/debug: dri/<unique>, named after the
+	// parent device, and a link to it per minor, written as debugfs writes it.
+	unique := '${oracle_unit}.${oracle_node}'
+	debugfs := 'kernel/debug/dri/${unique}'
+	assert gpu_device.debugfs_dir == debugfs, gpu_device.debugfs_dir
+	assert fs.published(debugfs)
+	for minor in [u32(1), 129] {
+		assert (readlink('kernel/debug/dri/${minor}') or { '' }) == unique, 'dri/${minor}'
+		assert (resolve('kernel/debug/dri/${minor}') or { '' }) == debugfs
+	}
+	// A driver's file in it: root-only, read through its show function, and
+	// reachable through either minor's link.
+	assert debugfs_add_file(&gpu_device, 'asahi_stats', show_marker, voidptr(u64(42)))
+	assert !debugfs_add_file(&gpu_device, 'asahi_stats', show_marker, voidptr(u64(42)))
+	stats := fs.entry('${debugfs}/asahi_stats') or { panic('asahi_stats missing') }
+	assert stats.kind == .attribute && stats.mode == 0o400
+	assert (read_attribute('kernel/debug/dri/1/asahi_stats') or { '' }) == 'stats of 42\n'
+	assert (read_attribute('kernel/debug/dri/129/asahi_stats') or { '' }) == 'stats of 42\n'
+	// A second device whose parent has the same name gets no directory, as
+	// Linux's debugfs_create_dir() refuses a taken name, and its removal
+	// leaves the first device's directory alone.
+	mut twin_driver := DrmDriver{sysfs_parent: parent}
+	mut twin := DrmDevice{driver: &twin_driver, dev_id: 2, render_node: &node}
+	publish_drm_sysfs(mut twin)
+	assert twin.debugfs_dir == '' && !fs.published('kernel/debug/dri/2')
+	assert !fs.published('kernel/debug/dri/130')
+	assert !debugfs_add_file(&twin, 'asahi_stats', show_marker, unsafe { nil })
+	remove_drm_sysfs(mut twin)
+	assert (read_attribute('kernel/debug/dri/1/asahi_stats') or { '' }) == 'stats of 42\n'
+
 	// A device with no parent, such as the QEMU framebuffer: Linux's
 	// devices/virtual entries, which libdrm does not enumerate.
 	mut plain := DrmDriver{}
@@ -151,6 +198,9 @@ pub fn run_checks() {
 	assert (resolve('class/drm/card0/subsystem') or { '' }) == 'class/drm'
 	assert !exists('class/drm/card0/device') && !node_is_drm(0)
 	assert !exists('dev/char/226:128')
+	// It has no debugfs directory to add files to.
+	assert framebuffer.debugfs_dir == '' && !fs.published('kernel/debug/dri/0')
+	assert !debugfs_add_file(&framebuffer, 'asahi_stats', show_marker, unsafe { nil })
 
 	// Unregistering removes the class and dev/char links and the minors; the
 	// parent directory and its own files stay with their driver.
@@ -158,15 +208,17 @@ pub fn run_checks() {
 	remove_drm_sysfs(mut framebuffer)
 	for path in ['class/drm/card1', 'class/drm/renderD129', 'dev/char/226:1', 'dev/char/226:129',
 		'${parent}/drm/card1', '${parent}/drm/renderD129', 'class/drm/card0', 'dev/char/226:0',
-		'devices/virtual/drm/card0'] {
+		'devices/virtual/drm/card0', 'kernel/debug/dri/1', 'kernel/debug/dri/129', debugfs,
+		'${debugfs}/asahi_stats'] {
 		assert !fs.published(path), '${path} survived unregister'
 	}
 	assert fs.published('${parent}/uevent')
 	assert gpu_device.sysfs_parent == '' && framebuffer.sysfs_parent == ''
+	assert gpu_device.debugfs_dir == ''
 	// A second registration can publish the same names again.
 	publish_drm_sysfs(mut framebuffer)
 	assert node_is_drm(0) == false && exists('class/drm/card0')
 	remove_drm_sysfs(mut framebuffer)
 	_ = lib.new_text(0)
-	println('DRM sysfs: libdrm finds the M1 GPU as a platform device named from the pinned device tree, virtual devices stay unlisted, and unregister removes every link')
+	println('DRM sysfs: libdrm finds the M1 GPU as a platform device named from the pinned device tree, its debugfs directory holds root-only driver files, virtual devices stay unlisted, and unregister removes every link')
 }
