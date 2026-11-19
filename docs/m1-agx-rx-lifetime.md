@@ -438,3 +438,30 @@ archived patch. Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-paired-removal-20261119.xeY3Qw/`.
 The `bundle.tar.gz` SHA-256 is
 `2eb665a310a839a8308b3361c16c26cd500a73064670e162c2dc3994f5549c0b`.
+
+## First DRM directory creation after staging
+
+Devtmpfs checks an existing `/dev/dri` for type and name collisions before
+staging the DRM leaves. When the directory is absent, it creates it after
+all requested leaf allocations succeed. A recoverable failure on the first
+registration therefore leaves the directory absent.
+
+The DRM wire sanitizer fixture injected 14 first-registration allocation
+failures across card-only and paired registration, checked cleanup and an
+empty registry, and verified successful retry. The previous implementation
+failed the directory absence check. Independent lifetime review and generated
+ARM64 code confirmed that staging is private and parent assignment precedes
+publication.
+
+Both kernel builds, both AGX sanitizer suites, 79 local contract tests and
+122 pinned-reference checks passed. The allocation scan matched the 173
+baseline findings. QEMU descriptor-flags checks passed with debug-stripped
+copies of both kernels and matching loadable segment layouts. The ARM64
+guest reused the previous smoke test ISO with the new kernel and logged
+`/dev/dri/card0` creation. Native M1 validation remains open.
+
+The tested base was `fbcdafd462a11362b68b4af30be957d657af48eb` plus the
+archived patch. Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-initial-directory-20261119.oXyMjn/`.
+The `bundle.tar.gz` SHA-256 is
+`ed1de8be7a183ce6f14d3590883397578025e164aa62e676559ba9d02b9d6769`.

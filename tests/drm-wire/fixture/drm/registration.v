@@ -172,6 +172,28 @@ fn observe_dri_publication() {
 	}
 }
 
+fn check_initial_registration_failures() {
+	for render in [false, true]! {
+		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
+		allocations := if render { 9 } else { 5 }
+		for successful in 0 .. allocations {
+			before := memory.registration_outstanding()
+			memory.fail_registration_after(successful)
+			assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enomem
+			memory.fail_registration_after(-1)
+			assert 'dri' !in devtmpfs_root.children, 'failed first registration created the DRM directory'
+			assert memory.registration_outstanding() == before && get_device(0) == none
+			assert !drm_devices_lock.held && !vfs_lock.held && !children_lock.held
+		}
+	}
+	retry := register_driver_with_data(&DrmDriver{features: driver_render}, unsafe { nil }) or { panic('first registration retry failed') }
+	dir := unsafe { devtmpfs_root.children['dri'] }
+	assert dir.children.len == 2 && 'card0' in dir.children && 'renderD128' in dir.children
+	unregister_device(retry)
+	assert dir.children.len == 0
+	println('DRM registration: 14 first-registration failures leave /dev/dri absent and allow retry')
+}
+
 fn check_registration_collisions() {
 	driver := DrmDriver{features: driver_render}
 	assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.enodev
@@ -183,13 +205,16 @@ fn check_registration_collisions() {
 	assert memory.registration_outstanding() == 0
 	assert unsafe { devtmpfs_root.children['dri'] == blocker }
 	devtmpfs_root.children.delete('dri')
-	mut dir := ensure_devtmpfs_dir(devtmpfs_root, 'dri')
+	check_initial_registration_failures()
+	mut dir := unsafe { devtmpfs_root.children['dri'] }
+	prior_publications := published_nodes
+	live := memory.registration_outstanding()
 	for leaf in ['card0', 'renderD128']! {
 		unsafe { dir.children[leaf] = blocker }
 		assert register_driver_with_data(&driver, unsafe { nil }) == none && errno.get() == errno.eexist
-		assert published_nodes == 0 && dir.children.len == 1 && unsafe { dir.children[leaf] == blocker }
+		assert published_nodes == prior_publications && dir.children.len == 1 && unsafe { dir.children[leaf] == blocker }
 		assert get_device(0) == none && node_names[0] == unsafe { nil } && node_names[128] == unsafe { nil }
-		assert memory.registration_outstanding() == 0
+		assert memory.registration_outstanding() == live
 		if leaf == 'card0' {
 			assert register_driver_with_data(&DrmDriver{}, unsafe { nil }) == none && errno.get() == errno.eexist
 		}

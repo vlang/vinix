@@ -424,23 +424,33 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 		errno.set(errno.enodev)
 		return none
 	}
-	mut parent := ensure_devtmpfs_dir(devtmpfs_root, 'dri')
-	if parent.children == unsafe { nil } || !stat.isdir(parent.resource.stat.mode) {
-		errno.set(errno.enotdir)
-		return none
+	mut parent := unsafe { devtmpfs_root.children['dri'] or { &VFSNode(nil) } }
+	if parent != unsafe { nil } {
+		if parent.children == unsafe { nil } || !stat.isdir(parent.resource.stat.mode) {
+			errno.set(errno.enotdir)
+			return none
+		}
+		if card_name in parent.children || (render != unsafe { nil } && render_name in parent.children) {
+			errno.set(errno.eexist)
+			return none
+		}
 	}
-	if card_name in parent.children || (render != unsafe { nil } && render_name in parent.children) {
-		errno.set(errno.eexist)
-		return none
-	}
-	mut primary_leaf := prepare_dri_leaf(parent, card_name)?
+	mut primary_leaf := prepare_dri_leaf(card_name)?
+	mut render_leaf := unsafe { &VFSNode(nil) }
 	if render != unsafe { nil } {
-		mut render_leaf := prepare_dri_leaf(parent, render_name) or {
+		render_leaf = prepare_dri_leaf(render_name) or {
 			memory.free(primary_leaf.name.str)
 			memory.free(primary_leaf)
 			return none
 		}
-		init_devtmpfs_node(mut primary_leaf, card, true)
+	}
+	if parent == unsafe { nil } {
+		parent = ensure_devtmpfs_dir(devtmpfs_root, 'dri')
+	}
+	primary_leaf.parent = unsafe { parent }
+	init_devtmpfs_node(mut primary_leaf, card, true)
+	if render_leaf != unsafe { nil } {
+		render_leaf.parent = unsafe { parent }
 		init_devtmpfs_node(mut render_leaf, render, true)
 		// Directory readers see the pair when the map lock is released.
 		children_lock.acquire()
@@ -451,12 +461,11 @@ pub fn devtmpfs_add_dri_devices(card &resource.Resource, card_name string,
 		children_lock.release()
 		return
 	}
-	init_devtmpfs_node(mut primary_leaf, card, true)
 	publish_child(parent, primary_leaf.name, primary_leaf)
 }
 
 // No namespace or resource reference is transferred until publication.
-fn prepare_dri_leaf(parent &VFSNode, name string) ?&VFSNode {
+fn prepare_dri_leaf(name string) ?&VFSNode {
 	storage := memory.malloc_packed_fallible(sizeof(VFSNode))
 	if storage == unsafe { nil } {
 		errno.set(errno.enomem)
@@ -474,7 +483,6 @@ fn prepare_dri_leaf(parent &VFSNode, name string) ?&VFSNode {
 		(&u8(name_storage))[name.len] = 0
 		*node = VFSNode{
 			name: tos(&u8(name_storage), name.len)
-			parent: parent
 			filesystem: filesystems['devtmpfs']
 		}
 	}
