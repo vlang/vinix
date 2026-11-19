@@ -29,6 +29,10 @@ const msg_nosignal = 0x4000
 const msg_waitall = 0x100
 const cmsg_header_size = u64(16)
 const cmsg_align = u64(8)
+const peer_login_idle = u32(0)
+const peer_login_connecting = u32(1)
+const peer_login_connected = u32(2)
+const peer_login_closed = u32(3)
 
 pub struct SockaddrUn {
 pub mut:
@@ -89,6 +93,13 @@ pub mut:
 	peer_pid  int
 	peer_uid  u32
 	peer_gid  u32
+	// Immutable account-session labels travel with these scalar snapshots;
+	// descriptors may outlive or be transferred away from their creator.
+	owner_login_uid     u32
+	owner_login_session u32
+	// Published as one atomic tuple; readers never observe half an identity.
+	peer_login_value u64
+	peer_login_state u32
 
 	// shutdown(2) state. `read_closed` and `write_closed` are this socket's own
 	// halves; `peer_finished` records that the other end promised to send
@@ -1003,6 +1014,7 @@ fn (mut this UnixSocket) close_endpoint() {
 		return
 	}
 	this.closed = true
+	katomic.store(mut &this.peer_login_state, peer_login_closed)
 	this.listening = false
 	this.read_closed = true
 	this.write_closed = true
@@ -1231,6 +1243,27 @@ pub fn (this &UnixSocket) peer_credentials() ?sock_pub.UCred {
 	}
 }
 
+pub fn (this &UnixSocket) peer_login() ?sock_pub.PeerLogin {
+	if katomic.load(&this.peer_login_state) != peer_login_connected {
+		errno.set(errno.enotconn)
+		return none
+	}
+	identity := katomic.load(&this.peer_login_value)
+	return sock_pub.PeerLogin{
+		login_uid: u32(identity)
+		login_session: u32(identity >> 32)
+	}
+}
+
+fn (mut this UnixSocket) publish_peer_login(uid u32, session u32) {
+	// ARM's compare-and-swap is relaxed. Complete the tuple store before it
+	// makes the connected state visible to an acquire-loading reader.
+	// Only the connect owner writes it. A close cannot be made ready again.
+	katomic.store(mut &this.peer_login_value, u64(uid) | (u64(session) << 32))
+	katomic.sync()
+	katomic.cas(mut &this.peer_login_state, peer_login_connecting, peer_login_connected)
+}
+
 fn (mut this UnixSocket) setsockopt(_handle voidptr, level int, optname int, value int) ? {
 	if level != sock_pub.sol_socket {
 		errno.set(errno.enoprotoopt)
@@ -1316,6 +1349,18 @@ fn (mut this UnixSocket) accept(_handle voidptr) ?&resource.Resource {
 }
 
 fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? {
+	client := proc.current_thread().process
+	login_uid, login_session := proc.login_identity(client.pid)
+	stream := !this.is_datagram()
+	if stream && !katomic.cas(mut &this.peer_login_state, peer_login_idle, peer_login_connecting) {
+		state := katomic.load(&this.peer_login_state)
+		errno.set(if state == peer_login_connected { errno.eisconn } else if state == peer_login_closed { errno.econnrefused } else { errno.ealready })
+		return none
+	}
+	defer {
+		// Failed connects remain retryable; success and close cannot be reset.
+		if stream { katomic.cas(mut &this.peer_login_state, peer_login_connecting, peer_login_idle) }
+	}
 	mut socket := lookup_bound(_addr, addrlen)?
 	defer { socket.unref(unsafe { nil }) or {} }
 
@@ -1373,6 +1418,7 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		refcount:  1
 		peer:      this
 		connected: true
+		peer_login_state: peer_login_connecting
 		name:      socket.name
 		name_len:  socket.name_len
 		status:    file.pollout
@@ -1380,22 +1426,25 @@ fn (mut this UnixSocket) connect(_handle voidptr, _addr voidptr, addrlen u32) ? 
 		owner_pid: socket.owner_pid
 		owner_uid: socket.owner_uid
 		owner_gid: socket.owner_gid
+		owner_login_uid: socket.owner_login_uid
+		owner_login_session: socket.owner_login_session
 	}
 	connection_socket.stat.mode = stat.ifsock | 0o777
-	client := proc.current_thread().process
 	connection_socket.peer_pid = client.pid
 	connection_socket.peer_uid = client.euid
 	connection_socket.peer_gid = client.egid
+	connection_socket.publish_peer_login(login_uid, login_session)
 
 	// Each end points at the other, and the listener queues the new one.
 	hold(mut connection_socket)
 	hold(mut this)
 	hold(mut connection_socket)
 	this.peer = connection_socket
-	this.connected = true
 	this.peer_pid = socket.owner_pid
 	this.peer_uid = socket.owner_uid
 	this.peer_gid = socket.owner_gid
+	this.publish_peer_login(socket.owner_login_uid, socket.owner_login_session)
+	this.connected = true
 	this.status |= file.pollout
 	socket.backlog << connection_socket
 
@@ -1838,6 +1887,7 @@ fn (mut this UnixSocket) recvmsg(_handle voidptr, msg &sock_pub.MsgHdr, flags in
 
 pub fn create(@type int) ?&UnixSocket {
 	process := proc.current_thread().process
+	login_uid, login_session := proc.login_identity(process.pid)
 	charge := proc.reserve_kernel_for(proc.kernel_owner(), .socket, 8192)?
 	mut ret := &UnixSocket{
 		kernel_charge: charge
@@ -1846,6 +1896,8 @@ pub fn create(@type int) ?&UnixSocket {
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
+		owner_login_uid: login_uid
+		owner_login_session: login_session
 	}
 	ret.name.sun_family = sock_pub.af_unix
 	ret.socktype = @type & sock_pub.sock_type_mask
@@ -1860,14 +1912,18 @@ pub fn create(@type int) ?&UnixSocket {
 
 pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	process := proc.current_thread().process
+	login_uid, login_session := proc.login_identity(process.pid)
 	a_charge := proc.reserve_kernel_for(proc.kernel_owner(), .socket, 8192)?
 	mut a := &UnixSocket{
 		kernel_charge: a_charge
 		refcount:  1
 		peer:      unsafe { nil }
+		peer_login_state: peer_login_connecting
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
+		owner_login_uid: login_uid
+		owner_login_session: login_session
 	}
 	a.name.sun_family = sock_pub.af_unix
 	a.socktype = @type & sock_pub.sock_type_mask
@@ -1880,9 +1936,12 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 		kernel_charge: b_charge
 		refcount:  1
 		peer:      unsafe { nil }
+		peer_login_state: peer_login_connecting
 		owner_pid: process.pid
 		owner_uid: process.euid
 		owner_gid: process.egid
+		owner_login_uid: login_uid
+		owner_login_session: login_session
 	}
 	b.name.sun_family = sock_pub.af_unix
 	b.socktype = @type & sock_pub.sock_type_mask
@@ -1898,14 +1957,16 @@ pub fn create_pair(@type int) ?(&UnixSocket, &UnixSocket) {
 	b.peer = a
 	hold(mut a)
 	hold(mut b)
-	a.connected = true
-	b.connected = true
 	a.peer_pid = b.owner_pid
 	a.peer_uid = b.owner_uid
 	a.peer_gid = b.owner_gid
+	a.publish_peer_login(b.owner_login_uid, b.owner_login_session)
 	b.peer_pid = a.owner_pid
 	b.peer_uid = a.owner_uid
 	b.peer_gid = a.owner_gid
+	b.publish_peer_login(a.owner_login_uid, a.owner_login_session)
+	a.connected = true
+	b.connected = true
 
 	return a, b
 }

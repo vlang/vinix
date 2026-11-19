@@ -1,0 +1,19 @@
+#!/bin/sh
+# SPDX-License-Identifier: GPL-2.0-or-later
+# Compile and start the controller, which shares the machine-booting half of
+# the hardware tests (tests/hardware-platform/hwhost).
+set -eu
+here=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+. "$here/../../build-support/find-v.sh"
+export V
+work=$(mktemp -d "${TMPDIR:-/tmp}/vinix-peer-login-run.XXXXXX")
+trap 'rm -rf "$work"' 0
+trap 'exit 129' HUP
+trap 'exit 130' INT
+trap 'exit 143' TERM
+"$V" -cc cc -nocache -path "@vlib|@vmodules|$here/../hardware-platform" -o "$work/run" "$here/run.v" >&2
+set +e
+"$work/run" "$@"
+status=$?
+set -e
+exit "$status"

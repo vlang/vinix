@@ -16,9 +16,22 @@ endpoint must report the process identity obtained from the initial socketpair.
 The fixture checks transport ownership with equal process labels; differing
 login-session provenance is qualified separately by the account/audio fixtures.
 
+## Run it in a VM
+
+`tests/socket-peer-login/run --arch aarch64|x86_64 --kernel <ELF>` boots the
+kernel in QEMU with `vm/` as PID 1 (the hardware tests' `hwhost` does the
+booting; `run --help` lists its options). PID 1 runs `guest.v` as an ordinary
+child, then checks cross-login provenance the fixture cannot: three logins
+(two people, one of them twice) each get a distinct session; a system listener
+sees the login at the other end, including a descendant that changed uid; a
+listener carries the login of its maker at creation time; records survive the
+exit of the process they name; unconnected, datagram and non-UNIX sockets
+refuse. On 2026-11-19 both architectures passed against a kernel carrying the
+`SO_PEERLOGIN` implementation.
+
 The [native runtime check](runtime-check.md) passes on both fresh kernel ELFs,
-including all 32 concurrent rounds and natural guest shutdown. Cross-login
-provenance, allocation/performance and production integration remain separate.
+including all 32 concurrent rounds and natural guest shutdown. The VM run above
+checks cross-login provenance; allocation/performance remain separate.
 
 `guarded-build-check.v` builds the isolated allocation-tracked kernel for both
 architectures and retains source, complete input closures, generated C and

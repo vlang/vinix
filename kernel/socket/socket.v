@@ -1098,8 +1098,7 @@ pub fn syscall_shutdown(_ voidptr, fdnum int, how int) (u64, u64) {
 	return 0, 0
 }
 
-// getsockopt(2). Most options are integer-valued; SO_PEERCRED carries Linux's
-// three-field ucred record and is handled before the generic path.
+// getsockopt(2). Record-valued peer identities precede the generic integer path.
 pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u64, optlen u64) (u64, u64) {
 	mut fd, mut sock := socket_from_fdnum(fdnum) or { return errno.err, errno.get() }
 	defer {
@@ -1123,6 +1122,22 @@ pub fn syscall_getsockopt(_ voidptr, fdnum int, level int, optname int, optval u
 			credentials := res.peer_credentials() or { return errno.err, errno.get() }
 			written := u32(sizeof(sock_pub.UCred))
 			if !usercopy.copy_to_user(optval, voidptr(&credentials), sizeof(sock_pub.UCred))
+				|| !usercopy.copy_to_user(optlen, voidptr(&written), sizeof(u32)) {
+				return errno.err, errno.efault
+			}
+			return 0, 0
+		}
+		return errno.err, errno.enoprotoopt
+	}
+	if level == sock_pub.sol_socket && optname == sock_pub.so_peerlogin {
+		if capacity < sizeof(sock_pub.PeerLogin) {
+			return errno.err, errno.einval
+		}
+		mut res := fd.handle.resource
+		if mut res is sock_unix.UnixSocket {
+			identity := res.peer_login() or { return errno.err, errno.get() }
+			written := u32(sizeof(sock_pub.PeerLogin))
+			if !usercopy.copy_to_user(optval, voidptr(&identity), sizeof(sock_pub.PeerLogin))
 				|| !usercopy.copy_to_user(optlen, voidptr(&written), sizeof(u32)) {
 				return errno.err, errno.efault
 			}

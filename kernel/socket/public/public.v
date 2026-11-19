@@ -81,6 +81,11 @@ pub const so_sndtimeo = 21
 
 pub const so_peercred = 17
 
+// Vinix's immutable login identity captured with the UNIX peer credentials.
+// Unlike looking up SO_PEERCRED.pid in /proc, this survives creator exit and
+// PID reuse. The ABI is exactly two native-endian 32-bit words.
+pub const so_peerlogin = 0x564c
+
 pub const so_acceptconn = 30
 
 pub const so_domain = 39
@@ -94,6 +99,12 @@ pub:
 	pid i32
 	uid u32
 	gid u32
+}
+
+pub struct PeerLogin {
+pub:
+	login_uid     u32
+	login_session u32
 }
 
 // Copy an address out the way getsockname(2) and getpeername(2) ask for it:
