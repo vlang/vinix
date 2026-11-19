@@ -228,31 +228,33 @@ fn close_file(_dev &drm.DrmDevice, handle voidptr) {
 	}
 }
 
+const drm_ioctl_table = [
+	drm.DrmIoctl{ cmd: ioctl.drm_ioctl_mode_create_dumb, handler: create_dumb_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_ioctl_mode_map_dumb, handler: map_dumb_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_ioctl_mode_destroy_dumb, handler: destroy_dumb_handler },
+]!
+
 // Multiple firmware framebuffers share one allocator.
 pub fn register() {
 	if simple_registered {
 		return
 	}
 	simple_registered = true
-	mut driver := &drm.DrmDriver{
+	driver := drm.DrmDriver{
 		name: 'vinix-dumb'
 		desc: 'Vinix framebuffer dumb-buffer allocator'
 		major: 1
 		minor: 0
 		patchlevel: 0
 		features: drm.driver_gem | drm.driver_dumb_buffer
-		ioctls: [
-			drm.DrmIoctl{ cmd: ioctl.drm_ioctl_mode_create_dumb, handler: create_dumb_handler },
-			drm.DrmIoctl{ cmd: ioctl.drm_ioctl_mode_map_dumb, handler: map_dumb_handler },
-			drm.DrmIoctl{ cmd: ioctl.drm_ioctl_mode_destroy_dumb, handler: destroy_dumb_handler },
-		]
+		ioctls: unsafe { drm.static_ioctl_table(&drm_ioctl_table[0], drm_ioctl_table.len) }
 		file_close: close_file
 		gem_close: close_handle
 		gem_export: export_object
 		gem_import: import_object
 		mmap: mmap_object
 	}
-	drm.register_owned_driver(driver, unsafe { nil }) or {
+	drm.register_driver_definition(driver, unsafe { nil }) or {
 		simple_registered = false
 		println('simpledrm: failed to register dumb-buffer allocator')
 		return

@@ -849,8 +849,35 @@ pub fn register_driver(driver &DrmDriver) ?&DrmDevice {
 	return register_driver_with_data(driver, unsafe { nil })
 }
 
-// Consume a heap driver descriptor with an owned ioctl table. On success
-// the device keeps both for open files that can survive unregister.
+// Borrow a fixed ioctl table that outlives every registration using it.
+@[unsafe]
+pub fn static_ioctl_table(entries &DrmIoctl, count int) []DrmIoctl {
+	mut view := []DrmIoctl{}
+	unsafe {
+		view.data = voidptr(entries)
+		view.len = count
+		view.cap = count
+		view.flags = .nofree
+	}
+	return view
+}
+
+// Store a driver definition for the lifetime of its registered device.
+// The definition transfers any owned ioctl table, including on failure.
+pub fn register_driver_definition(definition DrmDriver, driver_data voidptr) ?&DrmDevice {
+	storage := memory.malloc_packed_fallible(sizeof(DrmDriver))
+	if storage == unsafe { nil } {
+		unsafe { definition.ioctls.free() }
+		errno.set(errno.enomem)
+		return none
+	}
+	mut driver := unsafe { &DrmDriver(storage) }
+	unsafe { *driver = definition }
+	return register_owned_driver(driver, driver_data)
+}
+
+// Consume a heap driver descriptor and any owned ioctl table. On success
+// the device keeps them for open files that can survive unregister.
 pub fn register_owned_driver(driver &DrmDriver, driver_data voidptr) ?&DrmDevice {
 	return register_driver_with_data(driver, driver_data) or {
 		unsafe {

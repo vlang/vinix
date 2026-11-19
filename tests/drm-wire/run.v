@@ -48,7 +48,7 @@ fn main() {
 		.replace('fs.devtmpfs_remove_device(', 'devtmpfs_remove_device(')
 	production += section(source, 'fn (mut this DrmNode) admit_mapping_range(', 'fn (mut this DrmNode) read(')!
 		.replace('mmap.map_shared', 'map_shared')
-	production += section(source, 'pub fn register_owned_driver(', 'fn copy_version_field(')!
+	production += section(source, 'pub fn static_ioctl_table(', 'fn copy_version_field(')!
 		.replace('syncobj.shared_timeline_stub()', 'shared_timeline_stub()').replace('C.kprintf(', 'C.printf(')
 		.replace('driver.ioctls.free()', 'release_test_driver_ioctls(driver.ioctls)')
 		.replace('free(driver)', 'release_test_driver(driver)')
@@ -61,7 +61,7 @@ fn main() {
 		'${repo}/kernel/gpu/agx/driver/driver.v'
 	})!
 	chip_check := section(agx_source, '\tbase_m1 :=', '\tmut features :=')!
-	metadata := section(agx_source, 'agx_drm_driver := &drm.DrmDriver{', '\t\tfeatures: features')!
+	metadata := section(agx_source, 'agx_drm_driver := drm.DrmDriver{', '\t\tfeatures: features')!
 		.all_after('{').replace('drm.default_driver_date', 'default_driver_date')
 	os.write_file('${scratch}/drm/agx_metadata.v', 'module drm\nfn agx_metadata(chip_id u32) DrmDriver {\n${chip_check}\treturn DrmDriver{${metadata}\t}\n}\n')!
 	os.cp('${repo}/tests/drm-wire/test.v', '${scratch}/main.v')!

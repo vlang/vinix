@@ -311,3 +311,32 @@ Evidence is stored at
 `/Users/alex/.local/state/vinix/omarchy-m1-drm-owned-driver-20261119.L80oKk/`.
 The `bundle.tar.gz` SHA-256 is
 `1e942eece7c13d2d70e6b1d94f80aecc9c24990b1daaf7c6ee8015c18bce4212`.
+
+## Static ioctl tables and fallible driver definitions
+
+Native AGX, fake G17, simple DRM and VirtIO GPU use fixed ioctl tables.
+Each registration borrows its table through an allocation-free view and
+allocates a private copy of the driver definition with the fallible
+allocator. A failed definition allocation returns `ENOMEM`. A later
+rejection releases the definition. The fixed table remains available
+to other registrations and to files that survive unregister.
+
+The DRM wire sanitizer fixture injected 48 failures across the
+definition, device, node and box allocations. It checked live storage,
+absence of published names, the static table during retry and table
+access after unregister. Two controls caught a leaked definition and a
+view missing `.nofree`. The independent lifetime review compared all 48
+ioctl entries and confirmed their storage in generated ARM64 code.
+
+Both kernel builds, both QEMU descriptor-flags suites, both AGX
+sanitizer suites, the ARM64 modern dispatch checker, 79 local contract
+tests and 122 pinned-reference checks passed. The allocation scan found
+eight fewer implicit sites on AArch64 and two fewer on x86-64, with 173
+existing allowance findings. The tested base was
+`8f25fccef5cb2b37a8ac046ad7e71e3c2eb461f7` plus the archived patch.
+Native M1 validation remains open.
+
+Evidence is stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-drm-driver-definition-20261119.Gpl3ZL/`.
+The `bundle.tar.gz` SHA-256 is
+`923255fd53c319b74b103cfe225de8f58b4699264ca299d1414276f91e137a01`.

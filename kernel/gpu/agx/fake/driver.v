@@ -1067,21 +1067,19 @@ pub fn gem_import_handler(dev &drm.DrmDevice, handle voidptr,
 	return file.import_object(object)
 }
 
-fn drm_ioctls() []drm.DrmIoctl {
-	return [
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_params_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: vm_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: drm.ioctl_write, handler: vm_destroy_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_mmap_offset_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: drm.ioctl_write, handler: gem_bind_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: queue_create_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: drm.ioctl_write, handler: queue_destroy_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: drm.ioctl_write, handler: submit_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_time_handler },
-		drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: unsupported_bind_object },
-	]
-}
+const drm_ioctl_table = [
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_params, size: u32(sizeof(ioctl.DrmAsahiGetParams)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_params_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_create, size: u32(sizeof(ioctl.DrmAsahiVmCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: vm_create_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_vm_destroy, size: u32(sizeof(ioctl.DrmAsahiVmDestroy)), direction: drm.ioctl_write, handler: vm_destroy_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_create, size: u32(sizeof(ioctl.DrmAsahiGemCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_create_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_mmap_offset, size: u32(sizeof(ioctl.DrmAsahiGemMmapOffset)), direction: drm.ioctl_write | drm.ioctl_read, handler: gem_mmap_offset_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind, size: u32(sizeof(ioctl.DrmAsahiGemBind)), direction: drm.ioctl_write, handler: gem_bind_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_create, size: u32(sizeof(ioctl.DrmAsahiQueueCreate)), direction: drm.ioctl_write | drm.ioctl_read, handler: queue_create_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_queue_destroy, size: u32(sizeof(ioctl.DrmAsahiQueueDestroy)), direction: drm.ioctl_write, handler: queue_destroy_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_submit, size: u32(sizeof(ioctl.DrmAsahiSubmit)), direction: drm.ioctl_write, handler: submit_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_get_time, size: u32(sizeof(ioctl.DrmAsahiGetTime)), direction: drm.ioctl_write | drm.ioctl_read, handler: get_time_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_asahi_gem_bind_object, size: u32(sizeof(ioctl.DrmAsahiGemBindObject)), direction: drm.ioctl_write | drm.ioctl_read, handler: unsupported_bind_object },
+]!
 
 // Register a distinct render node. This function performs no hardware probe
 // and is safe to call only when explicitly selected for VM testing.
@@ -1093,21 +1091,21 @@ pub fn initialise() bool {
 		println('fake-g17: Asahi UAPI layout validation failed')
 		return false
 	}
-	mut driver := &drm.DrmDriver{
+	driver := drm.DrmDriver{
 		name: 'asahi'
 		desc: 'Vinix software-only fake G17 verifier'
 		major: 1
 		minor: 0
 		patchlevel: 0
 		features: drm.driver_gem | drm.driver_render | drm.driver_compute
-		ioctls: drm_ioctls()
+		ioctls: unsafe { drm.static_ioctl_table(&drm_ioctl_table[0], drm_ioctl_table.len) }
 		file_close: release_handle
 		gem_close: close_gem_handle
 		gem_export: gem_export_handler
 		gem_import: gem_import_handler
 		mmap: mmap_handle
 	}
-	device := drm.register_owned_driver(driver, unsafe { nil }) or {
+	device := drm.register_driver_definition(driver, unsafe { nil }) or {
 		println('fake-g17: DRM registration failed')
 		return false
 	}

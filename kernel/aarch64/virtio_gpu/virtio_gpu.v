@@ -1253,60 +1253,29 @@ pub fn initialise(hhdm u64) bool {
 	return false
 }
 
+const drm_ioctl_table = [
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_map, handler: map_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_execbuffer, handler: execbuffer_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_getparam, handler: getparam_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_resource_create, handler: resource_create_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_resource_info, handler: resource_info_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_transfer_from_host, handler: transfer_from_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_transfer_to_host, handler: transfer_to_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_wait, handler: wait_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_get_caps, handler: get_caps_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_resource_create_blob, handler: resource_create_blob_handler },
+	drm.DrmIoctl{ cmd: ioctl.drm_virtgpu_context_init, handler: context_init_handler },
+]!
+
 fn register_driver() bool {
-	mut driver := &drm.DrmDriver{
+	driver := drm.DrmDriver{
 		name:            'virtio_gpu'
 		desc:            'Vinix VirtIO-GPU VirGL'
 		major:           0
 		minor:           0
 		patchlevel:      1
 		features:        drm.driver_gem | drm.driver_render | drm.driver_compute
-		ioctls:          [
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_map
-				handler: map_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_execbuffer
-				handler: execbuffer_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_getparam
-				handler: getparam_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_resource_create
-				handler: resource_create_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_resource_info
-				handler: resource_info_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_transfer_from_host
-				handler: transfer_from_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_transfer_to_host
-				handler: transfer_to_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_wait
-				handler: wait_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_get_caps
-				handler: get_caps_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_resource_create_blob
-				handler: resource_create_blob_handler
-			},
-			drm.DrmIoctl{
-				cmd:     ioctl.drm_virtgpu_context_init
-				handler: context_init_handler
-			},
-		]
+		ioctls:          unsafe { drm.static_ioctl_table(&drm_ioctl_table[0], drm_ioctl_table.len) }
 		file_close:      close_file
 		gem_close:       close_handle
 		gem_export:      export_object
@@ -1317,7 +1286,7 @@ fn register_driver() bool {
 		mmap_retain:     mmap_retain
 		mmap_release:    mmap_release
 	}
-	drm.register_owned_driver(driver, unsafe { nil }) or {
+	drm.register_driver_definition(driver, unsafe { nil }) or {
 		virtgpu_transport.ready = false
 		uart.puts(c'virtio-gpu: DRM registration failed\n')
 		return false

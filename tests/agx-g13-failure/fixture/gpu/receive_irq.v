@@ -36,7 +36,7 @@ __global published_gpu = unsafe { &GpuManager(nil) }
 
 fn set_global_manager(mgr &GpuManager) { published_gpu = unsafe { mgr } }
 
-fn register_owned_driver(driver &DrmDriver, data voidptr) ?&DrmDevice {
+fn register_driver_definition(driver DrmDriver, data voidptr) ?&DrmDevice {
 	assert published_gpu == unsafe { nil }, 'GPU publication must follow DRM registration'
 	if driver.fail { return none }
 	test_drm_device.driver_data = data
@@ -52,7 +52,7 @@ fn check_g13_drm_registration() {
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
 		for scenario in [0, 1, 2]! {
 			mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi}, stop_fails: scenario == 2}
-			registered := agx_driver_inst.register_gpu(unsafe { &mgr }, &DrmDriver{fail: scenario != 0})
+			registered := agx_driver_inst.register_gpu(unsafe { &mgr }, DrmDriver{fail: scenario != 0})
 			assert registered == (scenario == 0) && agx_driver_inst.initialized == registered
 			if registered {
 				assert mgr.state == .running && mgr.trace.len == 0

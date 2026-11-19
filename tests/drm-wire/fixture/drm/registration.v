@@ -171,6 +171,10 @@ fn new_owned_test_driver() &DrmDriver {
 }
 
 fn release_test_driver_ioctls(ioctls []DrmIoctl) {
+	if ioctls.flags.has(.nofree) {
+		unsafe { ioctls.free() }
+		return
+	}
 	assert owned_driver != unsafe { nil }
 	assert owned_ioctl_storage != unsafe { nil } && owned_ioctl_storage == ioctls.data
 	unsafe { ioctls.free() }
@@ -178,6 +182,10 @@ fn release_test_driver_ioctls(ioctls []DrmIoctl) {
 }
 
 fn release_test_driver(driver &DrmDriver) {
+	if driver.ioctls.flags.has(.nofree) {
+		memory.free_registration(voidptr(driver))
+		return
+	}
 	assert driver == owned_driver && owned_ioctl_storage == unsafe { nil }
 	unsafe { free(driver) }
 	owned_driver = unsafe { nil }
@@ -217,10 +225,39 @@ fn check_owned_driver_registration() {
 	println('DRM owned registration: 96 failed attempts release the driver and ioctl table, and a published device keeps both')
 }
 
+const published_ioctl_table = [DrmIoctl{cmd: 0x40}, DrmIoctl{cmd: 0x41}]!
+
+fn check_driver_definition_registration() {
+	directory := unsafe { devtmpfs_root.children['dri'] }
+	ioctls := unsafe { static_ioctl_table(&published_ioctl_table[0], published_ioctl_table.len) }
+	definition := DrmDriver{name: 'static-table', features: driver_render, ioctls: ioctls}
+	assert ioctls.data == unsafe { voidptr(&published_ioctl_table[0]) }
+	assert ioctls.len == published_ioctl_table.len && ioctls.flags.has(.nofree)
+	for _ in 0 .. 8 {
+		live := memory.registration_outstanding()
+		prior_publications := published_nodes
+		for allocation in 0 .. 6 {
+			memory.fail_registration_after(allocation)
+			errno.set(0)
+			assert register_driver_definition(definition, unsafe { nil }) == none && errno.get() == errno.enomem
+			memory.fail_registration_after(-1)
+			assert memory.registration_outstanding() == live && published_nodes == prior_publications
+			assert get_device(0) == none && directory.children.len == 0
+			assert ioctls[0].cmd == 0x40 && ioctls[1].cmd == 0x41
+		}
+	}
+	device := register_driver_definition(definition, unsafe { nil }) or { panic('definition retry failed') }
+	assert device.dev_id == 0 && device.driver.ioctls.data == ioctls.data
+	unregister_device(device)
+	assert device.driver.ioctls[1].cmd == 0x41
+	println('DRM driver definition: 48 allocation failures release storage and preserve the static ioctl table')
+}
+
 fn check_registration() {
 	check_registration_collisions()
 	check_registration_allocation_failure()
 	check_owned_driver_registration()
+	check_driver_definition_registration()
 	for render in [false, true]! {
 		driver := DrmDriver{features: if render { driver_render } else { u32(0) }}
 		dev := register_driver_with_data(&driver, voidptr(0x1234)) or { panic('registration failed') }

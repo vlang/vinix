@@ -1220,7 +1220,7 @@ pub fn initialise() {
 	if base_m1 {
 		features |= drm.driver_syncobj_timeline
 	}
-	agx_drm_driver := &drm.DrmDriver{
+	agx_drm_driver := drm.DrmDriver{
 		name: 'asahi'
 		desc: if base_m1 { 'Apple AGX Graphics' } else { 'Apple AGX GPU' }
 		date: if base_m1 { '0' } else { drm.default_driver_date }
@@ -1249,9 +1249,9 @@ pub fn initialise() {
 	C.kprintf(c'agx: DRM device registered as card%llu\n', u64(agx_driver_inst.drm_dev.dev_id))
 }
 
-fn (mut driver AgxDriver) register_gpu(mgr &gpu.GpuManager, agx_drm_driver &drm.DrmDriver) bool {
+fn (mut driver AgxDriver) register_gpu(mgr &gpu.GpuManager, agx_drm_driver drm.DrmDriver) bool {
 	driver.gpu = unsafe { mgr }
-	driver.drm_dev = drm.register_owned_driver(agx_drm_driver, voidptr(mgr)) or {
+	driver.drm_dev = drm.register_driver_definition(agx_drm_driver, voidptr(mgr)) or {
 		println('agx: Failed to register DRM driver')
 		driver.stop_gpu()
 		return false

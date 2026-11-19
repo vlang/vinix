@@ -79,7 +79,12 @@ fn check_timestamp_registration_local(file string, drm string, driver string) ! 
 	require_order(owned, ['return register_driver_with_data(driver, driver_data) or {',
 		'driver.ioctls.free()', 'free(driver)', 'return none'],
 		'Failed registration releases its owned ioctl table and descriptor')!
-	require_order(driver, ['mgr.init(', 'drm.register_owned_driver(agx_drm_driver, voidptr(mgr))'],
+	definition := section(drm, 'pub fn register_driver_definition(', '// Consume a heap driver descriptor', 'Driver definition storage')!
+	require_order(definition, ['memory.malloc_packed_fallible(sizeof(DrmDriver))',
+		'if storage == unsafe { nil }', 'definition.ioctls.free()', 'errno.set(errno.enomem)', 'return none',
+		'*driver = definition', 'return register_owned_driver(driver, driver_data)'],
+		'Driver definition storage fails before publication and releases any owned ioctl table')!
+	require_order(driver, ['mgr.init(', 'drm.register_driver_definition(agx_drm_driver, voidptr(mgr))'],
 		'AGX registers the initialized manager with its device')!
 	constructor := section(file, 'pub fn new_gpu_file(', '// Tear the file down.', 'File registration context')!
 	require_order(constructor, ['dev == unsafe { nil }', 'manager := unsafe { &gpu.GpuManager(dev.driver_data) }',
