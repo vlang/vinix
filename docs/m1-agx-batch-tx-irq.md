@@ -87,3 +87,29 @@ Evidence and the tested diff are stored at
 The `bundle.tar.gz` SHA-256 is
 `3b7b7a39e89356d16109d5a8da29d71296c70c65ff259aeaf062741c5fbd7b04`.
 Native M1 firmware validation remains open.
+
+## RTKit crash during a polled send
+
+The receive worker can clear RTKit application readiness while handling a
+crash notification, even while a polled doorbell holds the manager lock.
+Firmware-led application sends now check readiness before the first FIFO
+attempt and after every IRQ or polling wait. The mailbox checks caller
+liveness under the caller's lock when one is supplied.
+
+The sanitizer fixture reproduced a stale doorbell on
+`0fc58c97b713c294d01711f036b3a2b55fb9d4b8`. Four regression cases passed
+across the two G13 ABIs with either no send IRQ or interrupts masked. They
+verify that the live doorbell succeeds, a crash during the wait prevents
+another FIFO read or either mailbox write, and subsequent sends are rejected.
+The existing guarded transmit, system reply and job-lifetime checks passed.
+
+AArch64 and x86-64 kernel builds, all 79 local contract tests and 122
+archived-reference checks passed. Generated AArch64 C keeps the readiness
+context on the stack. The allocation scan reproduced 176 baseline findings.
+
+Evidence and the tested diff are stored at
+`/Users/alex/.local/state/vinix/omarchy-m1-rtkit-polled-readiness-20261119.n0Aejo/`.
+The original and restored bundles passed inventory verification. The
+`bundle.tar.gz` SHA-256 is
+`5050f93928e525b0fad511d78cdd706f97bb3e9861116775b3df49429de9f708`.
+Native M1 firmware validation remains open.

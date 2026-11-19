@@ -858,31 +858,27 @@ struct ApplicationSendGuard {
 
 fn rtkit_application_send_active(context voidptr) bool {
 	guard := unsafe { &ApplicationSendGuard(context) }
-	return guard.wait.active(guard.wait.context) && katomic.load(&guard.rtk.application_ready)
+	return (guard.wait.active == unsafe { nil } || guard.wait.active(guard.wait.context))
+		&& katomic.load(&guard.rtk.application_ready)
 }
 
-// Runtime sends carrying a guard recheck liveness before retrying the FIFO.
+// Firmware-led application sends recheck readiness after polling or IRQ waits.
 pub fn (mut rtk RTKit) send_message_wait(ep u8, data u64, wait mailbox.SendWait) bool {
-	application := ep >= app_endpoint_start && rtk.firmware_led_boot
-	if application && !katomic.load(&rtk.application_ready) {
-		return false
-	}
 	message := mailbox.MboxMsg{
 		data0: data
 		data1: u64(ep)
 	}
+	if ep >= app_endpoint_start && rtk.firmware_led_boot {
+		// The mailbox checks this synchronously, with wait.lock held if supplied.
+		guard := ApplicationSendGuard{rtk: rtk, wait: wait}
+		return rtk.mbox.send_timed_wait(message, mailbox.SendWait{
+			irq: wait.irq
+			lock: wait.lock
+			context: unsafe { voidptr(&guard) }
+			active: rtkit_application_send_active
+		})
+	}
 	if wait.lock != unsafe { nil } {
-		if application {
-			// The mailbox calls back synchronously after reacquiring wait.lock.
-			// Power acknowledgements can arrive while that lock is released.
-			guard := ApplicationSendGuard{rtk: rtk, wait: wait}
-			return rtk.mbox.send_timed_wait(message, mailbox.SendWait{
-				irq: wait.irq
-				lock: wait.lock
-				context: unsafe { voidptr(&guard) }
-				active: rtkit_application_send_active
-			})
-		}
 		return rtk.mbox.send_timed_wait(message, wait)
 	}
 	if rtk.firmware_led_boot {

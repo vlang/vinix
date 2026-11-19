@@ -136,10 +136,13 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 		'mbox.send_irq_claimed || !aic.arm_deferred_send_irq(irq)', 'mbox.send_irq_claimed = true',
 		'mbox.lock.acquire()', 'aic.mask_irq(irq)', 'mbox.send_irq_claimed = false', 'mbox.lock.release()'],
 		'Vinix serializes the single IRQ waiter and masks before releasing ownership')!
-	require_order(timed, ['if wait_for_irq {', 'if guarded { guard.release() }', 'wait_send_irq(irq, interval)',
-		'guard.acquire()', 'if !wait.active(wait.context)', 'return false',
+	require_order(timed, ['check_active := wait.active != unsafe { nil }',
+		'if check_active && !wait.active(wait.context) { return false }', 'mbox.try_send(msg, none)',
+		'if wait_for_irq {', 'if guarded { guard.release() }', 'wait_send_irq(irq, interval)',
+		'if guarded { guard.acquire() }', 'timer.busywait_us(interval)',
+		'if check_active && !wait.active(wait.context) { return false }',
 		'timer.get_us() - started > send_timeout_us', 'break', 'mbox.try_send(msg, started)'],
-		'Vinix reacquires the runtime guard and checks liveness and deadline before retrying TX')!
+		'Vinix checks optional liveness before first TX and after both IRQ and polling waits with any guard held')!
 	try_send := section(local, 'fn (mut mbox Mailbox) try_send(msg', '// Use the polled ASC timeout', 'Vinix mailbox locking')!
 	require_order(try_send, ['mbox.lock.acquire()', 'defer { mbox.lock.release() }', 'if start := started',
 		'if timer.get_us() - start > send_timeout_us { return false }', 'return mbox.try_send_locked(msg)'],
@@ -162,15 +165,14 @@ fn check_rtkit_mailbox_send(transport string, asahi_linux string, repo string) !
 	require_order(local_send, ['if rtk.firmware_led_boot {', 'return rtk.mbox.send_timed(message)', 'return rtk.mbox.send(message)'],
 		'Vinix selects elapsed-time transmit only for firmware-led G13 RTKit')!
 	require_order(local_send, ['fn rtkit_application_send_active(',
-		'guard.wait.active(guard.wait.context) && katomic.load(&guard.rtk.application_ready)',
-		'application := ep >= app_endpoint_start && rtk.firmware_led_boot',
-		'if application && !katomic.load(&rtk.application_ready)', 'return false',
-		'if wait.lock != unsafe { nil }', 'if application {',
+		'guard.wait.active == unsafe { nil } || guard.wait.active(guard.wait.context)',
+		'&& katomic.load(&guard.rtk.application_ready)',
+		'if ep >= app_endpoint_start && rtk.firmware_led_boot {',
 		'guard := ApplicationSendGuard{rtk: rtk, wait: wait}',
-		'return rtk.mbox.send_timed_wait(message, mailbox.SendWait{', 'lock: wait.lock',
+		'return rtk.mbox.send_timed_wait(message, mailbox.SendWait{', 'irq: wait.irq', 'lock: wait.lock',
 		'context: unsafe { voidptr(&guard) }', 'active: rtkit_application_send_active',
-		'return rtk.mbox.send_timed_wait(message, wait)'],
-		'Vinix checks both caller liveness and RTKit readiness after guarded application waits')!
+		'if wait.lock != unsafe { nil }', 'return rtk.mbox.send_timed_wait(message, wait)'],
+		'Vinix supplies RTKit readiness and optional caller liveness for every firmware-led application send')!
 }
 
 fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot string, boot string, start string) ! {
@@ -201,6 +203,7 @@ fn check_rtkit_iop_confirmation(transport string, linux string, linux_boot strin
 	local_send := section(transport, 'pub fn (mut rtk RTKit) send_message(', 'pub fn (mut rtk RTKit) recv_msg(', 'Vinix application send')!
 	require_order(local_start, ['ep >= app_endpoint_start', 'katomic.load(&rtk.application_ready)',
 		'if !ready', 'return false', 'rtk.send_start_endpoint(ep, irq)'], 'Vinix checks readiness before starting application endpoints')!
-	require_order(local_send, ['ep >= app_endpoint_start', '!katomic.load(&rtk.application_ready)',
-		'return false', 'rtk.mbox.send'], 'Vinix checks readiness before application mailbox writes')!
+	require_order(local_send, ['fn rtkit_application_send_active(', 'katomic.load(&guard.rtk.application_ready)',
+		'if ep >= app_endpoint_start && rtk.firmware_led_boot', 'rtk.mbox.send_timed_wait',
+		'active: rtkit_application_send_active'], 'Vinix supplies the current readiness gate before timed application mailbox writes')!
 }

@@ -171,11 +171,53 @@ fn check_g13_batch_power_wait(mut mgr GpuManager, mut tx ascmailbox.Mailbox) {
 	}
 }
 
+fn crash_during_polled_doorbell() {
+	timer.watch_busywait(unsafe { nil })
+	assert rtkit_owner.lock.is_held() && kio.aic_irq_masked(575)
+	assert !rtkit_owner.handle_role_system_message(0, mailbox.MboxMsg{data0: u64(1) << 52,
+		data1: rtkit.ep_crashlog})
+}
+
+fn check_g13_polled_crash_wait(abi hw.FirmwareAbi, mut tx ascmailbox.Mailbox) {
+	for irq in [u32(0), 575]! {
+		mut transport := rtkit.RTKit{name: 'g13-polled-crash'}
+		boot_g13_fixture_transport(mut transport)
+		transport.mbox.unguarded_transport = unsafe { &tx }
+		// The receive worker handles a crash on an allocated endpoint outside mgr.lock.
+		transport.system_iovas[rtkit.ep_crashlog] = 1
+		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
+			rtkit_send_irq: irq, rtk: unsafe { &transport }}
+		rtkit_owner = unsafe { &mgr }
+		kio.require_send_owner(unsafe { &mgr.lock })
+		cpu.set_interrupt_state(irq == 0)
+		mgr.lock.acquire()
+		kio.configure_send(tx.base, unsafe { &tx.lock }, 0)
+		assert mgr.ring_g13_batch_pipe_locked(3, 2)
+		reads, writes, words := kio.send_result()
+		assert reads == 1 && writes == 2 && words == [u64(0x008300000000000e), 0x21]!
+		kio.configure_send(tx.base, unsafe { &tx.lock }, 1)
+		timer.watch_busywait(crash_during_polled_doorbell)
+		assert !mgr.ring_g13_batch_pipe_locked(3, 2), 'polled doorbell must stop when a crash revokes RTKit readiness during the FIFO wait'
+		assert transport.state == .error && mgr.state == .running && mgr.lock.is_held()
+		crash_reads, crash_writes, _ := kio.send_result()
+		assert crash_reads == 1 && crash_writes == 0 && !tx.lock.is_held()
+		assert !mgr.ring_g13_batch_pipe_locked(3, 2)
+		final_reads, final_writes, _ := kio.send_result()
+		assert final_reads == 1 && final_writes == 0
+		mgr.lock.release()
+		assert cpu.interrupt_state() == (irq == 0)
+		cpu.set_interrupt_state(true)
+		rtkit_owner = unsafe { nil }
+		kio.require_send_owner(unsafe { nil })
+	}
+}
+
 fn check_g13_batch_pipe_transmit() {
 	base := u64(0x206408000)
 	mut tx := ascmailbox.new_mailbox(base)
 	mailbox.set_wait_transport(unsafe { &tx })
 	for abi in [hw.FirmwareAbi.v12_3, .v13_5_partial]! {
+		check_g13_polled_crash_wait(abi, mut tx)
 		mut transport := rtkit.RTKit{name: 'g13-batch-doorbell'}
 		boot_g13_fixture_transport(mut transport)
 		mut mgr := GpuManager{hw_config: hw.HwConfig{gpu_gen: .g13, firmware_abi: abi},
@@ -218,5 +260,5 @@ fn check_g13_batch_pipe_transmit() {
 	rtkit_owner = unsafe { nil }
 	kio.require_send_owner(unsafe { nil })
 	kio.configure_send(0, unsafe { nil }, 0)
-	println('G13 batch pipe transmit: both ABIs cover live encoding, shutdown and four in-flight power transitions with system replies')
+	println('G13 batch pipe transmit: both ABIs cover live encoding, shutdown, polled crashes and in-flight power transitions with system replies')
 }

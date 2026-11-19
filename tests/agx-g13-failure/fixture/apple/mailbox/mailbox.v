@@ -27,6 +27,7 @@ pub mut:
 	last MboxMsg
 	fail_next_send bool
 	send_timeout_mask u16
+	unguarded_transport &ascmailbox.Mailbox = unsafe { nil }
 }
 
 __global on_send fn () = unsafe { nil }
@@ -99,21 +100,26 @@ pub fn (mut box Mailbox) send(message MboxMsg) bool {
 }
 
 pub fn (mut box Mailbox) send_timed(message MboxMsg) bool {
-	box.timed_attempts++
-	return box.send(message)
+	return box.send_timed_wait(message, SendWait{})
 }
 
 pub fn (mut box Mailbox) send_timed_irq(message MboxMsg, irq u32) bool {
-	assert irq == 575
-	box.irq_send_attempts++
-	return box.send_timed(message)
+	return box.send_timed_wait(message, SendWait{irq: irq})
 }
 
 pub fn (mut box Mailbox) send_timed_wait(message MboxMsg, wait SendWait) bool {
-	assert wait.lock.is_held()
-	if wait_transport == unsafe { nil } {
-		return box.send_timed(message)
+	guarded := wait.lock != unsafe { nil }
+	if guarded { assert wait.lock.is_held() }
+	mut transport := unsafe { if guarded { wait_transport } else { box.unguarded_transport } }
+	if transport != unsafe { nil } {
+		return transport.send_timed_wait(ascmailbox.MboxMsg{data0: message.data0, data1: message.data1},
+			ascmailbox.SendWait{irq: wait.irq, lock: wait.lock, context: wait.context, active: wait.active})
 	}
-	return wait_transport.send_timed_wait(ascmailbox.MboxMsg{data0: message.data0, data1: message.data1},
-		ascmailbox.SendWait{irq: wait.irq, lock: wait.lock, context: wait.context, active: wait.active})
+	if wait.irq != 0 && !guarded {
+		assert wait.irq == 575
+		box.irq_send_attempts++
+	}
+	if wait.active != unsafe { nil } && !wait.active(wait.context) { return false }
+	box.timed_attempts++
+	return box.send(message)
 }

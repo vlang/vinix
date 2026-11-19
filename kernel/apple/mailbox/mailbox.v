@@ -43,9 +43,9 @@ mut:
 	send_irq_claimed bool
 }
 
-// With a guard, the caller holds lock and has checked that the transport is
-// active. Only the IRQ wait drops lock. A stopped transport must be detected
-// after reacquiring it, before checking or writing the FIFO again.
+// If supplied, active is checked before the first attempt and after each wait.
+// The caller holds lock when supplied. Only an IRQ wait drops it, and reacquires
+// it before checking active again.
 pub struct SendWait {
 pub:
 	irq     u32
@@ -153,6 +153,8 @@ fn (mut mbox Mailbox) release_send_irq(irq u32) {
 // One sender owns the line. Concurrent senders continue to poll the FIFO
 // without changing that sender's interrupt mask or pending state.
 pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
+	check_active := wait.active != unsafe { nil }
+	if check_active && !wait.active(wait.context) { return false }
 	if mbox.try_send(msg, none) {
 		return true
 	}
@@ -175,15 +177,11 @@ pub fn (mut mbox Mailbox) send_timed_wait(msg MboxMsg, wait SendWait) bool {
 		if wait_for_irq {
 			if guarded { guard.release() }
 			wait_send_irq(irq, interval)
-			if guarded {
-				guard.acquire()
-				if !wait.active(wait.context) {
-					return false
-				}
-			}
+			if guarded { guard.acquire() }
 		} else {
 			timer.busywait_us(interval)
 		}
+		if check_active && !wait.active(wait.context) { return false }
 		if timer.get_us() - started > send_timeout_us { break }
 		if mbox.try_send(msg, started) {
 			return true
