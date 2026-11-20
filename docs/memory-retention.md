@@ -65,6 +65,12 @@ Both passed the directory descriptor/cwd/subtree and final PTY callback cases.
 The diagnostic interfaces are warmed before collecting the control snapshots;
 their first access is part of warmup too.
 
+A rerun on 2026-11-20 at `545cd92dc` stopped at the first PTY hard link with
+`EXDEV`. Device leaves had carried the global devtmpfs prototype rather than
+their mount's filesystem, which link(2) refuses to cross since `996913568`.
+With `5edffed71`, tracking kernels pass again: all three cohorts flat in
+every slab class (18 AArch64, 14 x86 classes).
+
 The kernel sources were reviewed independently before qualification and built
 over isolated baseline commit `69412419`, with `ALLOC_TRACK=1`, SMP and the TLB
 and large-page self-tests enabled. Generated C on both architectures confirms
