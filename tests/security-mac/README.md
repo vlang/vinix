@@ -14,7 +14,8 @@ It verifies that capabilities cannot bypass the policy on retained and
 SCM_RIGHTS descriptors, aliases, bind mounts, overlay copy-up, metadata,
 transfers (including a separate denied-pipe domain for tee/vmsplice), shared mapping protection increases, exec/interpreters, privileged
 audit snapshots, inotify instances and cross-domain process control. Own-domain
-operations continue to work. Policy setup in another user namespace is denied.
+operations continue to work. Policy setup in another user namespace is denied;
+while Vinix refuses new user namespaces (EINVAL) that check is skipped.
 
 Concurrent close of the last memfd descriptor during exec exercises the loader
 reference lifetime. Repeated allowed and denied operations report their live

@@ -287,7 +287,8 @@ pub fn blocked_thread(argument voidptr) voidptr {
 fn prepare_interpreter_test() i32 {
 	unsafe {
 		mut image := [4096]u8{}
-		mut header := C.Elf64_Ehdr{}
+		mut header := &C.Elf64_Ehdr(C.__builtin_alloca(sizeof(C.Elf64_Ehdr)))
+		C.memset(header, 0, sizeof(C.Elf64_Ehdr))
 		C.memcpy(&header.e_ident[0], voidptr(C.ELFMAG), usize(C.SELFMAG))
 		header.e_ident[C.EI_CLASS] = u8(C.ELFCLASS64)
 		header.e_ident[C.EI_DATA] = u8(C.ELFDATA2LSB)
@@ -300,8 +301,8 @@ fn prepare_interpreter_test() i32 {
 		}
 		header.e_version = u32(C.EV_CURRENT)
 		header.e_entry = 0x400800
-		header.e_phoff = u64(sizeof(header))
-		header.e_ehsize = u16(sizeof(header))
+		header.e_phoff = u64(sizeof(C.Elf64_Ehdr))
+		header.e_ehsize = u16(sizeof(C.Elf64_Ehdr))
 		header.e_phentsize = u16(sizeof(C.Elf64_Phdr))
 		header.e_phnum = 2
 		mut program := [2]C.Elf64_Phdr{}
@@ -309,7 +310,7 @@ fn prepare_interpreter_test() i32 {
 			u8(`v`), u8(`a`), u8(`t`), u8(`e`), u8(`/`), u8(`e`), u8(`x`), u8(`e`), u8(`c`), u8(`-`),
 			u8(`d`), u8(`e`), u8(`n`), u8(`i`), u8(`e`), u8(`d`), u8(0)]!
 		program[0].p_type = u32(C.PT_INTERP)
-		program[0].p_offset = u64(sizeof(header) + sizeof(program))
+		program[0].p_offset = u64(sizeof(C.Elf64_Ehdr) + sizeof(program))
 		program[0].p_filesz = u64(sizeof(interpreter))
 		program[1].p_type = u32(C.PT_LOAD)
 		program[1].p_flags = u32(C.PF_R | C.PF_X)
@@ -317,8 +318,8 @@ fn prepare_interpreter_test() i32 {
 		program[1].p_filesz = u64(sizeof(image))
 		program[1].p_memsz = 16384
 		program[1].p_align = 16384
-		C.memcpy(&image[0], &header, sizeof(header))
-		C.memcpy(&image[0] + sizeof(header), &program[0], sizeof(program))
+		C.memcpy(&image[0], header, sizeof(C.Elf64_Ehdr))
+		C.memcpy(&image[0] + sizeof(C.Elf64_Ehdr), &program[0], sizeof(program))
 		C.memcpy(&image[0] + program[0].p_offset, &interpreter[0], sizeof(interpreter))
 		fd := C.open(c'/mac-private/dynamic', C.O_CREAT | C.O_WRONLY, i32(0o755))
 		if fd < 0 { return -1 }
@@ -436,13 +437,13 @@ fn send_fd(channel i32, descriptor i32) i32 {
 	unsafe {
 		mut byte := u8(`F`)
 		mut vec := C.iovec{ iov_base: &byte, iov_len: 1 }
-		mut raw := C.mac_cmsg_storage{}
-		C.memset(&raw, 0, sizeof(raw))
+		raw := &C.mac_cmsg_storage(C.__builtin_alloca(sizeof(C.mac_cmsg_storage)))
+		C.memset(raw, 0, sizeof(C.mac_cmsg_storage))
 		mut message := C.msghdr{}
 		message.msg_iov = &vec
 		message.msg_iovlen = 1
 		message.msg_control = &raw.bytes[0]
-		message.msg_controllen = u32(sizeof(raw.bytes))
+		message.msg_controllen = u32(sizeof(C.mac_cmsg_storage))
 		mut ancillary := C.CMSG_FIRSTHDR(&message)
 		ancillary.cmsg_level = i32(C.SOL_SOCKET)
 		ancillary.cmsg_type = i32(C.SCM_RIGHTS)
@@ -456,13 +457,13 @@ fn receive_fd(channel i32) i32 {
 	unsafe {
 		byte := C.__builtin_alloca(1)
 		mut vec := C.iovec{ iov_base: byte, iov_len: 1 }
-		mut raw := C.mac_cmsg_storage{}
-		C.memset(&raw, 0, sizeof(raw))
+		raw := &C.mac_cmsg_storage(C.__builtin_alloca(sizeof(C.mac_cmsg_storage)))
+		C.memset(raw, 0, sizeof(C.mac_cmsg_storage))
 		mut message := C.msghdr{}
 		message.msg_iov = &vec
 		message.msg_iovlen = 1
 		message.msg_control = &raw.bytes[0]
-		message.msg_controllen = u32(sizeof(raw.bytes))
+		message.msg_controllen = u32(sizeof(C.mac_cmsg_storage))
 		if C.recvmsg(channel, &message, 0) != 1 { return -1 }
 		ancillary := C.CMSG_FIRSTHDR(&message)
 		if ancillary == nil || ancillary.cmsg_type != C.SCM_RIGHTS || ancillary.cmsg_len != C.CMSG_LEN(sizeof(i32)) {
@@ -1082,6 +1083,7 @@ fn worker(secret_fd i32, readonly_fd i32, channel i32, parent i32, address usize
 					return 1
 				}
 			}
+			for i := 0; i < 12; i++ { C.usleep(1000000) }
 			before = slab_class_bytes(512)
 			for i := i32(0); i < 200; i++ {
 				if !require(C.mkfifo(c'/mac-private/temporary-fifo', 0o600) == 0, 489, c'mkfifo("/mac-private/temporary-fifo", 0600) == 0') {
@@ -1091,6 +1093,9 @@ fn worker(secret_fd i32, readonly_fd i32, channel i32, parent i32, address usize
 					return 1
 				}
 			}
+			// Removed names are released after a grace period (fs/removed.v):
+			// wait out two before measuring.
+			for i := 0; i < 12; i++ { C.usleep(1000000) }
 			after = slab_class_bytes(512)
 			C.printf(c'SECURITY MAC FIFO interface_bytes=%lld\n', native_signed(i64(after - before)))
 			if !require(after <= before + 512, 494, c'after <= before + 512') { return 1 }
@@ -1269,7 +1274,9 @@ pub fn entry(argc i32, argv &&char) i32 {
 		userns := C.fork()
 		if !require(userns >= 0, 572, c'userns >= 0') { return 1 }
 		if userns == 0 {
-			if C.unshare(C.CLONE_NEWUSER) != 0 { C._exit(2) }
+			// New user namespaces are refused with EINVAL (081bd5dab); the
+			// in-namespace denials run once they exist.
+			if C.unshare(C.CLONE_NEWUSER) != 0 { C._exit(if C.errno == C.EINVAL { 0 } else { 2 }) }
 			C.errno = 0
 			if label(c'/mac-private', c'0') != -1 || C.errno != C.EPERM { C._exit(3) }
 			C.errno = 0
