@@ -62,9 +62,9 @@ fn process_command(args []string, family string) !int {
 	} else if family == 'tlb' {
 		forwarded << ['--source', root() + '/tests/tlb/guest.c', '--expect', 'TLB: ALL PASS', '--fail', 'FAIL: TLB']
 	} else if family == 'syscall-retention' {
-		// Each of 27 operations waits out two 13-second settles.
+		// Each of 33 operations waits out two 13-second settles.
 		forwarded << ['--source', root() + '/tests/syscall-retention/guest.c', '--expect', 'SYSCALL RETENTION: PASS',
-			'--fail', 'SYSCALL RETENTION FAIL', '--timeout', '3000']
+			'--fail', 'SYSCALL RETENTION FAIL', '--timeout', '3600']
 	}
 	forwarded << args
 	if family == 'memory-retention' {

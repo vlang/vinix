@@ -23,6 +23,11 @@ sockets, epoll, timers, threads, fork and file creation:
   netlink route dumps, SCM_RIGHTS passing and socket options;
 - anonymous mprotect/madvise/mremap and a sealed, synced memfd mapping;
 - creating and removing a cgroup;
+- a loopback TCP connection carrying data both ways and UDP datagrams;
+- futex wake/wait, a child that drops credentials and changes root,
+  priorities, signal actions, alternate signal stacks, rlimits and short
+  sleeps;
+- framebuffer and input-device queries and a /dev listing;
 - xattrs, flock/POSIX/OFD locks, inotify and metadata changes (chmod,
   chown, utimens, truncate, fsync), and sendfile/copy_file_range/splice
   between two files, on tmpfs and on ext2. The runner formats a
@@ -38,7 +43,7 @@ tests/syscall-retention/run --arch x86_64 --kernel-dir /work/x86/kernel --state-
 ```
 
 The runner requires `SYSCALL RETENTION: PASS`, rejects `SYSCALL RETENTION
-FAIL`, panics and fatal exceptions, and allows 3000 seconds: each of the 27
+FAIL`, panics and fatal exceptions, and allows 3600 seconds: each of the 33
 measured operations waits about half a minute. AArch64 builds the guest
 against `VINIX_AARCH64_SYSROOT` (default `build-aarch64-userland/sysroot`).
 

@@ -41,6 +41,11 @@
 #include <sys/wait.h>
 #include <signal.h>
 #include <time.h>
+#include <grp.h>
+#include <linux/fb.h>
+#include <linux/futex.h>
+#include <netinet/tcp.h>
+#include <sys/syscall.h>
 #include <unistd.h>
 
 #define CHECK(x) do { if (!(x)) { printf("SYSCALL RETENTION FAIL line=%d errno=%d: %s\n", __LINE__, errno, #x); _exit(1); } } while (0)
@@ -346,6 +351,103 @@ static void op_copy(int i) {
 	CHECK(unlink(a) == 0 && unlink(b) == 0);
 }
 
+/* A loopback TCP connection carrying data both ways, then UDP datagrams. */
+static void op_tcp(int i) {
+	(void)i;
+	int l = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	CHECK(l >= 0);
+	int one = 1;
+	setsockopt(l, SOL_SOCKET, SO_REUSEADDR, &one, sizeof one);
+	struct sockaddr_in a = {.sin_family = AF_INET, .sin_port = 0, .sin_addr = {htonl(0x7f000001)}};
+	socklen_t len = sizeof a;
+	CHECK(bind(l, (struct sockaddr *)&a, sizeof a) == 0 && listen(l, 4) == 0 && getsockname(l, (struct sockaddr *)&a, &len) == 0);
+	int c = socket(AF_INET, SOCK_STREAM | SOCK_CLOEXEC, 0);
+	CHECK(c >= 0 && connect(c, (struct sockaddr *)&a, sizeof a) == 0);
+	int s = accept4(l, NULL, NULL, SOCK_CLOEXEC);
+	CHECK(s >= 0);
+	setsockopt(c, IPPROTO_TCP, TCP_NODELAY, &one, sizeof one);
+	char buf[4096]; memset(buf, 'z', sizeof buf);
+	CHECK(send(c, buf, sizeof buf, 0) == (ssize_t)sizeof buf);
+	size_t got = 0;
+	while (got < sizeof buf) { ssize_t n = recv(s, buf, sizeof buf, 0); CHECK(n > 0); got += (size_t)n; }
+	send(s, buf, 16, 0); recv(c, buf, 16, 0);
+	shutdown(c, SHUT_WR); recv(s, buf, sizeof buf, 0);
+	close(s); close(c); close(l);
+}
+
+static void op_udp(int i) {
+	(void)i;
+	int r = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0), w = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	CHECK(r >= 0 && w >= 0);
+	struct sockaddr_in a = {.sin_family = AF_INET, .sin_port = 0, .sin_addr = {htonl(0x7f000001)}};
+	socklen_t len = sizeof a;
+	CHECK(bind(r, (struct sockaddr *)&a, sizeof a) == 0 && getsockname(r, (struct sockaddr *)&a, &len) == 0);
+	char buf[512] = "ping";
+	sendto(w, buf, 64, 0, (struct sockaddr *)&a, sizeof a);
+	struct sockaddr_in from; socklen_t fl = sizeof from;
+	recvfrom(r, buf, sizeof buf, MSG_DONTWAIT, (struct sockaddr *)&from, &fl);
+	close(r); close(w);
+}
+
+static void op_futex(int i) {
+	(void)i;
+	static int word;
+	struct timespec t = {0, 1000};
+	syscall(SYS_futex, &word, FUTEX_WAKE_PRIVATE, 1, NULL, NULL, 0);
+	syscall(SYS_futex, &word, FUTEX_WAIT_PRIVATE, 1, &t, NULL, 0);
+	syscall(SYS_futex, &word, FUTEX_WAIT_PRIVATE, 0, &t, NULL, 0);
+}
+
+/* A child that drops its credentials and changes root, then exits. */
+static void op_creds(int i) {
+	(void)i;
+	pid_t c = fork();
+	CHECK(c >= 0);
+	if (c == 0) {
+		gid_t groups[2] = {10, 20};
+		setgroups(2, groups); setgid(100); setuid(100);
+		_exit(chroot("/tmp") == 0 ? 0 : 1);
+	}
+	CHECK(waitpid(c, NULL, 0) == c);
+}
+
+static void op_misc(int i) {
+	(void)i;
+	setpriority(PRIO_PROCESS, 0, 1); getpriority(PRIO_PROCESS, 0); setpriority(PRIO_PROCESS, 0, 0);
+	struct sigaction sa = {.sa_handler = SIG_IGN};
+	sigaction(SIGUSR2, &sa, NULL);
+	static char altstack[16384];
+	stack_t ss = {.ss_sp = altstack, .ss_size = sizeof altstack};
+	sigaltstack(&ss, NULL); ss.ss_flags = SS_DISABLE; sigaltstack(&ss, NULL);
+	struct rlimit rl = {1024, 1024}; setrlimit(RLIMIT_NOFILE, &rl);
+	sched_yield();
+	struct timespec t = {0, 1000}; clock_nanosleep(CLOCK_MONOTONIC, 0, &t, NULL);
+}
+
+/* Framebuffer and input-device queries, and a /dev listing. */
+static void op_devices(int i) {
+	(void)i;
+	int fb = open("/dev/fb0", O_RDWR | O_CLOEXEC);
+	if (fb >= 0) {
+		struct fb_var_screeninfo v; ioctl(fb, FBIOGET_VSCREENINFO, &v);
+		struct fb_fix_screeninfo f; ioctl(fb, FBIOGET_FSCREENINFO, &f);
+		close(fb);
+	}
+	DIR *d = opendir("/dev/input");
+	if (d) {
+		struct dirent *e; char path[300];
+		while ((e = readdir(d))) {
+			if (e->d_name[0] == '.') continue;
+			snprintf(path, sizeof path, "/dev/input/%s", e->d_name);
+			int fd = open(path, O_RDONLY | O_NONBLOCK | O_CLOEXEC);
+			if (fd >= 0) { char name[64]; ioctl(fd, _IOC(_IOC_READ, 'E', 0x06, sizeof name), name); close(fd); }
+		}
+		closedir(d);
+	}
+	d = opendir("/dev");
+	if (d) { while (readdir(d)) {} closedir(d); }
+}
+
 struct op { const char *name; void (*run)(int); int count; };
 
 static int failures;
@@ -399,7 +501,8 @@ int main(void) {
 		{"sysv_sem", op_sysv_sem, 200}, {"sysv_shm", op_sysv_shm, 200}, {"pty", op_pty, 200},
 		{"signalfd", op_signalfd, 200}, {"posix_timer", op_posix_timer, 200}, {"netlink", op_netlink, 200},
 		{"scm_rights", op_scm_rights, 200}, {"sockopt", op_sockopt, 200}, {"vm", op_vm, 200},
-		{"cgroup", op_cgroup, 200},
+		{"cgroup", op_cgroup, 200}, {"tcp", op_tcp, 200}, {"udp", op_udp, 200}, {"futex", op_futex, 200},
+		{"creds", op_creds, 200}, {"misc", op_misc, 200}, {"devices", op_devices, 200},
 	};
 	static const struct op files[] = {
 		{"xattr", op_xattr, 200}, {"locks", op_locks, 200}, {"inotify", op_inotify, 200},
