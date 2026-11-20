@@ -122,10 +122,12 @@ fn send_signal() isize {
 }
 fn child(argument voidptr) i32 {
  unsafe {
-  mut s := *(&State(argument))
+  // A stack copy the handlers reach through current_state.
+  mut s := &State(C.alloca(usize(sizeof(State))))
+  *s = *(&State(argument))
   s.phase = 1; s.totals = Totals{}; s.calls = 0
   if s.operation in [2, 5] { s.base = 0; s.flags = 2 }
-  current_state = &s
+  current_state = s
   query(false, 30)
   check(send_signal() == 0, 31)
   query(false, 32)
@@ -164,11 +166,13 @@ fn suite(configuration int, operation int) Totals {
   }
   mut pipe := [2]i32{}
   if C.pipe(&pipe[0]) != 0 { fatal(5) }
-  mut s := State{a: a, b: b, configuration: configuration, operation: operation,
+  // Explicit stack storage: the handlers reach it through current_state.
+  mut s := &State(C.alloca(usize(sizeof(State))))
+  *s = State{a: a, b: b, configuration: configuration, operation: operation,
    number: configuration * 8 + operation, pipe: pipe[1],
    base: if configuration == 0 { usize(0) } else { a },
    flags: if configuration == 0 { u32(2) } else { u32(configuration - 1) }}
-  current_state = &s
+  current_state = s
   raw := [u64(s.base), u64(s.flags), u64(if s.base == 0 { 0 } else { 65536 })]!
   if C.syscall(isize(C.SYS_sigaltstack), &raw[0], nil) != 0 { fatal(6) }
   mut action := C.sigaction{sa_sigaction: handler, sa_flags: C.SA_SIGINFO | C.SA_ONSTACK}
@@ -176,30 +180,30 @@ fn suite(configuration int, operation int) Totals {
   mut status := i32(0)
   if operation == 5 {
    mut id := C.pthread_t{}
-   if C.pthread_create(&id, nil, thread, &s) != 0 { fatal(8) }
+   if C.pthread_create(&id, nil, thread, s) != 0 { fatal(8) }
    mut result := voidptr(nil)
    joined := C.pthread_join(id, &result)
-   current_state = &s
+   current_state = s
    check(joined == 0 && usize(result) == 37, 50)
   } else {
    mut pid := i32(-1)
    if operation == 0 {
     pid = C.fork()
-    if pid == 0 { C._exit(child(&s)) }
+    if pid == 0 { C._exit(child(s)) }
    } else if operation in [6, 7] {
     mut args := [11]u64{}
     args[0] = if operation == 7 { u64(C.CLONE_VFORK) } else { u64(0) }
     args[4] = u64(C.SIGCHLD)
     pid = i32(C.syscall(isize(C.SYS_clone3), &args[0], usize(88)))
-    if pid == 0 { C._exit(child(&s)) }
+    if pid == 0 { C._exit(child(s)) }
    } else {
     flags := C.SIGCHLD | if operation in [2, 4] { C.CLONE_VM } else { 0 }
      | if operation in [3, 4] { C.CLONE_VFORK } else { 0 }
-    pid = C.clone(child, voidptr(clone_stack + 262144), flags, &s)
+    pid = C.clone(child, voidptr(clone_stack + 262144), flags, s)
    }
    if pid < 0 { fatal(9) }
    waited := C.waitpid(pid, &status, 0)
-   current_state = &s
+   current_state = s
    check(waited == pid && status == 37 << 8, 50)
   }
   mut reply := Totals{}
