@@ -5,6 +5,7 @@ module main
 import os
 import time
 import browsercookies
+import crypto.rand
 
 #include <signal.h>
 
@@ -68,7 +69,8 @@ fn run() ! {
 	// cookies, and does not propagate SQL write failures through WebKit's API.
 	mut store := browsercookies.open(data)!
 	defer { browsercookies.dispose(mut store) or {} }
-	mut engine := &Engine{ api: a, fd: fd, session: session, cookies: cookies, store: store }
+	token := rand.bytes(16)!.hex()
+	mut engine := &Engine{ api: a, fd: fd, session: session, cookies: cookies, store: store, js_token: token }
 	engine.restore_cookies()!
 	for !engine.closed {
 		engine.read()

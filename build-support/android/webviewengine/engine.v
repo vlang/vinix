@@ -28,6 +28,9 @@ mut:
 	text_jobs        map[u64]&TextJob
 	policies         map[u64]Policy
 	next_policy      u64
+	js_token         string
+	js_calls         map[u64]JsBridgeCall
+	next_js_call     u64
 	input_pending    bool
 	input_header     browseripc.Header
 	input_deadline   u64
@@ -50,6 +53,7 @@ mut:
 	signals       []u64
 	snapshot_busy bool
 	next_snapshot u64
+	interfaces    []browseripc.JsInterface
 }
 
 struct ImageJob {
@@ -199,6 +203,7 @@ fn (mut e Engine) create(h browseripc.Header, bytes []u8) {
 	v.signals << e.api.connect(view, c'load-failed', voidptr(load_failed), v, unsafe { nil }, 0)
 	v.signals << e.api.connect(view, c'web-process-terminated', voidptr(process_failed), v, unsafe { nil }, 0)
 	v.signals << e.api.connect(view, c'decide-policy', voidptr(decide_policy), v, unsafe { nil }, 0)
+	v.signals << e.api.connect(view, c'script-dialog', voidptr(script_dialog), v, unsafe { nil }, 0)
 	e.views[h.view] = v
 	e.api.present(window)
 	e.ack(h)
@@ -213,6 +218,7 @@ fn (mut e Engine) destroy(v &EngineView) {
 		if policy.view.id == v.id { ids << id }
 	}
 	for id in ids { e.remove_policy(id, false) }
+	e.close_js_calls(v.id)
 	e.api.destroy(target.window)
 	e.views.delete(target.id)
 	// Outstanding WebKit async callbacks retain EngineView through ImageJob.
@@ -271,6 +277,8 @@ fn (mut e Engine) handle(h browseripc.Header, bytes []u8) {
 			e.destroy(v)
 			e.ack(h)
 		}
+		.js_interfaces { e.js_interfaces(h, bytes, mut v) }
+		.js_reply { e.js_reply(h, bytes) }
 		.policy_reply {
 			id := binary.little_endian_u64(bytes[..8])
 			p := e.policies[id] or {
@@ -328,6 +336,7 @@ fn (mut e Engine) tick() {
 		if now >= p.deadline || !p.view.alive || p.navigation != p.view.navigation { expired << id }
 	}
 	for id in expired { e.remove_policy(id, false) }
+	e.expire_js_calls(now)
 	for _, mut v in e.views {
 		if !v.alive || v.navigation == 0 || v.snapshot_busy || now < v.next_snapshot
 			|| e.queued > browseripc.max_payload {

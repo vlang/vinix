@@ -62,6 +62,7 @@ type Keycode = fn (voidptr, u64) u8
 type FakeKey = fn (voidptr, u32, i32, u64) i32
 type Flush = fn (voidptr) i32
 type Sync = fn (voidptr, i32) i32
+type UserScriptNew = fn (&char, i32, i32, voidptr, voidptr) voidptr
 
 // Runtime symbol resolution keeps GTK objects in this helper process. Native
 // Android views never become GTK widget pointers or cross this ABI boundary.
@@ -152,6 +153,18 @@ struct Api {
 	xkey               FakeKey       @[required]
 	xflush             Flush         @[required]
 	xsync              Sync          @[required]
+	content_manager    Get           @[required]
+	script_new         UserScriptNew @[required]
+	script_unref       Call          @[required]
+	add_script         Child         @[required]
+	remove_scripts     Call          @[required]
+	dialog_type        GetFlag       @[required]
+	dialog_message     GetText       @[required]
+	dialog_default     GetText       @[required]
+	dialog_set_text    SetText       @[required]
+	dialog_ref         Get           @[required]
+	dialog_unref       Call          @[required]
+	dialog_close       Call          @[required]
 }
 
 fn api() !Api {
@@ -249,5 +262,17 @@ fn api() !Api {
 		xkey:               unsafe { FakeKey(dl.sym_opt(t, 'XTestFakeKeyEvent')!) }
 		xflush:             unsafe { Flush(dl.sym_opt(x, 'XFlush')!) }
 		xsync:              unsafe { Sync(dl.sym_opt(x, 'XSync')!) }
+		content_manager:    unsafe { Get(dl.sym_opt(w, 'webkit_web_view_get_user_content_manager')!) }
+		script_new:         unsafe { UserScriptNew(dl.sym_opt(w, 'webkit_user_script_new')!) }
+		script_unref:       unsafe { Call(dl.sym_opt(w, 'webkit_user_script_unref')!) }
+		add_script:         unsafe { Child(dl.sym_opt(w, 'webkit_user_content_manager_add_script')!) }
+		remove_scripts:     unsafe { Call(dl.sym_opt(w, 'webkit_user_content_manager_remove_all_scripts')!) }
+		dialog_type:        unsafe { GetFlag(dl.sym_opt(w, 'webkit_script_dialog_get_dialog_type')!) }
+		dialog_message:     unsafe { GetText(dl.sym_opt(w, 'webkit_script_dialog_get_message')!) }
+		dialog_default:     unsafe { GetText(dl.sym_opt(w, 'webkit_script_dialog_prompt_get_default_text')!) }
+		dialog_set_text:    unsafe { SetText(dl.sym_opt(w, 'webkit_script_dialog_prompt_set_text')!) }
+		dialog_ref:         unsafe { Get(dl.sym_opt(w, 'webkit_script_dialog_ref')!) }
+		dialog_unref:       unsafe { Call(dl.sym_opt(w, 'webkit_script_dialog_unref')!) }
+		dialog_close:       unsafe { Call(dl.sym_opt(w, 'webkit_script_dialog_close')!) }
 	}
 }

@@ -29,6 +29,8 @@ pub enum Op as u16 {
 	policy_reply
 	cookie_flush
 	cookie_clear
+	js_interfaces
+	js_reply
 	ack    = 256
 	pixels
 	navigation
@@ -36,6 +38,7 @@ pub enum Op as u16 {
 	cookie_result
 	policy_request
 	cookie_cleared
+	js_call
 }
 
 pub enum Direction {
@@ -74,6 +77,8 @@ fn valid_op(number u16) !Op {
 		13 { .policy_reply }
 		14 { .cookie_flush }
 		15 { .cookie_clear }
+		16 { .js_interfaces }
+		17 { .js_reply }
 		256 { .ack }
 		257 { .pixels }
 		258 { .navigation }
@@ -81,6 +86,7 @@ fn valid_op(number u16) !Op {
 		260 { .cookie_result }
 		261 { .policy_request }
 		262 { .cookie_cleared }
+		263 { .js_call }
 		else { return error('unknown browser operation') }
 	}
 }
@@ -98,10 +104,10 @@ fn (h Header) validate(direction Direction) ! {
 		}
 	} else {
 		if h.view == 0 || h.generation == 0 { return error('browser view identity is missing') }
-		if command(h.op) || h.op in [.ack, .policy_request] {
+		if command(h.op) || h.op in [.ack, .policy_request, .js_call] {
 			if h.request == 0 { return error('browser request identity is missing') }
 		}
-		if h.op in [.navigate, .navigation, .policy_request, .policy_reply, .pixels]
+		if h.op in [.navigate, .navigation, .policy_request, .policy_reply, .js_call, .js_reply, .pixels]
 			&& h.navigation == 0 {
 			return error('browser navigation identity is missing')
 		}
@@ -228,6 +234,17 @@ pub fn validate_payload(h Header, bytes []u8) ! {
 			text(bytes[1..], 64 * 1024, false)!
 		}
 		.failure { text(bytes, 4096, false)! }
+		.js_interfaces { parse_js_interfaces(bytes)! }
+		.js_call { parse_js_call(bytes)! }
+		.js_reply {
+			if bytes.len < 9 || binary.little_endian_u64(bytes[..8]) == 0 || bytes[8] > 1 {
+				return error('invalid browser JavaScript reply')
+			}
+			text(bytes[9..], max_text, bytes[8] == 1)!
+			if bytes[8] == 0 {
+				tagged_list(bytes[9..].bytestr(), 1)!
+			}
+		}
 		.policy_request {
 			if bytes.len < 9 || binary.little_endian_u64(bytes[..8]) == 0 {
 				return error('invalid browser policy identity')

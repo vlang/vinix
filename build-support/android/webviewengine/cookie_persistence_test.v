@@ -99,6 +99,18 @@ fn cookie_test_api() Api {
 		xkey:               unsafe { FakeKey(voidptr(cookie_test_unused)) }
 		xflush:             unsafe { Flush(voidptr(cookie_test_unused)) }
 		xsync:              unsafe { Sync(voidptr(cookie_test_unused)) }
+		content_manager:    unsafe { Get(voidptr(cookie_test_unused)) }
+		script_new:         unsafe { UserScriptNew(voidptr(cookie_test_unused)) }
+		script_unref:       unsafe { Call(voidptr(cookie_test_unused)) }
+		add_script:         unsafe { Child(voidptr(cookie_test_unused)) }
+		remove_scripts:     unsafe { Call(voidptr(cookie_test_unused)) }
+		dialog_type:        unsafe { GetFlag(voidptr(cookie_test_unused)) }
+		dialog_message:     unsafe { GetText(voidptr(cookie_test_unused)) }
+		dialog_default:     unsafe { GetText(voidptr(cookie_test_unused)) }
+		dialog_set_text:    unsafe { SetText(voidptr(cookie_test_unused)) }
+		dialog_ref:         unsafe { Get(voidptr(cookie_test_unused)) }
+		dialog_unref:       unsafe { Call(voidptr(cookie_test_unused)) }
+		dialog_close:       unsafe { Call(voidptr(cookie_test_unused)) }
 	}
 }
 
