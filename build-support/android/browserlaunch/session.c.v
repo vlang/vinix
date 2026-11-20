@@ -226,7 +226,10 @@ fn (config Config) browser_environment(session string, profile_path string, disp
 		'GIO_USE_PROXY_RESOLVER': 'dummy'
 		'GSETTINGS_BACKEND': 'memory'
 		'LIBGL_ALWAYS_SOFTWARE': '1'
-		'GALLIUM_DRIVER': 'softpipe'
+		// The runtime's Mesa builds llvmpipe only, and fails rather than falling
+		// back when GALLIUM_DRIVER names a driver it lacks: WebKit's web process
+		// then aborts on "Could not create surfaceless EGL display".
+		'GALLIUM_DRIVER': 'llvmpipe'
 		'WEBKIT_DISABLE_DMABUF_RENDERER': '1'
 	}
 }
