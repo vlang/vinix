@@ -204,3 +204,47 @@ Current candidate inputs: framework `framework-signin-platform-20261120-r1`,
 native `bridge-native-20261120-r4`, browser client
 `bridge-browser-client-20261120-r1`, engine `bridge-engine-20261120-r1`
 (API audit: 111 symbols present in the deployed libraries).
+
+## r128–r146: WebKit's sandbox starts; the web process stops at EGL
+
+The kernel now gives unprivileged processes user and network namespaces
+(d65a77034 and following, see docs/linux-posix-qualification.md), and
+GLib uses its direct proxy resolver (01db535b5), so neither blocker above
+remains. Each run then exposed the next one:
+
+| Runs | Stopped at | Fixed by |
+| --- | --- | --- |
+| r128 | bwrap: openat2 RESOLVE_IN_ROOT, then mount_setattr, unsupported | 112c791ad, d65a77034 |
+| r129 | /sys/block and /dev/random missing | 7ecaba266 |
+| r129–r131 | WebView creation timed out after 10 s (engine start ~15–26 s); a 60 s wait exceeded browserclient's 30 s cap; View finalizers blocked on the browser lock | 9b62d009a |
+| r139 | bwrap: "setting up uid map": it maps the app to root, then back | c1346a7b7 |
+| r143 | bwrap: O_PATH open of /dev/tty ran the tty open (ENXIO) | f9ecf676b |
+| r144 | web process: no fontconfig file, no injected bundle | ac1c6f8ef, 1bc1ddb7a |
+| r145–r146 | web process: "Could not create surfaceless EGL display" | open |
+
+In r144–r146 WebKitWebProcess runs inside bubblewrap's user, pid, IPC,
+UTS and network namespaces. It aborts because Mesa 26.2.3 in the runtime
+(libgallium only, empty dri/) cannot create its DRI screen
+("DRI2: failed to create screen"). The engine's UI process logs the same
+warnings outside the sandbox, so this is the graphics stack, not the
+sandbox. WebKitGTK 2.48's web process requires a surfaceless EGL display.
+
+Check-in still fails some runs (r138, r140); tapping Add account as soon
+as the chooser appears (poll screenshots after Sign in) avoided it in
+r139 and r141–r146. A second Add account in the same session does nothing.
+The engine deletes its session directory when it ends: copy
+session-*/session.log while it runs (with sh, not the guest's zsh, whose
+NOMATCH ends a loop on an unmatched glob).
+
+| Run | session.log SHA256 |
+| --- | --- |
+| r143 | 50d3299a4b4680264d22a5f8fefef050c98df5b2390c3fb3dab03e03241438a8 |
+| r145 | 2b0789a028945be0e2f3c201051db6b9b55362a4cbca7984c4ec8c908ba5f3cc |
+| r146 | 173c1ae9c12b980e0af059789ec05b2a6d6615a2f0b29f1ea6e16854fc66112a (EGL_LOG_LEVEL=debug launcher, not committed) |
+
+Inputs for r145: kernel from master f9ecf676b, native
+`bridge-native-20261120-r7`, engine `bridge-engine-20261120-r3`
+(API audit 113 symbols), launcher `launcher-proxy-20261120-r1`, browser
+client `bridge-browser-client-20261120-r1`; the injected bundle was
+copied to /usr/lib/webkitgtk-6.0/injected-bundle in the guest by hand
+(the deployment has not been rebuilt with 1bc1ddb7a).
