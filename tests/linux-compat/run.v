@@ -140,7 +140,9 @@ fn main() {
 		case_timeout := fixture_timeout(name, timeout, options.has('--timeout'))
 		mut detail := ''
 		code := guesthost.guest(frozen_source + '/core.v', '', work + '/' + name, work + '/kernel', arch,
-			if name == 'runtime' {
+			if added := added_markers(name, arch, marker) {
+				added
+			} else if name == 'runtime' {
 				[marker, 'LINUX RUNTIME PASS: atomics SIMD TLS', 'LINUX RUNTIME PASS: JIT page sizes']
 			} else if name == 'priozombie' {
 				[marker, 'LINUX PRIOZOMBIE SUMMARY: checks=1728 failures=0']
@@ -162,20 +164,6 @@ fn main() {
 				[marker, 'LINUX SIGACTIONFLAGS SUMMARY: checks=6480 failures=0']
 			} else if name == 'selectready' {
 				[marker, 'LINUX SELECTREADY SUMMARY: checks=' + (if arch == 'aarch64' { '6720' } else { '8960' }) + ' failures=0']
-			} else if name == 'syslog' {
-				[marker, 'LINUX SYSLOG SUMMARY: checks=35 failures=0', 'LINUX SYSLOG CHILD: checks=10 failures=0']
-			} else if name == 'fchmodat2' {
-				[marker, 'LINUX FCHMODAT2 SUMMARY: checks=33 failures=0', 'LINUX FCHMODAT2 CHILD: checks=3 failures=0']
-			} else if name == 'readahead' {
-				[marker, 'LINUX READAHEAD SUMMARY: checks=22 failures=0']
-			} else if name == 'pidfdgetfd' {
-				[marker, 'LINUX PIDFDGETFD SUMMARY: checks=20 failures=0', 'LINUX PIDFDGETFD CHILD: checks=3 failures=0']
-			} else if name == 'personality' {
-				[marker, 'LINUX PERSONALITY SUMMARY: checks=' + (if arch == 'aarch64' { '39' } else { '40' }) + ' failures=0']
-			} else if name == 'ioprio' {
-				[marker, 'LINUX IOPRIO SUMMARY: checks=45 failures=0', 'LINUX IOPRIO VALIDATION: checks=63 failures=0', 'LINUX IOPRIO CHILD: checks=13 failures=0']
-			} else if name == 'kcmp' {
-				[marker, 'LINUX KCMP SUMMARY: checks=66 failures=0', 'LINUX KCMP CHILD: checks=8 failures=0']
 			} else if name == 'epollchurn' {
 				[marker, 'LINUX EPOLLCHURN SUMMARY: checks=5760 failures=0']
 			} else if name == 'epollkey' {
@@ -298,4 +286,19 @@ fn main() {
 		exit(1)
 	}
 	println('Linux compatibility guest suite: PASS')
+}
+
+// The summary lines of the cases added since the chain above grew past what
+// one if expression can hold.
+fn added_markers(name string, arch string, marker string) ?[]string {
+	return match name {
+		'kcmp' { [marker, 'LINUX KCMP SUMMARY: checks=66 failures=0', 'LINUX KCMP CHILD: checks=8 failures=0'] }
+		'ioprio' { [marker, 'LINUX IOPRIO SUMMARY: checks=45 failures=0', 'LINUX IOPRIO VALIDATION: checks=63 failures=0', 'LINUX IOPRIO CHILD: checks=13 failures=0'] }
+		'personality' { [marker, 'LINUX PERSONALITY SUMMARY: checks=' + (if arch == 'aarch64' { '39' } else { '40' }) + ' failures=0'] }
+		'pidfdgetfd' { [marker, 'LINUX PIDFDGETFD SUMMARY: checks=20 failures=0', 'LINUX PIDFDGETFD CHILD: checks=3 failures=0'] }
+		'fchmodat2' { [marker, 'LINUX FCHMODAT2 SUMMARY: checks=33 failures=0', 'LINUX FCHMODAT2 CHILD: checks=3 failures=0'] }
+		'readahead' { [marker, 'LINUX READAHEAD SUMMARY: checks=22 failures=0'] }
+		'syslog' { [marker, 'LINUX SYSLOG SUMMARY: checks=35 failures=0', 'LINUX SYSLOG CHILD: checks=10 failures=0'] }
+		else { none }
+	}
 }
