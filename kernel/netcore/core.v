@@ -3060,15 +3060,18 @@ pub fn vinix_socket_connect_endpoint(socket &Vinix_socket, endpoint &C.vinix_net
 @[export: 'vinix_socket_send_endpoint']
 pub fn vinix_socket_send_endpoint(socket &Vinix_socket, data voidptr, length uint, endpoint &C.vinix_net_endpoint, has_address i32) i32 {
 	unsafe {
-		ip := C.ip_addr{}
+		// A stack slot: V moved this fixed-array local to the heap for its taken
+		// address and never freed it, 32 bytes per UDP send.
+		ip := &C.ip_addr(C.vinix_stack_alloc(sizeof(C.ip_addr)))
+		C.memset(voidptr(ip), 0, sizeof(C.ip_addr))
 		if has_address {
-			error_ := endpoint_ip(socket, endpoint, &ip)
+			error_ := endpoint_ip(socket, endpoint, ip)
 			if error_ {
 				return -error_
 			}
 		}
 		return send_ip(socket, voidptr(data), length, if has_address {
-			&ip
+			ip
 		} else {
 			&C.ip_addr(nil)
 		}, u16(if has_address { i32(endpoint.port) } else { 0 }), has_address)
@@ -3083,12 +3086,15 @@ pub fn vinix_socket_recv_endpoint(socket &Vinix_socket, data voidptr, length uin
 @[export: 'vinix_socket_recv_endpoint_flags']
 pub fn vinix_socket_recv_endpoint_flags(socket &Vinix_socket, data voidptr, length uint, endpoint &C.vinix_net_endpoint, flags i32) i32 {
 	unsafe {
-		ip := C.ip_addr{}
-		port := u16(0)
-		C.memset(voidptr(&ip), 0, sizeof(ip))
-		result := recv_ip_flags(socket, voidptr(data), length, &ip, &port, flags)
+		// Stack slots: V moved these locals to the heap for their taken addresses
+		// and never freed them, 32 bytes per UDP receive.
+		ip := &C.ip_addr(C.vinix_stack_alloc(sizeof(C.ip_addr)))
+		C.memset(voidptr(ip), 0, sizeof(C.ip_addr))
+		port := &u16(C.vinix_stack_alloc(sizeof(u16)))
+		*port = 0
+		result := recv_ip_flags(socket, voidptr(data), length, ip, port, flags)
 		if result >= 0 && !(uint(endpoint) == 0) {
-			endpoint_from_ip(socket.family, &ip, port, endpoint)
+			endpoint_from_ip(socket.family, ip, *port, endpoint)
 		}
 		return result
 	}
