@@ -27,6 +27,20 @@
 #include <sys/utsname.h>
 #include <sys/xattr.h>
 #include <termios.h>
+#include <linux/netlink.h>
+#include <linux/rtnetlink.h>
+#include <netinet/in.h>
+#include <sys/ipc.h>
+#include <sys/mman.h>
+#include <sys/sem.h>
+#include <sys/sendfile.h>
+#include <sys/shm.h>
+#include <sys/signalfd.h>
+#include <sys/socket.h>
+#include <sys/uio.h>
+#include <sys/wait.h>
+#include <signal.h>
+#include <time.h>
 #include <unistd.h>
 
 #define CHECK(x) do { if (!(x)) { printf("SYSCALL RETENTION FAIL line=%d errno=%d: %s\n", __LINE__, errno, #x); _exit(1); } } while (0)
@@ -198,6 +212,140 @@ static void op_metadata(int i) {
 	CHECK(close(fd) == 0 && unlink(path) == 0);
 }
 
+static void op_sysv_sem(int i) {
+	(void)i;
+	int id = semget(IPC_PRIVATE, 2, IPC_CREAT | 0600);
+	CHECK(id >= 0);
+	struct sembuf b = {.sem_num = 0, .sem_op = 1};
+	semop(id, &b, 1); semctl(id, 0, GETVAL);
+	CHECK(semctl(id, 0, IPC_RMID) == 0);
+}
+
+static void op_sysv_shm(int i) {
+	(void)i;
+	int id = shmget(IPC_PRIVATE, 8192, IPC_CREAT | 0600);
+	CHECK(id >= 0);
+	void *p = shmat(id, NULL, 0);
+	if (p != (void *)-1) { ((char *)p)[0] = 1; shmdt(p); }
+	CHECK(shmctl(id, IPC_RMID, NULL) == 0);
+}
+
+static void op_pty(int i) {
+	(void)i;
+	int m = posix_openpt(O_RDWR | O_NOCTTY);
+	CHECK(m >= 0);
+	grantpt(m); unlockpt(m);
+	char *name = ptsname(m);
+	int s = name ? open(name, O_RDWR | O_NOCTTY) : -1;
+	if (s >= 0) { (void)write(m, "x\n", 2); char c[8]; (void)read(s, c, sizeof c); close(s); }
+	close(m);
+}
+
+static void op_signalfd(int i) {
+	(void)i;
+	sigset_t set; sigemptyset(&set); sigaddset(&set, SIGUSR2);
+	sigprocmask(SIG_BLOCK, &set, NULL);
+	int fd = signalfd(-1, &set, SFD_NONBLOCK | SFD_CLOEXEC);
+	CHECK(fd >= 0);
+	kill(getpid(), SIGUSR2);
+	struct signalfd_siginfo info; (void)read(fd, &info, sizeof info);
+	close(fd);
+}
+
+static void op_posix_timer(int i) {
+	(void)i;
+	timer_t t; struct sigevent ev = {.sigev_notify = SIGEV_NONE};
+	CHECK(timer_create(CLOCK_MONOTONIC, &ev, &t) == 0);
+	struct itimerspec spec = {.it_value = {10, 0}};
+	timer_settime(t, 0, &spec, NULL); timer_gettime(t, &spec);
+	CHECK(timer_delete(t) == 0);
+}
+
+static void op_netlink(int i) {
+	(void)i;
+	int fd = socket(AF_NETLINK, SOCK_RAW | SOCK_CLOEXEC, NETLINK_ROUTE);
+	if (fd < 0) return;
+	struct { struct nlmsghdr h; struct ifinfomsg m; } req = {
+		.h = {.nlmsg_len = sizeof req, .nlmsg_type = RTM_GETLINK, .nlmsg_flags = NLM_F_REQUEST | NLM_F_DUMP, .nlmsg_seq = 1}};
+	send(fd, &req, sizeof req, 0);
+	char buf[8192];
+	for (int k = 0; k < 8; k++) if (recv(fd, buf, sizeof buf, MSG_DONTWAIT) <= 0) break;
+	close(fd);
+}
+
+static void op_scm_rights(int i) {
+	(void)i;
+	int sv[2];
+	CHECK(socketpair(AF_UNIX, SOCK_STREAM | SOCK_CLOEXEC, 0, sv) == 0);
+	int passed = open("/dev/null", O_RDONLY | O_CLOEXEC);
+	char byte = 'x'; struct iovec iov = {&byte, 1};
+	char control[CMSG_SPACE(sizeof(int))] = {0};
+	struct msghdr msg = {.msg_iov = &iov, .msg_iovlen = 1, .msg_control = control, .msg_controllen = sizeof control};
+	struct cmsghdr *c = CMSG_FIRSTHDR(&msg);
+	c->cmsg_level = SOL_SOCKET; c->cmsg_type = SCM_RIGHTS; c->cmsg_len = CMSG_LEN(sizeof(int));
+	memcpy(CMSG_DATA(c), &passed, sizeof(int));
+	CHECK(sendmsg(sv[0], &msg, 0) == 1);
+	char rcontrol[CMSG_SPACE(sizeof(int))];
+	struct msghdr r = {.msg_iov = &iov, .msg_iovlen = 1, .msg_control = rcontrol, .msg_controllen = sizeof rcontrol};
+	if (recvmsg(sv[1], &r, MSG_CMSG_CLOEXEC) > 0) {
+		struct cmsghdr *rc = CMSG_FIRSTHDR(&r);
+		if (rc) { int got; memcpy(&got, CMSG_DATA(rc), sizeof got); close(got); }
+	}
+	close(passed); close(sv[0]); close(sv[1]);
+}
+
+static void op_sockopt(int i) {
+	(void)i;
+	int fd = socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+	CHECK(fd >= 0);
+	int v = 1; socklen_t l = sizeof v;
+	setsockopt(fd, SOL_SOCKET, SO_REUSEADDR, &v, sizeof v); getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &v, &l);
+	struct timeval tv = {1, 0}; setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof tv);
+	struct sockaddr_in a = {.sin_family = AF_INET, .sin_port = 0, .sin_addr = {htonl(0x7f000001)}};
+	bind(fd, (struct sockaddr *)&a, sizeof a); l = sizeof a; getsockname(fd, (struct sockaddr *)&a, &l);
+	close(fd);
+}
+
+/* Anonymous remapping and protection changes, and a sealed, synced memfd. */
+static void op_vm(int i) {
+	(void)i;
+	char *p = mmap(NULL, 65536, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+	CHECK(p != MAP_FAILED);
+	p[0] = 1; mprotect(p, 16384, PROT_READ); madvise(p, 65536, MADV_DONTNEED);
+	char *q = mremap(p, 65536, 131072, MREMAP_MAYMOVE);
+	if (q != MAP_FAILED) p = q;
+	munmap(p, 131072);
+	int fd = memfd_create("seal", MFD_ALLOW_SEALING | MFD_CLOEXEC);
+	CHECK(fd >= 0);
+	CHECK(ftruncate(fd, 4096) == 0 && fcntl(fd, F_ADD_SEALS, F_SEAL_SHRINK) == 0 && fcntl(fd, F_GET_SEALS) >= 0);
+	char *m = mmap(NULL, 4096, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+	if (m != MAP_FAILED) { m[0] = 1; msync(m, 4096, MS_SYNC); munmap(m, 4096); }
+	close(fd);
+}
+
+static void op_cgroup(int i) {
+	char path[128]; snprintf(path, sizeof path, "/sys/fs/cgroup/retention-%d", i);
+	if (mkdir(path, 0755) != 0) return;
+	char procs[192]; snprintf(procs, sizeof procs, "%s/cgroup.procs", path); slurp(procs);
+	CHECK(rmdir(path) == 0);
+}
+
+/* sendfile, copy_file_range and splice between two files. */
+static void op_copy(int i) {
+	char a[256], b[256];
+	snprintf(a, sizeof a, "%s/ca-%d", scratch, i); snprintf(b, sizeof b, "%s/cb-%d", scratch, i);
+	int in = open(a, O_CREAT | O_RDWR | O_CLOEXEC, 0600), out = open(b, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+	CHECK(in >= 0 && out >= 0);
+	char data[8192]; memset(data, 'y', sizeof data);
+	CHECK(write(in, data, sizeof data) == (ssize_t)sizeof data);
+	off_t off = 0; sendfile(out, in, &off, sizeof data);
+	loff_t o1 = 0, o2 = 0; copy_file_range(in, &o1, out, &o2, 4096, 0);
+	int pp[2];
+	if (pipe(pp) == 0) { loff_t o3 = 0; splice(in, &o3, pp[1], NULL, 4096, 0); splice(pp[0], NULL, out, NULL, 4096, 0); close(pp[0]); close(pp[1]); }
+	close(in); close(out);
+	CHECK(unlink(a) == 0 && unlink(b) == 0);
+}
+
 struct op { const char *name; void (*run)(int); int count; };
 
 static int failures;
@@ -248,10 +396,14 @@ int main(void) {
 		{"proc_self", op_proc_self, 200}, {"proc_system", op_proc_system, 200},
 		{"proc_links", op_proc_links, 200}, {"sysfs", op_sysfs, 100}, {"queries", op_queries, 200},
 		{"ioctl", op_ioctl, 200}, {"hostname", op_hostname, 200},
+		{"sysv_sem", op_sysv_sem, 200}, {"sysv_shm", op_sysv_shm, 200}, {"pty", op_pty, 200},
+		{"signalfd", op_signalfd, 200}, {"posix_timer", op_posix_timer, 200}, {"netlink", op_netlink, 200},
+		{"scm_rights", op_scm_rights, 200}, {"sockopt", op_sockopt, 200}, {"vm", op_vm, 200},
+		{"cgroup", op_cgroup, 200},
 	};
 	static const struct op files[] = {
 		{"xattr", op_xattr, 200}, {"locks", op_locks, 200}, {"inotify", op_inotify, 200},
-		{"metadata", op_metadata, 200},
+		{"metadata", op_metadata, 200}, {"copy", op_copy, 200},
 	};
 	for (unsigned t = 0; t < sizeof system / sizeof system[0]; t++) measure(&system[t]);
 	static const char *dirs[] = {"/tmp", "/root"};

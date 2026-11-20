@@ -19,8 +19,13 @@ sockets, epoll, timers, threads, fork and file creation:
   getcwd and gethostname;
 - pipe and console ioctls, /dev/null and /dev/urandom reads;
 - sethostname followed by uname, which must report the new name;
+- SysV semaphores and shared memory, PTY pairs, signalfd, POSIX timers,
+  netlink route dumps, SCM_RIGHTS passing and socket options;
+- anonymous mprotect/madvise/mremap and a sealed, synced memfd mapping;
+- creating and removing a cgroup;
 - xattrs, flock/POSIX/OFD locks, inotify and metadata changes (chmod,
-  chown, utimens, truncate, fsync) on tmpfs and on ext2. The runner formats a
+  chown, utimens, truncate, fsync), and sendfile/copy_file_range/splice
+  between two files, on tmpfs and on ext2. The runner formats a
   fresh 64 MiB ext2 image with e2fsprogs and attaches it, and the kernel
   mounts it at `/root`; if `/root` is still not ext2 the guest says so and
   skips those.
@@ -33,7 +38,7 @@ tests/syscall-retention/run --arch x86_64 --kernel-dir /work/x86/kernel --state-
 ```
 
 The runner requires `SYSCALL RETENTION: PASS`, rejects `SYSCALL RETENTION
-FAIL`, panics and fatal exceptions, and allows 1800 seconds: each of the 15
+FAIL`, panics and fatal exceptions, and allows 3000 seconds: each of the 27
 measured operations waits about half a minute. AArch64 builds the guest
 against `VINIX_AARCH64_SYSROOT` (default `build-aarch64-userland/sysroot`).
 
