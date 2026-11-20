@@ -238,13 +238,14 @@ above are gone). Recordings, measured by zero crossings and peak per second
 
 | Scenario | AArch64 (HVF) | x86_64 (TCG) |
 | --- | --- | --- |
-| basic | 440, 660, 880 Hz, 1.00 s each, both channels, peak 12000 | 440 Hz clean; 660 Hz cut at 0.46 s; third run not 880 Hz |
-| lifecycle | 440, 660, 880, 440 Hz, 1.00 s each | 440 Hz, then a 2 s mixed run, then 440 Hz |
-| seat | 440, 880 Hz, 1.00 s each | 440, 880 Hz, 1.00 s each |
+| basic | 440, 660, 880 Hz, 1.00 s each, both channels, peak 12000 | 440, 660, 880 Hz, about 1 s each, silence between |
+| lifecycle | 440, 660, 880, 440 Hz, 1.00 s each | 440, 660, 880, 440 Hz, about 1 s each |
+| seat | 440, 880 Hz, 1.00 s each | 440, 880 Hz, about 1 s each |
 
-Real playback is therefore shown on AArch64. On x86_64 the guest still sees
-the exact PCM sequence pass through the portal, so the dropouts are likely
-device or driver timing under emulation; this is not yet traced.
+Real playback is shown on both architectures. The x86_64 column is from a
+kernel with `e385b64b3`: before it, the HD Audio driver replayed old ring
+contents whenever the portal paused between tones and queued the next tone a
+whole ring later, which garbled every tone after the first.
 
 `audio-portal-retain` still refuses these runs, for three reasons outside the
 portal:
