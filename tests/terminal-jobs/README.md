@@ -6,7 +6,9 @@ and foreground restart, Ctrl-C/Ctrl-Z group signals, and group/session
 validation including successful exec. It checks one controlling terminal
 per session and `/dev/tty` across detach and replacement. Repeated rejected
 reads and controlling-terminal opens measure the guest slab before and after
-1,000 calls. The SA_RESTART fixture delays input until after its handler
+1,000 calls. The open loop sums live object bytes from `/proc/slabinfo`, after
+two grace periods: the meminfo Slab total also counts empty pages the allocator
+keeps, which on ARM's 16 KiB pages varies by 16-48 KiB from run to run. The SA_RESTART fixture delays input until after its handler
 returns, requiring the restarted call to block again without a stale signal wake.
 Stopped groups are resumed when setpgid or setsid orphans them. Session-leader
 exit sends HUP/CONT to the foreground group, clears remaining members' terminal
