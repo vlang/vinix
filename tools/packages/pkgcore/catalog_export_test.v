@@ -7,7 +7,11 @@ import time
 #include <sys/resource.h>
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 struct CatalogExportLimit { current u64 maximum u64 }
 
 fn catalog_export_fixture() !(string, []CatalogSource) {

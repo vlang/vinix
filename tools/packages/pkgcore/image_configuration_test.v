@@ -5,7 +5,11 @@ import json2
 import os
 import time
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn image_configuration_fixture() !string {
 	work := os.real_path(os.temp_dir()) + '/vinix-image-config-' + os.getpid().str() + '-' + time.now().unix_micro().str()

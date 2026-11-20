@@ -12,7 +12,11 @@ fn C.fork() int
 fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
 

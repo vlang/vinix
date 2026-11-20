@@ -11,7 +11,11 @@ $if track_heap ? {
 	fn C.vinix_heap_count() u32
 }
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 struct ImportLookupCase {
 	name string

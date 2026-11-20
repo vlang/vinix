@@ -15,7 +15,11 @@ fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
 #include <sys/resource.h>
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn https_owner_cycles() int {
 	$if https_owner_baseline ? { return 2 }

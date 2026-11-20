@@ -7,10 +7,14 @@ import time
 #include <sys/resource.h>
 #include <sys/wait.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.fcntl(int, int, ...int) int
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
@@ -65,18 +69,18 @@ fn atomic_failure(phase string, temporary string) ! {
 	if phase == os.file_name(os.dir(temporary)) { return error('injected atomic ' + phase + ' failure') }
 }
 
-fn atomic_short_interrupted_write(fd int, data voidptr, count usize) isize {
+fn atomic_short_interrupted_write(fd int, data voidptr, count uint) int {
 	flags := C.fcntl(fd, C.F_GETFL)
 	if flags & C.O_NONBLOCK != 0 {
 		assert C.fcntl(fd, C.F_SETFL, flags & ~C.O_NONBLOCK) == 0
 		C.errno = C.EINTR
 		return -1
 	}
-	return C.write(fd, data, if count > 7 { usize(7) } else { count })
+	return C.write(fd, data, if count > 7 { uint(7) } else { count })
 }
 
-fn atomic_zero_write(_ int, _ voidptr, _ usize) isize { return 0 }
-fn atomic_bad_write(_ int, _ voidptr, _ usize) isize { C.errno = C.EIO; return -1 }
+fn atomic_zero_write(_ int, _ voidptr, _ uint) int { return 0 }
+fn atomic_bad_write(_ int, _ voidptr, _ uint) int { C.errno = C.EIO; return -1 }
 
 fn atomic_file_flush_failure(fd int) int {
 	mut info := C.stat{}
@@ -218,7 +222,7 @@ fn test_atomic_concurrent_writers_and_readers_observe_only_complete_documents() 
 		assert text in texts
 		unsafe { text.free() }
 	}
-	for child in children { mut status := 0; assert C.waitpid(child, &status, 0) == child && status == 0 }
+	for child in children { mut status := i32(0); assert C.waitpid(child, &status, 0) == child && status == 0 }
 	assert read_metadata(path)! in texts && os.ls(work)!.sorted() == ['metadata']
 }
 

@@ -14,7 +14,7 @@ fn image_tools_descriptors() int {
 	return count
 }
 
-fn image_tools_write(fd int, data voidptr, count usize) isize {
+fn image_tools_write(fd int, data voidptr, count uint) int {
 	mode := os.getenv('VINIX_IMAGE_TOOLS_MODE')
 	defer { unsafe { mode.free() } }
 	if mode == 'write' { return 0 }

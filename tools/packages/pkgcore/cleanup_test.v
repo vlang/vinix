@@ -7,7 +7,7 @@ import time
 
 #include <sys/wait.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.setgroups(usize, voidptr) int
 fn C.setgid(u32) int
@@ -158,7 +158,7 @@ fn test_cleanup_ordinary_reader_and_all_inventory_preflight_on_root_owned_state(
 		observed.close(); close_collection_targets(captured); guard.release()
 		C._exit(0)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	foreign := directory + '/generations/3/foreign'
 	os.mkdir(foreign)!; assert C.chown(foreign.str, 1000, 1000) == 0

@@ -7,7 +7,11 @@ import os
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.sleep(u32) u32
 struct ExportRetirementLimit { current u64 maximum u64 }
 

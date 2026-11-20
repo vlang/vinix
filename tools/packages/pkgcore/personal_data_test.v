@@ -4,7 +4,11 @@ module pkgcore
 import os
 import time
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn data_work() !string {
 	path := os.real_path(os.temp_dir()) + '/vdata-' + os.getpid().str() + '-' + time.now().unix_micro().str()

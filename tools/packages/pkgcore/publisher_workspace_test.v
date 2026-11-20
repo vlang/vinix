@@ -7,11 +7,15 @@ import time
 
 #include <sys/resource.h>
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
 struct PublisherWorkspaceLimit { current u64 maximum u64 }
@@ -101,7 +105,7 @@ fn test_publisher_workspace_all_mutators_share_exclusion_preserve_documents_and_
 			PackSourceOptions{ checkpoint: workspace_stop_locked }) or { C._exit(78) }
 		C._exit(79)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, &status, 0) == child && status == 77 << 8
 	assert workspace_documents(work)! == stable
 	pack(work + '/manifest.json', work + '/source', work + '/repository')!

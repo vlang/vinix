@@ -11,7 +11,11 @@ $if track_heap ? {
 fn C.vinix_heap_begin()
 fn C.vinix_heap_end() u64
 fn C.vinix_heap_count() u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn health_fixture() !(string, State, Plan) {
 	directory := os.temp_dir() + '/vinix-installed-health-' + os.getpid().str() + '-' + time.now().unix_micro().str()

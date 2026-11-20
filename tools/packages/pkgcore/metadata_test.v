@@ -8,10 +8,14 @@ import time
 #include <sys/wait.h>
 #include <sys/resource.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
 
@@ -35,7 +39,7 @@ fn metadata_denied(path string) {
 		}
 		C._exit(42)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, &status, 0) == child
 	assert status == 0, '${path}: expected prompt metadata refusal, wait status ${status}'
 }

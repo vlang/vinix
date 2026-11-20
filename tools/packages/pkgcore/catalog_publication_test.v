@@ -6,9 +6,13 @@ import os
 import time
 
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
 
@@ -400,7 +404,7 @@ fn test_catalog_publication_captures_bounded_controlled_lock_and_refuses_replace
 			catalog_publication_reader(path, MetadataReadOptions{}, true)
 			C._exit(0)
 		}
-		mut status := 0
+		mut status := i32(0)
 		catalog_publication_check(C.waitpid(child, &status, 0) == child && status == 0, 'unsafe file refused promptly: ' + mode)
 		if mode == 'directory' { os.rmdir(path)! } else { os.rm(path)! }
 		os.write_file(path, 'captured')!

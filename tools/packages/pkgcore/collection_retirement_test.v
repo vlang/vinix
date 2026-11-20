@@ -6,7 +6,11 @@ import os
 import time
 
 #include <sys/resource.h>
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.link(&char, &char) int
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int

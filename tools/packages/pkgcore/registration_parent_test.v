@@ -8,9 +8,13 @@ import time
 #include <sys/resource.h>
 #include <sys/wait.h>
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.setgroups(usize, voidptr) int
 fn C.setgid(u32) int
@@ -143,7 +147,7 @@ fn test_launcher_ordinary_account_rejects_damaged_registration_before_private_da
 			assert refused && !os.exists(work + '/home/.local')
 			C._exit(0)
 		}
-		mut status := 0; assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+		mut status := i32(0); assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 		os.rm(path)!; os.rename(work + '/outside', path)!
 	}
 	if os.geteuid() == 0 {
@@ -158,7 +162,7 @@ fn test_launcher_ordinary_account_rejects_damaged_registration_before_private_da
 		if os.geteuid() == 0 { assert C.setgroups(0, unsafe { nil }) == 0 && C.setgid(1000) == 0 && C.setuid(1000) == 0 }
 		verify_installed(work + '/store', state, no_progress)!; C._exit(0)
 	}
-	mut status := 0; assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+	mut status := i32(0); assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	println('LAUNCHER PARENTS ordinary launch refuses damaged registration before private data or execution; restored administrator-owned launchers verify; guest root checks foreign ownership PASS')
 }
 

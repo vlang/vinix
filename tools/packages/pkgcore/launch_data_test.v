@@ -8,10 +8,14 @@ import net.unix
 #include <sys/wait.h>
 #include <sys/resource.h>
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
 struct LaunchDataLimit { current u64 maximum u64 }
@@ -30,7 +34,7 @@ fn launch_data_refusal(home string, id string, uid u32) {
 		prepare_launch_data(home, id, uid) or { C._exit(0) }
 		C._exit(42)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(child, &status, 0) == child
 	assert status == 0, '${home}/${id}: refused promptly, wait status ${status}'
 }

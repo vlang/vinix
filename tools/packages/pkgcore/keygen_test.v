@@ -5,7 +5,11 @@ import os
 import time
 
 #include <sys/resource.h>
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
 struct KeygenLimit { current u64 maximum u64 }
@@ -42,13 +46,13 @@ fn keygen_fault(phase string, path string) ! {
 	}
 }
 
-fn keygen_short_write(fd int, bytes voidptr, count usize) isize {
+fn keygen_short_write(fd int, bytes voidptr, count uint) int {
 	if os.getenv('VINIX_KEYGEN_WRITE') == '' { os.setenv('VINIX_KEYGEN_WRITE', 'interrupted', true); C.errno = C.EINTR; return -1 }
-	return C.write(fd, bytes, if count > 7 { usize(7) } else { count })
+	return C.write(fd, bytes, if count > 7 { uint(7) } else { count })
 }
 
-fn keygen_failed_write(fd int, bytes voidptr, count usize) isize {
-	if os.getenv('VINIX_KEYGEN_WRITE') == '' { os.setenv('VINIX_KEYGEN_WRITE', 'partial', true); return C.write(fd, bytes, if count > 5 { usize(5) } else { count }) }
+fn keygen_failed_write(fd int, bytes voidptr, count uint) int {
+	if os.getenv('VINIX_KEYGEN_WRITE') == '' { os.setenv('VINIX_KEYGEN_WRITE', 'partial', true); return C.write(fd, bytes, if count > 5 { uint(5) } else { count }) }
 	C.errno = C.ENOSPC; return -1
 }
 

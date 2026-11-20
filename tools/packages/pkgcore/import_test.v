@@ -4,7 +4,11 @@ module pkgcore
 import json2
 import os
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn import_scratch(label string) !string {
 	path := os.temp_dir() + '/vinix-import-' + label + '-' + os.getpid().str()

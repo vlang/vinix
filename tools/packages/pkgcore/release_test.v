@@ -6,10 +6,14 @@ import os
 import time
 
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn release_fixture() !(string, string, i64) {
 	work := os.real_path(os.temp_dir()) + '/vinix-release-' + os.getpid().str() + '-' + time.now().unix_micro().str()
@@ -250,7 +254,7 @@ fn test_release_interruption_preserves_sequence_and_exact_retry_without_fork_or_
 		release_locked(work + '/repository', 'fixture', work + '/seed', 2, expires, work + '/release', ReleaseOptions{ checkpoint: release_stop_reserved }) or { C._exit(79) }
 		C._exit(80)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(pid, &status, 0) == pid && status == 77 << 8
 	assert !os.exists(work + '/release') && os.ls(work)!.filter(it.starts_with('.vinix-release-')).len == 1
 	assert release_history(work + '/repository')!.repositories[0].sequence == 2

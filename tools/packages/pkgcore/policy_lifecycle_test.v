@@ -13,7 +13,11 @@ $if track_heap ? {
 	fn C.vinix_heap_end() u64
 }
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 
 const policy_lifecycle_key = 'd75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a'

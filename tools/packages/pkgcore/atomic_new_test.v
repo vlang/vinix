@@ -4,10 +4,14 @@ module pkgcore
 import os
 import time
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.link(&char, &char) int
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 
 fn new_metadata_work() !string {
@@ -37,7 +41,7 @@ fn new_metadata_flush_failure(fd int) int {
 	return if info.st_mode & 0o170000 == 0o040000 { -1 } else { C.fsync(fd) }
 }
 
-fn new_metadata_write_failure(_ int, _ voidptr, _ usize) isize { C.errno = C.ENOSPC; return -1 }
+fn new_metadata_write_failure(_ int, _ voidptr, _ uint) int { C.errno = C.ENOSPC; return -1 }
 
 fn test_new_metadata_never_replaces_existing_files_aliases_fifo_directories_or_hardlinks() {
 	work := new_metadata_work()!; defer { os.rmdir_all(work) or {} }
@@ -102,7 +106,7 @@ fn test_new_metadata_concurrent_publishers_produce_one_complete_durable_winner()
 		children << child
 	}
 	mut winners := 0
-	for child in children { mut status := 0; assert C.waitpid(child, &status, 0) == child; assert status in [0, 42 << 8]; if status == 0 { winners++ } }
+	for child in children { mut status := i32(0); assert C.waitpid(child, &status, 0) == child; assert status in [0, 42 << 8]; if status == 0 { winners++ } }
 	assert winners == 1 && read_metadata(path)! in texts && os.lstat(path)!.mode & 0o777 == 0o644
 	assert os.ls(work)! == ['saved']
 	println('NEW METADATA concurrent publishers admit exactly one complete file with canonical final mode and no temporary leftovers PASS')

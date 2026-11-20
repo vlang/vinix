@@ -9,7 +9,11 @@ import time
 struct CacheDescriptorLimit { current u64 maximum u64 }
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 struct CachePromotionFixture { directory string partial string object string outside string payload Payload }
 

@@ -5,7 +5,11 @@ import os
 import time
 
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.umask(u32) u32
 
 fn integration_descriptors() int {
@@ -14,10 +18,10 @@ fn integration_descriptors() int {
 	return count
 }
 
-fn integration_write(fd int, bytes voidptr, count usize) isize {
+fn integration_write(fd int, bytes voidptr, count uint) int {
 	mode := os.getenv('VINIX_INTEGRATION_MODE')
 	if mode == 'write' { return 0 }
-	if mode == 'short' { return C.write(fd, bytes, if count > 3 { usize(3) } else { count }) }
+	if mode == 'short' { return C.write(fd, bytes, if count > 3 { uint(3) } else { count }) }
 	if mode == 'eintr' && os.getenv('VINIX_INTEGRATION_INTERRUPTED') == '' {
 		os.setenv('VINIX_INTEGRATION_INTERRUPTED', '1', true); C.errno = C.EINTR; return -1
 	}
@@ -164,7 +168,7 @@ fn integration_case(architecture string, mode string) ! {
 			if i in [2, 5]! {
 				assert os.is_link(path)
 				mut bytes := [128]u8{}
-				count := C.readlinkat(C.AT_FDCWD, path.str, unsafe { &bytes[0] }, usize(bytes.len))
+				count := C.readlinkat(C.AT_FDCWD, path.str, unsafe { &bytes[0] }, uint(bytes.len))
 				target := if i == 2 { '/usr/bin/vinix-desktop' } else { '/var/lib/vinix-packages/current/share/applications' }
 				assert count == target.len && unsafe { tos(&bytes[0], int(count)) } == target
 			} else {

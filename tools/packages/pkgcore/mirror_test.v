@@ -8,10 +8,14 @@ import time
 import tools.packages.pkgprotocol
 
 fn C.fork() int
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C._exit(int)
 fn C.link(&char, &char) int
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 #include <sys/resource.h>
 fn C.getrlimit(int, voidptr) int
 fn C.setrlimit(int, voidptr) int
@@ -254,7 +258,7 @@ fn test_mirror_space_preflight_and_abrupt_exit_leave_final_name_retryable() {
 		mirror_export(config, work + '/store', work + '/interrupted', ['app'], MirrorOptions{ checkpoint: mirror_interrupt_ready }) or { C._exit(78) }
 		C._exit(79)
 	}
-	mut status := 0
+	mut status := i32(0)
 	assert C.waitpid(pid, &status, 0) == pid && status == 77 << 8
 	assert !os.exists(work + '/interrupted') && mirror_stages(work)!.len == 1
 	// A retry never reuses unauthenticated staging data or sweeps unrelated trees.

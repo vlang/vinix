@@ -86,7 +86,7 @@ fn composition_refused(sources []CatalogSource, work string, options CatalogOpti
 	mut denied := false
 	compose_catalog_with(sources, work + '/refused', options) or { denied = err.msg().contains(diagnostic) }
 	assert denied && !os.exists(work + '/refused'), diagnostic
-	assert os.ls(work)!.all(!it.starts_with('.vinix-composition-'))
+	assert (os.ls(work) or { panic(err) }).all(!it.starts_with('.vinix-composition-'))
 }
 
 fn composition_no_space(_ string) !u64 { return 0 }
@@ -264,7 +264,7 @@ fn composition_target_refused(architecture string, sources []CatalogSource, work
 	mut denied := false
 	compose_catalog_for_with(architecture, sources, work + '/refused', options) or { denied = err.msg().contains(diagnostic) }
 	assert denied && !os.exists(work + '/refused'), diagnostic
-	assert os.ls(work)!.all(!it.starts_with('.vinix-composition-'))
+	assert (os.ls(work) or { panic(err) }).all(!it.starts_with('.vinix-composition-'))
 }
 
 fn test_selected_composition_validates_full_inputs_before_omitting_other_variants() {
@@ -308,7 +308,7 @@ fn test_selected_composition_refuses_invalid_targets_space_staging_corruption_an
 	mut raced := false
 	compose_catalog_for_with('aarch64', sources, work + '/refused', CatalogOptions{ checkpoint: composition_race }) or { raced = true }
 	assert raced && os.is_dir(work + '/refused') && os.ls(work + '/refused')!.len == 0
-	assert os.ls(work)!.all(!it.starts_with('.vinix-composition-'))
+	assert (os.ls(work) or { panic(err) }).all(!it.starts_with('.vinix-composition-'))
 	os.rmdir(work + '/refused')!
 	assert compose_catalog_for('aarch64', sources, work + '/refused')!.package_count == 4
 }

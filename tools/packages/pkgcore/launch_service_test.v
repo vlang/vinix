@@ -7,12 +7,16 @@ import time
 
 #include <sys/wait.h>
 #include <grp.h>
-fn C.waitpid(int, &int, int) int
+fn C.waitpid(int, &i32, int) int
 fn C.setgroups(usize, &u32) int
 fn C.setgid(u32) int
 fn C.setuid(u32) int
 fn C.alarm(u32) u32
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 $if track_heap ? {
 	#include "@VMODROOT/../../../desktop/tools/tests/heap_tracker.h"
@@ -79,7 +83,7 @@ fn launch_service_ordinary_failure(service Service, id string, expected string) 
 		launch_service_failure(service, id, expected, launch_service_cycles())
 		C._exit(0)
 	}
-	mut status := 0; assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0, expected
+	mut status := i32(0); assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0, expected
 }
 
 fn launch_service_owned_snapshots() ! {
@@ -136,7 +140,7 @@ fn test_prepared_launch_owns_snapshots_and_releases_only_its_lease() {
 			launch_service_owned_snapshots()!
 			C._exit(0)
 		}
-		mut status := 0; assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+		mut status := i32(0); assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	} else { launch_service_owned_snapshots()! }
 	println('LAUNCH SERVICE both architectures, independent 1/64-entry snapshots, offline overlay, reusable close, reader release and exact generation lease lifetime PASS')
 }
@@ -233,7 +237,7 @@ fn test_real_root_service_retires_root_and_ordinary_launch_refusals() {
 		launch_service_run_failure(service, false, launch_service_cycles())
 		C._exit(0)
 	}
-	mut status := 0; assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
+	mut status := i32(0); assert C.waitpid(child, unsafe { &status }, 0) == child && status == 0
 	assert !os.exists('/home/launch-service-fixture')
 	writer := acquire('/var/lib/vinix-packages')!; writer.release()
 	println('LAUNCH SERVICE real-root root and UID 1000 runners retire all five launch modes before session/data creation or execution PASS')

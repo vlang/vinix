@@ -6,7 +6,11 @@ import os
 import time
 import tools.packages.pkgprotocol
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 fn C.link(&char, &char) int
 
 fn image_apps_fixture() !(string, string) {
@@ -579,7 +583,7 @@ fn image_export_checkpoint(phase string, temporary string) ! {
 	if kind == phase { return error('injected image export ' + phase + ' failure') }
 }
 
-fn image_export_no_space(_ int, _ voidptr, _ usize) isize { C.errno = C.ENOSPC; return -1 }
+fn image_export_no_space(_ int, _ voidptr, _ uint) int { C.errno = C.ENOSPC; return -1 }
 fn image_export_directory_flush_failure(fd int) int {
 	mut info := C.stat{}; assert C.fstat(fd, unsafe { &info }) == 0
 	return if info.st_mode & 0o170000 == 0o040000 { -1 } else { C.fsync(fd) }

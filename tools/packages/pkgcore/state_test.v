@@ -5,7 +5,11 @@ import json2
 import os
 import time
 
-fn C.mkfifo(&char, u32) int
+$if macos || ios {
+	fn C.mkfifo(&char, u16) int
+} $else {
+	fn C.mkfifo(&char, u32) int
+}
 
 fn state_validation_fixture(architecture string) State {
 	runtime := Package{ id: 'runtime', version: '1.0.0', architecture: architecture, name: 'Runtime', license: 'MIT', kind: 'runtime',
