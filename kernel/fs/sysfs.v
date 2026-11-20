@@ -125,6 +125,10 @@ fn (mut this SysFS) mount(parent &VFSNode, name string, _source &VFSNode) ?&VFSN
 	mut kernel_dir := add_sysfs_directory(mut root, 'kernel')
 	add_sysfs_directory(mut kernel_dir, 'security')
 	add_sysfs_directory(mut root, 'module')
+	// Linux always has /sys/block, and sandboxes bind it in without checking:
+	// WebKit's bubblewrap arguments fail when it is missing. Vinix publishes
+	// no block devices in sysfs yet, so it stays empty.
+	add_sysfs_directory(mut root, 'block')
 
 	return root
 }

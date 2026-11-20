@@ -59,14 +59,17 @@ fn (mut this URandom) grow(_handle voidptr, _new_size u64) ? {}
 
 pub fn initialise() {
 	krandom.initialise()
-	mut rng := &URandom{}
-	rng.stat.blksize = 4096
-	rng.stat.rdev = resource.create_dev_id()
-	rng.stat.mode = 0o666 | stat.ifchr
-	rng.can_mmap = true
-
 	if !krandom.is_ready() {
 		println('random: no trusted boot entropy; secure reads return EAGAIN')
 	}
-	fs.devtmpfs_add_device(rng, 'urandom')
+	// Linux has both, and since 5.6 they read alike once the pool is ready,
+	// as both do here. Sandboxes such as bubblewrap bind each into their /dev.
+	for name in ['urandom', 'random']! {
+		mut rng := &URandom{}
+		rng.stat.blksize = 4096
+		rng.stat.rdev = resource.create_dev_id()
+		rng.stat.mode = 0o666 | stat.ifchr
+		rng.can_mmap = true
+		fs.devtmpfs_add_device(rng, name)
+	}
 }
