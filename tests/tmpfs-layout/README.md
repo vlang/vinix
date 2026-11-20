@@ -14,8 +14,10 @@ is a tmpfs, that is what every file a package installs cost.
 of the limit a byte, seven bytes, a hundred and a page at a time and reads
 them back; checks that holes and what a truncation cut read as zeroes; grows
 a file across the limit by appending and by `ftruncate`; maps small files
-privately and shared; and measures what ten thousand files of 100 bytes and
-two thousand of 70 KiB take from free memory.
+privately and shared; and measures what four thousand files of 100 bytes and
+two thousand of 70 KiB take from free memory. Each file also reserves about
+12 KiB of its creator's kernel budget, a sixteenth of RAM
+(`docs/kernel-resources.md`), which ten thousand would exceed in this guest.
 
 ```sh
 tests/kernel-gaps/run-native --source tests/tmpfs-layout/guest.c \

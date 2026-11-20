@@ -219,6 +219,9 @@ static void cost_of_files(unsigned count, size_t size, unsigned long long limit)
 		require(unlink(path) == 0, "remove one of many");
 	}
 	require(rmdir("/tmp/many") == 0, "remove the directory");
+	/* Removed names give back their kernel reservations after a grace period
+	 * (fs/removed.v): wait it out before the next cohort is charged. */
+	sleep(7);
 }
 
 int main(void) {
@@ -250,7 +253,10 @@ int main(void) {
 
 	/* A hundred bytes took two pages each, 32 KiB of them where a page is
 	 * 16 KiB; 70 KiB took 132 KiB. Now: the file, its name and its inode. */
-	cost_of_files(10000, 100, 48 * MIB);
+	/* Each file also reserves about 12 KiB of the creator's kernel budget, a
+	 * sixteenth of RAM (docs/kernel-resources.md): 4000 fit in this guest,
+	 * held to the same 48 MiB per ten thousand. */
+	cost_of_files(4000, 100, 4000 * 48 * MIB / 10000);
 	cost_of_files(2000, 70 * KIB, 2000 * 70 * KIB / 100 * 130);
 	puts("TMPFS-LAYOUT PASS files cost about what they hold");
 	puts("TMPFS-LAYOUT PASS all");
