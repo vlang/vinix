@@ -108,6 +108,15 @@ fn stage(parent string, framework string, native string, root string) ! {
 		inputs[relative] = json2.Any(media.hash(root + '/payload' + relative)!)
 		deployment['inputs_sha256'] = json2.Any(inputs)
 	}
+	if client := os.getenv_opt('VINIX_CURRENT_BROWSER_CLIENT') {
+		// ART's WebView transport; the controller requires its pinned digest.
+		relative := '/opt/vinix-android-aarch64/usr/lib/libvinix-android-browser.so'
+		os.mkdir_all(os.dir(root + '/payload' + relative))!
+		os.cp(client, root + '/payload' + relative)!
+		os.chmod(root + '/payload' + relative, 0o644)!
+		inputs[relative] = json2.Any(media.hash(root + '/payload' + relative)!)
+		deployment['inputs_sha256'] = json2.Any(inputs)
+	}
 	if boot := os.getenv_opt('VINIX_CURRENT_CORE_LIBART') {
 		relative := '/opt/vinix-android-aarch64/usr/lib/java/dex/art/core-libart-hostdex.jar'
 		os.mkdir_all(os.dir(root + '/payload' + relative))!
