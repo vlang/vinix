@@ -1405,7 +1405,7 @@ pub fn vinix_net_attach(mac &u8, driver i32) i32 {
 			return -12
 		}
 		C.printf(c'net: attached %c%c%u, %s\n', i32(net_physical_netif.name[0]), i32(net_physical_netif.name[1]), i32(net_physical_netif.num),
-			if net_physical_netif.flags & 4 != 0 { c'DHCP started' } else { c'waiting for carrier before DHCP' })
+			if net_physical_netif.flags & 4 != 0 { &char(c'DHCP started') } else { &char(c'waiting for carrier before DHCP') })
 		return 0
 	}
 }
@@ -1807,7 +1807,8 @@ fn udp_connect_source(socket &Vinix_socket, destination &C.ip_addr, source &C.ip
 			if netif == nil { return 101 }
 			if local.u_addr.ip6.addr[0] | local.u_addr.ip6.addr[1]
 				| local.u_addr.ip6.addr[2] | local.u_addr.ip6.addr[3] == 0 {
-				selected := C.ip6_select_source_address(netif, &destination.u_addr.ip6)
+				// lwIP returns a const address; only its bytes are copied.
+				selected := voidptr(C.ip6_select_source_address(netif, &destination.u_addr.ip6))
 				if selected == nil { return 101 }
 				C.memcpy(source, selected, sizeof(C.ip_addr))
 			} else { C.memcpy(source, local, sizeof(C.ip_addr)) }
