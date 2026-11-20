@@ -4,6 +4,7 @@
 module streamfixture
 
 #include <stream-native-abi.h>
+#include <alloca.h>
 
 @[typedef] struct C.FILE {}
 struct C.termios { mut: c_lflag u32 c_cc [32]u8 }
@@ -35,6 +36,7 @@ fn C.posix_openpt(i32) i32
 fn C.ioctl(i32, usize, ...) i32
 fn C.snprintf(&char, usize, &char, ...) i32
 fn C.tcgetattr(i32, &C.termios) i32
+fn C.alloca(usize) voidptr
 fn C.tcsetattr(i32, i32, &C.termios) i32
 fn C.dup2(i32, i32) i32
 fn C.pause() i32
@@ -187,12 +189,15 @@ pub fn run() i32 {
 		mut path := [64]char{}
 		C.snprintf(&path[0], sizeof(path), c'/dev/pts/%u', id)
 		slave := C.open(&path[0], C.O_RDWR | C.O_NOCTTY)
-		mut settings := C.termios{}
-		check(slave >= 0 && C.tcgetattr(slave, &settings) == 0, c'PTY slave')
+		// A stack slot: V moves a fixed-array local whose address is taken to the
+		// heap, and this -no-builtin fixture has no allocator for it.
+		mut settings := &C.termios(C.alloca(sizeof(C.termios)))
+		C.memset(settings, 0, sizeof(C.termios))
+		check(slave >= 0 && C.tcgetattr(slave, settings) == 0, c'PTY slave')
 		settings.c_lflag &= ~u32(C.ICANON | C.ECHO)
 		settings.c_cc[C.VMIN] = 1
 		settings.c_cc[C.VTIME] = 0
-		check(C.tcsetattr(slave, C.TCSANOW, &settings) == 0, c'PTY raw input')
+		check(C.tcsetattr(slave, C.TCSANOW, settings) == 0, c'PTY raw input')
 		readers(slave, master, c'terminal')
 		C.close(slave)
 		C.close(master)

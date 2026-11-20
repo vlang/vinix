@@ -3,6 +3,7 @@
 @[translated; has_globals]
 module socketfixture
 #include <socket-native-abi.h>
+#include <alloca.h>
 
 @[typedef] struct C.FILE {}
 @[typedef] struct C.pthread_t {}
@@ -24,6 +25,7 @@ fn C.printf(&char,...) i32
 fn C.puts(&char) i32
 fn C.pause() i32
 fn C.memset(voidptr,i32,usize) voidptr
+fn C.alloca(usize) voidptr
 fn C.memcpy(voidptr,voidptr,usize) voidptr
 fn C.memcmp(voidptr,voidptr,usize) i32
 fn C.fopen(&char,&char) &C.FILE
@@ -84,9 +86,12 @@ fn sites(path &char,label &char) { unsafe {
 } }
 fn measure(label &char,operation fn(),count i32) { unsafe {
  for i:=i32(0);i<20;i++ { operation() }
- mut before:=Heap{};mut after:=Heap{};heap_snapshot(&before);sites(c'/proc/allocstart',nil)
+ // Stack slots: V moves a fixed-array local whose address is taken to the heap,
+ // and these -no-builtin fixtures have no allocator for it.
+ before:=&Heap(C.alloca(sizeof(Heap)));after:=&Heap(C.alloca(sizeof(Heap)))
+ C.memset(before,0,sizeof(Heap));C.memset(after,0,sizeof(Heap));heap_snapshot(before);sites(c'/proc/allocstart',nil)
  for i:=i32(0);i<count;i++ { operation() }
- heap_snapshot(&after);sites(c'/proc/allocsites',label);ck(before.n==after.n, 40)
+ heap_snapshot(after);sites(c'/proc/allocsites',label);ck(before.n==after.n, 40)
  mut kept:=(after.large-before.large)*C.sysconf(C._SC_PAGESIZE)
  for i:=i32(0);i<before.n;i++ {
   delta:=after.objects[i]-before.objects[i]
