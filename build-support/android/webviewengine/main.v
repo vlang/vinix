@@ -57,6 +57,16 @@ fn run() ! {
 		return error('unqualified browser library versions')
 	}
 	if a.init() == 0 { return error('private display initialization failed') }
+	// The runtime lives under its own root, not /usr: WebKit's web process
+	// sandbox binds only standard directories and LD_LIBRARY_PATH, so fonts,
+	// the fontconfig file and EGL's vendor files would be missing. Bind the
+	// root read-only before the first web process starts. The engine runs
+	// through the runtime's own loader (/opt/.../lib/ld-musl-*.so.1).
+	runtime := os.dir(os.dir(os.executable()))
+	if !runtime.starts_with('/opt/') || runtime.contains('..') {
+		return error('browser runtime root is not under /opt')
+	}
+	a.sandbox_path(a.context_default(), &char(runtime.str), 1)
 	data := private_profile + '/data'
 	cache := private_profile + '/cache'
 	session := a.session_new(data.str, cache.str)

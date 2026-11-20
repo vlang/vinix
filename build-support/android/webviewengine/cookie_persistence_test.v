@@ -28,6 +28,8 @@ fn cookie_test_api() Api {
 		view_type:          unsafe { Type(voidptr(cookie_test_unused)) }
 		view_new:           unsafe { NewView(voidptr(cookie_test_unused)) }
 		session_new:        unsafe { NewSession(voidptr(cookie_test_unused)) }
+		context_default:    unsafe { New(voidptr(cookie_test_unused)) }
+		sandbox_path:       unsafe { SandboxPath(voidptr(cookie_test_unused)) }
 		session_cookies:    unsafe { Get(voidptr(cookie_test_unused)) }
 		settings:           unsafe { Get(voidptr(cookie_test_unused)) }
 		javascript:         unsafe { SetFlag(voidptr(cookie_test_unused)) }

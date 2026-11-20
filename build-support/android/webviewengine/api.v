@@ -30,6 +30,7 @@ type Child = fn (voidptr, voidptr)
 type Type = fn () u64
 type NewView = fn (u64, &char, voidptr, voidptr) voidptr
 type NewSession = fn (&char, &char) voidptr
+type SandboxPath = fn (voidptr, &char, i32)
 type Iterate = fn (voidptr, i32) i32
 type Connect = fn (voidptr, &char, voidptr, voidptr, voidptr, u32) u64
 type Disconnect = fn (voidptr, u64)
@@ -82,6 +83,8 @@ struct Api {
 	view_type          Type          @[required]
 	view_new           NewView       @[required]
 	session_new        NewSession    @[required]
+	context_default    New           @[required]
+	sandbox_path       SandboxPath   @[required]
 	session_cookies    Get           @[required]
 	settings           Get           @[required]
 	javascript         SetFlag       @[required]
@@ -191,6 +194,8 @@ fn api() !Api {
 		// three pointer arguments use the same registers as this fixed shape.
 		view_new:           unsafe { NewView(dl.sym_opt(w, 'g_object_new')!) }
 		session_new:        unsafe { NewSession(dl.sym_opt(w, 'webkit_network_session_new')!) }
+		context_default:    unsafe { New(dl.sym_opt(w, 'webkit_web_context_get_default')!) }
+		sandbox_path:       unsafe { SandboxPath(dl.sym_opt(w, 'webkit_web_context_add_path_to_sandbox')!) }
 		session_cookies:    unsafe { Get(dl.sym_opt(w, 'webkit_network_session_get_cookie_manager')!) }
 		settings:           unsafe { Get(dl.sym_opt(w, 'webkit_web_view_get_settings')!) }
 		javascript:         unsafe { SetFlag(dl.sym_opt(w, 'webkit_settings_set_enable_javascript')!) }
