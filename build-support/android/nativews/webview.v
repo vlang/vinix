@@ -162,6 +162,7 @@ fn ws_web_attach(e voidptr, object voidptr, widget i64) {
 			C.free(node)
 			return
 		}
+		node.widget.web = true
 		node.next = ws_browser_views
 		ws_browser_views = node
 	}
@@ -234,7 +235,9 @@ fn ws_web_create(e voidptr, object voidptr, node &WsWebView) bool {
 		mut header := [48]u8{}
 		mut payload := &u8(nil)
 		mut length := u32(0)
-		status := ws_web_read_copy(request, &header[0], &payload, &length, 10000)
+		// The first view sets up WebKit in the engine (GTK, fonts, the network
+		// process), about 15 s in a guest. 30 s is the most browserclient waits.
+		status := ws_web_read_copy(request, &header[0], &payload, &length, 30000)
 		C.free(payload)
 		if status != 1 || header[6] != 0 || header[7] != 1 {
 			node.failed = true
@@ -398,6 +401,8 @@ fn ws_web_js_reply(node &WsWebView, id u64, status u8, text &char) {
 fn ws_web_forget(e voidptr, widget &WsView) {
 	unsafe {
 		if !ws_browser_initialized { return }
+		// Any other view: its finalizer must not wait for the browser lock.
+		if !widget.web { return }
 		C.pthread_mutex_lock(&ws_browser_mutex)
 		defer { C.pthread_mutex_unlock(&ws_browser_mutex) }
 		mut previous := &WsWebView(nil)

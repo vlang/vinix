@@ -28,6 +28,10 @@ mut:
 	progress       f32
 	indeterminate  bool
 	window         &WsNativeWindow
+	// A WebView: its node is in ws_browser_views (ws_web_attach). Only such a
+	// view's destructor needs ws_browser_mutex, which a WebView creation
+	// holds while the engine starts (ws_web_create).
+	web bool
 }
 
 fn ws_view(e voidptr, object voidptr) &WsView {
