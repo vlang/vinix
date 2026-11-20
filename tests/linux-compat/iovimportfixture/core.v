@@ -224,8 +224,12 @@ fn read_case(count i32, protect bool) bool {
 		if u64(headers) == u64(-1) { return false }
 		defer { C.munmap(headers, size) }
 		mut vector := &IOVec(headers)
-		mut received := [2]u8{}
-		mut alternate := u8(0)
+		// Stack slots: the vector holds their addresses, so V moved these locals to
+		// the heap with memdup, which this fixture build does not have.
+		mut received := &u8(C.alloca(2))
+		received[0] = 0; received[1] = 0
+		mut alternate := &u8(C.alloca(1))
+		*alternate = 0
 		vector[0] = IOVec{base: u64(&received[0]), len: 1}; vector[1] = IOVec{base: u64(&received[1]), len: 1}
 		if C.mprotect(headers, size, C.PROT_READ) != 0 { return false }
 		mut pipes := [2]i32{}
@@ -256,15 +260,15 @@ fn read_case(count i32, protect bool) bool {
 			if C.mprotect(headers, size, C.PROT_NONE) != 0 { abandon(c'LINUX IOVIMPORT FAIL: header protection') }
 		} else {
 			if C.mprotect(headers, size, 3) != 0 { abandon(c'LINUX IOVIMPORT FAIL: header mutation setup') }
-			vector[1].base = u64(&alternate)
+			vector[1].base = u64(alternate)
 			if C.mprotect(headers, size, C.PROT_READ) != 0 { abandon(c'LINUX IOVIMPORT FAIL: header mutation protection') }
 		}
 		mut data := [u8(0x41), u8(0x42)]!
 		if C.write(pipes[1], &data[0], 2) != 2 || C.close(pipes[1]) != 0
 			|| C.pthread_join(worker, nil) != 0 { abandon(c'LINUX IOVIMPORT FAIL: read delivery or join') }
-		valid := request.result == 2 && request.error == 0 && received[0] == 0x41 && received[1] == 0x42 && alternate == 0
+		valid := request.result == 2 && request.error == 0 && received[0] == 0x41 && received[1] == 0x42 && *alternate == 0
 		if !valid {
-			C.printf(c'LINUX IOVIMPORT DETAIL: read count=%d protect=%d result=%ld/%d bytes=%02x,%02x alternate=%02x\n', count, i32(protect), request.result, request.error, i32(received[0]), i32(received[1]), i32(alternate)); C.fflush(nil)
+			C.printf(c'LINUX IOVIMPORT DETAIL: read count=%d protect=%d result=%ld/%d bytes=%02x,%02x alternate=%02x\n', count, i32(protect), request.result, request.error, i32(received[0]), i32(received[1]), i32(*alternate)); C.fflush(nil)
 		}
 		return valid
 	}

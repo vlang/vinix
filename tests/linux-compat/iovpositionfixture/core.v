@@ -148,7 +148,10 @@ fn normal(fd i32, write bool, version i32, count i32, verbose bool) bool {
 		page := usize(C.sysconf(C._SC_PAGESIZE)); bytes := (usize(count) * sizeof(IOVec) + page - 1) & ~(page - 1)
 		mut vector := &IOVec(C.mmap(nil, bytes, C.PROT_READ | C.PROT_WRITE, C.MAP_PRIVATE | C.MAP_ANONYMOUS, -1, 0))
 		if u64(vector) == u64(-1) { return false }; defer { C.munmap(vector, bytes) }
-		mut data := [u8(0x4c), u8(0x4f), u8(0x41), u8(0x42), u8(0), u8(0)]!
+		// A stack slot: the vector holds its address, so V moved the local to the
+		// heap with memdup, which this fixture build does not have.
+		mut data := &u8(C.alloca(6))
+		data[0] = 0x4c; data[1] = 0x4f; data[2] = 0x41; data[3] = 0x42; data[4] = 0; data[5] = 0
 		if C.pwrite(fd, &data[0], 2, 0) != 2 || C.lseek(fd, 3, C.SEEK_SET) != 3 { return false }
 		vector[0] = IOVec{base: u64(if write { &data[2] } else { &data[4] }), len: 1}
 		vector[count - 1] = IOVec{base: u64(if write { &data[3] } else { &data[5] }), len: 1}

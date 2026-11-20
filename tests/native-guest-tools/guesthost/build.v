@@ -19,7 +19,9 @@ pub fn compile_module(module_path string, object string, arch string, flags []st
 	mut options := flags.filter(it !in ['-static', '-nostdlib', '-pie']
 		&& !it.starts_with('-L') && !it.starts_with('-l') && !it.starts_with('-Wl,')
 		&& !it.starts_with('-fuse-ld='))
-	options << ['-Wno-unused-function', '-Wno-unused-parameter', '-fPIC', '-I', resolve(module_path)!,
+	// V's freestanding `string` typedef has a `char *` field while its literals
+	// are cast to `u8 *`; GCC (the x86 fixture compiler) rejects that pairing.
+	options << ['-Wno-unused-function', '-Wno-unused-parameter', '-Wno-pointer-sign', '-fPIC', '-I', resolve(module_path)!,
 		'-c', source, '-o', object]
 	run(options)!
 }
