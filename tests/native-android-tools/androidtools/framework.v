@@ -207,6 +207,7 @@ pub fn extend_framework(input string, output string, work string, tools string, 
  framework_webview_signin(smali)!
  framework_webview_client(smali)!
  framework_webview_bridge(smali, work, tools, java)!
+ framework_signin_platform(smali)!
  framework_boot_classpath(smali)!
  framework_restrictions_service(smali)!
  framework_runtime_queries(smali)!
