@@ -77,7 +77,7 @@ fn scan(path string) []Hit {
 
 fn main() {
 	for dir in os.args[1..] {
-		mut files := os.walk_ext(dir, '.v').filter(!it.ends_with('_test.v') && !it.contains('/results/'))
+		mut files := os.walk_ext(dir, '.v').filter(!it.ends_with('_test.v') && !it.contains('/results/') && !it.contains('/obj/'))
 		files.sort()
 		for f in files {
 			for h in scan(f) {
@@ -111,6 +111,21 @@ fn owned_arrays(lines []string, r []int) []string {
 		body := line.all_after('{') + (if i + 1 < r[1] { lines[i + 1] } else { '' })
 		if body.contains('${v}.free()') {
 			arrays << arr
+		}
+	}
+	// `arr.free()` on a []string frees every element as well as the buffer.
+	for i in r[0] .. r[1] {
+		line := lines[i].all_before('//')
+		if !line.contains(' := []string{') {
+			continue
+		}
+		name := line.all_before(' := ').trim_space().all_after('mut ').trim_space()
+		for j in r[0] .. r[1] {
+			other := lines[j].all_before('//')
+			if other.contains('${name}.free()') && !other.contains('.${name}.free()')
+				&& !other.contains('&${name})') && name !in arrays {
+				arrays << name
+			}
 		}
 	}
 	return arrays
