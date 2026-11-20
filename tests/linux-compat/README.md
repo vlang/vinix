@@ -12,6 +12,11 @@ must pass; bad pointers, errno, compiler failure, panic, timeout and late failur
 remain failures. Sources, init/ISO/kernel hashes, receipts and raw serial logs
 stay in the required fresh artifact directory, including on failure.
 
+`--cases ioprio` checks ioprio_get/ioprio_set validation, storage, error order,
+inheritance, process-group and user aggregation and unprivileged limits; the
+same ELF runs on Linux through `syscall-reference.v --case ioprio`. See
+[semantics and receipts](../../docs/linux-ioprio.md).
+
 `--cases kcmp` checks kcmp(2) for every type across the calling process, a
 thread, fork children and UID 1000 children, with argument words and error
 order. `syscall-reference.v --case kcmp` boots the same probe ELF on a supplied

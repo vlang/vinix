@@ -2605,6 +2605,12 @@ application catalog without host-side image rebuilds or manual runtime surgery.
   checks on Vinix and Linux 6.12 on both architectures. See
   [the kcmp receipts](docs/linux-kcmp.md).
 
+- [x] Implement ioprio_get/ioprio_set with Linux 6.12's validation, 16-bit
+  per-thread contexts, fork/thread/exec inheritance, group/user aggregation of
+  effective priorities and unprivileged limits, and compare the contexts in
+  KCMP_IO. The same probe ELF passes 45 + 63 + 13 checks on Vinix and Linux
+  6.12 on both architectures. See [the ioprio receipts](docs/linux-ioprio.md).
+
 Acceptance: published Linux workloads install, run, save, update and integrate
 with the desktop on the advertised architecture/runtime combination.
 

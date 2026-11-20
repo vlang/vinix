@@ -1399,6 +1399,8 @@ pub fn new_cloned_thread(_process &proc.Process, _source &proc.Thread, state &cp
 		sched_nice_override: inherited_nice(source)
 		sched_has_nice_override: true
 		timer_slack_ns: source.timer_slack_ns
+		ioprio_value: proc.inherited_io_priority(source)
+		ioprio_context: proc.inherited_io_context(source)
 	} }
 	charge_transferred = true
 

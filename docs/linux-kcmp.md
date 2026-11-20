@@ -24,8 +24,9 @@ on AArch64 (272) and x86-64 (312).
   descriptor table and handlers only between threads.
 - `KCMP_FS` compares the thread's own view after `unshare(CLONE_FS)`, and the
   process otherwise.
-- `KCMP_IO`: Vinix has no I/O contexts (no `ioprio_set`), which Linux reports
-  as equal, as it does for tasks that never set an I/O priority.
+- `KCMP_IO` compares the per-thread I/O contexts `ioprio_set` and inheritance
+  create (see [ioprio](linux-ioprio.md)); tasks without one compare equal, as
+  on Linux.
 - `KCMP_SYSVSEM`: Linux allocates a process's semaphore undo list when it
   first creates a `CLONE_SYSVSEM` thread (both libcs' `pthread_create` pass
   it), and drops it on `unshare(CLONE_SYSVSEM)`. `Process.sysvsem_undo`
@@ -76,11 +77,15 @@ Source revision: the commit that adds this file. Kernels: `PROD=true`,
 Hashes are SHA-256 prefixes. The bundles are kept outside Git in
 `~/.cache/vinix-r15/runs/kcmp-{arm,x86}-1` and `kcmp-{arm,x86}-linux-1`.
 
+When ioprio gave threads I/O contexts, the unchanged probe was run again with
+the ioprio kernels and passed 66 + 8 checks on both architectures (serial logs
+`1a5ad269d6905dc5` in `kcmp2-arm-1`, `c3aa71d5e901655d` in `ioprio-x86-1/kcmp`).
+
 ## Limits
 
 - A zombie that has not been reaped is ESRCH; Linux still finds it and
   reports EBADF for its descriptors.
 - `CLONE_SYSVSEM` between processes and per-thread undo lists after a
   multithreaded `unshare(CLONE_SYSVSEM)` are not modelled.
-- `CLONE_IO` is not modelled; `KCMP_IO` is always equal.
+- `CLONE_IO` is not modelled: such a child gets its own context.
 - pledge has no promise for kcmp, so a pledged process cannot call it.

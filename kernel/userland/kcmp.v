@@ -49,21 +49,23 @@ fn kcmp_order(first u64, second u64, kind int) u64 {
 
 // The objects one thread shares with others, as kcmp sees them. Vinix keeps
 // the descriptor table and signal handlers per process (clone shares them
-// only between threads), the filesystem view per process until a thread unshares
-// CLONE_FS, and no I/O contexts (there is no ioprio_set): every task has
-// none, which Linux reports as equal, as it does for tasks that never set an
-// I/O priority. An undo list exists once the process has made a CLONE_SYSVSEM
-// thread; see Process.sysvsem_undo.
+// only between threads), the filesystem view per process until a thread
+// unshares CLONE_FS, and an I/O context per thread once ioprio_set or
+// inheritance gives it one: tasks without one compare equal, as on Linux. An
+// undo list exists once the process has made a CLONE_SYSVSEM thread; see
+// Process.sysvsem_undo.
 struct KcmpTask {
 mut:
 	process &proc.Process = unsafe { nil }
 	fs      voidptr
 	vm      voidptr
+	io      voidptr
 }
 
 fn kcmp_identity(kind int, task &KcmpTask) u64 {
 	return match kind {
 		kcmp_vm { u64(task.vm) }
+		kcmp_io { u64(task.io) }
 		kcmp_files, kcmp_sighand { u64(voidptr(task.process)) }
 		kcmp_sysvsem { if katomic.load(&task.process.sysvsem_undo) { u64(voidptr(task.process)) } else { u64(0) } }
 		kcmp_fs { if task.fs != unsafe { nil } { u64(task.fs) } else { u64(voidptr(task.process)) } }
@@ -84,6 +86,8 @@ fn kcmp_task_locked(global int, mut task KcmpTask) u64 {
 	task.process = t.process
 	task.fs = voidptr(t.fs)
 	task.vm = voidptr(t.process.pagemap)
+	// A thread's I/O context is its own once ioprio_set or inheritance gave it one.
+	task.io = if t.ioprio_context { voidptr(t) } else { unsafe { nil } }
 	return 0
 }
 

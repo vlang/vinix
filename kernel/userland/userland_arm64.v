@@ -1469,6 +1469,7 @@ fn load_native_program_image(execve bool, prog_node &fs.VFSNode, prog_mount &lib
 		new_thread.sched_has_nice_override = true
 		proc.set_thread_sched_params_with_util(new_thread.tid, inherited_sched, true)
 		new_thread.timer_slack_ns = katomic.load(&t.timer_slack_ns)
+		proc.carry_io_context(mut new_thread, t)
 		gpu_exec_trace(trace_gpu, 'inherited scheduler parameters')
 		// exec keeps blocked and ignored signals, as the x86 handoff does.
 		new_thread.masked_signals = t.masked_signals

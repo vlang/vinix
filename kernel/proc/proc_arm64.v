@@ -133,6 +133,10 @@ pub mut:
 	pi_rank int
 	pi_closed bool
 	timer_slack_ns u64 = 50000
+	// The I/O priority ioprio_set(2) recorded, in the 16 bits Linux's I/O
+	// context keeps, and whether this thread has such a context. See ioprio.v.
+	ioprio_value   u16
+	ioprio_context bool
 	// Scheduling policy, priority and, under SCHED_DEADLINE, the budget left
 	// in this period. Inherited by fork and by every thread a process clones,
 	// and kept across exec, so `chrt -f 50 ./program` gives the program the

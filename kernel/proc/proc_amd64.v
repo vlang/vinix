@@ -87,6 +87,10 @@ pub mut:
 	pi_rank int
 	pi_closed bool
 	timer_slack_ns u64 = 50000
+	// The I/O priority ioprio_set(2) recorded, in the 16 bits Linux's I/O
+	// context keeps, and whether this thread has such a context. See ioprio.v.
+	ioprio_value   u16
+	ioprio_context bool
 	// A filesystem change this thread made during its syscall that is not on
 	// the device yet. It is flushed on the way back to userspace, or once an
 	// exiting process' descriptors are closed, where no lock is held; see
